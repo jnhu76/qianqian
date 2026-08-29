@@ -10,17 +10,17 @@
       },
       "static_libs_bytes": 39582070,
       "static_libs_stripped_bytes": 38594942,
-      "static_libs_stripped_xz_bytes": 10339396,
+      "static_libs_stripped_xz_bytes": 10339148,
       "bench_linked_bytes": 21400384,
       "bench_stripped_bytes": 20515208,
       "bench_stripped_xz_bytes": 7314936,
       "defined_symbols": 56272,
       "throughput_xrt_songcore_output": {
-        "mp3-cbr-id3v23": 1916.87,
-        "mp3-vbr-id3v24": 2196.3,
-        "mp3-long": 1949.14,
-        "flac-16-44-stereo": 1112.82,
-        "flac-24-96": 493.86
+        "mp3-cbr-id3v23": 2049.44,
+        "mp3-vbr-id3v24": 2277.41,
+        "mp3-long": 1942.73,
+        "flac-16-44-stereo": 1097.89,
+        "flac-24-96": 484.71
       }
     },
     {
@@ -33,17 +33,17 @@
       },
       "static_libs_bytes": 12858320,
       "static_libs_stripped_bytes": 12552024,
-      "static_libs_stripped_xz_bytes": 3738568,
+      "static_libs_stripped_xz_bytes": 3738632,
       "bench_linked_bytes": 8630456,
       "bench_stripped_bytes": 8187864,
       "bench_stripped_xz_bytes": 3355948,
       "defined_symbols": 21702,
       "throughput_xrt_songcore_output": {
-        "mp3-cbr-id3v23": 1983.59,
-        "mp3-vbr-id3v24": 2322.64,
-        "mp3-long": 1983.24,
-        "flac-16-44-stereo": 1120.67,
-        "flac-24-96": 489.46
+        "mp3-cbr-id3v23": 1989.94,
+        "mp3-vbr-id3v24": 2213.59,
+        "mp3-long": 1950.02,
+        "flac-16-44-stereo": 1120.85,
+        "flac-24-96": 462.17
       }
     },
     {
@@ -56,17 +56,17 @@
       },
       "static_libs_bytes": 2741492,
       "static_libs_stripped_bytes": 2676580,
-      "static_libs_stripped_xz_bytes": 694816,
+      "static_libs_stripped_xz_bytes": 694812,
       "bench_linked_bytes": 1124216,
       "bench_stripped_bytes": 1042680,
       "bench_stripped_xz_bytes": 371536,
       "defined_symbols": 5057,
       "throughput_xrt_songcore_output": {
-        "mp3-cbr-id3v23": 1980.95,
-        "mp3-vbr-id3v24": 2289.32,
-        "mp3-long": 1957.65,
-        "flac-16-44-stereo": 1120.75,
-        "flac-24-96": 492.87
+        "mp3-cbr-id3v23": 1909.97,
+        "mp3-vbr-id3v24": 2244.16,
+        "mp3-long": 1968.01,
+        "flac-16-44-stereo": 1067.02,
+        "flac-24-96": 487.48
       }
     },
     {
@@ -79,17 +79,17 @@
       },
       "static_libs_bytes": 2741460,
       "static_libs_stripped_bytes": 2676548,
-      "static_libs_stripped_xz_bytes": 694804,
+      "static_libs_stripped_xz_bytes": 694784,
       "bench_linked_bytes": 1124216,
       "bench_stripped_bytes": 1042680,
       "bench_stripped_xz_bytes": 371604,
       "defined_symbols": 5057,
       "throughput_xrt_songcore_output": {
-        "mp3-cbr-id3v23": 1964.11,
-        "mp3-vbr-id3v24": 2191.13,
-        "mp3-long": 1950.26,
-        "flac-16-44-stereo": 1136.81,
-        "flac-24-96": 485.46
+        "mp3-cbr-id3v23": 1992.67,
+        "mp3-vbr-id3v24": 2029.39,
+        "mp3-long": 1886.64,
+        "flac-16-44-stereo": 1133.25,
+        "flac-24-96": 496.96
       }
     },
     {
@@ -102,17 +102,17 @@
       },
       "static_libs_bytes": 2549250,
       "static_libs_stripped_bytes": 2490034,
-      "static_libs_stripped_xz_bytes": 645724,
+      "static_libs_stripped_xz_bytes": 645720,
       "bench_linked_bytes": 986288,
       "bench_stripped_bytes": 911608,
       "bench_stripped_xz_bytes": 330792,
       "defined_symbols": 4714,
       "throughput_xrt_songcore_output": {
-        "mp3-cbr-id3v23": 1932.14,
-        "mp3-vbr-id3v24": 2209.68,
-        "mp3-long": 1929.45,
-        "flac-16-44-stereo": 1141.79,
-        "flac-24-96": 511.33
+        "mp3-cbr-id3v23": 2045.17,
+        "mp3-vbr-id3v24": 1967.33,
+        "mp3-long": 1972.1,
+        "flac-16-44-stereo": 1121.43,
+        "flac-24-96": 498.68
       }
     }
   ],

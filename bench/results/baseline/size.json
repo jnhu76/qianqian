@@ -39,7 +39,7 @@
     },
     "static_libs_defined_symbols": 56272,
     "static_libs_stripped_bytes": 38594942,
-    "static_libs_stripped_xz_bytes": 10339396,
+    "static_libs_stripped_xz_bytes": 10339148,
     "static_libs_total_bytes": 39582070
   },
   "n1-audio": {
@@ -70,7 +70,7 @@
     },
     "static_libs_defined_symbols": 21702,
     "static_libs_stripped_bytes": 12552024,
-    "static_libs_stripped_xz_bytes": 3738568,
+    "static_libs_stripped_xz_bytes": 3738632,
     "static_libs_total_bytes": 12858320
   },
   "n2-stage-a": {
@@ -101,7 +101,7 @@
     },
     "static_libs_defined_symbols": 5057,
     "static_libs_stripped_bytes": 2676580,
-    "static_libs_stripped_xz_bytes": 694816,
+    "static_libs_stripped_xz_bytes": 694812,
     "static_libs_total_bytes": 2741492
   },
   "n3-min": {
@@ -132,7 +132,7 @@
     },
     "static_libs_defined_symbols": 5057,
     "static_libs_stripped_bytes": 2676548,
-    "static_libs_stripped_xz_bytes": 694804,
+    "static_libs_stripped_xz_bytes": 694784,
     "static_libs_total_bytes": 2741460
   },
   "n3-min-noswr": {
@@ -159,7 +159,7 @@
     },
     "static_libs_defined_symbols": 4714,
     "static_libs_stripped_bytes": 2490034,
-    "static_libs_stripped_xz_bytes": 645724,
+    "static_libs_stripped_xz_bytes": 645720,
     "static_libs_total_bytes": 2549250
   }
 }

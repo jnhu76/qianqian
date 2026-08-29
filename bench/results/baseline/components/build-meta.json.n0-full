@@ -2,7 +2,7 @@
   "arch": "x86_64",
   "bench_source_sha256": "2edd6e28fdfea7565994e91934b36a0b7d439850fe283f27defc12da4a96a30f",
   "build_type": "release-static",
-  "built_at": "2026-08-29T22:58:47+0800",
+  "built_at": "2026-08-29T23:06:38+0800",
   "compiler": "gcc",
   "compiler_ident": "gcc 15 (Ubuntu 15.2.0-16ubuntu1)",
   "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
@@ -25,5 +25,5 @@
   "profile": "n0-full",
   "profile_json_sha256": "3637434d847ca060f2a344ad19fffb8d4f401ca0f31410023434a0d51d85efd3",
   "qianqian_git_dirty": true,
-  "qianqian_git_sha": "0f99b218afbd426988af57b5912423195b94f922"
+  "qianqian_git_sha": "b94bd0996400863e7141806c49715d3068ffb341"
 }

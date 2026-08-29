@@ -1,7 +1,7 @@
 {
   "run_id": "baseline",
-  "started_at": "2026-08-29T22:59:48+0800",
-  "qianqian_git_sha": "0f99b218afbd426988af57b5912423195b94f922",
+  "started_at": "2026-08-29T23:10:22+0800",
+  "qianqian_git_sha": "b94bd0996400863e7141806c49715d3068ffb341",
   "qianqian_git_dirty": true,
   "ffmpeg_tag": "n9.0.1",
   "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
@@ -28,31 +28,31 @@
       "configure_args_hash": "a2fab07114bc9ce51a5a9b50101040f7b4fa9b68bd85f2290c7d984f783c690f",
       "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
       "build_type": "release-static",
-      "built_at": "2026-08-29T22:58:47+0800"
+      "built_at": "2026-08-29T23:06:38+0800"
     },
     "n1-audio": {
       "configure_args_hash": "384827668895ce6b01d96f9f6ebc9a3930673529c0fd5043c7b64bedfaa2a6b0",
       "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
       "build_type": "release-static",
-      "built_at": "2026-08-29T22:59:25+0800"
+      "built_at": "2026-08-29T23:08:27+0800"
     },
     "n2-stage-a": {
       "configure_args_hash": "fca69ca5960a82838e28e72a8d6a28e0c70f2b93dd7aba52986d5048bf758d3f",
       "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
       "build_type": "release-static",
-      "built_at": "2026-08-29T22:59:39+0800"
+      "built_at": "2026-08-29T23:09:13+0800"
     },
     "n3-min": {
       "configure_args_hash": "0c752802c029c512d41334c862ce5cc74fc876c7d961cc0e4a563940e5775d50",
       "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
       "build_type": "release-static",
-      "built_at": "2026-08-29T22:59:42+0800"
+      "built_at": "2026-08-29T23:09:47+0800"
     },
     "n3-min-noswr": {
       "configure_args_hash": "ca836d29e203f6b9ea9148d0cbcfd9183e16d1d0784cc99708a86b9bde8dafdd",
       "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
       "build_type": "release-static",
-      "built_at": "2026-08-29T22:59:45+0800"
+      "built_at": "2026-08-29T23:10:20+0800"
     }
   },
   "swr_bypass_pcm_identical": true,
