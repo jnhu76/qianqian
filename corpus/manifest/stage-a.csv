@@ -1,0 +1,10 @@
+id,format,purpose,source_policy,status
+mp3-cbr-id3v23,mp3,CBR + ID3v2.3,generate-or-CC0,TODO
+mp3-vbr-id3v24,mp3,VBR + ID3v2.4,generate-or-CC0,TODO
+mp3-artwork,mp3,embedded artwork,generate-or-CC0,TODO
+mp3-corrupt-tail,mp3,error handling,generated,TODO
+flac-16-44,flac,16-bit 44.1kHz,generated,TODO
+flac-24-96,flac,24-bit 96kHz,generated,TODO
+flac-artwork,flac,embedded artwork,generate-or-CC0,TODO
+flac-replaygain,flac,ReplayGain metadata,generated,TODO
+flac-truncated,flac,error handling,generated,TODO

@@ -1,0 +1,70 @@
+# Qianqian Audio Lab
+
+> 一个只为“本地歌曲播放”服务的极薄跨平台音频实验项目。
+
+Qianqian Audio Lab 是「千千·现代（Qianqian Modern）」的 Phase 0。
+
+它**不是播放器**，也不是通用 FFmpeg wrapper。第一阶段只回答一个问题：
+
+> 如果我们只想稳定、高质量地播放本地歌曲，FFmpeg 真正不可约的能力集合是什么？
+
+项目先构建一个极小的 `SongCore` 边界：
+
+```text
+AudioSource
+    │
+    ▼
+ SongCore
+    │
+    ├── probe / metadata / artwork
+    ├── decode → PCM
+    ├── seek
+    └── close
+    │
+    ▼
+AudioSink / benchmark / test harness
+```
+
+## Phase 0 的目标
+
+1. 建立最小 `SongCore` API。
+2. 先实现 **Native FFmpeg** 后端。
+3. 用真实歌曲 corpus 驱动 FFmpeg 极限裁剪。
+4. 验证无 DSP 路径的音频透明性。
+5. 建立音质、seek、内存、启动、decode throughput benchmark。
+6. 第二步再加入 **WASM FFmpeg** 后端，用同一 API、同一 corpus 对比。
+7. 数据稳定后，再决定 Qianqian Modern 播放器如何接入。
+
+## 明确不做
+
+Phase 0 不做：
+
+- Compose UI
+- 播放列表
+- 媒体库
+- 歌词 UI
+- 皮肤
+- 均衡器 UI
+- 视频
+- 转码
+- 编码
+- 导出
+- 网络流媒体
+- FFmpeg CLI wrapper
+
+## 第一条规则
+
+> **任何新增能力都必须回答：没有它，哪一首正常歌曲播不了？**
+
+答不上来，就不进入 SongCore。
+
+## 文档入口
+
+- [PRD](PRD.md)
+- [架构边界](docs/architecture/songcore-boundary.md)
+- [FFmpeg 极限裁剪实验](docs/experiments/e01-ffmpeg-minimal-profile.md)
+- [Native vs WASM](docs/experiments/e02-native-vs-wasm.md)
+- [音频透明性与音质](docs/experiments/e03-audio-quality.md)
+- [DSP 分层实验](docs/experiments/e04-dsp-boundary.md)
+- [Codec Corpus](docs/testing/audio-corpus.md)
+- [M0 决策门](docs/experiments/m0-decision-gate.md)

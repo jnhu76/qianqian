@@ -1,0 +1,19 @@
+{
+  "name": "qianqian-audio-lab",
+  "phase": "M0",
+  "purpose": "Thin local-song playback audio core experiment",
+  "primary_backend": "trimmed native FFmpeg",
+  "experimental_backend": "trimmed FFmpeg WASM",
+  "initial_formats": [
+    "MP3",
+    "FLAC"
+  ],
+  "principles": [
+    "Playback-only",
+    "Extreme subtraction",
+    "Explicit DSP",
+    "Corpus-driven support",
+    "Native-first, WASM-measured"
+  ],
+  "generated_at": "2026-08-29T09:50:56.526512"
+}
