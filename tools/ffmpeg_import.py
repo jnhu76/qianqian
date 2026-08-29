@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+"""Resolve a minimal FFmpeg build once, then freeze its compile closure for Xmake.
+
+This is an *import/upgrade-time* tool. It is allowed to use FFmpeg's configure
+and Makefiles as an upstream oracle. Normal Qianqian builds do not use them:
+Xmake reads build/ffmpeg-xmake/manifest.json and recompiles only the recorded
+translation units into one application-owned static archive.
+
+The manifest is deliberately generated, never hand-maintained. Updating FFmpeg
+means rerunning this importer with the same capability profile and reviewing the
+resulting source/flag drift.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from pathlib import Path
+import shlex
+import shutil
+import subprocess
+import sys
+from typing import Iterable
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "build" / "ffmpeg-src"
+OUT = ROOT / "build" / "ffmpeg-xmake"
+ORACLE = OUT / "oracle"
+MANIFEST = OUT / "manifest.json"
+PIN = ROOT / "bench" / "ffmpeg-pin.json"
+PROFILE = ROOT / "bench" / "profiles" / "n3-min-noswr.json"
+
+LIB_TARGETS = (
+    "libavutil/libavutil.a",
+    "libavcodec/libavcodec.a",
+    "libavformat/libavformat.a",
+)
+SOURCE_SUFFIXES = (".c", ".S", ".s", ".asm", ".cpp", ".m")
+DEP_FLAGS_WITH_VALUE = {"-MF", "-MT", "-MQ"}
+DEP_FLAGS = {"-MMD", "-MD", "-MP", "-MM", "-M"}
+
+
+def run(cmd: list[str], *, cwd: Path, capture: bool = False) -> str:
+    print("+", shlex.join(cmd))
+    p = subprocess.run(
+        cmd,
+        cwd=cwd,
+        text=True,
+        stdout=subprocess.PIPE if capture else None,
+        stderr=subprocess.STDOUT if capture else None,
+        env={**os.environ, "LC_ALL": "C"},
+    )
+    if p.returncode:
+        tail = (p.stdout or "")[-8000:]
+        raise SystemExit(f"command failed ({p.returncode}): {shlex.join(cmd)}\n{tail}")
+    return p.stdout or ""
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def verified_source(pin: dict) -> None:
+    stamp = SRC / ".qianqian-verified"
+    expected = f"{pin['ffmpeg_commit_sha']}|{pin['source_sha256']}"
+    if not stamp.is_file() or stamp.read_text().strip() != expected:
+        fetch = ROOT / "scripts" / "fetch-ffmpeg"
+        run([str(fetch)], cwd=ROOT)
+    if not stamp.is_file() or stamp.read_text().strip() != expected:
+        raise SystemExit("pinned FFmpeg source did not verify after fetch")
+
+
+def configure_args(profile: dict) -> list[str]:
+    # This mirrors the deterministic ordering used by scripts/build-profile.
+    args = ["--prefix=install"]
+    if profile.get("component_base") == "everything-disabled":
+        args.append("--disable-everything")
+    args.extend("--disable-" + item for item in profile.get("disable", []))
+
+    libs = profile.get("libraries", {})
+    for name in sorted(libs.get("disable", [])):
+        args.append(f"--disable-{name}")
+    for name in libs.get("enable", []):
+        args.append(f"--enable-{name}")
+
+    classes = ("demuxer", "decoder", "encoder", "muxer", "parser", "bsf",
+               "protocol", "filter", "indev", "outdev")
+    for cls in classes:
+        for name in sorted(profile.get("components", {}).get(cls, [])):
+            args.append(f"--enable-{cls}={name}")
+    return args
+
+
+def make_log() -> str:
+    # A clean oracle tree gives us both generated configuration and the exact
+    # commands FFmpeg itself considers necessary for this capability slice.
+    shutil.rmtree(ORACLE, ignore_errors=True)
+    ORACLE.mkdir(parents=True)
+
+    profile = json.loads(PROFILE.read_text())
+    args = configure_args(profile)
+    run([str(SRC / "configure"), *args], cwd=ORACLE)
+
+    jobs = str(max(1, os.cpu_count() or 4))
+    # V=1 is the important bit: source closure is observed from real compiler
+    # invocations rather than reimplementing FFmpeg's Make language.
+    return run(["make", "-j", jobs, "V=1", *LIB_TARGETS], cwd=ORACLE, capture=True)
+
+
+def normalize_path(token: str) -> tuple[str, str] | None:
+    p = Path(token)
+    if not p.is_absolute():
+        p = (ORACLE / p).resolve()
+    else:
+        p = p.resolve()
+    try:
+        return "source", p.relative_to(SRC.resolve()).as_posix()
+    except ValueError:
+        pass
+    try:
+        return "generated", p.relative_to(ORACLE.resolve()).as_posix()
+    except ValueError:
+        return None
+
+
+def rewrite_flag(flag: str) -> str:
+    # No operator-specific absolute paths are allowed in the lock manifest.
+    sroot = str(SRC.resolve())
+    broot = str(ORACLE.resolve())
+    flag = flag.replace(sroot, "@SRC@").replace(broot, "@BUILD@")
+    if flag in ("-I.", "-I./"):
+        return "-I@BUILD@"
+    return flag
+
+
+def parse_compile(line: str) -> dict | None:
+    try:
+        argv = shlex.split(line)
+    except ValueError:
+        return None
+    if "-c" not in argv or "-o" not in argv:
+        return None
+    oi = argv.index("-o")
+    if oi + 1 >= len(argv):
+        return None
+    obj = argv[oi + 1]
+    obj_norm = Path(obj).as_posix().lstrip("./")
+    if not obj_norm.startswith(("libavutil/", "libavcodec/", "libavformat/")):
+        return None
+
+    source_i = None
+    source_info = None
+    for i, token in enumerate(argv):
+        if token.endswith(SOURCE_SUFFIXES):
+            info = normalize_path(token)
+            if info is not None:
+                source_i, source_info = i, info
+    if source_i is None or source_info is None:
+        return None
+
+    # Compiler executable and build-only dependency/output arguments are not
+    # semantic replay flags. Keep everything else exactly as the oracle used.
+    flags: list[str] = []
+    skip_next = False
+    for i, token in enumerate(argv[1:], 1):
+        if skip_next:
+            skip_next = False
+            continue
+        if i == source_i or token == "-c":
+            continue
+        if token == "-o":
+            skip_next = True
+            continue
+        if token in DEP_FLAGS:
+            continue
+        if token in DEP_FLAGS_WITH_VALUE:
+            skip_next = True
+            continue
+        flags.append(rewrite_flag(token))
+
+    origin, source = source_info
+    suffix = Path(source).suffix
+    flag_kind = "asflags" if suffix in (".S", ".s", ".asm") else "cflags"
+    return {
+        "object": obj_norm,
+        "origin": origin,
+        "path": source,
+        "flag_kind": flag_kind,
+        "flags": flags,
+    }
+
+
+def closure_from_log(log: str) -> list[dict]:
+    by_object: dict[str, dict] = {}
+    for line in log.splitlines():
+        unit = parse_compile(line.strip())
+        if unit:
+            previous = by_object.get(unit["object"])
+            if previous and previous != unit:
+                raise SystemExit(f"compiler command drift for {unit['object']}")
+            by_object[unit["object"]] = unit
+    units = [by_object[k] for k in sorted(by_object)]
+    if not units:
+        raise SystemExit("no FFmpeg translation units captured; V=1 parsing failed")
+    return units
+
+
+def assert_no_absolute_paths(value) -> None:
+    if isinstance(value, dict):
+        for v in value.values():
+            assert_no_absolute_paths(v)
+    elif isinstance(value, list):
+        for v in value:
+            assert_no_absolute_paths(v)
+    elif isinstance(value, str):
+        if str(ROOT.resolve()) in value or str(Path.home()) in value:
+            raise SystemExit(f"machine-local path leaked into manifest: {value}")
+
+
+def main() -> None:
+    pin = json.loads(PIN.read_text())
+    profile = json.loads(PROFILE.read_text())
+    if profile.get("profile") != "n3-min-noswr":
+        raise SystemExit("import profile identity changed unexpectedly")
+    verified_source(pin)
+
+    log = make_log()
+    units = closure_from_log(log)
+    args = configure_args(profile)
+
+    refs = {}
+    for rel in LIB_TARGETS:
+        archive = ORACLE / rel
+        if not archive.is_file():
+            raise SystemExit(f"oracle archive missing: {archive}")
+        refs[rel] = {"bytes": archive.stat().st_size, "sha256": sha256_file(archive)}
+
+    source_units = sum(u["origin"] == "source" for u in units)
+    generated_units = len(units) - source_units
+    manifest = {
+        "schema": 1,
+        "ffmpeg_tag": pin["ffmpeg_tag"],
+        "ffmpeg_commit_sha": pin["ffmpeg_commit_sha"],
+        "profile": profile["profile"],
+        "profile_sha256": sha256_file(PROFILE),
+        "source_root": "build/ffmpeg-src",
+        "config_root": "build/ffmpeg-xmake/oracle",
+        "configure_args": args,
+        "closure": {
+            "translation_units": len(units),
+            "upstream_sources": source_units,
+            "generated_sources": generated_units,
+        },
+        "reference_archives": refs,
+        "units": units,
+    }
+    assert_no_absolute_paths(manifest)
+    OUT.mkdir(parents=True, exist_ok=True)
+    MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    (OUT / "oracle-build.log").write_text(log)
+
+    print(f"wrote {MANIFEST.relative_to(ROOT)}")
+    print(f"closure: {len(units)} translation units ({generated_units} generated)")
+    print("normal builds may now run: xmake qianqian_av")
+
+
+if __name__ == "__main__":
+    main()
