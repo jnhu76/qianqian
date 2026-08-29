@@ -32,12 +32,12 @@ def run(cmd: list[str], *, binary: bool = False):
     return p
 
 
-def bench_json(exe: Path, song: Path) -> dict:
-    p = run([str(exe), "correct", str(song)])
+def bench_json(exe: Path, song: Path) -> tuple[int, dict]:
+    p = subprocess.run([str(exe), "correct", str(song)], cwd=ROOT, capture_output=True, text=True)
     lines = [line for line in p.stdout.splitlines() if line.strip()]
     if not lines:
-        raise SystemExit(f"no JSON from {exe.name} for {song.name}")
-    return json.loads(lines[-1])
+        raise SystemExit(f"no JSON from {exe.name} for {song.name}\n{p.stderr[-2000:]}")
+    return p.returncode, json.loads(lines[-1])
 
 
 def remove_measurement_noise(value):
@@ -108,10 +108,11 @@ def main() -> None:
     replay_results: dict[str, dict] = {}
     for case in corpus["cases"]:
         song = CORPUS / case["file"]
-        reference = bench_json(ref_bench, song)
-        replay = bench_json(replay_bench, song)
+        reference_rc, reference = bench_json(ref_bench, song)
+        replay_rc, replay = bench_json(replay_bench, song)
         replay_results[case["id"]] = replay
-        if remove_measurement_noise(reference) != remove_measurement_noise(replay):
+        if (reference_rc != replay_rc or
+                remove_measurement_noise(reference) != remove_measurement_noise(replay)):
             mismatches.append(case["id"])
 
     if mismatches:
