@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Qianqian bench-native v0 results",
+  "type": "object",
+  "required": ["manifest", "correctness", "size", "throughput", "summary"],
+  "properties": {
+    "manifest": {
+      "type": "object",
+      "required": [
+        "run_id", "started_at", "qianqian_git_sha", "ffmpeg_tag",
+        "ffmpeg_commit_sha", "ffmpeg_version", "corpus_id", "platform",
+        "arch", "cpu", "profiles", "profile_build"
+      ],
+      "properties": {
+        "qianqian_git_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "ffmpeg_tag": { "const": "n9.0.1" },
+        "ffmpeg_commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "corpus_id": { "type": "string" },
+        "profile_build": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["configure_args_hash", "compiler_version", "build_type"],
+            "properties": {
+              "configure_args_hash": { "type": "string" },
+              "build_type": { "const": "release-static" }
+            }
+          }
+        },
+        "swr_bypass_pcm_identical": { "type": "boolean" }
+      }
+    },
+    "correctness": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "status": { "enum": ["pass", "degraded_pass", "fail"] },
+            "checks": { "type": "object" }
+          }
+        }
+      }
+    },
+    "size": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["static_libs", "static_libs_total_bytes", "artifacts"],
+        "properties": {
+          "static_libs_total_bytes": { "type": "integer" },
+          "static_libs_defined_symbols": { "type": "integer" },
+          "artifacts": {
+            "type": "object",
+            "required": ["bench_linked_bytes", "bench_stripped_bytes", "bench_stripped_xz_bytes"]
+          }
+        }
+      }
+    },
+    "throughput": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "required": ["iterations", "warmup", "decode_core", "songcore_output"],
+          "properties": {
+            "iterations": { "type": "integer", "minimum": 3 },
+            "warmup": { "const": 1 },
+            "xrt_decode_core": { "type": "number" },
+            "xrt_songcore_output": { "type": "number" }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["ladder", "pcm_cross_profile"],
+      "properties": {
+        "ladder": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["profile", "correctness", "static_libs_bytes"],
+            "properties": {
+              "profile": { "type": "string" },
+              "correctness": {
+                "type": "object",
+                "required": ["pass", "degraded_pass", "fail", "total"]
+              }
+            }
+          }
+        },
+        "pcm_cross_profile": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["case", "consistent"],
+            "properties": {
+              "case": { "type": "string" },
+              "consistent": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
