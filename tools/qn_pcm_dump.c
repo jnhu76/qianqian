@@ -7,12 +7,20 @@
  *
  * It does NOT know FFmpeg types and it does NOT own an audio device.
  */
+#if !defined(_WIN32)
+#define _FILE_OFFSET_BITS 64
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "songcore.h"
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if !defined(_WIN32)
+#include <sys/types.h>
+#endif
 
 #if defined(_WIN32)
 #include <fcntl.h>
