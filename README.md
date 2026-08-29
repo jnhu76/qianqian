@@ -68,3 +68,15 @@ Phase 0 不做：
 - [DSP 分层实验](docs/experiments/e04-dsp-boundary.md)
 - [Codec Corpus](docs/testing/audio-corpus.md)
 - [M0 决策门](docs/experiments/m0-decision-gate.md)
+
+## 复现实验（Phase 0 Step 1 Native）
+
+```text
+scripts/bench-native
+```
+
+一条命令完成：pin 校验的 FFmpeg `n9.0.1` 下载 → N0/N1/N2/N3(+noswr)
+构建 → Stage A corpus correctness/PCM/size/throughput。
+结果写入 `bench/results/runs/<时间戳>/`，canonical baseline 见
+`bench/results/baseline/`。需要 `bash、python3、gcc、make、unzip、xz`；
+网络经代理时设置 `https_proxy`（默认尝试 `http://127.0.0.1:7897`）。

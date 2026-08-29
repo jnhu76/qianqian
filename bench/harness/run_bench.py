@@ -200,6 +200,59 @@ def check_case(case, obs, expect_cross):
     return ("degraded_pass" if case.get("degraded") else "pass"), checks
 
 
+def validate_results(out_dir, profiles):
+    """Minimal contract check mirroring bench/results/schema.json (stdlib only)."""
+    problems = []
+
+    def load(name):
+        with open(os.path.join(out_dir, f"{name}.json")) as f:
+            return json.load(f)
+
+    meta = load("manifest")
+    for k in ("run_id", "started_at", "qianqian_git_sha", "ffmpeg_tag",
+              "ffmpeg_commit_sha", "ffmpeg_version", "corpus_id", "platform",
+              "arch", "cpu", "profiles", "profile_build"):
+        if k not in meta:
+            problems.append(f"manifest missing {k}")
+    if meta.get("ffmpeg_tag") != "n9.0.1":
+        problems.append("manifest ffmpeg_tag != n9.0.1")
+    for prof in profiles:
+        pb = meta.get("profile_build", {}).get(prof, {})
+        if "configure_args_hash" not in pb or pb.get("build_type") != "release-static":
+            problems.append(f"manifest profile_build[{prof}] incomplete")
+
+    correctness = load("correctness")
+    for prof in profiles:
+        for cid, r in correctness.get(prof, {}).items():
+            if r.get("status") not in ("pass", "degraded_pass", "fail"):
+                problems.append(f"correctness[{prof}][{cid}] bad status")
+
+    sizes = load("size")
+    for prof in profiles:
+        s = sizes.get(prof, {})
+        if "static_libs_total_bytes" not in s or "artifacts" not in s:
+            problems.append(f"size[{prof}] incomplete")
+
+    throughput = load("throughput")
+    for prof, cases in throughput.items():
+        for cid, v in cases.items():
+            if v.get("iterations", 0) < 3 or v.get("warmup") != 1:
+                problems.append(f"throughput[{prof}][{cid}] insufficient iterations")
+
+    summary = load("summary")
+    for entry in summary.get("ladder", []):
+        for k in ("profile", "correctness", "static_libs_bytes"):
+            if k not in entry:
+                problems.append(f"ladder entry missing {k}")
+
+    if problems:
+        for p in problems:
+            print(f"  [schema] {p}")
+    else:
+        print("  [schema] results match the contract (bench/results/schema.json)")
+    return problems
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
@@ -380,6 +433,8 @@ def main():
         with open(os.path.join(args.out, f"{name}.json"), "w") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
             f.write("\n")
+
+    validate_results(args.out, profiles)
 
     nfail = sum(l["correctness"]["fail"] for l in ladder)
     pcm_concrete = [c for c in cross_checks if c["consistent"] is not None]
