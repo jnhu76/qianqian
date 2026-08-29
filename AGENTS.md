@@ -84,3 +84,21 @@ Phase 0 不实现：
 - relevant tests；
 - benchmark 是否受影响；
 - 是否改变音频 PCM。
+
+## 8. Production dependency boundary
+
+Production decode 路径只允许依赖：
+
+- pinned upstream FFmpeg 的机器推导最小 source slice；
+- Qianqian 自有代码。
+
+`libav.js`、`ffmpeg.wasm`、`ffmpeg-kit` 等可以研究其方法，但不得成为 shipping runtime layer。
+
+为了证明 PCM 真正可听，可以在 `tools/` 使用极薄的 test-only audio sink（例如 Python `sounddevice`）；它不得解码压缩音频，也不得进入 SongCore 或 shipping dependency graph。
+
+## 9. Selective-build / upgrade rule
+
+- capability intent 由人维护；source-file closure 由机器推导，禁止手工维护“删过的 FFmpeg fork”。
+- FFmpeg `configure/Make` 可以在 import / upstream upgrade 时充当 oracle；normal production-oriented build 应由 Qianqian 自有构建系统重放冻结的 compile manifest。
+- 升级 FFmpeg 时重新求 closure 并审查 source/flag/size/symbol/corpus/PCM drift，不得直接复制旧版本 source list。
+- 未在真实环境运行的 selective-build 或 audible smoke 只能标记 `CODE_COMPLETE_PENDING_VALIDATION`，不能写 PASS。
