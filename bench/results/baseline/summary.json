@@ -1,0 +1,287 @@
+{
+  "ladder": [
+    {
+      "profile": "n0-full",
+      "correctness": {
+        "pass": 12,
+        "degraded_pass": 3,
+        "fail": 0,
+        "total": 15
+      },
+      "static_libs_bytes": 39582070,
+      "static_libs_stripped_bytes": 38594942,
+      "static_libs_stripped_xz_bytes": 10339396,
+      "bench_linked_bytes": 21400384,
+      "bench_stripped_bytes": 20515208,
+      "bench_stripped_xz_bytes": 7314936,
+      "defined_symbols": 56272,
+      "throughput_xrt_songcore_output": {
+        "mp3-cbr-id3v23": 1916.87,
+        "mp3-vbr-id3v24": 2196.3,
+        "mp3-long": 1949.14,
+        "flac-16-44-stereo": 1112.82,
+        "flac-24-96": 493.86
+      }
+    },
+    {
+      "profile": "n1-audio",
+      "correctness": {
+        "pass": 12,
+        "degraded_pass": 3,
+        "fail": 0,
+        "total": 15
+      },
+      "static_libs_bytes": 12858320,
+      "static_libs_stripped_bytes": 12552024,
+      "static_libs_stripped_xz_bytes": 3738568,
+      "bench_linked_bytes": 8630456,
+      "bench_stripped_bytes": 8187864,
+      "bench_stripped_xz_bytes": 3355948,
+      "defined_symbols": 21702,
+      "throughput_xrt_songcore_output": {
+        "mp3-cbr-id3v23": 1983.59,
+        "mp3-vbr-id3v24": 2322.64,
+        "mp3-long": 1983.24,
+        "flac-16-44-stereo": 1120.67,
+        "flac-24-96": 489.46
+      }
+    },
+    {
+      "profile": "n2-stage-a",
+      "correctness": {
+        "pass": 12,
+        "degraded_pass": 3,
+        "fail": 0,
+        "total": 15
+      },
+      "static_libs_bytes": 2741492,
+      "static_libs_stripped_bytes": 2676580,
+      "static_libs_stripped_xz_bytes": 694816,
+      "bench_linked_bytes": 1124216,
+      "bench_stripped_bytes": 1042680,
+      "bench_stripped_xz_bytes": 371536,
+      "defined_symbols": 5057,
+      "throughput_xrt_songcore_output": {
+        "mp3-cbr-id3v23": 1980.95,
+        "mp3-vbr-id3v24": 2289.32,
+        "mp3-long": 1957.65,
+        "flac-16-44-stereo": 1120.75,
+        "flac-24-96": 492.87
+      }
+    },
+    {
+      "profile": "n3-min",
+      "correctness": {
+        "pass": 12,
+        "degraded_pass": 3,
+        "fail": 0,
+        "total": 15
+      },
+      "static_libs_bytes": 2741460,
+      "static_libs_stripped_bytes": 2676548,
+      "static_libs_stripped_xz_bytes": 694804,
+      "bench_linked_bytes": 1124216,
+      "bench_stripped_bytes": 1042680,
+      "bench_stripped_xz_bytes": 371604,
+      "defined_symbols": 5057,
+      "throughput_xrt_songcore_output": {
+        "mp3-cbr-id3v23": 1964.11,
+        "mp3-vbr-id3v24": 2191.13,
+        "mp3-long": 1950.26,
+        "flac-16-44-stereo": 1136.81,
+        "flac-24-96": 485.46
+      }
+    },
+    {
+      "profile": "n3-min-noswr",
+      "correctness": {
+        "pass": 12,
+        "degraded_pass": 3,
+        "fail": 0,
+        "total": 15
+      },
+      "static_libs_bytes": 2549250,
+      "static_libs_stripped_bytes": 2490034,
+      "static_libs_stripped_xz_bytes": 645724,
+      "bench_linked_bytes": 986288,
+      "bench_stripped_bytes": 911608,
+      "bench_stripped_xz_bytes": 330792,
+      "defined_symbols": 4714,
+      "throughput_xrt_songcore_output": {
+        "mp3-cbr-id3v23": 1932.14,
+        "mp3-vbr-id3v24": 2209.68,
+        "mp3-long": 1929.45,
+        "flac-16-44-stereo": 1141.79,
+        "flac-24-96": 511.33
+      }
+    }
+  ],
+  "pcm_cross_profile": [
+    {
+      "case": "mp3-cbr-id3v23",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+        "n1-audio": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+        "n2-stage-a": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+        "n3-min": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+        "n3-min-noswr": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926"
+      }
+    },
+    {
+      "case": "mp3-cbr-id3v23-artwork",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+        "n1-audio": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+        "n2-stage-a": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+        "n3-min": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+        "n3-min-noswr": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926"
+      }
+    },
+    {
+      "case": "mp3-vbr-id3v24",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
+        "n1-audio": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
+        "n2-stage-a": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
+        "n3-min": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
+        "n3-min-noswr": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85"
+      }
+    },
+    {
+      "case": "mp3-minimal",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
+        "n1-audio": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
+        "n2-stage-a": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
+        "n3-min": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
+        "n3-min-noswr": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559"
+      }
+    },
+    {
+      "case": "mp3-short",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
+        "n1-audio": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
+        "n2-stage-a": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
+        "n3-min": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
+        "n3-min-noswr": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561"
+      }
+    },
+    {
+      "case": "mp3-long",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
+        "n1-audio": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
+        "n2-stage-a": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
+        "n3-min": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
+        "n3-min-noswr": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c"
+      }
+    },
+    {
+      "case": "mp3-corrupt-tail",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
+        "n1-audio": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
+        "n2-stage-a": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
+        "n3-min": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
+        "n3-min-noswr": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398"
+      }
+    },
+    {
+      "case": "mp3-truncated-header",
+      "consistent": null,
+      "per_profile": {
+        "n0-full": null,
+        "n1-audio": null,
+        "n2-stage-a": null,
+        "n3-min": null,
+        "n3-min-noswr": null
+      }
+    },
+    {
+      "case": "flac-16-44-stereo",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+        "n1-audio": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+        "n2-stage-a": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+        "n3-min": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+        "n3-min-noswr": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc"
+      }
+    },
+    {
+      "case": "flac-16-44-mono",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
+        "n1-audio": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
+        "n2-stage-a": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
+        "n3-min": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
+        "n3-min-noswr": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70"
+      }
+    },
+    {
+      "case": "flac-24-96",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
+        "n1-audio": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
+        "n2-stage-a": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
+        "n3-min": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
+        "n3-min-noswr": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6"
+      }
+    },
+    {
+      "case": "flac-artwork",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
+        "n1-audio": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
+        "n2-stage-a": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
+        "n3-min": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
+        "n3-min-noswr": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98"
+      }
+    },
+    {
+      "case": "flac-replaygain",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+        "n1-audio": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+        "n2-stage-a": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+        "n3-min": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+        "n3-min-noswr": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87"
+      }
+    },
+    {
+      "case": "flac-minimal",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+        "n1-audio": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+        "n2-stage-a": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+        "n3-min": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+        "n3-min-noswr": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87"
+      }
+    },
+    {
+      "case": "flac-truncated",
+      "consistent": true,
+      "per_profile": {
+        "n0-full": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
+        "n1-audio": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
+        "n2-stage-a": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
+        "n3-min": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
+        "n3-min-noswr": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea"
+      }
+    }
+  ],
+  "swr_bypass_pcm_identical": true
+}

@@ -1,0 +1,109 @@
+{
+  "profile": "n3-min",
+  "method": "one-component removal probes over the full Stage A corpus; a component stays only if its removal fails corpus cases. lib:swresample is probed by the n3-min-noswr bypass profile.",
+  "baseline_correctness": {
+    "mp3-cbr-id3v23": "pass",
+    "mp3-cbr-id3v23-artwork": "pass",
+    "mp3-vbr-id3v24": "pass",
+    "mp3-minimal": "pass",
+    "mp3-short": "pass",
+    "mp3-long": "pass",
+    "mp3-corrupt-tail": "degraded_pass",
+    "mp3-truncated-header": "degraded_pass",
+    "flac-16-44-stereo": "pass",
+    "flac-16-44-mono": "pass",
+    "flac-24-96": "pass",
+    "flac-artwork": "pass",
+    "flac-replaygain": "pass",
+    "flac-minimal": "pass",
+    "flac-truncated": "degraded_pass"
+  },
+  "probes": [
+    {
+      "component": "demuxer:mp3",
+      "variant_profile": "n3-min-probe-no-demuxer-mp3",
+      "still_enabled_after_removal": false,
+      "verdict": "required",
+      "corpus_cases_failed_without_it": [
+        "mp3-cbr-id3v23",
+        "mp3-cbr-id3v23-artwork",
+        "mp3-corrupt-tail",
+        "mp3-long",
+        "mp3-minimal",
+        "mp3-short",
+        "mp3-vbr-id3v24"
+      ],
+      "corpus_cases_passed_without_it": 8,
+      "required": true,
+      "evidence": "removal-probe: corpus cases failed without it"
+    },
+    {
+      "component": "demuxer:flac",
+      "variant_profile": "n3-min-probe-no-demuxer-flac",
+      "still_enabled_after_removal": false,
+      "verdict": "required",
+      "corpus_cases_failed_without_it": [
+        "flac-16-44-mono",
+        "flac-16-44-stereo",
+        "flac-24-96",
+        "flac-artwork",
+        "flac-minimal",
+        "flac-replaygain",
+        "flac-truncated"
+      ],
+      "corpus_cases_passed_without_it": 8,
+      "required": true,
+      "evidence": "removal-probe: corpus cases failed without it"
+    },
+    {
+      "component": "decoder:flac",
+      "variant_profile": "n3-min-probe-no-decoder-flac",
+      "still_enabled_after_removal": false,
+      "verdict": "required",
+      "corpus_cases_failed_without_it": [
+        "flac-16-44-mono",
+        "flac-16-44-stereo",
+        "flac-24-96",
+        "flac-artwork",
+        "flac-minimal",
+        "flac-replaygain"
+      ],
+      "corpus_cases_passed_without_it": 9,
+      "required": true,
+      "evidence": "removal-probe: corpus cases failed without it"
+    },
+    {
+      "component": "decoder:mp3float",
+      "variant_profile": "n3-min-probe-no-decoder-mp3float",
+      "still_enabled_after_removal": false,
+      "verdict": "required",
+      "corpus_cases_failed_without_it": [
+        "mp3-cbr-id3v23",
+        "mp3-cbr-id3v23-artwork",
+        "mp3-long",
+        "mp3-minimal",
+        "mp3-short",
+        "mp3-vbr-id3v24"
+      ],
+      "corpus_cases_passed_without_it": 9,
+      "required": true,
+      "evidence": "removal-probe: corpus cases failed without it"
+    },
+    {
+      "component": "parser:mpegaudio",
+      "variant_profile": "n3-min-probe-no-parser-mpegaudio",
+      "still_enabled_after_removal": true,
+      "verdict": "configure-required",
+      "corpus_cases_failed_without_it": [],
+      "corpus_cases_passed_without_it": 15,
+      "required": true,
+      "evidence": "still enabled after allow-list removal: FFmpeg's configure dependency graph hard-selects it for a demuxer/decoder that stays (see configure *_select)"
+    }
+  ],
+  "libraries": {
+    "lib:swresample": {
+      "probe": "n3-min vs n3-min-noswr bypass profiles (see bench/results summary swr_bypass_pcm_identical and the size delta)"
+    }
+  },
+  "internal_modules_note": "id3v2/apetag/replaygain/flac picture handling are internal libavformat modules of the mp3/flac demuxers, not individually selectable components."
+}

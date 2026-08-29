@@ -1,0 +1,165 @@
+{
+  "n0-full": {
+    "artifacts": {
+      "bench_linked_bytes": 21400384,
+      "bench_linked_xz_bytes": 7505140,
+      "bench_stripped_bytes": 20515208,
+      "bench_stripped_xz_bytes": 7314936
+    },
+    "profile": "n0-full",
+    "static_libs": {
+      "libavcodec.a": {
+        "bytes": 21879670,
+        "defined_symbols": 26511
+      },
+      "libavdevice.a": {
+        "bytes": 98104,
+        "defined_symbols": 227
+      },
+      "libavfilter.a": {
+        "bytes": 7977782,
+        "defined_symbols": 12148
+      },
+      "libavformat.a": {
+        "bytes": 5832318,
+        "defined_symbols": 12245
+      },
+      "libavutil.a": {
+        "bytes": 1279664,
+        "defined_symbols": 2383
+      },
+      "libswresample.a": {
+        "bytes": 191930,
+        "defined_symbols": 343
+      },
+      "libswscale.a": {
+        "bytes": 2322602,
+        "defined_symbols": 2415
+      }
+    },
+    "static_libs_defined_symbols": 56272,
+    "static_libs_stripped_bytes": 38594942,
+    "static_libs_stripped_xz_bytes": 10339396,
+    "static_libs_total_bytes": 39582070
+  },
+  "n1-audio": {
+    "artifacts": {
+      "bench_linked_bytes": 8630456,
+      "bench_linked_xz_bytes": 3455520,
+      "bench_stripped_bytes": 8187864,
+      "bench_stripped_xz_bytes": 3355948
+    },
+    "profile": "n1-audio",
+    "static_libs": {
+      "libavcodec.a": {
+        "bytes": 8060740,
+        "defined_symbols": 12467
+      },
+      "libavformat.a": {
+        "bytes": 3320246,
+        "defined_symbols": 6535
+      },
+      "libavutil.a": {
+        "bytes": 1279140,
+        "defined_symbols": 2357
+      },
+      "libswresample.a": {
+        "bytes": 198194,
+        "defined_symbols": 343
+      }
+    },
+    "static_libs_defined_symbols": 21702,
+    "static_libs_stripped_bytes": 12552024,
+    "static_libs_stripped_xz_bytes": 3738568,
+    "static_libs_total_bytes": 12858320
+  },
+  "n2-stage-a": {
+    "artifacts": {
+      "bench_linked_bytes": 1124216,
+      "bench_linked_xz_bytes": 391568,
+      "bench_stripped_bytes": 1042680,
+      "bench_stripped_xz_bytes": 371536
+    },
+    "profile": "n2-stage-a",
+    "static_libs": {
+      "libavcodec.a": {
+        "bytes": 791890,
+        "defined_symbols": 1260
+      },
+      "libavformat.a": {
+        "bytes": 484172,
+        "defined_symbols": 1097
+      },
+      "libavutil.a": {
+        "bytes": 1273188,
+        "defined_symbols": 2357
+      },
+      "libswresample.a": {
+        "bytes": 192242,
+        "defined_symbols": 343
+      }
+    },
+    "static_libs_defined_symbols": 5057,
+    "static_libs_stripped_bytes": 2676580,
+    "static_libs_stripped_xz_bytes": 694816,
+    "static_libs_total_bytes": 2741492
+  },
+  "n3-min": {
+    "artifacts": {
+      "bench_linked_bytes": 1124216,
+      "bench_linked_xz_bytes": 390768,
+      "bench_stripped_bytes": 1042680,
+      "bench_stripped_xz_bytes": 371604
+    },
+    "profile": "n3-min",
+    "static_libs": {
+      "libavcodec.a": {
+        "bytes": 791882,
+        "defined_symbols": 1260
+      },
+      "libavformat.a": {
+        "bytes": 484164,
+        "defined_symbols": 1097
+      },
+      "libavutil.a": {
+        "bytes": 1273180,
+        "defined_symbols": 2357
+      },
+      "libswresample.a": {
+        "bytes": 192234,
+        "defined_symbols": 343
+      }
+    },
+    "static_libs_defined_symbols": 5057,
+    "static_libs_stripped_bytes": 2676548,
+    "static_libs_stripped_xz_bytes": 694804,
+    "static_libs_total_bytes": 2741460
+  },
+  "n3-min-noswr": {
+    "artifacts": {
+      "bench_linked_bytes": 986288,
+      "bench_linked_xz_bytes": 349312,
+      "bench_stripped_bytes": 911608,
+      "bench_stripped_xz_bytes": 330792
+    },
+    "profile": "n3-min-noswr",
+    "static_libs": {
+      "libavcodec.a": {
+        "bytes": 791890,
+        "defined_symbols": 1260
+      },
+      "libavformat.a": {
+        "bytes": 484172,
+        "defined_symbols": 1097
+      },
+      "libavutil.a": {
+        "bytes": 1273188,
+        "defined_symbols": 2357
+      }
+    },
+    "static_libs_defined_symbols": 4714,
+    "static_libs_stripped_bytes": 2490034,
+    "static_libs_stripped_xz_bytes": 645724,
+    "static_libs_total_bytes": 2549250
+  }
+}

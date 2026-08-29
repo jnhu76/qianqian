@@ -1,0 +1,6 @@
+--prefix=/home/hoo/Source/qianqian/build/n0-full/install
+--disable-programs
+--disable-doc
+--disable-debug
+--disable-autodetect
+--disable-x86asm

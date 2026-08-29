@@ -1,0 +1,3812 @@
+{
+  "n0-full": {
+    "mp3-cbr-id3v23": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.498,
+          "probe_ms": 0.593,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+            "canonical_len": 352800,
+            "decode_ms": 2.686
+          }
+        }
+      }
+    },
+    "mp3-cbr-id3v23-artwork": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 2,
+          "open_ms": 0.428,
+          "probe_ms": 0.729,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+            "canonical_len": 352800,
+            "decode_ms": 2.718
+          }
+        }
+      }
+    },
+    "mp3-vbr-id3v24": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.469,
+          "probe_ms": 0.652,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
+            "canonical_len": 352800,
+            "decode_ms": 2.703
+          }
+        }
+      }
+    },
+    "mp3-minimal": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 21888,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 65664,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.451,
+          "probe_ms": 0.574,
+          "decode": {
+            "frames": 78,
+            "samples": 88200,
+            "canonical_f32_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
+            "canonical_len": 176400,
+            "decode_ms": 1.39
+          }
+        }
+      }
+    },
+    "mp3-short": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 13230,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 75000,
+            "resume_sample": 2304,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 150000,
+            "resume_sample": 5760,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 225000,
+            "resume_sample": 9216,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 300000,
+          "nb_streams": 1,
+          "open_ms": 0.417,
+          "probe_ms": 0.598,
+          "decode": {
+            "frames": 13,
+            "samples": 13230,
+            "canonical_f32_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
+            "canonical_len": 26460,
+            "decode_ms": 0.434
+          }
+        }
+      }
+    },
+    "mp3-long": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 529200,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 6000000,
+            "resume_sample": 263808,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 9000000,
+            "resume_sample": 396288,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 12000000,
+          "nb_streams": 1,
+          "open_ms": 0.327,
+          "probe_ms": 0.583,
+          "decode": {
+            "frames": 461,
+            "samples": 529200,
+            "canonical_f32_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
+            "canonical_len": 1058400,
+            "decode_ms": 7.895
+          }
+        }
+      }
+    },
+    "mp3-corrupt-tail": {
+      "status": "degraded_pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132527,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.472,
+          "probe_ms": 0.678,
+          "decode": {
+            "frames": 116,
+            "samples": 132527,
+            "canonical_f32_sha256": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
+            "canonical_len": 265054,
+            "decode_ms": 2.184
+          }
+        }
+      }
+    },
+    "mp3-truncated-header": {
+      "status": "degraded_pass",
+      "checks": {
+        "status": "open_failed",
+        "allowed": true,
+        "error": "open_input: -1094995529 (Invalid data found when processing input)",
+        "observed": {
+          "container": null,
+          "codec": null,
+          "sample_rate": null,
+          "channels": null,
+          "duration_us": null,
+          "nb_streams": null,
+          "open_ms": null,
+          "probe_ms": null,
+          "decode": {
+            "frames": null,
+            "samples": null,
+            "canonical_f32_sha256": null,
+            "canonical_len": null,
+            "decode_ms": null
+          }
+        },
+        "pcm_consistent_cross_profile": null
+      }
+    },
+    "flac-16-44-stereo": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 129024,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.306,
+          "probe_ms": 0.331,
+          "decode": {
+            "frames": 39,
+            "samples": 176400,
+            "canonical_f32_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+            "canonical_len": 352800,
+            "decode_ms": 4.237
+          }
+        }
+      }
+    },
+    "flac-16-44-mono": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132300,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 32256,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 1,
+          "duration_us": 3000000,
+          "nb_streams": 1,
+          "open_ms": 1.124,
+          "probe_ms": 0.521,
+          "decode": {
+            "frames": 29,
+            "samples": 132300,
+            "canonical_f32_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
+            "canonical_len": 132300,
+            "decode_ms": 2.33
+          }
+        }
+      }
+    },
+    "flac-24-96": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 288000,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 65536,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 139264,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 212992,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 96000,
+          "channels": 2,
+          "duration_us": 3000000,
+          "nb_streams": 1,
+          "open_ms": 0.382,
+          "probe_ms": 0.563,
+          "decode": {
+            "frames": 36,
+            "samples": 288000,
+            "canonical_f32_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
+            "canonical_len": 576000,
+            "decode_ms": 7.03
+          }
+        }
+      }
+    },
+    "flac-artwork": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132300,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 32256,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 3000000,
+          "nb_streams": 2,
+          "open_ms": 0.373,
+          "probe_ms": 0.364,
+          "decode": {
+            "frames": 29,
+            "samples": 132300,
+            "canonical_f32_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
+            "canonical_len": 264600,
+            "decode_ms": 3.218
+          }
+        }
+      }
+    },
+    "flac-replaygain": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 18432,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.282,
+          "probe_ms": 0.261,
+          "decode": {
+            "frames": 20,
+            "samples": 88200,
+            "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+            "canonical_len": 176400,
+            "decode_ms": 2.508
+          }
+        }
+      }
+    },
+    "flac-minimal": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 18432,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.292,
+          "probe_ms": 0.33,
+          "decode": {
+            "frames": 20,
+            "samples": 88200,
+            "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+            "canonical_len": 176400,
+            "decode_ms": 2.242
+          }
+        }
+      }
+    },
+    "flac-truncated": {
+      "status": "degraded_pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 101376,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 1,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.429,
+          "probe_ms": 0.325,
+          "decode": {
+            "frames": 22,
+            "samples": 101376,
+            "canonical_f32_sha256": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
+            "canonical_len": 202752,
+            "decode_ms": 2.514
+          }
+        }
+      }
+    }
+  },
+  "n1-audio": {
+    "mp3-cbr-id3v23": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.538,
+          "probe_ms": 0.598,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+            "canonical_len": 352800,
+            "decode_ms": 2.879
+          }
+        }
+      }
+    },
+    "mp3-cbr-id3v23-artwork": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 2,
+          "open_ms": 0.401,
+          "probe_ms": 0.708,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+            "canonical_len": 352800,
+            "decode_ms": 2.695
+          }
+        }
+      }
+    },
+    "mp3-vbr-id3v24": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.38,
+          "probe_ms": 0.587,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
+            "canonical_len": 352800,
+            "decode_ms": 2.472
+          }
+        }
+      }
+    },
+    "mp3-minimal": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 21888,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 65664,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.452,
+          "probe_ms": 0.603,
+          "decode": {
+            "frames": 78,
+            "samples": 88200,
+            "canonical_f32_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
+            "canonical_len": 176400,
+            "decode_ms": 1.499
+          }
+        }
+      }
+    },
+    "mp3-short": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 13230,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 75000,
+            "resume_sample": 2304,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 150000,
+            "resume_sample": 5760,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 225000,
+            "resume_sample": 9216,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 300000,
+          "nb_streams": 1,
+          "open_ms": 0.353,
+          "probe_ms": 0.51,
+          "decode": {
+            "frames": 13,
+            "samples": 13230,
+            "canonical_f32_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
+            "canonical_len": 26460,
+            "decode_ms": 0.279
+          }
+        }
+      }
+    },
+    "mp3-long": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 529200,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 6000000,
+            "resume_sample": 263808,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 9000000,
+            "resume_sample": 396288,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 12000000,
+          "nb_streams": 1,
+          "open_ms": 0.244,
+          "probe_ms": 0.539,
+          "decode": {
+            "frames": 461,
+            "samples": 529200,
+            "canonical_f32_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
+            "canonical_len": 1058400,
+            "decode_ms": 7.884
+          }
+        }
+      }
+    },
+    "mp3-corrupt-tail": {
+      "status": "degraded_pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132527,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.442,
+          "probe_ms": 0.567,
+          "decode": {
+            "frames": 116,
+            "samples": 132527,
+            "canonical_f32_sha256": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
+            "canonical_len": 265054,
+            "decode_ms": 2.061
+          }
+        }
+      }
+    },
+    "mp3-truncated-header": {
+      "status": "degraded_pass",
+      "checks": {
+        "status": "open_failed",
+        "allowed": true,
+        "error": "open_input: -1094995529 (Invalid data found when processing input)",
+        "observed": {
+          "container": null,
+          "codec": null,
+          "sample_rate": null,
+          "channels": null,
+          "duration_us": null,
+          "nb_streams": null,
+          "open_ms": null,
+          "probe_ms": null,
+          "decode": {
+            "frames": null,
+            "samples": null,
+            "canonical_f32_sha256": null,
+            "canonical_len": null,
+            "decode_ms": null
+          }
+        },
+        "pcm_consistent_cross_profile": null
+      }
+    },
+    "flac-16-44-stereo": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 129024,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.238,
+          "probe_ms": 0.261,
+          "decode": {
+            "frames": 39,
+            "samples": 176400,
+            "canonical_f32_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+            "canonical_len": 352800,
+            "decode_ms": 4.36
+          }
+        }
+      }
+    },
+    "flac-16-44-mono": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132300,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 32256,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 1,
+          "duration_us": 3000000,
+          "nb_streams": 1,
+          "open_ms": 0.264,
+          "probe_ms": 0.171,
+          "decode": {
+            "frames": 29,
+            "samples": 132300,
+            "canonical_f32_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
+            "canonical_len": 132300,
+            "decode_ms": 1.702
+          }
+        }
+      }
+    },
+    "flac-24-96": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 288000,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 65536,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 139264,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 212992,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 96000,
+          "channels": 2,
+          "duration_us": 3000000,
+          "nb_streams": 1,
+          "open_ms": 0.231,
+          "probe_ms": 0.542,
+          "decode": {
+            "frames": 36,
+            "samples": 288000,
+            "canonical_f32_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
+            "canonical_len": 576000,
+            "decode_ms": 7.025
+          }
+        }
+      }
+    },
+    "flac-artwork": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132300,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 32256,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 3000000,
+          "nb_streams": 2,
+          "open_ms": 0.372,
+          "probe_ms": 0.269,
+          "decode": {
+            "frames": 29,
+            "samples": 132300,
+            "canonical_f32_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
+            "canonical_len": 264600,
+            "decode_ms": 3.206
+          }
+        }
+      }
+    },
+    "flac-replaygain": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 18432,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.281,
+          "probe_ms": 0.255,
+          "decode": {
+            "frames": 20,
+            "samples": 88200,
+            "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+            "canonical_len": 176400,
+            "decode_ms": 2.21
+          }
+        }
+      }
+    },
+    "flac-minimal": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 18432,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.245,
+          "probe_ms": 0.26,
+          "decode": {
+            "frames": 20,
+            "samples": 88200,
+            "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+            "canonical_len": 176400,
+            "decode_ms": 2.111
+          }
+        }
+      }
+    },
+    "flac-truncated": {
+      "status": "degraded_pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 101376,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 1,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.293,
+          "probe_ms": 0.255,
+          "decode": {
+            "frames": 22,
+            "samples": 101376,
+            "canonical_f32_sha256": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
+            "canonical_len": 202752,
+            "decode_ms": 2.498
+          }
+        }
+      }
+    }
+  },
+  "n2-stage-a": {
+    "mp3-cbr-id3v23": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.183,
+          "probe_ms": 0.625,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+            "canonical_len": 352800,
+            "decode_ms": 2.988
+          }
+        }
+      }
+    },
+    "mp3-cbr-id3v23-artwork": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 2,
+          "open_ms": 0.121,
+          "probe_ms": 0.637,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+            "canonical_len": 352800,
+            "decode_ms": 2.716
+          }
+        }
+      }
+    },
+    "mp3-vbr-id3v24": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.129,
+          "probe_ms": 0.496,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
+            "canonical_len": 352800,
+            "decode_ms": 2.464
+          }
+        }
+      }
+    },
+    "mp3-minimal": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 21888,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 65664,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.123,
+          "probe_ms": 0.507,
+          "decode": {
+            "frames": 78,
+            "samples": 88200,
+            "canonical_f32_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
+            "canonical_len": 176400,
+            "decode_ms": 1.454
+          }
+        }
+      }
+    },
+    "mp3-short": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 13230,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 75000,
+            "resume_sample": 2304,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 150000,
+            "resume_sample": 5760,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 225000,
+            "resume_sample": 9216,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 300000,
+          "nb_streams": 1,
+          "open_ms": 0.099,
+          "probe_ms": 0.469,
+          "decode": {
+            "frames": 13,
+            "samples": 13230,
+            "canonical_f32_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
+            "canonical_len": 26460,
+            "decode_ms": 0.287
+          }
+        }
+      }
+    },
+    "mp3-long": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 529200,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 6000000,
+            "resume_sample": 263808,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 9000000,
+            "resume_sample": 396288,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 12000000,
+          "nb_streams": 1,
+          "open_ms": 0.11,
+          "probe_ms": 0.475,
+          "decode": {
+            "frames": 461,
+            "samples": 529200,
+            "canonical_f32_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
+            "canonical_len": 1058400,
+            "decode_ms": 7.793
+          }
+        }
+      }
+    },
+    "mp3-corrupt-tail": {
+      "status": "degraded_pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132527,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.156,
+          "probe_ms": 0.576,
+          "decode": {
+            "frames": 116,
+            "samples": 132527,
+            "canonical_f32_sha256": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
+            "canonical_len": 265054,
+            "decode_ms": 2.687
+          }
+        }
+      }
+    },
+    "mp3-truncated-header": {
+      "status": "degraded_pass",
+      "checks": {
+        "status": "open_failed",
+        "allowed": true,
+        "error": "open_input: -1094995529 (Invalid data found when processing input)",
+        "observed": {
+          "container": null,
+          "codec": null,
+          "sample_rate": null,
+          "channels": null,
+          "duration_us": null,
+          "nb_streams": null,
+          "open_ms": null,
+          "probe_ms": null,
+          "decode": {
+            "frames": null,
+            "samples": null,
+            "canonical_f32_sha256": null,
+            "canonical_len": null,
+            "decode_ms": null
+          }
+        },
+        "pcm_consistent_cross_profile": null
+      }
+    },
+    "flac-16-44-stereo": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 129024,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.092,
+          "probe_ms": 0.218,
+          "decode": {
+            "frames": 39,
+            "samples": 176400,
+            "canonical_f32_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+            "canonical_len": 352800,
+            "decode_ms": 4.06
+          }
+        }
+      }
+    },
+    "flac-16-44-mono": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132300,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 32256,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 1,
+          "duration_us": 3000000,
+          "nb_streams": 1,
+          "open_ms": 0.129,
+          "probe_ms": 0.183,
+          "decode": {
+            "frames": 29,
+            "samples": 132300,
+            "canonical_f32_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
+            "canonical_len": 132300,
+            "decode_ms": 1.751
+          }
+        }
+      }
+    },
+    "flac-24-96": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 288000,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 65536,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 139264,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 212992,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 96000,
+          "channels": 2,
+          "duration_us": 3000000,
+          "nb_streams": 1,
+          "open_ms": 0.111,
+          "probe_ms": 0.529,
+          "decode": {
+            "frames": 36,
+            "samples": 288000,
+            "canonical_f32_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
+            "canonical_len": 576000,
+            "decode_ms": 7.026
+          }
+        }
+      }
+    },
+    "flac-artwork": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132300,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 32256,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 3000000,
+          "nb_streams": 2,
+          "open_ms": 0.111,
+          "probe_ms": 0.247,
+          "decode": {
+            "frames": 29,
+            "samples": 132300,
+            "canonical_f32_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
+            "canonical_len": 264600,
+            "decode_ms": 3.336
+          }
+        }
+      }
+    },
+    "flac-replaygain": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 18432,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.125,
+          "probe_ms": 0.235,
+          "decode": {
+            "frames": 20,
+            "samples": 88200,
+            "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+            "canonical_len": 176400,
+            "decode_ms": 2.1
+          }
+        }
+      }
+    },
+    "flac-minimal": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 18432,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.098,
+          "probe_ms": 0.226,
+          "decode": {
+            "frames": 20,
+            "samples": 88200,
+            "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+            "canonical_len": 176400,
+            "decode_ms": 2.206
+          }
+        }
+      }
+    },
+    "flac-truncated": {
+      "status": "degraded_pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 101376,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 1,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.105,
+          "probe_ms": 0.269,
+          "decode": {
+            "frames": 22,
+            "samples": 101376,
+            "canonical_f32_sha256": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
+            "canonical_len": 202752,
+            "decode_ms": 2.519
+          }
+        }
+      }
+    }
+  },
+  "n3-min": {
+    "mp3-cbr-id3v23": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.167,
+          "probe_ms": 0.608,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+            "canonical_len": 352800,
+            "decode_ms": 2.994
+          }
+        }
+      }
+    },
+    "mp3-cbr-id3v23-artwork": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 2,
+          "open_ms": 0.133,
+          "probe_ms": 0.705,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+            "canonical_len": 352800,
+            "decode_ms": 2.754
+          }
+        }
+      }
+    },
+    "mp3-vbr-id3v24": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.169,
+          "probe_ms": 0.535,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
+            "canonical_len": 352800,
+            "decode_ms": 2.469
+          }
+        }
+      }
+    },
+    "mp3-minimal": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 21888,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 65664,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.121,
+          "probe_ms": 0.509,
+          "decode": {
+            "frames": 78,
+            "samples": 88200,
+            "canonical_f32_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
+            "canonical_len": 176400,
+            "decode_ms": 1.465
+          }
+        }
+      }
+    },
+    "mp3-short": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 13230,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 75000,
+            "resume_sample": 2304,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 150000,
+            "resume_sample": 5760,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 225000,
+            "resume_sample": 9216,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 300000,
+          "nb_streams": 1,
+          "open_ms": 0.15,
+          "probe_ms": 0.708,
+          "decode": {
+            "frames": 13,
+            "samples": 13230,
+            "canonical_f32_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
+            "canonical_len": 26460,
+            "decode_ms": 0.33
+          }
+        }
+      }
+    },
+    "mp3-long": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 529200,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 6000000,
+            "resume_sample": 263808,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 9000000,
+            "resume_sample": 396288,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 12000000,
+          "nb_streams": 1,
+          "open_ms": 0.117,
+          "probe_ms": 0.495,
+          "decode": {
+            "frames": 461,
+            "samples": 529200,
+            "canonical_f32_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
+            "canonical_len": 1058400,
+            "decode_ms": 8.227
+          }
+        }
+      }
+    },
+    "mp3-corrupt-tail": {
+      "status": "degraded_pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132527,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.134,
+          "probe_ms": 0.544,
+          "decode": {
+            "frames": 116,
+            "samples": 132527,
+            "canonical_f32_sha256": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
+            "canonical_len": 265054,
+            "decode_ms": 2.389
+          }
+        }
+      }
+    },
+    "mp3-truncated-header": {
+      "status": "degraded_pass",
+      "checks": {
+        "status": "open_failed",
+        "allowed": true,
+        "error": "open_input: -1094995529 (Invalid data found when processing input)",
+        "observed": {
+          "container": null,
+          "codec": null,
+          "sample_rate": null,
+          "channels": null,
+          "duration_us": null,
+          "nb_streams": null,
+          "open_ms": null,
+          "probe_ms": null,
+          "decode": {
+            "frames": null,
+            "samples": null,
+            "canonical_f32_sha256": null,
+            "canonical_len": null,
+            "decode_ms": null
+          }
+        },
+        "pcm_consistent_cross_profile": null
+      }
+    },
+    "flac-16-44-stereo": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 129024,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.098,
+          "probe_ms": 0.213,
+          "decode": {
+            "frames": 39,
+            "samples": 176400,
+            "canonical_f32_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+            "canonical_len": 352800,
+            "decode_ms": 4.233
+          }
+        }
+      }
+    },
+    "flac-16-44-mono": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132300,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 32256,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 1,
+          "duration_us": 3000000,
+          "nb_streams": 1,
+          "open_ms": 0.125,
+          "probe_ms": 0.182,
+          "decode": {
+            "frames": 29,
+            "samples": 132300,
+            "canonical_f32_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
+            "canonical_len": 132300,
+            "decode_ms": 1.714
+          }
+        }
+      }
+    },
+    "flac-24-96": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 288000,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 65536,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 139264,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 212992,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 96000,
+          "channels": 2,
+          "duration_us": 3000000,
+          "nb_streams": 1,
+          "open_ms": 0.101,
+          "probe_ms": 0.492,
+          "decode": {
+            "frames": 36,
+            "samples": 288000,
+            "canonical_f32_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
+            "canonical_len": 576000,
+            "decode_ms": 6.854
+          }
+        }
+      }
+    },
+    "flac-artwork": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132300,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 32256,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 3000000,
+          "nb_streams": 2,
+          "open_ms": 0.118,
+          "probe_ms": 0.278,
+          "decode": {
+            "frames": 29,
+            "samples": 132300,
+            "canonical_f32_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
+            "canonical_len": 264600,
+            "decode_ms": 3.225
+          }
+        }
+      }
+    },
+    "flac-replaygain": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 18432,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.155,
+          "probe_ms": 0.242,
+          "decode": {
+            "frames": 20,
+            "samples": 88200,
+            "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+            "canonical_len": 176400,
+            "decode_ms": 2.293
+          }
+        }
+      }
+    },
+    "flac-minimal": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 18432,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.118,
+          "probe_ms": 0.254,
+          "decode": {
+            "frames": 20,
+            "samples": 88200,
+            "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+            "canonical_len": 176400,
+            "decode_ms": 2.234
+          }
+        }
+      }
+    },
+    "flac-truncated": {
+      "status": "degraded_pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 101376,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 1,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.124,
+          "probe_ms": 0.245,
+          "decode": {
+            "frames": 22,
+            "samples": 101376,
+            "canonical_f32_sha256": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
+            "canonical_len": 202752,
+            "decode_ms": 2.638
+          }
+        }
+      }
+    }
+  },
+  "n3-min-noswr": {
+    "mp3-cbr-id3v23": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.13,
+          "probe_ms": 0.547,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+            "canonical_len": 352800,
+            "decode_ms": 2.754
+          }
+        }
+      }
+    },
+    "mp3-cbr-id3v23-artwork": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 2,
+          "open_ms": 0.133,
+          "probe_ms": 0.65,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+            "canonical_len": 352800,
+            "decode_ms": 3.034
+          }
+        }
+      }
+    },
+    "mp3-vbr-id3v24": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.168,
+          "probe_ms": 0.497,
+          "decode": {
+            "frames": 155,
+            "samples": 176400,
+            "canonical_f32_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
+            "canonical_len": 352800,
+            "decode_ms": 2.563
+          }
+        }
+      }
+    },
+    "mp3-minimal": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 21888,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 65664,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.115,
+          "probe_ms": 0.577,
+          "decode": {
+            "frames": 78,
+            "samples": 88200,
+            "canonical_f32_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
+            "canonical_len": 176400,
+            "decode_ms": 1.484
+          }
+        }
+      }
+    },
+    "mp3-short": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 13230,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 75000,
+            "resume_sample": 2304,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 150000,
+            "resume_sample": 5760,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 225000,
+            "resume_sample": 9216,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 300000,
+          "nb_streams": 1,
+          "open_ms": 0.083,
+          "probe_ms": 0.516,
+          "decode": {
+            "frames": 13,
+            "samples": 13230,
+            "canonical_f32_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
+            "canonical_len": 26460,
+            "decode_ms": 0.245
+          }
+        }
+      }
+    },
+    "mp3-long": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 529200,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 6000000,
+            "resume_sample": 263808,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 9000000,
+            "resume_sample": 396288,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 12000000,
+          "nb_streams": 1,
+          "open_ms": 0.097,
+          "probe_ms": 0.48,
+          "decode": {
+            "frames": 461,
+            "samples": 529200,
+            "canonical_f32_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
+            "canonical_len": 1058400,
+            "decode_ms": 7.774
+          }
+        }
+      }
+    },
+    "mp3-corrupt-tail": {
+      "status": "degraded_pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132527,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 43776,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": false,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 131328,
+            "suffix_match_sequential": false,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.215,
+          "probe_ms": 0.526,
+          "decode": {
+            "frames": 116,
+            "samples": 132527,
+            "canonical_f32_sha256": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
+            "canonical_len": 265054,
+            "decode_ms": 2.063
+          }
+        }
+      }
+    },
+    "mp3-truncated-header": {
+      "status": "degraded_pass",
+      "checks": {
+        "status": "open_failed",
+        "allowed": true,
+        "error": "open_input: -1094995529 (Invalid data found when processing input)",
+        "observed": {
+          "container": null,
+          "codec": null,
+          "sample_rate": null,
+          "channels": null,
+          "duration_us": null,
+          "nb_streams": null,
+          "open_ms": null,
+          "probe_ms": null,
+          "decode": {
+            "frames": null,
+            "samples": null,
+            "canonical_f32_sha256": null,
+            "canonical_len": null,
+            "decode_ms": null
+          }
+        },
+        "pcm_consistent_cross_profile": null
+      }
+    },
+    "flac-16-44-stereo": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 176400,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 129024,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.101,
+          "probe_ms": 0.228,
+          "decode": {
+            "frames": 39,
+            "samples": 176400,
+            "canonical_f32_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+            "canonical_len": 352800,
+            "decode_ms": 4.175
+          }
+        }
+      }
+    },
+    "flac-16-44-mono": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132300,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 32256,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 1,
+          "duration_us": 3000000,
+          "nb_streams": 1,
+          "open_ms": 0.113,
+          "probe_ms": 0.161,
+          "decode": {
+            "frames": 29,
+            "samples": 132300,
+            "canonical_f32_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
+            "canonical_len": 132300,
+            "decode_ms": 1.67
+          }
+        }
+      }
+    },
+    "flac-24-96": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 288000,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 65536,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 139264,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 212992,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 96000,
+          "channels": 2,
+          "duration_us": 3000000,
+          "nb_streams": 1,
+          "open_ms": 0.105,
+          "probe_ms": 0.596,
+          "decode": {
+            "frames": 36,
+            "samples": 288000,
+            "canonical_f32_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
+            "canonical_len": 576000,
+            "decode_ms": 6.864
+          }
+        }
+      }
+    },
+    "flac-artwork": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 132300,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 750000,
+            "resume_sample": 32256,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2250000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 3000000,
+          "nb_streams": 2,
+          "open_ms": 0.119,
+          "probe_ms": 0.251,
+          "decode": {
+            "frames": 29,
+            "samples": 132300,
+            "canonical_f32_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
+            "canonical_len": 264600,
+            "decode_ms": 3.044
+          }
+        }
+      }
+    },
+    "flac-replaygain": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 18432,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.123,
+          "probe_ms": 0.251,
+          "decode": {
+            "frames": 20,
+            "samples": 88200,
+            "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+            "canonical_len": 176400,
+            "decode_ms": 2.079
+          }
+        }
+      }
+    },
+    "flac-minimal": {
+      "status": "pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 88200,
+        "pcm_strict": true,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 0,
+        "seek": [
+          {
+            "target_us": 500000,
+            "resume_sample": 18432,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 1500000,
+            "resume_sample": 64512,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 2000000,
+          "nb_streams": 1,
+          "open_ms": 0.094,
+          "probe_ms": 0.22,
+          "decode": {
+            "frames": 20,
+            "samples": 88200,
+            "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+            "canonical_len": 176400,
+            "decode_ms": 2.01
+          }
+        }
+      }
+    },
+    "flac-truncated": {
+      "status": "degraded_pass",
+      "checks": {
+        "structural": "ok",
+        "samples": 101376,
+        "pcm_consistent_cross_profile": true,
+        "metadata": "ok",
+        "artwork": "ok",
+        "eof": {
+          "demux": true,
+          "decoder": true
+        },
+        "error_count": 1,
+        "seek": [
+          {
+            "target_us": 1000000,
+            "resume_sample": 41472,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 2000000,
+            "resume_sample": 87552,
+            "suffix_match_sequential": true,
+            "status": "done"
+          },
+          {
+            "target_us": 3000000,
+            "resume_sample": 96768,
+            "suffix_match_sequential": true,
+            "status": "done"
+          }
+        ],
+        "observed": {
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "duration_us": 4000000,
+          "nb_streams": 1,
+          "open_ms": 0.11,
+          "probe_ms": 0.263,
+          "decode": {
+            "frames": 22,
+            "samples": 101376,
+            "canonical_f32_sha256": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
+            "canonical_len": 202752,
+            "decode_ms": 2.377
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "arch": "x86_64",
+  "bench_source_sha256": "2edd6e28fdfea7565994e91934b36a0b7d439850fe283f27defc12da4a96a30f",
+  "build_type": "release-static",
+  "built_at": "2026-08-29T22:58:47+0800",
+  "compiler": "gcc",
+  "compiler_ident": "gcc 15 (Ubuntu 15.2.0-16ubuntu1)",
+  "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "configure_args": [
+    "--prefix=/home/hoo/Source/qianqian/build/n0-full/install",
+    "--disable-programs",
+    "--disable-doc",
+    "--disable-debug",
+    "--disable-autodetect",
+    "--disable-x86asm"
+  ],
+  "configure_args_hash": "a2fab07114bc9ce51a5a9b50101040f7b4fa9b68bd85f2290c7d984f783c690f",
+  "corpus_id": "stage-a-v1",
+  "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+  "ffmpeg_tag": "n9.0.1",
+  "ffmpeg_version": "9.0.1",
+  "host_cpu": "unknown",
+  "platform": "linux",
+  "platform_release": "6.18.33.2-microsoft-standard-WSL2",
+  "profile": "n0-full",
+  "profile_json_sha256": "3637434d847ca060f2a344ad19fffb8d4f401ca0f31410023434a0d51d85efd3",
+  "qianqian_git_dirty": true,
+  "qianqian_git_sha": "0f99b218afbd426988af57b5912423195b94f922"
+}
