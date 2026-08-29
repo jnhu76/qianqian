@@ -1,7 +1,7 @@
 {
   "run_id": "baseline",
-  "started_at": "2026-08-29T23:10:22+0800",
-  "qianqian_git_sha": "b94bd0996400863e7141806c49715d3068ffb341",
+  "started_at": "2026-08-29T23:19:07+0800",
+  "qianqian_git_sha": "55828034c25925fe7d6470afd285cc0889d0a0b8",
   "qianqian_git_dirty": true,
   "ffmpeg_tag": "n9.0.1",
   "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
@@ -25,34 +25,34 @@
   "xrt_definition": "audio_seconds / median(decode wall time); decode_core = demux+decode only; songcore_output = demux+decode+Float32 interleave conversion",
   "profile_build": {
     "n0-full": {
-      "configure_args_hash": "a2fab07114bc9ce51a5a9b50101040f7b4fa9b68bd85f2290c7d984f783c690f",
+      "configure_args_hash": "9940b3c7a01aa95b953040471906a7c0a4d560bcab48224542738473268eeb70",
       "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
       "build_type": "release-static",
-      "built_at": "2026-08-29T23:06:38+0800"
+      "built_at": "2026-08-29T23:15:23+0800"
     },
     "n1-audio": {
-      "configure_args_hash": "384827668895ce6b01d96f9f6ebc9a3930673529c0fd5043c7b64bedfaa2a6b0",
+      "configure_args_hash": "d24930ed32bd4fd78b42784ba8f7ca2570e87ab2766eb577d63f62ddfc474954",
       "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
       "build_type": "release-static",
-      "built_at": "2026-08-29T23:08:27+0800"
+      "built_at": "2026-08-29T23:17:08+0800"
     },
     "n2-stage-a": {
-      "configure_args_hash": "fca69ca5960a82838e28e72a8d6a28e0c70f2b93dd7aba52986d5048bf758d3f",
+      "configure_args_hash": "da4ae9ab4bc9f46b66b6500419d009cd607d7c5c17f6628080aa689131559b39",
       "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
       "build_type": "release-static",
-      "built_at": "2026-08-29T23:09:13+0800"
+      "built_at": "2026-08-29T23:17:55+0800"
     },
     "n3-min": {
-      "configure_args_hash": "0c752802c029c512d41334c862ce5cc74fc876c7d961cc0e4a563940e5775d50",
+      "configure_args_hash": "da4ae9ab4bc9f46b66b6500419d009cd607d7c5c17f6628080aa689131559b39",
       "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
       "build_type": "release-static",
-      "built_at": "2026-08-29T23:09:47+0800"
+      "built_at": "2026-08-29T23:18:29+0800"
     },
     "n3-min-noswr": {
-      "configure_args_hash": "ca836d29e203f6b9ea9148d0cbcfd9183e16d1d0784cc99708a86b9bde8dafdd",
+      "configure_args_hash": "479f9b4b1f61ff3d3754af6276e262a2ab0e2de5162b0613e3729af9d1884f38",
       "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
       "build_type": "release-static",
-      "built_at": "2026-08-29T23:10:20+0800"
+      "built_at": "2026-08-29T23:19:04+0800"
     }
   },
   "swr_bypass_pcm_identical": true,

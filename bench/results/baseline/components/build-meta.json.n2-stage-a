@@ -2,12 +2,12 @@
   "arch": "x86_64",
   "bench_source_sha256": "2edd6e28fdfea7565994e91934b36a0b7d439850fe283f27defc12da4a96a30f",
   "build_type": "release-static",
-  "built_at": "2026-08-29T23:09:13+0800",
+  "built_at": "2026-08-29T23:17:55+0800",
   "compiler": "gcc",
   "compiler_ident": "gcc 15 (Ubuntu 15.2.0-16ubuntu1)",
   "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
   "configure_args": [
-    "--prefix=/home/hoo/Source/qianqian/build/n2-stage-a/install",
+    "--prefix=install",
     "--disable-everything",
     "--disable-programs",
     "--disable-doc",
@@ -29,7 +29,7 @@
     "--enable-decoder=mp3float",
     "--enable-parser=mpegaudio"
   ],
-  "configure_args_hash": "fca69ca5960a82838e28e72a8d6a28e0c70f2b93dd7aba52986d5048bf758d3f",
+  "configure_args_hash": "da4ae9ab4bc9f46b66b6500419d009cd607d7c5c17f6628080aa689131559b39",
   "corpus_id": "stage-a-v1",
   "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
   "ffmpeg_tag": "n9.0.1",
@@ -40,5 +40,5 @@
   "profile": "n2-stage-a",
   "profile_json_sha256": "adb1e01a577259e201a7e1c9b2b28ba78b06a25527f4f1c95ad8f3933f500634",
   "qianqian_git_dirty": true,
-  "qianqian_git_sha": "b94bd0996400863e7141806c49715d3068ffb341"
+  "qianqian_git_sha": "55828034c25925fe7d6470afd285cc0889d0a0b8"
 }

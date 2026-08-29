@@ -1,4 +1,4 @@
---prefix=/home/hoo/Source/qianqian/build/n0-full/install
+--prefix=install
 --disable-programs
 --disable-doc
 --disable-debug

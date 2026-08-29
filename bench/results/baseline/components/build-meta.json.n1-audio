@@ -2,12 +2,12 @@
   "arch": "x86_64",
   "bench_source_sha256": "2edd6e28fdfea7565994e91934b36a0b7d439850fe283f27defc12da4a96a30f",
   "build_type": "release-static",
-  "built_at": "2026-08-29T23:08:27+0800",
+  "built_at": "2026-08-29T23:17:08+0800",
   "compiler": "gcc",
   "compiler_ident": "gcc 15 (Ubuntu 15.2.0-16ubuntu1)",
   "compiler_version": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
   "configure_args": [
-    "--prefix=/home/hoo/Source/qianqian/build/n1-audio/install",
+    "--prefix=install",
     "--disable-programs",
     "--disable-doc",
     "--disable-debug",
@@ -252,7 +252,7 @@
     "--enable-decoder=xma1",
     "--enable-decoder=xma2"
   ],
-  "configure_args_hash": "384827668895ce6b01d96f9f6ebc9a3930673529c0fd5043c7b64bedfaa2a6b0",
+  "configure_args_hash": "d24930ed32bd4fd78b42784ba8f7ca2570e87ab2766eb577d63f62ddfc474954",
   "corpus_id": "stage-a-v1",
   "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
   "ffmpeg_tag": "n9.0.1",
@@ -263,5 +263,5 @@
   "profile": "n1-audio",
   "profile_json_sha256": "537da675cc9dbee430df840b11b82b75074af09e0981f341555ef76381710af3",
   "qianqian_git_dirty": true,
-  "qianqian_git_sha": "b94bd0996400863e7141806c49715d3068ffb341"
+  "qianqian_git_sha": "55828034c25925fe7d6470afd285cc0889d0a0b8"
 }

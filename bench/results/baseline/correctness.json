@@ -40,14 +40,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.646,
-          "probe_ms": 0.784,
+          "open_ms": 0.531,
+          "probe_ms": 0.652,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
             "canonical_len": 352800,
-            "decode_ms": 2.828
+            "decode_ms": 2.74
           }
         }
       }
@@ -92,14 +92,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 2,
-          "open_ms": 0.406,
-          "probe_ms": 0.778,
+          "open_ms": 0.429,
+          "probe_ms": 0.857,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
             "canonical_len": 352800,
-            "decode_ms": 2.735
+            "decode_ms": 2.844
           }
         }
       }
@@ -144,14 +144,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.467,
-          "probe_ms": 0.583,
+          "open_ms": 0.398,
+          "probe_ms": 0.724,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
             "canonical_len": 352800,
-            "decode_ms": 2.468
+            "decode_ms": 2.72
           }
         }
       }
@@ -196,14 +196,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.47,
-          "probe_ms": 0.671,
+          "open_ms": 0.429,
+          "probe_ms": 0.678,
           "decode": {
             "frames": 78,
             "samples": 88200,
             "canonical_f32_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
             "canonical_len": 176400,
-            "decode_ms": 1.477
+            "decode_ms": 1.561
           }
         }
       }
@@ -248,14 +248,14 @@
           "channels": 2,
           "duration_us": 300000,
           "nb_streams": 1,
-          "open_ms": 0.462,
-          "probe_ms": 0.563,
+          "open_ms": 0.381,
+          "probe_ms": 0.552,
           "decode": {
             "frames": 13,
             "samples": 13230,
             "canonical_f32_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
             "canonical_len": 26460,
-            "decode_ms": 0.287
+            "decode_ms": 0.281
           }
         }
       }
@@ -300,14 +300,14 @@
           "channels": 2,
           "duration_us": 12000000,
           "nb_streams": 1,
-          "open_ms": 0.305,
-          "probe_ms": 0.564,
+          "open_ms": 0.307,
+          "probe_ms": 0.574,
           "decode": {
             "frames": 461,
             "samples": 529200,
             "canonical_f32_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
             "canonical_len": 1058400,
-            "decode_ms": 7.928
+            "decode_ms": 7.899
           }
         }
       }
@@ -352,14 +352,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.558,
-          "probe_ms": 0.661,
+          "open_ms": 0.433,
+          "probe_ms": 0.613,
           "decode": {
             "frames": 116,
             "samples": 132527,
             "canonical_f32_sha256": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
             "canonical_len": 265054,
-            "decode_ms": 2.122
+            "decode_ms": 2.177
           }
         }
       }
@@ -431,14 +431,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.272,
-          "probe_ms": 0.316,
+          "open_ms": 0.488,
+          "probe_ms": 0.396,
           "decode": {
             "frames": 39,
             "samples": 176400,
             "canonical_f32_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
             "canonical_len": 352800,
-            "decode_ms": 4.29
+            "decode_ms": 4.623
           }
         }
       }
@@ -484,14 +484,14 @@
           "channels": 1,
           "duration_us": 3000000,
           "nb_streams": 1,
-          "open_ms": 0.293,
-          "probe_ms": 0.191,
+          "open_ms": 0.34,
+          "probe_ms": 0.185,
           "decode": {
             "frames": 29,
             "samples": 132300,
             "canonical_f32_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
             "canonical_len": 132300,
-            "decode_ms": 1.772
+            "decode_ms": 1.767
           }
         }
       }
@@ -537,14 +537,14 @@
           "channels": 2,
           "duration_us": 3000000,
           "nb_streams": 1,
-          "open_ms": 0.276,
-          "probe_ms": 0.608,
+          "open_ms": 0.282,
+          "probe_ms": 0.575,
           "decode": {
             "frames": 36,
             "samples": 288000,
             "canonical_f32_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
             "canonical_len": 576000,
-            "decode_ms": 7.003
+            "decode_ms": 6.902
           }
         }
       }
@@ -590,14 +590,14 @@
           "channels": 2,
           "duration_us": 3000000,
           "nb_streams": 2,
-          "open_ms": 0.298,
-          "probe_ms": 0.308,
+          "open_ms": 0.496,
+          "probe_ms": 0.398,
           "decode": {
             "frames": 29,
             "samples": 132300,
             "canonical_f32_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
             "canonical_len": 264600,
-            "decode_ms": 3.21
+            "decode_ms": 3.486
           }
         }
       }
@@ -643,14 +643,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.308,
-          "probe_ms": 0.332,
+          "open_ms": 0.313,
+          "probe_ms": 0.3,
           "decode": {
             "frames": 20,
             "samples": 88200,
             "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
             "canonical_len": 176400,
-            "decode_ms": 2.149
+            "decode_ms": 2.221
           }
         }
       }
@@ -696,14 +696,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.29,
-          "probe_ms": 0.288,
+          "open_ms": 0.31,
+          "probe_ms": 0.283,
           "decode": {
             "frames": 20,
             "samples": 88200,
             "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
             "canonical_len": 176400,
-            "decode_ms": 2.24
+            "decode_ms": 2.173
           }
         }
       }
@@ -748,14 +748,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.31,
-          "probe_ms": 0.291,
+          "open_ms": 0.299,
+          "probe_ms": 0.382,
           "decode": {
             "frames": 22,
             "samples": 101376,
             "canonical_f32_sha256": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
             "canonical_len": 202752,
-            "decode_ms": 2.536
+            "decode_ms": 2.481
           }
         }
       }
@@ -802,14 +802,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.476,
-          "probe_ms": 0.804,
+          "open_ms": 0.448,
+          "probe_ms": 0.621,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
             "canonical_len": 352800,
-            "decode_ms": 3.244
+            "decode_ms": 2.686
           }
         }
       }
@@ -854,14 +854,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 2,
-          "open_ms": 0.347,
-          "probe_ms": 0.688,
+          "open_ms": 0.352,
+          "probe_ms": 0.752,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
             "canonical_len": 352800,
-            "decode_ms": 2.757
+            "decode_ms": 2.889
           }
         }
       }
@@ -906,14 +906,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.384,
-          "probe_ms": 0.573,
+          "open_ms": 0.362,
+          "probe_ms": 0.593,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
             "canonical_len": 352800,
-            "decode_ms": 2.538
+            "decode_ms": 2.651
           }
         }
       }
@@ -958,14 +958,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.526,
-          "probe_ms": 0.622,
+          "open_ms": 0.436,
+          "probe_ms": 0.609,
           "decode": {
             "frames": 78,
             "samples": 88200,
             "canonical_f32_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
             "canonical_len": 176400,
-            "decode_ms": 1.534
+            "decode_ms": 1.624
           }
         }
       }
@@ -1010,14 +1010,14 @@
           "channels": 2,
           "duration_us": 300000,
           "nb_streams": 1,
-          "open_ms": 0.379,
-          "probe_ms": 0.547,
+          "open_ms": 0.492,
+          "probe_ms": 0.682,
           "decode": {
             "frames": 13,
             "samples": 13230,
             "canonical_f32_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
             "canonical_len": 26460,
-            "decode_ms": 0.297
+            "decode_ms": 0.323
           }
         }
       }
@@ -1062,14 +1062,14 @@
           "channels": 2,
           "duration_us": 12000000,
           "nb_streams": 1,
-          "open_ms": 0.253,
-          "probe_ms": 0.561,
+          "open_ms": 0.334,
+          "probe_ms": 0.606,
           "decode": {
             "frames": 461,
             "samples": 529200,
             "canonical_f32_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
             "canonical_len": 1058400,
-            "decode_ms": 8.425
+            "decode_ms": 8.722
           }
         }
       }
@@ -1114,14 +1114,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.395,
-          "probe_ms": 0.578,
+          "open_ms": 0.401,
+          "probe_ms": 0.605,
           "decode": {
             "frames": 116,
             "samples": 132527,
             "canonical_f32_sha256": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
             "canonical_len": 265054,
-            "decode_ms": 2.133
+            "decode_ms": 2.403
           }
         }
       }
@@ -1193,14 +1193,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.237,
-          "probe_ms": 0.253,
+          "open_ms": 0.258,
+          "probe_ms": 0.301,
           "decode": {
             "frames": 39,
             "samples": 176400,
             "canonical_f32_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
             "canonical_len": 352800,
-            "decode_ms": 4.097
+            "decode_ms": 4.647
           }
         }
       }
@@ -1246,14 +1246,14 @@
           "channels": 1,
           "duration_us": 3000000,
           "nb_streams": 1,
-          "open_ms": 0.256,
-          "probe_ms": 0.173,
+          "open_ms": 0.362,
+          "probe_ms": 0.227,
           "decode": {
             "frames": 29,
             "samples": 132300,
             "canonical_f32_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
             "canonical_len": 132300,
-            "decode_ms": 1.744
+            "decode_ms": 1.787
           }
         }
       }
@@ -1299,14 +1299,14 @@
           "channels": 2,
           "duration_us": 3000000,
           "nb_streams": 1,
-          "open_ms": 0.231,
-          "probe_ms": 0.563,
+          "open_ms": 0.345,
+          "probe_ms": 0.628,
           "decode": {
             "frames": 36,
             "samples": 288000,
             "canonical_f32_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
             "canonical_len": 576000,
-            "decode_ms": 7.197
+            "decode_ms": 7.95
           }
         }
       }
@@ -1352,14 +1352,14 @@
           "channels": 2,
           "duration_us": 3000000,
           "nb_streams": 2,
-          "open_ms": 0.313,
-          "probe_ms": 0.311,
+          "open_ms": 0.302,
+          "probe_ms": 0.302,
           "decode": {
             "frames": 29,
             "samples": 132300,
             "canonical_f32_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
             "canonical_len": 264600,
-            "decode_ms": 3.436
+            "decode_ms": 3.485
           }
         }
       }
@@ -1405,14 +1405,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.316,
-          "probe_ms": 0.343,
+          "open_ms": 0.302,
+          "probe_ms": 0.317,
           "decode": {
             "frames": 20,
             "samples": 88200,
             "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
             "canonical_len": 176400,
-            "decode_ms": 2.278
+            "decode_ms": 2.498
           }
         }
       }
@@ -1458,14 +1458,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.251,
-          "probe_ms": 0.252,
+          "open_ms": 0.317,
+          "probe_ms": 0.298,
           "decode": {
             "frames": 20,
             "samples": 88200,
             "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
             "canonical_len": 176400,
-            "decode_ms": 2.34
+            "decode_ms": 2.32
           }
         }
       }
@@ -1510,14 +1510,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.239,
-          "probe_ms": 0.257,
+          "open_ms": 0.353,
+          "probe_ms": 0.359,
           "decode": {
             "frames": 22,
             "samples": 101376,
             "canonical_f32_sha256": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
             "canonical_len": 202752,
-            "decode_ms": 2.619
+            "decode_ms": 2.886
           }
         }
       }
@@ -1564,14 +1564,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.193,
-          "probe_ms": 0.529,
+          "open_ms": 0.141,
+          "probe_ms": 0.611,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
             "canonical_len": 352800,
-            "decode_ms": 2.81
+            "decode_ms": 3.157
           }
         }
       }
@@ -1616,14 +1616,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 2,
-          "open_ms": 0.222,
-          "probe_ms": 0.668,
+          "open_ms": 0.171,
+          "probe_ms": 0.741,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
             "canonical_len": 352800,
-            "decode_ms": 2.987
+            "decode_ms": 2.943
           }
         }
       }
@@ -1668,14 +1668,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.125,
-          "probe_ms": 0.494,
+          "open_ms": 0.169,
+          "probe_ms": 0.589,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
             "canonical_len": 352800,
-            "decode_ms": 2.482
+            "decode_ms": 2.991
           }
         }
       }
@@ -1720,14 +1720,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.126,
-          "probe_ms": 0.57,
+          "open_ms": 0.211,
+          "probe_ms": 0.915,
           "decode": {
             "frames": 78,
             "samples": 88200,
             "canonical_f32_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
             "canonical_len": 176400,
-            "decode_ms": 1.548
+            "decode_ms": 2.578
           }
         }
       }
@@ -1772,14 +1772,14 @@
           "channels": 2,
           "duration_us": 300000,
           "nb_streams": 1,
-          "open_ms": 0.11,
-          "probe_ms": 0.501,
+          "open_ms": 0.131,
+          "probe_ms": 0.572,
           "decode": {
             "frames": 13,
             "samples": 13230,
             "canonical_f32_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
             "canonical_len": 26460,
-            "decode_ms": 0.303
+            "decode_ms": 0.413
           }
         }
       }
@@ -1824,14 +1824,14 @@
           "channels": 2,
           "duration_us": 12000000,
           "nb_streams": 1,
-          "open_ms": 0.109,
-          "probe_ms": 0.507,
+          "open_ms": 0.171,
+          "probe_ms": 0.598,
           "decode": {
             "frames": 461,
             "samples": 529200,
             "canonical_f32_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
             "canonical_len": 1058400,
-            "decode_ms": 7.943
+            "decode_ms": 10.239
           }
         }
       }
@@ -1876,8 +1876,8 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.131,
-          "probe_ms": 0.534,
+          "open_ms": 0.143,
+          "probe_ms": 0.568,
           "decode": {
             "frames": 116,
             "samples": 132527,
@@ -1955,14 +1955,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.092,
-          "probe_ms": 0.229,
+          "open_ms": 0.1,
+          "probe_ms": 0.258,
           "decode": {
             "frames": 39,
             "samples": 176400,
             "canonical_f32_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
             "canonical_len": 352800,
-            "decode_ms": 4.308
+            "decode_ms": 4.554
           }
         }
       }
@@ -2008,14 +2008,14 @@
           "channels": 1,
           "duration_us": 3000000,
           "nb_streams": 1,
-          "open_ms": 0.129,
-          "probe_ms": 0.165,
+          "open_ms": 0.128,
+          "probe_ms": 0.175,
           "decode": {
             "frames": 29,
             "samples": 132300,
             "canonical_f32_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
             "canonical_len": 132300,
-            "decode_ms": 1.804
+            "decode_ms": 2.005
           }
         }
       }
@@ -2061,14 +2061,14 @@
           "channels": 2,
           "duration_us": 3000000,
           "nb_streams": 1,
-          "open_ms": 0.095,
-          "probe_ms": 0.537,
+          "open_ms": 0.13,
+          "probe_ms": 0.595,
           "decode": {
             "frames": 36,
             "samples": 288000,
             "canonical_f32_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
             "canonical_len": 576000,
-            "decode_ms": 7.306
+            "decode_ms": 8.065
           }
         }
       }
@@ -2114,14 +2114,14 @@
           "channels": 2,
           "duration_us": 3000000,
           "nb_streams": 2,
-          "open_ms": 0.115,
-          "probe_ms": 0.252,
+          "open_ms": 0.187,
+          "probe_ms": 0.33,
           "decode": {
             "frames": 29,
             "samples": 132300,
             "canonical_f32_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
             "canonical_len": 264600,
-            "decode_ms": 3.332
+            "decode_ms": 3.59
           }
         }
       }
@@ -2167,14 +2167,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.099,
-          "probe_ms": 0.25,
+          "open_ms": 0.126,
+          "probe_ms": 0.247,
           "decode": {
             "frames": 20,
             "samples": 88200,
             "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
             "canonical_len": 176400,
-            "decode_ms": 2.209
+            "decode_ms": 2.303
           }
         }
       }
@@ -2220,14 +2220,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.1,
-          "probe_ms": 0.227,
+          "open_ms": 0.119,
+          "probe_ms": 0.258,
           "decode": {
             "frames": 20,
             "samples": 88200,
             "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
             "canonical_len": 176400,
-            "decode_ms": 2.216
+            "decode_ms": 2.365
           }
         }
       }
@@ -2272,14 +2272,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.135,
-          "probe_ms": 0.236,
+          "open_ms": 0.107,
+          "probe_ms": 0.266,
           "decode": {
             "frames": 22,
             "samples": 101376,
             "canonical_f32_sha256": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
             "canonical_len": 202752,
-            "decode_ms": 2.592
+            "decode_ms": 2.708
           }
         }
       }
@@ -2326,14 +2326,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.141,
-          "probe_ms": 0.532,
+          "open_ms": 0.173,
+          "probe_ms": 0.576,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
             "canonical_len": 352800,
-            "decode_ms": 2.781
+            "decode_ms": 3.031
           }
         }
       }
@@ -2378,14 +2378,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 2,
-          "open_ms": 0.13,
-          "probe_ms": 0.635,
+          "open_ms": 0.174,
+          "probe_ms": 0.974,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
             "canonical_len": 352800,
-            "decode_ms": 2.848
+            "decode_ms": 4.263
           }
         }
       }
@@ -2430,14 +2430,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.133,
-          "probe_ms": 0.501,
+          "open_ms": 0.13,
+          "probe_ms": 0.528,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
             "canonical_len": 352800,
-            "decode_ms": 2.549
+            "decode_ms": 2.662
           }
         }
       }
@@ -2482,14 +2482,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.114,
-          "probe_ms": 0.533,
+          "open_ms": 0.153,
+          "probe_ms": 0.592,
           "decode": {
             "frames": 78,
             "samples": 88200,
             "canonical_f32_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
             "canonical_len": 176400,
-            "decode_ms": 1.564
+            "decode_ms": 1.535
           }
         }
       }
@@ -2534,14 +2534,14 @@
           "channels": 2,
           "duration_us": 300000,
           "nb_streams": 1,
-          "open_ms": 0.123,
-          "probe_ms": 0.479,
+          "open_ms": 0.138,
+          "probe_ms": 0.587,
           "decode": {
             "frames": 13,
             "samples": 13230,
             "canonical_f32_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
             "canonical_len": 26460,
-            "decode_ms": 0.289
+            "decode_ms": 0.362
           }
         }
       }
@@ -2586,14 +2586,14 @@
           "channels": 2,
           "duration_us": 12000000,
           "nb_streams": 1,
-          "open_ms": 0.102,
-          "probe_ms": 0.499,
+          "open_ms": 0.144,
+          "probe_ms": 0.526,
           "decode": {
             "frames": 461,
             "samples": 529200,
             "canonical_f32_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
             "canonical_len": 1058400,
-            "decode_ms": 7.648
+            "decode_ms": 8.386
           }
         }
       }
@@ -2638,14 +2638,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.147,
-          "probe_ms": 0.615,
+          "open_ms": 0.173,
+          "probe_ms": 0.603,
           "decode": {
             "frames": 116,
             "samples": 132527,
             "canonical_f32_sha256": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
             "canonical_len": 265054,
-            "decode_ms": 2.357
+            "decode_ms": 2.458
           }
         }
       }
@@ -2717,14 +2717,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.114,
-          "probe_ms": 0.276,
+          "open_ms": 0.134,
+          "probe_ms": 0.285,
           "decode": {
             "frames": 39,
             "samples": 176400,
             "canonical_f32_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
             "canonical_len": 352800,
-            "decode_ms": 4.134
+            "decode_ms": 4.586
           }
         }
       }
@@ -2770,14 +2770,14 @@
           "channels": 1,
           "duration_us": 3000000,
           "nb_streams": 1,
-          "open_ms": 0.097,
-          "probe_ms": 0.149,
+          "open_ms": 0.117,
+          "probe_ms": 0.179,
           "decode": {
             "frames": 29,
             "samples": 132300,
             "canonical_f32_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
             "canonical_len": 132300,
-            "decode_ms": 1.757
+            "decode_ms": 1.863
           }
         }
       }
@@ -2823,14 +2823,14 @@
           "channels": 2,
           "duration_us": 3000000,
           "nb_streams": 1,
-          "open_ms": 0.12,
-          "probe_ms": 0.531,
+          "open_ms": 0.109,
+          "probe_ms": 0.547,
           "decode": {
             "frames": 36,
             "samples": 288000,
             "canonical_f32_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
             "canonical_len": 576000,
-            "decode_ms": 7.101
+            "decode_ms": 7.282
           }
         }
       }
@@ -2876,14 +2876,14 @@
           "channels": 2,
           "duration_us": 3000000,
           "nb_streams": 2,
-          "open_ms": 0.118,
-          "probe_ms": 0.319,
+          "open_ms": 0.126,
+          "probe_ms": 0.274,
           "decode": {
             "frames": 29,
             "samples": 132300,
             "canonical_f32_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
             "canonical_len": 264600,
-            "decode_ms": 3.378
+            "decode_ms": 3.734
           }
         }
       }
@@ -2929,14 +2929,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.102,
-          "probe_ms": 0.229,
+          "open_ms": 0.121,
+          "probe_ms": 0.252,
           "decode": {
             "frames": 20,
             "samples": 88200,
             "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
             "canonical_len": 176400,
-            "decode_ms": 2.16
+            "decode_ms": 2.318
           }
         }
       }
@@ -2982,14 +2982,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.11,
-          "probe_ms": 0.246,
+          "open_ms": 0.141,
+          "probe_ms": 0.311,
           "decode": {
             "frames": 20,
             "samples": 88200,
             "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
             "canonical_len": 176400,
-            "decode_ms": 2.241
+            "decode_ms": 2.581
           }
         }
       }
@@ -3034,14 +3034,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.103,
-          "probe_ms": 0.226,
+          "open_ms": 0.119,
+          "probe_ms": 0.269,
           "decode": {
             "frames": 22,
             "samples": 101376,
             "canonical_f32_sha256": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
             "canonical_len": 202752,
-            "decode_ms": 2.483
+            "decode_ms": 3.008
           }
         }
       }
@@ -3088,14 +3088,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.125,
-          "probe_ms": 0.522,
+          "open_ms": 0.157,
+          "probe_ms": 0.592,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
             "canonical_len": 352800,
-            "decode_ms": 2.71
+            "decode_ms": 2.98
           }
         }
       }
@@ -3140,14 +3140,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 2,
-          "open_ms": 0.126,
-          "probe_ms": 0.641,
+          "open_ms": 0.153,
+          "probe_ms": 0.689,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
             "canonical_len": 352800,
-            "decode_ms": 3.029
+            "decode_ms": 2.974
           }
         }
       }
@@ -3192,14 +3192,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.114,
-          "probe_ms": 0.487,
+          "open_ms": 0.159,
+          "probe_ms": 0.642,
           "decode": {
             "frames": 155,
             "samples": 176400,
             "canonical_f32_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
             "canonical_len": 352800,
-            "decode_ms": 2.426
+            "decode_ms": 2.599
           }
         }
       }
@@ -3244,14 +3244,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.14,
-          "probe_ms": 0.642,
+          "open_ms": 0.147,
+          "probe_ms": 0.602,
           "decode": {
             "frames": 78,
             "samples": 88200,
             "canonical_f32_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
             "canonical_len": 176400,
-            "decode_ms": 1.505
+            "decode_ms": 1.865
           }
         }
       }
@@ -3296,14 +3296,14 @@
           "channels": 2,
           "duration_us": 300000,
           "nb_streams": 1,
-          "open_ms": 0.099,
-          "probe_ms": 0.493,
+          "open_ms": 0.124,
+          "probe_ms": 0.591,
           "decode": {
             "frames": 13,
             "samples": 13230,
             "canonical_f32_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
             "canonical_len": 26460,
-            "decode_ms": 0.25
+            "decode_ms": 0.358
           }
         }
       }
@@ -3348,14 +3348,14 @@
           "channels": 2,
           "duration_us": 12000000,
           "nb_streams": 1,
-          "open_ms": 0.118,
-          "probe_ms": 0.509,
+          "open_ms": 0.105,
+          "probe_ms": 0.496,
           "decode": {
             "frames": 461,
             "samples": 529200,
             "canonical_f32_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
             "canonical_len": 1058400,
-            "decode_ms": 7.675
+            "decode_ms": 7.682
           }
         }
       }
@@ -3400,14 +3400,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.137,
-          "probe_ms": 0.553,
+          "open_ms": 0.14,
+          "probe_ms": 0.556,
           "decode": {
             "frames": 116,
             "samples": 132527,
             "canonical_f32_sha256": "0f59c309e17cfb5d5b1e913b814a9ab1420a163d65cbd5254068fa39c3724398",
             "canonical_len": 265054,
-            "decode_ms": 2.261
+            "decode_ms": 2.14
           }
         }
       }
@@ -3479,14 +3479,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.089,
-          "probe_ms": 0.225,
+          "open_ms": 0.128,
+          "probe_ms": 0.243,
           "decode": {
             "frames": 39,
             "samples": 176400,
             "canonical_f32_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
             "canonical_len": 352800,
-            "decode_ms": 4.108
+            "decode_ms": 4.149
           }
         }
       }
@@ -3532,14 +3532,14 @@
           "channels": 1,
           "duration_us": 3000000,
           "nb_streams": 1,
-          "open_ms": 0.12,
-          "probe_ms": 0.15,
+          "open_ms": 0.132,
+          "probe_ms": 0.147,
           "decode": {
             "frames": 29,
             "samples": 132300,
             "canonical_f32_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
             "canonical_len": 132300,
-            "decode_ms": 1.734
+            "decode_ms": 1.69
           }
         }
       }
@@ -3585,14 +3585,14 @@
           "channels": 2,
           "duration_us": 3000000,
           "nb_streams": 1,
-          "open_ms": 0.111,
-          "probe_ms": 0.551,
+          "open_ms": 0.115,
+          "probe_ms": 0.585,
           "decode": {
             "frames": 36,
             "samples": 288000,
             "canonical_f32_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
             "canonical_len": 576000,
-            "decode_ms": 6.893
+            "decode_ms": 6.706
           }
         }
       }
@@ -3638,14 +3638,14 @@
           "channels": 2,
           "duration_us": 3000000,
           "nb_streams": 2,
-          "open_ms": 0.129,
-          "probe_ms": 0.238,
+          "open_ms": 0.107,
+          "probe_ms": 0.243,
           "decode": {
             "frames": 29,
             "samples": 132300,
             "canonical_f32_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
             "canonical_len": 264600,
-            "decode_ms": 3.131
+            "decode_ms": 3.229
           }
         }
       }
@@ -3691,14 +3691,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.11,
-          "probe_ms": 0.244,
+          "open_ms": 0.108,
+          "probe_ms": 0.221,
           "decode": {
             "frames": 20,
             "samples": 88200,
             "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
             "canonical_len": 176400,
-            "decode_ms": 2.037
+            "decode_ms": 2.068
           }
         }
       }
@@ -3744,14 +3744,14 @@
           "channels": 2,
           "duration_us": 2000000,
           "nb_streams": 1,
-          "open_ms": 0.097,
-          "probe_ms": 0.259,
+          "open_ms": 0.093,
+          "probe_ms": 0.226,
           "decode": {
             "frames": 20,
             "samples": 88200,
             "canonical_f32_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
             "canonical_len": 176400,
-            "decode_ms": 2.108
+            "decode_ms": 2.097
           }
         }
       }
@@ -3796,14 +3796,14 @@
           "channels": 2,
           "duration_us": 4000000,
           "nb_streams": 1,
-          "open_ms": 0.137,
-          "probe_ms": 0.252,
+          "open_ms": 0.105,
+          "probe_ms": 0.222,
           "decode": {
             "frames": 22,
             "samples": 101376,
             "canonical_f32_sha256": "121ed801eae36308da91eaabf9044072b4ffbd03b5e5486ba1d13e330edcb2ea",
             "canonical_len": 202752,
-            "decode_ms": 2.438
+            "decode_ms": 2.417
           }
         }
       }

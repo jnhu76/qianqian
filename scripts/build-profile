@@ -106,8 +106,9 @@ def audio_decoder_list():
 
 
 def configure_args(profile, pin):
+    # relative prefix: keeps configure-args (and their hash) machine-independent
     args = [
-        "--prefix=" + os.path.join(BUILD, profile["profile"], "install"),
+        "--prefix=install",
     ]
     if profile.get("component_base") == "everything-disabled":
         args.append("--disable-everything")
@@ -214,7 +215,8 @@ def main():
 
     pdir = os.path.join(BUILD, name)
     bdir = os.path.join(pdir, "ffmpeg")
-    idir = os.path.join(pdir, "install")
+    # relative --prefix resolves against the build dir
+    idir = os.path.join(bdir, "install")
     os.makedirs(os.path.join(pdir, "meta"), exist_ok=True)
     with open(os.path.join(pdir, "configure-args.txt"), "w") as f:
         f.write(args_blob)

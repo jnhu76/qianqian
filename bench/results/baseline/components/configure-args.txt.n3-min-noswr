@@ -1,4 +1,4 @@
---prefix=/home/hoo/Source/qianqian/build/n3-min-noswr/install
+--prefix=install
 --disable-everything
 --disable-programs
 --disable-doc

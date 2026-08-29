@@ -1,4 +1,4 @@
---prefix=/home/hoo/Source/qianqian/build/n2-stage-a/install
+--prefix=install
 --disable-everything
 --disable-programs
 --disable-doc
