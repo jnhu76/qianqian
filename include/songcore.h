@@ -10,17 +10,20 @@ extern "C" {
 
 typedef struct song_handle song_handle;
 
+/* Return bytes read, 0 for EOF, <0 for host IO error. */
 typedef int64_t (*song_read_fn)(
     void* userdata,
     uint8_t* dst,
     size_t size
 );
 
+/* Seek to an absolute byte offset. Return resulting absolute offset, <0 on error. */
 typedef int64_t (*song_seek_fn)(
     void* userdata,
     int64_t absolute_offset
 );
 
+/* Return total source size in bytes, <0 when unavailable/error. */
 typedef int64_t (*song_size_fn)(
     void* userdata
 );
@@ -44,12 +47,14 @@ typedef struct song_info {
 /*
  * Experimental ABI sketch.
  * This header is intentionally tiny and is NOT frozen yet.
+ * FFmpeg types are forbidden above this boundary.
  */
 
 song_handle* song_open(const song_io* io);
 int song_probe(song_handle* handle, song_info* out_info);
 
-/* Interleaved Float32 PCM. Returns frames produced, 0 for EOF, <0 for error. */
+/* Interleaved Float32 PCM at source rate/layout. Returns frames produced,
+ * 0 for EOF, <0 for error. The core does not own an audio device. */
 int64_t song_read_pcm(
     song_handle* handle,
     float* output,
