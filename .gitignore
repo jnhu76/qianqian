@@ -1,0 +1,9 @@
+# Build trees and fetched sources (reproduce with scripts/fetch-ffmpeg)
+/build/
+
+# Ephemeral benchmark runs (canonical baselines are tracked under bench/results/baseline)
+bench/results/runs/
+
+# Python
+__pycache__/
+*.pyc
