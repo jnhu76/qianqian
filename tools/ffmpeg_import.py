@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import platform
 import re
 import shlex
 import shutil
@@ -109,6 +110,32 @@ def make_log() -> str:
     # V=1 is the key: source closure is observed from real compiler invocations
     # rather than reimplementing FFmpeg's Make language.
     return run(["make", "-j", jobs, "V=1", *LIB_TARGETS], cwd=ORACLE, capture=True)
+
+
+def config_value(name: str) -> str | None:
+    config_mak = ORACLE / "ffbuild" / "config.mak"
+    if not config_mak.is_file():
+        return None
+    text = config_mak.read_text(errors="replace")
+    match = re.search(rf"^{re.escape(name)}=(.*)$", text, re.M)
+    return match.group(1).strip() if match else None
+
+
+def toolchain_identity() -> dict:
+    """Record the oracle environment that generated this closure.
+
+    Generated config headers and selected architecture sources are not portable
+    across arbitrary compilers/targets. A changed toolchain therefore requires
+    a fresh import rather than silently replaying an old manifest.
+    """
+    return {
+        "system": platform.system().lower(),
+        "machine": platform.machine(),
+        "cc": config_value("CC"),
+        "cc_ident": config_value("CC_IDENT"),
+        "arch": config_value("ARCH"),
+        "target_os": config_value("TARGET_OS"),
+    }
 
 
 def normalize_path(token: str) -> tuple[str, str] | None:
@@ -237,6 +264,7 @@ def main() -> None:
     log = make_log()
     units = closure_from_log(log)
     args = configure_args(profile)
+    toolchain = toolchain_identity()
 
     refs = {}
     for rel in LIB_TARGETS:
@@ -253,6 +281,7 @@ def main() -> None:
         "ffmpeg_commit_sha": pin["ffmpeg_commit_sha"],
         "profile": profile["profile"],
         "profile_sha256": sha256_file(PROFILE),
+        "toolchain": toolchain,
         "source_root": "build/ffmpeg-src",
         "config_root": "build/ffmpeg-xmake/oracle",
         "configure_args": args,
@@ -271,6 +300,7 @@ def main() -> None:
 
     print(f"wrote {MANIFEST.relative_to(ROOT)}")
     print(f"closure: {len(units)} translation units ({generated_units} generated)")
+    print(f"toolchain: {toolchain}")
     print("normal builds may now run: xmake qianqian_av")
 
 
