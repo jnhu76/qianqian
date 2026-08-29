@@ -1,6 +1,7 @@
 set_project("qianqian")
 set_version("0.1.0")
 set_languages("c11")
+set_config("buildir", "build/xmake")
 add_rules("mode.debug", "mode.release")
 
 local artifact_dir = path.join(os.projectdir(), "build", "artifacts")
@@ -26,7 +27,6 @@ target("qianqian_av")
     set_kind("static")
     set_default(false)
     set_targetdir(artifact_dir)
-    set_warnings("none")
     on_load(function (target)
         import("core.base.json")
         -- Do not fail project loading here: `xmake ffmpeg-import` must be able
@@ -47,8 +47,8 @@ target("qianqian_av")
             local source = path.join(root, unit.path)
             local flags = {}
             for _, flag in ipairs(unit.flags or {}) do
-                flag = flag:gsub("@SRC@", srcroot)
-                flag = flag:gsub("@BUILD@", buildroot)
+                flag = flag:gsub("@SRC@", function () return srcroot end)
+                flag = flag:gsub("@BUILD@", function () return buildroot end)
                 table.insert(flags, flag)
             end
             if #flags > 0 then
