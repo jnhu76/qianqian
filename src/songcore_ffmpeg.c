@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -161,29 +162,53 @@ int song_probe(song_handle *h, song_info *out_info) {
 
     if (!h->probed) {
         if (avformat_find_stream_info(h->fmt, NULL) < 0) return -1;
+
+        int audio_index = -1;
         for (unsigned i = 0; i < h->fmt->nb_streams; ++i) {
             if (h->fmt->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-                h->audio_index = (int)i;
+                audio_index = (int)i;
                 break;
             }
         }
-        if (h->audio_index < 0) return -1;
+        if (audio_index < 0) return -1;
 
-        AVStream *st = h->fmt->streams[h->audio_index];
+        AVStream *st = h->fmt->streams[audio_index];
         const AVCodec *codec = avcodec_find_decoder(st->codecpar->codec_id);
         if (!codec) return -1;
-        h->dec = avcodec_alloc_context3(codec);
-        if (!h->dec) return -1;
-        if (avcodec_parameters_to_context(h->dec, st->codecpar) < 0) return -1;
-        if (avcodec_open2(h->dec, codec, NULL) < 0) return -1;
 
-        h->packet = av_packet_alloc();
-        h->frame = av_frame_alloc();
-        if (!h->packet || !h->frame) return -1;
+        AVCodecContext *dec = avcodec_alloc_context3(codec);
+        AVPacket *packet = NULL;
+        AVFrame *frame = NULL;
+        if (!dec) return -1;
+        if (avcodec_parameters_to_context(dec, st->codecpar) < 0 ||
+            avcodec_open2(dec, codec, NULL) < 0) {
+            avcodec_free_context(&dec);
+            return -1;
+        }
+        packet = av_packet_alloc();
+        frame = av_frame_alloc();
+        if (!packet || !frame) {
+            av_packet_free(&packet);
+            av_frame_free(&frame);
+            avcodec_free_context(&dec);
+            return -1;
+        }
 
-        h->sample_rate = st->codecpar->sample_rate;
-        h->channels = st->codecpar->ch_layout.nb_channels;
-        if (h->sample_rate <= 0 || h->channels <= 0) return -1;
+        int sample_rate = st->codecpar->sample_rate;
+        int channels = st->codecpar->ch_layout.nb_channels;
+        if (sample_rate <= 0 || channels <= 0) {
+            av_packet_free(&packet);
+            av_frame_free(&frame);
+            avcodec_free_context(&dec);
+            return -1;
+        }
+
+        h->audio_index = audio_index;
+        h->dec = dec;
+        h->packet = packet;
+        h->frame = frame;
+        h->sample_rate = sample_rate;
+        h->channels = channels;
         h->probed = 1;
     }
 
@@ -201,7 +226,7 @@ int song_probe(song_handle *h, song_info *out_info) {
 }
 
 static int ensure_pcm(song_handle *h, size_t frames, int channels) {
-    if (frames > SIZE_MAX / (size_t)channels) return -1;
+    if (channels <= 0 || frames > SIZE_MAX / (size_t)channels) return -1;
     size_t floats = frames * (size_t)channels;
     if (floats <= h->pcm_capacity_floats) return 0;
     if (floats > SIZE_MAX / sizeof(float)) return -1;
@@ -219,10 +244,11 @@ static int frame_to_f32(song_handle *h, const AVFrame *f) {
         return -1;
     if (ensure_pcm(h, (size_t)frames, channels) < 0) return -1;
 
+    const size_t samples = (size_t)frames * (size_t)channels;
     float *dst = h->pcm;
     switch ((enum AVSampleFormat)f->format) {
     case AV_SAMPLE_FMT_FLT:
-        memcpy(dst, f->data[0], sizeof(float) * (size_t)frames * channels);
+        memcpy(dst, f->data[0], sizeof(float) * samples);
         break;
     case AV_SAMPLE_FMT_FLTP:
         for (int c = 0; c < channels; ++c) {
@@ -230,10 +256,11 @@ static int frame_to_f32(song_handle *h, const AVFrame *f) {
             for (int i = 0; i < frames; ++i) dst[(size_t)i * channels + c] = src[i];
         }
         break;
-    case AV_SAMPLE_FMT_S16:
-        for (int i = 0; i < frames * channels; ++i)
-            dst[i] = (float)((const int16_t *)f->data[0])[i] * (1.0f / 32768.0f);
+    case AV_SAMPLE_FMT_S16: {
+        const int16_t *src = (const int16_t *)f->data[0];
+        for (size_t i = 0; i < samples; ++i) dst[i] = (float)src[i] * (1.0f / 32768.0f);
         break;
+    }
     case AV_SAMPLE_FMT_S16P:
         for (int c = 0; c < channels; ++c) {
             const int16_t *src = (const int16_t *)f->extended_data[c];
@@ -241,10 +268,11 @@ static int frame_to_f32(song_handle *h, const AVFrame *f) {
                 dst[(size_t)i * channels + c] = (float)src[i] * (1.0f / 32768.0f);
         }
         break;
-    case AV_SAMPLE_FMT_S32:
-        for (int i = 0; i < frames * channels; ++i)
-            dst[i] = (float)((const int32_t *)f->data[0])[i] * (1.0f / 2147483648.0f);
+    case AV_SAMPLE_FMT_S32: {
+        const int32_t *src = (const int32_t *)f->data[0];
+        for (size_t i = 0; i < samples; ++i) dst[i] = (float)src[i] * (1.0f / 2147483648.0f);
         break;
+    }
     case AV_SAMPLE_FMT_S32P:
         for (int c = 0; c < channels; ++c) {
             const int32_t *src = (const int32_t *)f->extended_data[c];
@@ -303,8 +331,11 @@ static int decode_one_frame(song_handle *h) {
                 ret = av_read_frame(h->fmt, h->packet);
                 if (ret < 0) {
                     av_packet_unref(h->packet);
-                    h->demux_eof = 1;
-                    break;
+                    if (ret == AVERROR_EOF || avio_feof(h->fmt->pb)) {
+                        h->demux_eof = 1;
+                        break;
+                    }
+                    return -1;
                 }
                 if (h->packet->stream_index == h->audio_index) {
                     h->packet_pending = 1;
