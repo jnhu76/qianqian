@@ -29,8 +29,10 @@ target("qianqian_av")
     set_warnings("none")
     on_load(function (target)
         import("core.base.json")
+        -- Do not fail project loading here: `xmake ffmpeg-import` must be able
+        -- to run before the manifest exists. before_build below owns the gate.
         if not os.isfile(ffmpeg_manifest) then
-            raise("FFmpeg source closure is missing. Run `xmake ffmpeg-import` first.")
+            return
         end
 
         local m = json.loadfile(ffmpeg_manifest)
@@ -44,16 +46,23 @@ target("qianqian_av")
             local root = unit.origin == "generated" and buildroot or srcroot
             local source = path.join(root, unit.path)
             local flags = {}
-            for _, flag in ipairs(unit.cflags or {}) do
+            for _, flag in ipairs(unit.flags or {}) do
                 flag = flag:gsub("@SRC@", srcroot)
                 flag = flag:gsub("@BUILD@", buildroot)
                 table.insert(flags, flag)
             end
             if #flags > 0 then
-                target:add("files", source, {force = {cflags = flags}})
+                local force = {}
+                force[unit.flag_kind or "cflags"] = flags
+                target:add("files", source, {force = force})
             else
                 target:add("files", source)
             end
+        end
+    end)
+    before_build(function ()
+        if not os.isfile(ffmpeg_manifest) then
+            raise("FFmpeg source closure is missing. Run `xmake ffmpeg-import` first, then rerun xmake.")
         end
     end)
 
@@ -71,8 +80,6 @@ target("qn_pcm_dump")
     set_targetdir(artifact_dir)
     add_files("tools/qn_pcm_dump.c")
     add_deps("songcore")
-    if is_plat("linux") then
-        add_syslinks("m", "pthread")
-    elseif is_plat("macosx") then
+    if is_plat("linux") or is_plat("macosx") then
         add_syslinks("m", "pthread")
     end
