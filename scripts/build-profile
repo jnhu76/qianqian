@@ -1,0 +1,354 @@
+#!/usr/bin/env python3
+"""Build one FFmpeg profile from bench/profiles/<name>.json and link the bench binary.
+
+Usage:
+  scripts/build-profile <profile-name> [--force]
+
+Deterministic: the configure argument list is generated from the profile JSON
+in a fixed order; its sha256 is recorded as configure_args_hash. A build is
+reused only when the stored hash matches, otherwise the build tree is wiped
+and reconfigured.
+
+Outputs per profile (all under build/, untracked):
+  build/<profile>/configure-args.txt
+  build/<profile>/build-meta.json
+  build/<profile>/meta/enabled-components.txt   (extracted from config.h)
+  build/<profile>/meta/generated-components.json (e.g. n1 audio-decoder list)
+  build/<profile>/size.json
+  build/<profile>/install/lib/*.a
+  build/<profile>/qn_bench            bench binary linked against this profile
+  build/<profile>/qn_bench.stripped
+"""
+import hashlib
+import json
+import os
+import platform
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "build", "ffmpeg-src")
+BUILD = os.path.join(ROOT, "build")
+PIN = os.path.join(ROOT, "bench", "ffmpeg-pin.json")
+CORPUS_MANIFEST = os.path.join(ROOT, "corpus", "manifest", "stage-a.json")
+
+COMPONENT_CLASSES = ["demuxer", "decoder", "encoder", "muxer", "parser", "bsf",
+                     "protocol", "filter", "indev", "outdev"]
+
+
+def sh(cmd, cwd=None, env=None, capture=True):
+    r = subprocess.run(cmd, cwd=cwd, env=env,
+                       stdout=subprocess.PIPE if capture else None,
+                       stderr=subprocess.STDOUT if capture else None, text=True)
+    if r.returncode != 0:
+        out = (r.stdout or "")[-4000:]
+        raise SystemExit(f"command failed ({r.returncode}): {' '.join(cmd)}\n{out}")
+    return r.stdout or ""
+
+
+def sha256_file(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def git_sha():
+    try:
+        sha = sh(["git", "rev-parse", "HEAD"], cwd=ROOT).strip()
+        dirty = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT,
+                               capture_output=True, text=True).stdout.strip() != ""
+        return sha, dirty
+    except SystemExit:
+        return "unknown", True
+
+
+def audio_decoder_list():
+    """Mechanically derive the audio-only decoder list from the pinned source.
+
+    Primary source: libavcodec/codec_desc.c (descriptor name -> media type).
+    Fallback for decoders whose name has no descriptor (mp3float, dca,
+    hardware wrappers, ...): locate `ff_<name>_decoder` in libavcodec/*.c and
+    read .p.type from its FFCodec struct. Decoders with no classification are
+    reported and stay disabled.
+    """
+    decoders = sh([os.path.join(SRC, "configure"), "--list-decoders"], cwd=SRC).split()
+    desc = open(os.path.join(SRC, "libavcodec", "codec_desc.c"), encoding="utf-8").read()
+    types = {name: t for t, name in re.findall(
+        r'\.type\s*=\s*AVMEDIA_TYPE_([A-Z]+),(?:[^;]*?)\.name\s*=\s*"([a-z0-9_]+)"',
+        desc, re.S)}
+
+    codec_blobs = {}
+    libdir = os.path.join(SRC, "libavcodec")
+    for fn in os.listdir(libdir):
+        if fn.endswith(".c"):
+            codec_blobs[fn] = open(os.path.join(libdir, fn), encoding="utf-8", errors="replace").read()
+    blob = "\n".join(codec_blobs.values())
+
+    def struct_type(name):
+        m = re.search(rf'ff_{re.escape(name)}_decoder\s*=\s*\{{(.*?)\n\}};', blob, re.S)
+        if not m:
+            return None
+        t = re.search(r'AVMEDIA_TYPE_([A-Z]+)', m.group(1))
+        return t.group(1) if t else None
+
+    result = {}
+    for d in decoders:
+        t = types.get(d) or struct_type(d)
+        result[d] = t or "UNKNOWN"
+    audio = sorted(d for d, t in result.items() if t == "AUDIO")
+    unknown = sorted(d for d, t in result.items() if t == "UNKNOWN")
+    return audio, unknown, len(decoders)
+
+
+def configure_args(profile, pin):
+    args = [
+        "--prefix=" + os.path.join(BUILD, profile["profile"], "install"),
+    ]
+    if profile.get("component_base") == "everything-disabled":
+        args.append("--disable-everything")
+    args += ["--disable-" + f for f in profile.get("disable", [])]
+
+    libs = profile.get("libraries", "default")
+    if isinstance(libs, dict):
+        for name in sorted(libs.get("disable", [])):
+            args.append(f"--disable-{name}")
+        for name in libs.get("enable", []):
+            args.append(f"--enable-{name}")
+
+    comps = profile.get("components", {})
+    for cls in COMPONENT_CLASSES:
+        val = comps.get(cls)
+        if not val:
+            continue
+        if isinstance(val, str) and val == "audio-only":
+            audio, _, _ = audio_decoder_list()
+            for name in audio:
+                args.append(f"--enable-decoder={name}")
+        else:
+            for name in sorted(val):
+                args.append(f"--enable-{cls}={name}")
+    return args
+
+
+def extract_enabled_components(config_h):
+    """Extract enabled components from the generated config.h. Machine truth."""
+    text = open(config_h, encoding="utf-8").read()
+    enabled = re.findall(r'^#define (CONFIG_[A-Z0-9_]+) 1', text, re.M)
+    classes = {c.upper(): c for c in COMPONENT_CLASSES}
+    libs = {"AVUTIL", "AVCODEC", "AVFORMAT", "SWRESAMPLE", "SWSCALE",
+            "AVFILTER", "AVDEVICE", "POSTPROC"}
+    out = {}
+    other = []
+    for flag in sorted(enabled):
+        name = flag[len("CONFIG_"):]
+        matched = False
+        for suffix, cls in classes.items():
+            if name.endswith("_" + suffix):
+                out.setdefault(cls, []).append(name[: -(len(suffix) + 1)].lower())
+                matched = True
+                break
+        if not matched and name in libs:
+            out.setdefault("library", []).append(name.lower())
+        elif not matched:
+            other.append(name)
+    out["other_config_flags"] = other
+    return out
+
+
+def symbol_count(a):
+    try:
+        out = subprocess.run(["nm", "--defined-only", a], capture_output=True, text=True).stdout
+        return sum(1 for line in out.splitlines() if re.match(r'^[0-9a-fA-F]+ ', line))
+    except Exception:
+        return None
+
+
+def xz_size(path):
+    xz = os.path.join(BUILD, "tmp-size.xz")
+    if os.path.exists(xz):
+        os.remove(xz)
+    subprocess.run(["xz", "-9", "-c", path], stdout=open(xz, "wb"), check=True)
+    n = os.path.getsize(xz)
+    os.remove(xz)
+    return n
+
+
+def main():
+    if len(sys.argv) < 2:
+        raise SystemExit(__doc__)
+    force = "--force" in sys.argv
+    profile_file = None
+    if "--profile-file" in sys.argv:
+        profile_file = sys.argv[sys.argv.index("--profile-file") + 1]
+        name = json.load(open(profile_file))["profile"]
+    else:
+        name = sys.argv[1]
+        profile_file = os.path.join(ROOT, "bench", "profiles", f"{name}.json")
+    if not os.path.exists(profile_file):
+        raise SystemExit(f"profile not found: {profile_file}")
+    profile = json.load(open(profile_file))
+    if profile["profile"] != name:
+        raise SystemExit("profile name mismatch")
+    pin = json.load(open(PIN))
+
+    if not os.path.exists(os.path.join(SRC, ".qianqian-verified")):
+        raise SystemExit("ffmpeg source missing — run scripts/fetch-ffmpeg first")
+
+    args = configure_args(profile, pin)
+    args_blob = "\n".join(args) + "\n"
+    args_hash = hashlib.sha256(args_blob.encode()).hexdigest()
+
+    pdir = os.path.join(BUILD, name)
+    bdir = os.path.join(pdir, "ffmpeg")
+    idir = os.path.join(pdir, "install")
+    os.makedirs(os.path.join(pdir, "meta"), exist_ok=True)
+    with open(os.path.join(pdir, "configure-args.txt"), "w") as f:
+        f.write(args_blob)
+
+    # build cache: reuse only when args hash matches
+    stamp = os.path.join(pdir, "meta", "configure_args_hash")
+    if not force and os.path.exists(stamp) and open(stamp).read().strip() == args_hash \
+            and os.path.exists(os.path.join(bdir, "config.h")):
+        print(f"[{name}] configure args unchanged ({args_hash[:12]}), reusing build tree")
+    else:
+        shutil.rmtree(bdir, ignore_errors=True)
+        os.makedirs(bdir)
+        print(f"[{name}] configuring ({len(args)} args)…")
+        sh([os.path.join(SRC, "configure")] + args, cwd=bdir)
+        with open(stamp, "w") as f:
+            f.write(args_hash)
+
+    if force or not os.path.exists(os.path.join(bdir, "libavformat", "libavformat.a")):
+        print(f"[{name}] building…")
+        env = dict(os.environ, LC_ALL="C")
+        sh(["make", "-j", str(os.cpu_count() or 4)], cwd=bdir, env=env)
+        sh(["make", "install"], cwd=bdir, env=env)
+
+    # metadata
+    cc = "gcc"
+    cc_version = sh([cc, "--version"]).splitlines()[0].strip()
+    cc_ident = "unknown"
+    mak = os.path.join(bdir, "ffbuild", "config.mak")
+    if os.path.exists(mak):
+        m = re.search(r'^CC_IDENT=(.*)$', open(mak).read(), re.M)
+        if m:
+            cc_ident = m.group(1).strip()
+    qsha, dirty = git_sha()
+    corpus_id = None
+    if os.path.exists(CORPUS_MANIFEST):
+        corpus_id = json.load(open(CORPUS_MANIFEST)).get("corpus_id")
+
+    version = open(os.path.join(SRC, "RELEASE")).read().strip()
+    meta = {
+        "profile": name,
+        "profile_json_sha256": sha256_file(profile_file),
+        "ffmpeg_tag": pin["ffmpeg_tag"],
+        "ffmpeg_commit_sha": pin["ffmpeg_commit_sha"],
+        "ffmpeg_version": version,
+        "compiler": cc,
+        "compiler_version": cc_version,
+        "compiler_ident": cc_ident,
+        "platform": platform.system().lower(),
+        "platform_release": platform.release(),
+        "arch": platform.machine(),
+        "build_type": "release-static",
+        "configure_args": args,
+        "configure_args_hash": args_hash,
+        "qianqian_git_sha": qsha,
+        "qianqian_git_dirty": dirty,
+        "corpus_id": corpus_id,
+        "host_cpu": platform.processor() or "unknown",
+        "built_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    }
+    with open(os.path.join(pdir, "build-meta.json"), "w") as f:
+        json.dump(meta, f, indent=2, sort_keys=True)
+        f.write("\n")
+
+    comps = extract_enabled_components(os.path.join(bdir, "config.h"))
+    with open(os.path.join(pdir, "meta", "enabled-components.txt"), "w") as f:
+        for cls in COMPONENT_CLASSES + ["library"]:
+            for n in sorted(comps.get(cls, [])):
+                f.write(f"{cls}: {n}\n")
+        for n in comps.get("other_config_flags", []):
+            f.write(f"other: {n}\n")
+    with open(os.path.join(pdir, "meta", "enabled-components.json"), "w") as f:
+        json.dump(comps, f, indent=2, sort_keys=True)
+        f.write("\n")
+
+    # generated component lists (e.g. n1 audio-only decoders) — recorded for audit
+    comps_profile = profile.get("components", {})
+    if comps_profile.get("decoder") == "audio-only":
+        audio, unknown, total = audio_decoder_list()
+        with open(os.path.join(pdir, "meta", "generated-components.json"), "w") as f:
+            json.dump({"policy": "audio-only", "decoders_total": total,
+                       "audio_decoders": audio, "unclassified": unknown}, f, indent=2)
+        print(f"[{name}] generated audio-only decoder list: {len(audio)} enabled, "
+              f"{len(unknown)} unclassified (left disabled)")
+
+    # bench binary — swr use is decided by what the profile actually BUILT
+    have_swr = os.path.exists(os.path.join(idir, "lib", "libswresample.a"))
+    bench_c = os.path.join(ROOT, "bench", "native", "qn_bench.c")
+    exe = os.path.join(pdir, "qn_bench")
+    ldlibs = ["-lavformat", "-lavcodec"]
+    if have_swr:
+        ldlibs.append("-lswresample")
+    ldlibs += ["-lavutil", "-lm", "-lpthread"]
+    cmd = ["gcc", "-O2", "-Wall", "-Wno-deprecated-declarations",
+           "-I" + bdir, "-I" + SRC,
+           "-o", exe, bench_c,
+           "-L" + os.path.join(idir, "lib"),
+           "-Wl,-rpath," + os.path.join(idir, "lib")] + ldlibs
+    if have_swr:
+        cmd.insert(2, "-DQN_HAVE_SWR=1")
+    print(f"[{name}] compiling bench binary (swr={have_swr})…")
+    sh(cmd, cwd=ROOT)
+    stripped = exe + ".stripped"
+    shutil.copyfile(exe, stripped)
+    subprocess.run(["strip", "--strip-unneeded", stripped], check=True)
+
+    # sizes
+    libdir = os.path.join(idir, "lib")
+    libs_info = {}
+    total = 0
+    total_sym = 0
+    if os.path.isdir(libdir):
+        for lib in sorted(os.listdir(libdir)):
+            if not lib.endswith(".a"):
+                continue
+            p = os.path.join(libdir, lib)
+            n = os.path.getsize(p)
+            total += n
+            syms = symbol_count(p) or 0
+            total_sym += syms
+            libs_info[lib] = {"bytes": n, "defined_symbols": syms}
+
+    artifacts = {}
+    for label, p in [("bench_linked", exe), ("bench_stripped", stripped)]:
+        if os.path.exists(p):
+            artifacts[label + "_bytes"] = os.path.getsize(p)
+            artifacts[label + "_xz_bytes"] = xz_size(p)
+    size = {
+        "profile": name,
+        "static_libs": libs_info,
+        "static_libs_total_bytes": total,
+        "static_libs_defined_symbols": total_sym,
+        "artifacts": artifacts,
+    }
+    with open(os.path.join(pdir, "size.json"), "w") as f:
+        json.dump(size, f, indent=2, sort_keys=True)
+        f.write("\n")
+
+    print(f"[{name}] done: static libs {total/1024:.0f} KiB, "
+          f"bench {artifacts.get('bench_stripped_bytes', 0)/1024:.0f} KiB stripped")
+    print(f"[{name}] components: " + ", ".join(
+        f"{cls}={len(comps.get(cls, []))}" for cls in COMPONENT_CLASSES
+        if comps.get(cls)))
+
+
+if __name__ == "__main__":
+    main()

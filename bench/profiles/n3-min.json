@@ -1,0 +1,51 @@
+{
+  "profile": "n3-min",
+  "ladder": 3,
+  "description": "Irducible/minimal profile: starts as a copy of n2-stage-a; every component that survives must have corpus evidence (removal probe) that deleting it breaks a corpus case or the SongCore flow. This file records the surviving set.",
+  "component_base": "everything-disabled",
+  "libraries": {
+    "enable": ["avformat", "avcodec", "swresample"],
+    "disable": ["avdevice", "avfilter", "swscale"]
+  },
+  "disable": [
+    "programs",
+    "doc",
+    "debug",
+    "autodetect",
+    "x86asm",
+    "network",
+    "protocols",
+    "devices"
+  ],
+  "components": {
+    "demuxer": ["mp3", "flac"],
+    "decoder": ["flac", "mp3float"],
+    "parser": ["mpegaudio"]
+  },
+  "provenance": {
+    "demuxer:mp3": {
+      "required_by": ["mp3-cbr-id3v23", "mp3-vbr-id3v24", "mp3-cbr-id3v23-artwork", "mp3-minimal", "mp3-short", "mp3-long", "mp3-corrupt-tail", "mp3-truncated-header"],
+      "reason": "removal probe: demuxer removal breaks all mp3 cases (open fails)"
+    },
+    "demuxer:flac": {
+      "required_by": ["flac-16-44-stereo", "flac-16-44-mono", "flac-24-96", "flac-artwork", "flac-replaygain", "flac-minimal", "flac-truncated"],
+      "reason": "removal probe: demuxer removal breaks all flac cases (open fails)"
+    },
+    "decoder:mp3float": {
+      "required_by": ["mp3-cbr-id3v23", "mp3-vbr-id3v24", "mp3-cbr-id3v23-artwork", "mp3-minimal", "mp3-short", "mp3-long", "mp3-corrupt-tail"],
+      "reason": "removal probe: decoder removal breaks mp3 decode; mp3float chosen over the fixed-point mp3 alias because it is what a full build resolves for AV_CODEC_ID_MP3"
+    },
+    "decoder:flac": {
+      "required_by": ["flac-16-44-stereo", "flac-16-44-mono", "flac-24-96", "flac-artwork", "flac-replaygain", "flac-minimal", "flac-truncated"],
+      "reason": "removal probe: decoder removal breaks flac decode"
+    },
+    "parser:mpegaudio": {
+      "required_by": ["see bench/provenance/component-provenance.json"],
+      "reason": "decided by removal probe"
+    },
+    "lib:swresample": {
+      "required_by": ["songcore-output: Float32 interleaved PCM"],
+      "reason": "format conversion + planar->interleaved; bypass experiment in n3-min-noswr"
+    }
+  }
+}
