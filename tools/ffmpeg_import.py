@@ -16,11 +16,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
-import sys
-from typing import Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "build" / "ffmpeg-src"
@@ -38,6 +37,7 @@ LIB_TARGETS = (
 SOURCE_SUFFIXES = (".c", ".S", ".s", ".asm", ".cpp", ".m")
 DEP_FLAGS_WITH_VALUE = {"-MF", "-MT", "-MQ"}
 DEP_FLAGS = {"-MMD", "-MD", "-MP", "-MM", "-M"}
+WINDOWS_ABS = re.compile(r"^[A-Za-z]:[\\/]")
 
 
 def run(cmd: list[str], *, cwd: Path, capture: bool = False) -> str:
@@ -64,10 +64,6 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def sha256_text(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
 def verified_source(pin: dict) -> None:
     stamp = SRC / ".qianqian-verified"
     expected = f"{pin['ffmpeg_commit_sha']}|{pin['source_sha256']}"
@@ -79,7 +75,7 @@ def verified_source(pin: dict) -> None:
 
 
 def configure_args(profile: dict) -> list[str]:
-    # This mirrors the deterministic ordering used by scripts/build-profile.
+    # Mirrors the deterministic ordering used by scripts/build-profile.
     args = ["--prefix=install"]
     if profile.get("component_base") == "everything-disabled":
         args.append("--disable-everything")
@@ -100,8 +96,8 @@ def configure_args(profile: dict) -> list[str]:
 
 
 def make_log() -> str:
-    # A clean oracle tree gives us both generated configuration and the exact
-    # commands FFmpeg itself considers necessary for this capability slice.
+    # A clean oracle tree gives generated config and the exact commands FFmpeg
+    # itself considers necessary for this capability slice.
     shutil.rmtree(ORACLE, ignore_errors=True)
     ORACLE.mkdir(parents=True)
 
@@ -110,8 +106,8 @@ def make_log() -> str:
     run([str(SRC / "configure"), *args], cwd=ORACLE)
 
     jobs = str(max(1, os.cpu_count() or 4))
-    # V=1 is the important bit: source closure is observed from real compiler
-    # invocations rather than reimplementing FFmpeg's Make language.
+    # V=1 is the key: source closure is observed from real compiler invocations
+    # rather than reimplementing FFmpeg's Make language.
     return run(["make", "-j", jobs, "V=1", *LIB_TARGETS], cwd=ORACLE, capture=True)
 
 
@@ -132,7 +128,7 @@ def normalize_path(token: str) -> tuple[str, str] | None:
 
 
 def rewrite_flag(flag: str) -> str:
-    # No operator-specific absolute paths are allowed in the lock manifest.
+    # No checkout-specific absolute paths are allowed in the lock manifest.
     sroot = str(SRC.resolve())
     broot = str(ORACLE.resolve())
     flag = flag.replace(sroot, "@SRC@").replace(broot, "@BUILD@")
@@ -166,11 +162,12 @@ def parse_compile(line: str) -> dict | None:
     if source_i is None or source_info is None:
         return None
 
-    # Compiler executable and build-only dependency/output arguments are not
-    # semantic replay flags. Keep everything else exactly as the oracle used.
+    # Skip compiler/wrapper words before the first option (e.g. ccache gcc),
+    # plus output/dependency bookkeeping. Preserve semantic compile flags.
+    first_option = next((i for i, token in enumerate(argv) if token.startswith("-")), 1)
     flags: list[str] = []
     skip_next = False
-    for i, token in enumerate(argv[1:], 1):
+    for i, token in enumerate(argv[first_option:], first_option):
         if skip_next:
             skip_next = False
             continue
@@ -213,16 +210,21 @@ def closure_from_log(log: str) -> list[dict]:
     return units
 
 
-def assert_no_absolute_paths(value) -> None:
-    if isinstance(value, dict):
-        for v in value.values():
-            assert_no_absolute_paths(v)
-    elif isinstance(value, list):
-        for v in value:
-            assert_no_absolute_paths(v)
-    elif isinstance(value, str):
-        if str(ROOT.resolve()) in value or str(Path.home()) in value:
-            raise SystemExit(f"machine-local path leaked into manifest: {value}")
+def flag_contains_absolute_path(flag: str) -> bool:
+    if "@SRC@" in flag or "@BUILD@" in flag:
+        return False
+    candidates = [flag]
+    for prefix in ("-I", "-L", "-isystem", "--sysroot="):
+        if flag.startswith(prefix) and len(flag) > len(prefix):
+            candidates.append(flag[len(prefix):])
+    return any(c.startswith("/") or WINDOWS_ABS.match(c) for c in candidates)
+
+
+def assert_portable_manifest(manifest: dict) -> None:
+    for unit in manifest["units"]:
+        for flag in unit["flags"]:
+            if flag_contains_absolute_path(flag):
+                raise SystemExit(f"machine-local compile path leaked into manifest: {flag}")
 
 
 def main() -> None:
@@ -262,7 +264,7 @@ def main() -> None:
         "reference_archives": refs,
         "units": units,
     }
-    assert_no_absolute_paths(manifest)
+    assert_portable_manifest(manifest)
     OUT.mkdir(parents=True, exist_ok=True)
     MANIFEST.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     (OUT / "oracle-build.log").write_text(log)
