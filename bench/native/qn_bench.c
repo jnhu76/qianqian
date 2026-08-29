@@ -666,8 +666,11 @@ static int run_correct(const char *path) {
         AVStream *ast2 = s2.fmt->streams[s2.audio_index];
         int64_t target_samples = (int64_t)av_rescale_q(target, (AVRational){1, AV_TIME_BASE},
                                                        (AVRational){1, ast2->codecpar->sample_rate});
+        /* target is in AV_TIME_BASE us; seek wants stream time_base units */
+        int64_t target_ts = av_rescale_q(target, (AVRational){1, AV_TIME_BASE},
+                                         ast2->time_base);
         double t_s = now_ms();
-        int ret = av_seek_frame(s2.fmt, s2.audio_index, target, AVSEEK_FLAG_BACKWARD);
+        int ret = av_seek_frame(s2.fmt, s2.audio_index, target_ts, AVSEEK_FLAG_BACKWARD);
         double seek_ms = now_ms() - t_s;
         if (ret < 0) {
             printf("\"status\":\"seek_failed\",\"target_us\":%" PRId64 ",\"ret\":%d}", target, ret);

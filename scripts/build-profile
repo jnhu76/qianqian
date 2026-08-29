@@ -136,8 +136,16 @@ def configure_args(profile, pin):
 
 
 def extract_enabled_components(config_h):
-    """Extract enabled components from the generated config.h. Machine truth."""
-    text = open(config_h, encoding="utf-8").read()
+    """Extract enabled components from the generated config headers.
+
+    FFmpeg >= 6.1 splits component flags into config_components.h next to
+    config.h; library/feature flags stay in config.h. Machine truth only.
+    """
+    files = [config_h, os.path.join(os.path.dirname(config_h), "config_components.h")]
+    text = ""
+    for f in files:
+        if os.path.exists(f):
+            text += open(f, encoding="utf-8").read() + "\n"
     enabled = re.findall(r'^#define (CONFIG_[A-Z0-9_]+) 1', text, re.M)
     classes = {c.upper(): c for c in COMPONENT_CLASSES}
     libs = {"AVUTIL", "AVCODEC", "AVFORMAT", "SWRESAMPLE", "SWSCALE",
@@ -169,13 +177,14 @@ def symbol_count(a):
 
 
 def xz_size(path):
-    xz = os.path.join(BUILD, "tmp-size.xz")
-    if os.path.exists(xz):
-        os.remove(xz)
-    subprocess.run(["xz", "-9", "-c", path], stdout=open(xz, "wb"), check=True)
-    n = os.path.getsize(xz)
-    os.remove(xz)
-    return n
+    xz = f"{path}.tmp{os.getpid()}.xz"  # unique: concurrent builds must not collide
+    try:
+        with open(xz, "wb") as f:
+            subprocess.run(["xz", "-9", "-c", path], stdout=f, check=True)
+        return os.path.getsize(xz)
+    finally:
+        if os.path.exists(xz):
+            os.remove(xz)
 
 
 def main():
@@ -239,6 +248,7 @@ def main():
         if m:
             cc_ident = m.group(1).strip()
     qsha, dirty = git_sha()
+    bench_src = os.path.join(ROOT, "bench", "native", "qn_bench.c")
     corpus_id = None
     if os.path.exists(CORPUS_MANIFEST):
         corpus_id = json.load(open(CORPUS_MANIFEST)).get("corpus_id")
@@ -261,6 +271,7 @@ def main():
         "configure_args_hash": args_hash,
         "qianqian_git_sha": qsha,
         "qianqian_git_dirty": dirty,
+        "bench_source_sha256": sha256_file(bench_src) if os.path.exists(bench_src) else None,
         "corpus_id": corpus_id,
         "host_cpu": platform.processor() or "unknown",
         "built_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
@@ -316,6 +327,8 @@ def main():
     libs_info = {}
     total = 0
     total_sym = 0
+    stripped_total = 0
+    stripped_xz_total = 0
     if os.path.isdir(libdir):
         for lib in sorted(os.listdir(libdir)):
             if not lib.endswith(".a"):
@@ -325,6 +338,14 @@ def main():
             total += n
             syms = symbol_count(p) or 0
             total_sym += syms
+            # stripped + compressed view of what a product would ship
+            st = f"/tmp/qianqian-strip-{os.getpid()}-{lib}"
+            shutil.copyfile(p, st)
+            subprocess.run(["strip", "--strip-unneeded", st], check=True)
+            ns = os.path.getsize(st)
+            stripped_total += ns
+            stripped_xz_total += xz_size(st)
+            os.remove(st)
             libs_info[lib] = {"bytes": n, "defined_symbols": syms}
 
     artifacts = {}
@@ -336,6 +357,8 @@ def main():
         "profile": name,
         "static_libs": libs_info,
         "static_libs_total_bytes": total,
+        "static_libs_stripped_bytes": stripped_total,
+        "static_libs_stripped_xz_bytes": stripped_xz_total,
         "static_libs_defined_symbols": total_sym,
         "artifacts": artifacts,
     }

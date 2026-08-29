@@ -25,19 +25,21 @@ import os
 import shutil
 import subprocess
 import sys
+from importlib.machinery import SourceFileLoader
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def load_mod(path, name):
-    spec = importlib.util.spec_from_file_location(name, path)
+    loader = SourceFileLoader(name, path)
+    spec = importlib.util.spec_from_loader(name, loader)
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    loader.exec_module(mod)
     return mod
 
 
-bp = load_mod(os.path.join(ROOT, "scripts", "build-profile"), "bp")
-rb = load_mod(os.path.join(ROOT, "bench", "harness", "run_bench.py"), "rb")
+rb = load_mod(os.path.join(ROOT, "bench", "harness", "run_bench.py"), "qianqian_run_bench")
+bp = load_mod(os.path.join(ROOT, "scripts", "build-profile"), "qianqian_build_profile")
 
 
 def correctness_for(profile_name, manifest, timeout=120):
@@ -84,17 +86,43 @@ def main():
             print(f"--- probing: removing {cls}:{name} ---")
             subprocess.run([os.path.join(ROOT, "scripts", "build-profile"),
                             "--profile-file", pf], cwd=ROOT, check=True)
+
+            # configure's dependency graph may hard-select the component
+            # (e.g. mp3_demuxer_select="mpegaudio_parser"); if it is still
+            # enabled in the variant, allow-list removal has no effect.
+            cfg = os.path.join(ROOT, "build", variant["profile"], "ffmpeg")
+            still = bp.extract_enabled_components(os.path.join(cfg, "config.h"))
+            still_enabled = name.upper().replace("-", "_") in \
+                [c.upper().replace("-", "_") for c in still.get(cls, [])]
+
             res = correctness_for(variant["profile"], manifest)
             failed = sorted(cid for cid, s in res.items() if s == "fail")
             ok = sum(1 for s in res.values() if s in ("pass", "degraded_pass"))
-            print(f"    {ok}/{len(res)} pass; failing without {cls}:{name}: {failed}")
+            if still_enabled:
+                verdict = "configure-required"
+                required = True
+                evidence = ("still enabled after allow-list removal: FFmpeg's "
+                            "configure dependency graph hard-selects it for a "
+                            "demuxer/decoder that stays (see configure *_select)")
+            elif failed:
+                verdict = "required"
+                required = True
+                evidence = "removal-probe: corpus cases failed without it"
+            else:
+                verdict = "NONE — component is not justified"
+                required = False
+                evidence = "removal-probe: corpus fully passes without it"
+            print(f"    {ok}/{len(res)} pass; failing without {cls}:{name}: {failed}"
+                  f"{' [configure-required]' if still_enabled else ''}")
             probes.append({
                 "component": f"{cls}:{name}",
                 "variant_profile": variant["profile"],
+                "still_enabled_after_removal": still_enabled,
+                "verdict": verdict,
                 "corpus_cases_failed_without_it": failed,
                 "corpus_cases_passed_without_it": ok,
-                "required": bool(failed),
-                "evidence": "removal-probe" if failed else "NONE — component is not justified",
+                "required": required,
+                "evidence": evidence,
             })
 
     baseline_components = os.path.join(ROOT, "build", profile_name, "meta",

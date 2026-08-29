@@ -30,19 +30,22 @@ import shutil
 import subprocess
 import sys
 import time
+from importlib.machinery import SourceFileLoader
+from importlib.util import module_from_spec
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def _load_build_profile():
-    spec = importlib.util.spec_from_file_location(
-        "build_profile_mod", os.path.join(ROOT, "scripts", "build-profile"))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+def _load_module(path, name):
+    loader = SourceFileLoader(name, path)
+    spec = importlib.util.spec_from_loader(name, loader)
+    mod = module_from_spec(spec)
+    loader.exec_module(mod)
     return mod
 
 
-bp = _load_build_profile()  # reuse sha256_file / git_sha from the build tool
+bp = _load_module(os.path.join(ROOT, "scripts", "build-profile"),
+                  "qianqian_build_profile")  # reuse sha256_file / git_sha
 
 MANIFEST = os.path.join(ROOT, "corpus", "manifest", "stage-a.json")
 PIN = os.path.join(ROOT, "bench", "ffmpeg-pin.json")
@@ -59,14 +62,14 @@ def run_bench_binary(exe, mode, fixture, extra=None, timeout=120):
         if r.returncode < 0:
             return {"harness_status": "crash", "signal": -r.returncode,
                     "stderr_tail": r.stderr[-500:]}
+        # typed failures (open_failed/probe_failed) still emit a JSON report
         try:
             out = json.loads(r.stdout)
+            out["exit_code"] = r.returncode
+            return out
         except json.JSONDecodeError:
-            out = {}
-        out.setdefault("harness_status", "failed_exit")
-        out["exit_code"] = r.returncode
-        out["stderr_tail"] = r.stderr[-500:]
-        return out
+            return {"harness_status": "failed_exit", "exit_code": r.returncode,
+                    "stderr_tail": r.stderr[-500:]}
     try:
         return json.loads(r.stdout)
     except json.JSONDecodeError:
@@ -177,10 +180,15 @@ def check_case(case, obs, expect_cross):
         for i, s in enumerate(seeks):
             if s.get("status") != "done":
                 fail.append(f"seek[{i}]: status {s.get('status')}")
-            elif not s.get("suffix_match_sequential"):
+                continue
+            if not s.get("suffix_match_sequential"):
                 fail.append(f"seek[{i}]: suffix mismatch vs sequential decode")
-            elif s.get("resume_sample", -1) < s.get("target_sample", 1 << 62) - 1:
-                fail.append(f"seek[{i}]: resumed before target")
+            # AVSEEK_FLAG_BACKWARD must resume at a frame boundary at or
+            # before the target (within one generous frame/block window)
+            tgt = s.get("target_sample")
+            res = s.get("resume_sample", -1)
+            if tgt is None or not (tgt - 65536 < res <= tgt):
+                fail.append(f"seek[{i}]: resume {res} not at frame boundary <= target {tgt}")
     checks["seek"] = [None if not seeks else
                       {k: s.get(k) for k in ("target_us", "resume_sample",
                                              "suffix_match_sequential", "status")}
@@ -301,15 +309,17 @@ def main():
     for case in manifest["cases"]:
         by_prof = pcm_by_case.get(case["id"], {})
         shas = {p: s for p, s in by_prof.items() if s}
-        consistent = (len(set(shas.values())) == 1) if shas else None
+        # None = nothing to compare (e.g. every profile correctly refuses to
+        # open a pathological fixture); False only when PCM actually differs.
+        consistent = (len(set(shas.values())) == 1) if len(shas) >= 2 else None
         cross_checks.append({
             "case": case["id"],
             "consistent": consistent,
             "per_profile": by_prof,
         })
-        for prof, res in results["correctness"].items():
-            if case["id"] in res:
-                res["checks"]["pcm_consistent_cross_profile"] = consistent
+        for prof, per_case in results["correctness"].items():
+            if case["id"] in per_case:
+                per_case[case["id"]]["checks"]["pcm_consistent_cross_profile"] = consistent
         if consistent is False:
             print(f"  [CROSS-FAIL] {case['id']}: PCM differs across profiles")
     bypass_pairs = [(pcm_by_case[c["id"]].get("n3-min-noswr"),
@@ -338,10 +348,11 @@ def main():
             "correctness": {"pass": npass, "degraded_pass": ndeg, "fail": nfail,
                             "total": len(cases)},
             "static_libs_bytes": static,
+            "static_libs_stripped_bytes": s.get("static_libs_stripped_bytes"),
+            "static_libs_stripped_xz_bytes": s.get("static_libs_stripped_xz_bytes"),
             "bench_linked_bytes": art.get("bench_linked_bytes"),
             "bench_stripped_bytes": art.get("bench_stripped_bytes"),
             "bench_stripped_xz_bytes": art.get("bench_stripped_xz_bytes"),
-            "static_libs_xz_bytes": art.get("static_libs_xz_bytes"),
             "defined_symbols": s.get("static_libs_defined_symbols"),
             "throughput_xrt_songcore_output": xrt,
         })
@@ -371,10 +382,13 @@ def main():
             f.write("\n")
 
     nfail = sum(l["correctness"]["fail"] for l in ladder)
+    pcm_concrete = [c for c in cross_checks if c["consistent"] is not None]
     print(f"\nrun written to {args.out}")
     print(f"correctness: {sum(l['correctness']['pass'] for l in ladder)} pass, "
           f"{sum(l['correctness']['degraded_pass'] for l in ladder)} degraded, "
-          f"{nfail} fail; swr bypass identical: {noswr}")
+          f"{nfail} fail; swr bypass identical: {noswr}; "
+          f"pcm cross-profile: {sum(c['consistent'] for c in pcm_concrete)}"
+          f"/{len(pcm_concrete)} comparable cases consistent")
     return 1 if nfail else 0
 
 
