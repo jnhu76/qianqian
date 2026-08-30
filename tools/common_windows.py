@@ -191,12 +191,20 @@ def compiled_ffmpeg_objects() -> set[str]:
     if not objs_root.is_dir():
         raise SystemExit("missing xmake object tree; build first")
     out = set()
-    for o in objs_root.rglob("*.o"):
-        # .objs/qianqian_av/<plat>/<arch>/<mode>/<project-relative source path>.o
-        parts = o.relative_to(objs_root).parts
-        if len(parts) < 5:
-            raise SystemExit(f"unrecognized object path: {o}")
-        out.add("/".join(parts[3:])[:-2])  # strip trailing .o
+    for pattern in ("*.o", "*.obj"):
+        for o in objs_root.rglob(pattern):
+            # .objs/qianqian_av/<plat>/<arch>/<mode>/<project-relative source path>.o|.obj
+            parts = o.relative_to(objs_root).parts
+            if len(parts) < 5:
+                raise SystemExit(f"unrecognized object path: {o}")
+            src = "/".join(parts[3:])
+            if src.endswith(".obj"):
+                src = src[:-4]
+            elif src.endswith(".o"):
+                src = src[:-2]
+            else:
+                raise SystemExit(f"unrecognized object suffix: {o}")
+            out.add(src)
     return out
 
 
