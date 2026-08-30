@@ -43,7 +43,7 @@ def main() -> int:
     if not args.song.is_file():
         parser.error(f"song not found: {args.song}")
     if not args.decoder.is_file():
-        parser.error(f"decoder not found: {args.decoder} (build with `xmake qn_pcm_dump`)")
+        parser.error(f"decoder not found: {args.decoder} (build with `xmake build qn_pcm_dump`)")
 
     try:
         import sounddevice as sd

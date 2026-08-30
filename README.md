@@ -89,8 +89,8 @@ E06 的目标不是再造 FFmpeg build system，而是把它降级为 **import/u
 ```text
 xmake ffmpeg-import       # 上游 configure/Make 只在这里参与，生成 compile closure
 xmake f -m release
-xmake qianqian_av         # normal build：Xmake 直接产出单一 libqianqian_av.a
-xmake qn_pcm_dump         # SongCore → Float32 PCM pipe
+xmake build qianqian_av   # normal build：Xmake 直接产出单一 libqianqian_av.a
+xmake build qn_pcm_dump   # SongCore → Float32 PCM pipe
 python3 tools/verify_xmake_core.py
 ```
 

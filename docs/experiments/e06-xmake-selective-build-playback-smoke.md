@@ -168,7 +168,7 @@ build/ffmpeg-xmake/oracle-build.log
 
 ```bash
 xmake f -m release
-xmake qianqian_av
+xmake build qianqian_av
 ```
 
 产物：
@@ -182,7 +182,7 @@ build/artifacts/libqianqian_av.a
 ### 5.3 Production SongCore + PCM transport
 
 ```bash
-xmake qn_pcm_dump
+xmake build qn_pcm_dump
 ```
 
 这会构建：
@@ -320,7 +320,7 @@ song_close
 update pin
 → xmake ffmpeg-import
 → diff old/new manifest
-→ xmake qianqian_av
+→ xmake build qianqian_av
 → verify_xmake_core.py
 → size / symbol / corpus / PCM drift report
 ```
@@ -368,7 +368,7 @@ same PCM contract
 
 ```text
 [ ] importer 从 pinned n9.0.1 生成非空、无机器绝对路径的 closure
-[ ] normal `xmake qianqian_av` 不调用 FFmpeg Make/configure
+[ ] normal `xmake build qianqian_av` 不调用 FFmpeg Make/configure
 [ ] 得到单一 libqianqian_av.a
 [ ] oracle vs Xmake 全 Stage A corpus 等价
 [ ] SongCore MP3 PCM byte-identical

@@ -301,7 +301,7 @@ def main() -> None:
     print(f"wrote {MANIFEST.relative_to(ROOT)}")
     print(f"closure: {len(units)} translation units ({generated_units} generated)")
     print(f"toolchain: {toolchain}")
-    print("normal builds may now run: xmake qianqian_av")
+    print("normal builds may now run: xmake build qianqian_av")
 
 
 if __name__ == "__main__":

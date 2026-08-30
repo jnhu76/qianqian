@@ -90,7 +90,7 @@ def main() -> None:
     single = ARTIFACTS / "libqianqian_av.a"
     pcm_dump = ARTIFACTS / ("qn_pcm_dump.exe" if sys.platform == "win32" else "qn_pcm_dump")
     if not single.is_file() or not pcm_dump.is_file():
-        raise SystemExit("missing Xmake artifacts; run `xmake qianqian_av qn_pcm_dump`")
+        raise SystemExit("missing Xmake artifacts; run `xmake build qn_pcm_dump`")
 
     VERIFY_DIR.mkdir(parents=True, exist_ok=True)
     ref_bench = VERIFY_DIR / "qn_bench_oracle"

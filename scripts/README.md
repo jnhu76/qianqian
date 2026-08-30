@@ -20,8 +20,8 @@ scripts/bench-native            fetch + build all + 跑 harness（端到端）
 
 ```text
 xmake ffmpeg-import             升级/import 时让 upstream configure+Make 求一次真实 closure
-xmake qianqian_av               normal build 直接重放 closure → libqianqian_av.a
-xmake qn_pcm_dump               同时构建 SongCore + 极薄 PCM pipe
+xmake build qianqian_av               normal build 直接重放 closure → libqianqian_av.a
+xmake build qn_pcm_dump               同时构建 SongCore + 极薄 PCM pipe
 python3 tools/verify_xmake_core.py
 python3 tools/play_smoke.py <mp3>
 ```
