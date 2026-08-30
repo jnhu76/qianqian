@@ -306,15 +306,21 @@ def main() -> None:
             raise SystemExit("Windows reachability gate FAILED: " + "; ".join(problems))
 
         # --- lld -Map corroboration (name-granular; duplicates make the map
-        # ambiguous, so this is supporting evidence, not the hard gate)
+        # ambiguous, so this is supporting evidence, not the hard gate).
+        # Only names inside the FFmpeg manifest universe are gated: the map
+        # also legitimately contains probe/CRT/libsongcore contributions.
         map_names = set(re.findall(r"^\S+\s+\S+\s+\S+\s+(\S+\.obj):\(",
                                    (outdir / "linker.map").read_text(), re.M))
         pulled_keys = {member_unit_key(m["member"]) for m in pulled_members}
+        universe = {member_unit_key(Path(u["object"]).name) for u in units}
         map_keys = {member_unit_key(n) for n in map_names}
-        strays = sorted(map_keys - pulled_keys)
+        if not (map_keys & universe):
+            raise SystemExit("Windows reachability gate FAILED: lld map shows no "
+                             "FFmpeg member contributions; map parse drifted")
+        strays = sorted((map_keys & universe) - pulled_keys)
         if strays:
             raise SystemExit(f"Windows reachability gate FAILED: lld map contributes "
-                             f"members outside the simulation: {strays[:8]}")
+                             f"FFmpeg members outside the simulation: {strays[:8]}")
 
     # --- map members to manifest units 1:1 (xmake archives in manifest order)
     units = manifest["units"]
