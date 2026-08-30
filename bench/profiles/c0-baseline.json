@@ -1,0 +1,43 @@
+{
+  "profile": "c0-baseline",
+  "ladder": "C0",
+  "description": "Common Formats ladder C0 baseline: the frozen MP3+FLAC capability of main, composed with E07's accepted configure dimensions (--disable-iconv, --disable-pthreads; s3-pthreads gate-equivalent). Machine closure over this profile reproduces the 106-TU proven-sufficient baseline.",
+  "component_base": "everything-disabled",
+  "libraries": {
+    "enable": [
+      "avformat",
+      "avcodec"
+    ],
+    "disable": [
+      "swresample",
+      "avdevice",
+      "avfilter",
+      "swscale"
+    ]
+  },
+  "disable": [
+    "autodetect",
+    "debug",
+    "devices",
+    "doc",
+    "iconv",
+    "network",
+    "programs",
+    "protocols",
+    "pthreads",
+    "x86asm"
+  ],
+  "components": {
+    "demuxer": [
+      "mp3",
+      "flac"
+    ],
+    "decoder": [
+      "flac",
+      "mp3float"
+    ],
+    "parser": [
+      "mpegaudio"
+    ]
+  }
+}

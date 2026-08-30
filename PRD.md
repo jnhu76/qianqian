@@ -134,8 +134,8 @@ API 设计目标不是“覆盖 FFmpeg”，而是**阻止 FFmpeg 泄漏到上�
 | artwork extraction | ✅ |
 | seek | ✅ |
 | PCM 输出 | ✅ |
-| 必要 sample-format conversion | ✅ |
-| 必要 resampling | ✅ |
+| sample-format conversion（packed/planar → Float32） | ✅ |
+| resampling / SRC / channel rematrix | ❌（SongCore 只输出 source-rate / source-layout Float32 PCM；设备侧适配属 AudioSink 协商） |
 | 视频 decode | ❌ |
 | 视频 encode | ❌ |
 | 音频 encode | ❌ |
@@ -196,8 +196,11 @@ PCM
 libavformat
 libavcodec
 libavutil
-libswresample
 ```
+
+`libswresample` **不在**基线内（E07 已裁掉）。它只可能因 FFmpeg n9.0.1 某
+decoder 的上游 build 依赖被强制拉入闭包（当前唯一来源：Opus decoder）；
+这是 decoder implementation dependency，不是 SongCore 能力（见 §9）。
 
 明确排除：
 
@@ -245,15 +248,19 @@ FFmpeg 只看到字节，不获得网络或平台文件系统权限。
 
 ---
 
-# 7. 第一批格式
+# 7. 格式路线
 
-## Stage A
-
-只做：
+## Core Common Formats（当前核心，issue #8 / E08 已落地）
 
 ```text
 MP3
 FLAC
+AAC / M4A
+raw ADTS AAC
+ALAC / M4A
+PCM WAV（u8 / s16le / s24le / s32le / f32le / f64le）
+Ogg Vorbis
+Ogg Opus
 ```
 
 验收：
@@ -267,29 +274,17 @@ open
 → EOF
 ```
 
-## Stage B
-
-在 Stage A 稳定后加入：
-
-```text
-AAC / M4A
-ALAC
-OGG Vorbis
-Opus
-```
-
-## Stage C
-
-最后加入：
+## Future compatibility（不在 Common Formats 核心内，issue #9）
 
 ```text
 APE
-WAV
+WMA
 AIFF
-WavPack（视 corpus 与实际用户需求）
+WavPack
 ```
 
-格式加入顺序由真实音乐库需求决定，不由 FFmpeg feature list 决定。
+格式加入顺序由真实音乐库需求决定，不由 FFmpeg feature list 决定；
+每一项都必须先回答"没有它，哪一首正常歌曲播不了"。
 
 ---
 
@@ -326,27 +321,27 @@ AudioSink
 
 ---
 
-# 9. 为什么暂时保留 libswresample
+# 9. SongCore 不提供 resample —— 与 libswresample 的关系
 
-极致减法不意味着删除播放器真正需要的最后一公里能力。
-
-现实中可能出现：
+SongCore 的 PCM 契约是：
 
 ```text
-source = 44.1 kHz / planar float
-device = 48 kHz / interleaved float
+SongCore
+→ source-rate / source-layout Float32 PCM
 ```
 
-因此第一版保留 `libswresample` 处理：
+SongCore **不提供** SRC / sample-rate conversion / channel rematrix 能力。
+sample format 统一（packed/planar → interleaved Float32）属于契约内转换，
+sample rate 与 channel layout 一律保持 source 原样；设备侧适配由 host 的
+AudioSink 能力协商完成。
 
-- sample format conversion；
-- planar ↔ interleaved；
-- channel rematrix；
-- 必要 sample-rate conversion。
+`libswresample` 出现在构建闭包中的唯一原因：FFmpeg n9.0.1 的 Opus decoder
+在 upstream configure 图中硬依赖 swresample（`Disabled opus_decoder ...
+not all dependencies are satisfied: swresample`）。这是 **decoder
+implementation dependency**，不代表 SongCore 获得 resample 能力；其真实
+成员 pull 由 link audit 计量（E08 实测）。
 
-后续实验必须验证：
-
-> 是否可以通过 AudioSink 能力协商进一步减少 swresample 的使用频率，甚至某些平台完全旁路。
+不要把 implementation dependency 写成 product capability。
 
 ---
 

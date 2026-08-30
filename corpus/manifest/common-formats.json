@@ -1,0 +1,1055 @@
+{
+  "corpus_id": "common-formats-v1",
+  "canonical_pcm_definition": "Float32 interleaved, source rate/layout, no resample/rematrix; sha256 over raw f32le bytes",
+  "generator": {
+    "tool": "ffmpeg version 8.0.1-3ubuntu2 Copyright (c) 2000-2025 the FFmpeg developers",
+    "script": "corpus/tools/gen_corpus_common.py",
+    "regenerate": "python3 corpus/tools/gen_corpus_common.py"
+  },
+  "cases": [
+    {
+      "id": "aac-lc-44-stereo",
+      "capability": "aac",
+      "file": "aac-lc-44-stereo.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "3bad130b2fc84702aa9799a5e40f2ac6cf91e1d81cb7fea68cd62c5ac7fd0864",
+      "fixture_bytes": 198854,
+      "throughput": true,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "aac",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "record",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 529408,
+        "duration_us": 12000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "aac",
+            "suffix_matches": [
+              false,
+              false,
+              false
+            ],
+            "resume_frame_aligned": false,
+            "strict_eligible": false
+          },
+          "family_verdict": "record"
+        }
+      },
+      "notes": "main AAC-LC CBR case; also the AAC throughput sample [sample-count vs nominal 529200: delta 208]"
+    },
+    {
+      "id": "aac-lc-48-stereo",
+      "capability": "aac",
+      "file": "aac-lc-48-stereo.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "0aca51f749c94f9e2f4872b3bd0d77daeef067ae9a4eaa98ea787da06402d5c5",
+      "fixture_bytes": 66056,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "aac",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "record",
+        "eof": "clean",
+        "sample_rate": 48000,
+        "channels": 2,
+        "samples": 192512,
+        "duration_us": 4000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "aac",
+            "suffix_matches": [
+              false,
+              false,
+              false
+            ],
+            "resume_frame_aligned": false,
+            "strict_eligible": false
+          },
+          "family_verdict": "record"
+        }
+      },
+      "notes": "[sample-count vs nominal 192000: delta 512]"
+    },
+    {
+      "id": "aac-lc-44-mono",
+      "capability": "aac",
+      "file": "aac-lc-44-mono.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "9c3fa96867bddc09a51bc76c252226d8eb59c0ec2ad1a062f72ddc56703c66b6",
+      "fixture_bytes": 50056,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "aac",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "record",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 1,
+        "samples": 177152,
+        "duration_us": 4000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "aac",
+            "suffix_matches": [
+              false,
+              false,
+              false
+            ],
+            "resume_frame_aligned": false,
+            "strict_eligible": false
+          },
+          "family_verdict": "record"
+        }
+      },
+      "notes": "[sample-count vs nominal 176400: delta 752]"
+    },
+    {
+      "id": "aac-vbr",
+      "capability": "aac",
+      "file": "aac-vbr.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "a02ae11637af0d8ce140079bddec80f3ffc10d9b57af8b28500566a5ffde83cc",
+      "fixture_bytes": 78336,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "aac",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "record",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 177152,
+        "duration_us": 4000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "aac",
+            "suffix_matches": [
+              false,
+              false,
+              false
+            ],
+            "resume_frame_aligned": false,
+            "strict_eligible": false
+          },
+          "family_verdict": "record"
+        }
+      },
+      "notes": "native aac encoder VBR mode (-q:a); avg bitrate recorded by generator [sample-count vs nominal 176400: delta 752]"
+    },
+    {
+      "id": "aac-adts-44-stereo",
+      "capability": "aac",
+      "file": "aac-adts-44-stereo.aac",
+      "format": "aac",
+      "fixture_sha256": "e2494df357ea26363d61a9ebe86f5940ccb32fc222a4415f08934f8ad4aa3a6a",
+      "fixture_bytes": 66545,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "aac",
+        "codec": "aac",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "metadata_absent_or_empty": true,
+        "artwork": null,
+        "seek": "record",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 178176,
+        "duration_us": 4088881,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "aac",
+            "suffix_matches": [],
+            "resume_frame_aligned": true,
+            "strict_eligible": false
+          },
+          "family_verdict": "record"
+        }
+      },
+      "notes": "raw ADTS stream; no container metadata by construction [sample-count vs nominal 176400: delta 1776]"
+    },
+    {
+      "id": "aac-artwork",
+      "capability": "aac",
+      "file": "aac-artwork.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "341f2a2b07e6de0651040df924174d65096eeede4cb00d32c5e2346a22d47f3d",
+      "fixture_bytes": 67202,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "aac",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "metadata": {},
+        "artwork": {
+          "sha256": "d101d7fa0beeeb03582b9d47bc50c0f4647d01936ff62f2f863cd6c8dfca4369",
+          "size": 349,
+          "codec": "png"
+        },
+        "seek": "record",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 177152,
+        "duration_us": 4000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "aac",
+            "suffix_matches": [
+              false,
+              false,
+              false
+            ],
+            "resume_frame_aligned": false,
+            "strict_eligible": false
+          },
+          "family_verdict": "record"
+        }
+      },
+      "notes": "[sample-count vs nominal 176400: delta 752]"
+    },
+    {
+      "id": "aac-short",
+      "capability": "aac",
+      "file": "aac-short.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "8b9b6e0086dff9c47457ffd065d56c67fbefbb1f8a1916316dab223faea03a37",
+      "fixture_bytes": 5904,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "aac",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "record",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 13312,
+        "duration_us": 300000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "aac",
+            "suffix_matches": [
+              false,
+              false,
+              false
+            ],
+            "resume_frame_aligned": false,
+            "strict_eligible": false
+          },
+          "family_verdict": "record"
+        }
+      },
+      "notes": "[sample-count vs nominal 13230: delta 82]"
+    },
+    {
+      "id": "aac-truncated",
+      "capability": "aac",
+      "file": "aac-truncated.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "49accfb2f1627ef6f00bc06c3f3c258c6c0d2a09343615199211820f07bd35e5",
+      "fixture_bytes": 119312,
+      "throughput": false,
+      "degraded": true,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "aac",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "min_samples": 264704,
+        "artwork": null,
+        "seek": "record",
+        "eof": "error_or_eof",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 314368,
+        "duration_us": 12000000
+      }
+    },
+    {
+      "id": "aac-malformed-header",
+      "capability": "aac",
+      "file": "aac-malformed-header.aac",
+      "format": "aac",
+      "fixture_sha256": "7d5c30167fcd1944da96257845a56ddf359136890a8eb2494143c333c780e62f",
+      "fixture_bytes": 998,
+      "throughput": false,
+      "degraded": true,
+      "expect": {
+        "container": "aac",
+        "codec": "aac",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "artwork": null,
+        "seek": "none",
+        "eof": "error_or_eof",
+        "probe_may_fail": true
+      }
+    },
+    {
+      "id": "alac-16-44-stereo",
+      "capability": "alac",
+      "file": "alac-16-44-stereo.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3",
+      "fixture_bytes": 594196,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "alac",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 176400,
+        "duration_us": 4000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "alac",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 176400: delta 0]"
+    },
+    {
+      "id": "alac-24-96-stereo",
+      "capability": "alac",
+      "file": "alac-24-96-stereo.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "4e566d97492cda5e688c14d7dfddfe50741085badf7b8be17d29bfa6c0333026",
+      "fixture_bytes": 580892,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "alac",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "1661b677d5e71992b684d2e0be06be15ff4a7bde8ec7b77552a689ea1aadc464"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 96000,
+        "channels": 2,
+        "samples": 192000,
+        "duration_us": 2000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "alac",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "24-bit via s32 input; observed bits recorded by SongCore probe [sample-count vs nominal 192000: delta 0]"
+    },
+    {
+      "id": "alac-16-44-mono",
+      "capability": "alac",
+      "file": "alac-16-44-mono.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "583fbf4b1102fea0a176352f0bb3cddad440b92828157b302f8c48ea0c04de5e",
+      "fixture_bytes": 142265,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "alac",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "fbe9d411428b8358bbfbd26f95d0eb935c6f4b5cd2e93e180bdb29986cdca238"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 1,
+        "samples": 88200,
+        "duration_us": 2000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "alac",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 88200: delta 0]"
+    },
+    {
+      "id": "alac-artwork",
+      "capability": "alac",
+      "file": "alac-artwork.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "6e43929c0643433150ea1f2f12b559ee4b8edbda89736ecaf745e9998928f31f",
+      "fixture_bytes": 298629,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "alac",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "a19b0974b5c517685f16e768434e9b010beb38986c3da6a17259092015a4a853"
+        },
+        "metadata": {},
+        "artwork": {
+          "sha256": "4d05645eb30a29da3afc9cd142fc5c6cf262f1944e1dbd10a57f30f4c6dc9bef",
+          "size": 886,
+          "codec": "png"
+        },
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 88200,
+        "duration_us": 2000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "alac",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 88200: delta 0]"
+    },
+    {
+      "id": "alac-long",
+      "capability": "alac",
+      "file": "alac-long.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c",
+      "fixture_bytes": 890903,
+      "throughput": true,
+      "degraded": false,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "alac",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 264600,
+        "duration_us": 6000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "alac",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 264600: delta 0]"
+    },
+    {
+      "id": "alac-truncated",
+      "capability": "alac",
+      "file": "alac-truncated.m4a",
+      "format": "mov,mp4,m4a,3gp,3g2,mj2",
+      "fixture_sha256": "f1dd92ed3cef5ee1aa594fe4b469de4ed5eeeb061099758f683c2f6e487e9ec1",
+      "fixture_bytes": 356517,
+      "throughput": false,
+      "degraded": true,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "alac",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "min_samples": 88200,
+        "artwork": null,
+        "seek": "record",
+        "eof": "error_or_eof",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 102400,
+        "duration_us": 4000000
+      }
+    },
+    {
+      "id": "wav-u8-44-mono",
+      "capability": "wav",
+      "file": "wav-u8-44-mono.wav",
+      "format": "wav",
+      "fixture_sha256": "ee6ec3dbfd0ec07fb39588ee44e21ae703eb21517ca40728fc4db78a94506533",
+      "fixture_bytes": 88244,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "wav",
+        "codec": "pcm_u8",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "b5bd98c6fd6698475b1be0e3c3540d78c37e38f294b3aaac90c96fc90a314aae"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 1,
+        "samples": 88200,
+        "duration_us": 2000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "wav",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 88200: delta 0]"
+    },
+    {
+      "id": "wav-s16le-44-stereo",
+      "capability": "wav",
+      "file": "wav-s16le-44-stereo.wav",
+      "format": "wav",
+      "fixture_sha256": "c7a31488b22bbaec1a4d879cc03508f0373f90dd789e5cc0f59a3c8c60a3dcd4",
+      "fixture_bytes": 1058444,
+      "throughput": true,
+      "degraded": false,
+      "expect": {
+        "container": "wav",
+        "codec": "pcm_s16le",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "2a566361444e912171549bf1e900f53eebb34fb0576f2899c03679af9fbb5789"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 264600,
+        "duration_us": 6000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "wav",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 264600: delta 0]"
+    },
+    {
+      "id": "wav-s24le-96-stereo",
+      "capability": "wav",
+      "file": "wav-s24le-96-stereo.wav",
+      "format": "wav",
+      "fixture_sha256": "e1c3b451a9c86ef442c923bc46acca9a38f1dab6454c82af3fbbf20cbaf0aba0",
+      "fixture_bytes": 864068,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "wav",
+        "codec": "pcm_s24le",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "fbbca23dcd13c3ff0b55936b885824cd54ca550e05f0fe0f5007cf7e060a5257"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 96000,
+        "channels": 2,
+        "samples": 144000,
+        "duration_us": 1500000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "wav",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 144000: delta 0]"
+    },
+    {
+      "id": "wav-s32le-48-stereo",
+      "capability": "wav",
+      "file": "wav-s32le-48-stereo.wav",
+      "format": "wav",
+      "fixture_sha256": "be6a54731bb1b8a1b90b4c3035601f4097e114856c52a724eaf89b063b07e783",
+      "fixture_bytes": 768068,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "wav",
+        "codec": "pcm_s32le",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "667b8dabd2c785b85b36859560476e426364ecff3ebc7fc3a757dba9f54b9faf"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 48000,
+        "channels": 2,
+        "samples": 96000,
+        "duration_us": 2000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "wav",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 96000: delta 0]"
+    },
+    {
+      "id": "wav-f32le-44-stereo",
+      "capability": "wav",
+      "file": "wav-f32le-44-stereo.wav",
+      "format": "wav",
+      "fixture_sha256": "7211919e07e9ca6ef573f8727c1c94bc3a23733cfbe28e7bbf695313d33d05dd",
+      "fixture_bytes": 705658,
+      "throughput": true,
+      "degraded": false,
+      "expect": {
+        "container": "wav",
+        "codec": "pcm_f32le",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "c37d266e29a6a90663827faea459ae7ea157a8d01578b31c20737ec0ea528a57"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 88200,
+        "duration_us": 2000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "wav",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 88200: delta 0]"
+    },
+    {
+      "id": "wav-f64le-44-mono",
+      "capability": "wav",
+      "file": "wav-f64le-44-mono.wav",
+      "format": "wav",
+      "fixture_sha256": "63f3442fae51eff1b2f2b502b54a368ad39281fce0eb54260f13f46e316aa4eb",
+      "fixture_bytes": 705658,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "wav",
+        "codec": "pcm_f64le",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "b01297f720486df208c9bf5e7567db947daa186f702c5a508639c8ecc49b71d7"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 1,
+        "samples": 88200,
+        "duration_us": 2000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "wav",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 88200: delta 0]"
+    },
+    {
+      "id": "wav-odd-chunk",
+      "capability": "wav",
+      "file": "wav-odd-chunk.wav",
+      "format": "wav",
+      "fixture_sha256": "8615329715f399ebe81ff10b4d87a09ea2e7005452a51d73f288ca46b0310462",
+      "fixture_bytes": 1058466,
+      "throughput": false,
+      "degraded": false,
+      "expect": {
+        "container": "wav",
+        "codec": "pcm_s16le",
+        "pcm": {
+          "mode": "strict",
+          "canonical_f32_sha256": "2a566361444e912171549bf1e900f53eebb34fb0576f2899c03679af9fbb5789"
+        },
+        "metadata_absent_or_empty": true,
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 264600,
+        "duration_us": 6000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "wav",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "valid RIFF with an odd-sized LIST chunk + pad byte after 'fmt ' [sample-count vs nominal 264600: delta 0]"
+    },
+    {
+      "id": "wav-truncated",
+      "capability": "wav",
+      "file": "wav-truncated.wav",
+      "format": "wav",
+      "fixture_sha256": "5b708503b1eebb7405b606c6af840592898e6e2725c2785e5b83eb84dbc07f04",
+      "fixture_bytes": 635066,
+      "throughput": false,
+      "degraded": true,
+      "expect": {
+        "container": "wav",
+        "codec": "pcm_s16le",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "min_samples": 132300,
+        "artwork": null,
+        "seek": "record",
+        "eof": "error_or_eof",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 158755,
+        "duration_us": 3599909
+      }
+    },
+    {
+      "id": "wav-malformed-header",
+      "capability": "wav",
+      "file": "wav-malformed-header.wav",
+      "format": "wav",
+      "fixture_sha256": "ae67e20c2d52b95c39ea6f55d1dcea0ef025b814b00c9ecbafbb4cfcb2959975",
+      "fixture_bytes": 1058444,
+      "throughput": false,
+      "degraded": true,
+      "expect": {
+        "container": "wav",
+        "codec": "pcm_s16le",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "artwork": null,
+        "seek": "none",
+        "eof": "error_or_eof",
+        "probe_may_fail": true
+      }
+    },
+    {
+      "id": "vorbis-44-stereo",
+      "capability": "vorbis",
+      "file": "vorbis-44-stereo.ogg",
+      "format": "ogg",
+      "fixture_sha256": "ba764bf5fb668ddd9700f00b73b3e368fc2f8745a02b7e1bc4370cb1ed0763b5",
+      "fixture_bytes": 42009,
+      "throughput": true,
+      "degraded": false,
+      "expect": {
+        "container": "ogg",
+        "codec": "vorbis",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "strict",
+        "eof": "clean",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 529200,
+        "duration_us": 12000000,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "vorbis",
+            "suffix_matches": [
+              true,
+              true,
+              true
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": true
+          },
+          "family_verdict": "strict"
+        }
+      },
+      "notes": "[sample-count vs nominal 529200: delta 0]"
+    },
+    {
+      "id": "vorbis-truncated",
+      "capability": "vorbis",
+      "file": "vorbis-truncated.ogg",
+      "format": "ogg",
+      "fixture_sha256": "cfefb7168ea944adce2268412f6d12a49b132702c234eb5211d842da192e8fe2",
+      "fixture_bytes": 31506,
+      "throughput": false,
+      "degraded": true,
+      "expect": {
+        "container": "ogg",
+        "codec": "vorbis",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "min_samples": 264600,
+        "artwork": null,
+        "seek": "record",
+        "eof": "error_or_eof",
+        "sample_rate": 44100,
+        "channels": 2,
+        "samples": 360000,
+        "duration_us": 8163265
+      }
+    },
+    {
+      "id": "opus-48-stereo",
+      "capability": "opus",
+      "file": "opus-48-stereo.opus",
+      "format": "ogg",
+      "fixture_sha256": "c00d25d4182527d797ec67bc84e6228d3c7fb07b4683605078966829d0aa38e6",
+      "fixture_bytes": 167869,
+      "throughput": true,
+      "degraded": false,
+      "expect": {
+        "container": "ogg",
+        "codec": "opus",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "metadata": {},
+        "artwork": null,
+        "seek": "record",
+        "eof": "clean",
+        "sample_rate": 48000,
+        "channels": 2,
+        "samples": 576000,
+        "duration_us": 12006500,
+        "seek_evidence": {
+          "method": "bench suffix-match at 25/50/75% vs sequential decode",
+          "observed": {
+            "capability": "opus",
+            "suffix_matches": [
+              false,
+              false,
+              false
+            ],
+            "resume_frame_aligned": true,
+            "strict_eligible": false
+          },
+          "family_verdict": "record"
+        }
+      },
+      "notes": "preskip/end-trim correctness asserted below against nominal duration [sample-count vs nominal 576000: delta 0]"
+    },
+    {
+      "id": "opus-truncated",
+      "capability": "opus",
+      "file": "opus-truncated.opus",
+      "format": "ogg",
+      "fixture_sha256": "eabd83a024797ca382f079191d4ec32519b2f2ebb2321436c9003c3f3966fa4c",
+      "fixture_bytes": 125901,
+      "throughput": false,
+      "degraded": true,
+      "expect": {
+        "container": "ogg",
+        "codec": "opus",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "min_samples": 288000,
+        "artwork": null,
+        "seek": "record",
+        "eof": "error_or_eof",
+        "sample_rate": 48000,
+        "channels": 2,
+        "samples": 431688,
+        "duration_us": 9000000
+      }
+    },
+    {
+      "id": "opus-malformed-header",
+      "capability": "opus",
+      "file": "opus-malformed-header.opus",
+      "format": "ogg",
+      "fixture_sha256": "d9e80ce097a17c2aed56f125e9c99e04a76bb7eb23f4ced6c3ea95f5639fae10",
+      "fixture_bytes": 167869,
+      "throughput": false,
+      "degraded": true,
+      "expect": {
+        "container": "ogg",
+        "codec": "opus",
+        "pcm": {
+          "mode": "consistency"
+        },
+        "artwork": null,
+        "seek": "none",
+        "eof": "error_or_eof",
+        "probe_may_fail": true
+      }
+    }
+  ]
+}

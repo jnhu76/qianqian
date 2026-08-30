@@ -1,0 +1,74 @@
+{
+  "profile": "c5-opus",
+  "ladder": "C5",
+  "extends": "c4-vorbis",
+  "description": "C4 + Ogg Opus (.opus). The Ogg container cost was already paid in C4; this stage isolates the Opus decoder marginal cost. This profile is the full Common Formats capability set. Baseline dimensions --disable-iconv/--disable-pthreads (E07-accepted) are composed in.",
+  "component_base": "everything-disabled",
+  "libraries": {
+    "enable": [
+      "avformat",
+      "avcodec",
+      "swresample"
+    ],
+    "disable": [
+      "avdevice",
+      "avfilter",
+      "swscale"
+    ]
+  },
+  "disable": [
+    "autodetect",
+    "debug",
+    "devices",
+    "doc",
+    "iconv",
+    "network",
+    "programs",
+    "protocols",
+    "pthreads",
+    "x86asm"
+  ],
+  "components": {
+    "demuxer": [
+      "aac",
+      "flac",
+      "mov",
+      "mp3",
+      "ogg",
+      "wav"
+    ],
+    "decoder": [
+      "aac",
+      "alac",
+      "flac",
+      "mp3float",
+      "opus",
+      "vorbis",
+      "pcm_u8",
+      "pcm_s16le",
+      "pcm_s24le",
+      "pcm_s32le",
+      "pcm_f32le",
+      "pcm_f64le"
+    ],
+    "parser": [
+      "mpegaudio"
+    ]
+  },
+  "provenance": {
+    "decoder:opus": {
+      "required_by": [
+        "opus-48-stereo",
+        "opus-truncated",
+        "opus-malformed-header"
+      ],
+      "reason": "issue #8 capability intent: Ogg -> Opus decoder; preskip/end-trim correctness is part of the corpus gate"
+    },
+    "lib:swresample": {
+      "required_by": [
+        "decoder:opus"
+      ],
+      "reason": "FFmpeg n9.0.1 configure hard dependency: the native Opus decoder selects swresample ('Disabled opus_decoder ... not all dependencies are satisfied: swresample'). SongCore does NOT use swr for its PCM contract; the library enters the closure only through the Opus decoder's own upstream build graph, and its actual member pull is measured by the link audit. Resampling remains out of scope."
+    }
+  }
+}

@@ -35,6 +35,11 @@ LIB_TARGETS = (
     "libavcodec/libavcodec.a",
     "libavformat/libavformat.a",
 )
+# Object roots accepted as closure members. libswresample is included so
+# profiles that enable it (e.g. the Opus decoder's upstream dependency)
+# capture its translation units; for profiles without it the root simply
+# never matches.
+OBJECT_ROOTS = ("libavutil/", "libavcodec/", "libavformat/", "libswresample/")
 SOURCE_SUFFIXES = (".c", ".S", ".s", ".asm", ".cpp", ".m")
 DEP_FLAGS_WITH_VALUE = {"-MF", "-MT", "-MQ"}
 DEP_FLAGS = {"-MMD", "-MD", "-MP", "-MM", "-M"}
@@ -176,7 +181,7 @@ def parse_compile(line: str) -> dict | None:
         return None
     obj = argv[oi + 1]
     obj_norm = Path(obj).as_posix().lstrip("./")
-    if not obj_norm.startswith(("libavutil/", "libavcodec/", "libavformat/")):
+    if not obj_norm.startswith(OBJECT_ROOTS):
         return None
 
     source_i = None

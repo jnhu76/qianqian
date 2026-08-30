@@ -1,0 +1,76 @@
+{
+  "profile": "c1-aac",
+  "ladder": "C1",
+  "extends": "n3-min-noswr",
+  "description": "C0 (MP3+FLAC, no swresample) + AAC capability: AAC-LC in MOV/MP4/M4A and raw ADTS AAC. First stage that pays the MOV/MP4 container cost plus the AAC decoder cost. Baseline dimensions --disable-iconv/--disable-pthreads (E07-accepted) are composed in.",
+  "component_base": "everything-disabled",
+  "libraries": {
+    "enable": [
+      "avformat",
+      "avcodec"
+    ],
+    "disable": [
+      "swresample",
+      "avdevice",
+      "avfilter",
+      "swscale"
+    ]
+  },
+  "disable": [
+    "autodetect",
+    "debug",
+    "devices",
+    "doc",
+    "iconv",
+    "network",
+    "programs",
+    "protocols",
+    "pthreads",
+    "x86asm"
+  ],
+  "components": {
+    "demuxer": [
+      "aac",
+      "flac",
+      "mov",
+      "mp3"
+    ],
+    "decoder": [
+      "aac",
+      "flac",
+      "mp3float"
+    ],
+    "parser": [
+      "mpegaudio"
+    ]
+  },
+  "provenance": {
+    "capability:mov/mp4/m4a -> AAC decoder": {
+      "required_by": [
+        "aac-lc-44-stereo",
+        "aac-lc-48-stereo",
+        "aac-lc-44-mono",
+        "aac-vbr",
+        "aac-artwork",
+        "aac-short",
+        "aac-truncated"
+      ],
+      "reason": "issue #8 capability intent: MOV/MP4/M4A container must hand AAC-LC packets to the AAC decoder (demuxer mov covers mov,mp4,m4a,3gp,3g2,mj2)"
+    },
+    "demuxer:aac": {
+      "required_by": [
+        "aac-adts-44-stereo",
+        "aac-malformed-header"
+      ],
+      "reason": "raw ADTS AAC streams are their own container (demuxer aac)"
+    },
+    "decoder:aac": {
+      "required_by": [
+        "aac-lc-44-stereo",
+        "aac-adts-44-stereo",
+        "aac-*"
+      ],
+      "reason": "only AAC decoder in the C1 corpus; AAC-LC only, no HE-AAC edge profiles unless real files demand them"
+    }
+  }
+}
