@@ -1,67 +1,123 @@
 {
   "base": {
-    "groups": [
-      {
-        "base_live_bytes": 0,
-        "delta_live_bytes": 112115,
-        "family": "mov/isom",
-        "stage_live_bytes": 112115
-      },
-      {
-        "base_live_bytes": 0,
-        "delta_live_bytes": 0,
-        "family": "adts-demux",
-        "stage_live_bytes": 0
-      },
-      {
-        "base_live_bytes": 0,
-        "delta_live_bytes": 169771,
-        "family": "aac-decoder",
-        "stage_live_bytes": 169771
-      },
-      {
-        "base_live_bytes": 475740,
-        "delta_live_bytes": 213662,
-        "family": "shared",
-        "stage_live_bytes": 689402
-      }
-    ],
-    "map": "build/minimize/c0-so/so.map",
-    "members": 100,
-    "stage": "c0-so"
+    "pulled_units": 106,
+    "stage": "c0"
   },
   "increment_attribution": [
     {
-      "base_live_bytes": 0,
-      "delta_live_bytes": 112115,
       "family": "mov/isom",
-      "stage_live_bytes": 112115
+      "increment_bytes": 0
     },
     {
-      "base_live_bytes": 0,
-      "delta_live_bytes": 0,
       "family": "adts-demux",
-      "stage_live_bytes": 0
+      "increment_bytes": 0
     },
     {
-      "base_live_bytes": 0,
-      "delta_live_bytes": 169771,
       "family": "aac-decoder",
-      "stage_live_bytes": 169771
+      "increment_bytes": 0
     },
     {
-      "base_live_bytes": 475740,
-      "delta_live_bytes": 213662,
       "family": "shared",
-      "stage_live_bytes": 689402
+      "increment_bytes": 0
     }
   ],
-  "method": "GNU ld -Map contributory input-section bytes per archive member family, post gc-sections (live shipping bytes, not object-file or TU counts)",
-  "note": "shared covers container/codec/util support shared with pre-existing capabilities; only the mov/isom + adts-demux + aac-decoder families are attributable to the AAC/M4A/ADTS capability bundle",
-  "schema": 1,
+  "increment_total_bytes": 0,
+  "members_top": [
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aac/aacdec.c",
+      "unit": "libavcodec/aac/aacdec.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aac/aacdec_ac.c",
+      "unit": "libavcodec/aac/aacdec_ac.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aac/aacdec_float.c",
+      "unit": "libavcodec/aac/aacdec_float.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aac/aacdec_lpd.c",
+      "unit": "libavcodec/aac/aacdec_lpd.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aac/aacdec_tab.c",
+      "unit": "libavcodec/aac/aacdec_tab.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aac/aacdec_usac.c",
+      "unit": "libavcodec/aac/aacdec_usac.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aac/aacdec_usac_mps212.c",
+      "unit": "libavcodec/aac/aacdec_usac_mps212.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aacps_common.c",
+      "unit": "libavcodec/aacps_common.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aacps_float.c",
+      "unit": "libavcodec/aacps_float.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aacpsdsp_float.c",
+      "unit": "libavcodec/aacpsdsp_float.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aacsbr.c",
+      "unit": "libavcodec/aacsbr.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/aactab.c",
+      "unit": "libavcodec/aactab.o"
+    },
+    {
+      "family": "shared",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/ac3_channel_layout_tab.c",
+      "unit": "libavcodec/ac3_channel_layout_tab.o"
+    },
+    {
+      "family": "shared",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/adts_header.c",
+      "unit": "libavcodec/adts_header.o"
+    },
+    {
+      "family": "shared",
+      "file_backed_bytes": 0,
+      "source": "libavcodec/cbrt_data.c",
+      "unit": "libavcodec/cbrt_data.o"
+    }
+  ],
+  "method": "increment members (pulled at stage, not at base) x file-backed section bytes per manifest unit (size -A, DWARF/bss excluded); families by manifest source path, so duplicate basenames (aacdec decoder vs ADTS demuxer) are attributed exactly. Upper bound of post-gc live bytes; live .so total is cross-checked in docs/experiments/e08-common-formats.md",
+  "schema": 2,
   "stage": {
-    "map": "build/minimize/c1-so/so.map",
-    "members": 149,
-    "stage": "c1-so"
+    "pulled_units": 157,
+    "stage": "c1"
   }
 }

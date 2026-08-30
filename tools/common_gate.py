@@ -128,7 +128,8 @@ def unit_file_backed_bytes(archive: Path, manifest_path: Path, out_path: Path) -
             total = 0
             for line in out.splitlines():
                 parts = line.split()
-                if len(parts) != 2 or not parts[0].startswith("."):
+                # SysV rows: '<section> <size> <addr>' (three columns)
+                if len(parts) < 2 or not parts[0].startswith("."):
                     continue
                 try:
                     sz = int(parts[1])
@@ -136,6 +137,10 @@ def unit_file_backed_bytes(archive: Path, manifest_path: Path, out_path: Path) -
                     continue
                 if not UNIT_EXCLUDED_SECTION.match(parts[0]):
                     total += sz
+            if total == 0:
+                raise SystemExit(
+                    f"unit-bytes: zero size for {unit['object']} — "
+                    f"size -A parse drift or bitcode member")
             results.append({
                 "unit_object": unit["object"],
                 "source": unit["path"],
@@ -410,14 +415,14 @@ def main() -> None:
     full_manifest = (json.loads(full_path.read_text()) if full_path.is_file()
                      else projected)  # flags-derived stages carry only the projection
     unit_bytes_path = stage_dir / "unit-bytes.json"
-    if not unit_bytes_path.is_file():
-        if any("-flto" in (u.get("flags") or []) for u in projected["units"]):
-            # LTO archives contain bitcode members; per-section sizes are
-            # meaningless there and attribution only uses non-LTO stages
-            print("  (unit-bytes skipped: LTO closure)")
-        else:
-            unit_file_backed_bytes(single, stage_dir / "manifest-projected.json",
-                                   unit_bytes_path)
+    if any("-flto" in (u.get("flags") or []) for u in projected["units"]):
+        # LTO archives contain bitcode members; per-section sizes are
+        # meaningless there and attribution only uses non-LTO stages
+        print("  (unit-bytes skipped: LTO closure)")
+    else:
+        # always regenerate: a stale capture poisons attribution silently
+        unit_file_backed_bytes(single, stage_dir / "manifest-projected.json",
+                               unit_bytes_path)
     expect_fails = [k for k, v in expectations.items() if v["status"] == "fail"]
     gate = {
         "stage": args.stage,

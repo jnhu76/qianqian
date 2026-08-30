@@ -73,8 +73,8 @@ python3 tools/common_so.py --stage c6-so-lto --from-stage c5 --lto
 step "7. summary (all numbers from gate.json / so.json, zero hand-entry)"
 python3 tools/common_summary.py
 
-step "7b. capability attribution (C0 -> C1 live .so bytes, machine-derived)"
-python3 tools/common_attribution.py --base c0-so --stage c1-so
+step "7b. capability attribution (C0 -> C1 machine-derived member bytes)"
+python3 tools/common_attribution.py --base c0 --stage c1
 
 step "8. markdown authority check (ladder.md / PR_BODY.md == summary.json derivation)"
 python3 tools/common_summary.py --check

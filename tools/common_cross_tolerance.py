@@ -21,6 +21,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import argparse
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from common_corpus import STAGE_CAPABILITIES, load_cases  # noqa: E402
@@ -30,7 +32,6 @@ WIN_EXE_CANDIDATES = [
     ROOT / "build/minimize/win-c6/dll/qn_pcm_dump.exe",
     ROOT / "build/artifacts/qn_pcm_dump.exe",
 ]
-WIN_EXE = next((p for p in WIN_EXE_CANDIDATES if p.is_file()), WIN_EXE_CANDIDATES[0])
 
 
 def read_qpcm(payload: bytes):
@@ -44,10 +45,18 @@ def read_qpcm(payload: bytes):
 
 
 def main() -> None:
-    linux_exe = ROOT / "build/artifacts/qn_pcm_dump"
-    if not linux_exe.is_file() or not WIN_EXE.is_file():
-        raise SystemExit("need both platform binaries: run the Linux clean-room "
-                         "and `python3 tools/common_windows.py --build --dll` first")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--linux-exe", default=str(ROOT / "build/artifacts/qn_pcm_dump"),
+                    help="Linux production-path binary (default: build/artifacts; "
+                         "pass a preserved copy when the Windows phase has wiped "
+                         "build/artifacts)")
+    args = ap.parse_args()
+    linux_exe = Path(args.linux_exe)
+    win_exe = next((p for p in WIN_EXE_CANDIDATES if p.is_file()), WIN_EXE_CANDIDATES[0])
+    if not linux_exe.is_file() or not win_exe.is_file():
+        raise SystemExit(f"need both platform binaries: {linux_exe} / {win_exe}: "
+                         "run the Linux clean-room and "
+                         "`python3 tools/common_windows.py --build --dll` first")
 
     summary = json.loads(OUT.read_text())
     windows = summary["dll"]["dll"]  # noqa: F841 (documentation anchor)
@@ -62,7 +71,7 @@ def main() -> None:
         lin = read_qpcm(subprocess.run(
             [str(linux_exe), fixture], capture_output=True, check=True).stdout)
         win = read_qpcm(subprocess.run(
-            [str(WIN_EXE), fixture], capture_output=True, check=True).stdout)
+            [str(win_exe), fixture], capture_output=True, check=True).stdout)
         if not lin or not win:
             raise SystemExit(f"{cid}: bad QPCM stream")
         n = min(len(lin[2]), len(win[2]))

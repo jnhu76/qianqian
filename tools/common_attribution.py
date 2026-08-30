@@ -44,7 +44,7 @@ def load(stage: str):
     sources = json.loads((stage_dir / "reachable-sources.json").read_text())
     bytes_by_unit = {u["unit_object"]: u["file_backed_bytes"]
                      for u in json.loads((stage_dir / "unit-bytes.json").read_text())}
-    pulled = {u["unit_object"]: u["pulled"] and u["object"] in bytes_by_unit
+    pulled = {u["object"]: u["pulled"] and u["object"] in bytes_by_unit
               for u in sources}
     return sources, pulled, bytes_by_unit
 

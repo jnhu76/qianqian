@@ -1,63 +1,63 @@
 {
   "codegen_throughput": {
     "aac-lc-44-stereo": {
-      "o3": 1455.16,
-      "os": 1280.85,
-      "os_lto": 1160.96
+      "o3": 1726.63,
+      "os": 1704.2,
+      "os_lto": 1726.28
     },
     "alac-long": {
-      "o3": 460.73,
-      "os": 318.88,
-      "os_lto": 287.39
+      "o3": 508.01,
+      "os": 394.05,
+      "os_lto": 391.35
     },
     "flac-16-44-stereo": {
-      "o3": 968.69,
-      "os": 761.28,
-      "os_lto": 817.65
+      "o3": 1088.77,
+      "os": 1047.84,
+      "os_lto": 1034.93
     },
     "flac-24-96": {
-      "o3": 422.22,
-      "os": 363.75,
-      "os_lto": 350.95
+      "o3": 467.48,
+      "os": 431.18,
+      "os_lto": 446.08
     },
     "mp3-cbr-id3v23": {
-      "o3": 1577.97,
-      "os": 796.26,
-      "os_lto": 1446.36
+      "o3": 1860.55,
+      "os": 1701.03,
+      "os_lto": 1727.33
     },
     "mp3-long": {
-      "o3": 1610.37,
-      "os": 1104.98,
-      "os_lto": 1365.63
+      "o3": 1692.78,
+      "os": 1523.36,
+      "os_lto": 1600.9
     },
     "mp3-vbr-id3v24": {
-      "o3": 1361.46,
-      "os": 1471.68,
-      "os_lto": 1571.65
+      "o3": 1890.7,
+      "os": 1857.31,
+      "os_lto": 1945.71
     },
     "opus-48-stereo": {
-      "o3": 471.92,
-      "os": 387.02,
-      "os_lto": 385.85
+      "o3": 526.24,
+      "os": 497.97,
+      "os_lto": 475.81
     },
     "vorbis-44-stereo": {
-      "o3": 1419.95,
-      "os": 801.29,
-      "os_lto": 1343.33
+      "o3": 1606.32,
+      "os": 1608.26,
+      "os_lto": 1630.44
     },
     "wav-f32le-44-stereo": {
-      "o3": 3676.87,
-      "os": 3627.87,
-      "os_lto": 4511.87
+      "o3": 5065.37,
+      "os": 5412.6,
+      "os_lto": 5856.67
     },
     "wav-s16le-44-stereo": {
-      "o3": 11408.02,
-      "os": 13733.97,
-      "os_lto": 9570.55
+      "o3": 13721.81,
+      "os": 18347.78,
+      "os_lto": 25777.51
     }
   },
   "final_so": {
-    "dynamic_dependencies": "linux-vdso.so.1 (0x00007e92c4a47000)\n\tlibm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6 (0x00007e92c490a000)\n\tlibc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x00007e92c4200000)\n\t/lib64/ld-linux-x86-64.so.2 (0x00007e92c4a49000)",
+    "dynamic_dependencies": "linux-vdso.so.1 (0x0000796336f55000)\n\tlibm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6 (0x0000796336ada000)\n\tlibc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x0000796336800000)\n\t/lib64/ld-linux-x86-64.so.2 (0x0000796336f57000)",
     "exported_api_count": 5,
     "raw_bytes": 1435336,
     "sha256": "0e9c0fdc6a55329153a86d28b1297564d3fd3ed26fd38e83f9cd74abe938c508",
@@ -76,7 +76,7 @@
       "capability": "MP3+FLAC",
       "gate": "PASS",
       "linked_stripped_bytes": 952568,
-      "min_xrt": 303.25,
+      "min_xrt": 471.07,
       "min_xrt_sample": "flac-24-96",
       "oracle_tu": 202,
       "reachable_tu": 106,
@@ -95,7 +95,7 @@
       "capability": "+AAC/M4A +ADTS",
       "gate": "PASS",
       "linked_stripped_bytes": 1870072,
-      "min_xrt": 439.83,
+      "min_xrt": 409.06,
       "min_xrt_sample": "flac-24-96",
       "oracle_tu": 237,
       "reachable_tu": 157,
@@ -115,7 +115,7 @@
       "capability": "+ALAC/M4A",
       "gate": "PASS",
       "linked_stripped_bytes": 1882360,
-      "min_xrt": 399.86,
+      "min_xrt": 482.99,
       "min_xrt_sample": "flac-24-96",
       "oracle_tu": 240,
       "reachable_tu": 160,
@@ -136,8 +136,8 @@
       "capability": "+PCM WAV (6 fmts)",
       "gate": "PASS",
       "linked_stripped_bytes": 1902840,
-      "min_xrt": 349.24,
-      "min_xrt_sample": "alac-long",
+      "min_xrt": 477.99,
+      "min_xrt_sample": "flac-24-96",
       "oracle_tu": 243,
       "reachable_tu": 163,
       "so_stripped_bytes": 1133376,
@@ -158,7 +158,7 @@
       "capability": "+Ogg Vorbis",
       "gate": "PASS",
       "linked_stripped_bytes": 2021624,
-      "min_xrt": 441.87,
+      "min_xrt": 448.08,
       "min_xrt_sample": "flac-24-96",
       "oracle_tu": 257,
       "reachable_tu": 180,
@@ -181,7 +181,7 @@
       "capability": "+Ogg Opus",
       "gate": "PASS",
       "linked_stripped_bytes": 2259192,
-      "min_xrt": 422.22,
+      "min_xrt": 467.48,
       "min_xrt_sample": "flac-24-96",
       "oracle_tu": 276,
       "reachable_tu": 198,
@@ -204,7 +204,7 @@
       "capability": "Common Formats minimized",
       "gate": "PASS",
       "linked_stripped_bytes": 1317104,
-      "min_xrt": 287.39,
+      "min_xrt": 391.35,
       "min_xrt_sample": "alac-long",
       "oracle_tu": 198,
       "reachable_tu": 198,
