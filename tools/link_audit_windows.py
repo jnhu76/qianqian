@@ -55,7 +55,46 @@ sys_guard = str(ROOT / "tools")
 if sys_guard not in __import__("sys").path:
     __import__("sys").path.insert(0, sys_guard)
 
-from link_audit import CONTRACT_SYMBOLS, GLOBAL_DEF_TYPES, parse_archive, run  # noqa: E402
+from link_audit import CONTRACT_SYMBOLS, GLOBAL_DEF_TYPES, run  # noqa: E402
+
+
+def parse_archive_coff(path: Path) -> list[dict]:
+    """COFF-flavored ar parsing (llvm-ar output).
+
+    Two deviations from the GNU layout that tools/link_audit.py handles:
+    - the '//' long-name table entries are NUL-separated (not newline);
+    - members keep their compiler object names ('aacdec.c.obj'), so no
+      '.o' suffix is appended — names stay exactly as stored.
+    Members are identified by archive position (index), which keeps
+    duplicate basenames distinct."""
+    data = path.read_bytes()
+    if data[:8] != b"!<arch>\n":
+        raise SystemExit(f"not an ar archive: {path}")
+    members = []
+    pos = 8
+    long_names = b""
+    while pos < len(data):
+        if len(data) - pos < 60:
+            break
+        hdr = data[pos:pos + 60]
+        name_raw = hdr[0:16].decode("ascii", "replace").rstrip()
+        size = int(hdr[48:58].decode().strip())
+        body = data[pos + 60:pos + 60 + size]
+        if name_raw == "//":
+            long_names = body
+        elif re.fullmatch(r"/\d+", name_raw):
+            off = int(name_raw[1:])
+            end_n, end_z = long_names.find(b"\n", off), long_names.find(b"\x00", off)
+            ends = [e for e in (end_n, end_z) if e >= 0]
+            end = min(ends) if ends else len(long_names)
+            name = long_names[off:end].decode("ascii", "replace").rstrip("\x00").rstrip("/")
+        else:
+            name = name_raw.rstrip("/")
+        if name not in ("", "/", "/SYM64/", "__.SYMDEF"):  # skip symbol index
+            members.append({"index": len(members), "member": name,
+                            "size": size, "offset": pos + 60})
+        pos += 60 + size + (size & 1)
+    return members
 
 # load-bearing PE sections: content must be identical between the full and
 # reduced-archive links; debug sections are stripped first (they embed the
@@ -162,18 +201,18 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="win-audit-") as tmp:
         work = Path(tmp)
 
-        ffmpeg_members = parse_archive(archive_path)
+        ffmpeg_members = parse_archive_coff(archive_path)
         archive_bytes = archive_path.read_bytes()
         for m in ffmpeg_members:
-            obj = work / f"m{m['index']:04d}_{m['member']}"
+            obj = work / f"m{m['index']:04d}"
             obj.write_bytes(archive_bytes[m["offset"]:m["offset"] + m["size"]])
             d, u, w = nm_symbols(obj, nm)
             m["defined"], m["undef"], m["weak_undef"] = d, u, w
 
-        songcore_members = parse_archive(songcore_path)
+        songcore_members = parse_archive_coff(songcore_path)
         songcore_raw = songcore_path.read_bytes()
         for m in songcore_members:
-            obj = work / f"sc{m['index']:04d}_{m['member']}"
+            obj = work / f"sc{m['index']:04d}"
             obj.write_bytes(songcore_raw[m["offset"]:m["offset"] + m["size"]])
             d, u, w = nm_symbols(obj, nm)
             m["defined"], m["undef"], m["weak_undef"] = d, u, w
