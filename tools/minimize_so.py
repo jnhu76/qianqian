@@ -155,10 +155,13 @@ def main() -> None:
         stripped = stripped_copy.stat().st_size
         stripped_xz = xz_bytes(stripped_copy)
     raw_xz = xz_bytes(so)
-    dynsym_count = run(["nm", "-D", str(so)]).stdout.count("\n")
 
+    # Symbol calibers (review round 2): the API surface is the five song_*
+    # entry points; the QIANQIAN_1.0 version-definition marker is a dynsym
+    # entry but not an exported API symbol. Report both, never merged.
+    api = sorted(s for s in exported if s in CONTRACT)
     result = {
-        "schema": 1,
+        "schema": 2,
         "stage": args.stage,
         "closure_from": args.from_stage,
         "manifest": f"build/minimize/{args.stage}/manifest-projected.json",
@@ -166,9 +169,10 @@ def main() -> None:
                              "cases": report.get("oracle_vs_xmake_cases")},
         "so": str(so.relative_to(ROOT)),
         "so_sha256": sha256_file(so),
-        "exported_symbols": sorted(exported),
-        "exported_count": len(exported),
-        "dynsym_entries": dynsym_count,
+        "exported_api_symbols": api,
+        "exported_api_count": len(api),
+        "defined_dynsym_entries": sorted(exported),
+        "defined_dynsym_count": len(exported),
         "smoke": smoke,
         "sizes": {
             "libqianqian_songcore_so_bytes": raw,
@@ -179,7 +183,7 @@ def main() -> None:
         },
     }
     (stage_dir / "so.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
-    print(json.dumps({k: result[k] for k in ("exported_symbols", "sizes", "smoke")}, indent=2))
+    print(json.dumps({k: result[k] for k in ("exported_api_symbols", "defined_dynsym_entries", "sizes", "smoke")}, indent=2))
     print(f"wrote {stage_dir / 'so.json'}")
 
 

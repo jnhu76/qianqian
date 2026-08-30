@@ -15,17 +15,19 @@
       "stage": "s3-pthreads",
       "translation_units": 106
     },
-    "shipped_shared_core": {
-      "exported_symbols": 6,
-      "so_stripped_bytes": 949016,
-      "so_stripped_xz_bytes": 339984,
-      "stage": "s6-shipped-so"
-    },
     "smallest_conventional_archive": {
       "archive_bytes": 1196120,
       "note": "same closure at -Os; LTO archives are bytecode and do not compete",
       "stage": "s5-Os",
       "translation_units": 106
+    },
+    "so_abi_visibility_baseline": {
+      "defined_dynsym_entries": 6,
+      "exported_api_symbols": 5,
+      "note": "ABI/visibility baseline: version script exposes ONLY the five song_* entry points, every FFmpeg/internal symbol forced local. Not built with -Os/LTO, so not size-comparable to minimal_linked_core.",
+      "so_stripped_bytes": 949016,
+      "so_stripped_xz_bytes": 339984,
+      "stage": "s6-shipped-so"
     }
   },
   "gate": "tools/minimize_gate.py (corpus 15/15 oracle-equivalence incl. bench seek, SongCore PCM canonical hashes, SongCore-level seek probes, real-song full decodes)",
@@ -39,7 +41,8 @@
   "schema": 2,
   "shipped_so": {
     "s6-shipped-so": {
-      "exported_symbols": 6,
+      "defined_dynsym_entries": 6,
+      "exported_api_symbols": 5,
       "pic_corpus": "PASS",
       "smoke_ok": true,
       "so_raw_bytes": 1019536,
@@ -152,5 +155,17 @@
       "strict_failures": [],
       "translation_units": 106
     }
+  },
+  "throughput_tradeoff": {
+    "baseline_flac_xrt": 964.33,
+    "baseline_mp3_xrt": 956.35,
+    "baseline_stage": "s0",
+    "flac_regression_pct": 9.2,
+    "gate_floor_xrt": 50,
+    "metric": "SongCore decode xRT (min across the stage's real songs)",
+    "mp3_regression_pct": 20.4,
+    "worst_flac_xrt": 875.58,
+    "worst_mp3_xrt": 761.53,
+    "worst_stage": "s5-Os-LTO"
   }
 }
