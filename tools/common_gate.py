@@ -98,6 +98,53 @@ def symbol_count(path: Path) -> int:
     return sum(1 for l in out.splitlines() if l.strip())
 
 
+# file-backed, non-debug section filter for per-unit size attribution
+# (.bss/.sbss are NOBITS runtime memory; DWARF is stripped from shipping)
+UNIT_EXCLUDED_SECTION = re.compile(r"^\.(debug|comment|group|note|zdebug|s?bss)")
+
+
+def unit_file_backed_bytes(archive: Path, manifest_path: Path, out_path: Path) -> None:
+    """Per-manifest-unit file-backed section bytes, machine-derived.
+
+    Members are extracted by archive offset (duplicate basenames such as
+    libavcodec/aacdec.o vs libavformat/aacdec.o stay distinct via the 1:1
+    manifest-order mapping) and measured with `size -A`. Consumed by
+    tools/common_attribution.py for capability-increment attribution."""
+    from link_audit import parse_archive
+    from tempfile import TemporaryDirectory
+
+    manifest = json.loads(manifest_path.read_text())
+    units = manifest["units"]
+    members = parse_archive(archive)
+    if len(members) != len(units):
+        raise SystemExit(f"unit-bytes: member/unit drift {len(members)} vs {len(units)}")
+    raw = archive.read_bytes()
+    results = []
+    with TemporaryDirectory() as td:
+        for m, unit in zip(members, units):
+            obj = Path(td) / f"m{m['index']:04d}"
+            obj.write_bytes(raw[m["offset"]:m["offset"] + m["size"]])
+            out = run(["size", "-A", str(obj)]).stdout
+            total = 0
+            for line in out.splitlines():
+                parts = line.split()
+                if len(parts) != 2 or not parts[0].startswith("."):
+                    continue
+                try:
+                    sz = int(parts[1])
+                except ValueError:
+                    continue
+                if not UNIT_EXCLUDED_SECTION.match(parts[0]):
+                    total += sz
+            results.append({
+                "unit_object": unit["object"],
+                "source": unit["path"],
+                "origin": unit["origin"],
+                "file_backed_bytes": total,
+            })
+    out_path.write_text(json.dumps(results, indent=1) + "\n")
+
+
 def xz_bytes(path: Path) -> int:
     return len(subprocess.run(["xz", "-c", str(path)], capture_output=True,
                               check=True).stdout)
@@ -362,6 +409,15 @@ def main() -> None:
     full_path = stage_dir / "manifest.json"
     full_manifest = (json.loads(full_path.read_text()) if full_path.is_file()
                      else projected)  # flags-derived stages carry only the projection
+    unit_bytes_path = stage_dir / "unit-bytes.json"
+    if not unit_bytes_path.is_file():
+        if any("-flto" in (u.get("flags") or []) for u in projected["units"]):
+            # LTO archives contain bitcode members; per-section sizes are
+            # meaningless there and attribution only uses non-LTO stages
+            print("  (unit-bytes skipped: LTO closure)")
+        else:
+            unit_file_backed_bytes(single, stage_dir / "manifest-projected.json",
+                                   unit_bytes_path)
     expect_fails = [k for k, v in expectations.items() if v["status"] == "fail"]
     gate = {
         "stage": args.stage,

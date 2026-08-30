@@ -118,6 +118,25 @@ def strip_debug(pe: Path, out: Path, strip: str) -> None:
     run([strip, "--strip-debug", str(out)])
 
 
+def member_unit_key(name: str) -> str:
+    """Normalize an archive-member/object name to the manifest's unit key.
+
+    Manifest units carry FFmpeg-make-style object names ('aacdec.o'); xmake's
+    on-disk objects and archive members are platform-named ('aacdec.c.o' on
+    linux/gcc, potentially 'aacdec.obj'-style under mingw). Strip the platform
+    object suffix, then the source extension, then re-canonicalize."""
+    stem = name
+    for suf in (".obj", ".o"):
+        if stem.endswith(suf):
+            stem = stem[: -len(suf)]
+            break
+    for suf in (".c", ".s", ".S", ".m", ".h", ".cc", ".cpp"):
+        if stem.endswith(suf):
+            stem = stem[: -len(suf)]
+            break
+    return stem + ".o"
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--archive", default="build/artifacts/libqianqian_av.a")
@@ -246,10 +265,9 @@ def main() -> None:
         # ambiguous, so this is supporting evidence, not the hard gate)
         map_names = set(re.findall(r"^\S+\s+\S+\s+\S+\s+(\S+\.obj):\(",
                                    (outdir / "linker.map").read_text(), re.M))
-        pulled_bases = {m["member"] for m in pulled_members}
-        map_pulled = {n for n in map_names if n.replace(".obj", ".c.o") in pulled_bases
-                      or n in pulled_bases}
-        strays = sorted(map_names - map_pulled)
+        pulled_keys = {member_unit_key(m["member"]) for m in pulled_members}
+        map_keys = {member_unit_key(n) for n in map_names}
+        strays = sorted(map_keys - pulled_keys)
         if strays:
             raise SystemExit(f"Windows reachability gate FAILED: lld map contributes "
                              f"members outside the simulation: {strays[:8]}")
@@ -263,7 +281,7 @@ def main() -> None:
 
     reachable_objects = []
     for m, unit in zip(ffmpeg_members, units):
-        if m["member"] != Path(unit["object"]).name:
+        if member_unit_key(m["member"]) != member_unit_key(Path(unit["object"]).name):
             raise SystemExit(
                 f"archive/manifest order drift at member {m['index']}: "
                 f"{m['member']} vs {unit['object']}")

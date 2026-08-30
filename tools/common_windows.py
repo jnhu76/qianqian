@@ -171,13 +171,11 @@ def compiled_ffmpeg_objects() -> set[str]:
         raise SystemExit("missing xmake object tree; build first")
     out = set()
     for o in objs_root.rglob("*.o"):
+        # .objs/qianqian_av/<plat>/<arch>/<mode>/<project-relative source path>.o
         parts = o.relative_to(objs_root).parts
-        for i, p in enumerate(parts):
-            if p == "ffmpeg-src" or p == "oracle":
-                out.add("/".join(parts[i:])[:-2])  # strip trailing .o
-                break
-        else:
+        if len(parts) < 5:
             raise SystemExit(f"unrecognized object path: {o}")
+        out.add("/".join(parts[3:])[:-2])  # strip trailing .o
     return out
 
 

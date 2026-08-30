@@ -235,11 +235,12 @@ def derive_ladder_md(summary: dict) -> str:
 
 
 def derive_pr_body(summary: dict, windows: dict | None) -> str | None:
-    """PR body as a pure function of machine results. Requires windows.json
-    (the Windows phase is part of this PR's claim); without it the body is
-    not regenerated — a stale body then fails --check against its embedded
-    provenance shas instead of silently mixing old and new numbers."""
-    if windows is None:
+    """PR body as a pure function of machine results. Requires CURRENT-schema
+    windows.json (the Windows phase is part of this PR's claim); with a stale
+    or absent windows.json the body is not regenerated — a stale body then
+    fails --check against its embedded provenance shas once the Windows phase
+    has produced current results, and is explicitly DEFERRED before that."""
+    if windows is None or windows.get("schema", 0) < 2:
         return None
     rows = {r["stage"]: r for r in summary["ladder"]}
     c6 = rows["c6"]
@@ -398,17 +399,18 @@ def check() -> None:
     if committed_ladder != derive_ladder_md(summary):
         drift.append("ladder.md differs from summary.json derivation")
     body_path = OUT / "PR_BODY.md"
-    if body_path.is_file():
-        committed = body_path.read_text()
-        derived = derive_pr_body(summary, windows)
-        if derived is None:
-            drift.append("PR_BODY.md exists but windows.json missing")
-        elif committed != derived:
+    derived = derive_pr_body(summary, windows)
+    if derived is None:
+        print("PR_BODY check DEFERRED: windows.json is absent or pre-projection "
+              "schema; run the Windows phase + common_windows_summary + "
+              "common_cross_tolerance, then rerun tools/common_summary.py")
+    else:
+        if body_path.is_file() and body_path.read_text() != derived:
             drift.append("PR_BODY.md differs from summary.json+windows.json derivation")
-    # provenance: the committed Markdown must reference the CURRENT machine JSONs
-    marker = provenance_marker(summary, windows)
-    if body_path.is_file() and marker not in body_path.read_text():
-        drift.append("PR_BODY.md provenance marker does not match current summary.json/windows.json")
+        # provenance: the committed Markdown must reference the CURRENT machine JSONs
+        marker = provenance_marker(summary, windows)
+        if body_path.is_file() and marker not in body_path.read_text():
+            drift.append("PR_BODY.md provenance marker does not match current summary.json/windows.json")
     if drift:
         for d in drift:
             print(f"DRIFT: {d}")

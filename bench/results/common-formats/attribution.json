@@ -1,0 +1,67 @@
+{
+  "base": {
+    "groups": [
+      {
+        "base_live_bytes": 0,
+        "delta_live_bytes": 112115,
+        "family": "mov/isom",
+        "stage_live_bytes": 112115
+      },
+      {
+        "base_live_bytes": 0,
+        "delta_live_bytes": 0,
+        "family": "adts-demux",
+        "stage_live_bytes": 0
+      },
+      {
+        "base_live_bytes": 0,
+        "delta_live_bytes": 169771,
+        "family": "aac-decoder",
+        "stage_live_bytes": 169771
+      },
+      {
+        "base_live_bytes": 475740,
+        "delta_live_bytes": 213662,
+        "family": "shared",
+        "stage_live_bytes": 689402
+      }
+    ],
+    "map": "build/minimize/c0-so/so.map",
+    "members": 100,
+    "stage": "c0-so"
+  },
+  "increment_attribution": [
+    {
+      "base_live_bytes": 0,
+      "delta_live_bytes": 112115,
+      "family": "mov/isom",
+      "stage_live_bytes": 112115
+    },
+    {
+      "base_live_bytes": 0,
+      "delta_live_bytes": 0,
+      "family": "adts-demux",
+      "stage_live_bytes": 0
+    },
+    {
+      "base_live_bytes": 0,
+      "delta_live_bytes": 169771,
+      "family": "aac-decoder",
+      "stage_live_bytes": 169771
+    },
+    {
+      "base_live_bytes": 475740,
+      "delta_live_bytes": 213662,
+      "family": "shared",
+      "stage_live_bytes": 689402
+    }
+  ],
+  "method": "GNU ld -Map contributory input-section bytes per archive member family, post gc-sections (live shipping bytes, not object-file or TU counts)",
+  "note": "shared covers container/codec/util support shared with pre-existing capabilities; only the mov/isom + adts-demux + aac-decoder families are attributable to the AAC/M4A/ADTS capability bundle",
+  "schema": 1,
+  "stage": {
+    "map": "build/minimize/c1-so/so.map",
+    "members": 149,
+    "stage": "c1-so"
+  }
+}
