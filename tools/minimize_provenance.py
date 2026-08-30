@@ -89,7 +89,8 @@ def main() -> None:
             "so_raw_bytes": s["libqianqian_songcore_so_bytes"],
             "so_stripped_bytes": s["libqianqian_songcore_so_stripped_bytes"],
             "so_stripped_xz_bytes": s["libqianqian_songcore_so_stripped_xz_bytes"],
-            "exported_symbols": so["exported_count"],
+            "exported_api_symbols": so["exported_api_count"],
+            "defined_dynsym_entries": so["defined_dynsym_count"],
             "correctness": "PASS" if so["pic_codegen_gate"]["corpus_verdict"] == "PASS"
                            and all(v.get("exit_code") == 0 for v in so["smoke"].values()) else "FAIL",
             "verdict": "control_reference",

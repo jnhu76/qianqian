@@ -30,7 +30,7 @@ ROLES = {
     "minimal_closure_gc": "s4-gc",
     "smallest_conventional_archive": "s5-Os",
     "minimal_linked_core": "s5-Os-LTO",
-    "shipped_shared_core": "s6-shipped-so",
+    "so_abi_visibility_baseline": "s6-shipped-so",
 }
 
 
@@ -73,7 +73,8 @@ def load_so(stage: str) -> dict | None:
         "so_raw_bytes": s["libqianqian_songcore_so_bytes"],
         "so_stripped_bytes": s["libqianqian_songcore_so_stripped_bytes"],
         "so_stripped_xz_bytes": s["libqianqian_songcore_so_stripped_xz_bytes"],
-        "exported_symbols": d["exported_count"],
+        "exported_api_symbols": d["exported_api_count"],
+        "defined_dynsym_entries": d["defined_dynsym_count"],
         "pic_corpus": d["pic_codegen_gate"]["corpus_verdict"],
         "smoke_ok": all(v.get("exit_code") == 0 for v in d["smoke"].values()),
     }
@@ -145,12 +146,39 @@ def main() -> None:
         },
     }
     if so_stages:
-        doc["finals"]["shipped_shared_core"] = {
-            "stage": ROLES["shipped_shared_core"],
-            "so_stripped_bytes": list(so_stages.values())[0]["so_stripped_bytes"],
-            "so_stripped_xz_bytes": list(so_stages.values())[0]["so_stripped_xz_bytes"],
-            "exported_symbols": list(so_stages.values())[0]["exported_symbols"],
+        # Review round 2 caliber: this stage is an ABI/visibility baseline
+        # (s3 closure, default -O2 + PIC, no -Os/LTO). It proves the core can
+        # expose exactly the five song_* entry points; its size must NOT be
+        # read as PIC/dynamic-library overhead versus the s5-Os-LTO executable.
+        so = list(so_stages.values())[0]
+        doc["finals"]["so_abi_visibility_baseline"] = {
+            "stage": ROLES["so_abi_visibility_baseline"],
+            "so_stripped_bytes": so["so_stripped_bytes"],
+            "so_stripped_xz_bytes": so["so_stripped_xz_bytes"],
+            "exported_api_symbols": so["exported_api_symbols"],
+            "defined_dynsym_entries": so["defined_dynsym_entries"],
+            "note": "ABI/visibility baseline: version script exposes ONLY the five song_* "
+                    "entry points, every FFmpeg/internal symbol forced local. Not built "
+                    "with -Os/LTO, so not size-comparable to minimal_linked_core.",
         }
+
+    # Throughput tradeoff (review round 2): size-oriented codegen is not free.
+    # Stated against s0, machine-derived — never summarized as "noise".
+    worst = min(gates.values(), key=lambda d: d["mp3_xrt_songcore"])
+    doc["throughput_tradeoff"] = {
+        "metric": "SongCore decode xRT (min across the stage's real songs)",
+        "baseline_stage": ROLES["baseline"],
+        "baseline_mp3_xrt": baseline["mp3_xrt_songcore"],
+        "baseline_flac_xrt": baseline["flac_xrt_songcore"],
+        "worst_stage": worst["stage"],
+        "worst_mp3_xrt": worst["mp3_xrt_songcore"],
+        "worst_flac_xrt": worst["flac_xrt_songcore"],
+        "mp3_regression_pct": round(100 * (1 - worst["mp3_xrt_songcore"]
+                                           / baseline["mp3_xrt_songcore"]), 1),
+        "flac_regression_pct": round(100 * (1 - worst["flac_xrt_songcore"]
+                                            / baseline["flac_xrt_songcore"]), 1),
+        "gate_floor_xrt": 50,
+    }
 
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "summary.json").write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n")
@@ -174,6 +202,12 @@ def main() -> None:
         "Linked-size decomposition (stripped): "
         f"GC {gc_at_full_closure:,} + source closure {closure_at_gc:,} + codegen {codegen:,} "
         f"= {total:,} B total.",
+        "",
+        f"Throughput tradeoff: size-oriented codegen costs up to "
+        f"{doc['throughput_tradeoff']['mp3_regression_pct']:.0f}% MP3 decode xRT "
+        f"({baseline['mp3_xrt_songcore']:.0f}x on {ROLES['baseline']} -> "
+        f"{worst['mp3_xrt_songcore']:.0f}x on {worst['stage']}); worst case still "
+        f"{worst['mp3_xrt_songcore']:.0f}x realtime vs the 50x gate floor.",
     ]
     (OUT / "ladder.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))

@@ -9,3 +9,5 @@
 | s6-shipped-so (.so) | — | — | 1,019,536 | 949,016 | 339,984 | PIC PASS + smoke | — | — |
 
 Linked-size decomposition (stripped): GC 233,480 + source closure 20,488 + codegen 188,416 = 442,384 B total.
+
+Throughput tradeoff: size-oriented codegen costs up to 20% MP3 decode xRT (956x on s0 -> 762x on s5-Os-LTO); worst case still 762x realtime vs the 50x gate floor.

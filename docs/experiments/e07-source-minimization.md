@@ -17,7 +17,8 @@ clean-room 重推整条梯子；全部 gate 与 S0 基线行为等价，全部�
 4. ELF 等价升级为**内容证明**：full-archive 链接 vs reduced-archive 链接
    **整文件 SHA256 相等**（本机 build-id 为内容派生，相等即整文件相等）；
    不等时回退到逐 section SHA256 比对并 fail。
-5. 新增 **S6：libqianqian_songcore.so 实验**（见下）——回答"shipped core 到底多大"。
+5. 新增 **S6：libqianqian_songcore.so 实验**（见下）——把 shipped core 的
+   符号边界用 version script 机制性强制，并给出其 **ABI/visibility baseline** 体积。
 6. linked 体积统一三口径：**raw / stripped / stripped+xz**，shipping 结论一律用
    stripped（本工具链 raw==stripped：xmake release 链接产物本身不含 .symtab）。
 7. `minimize_summary.py` **零手填数字**：所有字节/TU/verdict/xRT 从
@@ -124,12 +125,15 @@ gate 语义沿用 corpus 既有契约：FLAC seek `strict`，MP3 seek `record`
 
 - 可执行形态（qn_pcm_dump = SongCore+FFmpeg+host 代码）：**530,664 B stripped**
   （xz 180,408；S0 973,048 → −45%）。
-- **动态库形态（新增，最接近"shipped core"的本义）**：
+- **动态库形态（ABI/visibility baseline，新增）**：
   `libqianqian_songcore.so` = 106-TU PIC closure + SongCore PIC，
   version script 只导出 5 个 `song_*`（`QIANQIAN_1.0`），FFmpeg/内部符号全部
-  local——**stripped 949,016 B（xz 339,984）**，比可执行形态大，因为 PIC codegen
-  （GOT/PLT）且此 stage 不用 LTO；它是符号边界被机制性强制的形态
-  （AGENTS.md 第 3 条的机器证明）。
+  local——stripped **949,016 B**（xz 339,984）；导出 dynsym 恰好 6 项定义项
+  （5 API + `QIANQIAN_1.0` 版本定义）。它证明的是**符号边界可以被机制性强制**：
+  整个 codec core 只暴露 5 个 SongCore API（AGENTS.md 第 3 条的机器证明）。
+  口径注意：此 stage 是 s3 closure 的默认 -O2 + PIC，未开 -Os/LTO，因此
+  949,016 与 530,664 不可解读为"PIC/动态库多了 400 KB"——两者 codegen 维度不同，
+  S6 的价值在 API 面与符号可见性，不在与可执行形态比大小。
 
 > 核心结论（round-2 clean-room 重新确认）：**源码裁剪主要优化的是构建闭包、
 > 升级面和维护成本（.a −42%，TU −48%）；最终交付体积主要由 linker GC（52.8%）
@@ -173,12 +177,15 @@ encode.c / mux / crypto / video-generic 的对象在 link 层已被排除；
 14. 每阶段 `rm -rf build/xmake build/artifacts`；最终以 `rm -rf build` clean-room 复现；
 15. 21 个生成 manifest 无机器绝对路径（importer portability 断言 + 全量扫描）；
 16. TU 下降 = 精确 manifest 投影（position 1:1 断言），无 object 合并；
-17. S6 导出符号断言 + consumer smoke：`.so` 形态同样不泄漏 FFmpeg 符号且功能可用。
+17. S6 导出符号断言（5 个带版本 `song_*` API；dynsym 定义项共 6 = 5 API +
+    `QIANQIAN_1.0` 版本定义）+ consumer smoke：`.so` 形态不泄漏 FFmpeg 符号且功能可用。
 
 ## 性能
 
 round-2 全梯子最低 xRT：762×（s5-Os-LTO mp3）；最高 ~1,180×。警告线 50×。
-体积优化未付出可感知的解码性能代价（xRT 波动 ~±5% 为运行噪声）。
+size-oriented codegen **不是免费的**：S0 MP3 最低 956× → s5-Os-LTO 762×，
+本次运行最多牺牲约 20% decode throughput（FLAC 964×→876×，约 9%）；
+但最差仍约 762× realtime，远高于 50× gate，本地播放无可感知影响。
 
 ## Provenance
 
