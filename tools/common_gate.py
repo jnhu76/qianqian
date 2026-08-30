@@ -143,10 +143,24 @@ def main() -> None:
 
     stage_dir = ROOT / "build" / "minimize" / args.stage
     stage_dir.mkdir(parents=True, exist_ok=True)
-    # derived stages (cN-so, cN-so-lto) gate with the base stage's capability set
-    base_stage = args.stage.split("-so")[0] if "-so" in args.stage else args.stage
+    # derived stages (cN-so, cN-so-lto, c6-os, win-*) gate with the base
+    # stage's capability set
+    m = re.match(r"(c\d+)", args.stage)
+    if not m or m.group(1) not in STAGE_CAPABILITIES:
+        raise SystemExit(f"cannot map stage {args.stage} to a capability set")
+    base_stage = m.group(1)
     capabilities = STAGE_CAPABILITIES[base_stage]
-    oracle_dir = Path(args.oracle_dir) if args.oracle_dir else stage_dir / "oracle"
+    # derived stages (cN-so, c6-os...) have no oracle of their own; the base
+    # stage's oracle proves their (codegen-only) closure is still equivalent
+    if args.oracle_dir:
+        oracle_dir = Path(args.oracle_dir)
+    elif (stage_dir / "oracle").is_dir():
+        oracle_dir = stage_dir / "oracle"
+    else:
+        # c6-* stages have no import of their own: the full-set closure
+        # lives in the c5 stage dir
+        oracle_base = "c5" if base_stage == "c6" else base_stage
+        oracle_dir = ROOT / "build" / "minimize" / oracle_base / "oracle"
 
     single = ROOT / "build/artifacts/libqianqian_av.a"
     songcore = ROOT / "build/artifacts/libsongcore.a"

@@ -1,0 +1,253 @@
+{
+  "codegen_throughput": {
+    "aac-lc-44-stereo": {
+      "o3": 1742.43,
+      "os": 1539.24,
+      "os_lto": 1576.17
+    },
+    "alac-long": {
+      "o3": 521.26,
+      "os": 333.08,
+      "os_lto": 372.3
+    },
+    "flac-16-44-stereo": {
+      "o3": 991.57,
+      "os": 848.84,
+      "os_lto": 977.11
+    },
+    "flac-24-96": {
+      "o3": 489.32,
+      "os": 359.3,
+      "os_lto": 435.33
+    },
+    "mp3-cbr-id3v23": {
+      "o3": 1968.49,
+      "os": 848.06,
+      "os_lto": 1527.7
+    },
+    "mp3-long": {
+      "o3": 2009.28,
+      "os": 837.2,
+      "os_lto": 1595.57
+    },
+    "mp3-vbr-id3v24": {
+      "o3": 2084.21,
+      "os": 1256.43,
+      "os_lto": 1891.35
+    },
+    "opus-48-stereo": {
+      "o3": 538.26,
+      "os": 429.52,
+      "os_lto": 470.97
+    },
+    "vorbis-44-stereo": {
+      "o3": 1582.56,
+      "os": 1385.55,
+      "os_lto": 1554.5
+    },
+    "wav-f32le-44-stereo": {
+      "o3": 5596.85,
+      "os": 4471.54,
+      "os_lto": 5808.09
+    },
+    "wav-s16le-44-stereo": {
+      "o3": 17653.19,
+      "os": 15974.61,
+      "os_lto": 14569.65
+    }
+  },
+  "final_so": {
+    "dynamic_dependencies": "linux-vdso.so.1 (0x00007bc71fcc3000)\n\tlibm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6 (0x00007bc71f8cb000)\n\tlibc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x00007bc71f600000)\n\t/lib64/ld-linux-x86-64.so.2 (0x00007bc71fcc5000)",
+    "exported_api_count": 5,
+    "raw_bytes": 1435336,
+    "sha256": "0e9c0fdc6a55329153a86d28b1297564d3fd3ed26fd38e83f9cd74abe938c508",
+    "stage": "c6-so-lto",
+    "stripped_bytes": 1309520,
+    "stripped_xz_bytes": 503684
+  },
+  "ladder": [
+    {
+      "archive_o3_bytes": 1535360,
+      "archive_os_bytes": null,
+      "capabilities": [
+        "flac",
+        "mp3"
+      ],
+      "capability": "MP3+FLAC",
+      "gate": "PASS",
+      "linked_stripped_bytes": 952568,
+      "min_xrt": 547.69,
+      "oracle_tu": 202,
+      "reachable_tu": 106,
+      "so_stripped_bytes": 551680,
+      "so_stripped_xz_bytes": 187956,
+      "stage": "c0"
+    },
+    {
+      "archive_o3_bytes": 2821296,
+      "archive_os_bytes": null,
+      "capabilities": [
+        "aac",
+        "flac",
+        "mp3"
+      ],
+      "capability": "+AAC/M4A +ADTS",
+      "gate": "PASS",
+      "linked_stripped_bytes": 1870072,
+      "min_xrt": 530.59,
+      "oracle_tu": 237,
+      "reachable_tu": 157,
+      "so_stripped_bytes": 1112896,
+      "so_stripped_xz_bytes": 407392,
+      "stage": "c1"
+    },
+    {
+      "archive_o3_bytes": 2840444,
+      "archive_os_bytes": null,
+      "capabilities": [
+        "aac",
+        "alac",
+        "flac",
+        "mp3"
+      ],
+      "capability": "+ALAC/M4A",
+      "gate": "PASS",
+      "linked_stripped_bytes": 1882360,
+      "min_xrt": 524.65,
+      "oracle_tu": 240,
+      "reachable_tu": 160,
+      "so_stripped_bytes": 1116992,
+      "so_stripped_xz_bytes": 410256,
+      "stage": "c2"
+    },
+    {
+      "archive_o3_bytes": 2876380,
+      "archive_os_bytes": null,
+      "capabilities": [
+        "aac",
+        "alac",
+        "flac",
+        "mp3",
+        "wav"
+      ],
+      "capability": "+PCM WAV (6 fmts)",
+      "gate": "PASS",
+      "linked_stripped_bytes": 1902840,
+      "min_xrt": 467.72,
+      "oracle_tu": 243,
+      "reachable_tu": 163,
+      "so_stripped_bytes": 1133376,
+      "so_stripped_xz_bytes": 415292,
+      "stage": "c3"
+    },
+    {
+      "archive_o3_bytes": 3057632,
+      "archive_os_bytes": null,
+      "capabilities": [
+        "aac",
+        "alac",
+        "flac",
+        "mp3",
+        "vorbis",
+        "wav"
+      ],
+      "capability": "+Ogg Vorbis",
+      "gate": "PASS",
+      "linked_stripped_bytes": 2021624,
+      "min_xrt": 485.58,
+      "oracle_tu": 257,
+      "reachable_tu": 180,
+      "so_stripped_bytes": 1219400,
+      "so_stripped_xz_bytes": 462224,
+      "stage": "c4"
+    },
+    {
+      "archive_o3_bytes": 3412572,
+      "archive_os_bytes": null,
+      "capabilities": [
+        "aac",
+        "alac",
+        "flac",
+        "mp3",
+        "opus",
+        "vorbis",
+        "wav"
+      ],
+      "capability": "+Ogg Opus",
+      "gate": "PASS",
+      "linked_stripped_bytes": 2259192,
+      "min_xrt": 489.32,
+      "oracle_tu": 276,
+      "reachable_tu": 198,
+      "so_stripped_bytes": 1346384,
+      "so_stripped_xz_bytes": 515472,
+      "stage": "c5"
+    },
+    {
+      "archive_o3_bytes": 3412572,
+      "archive_os_bytes": 3110268,
+      "capabilities": [
+        "aac",
+        "alac",
+        "flac",
+        "mp3",
+        "opus",
+        "vorbis",
+        "wav"
+      ],
+      "capability": "Common Formats minimized",
+      "gate": "PASS",
+      "linked_stripped_bytes": 1317104,
+      "min_xrt": 372.3,
+      "oracle_tu": 198,
+      "reachable_tu": 198,
+      "so_stripped_bytes": 1309520,
+      "so_stripped_xz_bytes": 503684,
+      "stage": "c6"
+    }
+  ],
+  "marginal_cost": [
+    {
+      "d_archive_o3_bytes": 1285936,
+      "d_so_stripped_bytes": 561216,
+      "d_tu": 51,
+      "increment": "+AAC/M4A +ADTS"
+    },
+    {
+      "d_archive_o3_bytes": 19148,
+      "d_so_stripped_bytes": 4096,
+      "d_tu": 3,
+      "increment": "+ALAC/M4A"
+    },
+    {
+      "d_archive_o3_bytes": 35936,
+      "d_so_stripped_bytes": 16384,
+      "d_tu": 3,
+      "increment": "+PCM WAV (6 fmts)"
+    },
+    {
+      "d_archive_o3_bytes": 181252,
+      "d_so_stripped_bytes": 86024,
+      "d_tu": 17,
+      "increment": "+Ogg Vorbis"
+    },
+    {
+      "d_archive_o3_bytes": 354940,
+      "d_so_stripped_bytes": 126984,
+      "d_tu": 18,
+      "increment": "+Ogg Opus"
+    },
+    {
+      "d_archive_o3_bytes": 0,
+      "d_so_stripped_bytes": -36864,
+      "d_tu": 0,
+      "increment": "Common Formats minimized"
+    }
+  ],
+  "schema": 1,
+  "total_from_c0": {
+    "d_archive_bytes": 1877212,
+    "d_so_stripped_bytes": 757840,
+    "d_tu": 92
+  }
+}
