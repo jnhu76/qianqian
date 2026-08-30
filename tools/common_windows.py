@@ -50,9 +50,17 @@ CONTRACT = ["song_open", "song_probe", "song_read_pcm", "song_seek", "song_close
 FORBIDDEN_DLL = re.compile(r"(avcodec|avformat|avutil|swresample|swscale|avfilter)", re.I)
 
 
+def sdk_env() -> dict:
+    if not (SDK / "bin").is_dir():
+        raise SystemExit(f"llvm-mingw SDK not found at {SDK}; set LLVM_MINGW_SDK")
+    return {"PATH": f"{SDK / 'bin'}:{os.environ['PATH']}"}
+
+
 def run(cmd: list[str], *, check=True, binary=False, env=None) -> subprocess.CompletedProcess:
     print("+", " ".join(map(str, cmd)), flush=True)
-    e = dict(os.environ)
+    # every child needs the llvm-mingw tools on PATH (xmake resolves the
+    # pinned x86_64-w64-mingw32-* wrappers through it)
+    e = sdk_env()
     if env:
         e.update(env)
     p = subprocess.run(list(map(str, cmd)), cwd=ROOT, capture_output=True,
@@ -61,12 +69,6 @@ def run(cmd: list[str], *, check=True, binary=False, env=None) -> subprocess.Com
         err = p.stderr if not binary else p.stderr.decode("utf-8", "replace")
         raise SystemExit(f"command failed ({p.returncode}): {' '.join(map(str, cmd))}\n{err[-4000:]}")
     return p
-
-
-def sdk_env() -> dict:
-    if not (SDK / "bin").is_dir():
-        raise SystemExit(f"llvm-mingw SDK not found at {SDK}; set LLVM_MINGW_SDK")
-    return {"PATH": f"{SDK / 'bin'}:{os.environ['PATH']}"}
 
 
 def last_json(stdout: str):
@@ -78,23 +80,33 @@ def import_windows() -> None:
     """Windows configure/Make oracle -> target-specific compile manifest."""
     run([sys.executable, "tools/common_import.py", "--stage", STAGE,
          "--profile", "bench/profiles/c5-opus.json", "--force",
-         "--configure-extra", "--enable-cross-compile",
-         "--configure-extra", "--cross-prefix=x86_64-w64-mingw32-",
-         "--configure-extra", "--target-os=mingw32",
-         "--configure-extra", "--arch=x86_64"],
+         "--configure-extra=--enable-cross-compile",
+         "--configure-extra=--cross-prefix=x86_64-w64-mingw32-",
+         "--configure-extra=--target-os=mingw32",
+         "--configure-extra=--arch=x86_64"],
         env=sdk_env())
     manifest = json.loads((STAGE_DIR / "manifest.json").read_text())
     print(f"windows closure: {manifest['closure']['translation_units']} TUs; "
           f"toolchain: {manifest['toolchain']}")
-    if manifest["toolchain"]["system"] != "linux":
-        raise SystemExit("oracle toolchain identity unexpected")
-    if "mingw32" not in (manifest["toolchain"].get("target_os") or ""):
-        raise SystemExit(f"oracle target_os is not mingw32: {manifest['toolchain']}")
+    # identity: the cross toolchain must be pinned in the recorded CC, and
+    # the mingw32 target must be part of the recorded configure arguments
+    if "mingw32" not in manifest["toolchain"]["cc"]:
+        raise SystemExit(f"oracle CC is not the mingw cross compiler: {manifest['toolchain']}")
+    if "--target-os=mingw32" not in manifest["configure_args"]:
+        raise SystemExit("configure_args missing --target-os=mingw32")
+    if "ARCH_X86_64=yes" not in (STAGE_DIR / "oracle" / "ffbuild" / "config.mak").read_text():
+        raise SystemExit("oracle did not configure for x86_64")
 
 
 def build_windows() -> None:
-    """Replay the Windows manifest through Xmake's mingw platform."""
-    run(["xmake", "f", "-p", "mingw", "--sdk", str(SDK), "-m", "release",
+    """Replay the Windows manifest through Xmake's mingw platform.
+
+    The x86_64 tools are pinned explicitly: llvm-mingw ships several
+    target wrappers (incl. arm64ec-*-uwp), and xmake's SDK autodetect
+    otherwise picks the wrong one (which rejects FFmpeg's inline asm)."""
+    run(["xmake", "f", "-p", "mingw", "--sdk=" + str(SDK), "-m", "release",
+         "--cc=x86_64-w64-mingw32-gcc", "--cxx=x86_64-w64-mingw32-g++",
+         "--ld=x86_64-w64-mingw32-gcc", "--ar=x86_64-w64-mingw32-ar",
          f"--av_manifest=build/minimize/{STAGE}/manifest.json",
          "--gc_sections=n", "--lto=n", "-y"])
     shutil.rmtree(ROOT / "build" / "xmake", ignore_errors=True)
@@ -105,83 +117,106 @@ def build_windows() -> None:
             raise SystemExit(f"missing Windows artifact {a}")
 
 
-def parse_map_members(map_text: str, archive_stem: str) -> list[str]:
-    """lld COFF -Map: archive members appear as '<stem>-<member>.o:(.section)'.
-    Returns the member basename multiset that contributed to the image."""
-    members = []
-    for m in re.finditer(rf"^\S*\s+\S+\s+{re.escape(archive_stem)}-(\S+?)\.o:\(", map_text, re.M):
-        members.append(m.group(1) + ".o")
-    return sorted(members)
+def nm_archive(archive):
+    """Per-member symbol sets via llvm-nm on a COFF archive.
+
+    llvm-nm prints one 'member.obj:' header per member followed by its
+    symbols; types follow the ELF convention (uppercase/global definitions,
+    U undefined, w weak-undefined). Members with no symbol table entries
+    cannot participate in resolution and are skipped by nm itself.
+    """
+    nm = str(SDK / "bin" / "x86_64-w64-mingw32-nm")
+    out = run([nm, str(archive)]).stdout
+    members = {}
+    current = None
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        if line.endswith(":") and not line.startswith(" "):
+            current = line[:-1]
+            members.setdefault(current, {"defined": set(), "undef": set()})
+            continue
+        parts = line.split()
+        if current is None or not parts:
+            continue
+        typ = parts[-2] if len(parts) >= 3 else parts[0]
+        name = parts[-1]
+        m = members[current]
+        if typ == "U":
+            m["undef"].add(name)
+        elif typ == "w":
+            continue
+        elif typ in "ABCDGRSTVWu":
+            m["defined"].add(name)
+    return members
 
 
 def audit_windows() -> None:
-    """COFF reachability: simulate GNU/llvm ld first-definer pull over the
-    archive, then hard-gate against the real lld -Map member multiset."""
-    import link_audit as la
-
+    """COFF reachability: simulate first-definer archive pull over the
+    archive (llvm-nm semantics), then hard-gate the simulated pulled set
+    against the member names that actually appear in the real lld -Map."""
     archive = ROOT / "build/artifacts/libqianqian_av.a"
     songcore = ROOT / "build/artifacts/libsongcore.a"
-    members = la.parse_archive(archive)
-    with _tmpdir() as tmp:
-        for m in members:
-            d, u, w = la.nm_symbols(
-                archive.read_bytes()[m["offset"]:m["offset"] + m["size"]], tmp, m["index"])
-            m["defined"], m["undef"] = d, u
-        sc_members = la.parse_archive(songcore)
-        for m in sc_members:
-            d, u, w = la.nm_symbols(
-                songcore.read_bytes()[m["offset"]:m["offset"] + m["size"]], tmp, 10000 + m["index"])
-            m["defined"], m["undef"] = d, u
-        undefined, defined = set(), set()
-        for m in sc_members:
-            undefined |= m["undef"] - m["defined"]
-            defined |= m["defined"]
-        undefined -= defined
-        pulled, changed = {}, True
-        while changed:
-            changed = False
-            for m in members:
-                if m["index"] in pulled:
-                    continue
-                if m["defined"] & undefined:
-                    pulled[m["index"]] = m
-                    undefined -= m["defined"]
-                    undefined |= m["undef"] - m["defined"]
-                    changed = True
-        sim = sorted(m["member"] for m in pulled.values())
+    ff_members = nm_archive(archive)
+    sc_members = nm_archive(songcore)
 
-        # real lld evidence
-        host = STAGE_DIR / "win-audit-main.c"
-        host.write_text(
-            'extern void *song_open(void *);extern void song_probe(void *);'
-            'extern void song_read_pcm(void *);extern void song_seek(void *);'
-            'extern void song_close(void *);\n'
-            'int main(void){void *h=song_open(0);song_probe(h);song_read_pcm(h,0,0);'
-            'song_seek(h,0);song_close(h);return 0;}\n')
-        exe = STAGE_DIR / "win-audit.exe"
-        mapf = STAGE_DIR / "linker.map"
-        cc = str(SDK / "bin" / "x86_64-w64-mingw32-clang")
-        run([cc, "-O2", "-I", "include", "-o", str(exe), str(host),
-             str(songcore), str(archive), "-lm", "-Wl,-Map=" + str(mapf),
-             "-Wl,--gc-sections"], env=sdk_env())
-        real = parse_map_members(mapf.read_text(), archive.stem.replace("lib", "", 1))
-        # map lists member basenames; compare as multisets against simulation
-        from collections import Counter
-        sim_ms = Counter(m["member"].rsplit("/", 1)[-1] for m in pulled.values())
-        real_ms = Counter(real)
-        if sim_ms != real_ms:
-            only_real = sorted((real_ms - sim_ms).elements())
-            only_sim = sorted((sim_ms - real_ms).elements())
-            raise SystemExit(f"Windows reachability gate FAILED: lld map vs simulation "
-                             f"(real-only={only_real[:8]}, sim-only={only_sim[:8]})")
-        (STAGE_DIR / "win-reachability.json").write_text(json.dumps({
-            "archive_members": len(members),
-            "pulled_members": len(pulled),
-            "lld_map_member_multiset_equal": True,
-            "pulled": sim,
-        }, indent=1) + "\n")
-        print(f"windows reachability: {len(pulled)}/{len(members)} members pulled; "
-              f"lld map multiset == simulation")
+    undefined = set()
+    defined = set()
+    for m in sc_members.values():
+        undefined |= m["undef"] - m["defined"]
+        defined |= m["defined"]
+    # the audit host references the FULL contract (win-audit-main.c): these
+    # are the undefined roots that drive the archive pull chain
+    undefined |= {"song_open", "song_probe", "song_read_pcm", "song_seek", "song_close"}
+    undefined -= defined
+    pulled = set()
+    changed = True
+    while changed:
+        changed = False
+        for name, m in ff_members.items():
+            if name in pulled:
+                continue
+            if m["defined"] & undefined:
+                pulled.add(name)
+                undefined -= m["defined"]
+                undefined |= m["undef"] - m["defined"]
+                changed = True
+
+    # real lld evidence: link the full contract against the archive
+    host = STAGE_DIR / "win-audit-main.c"
+    host.write_text(
+        '#include "songcore.h"\n'
+        '#include <stdlib.h>\n'
+        'int main(void){\n'
+        '  song_io io = {0};\n'
+        '  song_handle *h = song_open(&io);\n'
+        '  song_info info;\n'
+        '  if (h) { song_probe(h, &info); song_read_pcm(h, NULL, 0);\n'
+        '           song_seek(h, 0); song_close(h); }\n'
+        '  return h == NULL ? 0 : 0; }\n')
+    exe = STAGE_DIR / "win-audit.exe"
+    mapf = STAGE_DIR / "linker.map"
+    cc = str(SDK / "bin" / "x86_64-w64-mingw32-clang")
+    run([cc, "-O2", "-I", "include", "-o", str(exe), str(host),
+         str(songcore), str(archive), "-lbcrypt", "-Wl,-Map=" + str(mapf),
+         "-Wl,--gc-sections"], env=sdk_env())
+    # lld's COFF map lists contributed sections as '<member>.obj:(.section)';
+    # member names inside our archive are unique, so distinct-name sets match
+    map_names = set(re.findall(r"^\S+\s+\S+\s+\S+\s+(\S+\.obj):\(", mapf.read_text(), re.M))
+    real = {n for n in map_names if n in ff_members}
+    sim = set(pulled)
+    if real != sim:
+        raise SystemExit(f"Windows reachability gate FAILED: lld map vs simulation "
+                         f"(real-only={sorted(real - sim)[:8]}, "
+                         f"sim-only={sorted(sim - real)[:8]})")
+    (STAGE_DIR / "win-reachability.json").write_text(json.dumps({
+        "archive_members": len(ff_members),
+        "pulled_members": len(pulled),
+        "lld_map_member_set_equal": True,
+        "pulled": sorted(pulled),
+    }, indent=1) + "\n")
+    print(f"windows reachability: {len(pulled)}/{len(ff_members)} members pulled; "
+          f"lld map member set == simulation")
 
 
 class _tmpdir:
@@ -215,7 +250,9 @@ def build_dll(*, lto: bool) -> dict:
         flags += ["--add-flag=-flto"]
     run([sys.executable, "tools/minimize_flags.py", "--stage", dll_stage,
          "--from-stage", STAGE, *flags])
-    run(["xmake", "f", "-p", "mingw", "--sdk", str(SDK), "-m", "release",
+    run(["xmake", "f", "-p", "mingw", "--sdk=" + str(SDK), "-m", "release",
+         "--cc=x86_64-w64-mingw32-gcc", "--cxx=x86_64-w64-mingw32-g++",
+         "--ld=x86_64-w64-mingw32-gcc", "--ar=x86_64-w64-mingw32-ar",
          f"--av_manifest=build/minimize/{dll_stage}/manifest-projected.json",
          "--gc_sections=n", "--lto=" + ("y" if lto else "n"), "-y"])
     shutil.rmtree(ROOT / "build" / "xmake", ignore_errors=True)
@@ -234,7 +271,7 @@ def build_dll(*, lto: bool) -> dict:
     implib = out_dir / "qianqian_songcore.lib"
     run([cc, "-shared", *opt, "-o", str(dll), str(songcore_o), str(av_archive),
          "tools/songcore_q.def", f"-Wl,--out-implib={implib}",
-         "-Wl,--gc-sections"], env=sdk_env())
+         "-Wl,--gc-sections", "-lbcrypt"], env=sdk_env())
 
     # --- export gate
     objdump = str(SDK / "bin" / "x86_64-w64-mingw32-objdump")
@@ -242,14 +279,16 @@ def build_dll(*, lto: bool) -> dict:
     exports = []
     in_export = False
     for line in pe.splitlines():
-        if "[Ordinal/Name Pointer] Table" in line:
+        if line.startswith("Export Table:"):
             in_export = True
             continue
         if in_export:
-            if line.startswith("\t\t"):
-                exports.append(line.strip())
-            else:
-                in_export = False
+            # rows look like: '       1   0x1eca  song_open'
+            m = re.match(r"^\s+\d+\s+0x[0-9a-f]+\s+(\S+)$", line)
+            if m:
+                exports.append(m.group(1))
+            elif exports:
+                break
     missing = [s for s in CONTRACT if s not in exports]
     unexpected = sorted(set(exports) - set(CONTRACT))
     if missing or unexpected:
@@ -339,19 +378,28 @@ def correct_windows(dll_info: dict) -> dict:
         except Exception:
             results[case["id"]] = {"status": "bad_output", "stdout_tail": p.stdout[-200:]}
             continue
+        seeks = obs.get("seeks", [])
         entry = {
             "status": "ok" if p.returncode == 0 else "failed",
             "sequential_ok": obs.get("sequential_ok"),
             "sequential_sha256": obs.get("sequential_sha256"),
-            "seeks_clean_eof": all(s.get("clean_eof") for s in obs.get("seeks", [])),
-            "seeks_suffix_exact": [bool(s.get("suffix_exact")) for s in obs.get("seeks", [])],
+            "seeks_clean_eof": all(s.get("clean_eof") for s in seeks),
+            "seeks_ok_or_noseek": all(
+                s.get("status") == "done" or s.get("status") == "seek_failed"
+                for s in seeks),
+            "seeks_suffix_exact": [bool(s.get("suffix_exact")) for s in seeks],
         }
         results[case["id"]] = entry
         cap = case["capability"]
         problems = []
         if entry["status"] != "ok" or not entry["sequential_ok"]:
             problems.append("decode failed")
-        if not entry["seeks_clean_eof"]:
+        if case["file"].endswith(".aac"):
+            # FFmpeg's raw ADTS demuxer has no seek implementation (recorded
+            # capability finding): seeks may fail, decode/EOF still must hold
+            if not entry["seeks_ok_or_noseek"]:
+                problems.append("adts seek neither done nor typed-failed")
+        elif not entry["seeks_clean_eof"]:
             problems.append("seek without clean EOF")
         if strict_by_cap[cap] and not all(entry["seeks_suffix_exact"]):
             problems.append("strict family suffix mismatch on Windows")
@@ -387,6 +435,7 @@ def correct_windows(dll_info: dict) -> dict:
         "host": str(host.relative_to(ROOT)) if str(host).startswith(str(ROOT)) else str(host),
         "host_link": "qianqian_songcore.lib (shipping DLL import library)",
         "cases": len(results),
+        "per_case": results,
         "failures": failures,
         "unicode_path_gate": {"pass": unicode_ok, "observed": unicode_obs},
         "largefile_gate": {"pass": large_ok, "observed": large_obs},

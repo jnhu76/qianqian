@@ -1,0 +1,400 @@
+{
+  "closure": {
+    "archive_members": 266,
+    "lld_map_member_set_equal": true,
+    "oracle_tu": 279,
+    "reachable_tu": 192
+  },
+  "correctness": {
+    "cases": 33,
+    "largefile_gate": true,
+    "largefile_observed": {
+      "channels": 2,
+      "decode_ok": true,
+      "duration_us": 16739172426,
+      "gt_2gib_seek": true,
+      "label": "largefile",
+      "max_read_end": 3221225472,
+      "max_seek_offset": 2952790060,
+      "negative_seek": false,
+      "post_seek_frames": 8192,
+      "sample_rate": 44100,
+      "target_us": 12554379319
+    },
+    "unicode_observed": {
+      "channels": 2,
+      "codec": "aac",
+      "container": "mov,mp4,m4a,3gp,3g2,mj2",
+      "head_frames": 44100,
+      "head_sha256": "4f10f375078521bcb92a1a337dd107afa4625b3281fdf83633576f7086eac5c9",
+      "label": "unicode-path",
+      "sample_rate": 44100,
+      "seeks": [
+        {
+          "clean_eof": true,
+          "frames": 396080,
+          "resume_frame": -1,
+          "sha256": "fad538f718b145e3d7afc362dabb6dda0545049569186a8e67f981b5b354c0a3",
+          "status": "done",
+          "suffix_exact": false,
+          "target_us": 3000000
+        },
+        {
+          "clean_eof": true,
+          "frames": 263984,
+          "resume_frame": -1,
+          "sha256": "cdcf76a728acafc4752427ffa8e541239eef1ed8e8d025299e521957976c9322",
+          "status": "done",
+          "suffix_exact": false,
+          "target_us": 6000000
+        },
+        {
+          "clean_eof": true,
+          "frames": 131888,
+          "resume_frame": -1,
+          "sha256": "9b2bbfccd507dde81ad3956d848f12338ebdcaed4854de16f20371f509d4bc80",
+          "status": "done",
+          "suffix_exact": false,
+          "target_us": 9000000
+        }
+      ],
+      "sequential_frames": 529200,
+      "sequential_ok": true,
+      "sequential_sha256": "1b52ad546588044f78330c37ebdf8355a7fedc250114486f3501af450d48f14d"
+    },
+    "unicode_path_gate": true,
+    "verdict": "PASS"
+  },
+  "dll": {
+    "dll": "build/minimize/win-c6/dll/qianqian_songcore.dll",
+    "dll_sha256": "3160bceb675e6a3fcd8a3c4cf436effcc312c68726a5458adcfce983250f3b67",
+    "exported_api_count": 5,
+    "exported_api_symbols": [
+      "song_close",
+      "song_open",
+      "song_probe",
+      "song_read_pcm",
+      "song_seek"
+    ],
+    "import_table": [
+      "KERNEL32.dll",
+      "api-ms-win-crt-convert-l1-1-0.dll",
+      "api-ms-win-crt-environment-l1-1-0.dll",
+      "api-ms-win-crt-filesystem-l1-1-0.dll",
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-locale-l1-1-0.dll",
+      "api-ms-win-crt-math-l1-1-0.dll",
+      "api-ms-win-crt-private-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-stdio-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "api-ms-win-crt-time-l1-1-0.dll",
+      "api-ms-win-crt-utility-l1-1-0.dll",
+      "bcrypt.dll"
+    ],
+    "lto": false,
+    "schema": 1,
+    "sizes": {
+      "dll_bytes": 1829888,
+      "dll_stripped_bytes": 1327616,
+      "dll_stripped_xz_bytes": 552208,
+      "dll_xz_bytes": 672604,
+      "implib_bytes": 2262,
+      "libqianqian_av_a_bytes": 3938616
+    },
+    "stage": "win-c6-dll"
+  },
+  "dll_lto": {
+    "dll": "build/minimize/win-c6/dll-lto/qianqian_songcore.dll",
+    "dll_sha256": "b630ae5d377cab2b5a82c75fbb3e88478b241faaf3e14d5c0db28194bdaf5a0b",
+    "exported_api_count": 5,
+    "exported_api_symbols": [
+      "song_close",
+      "song_open",
+      "song_probe",
+      "song_read_pcm",
+      "song_seek"
+    ],
+    "import_table": [
+      "KERNEL32.dll",
+      "api-ms-win-crt-convert-l1-1-0.dll",
+      "api-ms-win-crt-environment-l1-1-0.dll",
+      "api-ms-win-crt-filesystem-l1-1-0.dll",
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-locale-l1-1-0.dll",
+      "api-ms-win-crt-math-l1-1-0.dll",
+      "api-ms-win-crt-private-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-stdio-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "api-ms-win-crt-time-l1-1-0.dll",
+      "api-ms-win-crt-utility-l1-1-0.dll",
+      "bcrypt.dll"
+    ],
+    "lto": true,
+    "schema": 1,
+    "sizes": {
+      "dll_bytes": 1834496,
+      "dll_stripped_bytes": 1307136,
+      "dll_stripped_xz_bytes": 545900,
+      "dll_xz_bytes": 677632,
+      "implib_bytes": 2262,
+      "libqianqian_av_a_bytes": 5422532
+    },
+    "stage": "win-c6-dll-lto"
+  },
+  "pcm_cross_platform": {
+    "aac-adts-44-stereo": {
+      "capability": "aac",
+      "identical": false,
+      "linux_sha256": "a9fe6812f19dc11f1803aa9afda23c399d32d0146ca8bfb35fc896474892425a",
+      "windows_sha256": "a92a68e4bf950e2cb608a63ac0109b0807066ffc535471cc03f66cad834d6f5e"
+    },
+    "aac-artwork": {
+      "capability": "aac",
+      "identical": false,
+      "linux_sha256": "eb4b305233e43b86ecbb15e003f18a5d3379208666168c74024b4bac38c19dc4",
+      "windows_sha256": "429a29b75181a33798a73dceb80b16578c96cefd30bba35778196967dad2e087"
+    },
+    "aac-lc-44-mono": {
+      "capability": "aac",
+      "identical": false,
+      "linux_sha256": "6e6b2dec47ae0664f2965bc83d114e5e35269cb075fd469b772433dbc91a194c",
+      "windows_sha256": "bb903982469084c385ebb6b266093f16767b815f5dd4a5e51c95fc0ea12e7cc7"
+    },
+    "aac-lc-44-stereo": {
+      "capability": "aac",
+      "identical": false,
+      "linux_sha256": "45262f843899438cec9a3f5fbff32c14ab15daeb809fbe1dac506d8223cd3b99",
+      "windows_sha256": "1b52ad546588044f78330c37ebdf8355a7fedc250114486f3501af450d48f14d"
+    },
+    "aac-lc-48-stereo": {
+      "capability": "aac",
+      "identical": false,
+      "linux_sha256": "15a6ec033b60092c784579442ef54aa8eff17dfe98c50a6df953736632febffd",
+      "windows_sha256": "1cd39574e01e913d8e2cdc18cf8ba1d8c71a7a97b11456de31aade2c06dcd839"
+    },
+    "aac-short": {
+      "capability": "aac",
+      "identical": false,
+      "linux_sha256": "d13507f75066a2f94fa2c0e9b04caa34b7af4556c3142a31341c5b1cd323fcbc",
+      "windows_sha256": "b84b3e4e63c7f396cb52dccfde1ae1e5efb171e4f7972f61c35315955dc4fcd6"
+    },
+    "aac-vbr": {
+      "capability": "aac",
+      "identical": false,
+      "linux_sha256": "a97f556e28357e33523edf138d96f79223e07f4284c6d19ca5311b715081251b",
+      "windows_sha256": "08c9a75960029ea05e9988f08804b820608ebaffc94de870b3f9d608d13bc7e1"
+    },
+    "alac-16-44-mono": {
+      "capability": "alac",
+      "identical": true,
+      "linux_sha256": "fbe9d411428b8358bbfbd26f95d0eb935c6f4b5cd2e93e180bdb29986cdca238",
+      "windows_sha256": "fbe9d411428b8358bbfbd26f95d0eb935c6f4b5cd2e93e180bdb29986cdca238"
+    },
+    "alac-16-44-stereo": {
+      "capability": "alac",
+      "identical": true,
+      "linux_sha256": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+      "windows_sha256": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46"
+    },
+    "alac-24-96-stereo": {
+      "capability": "alac",
+      "identical": true,
+      "linux_sha256": "1661b677d5e71992b684d2e0be06be15ff4a7bde8ec7b77552a689ea1aadc464",
+      "windows_sha256": "1661b677d5e71992b684d2e0be06be15ff4a7bde8ec7b77552a689ea1aadc464"
+    },
+    "alac-artwork": {
+      "capability": "alac",
+      "identical": true,
+      "linux_sha256": "a19b0974b5c517685f16e768434e9b010beb38986c3da6a17259092015a4a853",
+      "windows_sha256": "a19b0974b5c517685f16e768434e9b010beb38986c3da6a17259092015a4a853"
+    },
+    "alac-long": {
+      "capability": "alac",
+      "identical": true,
+      "linux_sha256": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+      "windows_sha256": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612"
+    },
+    "flac-16-44-mono": {
+      "capability": "flac",
+      "identical": true,
+      "linux_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70",
+      "windows_sha256": "a8634f1cb54ff47dee521d6f5ef51c0621a8829f617a4c44258f438cbd8c2a70"
+    },
+    "flac-16-44-stereo": {
+      "capability": "flac",
+      "identical": true,
+      "linux_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+      "windows_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc"
+    },
+    "flac-24-96": {
+      "capability": "flac",
+      "identical": true,
+      "linux_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6",
+      "windows_sha256": "36a2327ba4cac70edd680cf74ca80db46bfedcfcc3083b58ad0c19a03016fdd6"
+    },
+    "flac-artwork": {
+      "capability": "flac",
+      "identical": true,
+      "linux_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98",
+      "windows_sha256": "7b196859c6855fde16a7ea43c055d9610e9f8e9a1831f6324e65ffbbfda1ef98"
+    },
+    "flac-minimal": {
+      "capability": "flac",
+      "identical": true,
+      "linux_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+      "windows_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87"
+    },
+    "flac-replaygain": {
+      "capability": "flac",
+      "identical": true,
+      "linux_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87",
+      "windows_sha256": "09d6d3ef3d5d79c7ffc30333b767ac9cde1b0ccf6f94b62d34945e548f63ca87"
+    },
+    "mp3-cbr-id3v23": {
+      "capability": "mp3",
+      "identical": true,
+      "linux_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+      "windows_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926"
+    },
+    "mp3-cbr-id3v23-artwork": {
+      "capability": "mp3",
+      "identical": true,
+      "linux_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+      "windows_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926"
+    },
+    "mp3-long": {
+      "capability": "mp3",
+      "identical": true,
+      "linux_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c",
+      "windows_sha256": "b1f9f1966dd6239fb937ce41c7443a5039bc70a40a8e65f9912859d71235355c"
+    },
+    "mp3-minimal": {
+      "capability": "mp3",
+      "identical": true,
+      "linux_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559",
+      "windows_sha256": "1c4623d5a2726d69cb273fa8a2e5b74bab6ccfbd869962a2f5f6d568d7b0d559"
+    },
+    "mp3-short": {
+      "capability": "mp3",
+      "identical": true,
+      "linux_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561",
+      "windows_sha256": "1d90b2d1411a0d4701a226fb1f5c1bef53db011c4ba9accd8eabb492fa1a9561"
+    },
+    "mp3-vbr-id3v24": {
+      "capability": "mp3",
+      "identical": true,
+      "linux_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85",
+      "windows_sha256": "405320fc01b3e757ebe730c019f7e3e3c66db106877067272ed1b2165e213e85"
+    },
+    "opus-48-stereo": {
+      "capability": "opus",
+      "identical": true,
+      "linux_sha256": "81dd8eaaab9773b70312c86901455fb64044b53354191b2342c018b09181b034",
+      "windows_sha256": "81dd8eaaab9773b70312c86901455fb64044b53354191b2342c018b09181b034"
+    },
+    "vorbis-44-stereo": {
+      "capability": "vorbis",
+      "identical": true,
+      "linux_sha256": "d729af82522b10c2582309008c93ecf95b631c823e27799ba1a0a79cfb1374a2",
+      "windows_sha256": "d729af82522b10c2582309008c93ecf95b631c823e27799ba1a0a79cfb1374a2"
+    },
+    "wav-f32le-44-stereo": {
+      "capability": "wav",
+      "identical": true,
+      "linux_sha256": "c37d266e29a6a90663827faea459ae7ea157a8d01578b31c20737ec0ea528a57",
+      "windows_sha256": "c37d266e29a6a90663827faea459ae7ea157a8d01578b31c20737ec0ea528a57"
+    },
+    "wav-f64le-44-mono": {
+      "capability": "wav",
+      "identical": true,
+      "linux_sha256": "b01297f720486df208c9bf5e7567db947daa186f702c5a508639c8ecc49b71d7",
+      "windows_sha256": "b01297f720486df208c9bf5e7567db947daa186f702c5a508639c8ecc49b71d7"
+    },
+    "wav-odd-chunk": {
+      "capability": "wav",
+      "identical": true,
+      "linux_sha256": "2a566361444e912171549bf1e900f53eebb34fb0576f2899c03679af9fbb5789",
+      "windows_sha256": "2a566361444e912171549bf1e900f53eebb34fb0576f2899c03679af9fbb5789"
+    },
+    "wav-s16le-44-stereo": {
+      "capability": "wav",
+      "identical": true,
+      "linux_sha256": "2a566361444e912171549bf1e900f53eebb34fb0576f2899c03679af9fbb5789",
+      "windows_sha256": "2a566361444e912171549bf1e900f53eebb34fb0576f2899c03679af9fbb5789"
+    },
+    "wav-s24le-96-stereo": {
+      "capability": "wav",
+      "identical": true,
+      "linux_sha256": "fbbca23dcd13c3ff0b55936b885824cd54ca550e05f0fe0f5007cf7e060a5257",
+      "windows_sha256": "fbbca23dcd13c3ff0b55936b885824cd54ca550e05f0fe0f5007cf7e060a5257"
+    },
+    "wav-s32le-48-stereo": {
+      "capability": "wav",
+      "identical": true,
+      "linux_sha256": "667b8dabd2c785b85b36859560476e426364ecff3ebc7fc3a757dba9f54b9faf",
+      "windows_sha256": "667b8dabd2c785b85b36859560476e426364ecff3ebc7fc3a757dba9f54b9faf"
+    },
+    "wav-u8-44-mono": {
+      "capability": "wav",
+      "identical": true,
+      "linux_sha256": "b5bd98c6fd6698475b1be0e3c3540d78c37e38f294b3aaac90c96fc90a314aae",
+      "windows_sha256": "b5bd98c6fd6698475b1be0e3c3540d78c37e38f294b3aaac90c96fc90a314aae"
+    }
+  },
+  "schema": 1,
+  "static_archive_bytes": 5422532,
+  "toolchain": {
+    "cc": "x86_64-w64-mingw32-gcc",
+    "cc_ident": "clang version 23.1.0 (https://github.com/llvm/llvm-project.git ea7d852a70e8bdfaf601d6626a760f9771b2c4b4)",
+    "configure_args": [
+      "--prefix=install",
+      "--disable-everything",
+      "--disable-autodetect",
+      "--disable-debug",
+      "--disable-devices",
+      "--disable-doc",
+      "--disable-iconv",
+      "--disable-network",
+      "--disable-programs",
+      "--disable-protocols",
+      "--disable-pthreads",
+      "--disable-x86asm",
+      "--disable-avdevice",
+      "--disable-avfilter",
+      "--disable-swresample",
+      "--disable-swscale",
+      "--enable-avformat",
+      "--enable-avcodec",
+      "--enable-swresample",
+      "--enable-demuxer=aac",
+      "--enable-demuxer=flac",
+      "--enable-demuxer=mov",
+      "--enable-demuxer=mp3",
+      "--enable-demuxer=ogg",
+      "--enable-demuxer=wav",
+      "--enable-decoder=aac",
+      "--enable-decoder=alac",
+      "--enable-decoder=flac",
+      "--enable-decoder=mp3float",
+      "--enable-decoder=opus",
+      "--enable-decoder=pcm_f32le",
+      "--enable-decoder=pcm_f64le",
+      "--enable-decoder=pcm_s16le",
+      "--enable-decoder=pcm_s24le",
+      "--enable-decoder=pcm_s32le",
+      "--enable-decoder=pcm_u8",
+      "--enable-decoder=vorbis",
+      "--enable-parser=mpegaudio",
+      "--enable-cross-compile",
+      "--cross-prefix=x86_64-w64-mingw32-",
+      "--target-os=mingw32",
+      "--arch=x86_64"
+    ],
+    "kind": "llvm-mingw (cross from WSL, binaries executed natively on Windows)",
+    "runtime": "ucrt",
+    "sdk": "/home/hoo/toolchains/llvm-mingw",
+    "target_triple": "x86_64-w64-mingw32"
+  }
+}

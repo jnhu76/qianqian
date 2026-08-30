@@ -244,80 +244,96 @@ static wchar_t *utf8_to_wide(const char *s) {
     return w;
 }
 
-static int run_contract(song_handle *song, const char *label) {
+static int run_contract(const wchar_t *wpath, const char *label) {
+    song_handle *song = NULL;
+    win_source src;
+    if (win_open(wpath, &song, &src) < 0) {
+        fprintf(stderr, "open failed for %s\n", label);
+        return 1;
+    }
     song_info info;
     if (song_probe(song, &info) < 0) {
         fprintf(stderr, "probe failed for %s\n", label);
+        win_close(&song, &src);
         return 1;
     }
     printf("{\"label\":\"%s\",\"container\":\"%s\",\"codec\":\"%s\","
            "\"sample_rate\":%d,\"channels\":%d",
            label, info.container, info.codec, info.sample_rate, info.channels);
+    win_close(&song, &src);
 
-    /* bounded head decode */
+    /* bounded head decode (fresh handle) */
     size_t head_frames = (size_t)info.sample_rate;
     float *head = (float *)malloc(head_frames * (size_t)info.channels * sizeof(float));
     size_t head_got = 0;
-    while (head_got < head_frames) {
-        int64_t n = song_read_pcm(song, head + head_got * (size_t)info.channels,
-                                  head_frames - head_got);
-        if (n < 0) { free(head); return 1; }
-        if (n == 0) break;
-        head_got += (size_t)n;
+    if (win_open(wpath, &song, &src) == 0 && song_probe(song, &info) == 0) {
+        while (head_got < head_frames) {
+            int64_t n = song_read_pcm(song, head + head_got * (size_t)info.channels,
+                                      head_frames - head_got);
+            if (n < 0) break;
+            if (n == 0) break;
+            head_got += (size_t)n;
+        }
     }
+    win_close(&song, &src);
     char head_sha[65] = "";
     if (head_got) sha256_hex(head, head_got * (size_t)info.channels * sizeof(float), head_sha);
     free(head);
     printf(",\"head_frames\":%zu,\"head_sha256\":\"%s\"", head_got, head_sha);
 
-    /* sequential decode to EOF */
-    song_info info2;
-    pcm_buf seq = { .channels = info.channels };
-    if (song_probe(song, &info2) < 0) return 1;
-    int seq_ok = decode_all(song, &seq) == 0;
+    /* full sequential decode on a FRESH handle: the reference stream starts
+     * at sample 0 (never the tail of a partially consumed handle) */
+    int seq_ok = 0;
+    size_t seq_frames = 0;
     char seq_sha[65] = "";
+    pcm_buf seq = { .channels = info.channels };
+    if (win_open(wpath, &song, &src) == 0 && song_probe(song, &info) == 0) {
+        seq_ok = decode_all(song, &seq) == 0;
+        seq_frames = seq.frames;
+    }
+    win_close(&song, &src);
     if (seq_ok && seq.frames)
         sha256_hex(seq.data, seq.frames * (size_t)seq.channels * sizeof(float), seq_sha);
     printf(",\"sequential_frames\":%zu,\"sequential_ok\":%s,\"sequential_sha256\":\"%s\"",
-           seq.frames, seq_ok ? "true" : "false", seq_sha);
+           seq_frames, seq_ok ? "true" : "false", seq_sha);
 
-    /* seeks */
+    /* seeks: reopen + probe + seek + decode-to-EOF, content-search the 64-frame
+     * prefix inside the sequential reference (like the Linux probe) */
     printf(",\"seeks\":[");
     for (int i = 0; i < 3; ++i) {
         int64_t target = info.duration_us > 0
             ? (int64_t)((double)info.duration_us * (0.25 * (i + 1))) : 0;
         printf("%s{", i ? "," : "");
-        song_handle *s2 = NULL;
-        win_source src2;
-        if (song_seek(song, target) != 0) {
+        if (win_open(wpath, &song, &src) < 0 || song_probe(song, &info) < 0 ||
+            song_seek(song, target) != 0) {
             printf("\"status\":\"seek_failed\",\"target_us\":%" PRId64 "}", target);
+            win_close(&song, &src);
             continue;
         }
-        (void)s2; (void)src2;
         pcm_buf post = { .channels = info.channels };
         int ok = decode_all(song, &post) == 0;
         int64_t resume = -1;
         int suffix_exact = 0;
         char post_sha[65] = "";
-        /* locate the 64-frame probe prefix inside the sequential stream */
         const size_t probe_frames = 64;
         if (ok && post.frames >= probe_frames && seq.frames >= probe_frames) {
             const float *probe = post.data;
             size_t span = probe_frames * (size_t)seq.channels;
             size_t limit = (seq.frames - probe_frames) * (size_t)seq.channels;
             uint32_t first = ((const uint32_t *)probe)[0];
-            for (size_t off = 0; off <= limit; off += (size_t)seq.channels) {
+            /* verify the FULL suffix at every 64-frame candidate: short
+             * periodic content (mono sines) can alias the probe prefix */
+            for (size_t off = 0; off <= limit && !suffix_exact; off += (size_t)seq.channels) {
                 if (((const uint32_t *)seq.data)[off] != first) continue;
-                if (memcmp(seq.data + off, probe, span * sizeof(float)) == 0) {
-                    resume = (int64_t)(off / (size_t)seq.channels);
-                    break;
+                if (memcmp(seq.data + off, probe, span * sizeof(float)) != 0) continue;
+                size_t candidate = off / (size_t)seq.channels;
+                size_t remaining = seq.frames - candidate;
+                if (remaining == post.frames &&
+                    memcmp(seq.data + off, post.data,
+                           post.frames * (size_t)seq.channels * sizeof(float)) == 0) {
+                    resume = (int64_t)candidate;
+                    suffix_exact = 1;
                 }
-            }
-            if (resume >= 0) {
-                size_t remaining = seq.frames - (size_t)resume;
-                suffix_exact = remaining == post.frames &&
-                    memcmp(seq.data + (size_t)resume * (size_t)seq.channels,
-                           post.data, post.frames * (size_t)seq.channels * sizeof(float)) == 0;
             }
         }
         if (post.frames)
@@ -328,6 +344,7 @@ static int run_contract(song_handle *song, const char *label) {
                target, post.frames, resume, suffix_exact ? "true" : "false",
                ok ? "true" : "false", post_sha);
         free(post.data);
+        win_close(&song, &src);
     }
     printf("]}\n");
     free(seq.data);
@@ -341,15 +358,7 @@ static int run_contract(song_handle *song, const char *label) {
 static int mode_file(const char *path) {
     wchar_t *wpath = utf8_to_wide(path);
     if (!wpath) { fprintf(stderr, "utf8 conversion failed\n"); return 2; }
-    song_handle *song = NULL;
-    win_source src;
-    if (win_open(wpath, &song, &src) < 0) {
-        fprintf(stderr, "open failed: %ls\n", wpath);
-        free(wpath);
-        return 1;
-    }
-    int rc = run_contract(song, path);
-    win_close(&song, &src);
+    int rc = run_contract(wpath, path);
     free(wpath);
     return rc;
 }
@@ -367,107 +376,33 @@ static int mode_unicode(const wchar_t *fixture_w) {
     _snwprintf(dir, MAX_PATH, L"%sqianqian-unicode-test\\测试音乐", base);
     _snwprintf(file, MAX_PATH, L"%s\\歌曲-你好世界.m4a", dir);
     dir[MAX_PATH - 1] = 0; file[MAX_PATH - 1] = 0;
+    wchar_t parent[MAX_PATH];
+    _snwprintf(parent, MAX_PATH, L"%sqianqian-unicode-test", base);
+    parent[MAX_PATH - 1] = 0;
+    if (!CreateDirectoryW(parent, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
+        return 2;
     if (!CreateDirectoryW(dir, NULL) && GetLastError() != ERROR_ALREADY_EXISTS)
         return 2;
     if (!CopyFileW(fixture_w, file, FALSE)) {
         fprintf(stderr, "CopyFileW failed: %lu\n", GetLastError());
         return 2;
     }
-    song_handle *song = NULL;
-    win_source src;
-    if (win_open(file, &song, &src) < 0) {
-        fprintf(stderr, "wide open failed: %ls\n", file);
-        return 1;
-    }
-    int rc = run_contract(song, "unicode-path");
-    win_close(&song, &src);
+    int rc = run_contract(file, "unicode-path");
     DeleteFileW(file);
     /* leave the directory; it is in the temp tree */
     return rc;
 }
 
-static int mode_largefile(void) {
-    /* A RIFF/WAVE header declaring 3 GiB of PCM data, served by the virtual
-     * IO: probing derives duration from the size callback, seeking to 75%
-     * must ask the host for an offset > 2 GiB (proving 64-bit IO survives
-     * the whole stack), and decode must produce frames afterwards. */
-    static const uint8_t wav_header[44] = {
-        'R','I','F','F', 0xFF,0xFF,0xFF,0x7F, 'W','A','V','E',
-        'f','m','t',' ', 16,0,0,0, 1,0, 2,0, 0x44,0xAC,0,0,
-        0x10,0xB1,2,0, 4,0, 16,0,
-        'd','a','t','a', 0x00,0x00,0x00,0x70 /* 0x70000000 = 1.75 GiB */
-    };
-    /* data chunk size 0x70000000 (~1.75 GiB) keeps total RIFF < 2 GiB of
-     * declared payload; the HOST size (3 GiB) and the seek arithmetic are
-     * what push offsets past 2 GiB via sample seek inside a padded stream.
-     * To force >2 GiB offsets deterministically we instead declare the full
-     * 3 GiB below. */
-    uint8_t hdr[44];
-    memcpy(hdr, wav_header, 44);
-    uint32_t data_size = 0xB0000000u; /* 2.75 GiB of s16le stereo @44.1k */
-    uint32_t riff_size = 36 + data_size;
-    hdr[4] = (uint8_t)(riff_size); hdr[5] = (uint8_t)(riff_size >> 8);
-    hdr[6] = (uint8_t)(riff_size >> 16); hdr[7] = (uint8_t)(riff_size >> 24);
-    hdr[40] = (uint8_t)(data_size); hdr[41] = (uint8_t)(data_size >> 8);
-    hdr[42] = (uint8_t)(data_size >> 16); hdr[43] = (uint8_t)(data_size >> 24);
+/* prefix state for the virtual large-file source */
+static uint8_t g_prefix[44];
+static size_t g_prefix_consumed;
 
-    virtual_source virt = {0};
-    /* serve the header, then zeros, through a read callback wrapper */
-    /* simplest: materialize a 44-byte prefix buffer inside the source */
-    /* (the virtual read returns zeros; patch the prefix via a static) */
-    static uint8_t prefix[44];
-    memcpy(prefix, hdr, 44);
-
-    song_io io = {
-        .userdata = &virt,
-        .read = NULL, .seek = virt_seek, .size = virt_size,
-    };
-    /* wrap: first read serves prefix, later reads zeros */
-    /* (implemented with a tiny trampoline below) */
-    extern int64_t virt_read_prefix(void *userdata, uint8_t *dst, size_t size);
-    io.read = virt_read_prefix;
-    /* stash the prefix pointer in a file-scope variable */
-    g_prefix = prefix;
-    g_prefix_consumed = 0;
-    virt.pos = 0;
-    virt.max_seek_abs = 0;
-    virt.max_read_end = 0;
-
-    song_handle *song = song_open(&io);
-    if (!song) { fprintf(stderr, "virtual open failed\n"); return 1; }
-    song_info info;
-    if (song_probe(song, &info) < 0) { fprintf(stderr, "virtual probe failed\n"); return 1; }
-    printf("{\"label\":\"largefile\",\"sample_rate\":%d,\"channels\":%d,"
-           "\"duration_us\":%" PRId64 "}", info.sample_rate, info.channels, info.duration_us);
-    int rc = 0;
-    int64_t target = (int64_t)((double)info.duration_us * 0.75);
-    if (song_seek(song, target) != 0) { printf(",\"seek_failed\":true}\n"); return 1; }
-    pcm_buf post = { .channels = info.channels };
-    int ok = decode_all(song, &post) == 0;
-    printf(",\"target_us\":%" PRId64 ",\"max_seek_offset\":%" PRId64
-           ",\"max_read_end\":%" PRId64 ",\"post_seek_frames\":%zu,"
-           "\"clean_eof\":%s,\"negative_seek\":%s,"
-           "\"gt_2gib_seek\":%s}",
-           target, virt.max_seek_abs, virt.max_read_end, post.frames,
-           ok ? "true" : "false",
-           virt.negative_seek ? "true" : "false",
-           virt.max_seek_abs > ((int64_t)2 * 1024 * 1024 * 1024) ? "true" : "false");
-    if (!ok || virt.max_seek_abs <= (int64_t)2 * 1024 * 1024 * 1024 || virt.negative_seek)
-        rc = 1;
-    free(post.data);
-    song_close(song);
-    return rc;
-}
-
-/* trampoline state + read wrapper (file scope) */
-static uint8_t *g_prefix = NULL;
-static size_t g_prefix_consumed = 0;
 static int64_t virt_read_prefix(void *userdata, uint8_t *dst, size_t size) {
     virtual_source *v = (virtual_source *)userdata;
     size_t served = 0;
-    if (g_prefix_consumed < 44 && v->pos < 44) {
+    if (g_prefix_consumed < sizeof(g_prefix) && v->pos < (int64_t)sizeof(g_prefix)) {
         size_t off = (size_t)v->pos;
-        served = 44 - off < size ? 44 - off : size;
+        served = sizeof(g_prefix) - off < size ? sizeof(g_prefix) - off : size;
         memcpy(dst, g_prefix + off, served);
         g_prefix_consumed = off + served;
         v->pos += (int64_t)served;
@@ -477,6 +412,69 @@ static int64_t virt_read_prefix(void *userdata, uint8_t *dst, size_t size) {
     int64_t n = virt_read(userdata, dst + served, size - served);
     if (n < 0) return -1;
     return (int64_t)served + n;
+}
+
+static int mode_largefile(void) {
+    /* A RIFF/WAVE header declaring 2.75 GiB of s16le stereo PCM, served by a
+     * synthetic virtual IO (no real file): probing derives duration from the
+     * size callback (3 GiB), and seeking to 75% must ask the host for an
+     * offset > 2 GiB — proving 64-bit IO survives the whole stack — after
+     * which decode still produces frames and reaches a clean EOF. */
+    static const uint8_t wav_header[44] = {
+        'R','I','F','F', 0,0,0,0, 'W','A','V','E',
+        'f','m','t',' ', 16,0,0,0, 1,0, 2,0, 0x44,0xAC,0,0,
+        0x10,0xB1,2,0, 4,0, 16,0,
+        'd','a','t','a', 0,0,0,0
+    };
+    uint32_t data_size = 0xB0000000u; /* 2.75 GiB of payload */
+    uint32_t riff_size = 36u + data_size;
+    memcpy(g_prefix, wav_header, 44);
+    g_prefix[4] = (uint8_t)riff_size;      g_prefix[5] = (uint8_t)(riff_size >> 8);
+    g_prefix[6] = (uint8_t)(riff_size >> 16); g_prefix[7] = (uint8_t)(riff_size >> 24);
+    g_prefix[40] = (uint8_t)data_size;     g_prefix[41] = (uint8_t)(data_size >> 8);
+    g_prefix[42] = (uint8_t)(data_size >> 16); g_prefix[43] = (uint8_t)(data_size >> 24);
+    g_prefix_consumed = 0;
+
+    virtual_source virt = {0};
+    song_io io = {
+        .userdata = &virt,
+        .read = virt_read_prefix, .seek = virt_seek, .size = virt_size,
+    };
+    song_handle *song = song_open(&io);
+    if (!song) { fprintf(stderr, "virtual open failed\n"); return 1; }
+    song_info info;
+    if (song_probe(song, &info) < 0) { fprintf(stderr, "virtual probe failed\n"); return 1; }
+    printf("{\"label\":\"largefile\",\"sample_rate\":%d,\"channels\":%d,"
+           "\"duration_us\":%" PRId64, info.sample_rate, info.channels, info.duration_us);
+    int rc = 0;
+    int64_t target = (int64_t)((double)info.duration_us * 0.75);
+    if (song_seek(song, target) != 0) { printf(",\"seek_failed\":true}\n"); return 1; }
+    /* bounded post-seek decode: the gate proves the >2 GiB offset reached
+     * the host and that decode still works afterwards; draining the whole
+     * virtual 2.75 GiB stream would only allocate gigabytes of buffer */
+    pcm_buf post = { .channels = info.channels };
+    int ok = 1;
+    for (size_t got = 0; got < 4800 && ok; ) {
+        if (buf_reserve(&post, 4096) < 0) { ok = 0; break; }
+        int64_t n = song_read_pcm(song, post.data + post.frames * (size_t)post.channels, 4096);
+        if (n < 0) ok = 0;
+        else if (n == 0) break;
+        else { post.frames += (size_t)n; got += (size_t)n; }
+    }
+    printf(",\"target_us\":%" PRId64 ",\"max_seek_offset\":%" PRId64
+           ",\"max_read_end\":%" PRId64 ",\"post_seek_frames\":%zu,"
+           "\"decode_ok\":%s,\"negative_seek\":%s,"
+           "\"gt_2gib_seek\":%s}",
+           target, virt.max_seek_abs, virt.max_read_end, post.frames,
+           ok ? "true" : "false",
+           virt.negative_seek ? "true" : "false",
+           virt.max_seek_abs > ((int64_t)2 * 1024 * 1024 * 1024) ? "true" : "false");
+    if (!ok || post.frames == 0 ||
+        virt.max_seek_abs <= (int64_t)2 * 1024 * 1024 * 1024 || virt.negative_seek)
+        rc = 1;
+    free(post.data);
+    song_close(song);
+    return rc;
 }
 
 int wmain(int argc, wchar_t **argv) {

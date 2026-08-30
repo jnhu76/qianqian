@@ -106,6 +106,10 @@ target("qn_pcm_dump")
     if is_plat("linux") or is_plat("macosx") then
         add_syslinks("m", "pthread")
     end
+    if is_plat("mingw") then
+        -- FFmpeg's av_random_bytes uses BCryptGenRandom on Windows
+        add_syslinks("bcrypt")
+    end
     on_load(function (target)
         if get_config("gc_sections") then
             target:add("ldflags", "-Wl,--gc-sections")

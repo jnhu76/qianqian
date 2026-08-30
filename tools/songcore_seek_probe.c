@@ -192,14 +192,21 @@ static void close_song(song_handle **song, file_source *src) {
 /* Locate the frame-aligned offset in the sequential stream where `probe`
  * (n_frames frames) begins; -1 when absent. */
 static int64_t find_resume_frame(const pcm_buf *seq, const float *probe, size_t n_frames) {
+    const size_t n_frames_total = n_frames;
     if (n_frames == 0 || seq->frames < n_frames) return -1;
     size_t span = n_frames * (size_t)seq->channels;
     size_t limit = (seq->frames - n_frames) * (size_t)seq->channels;
     uint32_t first = ((const uint32_t *)probe)[0];
     for (size_t off = 0; off <= limit; off += (size_t)seq->channels) {
         if (((const uint32_t *)seq->data)[off] != first) continue;
-        if (memcmp(seq->data + off, probe, span * sizeof(float)) == 0)
-            return (int64_t)(off / (size_t)seq->channels);
+        if (memcmp(seq->data + off, probe, span * sizeof(float)) != 0) continue;
+        /* full-suffix verification at every candidate: short periodic
+         * content (mono sines) can alias the probe prefix */
+        size_t candidate = off / (size_t)seq->channels;
+        size_t remaining = seq->frames - candidate;
+        if (remaining == n_frames_total &&
+            memcmp(seq->data + off, probe, n_frames_total * (size_t)seq->channels * sizeof(float)) == 0)
+            return (int64_t)candidate;
     }
     return -1;
 }
