@@ -45,6 +45,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import struct
 import subprocess
 import tempfile
