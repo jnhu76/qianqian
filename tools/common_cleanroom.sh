@@ -43,7 +43,7 @@ python3 tools/common_calibrate.py --stage prepare-c5 --check
 
 for s in c0 c1 c2 c3 c4 c5; do
     step "3. ladder stage $s"
-    python3 tools/common_stage.py --stage "$s" --skip-import=false
+    python3 tools/common_stage.py --stage "$s"
     if [ "$s" != "c0" ]; then
         python3 tools/common_compare.py c0 "$s"
     fi
