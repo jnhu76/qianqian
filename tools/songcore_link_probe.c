@@ -4,49 +4,34 @@
  * It exists so the S1 minimization audit can force the linker to resolve the
  * ENTIRE SongCore public contract (open/probe/read_pcm/seek/close) against
  * libqianqian_av.a, independent of whatever subset qn_pcm_dump happens to
- * call on its current code path. Taking the address of every entry point
- * through a volatile table prevents the compiler from folding them away.
+ * call on its current code path.
  *
- * It must stay free of FFmpeg types: it only pins the boundary contract.
+ * The machine guarantee is external linkage: `songcore_contract` is visible
+ * outside this translation unit, so the compiler must emit ALL five address
+ * relocations (it may not elide single elements of an array whose address
+ * escapes). The volatile read in main only preserves the runtime claim;
+ * tools/link_audit.py additionally asserts with `nm -u` that probe.o's
+ * undefined-symbol set is EXACTLY the five contract entry points.
+ *
+ * It must stay free of FFmpeg types and of libc calls: any extra undefined
+ * reference would weaken the exact-set assertion.
  */
 #include "songcore.h"
 
-#include <stdio.h>
+#define SONG_CONTRACT_N 5
 
-typedef song_handle *(*song_open_fn)(const song_io *);
-typedef int (*song_probe_fn)(song_handle *, song_info *);
-typedef int64_t (*song_read_pcm_fn)(song_handle *, float *, size_t);
-typedef int (*song_seek_api_fn)(song_handle *, int64_t);
-typedef void (*song_close_fn)(song_handle *);
+void *const songcore_contract[SONG_CONTRACT_N] = {
+    (void *)&song_open,
+    (void *)&song_probe,
+    (void *)&song_read_pcm,
+    (void *)&song_seek,
+    (void *)&song_close,
+};
 
-int main(int argc, char **argv) {
-    if (argc < 2) {
-        fprintf(stderr, "usage: %s <local-song>\n", argv[0]);
-        return 2;
+int main(void) {
+    void *const volatile *pin = songcore_contract;
+    for (int i = 0; i < SONG_CONTRACT_N; i++) {
+        if (pin[i] == (void *)0) return 3;
     }
-
-    /* Contract pin: every public entry point must be resolvable at link
-     * time, whether or not this host exercises each one at runtime. */
-    static void *const contract[] = {
-        (void *)&song_open,
-        (void *)&song_probe,
-        (void *)&song_read_pcm,
-        (void *)&song_seek,
-        (void *)&song_close,
-    };
-    void *const *pin = contract;
-    if (pin[0] == NULL) return 3;
-    volatile const void *const pinned = pin[0];
-    (void)pinned;
-
-    FILE *f = fopen(argv[1], "rb");
-    if (!f) return 1;
-    /* The decode path is intentionally NOT run here; reachability only needs
-     * symbol-level resolution against the full contract. Decode / seek / EOF
-     * behavior is owned by the real gates (corpus, PCM, seek, real songs). */
-    static song_io io;
-    song_handle *h = ((song_open_fn)contract[0])(&io);
-    if (h) ((song_close_fn)contract[4])(h);
-    fclose(f);
     return 0;
 }

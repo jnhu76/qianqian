@@ -215,6 +215,7 @@ def main() -> None:
         "libqianqian_av_symbols": symbol_count(single),
         "libqianqian_av_xz_bytes": xz_bytes(single),
         "libsongcore_a_bytes": songcore.stat().st_size,
+        "libsongcore_a_xz_bytes": xz_bytes(songcore),
         "qn_pcm_dump_bytes": qn_linked["bytes"],
         "qn_pcm_dump_xz_bytes": qn_linked["xz_bytes"],
         "qn_pcm_dump_stripped_bytes": qn_stripped["bytes"],
