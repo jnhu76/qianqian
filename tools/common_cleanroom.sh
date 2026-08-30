@@ -23,7 +23,7 @@ step() { printf '\n===== %s =====\n' "$*"; }
 
 step "0. clean build tree and reset persisted xmake config"
 rm -rf build
-rm -f .xmake/xmake.conf
+rm -rf .xmake
 
 step "1. corpus integrity"
 python3 - <<'EOF'

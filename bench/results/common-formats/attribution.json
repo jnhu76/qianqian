@@ -6,112 +6,112 @@
   "increment_attribution": [
     {
       "family": "mov/isom",
-      "increment_bytes": 0
+      "increment_bytes": 165579
     },
     {
       "family": "adts-demux",
-      "increment_bytes": 0
+      "increment_bytes": 1603
     },
     {
       "family": "aac-decoder",
-      "increment_bytes": 0
+      "increment_bytes": 296788
     },
     {
       "family": "shared",
-      "increment_bytes": 0
+      "increment_bytes": 417283
     }
   ],
-  "increment_total_bytes": 0,
+  "increment_total_bytes": 881253,
   "members_top": [
     {
-      "family": "aac-decoder",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/aac/aacdec.c",
-      "unit": "libavcodec/aac/aacdec.o"
+      "family": "mov/isom",
+      "file_backed_bytes": 150567,
+      "source": "libavformat/mov.c",
+      "unit": "libavformat/mov.o"
+    },
+    {
+      "family": "shared",
+      "file_backed_bytes": 113052,
+      "source": "libavutil/tx_float.c",
+      "unit": "libavutil/tx_float.o"
+    },
+    {
+      "family": "shared",
+      "file_backed_bytes": 111230,
+      "source": "libavutil/tx_double.c",
+      "unit": "libavutil/tx_double.o"
+    },
+    {
+      "family": "shared",
+      "file_backed_bytes": 98795,
+      "source": "libavutil/tx_int32.c",
+      "unit": "libavutil/tx_int32.o"
     },
     {
       "family": "aac-decoder",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/aac/aacdec_ac.c",
-      "unit": "libavcodec/aac/aacdec_ac.o"
-    },
-    {
-      "family": "aac-decoder",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/aac/aacdec_float.c",
-      "unit": "libavcodec/aac/aacdec_float.o"
-    },
-    {
-      "family": "aac-decoder",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/aac/aacdec_lpd.c",
-      "unit": "libavcodec/aac/aacdec_lpd.o"
-    },
-    {
-      "family": "aac-decoder",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/aac/aacdec_tab.c",
-      "unit": "libavcodec/aac/aacdec_tab.o"
-    },
-    {
-      "family": "aac-decoder",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/aac/aacdec_usac.c",
-      "unit": "libavcodec/aac/aacdec_usac.o"
-    },
-    {
-      "family": "aac-decoder",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/aac/aacdec_usac_mps212.c",
-      "unit": "libavcodec/aac/aacdec_usac_mps212.o"
-    },
-    {
-      "family": "aac-decoder",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/aacps_common.c",
-      "unit": "libavcodec/aacps_common.o"
-    },
-    {
-      "family": "aac-decoder",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/aacps_float.c",
-      "unit": "libavcodec/aacps_float.o"
-    },
-    {
-      "family": "aac-decoder",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/aacpsdsp_float.c",
-      "unit": "libavcodec/aacpsdsp_float.o"
-    },
-    {
-      "family": "aac-decoder",
-      "file_backed_bytes": 0,
+      "file_backed_bytes": 57946,
       "source": "libavcodec/aacsbr.c",
       "unit": "libavcodec/aacsbr.o"
     },
     {
       "family": "aac-decoder",
-      "file_backed_bytes": 0,
+      "file_backed_bytes": 55403,
       "source": "libavcodec/aactab.c",
       "unit": "libavcodec/aactab.o"
     },
     {
-      "family": "shared",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/ac3_channel_layout_tab.c",
-      "unit": "libavcodec/ac3_channel_layout_tab.o"
+      "family": "aac-decoder",
+      "file_backed_bytes": 48112,
+      "source": "libavcodec/aac/aacdec.c",
+      "unit": "libavcodec/aac/aacdec.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 39827,
+      "source": "libavcodec/aac/aacdec_usac.c",
+      "unit": "libavcodec/aac/aacdec_usac.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 24208,
+      "source": "libavcodec/aac/aacdec_float.c",
+      "unit": "libavcodec/aac/aacdec_float.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 23398,
+      "source": "libavcodec/aac/aacdec_usac_mps212.c",
+      "unit": "libavcodec/aac/aacdec_usac_mps212.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 18678,
+      "source": "libavcodec/aacps_float.c",
+      "unit": "libavcodec/aacps_float.o"
     },
     {
       "family": "shared",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/adts_header.c",
-      "unit": "libavcodec/adts_header.o"
+      "file_backed_bytes": 16582,
+      "source": "libavutil/tx.c",
+      "unit": "libavutil/tx.o"
     },
     {
       "family": "shared",
-      "file_backed_bytes": 0,
-      "source": "libavcodec/cbrt_data.c",
-      "unit": "libavcodec/cbrt_data.o"
+      "file_backed_bytes": 15124,
+      "source": "libavformat/iamf_parse.c",
+      "unit": "libavformat/iamf_parse.o"
+    },
+    {
+      "family": "shared",
+      "file_backed_bytes": 12881,
+      "source": "libavcodec/sbrdsp.c",
+      "unit": "libavcodec/sbrdsp.o"
+    },
+    {
+      "family": "aac-decoder",
+      "file_backed_bytes": 11154,
+      "source": "libavcodec/aac/aacdec_tab.c",
+      "unit": "libavcodec/aac/aacdec_tab.o"
     }
   ],
   "method": "increment members (pulled at stage, not at base) x file-backed section bytes per manifest unit (size -A, DWARF/bss excluded); families by manifest source path, so duplicate basenames (aacdec decoder vs ADTS demuxer) are attributed exactly. Upper bound of post-gc live bytes; live .so total is cross-checked in docs/experiments/e08-common-formats.md",

@@ -92,7 +92,9 @@ def run(cmd: list[str], *, check=True, binary=False, env=None, timeout=None) -> 
                        text=not binary, env=e, timeout=timeout)
     if check and p.returncode:
         err = p.stderr if not binary else p.stderr.decode("utf-8", "replace")
-        raise SystemExit(f"command failed ({p.returncode}): {' '.join(map(str, cmd))}\n{err[-4000:]}")
+        out = p.stdout if not binary else p.stdout.decode("utf-8", "replace")
+        detail = (err.strip() or out.strip())[-4000:]
+        raise SystemExit(f"command failed ({p.returncode}): {' '.join(map(str, cmd))}\n{detail}")
     return p
 
 
@@ -128,18 +130,37 @@ def _xmake_configure(av_manifest: Path, *, lto: bool) -> None:
 
     The x86_64 tools are pinned explicitly: llvm-mingw ships several
     target wrappers (incl. arm64ec-*-uwp), and xmake's SDK autodetect
-    otherwise picks the wrong one (which rejects FFmpeg's inline asm)."""
+    otherwise picks the wrong one (which rejects FFmpeg's inline asm).
+
+    The persisted project config directory is wiped first: xmake keeps the
+    config under .xmake/<plat>/<arch>/ but reuses the PREVIOUS platform's
+    directory when switching (-p mingw over an existing linux config wrote
+    .xmake/linux/...), after which `xmake build` reads the (missing) mingw
+    path, falls back to option defaults, and fails with 'closure missing'."""
+    shutil.rmtree(ROOT / ".xmake", ignore_errors=True)
     run(["xmake", "f", "-p", "mingw", "--sdk=" + str(SDK), "-m", "release",
          "--cc=x86_64-w64-mingw32-gcc", "--cxx=x86_64-w64-mingw32-g++",
          "--ld=x86_64-w64-mingw32-gcc", "--ar=x86_64-w64-mingw32-ar",
          f"--av_manifest={av_manifest}",
          "--gc_sections=n", "--lto=" + ("y" if lto else "n"), "-y"])
+    # the replayed closure must be the configured one, not an option default
+    conf = next((ROOT / ".xmake").rglob("xmake.conf"), None)
+    if conf is None or "mingw" not in str(conf) or \
+            Path(json_value(conf, "av_manifest")).resolve() != Path(av_manifest).resolve():
+        raise SystemExit(f"xmake config did not persist av_manifest={av_manifest} "
+                         f"(looked at {conf})")
     shutil.rmtree(ROOT / "build" / "xmake", ignore_errors=True)
     shutil.rmtree(ROOT / "build" / "artifacts", ignore_errors=True)
     run(["xmake", "build", "qn_pcm_dump"])
     for a in ("libqianqian_av.a", "libsongcore.a", "qn_pcm_dump.exe"):
         if not (ROOT / "build/artifacts" / a).is_file():
             raise SystemExit(f"missing Windows artifact {a}")
+
+
+def json_value(conf: Path, key: str) -> str | None:
+    import re
+    m = re.search(rf'{key}\s*=\s*"([^"]*)"', conf.read_text())
+    return m.group(1) if m else None
 
 
 def build_windows() -> None:
