@@ -16,6 +16,9 @@
  *   --largefile  synthetic virtual IO: declares a 3 GiB WAV, asserts the
  *                >2 GiB seek offset actually reaches the host and that
  *                decode still works after it.
+ *   --robust     bounded typed classification for degraded (truncated/
+ *                malformed) corpus inputs; always exits 0 once classified,
+ *                so crashes/hangs are detectable by the gate driver.
  *
  * The adapter owns ALL file IO; SongCore/FFmpeg only ever see callbacks.
  * Prints one JSON line. Exit code 0 = PASS.
@@ -477,11 +480,73 @@ static int mode_largefile(void) {
     return rc;
 }
 
+/* ------------------------------------------------------------------ */
+/* robust classification mode (degraded corpus inputs)                 */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Bounded, typed classification for truncated/malformed fixtures. The host
+ * always exits 0 when classification completes — crash detection (nonzero
+ * or exception exit codes) and hang detection (driver-side timeout) belong
+ * to the gate driver. Output is one JSON line:
+ *   {"classification":"OPEN_FAILED|PROBE_FAILED|DECODE_ERROR|DEGRADED_EOF|CAPPED_OUTPUT",
+ *    "probe_rc":N,"frames":N,"capped":bool}
+ */
+static int mode_robust(const char *path) {
+    wchar_t *wpath = utf8_to_wide(path);
+    if (!wpath) { fprintf(stderr, "utf8 conversion failed\n"); return 2; }
+    song_handle *song = NULL;
+    win_source src;
+    const char *classification = "OPEN_FAILED";
+    int probe_rc = -1;
+    size_t frames = 0;
+    int capped = 0;
+
+    if (win_open(wpath, &song, &src) == 0) {
+        song_info info;
+        probe_rc = song_probe(song, &info);
+        if (probe_rc < 0) {
+            classification = "PROBE_FAILED";
+            win_close(&song, &src);
+        } else {
+            /* bounded decode: enough to prove bounded behavior, never the
+             * full drain of a hostile stream (cap = 10s @ 48kHz stereo) */
+            const size_t cap = 480000;
+            const size_t chunk = 4096;
+            float *buf = (float *)malloc(chunk * (size_t)info.channels * sizeof(float));
+            int err = 0;
+            while (frames < cap) {
+                int64_t n = song_read_pcm(song, buf, chunk);
+                if (n < 0) { err = 1; break; }
+                if (n == 0) break;
+                frames += (size_t)n;
+            }
+            free(buf);
+            win_close(&song, &src);
+            if (frames >= cap) { capped = 1; classification = "CAPPED_OUTPUT"; }
+            else classification = err ? "DECODE_ERROR" : "DEGRADED_EOF";
+        }
+    }
+    free(wpath);
+    printf("{\"classification\":\"%s\",\"probe_rc\":%d,\"frames\":%zu,"
+           "\"capped\":%s}\n",
+           classification, probe_rc, frames, capped ? "true" : "false");
+    return 0;
+}
+
 int wmain(int argc, wchar_t **argv) {
     if (argc >= 3 && wcscmp(argv[1], L"--unicode") == 0)
         return mode_unicode(argv[2]);
     if (argc >= 2 && wcscmp(argv[1], L"--largefile") == 0)
         return mode_largefile();
+    if (argc >= 3 && wcscmp(argv[1], L"--robust") == 0) {
+        int n = WideCharToMultiByte(CP_UTF8, 0, argv[2], -1, NULL, 0, NULL, NULL);
+        char *p = (char *)malloc((size_t)n);
+        WideCharToMultiByte(CP_UTF8, 0, argv[2], -1, p, n, NULL, NULL);
+        int rc = mode_robust(p);
+        free(p);
+        return rc;
+    }
     if (argc >= 2) {
         int n = WideCharToMultiByte(CP_UTF8, 0, argv[1], -1, NULL, 0, NULL, NULL);
         char *p = (char *)malloc((size_t)n);
@@ -491,6 +556,7 @@ int wmain(int argc, wchar_t **argv) {
         return rc;
     }
     fprintf(stderr, "usage: songcore_windows_host <file>\n"
+                    "       songcore_windows_host --robust <file>\n"
                     "       songcore_windows_host --unicode <fixture>\n"
                     "       songcore_windows_host --largefile\n");
     return 2;

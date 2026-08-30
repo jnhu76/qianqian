@@ -23,6 +23,39 @@ sys.path.insert(0, str(ROOT / "tools"))
 import ffmpeg_import as fi  # noqa: E402
 
 
+def validate_profile(profile: dict, source: Path) -> None:
+    """Capability-intent sanity: contradictions must fail fast, before the
+    expensive oracle run. A library enabled and disabled in the same profile
+    only 'works' while configure argument ordering happens to favor the last
+    one — that is fragility, not intent."""
+    problems = []
+
+    def norm(names) -> list[str]:
+        out = []
+        for n in names or []:
+            if n not in out:
+                out.append(n)
+            else:
+                problems.append(f"duplicate entry '{n}'")
+        return out
+
+    libs = profile.get("libraries", {})
+    enabled = norm(libs.get("enable", []))
+    disabled = norm(libs.get("disable", []))
+    clash = sorted(set(enabled) & set(disabled))
+    if clash:
+        problems.append(f"libraries both enabled and disabled: {clash}")
+    if "everything-disabled" == profile.get("component_base") and enabled:
+        pass  # libraries may still be re-enabled explicitly on the disabled base
+    components = profile.get("components", {})
+    for cls, names in components.items():
+        norm(names)
+    if problems:
+        raise SystemExit(
+            f"profile {source.name} failed validation:\n  - " +
+            "\n  - ".join(problems))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", required=True, help="stage id, e.g. c1")
@@ -44,6 +77,7 @@ def main() -> None:
     if not profile_path.is_absolute():
         profile_path = ROOT / profile_path
     profile = json.loads(profile_path.read_text())
+    validate_profile(profile, profile_path)
 
     # Profiles that enable swresample (the Opus decoder's upstream build
     # dependency) must also make its archive an oracle build target, or its

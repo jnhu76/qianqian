@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Collect the Windows phase results into bench/results/common-formats/windows.json.
 
-Gathers: toolchain identity, target-specific closure sizes, reachability,
-static archive, both DLL variants (stock -Os and -Os+LTO) with their PE
-gates, and the native correctness report — including a cross-platform PCM
-comparison against the Linux stage gates (exact sha equality where the
-decoder contract demands it; recorded per-case otherwise).
+Gathers: toolchain identity, the full-closure and projected-closure numbers
+(oracle TU / archive members / reachable units / fixpoint evidence), the
+static projected archive, both DLL variants (-Os and -Os+LTO) with their PE
+gates, the canonical shipping artifact (smallest accepted variant by
+stripped+xz — every variant must carry its own native correctness PASS), and
+the native correctness report — including a cross-platform PCM comparison
+against the Linux stage gates (exact sha equality where the decoder contract
+demands it; recorded per-case otherwise).
 
-    python3 tools/common_windows.py --summary
+    python3 tools/common_windows_summary.py
 """
 from __future__ import annotations
 
@@ -29,26 +32,32 @@ def load(p: Path) -> dict:
 
 def main() -> None:
     manifest = load(WIN / "manifest.json")
-    reach = load(WIN / "win-reachability.json")
+    reach = load(WIN / "reachability" / "report.json")
+    projection = load(WIN / "projection.json")
     dll = load(WIN / "dll" / "dll.json")
     dll_lto_path = WIN / "dll-lto" / "dll.json"
     dll_lto = load(dll_lto_path) if dll_lto_path.is_file() else None
     correct = load(WIN / "correctness" / "correctness.json")
-    artifacts = WIN.parent.parent / "artifacts"
+    correct_lto_path = WIN / "correctness" / "correctness-lto.json"
+    correct_lto = load(correct_lto_path) if correct_lto_path.is_file() else None
 
-    # cross-platform PCM: Windows shas vs Linux SongCore shas (c5 gate)
+    # canonical shipping artifact: min stripped+xz among ACCEPTED variants
+    # (accepted = export/import gates passed at build time AND its own
+    # native correctness PASS; --correct aborts the run otherwise)
+    variants = [("dll", dll, correct)]
+    if dll_lto is not None and correct_lto is not None:
+        variants.append(("dll-lto", dll_lto, correct_lto))
+    canon_name, canon, canon_corr = min(
+        variants, key=lambda v: v[1]["sizes"]["dll_stripped_xz_bytes"])
+
+    # cross-platform PCM: Windows shas vs Linux SongCore shas (c5 gate);
+    # clean cases only — degraded cases are classified, not sha-compared
     linux_gate = load(ROOT / "build" / "minimize" / "c5" / "gate.json")
-    pcm = []
-    for cid, entry in correct.get("failures", {}).items():
-        pass  # failures were already fatal at gate time
-    for cid, entry in sorted(correct["failures"].items()) and []:
-        pass
     cases = {c["id"]: c for c in load_cases(STAGE_CAPABILITIES["c5"])}
     win_shas = {}
-    # correctness.json keeps per-case entries only for failures; re-derive the
-    # full table by re-reading the raw per-case output saved during the run
-    raw = correct.get("per_case", {})
-    for cid, entry in raw.items():
+    for cid, entry in sorted(correct["per_case"].items()):
+        if entry.get("mode") == "robust":
+            continue
         linux = linux_gate["songcore_pcm"].get(cid, {}).get("pcm_sha256")
         win_shas[cid] = {
             "capability": cases[cid]["capability"] if cid in cases else None,
@@ -59,7 +68,7 @@ def main() -> None:
         }
 
     summary = {
-        "schema": 1,
+        "schema": 2,
         "toolchain": {
             "kind": "llvm-mingw (cross from WSL, binaries executed natively on Windows)",
             "sdk": str(Path.home() / "toolchains/llvm-mingw"),
@@ -71,19 +80,35 @@ def main() -> None:
         },
         "closure": {
             "oracle_tu": manifest["closure"]["translation_units"],
-            "reachable_tu": reach["pulled_members"],
-            "archive_members": reach["archive_members"],
-            "lld_map_member_set_equal": reach["lld_map_member_set_equal"],
+            "full_archive_members": reach["archive_members"],
+            "duplicate_member_basenames": reach["duplicate_member_basenames"],
+            "full_archive_pulled_members": reach["pulled_members"],
+            "projected_units": projection["projected_units"],
+            "projection_iterations": projection["iterations"],
+            "compiled_units_verified": projection["pulled_units"],
+            "reachability_proof": reach["verification"]["method"],
         },
-        "static_archive_bytes": artifacts.joinpath("libqianqian_av.a").stat().st_size
-        if artifacts.joinpath("libqianqian_av.a").is_file() else dll["sizes"]["libqianqian_av_a_bytes"],
+        "static_archive_bytes": dll["sizes"]["libqianqian_av_a_bytes"],
         "dll": dll,
         "dll_lto": dll_lto,
-        "dll_lto_note": "dll_lto null when the -Os+LTO variant was not rebuilt in this run; "
-                        "see git history for the recorded variant",
+        "canonical_shipping": {
+            "variant": canon_name,
+            "stage": canon["stage"],
+            "lto": canon["lto"],
+            "stripped_bytes": canon["sizes"]["dll_stripped_bytes"],
+            "stripped_xz_bytes": canon["sizes"]["dll_stripped_xz_bytes"],
+            "selection": "min dll_stripped_xz_bytes among variants with own native correctness PASS",
+            "correctness_verdicts": {n: c["verdict"] for n, _, c in variants},
+        },
         "correctness": {
             "verdict": correct["verdict"],
-            "cases": correct["cases"],
+            "verdict_lto": correct_lto["verdict"] if correct_lto else None,
+            "total_applicable": correct["total_applicable"],
+            "clean_cases": correct["clean_cases"],
+            "degraded_cases": correct["degraded_cases"],
+            "executed": correct["executed"],
+            "skipped": correct["skipped"],
+            "seek_tiers": correct["seek_tiers"],
             "unicode_path_gate": correct["unicode_path_gate"]["pass"],
             "largefile_gate": correct["largefile_gate"]["pass"],
             "unicode_observed": correct["unicode_path_gate"].get("observed"),
@@ -97,6 +122,15 @@ def main() -> None:
     ident = sum(1 for v in win_shas.values() if v["identical"] is True)
     diff = [k for k, v in win_shas.items() if v["identical"] is False]
     print(f"wrote {out}")
+    print(f"closure: oracle {summary['closure']['oracle_tu']} TU / "
+          f"{summary['closure']['full_archive_members']} members -> "
+          f"projected {summary['closure']['projected_units']} TU "
+          f"(fixpoint after {summary['closure']['projection_iterations']} iteration(s))")
+    print(f"canonical shipping: {canon_name} "
+          f"{canon['sizes']['dll_stripped_bytes']} B stripped / "
+          f"{canon['sizes']['dll_stripped_xz_bytes']} B xz")
+    print(f"correctness: {correct['verdict']} (clean {correct['clean_cases']} + "
+          f"degraded {correct['degraded_cases']}, tiers {correct['seek_tiers']})")
     print(f"pcm cross-platform: {ident} identical, {len(diff)} differing {diff[:8]}")
 
 

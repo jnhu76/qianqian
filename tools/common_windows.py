@@ -11,15 +11,25 @@ executed natively on Windows through WSL interop (`./tool.exe` from WSL
 launches the Windows loader) — correctness never comes from Wine or from
 unexecuted artifacts.
 
-Stages:
+Pipeline (--all), mirroring the Linux ladder's TU projection:
+
   --import     Windows configure/Make oracle -> target-specific manifest
-  --build      Xmake mingw replay -> libqianqian_av.a / qn_pcm_dump.exe
-  --audit      COFF reachability simulation + lld -Map member-multiset gate
-  --dll        qianqian_songcore.dll (+ import lib) with export/import-table
-               hard gates (only the five song_* APIs; no FFmpeg DLL imports)
-  --correct    Windows-native correctness: consumer .exe + qn_pcm_dump.exe +
-               wide-path / >2GiB host gates across the full applicable corpus
-  --all        everything above in order
+  --build      Xmake mingw replay of the FULL closure -> libqianqian_av.a
+  --audit      COFF link-reachability (offset-identified members, llvm-nm
+               semantics) + reduced-archive PE content proof + lld -Map
+               corroboration   (tools/link_audit_windows.py)
+  --project    manifest projection to the reachable closure
+               (tools/minimize_manifest.py)
+  --projected  clean rebuild of the projected closure ONLY, with a hard
+               per-TU verification that xmake compiled exactly the projected
+               units (no more, no less), then re-audit to fixpoint
+  --dll        shipping variants (qianqian_songcore.dll) built from the
+               projected closure: -Os and -Os+LTO, each with export/import
+               hard gates
+  --correct    Windows-native correctness per DLL variant: full applicable
+               corpus — clean cases under the STRICT/LAPPED/UNSUPPORTED seek
+               contract, degraded (truncated/malformed) cases under typed
+               boundedness gates — plus wide-path / >2GiB host gates
 
     python3 tools/common_windows.py --all
 """
@@ -38,8 +48,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from common_corpus import (  # noqa: E402
-    STAGE_CAPABILITIES, bench_json, fixture_path, load_cases, sha256_file,
-    verify_fixtures,
+    STAGE_CAPABILITIES, fixture_path, load_cases, sha256_file,
 )
 import common_import  # noqa: E402
 
@@ -49,14 +58,30 @@ STAGE_DIR = ROOT / "build" / "minimize" / STAGE
 CONTRACT = ["song_open", "song_probe", "song_read_pcm", "song_seek", "song_close"]
 FORBIDDEN_DLL = re.compile(r"(avcodec|avformat|avutil|swresample|swscale|avfilter)", re.I)
 
+FULL_MANIFEST = STAGE_DIR / "manifest.json"
+PROJECTED_MANIFEST = STAGE_DIR / "manifest-projected.json"
+
+# Seek contract per format family (gate-owned minimum semantics; calibrate
+# only observes). STRICT requires exact suffix equality; LAPPED accepts
+# codec-lapping suffix differences (MP3 bit reservoir, AAC MDCT 50% overlap,
+# CELT overlap-add) but still demands seek success + bounded resume + PCM +
+# clean EOF; UNSUPPORTED (raw ADTS) accepts the typed seek failure while
+# decode/EOF gates still hold.
+SEEK_TIER = {"flac": "STRICT", "alac": "STRICT", "wav": "STRICT", "vorbis": "STRICT",
+             "mp3": "LAPPED", "aac": "LAPPED", "opus": "LAPPED"}
+TYPED_OUTCOMES = {"OPEN_FAILED", "PROBE_FAILED", "DECODE_ERROR", "DEGRADED_EOF",
+                  "CAPPED_OUTPUT"}
+
 
 def sdk_env() -> dict:
     if not (SDK / "bin").is_dir():
         raise SystemExit(f"llvm-mingw SDK not found at {SDK}; set LLVM_MINGW_SDK")
-    return {"PATH": f"{SDK / 'bin'}:{os.environ['PATH']}"}
+    e = dict(os.environ)
+    e["PATH"] = f"{SDK / 'bin'}:{os.environ['PATH']}"
+    return e
 
 
-def run(cmd: list[str], *, check=True, binary=False, env=None) -> subprocess.CompletedProcess:
+def run(cmd: list[str], *, check=True, binary=False, env=None, timeout=None) -> subprocess.CompletedProcess:
     print("+", " ".join(map(str, cmd)), flush=True)
     # every child needs the llvm-mingw tools on PATH (xmake resolves the
     # pinned x86_64-w64-mingw32-* wrappers through it)
@@ -64,7 +89,7 @@ def run(cmd: list[str], *, check=True, binary=False, env=None) -> subprocess.Com
     if env:
         e.update(env)
     p = subprocess.run(list(map(str, cmd)), cwd=ROOT, capture_output=True,
-                       text=not binary, env=e)
+                       text=not binary, env=e, timeout=timeout)
     if check and p.returncode:
         err = p.stderr if not binary else p.stderr.decode("utf-8", "replace")
         raise SystemExit(f"command failed ({p.returncode}): {' '.join(map(str, cmd))}\n{err[-4000:]}")
@@ -85,7 +110,7 @@ def import_windows() -> None:
          "--configure-extra=--target-os=mingw32",
          "--configure-extra=--arch=x86_64"],
         env=sdk_env())
-    manifest = json.loads((STAGE_DIR / "manifest.json").read_text())
+    manifest = json.loads(FULL_MANIFEST.read_text())
     print(f"windows closure: {manifest['closure']['translation_units']} TUs; "
           f"toolchain: {manifest['toolchain']}")
     # identity: the cross toolchain must be pinned in the recorded CC, and
@@ -98,8 +123,8 @@ def import_windows() -> None:
         raise SystemExit("oracle did not configure for x86_64")
 
 
-def build_windows() -> None:
-    """Replay the Windows manifest through Xmake's mingw platform.
+def _xmake_configure(av_manifest: Path, *, lto: bool) -> None:
+    """Replay a manifest through Xmake's mingw platform.
 
     The x86_64 tools are pinned explicitly: llvm-mingw ships several
     target wrappers (incl. arm64ec-*-uwp), and xmake's SDK autodetect
@@ -107,8 +132,8 @@ def build_windows() -> None:
     run(["xmake", "f", "-p", "mingw", "--sdk=" + str(SDK), "-m", "release",
          "--cc=x86_64-w64-mingw32-gcc", "--cxx=x86_64-w64-mingw32-g++",
          "--ld=x86_64-w64-mingw32-gcc", "--ar=x86_64-w64-mingw32-ar",
-         f"--av_manifest=build/minimize/{STAGE}/manifest.json",
-         "--gc_sections=n", "--lto=n", "-y"])
+         f"--av_manifest={av_manifest}",
+         "--gc_sections=n", "--lto=" + ("y" if lto else "n"), "-y"])
     shutil.rmtree(ROOT / "build" / "xmake", ignore_errors=True)
     shutil.rmtree(ROOT / "build" / "artifacts", ignore_errors=True)
     run(["xmake", "build", "qn_pcm_dump"])
@@ -117,163 +142,117 @@ def build_windows() -> None:
             raise SystemExit(f"missing Windows artifact {a}")
 
 
-def nm_archive(archive):
-    """Per-member symbol sets via llvm-nm on a COFF archive.
+def build_windows() -> None:
+    """Replay the FULL Windows manifest through Xmake (audit input)."""
+    _xmake_configure(FULL_MANIFEST, lto=False)
 
-    llvm-nm prints one 'member.obj:' header per member followed by its
-    symbols; types follow the ELF convention (uppercase/global definitions,
-    U undefined, w weak-undefined). Members with no symbol table entries
-    cannot participate in resolution and are skipped by nm itself.
+
+def audit_windows(manifest: Path, out_name: str) -> dict:
+    """Offset-level COFF reachability + reduced-archive PE content proof."""
+    outdir = STAGE_DIR / out_name
+    run([sys.executable, "tools/link_audit_windows.py",
+         "--archive", "build/artifacts/libqianqian_av.a",
+         "--songcore", "build/artifacts/libsongcore.a",
+         "--manifest", str(manifest.relative_to(ROOT)),
+         "--out", str(outdir.relative_to(ROOT))], env=sdk_env())
+    return json.loads((outdir / "report.json").read_text())
+
+
+def compiled_ffmpeg_objects() -> set[str]:
+    """Source paths of every object xmake actually compiled for qianqian_av.
+
+    Object dirs mirror the source tree:
+      build/xmake/.objs/qianqian_av/<plat>/<arch>/<mode>/<root>/<rel>.o
+    where <root> is the FFmpeg source root or the stage's oracle (generated
+    config sources). Returned as source paths with the trailing .o removed.
     """
-    nm = str(SDK / "bin" / "x86_64-w64-mingw32-nm")
-    out = run([nm, str(archive)]).stdout
-    members = {}
-    current = None
-    for line in out.splitlines():
-        if not line.strip():
-            continue
-        if line.endswith(":") and not line.startswith(" "):
-            current = line[:-1]
-            members.setdefault(current, {"defined": set(), "undef": set()})
-            continue
-        parts = line.split()
-        if current is None or not parts:
-            continue
-        typ = parts[-2] if len(parts) >= 3 else parts[0]
-        name = parts[-1]
-        m = members[current]
-        if typ == "U":
-            m["undef"].add(name)
-        elif typ == "w":
-            continue
-        elif typ in "ABCDGRSTVWu":
-            m["defined"].add(name)
-    return members
+    objs_root = ROOT / "build/xmake/.objs/qianqian_av"
+    if not objs_root.is_dir():
+        raise SystemExit("missing xmake object tree; build first")
+    out = set()
+    for o in objs_root.rglob("*.o"):
+        parts = o.relative_to(objs_root).parts
+        for i, p in enumerate(parts):
+            if p == "ffmpeg-src" or p == "oracle":
+                out.add("/".join(parts[i:])[:-2])  # strip trailing .o
+                break
+        else:
+            raise SystemExit(f"unrecognized object path: {o}")
+    return out
 
 
-def audit_windows() -> None:
-    """COFF reachability: simulate first-definer archive pull over the
-    archive (llvm-nm semantics), then hard-gate the simulated pulled set
-    against the member names that actually appear in the real lld -Map."""
-    archive = ROOT / "build/artifacts/libqianqian_av.a"
-    songcore = ROOT / "build/artifacts/libsongcore.a"
-    ff_members = nm_archive(archive)
-    sc_members = nm_archive(songcore)
-
-    undefined = set()
-    defined = set()
-    for m in sc_members.values():
-        undefined |= m["undef"] - m["defined"]
-        defined |= m["defined"]
-    # the audit host references the FULL contract (win-audit-main.c): these
-    # are the undefined roots that drive the archive pull chain
-    undefined |= {"song_open", "song_probe", "song_read_pcm", "song_seek", "song_close"}
-    undefined -= defined
-    pulled = set()
-    changed = True
-    while changed:
-        changed = False
-        for name, m in ff_members.items():
-            if name in pulled:
-                continue
-            if m["defined"] & undefined:
-                pulled.add(name)
-                undefined -= m["defined"]
-                undefined |= m["undef"] - m["defined"]
-                changed = True
-
-    # real lld evidence: link the full contract against the archive
-    host = STAGE_DIR / "win-audit-main.c"
-    host.write_text(
-        '#include "songcore.h"\n'
-        '#include <stdlib.h>\n'
-        'int main(void){\n'
-        '  song_io io = {0};\n'
-        '  song_handle *h = song_open(&io);\n'
-        '  song_info info;\n'
-        '  if (h) { song_probe(h, &info); song_read_pcm(h, NULL, 0);\n'
-        '           song_seek(h, 0); song_close(h); }\n'
-        '  return h == NULL ? 0 : 0; }\n')
-    exe = STAGE_DIR / "win-audit.exe"
-    mapf = STAGE_DIR / "linker.map"
-    cc = str(SDK / "bin" / "x86_64-w64-mingw32-clang")
-    run([cc, "-O2", "-I", "include", "-o", str(exe), str(host),
-         str(songcore), str(archive), "-lbcrypt", "-Wl,-Map=" + str(mapf),
-         "-Wl,--gc-sections"], env=sdk_env())
-    # lld's COFF map lists contributed sections as '<member>.obj:(.section)';
-    # member names inside our archive are unique, so distinct-name sets match
-    map_names = set(re.findall(r"^\S+\s+\S+\s+\S+\s+(\S+\.obj):\(", mapf.read_text(), re.M))
-    real = {n for n in map_names if n in ff_members}
-    sim = set(pulled)
-    if real != sim:
-        raise SystemExit(f"Windows reachability gate FAILED: lld map vs simulation "
-                         f"(real-only={sorted(real - sim)[:8]}, "
-                         f"sim-only={sorted(sim - real)[:8]})")
-    (STAGE_DIR / "win-reachability.json").write_text(json.dumps({
-        "archive_members": len(ff_members),
-        "pulled_members": len(pulled),
-        "lld_map_member_set_equal": True,
-        "pulled": sorted(pulled),
-    }, indent=1) + "\n")
-    print(f"windows reachability: {len(pulled)}/{len(ff_members)} members pulled; "
-          f"lld map member set == simulation")
+def verify_compiled_units(manifest_path: Path) -> int:
+    """Hard gate: xmake compiled EXACTLY this manifest's units."""
+    manifest = json.loads(manifest_path.read_text())
+    expected = set()
+    for unit in manifest["units"]:
+        root = (manifest["config_root"] if unit["origin"] == "generated"
+                else manifest["source_root"])
+        expected.add(f"{root}/{unit['path']}")
+    actual = compiled_ffmpeg_objects()
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    if missing or extra:
+        raise SystemExit(
+            f"compiled-TU verification FAILED for {manifest_path.name}: "
+            f"{len(missing)} expected-but-not-compiled {missing[:6]}, "
+            f"{len(extra)} compiled-but-not-expected {extra[:6]}")
+    print(f"compiled-TU verification: exactly {len(actual)} units "
+          f"({manifest_path.name})")
+    return len(actual)
 
 
-class _tmpdir:
-    def __enter__(self):
-        import tempfile
-        self.d = tempfile.mkdtemp()
-        return Path(self.d)
+def project_windows() -> dict:
+    """Derive the projected manifest from the full-archive audit evidence."""
+    reach = STAGE_DIR / "reachability" / "reachable-objects.json"
+    run([sys.executable, "tools/minimize_manifest.py",
+         "--stage", STAGE,
+         "--audit", str(reach.relative_to(ROOT)),
+         "--base-manifest", str(FULL_MANIFEST.relative_to(ROOT)),
+         "--out", str(PROJECTED_MANIFEST.relative_to(ROOT))])
+    return json.loads(PROJECTED_MANIFEST.read_text())
 
-    def __exit__(self, *a):
-        shutil.rmtree(self.d, ignore_errors=True)
+
+def build_projected_fixpoint(max_iterations: int = 4) -> dict:
+    """Clean-rebuild ONLY the projected TUs, then re-audit to fixpoint.
+
+    First-definer pull sets can shrink when dead members disappear from the
+    archive, so project -> rebuild -> re-audit repeats until the projected
+    closure equals the archive's pulled set. Each rebuild is verified per TU
+    against the xmake object tree."""
+    for iterations in range(1, max_iterations + 1):
+        if iterations > 1:
+            # shrink the projection using the latest projected-archive audit
+            run([sys.executable, "tools/minimize_manifest.py",
+                 "--stage", STAGE,
+                 "--audit", str((STAGE_DIR / "reachability-projected" /
+                                 "reachable-objects.json").relative_to(ROOT)),
+                 "--base-manifest", str(FULL_MANIFEST.relative_to(ROOT)),
+                 "--out", str(PROJECTED_MANIFEST.relative_to(ROOT))])
+        manifest = json.loads(PROJECTED_MANIFEST.read_text())
+        projected_units = len(manifest["units"])
+        print(f"projected rebuild iteration {iterations}: {projected_units} TUs")
+        _xmake_configure(PROJECTED_MANIFEST, lto=False)
+        verify_compiled_units(PROJECTED_MANIFEST)
+        audit_windows(PROJECTED_MANIFEST, "reachability-projected")
+        pulled = json.loads((STAGE_DIR / "reachability-projected" /
+                             "report.json").read_text())["pulled_manifest_units"]
+        print(f"projected-archive audit: {pulled}/{projected_units} units pulled")
+        if pulled == projected_units:
+            evidence = {
+                "iterations": iterations,
+                "projected_units": projected_units,
+                "pulled_units": pulled,
+                "fixpoint": True,
+            }
+            (STAGE_DIR / "projection.json").write_text(
+                json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+            return evidence
+    raise SystemExit("projection did not reach fixpoint "
+                     f"after {max_iterations} iterations")
 
 
-def build_dll(*, lto: bool) -> dict:
-    """qianqian_songcore.dll + import library with hard ABI/dependency gates.
-
-    The DLL is the size-oriented shipping form: the Windows closure at
-    -Os + function/data sections (+ LTO for the -lto variant), replayed
-    through Xmake, then linked with the .def file so the export table is
-    exactly the SongCore ABI."""
-    artifacts = ROOT / "build/artifacts"
-    cc = str(SDK / "bin" / "x86_64-w64-mingw32-clang")
-    suffix = "-lto" if lto else ""
-    dll_stage = f"{STAGE}-dll{suffix}"
-    out_dir = STAGE_DIR / f"dll{suffix}"
-    out_dir.mkdir(exist_ok=True)
-
-    # size-oriented projection of the Windows closure
-    flags = ["--replace-opt", "Os",
-             "--add-flag=-ffunction-sections", "--add-flag=-fdata-sections"]
-    if lto:
-        flags += ["--add-flag=-flto"]
-    run([sys.executable, "tools/minimize_flags.py", "--stage", dll_stage,
-         "--from-stage", STAGE, *flags])
-    run(["xmake", "f", "-p", "mingw", "--sdk=" + str(SDK), "-m", "release",
-         "--cc=x86_64-w64-mingw32-gcc", "--cxx=x86_64-w64-mingw32-g++",
-         "--ld=x86_64-w64-mingw32-gcc", "--ar=x86_64-w64-mingw32-ar",
-         f"--av_manifest=build/minimize/{dll_stage}/manifest-projected.json",
-         "--gc_sections=n", "--lto=" + ("y" if lto else "n"), "-y"])
-    shutil.rmtree(ROOT / "build" / "xmake", ignore_errors=True)
-    shutil.rmtree(ROOT / "build" / "artifacts", ignore_errors=True)
-    run(["xmake", "build", "qn_pcm_dump"])
-    manifest = json.loads((ROOT / f"build/minimize/{dll_stage}/manifest-projected.json").read_text())
-    av_archive = artifacts / "libqianqian_av.a"
-    ff_includes = ["-I", str(ROOT / manifest["config_root"]),
-                   "-I", str(ROOT / manifest["source_root"])]
-    opt = ["-Os"] + (["-flto"] if lto else [])
-    songcore_o = out_dir / "songcore.o"
-    run([cc, *opt, "-ffunction-sections", "-fdata-sections", "-I", "include",
-         *ff_includes, "-c", "src/songcore_ffmpeg.c", "-o", str(songcore_o)],
-        env=sdk_env())
-    dll = out_dir / "qianqian_songcore.dll"
-    implib = out_dir / "qianqian_songcore.lib"
-    run([cc, "-shared", *opt, "-o", str(dll), str(songcore_o), str(av_archive),
-         "tools/songcore_q.def", f"-Wl,--out-implib={implib}",
-         "-Wl,--gc-sections", "-lbcrypt"], env=sdk_env())
-
-    # --- export gate
+def _dll_export_import_gates(dll: Path, out_dir: Path) -> list[str]:
     objdump = str(SDK / "bin" / "x86_64-w64-mingw32-objdump")
     pe = run([objdump, "-p", str(dll)]).stdout
     exports = []
@@ -293,33 +272,82 @@ def build_dll(*, lto: bool) -> dict:
     unexpected = sorted(set(exports) - set(CONTRACT))
     if missing or unexpected:
         raise SystemExit(f"DLL export gate FAILED: missing={missing} unexpected={unexpected}")
-
-    # --- import gate: no FFmpeg DLLs, record everything
     imports = sorted(set(re.findall(r"^\s+DLL Name: (\S+)$", pe, re.M)))
     bad = [d for d in imports if FORBIDDEN_DLL.search(d)]
     if bad:
         raise SystemExit(f"DLL import gate FAILED: FFmpeg runtime dependency {bad}")
     (out_dir / "pe-info.txt").write_text(pe)
+    return imports
+
+
+def build_dll(*, lto: bool) -> dict:
+    """qianqian_songcore.dll + import library, built from the PROJECTED closure.
+
+    Hard requirement: the flags-projected manifest for the DLL derives from
+    the projected manifest (never from the full closure); the rebuild is
+    verified per TU before the DLL is linked."""
+    artifacts = ROOT / "build/artifacts"
+    cc = str(SDK / "bin" / "x86_64-w64-mingw32-clang")
+    suffix = "-lto" if lto else ""
+    dll_stage = f"{STAGE}-dll{suffix}"
+    out_dir = STAGE_DIR / f"dll{suffix}"
+    out_dir.mkdir(exist_ok=True)
+
+    # size-oriented flag projection of the PROJECTED closure only
+    flags = ["--replace-opt", "Os",
+             "--add-flag=-ffunction-sections", "--add-flag=-fdata-sections"]
+    if lto:
+        flags += ["--add-flag=-flto"]
+    dll_manifest = ROOT / f"build/minimize/{dll_stage}/manifest-projected.json"
+    run([sys.executable, "tools/minimize_flags.py", "--stage", dll_stage,
+         "--from-manifest", str(PROJECTED_MANIFEST.relative_to(ROOT)), *flags])
+    _xmake_configure(dll_manifest, lto=lto)
+    projected_tu = verify_compiled_units(dll_manifest)
+
+    ff_includes = ["-I", str(ROOT / "build/minimize/win-c6/oracle"),
+                   "-I", str(ROOT / "build/ffmpeg-src")]
+    opt = ["-Os"] + (["-flto"] if lto else [])
+    songcore_o = out_dir / "songcore.o"
+    run([cc, *opt, "-ffunction-sections", "-fdata-sections", "-I", "include",
+         *ff_includes, "-c", "src/songcore_ffmpeg.c", "-o", str(songcore_o)],
+        env=sdk_env())
+    dll = out_dir / "qianqian_songcore.dll"
+    implib = out_dir / "qianqian_songcore.lib"
+    av_archive = artifacts / "libqianqian_av.a"
+    run([cc, "-shared", *opt, "-o", str(dll), str(songcore_o), str(av_archive),
+         "tools/songcore_q.def", f"-Wl,--out-implib={implib}",
+         "-Wl,--gc-sections", "-lbcrypt"], env=sdk_env())
+
+    imports = _dll_export_import_gates(dll, out_dir)
 
     # --- identity + sizes
     def xz_bytes(path: Path) -> int:
         return len(subprocess.run(["xz", "-c", str(path)], capture_output=True,
                                   check=True).stdout)
 
-    import tempfile
     raw = dll.stat().st_size
+    import tempfile
     with tempfile.TemporaryDirectory() as td:
         stripped_copy = Path(td) / dll.name
         shutil.copy2(dll, stripped_copy)
         run([str(SDK / "bin" / "x86_64-w64-mingw32-strip"), str(stripped_copy)])
         stripped = stripped_copy.stat().st_size
         stripped_xz = xz_bytes(stripped_copy)
+    members_out = subprocess.run(
+        [str(SDK / "bin" / "x86_64-w64-mingw32-llvm-ar"), "t", str(av_archive)],
+        capture_output=True, text=True, check=True)
     result = {
-        "schema": 1,
-        "stage": f"{STAGE}-dll{suffix}",
+        "schema": 2,
+        "stage": dll_stage,
         "lto": lto,
         "dll": str(dll.relative_to(ROOT)),
         "dll_sha256": sha256_file(dll),
+        "closure": {
+            "projected_manifest": str(PROJECTED_MANIFEST.relative_to(ROOT)),
+            "projected_manifest_sha256": sha256_file(PROJECTED_MANIFEST),
+            "projected_units": projected_tu,
+            "archive_members": len(members_out.stdout.splitlines()),
+        },
         "exported_api_symbols": sorted(CONTRACT),
         "exported_api_count": len(CONTRACT),
         "import_table": imports,
@@ -333,20 +361,20 @@ def build_dll(*, lto: bool) -> dict:
         },
     }
     (out_dir / "dll.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
-    print(json.dumps(result["sizes"], indent=2, sort_keys=True))
+    print(json.dumps({"stage": dll_stage, "projected_units": projected_tu,
+                      **result["sizes"]}, indent=2, sort_keys=True))
     return result
 
 
-def correct_windows(dll_info: dict) -> dict:
-    """Windows-native correctness through the shipping DLL.
+def correct_windows(dll_info: dict, tag: str = "") -> dict:
+    """Windows-native correctness through the shipping DLL: FULL applicable
+    corpus (clean + degraded) with typed gates, plus wide-path / >2GiB gates.
 
-    The host adapter (tools/songcore_windows_host.c) links ONLY the import
-    library of qianqian_songcore.dll and drives the full contract natively:
-    open/probe/head/decode-to-EOF/seek 25/50/75 via CreateFileW-based host
-    IO. Lossless PCM must byte-match the canonical manifest shas; lossy PCM
-    is recorded and, where it differs from Linux, tolerance-metriced in a
-    dedicated step. Unicode-path and >2GiB-seek host gates close it out.
-    """
+    Clean cases run the full contract and are gated per seek tier
+    (STRICT/LAPPED/UNSUPPORTED). Degraded (truncated/malformed) cases run a
+    bounded `--robust` classification: the host prints a typed outcome and
+    exits 0; any crash exit code, hang (timeout), absurd frame count, or
+    nondeterministic classification is a gate failure."""
     cc = str(SDK / "bin" / "x86_64-w64-mingw32-clang")
     out_dir = STAGE_DIR / "correctness"
     out_dir.mkdir(exist_ok=True)
@@ -358,94 +386,171 @@ def correct_windows(dll_info: dict) -> dict:
     # run from the DLL directory so LoadLibrary resolves it
     cases = load_cases(STAGE_CAPABILITIES["c5"])
 
-    def host_run(argslist: list[str]):
-        return subprocess.run([str(host), *argslist], cwd=str(dll_dir),
-                              capture_output=True, text=True)
+    def host_run(argslist: list[str], *, timeout: int = 120):
+        try:
+            p = subprocess.run([str(host), *argslist], cwd=str(dll_dir),
+                               capture_output=True, text=True, timeout=timeout)
+            return p, None
+        except subprocess.TimeoutExpired:
+            return None, "timeout"
 
     # fixtures must be reachable from the DLL dir: copy them next to it
     fix_dir = dll_dir / "fixtures"
     fix_dir.mkdir(exist_ok=True)
     results = {}
-    strict_by_cap = {"wav": True, "alac": True, "vorbis": True,
-                     "aac": False, "opus": False, "mp3": False, "flac": True}
+    skipped = []
     for case in cases:
-        if case["expect"].get("probe_may_fail") or case["degraded"]:
-            continue
         shutil.copy2(fixture_path(case), fix_dir / case["file"])
-        p = host_run(["fixtures/" + case["file"]])
+        if case["degraded"] or case["expect"].get("probe_may_fail"):
+            # --- degraded: typed bounded classification, executed natively
+            runs = []
+            problems = []
+            for attempt in (1, 2):
+                p, err = host_run(["--robust", "fixtures/" + case["file"]])
+                if err == "timeout":
+                    problems.append(f"hang/timeout (attempt {attempt})")
+                    continue
+                if p.returncode != 0:
+                    problems.append(f"crash/unexpected exit {p.returncode} (attempt {attempt})")
+                    continue
+                try:
+                    obs = last_json(p.stdout)
+                except Exception:
+                    problems.append(f"bad output (attempt {attempt}): {p.stdout[-120:]}")
+                    continue
+                runs.append(obs)
+            entry = {"mode": "robust", "runs": runs}
+            if not problems and len(runs) == 2:
+                a, b = runs
+                entry["classification"] = a.get("classification")
+                entry["frames"] = a.get("frames")
+                entry["deterministic"] = (
+                    a.get("classification") == b.get("classification")
+                    and a.get("frames") == b.get("frames"))
+                cls = entry["classification"]
+                if cls not in TYPED_OUTCOMES:
+                    problems.append(f"untyped outcome {cls!r}")
+                elif not entry["deterministic"]:
+                    problems.append("nondeterministic classification")
+                elif case["expect"].get("probe_may_fail"):
+                    if cls not in {"OPEN_FAILED", "PROBE_FAILED", "DECODE_ERROR",
+                                   "DEGRADED_EOF"}:
+                        problems.append(f"probe_may_fail case produced {cls}")
+                else:
+                    # truncated: bounded decode floor from the corpus manifest
+                    if cls not in {"DECODE_ERROR", "DEGRADED_EOF"}:
+                        problems.append(f"truncated case produced {cls}")
+                    floor = case["expect"].get("min_samples")
+                    if floor and (entry["frames"] or 0) < floor:
+                        problems.append(f"frames {entry['frames']} below floor {floor}")
+            entry["problems"] = problems
+            results[case["id"]] = entry
+            continue
+
+        # --- clean case: full contract with tier-gated seeks
+        p, err = host_run(["fixtures/" + case["file"]])
+        if err == "timeout":
+            results[case["id"]] = {"status": "timeout"}
+            continue
         try:
             obs = last_json(p.stdout)
         except Exception:
             results[case["id"]] = {"status": "bad_output", "stdout_tail": p.stdout[-200:]}
             continue
         seeks = obs.get("seeks", [])
+        cap = case["capability"]
+        tier = "UNSUPPORTED" if case["file"].endswith(".aac") else SEEK_TIER[cap]
         entry = {
             "status": "ok" if p.returncode == 0 else "failed",
+            "contract": tier,
             "sequential_ok": obs.get("sequential_ok"),
             "sequential_sha256": obs.get("sequential_sha256"),
             "seeks_clean_eof": all(s.get("clean_eof") for s in seeks),
-            "seeks_ok_or_noseek": all(
-                s.get("status") == "done" or s.get("status") == "seek_failed"
-                for s in seeks),
             "seeks_suffix_exact": [bool(s.get("suffix_exact")) for s in seeks],
         }
         results[case["id"]] = entry
-        cap = case["capability"]
         problems = []
         if entry["status"] != "ok" or not entry["sequential_ok"]:
             problems.append("decode failed")
-        if case["file"].endswith(".aac"):
-            # FFmpeg's raw ADTS demuxer has no seek implementation (recorded
-            # capability finding): seeks may fail, decode/EOF still must hold
-            if not entry["seeks_ok_or_noseek"]:
-                problems.append("adts seek neither done nor typed-failed")
-        elif not entry["seeks_clean_eof"]:
-            problems.append("seek without clean EOF")
-        if strict_by_cap[cap] and not all(entry["seeks_suffix_exact"]):
-            problems.append("strict family suffix mismatch on Windows")
+        for s in seeks:
+            if tier == "UNSUPPORTED":
+                if s.get("status") == "seek_failed":
+                    continue  # the typed failure this tier accepts
+                if s.get("status") != "done" or not s.get("clean_eof") or not s.get("frames"):
+                    problems.append(f"seek @{s.get('target_us')} neither typed-failed "
+                                    f"nor bounded clean-EOF decode")
+            else:
+                if s.get("status") != "done":
+                    problems.append(f"seek @{s.get('target_us')} did not succeed ({tier})")
+                elif not s.get("clean_eof"):
+                    problems.append(f"seek @{s.get('target_us')} without clean EOF")
+                elif not s.get("frames"):
+                    problems.append(f"seek @{s.get('target_us')} produced no PCM")
+                elif tier == "STRICT" and not s.get("suffix_exact"):
+                    problems.append(f"seek @{s.get('target_us')} strict suffix mismatch")
         # lossless cross-platform byte equality
         if cap in ("alac", "wav", "flac"):
             want = case["expect"]["pcm"]["canonical_f32_sha256"]
             if entry["sequential_sha256"] != want:
                 problems.append("lossless PCM differs from canonical sha")
         if problems:
-            results[case["id"]]["problems"] = problems
-    failures = {k: v for k, v in results.items() if v.get("problems")}
+            entry["problems"] = problems
+
+    clean_results = {k: v for k, v in results.items() if v.get("mode") != "robust"}
+    degraded_results = {k: v for k, v in results.items() if v.get("mode") == "robust"}
+    failures = {k: v for k, v in results.items() if v.get("problems") or v.get("status") in ("timeout", "bad_output")}
+    clean_n = len(clean_results)
+    degraded_n = len(degraded_results)
 
     # unicode path gate (destination path is a wide literal inside the host)
     aac = next(c for c in cases if c["id"] == "aac-lc-44-stereo")
     shutil.copy2(fixture_path(aac), fix_dir / "unicode-src.m4a")
-    p = host_run(["--unicode", "fixtures/unicode-src.m4a"])
-    try:
-        unicode_ok = p.returncode == 0
-        unicode_obs = last_json(p.stdout)
-    except Exception:
-        unicode_ok, unicode_obs = False, {"stdout_tail": p.stdout[-200:]}
+    p, err = host_run(["--unicode", "fixtures/unicode-src.m4a"])
+    if err == "timeout":
+        unicode_ok, unicode_obs = False, {"error": "timeout"}
+    else:
+        try:
+            unicode_ok = p.returncode == 0
+            unicode_obs = last_json(p.stdout)
+        except Exception:
+            unicode_ok, unicode_obs = False, {"stdout_tail": p.stdout[-200:]}
 
     # >2 GiB seek gate (synthetic virtual IO)
-    p = host_run(["--largefile"])
-    try:
-        large_ok = p.returncode == 0
-        large_obs = last_json(p.stdout)
-    except Exception:
-        large_ok, large_obs = False, {"stdout_tail": p.stdout[-200:]}
+    p, err = host_run(["--largefile"])
+    if err == "timeout":
+        large_ok, large_obs = False, {"error": "timeout"}
+    else:
+        try:
+            large_ok = p.returncode == 0
+            large_obs = last_json(p.stdout)
+        except Exception:
+            large_ok, large_obs = False, {"stdout_tail": p.stdout[-200:]}
 
     report = {
-        "schema": 1,
+        "schema": 2,
         "host": str(host.relative_to(ROOT)) if str(host).startswith(str(ROOT)) else str(host),
         "host_link": "qianqian_songcore.lib (shipping DLL import library)",
-        "cases": len(results),
+        "total_applicable": len(cases),
+        "clean_cases": clean_n,
+        "degraded_cases": degraded_n,
+        "executed": clean_n + degraded_n,
+        "skipped": skipped,
+        "seek_tiers": {
+            tier: sum(1 for v in clean_results.values() if v.get("contract") == tier)
+            for tier in ("STRICT", "LAPPED", "UNSUPPORTED")},
         "per_case": results,
         "failures": failures,
         "unicode_path_gate": {"pass": unicode_ok, "observed": unicode_obs},
         "largefile_gate": {"pass": large_ok, "observed": large_obs},
     }
-    verdict = "PASS" if (not failures and unicode_ok and large_ok) else "FAIL"
+    verdict = "PASS" if (not failures and unicode_ok and large_ok and not skipped
+                         and clean_n + degraded_n == len(cases)) else "FAIL"
     report["verdict"] = verdict
-    (out_dir / "correctness.json").write_text(
+    (out_dir / f"correctness{tag}.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(json.dumps({k: report[k] for k in
-                      ("verdict", "cases", "unicode_path_gate", "largefile_gate")},
+                      ("verdict", "total_applicable", "clean_cases", "degraded_cases",
+                       "seek_tiers", "unicode_path_gate", "largefile_gate")},
                      indent=2, sort_keys=True))
     if verdict != "PASS":
         raise SystemExit(f"Windows correctness FAILED: {list(failures)[:5]}")
@@ -457,26 +562,40 @@ def main() -> None:
     ap.add_argument("--import", dest="do_import", action="store_true")
     ap.add_argument("--build", dest="do_build", action="store_true")
     ap.add_argument("--audit", dest="do_audit", action="store_true")
-    ap.add_argument("--dll", dest="do_dll", action="store_true")
-    ap.add_argument("--correct", dest="do_correct", action="store_true")
+    ap.add_argument("--project", dest="do_project", action="store_true")
+    ap.add_argument("--projected", dest="do_projected", action="store_true",
+                    help="clean rebuild of the projected closure + fixpoint re-audit")
+    ap.add_argument("--dll", dest="do_dll", action="store_true",
+                    help="both shipping variants (-Os, -Os+LTO) from the projected closure")
+    ap.add_argument("--correct", dest="do_correct", action="store_true",
+                    help="native correctness for both DLL variants (full applicable corpus)")
     ap.add_argument("--all", action="store_true")
     args = ap.parse_args()
     todo = args.all or not any((args.do_import, args.do_build, args.do_audit,
-                                args.do_dll, args.do_correct))
-    dll_info = None
+                                args.do_project, args.do_projected, args.do_dll,
+                                args.do_correct))
+    dll_variants: list[dict] = []
     if args.do_import or todo:
         import_windows()
     if args.do_build or todo:
         build_windows()
     if args.do_audit or todo:
-        audit_windows()
+        audit_windows(FULL_MANIFEST, "reachability")
+    if args.do_project or todo:
+        project_windows()
+    if args.do_projected or todo:
+        build_projected_fixpoint()
     if args.do_dll or todo:
-        dll_info = build_dll(lto=False)
+        dll_variants.append(build_dll(lto=False))
+        dll_variants.append(build_dll(lto=True))
     if args.do_correct or todo:
-        if dll_info is None:
-            dll_info = json.loads(
-                (STAGE_DIR / "dll" / "dll.json").read_text())
-        correct_windows(dll_info)
+        if not dll_variants:
+            for name in ("dll", "dll-lto"):
+                p = STAGE_DIR / name / "dll.json"
+                if p.is_file():
+                    dll_variants.append(json.loads(p.read_text()))
+        for info, tag in zip(dll_variants, ("", "-lto")):
+            correct_windows(info, tag)
 
 
 if __name__ == "__main__":

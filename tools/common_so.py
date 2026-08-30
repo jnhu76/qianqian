@@ -108,6 +108,7 @@ def main() -> None:
     p = run(["gcc", "-shared", *opt.split(), "-o", str(so), str(songcore_pic),
              str(av_archive),
              "-Wl,--version-script=tools/songcore_version.map", "-Wl,--gc-sections",
+             f"-Wl,-Map={stage_dir / 'so.map'}",
              "-lm", "-lpthread"], check=False)
     if p.returncode:
         raise SystemExit(f"{args.stage}: shared-library link rejected.\n" + p.stderr[-3000:])

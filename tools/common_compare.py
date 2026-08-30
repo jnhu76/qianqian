@@ -34,7 +34,7 @@ def behavior(gate: dict) -> dict:
         "expectations": strip_measurements(gate["expectations"]),
         "songcore_pcm": gate["songcore_pcm"],
         "seek_probe": strip_measurements(gate["seek_probe"]),
-        "strict_failures": gate["strict_failures"],
+        "seek_failures": gate["seek_failures"],
     }
 
 

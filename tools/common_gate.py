@@ -207,7 +207,21 @@ def main() -> None:
     songcore_pcm = {}
     for case in cases:
         if case["expect"].get("probe_may_fail"):
-            songcore_pcm[case["id"]] = {"skipped": "probe_may_fail"}
+            # malformed inputs must reach the production path too — the gate
+            # is a typed bounded failure, never "not executed"
+            entry = qn_pcm_dump(pcm_dump, fixture_path(case))
+            entry["typed_outcome"] = ("OPEN_OR_PROBE_FAILED"
+                                      if entry["pcm_sha256"] is None and entry["exit_code"] != 0
+                                      else "UNEXPECTED_DECODE_OUTPUT")
+            repeat = qn_pcm_dump(pcm_dump, fixture_path(case))
+            entry["deterministic"] = (
+                entry["exit_code"] == repeat["exit_code"]
+                and entry["pcm_sha256"] == repeat["pcm_sha256"])
+            songcore_pcm[case["id"]] = entry
+            if entry["typed_outcome"] != "OPEN_OR_PROBE_FAILED" or not entry["deterministic"]:
+                raise SystemExit(
+                    f"malformed case {case['id']} did not fail as a typed, "
+                    f"deterministic open/probe failure: {entry}")
             continue
         entry = qn_pcm_dump(pcm_dump, fixture_path(case))
         songcore_pcm[case["id"]] = entry
@@ -226,8 +240,34 @@ def main() -> None:
                 f"{entry['pcm_sha256']} != {want}")
 
     # --- 4. SongCore-level seek/EOF probes
+    #
+    # Seek contract tiers (the gate owns the minimum semantics; calibrate
+    # only observes and classifies families):
+    #
+    #   STRICT      seek success + bounded resume + PCM + clean EOF
+    #               + exact suffix equality            (FLAC/ALAC/WAV/Vorbis)
+    #   LAPPED      seek success + bounded resume + PCM + clean EOF;
+    #               suffix byte equality NOT required because codec state
+    #               laps across packets: MP3 bit reservoir, AAC MDCT 50%
+    #               overlap, CELT overlap-add          (MP3/AAC-M4A/Opus)
+    #   UNSUPPORTED typed seek failure accepted; decode/EOF still hold
+    #               (raw ADTS: upstream demuxer has no seek)
+    #   REGRESSION  real E07 songs: recorded for cross-stage comparison
+    #               only (known damaged inputs, documented in E07)
+    def seek_tier(rel: str, case) -> str | None:
+        if case is None:
+            return "REGRESSION"          # corpus/local real songs
+        if case["expect"].get("probe_may_fail"):
+            return None                  # malformed: covered by production-path typed gate
+        if rel.endswith(".aac"):
+            return "UNSUPPORTED"         # raw ADTS stream
+        if case["expect"].get("seek") == "strict":
+            return "STRICT"
+        return "LAPPED"
+
     case_by_file = {case["file"]: case for case in cases}
-    strict_failures = []
+    seek_failures = []
+    tier_counts: dict[str, int] = {}
     seek_probe = {}
     probe_src = ROOT / "tools/songcore_seek_probe.c"
     probe_bin = stage_dir / "songcore_seek_probe"
@@ -235,18 +275,13 @@ def main() -> None:
          str(probe_src), str(songcore), str(single), "-lm", "-lpthread"])
     for rel in SEEK_PROBE_FILES:
         case = case_by_file.get(Path(rel).name)
-        if case is None and rel.startswith(REAL_SONG_PREFIX):
-            family = "flac" if rel.endswith(".flac") else "mp3"
-        elif case is None:
+        if case is None and not rel.startswith(REAL_SONG_PREFIX):
             continue
-        else:
-            family = case["capability"]
-            if case["expect"].get("probe_may_fail"):
-                continue
-        # real songs are regression records: never strict (the shipped FLAC has
-        # a damaged final frame, MP3 carries bit-reservoir history)
-        strict = (case is not None and not rel.startswith(REAL_SONG_PREFIX)
-                  and case["expect"].get("seek") == "strict")
+        family = (case["capability"] if case
+                  else ("flac" if rel.endswith(".flac") else "mp3"))
+        tier = seek_tier(rel, case)
+        if tier is None:
+            continue
         p = run([str(probe_bin), rel], check=False)
         try:
             data = json.loads(p.stdout.strip().splitlines()[-1])
@@ -254,16 +289,39 @@ def main() -> None:
             data = {"parse_error": p.stdout[-200:], "stderr_tail": p.stderr[-400:]}
         data["exit_code"] = p.returncode
         data["family"] = family
-        data["contract"] = "strict" if strict else "record"
+        data["contract"] = tier
         seek_probe[rel] = data
-        if strict:
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+
+        def fail(msg: str):
+            seek_failures.append(f"{rel} [{tier}]: {msg}")
+
+        if tier == "REGRESSION":
+            continue  # recorded only; real songs carry E07-documented damage
+        if tier == "UNSUPPORTED":
             if not data.get("sequential_ok") or data.get("exit_code") != 0:
-                strict_failures.append(f"{rel}: sequential decode failed")
+                fail("sequential decode failed")
             for s in data.get("seeks", []):
-                if s.get("status") != "done" or not s.get("suffix_exact") or not s.get("clean_eof"):
-                    strict_failures.append(f"{rel}@{s.get('target_us')}: strict seek contract violated")
-        # record files: everything is recorded and compared across stages
-        # (real songs include the E07-documented damaged-FLAC signatures)
+                if s.get("status") == "seek_failed":
+                    continue  # the typed failure this tier accepts
+                if s.get("status") != "done" or not s.get("clean_eof") or not s.get("frames"):
+                    fail(f"@{s.get('target_us')}: seek neither typed-failed nor "
+                         f"a bounded clean-EOF decode")
+            continue
+        # STRICT / LAPPED both require: sequential ok, every seek done with
+        # bounded resume + PCM + clean EOF
+        if not data.get("sequential_ok") or data.get("exit_code") != 0:
+            fail("sequential decode failed")
+        for s in data.get("seeks", []):
+            if s.get("status") != "done":
+                fail(f"@{s.get('target_us')}: seek did not succeed")
+                continue
+            if not s.get("clean_eof"):
+                fail(f"@{s.get('target_us')}: no clean EOF after seek")
+            if not s.get("frames"):
+                fail(f"@{s.get('target_us')}: no PCM after seek")
+            if tier == "STRICT" and not s.get("suffix_exact"):
+                fail(f"@{s.get('target_us')}: strict suffix contract violated")
 
     # --- 5. throughput for representative samples
     throughput = {}
@@ -315,7 +373,8 @@ def main() -> None:
         "expect_failures": expect_fails,
         "songcore_pcm": songcore_pcm,
         "seek_probe": seek_probe,
-        "strict_failures": strict_failures,
+        "seek_contract_tiers": tier_counts,
+        "seek_failures": seek_failures,
         "throughput": throughput,
         "sizes": sizes,
     }
@@ -328,12 +387,13 @@ def main() -> None:
         "reachable_tu": gate["closure"]["reachable_translation_units"],
         "corpus_cases": len(cases),
         "expect_failures": expect_fails,
-        "strict_failures": strict_failures,
+        "seek_failures": seek_failures,
+        "seek_contract_tiers": tier_counts,
         "sizes": sizes,
         "throughput": throughput,
     }
     print(json.dumps(summary, indent=2, sort_keys=True))
-    if expect_fails or strict_failures:
+    if expect_fails or seek_failures:
         raise SystemExit("GATE FAILURES (expectations/seek contract)")
 
 
