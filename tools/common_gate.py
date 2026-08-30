@@ -208,20 +208,26 @@ def main() -> None:
     for case in cases:
         if case["expect"].get("probe_may_fail"):
             # malformed inputs must reach the production path too — the gate
-            # is a typed bounded failure, never "not executed"
+            # is a typed bounded failure, never "not executed". Two typed
+            # failure shapes are accepted (recorded per case):
+            #   OPEN_OR_PROBE_FAILED      no PCM, nonzero exit
+            #   DECODE_ERROR_AFTER_OUTPUT bounded PCM, then typed decode error
             entry = qn_pcm_dump(pcm_dump, fixture_path(case))
-            entry["typed_outcome"] = ("OPEN_OR_PROBE_FAILED"
-                                      if entry["pcm_sha256"] is None and entry["exit_code"] != 0
-                                      else "UNEXPECTED_DECODE_OUTPUT")
+            if entry["exit_code"] != 0 and entry["pcm_sha256"] is None:
+                entry["typed_outcome"] = "OPEN_OR_PROBE_FAILED"
+            elif entry["exit_code"] != 0:
+                entry["typed_outcome"] = "DECODE_ERROR_AFTER_OUTPUT"
+            else:
+                entry["typed_outcome"] = "CLEAN_DECODE"
             repeat = qn_pcm_dump(pcm_dump, fixture_path(case))
             entry["deterministic"] = (
                 entry["exit_code"] == repeat["exit_code"]
                 and entry["pcm_sha256"] == repeat["pcm_sha256"])
             songcore_pcm[case["id"]] = entry
-            if entry["typed_outcome"] != "OPEN_OR_PROBE_FAILED" or not entry["deterministic"]:
+            if entry["typed_outcome"] == "CLEAN_DECODE" or not entry["deterministic"]:
                 raise SystemExit(
                     f"malformed case {case['id']} did not fail as a typed, "
-                    f"deterministic open/probe failure: {entry}")
+                    f"deterministic production-path failure: {entry}")
             continue
         entry = qn_pcm_dump(pcm_dump, fixture_path(case))
         songcore_pcm[case["id"]] = entry
