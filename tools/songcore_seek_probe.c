@@ -189,23 +189,28 @@ static void close_song(song_handle **song, file_source *src) {
     if (src->file) { fclose(src->file); src->file = NULL; }
 }
 
-/* Locate the frame-aligned offset in the sequential stream where `probe`
- * (n_frames frames) begins; -1 when absent. */
-static int64_t find_resume_frame(const pcm_buf *seq, const float *probe, size_t n_frames) {
-    const size_t n_frames_total = n_frames;
-    if (n_frames == 0 || seq->frames < n_frames) return -1;
-    size_t span = n_frames * (size_t)seq->channels;
-    size_t limit = (seq->frames - n_frames) * (size_t)seq->channels;
-    uint32_t first = ((const uint32_t *)probe)[0];
+/*
+ * Locate the frame-aligned offset in the sequential stream where the seeked
+ * decode (post, post_frames) begins. The 64-frame prefix locates candidates;
+ * EACH candidate is verified against the FULL post stream before acceptance
+ * (short periodic content — mono sines — can alias a short probe prefix).
+ * Returns the verified resume frame or -1.
+ */
+static int64_t find_resume_frame(const pcm_buf *seq, const pcm_buf *post) {
+    const size_t probe_frames = 64;
+    if (probe_frames == 0 || post->frames < probe_frames || seq->frames < probe_frames)
+        return -1;
+    size_t span = probe_frames * (size_t)seq->channels;
+    size_t limit = (seq->frames - probe_frames) * (size_t)seq->channels;
+    uint32_t first = ((const uint32_t *)post->data)[0];
     for (size_t off = 0; off <= limit; off += (size_t)seq->channels) {
         if (((const uint32_t *)seq->data)[off] != first) continue;
-        if (memcmp(seq->data + off, probe, span * sizeof(float)) != 0) continue;
-        /* full-suffix verification at every candidate: short periodic
-         * content (mono sines) can alias the probe prefix */
+        if (memcmp(seq->data + off, post->data, span * sizeof(float)) != 0) continue;
         size_t candidate = off / (size_t)seq->channels;
         size_t remaining = seq->frames - candidate;
-        if (remaining == n_frames_total &&
-            memcmp(seq->data + off, probe, n_frames_total * (size_t)seq->channels * sizeof(float)) == 0)
+        if (remaining == post->frames &&
+            memcmp(seq->data + off, post->data,
+                   post->frames * (size_t)seq->channels * sizeof(float)) == 0)
             return (int64_t)candidate;
     }
     return -1;
@@ -292,13 +297,8 @@ int main(int argc, char **argv) {
             char post_sha[65] = "";
             if (decode_ok && post.frames >= probe_frames && seq.frames) {
                 memcpy(probe, post.data, probe_frames * (size_t)info.channels * sizeof(float));
-                resume = find_resume_frame(&seq, probe, probe_frames);
-                if (resume >= 0) {
-                    size_t remaining = seq.frames - (size_t)resume;
-                    suffix_exact = remaining == post.frames &&
-                        memcmp(seq.data + (size_t)resume * (size_t)seq.channels,
-                               post.data, post.frames * (size_t)seq.channels * sizeof(float)) == 0;
-                }
+                resume = find_resume_frame(&seq, &post);
+                suffix_exact = resume >= 0;
             } else if (decode_ok && post.frames == 0) {
                 resume = -1;
                 suffix_exact = seq.frames == 0;
