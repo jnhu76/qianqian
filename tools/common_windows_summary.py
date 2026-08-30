@@ -31,7 +31,8 @@ def main() -> None:
     manifest = load(WIN / "manifest.json")
     reach = load(WIN / "win-reachability.json")
     dll = load(WIN / "dll" / "dll.json")
-    dll_lto = load(WIN / "dll-lto" / "dll.json")
+    dll_lto_path = WIN / "dll-lto" / "dll.json"
+    dll_lto = load(dll_lto_path) if dll_lto_path.is_file() else None
     correct = load(WIN / "correctness" / "correctness.json")
     artifacts = WIN.parent.parent / "artifacts"
 
@@ -78,6 +79,8 @@ def main() -> None:
         if artifacts.joinpath("libqianqian_av.a").is_file() else dll["sizes"]["libqianqian_av_a_bytes"],
         "dll": dll,
         "dll_lto": dll_lto,
+        "dll_lto_note": "dll_lto null when the -Os+LTO variant was not rebuilt in this run; "
+                        "see git history for the recorded variant",
         "correctness": {
             "verdict": correct["verdict"],
             "cases": correct["cases"],

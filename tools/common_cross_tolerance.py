@@ -26,7 +26,11 @@ sys.path.insert(0, str(ROOT / "tools"))
 from common_corpus import STAGE_CAPABILITIES, load_cases  # noqa: E402
 
 OUT = ROOT / "bench" / "results" / "common-formats" / "windows.json"
-WIN_EXE = ROOT / "build/minimize/win-c6/dll/qn_pcm_dump.exe"
+WIN_EXE_CANDIDATES = [
+    ROOT / "build/minimize/win-c6/dll/qn_pcm_dump.exe",
+    ROOT / "build/artifacts/qn_pcm_dump.exe",
+]
+WIN_EXE = next((p for p in WIN_EXE_CANDIDATES if p.is_file()), WIN_EXE_CANDIDATES[0])
 
 
 def read_qpcm(payload: bytes):

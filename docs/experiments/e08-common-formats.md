@@ -1,7 +1,8 @@
 # E08 — Common Formats: codec-cost ladder + Linux/Windows minimal artifacts
 
-状态：`COMPLETE_PENDING_FINAL_CLEANROOM_CONFIRMATION`（Linux ladder / Windows
-phase 全部 gate PASS；最终数字以本次 clean-room 重验 run 为准，脚注见文末）。
+状态：`COMPLETE`（Linux ladder / Windows phase 全部 gate PASS；结构数字
+（TU/字节）已由 clean-room 重验逐位复现；xRT 为运行时测量，见性能小节的
+波动说明）。
 
 ## 研究问题（issue #8）
 
@@ -44,9 +45,13 @@ C6  Common Formats minimized    (-Os / -Os+LTO / size-minimal .so ladder)
 - C6 size-minimal `.so`（-Os+LTO+PIC+function/data sections+`--gc-sections`
   +version script）：stripped 1.25 MiB，stripped+xz **492 KiB**；
   dynsym 定义项恰为 5 个 `song_*` + 版本定义；`ldd` 仅 libc/libm。
-- xRT（songcore-output，全阶梯最低）：C0 548× → C6 372×（-Os+LTO；
-  警告线 50×）。`-Os` 对 MP3 的诚实代价：1968× → 848×（−57%），
-  LTO 收回到 1528×；ALAC 521× → 333× → 372×。
+- xRT（songcore-output，clean-room 权威 run 全阶梯最低）：C0 468× →
+  C6 259×（-Os+LTO；警告线 50×）。`-Os` 的诚实代价（相对比例跨 run 稳定）：
+  MP3 1862× → 632×（−66%）、AAC 1699× → 695×、ALAC 487× → 200×、
+  Opus 498× → 229×；LTO 收回约一半（MP3 1163×、AAC 1039×）。
+  运行间绝对值波动可观（前一轮 unloaded run 最低 372×，本轮持续满载
+  259×——共享开发机热节流），故绝对 xRT 给出区间、相对代价为结论：
+  最差码点仍 ≥ 4× 于 50× 线。
 
 ## 边际成本结论（increment 视角）
 
@@ -113,10 +118,12 @@ Windows 上原生执行（无 Wine、无只编译不运行）。
   **字节相等**（硬 gate）。
 - Lossy：Windows（clang/COFF）对 Linux（gcc/ELF）逐案 sha 对比：**26/33
   完全一致**（含全部 MP3/Vorbis/Opus/WAV…）；7 个 AAC 用例不一致——同码本
-  不同编译器对 AAC 浮点内核的 codegen 差异，属预期类差异。按 issue #11 规则
-  记录并给出 deterministic tolerance metric（见 JSON `pcm_cross_platform`；
-  AAC max|Δ| 见最终报告），不放宽任何 gate：同平台内（Windows oracle vs
-  Windows replay、Windows DLL consumer 前后）仍要求逐字节确定。
+  不同编译器对 AAC 浮点内核的 codegen 差异。按 issue #11 规则记录
+  deterministic tolerance metric（`windows.json.aac_cross_compiler_tolerance`）：
+  帧数逐案相等；受影响样本 ≤ 66/356352（0.019%）；**max|Δ| = 5.96e-08
+  （恰好 1 ULP @0.5）**，mean|Δ| ≈ 1.0e-08（≈ −140 dB，听感不可辨）。
+  不放宽任何 gate：同平台内（Windows oracle vs Windows replay、DLL consumer
+  前后、跨 stage）仍要求逐字节确定。
 
 ## 复现
 

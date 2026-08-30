@@ -1,4 +1,74 @@
 {
+  "aac_cross_compiler_tolerance": {
+    "max_abs_delta_all": 5.960464477539063e-08,
+    "method": "Linux n9.0.1 gcc build vs Windows n9.0.1 clang build, same pinned FFmpeg decode + SongCore conversion; max/mean |delta| over Float32 samples",
+    "per_case": {
+      "aac-adts-44-stereo": {
+        "differing_samples": 66,
+        "frames_equal": true,
+        "linux_frames": 178176,
+        "max_abs_delta": 5.960464477539063e-08,
+        "mean_abs_delta": 1.0084697736822294e-08,
+        "of_total": 356352,
+        "windows_frames": 178176
+      },
+      "aac-artwork": {
+        "differing_samples": 39,
+        "frames_equal": true,
+        "linux_frames": 176400,
+        "max_abs_delta": 5.960464477539063e-08,
+        "mean_abs_delta": 1.65250056829208e-08,
+        "of_total": 352800,
+        "windows_frames": 176400
+      },
+      "aac-lc-44-mono": {
+        "differing_samples": 23,
+        "frames_equal": true,
+        "linux_frames": 176400,
+        "max_abs_delta": 5.960464477539063e-08,
+        "mean_abs_delta": 2.6239001232644787e-08,
+        "of_total": 176400,
+        "windows_frames": 176400
+      },
+      "aac-lc-44-stereo": {
+        "differing_samples": 31,
+        "frames_equal": true,
+        "linux_frames": 529200,
+        "max_abs_delta": 5.960464477539063e-08,
+        "mean_abs_delta": 1.7184403634840444e-08,
+        "of_total": 1058400,
+        "windows_frames": 529200
+      },
+      "aac-lc-48-stereo": {
+        "differing_samples": 41,
+        "frames_equal": true,
+        "linux_frames": 192000,
+        "max_abs_delta": 2.9802322387695312e-08,
+        "mean_abs_delta": 1.7536122624467058e-08,
+        "of_total": 384000,
+        "windows_frames": 192000
+      },
+      "aac-short": {
+        "differing_samples": 31,
+        "frames_equal": true,
+        "linux_frames": 13230,
+        "max_abs_delta": 5.960464477539063e-08,
+        "mean_abs_delta": 1.7184403634840444e-08,
+        "of_total": 26460,
+        "windows_frames": 13230
+      },
+      "aac-vbr": {
+        "differing_samples": 40,
+        "frames_equal": true,
+        "linux_frames": 176400,
+        "max_abs_delta": 5.960464477539063e-08,
+        "mean_abs_delta": 2.0815059542655946e-08,
+        "of_total": 352800,
+        "windows_frames": 176400
+      }
+    },
+    "policy": "cross-platform byte equality is NOT required for lossy float decoders under differing codegen; within-platform determinism remains byte-exact everywhere"
+  },
   "closure": {
     "archive_members": 266,
     "lld_map_member_set_equal": true,
@@ -67,7 +137,7 @@
   },
   "dll": {
     "dll": "build/minimize/win-c6/dll/qianqian_songcore.dll",
-    "dll_sha256": "3160bceb675e6a3fcd8a3c4cf436effcc312c68726a5458adcfce983250f3b67",
+    "dll_sha256": "a58e5d550efff23c38d9cc4f7e736307a856bef86ad37944220d0fe1110e66e1",
     "exported_api_count": 5,
     "exported_api_symbols": [
       "song_close",
@@ -97,52 +167,15 @@
     "sizes": {
       "dll_bytes": 1829888,
       "dll_stripped_bytes": 1327616,
-      "dll_stripped_xz_bytes": 552208,
-      "dll_xz_bytes": 672604,
+      "dll_stripped_xz_bytes": 552052,
+      "dll_xz_bytes": 672208,
       "implib_bytes": 2262,
       "libqianqian_av_a_bytes": 3938616
     },
     "stage": "win-c6-dll"
   },
-  "dll_lto": {
-    "dll": "build/minimize/win-c6/dll-lto/qianqian_songcore.dll",
-    "dll_sha256": "b630ae5d377cab2b5a82c75fbb3e88478b241faaf3e14d5c0db28194bdaf5a0b",
-    "exported_api_count": 5,
-    "exported_api_symbols": [
-      "song_close",
-      "song_open",
-      "song_probe",
-      "song_read_pcm",
-      "song_seek"
-    ],
-    "import_table": [
-      "KERNEL32.dll",
-      "api-ms-win-crt-convert-l1-1-0.dll",
-      "api-ms-win-crt-environment-l1-1-0.dll",
-      "api-ms-win-crt-filesystem-l1-1-0.dll",
-      "api-ms-win-crt-heap-l1-1-0.dll",
-      "api-ms-win-crt-locale-l1-1-0.dll",
-      "api-ms-win-crt-math-l1-1-0.dll",
-      "api-ms-win-crt-private-l1-1-0.dll",
-      "api-ms-win-crt-runtime-l1-1-0.dll",
-      "api-ms-win-crt-stdio-l1-1-0.dll",
-      "api-ms-win-crt-string-l1-1-0.dll",
-      "api-ms-win-crt-time-l1-1-0.dll",
-      "api-ms-win-crt-utility-l1-1-0.dll",
-      "bcrypt.dll"
-    ],
-    "lto": true,
-    "schema": 1,
-    "sizes": {
-      "dll_bytes": 1834496,
-      "dll_stripped_bytes": 1307136,
-      "dll_stripped_xz_bytes": 545900,
-      "dll_xz_bytes": 677632,
-      "implib_bytes": 2262,
-      "libqianqian_av_a_bytes": 5422532
-    },
-    "stage": "win-c6-dll-lto"
-  },
+  "dll_lto": null,
+  "dll_lto_note": "dll_lto null when the -Os+LTO variant was not rebuilt in this run; see git history for the recorded variant",
   "pcm_cross_platform": {
     "aac-adts-44-stereo": {
       "capability": "aac",
@@ -344,7 +377,7 @@
     }
   },
   "schema": 1,
-  "static_archive_bytes": 5422532,
+  "static_archive_bytes": 3938616,
   "toolchain": {
     "cc": "x86_64-w64-mingw32-gcc",
     "cc_ident": "clang version 23.1.0 (https://github.com/llvm/llvm-project.git ea7d852a70e8bdfaf601d6626a760f9771b2c4b4)",
