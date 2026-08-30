@@ -30,17 +30,25 @@ def sha256_file(path: Path) -> str:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", required=True)
-    ap.add_argument("--from-stage", required=True)
+    ap.add_argument("--from-stage", default=None,
+                    help="stage whose manifest(-projected).json is the source closure")
+    ap.add_argument("--from-manifest", default=None,
+                    help="arbitrary manifest path (e.g. the canonical import manifest)")
     ap.add_argument("--add-flag", action="append", default=[])
     ap.add_argument("--replace-opt", metavar="OPT",
                     help="replace the existing -O<level> with -OPT (e.g. Os)")
     ap.add_argument("--keep-manifest", action="store_true",
                     help="write manifest.json instead of manifest-projected.json")
     args = ap.parse_args()
+    if bool(args.from_stage) == bool(args.from_manifest):
+        raise SystemExit("exactly one of --from-stage / --from-manifest is required")
 
-    src = ROOT / "build" / "minimize" / args.from_stage / "manifest-projected.json"
-    if not src.is_file():
-        src = ROOT / "build" / "minimize" / args.from_stage / "manifest.json"
+    if args.from_manifest:
+        src = ROOT / args.from_manifest
+    else:
+        src = ROOT / "build" / "minimize" / args.from_stage / "manifest-projected.json"
+        if not src.is_file():
+            src = ROOT / "build" / "minimize" / args.from_stage / "manifest.json"
     manifest = json.loads(src.read_text())
 
     extra = list(args.add_flag)
@@ -61,8 +69,7 @@ def main() -> None:
     manifest["flag_mutation"] = {
         "stage": args.stage,
         "derived_from": str(src.relative_to(ROOT)),
-        "derived_from_sha256": sha256_file(src),
-        "added_flags": extra,
+        "derived_from_sha256": sha256_file(src),        "added_flags": extra,
         "replaced_opt": args.replace_opt,
         "reason": "S4/S5 codegen experiment; source closure unchanged, gate must remain byte-identical",
     }

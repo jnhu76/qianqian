@@ -43,8 +43,19 @@ tools/minimize_gate.py           完整 gate：corpus + PCM + seek + real songs 
 tools/minimize_compare.py        两阶段 gate 行为等价对比
 tools/minimize_provenance.py     结论登记 → bench/provenance/source-minimization.json
 tools/minimize_run_stage.py      单阶段流水线（import→audit→project→build→gate→compare）
-tools/minimize_cleanroom.sh      rm -rf build 后一键复现 S0→最小 archive→最小 linked
+tools/minimize_cleanroom.sh      rm -rf build 后一键复现完整阶梯（s0→s3→s4→s5→s6→summary）
+tools/minimize_summary.py        从 gate.json/so.json 生成 ladder（零手填数字）
+tools/minimize_so.py             S6：libqianqian_songcore.so 实验（PIC closure + version script）
+tools/songcore_version.map       .so 可见性契约：只导出 5 个 song_* 入口，FFmpeg 符号全部 local
+tools/songcore_so_consumer.c     .so 功能 smoke：open/probe/read/seek/close
 ```
+
+S1 audit 的硬证据标准（`tools/link_audit.py`）：
+
+- probe.o 的 `nm -u` 未定义集必须**恰好等于** 5 个契约符号（probe 无 libc 引用）；
+- 符号解析只认 global/weak/common/unique 定义（nm `ABCDGRSTVWu`），local 符号不可能触发 member pull；
+- real GNU ld `-Map` 的 pulled-member 多重集必须与模拟**完全相等**（硬 gate）；
+- full-archive 链接 vs reduced-archive 链接必须整 ELF SHA256 相等（回退：逐 section SHA256）。
 
 实验文档：`docs/experiments/e07-source-minimization.md`。
 
