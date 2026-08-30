@@ -192,6 +192,7 @@ def main() -> None:
     archive_path = ROOT / args.archive
     songcore_path = ROOT / args.songcore
     manifest = json.loads((ROOT / args.manifest).read_text())
+    units = manifest["units"]
 
     import os
     nm = os.environ.get("WIN_NM", "x86_64-w64-mingw32-nm")
@@ -323,7 +324,7 @@ def main() -> None:
                              f"FFmpeg members outside the simulation: {strays[:8]}")
 
     # --- map members to manifest units 1:1 (xmake archives in manifest order)
-    units = manifest["units"]
+
     if len(ffmpeg_members) != len(units):
         raise SystemExit(
             f"member/unit count drift: {len(ffmpeg_members)} members vs "
