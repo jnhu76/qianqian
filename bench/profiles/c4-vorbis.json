@@ -2,29 +2,71 @@
   "profile": "c4-vorbis",
   "ladder": "C4",
   "extends": "c3-wav",
-  "description": "C3 + Ogg Vorbis. First stage that pays the Ogg container cost plus the Vorbis decoder cost.",
+  "description": "C3 + Ogg Vorbis. First stage that pays the Ogg container cost plus the Vorbis decoder cost. Baseline dimensions --disable-iconv/--disable-pthreads (E07-accepted) are composed in.",
   "component_base": "everything-disabled",
   "libraries": {
-    "enable": ["avformat", "avcodec"],
-    "disable": ["swresample", "avdevice", "avfilter", "swscale"]
+    "enable": [
+      "avformat",
+      "avcodec"
+    ],
+    "disable": [
+      "swresample",
+      "avdevice",
+      "avfilter",
+      "swscale"
+    ]
   },
   "disable": [
-    "programs", "doc", "debug", "autodetect", "x86asm",
-    "network", "protocols", "devices"
+    "autodetect",
+    "debug",
+    "devices",
+    "doc",
+    "iconv",
+    "network",
+    "programs",
+    "protocols",
+    "pthreads",
+    "x86asm"
   ],
   "components": {
-    "demuxer": ["aac", "flac", "mov", "mp3", "ogg", "wav"],
-    "decoder": ["aac", "alac", "flac", "mp3float", "vorbis",
-                "pcm_u8", "pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le", "pcm_f64le"],
-    "parser": ["mpegaudio"]
+    "demuxer": [
+      "aac",
+      "flac",
+      "mov",
+      "mp3",
+      "ogg",
+      "wav"
+    ],
+    "decoder": [
+      "aac",
+      "alac",
+      "flac",
+      "mp3float",
+      "vorbis",
+      "pcm_u8",
+      "pcm_s16le",
+      "pcm_s24le",
+      "pcm_s32le",
+      "pcm_f32le",
+      "pcm_f64le"
+    ],
+    "parser": [
+      "mpegaudio"
+    ]
   },
   "provenance": {
     "demuxer:ogg": {
-      "required_by": ["vorbis-44-stereo", "vorbis-truncated"],
+      "required_by": [
+        "vorbis-44-stereo",
+        "vorbis-truncated"
+      ],
       "reason": "issue #8 capability intent: Ogg container -> Vorbis decoder (also carries Opus in C5)"
     },
     "decoder:vorbis": {
-      "required_by": ["vorbis-44-stereo", "vorbis-truncated"],
+      "required_by": [
+        "vorbis-44-stereo",
+        "vorbis-truncated"
+      ],
       "reason": "FFmpeg native Vorbis decoder"
     }
   }

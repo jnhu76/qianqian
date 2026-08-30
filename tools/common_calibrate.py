@@ -34,6 +34,9 @@ def main() -> None:
                     help="stage dir whose build tree holds the full-capability qn_bench")
     ap.add_argument("--apply", action="store_true",
                     help="write the observed pins into the manifest (default: report only)")
+    ap.add_argument("--check", action="store_true",
+                    help="clean-room mode: derive pins and assert the committed manifest "
+                         "matches; exit 1 on drift, never write")
     args = ap.parse_args()
 
     verify_fixtures()
@@ -96,6 +99,22 @@ def main() -> None:
             print(f"  {line}")
     else:
         print("all pins unchanged")
+    if args.check:
+        drift = []
+        for case in manifest["cases"]:
+            if case["degraded"]:
+                continue
+            want = "strict" if families.get(case["capability"], False) else "record"
+            committed = case["expect"].get("seek")
+            if committed != want:
+                drift.append(f"{case['id']}: committed {committed} but observed {want}")
+        if drift:
+            for line in drift:
+                print(f"  DRIFT {line}")
+            raise SystemExit("calibration check FAILED: committed seek pins drifted "
+                             "from machine observation")
+        print("calibration check: committed seek pins match machine observation")
+        return
     if args.apply:
         manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
         print(f"applied to {manifest_path.relative_to(ROOT)}")

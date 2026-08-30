@@ -2,24 +2,59 @@
   "profile": "c2-alac",
   "ladder": "C2",
   "extends": "c1-aac",
-  "description": "C1 + ALAC in MOV/MP4/M4A. The MOV container cost was already paid in C1; this stage isolates the ALAC decoder marginal cost.",
+  "description": "C1 + ALAC in MOV/MP4/M4A. The MOV container cost was already paid in C1; this stage isolates the ALAC decoder marginal cost. Baseline dimensions --disable-iconv/--disable-pthreads (E07-accepted) are composed in.",
   "component_base": "everything-disabled",
   "libraries": {
-    "enable": ["avformat", "avcodec"],
-    "disable": ["swresample", "avdevice", "avfilter", "swscale"]
+    "enable": [
+      "avformat",
+      "avcodec"
+    ],
+    "disable": [
+      "swresample",
+      "avdevice",
+      "avfilter",
+      "swscale"
+    ]
   },
   "disable": [
-    "programs", "doc", "debug", "autodetect", "x86asm",
-    "network", "protocols", "devices"
+    "autodetect",
+    "debug",
+    "devices",
+    "doc",
+    "iconv",
+    "network",
+    "programs",
+    "protocols",
+    "pthreads",
+    "x86asm"
   ],
   "components": {
-    "demuxer": ["aac", "flac", "mov", "mp3"],
-    "decoder": ["aac", "alac", "flac", "mp3float"],
-    "parser": ["mpegaudio"]
+    "demuxer": [
+      "aac",
+      "flac",
+      "mov",
+      "mp3"
+    ],
+    "decoder": [
+      "aac",
+      "alac",
+      "flac",
+      "mp3float"
+    ],
+    "parser": [
+      "mpegaudio"
+    ]
   },
   "provenance": {
     "decoder:alac": {
-      "required_by": ["alac-16-44-stereo", "alac-24-96-stereo", "alac-16-44-mono", "alac-artwork", "alac-long", "alac-truncated"],
+      "required_by": [
+        "alac-16-44-stereo",
+        "alac-24-96-stereo",
+        "alac-16-44-mono",
+        "alac-artwork",
+        "alac-long",
+        "alac-truncated"
+      ],
       "reason": "issue #8 capability intent: MOV/MP4/M4A -> ALAC decoder; lossless, PCM strictly comparable"
     }
   }

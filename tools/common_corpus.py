@@ -30,7 +30,7 @@ STAGE_CAPABILITIES = {
 STAGE_CAPABILITIES["c6"] = STAGE_CAPABILITIES["c5"]
 
 STAGE_PROFILES = {
-    "c0": "bench/profiles/n3-min-noswr.json",
+    "c0": "bench/profiles/c0-baseline.json",
     "c1": "bench/profiles/c1-aac.json",
     "c2": "bench/profiles/c2-alac.json",
     "c3": "bench/profiles/c3-wav.json",

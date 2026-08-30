@@ -2,7 +2,7 @@
   "profile": "c5-opus",
   "ladder": "C5",
   "extends": "c4-vorbis",
-  "description": "C4 + Ogg Opus (.opus). The Ogg container cost was already paid in C4; this stage isolates the Opus decoder marginal cost. This profile is the full Common Formats capability set.",
+  "description": "C4 + Ogg Opus (.opus). The Ogg container cost was already paid in C4; this stage isolates the Opus decoder marginal cost. This profile is the full Common Formats capability set. Baseline dimensions --disable-iconv/--disable-pthreads (E07-accepted) are composed in.",
   "component_base": "everything-disabled",
   "libraries": {
     "enable": [
@@ -18,14 +18,16 @@
     ]
   },
   "disable": [
-    "programs",
-    "doc",
-    "debug",
     "autodetect",
-    "x86asm",
+    "debug",
+    "devices",
+    "doc",
+    "iconv",
     "network",
+    "programs",
     "protocols",
-    "devices"
+    "pthreads",
+    "x86asm"
   ],
   "components": {
     "demuxer": [
