@@ -50,6 +50,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 from common_corpus import (  # noqa: E402
     STAGE_CAPABILITIES, fixture_path, load_cases, sha256_file,
 )
+from common_gate import seek_resume_check  # noqa: E402  (shared contract semantics)
 import common_import  # noqa: E402
 
 SDK = Path(os.environ.get("LLVM_MINGW_SDK", Path.home() / "toolchains/llvm-mingw"))
@@ -506,15 +507,24 @@ def correct_windows(dll_info: dict, tag: str = "") -> dict:
                 if s.get("status") != "done" or not s.get("clean_eof") or not s.get("frames"):
                     problems.append(f"seek @{s.get('target_us')} neither typed-failed "
                                     f"nor bounded clean-EOF decode")
-            else:
-                if s.get("status") != "done":
-                    problems.append(f"seek @{s.get('target_us')} did not succeed ({tier})")
-                elif not s.get("clean_eof"):
-                    problems.append(f"seek @{s.get('target_us')} without clean EOF")
-                elif not s.get("frames"):
-                    problems.append(f"seek @{s.get('target_us')} produced no PCM")
-                elif tier == "STRICT" and not s.get("suffix_exact"):
-                    problems.append(f"seek @{s.get('target_us')} strict suffix mismatch")
+                continue
+            if s.get("status") != "done":
+                problems.append(f"seek @{s.get('target_us')} did not succeed ({tier})")
+                continue
+            implied, dev, resume_fail = seek_resume_check(
+                tier, cap, obs.get("sample_rate"), obs.get("sequential_frames"), s)
+            s["implied_resume"] = implied
+            s["resume_dev_samples"] = dev
+            if not s.get("clean_eof"):
+                problems.append(f"seek @{s.get('target_us')} without clean EOF")
+            if not s.get("frames"):
+                problems.append(f"seek @{s.get('target_us')} produced no PCM")
+            if resume_fail:
+                problems.append(f"seek @{s.get('target_us')} {resume_fail}")
+            if tier == "STRICT" and not s.get("suffix_exact"):
+                problems.append(f"seek @{s.get('target_us')} strict suffix mismatch")
+        # recorded after the gate loop: the loop fills resume evidence per seek
+        entry["seeks_resume_dev_samples"] = [s.get("resume_dev_samples") for s in seeks]
         # lossless cross-platform byte equality
         if cap in ("alac", "wav", "flac"):
             want = case["expect"]["pcm"]["canonical_f32_sha256"]

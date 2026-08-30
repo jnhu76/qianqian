@@ -37,4 +37,4 @@
 | wav-f32le-44-stereo | 5610× | 5474× | 5915× |
 | wav-s16le-44-stereo | 19395× | 27093× | 26982× |
 
-Final size-minimal `.so` (c6-so-lto): raw 1.37 MiB, stripped 1.25 MiB, stripped+xz 492 KiB, exports 5 SongCore APIs, deps: linux-vdso.so.1 (0x00007e219583e000); 	libm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6 (0x00007e2195701000); 	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x00007e2195000000); 	/lib64/ld-linux-x86-64.so.2 (0x00007e2195840000)
+Final size-minimal `.so` (c6-so-lto): raw 1.37 MiB, stripped 1.25 MiB, stripped+xz 492 KiB, exports 5 SongCore APIs, deps: linux-vdso.so.1 (0x00007f789862d000); 	libm.so.6 => /usr/lib/x86_64-linux-gnu/libm.so.6 (0x00007f78984f0000); 	libc.so.6 => /usr/lib/x86_64-linux-gnu/libc.so.6 (0x00007f7897e00000); 	/lib64/ld-linux-x86-64.so.2 (0x00007f789862f000)

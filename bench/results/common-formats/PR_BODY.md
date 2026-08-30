@@ -108,7 +108,7 @@ bash tools/common_cleanroom.sh
 # Windows（llvm-mingw SDK；产物经 WSL interop 在真 Windows 原生执行）
 python3 tools/common_windows.py --all
 python3 tools/common_windows_summary.py
-python3 tools/common_summary.py --pr-body --check
+python3 tools/common_summary.py --check
 ```
 
 Corpus：确定性合成（`corpus/tools/gen_corpus_common.py`），seek 语义由
@@ -120,4 +120,4 @@ Corpus：确定性合成（`corpus/tools/gen_corpus_common.py`），seek 语义�
 
 Closes #8 的 Linux + Windows 测量目标（不 merge 前保持 DRAFT；#9 不受影响）。
 
-<!-- provenance (machine authority): summary.json sha256=19cb0a3939df7b2789080fdf303b17efd5d1cb712bbe43e126f9f7557061498b; windows.json sha256=5cd391f5f4215ca423286297629e8cf4cb12558c2d93c2477a929be66ad07442 -->
+<!-- provenance (machine authority): summary.json sha256=1044d7c3f9c24312ca61702e1c0636d9c27792e8bf7e630b4f19576f674eb9fb; windows.json sha256=5cd391f5f4215ca423286297629e8cf4cb12558c2d93c2477a929be66ad07442 -->

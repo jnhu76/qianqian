@@ -51,6 +51,44 @@ POINTER = re.compile(r"@ 0x[0-9a-f]+")
 
 REAL_SONG_PREFIX = "corpus/local/"
 
+# LAPPED codecs resume at codec-frame granularity: the demuxer lands on a
+# packet boundary and priming/lapping shifts the first output sample, so the
+# resume point is bounded by frame geometry, not sample-exact. Window: two
+# codec frames either side of the requested target (observed envelope on the
+# frozen corpus, deterministic across every stage rerun: MP3 -2077..-1429,
+# AAC +412..+820, Opus -234..-78; a gross mis-seek such as "asked 50%,
+# plays from 20%" is orders of magnitude outside). STRICT pins the resume
+# exactly via suffix equality, so its deviation is recorded but not gated;
+# UNSUPPORTED and REGRESSION have no successful seek to bound.
+LAPPED_FRAME_SAMPLES = {"mp3": 1152, "aac": 1024, "opus": 960}
+
+
+def seek_resume_check(tier: str, family: str, sample_rate, sequential_frames,
+                      seek: dict) -> tuple[int | None, int | None, str | None]:
+    """Bounded-resume evaluation for one recorded seek observation.
+
+    The implied resume point is sequential_frames - post_seek_frames: the
+    frame index the post-seek decode effectively continued at, computable
+    even when PCM equality is not required (LAPPED). Returns
+    (implied_resume, deviation_samples, failure_message_or_None)."""
+    if tier not in ("STRICT", "LAPPED"):
+        return None, None, None
+    if (sample_rate is None or not sequential_frames
+            or seek.get("frames") is None or seek.get("target_us") is None):
+        return None, None, "missing frame counts for resume bound"
+    implied = sequential_frames - seek["frames"]
+    target = round(seek["target_us"] * sample_rate / 1_000_000)
+    dev = implied - target
+    if tier == "STRICT":
+        return implied, dev, None  # exactness already gated by suffix equality
+    frame = LAPPED_FRAME_SAMPLES.get(family)
+    if frame is None:
+        return implied, dev, f"no codec-frame resume window for family {family!r}"
+    if abs(dev) > 2 * frame:
+        return implied, dev, (f"resume {implied} outside target {target} "
+                              f"± {2 * frame} samples")
+    return implied, dev, None
+
 
 def load_checker():
     loader = SourceFileLoader("qianqian_run_bench", str(ROOT / "bench/harness/run_bench.py"))
@@ -374,10 +412,17 @@ def main() -> None:
             if s.get("status") != "done":
                 fail(f"@{s.get('target_us')}: seek did not succeed")
                 continue
+            implied, dev, resume_fail = seek_resume_check(
+                tier, family, data.get("sample_rate"),
+                data.get("sequential_frames"), s)
+            s["implied_resume"] = implied
+            s["resume_dev_samples"] = dev
             if not s.get("clean_eof"):
                 fail(f"@{s.get('target_us')}: no clean EOF after seek")
             if not s.get("frames"):
                 fail(f"@{s.get('target_us')}: no PCM after seek")
+            if resume_fail:
+                fail(f"@{s.get('target_us')}: {resume_fail}")
             if tier == "STRICT" and not s.get("suffix_exact"):
                 fail(f"@{s.get('target_us')}: strict suffix contract violated")
 

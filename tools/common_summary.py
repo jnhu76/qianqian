@@ -371,7 +371,7 @@ def derive_pr_body(summary: dict, windows: dict | None) -> str | None:
         "# Windows（llvm-mingw SDK；产物经 WSL interop 在真 Windows 原生执行）",
         "python3 tools/common_windows.py --all",
         "python3 tools/common_windows_summary.py",
-        "python3 tools/common_summary.py --pr-body --check",
+        "python3 tools/common_summary.py --check",
         "```",
         "",
         "Corpus：确定性合成（`corpus/tools/gen_corpus_common.py`），seek 语义由",

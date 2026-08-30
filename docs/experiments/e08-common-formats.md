@@ -53,11 +53,12 @@ C6  Common Formats minimized    (-Os / -Os+LTO / size-minimal .so ladder)
 - C6 size-minimal `.so`（-Os+LTO+PIC+function/data sections+`--gc-sections`
   +version script）：stripped 1,309,520 B，stripped+xz **503,684 B**；
   dynsym 定义项恰为 5 个 `song_*` + 版本定义；`ldd` 仅 libc/libm。
-- xRT（songcore-output）：本轮 clean-room run 的 C6 最低为 **392.8×
-  （alac-long，-Os+LTO）**；警告线 50×。绝对 xRT 跨 run 波动可观
-  （machine state：上一轮 unloaded 259×、本轮 393×），相对代价才是结论：
-  `-Os` 使 MP3 1862×→632×（−66%）、AAC 1699×→695×、ALAC 487×→200×、
-  Opus 498×→229×；LTO 收回约一半。逐 codec 权威表见 ladder.md。
+- xRT（songcore-output）：**易漂移量，本文件不复制具体数字**——逐 run /
+  逐 codegen（-O3/-Os/-Os+LTO）的权威表是机器生成的
+  `bench/results/common-formats/ladder.md`（provenance sha 绑定
+  summary.json）。结构化结论只有三条：全部观测高于 50× 实时警告线；
+  `-Os` 相对 `-O3` 有可观 decode 代价（逐 codec 见 ladder.md 的 codegen
+  对照表）；LTO 收回其中约一半。
 
 ## 能力增量归因（C0→C1，machine-derived，`attribution.json`）
 
@@ -91,6 +92,15 @@ shipping）**，其内部大头是 decoder 本体而非 container。
 机器校准（`common_calibrate.py`）只观测家族 suffix-match 行为并钉入 corpus
 manifest（clean-room `--check` 防漂移）；**gate 的三档最低语义独立于校准**，
 "record" 不等于"任何结果都算过"。
+
+**bounded resume 是硬 gate**（Linux `common_gate.seek_resume_check`，Windows
+correctness 同一函数）：由 `sequential_frames − post_seek_frames` 推出
+implied resume 点（不依赖 PCM 相等，LAPPED 下本就不可比），要求落在
+target ± 2 个 codec 帧内（MP3 2304 / AAC 2048 / Opus 1920 样本）。冻结
+corpus 的确定性观测包络：MP3 −2077..−1429、AAC +412..+820、Opus −234..−78
+（demuxer 落 packet 边界 + priming/lapping 裁剪，帧几何决定量级）；"要 50%
+却从 20% 播"类错误偏差在 10⁵ 样本量级，被该窗口拦下。STRICT 的偏差只记录
+不 gate（suffix 逐字节相等已钉死 resume 点；Vorbis 页粒度可早数十 ms 落点）。
 
 ## 其他真实发现
 
@@ -130,7 +140,7 @@ Windows capability intent
 | Actual compiled TU | 198 | 202（xmake 对象树逐 TU 核对） |
 | Static archive (projected) | 3,412,572 B | 3,413,190 B |
 | Shared artifact raw | `.so` 1,435,336 B | `.dll` 1,829,888 B |
-| Shared artifact stripped | 1,309,520 B | 1,307,136 B（-Os）/ 1,327,616 B（-Os） |
+| Shared artifact stripped | 1,309,520 B | 1,327,616 B（-Os）/ 1,307,136 B（-Os+LTO） |
 | Stripped+xz（canonical minimum） | **503,684 B** | **546,260 B**（dll-lto；-Os 变体 552,244 B 亦全 gates PASS） |
 | Exports | 恰 5 `song_*` | 恰 5 `song_*` |
 | Runtime FFmpeg deps | 0（ldd 仅 libc/libm） | 0（kernel32 + api-ms-win-crt-* + bcrypt） |
