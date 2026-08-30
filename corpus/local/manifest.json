@@ -1,0 +1,35 @@
+{
+  "corpus_id": "real-yinxing-de-chibi-v1",
+  "purpose": "Private real-world decode/audible acceptance corpus; synthetic Stage-A fixtures remain the deterministic correctness authority.",
+  "redistribution": "private-test-only",
+  "cases": [
+    {
+      "id": "yinxing-mp3-cbr-128",
+      "file": "yinxing-de-chibi/mp3-cbr-128.mp3",
+      "fixture_sha256": "23995935dbfecf70b75cc96d9d3db6047bbbbd86d6663525fc3bbf7e953be371",
+      "codec": "mp3",
+      "sample_rate": 44100,
+      "channels": 2,
+      "bit_rate": 128000
+    },
+    {
+      "id": "yinxing-mp3-cbr-320-artwork",
+      "file": "yinxing-de-chibi/mp3-cbr-320-artwork.mp3",
+      "fixture_sha256": "b9a069044c7456b1ea554cb1e2f4c5dd3d413c756c0245f829f28cb3577d3764",
+      "codec": "mp3",
+      "sample_rate": 44100,
+      "channels": 2,
+      "bit_rate": 320000,
+      "artwork": true
+    },
+    {
+      "id": "yinxing-flac-16-44-artwork",
+      "file": "yinxing-de-chibi/flac-16-44-artwork.flac",
+      "fixture_sha256": "12c10a3bd842ad5aa2ebddbdde96ac1c8f4b46a2f89e8e4b891f3c4819ace7c0",
+      "codec": "flac",
+      "sample_rate": 44100,
+      "channels": 2,
+      "artwork": true
+    }
+  ]
+}
