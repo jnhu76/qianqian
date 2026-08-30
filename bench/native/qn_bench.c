@@ -239,6 +239,16 @@ static int frame_to_f32(const AVFrame *f, float *dst, int dst_capacity_frames) {
             for (int i = 0; i < ns; i++) dst[(size_t)i*ch + c] = (float)src[i];
         }
         return ns;
+    case AV_SAMPLE_FMT_U8: {
+        const uint8_t *src = f->data[0];
+        for (int i = 0; i < ns * ch; i++) dst[i] = ((float)src[i] - 128.0f) * (1.0f/128.0f);
+        return ns;
+    }
+    case AV_SAMPLE_FMT_DBL: {
+        const double *src = (const double *)f->data[0];
+        for (int i = 0; i < ns * ch; i++) dst[i] = (float)src[i];
+        return ns;
+    }
     case AV_SAMPLE_FMT_U8P:
         for (int c = 0; c < ch; c++) {
             const uint8_t *src = f->extended_data[c];
@@ -465,6 +475,11 @@ static int sess_decode_all(session *s, sample_store *store,
                 int64_t first_index = frm->pts != AV_NOPTS_VALUE
                     ? av_rescale_q(frm->pts, st->time_base, (AVRational){1, frm->sample_rate})
                     : (int64_t)(store ? store->len / (store->channels ? (size_t)store->channels : 1) : 0);
+                /* Codec-delay trimming advances pts past the container start
+                 * (opus preskip): the presentation timeline is shifted
+                 * relative to the canonical output stream, which starts
+                 * at 0; a negative index can never be stored as size_t. */
+                if (first_index < 0) first_index = 0;
                 if (store) {
                     int n = -1;
 #ifdef QN_HAVE_SWR
@@ -495,6 +510,7 @@ static int sess_decode_all(session *s, sample_store *store,
                 int64_t first_index = frm->pts != AV_NOPTS_VALUE
                     ? av_rescale_q(frm->pts, st->time_base, (AVRational){1, frm->sample_rate})
                     : (int64_t)(store && store->channels ? store->len / (size_t)store->channels : 0);
+                if (first_index < 0) first_index = 0;
                 if (store) {
                     int n = -1;
 #ifdef QN_HAVE_SWR
@@ -636,13 +652,17 @@ static int run_correct(const char *path) {
     printf(",\"suffix\":[");
     if (store.len) {
         int ch = store.channels ? store.channels : 1;
+        int emitted = 0;
         for (size_t fi = 0; fi < store.frame_count; fi++) {
-            size_t off = (size_t)store.frame_first[fi] * ch;
+            int64_t idx = store.frame_first[fi];
+            if (idx < 0) continue;
+            size_t off = (size_t)idx * ch;
             if (off > store.len) continue;
             sha256_ctx c; sha256_init(&c);
             sha256_update(&c, store.data + off, (store.len - off) * sizeof(float));
             char hex[65]; sha256_hex(&c, hex);
-            printf("%s[%" PRId64 ",\"%s\"]", fi ? "," : "", store.frame_first[fi], hex);
+            printf("%s[%" PRId64 ",\"%s\"]", emitted ? "," : "", idx, hex);
+            emitted++;
         }
     }
     printf("]");

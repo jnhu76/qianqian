@@ -293,6 +293,17 @@ static int frame_to_f32(song_handle *h, const AVFrame *f) {
                 dst[(size_t)i * channels + c] = ((float)src[i] - 128.0f) * (1.0f / 128.0f);
         }
         break;
+    case AV_SAMPLE_FMT_U8: {
+        const uint8_t *src = f->data[0];
+        for (size_t i = 0; i < samples; ++i)
+            dst[i] = ((float)src[i] - 128.0f) * (1.0f / 128.0f);
+        break;
+    }
+    case AV_SAMPLE_FMT_DBL: {
+        const double *src = (const double *)f->data[0];
+        for (size_t i = 0; i < samples; ++i) dst[i] = (float)src[i];
+        break;
+    }
     default:
         return -1;
     }
