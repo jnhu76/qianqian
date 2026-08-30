@@ -1,8 +1,8 @@
 # Scripts
 
-这里的脚本是实验入口，不是最终 production build system。
+这里的 `scripts/` 主要是 Phase 0 benchmark / corpus 实验入口，不是长期 production build system。
 
-## 入口
+## Step 1 benchmark 入口
 
 ```text
 scripts/fetch-ffmpeg            下载并验证 pinned FFmpeg（bench/ffmpeg-pin.json）
@@ -14,7 +14,23 @@ scripts/bench-native            fetch + build all + 跑 harness（端到端）
 `build-profile` 支持 `--profile-file <path>`（供 probe 变体使用）与
 `--force`（忽略构建缓存）。
 
-## 产物
+## Step 1.5 selective-build 入口
+
+候选 production build boundary 从 E06 开始由仓库根目录的 `xmake.lua` 接管：
+
+```text
+xmake ffmpeg-import             升级/import 时让 upstream configure+Make 求一次真实 closure
+xmake build qianqian_av               normal build 直接重放 closure → libqianqian_av.a
+xmake build qn_pcm_dump               同时构建 SongCore + 极薄 PCM pipe
+python3 tools/verify_xmake_core.py
+python3 tools/play_smoke.py <mp3>
+```
+
+`tools/ffmpeg_import.py` **不是第二套 FFmpeg dependency resolver**。它观察 upstream `V=1` 的真实 compiler invocation 并生成 untracked manifest；之后 Xmake normal build 不再调用 FFmpeg Makefile。
+
+`tools/play_smoke.py` 的 `sounddevice` 只是 acceptance audio sink，不进入 shipping dependency graph，也不参与 MP3 解码。
+
+## Step 1 benchmark 产物
 
 每个 profile（`build/<profile>/`，untracked）：
 

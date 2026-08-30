@@ -63,6 +63,7 @@ Phase 0 不做：
 - [PRD](PRD.md)
 - [架构边界](docs/architecture/songcore-boundary.md)
 - [FFmpeg 极限裁剪实验](docs/experiments/e01-ffmpeg-minimal-profile.md)
+- [Xmake selective build + audible smoke](docs/experiments/e06-xmake-selective-build-playback-smoke.md)
 - [Native vs WASM](docs/experiments/e02-native-vs-wasm.md)
 - [音频透明性与音质](docs/experiments/e03-audio-quality.md)
 - [DSP 分层实验](docs/experiments/e04-dsp-boundary.md)
@@ -80,3 +81,26 @@ scripts/bench-native
 结果写入 `bench/results/runs/<时间戳>/`，canonical baseline 见
 `bench/results/baseline/`。需要 `bash、python3、gcc、make、unzip、xz`；
 网络经代理时设置 `https_proxy`（默认尝试 `http://127.0.0.1:7897`）。
+
+## Xmake selective-build 实验（Phase 0 Step 1.5）
+
+E06 的目标不是再造 FFmpeg build system，而是把它降级为 **import/upgrade-time oracle**：
+
+```text
+xmake ffmpeg-import       # 上游 configure/Make 只在这里参与，生成 compile closure
+xmake f -m release
+xmake build qianqian_av   # normal build：Xmake 直接产出单一 libqianqian_av.a
+xmake build qn_pcm_dump   # SongCore → Float32 PCM pipe
+python3 tools/verify_xmake_core.py
+```
+
+可听 smoke（test-only sink）：
+
+```text
+python -m pip install sounddevice
+python3 tools/play_smoke.py corpus/fixtures/mp3-cbr-id3v23.mp3
+```
+
+Python/sounddevice **不负责解码**、也不进入 shipping dependency graph；它只把 SongCore 已经产生的 Float32 PCM 送进系统音频设备。
+
+在真实机器跑完 E06 gate 前，这条路径只可标记 `CODE_COMPLETE_PENDING_VALIDATION`。

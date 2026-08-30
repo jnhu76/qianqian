@@ -1,5 +1,6 @@
 # Build trees and fetched sources (reproduce with scripts/fetch-ffmpeg)
 /build/
+.xmake/
 
 # Ephemeral benchmark runs (canonical baselines are tracked under bench/results/baseline)
 bench/results/runs/
