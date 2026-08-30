@@ -5,10 +5,6 @@
 # Ephemeral benchmark runs (canonical baselines are tracked under bench/results/baseline)
 bench/results/runs/
 
-# Local real-world audio (copyrighted; only corpus/local/README.md is tracked)
-corpus/local/**/*.mp3
-corpus/local/**/*.flac
-
 # Python
 __pycache__/
 *.pyc
