@@ -304,7 +304,7 @@ def derive_pr_body(summary: dict, windows: dict | None) -> str | None:
         "",
         "```text",
         f"oracle TU                 {closure['oracle_tu']}（独立 cross configure，禁复用 Linux manifest）",
-        f"reachable / compiled TU   {closure['reachable_units']} / {closure['compiled_units']}"
+        f"reachable / compiled TU   {closure['projected_units']} / {closure['compiled_units_verified']}"
         f"（archive member ↔ manifest TU 机器映射；投影 clean rebuild 后逐 TU 核对；fixpoint {closure.get('projection_iterations', 1)} 轮）",
         f"reachability proof        reduced-archive 链接按 section SHA 相等 + lld -Map 成员集合佐证",
         f"static archive            {kib(windows['static_archive_bytes'])}（projected closure replay）",

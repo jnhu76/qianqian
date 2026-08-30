@@ -69,14 +69,42 @@
     },
     "policy": "cross-platform byte equality is NOT required for lossy float decoders under differing codegen; within-platform determinism remains byte-exact everywhere"
   },
+  "canonical_shipping": {
+    "correctness_verdicts": {
+      "dll": "PASS",
+      "dll-lto": "PASS"
+    },
+    "lto": true,
+    "selection": "min dll_stripped_xz_bytes among variants with own native correctness PASS",
+    "stage": "win-c6-dll-lto",
+    "stripped_bytes": 1307136,
+    "stripped_xz_bytes": 546260,
+    "variant": "dll-lto"
+  },
   "closure": {
-    "archive_members": 266,
-    "lld_map_member_set_equal": true,
+    "compiled_units_verified": 202,
+    "duplicate_member_basenames": [
+      "aacdec.c.obj",
+      "cpu.c.obj",
+      "flacdec.c.obj",
+      "iamf.c.obj",
+      "mpegaudiodsp.c.obj",
+      "options.c.obj",
+      "pcm.c.obj",
+      "utils.c.obj",
+      "version.c.obj"
+    ],
+    "full_archive_members": 279,
+    "full_archive_pulled_members": 202,
     "oracle_tu": 279,
-    "reachable_tu": 192
+    "projected_units": 202,
+    "projection_iterations": 1,
+    "reachability_proof": "reduced-archive link: load-bearing PE sections (.text/.rdata/.data/.pdata) identical (VMA/size/sha256) after --strip-debug; stray lld -Map members rejected"
   },
   "correctness": {
-    "cases": 33,
+    "clean_cases": 33,
+    "degraded_cases": 11,
+    "executed": 44,
     "largefile_gate": true,
     "largefile_observed": {
       "channels": 2,
@@ -91,6 +119,13 @@
       "sample_rate": 44100,
       "target_us": 12554379319
     },
+    "seek_tiers": {
+      "LAPPED": 13,
+      "STRICT": 19,
+      "UNSUPPORTED": 1
+    },
+    "skipped": [],
+    "total_applicable": 44,
     "unicode_observed": {
       "channels": 2,
       "codec": "aac",
@@ -133,11 +168,18 @@
       "sequential_sha256": "1b52ad546588044f78330c37ebdf8355a7fedc250114486f3501af450d48f14d"
     },
     "unicode_path_gate": true,
-    "verdict": "PASS"
+    "verdict": "PASS",
+    "verdict_lto": "PASS"
   },
   "dll": {
+    "closure": {
+      "archive_members": 202,
+      "projected_manifest": "build/minimize/win-c6/manifest-projected.json",
+      "projected_manifest_sha256": "402fc704097f3b72ef8b9ba9c5fafbc19affa1be272cde14f4fc58a737de4d18",
+      "projected_units": 202
+    },
     "dll": "build/minimize/win-c6/dll/qianqian_songcore.dll",
-    "dll_sha256": "a58e5d550efff23c38d9cc4f7e736307a856bef86ad37944220d0fe1110e66e1",
+    "dll_sha256": "c1f872ae49c9ecc98656d507af4ddbd67ef04a5cf4699e1b7346cb32c59914a0",
     "exported_api_count": 5,
     "exported_api_symbols": [
       "song_close",
@@ -163,19 +205,62 @@
       "bcrypt.dll"
     ],
     "lto": false,
-    "schema": 1,
+    "schema": 2,
     "sizes": {
       "dll_bytes": 1829888,
       "dll_stripped_bytes": 1327616,
-      "dll_stripped_xz_bytes": 552052,
-      "dll_xz_bytes": 672208,
+      "dll_stripped_xz_bytes": 552244,
+      "dll_xz_bytes": 672092,
       "implib_bytes": 2262,
-      "libqianqian_av_a_bytes": 3938616
+      "libqianqian_av_a_bytes": 3413190
     },
     "stage": "win-c6-dll"
   },
-  "dll_lto": null,
-  "dll_lto_note": "dll_lto null when the -Os+LTO variant was not rebuilt in this run; see git history for the recorded variant",
+  "dll_lto": {
+    "closure": {
+      "archive_members": 202,
+      "projected_manifest": "build/minimize/win-c6/manifest-projected.json",
+      "projected_manifest_sha256": "402fc704097f3b72ef8b9ba9c5fafbc19affa1be272cde14f4fc58a737de4d18",
+      "projected_units": 202
+    },
+    "dll": "build/minimize/win-c6/dll-lto/qianqian_songcore.dll",
+    "dll_sha256": "6e600a2280cbdbc7996d58f5caf88ecbf44bde8de93bbd1aac95a5b0d9d3a2f7",
+    "exported_api_count": 5,
+    "exported_api_symbols": [
+      "song_close",
+      "song_open",
+      "song_probe",
+      "song_read_pcm",
+      "song_seek"
+    ],
+    "import_table": [
+      "KERNEL32.dll",
+      "api-ms-win-crt-convert-l1-1-0.dll",
+      "api-ms-win-crt-environment-l1-1-0.dll",
+      "api-ms-win-crt-filesystem-l1-1-0.dll",
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-locale-l1-1-0.dll",
+      "api-ms-win-crt-math-l1-1-0.dll",
+      "api-ms-win-crt-private-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-stdio-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "api-ms-win-crt-time-l1-1-0.dll",
+      "api-ms-win-crt-utility-l1-1-0.dll",
+      "bcrypt.dll"
+    ],
+    "lto": true,
+    "schema": 2,
+    "sizes": {
+      "dll_bytes": 1834496,
+      "dll_stripped_bytes": 1307136,
+      "dll_stripped_xz_bytes": 546260,
+      "dll_xz_bytes": 677796,
+      "implib_bytes": 2262,
+      "libqianqian_av_a_bytes": 4579372
+    },
+    "stage": "win-c6-dll-lto"
+  },
   "pcm_cross_platform": {
     "aac-adts-44-stereo": {
       "capability": "aac",
@@ -376,8 +461,8 @@
       "windows_sha256": "b5bd98c6fd6698475b1be0e3c3540d78c37e38f294b3aaac90c96fc90a314aae"
     }
   },
-  "schema": 1,
-  "static_archive_bytes": 3938616,
+  "schema": 2,
+  "static_archive_bytes": 3413190,
   "toolchain": {
     "cc": "x86_64-w64-mingw32-gcc",
     "cc_ident": "clang version 23.1.0 (https://github.com/llvm/llvm-project.git ea7d852a70e8bdfaf601d6626a760f9771b2c4b4)",
@@ -396,7 +481,6 @@
       "--disable-x86asm",
       "--disable-avdevice",
       "--disable-avfilter",
-      "--disable-swresample",
       "--disable-swscale",
       "--enable-avformat",
       "--enable-avcodec",
