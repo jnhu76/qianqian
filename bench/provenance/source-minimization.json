@@ -1,0 +1,191 @@
+{
+  "cleanroom": {
+    "method": "rm -rf build; canonical import + gate; composed variant import -> audit -> project -> build -> gate; flags mutation + gc/lto link -> gate",
+    "results": {
+      "s0": {
+        "archive": 2658174,
+        "linked": 973048,
+        "tu": 205
+      },
+      "s3-pthreads": {
+        "archive": 1535360,
+        "linked": 952568,
+        "tu": 106
+      },
+      "s5-Os-LTO": {
+        "archive": 3927088,
+        "linked": 530664,
+        "tu": 106
+      }
+    },
+    "script": "tools/minimize_cleanroom.sh",
+    "verdict": "all stages PASS full gate, behavior identical to S0"
+  },
+  "entries": [
+    {
+      "bytes_after": 1574932,
+      "bytes_before": 2658174,
+      "candidate": "s1",
+      "change": "link-reachability projection of canonical closure (110/205 TUs), fixpoint verified",
+      "correctness": "PASS",
+      "linked_bytes_after": 973048,
+      "linked_bytes_before": 973048,
+      "tu_after": 110,
+      "tu_before": 205,
+      "verdict": "removable"
+    },
+    {
+      "bytes_after": 1573484,
+      "bytes_before": 1574932,
+      "candidate": "s3-iconv",
+      "change": "--disable-iconv (single dimension)",
+      "correctness": "PASS",
+      "linked_bytes_after": 973048,
+      "linked_bytes_before": 973048,
+      "tu_after": 110,
+      "tu_before": 110,
+      "verdict": "removable"
+    },
+    {
+      "bytes_after": 1535360,
+      "bytes_before": 1573484,
+      "candidate": "s3-pthreads",
+      "change": "--disable-pthreads (single dimension, stacked)",
+      "correctness": "PASS",
+      "linked_bytes_after": 952568,
+      "linked_bytes_before": 973048,
+      "note": "clean-room final (tools/minimize_cleanroom.sh, rm -rf build): composed --disable-iconv + --disable-pthreads in one variant import (202 TU full closure -> 106 projected). Iterative per-dimension run measured 1,536,880/956,664; run-to-run object-level variance ~0.1%, TU closure deterministic (202/106). Behavior identical to S0.",
+      "tu_after": 106,
+      "tu_before": 110,
+      "verdict": "removable"
+    },
+    {
+      "bytes_after": 1536880,
+      "bytes_before": 1536880,
+      "candidate": "s3-runtime-cpu",
+      "change": "--disable-runtime_cpudetect (single dimension, stacked)",
+      "correctness": "PASS",
+      "linked_bytes_after": 956664,
+      "linked_bytes_before": 956664,
+      "tu_after": 106,
+      "tu_before": 106,
+      "verdict": "no_effect"
+    },
+    {
+      "bytes_after": 1536800,
+      "bytes_before": 1536880,
+      "candidate": "s3-pic",
+      "change": "--disable-pic (single dimension, stacked)",
+      "correctness": "PASS",
+      "linked_bytes_after": 956664,
+      "linked_bytes_before": 956664,
+      "tu_after": 106,
+      "tu_before": 106,
+      "verdict": "no_effect"
+    },
+    {
+      "bytes_after": 1536880,
+      "bytes_before": 1536880,
+      "candidate": "s3-iamf",
+      "change": "--disable-iamf (single dimension, stacked)",
+      "correctness": "PASS",
+      "linked_bytes_after": 956664,
+      "linked_bytes_before": 956664,
+      "tu_after": 106,
+      "tu_before": 106,
+      "verdict": "no_effect"
+    },
+    {
+      "bytes_after": null,
+      "bytes_before": 1536880,
+      "candidate": "s3-asm",
+      "change": "--disable-asm (single dimension, stacked): C reference kernels only",
+      "correctness": "FAIL (mp3 PCM diverges from SIMD kernels: 7/7 mp3 corpus cases differ)",
+      "linked_bytes_after": null,
+      "linked_bytes_before": 956664,
+      "note": "gate rejected at corpus equivalence step; mp3float SSE imdct36 blocks are not bit-identical to the C path. FLAC cases unaffected.",
+      "tu_after": null,
+      "tu_before": 106,
+      "verdict": "rejected_pcm_change"
+    },
+    {
+      "bytes_after": 1802472,
+      "bytes_before": 1536880,
+      "candidate": "s4-fdata",
+      "change": "-ffunction-sections -fdata-sections on replayed closure",
+      "correctness": "PASS",
+      "linked_bytes_after": 956664,
+      "linked_bytes_before": 956664,
+      "note": "archive +265,592 B of section headers; linked unchanged until --gc-sections. Reference: full 205-TU closure + fdata + gc links to 739,568 B \u2014 gc captures most of the linked-binary win alone.",
+      "tu_after": 106,
+      "tu_before": 106,
+      "verdict": "no_effect"
+    },
+    {
+      "bytes_after": 1802472,
+      "bytes_before": 1536880,
+      "candidate": "s4-gc",
+      "change": "-ffunction-sections -fdata-sections + -Wl,--gc-sections on qn_pcm_dump",
+      "correctness": "PASS (corpus/PCM/seek/real-song byte-identical)",
+      "linked_bytes_after": 719080,
+      "linked_bytes_before": 956664,
+      "note": "shipped-binary win: -237,584 B linked (-25%). Reference measurement: full 205-TU closure + fdata + gc links to 739,568 B \u2014 source minimization adds only ~20 KB beyond gc on the linked binary.",
+      "tu_after": 106,
+      "tu_before": 106,
+      "verdict": "removable"
+    },
+    {
+      "bytes_after": 1346776,
+      "bytes_before": 1536880,
+      "candidate": "s5-O2",
+      "change": "replace -O3 with -O2 in replayed closure",
+      "correctness": "PASS byte-identical",
+      "linked_bytes_after": 817400,
+      "linked_bytes_before": 956664,
+      "note": "xRT 653-1172 vs 830-1180 baseline; far above 50x floor",
+      "tu_after": 106,
+      "tu_before": 106,
+      "verdict": "removable"
+    },
+    {
+      "bytes_after": 1197464,
+      "bytes_before": 1536880,
+      "candidate": "s5-Os",
+      "change": "replace -O3 with -Os in replayed closure",
+      "correctness": "PASS byte-identical",
+      "linked_bytes_after": 690504,
+      "linked_bytes_before": 956664,
+      "note": "xRT 745-920; smallest plain archive",
+      "tu_after": 106,
+      "tu_before": 106,
+      "verdict": "removable"
+    },
+    {
+      "bytes_after": 3941432,
+      "bytes_before": 1536880,
+      "candidate": "s5-LTO",
+      "change": "-flto on replayed closure (-O3 kept)",
+      "correctness": "PASS byte-identical",
+      "linked_bytes_after": 702712,
+      "linked_bytes_before": 956664,
+      "note": "archive bloats with LTO bytecode; linked win superseded by Os+LTO",
+      "tu_after": 106,
+      "tu_before": 106,
+      "verdict": "no_effect"
+    },
+    {
+      "bytes_after": 3927088,
+      "bytes_before": 1536880,
+      "candidate": "s5-Os-LTO",
+      "change": "-Os + -flto on replayed closure, linked with --gc-sections",
+      "correctness": "PASS byte-identical",
+      "linked_bytes_after": 530664,
+      "linked_bytes_before": 956664,
+      "note": "clean-room final: minimal shipped linked core 530,664 B (-45% vs S0). xRT 755-946. Archive is LTO bytecode, not a shipping artifact.",
+      "tu_after": 106,
+      "tu_before": 106,
+      "verdict": "removable"
+    }
+  ],
+  "schema": 1
+}

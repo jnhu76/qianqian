@@ -1,0 +1,62 @@
+{
+  "experiment": "e07-source-minimization",
+  "ffmpeg": "n9.0.1",
+  "finals": {
+    "minimal_archive_bytes": 1197464,
+    "minimal_archive_pure_closure_bytes": 1536880,
+    "minimal_archive_pure_closure_stage": "s3-pthreads (106 TU, stock -O3 flags)",
+    "minimal_archive_stage": "s5-Os (106 TU, -Os codegen)",
+    "minimal_linked_core_bytes": 530672,
+    "minimal_linked_core_stage": "s5-Os-LTO (-Os -flto, linked with --gc-sections)",
+    "reference_full_closure_gc_linked_bytes": 739568
+  },
+  "gate": "tools/minimize_gate.py (corpus 15/15 oracle-equivalence incl. bench seek, SongCore PCM canonical hashes, SongCore-level seek probes, real-song full decodes)",
+  "schema": 1,
+  "stages": {
+    "s0": {
+      "archive_bytes": 2658174,
+      "archive_symbols": 7046,
+      "archive_xz_bytes": 670716,
+      "corpus": "PASS",
+      "corpus_cases": 15,
+      "flac_xrt_songcore": 903.31,
+      "linked_bytes": 973048,
+      "linked_xz_bytes": 350604,
+      "mp3_xrt_songcore": 940.82,
+      "pcm": "PASS",
+      "stage": "s0",
+      "strict_failures": [],
+      "translation_units": 205
+    },
+    "s3-pthreads": {
+      "archive_bytes": 1535360,
+      "archive_symbols": 4469,
+      "archive_xz_bytes": 386324,
+      "corpus": "PASS",
+      "corpus_cases": 15,
+      "flac_xrt_songcore": 924.19,
+      "linked_bytes": 952568,
+      "linked_xz_bytes": 342644,
+      "mp3_xrt_songcore": 964.8,
+      "pcm": "PASS",
+      "stage": "s3-pthreads",
+      "strict_failures": [],
+      "translation_units": 106
+    },
+    "s5-Os-LTO": {
+      "archive_bytes": 3927088,
+      "archive_symbols": 2344,
+      "archive_xz_bytes": 3328936,
+      "corpus": "PASS",
+      "corpus_cases": 15,
+      "flac_xrt_songcore": 866.18,
+      "linked_bytes": 530664,
+      "linked_xz_bytes": 180408,
+      "mp3_xrt_songcore": 755.49,
+      "pcm": "PASS",
+      "stage": "s5-Os-LTO",
+      "strict_failures": [],
+      "translation_units": 106
+    }
+  }
+}

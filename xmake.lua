@@ -4,8 +4,30 @@ set_languages("c11")
 set_config("builddir", "build/xmake")
 add_rules("mode.debug", "mode.release")
 
+-- Which frozen compile closure qianqian_av replays. Defaults to the
+-- canonical import manifest; minimization experiments project filtered
+-- manifests into build/minimize/<stage>/ and point this option at them.
+option("av_manifest")
+    set_default("build/ffmpeg-xmake/manifest.json")
+    set_showmenu(true)
+    set_description("FFmpeg compile-closure manifest to replay")
+
+-- S4 experiment: garbage-collect unreferenced sections in the final binary.
+option("gc_sections")
+    set_default(false)
+    set_showmenu(true)
+    set_description("Link qn_pcm_dump with -Wl,--gc-sections")
+
+-- S5 experiment: link-time optimization for the final binary.
+option("lto")
+    set_default(false)
+    set_showmenu(true)
+    set_description("Link qn_pcm_dump with -flto")
+
 local artifact_dir = path.join(os.projectdir(), "build", "artifacts")
-local ffmpeg_manifest = path.join(os.projectdir(), "build", "ffmpeg-xmake", "manifest.json")
+local ffmpeg_manifest = function ()
+    return path.join(os.projectdir(), get_config("av_manifest"))
+end
 
 -- Import is intentionally separate from normal builds. It may invoke FFmpeg's
 -- configure/Make once as an upstream oracle, then freezes the exact compile
@@ -31,11 +53,12 @@ target("qianqian_av")
         import("core.base.json")
         -- Do not fail project loading here: `xmake ffmpeg-import` must be able
         -- to run before the manifest exists. before_build below owns the gate.
-        if not os.isfile(ffmpeg_manifest) then
+        local manifest_path = ffmpeg_manifest()
+        if not os.isfile(manifest_path) then
             return
         end
 
-        local m = json.loadfile(ffmpeg_manifest)
+        local m = json.loadfile(manifest_path)
         local srcroot = path.join(os.projectdir(), m.source_root)
         local buildroot = path.join(os.projectdir(), m.config_root)
 
@@ -61,7 +84,7 @@ target("qianqian_av")
         end
     end)
     before_build(function ()
-        if not os.isfile(ffmpeg_manifest) then
+        if not os.isfile(ffmpeg_manifest()) then
             raise("FFmpeg source closure is missing. Run `xmake ffmpeg-import` first, then rerun xmake.")
         end
     end)
@@ -83,3 +106,11 @@ target("qn_pcm_dump")
     if is_plat("linux") or is_plat("macosx") then
         add_syslinks("m", "pthread")
     end
+    on_load(function (target)
+        if get_config("gc_sections") then
+            target:add("ldflags", "-Wl,--gc-sections")
+        end
+        if get_config("lto") then
+            target:add("ldflags", "-flto=auto")
+        end
+    end)

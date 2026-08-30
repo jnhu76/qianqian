@@ -280,10 +280,11 @@ def main() -> None:
         "ffmpeg_tag": pin["ffmpeg_tag"],
         "ffmpeg_commit_sha": pin["ffmpeg_commit_sha"],
         "profile": profile["profile"],
+        "profile_variant": profile.get("variant"),
         "profile_sha256": sha256_file(PROFILE),
         "toolchain": toolchain,
         "source_root": "build/ffmpeg-src",
-        "config_root": "build/ffmpeg-xmake/oracle",
+        "config_root": ORACLE.relative_to(ROOT).as_posix(),
         "configure_args": args,
         "closure": {
             "translation_units": len(units),
