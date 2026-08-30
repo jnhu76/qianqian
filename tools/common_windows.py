@@ -132,22 +132,22 @@ def _xmake_configure(av_manifest: Path, *, lto: bool) -> None:
     target wrappers (incl. arm64ec-*-uwp), and xmake's SDK autodetect
     otherwise picks the wrong one (which rejects FFmpeg's inline asm).
 
-    The persisted project config directory is wiped first: xmake keeps the
-    config under .xmake/<plat>/<arch>/ but reuses the PREVIOUS platform's
-    directory when switching (-p mingw over an existing linux config wrote
-    .xmake/linux/...), after which `xmake build` reads the (missing) mingw
-    path, falls back to option defaults, and fails with 'closure missing'."""
+    The persisted project config directory is wiped first (xmake reuses the
+    previous config session in surprising ways otherwise). The manifest is
+    passed as a PROJECT-RELATIVE path: absolute values are accepted by
+    `xmake f` but silently dropped back to the option default at build time,
+    which fails the closure gate with 'FFmpeg source closure is missing'."""
     shutil.rmtree(ROOT / ".xmake", ignore_errors=True)
+    manifest_arg = Path(av_manifest).resolve().relative_to(ROOT).as_posix()
     run(["xmake", "f", "-p", "mingw", "--sdk=" + str(SDK), "-m", "release",
          "--cc=x86_64-w64-mingw32-gcc", "--cxx=x86_64-w64-mingw32-g++",
          "--ld=x86_64-w64-mingw32-gcc", "--ar=x86_64-w64-mingw32-ar",
-         f"--av_manifest={av_manifest}",
+         f"--av_manifest={manifest_arg}",
          "--gc_sections=n", "--lto=" + ("y" if lto else "n"), "-y"])
     # the replayed closure must be the configured one, not an option default
     conf = next((ROOT / ".xmake").rglob("xmake.conf"), None)
-    if conf is None or "mingw" not in str(conf) or \
-            Path(json_value(conf, "av_manifest")).resolve() != Path(av_manifest).resolve():
-        raise SystemExit(f"xmake config did not persist av_manifest={av_manifest} "
+    if conf is None or json_value(conf, "av_manifest") != manifest_arg:
+        raise SystemExit(f"xmake config did not persist av_manifest={manifest_arg} "
                          f"(looked at {conf})")
     shutil.rmtree(ROOT / "build" / "xmake", ignore_errors=True)
     shutil.rmtree(ROOT / "build" / "artifacts", ignore_errors=True)
