@@ -4,6 +4,15 @@ set_languages("c11")
 set_config("builddir", "build/xmake")
 add_rules("mode.debug", "mode.release")
 
+-- E09 WASM sessions: every target in the session (including the FFmpeg
+-- closure replay in qianqian_av) compiles with the guest toolchain. The
+-- native default session stays untouched.
+if get_config("wasm") == "wasi" then
+    set_toolchains("wasi-sdk")
+elseif get_config("wasm") == "emscripten" then
+    set_toolchains("emcc")
+end
+
 -- Which frozen compile closure qianqian_av replays. Defaults to the
 -- canonical import manifest; minimization experiments project filtered
 -- manifests into build/minimize/<stage>/ and point this option at them.
@@ -65,6 +74,22 @@ target("qianqian_av")
         -- Generated config headers must win over the pristine source tree.
         target:add("includedirs", buildroot, srcroot, {public = true})
 
+        -- E09 WASM sessions replay the closure at -Os (shipping shape, same
+        -- caliber as the E08 -Os ladder floors). The manifest keeps the
+        -- oracle's own flags untouched; codegen level is a build decision.
+        local optimize_flags = function (flags)
+            local out = {}
+            for _, flag in ipairs(flags) do
+                if flag:match("^%-O") then
+                    flag = "-Os"
+                end
+                table.insert(out, flag)
+            end
+            return out
+        end
+        local wasm_session = (get_config("wasm") ~= nil and get_config("wasm") ~= false)
+            or (get_config("e09") == true) -- native twin parity with the -Os WASM guests
+
         for _, unit in ipairs(m.units) do
             local root = unit.origin == "generated" and buildroot or srcroot
             local source = path.join(root, unit.path)
@@ -73,6 +98,9 @@ target("qianqian_av")
                 flag = flag:gsub("@SRC@", function () return srcroot end)
                 flag = flag:gsub("@BUILD@", function () return buildroot end)
                 table.insert(flags, flag)
+            end
+            if wasm_session then
+                flags = optimize_flags(flags)
             end
             if #flags > 0 then
                 local force = {}
@@ -118,3 +146,344 @@ target("qn_pcm_dump")
             target:add("ldflags", "-flto=auto")
         end
     end)
+
+-- ====================================================================
+-- E09 — WASM total-cost experiment (independent sessions; the native
+-- default session above is untouched).
+--
+--   WASI session:
+--     xmake f -b build/xmake-wasi --wasm=wasi \
+--         --av_manifest=build/ffmpeg-xmake-wasi/manifest.json
+--     xmake build songcore_wasm qn_guest_wasm qn_pb_wasm
+--
+--   Emscripten session:
+--     xmake f -b build/xmake-em --wasm=emscripten \
+--         --av_manifest=build/ffmpeg-xmake-emscripten/manifest.json
+--
+--   Runner session (host binaries for the runtime ladder):
+--     xmake f --e09
+--     xmake build qn_native_runner qn_wamr_runner qn_wamr_aot_runner \
+--         qn_wasm3_runner qn_wasmtime_runner qn_pb_native
+-- ====================================================================
+
+option("wasm")
+    set_values(false, "wasi", "emscripten")
+    set_default(false)
+    set_showmenu(true)
+    set_description("E09 WASM target for this build session")
+
+option("wasmsdk")
+    set_default("")
+    set_showmenu(true)
+    set_description("Override wasi-sdk/emscripten SDK root (else QN_WASI_SDK/QN_EMSDK or ~/toolchains/e09)")
+
+option("e09")
+    set_default(false)
+    set_showmenu(true)
+    set_description("Build E09 host-side runtime-ladder runners (native session)")
+
+option("e09_home")
+    set_default("")
+    set_showmenu(true)
+    set_description("E09 external toolchain home (else QN_E09_HOME or ~/toolchains/e09)")
+
+local e09_home = function ()
+    local h = get_config("e09_home")
+    if h and #h > 0 then return h end
+    return os.getenv("QN_E09_HOME") or path.join(os.getenv("HOME"), "toolchains", "e09")
+end
+
+toolchain("wasi-sdk")
+    set_kind("standalone")
+    on_load(function (toolchain)
+        local sdk = get_config("wasmsdk")
+        if not sdk or #sdk == 0 then sdk = os.getenv("QN_WASI_SDK") end
+        if not sdk or #sdk == 0 then
+            sdk = path.join(os.getenv("HOME"), "toolchains", "e09", "wasi-sdk-34.0")
+        end
+        local bin = path.join(sdk, "bin")
+        local sysroot = path.join(sdk, "share", "wasi-sysroot")
+        local triple = "--target=wasm32-wasip1"
+        toolchain:set("toolset", "cc", path.join(bin, "clang"))
+        toolchain:set("toolset", "cxx", path.join(bin, "clang++"))
+        toolchain:set("toolset", "ld", path.join(bin, "clang"))
+        toolchain:set("toolset", "sh", path.join(bin, "clang"))
+        toolchain:set("toolset", "as", path.join(bin, "clang"))
+        toolchain:set("toolset", "ar", path.join(bin, "llvm-ar"))
+        toolchain:set("toolset", "strip", path.join(bin, "llvm-strip"))
+        toolchain:set("toolset", "nm", path.join(bin, "llvm-nm"))
+        toolchain:add("cxflags", triple, "--sysroot=" .. sysroot,
+                     "-D_WASI_EMULATED_PROCESS_CLOCKS", {force = true})
+        toolchain:add("asflags", triple, "--sysroot=" .. sysroot, {force = true})
+        toolchain:add("ldflags", triple, "--sysroot=" .. sysroot,
+                     "-D_WASI_EMULATED_PROCESS_CLOCKS",
+                     "-lwasi-emulated-process-clocks", {force = true})
+        toolchain:add("shflags", triple, "--sysroot=" .. sysroot, {force = true})
+    end)
+
+toolchain("emcc")
+    set_kind("standalone")
+    on_load(function (toolchain)
+        local sdk = get_config("wasmsdk")
+        if not sdk or #sdk == 0 then sdk = os.getenv("QN_EMSDK") end
+        if not sdk or #sdk == 0 then
+            sdk = path.join(os.getenv("HOME"), "toolchains", "e09", "emsdk", "upstream", "emscripten")
+        end
+        toolchain:set("toolset", "cc", path.join(sdk, "emcc"))
+        toolchain:set("toolset", "cxx", path.join(sdk, "em++"))
+        toolchain:set("toolset", "ld", path.join(sdk, "emcc"))
+        toolchain:set("toolset", "sh", path.join(sdk, "emcc"))
+        toolchain:set("toolset", "ar", path.join(sdk, "emar"))
+        toolchain:set("toolset", "ranlib", path.join(sdk, "emranlib"))
+        toolchain:set("toolset", "strip", path.join(sdk, "emstrip"))
+    end)
+
+-- WASM guest artifacts live in their own artifact subdir.
+local wasm_artifact_dir = path.join(artifact_dir, "wasm")
+
+-- Reactor link shape shared by every WASI guest module: no _start, callers
+-- initialize via _initialize, linear memory exported for host-side PCM reads.
+-- E09: wasi-sdk/LLVM 23 derives a tiny memory ceiling for reactor modules
+-- (min 0 / max ~46 pages observed), which starves FFmpeg allocation. Pin
+-- explicit bounds instead; actual usage is measured in the memory audit.
+-- E09: exporting __heap_base is REQUIRED for WAMR embedding — without it
+-- WAMR 2.4.5 places its app heap at __data_end and stomps guest .bss (the
+-- wasi-libc __tls_init guard lives there), making _initialize trap
+-- "unreachable". With the export, WAMR inserts its heap before __heap_base
+-- and rewrites the global; guest .bss stays intact.
+local wasi_reactor_ldflags = function ()
+    return {
+        "-mexec-model=reactor",
+        "-Wl,--export-memory",
+        "-Wl,--export-if-defined=__heap_base",
+        "-Wl,-z,stack-size=1048576",
+        "-Wl,--initial-memory=16777216",
+        "-Wl,--max-memory=268435456",
+    }
+end
+
+if get_config("wasm") then
+    target("songcore_wasm_lib")
+        set_kind("static")
+        set_default(false)
+        set_targetdir(wasm_artifact_dir)
+        set_optimize("smallest")
+        add_files("src/songcore_ffmpeg.c")
+        add_includedirs("include", {public = true})
+        add_deps("qianqian_av")
+
+    target("songcore_wasm")
+        set_kind("binary")
+        set_default(false)
+        set_targetdir(wasm_artifact_dir)
+        set_basename("SongCore")
+        set_extension(".wasm")
+        set_optimize("smallest")
+        add_files("src/songcore_ffmpeg.c", "src/wasm/songcore_wasm_bridge.c")
+        add_includedirs("include", "src/wasm")
+        add_deps("qianqian_av")
+        if get_config("wasm") == "wasi" then
+            add_ldflags(wasi_reactor_ldflags(), {force = true})
+        else
+            -- Emscripten: keep the same exports addressable from JS glue.
+            add_ldflags({
+                "-sALLOW_MEMORY_GROWTH=1",
+                "-sMODULARIZE=1",
+                "-sEXPORT_NAME=createSongCore",
+                "-sINVOKE_RUN=0",
+                "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
+                "-sEXPORTED_FUNCTIONS=[\"_initialize\",\"_song_wasm_open\",\"_song_wasm_probe\",\"_song_wasm_read_pcm\",\"_song_wasm_seek\",\"_song_wasm_close\",\"_malloc\",\"_free\"]",
+                "-sENVIRONMENT=node,web",
+            }, {force = true})
+        if get_config("wasm") == "wasi" then
+            -- E09: neutralize the wasi-libc init guard for WAMR (typed
+            -- finding E09-WAMR-1); no-op when the guard is absent
+            after_build(function (target)
+                os.exec("python3 tools/wasm_patch_initialize_guard.py "
+                        .. target:targetfile())
+            end)
+        end
+
+        end
+
+    target("qn_guest_wasm")
+        set_kind("binary")
+        set_default(false)
+        set_targetdir(wasm_artifact_dir)
+        set_basename("qn_guest_bench")
+        set_extension(".wasm")
+        set_optimize("smallest")
+        add_files("bench/wasm/qn_guest_bench.c")
+        add_includedirs("src/wasm")
+        add_deps("songcore_wasm_lib")
+        if get_config("wasm") == "wasi" then
+            add_ldflags(wasi_reactor_ldflags(), {force = true})
+        else
+            add_ldflags({
+                "-sALLOW_MEMORY_GROWTH=1",
+                "-sMODULARIZE=1",
+                "-sEXPORT_NAME=createQnGuestBench",
+                "-sINVOKE_RUN=0",
+                "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
+                "-sEXPORTED_FUNCTIONS=[\"_initialize\",\"_bench_bind\",\"_bench_correct\",\"_bench_bench\",\"_bench_pcm_prepare\",\"_bench_pcm_len\",\"_bench_pcm_ptr\",\"_bench_pcm_channels\",\"_bench_pcm_rate\",\"_bench_pcm_pull\",\"_bench_pcm_reset\",\"_bench_stage_alloc\",\"_bench_mem_pages\",\"_malloc\",\"_free\"]",
+                "-sENVIRONMENT=node,web",
+            }, {force = true})
+        if get_config("wasm") == "wasi" then
+            -- E09: neutralize the wasi-libc init guard for WAMR (typed
+            -- finding E09-WAMR-1); no-op when the guard is absent
+            after_build(function (target)
+                os.exec("python3 tools/wasm_patch_initialize_guard.py "
+                        .. target:targetfile())
+            end)
+        end
+
+        end
+
+    target("qn_guest_wasm_cmd")
+        set_kind("binary")
+        set_default(false)
+        set_targetdir(wasm_artifact_dir)
+        set_basename("qn_guest_bench_cmd")
+        set_extension(".wasm")
+        set_optimize("smallest")
+        add_files("bench/wasm/qn_guest_bench.c")
+        add_includedirs("src/wasm")
+        add_deps("songcore_wasm_lib")
+        add_defines("QN_GUEST_COMMAND")
+        if get_config("wasm") == "wasi" then
+            -- command model (_start instead of _initialize); same explicit
+            -- memory bounds -- LLVM 23 derives starved ceilings otherwise
+            add_ldflags({
+                "-Wl,--export-memory",
+                "-Wl,--export-if-defined=__heap_base",
+                "-Wl,-z,stack-size=1048576",
+                "-Wl,--initial-memory=16777216",
+                "-Wl,--max-memory=268435456",
+            }, {force = true})
+        end
+        after_build(function (target)
+            os.exec("python3 tools/wasm_patch_initialize_guard.py " .. target:targetfile())
+        end)
+
+    target("qn_pb_wasm")
+        set_kind("binary")
+        set_default(false)
+        set_targetdir(wasm_artifact_dir)
+        set_basename("qn_pb_guest")
+        set_extension(".wasm")
+        set_optimize("smallest")
+        add_files("bench/wasm/qn_pb_guest.c")
+        add_includedirs("src/wasm")
+        if get_config("wasm") == "wasi" then
+            add_ldflags(wasi_reactor_ldflags(), {force = true})
+        else
+            add_ldflags({
+                "-sALLOW_MEMORY_GROWTH=1",
+                "-sMODULARIZE=1",
+                "-sEXPORT_NAME=createQnPbGuest",
+                "-sINVOKE_RUN=0",
+                "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
+                "-sEXPORTED_FUNCTIONS=[\"_initialize\",\"_pb_fill\",\"_pb_ptr\",\"_pb_pull\",\"_pb_reset\",\"_pb_len\",\"_malloc\",\"_free\"]",
+                "-sENVIRONMENT=node,web",
+            }, {force = true})
+        if get_config("wasm") == "wasi" then
+            -- E09: neutralize the wasi-libc init guard for WAMR (typed
+            -- finding E09-WAMR-1); no-op when the guard is absent
+            after_build(function (target)
+                os.exec("python3 tools/wasm_patch_initialize_guard.py "
+                        .. target:targetfile())
+            end)
+        end
+
+        end
+end
+
+-- Host-side runtime ladder (native session only).
+if get_config("e09") then
+    local wamr_root = path.join(e09_home(), "wasm-micro-runtime-WAMR-2.4.5")
+    local wamr_libdir = path.join(wamr_root, "product-mini", "platforms", "linux", "build-e09")
+    local wasm3_root = path.join(e09_home(), "wasm3-2b4a5fa4c35def3552a9283c4f7aab39a93f33e9")
+    local wasmtime_root = path.join(e09_home(), "wasmtime")
+
+    target("qn_native_runner")
+        set_kind("binary")
+        set_default(false)
+        set_targetdir(artifact_dir)
+        set_optimize("smallest") -- guest harness parity with the WASM guests
+        add_files("bench/wasm/qn_guest_bench.c", "tools/wasm/qn_host_file.c")
+        add_includedirs("src/wasm", "tools/wasm")
+        add_defines("QN_GUEST_NATIVE")
+        add_deps("songcore")
+        if is_plat("linux") or is_plat("macosx") then
+            add_syslinks("m", "pthread")
+        end
+
+    target("qn_wamr_runner")
+        set_kind("binary")
+        set_default(false)
+        set_targetdir(artifact_dir)
+        set_optimize("faster") -- host-side runner code; guest speed is runtime-owned
+        add_files("tools/wasm/qn_wamr_runner.c", "tools/wasm/qn_runner_common.c")
+        add_includedirs("tools/wasm", path.join(wamr_root, "core", "iwasm", "include"))
+        add_linkdirs(wamr_libdir)
+        add_links("iwasm")
+        if is_plat("linux") then
+            add_syslinks("pthread", "dl", "m")
+        end
+
+    target("qn_wamr_aot_runner")
+        set_kind("binary")
+        set_default(false)
+        set_targetdir(artifact_dir)
+        set_optimize("faster")
+        add_files("tools/wasm/qn_wamr_runner.c", "tools/wasm/qn_runner_common.c")
+        add_includedirs("tools/wasm", path.join(wamr_root, "core", "iwasm", "include"))
+        add_linkdirs(wamr_libdir)
+        add_links("iwasm")
+        add_defines("QN_WAMR_AOT_RUNNER=1")
+        if is_plat("linux") then
+            add_syslinks("pthread", "dl", "m")
+        end
+
+    target("qn_wasm3_runner")
+        set_kind("binary")
+        set_default(false)
+        set_targetdir(artifact_dir)
+        set_optimize("faster")
+        add_files("tools/wasm/qn_wasm3_runner.c", "tools/wasm/qn_runner_common.c")
+        add_files(path.join(wasm3_root, "source", "*.c"))
+        remove_files(path.join(wasm3_root, "source", "m3_api_uvwasi.c"),
+                     path.join(wasm3_root, "source", "m3_api_wasi.c"),
+                     path.join(wasm3_root, "source", "m3_api_meta_wasi.c"),
+                     path.join(wasm3_root, "source", "m3_api_libc.c"),
+                     path.join(wasm3_root, "source", "m3_api_tracer.c"))
+        add_includedirs("tools/wasm", path.join(wasm3_root, "source"))
+        add_defines("d_m3HasWASI=0")
+        if is_plat("linux") then
+            add_syslinks("pthread", "dl", "m")
+        end
+
+    target("qn_wasmtime_runner")
+        set_kind("binary")
+        set_default(false)
+        set_targetdir(artifact_dir)
+        set_optimize("faster")
+        add_files("tools/wasm/qn_wasmtime_runner.c", "tools/wasm/qn_runner_common.c")
+        add_includedirs("tools/wasm", wasmtime_root .. "/include")
+        add_ldflags(wasmtime_root .. "/lib/libwasmtime.a", {force = true})
+        if is_plat("linux") then
+            add_syslinks("pthread", "dl", "m")
+        end
+
+    -- §14 PCM-copy microbenchmark, native side of the same protocol.
+    target("qn_pb_native")
+        set_kind("binary")
+        set_default(false)
+        set_targetdir(artifact_dir)
+        set_optimize("faster")
+        add_files("tools/wasm/qn_pb_native.c", "tools/wasm/qn_runner_common.c")
+        add_includedirs("tools/wasm")
+        if is_plat("linux") then
+            add_syslinks("m")
+        end
+end

@@ -1,0 +1,58 @@
+{
+    "profile": "wasm-common-formats",
+    "experiment": "e09-wasm-total-cost",
+    "extends": "c5-opus",
+    "description": "E09 capability intent for WASM targets (wasi + emscripten): the frozen Common Formats set from c5-opus unchanged. WASM adds no capability; it only changes the codegen target, so the closure must be re-derived per target by tools/wasm_import.py. x86asm stays in the disable list (it is a no-op on wasm) to keep the capability intent byte-identical with the frozen native set.",
+    "component_base": "everything-disabled",
+    "libraries": {
+        "enable": [
+            "avformat",
+            "avcodec",
+            "swresample"
+        ],
+        "disable": [
+            "avdevice",
+            "avfilter",
+            "swscale"
+        ]
+    },
+    "disable": [
+        "autodetect",
+        "debug",
+        "devices",
+        "doc",
+        "iconv",
+        "network",
+        "programs",
+        "protocols",
+        "pthreads",
+        "x86asm"
+    ],
+    "components": {
+        "demuxer": [
+            "aac",
+            "flac",
+            "mov",
+            "mp3",
+            "ogg",
+            "wav"
+        ],
+        "decoder": [
+            "aac",
+            "alac",
+            "flac",
+            "mp3float",
+            "opus",
+            "vorbis",
+            "pcm_u8",
+            "pcm_s16le",
+            "pcm_s24le",
+            "pcm_s32le",
+            "pcm_f32le",
+            "pcm_f64le"
+        ],
+        "parser": [
+            "mpegaudio"
+        ]
+    }
+}
