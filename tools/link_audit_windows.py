@@ -217,12 +217,16 @@ def main() -> None:
             d, u, w = nm_symbols(obj, nm)
             m["defined"], m["undef"], m["weak_undef"] = d, u, w
 
-        # --- contract pin: the probe must reference EXACTLY the five APIs
+        # --- contract pin: the probe must reference EXACTLY the five APIs.
+        # __main is whitelisted: the mingw CRT convention emits a call to it
+        # from main() for runtime initializers; it is resolved by the CRT
+        # startup objects and can never pull an FFmpeg archive member.
         probe_c = ROOT / args.probe_src
         probe_obj = work / "probe.obj"
         run([cc, "-O2", "-I", str(ROOT / "include"), "-c", str(probe_c),
              "-o", str(probe_obj)])
         probe_defined, probe_undef, _ = nm_symbols(probe_obj, nm)
+        probe_undef -= {"__main"}
         if probe_undef != CONTRACT_SYMBOLS:
             raise SystemExit(
                 f"probe contract pin violated: probe undefined set is {sorted(probe_undef)}, "
