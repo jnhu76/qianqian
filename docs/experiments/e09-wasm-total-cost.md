@@ -58,7 +58,9 @@ WAMR classic-interp 的 rewriter 把该 `br_if` 的跳转目标改写到
 `tools/wasm_patch_initialize_guard.py` 只把 `45 0d 00 00 0b → 45 0d 00
 01 0b`（unreachable→nop，仅限 `_initialize`/`_start` 函数体内、幂等）
 后即可启动。语义：单次 init 下 nop 等价；该 finding 上游级，升级 WAMR
-需复测。
+需复测。**AOT 路径同样 trap**（wamrc 编译 pristine 模块的 .aot 在
+`_initialize` 同样 "unreachable"，workaround 副本的 .aot 正常），因此
+E09-WAMR-1 覆盖 WAMR 的两条代码路径。
 
 ### E09-WAMR-2：app heap 布局在缺少 `__heap_base` 导出时踩 guest .bss
 
@@ -109,20 +111,62 @@ pb/native twin 曾把 64 位堆指针截断成 i32 传给 memcpy（段错误）�
 首轮 gate 把 `decode_ms` 一并比较，出现"native vs 全体 42/44 假阴性"。
 observable 必须只含可观测行为字段（`tools/wasm_gate.py` 已修正并注明）。
 
+### E09-native-pcm-1：native twin 的 Mode C 把 64 位堆指针截断成 wasm32 i32
+
+native twin 的 `bench_pcm_host` 复用 guest 的 `bench_pcm_pull(int32 dst)`
+（wasm32 线性内存指针口径），把 `malloc` 出的 64 位堆指针强转 i32 后符号
+扩展成非法地址 → SIGSEGV。与 E09-bridge-abi-1 同族；修复为 native 专用
+`pull_native(uint8_t*)` 直传真实指针（`bench/wasm/qn_guest_bench.c`）。
+
+## Typed findings 责任归属（review 后重分类）
+
+- **upstream candidates**：E09-WAMR-1（已具最小 repro 形态；正式 upstream
+  report 待本 PR machine-closed 后提交，修复方向是 classic-interp 的
+  branch/block target rewrite + 最小回归测试：`br_if 0` 必须跳到 block end，
+  不能落在 `end` 前的指令）。E09-WAMR-2 暂称 **upstream candidate，待
+  contract audit**——需先证明"无 `__heap_base` 导出 + 合法模块 + 正常
+  instantiate = WAMR 覆盖 guest live .bss"；若官方 contract 本要求该
+  embedding 模式导出 `__heap_base`，则应归为 documentation/API safety
+  issue 而非语义 bug。
+- **Qianqian bugs**：E09-bridge-abi-1、E09-native-pcm-1、E09-gate-1、
+  E09-xmake-1（artifact 会话互相覆盖——已有纪律，见工具链 provenance）。
+- **API/toolchain hazards**：E09-WAMR-3（变参 ABI）、E09-emscripten-1
+  （import 名压缩/重排）、E09-wasi-libc-1（guard 形态依赖 LLVM 内联决策）。
+
+## Artifact 纪律（pristine vs WAMR-workaround）
+
+WASI session 现在产出 **pristine** toolchain artifact（xmake 不再在
+after_build 里打补丁）。WAMR classic-interp 所需的 init-guard workaround
+（E09-WAMR-1）只施加在派生副本上，由 `tools/wasm_prepare_artifacts.py`
+生成并记录 pre/post SHA256（`bench/results/wasm/artifacts.json`）：
+
+- `SongCore.wasm` / `qn_guest_bench.wasm` = pristine，Wasmtime / wasm3 /
+  Node 消费；
+- `SongCore.wamr-workaround.wasm` / `qn_guest_bench.wamr-workaround.wasm` =
+  WAMR classic-interp 消费；
+- `SongCore.aot`（product，由 `SongCore.wamr-workaround.wasm` 经 wamrc
+  编译——WAMR AOT 同样 trap pristine 的 init guard，E09-WAMR-1 覆盖 AOT
+  路径）与 `qn_guest_bench.aot` 供 AOT 路径。
+
+回归证明：pristine 在 Wasmtime / wasm3 / Node 正常初始化并在 WAMR
+classic-interp 于 `_initialize` trap（unreachable）；workaround 副本在 WAMR
+classic-interp 与 WAMR AOT 均正常初始化。
+
 <!-- BEGIN GENERATED TABLES -->
 ### 1. Correctness gate（44-case，native twin 为 reference）
 
-machine authority：`bench/results/wasm/correctness.json`
+machine authority：`bench/results/wasm/correctness.json` + `correctness-em.json`（V8 行，Node harness 独立 authority）
 
-| runtime | passed / 44 |
-|---|---|
-| native | [44, 44] |
-| wamr | [28, 44] |
-| wamr_aot | [28, 44] |
-| wasm3 | [28, 44] |
-| wasmtime | [28, 44] |
+| runtime | exact | accepted\_with\_tolerance | rejected |
+|---|---:|---:|---:|
+| native | 44 | 0 | 0 |
+| wamr | 28 | 16 | 0 |
+| wamr_aot | 28 | 16 | 0 |
+| wasm3 | 28 | 16 | 0 |
+| wasmtime | 28 | 16 | 0 |
+| emscripten | 28 | 16 | 0 |
 
-wasm 侧互检（四个 wasm runtime 相互 observable 全等）：**44 / 44 一致，0 例分歧**。
+wasm 侧互检（emscripten, wamr, wamr_aot, wasm3, wasmtime 相互 observable 全等）：**44 / 44 一致，0 例分歧**。
 
 ### 3. 执行 ladder（Mode A，execution_tax = T_guest / T_native）
 
@@ -130,123 +174,188 @@ machine authority：`bench/results/wasm/performance.json`（逐 runtime 5 fixtur
 
 | runtime | flac 16/44.8k stereo (4 s) | mp3 cbr (4 s) | aac-lc (12 s) | opus (12 s) | mp3 cbr long (12 s) |
 |---|---:|---:|---:|---:|---:|
-| native ms | 6.85 | 3.43 | 10.50 | 31.39 | 8.55 |
-| wamr ms | 229.91 | 301.86 | 655.47 | 3,092.42 | 868.59 |
-| wamr_aot ms | 5.33 | 4.99 | 9.71 | 28.77 | 15.20 |
-| wasm3 ms | 86.08 | 164.79 | 283.26 | 853.78 | 533.69 |
-| wasmtime ms | 5.95 | 6.64 | 11.38 | 32.33 | 25.29 |
+| native ms | 8.68 | 7.19 | 15.04 | 46.25 | 14.31 |
+| wamr ms | 352.74 | 499.17 | 1,020.31 | 3,415.26 | 1,091.32 |
+| wamr_aot ms | 7.50 | 6.43 | 10.83 | 35.69 | 18.19 |
+| wasm3 ms | 108.16 | 197.31 | 358.22 | 998.07 | 597.97 |
+| wasmtime ms | 9.74 | 10.15 | 15.77 | 46.60 | 26.49 |
 | native tax | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 |
-| wamr tax | 33.57 | 87.90 | 62.42 | 98.50 | 101.59 |
-| wamr_aot tax | 0.78 | 1.45 | 0.92 | 0.92 | 1.78 |
-| wasm3 tax | 12.57 | 47.99 | 26.97 | 27.20 | 62.42 |
-| wasmtime tax | 0.87 | 1.93 | 1.08 | 1.03 | 2.96 |
-| emscripten ms | 8.26 | 14.23 | 18.56 | 57.11 | 25.59 |
-| emscripten tax | 1.21 | 4.14 | 1.77 | 1.82 | 2.99 |
+| wamr tax | 40.63 | 69.42 | 67.86 | 73.84 | 76.26 |
+| wamr_aot tax | 0.86 | 0.89 | 0.72 | 0.77 | 1.27 |
+| wasm3 tax | 12.46 | 27.44 | 23.82 | 21.58 | 41.78 |
+| wasmtime tax | 1.12 | 1.41 | 1.05 | 1.01 | 1.85 |
+| emscripten ms | 10.89 | 17.86 | 20.64 | 54.90 | 34.88 |
+| emscripten tax | 1.25 | 2.48 | 1.37 | 1.19 | 2.44 |
 
-perf stat（flac，bench×3，含 instantiate）：
+perf stat（flac，bench×3，整进程 elapsed——startup 分阶段见 `lifecycle`）：
 
-| runtime | cycles（flac bench×3） | IPC | elapsed ms |
+| runtime | cycles（flac bench×3） | IPC | elapsed ms（整进程） |
 |---|---:|---:|---:|
-| native | 163,395,454 | 2.68 | 53 |
-| wamr | 7,106,184,038 | 2.55 | 1,972 |
-| wamr_aot | 188,383,865 | 2.39 | 67 |
-| wasm3 | 2,943,488,104 | 1.97 | 806 |
-| wasmtime | 4,775,044,732 | 1.49 | 286 |
+| native | 181,274,539 | 2.75 | 72 |
+| wamr | 8,554,267,096 | 2.12 | 3,118 |
+| wamr_aot | 191,592,563 | 2.27 | 84 |
+| wasm3 | 3,057,142,236 | 1.90 | 988 |
+| wasmtime | 5,660,557,418 | 1.27 | 719 |
 
-### 4. Bridge / boundary（flac）
+### 4. Bridge / boundary（flac，bridge_tax = 回拷成本 / 该后端 guest 解码成本）
 
-machine authority：`bench/results/wasm/memory.json`（Mode B/C）+ `em_performance.json`
+machine authority：`bench/results/wasm/memory.json`（Mode B/C）+ `em_performance.json`（em 行，view/copy/hash 分列）
 
-| runtime | Mode B copy GB/s | Mode C 256fr calls/s | Mode C 4096fr calls/s | Mode C max call ms (4096fr) |
-|---|---:|---:|---:|---:|
-| wamr | 1.71 | 130,865 | 8,628 | 0.004 |
-| wamr_aot | 1.74 | 124,185 | 8,525 | 0.042 |
-| wasm3 | 1.70 | 133,903 | 8,956 | 0.004 |
-| wasmtime | 6.64 | 125,153 | 8,705 | 0.024 |
-| emscripten | 0.67 | — | — | 0.037 |
+| runtime | Mode B copy GB/s | copy ms | guest decode ms | bridge\_tax | Mode C 256fr calls/s | Mode C 4096fr calls/s |
+|---|---:|---:|---:|---:|---:|---:|
+| native | 1.45 | 0.976 | 8.68 | 0.112 | 94,032 | 5,891 |
+| wamr | 1.10 | 1.280 | 352.74 | 0.004 | 92,033 | 5,536 |
+| wamr_aot | 1.08 | 1.300 | 7.50 | 0.173 | 75,401 | 4,980 |
+| wasm3 | 1.10 | 1.285 | 108.16 | 0.012 | 85,719 | 6,328 |
+| wasmtime | 3.65 | 0.387 | 9.74 | 0.040 | 99,785 | 6,640 |
+| emscripten（view+copy+hash 分列） | 1.30 (copy) | 1.085 | 10.89 | 0.100 | — | — |
 
 ### 6. Memory audit
 
-machine authority：`bench/results/wasm/memory.json`
+machine authority：`bench/results/wasm/memory.json`（native 行已修正 CLI，RSS 为真实测量）
 
 | runtime | 线性内存 before→after（pages） | memory.grow 次数 | peak RSS（flac / mp3-long）MB |
 |---|---|---|---|
-| wamr | 256→256 | 0 | 29.8 / 36.5 |
-| wamr_aot | 256→256 | 0 | 34.2 / 41.1 |
-| wasm3 | 256→256 | 0 | 22.4 / 25.3 |
-| wasmtime | 256→256 | 0 | 66.3 / 72.9 |
+| native | n/a（native 无线性内存） | — | 6.8 / 12.6 |
+| wamr | 256→256 | 0 | 28.5 / 36.5 |
+| wamr_aot | 256→256 | 0 | 33.1 / 41.1 |
+| wasm3 | 256→256 | 0 | 22.5 / 25.4 |
+| wasmtime | 256→256 | 0 | 68.7 / 75.2 |
 
-### 2. Shipping footprint
+### 7. Lifecycle / startup（load → compile → instantiate → first open → first PCM → steady）
 
-machine authority：`bench/results/wasm/shipping.json` + `shipping-em.json`
+machine authority：`bench/results/wasm/lifecycle.json`（flac）
 
-| 交付形态 | raw | gzip -9 | brotli -11 |
-|---|---:|---:|---:|
-| WASI guest bench .wasm | 1,303,377 | 550,521 | 451,334 |
-| WASI SongCore.wasm（reactor） | 1,292,868 | — | — |
-| wamrc AOT artifact（x86_64） | 3,588,964 | — | — |
-| EM guest bench .wasm（-g1 保符号名） | 1,142,021 | 539,254 | 444,184 |
-| EM glue .js（bench） | 118,958 | 33,319 | 28,236 |
+| runtime | load ms | compile/JIT ms | instantiate ms | first open ms | first PCM ms | steady decode ms |
+|---|---:|---:|---:|---:|---:|---:|
+| native | — | — | — | 0.61 | 0.13 | 8.29 |
+| wamr | 14.92 | — | 2.31 | 22.20 | 7.63 | 334.00 |
+| wamr_aot | 7.51 | — | 1.14 | 2.58 | 0.20 | 8.79 |
+| wasm3 | 1.54 | 12.48 | — | 11.41 | 2.68 | 124.79 |
+| wasmtime | 1.83 | 414.60 | 0.28 | 0.49 | 0.15 | 8.77 |
+| emscripten | 1.56 | — | 16.59 | 13.06 | 0.65 | 14.96 |
+
+### 2. Shipping footprint（product-shaped deployment sets）
+
+machine authority：`bench/results/wasm/shipping.json`（host = stripped release runner；AOT 替代 .wasm）
+
+| 交付形态 | host（stripped release） | guest artifact | 合计 raw | 合计 xz -9e | 浏览器口径 gzip/brotli |
+|---|---:|---:|---:|---:|---:|
+| native | 1,505,608 | —（native 内置） | 1,505,608 | 580,792 | — |
+| wamr_interp | 465,056 | SongCore.wamr-workaround.wasm 1,292,868 | 1,757,924 | 591,664 | — |
+| wamr_aot | 465,056 | SongCore.aot 3,555,004 | 4,020,060 | 1,306,528 | — |
+| wasm3 | 207,432 | SongCore.wasm 1,292,868 | 1,500,300 | 499,524 | — |
+| wasmtime | 25,413,560 | SongCore.wasm 1,292,868 | 26,706,428 | 6,753,232 | — |
+| browser | 118,367 | SongCore.wasm (emscripten) 1,132,413 | 1,250,780 | — | 564,651 / 468,094 |
+
+参考行（单 artifact）：
+- SongCore.wasm（pristine）：raw 1,292,868，gzip -9 546,255，brotli -11 447,763
+- SongCore.aot（product，wamrc from SongCore.wamr-workaround.wasm）：raw 3,555,004，xz -9e 1,146,836（AOT 部署时替代 .wasm，不与 .wasm 相加）
 
 ### float 容差（native vs wasm，剩余分歧全量解释）
 
-machine authority：`bench/results/wasm/tolerance.json`
+machine authority：`bench/results/wasm/tolerance.json`（逐 fixture 证据，覆盖全部 tolerated fixture）
 
-| fixture | max\|Δ\| (f32) | 16-bit LSB 折算 | 差异样本占比 |
-|---|---:|---:|---:|
-| mp3-cbr-id3v23.mp3 | 1.79e-07 | 0.0059 | 48.64% |
-| aac-lc-44-stereo.m4a | 5.96e-08 | 0.0020 | 0.00% |
-| vorbis-44-stereo.ogg | 0.00e+00 | 0.0000 | 0.00% |
-| opus-48-stereo.opus | 0.00e+00 | 0.0000 | 0.00% |
+| fixture | max\|Δ\| (f32) | 16-bit LSB 折算 | 差异样本占比 | samples / frames |
+|---|---:|---:|---:|---:|
+| aac-adts-44-stereo.aac | 5.96e-08 | 0.0020 | 0.04% | 178176 / 174 |
+| aac-artwork.m4a | 5.96e-08 | 0.0020 | 0.02% | 176400 / 173 |
+| aac-lc-44-mono.m4a | 5.96e-08 | 0.0020 | 0.01% | 176400 / 173 |
+| aac-lc-44-stereo.m4a | 5.96e-08 | 0.0020 | 0.01% | 529200 / 517 |
+| aac-lc-48-stereo.m4a | 2.98e-08 | 0.0010 | 0.02% | 192000 / 188 |
+| aac-malformed-header.aac | 5.96e-08 | 0.0020 | 1.89% | 3072 / 3 |
+| aac-short.m4a | 5.96e-08 | 0.0020 | 0.23% | 13230 / 13 |
+| aac-truncated.m4a | 5.96e-08 | 0.0020 | 0.01% | 314368 / 307 |
+| aac-vbr.m4a | 5.96e-08 | 0.0020 | 0.02% | 176400 / 173 |
+| mp3-cbr-id3v23-artwork.mp3 | 1.79e-07 | 0.0059 | 97.29% | 176400 / 155 |
+| mp3-cbr-id3v23.mp3 | 1.79e-07 | 0.0059 | 97.29% | 176400 / 155 |
+| mp3-corrupt-tail.mp3 | 1.79e-07 | 0.0059 | 97.09% | 132527 / 116 |
+| mp3-long.mp3 | 1.79e-07 | 0.0059 | 97.15% | 529200 / 461 |
+| mp3-minimal.mp3 | 1.79e-07 | 0.0059 | 97.52% | 88200 / 78 |
+| mp3-short.mp3 | 1.19e-07 | 0.0039 | 97.66% | 13230 / 13 |
+| mp3-vbr-id3v24.mp3 | 1.79e-07 | 0.0059 | 97.11% | 176400 / 155 |
+| opus-48-stereo.opus | 0.00e+00 | 0.0000 | 0.00% | 576000 / 601 |
+| opus-truncated.opus | 0.00e+00 | 0.0000 | 0.00% | 431688 / 450 |
+| vorbis-44-stereo.ogg | 0.00e+00 | 0.0000 | 0.00% | 529200 / 518 |
+| vorbis-truncated.ogg | 0.00e+00 | 0.0000 | 0.00% | 360000 / 352 |
 
 <!-- END GENERATED TABLES -->
 
 ## 结果解读
 
-- **解释执行是数量级瓶颈**：WAMR classic-interp tax 33.6–101.6×、
-  wasm3 12.6–62.4×，且 cycles 放大与之匹配（43.5× / 18×）；perf 采样
-  99.4% 落在 `wasm_interp_call_func_bytecode`。fixture 越长/越碎，
-  tax 越高（mp3-long 最差）。
-- **AOT/JIT 把执行税基本抹平**：wamr_aot 0.78–1.78×、wasmtime
-  0.87–2.96×、emscripten 1.21–2.99×。wamr_aot 在 flac 上 0.78× **反超
-  native twin**——口径解释：native twin 与 guest 同为 -Os，wamrc 以
-  LLVM -O3 重新本机代码生成，赢在 codegen 而非"wasm 更快"。
-- **Bridge 不是瓶颈**：Mode B 全量回拷 1.4 MB（4s 音频）0.83–0.87 ms，
-  仅为 wamr guest 解码时间的 ~0.3%；Mode C 每次边界调用 2–4 µs
-  （256 帧粒度 ~130K calls/s），max call 无长尾异常。pb 微基准：native
-  直拷 1 MiB 22.0 µs（47.6 GB/s），call+copy 与 direct 差 <4%。
-- **内存静止**：16 MB 初始线性内存在全部 fixture 上零 `memory.grow`；
-  peak RSS wasm3 22 MB 最省、wasmtime 66–73 MB 最重（含 JIT 编译期）。
-- **正确性分层清晰**：五个 wasm runtime（含 Emscripten/V8）彼此
-  **44/44 bit-identical**；与 native twin 的残余分歧全部由 float-DSP
-  codegen 解释（mp3 max|Δ| = 0.006 LSB@16bit、aac 0.002 LSB、
-  vorbis/opus = 0）。整数/定点 codec（flac/alac/wav/opus/vorbis）对
-  native 也 bit-exact；降级（degraded）行为逐 case 同型。
+- **解释执行是数量级瓶颈**：WAMR classic-interp 与 wasm3 的 execution_tax
+  都在一个数量级以上（见 ladder 表），且 cycles 放大与之匹配；perf 采样
+  99.4% 落在 `wasm_interp_call_func_bytecode`。fixture 越长/越碎，tax 越高
+  （mp3-long 最差）。
+- **AOT/JIT 把执行税基本抹平**：wamr_aot、wasmtime 稳态解码回到
+  native 同量级；wamr_aot 在部分 fixture 上 **反超 native twin**——口径
+  解释：native twin 与 guest 同为 -Os，wamrc 以 LLVM -O3 重新本机代码
+  生成，赢在 codegen 而非"wasm 更快"。
+- **startup 与稳态解码必须分开看**：wasmtime 整进程 elapsed 的大头是
+  **JIT compile**（lifecycle 表里 compile_ms 单独列出，flac 上数百 ms
+  量级），instantiate 本身是亚毫秒级；WAMR AOT 的 load 也远大于
+  instantiate。lifecycle 表按
+  load → compile → instantiate → first open → first PCM → steady decode
+  分阶段列，禁止再用整进程 elapsed 当 startup。
+- **Bridge 是相对成本，不是绝对结论**：`bridge_tax = 回拷成本 / 该后端
+  guest 解码成本` 逐后端计算（见 bridge 表）。慢解释器下仅 ~0.4%
+  （WAMR interp flac），但 **execution tax 一旦被 AOT/JIT 消掉，
+  bridge/copy 会从三级成本升级成一线成本**：WAMR AOT flac ~17%、
+  Wasmtime ~4%、emscripten ~10%，native 直拷基线与之同量级（同一 host
+  memcpy）。EM 的 Mode B 按 view / copy / hash 分列（`Buffer.from` 是
+  共享 view 不是复制，且原测量把 SHA256 混进了 copyMs——hash 实测比 copy
+  还贵）。
+- **内存**：native RSS 基线已修正 CLI 并实测（远低于全部 wasm runtime，
+  无运行时开销）；`memory.grow` 为 **0 的结论限定在已审计的代表性
+  fixture（flac + mp3-long）**，不是声称 44 案全量 instrumented。wasm3
+  最省、wasmtime 最重（含 JIT 编译期）。
+- **正确性分层由机器 authority 支撑**：gate 现在把
+  `exact-required + tolerance-allowed = accepted` 写成可执行策略——结构
+  字段（frame/sample count、typed degraded、metadata、seek 语义）exact，
+  只有 mp3/aac float-DSP 族的 PCM hash 字段走 tolerance，且每个 tolerated
+  fixture 都有逐 fixture 证据（`tolerance.json`，max|Δ| ≤ 1e-6、samples/
+  frames 相等）。`exact_matches` 与 `accepted_with_tolerance` 分别计数，
+  28/44 exact + 16/44 tolerance 的事实不被藏掉。Emscripten/V8 由独立的
+  `correctness-em.json`（Node harness）加入同一 authority，"五个 wasm
+  实现 44/44 bit-identical"因此有统一机器依据。
 
 ## Bottleneck verdict（Layer 1）
 
 1. **#1 runtime dispatch（解释执行）**：唯一数量级项。证据：tax 表
-   （interp 系 12–102×）× perf 采样（99.4% 解释循环）× cycles 放大。
-   对策（供 Layer 2 决策）：AOT（wamrc）或宿主 JIT（wasmtime/JS 引擎）。
-2. **#2 shipping（AOT 的代价在体积）**：.aot artifact 3.59 MB ≈ guest
-   .wasm 的 2.75×；runtime 静态份额 wasmtime 71 MB(.a) >> WAMR/WASM3
-   (<1 MB 级)。分发口径的取舍是 guest+runtime 总和，不是 guest 单体。
-3. **#3 bridge/boundary 可忽略**：<1% 总成本，且协议本身无放大；
-   惟需记住 E09-bridge-abi-1 的 32 位指针边界。
+   （interp 系全部在一个数量级以上）× perf 采样（99.4% 解释循环）×
+   cycles 放大。对策（供 Layer 2 决策）：AOT（wamrc）或宿主 JIT
+   （wasmtime/JS 引擎）。
+2. **#2 shipping / startup（AOT 与 JIT 的代价在体积与启动）**：按
+   product-shaped deployment set 计（stripped release host + 对应 guest
+   artifact；AOT 以 .aot **替代** .wasm，不双份相加）。wasmtime host
+   静态份额最大（stripped 仍 ~25 MB 级，含 JIT）；WAMR/wasm3 host
+   <1 MB 级；AOT artifact（product `SongCore.aot`）是 guest .wasm 的
+   ~2.75×。startup 的 JIT compile 是 wasmtime 的启动大头。
+3. **#3 bridge/boundary 在 execution tax 消除后进入一线**：慢解释器下
+   bridge 可忽略（~0.4%），AOT/JIT 下 4–17%（见 bridge 表）；协议本身
+   无放大，惟需记住 E09-bridge-abi-1 / E09-native-pcm-1 的 64 位宿主
+   指针边界。
 
 ## Layer 1 decision gate
 
-- 正确性 gate：**PASS**（native twin 44/44；wasm 侧互检 44/44；
-  分歧全部由 tolerance.json 量化解释，降级行为同型）。
-- 性能 / bridge / 内存 / shipping 数据：**完备**（真实环境测量，
-  provenance 齐全）。
+- 正确性 gate：**PASS**（可执行策略：exact + tolerance = accepted，
+  rejected = 0；`exact_matches` 与 `accepted_with_tolerance` 分开计数；
+  每个 tolerated fixture 都有逐 fixture 证据；Emscripten/V8 由独立
+  `correctness-em.json` 加入同一 authority；降级行为同型）。
+- 性能 / bridge / 内存 / shipping / lifecycle 数据：**完备**（真实环境
+  测量，provenance 齐全；native 内存基线 CLI 已修正；startup 分阶段
+  测量）。
 - 判定：**Layer 1 PASS，Layer 2（Kotlin）解锁**。按任务边界本轮
-  到此 **STOP**：不 merge、不启动 Layer 2。
+  到此 **STOP**：不 merge、不启动 Layer 2。E09-WAMR-1 upstream report
+  在本次 machine-closure 之后单独提交。
 
 ## 结论有效性声明
 
-- 本文件所有数字槽位由 `tools/wasm_report_tables.py` 从
-  `bench/results/wasm/summary.json` 派生；手写即违规。
+- 本文件所有数字槽位由 `tools/wasm_report_tables.py --check` 保证与
+  `bench/results/wasm/summary.json` 同步；summary 是唯一 machine
+  authority，禁止任何脚本绕过它直读原始 JSON。
 - 真实环境全量运行（Linux x86_64 / WSL2）；Windows 侧不在本轮范围。
 - Emscripten 数据经 Node harness 实测（V8 口径）；浏览器（JSPI/worker）
   形态待 Layer 2 按需补测。
+- `memory.grow = 0` 仅覆盖已审计的代表性 fixture（flac + mp3-long），
+  不扩展到 44 案全量。

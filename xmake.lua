@@ -298,16 +298,17 @@ if get_config("wasm") then
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
                 "-sEXPORTED_FUNCTIONS=[\"_song_wasm_open\",\"_song_wasm_probe\",\"_song_wasm_read_pcm\",\"_song_wasm_seek\",\"_song_wasm_close\",\"_malloc\",\"_free\"]",
-                "-g1", -- keep import/export symbol names: the door is wired by name
+                "-g1", -- keep export symbol names for the JS glue (E09-emscripten-1:
+                       -- the door IMPORTS are wired by type signature in
+                       -- tools/wasm_em_node_harness.mjs because emscripten minifies
+                       -- names and the linker reorders import slots)
                 "-sENVIRONMENT=node,web",
             }, {force = true})
         if get_config("wasm") == "wasi" then
-            -- E09: neutralize the wasi-libc init guard for WAMR (typed
-            -- finding E09-WAMR-1); no-op when the guard is absent
-            after_build(function (target)
-                os.exec("python3 tools/wasm_patch_initialize_guard.py "
-                        .. target:targetfile())
-            end)
+            -- E09: artifact stays PRISTINE toolchain output. The WAMR-only
+            -- init-guard workaround (E09-WAMR-1) is applied to *copies* by
+            -- tools/wasm_prepare_artifacts.py so Wasmtime/wasm3/Node always
+            -- see unmodified bytes.
         end
 
         end
@@ -336,17 +337,18 @@ if get_config("wasm") then
                 "-sEXPORT_NAME=createQnGuestBench",
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
-                "-sEXPORTED_FUNCTIONS=[\"_bench_bind\",\"_bench_correct\",\"_bench_bench\",\"_bench_pcm_prepare\",\"_bench_pcm_len\",\"_bench_pcm_ptr\",\"_bench_pcm_channels\",\"_bench_pcm_rate\",\"_bench_pcm_pull\",\"_bench_pcm_reset\",\"_bench_stage_alloc\",\"_bench_mem_pages\",\"_malloc\",\"_free\"]",
-                "-g1", -- keep import/export symbol names: the door is wired by name
+                "-sEXPORTED_FUNCTIONS=[\"_bench_bind\",\"_bench_correct\",\"_bench_bench\",\"_bench_lifecycle\",\"_bench_pcm_prepare\",\"_bench_pcm_len\",\"_bench_pcm_ptr\",\"_bench_pcm_channels\",\"_bench_pcm_rate\",\"_bench_pcm_pull\",\"_bench_pcm_reset\",\"_bench_stage_alloc\",\"_bench_mem_pages\",\"_malloc\",\"_free\"]",
+                "-g1", -- keep export symbol names for the JS glue (E09-emscripten-1:
+                       -- the door IMPORTS are wired by type signature in
+                       -- tools/wasm_em_node_harness.mjs because emscripten minifies
+                       -- names and the linker reorders import slots)
                 "-sENVIRONMENT=node,web",
             }, {force = true})
         if get_config("wasm") == "wasi" then
-            -- E09: neutralize the wasi-libc init guard for WAMR (typed
-            -- finding E09-WAMR-1); no-op when the guard is absent
-            after_build(function (target)
-                os.exec("python3 tools/wasm_patch_initialize_guard.py "
-                        .. target:targetfile())
-            end)
+            -- E09: artifact stays PRISTINE toolchain output. The WAMR-only
+            -- init-guard workaround (E09-WAMR-1) is applied to *copies* by
+            -- tools/wasm_prepare_artifacts.py so Wasmtime/wasm3/Node always
+            -- see unmodified bytes.
         end
 
         end
@@ -373,9 +375,8 @@ if get_config("wasm") then
                 "-Wl,--max-memory=268435456",
             }, {force = true})
         end
-        after_build(function (target)
-            os.exec("python3 tools/wasm_patch_initialize_guard.py " .. target:targetfile())
-        end)
+        -- pristine toolchain output; WAMR-only guard workaround lives in
+        -- tools/wasm_prepare_artifacts.py (applied to copies, never here)
 
     target("qn_pb_wasm")
         set_kind("binary")
@@ -401,16 +402,17 @@ if get_config("wasm") then
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
                 "-sEXPORTED_FUNCTIONS=[\"_pb_fill\",\"_pb_ptr\",\"_pb_pull\",\"_pb_reset\",\"_pb_len\",\"_pb_stage_alloc\",\"_malloc\",\"_free\"]",
-                "-g1", -- keep import/export symbol names: the door is wired by name
+                "-g1", -- keep export symbol names for the JS glue (E09-emscripten-1:
+                       -- the door IMPORTS are wired by type signature in
+                       -- tools/wasm_em_node_harness.mjs because emscripten minifies
+                       -- names and the linker reorders import slots)
                 "-sENVIRONMENT=node,web",
             }, {force = true})
         if get_config("wasm") == "wasi" then
-            -- E09: neutralize the wasi-libc init guard for WAMR (typed
-            -- finding E09-WAMR-1); no-op when the guard is absent
-            after_build(function (target)
-                os.exec("python3 tools/wasm_patch_initialize_guard.py "
-                        .. target:targetfile())
-            end)
+            -- E09: artifact stays PRISTINE toolchain output. The WAMR-only
+            -- init-guard workaround (E09-WAMR-1) is applied to *copies* by
+            -- tools/wasm_prepare_artifacts.py so Wasmtime/wasm3/Node always
+            -- see unmodified bytes.
         end
 
         end
@@ -428,6 +430,8 @@ if get_config("e09") then
         set_default(false)
         set_targetdir(artifact_dir)
         set_optimize("smallest") -- guest harness parity with the WASM guests
+        set_symbols("debug")
+        set_strip("none")
         add_files("bench/wasm/qn_guest_bench.c", "tools/wasm/qn_host_file.c",
                   "tools/wasm/qn_runner_common.c") -- host-side sha/timing helpers
         add_includedirs("src/wasm", "tools/wasm")

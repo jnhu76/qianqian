@@ -155,6 +155,15 @@ static int run_bench_mode(wasm_exec_env_t env, wasm_module_inst_t inst, int iter
     return rc;
 }
 
+static int run_lifecycle_mode(wasm_exec_env_t env, wasm_module_inst_t inst) {
+    if (!call_i64(env, inst, "bench_bind", QN_HANDLE))
+        { die_on_exception(inst, "bench_bind"); return 1; }
+    int32_t rc = 0;
+    if (!call0_i32(env, inst, "bench_lifecycle", &rc))
+        { die_on_exception(inst, "bench_lifecycle"); return 1; }
+    return rc;
+}
+
 static const char *g_pcm_outfile; /* optional Mode B dump (E09 tolerance study) */
 
 static int run_pcm(wasm_exec_env_t env, wasm_module_inst_t inst) {
@@ -256,9 +265,9 @@ int main(int argc, char **argv) {
     if (argc < 4) {
         fprintf(stderr,
 #ifdef QN_WAMR_AOT_RUNNER
-                "usage: %s <module.aot> <correct|bench|pcm> <fixture> [iters]\n",
+                "usage: %s <module.aot> <correct|bench|pcm|lifecycle> <fixture> [iters]\n",
 #else
-                "usage: %s <module.wasm> <correct|bench|pcm> <fixture> [iters]\n",
+                "usage: %s <module.wasm> <correct|bench|pcm|lifecycle> <fixture> [iters]\n",
 #endif
                 argv[0]);
         return 2;
@@ -286,6 +295,7 @@ int main(int argc, char **argv) {
     }
     wasm_runtime_set_log_level((log_level_t)3);
 
+    double t_load = qn_now_ms();
     FILE *mf = fopen(module_path, "rb");
     if (!mf) { fprintf(stderr, "cannot open module %s\n", module_path); return 1; }
     fseek(mf, 0, SEEK_END);
@@ -301,6 +311,7 @@ int main(int argc, char **argv) {
     wasm_module_t module = wasm_runtime_load(mbuf, (uint32_t)msize,
                                              error_buf, sizeof(error_buf));
     if (!module) { fprintf(stderr, "load failed: %s\n", error_buf); return 1; }
+    double load_ms = qn_now_ms() - t_load;
 
     double t_inst = qn_now_ms();
     /* WASI command guest (QN_GUEST_COMMAND): bind via _start with the door
@@ -351,6 +362,17 @@ int main(int argc, char **argv) {
     if (strcmp(mode, "correct") == 0) rc = run_correct(env, inst);
     else if (strcmp(mode, "bench") == 0) rc = run_bench_mode(env, inst, iters);
     else if (strcmp(mode, "pcm") == 0) rc = run_pcm(env, inst);
+    else if (strcmp(mode, "lifecycle") == 0) {
+        rc = run_lifecycle_mode(env, inst);
+        printf("{\"mode\":\"lifecycle_host\",\"runtime\":\"%s\",\"load_ms\":%.3f,"
+               "\"compile_ms\":null,\"instantiate_ms\":%.3f}\n",
+#ifdef QN_WAMR_AOT_RUNNER
+               "wamr_aot",
+#else
+               "wamr",
+#endif
+               load_ms, inst_ms);
+    }
     else { fprintf(stderr, "unknown mode %s\n", mode); rc = 2; }
 
     fprintf(stderr, "qn_wamr_runner: instantiate_ms=%.3f\n", inst_ms);

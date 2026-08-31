@@ -30,8 +30,8 @@ OUT = ROOT / "bench" / "results" / "wasm" / "memory.json"
 FIXTURES = ["flac-16-44-stereo.flac", "mp3-long.mp3"]
 
 RUNS = [
-    ("native", ART / "qn_native_runner", "native"),
-    ("wamr", ART / "qn_wamr_runner", WASM / "qn_guest_bench.wasm"),
+    ("native", ART / "qn_native_runner", None),
+    ("wamr", ART / "qn_wamr_runner", WASM / "qn_guest_bench.wamr-workaround.wasm"),
     ("wamr_aot", ART / "qn_wamr_aot_runner", WASM / "qn_guest_bench.aot"),
     ("wasm3", ART / "qn_wasm3_runner", WASM / "qn_guest_bench.wasm"),
     ("wasmtime", ART / "qn_wasmtime_runner", WASM / "qn_guest_bench.wasm"),
@@ -54,8 +54,13 @@ def sample_rss(pid, stop, timeline):
 
 def run_pcm(binary, guest, fixture):
     fx = str(ROOT / "corpus" / "fixtures" / fixture)
-    cmd = [str(binary)] + ([str(guest)] if "native" not in binary.name else []) + \
-        ["pcm", fx]
+    # native twin has its own CLI order: <file> <mode>; the wasm runners are
+    # <module> <mode> <file> (the former bug passed WASM order to native and
+    # produced returncode=1 with no JSON — fixed here)
+    if guest is None:
+        cmd = [str(binary), fx, "pcm"]
+    else:
+        cmd = [str(binary), str(guest), "pcm", fx]
     timeline = []
     t0 = time.monotonic()
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,

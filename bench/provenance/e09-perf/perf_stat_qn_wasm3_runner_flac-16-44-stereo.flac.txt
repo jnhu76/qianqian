@@ -1,21 +1,21 @@
-# started on Mon Aug 31 13:29:56 2026
+# started on Mon Aug 31 18:46:45 2026
 
 
  Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_wasm3_runner /home/hoo/Source/qianqian/build/artifacts/wasm/qn_guest_bench.wasm bench /home/hoo/Source/qianqian/corpus/fixtures/flac-16-44-stereo.flac 3':
 
                  0      context-switches:u               #      0.0 cs/sec  cs_per_second     
                  0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
-              4480      page-faults:u                    #   5569.2 faults/sec  page_faults_per_second
-            804.43 msec task-clock:u                     #      1.0 CPUs  CPUs_utilized       
-           8059690      branch-misses:u                  #      0.9 %  branch_miss_rate         (49.52%)
-         939145434      branches:u                       #   1167.5 M/sec  branch_frequency     (66.42%)
-        2943488104      cpu-cycles:u                     #      3.7 GHz  cycles_frequency       (66.92%)
-        5803341094      instructions:u                   #      2.0 instructions  insn_per_cycle  (67.18%)
-         833204207      stalled-cycles-frontend:u        #     0.28 frontend_cycles_idle        (66.90%)
+              4478      page-faults:u                    #   4543.2 faults/sec  page_faults_per_second
+            985.64 msec task-clock:u                     #      1.0 CPUs  CPUs_utilized       
+           8753565      branch-misses:u                  #      0.9 %  branch_miss_rate         (50.07%)
+         934285282      branches:u                       #    947.9 M/sec  branch_frequency     (66.73%)
+        3057142236      cpu-cycles:u                     #      3.1 GHz  cycles_frequency       (66.75%)
+        5813295824      instructions:u                   #      1.9 instructions  insn_per_cycle  (66.77%)
+         751942450      stalled-cycles-frontend:u        #     0.25 frontend_cycles_idle        (66.55%)
 
-       0.806036913 seconds time elapsed
+       0.987543166 seconds time elapsed
 
-       0.797840000 seconds user
-       0.008018000 seconds sys
+       0.967104000 seconds user
+       0.019981000 seconds sys
 
 

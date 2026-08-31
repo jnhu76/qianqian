@@ -1,21 +1,21 @@
-# started on Mon Aug 31 13:28:29 2026
+# started on Mon Aug 31 18:44:26 2026
 
 
  Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_native_runner /home/hoo/Source/qianqian/corpus/fixtures/flac-16-44-stereo.flac bench 3':
 
                  0      context-switches:u               #      0.0 cs/sec  cs_per_second     
                  0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
-               916      page-faults:u                    #  17673.3 faults/sec  page_faults_per_second
-             51.83 msec task-clock:u                     #      0.7 CPUs  CPUs_utilized       
-             60477      branch-misses:u                  #      0.1 %  branch_miss_rate         (50.96%)
-          77955790      branches:u                       #   1504.1 M/sec  branch_frequency     (69.23%)
-         163395454      cpu-cycles:u                     #      3.2 GHz  cycles_frequency       (69.17%)
-         438179991      instructions:u                   #      2.7 instructions  insn_per_cycle  (69.06%)
-           9787697      stalled-cycles-frontend:u        #     0.06 frontend_cycles_idle        (64.45%)
+               915      page-faults:u                    #  13338.0 faults/sec  page_faults_per_second
+             68.60 msec task-clock:u                     #      0.9 CPUs  CPUs_utilized       
+             62508      branch-misses:u                  #      0.1 %  branch_miss_rate         (47.51%)
+          72438093      branches:u                       #   1055.9 M/sec  branch_frequency     (64.99%)
+         181274539      cpu-cycles:u                     #      2.6 GHz  cycles_frequency       (65.02%)
+         498450039      instructions:u                   #      2.7 instructions  insn_per_cycle  (70.57%)
+           7407451      stalled-cycles-frontend:u        #     0.04 frontend_cycles_idle        (69.91%)
 
-       0.053437211 seconds time elapsed
+       0.071462880 seconds time elapsed
 
-       0.053607000 seconds user
-       0.000000000 seconds sys
+       0.063683000 seconds user
+       0.007960000 seconds sys
 
 

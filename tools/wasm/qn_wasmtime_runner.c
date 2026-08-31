@@ -194,6 +194,13 @@ static int run_bench_mode(int iters) {
     return rc;
 }
 
+static int run_lifecycle_mode(void) {
+    die_on(call1_i64("bench_bind", QN_HANDLE), "bench_bind");
+    int32_t rc = 0;
+    die_on(call0_i32("bench_lifecycle", &rc), "bench_lifecycle");
+    return rc;
+}
+
 static int run_pcm(void) {
     die_on(call1_i64("bench_bind", QN_HANDLE), "bench_bind");
 
@@ -301,7 +308,7 @@ static wasm_functype_t *ft_from_kinds(const wasm_valkind_t *kinds, size_t n) {
 
 int main(int argc, char **argv) {
     if (argc < 4) {
-        fprintf(stderr, "usage: %s <module.wasm> <correct|bench|pcm> <fixture> [iters]\n", argv[0]);
+        fprintf(stderr, "usage: %s <module.wasm> <correct|bench|pcm|lifecycle> <fixture> [iters]\n", argv[0]);
         return 2;
     }
     const char *module_path = argv[1];
@@ -343,6 +350,7 @@ int main(int argc, char **argv) {
     clear_err(wasmtime_linker_define_func(linker, "qianqian_host", sizeof("qianqian_host") - 1, "size", 4,
                                           ft_size, ns_size, NULL, NULL), "define size");
 
+    double t_load = qn_now_ms();
     FILE *mf = fopen(module_path, "rb");
     if (!mf) { fprintf(stderr, "cannot open module\n"); return 1; }
     fseek(mf, 0, SEEK_END);
@@ -353,9 +361,12 @@ int main(int argc, char **argv) {
         fprintf(stderr, "cannot read module\n"); return 1;
     }
     fclose(mf);
+    double load_ms = qn_now_ms() - t_load;
 
+    double t_compile = qn_now_ms();
     wasmtime_module_t *module = NULL;
     clear_err(wasmtime_module_new(engine, mbuf, (size_t)msize, &module), "module_new");
+    double compile_ms = qn_now_ms() - t_compile;
 
     double t_inst = qn_now_ms();
     wasm_trap_t *trap = NULL;
@@ -375,6 +386,12 @@ int main(int argc, char **argv) {
     if (strcmp(mode, "correct") == 0) rc = run_correct();
     else if (strcmp(mode, "bench") == 0) rc = run_bench_mode(iters);
     else if (strcmp(mode, "pcm") == 0) rc = run_pcm();
+    else if (strcmp(mode, "lifecycle") == 0) {
+        rc = run_lifecycle_mode();
+        printf("{\"mode\":\"lifecycle_host\",\"runtime\":\"wasmtime\",\"load_ms\":%.3f,"
+               "\"compile_ms\":%.3f,\"instantiate_ms\":%.3f}\n",
+               load_ms, compile_ms, inst_ms);
+    }
     else { fprintf(stderr, "unknown mode %s\n", mode); rc = 2; }
 
     wasmtime_module_delete(module);

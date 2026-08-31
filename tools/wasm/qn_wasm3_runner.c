@@ -251,6 +251,13 @@ static int run_bench_mode(int iters) {
     return rc;
 }
 
+static int run_lifecycle_mode(void) {
+    die_on(call_i64arg("bench_bind", QN_HANDLE), "bench_bind");
+    int32_t rc = 0;
+    die_on(call_i32("bench_lifecycle", 0, 0, &rc), "bench_lifecycle");
+    return rc;
+}
+
 static int run_pcm(void) {
     die_on(call_i64arg("bench_bind", QN_HANDLE), "bench_bind");
 
@@ -336,7 +343,7 @@ static int run_pcm(void) {
 
 int main(int argc, char **argv) {
     if (argc < 4) {
-        fprintf(stderr, "usage: %s <module.wasm> <correct|bench|pcm> <fixture> [iters]\n", argv[0]);
+        fprintf(stderr, "usage: %s <module.wasm> <correct|bench|pcm|lifecycle> <fixture> [iters]\n", argv[0]);
         return 2;
     }
     const char *module_path = argv[1];
@@ -349,6 +356,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    double t_load = qn_now_ms();
     FILE *mf = fopen(module_path, "rb");
     if (!mf) { fprintf(stderr, "cannot open module\n"); return 1; }
     fseek(mf, 0, SEEK_END);
@@ -359,16 +367,19 @@ int main(int argc, char **argv) {
         fprintf(stderr, "cannot read module\n"); return 1;
     }
     fclose(mf);
+    double load_ms = qn_now_ms() - t_load;
 
     g_env = m3_NewEnvironment();
     if (!g_env) { fprintf(stderr, "m3_NewEnvironment failed\n"); return 1; }
     g_runtime = m3_NewRuntime(g_env, 8 << 20, NULL);
     if (!g_runtime) { fprintf(stderr, "m3_NewRuntime failed\n"); return 1; }
 
+    double t_compile = qn_now_ms();
     M3Result r = m3_ParseModule(g_env, &g_module, g_wasm, (uint32_t)msize);
     die_on(r, "m3_ParseModule");
     r = m3_LoadModule(g_runtime, g_module);
     die_on(r, "m3_LoadModule");
+    double compile_ms = qn_now_ms() - t_compile;
 
     /* link the qianqian_host door (module owns the links after LoadModule) */
     r = m3_LinkRawFunction(g_module, "qianqian_host", "read", "I(Iii)", ns_read);
@@ -418,6 +429,12 @@ int main(int argc, char **argv) {
     if (strcmp(mode, "correct") == 0) rc = run_correct();
     else if (strcmp(mode, "bench") == 0) rc = run_bench_mode(iters);
     else if (strcmp(mode, "pcm") == 0) rc = run_pcm();
+    else if (strcmp(mode, "lifecycle") == 0) {
+        rc = run_lifecycle_mode();
+        printf("{\"mode\":\"lifecycle_host\",\"runtime\":\"wasm3\",\"load_ms\":%.3f,"
+               "\"compile_ms\":%.3f,\"instantiate_ms\":null,\"init_ms\":%.3f}\n",
+               load_ms, compile_ms, init_ms);
+    }
     else { fprintf(stderr, "unknown mode %s\n", mode); rc = 2; }
 
     m3_FreeRuntime(g_runtime);

@@ -9,21 +9,21 @@
     "samples": 176400,
     "duration_us": 4000000,
     "canonical_f32_sha256": "42d1070b2677972af85ec6cdde40601e465cf0a2439c87d206e6ba8b61184727",
-    "open_first_ms": 0.622,
+    "open_first_ms": 0.596,
     "iterations": 3,
     "warmup": 1,
     "songcore_output_ms": {
-     "median": 8.261,
-     "min": 7.973,
-     "max": 18.126
+     "median": 10.89,
+     "min": 9.226,
+     "max": 16.078
     },
     "decode_core_ms": {
-     "median": 8.448,
-     "min": 7.679,
-     "max": 8.83
+     "median": 8.76,
+     "min": 7.8,
+     "max": 11.331
     },
-    "xrt_songcore_output": 484.18,
-    "xrt_decode_core": 473.48,
+    "xrt_songcore_output": 367.32,
+    "xrt_decode_core": 456.62,
     "audio_seconds": 4
    }
   },
@@ -36,21 +36,21 @@
     "samples": 176400,
     "duration_us": 4000000,
     "canonical_f32_sha256": "01591b8239fea294bc39922bd7625d02b193961c144459d7509572e1edc6f681",
-    "open_first_ms": 0.436,
+    "open_first_ms": 0.898,
     "iterations": 3,
     "warmup": 1,
     "songcore_output_ms": {
-     "median": 14.231,
-     "min": 12.799,
-     "max": 15.024
+     "median": 17.864,
+     "min": 14.444,
+     "max": 18.683
     },
     "decode_core_ms": {
-     "median": 14.538,
-     "min": 7.257,
-     "max": 14.567
+     "median": 15.568,
+     "min": 7.494,
+     "max": 18.904
     },
-    "xrt_songcore_output": 281.08,
-    "xrt_decode_core": 275.14,
+    "xrt_songcore_output": 223.92,
+    "xrt_decode_core": 256.93,
     "audio_seconds": 4
    }
   },
@@ -63,21 +63,21 @@
     "samples": 529200,
     "duration_us": 12000000,
     "canonical_f32_sha256": "0ae6379d746dbaa305ffa62a29a9cc22af8e160270842e02b7412be5b668cec9",
-    "open_first_ms": 8.355,
+    "open_first_ms": 1.604,
     "iterations": 3,
     "warmup": 1,
     "songcore_output_ms": {
-     "median": 18.559,
-     "min": 14.548,
-     "max": 28.734
+     "median": 20.641,
+     "min": 18.607,
+     "max": 32.291
     },
     "decode_core_ms": {
-     "median": 18.652,
-     "min": 15.057,
-     "max": 29.661
+     "median": 23.093,
+     "min": 19.385,
+     "max": 30.694
     },
-    "xrt_songcore_output": 646.59,
-    "xrt_decode_core": 643.35,
+    "xrt_songcore_output": 581.37,
+    "xrt_decode_core": 519.63,
     "audio_seconds": 12
    }
   },
@@ -90,21 +90,21 @@
     "samples": 576000,
     "duration_us": 12006500,
     "canonical_f32_sha256": "bcf34b306af7109bf5612ffa94812834cac2fde793c202ec4b1ed387ef27aab8",
-    "open_first_ms": 5.121,
+    "open_first_ms": 1.372,
     "iterations": 3,
     "warmup": 1,
     "songcore_output_ms": {
-     "median": 57.11,
-     "min": 45.35,
-     "max": 58.607
+     "median": 54.902,
+     "min": 51.453,
+     "max": 86.991
     },
     "decode_core_ms": {
-     "median": 49.861,
-     "min": 45.627,
-     "max": 51.522
+     "median": 60.579,
+     "min": 57.734,
+     "max": 62.015
     },
-    "xrt_songcore_output": 210.23,
-    "xrt_decode_core": 240.8,
+    "xrt_songcore_output": 218.69,
+    "xrt_decode_core": 198.2,
     "audio_seconds": 12.007
    }
   },
@@ -117,21 +117,21 @@
     "samples": 529200,
     "duration_us": 12000000,
     "canonical_f32_sha256": "0f656a7309a5e07382afd55da8eb4633dffcd4bf427714f8462d658bb440d5f4",
-    "open_first_ms": 0.368,
+    "open_first_ms": 0.572,
     "iterations": 3,
     "warmup": 1,
     "songcore_output_ms": {
-     "median": 25.593,
-     "min": 23.32,
-     "max": 27.665
+     "median": 34.885,
+     "min": 30.478,
+     "max": 36.494
     },
     "decode_core_ms": {
-     "median": 26.909,
-     "min": 25.216,
-     "max": 29.357
+     "median": 28.31,
+     "min": 24.611,
+     "max": 48.307
     },
-    "xrt_songcore_output": 468.88,
-    "xrt_decode_core": 445.95,
+    "xrt_songcore_output": 343.99,
+    "xrt_decode_core": 423.88,
     "audio_seconds": 12
    }
   }
@@ -139,9 +139,11 @@
  "em_mode_b": {
   "ok": true,
   "mode": "B",
-  "prepMs": 40.895316,
-  "copyMs": 2.111581,
-  "gbps": 0.6683144051779212,
+  "prepMs": 57.295427,
+  "viewMs": 0.021582,
+  "copyMs": 1.084534,
+  "hashMs": 1.648879,
+  "gbps": 1.3012040194221666,
   "bytes": 1411200,
   "sha": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
   "mem_pages_after": 287
@@ -154,10 +156,10 @@
    "calls": 690,
    "total": 1411200,
    "bytes": 1411200,
-   "pullMs": 0.753096,
-   "gbps": 1.8738646865738233,
-   "call_ms_median": 0.000401,
-   "call_ms_p999": 0.031902
+   "pullMs": 3.195238,
+   "gbps": 0.44165724118203403,
+   "call_ms_median": 0.000571,
+   "call_ms_p999": 0.521161
   },
   "1024": {
    "ok": true,
@@ -166,10 +168,10 @@
    "calls": 173,
    "total": 1411200,
    "bytes": 1411200,
-   "pullMs": 0.71894,
-   "gbps": 1.9628898099980525,
-   "call_ms_median": 0.001553,
-   "call_ms_p999": 0.151164
+   "pullMs": 0.630325,
+   "gbps": 2.23884504025701,
+   "call_ms_median": 0.001934,
+   "call_ms_p999": 0.033896
   },
   "4096": {
    "ok": true,
@@ -178,10 +180,10 @@
    "calls": 44,
    "total": 1411200,
    "bytes": 1411200,
-   "pullMs": 0.260667,
-   "gbps": 5.413803818665195,
-   "call_ms_median": 0.003617,
-   "call_ms_p999": 0.036591
+   "pullMs": 0.205783,
+   "gbps": 6.8577093345903215,
+   "call_ms_median": 0.003196,
+   "call_ms_p999": 0.033155
   }
  },
  "em_pb": {
@@ -189,8 +191,46 @@
   "chunkBytes": 65536,
   "iters": 200,
   "total_bytes": 838860800,
-  "ms": 39.839636,
-  "gbps": 21.055935350413343,
+  "ms": 66.707904,
+  "gbps": 12.575133525406525,
   "pattern_sha": "17b9119a63267a13419b7bd28ee689a2673350a22efa3ea80675be3ffc262adf"
+ },
+ "em_lifecycle": {
+  "flac-16-44-stereo.flac": {
+   "ok": true,
+   "mode": "lifecycle",
+   "guest": {
+    "mode": "lifecycle",
+    "status": "ok",
+    "open_ms": 13.062,
+    "first_pcm_ms": 0.653,
+    "first_pcm_samples": 4608,
+    "decode_ms": 14.961,
+    "samples": 176400,
+    "frames": 39
+   },
+   "host": {
+    "load_ms": 1.557765,
+    "instantiate_ms": 16.589345
+   }
+  },
+  "mp3-long.mp3": {
+   "ok": true,
+   "mode": "lifecycle",
+   "guest": {
+    "mode": "lifecycle",
+    "status": "ok",
+    "open_ms": 20.361,
+    "first_pcm_ms": 2.056,
+    "first_pcm_samples": 47,
+    "decode_ms": 67.86,
+    "samples": 529200,
+    "frames": 461
+   },
+   "host": {
+    "load_ms": 2.453912,
+    "instantiate_ms": 8.450472
+   }
+  }
  }
 }

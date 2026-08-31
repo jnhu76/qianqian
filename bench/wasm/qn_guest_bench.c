@@ -826,6 +826,89 @@ static int run_bench(int iterations) {
 }
 
 /* ------------------------------------------------------------------ */
+/* lifecycle mode: host load/compile/instantiate + guest open / first  */
+/* PCM / steady decode as separate machine-authority stages            */
+/* ------------------------------------------------------------------ */
+
+/* Decode from a fresh, already-opened session until the first decoded
+ * frame is produced. Returns samples in the first frame, or 0 on
+ * empty/error. Leaves the decoder mid-stream (caller discards the
+ * session afterwards). */
+static int64_t decode_until_first(session *s) {
+    AVPacket *pkt = av_packet_alloc();
+    AVFrame *frm = av_frame_alloc();
+    int64_t first_samples = 0;
+    int done = 0;
+    while (!done) {
+        int ret = av_read_frame(s->fmt, pkt);
+        if (ret < 0) { done = 1; break; }
+        if (pkt->stream_index == s->audio_index && s->dec) {
+            ret = avcodec_send_packet(s->dec, pkt);
+            if (ret < 0 && ret != AVERROR(EAGAIN)) { done = 1; break; }
+            while (ret >= 0) {
+                ret = avcodec_receive_frame(s->dec, frm);
+                if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) break;
+                if (ret < 0) { done = 1; break; }
+                first_samples = frm->nb_samples;
+                av_frame_unref(frm);
+                done = 1;
+                break;
+            }
+        }
+        av_packet_unref(pkt);
+    }
+    av_packet_free(&pkt);
+    av_frame_free(&frm);
+    return first_samples;
+}
+
+static int run_lifecycle(void) {
+    session s;
+    double t_open = now_ms();
+    if (sess_open(&s) < 0 || sess_probe(&s) < 0 || sess_open_decoder(&s) < 0) {
+        char e[512]; json_escape(s.first_error, e, sizeof(e));
+        printf("{\"mode\":\"lifecycle\",\"status\":\"failed\",\"error\":\"%s\"}\n", e);
+        sess_close(&s);
+        return 1;
+    }
+    double open_ms = now_ms() - t_open;
+
+    /* first PCM: fresh session, stop at the first decoded frame */
+    session s2;
+    int64_t first_samples = 0;
+    if (sess_open(&s2) < 0 || sess_probe(&s2) < 0 || sess_open_decoder(&s2) < 0) {
+        char e[512]; json_escape(s2.first_error, e, sizeof(e));
+        printf("{\"mode\":\"lifecycle\",\"status\":\"failed\",\"error\":\"%s\"}\n", e);
+        sess_close(&s2);
+        sess_close(&s);
+        return 1;
+    }
+    double t_fp = now_ms();
+    first_samples = decode_until_first(&s2);
+    double first_pcm_ms = now_ms() - t_fp;
+    sess_close(&s2);
+
+    /* steady decode on the primary session */
+    sample_store store;
+    store_init(&store);
+    store.channels = s.fmt->streams[s.audio_index]->codecpar->ch_layout.nb_channels;
+    store.sample_rate = s.fmt->streams[s.audio_index]->codecpar->sample_rate;
+    int64_t samples = 0, frames = 0;
+    double t_d = now_ms();
+    sess_decode_all(&s, &store, &samples, &frames);
+    double decode_ms = now_ms() - t_d;
+    store_free(&store);
+    sess_close(&s);
+
+    printf("{\"mode\":\"lifecycle\",\"status\":\"ok\",\"open_ms\":%.3f,"
+           "\"first_pcm_ms\":%.3f,\"first_pcm_samples\":%lld,"
+           "\"decode_ms\":%.3f,\"samples\":%lld,\"frames\":%lld}\n",
+           open_ms, first_pcm_ms, (long long)first_samples,
+           decode_ms, (long long)samples, (long long)frames);
+    return 0;
+}
+
+/* ------------------------------------------------------------------ */
 /* E09 Mode B/C: canonical PCM stays in the guest; host pulls          */
 /* ------------------------------------------------------------------ */
 
@@ -874,6 +957,13 @@ int32_t bench_correct(void) {
 QN_EXPORT("bench_bench")
 int32_t bench_bench(int32_t iters) {
     int rc = run_bench(iters);
+    fflush(stdout);
+    return rc;
+}
+
+QN_EXPORT("bench_lifecycle")
+int32_t bench_lifecycle(void) {
+    int rc = run_lifecycle();
     fflush(stdout);
     return rc;
 }
@@ -969,6 +1059,19 @@ static double now_ms_native(void) {
     return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
 }
 
+/* Native counterpart of bench_pcm_pull (which speaks the wasm32 int32
+ * staging-pointer ABI for the guest). Takes a real host pointer. */
+static int32_t pull_native(uint8_t *dst, int32_t cap_bytes) {
+    if (!g_pcm.data || cap_bytes < 0) return -1;
+    size_t total = g_pcm.len * sizeof(float);
+    if (g_pcm_cursor >= total) return 0;
+    size_t n = total - g_pcm_cursor;
+    if (n > (size_t)cap_bytes) n = (size_t)cap_bytes;
+    memcpy(dst, (const uint8_t *)g_pcm.data + g_pcm_cursor, n);
+    g_pcm_cursor += n;
+    return (int32_t)n;
+}
+
 static int bench_pcm_host(const char *outfile) {
     if (pcm_prepare_locked() != 0) return 1;
     size_t total = g_pcm.len * sizeof(float);
@@ -1007,7 +1110,11 @@ static int bench_pcm_host(const char *outfile) {
         double max_call_ms = 0;
         do {
             double c0 = now_ms_native();
-            n = bench_pcm_pull((int32_t)(intptr_t)stage, chunk_bytes);
+            /* native twin MUST use a real pointer here: bench_pcm_pull's
+             * int32 dst is the wasm32 ABI for the guest (32-bit linear-memory
+             * pointers); truncating a 64-bit host heap pointer through it
+             * sign-extends and SIGSEGVs (same family as E09-bridge-abi-1). */
+            n = pull_native(stage, chunk_bytes);
             double dt = now_ms_native() - c0;
             if (dt > max_call_ms) max_call_ms = dt;
             if (n > 0) { qn_sha_feed(sha, stage, (size_t)n); got += (size_t)n; calls++; }
@@ -1041,8 +1148,10 @@ int main(int argc, char **argv) {
     if (argc < 3) {
         fprintf(stderr,
                 "usage: %s <file> correct\n"
-                "       %s <file> bench [iterations=5]\n",
-                argv[0], argv[0]);
+                "       %s <file> bench [iterations=5]\n"
+                "       %s <file> pcm [outfile]\n"
+                "       %s <file> lifecycle\n",
+                argv[0], argv[0], argv[0], argv[0]);
         return 2;
     }
     av_log_set_level(AV_LOG_ERROR);
@@ -1056,6 +1165,12 @@ int main(int argc, char **argv) {
     if (strcmp(argv[2], "correct") == 0) return bench_correct();
     if (strcmp(argv[2], "bench") == 0) return bench_bench(argc > 3 ? atoi(argv[3]) : 5);
     if (strcmp(argv[2], "pcm") == 0) return bench_pcm_host(argc > 3 ? argv[3] : NULL);
+    if (strcmp(argv[2], "lifecycle") == 0) {
+        int rc = run_lifecycle();
+        printf("{\"mode\":\"lifecycle_host\",\"runtime\":\"native\",\"load_ms\":null,"
+               "\"compile_ms\":null,\"instantiate_ms\":null}\n");
+        return rc;
+    }
     fprintf(stderr, "unknown mode %s\n", argv[2]);
     return 2;
 }

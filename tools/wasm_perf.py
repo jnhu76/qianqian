@@ -43,8 +43,8 @@ FIXTURES = [
 ]
 
 RUNS = [
-    ("native", ART / "qn_native_runner", "native"),
-    ("wamr", ART / "qn_wamr_runner", WASM / "qn_guest_bench.wasm"),
+    ("native", ART / "qn_native_runner", None),
+    ("wamr", ART / "qn_wamr_runner", WASM / "qn_guest_bench.wamr-workaround.wasm"),
     ("wamr_aot", ART / "qn_wamr_aot_runner", WASM / "qn_guest_bench.aot"),
     ("wasm3", ART / "qn_wasm3_runner", WASM / "qn_guest_bench.wasm"),
     ("wasmtime", ART / "qn_wasmtime_runner", WASM / "qn_guest_bench.wasm"),
@@ -54,12 +54,12 @@ ITERS = "3"
 
 
 def guest_arg(rt_binary, guest):
-    return [str(guest)] if "native" not in rt_binary.name else []
+    return [str(guest)] if guest is not None else []
 
 
 def run_bench(binary, guest, fixture):
     fx = str(ROOT / "corpus" / "fixtures" / fixture)
-    if "native" in binary.name:
+    if guest is None:
         cmd = [str(binary), fx, "bench", ITERS]
     else:
         cmd = [str(binary), str(guest), "bench", fx, ITERS]
@@ -74,7 +74,7 @@ def perf_stat(binary, guest, fixture):
     PERFRAW.mkdir(parents=True, exist_ok=True)
     statfile = PERFRAW / f"perf_stat_{binary.name}_{fixture}.txt"
     fx = str(ROOT / "corpus" / "fixtures" / fixture)
-    if "native" in binary.name:
+    if guest is None:
         tgt = [str(binary), fx, "bench", ITERS]
     else:
         tgt = [str(binary), str(guest), "bench", fx, ITERS]
@@ -109,7 +109,7 @@ def perf_record(binary, guest, fixture, tag, seconds=30):
     PERFRAW.mkdir(parents=True, exist_ok=True)
     data = PERFRAW / f"{tag}.data"
     fx = str(ROOT / "corpus" / "fixtures" / fixture)
-    if "native" in binary.name:
+    if guest is None:
         tgt = [str(binary), fx, "bench", ITERS]
     else:
         tgt = [str(binary), str(guest), "bench", fx, ITERS]

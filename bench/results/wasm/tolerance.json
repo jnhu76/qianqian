@@ -1,34 +1,206 @@
 {
- "method": "canonical f32 PCM dumped from native twin (qn_pcm_dump, 12B header stripped) and WAMR Mode B (qn_wamr_runner pcm <fixture> <outfile>); element-wise f64 delta",
- "note": "all five wasm runtimes are bit-identical to each other (see correctness.json); this study quantifies native-vs-wasm residual for float-DSP codecs",
+ "method": "canonical f32 PCM dumped from the native twin (qn_native_runner pcm <fx> <out>) and WAMR Mode B (qn_wamr_runner pcm <fx> <out>); element-wise f32 delta; fixture set machine-derived from manifests (tolerated families mp3/aac + exact families vorbis/opus)",
+ "gate_bound_note": "correctness gate accepts a tolerated case only if this file carries its fixture with equal sample/frame counts and max_abs_delta within the gate policy bound",
  "fixtures": {
-  "mp3-cbr-id3v23.mp3": {
-   "samples": 352800,
-   "max_abs_delta": 1.7881393432617188e-07,
-   "rms_delta": 2.1954020907045704e-08,
-   "differing_samples": 171618,
-   "max_abs_delta_in_16bit_lsb": 0.005859375
+  "aac-adts-44-stereo.aac": {
+   "samples": 178176,
+   "frames": 174,
+   "channels": 2,
+   "max_abs_delta": 5.960464477539063e-08,
+   "rms_delta": 2.1126236529138023e-10,
+   "differing_samples": 72,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "family": "aac"
+  },
+  "aac-artwork.m4a": {
+   "samples": 176400,
+   "frames": 173,
+   "channels": 2,
+   "max_abs_delta": 5.960464477539063e-08,
+   "rms_delta": 2.1148329365761444e-10,
+   "differing_samples": 39,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "family": "aac"
+  },
+  "aac-lc-44-mono.m4a": {
+   "samples": 176400,
+   "frames": 173,
+   "channels": 1,
+   "max_abs_delta": 5.960464477539063e-08,
+   "rms_delta": 3.60508785235413e-10,
+   "differing_samples": 23,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "family": "aac"
   },
   "aac-lc-44-stereo.m4a": {
-   "samples": 1058400,
+   "samples": 529200,
+   "frames": 517,
+   "channels": 2,
    "max_abs_delta": 5.960464477539063e-08,
    "rms_delta": 1.1433594483272842e-10,
    "differing_samples": 31,
-   "max_abs_delta_in_16bit_lsb": 0.001953125
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "family": "aac"
   },
-  "vorbis-44-stereo.ogg": {
-   "samples": 1058400,
-   "max_abs_delta": 0.0,
-   "rms_delta": 0.0,
-   "differing_samples": 0,
-   "max_abs_delta_in_16bit_lsb": 0.0
+  "aac-lc-48-stereo.m4a": {
+   "samples": 192000,
+   "frames": 188,
+   "channels": 2,
+   "max_abs_delta": 2.9802322387695312e-08,
+   "rms_delta": 2.034216874291679e-10,
+   "differing_samples": 41,
+   "max_abs_delta_in_16bit_lsb": 0.0009765625,
+   "family": "aac"
+  },
+  "aac-malformed-header.aac": {
+   "samples": 3072,
+   "frames": 3,
+   "channels": 2,
+   "max_abs_delta": 5.960464477539063e-08,
+   "rms_delta": 1.5006960150165307e-09,
+   "differing_samples": 58,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "family": "aac"
+  },
+  "aac-short.m4a": {
+   "samples": 13230,
+   "frames": 13,
+   "channels": 2,
+   "max_abs_delta": 5.960464477539063e-08,
+   "rms_delta": 7.231240081975628e-10,
+   "differing_samples": 31,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "family": "aac"
+  },
+  "aac-truncated.m4a": {
+   "samples": 314368,
+   "frames": 307,
+   "channels": 2,
+   "max_abs_delta": 5.960464477539063e-08,
+   "rms_delta": 1.4834521306318986e-10,
+   "differing_samples": 31,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "family": "aac"
+  },
+  "aac-vbr.m4a": {
+   "samples": 176400,
+   "frames": 173,
+   "channels": 2,
+   "max_abs_delta": 5.960464477539063e-08,
+   "rms_delta": 2.676582385565271e-10,
+   "differing_samples": 40,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "family": "aac"
+  },
+  "mp3-cbr-id3v23-artwork.mp3": {
+   "samples": 176400,
+   "frames": 155,
+   "channels": 2,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "rms_delta": 2.1954020907045704e-08,
+   "differing_samples": 171618,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "family": "mp3"
+  },
+  "mp3-cbr-id3v23.mp3": {
+   "samples": 176400,
+   "frames": 155,
+   "channels": 2,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "rms_delta": 2.1954020907045704e-08,
+   "differing_samples": 171618,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "family": "mp3"
+  },
+  "mp3-corrupt-tail.mp3": {
+   "samples": 132527,
+   "frames": 116,
+   "channels": 2,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "rms_delta": 2.1899189477622292e-08,
+   "differing_samples": 128674,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "family": "mp3"
+  },
+  "mp3-long.mp3": {
+   "samples": 529200,
+   "frames": 461,
+   "channels": 2,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "rms_delta": 2.1960288520100744e-08,
+   "differing_samples": 514144,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "family": "mp3"
+  },
+  "mp3-minimal.mp3": {
+   "samples": 88200,
+   "frames": 78,
+   "channels": 2,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "rms_delta": 2.200268026758135e-08,
+   "differing_samples": 86015,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "family": "mp3"
+  },
+  "mp3-short.mp3": {
+   "samples": 13230,
+   "frames": 13,
+   "channels": 2,
+   "max_abs_delta": 1.1920928955078125e-07,
+   "rms_delta": 2.1816594853020434e-08,
+   "differing_samples": 12921,
+   "max_abs_delta_in_16bit_lsb": 0.00390625,
+   "family": "mp3"
+  },
+  "mp3-vbr-id3v24.mp3": {
+   "samples": 176400,
+   "frames": 155,
+   "channels": 2,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "rms_delta": 2.3403616718394718e-08,
+   "differing_samples": 171308,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "family": "mp3"
   },
   "opus-48-stereo.opus": {
-   "samples": 1152000,
+   "samples": 576000,
+   "frames": 601,
+   "channels": 2,
    "max_abs_delta": 0.0,
    "rms_delta": 0.0,
    "differing_samples": 0,
-   "max_abs_delta_in_16bit_lsb": 0.0
+   "max_abs_delta_in_16bit_lsb": 0.0,
+   "family": "opus"
+  },
+  "opus-truncated.opus": {
+   "samples": 431688,
+   "frames": 450,
+   "channels": 2,
+   "max_abs_delta": 0.0,
+   "rms_delta": 0.0,
+   "differing_samples": 0,
+   "max_abs_delta_in_16bit_lsb": 0.0,
+   "family": "opus"
+  },
+  "vorbis-44-stereo.ogg": {
+   "samples": 529200,
+   "frames": 518,
+   "channels": 2,
+   "max_abs_delta": 0.0,
+   "rms_delta": 0.0,
+   "differing_samples": 0,
+   "max_abs_delta_in_16bit_lsb": 0.0,
+   "family": "vorbis"
+  },
+  "vorbis-truncated.ogg": {
+   "samples": 360000,
+   "frames": 352,
+   "channels": 2,
+   "max_abs_delta": 0.0,
+   "rms_delta": 0.0,
+   "differing_samples": 0,
+   "max_abs_delta_in_16bit_lsb": 0.0,
+   "family": "vorbis"
   }
  }
 }

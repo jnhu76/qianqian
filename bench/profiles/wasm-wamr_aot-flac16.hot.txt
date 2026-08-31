@@ -3,205 +3,219 @@
 #
 # Total Lost Samples: 0
 #
-# Samples: 66  of event 'cpu/cycles/Pu'
-# Event count (approx.): 182854348
+# Samples: 75  of event 'cpu/cycles/Pu'
+# Event count (approx.): 181677372
 #
-# Overhead  Command          Shared Object         Symbol                          
-# ........  ...............  ....................  ................................
+# Overhead  Command          Shared Object         Symbol                        
+# ........  ...............  ....................  ..............................
 #
-     9.83%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ccd0
+    12.56%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f51e
             |
-            ---0x41a9ccd0
+            ---0x40e9f51e
 
-     6.82%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cc7b
+     9.81%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d40b
             |
-            ---0x41a9cc7b
+            ---0x40e9d40b
 
-     3.97%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ef96
+     5.43%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f517
             |
-            ---0x41a9ef96
+            ---0x40e9f517
 
-     3.94%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ccb6
+     3.61%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f726
             |
-            ---0x41a9ccb6
+            ---0x40e9f726
 
-     3.90%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9efd1
+     3.60%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d48d
             |
-            ---0x41a9efd1
+            ---0x40e9d48d
 
-     3.84%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ef44
+     3.54%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d43c
             |
-            ---0x41a9ef44
+            ---0x40e9d43c
 
-     3.83%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cec3
+     3.38%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d657
             |
-            ---0x41a9cec3
+            ---0x40e9d657
 
-     3.18%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cc94
+     2.92%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f4bc
             |
-            ---0x41a9cc94
+            ---0x40e9f4bc
 
-     2.09%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a04bec
+     1.82%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f45c
             |
-            ---0x41a04bec
+            ---0x40e9f45c
 
-     2.08%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a04883
+     1.81%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040fb7380
             |
-            ---0x41a04883
+            ---0x40fb7380
 
-     2.08%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a04b93
+     1.81%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d460
             |
-            ---0x41a04b93
+            ---0x40e9d460
 
-     2.07%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a0481e
+     1.81%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f4c4
             |
-            ---0x41a0481e
+            ---0x40e9f4c4
 
-     2.06%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cc9f
+     1.80%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040ea3af2
             |
-            ---0x41a9cc9f
+            ---0x40ea3af2
 
-     2.05%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a04843
+     1.80%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d44f
             |
-            ---0x41a04843
+            ---0x40e9d44f
 
-     2.05%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ccac
+     1.80%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e04262
             |
-            ---0x41a9ccac
+            ---0x40e04262
 
-     2.04%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ed2c
+     1.80%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f754
             |
-            ---0x41a9ed2c
+            ---0x40e9f754
 
-     2.04%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cc92
+     1.79%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e04b19
             |
-            ---0x41a9cc92
+            ---0x40e04b19
 
-     2.04%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a04262
+     1.79%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f507
             |
-            ---0x41a04262
+            ---0x40e9f507
 
-     2.03%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cc71
+     1.79%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e04226
             |
-            ---0x41a9cc71
+            ---0x40e04226
 
-     2.03%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ec2f
+     1.78%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f60d
             |
-            ---0x41a9ec2f
+            ---0x40e9f60d
 
-     2.02%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ed74
+     1.77%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e03ff9
             |
-            ---0x41a9ed74
+            ---0x40e03ff9
 
-     2.00%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041bcc78a
+     1.77%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f6d4
             |
-            ---0x41bcc78a
-               0x8000002d3f20
+            ---0x40e9f6d4
 
-     2.00%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a08268
+     1.76%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e0486a
             |
-            ---0x41a08268
+            ---0x40e0486a
 
-     2.00%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041aa3481
+     1.76%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e08a16
             |
-            ---0x41aa3481
+            ---0x40e08a16
 
-     1.99%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ef8a
+     1.76%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e04c60
             |
-            ---0x41a9ef8a
+            ---0x40e04c60
 
-     1.98%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cd01
+     1.73%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e04d4f
             |
-            ---0x41a9cd01
+            ---0x40e04d4f
 
-     1.97%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cc8c
+     1.72%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d65f
             |
-            ---0x41a9cc8c
+            ---0x40e9d65f
 
-     1.96%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ef5d
+     1.71%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f73f
             |
-            ---0x41a9ef5d
+            ---0x40e9f73f
 
-     1.96%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ee7d
+     1.70%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e089fc
             |
-            ---0x41a9ee7d
+            ---0x40e089fc
 
-     1.96%  qn_wamr_aot_run  libc.so.6             [.] __mpn_extract_double
+     1.63%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f447
             |
-            ---__mpn_extract_double
-               __printf_fp_l_buffer
-               __printf_buffer
-               __vfprintf_internal
-               ___fprintf_chk (inlined)
-               main
+            ---0x40e9f447
 
-     1.96%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cecf
+     1.56%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040fb7373
             |
-            ---0x41a9cecf
+            ---0x40fb7373
 
-     1.95%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ed8e
+     1.52%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f47d
             |
-            ---0x41a9ed8e
+            ---0x40e9f47d
 
-     1.78%  qn_wamr_aot_run  libc.so.6             [.] __memmove_avx_unaligned_erms
+     1.41%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d446
             |
-            ---__memmove_avx_unaligned_erms
-               |          
-                --1.01%--0x2
+            ---0x40e9d446
 
-     1.67%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ccd7
+     1.34%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f469
             |
-            ---0x41a9ccd7
+            ---0x40e9f469
 
-     1.54%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ecb7
+     1.16%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f747
             |
-            ---0x41a9ecb7
+            ---0x40e9f747
 
-     1.41%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cca4
+     1.12%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d653
             |
-            ---0x41a9cca4
+            ---0x40e9d653
 
-     1.39%  qn_wamr_aot_run  libc.so.6             [.] __strcmp_avx2
+     1.00%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f3bf
             |
-            ---__strcmp_avx2
-               |          
-               |--0.70%--0x34c100000000
-               |          0x6f61001f00007478
-               |          
-                --0.69%--aot_enlarge_memory
-                          0x6f6d656d5f656772
+            ---0x40e9f3bf
 
-     1.27%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9ebb0
+     0.86%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa9397804
             |
-            ---0x41a9ebb0
-
-     0.99%  qn_wamr_aot_run  [JIT] tid 2214872     [.] 0x0000000041a9cc83
-            |
-            ---0x41a9cc83
-
-     0.93%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa95ae1a0
-            |
-            ---0xffffffffa95ae1a0
+            ---0xffffffffa9397804
                0xffffffffa92afc9a
                0xffffffffaa39c0ce
                0xffffffffa900134b
                __memset_avx2_unaligned_erms
 
-     0.73%  qn_wamr_aot_run  libc.so.6             [.] _int_malloc
+     0.82%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f50a
             |
-            ---_int_malloc
-               __libc_malloc2
-               aot_instantiate
-               0x1000000000000
+            ---0x40e9f50a
 
-     0.50%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa95c2274
-     0.06%  qn_wamr_aot_run  ld-linux-x86-64.so.2  [.] _dl_map_object_from_fd
-     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa9001330
-     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa92afb64
+     0.70%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d491
+            |
+            ---0x40e9d491
+
+     0.68%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffaa371c57
+            |
+            ---0xffffffffaa371c57
+               0xffffffffa95ae19d
+               0xffffffffa92afc9a
+               0xffffffffaa39c0ce
+               0xffffffffa900134b
+               touch_pages
+               os_thread_signal_init
+               0x656372756f532f6f
+
+     0.68%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f716
+            |
+            ---0x40e9f716
+
+     0.66%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa9104109
+            |
+            ---0xffffffffa9104109
+               0xffffffffa95be468
+               0xffffffffa92afcd9
+               0xffffffffaa39c0ce
+               0xffffffffa900134b
+               __memset_avx2_unaligned_erms
+
+     0.58%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa92afb64
+            |
+            ---0xffffffffa92afb64
+               0xffffffffa900134b
+               __memmove_avx_unaligned_erms
+               0x2
+
+     0.47%  qn_wamr_aot_run  libc.so.6             [.] __strcmp_avx2
+     0.46%  qn_wamr_aot_run  qn_wamr_aot_runner    [.] load_from_sections
+     0.42%  qn_wamr_aot_run  qn_wamr_aot_runner    [.] load_relocation_section
+     0.41%  qn_wamr_aot_run  libc.so.6             [.] __strlen_avx2
+     0.33%  qn_wamr_aot_run  libc.so.6             [.] tcache_free_init
+     0.05%  qn_wamr_aot_run  ld-linux-x86-64.so.2  [.] _dl_map_new_object
+     0.00%  qn_wamr_aot_run  ld-linux-x86-64.so.2  [.] _dl_sysdep_parse_arguments
+     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffaa371ce1
      0.00%  qn_wamr_aot_run  ld-linux-x86-64.so.2  [.] _dl_start
-     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffaa39c095
-     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffaa39870c
-     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffaa39c0ef
+     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffaa39c065
+     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa9001320
+     0.00%  qn_wamr_aot_run  ld-linux-x86-64.so.2  [.] _start
 
 
 #

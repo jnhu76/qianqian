@@ -24,6 +24,7 @@
  * Usage: node tools/wasm_em_node_harness.mjs <guest> <mode> <args...>
  *   bench  correct  <fixture>
  *   bench  bench    <fixture> [iterations=3]
+ *   bench  lifecycle <fixture>
  *   bench  pcm      <fixture> [chunk_frames]   (Mode B if chunk_frames omitted)
  *   pb     pull     [chunk_bytes=65536] [iters=200]
  */
@@ -175,27 +176,35 @@ function wireImports(wasmPath, imports, suppliers) {
 /* load an emscripten MODULARIZE glue + its .wasm with the door wired */
 async function loadGuest(jsName, boundRef, withDoor = true) {
     const heapRef = { mod: null };
+    const hostRef = { load_ms: null, instantiate_ms: null };
     const door = makeDoor(boundRef, heapRef);
     const stdout = [], stderr = [];
     const factory = require_(path.join(ART, jsName));
     const wasmPath = path.join(ART, jsName.replace(/\.js$/, ".wasm"));
+    const t_load = process.hrtime.bigint();
+    const bytes = readFileSync(wasmPath);
+    hostRef.load_ms = Number(process.hrtime.bigint() - t_load) / 1e6;
     const mod = await factory({
         print: (s) => stdout.push(s),
         printErr: (s) => stderr.push(s),
         noInitialRun: true,
         instantiateWasm: (imports, success) => {
-            const bytes = wireImports(wasmPath, imports, withDoor && {
+            const wired = wireImports(wasmPath, imports, withDoor && {
                 read: door.qn_host_read,
                 seek: door.qn_host_seek,
                 size: door.qn_host_size,
             });
-            WebAssembly.instantiate(bytes, imports).then((r) =>
-                success(r.instance, r.module));
+            const t_inst = process.hrtime.bigint();
+            WebAssembly.instantiate(wired, imports).then((r) => {
+                hostRef.instantiate_ms =
+                    Number(process.hrtime.bigint() - t_inst) / 1e6;
+                success(r.instance, r.module);
+            });
             return {};
         },
     });
     heapRef.mod = mod;
-    return { mod, stdout, stderr };
+    return { mod, stdout, stderr, hostRef };
 }
 
 function jsonLine(lines) {
@@ -211,7 +220,7 @@ async function benchGuest() {
     const fixturePath = rest[0];
     if (!fixturePath) process.exit(2);
     const boundRef = { fx: null };
-    const { mod, stdout, stderr } = await loadGuest("qn_guest_bench.js", boundRef);
+    const { mod, stdout, stderr, hostRef } = await loadGuest("qn_guest_bench.js", boundRef);
     boundRef.fx = { buf: readFileSync(fixturePath), pos: 0 };
     mod._bench_bind(1n);                       // opaque to the guest
 
@@ -232,6 +241,14 @@ async function benchGuest() {
         process.exit(rc === 0 ? 0 : 1);
     }
 
+    if (mode === "lifecycle") {
+        const rc = mod._bench_lifecycle();
+        const j = jsonLine(stdout);
+        if (!j || rc !== 0) { out({ ok: false, gate: "no-json-or-failed", stderr: stderr.slice(-3) }); process.exit(1); }
+        out({ ok: true, mode: "lifecycle", guest: j, host: hostRef });
+        process.exit(0);
+    }
+
     if (mode === "pcm") {                       // Modes B / C
         const t0 = process.hrtime.bigint();
         const rc = mod._bench_pcm_prepare();
@@ -243,11 +260,20 @@ async function benchGuest() {
         const pagesAfter = mod._bench_mem_pages();
 
         if (rest[1] === undefined) {            // Mode B: one bulk host read
-            const t1 = process.hrtime.bigint();
+            // Split the boundary cost honestly: Buffer.from(ArrayBuffer, off,
+            // len) is a shared VIEW (no copy); the explicit copy and the
+            // SHA-256 consumer are timed separately so EM's numbers compare
+            // with the C runners' memcpy-based Mode B.
+            const t_v = process.hrtime.bigint();
             const pcm = Buffer.from(mod.HEAPU8.buffer, ptr, len);
-            const sha = createHash("sha256").update(pcm).digest("hex");
-            const copyMs = Number(process.hrtime.bigint() - t1) / 1e6;
-            out({ ok: true, mode: "B", prepMs, copyMs,
+            const viewMs = Number(process.hrtime.bigint() - t_v) / 1e6;
+            const t_c = process.hrtime.bigint();
+            const pcmCopy = Buffer.from(pcm);   // explicit copy (new buffer)
+            const copyMs = Number(process.hrtime.bigint() - t_c) / 1e6;
+            const t_h = process.hrtime.bigint();
+            const sha = createHash("sha256").update(pcmCopy).digest("hex");
+            const hashMs = Number(process.hrtime.bigint() - t_h) / 1e6;
+            out({ ok: true, mode: "B", prepMs, viewMs, copyMs, hashMs,
                   gbps: (len / 1e9) / (copyMs / 1e3), bytes: len, sha,
                   mem_pages_after: pagesAfter });
             process.exit(0);

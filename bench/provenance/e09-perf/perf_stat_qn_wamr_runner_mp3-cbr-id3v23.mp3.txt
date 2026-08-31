@@ -1,21 +1,21 @@
-# started on Mon Aug 31 13:28:37 2026
+# started on Mon Aug 31 18:44:42 2026
 
 
- Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_wamr_runner /home/hoo/Source/qianqian/build/artifacts/wasm/qn_guest_bench.wasm bench /home/hoo/Source/qianqian/corpus/fixtures/mp3-cbr-id3v23.mp3 3':
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_wamr_runner /home/hoo/Source/qianqian/build/artifacts/wasm/qn_guest_bench.wamr-workaround.wasm bench /home/hoo/Source/qianqian/corpus/fixtures/mp3-cbr-id3v23.mp3 3':
 
                  0      context-switches:u               #      0.0 cs/sec  cs_per_second     
                  0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
-              4546      page-faults:u                    #   1641.3 faults/sec  page_faults_per_second
-           2769.70 msec task-clock:u                     #      1.0 CPUs  CPUs_utilized       
-          87192345      branch-misses:u                  #      3.1 %  branch_miss_rate         (49.92%)
-        2779542312      branches:u                       #   1003.6 M/sec  branch_frequency     (66.67%)
-        9150813095      cpu-cycles:u                     #      3.3 GHz  cycles_frequency       (66.81%)
-       18201956766      instructions:u                   #      2.0 instructions  insn_per_cycle  (66.78%)
-        2116282320      stalled-cycles-frontend:u        #     0.23 frontend_cycles_idle        (66.70%)
+              4546      page-faults:u                    #   1109.7 faults/sec  page_faults_per_second
+           4096.69 msec task-clock:u                     #      1.0 CPUs  CPUs_utilized       
+          93245187      branch-misses:u                  #      3.3 %  branch_miss_rate         (50.15%)
+        2788493750      branches:u                       #    680.7 M/sec  branch_frequency     (66.80%)
+       10574991310      cpu-cycles:u                     #      2.6 GHz  cycles_frequency       (66.67%)
+       18261978734      instructions:u                   #      1.7 instructions  insn_per_cycle  (66.62%)
+        2347598815      stalled-cycles-frontend:u        #     0.22 frontend_cycles_idle        (66.50%)
 
-       2.772831378 seconds time elapsed
+       4.142005868 seconds time elapsed
 
-       2.743566000 seconds user
-       0.027995000 seconds sys
+       4.057544000 seconds user
+       0.032427000 seconds sys
 
 
