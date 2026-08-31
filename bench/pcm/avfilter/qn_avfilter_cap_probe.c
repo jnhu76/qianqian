@@ -180,6 +180,7 @@ typedef struct {
     uint64_t fnv;
     int all_finite;
     int channels;
+    int planar; /* negotiated sink format is planar: data[c] are planes */
 } Stats;
 
 static void stats_init(Stats *s, int ch) {
@@ -189,20 +190,39 @@ static void stats_init(Stats *s, int ch) {
     for (int c = 0; c < ch; c++) s->peak[c] = -1.0;
 }
 
-static void stats_feed(Stats *s, const float *p, int frames) {
+static void stats_feed(Stats *s, uint8_t **data, int frames) {
     const int ch = s->channels;
-    for (int i = 0; i < frames * ch; i++) {
-        float v = p[i];
-        uint32_t bits;
-        memcpy(&bits, &v, 4);
-        s->fnv = fnv1a64((uint8_t *)&bits, 4, s->fnv);
-        if (!isfinite(v)) { s->all_finite = 0; continue; }
-        int c = i % ch;
-        double a = fabs((double)v);
-        if (a > s->peak[c]) s->peak[c] = a;
-        s->sumsq[c] += (double)v * v;
-        s->n[c]++;
-        if (s->first_kept < FIRST_KEEP * ch) s->first[s->first_kept++] = v;
+    if (!s->planar) {
+        const float *p = (const float *)data[0];
+        for (int i = 0; i < frames * ch; i++) {
+            float v = p[i];
+            uint32_t bits;
+            memcpy(&bits, &v, 4);
+            s->fnv = fnv1a64((uint8_t *)&bits, 4, s->fnv);
+            if (!isfinite(v)) { s->all_finite = 0; continue; }
+            int c = i % ch;
+            double a = fabs((double)v);
+            if (a > s->peak[c]) s->peak[c] = a;
+            s->sumsq[c] += (double)v * v;
+            s->n[c]++;
+            if (s->first_kept < FIRST_KEEP * ch) s->first[s->first_kept++] = v;
+        }
+    } else {
+        for (int c = 0; c < ch; c++) {
+            const float *p = (const float *)data[c];
+            for (int i = 0; i < frames; i++) {
+                float v = p[i];
+                uint32_t bits;
+                memcpy(&bits, &v, 4);
+                s->fnv = fnv1a64((uint8_t *)&bits, 4, s->fnv);
+                if (!isfinite(v)) { s->all_finite = 0; continue; }
+                double a = fabs((double)v);
+                if (a > s->peak[c]) s->peak[c] = a;
+                s->sumsq[c] += (double)v * v;
+                s->n[c]++;
+                if (s->first_kept < FIRST_KEEP * ch) s->first[s->first_kept++] = v;
+            }
+        }
     }
     s->out_frames += frames;
 }
@@ -374,6 +394,7 @@ static int run_graph(const char *chain, int rate, int ch, const Signal *sig,
         }
         r->neg_rate = av_buffersink_get_sample_rate(sink);
         int fmt = av_buffersink_get_format(sink);
+        r->stats.planar = av_sample_fmt_is_planar(fmt);
         const char *fn = av_get_sample_fmt_name(fmt);
         snprintf(r->neg_fmt, sizeof(r->neg_fmt), "%s", fn ? fn : "?");
     }
@@ -412,7 +433,7 @@ static int run_graph(const char *chain, int rate, int ch, const Signal *sig,
         while ((ret = av_buffersink_get_frame(sink, outf)) >= 0) {
             if (!got_first) { got_first = 1; r->first_out_ns = now_ns() - tp;
                               r->first_out_in_frames = r->stats.in_frames_pushed; }
-            stats_feed(&r->stats, (const float *)outf->data[0], outf->nb_samples);
+            stats_feed(&r->stats, outf->data, outf->nb_samples);
             av_frame_unref(outf);
         }
         if (ret != AVERROR(EAGAIN)) { r->ok = 0; snprintf(r->err, sizeof(r->err), "sink pull: %s", av_err2str(ret)); break; }
@@ -423,7 +444,7 @@ static int run_graph(const char *chain, int rate, int ch, const Signal *sig,
         if (ret < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "eof push: %s", av_err2str(ret)); }
         else {
             while ((ret = av_buffersink_get_frame(sink, outf)) >= 0) {
-                stats_feed(&r->stats, (const float *)outf->data[0], outf->nb_samples);
+                stats_feed(&r->stats, outf->data, outf->nb_samples);
                 av_frame_unref(outf);
             }
             r->drained_eof = (ret == AVERROR_EOF);
