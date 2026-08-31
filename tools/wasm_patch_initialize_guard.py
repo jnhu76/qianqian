@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Patch the wasi-libc init guard in Qianqian E09 guest modules.
 
-WHY (E09 typed finding, WAMR-2.4.5 classic interpreter):
+WHY (E09-WAMR-1, OBSERVED behavior; mechanism is hypothesis):
   wasi-sdk-34/LLVM-23 reactor/command modules inline a __tls_init guard into
   _initialize / _start:
 
@@ -17,11 +17,13 @@ WHY (E09 typed finding, WAMR-2.4.5 classic interpreter):
       ... i32.store guard=1 ...
       call <init fn>
 
-  Under WAMR 2.4.5 the br_if lands ON the `unreachable` byte instead of the
-  `end` (guard memory and the __memory_base global were both verified to be
-  zero, so only a mis-targeted branch can reach the unreachable). The module
-  then traps "unreachable" at startup. Node and Wasmtime execute the same
-  bytes correctly.
+  OBSERVED: the SAME pristine bytes initialize fine on Node / Wasmtime /
+  wasm3 but trap "unreachable" at startup under WAMR 2.4.5 — in BOTH the
+  classic interpreter and the wamrc AOT path (E09-WAMR-1). Guard memory and
+  the __memory_base global were verified to be zero, so only a mis-targeted
+  branch can reach the unreachable; the precise WAMR-side mechanism (interp
+  block-target rewrite vs shared loader/control-flow machinery vs wamrc
+  codegen) is a HYPOTHESIS to be pinned by an upstream minimal repro.
 
 WORKAROUND (guest-side, not runtime modification):
   Replace the single `unreachable` (0x00) with `nop` (0x01) inside the guard

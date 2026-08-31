@@ -22,7 +22,7 @@ BEGIN = "<!-- BEGIN GENERATED TABLES -->"
 END = "<!-- END GENERATED TABLES -->"
 
 FX_LABEL = {
-    "flac-16-44-stereo.flac": "flac 16/44.8k stereo (4 s)",
+    "flac-16-44-stereo.flac": "flac 16/44.1k stereo (4 s)",
     "mp3-cbr-id3v23.mp3": "mp3 cbr (4 s)",
     "aac-lc-44-stereo.m4a": "aac-lc (12 s)",
     "opus-48-stereo.opus": "opus (12 s)",
@@ -50,13 +50,16 @@ def gate_table():
     inter = S["gate"]["wasm_inter_runtime_mismatches"]
     total = S["gate"]["wasm_inter_runtime_total"]
     rts = ", ".join(S["gate"].get("wasm_inter_runtime_runtimes", []))
+    anchor = (S["gate"].get("wasm_anchor") or {}).get("runtime", "?")
+    inter_gate = S["gate"].get("wasm_inter_runtime_gate", "?")
     return "\n".join([
         "| runtime | exact | accepted\\_with\\_tolerance | rejected |",
         "|---|---:|---:|---:|",
         *rows,
         "",
-        f"wasm 侧互检（{rts} 相互 observable 全等）：**{total - inter} / {total} "
-        f"一致，{inter} 例分歧**。",
+        f"wasm 侧互检（{rts}，canonical anchor = {anchor}）："
+        f"**{total - inter} / {total} 一致，{inter} 例分歧**；"
+        f"互检硬 gate = **{inter_gate}**（≠0 即 machine closure FAIL）。",
     ])
 
 
@@ -216,10 +219,23 @@ def tolerance_table():
         if "_err" in v:
             lines.append(f"| {fx} | ERROR | — | — | — |")
             continue
-        pct = 100.0 * v["differing_samples"] / v["samples"] if v["samples"] else 0
-        lines.append(f"| {fx} | {v['max_abs_delta']:.2e} | "
-                     f"{v['max_abs_delta_in_16bit_lsb']:.4f} | {pct:.2f}% | "
-                     f"{v['samples']} / {v['frames']} |")
+        max_d = v.get("max_abs_delta")
+        if max_d is None:
+            lines.append(f"| {fx} | — | — | — | — |")
+            continue
+        lsb = v.get("max_abs_delta_in_16bit_lsb", 0.0)
+        samples = v.get("samples") or 0
+        differing = v.get("differing_samples") or 0
+        pct = 100.0 * differing / samples if samples else 0
+        lines.append(f"| {fx} | {max_d:.2e} | {lsb:.4f} | {pct:.2f}% | "
+                     f"{samples} / {v.get('frames')} |")
+    pol = S.get("float_tolerance_policy", {})
+    anchor = (pol.get("wasm_anchor") or {}).get("runtime", "?")
+    bound = pol.get("max_abs_delta_bound")
+    lines.append("")
+    lines.append(f"evidence：native↔canonical anchor（{anchor}）identity-bound "
+                 f"（逐 tolerated stream 记录 native/anchor PCM hash，stale 即 "
+                 f"REJECT）；bound = {bound}。")
     return "\n".join(lines)
 
 
@@ -299,8 +315,9 @@ def build_block():
         "",
         "### float 容差（native vs wasm，剩余分歧全量解释）",
         "",
-        "machine authority：`bench/results/wasm/tolerance.json`（逐 fixture "
-        "证据，覆盖全部 tolerated fixture）",
+        "machine authority：`bench/results/wasm/tolerance.json`（identity-"
+        "bound 逐 fixture 证据：native + canonical WASM anchor PCM hash 逐 "
+        "stream 绑定 + 数值 delta，覆盖全部 tolerated fixture）",
         "",
         tolerance_table(),
         "",

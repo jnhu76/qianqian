@@ -62,8 +62,8 @@ static const uint32_t K256[64] = {
     0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
     0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
     0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
-    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,
-    0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
 };
 
 #define ROTR(x,n) (((x) >> (n)) | ((x) << (32 - (n))))
@@ -539,6 +539,27 @@ static int sess_decode_all(session *s, sample_store *store,
 /* correctness mode                                                    */
 /* ------------------------------------------------------------------ */
 
+/* E09 seek: shared target math + seek + flush, used by both the
+ * correctness-mode seeks and the pcm-seek tolerance dump so the two
+ * measure the SAME bytes. Returns the raw av_seek_frame result (<0 on
+ * failure); on success the decoder is flushed and ready to re-decode. */
+static int sess_seek(session *s, int64_t target_us, int64_t *out_target_samples,
+                     double *out_seek_ms) {
+    AVStream *ast = s->fmt->streams[s->audio_index];
+    if (out_target_samples)
+        *out_target_samples = (int64_t)av_rescale_q(
+            target_us, (AVRational){1, AV_TIME_BASE},
+            (AVRational){1, ast->codecpar->sample_rate});
+    int64_t target_ts = av_rescale_q(target_us, (AVRational){1, AV_TIME_BASE},
+                                     ast->time_base);
+    double t0 = now_ms();
+    int ret = av_seek_frame(s->fmt, s->audio_index, target_ts, AVSEEK_FLAG_BACKWARD);
+    if (out_seek_ms) *out_seek_ms = now_ms() - t0;
+    if (ret < 0) return ret;
+    avcodec_flush_buffers(s->dec);
+    return 0;
+}
+
 static int run_correct(void) {
     session s;
     double t0 = now_ms();
@@ -675,20 +696,14 @@ static int run_correct(void) {
             sess_close(&s2);
             continue;
         }
-        AVStream *ast2 = s2.fmt->streams[s2.audio_index];
-        int64_t target_samples = (int64_t)av_rescale_q(target, (AVRational){1, AV_TIME_BASE},
-                                                       (AVRational){1, ast2->codecpar->sample_rate});
-        int64_t target_ts = av_rescale_q(target, (AVRational){1, AV_TIME_BASE},
-                                         ast2->time_base);
-        double t_s = now_ms();
-        int ret = av_seek_frame(s2.fmt, s2.audio_index, target_ts, AVSEEK_FLAG_BACKWARD);
-        double seek_ms = now_ms() - t_s;
+        int64_t target_samples = 0;
+        double seek_ms = 0;
+        int ret = sess_seek(&s2, target, &target_samples, &seek_ms);
         if (ret < 0) {
             printf("\"status\":\"seek_failed\",\"target_us\":%" PRId64 ",\"ret\":%d}", target, ret);
             sess_close(&s2);
             continue;
         }
-        avcodec_flush_buffers(s2.dec);
         sample_store st2;
         store_init(&st2);
         st2.channels = store.channels;
@@ -940,6 +955,41 @@ static int pcm_prepare_locked(void) {
     return rc == 0 ? 0 : -1;
 }
 
+/* E09 tolerance study: fill g_pcm with the seek re-decode PCM (the exact
+ * artifact the correctness mode's seeks[*].suffix_sha256 hashes) so the
+ * host can dump it and measure the native<->anchor numeric delta. Uses the
+ * same sess_seek + sess_decode_all path as run_correct. */
+static int pcm_seek_locked(int64_t target_us) {
+    session s;
+    if (sess_open(&s) < 0 || sess_probe(&s) < 0 || sess_open_decoder(&s) < 0) {
+        char e[512]; json_escape(s.first_error, e, sizeof(e));
+        printf("{\"mode\":\"pcm_seek\",\"status\":\"failed\",\"error\":\"%s\"}\n", e);
+        sess_close(&s);
+        return -1;
+    }
+    double seek_ms = 0;
+    int sret = sess_seek(&s, target_us, NULL, &seek_ms);
+    store_free(&g_pcm);
+    store_init(&g_pcm);
+    g_pcm.channels = s.fmt->streams[s.audio_index]->codecpar->ch_layout.nb_channels;
+    g_pcm.sample_rate = s.fmt->streams[s.audio_index]->codecpar->sample_rate;
+    int64_t smp = 0, fr = 0;
+    int rc = -1;
+    if (sret == 0)
+        rc = sess_decode_all(&s, &g_pcm, &smp, &fr);
+    sess_close(&s);
+    g_pcm_cursor = 0;
+    printf("{\"mode\":\"pcm_seek\",\"status\":\"%s\",\"target_us\":%" PRId64
+           ",\"seek_ms\":%.3f,\"channels\":%d,\"sample_rate\":%d,"
+           "\"samples\":%lld,\"frames\":%lld,\"bytes\":%zu}\n",
+           sret == 0 && rc == 0 ? "ok" : "decode_error",
+           target_us, seek_ms,
+           g_pcm.channels, g_pcm.sample_rate, (long long)smp, (long long)fr,
+           g_pcm.len * sizeof(float));
+    fflush(stdout);
+    return sret == 0 && rc == 0 ? 0 : -1;
+}
+
 /* ------------------------------------------------------------------ */
 /* exports (reactor mode; no-ops on native twin)                       */
 /* ------------------------------------------------------------------ */
@@ -971,6 +1021,11 @@ int32_t bench_lifecycle(void) {
 QN_EXPORT("bench_pcm_prepare")
 int32_t bench_pcm_prepare(void) {
     return pcm_prepare_locked();
+}
+
+QN_EXPORT("bench_pcm_seek_prepare")
+int32_t bench_pcm_seek_prepare(int64_t target_us) {
+    return pcm_seek_locked(target_us);
 }
 
 /* canonical PCM byte length (Mode B) */
@@ -1096,7 +1151,6 @@ static int bench_pcm_host(const char *outfile) {
     printf("{\"mode\":\"pcm_host\",\"bytes\":%zu,\"copy_ms\":%.3f,"
            "\"effective_gbps\":%.3f,\"sha256\":\"%s\"}\n",
            total, copy_ms, copy_ms > 0 ? ((double)total / 1e9) / (copy_ms / 1000.0) : 0.0, hex);
-
     uint8_t *stage = malloc(1 << 20);
     int chunk_frames[] = { 256, 1024, 4096 };
     for (unsigned ci = 0; ci < sizeof(chunk_frames)/sizeof(chunk_frames[0]); ci++) {
@@ -1137,6 +1191,28 @@ static int bench_pcm_host(const char *outfile) {
     }
     return 0;
 }
+
+/* E09 tolerance study (native twin): dump the seek re-decode PCM (the exact
+ * artifact correctness-mode seeks[*].suffix_sha256 hashes) to a file. */
+static int bench_pcm_seek_host(int64_t target_us, const char *outfile) {
+    if (pcm_seek_locked(target_us) != 0) return 1;
+    size_t total = g_pcm.len * sizeof(float);
+    const uint8_t *src = (const uint8_t *)g_pcm.data;
+    if (outfile) {
+        FILE *of = fopen(outfile, "wb");
+        if (!of || fwrite(src, 1, total, of) != total) {
+            fprintf(stderr, "cannot write %s\n", outfile);
+            if (of) fclose(of);
+            return 1;
+        }
+        fclose(of);
+    }
+    char hex[65];
+    qn_sha256(src, total, hex);
+    printf("{\"mode\":\"pcm_seek_host\",\"bytes\":%zu,\"sha256\":\"%s\"}\n",
+           total, hex);
+    return 0;
+}
 #endif
 
 /* ------------------------------------------------------------------ */
@@ -1150,8 +1226,9 @@ int main(int argc, char **argv) {
                 "usage: %s <file> correct\n"
                 "       %s <file> bench [iterations=5]\n"
                 "       %s <file> pcm [outfile]\n"
+                "       %s <file> pcm-seek <target_us> [outfile]\n"
                 "       %s <file> lifecycle\n",
-                argv[0], argv[0], argv[0], argv[0]);
+                argv[0], argv[0], argv[0], argv[0], argv[0]);
         return 2;
     }
     av_log_set_level(AV_LOG_ERROR);
@@ -1165,6 +1242,9 @@ int main(int argc, char **argv) {
     if (strcmp(argv[2], "correct") == 0) return bench_correct();
     if (strcmp(argv[2], "bench") == 0) return bench_bench(argc > 3 ? atoi(argv[3]) : 5);
     if (strcmp(argv[2], "pcm") == 0) return bench_pcm_host(argc > 3 ? argv[3] : NULL);
+    if (strcmp(argv[2], "pcm-seek") == 0)
+        return bench_pcm_seek_host(argc > 3 ? atoll(argv[3]) : 0,
+                                   argc > 4 ? argv[4] : NULL);
     if (strcmp(argv[2], "lifecycle") == 0) {
         int rc = run_lifecycle();
         printf("{\"mode\":\"lifecycle_host\",\"runtime\":\"native\",\"load_ms\":null,"

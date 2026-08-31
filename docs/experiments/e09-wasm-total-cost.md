@@ -16,9 +16,10 @@ shipping-em,tolerance,em_performance,toolchains}.json` 与
 
 三个口径严格分开（继承 E08 纪律）：
 
-- **SHIPPING FOOTPRINT**：guest .wasm + runtime 份额 + bridge +（AOT 时）
-  .aot artifact 的**总和**，raw / gzip -9 / brotli -11 / xz -9e 分别列，
-  不许混写。浏览器分发口径另计 glue .js。
+- **SHIPPING FOOTPRINT**：deployment-shaped accounting —— 每后端交付集合
+  为 host（stripped release）+ 对应 guest artifact + bridge；WAMR AOT 部署
+  时以 `.aot` **替代** .wasm（不双份相加），浏览器口径另计 glue .js。
+  raw / gzip -9 / brotli -11 / xz -9e 分别列，不许混写。
 - **EXECUTION TAX**：`execution_tax = T_guest / T_native`（同机同 fixture
   同模式，Mode A 中位数）。
 - **BRIDGE TAX**：boundary 回拷成本对照 guest 解码与 native 直拷。
@@ -37,8 +38,11 @@ shipping-em,tolerance,em_performance,toolchains}.json` 与
   - B：host PCM pull（`pcm_host`）——boundary 全量回拷；
   - C：分块 pull（256/1024/4096 frames）——boundary 调用频谱与长尾。
 - 正确性 gate：复用 E08 的 33 clean + 11 degraded = **44 fixture**，逐
-  runtime 与 native twin 的 observable 全等；任何弱化 gate 的结论无效。
-  另做 wasm 侧互检（四个 wasm runtime 相互全等）。
+  runtime 与 native twin 比较：结构行为 exact-required；mp3/aac 的 PCM
+  hash 字段走 identity-bound 的数值 tolerance（见 float 容差节）；
+  exact / accepted-with-tolerance / rejected 分别计数且不被隐藏。另做
+  wasm 侧互检（五个 WASM 实现/路径相互全等，canonical anchor = WAMR），
+  分歧数 ≠ 0 即 machine closure **FAIL**（硬 gate，不只是报告指标）。
 
 ## 工具链 provenance
 
@@ -48,19 +52,26 @@ shipping-em,tolerance,em_performance,toolchains}.json` 与
 
 ## Typed findings（与数字无关，独立成立）
 
-### E09-WAMR-1：classic-interp bytecode rewriter 对 wasi-libc init guard 的 mis-target
+### E09-WAMR-1：WAMR interp 与 AOT 在 wasi-libc init guard 上同样 misexecute（OBSERVED BEHAVIOR）
 
-wasi-libc 的 `__wasm_call_ctors` guard 编译为
-`i32.load; i32.eqz; br_if 0; unreachable`（guard==0 → br 到块尾继续
-ctor；非 0 → 落到 `unreachable`）。LLVM 20 内联进 `_initialize` 后，
-WAMR classic-interp 的 rewriter 把该 `br_if` 的跳转目标改写到
-`unreachable` 字节上，首次 `_initialize` 即 trap。Reproducible：
-`tools/wasm_patch_initialize_guard.py` 只把 `45 0d 00 00 0b → 45 0d 00
-01 0b`（unreachable→nop，仅限 `_initialize`/`_start` 函数体内、幂等）
-后即可启动。语义：单次 init 下 nop 等价；该 finding 上游级，升级 WAMR
-需复测。**AOT 路径同样 trap**（wamrc 编译 pristine 模块的 .aot 在
-`_initialize` 同样 "unreachable"，workaround 副本的 .aot 正常），因此
-E09-WAMR-1 覆盖 WAMR 的两条代码路径。
+**OBSERVED（已复现，非推断）**：同一份 pristine guest 字节——
+
+- Wasmtime / wasm3 / Node（V8）：`_initialize` 正常；
+- WAMR classic-interp：`_initialize` trap `unreachable`；
+- WAMR AOT（wamrc 编译 pristine 模块）：同样 trap `unreachable`。
+
+workaround（`tools/wasm_patch_initialize_guard.py` 把 guard 内的
+`unreachable` 改成 `nop`，只作用于 `_initialize`/`_start` 函数体、幂等）后，
+WAMR interp 与 AOT 均正常初始化。字节形态：wasi-libc 的 `__wasm_call_ctors`
+guard 编译为 `i32.load; i32.eqz; br_if 0; unreachable`，且 LLVM 20 内联进
+`_initialize`；`45 0d 00 00 0b → 45 0d 00 01 0b` 即可启动。语义：单次 init 下
+nop 等价；代价是失去 double-init abort（E09 runner 只 init 一次）。
+
+**ROOT-CAUSE HYPOTHESIS（待 upstream 最小 repro 确认，勿升级为结论）**：既然
+interp 与 AOT 两条路径同样复现，根因可能落在 WAMR 共享的 loader/control-flow
+机制、interp 的 branch/block target 重写、wamrc 的 codegen、或 validation——
+不能仅凭 interp 表现就钉死为"classic-interp bytecode rewriter"。正式 upstream
+report 需要最小 repro 后单独提交，再升级结论。
 
 ### E09-WAMR-2：app heap 布局在缺少 `__heap_base` 导出时踩 guest .bss
 
@@ -118,17 +129,34 @@ native twin 的 `bench_pcm_host` 复用 guest 的 `bench_pcm_pull(int32 dst)`
 扩展成非法地址 → SIGSEGV。与 E09-bridge-abi-1 同族；修复为 native 专用
 `pull_native(uint8_t*)` 直传真实指针（`bench/wasm/qn_guest_bench.c`）。
 
+### E09-sha-1：runner 与 guest 的 SHA-256 K 常量表缺一项并截断（本轮发现）
+
+`tools/wasm/qn_runner_common.c` 与 `bench/wasm/qn_guest_bench.c` 里
+copy-paste 的 SHA-256 实现，其 K 常量表**缺失 `0x391c0cb3`（K[52]）且只有
+63 项**（K[63] 被零初始化）——第 52–63 轮压缩用了错误/缺失的常量，所有
+"sha256" 值都是错的（如 `sha256("abc")` 应为 `ba7816bf…` 却得
+`ab0bd158…`）。影响：correctness.json 的 canonical/suffix/seek hash、
+`pcm_host` 的 sha256 全部不是真 SHA-256。由于 guest/runner 共享同一错误
+实现，跨 runtime 比较仍自洽（gate 的判等语义未受影响），但"sha256"标签
+是假的。修复：两个文件各补上缺失常量；本轮已全量重生成 correctness /
+correctness-em / tolerance 证据（native twin 用回完整 codec 的
+`build/minimize/c5/manifest.json`，与历史 PCM 逐字节一致——旧 hash 可用
+错误实现复算验证）。
+
 ## Typed findings 责任归属（review 后重分类）
 
 - **upstream candidates**：E09-WAMR-1（已具最小 repro 形态；正式 upstream
-  report 待本 PR machine-closed 后提交，修复方向是 classic-interp 的
-  branch/block target rewrite + 最小回归测试：`br_if 0` 必须跳到 block end，
-  不能落在 `end` 前的指令）。E09-WAMR-2 暂称 **upstream candidate，待
+  report 待本 PR machine-closed 后单独提交。根因**未提前钉死**——interp 与
+  AOT 均复现，最小 repro 后再判断是共享 loader/control-flow 机制、interp
+  的 branch/block target rewrite、wamrc codegen 还是 validation；回归测试
+  至少要求 `br_if 0` 必须跳到 block end，不能落在 `end` 前的指令）。
+  E09-WAMR-2 暂称 **upstream candidate，待
   contract audit**——需先证明"无 `__heap_base` 导出 + 合法模块 + 正常
   instantiate = WAMR 覆盖 guest live .bss"；若官方 contract 本要求该
   embedding 模式导出 `__heap_base`，则应归为 documentation/API safety
   issue 而非语义 bug。
 - **Qianqian bugs**：E09-bridge-abi-1、E09-native-pcm-1、E09-gate-1、
+  E09-sha-1（SHA-256 K 表缺项，本轮发现并修复）、
   E09-xmake-1（artifact 会话互相覆盖——已有纪律，见工具链 provenance）。
 - **API/toolchain hazards**：E09-WAMR-3（变参 ABI）、E09-emscripten-1
   （import 名压缩/重排）、E09-wasi-libc-1（guard 形态依赖 LLVM 内联决策）。
@@ -166,13 +194,13 @@ machine authority：`bench/results/wasm/correctness.json` + `correctness-em.json
 | wasmtime | 28 | 16 | 0 |
 | emscripten | 28 | 16 | 0 |
 
-wasm 侧互检（emscripten, wamr, wamr_aot, wasm3, wasmtime 相互 observable 全等）：**44 / 44 一致，0 例分歧**。
+wasm 侧互检（emscripten, wamr, wamr_aot, wasm3, wasmtime，canonical anchor = wamr）：**44 / 44 一致，0 例分歧**；互检硬 gate = **PASS**（≠0 即 machine closure FAIL）。
 
 ### 3. 执行 ladder（Mode A，execution_tax = T_guest / T_native）
 
 machine authority：`bench/results/wasm/performance.json`（逐 runtime 5 fixture；native twin 与 guest 同为 -Os codegen 口径）
 
-| runtime | flac 16/44.8k stereo (4 s) | mp3 cbr (4 s) | aac-lc (12 s) | opus (12 s) | mp3 cbr long (12 s) |
+| runtime | flac 16/44.1k stereo (4 s) | mp3 cbr (4 s) | aac-lc (12 s) | opus (12 s) | mp3 cbr long (12 s) |
 |---|---:|---:|---:|---:|---:|
 | native ms | 8.68 | 7.19 | 15.04 | 46.25 | 14.31 |
 | wamr ms | 352.74 | 499.17 | 1,020.31 | 3,415.26 | 1,091.32 |
@@ -254,7 +282,7 @@ machine authority：`bench/results/wasm/shipping.json`（host = stripped release
 
 ### float 容差（native vs wasm，剩余分歧全量解释）
 
-machine authority：`bench/results/wasm/tolerance.json`（逐 fixture 证据，覆盖全部 tolerated fixture）
+machine authority：`bench/results/wasm/tolerance.json`（identity-bound 逐 fixture 证据：native + canonical WASM anchor PCM hash 逐 stream 绑定 + 数值 delta，覆盖全部 tolerated fixture）
 
 | fixture | max\|Δ\| (f32) | 16-bit LSB 折算 | 差异样本占比 | samples / frames |
 |---|---:|---:|---:|---:|
@@ -278,6 +306,8 @@ machine authority：`bench/results/wasm/tolerance.json`（逐 fixture 证据，�
 | opus-truncated.opus | 0.00e+00 | 0.0000 | 0.00% | 431688 / 450 |
 | vorbis-44-stereo.ogg | 0.00e+00 | 0.0000 | 0.00% | 529200 / 518 |
 | vorbis-truncated.ogg | 0.00e+00 | 0.0000 | 0.00% | 360000 / 352 |
+
+evidence：native↔canonical anchor（wamr）identity-bound （逐 tolerated stream 记录 native/anchor PCM hash，stale 即 REJECT）；bound = 1e-06。
 
 <!-- END GENERATED TABLES -->
 
@@ -313,11 +343,16 @@ machine authority：`bench/results/wasm/tolerance.json`（逐 fixture 证据，�
   `exact-required + tolerance-allowed = accepted` 写成可执行策略——结构
   字段（frame/sample count、typed degraded、metadata、seek 语义）exact，
   只有 mp3/aac float-DSP 族的 PCM hash 字段走 tolerance，且每个 tolerated
-  fixture 都有逐 fixture 证据（`tolerance.json`，max|Δ| ≤ 1e-6、samples/
-  frames 相等）。`exact_matches` 与 `accepted_with_tolerance` 分别计数，
-  28/44 exact + 16/44 tolerance 的事实不被藏掉。Emscripten/V8 由独立的
-  `correctness-em.json`（Node harness）加入同一 authority，"五个 wasm
-  实现 44/44 bit-identical"因此有统一机器依据。
+  fixture 都有 **identity-bound 逐 fixture 证据**（`tolerance.json` 记录被
+  数值比较的具体 native 与 canonical WASM anchor（WAMR）PCM hash，覆盖
+  full decode / suffix / seek suffix 每个 tolerated stream，逐 stream
+  max|Δ| ≤ 1e-6 实测）。gate 只有当前 native/anchor hash 等于证据、且该
+  runtime 与 anchor bit-identical 时才放行（stale evidence / PCM 变更即
+  REJECT）；非 anchor runtime 与 anchor 的互检 ≠ 0 使 machine closure
+  **FAIL**（硬 gate）。`exact_matches` 与 `accepted_with_tolerance` 分别
+  计数，28/44 exact + 16/44 tolerance 的事实不被藏掉。Emscripten/V8 由
+  独立的 `correctness-em.json`（Node harness）加入同一 authority，"五个
+  wasm 实现 44/44 bit-identical"因此有统一机器依据。
 
 ## Bottleneck verdict（Layer 1）
 
@@ -340,8 +375,10 @@ machine authority：`bench/results/wasm/tolerance.json`（逐 fixture 证据，�
 
 - 正确性 gate：**PASS**（可执行策略：exact + tolerance = accepted，
   rejected = 0；`exact_matches` 与 `accepted_with_tolerance` 分开计数；
-  每个 tolerated fixture 都有逐 fixture 证据；Emscripten/V8 由独立
-  `correctness-em.json` 加入同一 authority；降级行为同型）。
+  每个 tolerated fixture 都有 identity-bound 逐 fixture 证据（native +
+  canonical WASM anchor PCM hash 绑定 + 逐 stream 数值 delta ≤ bound）；
+  wasm 互检 = 0 是硬 gate（分歧 ≠ 0 即 closure FAIL）；Emscripten/V8 由
+  独立 `correctness-em.json` 加入同一 authority；降级行为同型）。
 - 性能 / bridge / 内存 / shipping / lifecycle 数据：**完备**（真实环境
   测量，provenance 齐全；native 内存基线 CLI 已修正；startup 分阶段
   测量）。

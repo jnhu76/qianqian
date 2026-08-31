@@ -58,8 +58,15 @@ def main():
         print("error: correctness.json missing (run tools/wasm_gate.py in the "
               "WASI/native session first)")
         return 2
+    corr = json.loads(ref_path.read_text())
     ref = {cid: observable(j)
-           for cid, j in json.loads(ref_path.read_text())["raw"]["native"].items()}
+           for cid, j in corr["raw"]["native"].items()}
+    # canonical WASM anchor = the WAMR classic-interp row of correctness.json;
+    # the Emscripten/V8 row must be bit-identical to it on every
+    # tolerance-allowed stream, same contract as the C runners.
+    from wasm_gate import ANCHOR_RUNTIME
+    anchors = {cid: observable(j)
+               for cid, j in corr["raw"].get(ANCHOR_RUNTIME, {}).items()}
 
     per = {}
     for cid, c in cases.items():
@@ -69,7 +76,7 @@ def main():
     fails, tol_ok = [], []
     for cid, c in cases.items():
         obs = observable(per[cid])
-        kind, reason = classify(c, ref[cid], obs, tol)
+        kind, reason = classify(c, ref[cid], obs, tol, anchors.get(cid))
         if kind == "exact":
             exact += 1
         elif kind == "tolerated":
@@ -83,7 +90,8 @@ def main():
     out = {"corpus": "stage-a-v1 + common-formats-v1 (44 cases)",
            "reference": "native twin (joined from correctness.json)",
            "harness": "node tools/wasm_em_node_harness.mjs bench correct",
-           "policy": "same as tools/wasm_gate.py",
+           "policy": "same as tools/wasm_gate.py (identity-bound tolerance "
+                     "evidence + canonical WASM anchor contract)",
            "summary": {"emscripten": {
                "exact_matches": exact,
                "accepted_with_tolerance": accepted,

@@ -103,6 +103,20 @@ static bool call1_i32(wasm_exec_env_t env, wasm_module_inst_t inst,
     return true;
 }
 
+static bool call1_i64(wasm_exec_env_t env, wasm_module_inst_t inst,
+                      const char *name, int64_t a, int32_t *ret) {
+    wasm_function_inst_t f = wasm_runtime_lookup_function(inst, name);
+    if (!f) return false;
+    if (ret) {
+        wasm_val_t r[1] = { 0 };
+        if (!wasm_runtime_call_wasm_v(env, f, 1, r, 1, (uint64_t)a)) return false;
+        *ret = r[0].of.i32;
+    } else {
+        if (!wasm_runtime_call_wasm_v(env, f, 0, NULL, 1, (uint64_t)a)) return false;
+    }
+    return true;
+}
+
 static bool call2_i32(wasm_exec_env_t env, wasm_module_inst_t inst,
                       const char *name, int32_t a, int32_t b, int32_t *ret) {
     wasm_function_inst_t f = wasm_runtime_lookup_function(inst, name);
@@ -261,13 +275,57 @@ static int run_pcm(wasm_exec_env_t env, wasm_module_inst_t inst) {
     return 0;
 }
 
+/* pcm-seek: dump the seek re-decode PCM (tolerance study). Fills the guest
+ * g_pcm via bench_pcm_seek_prepare, then reads it out of linear memory with
+ * the same Mode B copy used by run_pcm. */
+static int run_pcm_seek(wasm_exec_env_t env, wasm_module_inst_t inst,
+                        int64_t target_us) {
+    if (!call_i64(env, inst, "bench_bind", QN_HANDLE))
+        { die_on_exception(inst, "bench_bind"); return 1; }
+    int32_t prep_rc = -1;
+    if (!call1_i64(env, inst, "bench_pcm_seek_prepare", target_us, &prep_rc))
+        { die_on_exception(inst, "bench_pcm_seek_prepare"); return 1; }
+    if (prep_rc != 0) return 1;
+    int32_t channels = 0, ptr = 0, len = 0;
+    if (!call0_i32(env, inst, "bench_pcm_channels", &channels)) return 1;
+    if (!call0_i32(env, inst, "bench_pcm_ptr", &ptr)) return 1;
+    if (!call0_i32(env, inst, "bench_pcm_len", &len)) return 1;
+    if (len <= 0 || ptr <= 0) { fprintf(stderr, "bad pcm len/ptr\n"); return 1; }
+    const uint8_t *src = wasm_runtime_addr_app_to_native(inst, (uint64_t)(uint32_t)ptr);
+    char *hostbuf = malloc((size_t)len);
+    if (!hostbuf) return 1;
+    size_t off = 0;
+    while (off < (size_t)len) {
+        size_t take = (size_t)len - off;
+        if (take > (1u << 20)) take = 1u << 20;
+        memcpy(hostbuf + off, src + off, take);
+        off += take;
+    }
+    char hex[65];
+    qn_sha256(hostbuf, (size_t)len, hex);
+    if (g_pcm_outfile) {
+        FILE *of = fopen(g_pcm_outfile, "wb");
+        if (!of || fwrite(hostbuf, 1, (size_t)len, of) != (size_t)len) {
+            fprintf(stderr, "cannot write %s\n", g_pcm_outfile);
+            if (of) fclose(of);
+            free(hostbuf);
+            return 1;
+        }
+        fclose(of);
+    }
+    printf("{\"mode\":\"pcm_seek_host\",\"bytes\":%d,\"sha256\":\"%s\"}\n",
+           len, hex);
+    free(hostbuf);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     if (argc < 4) {
         fprintf(stderr,
 #ifdef QN_WAMR_AOT_RUNNER
-                "usage: %s <module.aot> <correct|bench|pcm|lifecycle> <fixture> [iters]\n",
+                "usage: %s <module.aot> <correct|bench|pcm|pcm-seek|lifecycle> <fixture> [iters|target_us] [outfile]\n",
 #else
-                "usage: %s <module.wasm> <correct|bench|pcm|lifecycle> <fixture> [iters]\n",
+                "usage: %s <module.wasm> <correct|bench|pcm|pcm-seek|lifecycle> <fixture> [iters|target_us] [outfile]\n",
 #endif
                 argv[0]);
         return 2;
@@ -276,7 +334,14 @@ int main(int argc, char **argv) {
     const char *mode = argv[2];
     const char *fixture_path = argv[3];
     int iters = argc > 4 ? atoi(argv[4]) : 5;
-    g_pcm_outfile = argc > 4 ? argv[4] : NULL; /* pcm mode: <wasm> pcm <fixture> [outfile] */
+    int64_t seek_target = 0;
+    if (strcmp(mode, "pcm-seek") == 0) {
+        if (argc < 5) { fprintf(stderr, "pcm-seek needs <target_us>\n"); return 2; }
+        seek_target = atoll(argv[4]);
+        g_pcm_outfile = argc > 5 ? argv[5] : NULL;
+    } else {
+        g_pcm_outfile = argc > 4 ? argv[4] : NULL; /* pcm mode: <wasm> pcm <fixture> [outfile] */
+    }
 
     if (qn_fixture_load(&g_fixture, fixture_path) != 0) {
         fprintf(stderr, "cannot load fixture %s\n", fixture_path);
@@ -362,6 +427,7 @@ int main(int argc, char **argv) {
     if (strcmp(mode, "correct") == 0) rc = run_correct(env, inst);
     else if (strcmp(mode, "bench") == 0) rc = run_bench_mode(env, inst, iters);
     else if (strcmp(mode, "pcm") == 0) rc = run_pcm(env, inst);
+    else if (strcmp(mode, "pcm-seek") == 0) rc = run_pcm_seek(env, inst, seek_target);
     else if (strcmp(mode, "lifecycle") == 0) {
         rc = run_lifecycle_mode(env, inst);
         printf("{\"mode\":\"lifecycle_host\",\"runtime\":\"%s\",\"load_ms\":%.3f,"

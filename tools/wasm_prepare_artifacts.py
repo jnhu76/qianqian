@@ -5,9 +5,9 @@ The WASI session now emits PRISTINE toolchain output (xmake.lua no longer
 patches in after_build). This script derives the artifacts the runtime
 ladder actually consumes and records the exact provenance:
 
-  qn_guest_bench.wamr-workaround.wasm    patched copy for WAMR classic-interp
+  qn_guest_bench.wamr-workaround.wasm    patched copy for WAMR interp/AOT
   qn_guest_bench_cmd.wamr-workaround.wasm
-  SongCore.wamr-workaround.wasm          patched copy for WAMR classic-interp
+  SongCore.wamr-workaround.wasm          patched copy for WAMR interp/AOT
   qn_pb_guest.wamr-workaround.wasm       (pb microbench, WAMR only)
   qn_guest_bench.aot                     bench-guest AOT from the WORKAROUND
                                          guest (WAMR AOT traps pristine too)
@@ -16,7 +16,9 @@ ladder actually consumes and records the exact provenance:
 
 The patch is the deterministic E09-WAMR-1 workaround (unreachable -> nop in
 the _initialize/_start init guard) applied ONLY to the copies; Wasmtime /
-wasm3 / Node always consume unmodified bytes.
+wasm3 / Node always consume unmodified bytes. Both WAMR code paths — the
+classic interpreter AND the wamrc AOT — trap the pristine guard, so the same
+workaround copy feeds both.
 
 Emits bench/results/wasm/artifacts.json: per artifact pre/post SHA256 plus
 the exact wamrc command line used for each AOT compile.
@@ -56,7 +58,8 @@ def prepare_workaround(src_name: str, dst_name: str, record: dict):
         "source": src_name,
         "sha256_before": before,
         "sha256_after": after,
-        "patch": "E09-WAMR-1 init-guard unreachable->nop (classic-interp only)",
+        "patch": "E09-WAMR-1 WAMR init-guard workaround (unreachable->nop; "
+                 "WAMR interp and AOT both trap the pristine guard)",
     }
 
 

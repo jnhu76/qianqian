@@ -78,8 +78,12 @@ def main():
 
     # wasm-vs-wasm inter-runtime bit-exactness over the SAME observable the
     # gate uses (single source of truth; wall-clock fields stripped there).
+    # This is the executable form of the canonical-WASM-anchor contract:
+    # every non-anchor WASM runtime must be bit-identical to the anchor on
+    # every tolerance-allowed stream. mismatches HARD-FAIL the closure (they
+    # are not just a reported metric).
     sys.path.insert(0, str(ROOT / "tools"))
-    from wasm_gate import observable  # noqa: E402
+    from wasm_gate import observable, ANCHOR_RUNTIME  # noqa: E402
 
     wasm_rows = {rt: None for rt in WASM_RTS}
     if corr_em and "raw" in corr_em and "emscripten" in corr_em["raw"]:
@@ -97,16 +101,27 @@ def main():
         if len(vecs) > 1:
             mism += 1
             per_case[cid] = len(vecs)
+    inter_gate = "PASS" if mism == 0 else "FAIL"
     summary["gate"] = {
         "policy": corr.get("policy"),
         "native_vs_runtime": gate,
         "emscripten_authority": "correctness-em.json (node harness)" if corr_em
                                 else "absent",
+        "wasm_anchor": {
+            "runtime": ANCHOR_RUNTIME,
+            "contract": "every non-anchor WASM runtime must be bit-identical "
+                        "to the anchor on every tolerance-allowed stream",
+        },
         "wasm_inter_runtime_mismatches": mism,
         "wasm_inter_runtime_total": len(cases),
         "wasm_inter_runtime_runtimes": sorted(wasm_rows),
+        "wasm_inter_runtime_gate": inter_gate,
         "wasm_inter_runtime_mismatch_cases": per_case,
     }
+    if mism > 0:
+        print(f"error: wasm_inter_runtime_mismatches={mism} != 0 "
+              f"(canonical WASM anchor contract violated); cases={per_case}")
+        return 2
 
     # --- execution ladder (Mode A) -----------------------------------------
     ladder = {}
@@ -221,19 +236,41 @@ def main():
 
     # --- tolerance ----------------------------------------------------------
     if tol:
-        summary["float_tolerance_vs_native"] = tol.get("fixtures", tol)
-        summary["float_tolerance_policy"] = {
-            "families": (corr.get("policy") or {}).get("tolerance_allowed",
-                                                       {}).get("families"),
-            "gate_bound": None,
-        }
+        # compact per-fixture view for the report tables; the FULL identity
+        # evidence (native + anchor PCM hashes per stream) lives in
+        # tolerance.json — the summary references it, it does not duplicate it.
+        compact = {}
+        for fx, v in (tol.get("fixtures") or {}).items():
+            if "_err" in v:
+                compact[fx] = {"_err": v["_err"]}
+                continue
+            full = (v.get("numeric_delta") or {}).get("full", {})
+            compact[fx] = {
+                "family": v.get("family"),
+                "samples": v.get("samples"),
+                "frames": v.get("frames"),
+                "max_abs_delta": full.get("max_abs_delta"),
+                "max_abs_delta_in_16bit_lsb": full.get(
+                    "max_abs_delta_in_16bit_lsb"),
+                "differing_samples": full.get("differing_samples"),
+                "suffix_streams": len((v.get("numeric_delta") or {})
+                                      .get("suffix", [])),
+                "seek_streams": len((v.get("numeric_delta") or {})
+                                    .get("seek", [])),
+            }
+        summary["float_tolerance_vs_native"] = compact
+        # policy comes from MACHINE FIELDS (correctness.json policy carries the
+        # same numbers the evidence file writes); never parse prose to recover
+        # the bound — that is the reverse data flow.
         bnd = (corr.get("policy") or {}).get("tolerance_allowed", {})
-        # bound lives in the gate policy string; keep the numeric constant in
-        # sync by reading it back out of the gate's policy text
-        import re
-        m = re.search(r"max_abs_delta\s*<=\s*([0-9.e-]+)", json.dumps(bnd))
-        if m:
-            summary["float_tolerance_policy"]["gate_bound"] = float(m.group(1))
+        anchor_pol = (corr.get("policy") or {}).get("wasm_anchor", {})
+        summary["float_tolerance_policy"] = {
+            "families": bnd.get("families"),
+            "max_abs_delta_bound": bnd.get("max_abs_delta_bound"),
+            "wasm_anchor": anchor_pol,
+            "evidence_file": "tolerance.json (identity-bound native + anchor "
+                             "PCM hashes per tolerance-allowed stream)",
+        }
 
     OUT.write_text(json.dumps(summary, indent=1, ensure_ascii=False))
     print("summary.json written")
