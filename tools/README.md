@@ -25,3 +25,10 @@
 - `link_audit_windows.py`：COFF/PE 版链接可达性审计——offset 级成员解析（重名 basename 不再折叠）、llvm-nm 语义模拟、reduced-archive PE 内容相等证明（load-bearing section sha）+ lld -Map 佐证；reachable-objects.json 与 Linux 版同 schema。
 
 Windows host adapter：`songcore_windows_host.c`（`CreateFileW`/宽路径/`--unicode`/`--largefile` 虚拟 IO gate/`--robust` degraded typed 分类）；DLL 导出契约：`songcore_q.def`。
+
+## PCM Processing P0（issue #12，E10-P0）
+
+- `pcm_p0.py`：E10-P0 driver——编译 `bench/pcm/` 契约 + harness（`cc -std=c11 -O2`）、运行 96-case 透明 bypass corpus + lifecycle + allocation gate + placement model + block matrix，机器汇编 `bench/results/pcm-processing/p0-summary.json`（含 provenance + gates；生产代码零改动由 `git diff` 验证）。`--check` 校验 summary 与 section JSON 无漂移。
+- `pcm_report_tables.py`：`docs/experiments/e10-pcm-processing.md` 数字表格生成器，唯一 authority 为 `p0-summary.json`；`--check` 拒绝 doc 与 JSON 漂移。
+
+实验代码：`bench/pcm/pcm_pipeline.{h,c}`（rate-changing/rate-preserving 双契约 + BYPASS/OFF + 计数分配器 + 有界 slab 队列）与 `bench/pcm/qn_pcm_p0_harness.c`（测量仪器）。全部为实验代码，不进入 shipping runtime。
