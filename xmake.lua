@@ -278,6 +278,9 @@ if get_config("wasm") then
         set_targetdir(wasm_artifact_dir)
         set_basename("SongCore")
         set_extension(".wasm")
+        if get_config("wasm") == "emscripten" then
+            set_extension(".js") -- MODULARIZE glue + .wasm side by side
+        end
         set_optimize("smallest")
         add_files("src/songcore_ffmpeg.c", "src/wasm/songcore_wasm_bridge.c")
         add_includedirs("include", "src/wasm")
@@ -287,12 +290,14 @@ if get_config("wasm") then
         else
             -- Emscripten: keep the same exports addressable from JS glue.
             add_ldflags({
+                "--no-entry", -- library-style module: init via emscripten runtime
+                "-sERROR_ON_UNDEFINED_SYMBOLS=0", -- qianqian_host imports come from the embedder
                 "-sALLOW_MEMORY_GROWTH=1",
                 "-sMODULARIZE=1",
                 "-sEXPORT_NAME=createSongCore",
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
-                "-sEXPORTED_FUNCTIONS=[\"_initialize\",\"_song_wasm_open\",\"_song_wasm_probe\",\"_song_wasm_read_pcm\",\"_song_wasm_seek\",\"_song_wasm_close\",\"_malloc\",\"_free\"]",
+                "-sEXPORTED_FUNCTIONS=[\"_song_wasm_open\",\"_song_wasm_probe\",\"_song_wasm_read_pcm\",\"_song_wasm_seek\",\"_song_wasm_close\",\"_malloc\",\"_free\"]",
                 "-sENVIRONMENT=node,web",
             }, {force = true})
         if get_config("wasm") == "wasi" then
@@ -312,6 +317,9 @@ if get_config("wasm") then
         set_targetdir(wasm_artifact_dir)
         set_basename("qn_guest_bench")
         set_extension(".wasm")
+        if get_config("wasm") == "emscripten" then
+            set_extension(".js")
+        end
         set_optimize("smallest")
         add_files("bench/wasm/qn_guest_bench.c")
         add_includedirs("src/wasm")
@@ -320,12 +328,14 @@ if get_config("wasm") then
             add_ldflags(wasi_reactor_ldflags(), {force = true})
         else
             add_ldflags({
+                "--no-entry", -- library-style module: init via emscripten runtime
+                "-sERROR_ON_UNDEFINED_SYMBOLS=0", -- qianqian_host imports come from the embedder
                 "-sALLOW_MEMORY_GROWTH=1",
                 "-sMODULARIZE=1",
                 "-sEXPORT_NAME=createQnGuestBench",
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
-                "-sEXPORTED_FUNCTIONS=[\"_initialize\",\"_bench_bind\",\"_bench_correct\",\"_bench_bench\",\"_bench_pcm_prepare\",\"_bench_pcm_len\",\"_bench_pcm_ptr\",\"_bench_pcm_channels\",\"_bench_pcm_rate\",\"_bench_pcm_pull\",\"_bench_pcm_reset\",\"_bench_stage_alloc\",\"_bench_mem_pages\",\"_malloc\",\"_free\"]",
+                "-sEXPORTED_FUNCTIONS=[\"_bench_bind\",\"_bench_correct\",\"_bench_bench\",\"_bench_pcm_prepare\",\"_bench_pcm_len\",\"_bench_pcm_ptr\",\"_bench_pcm_channels\",\"_bench_pcm_rate\",\"_bench_pcm_pull\",\"_bench_pcm_reset\",\"_bench_stage_alloc\",\"_bench_mem_pages\",\"_malloc\",\"_free\"]",
                 "-sENVIRONMENT=node,web",
             }, {force = true})
         if get_config("wasm") == "wasi" then
@@ -371,6 +381,9 @@ if get_config("wasm") then
         set_targetdir(wasm_artifact_dir)
         set_basename("qn_pb_guest")
         set_extension(".wasm")
+        if get_config("wasm") == "emscripten" then
+            set_extension(".js")
+        end
         set_optimize("smallest")
         add_files("bench/wasm/qn_pb_guest.c")
         add_includedirs("src/wasm")
@@ -378,12 +391,14 @@ if get_config("wasm") then
             add_ldflags(wasi_reactor_ldflags(), {force = true})
         else
             add_ldflags({
+                "--no-entry", -- library-style module: init via emscripten runtime
+                "-sERROR_ON_UNDEFINED_SYMBOLS=0", -- qianqian_host imports come from the embedder
                 "-sALLOW_MEMORY_GROWTH=1",
                 "-sMODULARIZE=1",
                 "-sEXPORT_NAME=createQnPbGuest",
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
-                "-sEXPORTED_FUNCTIONS=[\"_initialize\",\"_pb_fill\",\"_pb_ptr\",\"_pb_pull\",\"_pb_reset\",\"_pb_len\",\"_malloc\",\"_free\"]",
+                "-sEXPORTED_FUNCTIONS=[\"_pb_fill\",\"_pb_ptr\",\"_pb_pull\",\"_pb_reset\",\"_pb_len\",\"_malloc\",\"_free\"]",
                 "-sENVIRONMENT=node,web",
             }, {force = true})
         if get_config("wasm") == "wasi" then
