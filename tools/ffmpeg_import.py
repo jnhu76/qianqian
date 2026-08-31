@@ -49,8 +49,9 @@ def lib_targets_for(profile: dict) -> tuple[str, ...]:
 # Object roots accepted as closure members. libswresample is included so
 # profiles that enable it (e.g. the Opus decoder's upstream dependency)
 # capture its translation units; for profiles without it the root simply
-# never matches.
-OBJECT_ROOTS = ("libavutil/", "libavcodec/", "libavformat/", "libswresample/")
+# never matches. libavfilter likewise (E10-C0 capability ladder).
+OBJECT_ROOTS = ("libavutil/", "libavcodec/", "libavformat/", "libswresample/",
+                "libavfilter/")
 SOURCE_SUFFIXES = (".c", ".S", ".s", ".asm", ".cpp", ".m")
 DEP_FLAGS_WITH_VALUE = {"-MF", "-MT", "-MQ"}
 DEP_FLAGS = {"-MMD", "-MD", "-MP", "-MM", "-M"}
