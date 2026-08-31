@@ -636,3 +636,48 @@ python3 tools/pcm_p0.py --check
   callback 工作量 B < A、memory pass A ≤ B 是本模型下的事实，但
   deadline 安全、功耗、真实调度抖动未测——**不做 production
   placement 决策**。
+
+## 最终 VERDICT（E10 本 run）
+
+机器权威：`bench/results/pcm-processing/e10-summary.json` +
+下方各阶段 summary；`tools/pcm_e10.py --check` 逐级验证。
+
+```text
+P0  — PASS（17 gates，含 sanitizer + 6 mutations 全捕获）
+A0  — DEVICE EVIDENCE COLLECTED（单 Windows 主机 Realtek 端点）
+A1  — evidence only（不冻结 SRC 决策）
+B0  — PASS（Gain/Biquad/EQ10/Limiter + NaN policy + memory passes）
+B1  — PASS（thin DSP 胜出：libavfilter dependency = 0 bytes）
+PRODUCTION CODE CHANGED: NO
+```
+
+- **A0**：本机（Realtek）mix = 48k f32 stereo；shared 原生率仅 48k，
+  44.1k/96k 需 SRC（app 或 Windows AUTOCONVERTPCM 均可）；exclusive
+  全采样率不支持（无 source-rate device path）；reopen ~42-43 ms
+  （Initialize 主导 ~40 ms）。
+- **A1（Pareto 初读）**：质量最弱为 swr 默认（近 Nyquist alias
+  -33 dB、THD+N -107 dB、DC 0.99999，但已在 FFmpeg closure 内）；
+  soxr = 质量/速度 sweet spot（-134 dB、~11 ns/frame、925×RT）但
+  post-prepare 43 次分配；r8b = 质量/shipping 最优（-151 dB、
+  6 KB xz 级）但需 double 胶水与理想帧数 drain；lsr = 除质量外无
+  优势（744 ns/frame、938 KB xz）。**不冻结决策**。
+- **B0**：节点抽象 = 每逻辑 filter 一遍 PCM pass（EQ10 = 10）；
+  biquad 频响误差 0.12 dB；limiter 无过冲、latency 0；NaN active-
+  sanitize、OFF 位透明；全链 post-prepare 0 分配。
+- **B1**：capability-equivalent 链 CPU 相当（框架非主导成本）；
+  libavfilter closure 205 TU vs thin 2 TU，shipping xz 205 KB vs
+  6 KB——thin DSP 以显著更小 closure/shipping 服务本能力集。
+
+**FINAL RECOMMENDATION（证据到哪说到哪）**
+- SRC 政策：44.1k 歌曲在 48k 设备上必须有人做 SRC；若选 app SRC，
+  soxr 是质量/速度首选（RT 路径需处理其分配），r8b 若接受 double
+  胶水则质量/shipping 更优；swr 默认质量不足需调优（filter_size）
+  后才算公平竞争；平台 SRC（Windows）是 sink-owned 竞争者，A1
+  未把 Windows SRC 纳入离线样本质量 harness。
+- 初始 DSP 架构：thin DSP（Gain/Biquad/EQ10/Limiter 标量参考），
+  先做 pass-fusion 前的成本可见（B0）；libavfilter 无需引入。
+- libavfilter 角色：`0 bytes`（本能力集）；若未来需要卷积/复杂图
+  再评估。
+- 进入 B2 的候选：EQ10/Gain 的 pass fusion（单遍级联）、limiter
+  的 lookahead 语义对比、soxr 分配的 RT 预案、swr filter_size 调优
+  对照、真实线程 placement（A0 后）。

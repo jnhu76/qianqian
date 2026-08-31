@@ -1,0 +1,55 @@
+{
+ "experiment": "e10-pcm-processing",
+ "verdict": "PASS",
+ "stages": {
+  "P0": {
+   "verdict": "PASS",
+   "authority": "p0-summary.json",
+   "gates": {
+    "bypass_pcm_bit_identical": "PASS",
+    "no_implicit_clipping_gain_rematrix_rate_change": "PASS",
+    "bypass_rate_mismatch_rejected": "PASS",
+    "post_prepare_allocation_gate": "PASS",
+    "buffer_bound": "PASS",
+    "queue_ownership_conservation": "PASS",
+    "queue_bound_enforced": "PASS",
+    "stale_token_rejected": "PASS",
+    "reset_lifecycle_same_instance": "PASS",
+    "reprepare_rate_transition_semantics": "PASS",
+    "zero_copy_guard_with_dsp_stage": "PASS",
+    "copy_memory_pass_accounting_present": "PASS",
+    "rt_vs_worker_placement_evidence_present": "PASS",
+    "bypass_overhead_measured": "PASS",
+    "sanitizer_clean": "PASS",
+    "mutation_tests_caught": "PASS"
+   }
+  },
+  "A0": {
+   "verdict": "COLLECTED",
+   "authority": "a0-summary.json"
+  },
+  "A1": {
+   "verdict": "PASS",
+   "authority": "a1-summary.json"
+  },
+  "B0": {
+   "verdict": "PASS",
+   "authority": "b0-summary.json"
+  },
+  "B1": {
+   "verdict": "PASS",
+   "authority": "b1-summary.json"
+  }
+ },
+ "scope_statements": {
+  "production_code_changed": false,
+  "no_pr_merged": true,
+  "no_simd": true,
+  "no_kotlin": true
+ },
+ "provenance": {
+  "git_parent_commit": "af875cd0c5b87d3c2683c9e06f99516fa0efc0cb",
+  "git_branch": "exp/e10-src-dsp-lab",
+  "generated_utc": "2026-08-31T17:41:23Z"
+ }
+}
