@@ -515,7 +515,7 @@ def graph_smoke_table():
          {"expect": "rms_ratio_vs_anull_db:ch=0:min=-30:max=-6"}),
         ("F1", "f1_highpass", "highpass=f=500", sig("sine", 100), 48000, 2, 48000,
          {"expect": "rms_ratio_vs_anull_db:ch=0:min=-30:max=-6"}),
-        ("F2", "f2_alimiter", "alimiter=limit=0.5", sig("noise", 0, 0.9), 48000, 2, 48000,
+        ("F2", "f2_alimiter", "alimiter=limit=0.5:level=0", sig("noise", 0, 0.9), 48000, 2, 48000,
          {"expect": "bounded:max=0.55", "lifecycle": 1}),
         ("F2", "f2_acompressor", "acompressor=threshold=0.1:ratio=4",
          sig("noise", 0, 0.9), 48000, 2, 48000,
