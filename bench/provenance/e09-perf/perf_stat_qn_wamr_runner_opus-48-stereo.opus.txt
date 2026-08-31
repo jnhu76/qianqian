@@ -1,0 +1,21 @@
+# started on Mon Aug 31 18:45:31 2026
+
+
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_wamr_runner /home/hoo/Source/qianqian/build/artifacts/wasm/qn_guest_bench.wamr-workaround.wasm bench /home/hoo/Source/qianqian/corpus/fixtures/opus-48-stereo.opus 3':
+
+                 0      context-switches:u               #      0.0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
+              4549      page-faults:u                    #    178.5 faults/sec  page_faults_per_second
+          25488.50 msec task-clock:u                     #      1.0 CPUs  CPUs_utilized       
+        1443571164      branch-misses:u                  #      7.3 %  branch_miss_rate         (50.02%)
+       19739202320      branches:u                       #    774.4 M/sec  branch_frequency     (66.70%)
+       80300466572      cpu-cycles:u                     #      3.2 GHz  cycles_frequency       (66.67%)
+      106494336510      instructions:u                   #      1.3 instructions  insn_per_cycle  (66.68%)
+       20084322982      stalled-cycles-frontend:u        #     0.25 frontend_cycles_idle        (66.67%)
+
+      25.498144925 seconds time elapsed
+
+      25.449070000 seconds user
+       0.039989000 seconds sys
+
+

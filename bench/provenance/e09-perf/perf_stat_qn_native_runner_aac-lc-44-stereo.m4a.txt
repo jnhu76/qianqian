@@ -1,0 +1,21 @@
+# started on Mon Aug 31 18:44:26 2026
+
+
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_native_runner /home/hoo/Source/qianqian/corpus/fixtures/aac-lc-44-stereo.m4a bench 3':
+
+                 0      context-switches:u               #      0.0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
+              2684      page-faults:u                    #  21734.6 faults/sec  page_faults_per_second
+            123.49 msec task-clock:u                     #      1.0 CPUs  CPUs_utilized       
+            538184      branch-misses:u                  #      0.7 %  branch_miss_rate         (51.47%)
+          74259748      branches:u                       #    601.3 M/sec  branch_frequency     (67.71%)
+         324651725      cpu-cycles:u                     #      2.6 GHz  cycles_frequency       (67.71%)
+        1016995268      instructions:u                   #      3.1 instructions  insn_per_cycle  (67.60%)
+          23199731      stalled-cycles-frontend:u        #     0.07 frontend_cycles_idle        (64.75%)
+
+       0.125723493 seconds time elapsed
+
+       0.114068000 seconds user
+       0.011800000 seconds sys
+
+

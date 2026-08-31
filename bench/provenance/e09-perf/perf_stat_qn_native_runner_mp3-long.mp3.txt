@@ -1,0 +1,21 @@
+# started on Mon Aug 31 18:44:27 2026
+
+
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_native_runner /home/hoo/Source/qianqian/corpus/fixtures/mp3-long.mp3 bench 3':
+
+                 0      context-switches:u               #      0.0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
+              2348      page-faults:u                    #  19330.7 faults/sec  page_faults_per_second
+            121.46 msec task-clock:u                     #      1.0 CPUs  CPUs_utilized       
+            379083      branch-misses:u                  #      0.5 %  branch_miss_rate         (50.61%)
+          72630009      branches:u                       #    598.0 M/sec  branch_frequency     (68.17%)
+         317773626      cpu-cycles:u                     #      2.6 GHz  cycles_frequency       (67.05%)
+         955392737      instructions:u                   #      3.0 instructions  insn_per_cycle  (67.09%)
+          21064637      stalled-cycles-frontend:u        #     0.07 frontend_cycles_idle        (65.90%)
+
+       0.123643835 seconds time elapsed
+
+       0.119649000 seconds user
+       0.003988000 seconds sys
+
+

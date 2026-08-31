@@ -35,6 +35,17 @@ LIB_TARGETS = (
     "libavcodec/libavcodec.a",
     "libavformat/libavformat.a",
 )
+
+
+def lib_targets_for(profile: dict) -> tuple[str, ...]:
+    # The V=1 make log is the closure source, so every archive a profile needs
+    # must actually be built. libswresample is only compiled when the profile
+    # enables it (e.g. the Opus decoder path); without this the captured
+    # manifest silently misses its translation units.
+    enabled = profile.get("libraries", {}).get("enable", [])
+    if "swresample" in enabled:
+        return LIB_TARGETS + ("libswresample/libswresample.a",)
+    return LIB_TARGETS
 # Object roots accepted as closure members. libswresample is included so
 # profiles that enable it (e.g. the Opus decoder's upstream dependency)
 # capture its translation units; for profiles without it the root simply
@@ -114,7 +125,7 @@ def make_log() -> str:
     jobs = str(max(1, os.cpu_count() or 4))
     # V=1 is the key: source closure is observed from real compiler invocations
     # rather than reimplementing FFmpeg's Make language.
-    return run(["make", "-j", jobs, "V=1", *LIB_TARGETS], cwd=ORACLE, capture=True)
+    return run(["make", "-j", jobs, "V=1", *lib_targets_for(profile)], cwd=ORACLE, capture=True)
 
 
 def config_value(name: str) -> str | None:
@@ -272,7 +283,7 @@ def main() -> None:
     toolchain = toolchain_identity()
 
     refs = {}
-    for rel in LIB_TARGETS:
+    for rel in lib_targets_for(profile):
         archive = ORACLE / rel
         if not archive.is_file():
             raise SystemExit(f"oracle archive missing: {archive}")

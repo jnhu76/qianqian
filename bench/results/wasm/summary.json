@@ -1,0 +1,1414 @@
+{
+ "experiment": "e09-wasm-total-cost",
+ "layer": 1,
+ "gate": {
+  "policy": {
+   "exact_required": "all observable fields except the PCM-derived hash fields listed below",
+   "tolerance_allowed": {
+    "families": [
+     "aac",
+     "mp3"
+    ],
+    "max_abs_delta_bound": 1e-06,
+    "pcm_hash_fields": [
+     "decode.canonical_f32_sha256",
+     "suffix[*].hash",
+     "seeks[*].suffix_sha256"
+    ],
+    "evidence": "tolerance.json — identity-bound per-fixture native + canonical-WASM-anchor PCM hashes for every tolerance-allowed stream (full / suffix / seek-suffix), numeric max_abs_delta <= bound"
+   },
+   "wasm_anchor": {
+    "runtime": "wamr",
+    "contract": "every non-anchor WASM runtime must be bit-identical to the anchor on every tolerance-allowed PCM stream"
+   },
+   "accepted": "exact_matches + accepted_with_tolerance"
+  },
+  "native_vs_runtime": {
+   "native": {
+    "exact_matches": 44,
+    "accepted_with_tolerance": 0,
+    "rejected": 0,
+    "total": 44
+   },
+   "wamr": {
+    "exact_matches": 28,
+    "accepted_with_tolerance": 16,
+    "rejected": 0,
+    "total": 44
+   },
+   "wamr_aot": {
+    "exact_matches": 28,
+    "accepted_with_tolerance": 16,
+    "rejected": 0,
+    "total": 44
+   },
+   "wasm3": {
+    "exact_matches": 28,
+    "accepted_with_tolerance": 16,
+    "rejected": 0,
+    "total": 44
+   },
+   "wasmtime": {
+    "exact_matches": 28,
+    "accepted_with_tolerance": 16,
+    "rejected": 0,
+    "total": 44
+   },
+   "emscripten": {
+    "exact_matches": 28,
+    "accepted_with_tolerance": 16,
+    "rejected": 0,
+    "total": 44
+   }
+  },
+  "emscripten_authority": "correctness-em.json (node harness)",
+  "wasm_anchor": {
+   "runtime": "wamr",
+   "contract": "every non-anchor WASM runtime must be bit-identical to the anchor on every tolerance-allowed stream"
+  },
+  "wasm_inter_runtime_mismatches": 0,
+  "wasm_inter_runtime_total": 44,
+  "wasm_inter_runtime_runtimes": [
+   "emscripten",
+   "wamr",
+   "wamr_aot",
+   "wasm3",
+   "wasmtime"
+  ],
+  "wasm_inter_runtime_gate": "PASS",
+  "wasm_inter_runtime_mismatch_cases": {}
+ },
+ "execution_ladder_mode_a": {
+  "native": {
+   "flac-16-44-stereo.flac": {
+    "songcore_output_ms": 8.682,
+    "decode_core_ms": 5.379,
+    "xrt_songcore_output": 460.71,
+    "execution_tax": 1.0
+   },
+   "mp3-cbr-id3v23.mp3": {
+    "songcore_output_ms": 7.191,
+    "decode_core_ms": 4.889,
+    "xrt_songcore_output": 556.26,
+    "execution_tax": 1.0
+   },
+   "aac-lc-44-stereo.m4a": {
+    "songcore_output_ms": 15.036,
+    "decode_core_ms": 9.821,
+    "xrt_songcore_output": 798.1,
+    "execution_tax": 1.0
+   },
+   "opus-48-stereo.opus": {
+    "songcore_output_ms": 46.254,
+    "decode_core_ms": 41.648,
+    "xrt_songcore_output": 259.58,
+    "execution_tax": 1.0
+   },
+   "mp3-long.mp3": {
+    "songcore_output_ms": 14.311,
+    "decode_core_ms": 12.995,
+    "xrt_songcore_output": 838.54,
+    "execution_tax": 1.0
+   }
+  },
+  "wamr": {
+   "flac-16-44-stereo.flac": {
+    "songcore_output_ms": 352.743,
+    "decode_core_ms": 342.765,
+    "xrt_songcore_output": 11.34,
+    "execution_tax": 40.63
+   },
+   "mp3-cbr-id3v23.mp3": {
+    "songcore_output_ms": 499.17,
+    "decode_core_ms": 435.423,
+    "xrt_songcore_output": 8.01,
+    "execution_tax": 69.42
+   },
+   "aac-lc-44-stereo.m4a": {
+    "songcore_output_ms": 1020.31,
+    "decode_core_ms": 945.208,
+    "xrt_songcore_output": 11.76,
+    "execution_tax": 67.86
+   },
+   "opus-48-stereo.opus": {
+    "songcore_output_ms": 3415.262,
+    "decode_core_ms": 3262.72,
+    "xrt_songcore_output": 3.52,
+    "execution_tax": 73.84
+   },
+   "mp3-long.mp3": {
+    "songcore_output_ms": 1091.322,
+    "decode_core_ms": 1028.235,
+    "xrt_songcore_output": 11.0,
+    "execution_tax": 76.26
+   }
+  },
+  "wamr_aot": {
+   "flac-16-44-stereo.flac": {
+    "songcore_output_ms": 7.496,
+    "decode_core_ms": 7.768,
+    "xrt_songcore_output": 533.65,
+    "execution_tax": 0.86
+   },
+   "mp3-cbr-id3v23.mp3": {
+    "songcore_output_ms": 6.431,
+    "decode_core_ms": 5.926,
+    "xrt_songcore_output": 621.99,
+    "execution_tax": 0.89
+   },
+   "aac-lc-44-stereo.m4a": {
+    "songcore_output_ms": 10.826,
+    "decode_core_ms": 10.134,
+    "xrt_songcore_output": 1108.4,
+    "execution_tax": 0.72
+   },
+   "opus-48-stereo.opus": {
+    "songcore_output_ms": 35.688,
+    "decode_core_ms": 36.087,
+    "xrt_songcore_output": 336.43,
+    "execution_tax": 0.77
+   },
+   "mp3-long.mp3": {
+    "songcore_output_ms": 18.192,
+    "decode_core_ms": 17.268,
+    "xrt_songcore_output": 659.62,
+    "execution_tax": 1.27
+   }
+  },
+  "wasm3": {
+   "flac-16-44-stereo.flac": {
+    "songcore_output_ms": 108.156,
+    "decode_core_ms": 99.472,
+    "xrt_songcore_output": 36.98,
+    "execution_tax": 12.46
+   },
+   "mp3-cbr-id3v23.mp3": {
+    "songcore_output_ms": 197.313,
+    "decode_core_ms": 199.825,
+    "xrt_songcore_output": 20.27,
+    "execution_tax": 27.44
+   },
+   "aac-lc-44-stereo.m4a": {
+    "songcore_output_ms": 358.223,
+    "decode_core_ms": 323.31,
+    "xrt_songcore_output": 33.5,
+    "execution_tax": 23.82
+   },
+   "opus-48-stereo.opus": {
+    "songcore_output_ms": 998.073,
+    "decode_core_ms": 989.417,
+    "xrt_songcore_output": 12.03,
+    "execution_tax": 21.58
+   },
+   "mp3-long.mp3": {
+    "songcore_output_ms": 597.972,
+    "decode_core_ms": 569.171,
+    "xrt_songcore_output": 20.07,
+    "execution_tax": 41.78
+   }
+  },
+  "wasmtime": {
+   "flac-16-44-stereo.flac": {
+    "songcore_output_ms": 9.741,
+    "decode_core_ms": 10.9,
+    "xrt_songcore_output": 410.63,
+    "execution_tax": 1.12
+   },
+   "mp3-cbr-id3v23.mp3": {
+    "songcore_output_ms": 10.152,
+    "decode_core_ms": 12.638,
+    "xrt_songcore_output": 394.0,
+    "execution_tax": 1.41
+   },
+   "aac-lc-44-stereo.m4a": {
+    "songcore_output_ms": 15.773,
+    "decode_core_ms": 16.104,
+    "xrt_songcore_output": 760.8,
+    "execution_tax": 1.05
+   },
+   "opus-48-stereo.opus": {
+    "songcore_output_ms": 46.604,
+    "decode_core_ms": 42.426,
+    "xrt_songcore_output": 257.63,
+    "execution_tax": 1.01
+   },
+   "mp3-long.mp3": {
+    "songcore_output_ms": 26.488,
+    "decode_core_ms": 32.693,
+    "xrt_songcore_output": 453.03,
+    "execution_tax": 1.85
+   }
+  }
+ },
+ "em_mode_a_node_harness": {
+  "em_mode_a": {
+   "flac-16-44-stereo.flac": {
+    "bench": {
+     "mode": "bench",
+     "status": "ok",
+     "sample_rate": 44100,
+     "channels": 2,
+     "samples": 176400,
+     "duration_us": 4000000,
+     "canonical_f32_sha256": "42d1070b2677972af85ec6cdde40601e465cf0a2439c87d206e6ba8b61184727",
+     "open_first_ms": 0.596,
+     "iterations": 3,
+     "warmup": 1,
+     "songcore_output_ms": {
+      "median": 10.89,
+      "min": 9.226,
+      "max": 16.078
+     },
+     "decode_core_ms": {
+      "median": 8.76,
+      "min": 7.8,
+      "max": 11.331
+     },
+     "xrt_songcore_output": 367.32,
+     "xrt_decode_core": 456.62,
+     "audio_seconds": 4
+    }
+   },
+   "mp3-cbr-id3v23.mp3": {
+    "bench": {
+     "mode": "bench",
+     "status": "ok",
+     "sample_rate": 44100,
+     "channels": 2,
+     "samples": 176400,
+     "duration_us": 4000000,
+     "canonical_f32_sha256": "01591b8239fea294bc39922bd7625d02b193961c144459d7509572e1edc6f681",
+     "open_first_ms": 0.898,
+     "iterations": 3,
+     "warmup": 1,
+     "songcore_output_ms": {
+      "median": 17.864,
+      "min": 14.444,
+      "max": 18.683
+     },
+     "decode_core_ms": {
+      "median": 15.568,
+      "min": 7.494,
+      "max": 18.904
+     },
+     "xrt_songcore_output": 223.92,
+     "xrt_decode_core": 256.93,
+     "audio_seconds": 4
+    }
+   },
+   "aac-lc-44-stereo.m4a": {
+    "bench": {
+     "mode": "bench",
+     "status": "ok",
+     "sample_rate": 44100,
+     "channels": 2,
+     "samples": 529200,
+     "duration_us": 12000000,
+     "canonical_f32_sha256": "0ae6379d746dbaa305ffa62a29a9cc22af8e160270842e02b7412be5b668cec9",
+     "open_first_ms": 1.604,
+     "iterations": 3,
+     "warmup": 1,
+     "songcore_output_ms": {
+      "median": 20.641,
+      "min": 18.607,
+      "max": 32.291
+     },
+     "decode_core_ms": {
+      "median": 23.093,
+      "min": 19.385,
+      "max": 30.694
+     },
+     "xrt_songcore_output": 581.37,
+     "xrt_decode_core": 519.63,
+     "audio_seconds": 12
+    }
+   },
+   "opus-48-stereo.opus": {
+    "bench": {
+     "mode": "bench",
+     "status": "ok",
+     "sample_rate": 48000,
+     "channels": 2,
+     "samples": 576000,
+     "duration_us": 12006500,
+     "canonical_f32_sha256": "bcf34b306af7109bf5612ffa94812834cac2fde793c202ec4b1ed387ef27aab8",
+     "open_first_ms": 1.372,
+     "iterations": 3,
+     "warmup": 1,
+     "songcore_output_ms": {
+      "median": 54.902,
+      "min": 51.453,
+      "max": 86.991
+     },
+     "decode_core_ms": {
+      "median": 60.579,
+      "min": 57.734,
+      "max": 62.015
+     },
+     "xrt_songcore_output": 218.69,
+     "xrt_decode_core": 198.2,
+     "audio_seconds": 12.007
+    }
+   },
+   "mp3-long.mp3": {
+    "bench": {
+     "mode": "bench",
+     "status": "ok",
+     "sample_rate": 44100,
+     "channels": 2,
+     "samples": 529200,
+     "duration_us": 12000000,
+     "canonical_f32_sha256": "0f656a7309a5e07382afd55da8eb4633dffcd4bf427714f8462d658bb440d5f4",
+     "open_first_ms": 0.572,
+     "iterations": 3,
+     "warmup": 1,
+     "songcore_output_ms": {
+      "median": 34.885,
+      "min": 30.478,
+      "max": 36.494
+     },
+     "decode_core_ms": {
+      "median": 28.31,
+      "min": 24.611,
+      "max": 48.307
+     },
+     "xrt_songcore_output": 343.99,
+     "xrt_decode_core": 423.88,
+     "audio_seconds": 12
+    }
+   }
+  },
+  "em_mode_b": {
+   "ok": true,
+   "mode": "B",
+   "prepMs": 57.295427,
+   "viewMs": 0.021582,
+   "copyMs": 1.084534,
+   "hashMs": 1.648879,
+   "gbps": 1.3012040194221666,
+   "bytes": 1411200,
+   "sha": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+   "mem_pages_after": 287
+  },
+  "em_mode_c": {
+   "256": {
+    "ok": true,
+    "mode": "C",
+    "chunk_frames": 256,
+    "calls": 690,
+    "total": 1411200,
+    "bytes": 1411200,
+    "pullMs": 3.195238,
+    "gbps": 0.44165724118203403,
+    "call_ms_median": 0.000571,
+    "call_ms_p999": 0.521161
+   },
+   "1024": {
+    "ok": true,
+    "mode": "C",
+    "chunk_frames": 1024,
+    "calls": 173,
+    "total": 1411200,
+    "bytes": 1411200,
+    "pullMs": 0.630325,
+    "gbps": 2.23884504025701,
+    "call_ms_median": 0.001934,
+    "call_ms_p999": 0.033896
+   },
+   "4096": {
+    "ok": true,
+    "mode": "C",
+    "chunk_frames": 4096,
+    "calls": 44,
+    "total": 1411200,
+    "bytes": 1411200,
+    "pullMs": 0.205783,
+    "gbps": 6.8577093345903215,
+    "call_ms_median": 0.003196,
+    "call_ms_p999": 0.033155
+   }
+  },
+  "em_pb": {
+   "ok": true,
+   "chunkBytes": 65536,
+   "iters": 200,
+   "total_bytes": 838860800,
+   "ms": 66.707904,
+   "gbps": 12.575133525406525,
+   "pattern_sha": "17b9119a63267a13419b7bd28ee689a2673350a22efa3ea80675be3ffc262adf"
+  },
+  "em_lifecycle": {
+   "flac-16-44-stereo.flac": {
+    "ok": true,
+    "mode": "lifecycle",
+    "guest": {
+     "mode": "lifecycle",
+     "status": "ok",
+     "open_ms": 13.062,
+     "first_pcm_ms": 0.653,
+     "first_pcm_samples": 4608,
+     "decode_ms": 14.961,
+     "samples": 176400,
+     "frames": 39
+    },
+    "host": {
+     "load_ms": 1.557765,
+     "instantiate_ms": 16.589345
+    }
+   },
+   "mp3-long.mp3": {
+    "ok": true,
+    "mode": "lifecycle",
+    "guest": {
+     "mode": "lifecycle",
+     "status": "ok",
+     "open_ms": 20.361,
+     "first_pcm_ms": 2.056,
+     "first_pcm_samples": 47,
+     "decode_ms": 67.86,
+     "samples": 529200,
+     "frames": 461
+    },
+    "host": {
+     "load_ms": 2.453912,
+     "instantiate_ms": 8.450472
+    }
+   }
+  }
+ },
+ "perf_stat_flac": {
+  "native": {
+   "cycles": 181274539,
+   "instructions": 498450039,
+   "ipc": 2.75,
+   "elapsed_ms": 71.5,
+   "user_s": 0.063683,
+   "sys_s": 0.00796,
+   "context_switches": 0,
+   "page_faults": 915,
+   "note": "whole-process elapsed (load+instantiate+bench x3); startup stages are measured separately in `lifecycle`"
+  },
+  "wamr": {
+   "cycles": 8554267096,
+   "instructions": 18112240649,
+   "ipc": 2.12,
+   "elapsed_ms": 3117.7,
+   "user_s": 3.047776,
+   "sys_s": 0.03984,
+   "context_switches": 0,
+   "page_faults": 4544,
+   "note": "whole-process elapsed (load+instantiate+bench x3); startup stages are measured separately in `lifecycle`"
+  },
+  "wamr_aot": {
+   "cycles": 191592563,
+   "instructions": 434099982,
+   "ipc": 2.27,
+   "elapsed_ms": 83.6,
+   "user_s": 0.059796,
+   "sys_s": 0.023918,
+   "context_switches": 0,
+   "page_faults": 4959,
+   "note": "whole-process elapsed (load+instantiate+bench x3); startup stages are measured separately in `lifecycle`"
+  },
+  "wasm3": {
+   "cycles": 3057142236,
+   "instructions": 5813295824,
+   "ipc": 1.9,
+   "elapsed_ms": 987.5,
+   "user_s": 0.967104,
+   "sys_s": 0.019981,
+   "context_switches": 0,
+   "page_faults": 4478,
+   "note": "whole-process elapsed (load+instantiate+bench x3); startup stages are measured separately in `lifecycle`"
+  },
+  "wasmtime": {
+   "cycles": 5660557418,
+   "instructions": 7193913645,
+   "ipc": 1.27,
+   "elapsed_ms": 718.8,
+   "user_s": 2.08597,
+   "sys_s": 0.177529,
+   "context_switches": 0,
+   "page_faults": 15021,
+   "note": "whole-process elapsed (load+instantiate+bench x3); startup stages are measured separately in `lifecycle`"
+  }
+ },
+ "bridge_and_memory": {
+  "native": {
+   "flac-16-44-stereo.flac": {
+    "mode_b_copy_ms": 0.976,
+    "mode_b_gbps": 1.446,
+    "mode_c_calls_per_s": {
+     "256": 94032.0,
+     "1024": 22440.2,
+     "4096": 5890.8
+    },
+    "mode_c_max_call_ms": {
+     "256": 0.001,
+     "1024": 0.021,
+     "4096": 0.031
+    },
+    "linear_pages_before": null,
+    "linear_pages_after": null,
+    "peak_rss_kb": 13024,
+    "rss_peak_sampled_kb": 6968,
+    "guest_decode_ms": 8.682,
+    "bridge_tax": 0.1124
+   },
+   "mp3-long.mp3": {
+    "mode_b_copy_ms": 3.86,
+    "mode_b_gbps": 1.097,
+    "mode_c_calls_per_s": {
+     "256": 79073.7,
+     "1024": 22643.6,
+     "4096": 4730.4
+    },
+    "mode_c_max_call_ms": {
+     "256": 0.031,
+     "1024": 0.026,
+     "4096": 0.031
+    },
+    "linear_pages_before": null,
+    "linear_pages_after": null,
+    "peak_rss_kb": 13280,
+    "rss_peak_sampled_kb": 12908,
+    "guest_decode_ms": 14.311,
+    "bridge_tax": 0.2697
+   }
+  },
+  "wamr": {
+   "flac-16-44-stereo.flac": {
+    "mode_b_copy_ms": 1.28,
+    "mode_b_gbps": 1.102,
+    "mode_c_calls_per_s": {
+     "256": 92033.0,
+     "1024": 23643.2,
+     "4096": 5535.9
+    },
+    "mode_c_max_call_ms": {
+     "256": 0.036,
+     "1024": 0.005,
+     "4096": 0.011
+    },
+    "linear_pages_before": 256,
+    "linear_pages_after": 256,
+    "peak_rss_kb": 30440,
+    "rss_peak_sampled_kb": 29228,
+    "guest_decode_ms": 352.743,
+    "bridge_tax": 0.0036
+   },
+   "mp3-long.mp3": {
+    "mode_b_copy_ms": 3.753,
+    "mode_b_gbps": 1.128,
+    "mode_c_calls_per_s": {
+     "256": 111582.3,
+     "1024": 27334.5,
+     "4096": 7046.9
+    },
+    "mode_c_max_call_ms": {
+     "256": 0.049,
+     "1024": 0.008,
+     "4096": 0.081
+    },
+    "linear_pages_before": 256,
+    "linear_pages_after": 256,
+    "peak_rss_kb": 37368,
+    "rss_peak_sampled_kb": 37408,
+    "guest_decode_ms": 1091.322,
+    "bridge_tax": 0.0034
+   }
+  },
+  "wamr_aot": {
+   "flac-16-44-stereo.flac": {
+    "mode_b_copy_ms": 1.3,
+    "mode_b_gbps": 1.085,
+    "mode_c_calls_per_s": {
+     "256": 75400.6,
+     "1024": 23060.8,
+     "4096": 4980.5
+    },
+    "mode_c_max_call_ms": {
+     "256": 0.045,
+     "1024": 0.024,
+     "4096": 0.061
+    },
+    "linear_pages_before": 256,
+    "linear_pages_after": 256,
+    "peak_rss_kb": 35092,
+    "rss_peak_sampled_kb": 33892,
+    "guest_decode_ms": 7.496,
+    "bridge_tax": 0.1734
+   },
+   "mp3-long.mp3": {
+    "mode_b_copy_ms": 3.282,
+    "mode_b_gbps": 1.29,
+    "mode_c_calls_per_s": {
+     "256": 100453.5,
+     "1024": 21479.9,
+     "4096": 6382.1
+    },
+    "mode_c_max_call_ms": {
+     "256": 0.036,
+     "1024": 0.011,
+     "4096": 0.01
+    },
+    "linear_pages_before": 256,
+    "linear_pages_after": 256,
+    "peak_rss_kb": 42064,
+    "rss_peak_sampled_kb": 42104,
+    "guest_decode_ms": 18.192,
+    "bridge_tax": 0.1804
+   }
+  },
+  "wasm3": {
+   "flac-16-44-stereo.flac": {
+    "mode_b_copy_ms": 1.285,
+    "mode_b_gbps": 1.098,
+    "mode_c_calls_per_s": {
+     "256": 85719.4,
+     "1024": 22249.2,
+     "4096": 6327.8
+    },
+    "mode_c_max_call_ms": {
+     "256": 0.03,
+     "1024": 0.012,
+     "4096": 0.009
+    },
+    "linear_pages_before": 256,
+    "linear_pages_after": 256,
+    "peak_rss_kb": 23024,
+    "rss_peak_sampled_kb": 23036,
+    "guest_decode_ms": 108.156,
+    "bridge_tax": 0.0119
+   },
+   "mp3-long.mp3": {
+    "mode_b_copy_ms": 4.124,
+    "mode_b_gbps": 1.026,
+    "mode_c_calls_per_s": {
+     "256": 106508.3,
+     "1024": 29700.6,
+     "4096": 7135.1
+    },
+    "mode_c_max_call_ms": {
+     "256": 0.017,
+     "1024": 0.006,
+     "4096": 0.037
+    },
+    "linear_pages_before": 256,
+    "linear_pages_after": 256,
+    "peak_rss_kb": 25840,
+    "rss_peak_sampled_kb": 25960,
+    "guest_decode_ms": 597.972,
+    "bridge_tax": 0.0069
+   }
+  },
+  "wasmtime": {
+   "flac-16-44-stereo.flac": {
+    "mode_b_copy_ms": 0.387,
+    "mode_b_gbps": 3.65,
+    "mode_c_calls_per_s": {
+     "256": 99784.7,
+     "1024": 30278.9,
+     "4096": 6640.5
+    },
+    "mode_c_max_call_ms": {
+     "256": 0.039,
+     "1024": 0.004,
+     "4096": 0.023
+    },
+    "linear_pages_before": 256,
+    "linear_pages_after": 256,
+    "peak_rss_kb": 69560,
+    "rss_peak_sampled_kb": 70364,
+    "guest_decode_ms": 9.741,
+    "bridge_tax": 0.0397
+   },
+   "mp3-long.mp3": {
+    "mode_b_copy_ms": 3.323,
+    "mode_b_gbps": 1.274,
+    "mode_c_calls_per_s": {
+     "256": 87567.4,
+     "1024": 21577.6,
+     "4096": 5699.4
+    },
+    "mode_c_max_call_ms": {
+     "256": 0.057,
+     "1024": 0.108,
+     "4096": 0.07
+    },
+    "linear_pages_before": 256,
+    "linear_pages_after": 256,
+    "peak_rss_kb": 76248,
+    "rss_peak_sampled_kb": 77008,
+    "guest_decode_ms": 26.488,
+    "bridge_tax": 0.1255
+   }
+  }
+ },
+ "em_bridge": {
+  "mode_b": {
+   "ok": true,
+   "mode": "B",
+   "prepMs": 57.295427,
+   "viewMs": 0.021582,
+   "copyMs": 1.084534,
+   "hashMs": 1.648879,
+   "gbps": 1.3012040194221666,
+   "bytes": 1411200,
+   "sha": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+   "mem_pages_after": 287
+  },
+  "bridge_tax_vs_em_guest": 0.0996,
+  "em_pb": {
+   "ok": true,
+   "chunkBytes": 65536,
+   "iters": 200,
+   "total_bytes": 838860800,
+   "ms": 66.707904,
+   "gbps": 12.575133525406525,
+   "pattern_sha": "17b9119a63267a13419b7bd28ee689a2673350a22efa3ea80675be3ffc262adf"
+  }
+ },
+ "lifecycle": {
+  "schema": "load -> compile(JIT if any) -> instantiate -> first open -> first PCM -> steady decode; host stages from the runner, guest stages from the same guest code",
+  "fixtures": [
+   "flac-16-44-stereo.flac",
+   "mp3-long.mp3"
+  ],
+  "runtimes": {
+   "native": {
+    "flac-16-44-stereo.flac": {
+     "host": {
+      "mode": "lifecycle_host",
+      "runtime": "native",
+      "load_ms": null,
+      "compile_ms": null,
+      "instantiate_ms": null
+     },
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 0.606,
+      "first_pcm_ms": 0.132,
+      "first_pcm_samples": 4608,
+      "decode_ms": 8.286,
+      "samples": 176400,
+      "frames": 39
+     }
+    },
+    "mp3-long.mp3": {
+     "host": {
+      "mode": "lifecycle_host",
+      "runtime": "native",
+      "load_ms": null,
+      "compile_ms": null,
+      "instantiate_ms": null
+     },
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 1.397,
+      "first_pcm_ms": 0.039,
+      "first_pcm_samples": 47,
+      "decode_ms": 18.583,
+      "samples": 529200,
+      "frames": 461
+     }
+    }
+   },
+   "wamr": {
+    "flac-16-44-stereo.flac": {
+     "host": {
+      "mode": "lifecycle_host",
+      "runtime": "wamr",
+      "load_ms": 14.919,
+      "compile_ms": null,
+      "instantiate_ms": 2.307
+     },
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 22.205,
+      "first_pcm_ms": 7.63,
+      "first_pcm_samples": 4608,
+      "decode_ms": 334.003,
+      "samples": 176400,
+      "frames": 39
+     }
+    },
+    "mp3-long.mp3": {
+     "host": {
+      "mode": "lifecycle_host",
+      "runtime": "wamr",
+      "load_ms": 14.147,
+      "compile_ms": null,
+      "instantiate_ms": 1.333
+     },
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 32.465,
+      "first_pcm_ms": 2.51,
+      "first_pcm_samples": 47,
+      "decode_ms": 1197.409,
+      "samples": 529200,
+      "frames": 461
+     }
+    }
+   },
+   "wamr_aot": {
+    "flac-16-44-stereo.flac": {
+     "host": {
+      "mode": "lifecycle_host",
+      "runtime": "wamr_aot",
+      "load_ms": 7.514,
+      "compile_ms": null,
+      "instantiate_ms": 1.135
+     },
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 2.578,
+      "first_pcm_ms": 0.196,
+      "first_pcm_samples": 4608,
+      "decode_ms": 8.788,
+      "samples": 176400,
+      "frames": 39
+     }
+    },
+    "mp3-long.mp3": {
+     "host": {
+      "mode": "lifecycle_host",
+      "runtime": "wamr_aot",
+      "load_ms": 11.179,
+      "compile_ms": null,
+      "instantiate_ms": 1.078
+     },
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 1.461,
+      "first_pcm_ms": 0.154,
+      "first_pcm_samples": 47,
+      "decode_ms": 34.214,
+      "samples": 529200,
+      "frames": 461
+     }
+    }
+   },
+   "wasm3": {
+    "flac-16-44-stereo.flac": {
+     "host": {
+      "mode": "lifecycle_host",
+      "runtime": "wasm3",
+      "load_ms": 1.545,
+      "compile_ms": 12.482,
+      "instantiate_ms": null,
+      "init_ms": 0.031
+     },
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 11.406,
+      "first_pcm_ms": 2.677,
+      "first_pcm_samples": 4608,
+      "decode_ms": 124.79,
+      "samples": 176400,
+      "frames": 39
+     }
+    },
+    "mp3-long.mp3": {
+     "host": {
+      "mode": "lifecycle_host",
+      "runtime": "wasm3",
+      "load_ms": 1.678,
+      "compile_ms": 15.943,
+      "instantiate_ms": null,
+      "init_ms": 0.039
+     },
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 19.413,
+      "first_pcm_ms": 2.343,
+      "first_pcm_samples": 47,
+      "decode_ms": 769.056,
+      "samples": 529200,
+      "frames": 461
+     }
+    }
+   },
+   "wasmtime": {
+    "flac-16-44-stereo.flac": {
+     "host": {
+      "mode": "lifecycle_host",
+      "runtime": "wasmtime",
+      "load_ms": 1.835,
+      "compile_ms": 414.595,
+      "instantiate_ms": 0.284
+     },
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 0.495,
+      "first_pcm_ms": 0.147,
+      "first_pcm_samples": 4608,
+      "decode_ms": 8.767,
+      "samples": 176400,
+      "frames": 39
+     }
+    },
+    "mp3-long.mp3": {
+     "host": {
+      "mode": "lifecycle_host",
+      "runtime": "wasmtime",
+      "load_ms": 1.834,
+      "compile_ms": 369.192,
+      "instantiate_ms": 0.33
+     },
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 1.607,
+      "first_pcm_ms": 1.355,
+      "first_pcm_samples": 47,
+      "decode_ms": 44.276,
+      "samples": 529200,
+      "frames": 461
+     }
+    }
+   },
+   "emscripten": {
+    "flac-16-44-stereo.flac": {
+     "ok": true,
+     "mode": "lifecycle",
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 13.062,
+      "first_pcm_ms": 0.653,
+      "first_pcm_samples": 4608,
+      "decode_ms": 14.961,
+      "samples": 176400,
+      "frames": 39
+     },
+     "host": {
+      "load_ms": 1.557765,
+      "instantiate_ms": 16.589345
+     }
+    },
+    "mp3-long.mp3": {
+     "ok": true,
+     "mode": "lifecycle",
+     "guest": {
+      "mode": "lifecycle",
+      "status": "ok",
+      "open_ms": 20.361,
+      "first_pcm_ms": 2.056,
+      "first_pcm_samples": 47,
+      "decode_ms": 67.86,
+      "samples": 529200,
+      "frames": 461
+     },
+     "host": {
+      "load_ms": 2.453912,
+      "instantiate_ms": 8.450472
+     }
+    }
+   }
+  }
+ },
+ "shipping": {
+  "calibers": {
+   "embedded": "xz -9e (archive caliber)",
+   "browser": "gzip -9 / brotli -11 (never mixed with xz)"
+  },
+  "deployments": {
+   "native": {
+    "host": {
+     "file": "qn_native_runner",
+     "bytes": 1505608,
+     "xz9e": 580792,
+     "gzip9": 705783,
+     "brotli11": 599761
+    },
+    "guest": null,
+    "total_raw": 1505608,
+    "total_xz9e": 580792,
+    "note": "AOT deployment ships .aot in place of .wasm (wamr_aot guest is SongCore.aot only; no .wasm + .aot sum)"
+   },
+   "wamr_interp": {
+    "host": {
+     "file": "qn_wamr_runner",
+     "bytes": 465056,
+     "xz9e": 159464,
+     "gzip9": 192400,
+     "brotli11": 161738
+    },
+    "guest": {
+     "file": "SongCore.wamr-workaround.wasm",
+     "bytes": 1292868,
+     "xz9e": 432200,
+     "gzip9": 546307,
+     "brotli11": 447343
+    },
+    "total_raw": 1757924,
+    "total_xz9e": 591664,
+    "note": "AOT deployment ships .aot in place of .wasm (wamr_aot guest is SongCore.aot only; no .wasm + .aot sum)"
+   },
+   "wamr_aot": {
+    "host": {
+     "file": "qn_wamr_aot_runner",
+     "bytes": 465056,
+     "xz9e": 159692,
+     "gzip9": 192378,
+     "brotli11": 161763
+    },
+    "guest": {
+     "file": "SongCore.aot",
+     "bytes": 3555004,
+     "xz9e": 1146836,
+     "gzip9": 1450077,
+     "brotli11": 1177665
+    },
+    "total_raw": 4020060,
+    "total_xz9e": 1306528,
+    "note": "AOT deployment ships .aot in place of .wasm (wamr_aot guest is SongCore.aot only; no .wasm + .aot sum)"
+   },
+   "wasm3": {
+    "host": {
+     "file": "qn_wasm3_runner",
+     "bytes": 207432,
+     "xz9e": 67108,
+     "gzip9": 80654,
+     "brotli11": 68369
+    },
+    "guest": {
+     "file": "SongCore.wasm",
+     "bytes": 1292868,
+     "xz9e": 432416,
+     "gzip9": 546255,
+     "brotli11": 447763
+    },
+    "total_raw": 1500300,
+    "total_xz9e": 499524,
+    "note": "AOT deployment ships .aot in place of .wasm (wamr_aot guest is SongCore.aot only; no .wasm + .aot sum)"
+   },
+   "wasmtime": {
+    "host": {
+     "file": "qn_wasmtime_runner",
+     "bytes": 25413560,
+     "xz9e": 6320816,
+     "gzip9": 9109740,
+     "brotli11": 6403851
+    },
+    "guest": {
+     "file": "SongCore.wasm",
+     "bytes": 1292868,
+     "xz9e": 432416,
+     "gzip9": 546255,
+     "brotli11": 447763
+    },
+    "total_raw": 26706428,
+    "total_xz9e": 6753232,
+    "note": "AOT deployment ships .aot in place of .wasm (wamr_aot guest is SongCore.aot only; no .wasm + .aot sum)"
+   },
+   "browser": {
+    "host": {
+     "file": "SongCore.js",
+     "bytes": 118367,
+     "sha256": "64489ed66baf743a8c7d196e2a7ab34651fc6e2fd7e168218ecfc8f97c0981ee",
+     "gzip9": 33174,
+     "brotli11": 28107
+    },
+    "guest": {
+     "file": "SongCore.wasm (emscripten)",
+     "bytes": 1132413,
+     "sha256": "41d9dcf39d98e27c0410e162917f6ae6eee242c76e243f03df77d2dfd449e4f3",
+     "gzip9": 531477,
+     "brotli11": 439987
+    },
+    "total_raw": 1250780,
+    "total_gzip9": 564651,
+    "total_brotli11": 468094,
+    "note": "browser engine (V8) is platform-provided, not shipped",
+    "sourced_from": "shipping-em.json (em session)"
+   }
+  },
+  "artifacts": {
+   "SongCore.wasm": {
+    "bytes": 1292868,
+    "xz9e": 432416,
+    "gzip9": 546255,
+    "brotli11": 447763
+   },
+   "SongCore.wamr-workaround.wasm": {
+    "bytes": 1292868,
+    "xz9e": 432200,
+    "gzip9": 546307,
+    "brotli11": 447343
+   },
+   "SongCore.aot": {
+    "bytes": 3555004,
+    "xz9e": 1146836,
+    "gzip9": 1450077,
+    "brotli11": 1177665
+   },
+   "qn_guest_bench.wasm": {
+    "bytes": 1304446,
+    "xz9e": 436468,
+    "gzip9": 550843,
+    "brotli11": 451771
+   },
+   "qn_guest_bench.wamr-workaround.wasm": {
+    "bytes": 1304446,
+    "xz9e": 435960,
+    "gzip9": 550845,
+    "brotli11": 452077
+   },
+   "qn_guest_bench.aot": {
+    "bytes": 3592176,
+    "xz9e": 1158264,
+    "gzip9": 1464510,
+    "brotli11": 1188957
+   },
+   "qn_guest_bench_cmd.wasm": {
+    "bytes": 1305561,
+    "xz9e": 436440,
+    "gzip9": 551023,
+    "brotli11": 451980
+   },
+   "qn_pb_guest.wasm": {
+    "bytes": 7021,
+    "xz9e": 2672,
+    "gzip9": 3021,
+    "brotli11": 2569
+   }
+  },
+  "runtime_libs": {
+   "wamr_libiwasm_a": {
+    "bytes": 1125956,
+    "xz9e": 202984
+   },
+   "wasmtime_libwasmtime_a": {
+    "bytes": 71193834,
+    "xz9e": 8222608
+   },
+   "wasm3": null
+  }
+ },
+ "float_tolerance_vs_native": {
+  "aac-adts-44-stereo.aac": {
+   "family": "aac",
+   "samples": 178176,
+   "frames": 174,
+   "max_abs_delta": 5.960464477539063e-08,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "differing_samples": 72,
+   "suffix_streams": 174,
+   "seek_streams": 0
+  },
+  "aac-artwork.m4a": {
+   "family": "aac",
+   "samples": 176400,
+   "frames": 173,
+   "max_abs_delta": 5.960464477539063e-08,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "differing_samples": 39,
+   "suffix_streams": 173,
+   "seek_streams": 3
+  },
+  "aac-lc-44-mono.m4a": {
+   "family": "aac",
+   "samples": 176400,
+   "frames": 173,
+   "max_abs_delta": 5.960464477539063e-08,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "differing_samples": 23,
+   "suffix_streams": 173,
+   "seek_streams": 3
+  },
+  "aac-lc-44-stereo.m4a": {
+   "family": "aac",
+   "samples": 529200,
+   "frames": 517,
+   "max_abs_delta": 5.960464477539063e-08,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "differing_samples": 31,
+   "suffix_streams": 517,
+   "seek_streams": 3
+  },
+  "aac-lc-48-stereo.m4a": {
+   "family": "aac",
+   "samples": 192000,
+   "frames": 188,
+   "max_abs_delta": 2.9802322387695312e-08,
+   "max_abs_delta_in_16bit_lsb": 0.0009765625,
+   "differing_samples": 41,
+   "suffix_streams": 188,
+   "seek_streams": 3
+  },
+  "aac-malformed-header.aac": {
+   "family": "aac",
+   "samples": 3072,
+   "frames": 3,
+   "max_abs_delta": 5.960464477539063e-08,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "differing_samples": 58,
+   "suffix_streams": 3,
+   "seek_streams": 0
+  },
+  "aac-short.m4a": {
+   "family": "aac",
+   "samples": 13230,
+   "frames": 13,
+   "max_abs_delta": 5.960464477539063e-08,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "differing_samples": 31,
+   "suffix_streams": 13,
+   "seek_streams": 3
+  },
+  "aac-truncated.m4a": {
+   "family": "aac",
+   "samples": 314368,
+   "frames": 307,
+   "max_abs_delta": 5.960464477539063e-08,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "differing_samples": 31,
+   "suffix_streams": 307,
+   "seek_streams": 2
+  },
+  "aac-vbr.m4a": {
+   "family": "aac",
+   "samples": 176400,
+   "frames": 173,
+   "max_abs_delta": 5.960464477539063e-08,
+   "max_abs_delta_in_16bit_lsb": 0.001953125,
+   "differing_samples": 40,
+   "suffix_streams": 173,
+   "seek_streams": 3
+  },
+  "mp3-cbr-id3v23-artwork.mp3": {
+   "family": "mp3",
+   "samples": 176400,
+   "frames": 155,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "differing_samples": 171618,
+   "suffix_streams": 154,
+   "seek_streams": 3
+  },
+  "mp3-cbr-id3v23.mp3": {
+   "family": "mp3",
+   "samples": 176400,
+   "frames": 155,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "differing_samples": 171618,
+   "suffix_streams": 154,
+   "seek_streams": 3
+  },
+  "mp3-corrupt-tail.mp3": {
+   "family": "mp3",
+   "samples": 132527,
+   "frames": 116,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "differing_samples": 128674,
+   "suffix_streams": 116,
+   "seek_streams": 3
+  },
+  "mp3-long.mp3": {
+   "family": "mp3",
+   "samples": 529200,
+   "frames": 461,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "differing_samples": 514144,
+   "suffix_streams": 460,
+   "seek_streams": 3
+  },
+  "mp3-minimal.mp3": {
+   "family": "mp3",
+   "samples": 88200,
+   "frames": 78,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "differing_samples": 86015,
+   "suffix_streams": 77,
+   "seek_streams": 3
+  },
+  "mp3-short.mp3": {
+   "family": "mp3",
+   "samples": 13230,
+   "frames": 13,
+   "max_abs_delta": 1.1920928955078125e-07,
+   "max_abs_delta_in_16bit_lsb": 0.00390625,
+   "differing_samples": 12921,
+   "suffix_streams": 12,
+   "seek_streams": 3
+  },
+  "mp3-vbr-id3v24.mp3": {
+   "family": "mp3",
+   "samples": 176400,
+   "frames": 155,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "max_abs_delta_in_16bit_lsb": 0.005859375,
+   "differing_samples": 171308,
+   "suffix_streams": 154,
+   "seek_streams": 3
+  },
+  "opus-48-stereo.opus": {
+   "family": "opus",
+   "samples": 576000,
+   "frames": 601,
+   "max_abs_delta": 0.0,
+   "max_abs_delta_in_16bit_lsb": 0.0,
+   "differing_samples": 0,
+   "suffix_streams": 601,
+   "seek_streams": 0
+  },
+  "opus-truncated.opus": {
+   "family": "opus",
+   "samples": 431688,
+   "frames": 450,
+   "max_abs_delta": 0.0,
+   "max_abs_delta_in_16bit_lsb": 0.0,
+   "differing_samples": 0,
+   "suffix_streams": 450,
+   "seek_streams": 0
+  },
+  "vorbis-44-stereo.ogg": {
+   "family": "vorbis",
+   "samples": 529200,
+   "frames": 518,
+   "max_abs_delta": 0.0,
+   "max_abs_delta_in_16bit_lsb": 0.0,
+   "differing_samples": 0,
+   "suffix_streams": 518,
+   "seek_streams": 0
+  },
+  "vorbis-truncated.ogg": {
+   "family": "vorbis",
+   "samples": 360000,
+   "frames": 352,
+   "max_abs_delta": 0.0,
+   "max_abs_delta_in_16bit_lsb": 0.0,
+   "differing_samples": 0,
+   "suffix_streams": 352,
+   "seek_streams": 0
+  }
+ },
+ "float_tolerance_policy": {
+  "families": [
+   "aac",
+   "mp3"
+  ],
+  "max_abs_delta_bound": 1e-06,
+  "wasm_anchor": {
+   "runtime": "wamr",
+   "contract": "every non-anchor WASM runtime must be bit-identical to the anchor on every tolerance-allowed PCM stream"
+  },
+  "evidence_file": "tolerance.json (identity-bound native + anchor PCM hashes per tolerance-allowed stream)"
+ }
+}

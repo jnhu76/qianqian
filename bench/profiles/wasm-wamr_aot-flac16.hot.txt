@@ -1,0 +1,223 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 75  of event 'cpu/cycles/Pu'
+# Event count (approx.): 181677372
+#
+# Overhead  Command          Shared Object         Symbol                        
+# ........  ...............  ....................  ..............................
+#
+    12.56%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f51e
+            |
+            ---0x40e9f51e
+
+     9.81%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d40b
+            |
+            ---0x40e9d40b
+
+     5.43%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f517
+            |
+            ---0x40e9f517
+
+     3.61%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f726
+            |
+            ---0x40e9f726
+
+     3.60%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d48d
+            |
+            ---0x40e9d48d
+
+     3.54%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d43c
+            |
+            ---0x40e9d43c
+
+     3.38%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d657
+            |
+            ---0x40e9d657
+
+     2.92%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f4bc
+            |
+            ---0x40e9f4bc
+
+     1.82%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f45c
+            |
+            ---0x40e9f45c
+
+     1.81%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040fb7380
+            |
+            ---0x40fb7380
+
+     1.81%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d460
+            |
+            ---0x40e9d460
+
+     1.81%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f4c4
+            |
+            ---0x40e9f4c4
+
+     1.80%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040ea3af2
+            |
+            ---0x40ea3af2
+
+     1.80%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d44f
+            |
+            ---0x40e9d44f
+
+     1.80%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e04262
+            |
+            ---0x40e04262
+
+     1.80%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f754
+            |
+            ---0x40e9f754
+
+     1.79%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e04b19
+            |
+            ---0x40e04b19
+
+     1.79%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f507
+            |
+            ---0x40e9f507
+
+     1.79%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e04226
+            |
+            ---0x40e04226
+
+     1.78%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f60d
+            |
+            ---0x40e9f60d
+
+     1.77%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e03ff9
+            |
+            ---0x40e03ff9
+
+     1.77%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f6d4
+            |
+            ---0x40e9f6d4
+
+     1.76%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e0486a
+            |
+            ---0x40e0486a
+
+     1.76%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e08a16
+            |
+            ---0x40e08a16
+
+     1.76%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e04c60
+            |
+            ---0x40e04c60
+
+     1.73%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e04d4f
+            |
+            ---0x40e04d4f
+
+     1.72%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d65f
+            |
+            ---0x40e9d65f
+
+     1.71%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f73f
+            |
+            ---0x40e9f73f
+
+     1.70%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e089fc
+            |
+            ---0x40e089fc
+
+     1.63%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f447
+            |
+            ---0x40e9f447
+
+     1.56%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040fb7373
+            |
+            ---0x40fb7373
+
+     1.52%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f47d
+            |
+            ---0x40e9f47d
+
+     1.41%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d446
+            |
+            ---0x40e9d446
+
+     1.34%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f469
+            |
+            ---0x40e9f469
+
+     1.16%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f747
+            |
+            ---0x40e9f747
+
+     1.12%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d653
+            |
+            ---0x40e9d653
+
+     1.00%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f3bf
+            |
+            ---0x40e9f3bf
+
+     0.86%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa9397804
+            |
+            ---0xffffffffa9397804
+               0xffffffffa92afc9a
+               0xffffffffaa39c0ce
+               0xffffffffa900134b
+               __memset_avx2_unaligned_erms
+
+     0.82%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f50a
+            |
+            ---0x40e9f50a
+
+     0.70%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9d491
+            |
+            ---0x40e9d491
+
+     0.68%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffaa371c57
+            |
+            ---0xffffffffaa371c57
+               0xffffffffa95ae19d
+               0xffffffffa92afc9a
+               0xffffffffaa39c0ce
+               0xffffffffa900134b
+               touch_pages
+               os_thread_signal_init
+               0x656372756f532f6f
+
+     0.68%  qn_wamr_aot_run  [JIT] tid 2488091     [.] 0x0000000040e9f716
+            |
+            ---0x40e9f716
+
+     0.66%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa9104109
+            |
+            ---0xffffffffa9104109
+               0xffffffffa95be468
+               0xffffffffa92afcd9
+               0xffffffffaa39c0ce
+               0xffffffffa900134b
+               __memset_avx2_unaligned_erms
+
+     0.58%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa92afb64
+            |
+            ---0xffffffffa92afb64
+               0xffffffffa900134b
+               __memmove_avx_unaligned_erms
+               0x2
+
+     0.47%  qn_wamr_aot_run  libc.so.6             [.] __strcmp_avx2
+     0.46%  qn_wamr_aot_run  qn_wamr_aot_runner    [.] load_from_sections
+     0.42%  qn_wamr_aot_run  qn_wamr_aot_runner    [.] load_relocation_section
+     0.41%  qn_wamr_aot_run  libc.so.6             [.] __strlen_avx2
+     0.33%  qn_wamr_aot_run  libc.so.6             [.] tcache_free_init
+     0.05%  qn_wamr_aot_run  ld-linux-x86-64.so.2  [.] _dl_map_new_object
+     0.00%  qn_wamr_aot_run  ld-linux-x86-64.so.2  [.] _dl_sysdep_parse_arguments
+     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffaa371ce1
+     0.00%  qn_wamr_aot_run  ld-linux-x86-64.so.2  [.] _dl_start
+     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffaa39c065
+     0.00%  qn_wamr_aot_run  [unknown]             [k] 0xffffffffa9001320
+     0.00%  qn_wamr_aot_run  ld-linux-x86-64.so.2  [.] _start
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
