@@ -1,0 +1,21 @@
+# started on Mon Aug 31 13:30:29 2026
+
+
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_wasmtime_runner /home/hoo/Source/qianqian/build/artifacts/wasm/qn_guest_bench.wasm bench /home/hoo/Source/qianqian/corpus/fixtures/aac-lc-44-stereo.m4a 3':
+
+                 0      context-switches:u               #      0.0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
+             15349      page-faults:u                    #   8686.3 faults/sec  page_faults_per_second
+           1767.04 msec task-clock:u                     #      4.9 CPUs  CPUs_utilized       
+          49009498      branch-misses:u                  #      4.1 %  branch_miss_rate         (48.33%)
+        1195320000      branches:u                       #    676.5 M/sec  branch_frequency     (65.65%)
+        5108837783      cpu-cycles:u                     #      2.9 GHz  cycles_frequency       (66.43%)
+        7781834804      instructions:u                   #      1.5 instructions  insn_per_cycle  (67.55%)
+        1249657420      stalled-cycles-frontend:u        #     0.24 frontend_cycles_idle        (68.39%)
+
+       0.358320223 seconds time elapsed
+
+       1.591471000 seconds user
+       0.166910000 seconds sys
+
+

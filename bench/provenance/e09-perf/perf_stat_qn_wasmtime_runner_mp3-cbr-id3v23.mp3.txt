@@ -1,0 +1,21 @@
+# started on Mon Aug 31 13:30:28 2026
+
+
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_wasmtime_runner /home/hoo/Source/qianqian/build/artifacts/wasm/qn_guest_bench.wasm bench /home/hoo/Source/qianqian/corpus/fixtures/mp3-cbr-id3v23.mp3 3':
+
+                 0      context-switches:u               #      0.0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
+             14844      page-faults:u                    #   8807.7 faults/sec  page_faults_per_second
+           1685.34 msec task-clock:u                     #      5.7 CPUs  CPUs_utilized       
+          48854336      branch-misses:u                  #      4.3 %  branch_miss_rate         (49.26%)
+        1135760594      branches:u                       #    673.9 M/sec  branch_frequency     (66.00%)
+        4874132362      cpu-cycles:u                     #      2.9 GHz  cycles_frequency       (66.23%)
+        7259129497      instructions:u                   #      1.5 instructions  insn_per_cycle  (67.01%)
+        1183775075      stalled-cycles-frontend:u        #     0.24 frontend_cycles_idle        (67.62%)
+
+       0.296206912 seconds time elapsed
+
+       1.589073000 seconds user
+       0.087399000 seconds sys
+
+

@@ -1,0 +1,21 @@
+# started on Mon Aug 31 13:28:30 2026
+
+
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_native_runner /home/hoo/Source/qianqian/corpus/fixtures/opus-48-stereo.opus bench 3':
+
+                 0      context-switches:u               #      0.0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
+              3014      page-faults:u                    #  12673.6 faults/sec  page_faults_per_second
+            237.82 msec task-clock:u                     #      1.0 CPUs  CPUs_utilized       
+           3363113      branch-misses:u                  #      1.2 %  branch_miss_rate         (49.57%)
+         271697130      branches:u                       #   1142.5 M/sec  branch_frequency     (66.41%)
+         791846938      cpu-cycles:u                     #      3.3 GHz  cycles_frequency       (66.33%)
+        2377038908      instructions:u                   #      3.0 instructions  insn_per_cycle  (67.13%)
+          48376287      stalled-cycles-frontend:u        #     0.06 frontend_cycles_idle        (67.27%)
+
+       0.240070453 seconds time elapsed
+
+       0.224186000 seconds user
+       0.016013000 seconds sys
+
+

@@ -1,0 +1,21 @@
+# started on Mon Aug 31 13:28:32 2026
+
+
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_wamr_runner /home/hoo/Source/qianqian/build/artifacts/wasm/qn_guest_bench.wasm bench /home/hoo/Source/qianqian/corpus/fixtures/flac-16-44-stereo.flac 3':
+
+                 0      context-switches:u               #      0.0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
+              4547      page-faults:u                    #   2308.2 faults/sec  page_faults_per_second
+           1969.93 msec task-clock:u                     #      1.0 CPUs  CPUs_utilized       
+          22906415      branch-misses:u                  #      0.9 %  branch_miss_rate         (50.07%)
+        2661444788      branches:u                       #   1351.0 M/sec  branch_frequency     (66.71%)
+        7106184038      cpu-cycles:u                     #      3.6 GHz  cycles_frequency       (66.70%)
+       18101484117      instructions:u                   #      2.5 instructions  insn_per_cycle  (66.71%)
+        1520126545      stalled-cycles-frontend:u        #     0.21 frontend_cycles_idle        (66.59%)
+
+       1.972314143 seconds time elapsed
+
+       1.955554000 seconds user
+       0.015996000 seconds sys
+
+

@@ -1,0 +1,41 @@
+{
+ "note": "Emscripten artifacts measured from the em session (with -g1: import/export names preserved for the door contract); measured before restoring WASI artifacts",
+ "guests": {
+  "em_songcore_js": {
+   "bytes": 63500,
+   "gzip9": 17887,
+   "brotli11": 16063,
+   "xz9e": 16712
+  },
+  "em_songcore_wasm": {
+   "bytes": 1132413,
+   "gzip9": 531477,
+   "brotli11": 439987,
+   "xz9e": 426888
+  },
+  "em_guest_bench_js": {
+   "bytes": 118958,
+   "gzip9": 33319,
+   "brotli11": 28236,
+   "xz9e": 29960
+  },
+  "em_guest_bench_wasm": {
+   "bytes": 1142021,
+   "gzip9": 539254,
+   "brotli11": 444184,
+   "xz9e": 430828
+  },
+  "em_guest_pb_js": {
+   "bytes": 18761,
+   "gzip9": 7040,
+   "brotli11": 5927,
+   "xz9e": 6828
+  },
+  "em_guest_pb_wasm": {
+   "bytes": 7021,
+   "gzip9": 3021,
+   "brotli11": 2569,
+   "xz9e": 2672
+  }
+ }
+}

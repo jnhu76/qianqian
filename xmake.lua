@@ -298,6 +298,7 @@ if get_config("wasm") then
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
                 "-sEXPORTED_FUNCTIONS=[\"_song_wasm_open\",\"_song_wasm_probe\",\"_song_wasm_read_pcm\",\"_song_wasm_seek\",\"_song_wasm_close\",\"_malloc\",\"_free\"]",
+                "-g1", -- keep import/export symbol names: the door is wired by name
                 "-sENVIRONMENT=node,web",
             }, {force = true})
         if get_config("wasm") == "wasi" then
@@ -336,6 +337,7 @@ if get_config("wasm") then
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
                 "-sEXPORTED_FUNCTIONS=[\"_bench_bind\",\"_bench_correct\",\"_bench_bench\",\"_bench_pcm_prepare\",\"_bench_pcm_len\",\"_bench_pcm_ptr\",\"_bench_pcm_channels\",\"_bench_pcm_rate\",\"_bench_pcm_pull\",\"_bench_pcm_reset\",\"_bench_stage_alloc\",\"_bench_mem_pages\",\"_malloc\",\"_free\"]",
+                "-g1", -- keep import/export symbol names: the door is wired by name
                 "-sENVIRONMENT=node,web",
             }, {force = true})
         if get_config("wasm") == "wasi" then
@@ -398,7 +400,8 @@ if get_config("wasm") then
                 "-sEXPORT_NAME=createQnPbGuest",
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
-                "-sEXPORTED_FUNCTIONS=[\"_pb_fill\",\"_pb_ptr\",\"_pb_pull\",\"_pb_reset\",\"_pb_len\",\"_malloc\",\"_free\"]",
+                "-sEXPORTED_FUNCTIONS=[\"_pb_fill\",\"_pb_ptr\",\"_pb_pull\",\"_pb_reset\",\"_pb_len\",\"_pb_stage_alloc\",\"_malloc\",\"_free\"]",
+                "-g1", -- keep import/export symbol names: the door is wired by name
                 "-sENVIRONMENT=node,web",
             }, {force = true})
         if get_config("wasm") == "wasi" then
@@ -425,7 +428,8 @@ if get_config("e09") then
         set_default(false)
         set_targetdir(artifact_dir)
         set_optimize("smallest") -- guest harness parity with the WASM guests
-        add_files("bench/wasm/qn_guest_bench.c", "tools/wasm/qn_host_file.c")
+        add_files("bench/wasm/qn_guest_bench.c", "tools/wasm/qn_host_file.c",
+                  "tools/wasm/qn_runner_common.c") -- host-side sha/timing helpers
         add_includedirs("src/wasm", "tools/wasm")
         add_defines("QN_GUEST_NATIVE")
         add_deps("songcore")

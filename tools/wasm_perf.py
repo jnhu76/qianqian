@@ -58,8 +58,11 @@ def guest_arg(rt_binary, guest):
 
 
 def run_bench(binary, guest, fixture):
-    cmd = [str(binary)] + guest_arg(binary, guest) + \
-        ["bench", str(ROOT / "corpus" / "fixtures" / fixture), ITERS]
+    fx = str(ROOT / "corpus" / "fixtures" / fixture)
+    if "native" in binary.name:
+        cmd = [str(binary), fx, "bench", ITERS]
+    else:
+        cmd = [str(binary), str(guest), "bench", fx, ITERS]
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
     lines = [l for l in p.stdout.splitlines() if l.startswith("{")]
     if not lines:
@@ -68,35 +71,49 @@ def run_bench(binary, guest, fixture):
 
 
 def perf_stat(binary, guest, fixture):
-    cmd = ["perf", "stat", "-j", "-o", "/dev/stdout", "--"] + \
-        [str(binary)] + guest_arg(binary, guest) + \
-        ["bench", str(ROOT / "corpus" / "fixtures" / fixture), ITERS]
-    p = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
-    # perf -j writes JSON-ish lines to the -o file (stdout here); runtime
-    # output mixing makes this fragile: parse counter lines instead
+    PERFRAW.mkdir(parents=True, exist_ok=True)
+    statfile = PERFRAW / f"perf_stat_{binary.name}_{fixture}.txt"
+    fx = str(ROOT / "corpus" / "fixtures" / fixture)
+    if "native" in binary.name:
+        tgt = [str(binary), fx, "bench", ITERS]
+    else:
+        tgt = [str(binary), str(guest), "bench", fx, ITERS]
+    cmd = ["perf", "stat", "-o", str(statfile), "--"] + tgt
+    subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
     counters = {}
-    for line in (p.stderr or "").splitlines():
-        m = re.match(r"\s*([\d,\.]+)\s+.*(cycles|instructions|"
-                     r"context-switches|cpu-migrations|page-faults|"
-                     r"branches|branch-misses|task-clock)", line)
-        if m:
-            val = m.group(1).replace(",", "").rstrip(".")
-            counters[m.group(2)] = int(float(val))
-        m2 = re.match(r"\s*([\d,\.]+)\s+.*(seconds (time elapsed|user|sys))", line)
-        if m2:
-            key = {"seconds time elapsed": "elapsed_s",
-                   "seconds user": "user_s",
-                   "seconds sys": "sys_s"}[m2.group(2)]
-            counters[key] = float(m2.group(1).replace(",", ""))
+    txt = statfile.read_text() if statfile.exists() else ""
+    EVENT_KEYS = {
+        "cpu-cycles": "cycles", "instructions": "instructions",
+        "context-switches": "context-switches", "cpu-migrations": "cpu-migrations",
+        "page-faults": "page-faults", "branches": "branches",
+        "branch-misses": "branch-misses", "task-clock": "task-clock",
+    }
+    for line in txt.splitlines():
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        ev = parts[1].split(":")[0]
+        if ev in EVENT_KEYS:
+            try:
+                counters[EVENT_KEYS[ev]] = int(float(parts[0].replace(",", "")))
+            except ValueError:
+                pass
+        elif len(parts) >= 4 and parts[1] == "seconds" and parts[2] == "time":
+            counters["elapsed_s"] = float(parts[0])
+        elif len(parts) >= 3 and parts[1] == "seconds" and parts[2] in ("user", "sys"):
+            counters["user_s" if parts[2] == "user" else "sys_s"] = float(parts[0])
     return counters
 
 
 def perf_record(binary, guest, fixture, tag, seconds=30):
     PERFRAW.mkdir(parents=True, exist_ok=True)
     data = PERFRAW / f"{tag}.data"
-    cmd = ["perf", "record", "-F", "999", "-g", "-o", str(data), "--",
-           str(binary)] + guest_arg(binary, guest) + \
-        ["bench", str(ROOT / "corpus" / "fixtures" / fixture), ITERS]
+    fx = str(ROOT / "corpus" / "fixtures" / fixture)
+    if "native" in binary.name:
+        tgt = [str(binary), fx, "bench", ITERS]
+    else:
+        tgt = [str(binary), str(guest), "bench", fx, ITERS]
+    cmd = ["perf", "record", "-F", "999", "-g", "-o", str(data), "--"] + tgt
     try:
         subprocess.run(cmd, capture_output=True, timeout=seconds * 4)
     except subprocess.TimeoutExpired:

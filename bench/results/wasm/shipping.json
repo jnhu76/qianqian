@@ -1,0 +1,77 @@
+{
+ "calibers": {
+  "shipping_total": "guest + runtime + bridge + aot (uncompressed and per-compression codec)",
+  "browser": "gzip -9 / brotli -11 (never mixed with xz)",
+  "archive": "xz -9e"
+ },
+ "guests": {
+  "wasi_songcore": {
+   "bytes": 1292868,
+   "gzip9": 546307,
+   "brotli11": 447343,
+   "xz9e": 432200
+  },
+  "wasi_guest_bench": {
+   "bytes": 1303377,
+   "gzip9": 550521,
+   "brotli11": 451334,
+   "xz9e": 435764
+  },
+  "wasi_guest_bench_aot": {
+   "bytes": 3588964,
+   "gzip9": 1463894,
+   "brotli11": 1187375,
+   "xz9e": 1157444
+  },
+  "wasi_guest_pb": {
+   "bytes": 7032,
+   "gzip9": 3057,
+   "brotli11": 2625,
+   "xz9e": 2720
+  },
+  "em_songcore_js": {
+   "bytes": 63500,
+   "gzip9": 17887,
+   "brotli11": 16063,
+   "xz9e": 16712
+  },
+  "em_songcore_wasm": {
+   "bytes": 1292868,
+   "gzip9": 546307,
+   "brotli11": 447343,
+   "xz9e": 432200
+  },
+  "em_guest_bench_js": {
+   "bytes": 118958,
+   "gzip9": 33319,
+   "brotli11": 28236,
+   "xz9e": 29960
+  }
+ },
+ "runtime_libs": {
+  "wamr_interp": {
+   "bytes": null,
+   "xz9e": null
+  },
+  "wamr_aot_runtime": {
+   "bytes": null,
+   "xz9e": null
+  },
+  "wasmtime": {
+   "bytes": 71193834,
+   "xz9e": 8222608
+  },
+  "wasm3_runner_total": {
+   "bytes": 1025384
+  },
+  "wamr_runner_total": {
+   "bytes": 581712
+  },
+  "wasmtime_runner_total": {
+   "bytes": 35981864
+  },
+  "native_runner_total": {
+   "bytes": 1505608
+  }
+ }
+}

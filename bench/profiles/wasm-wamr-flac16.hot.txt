@@ -1,0 +1,102 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cpu/cycles/Pu'
+# Event count (approx.): 7132438472
+#
+# Overhead  Command         Shared Object         Symbol                                        
+# ........  ..............  ....................  ..............................................
+#
+    89.82%  qn_wamr_runner  qn_wamr_runner        [.] wasm_interp_call_func_bytecode
+            |
+            ---wasm_interp_call_func_bytecode
+               |          
+               |--5.34%--0xbca6a7f410bc703
+               |          
+               |--2.91%--0xd0bca6a7f410bc7
+               |          
+               |--2.86%--0x7f410bc703c96a04
+               |          
+               |--2.25%--0xc97c89c77e000234
+               |          
+               |--2.25%--0xbc703c96a044103
+               |          
+               |--2.14%--0x3c96a044103c789
+               |          
+               |--1.94%--0x7e0002346a03c701
+               |          
+               |--1.52%--0x6a044103c789c97c
+               |          
+               |--1.47%--0xca6a74024103c700
+               |          
+               |--1.43%--0xc789c97c89c77e00
+               |          
+               |--0.97%--0x89c77e0002346a03
+               |          
+               |--0.87%--0xb03c902c70b000d
+               |          
+               |--0.61%--0x6a7f410bc703c96a
+               |          
+               |--0.61%--0xec96a04410ec700
+               |          
+               |--0.57%--0xc702c7400240027f
+               |          
+               |--0.56%--0x74024103c700c70b
+               |          
+               |--0.56%--0xb000d0bca6a7f41
+               |          
+               |--0.56%--0xac711ca6a014111
+               |          
+               |--0.56%--0x89c97c89c77e0002
+               |          
+               |--0.52%--0xc711ca6a014111c7
+               |          
+               |--0.51%--0xc96a044101c704c9
+               |          
+               |--0.51%--0x2c70b000d0bca6a
+               |          
+                --0.51%--0x24103c700c70b03
+
+     9.37%  qn_wamr_runner  qn_wamr_runner        [.] wasm_loader_find_block_addr
+            |
+            ---wasm_loader_find_block_addr
+               |          
+                --9.16%--0
+                          |          
+                          |--3.32%--0xc7400240020b0f64
+                          |          
+                          |--1.28%--0x7c70dc707c7000d
+                          |          
+                          |--1.27%--0x8089af1089c71803
+                          |          
+                          |--0.67%--0xc7010d02c7000d03
+                          |          
+                          |--0.56%--0x8080808080804287
+                          |          
+                           --0.56%--0x8080808080808080
+
+     0.20%  qn_wamr_runner  qn_wamr_runner        [.] wasm_loader_prepare_bytecode.isra.0
+     0.11%  qn_wamr_runner  qn_wamr_runner        [.] read_leb
+     0.10%  qn_wamr_runner  qn_wamr_runner        [.] is_valid_value_type
+     0.10%  qn_wamr_runner  libc.so.6             [.] __memmove_avx_unaligned_erms
+     0.05%  qn_wamr_runner  qn_wamr_runner        [.] is_valid_value_type_for_interpreter
+     0.05%  qn_wamr_runner  qn_wamr_runner        [.] wasm_runtime_invoke_native
+     0.05%  qn_wamr_runner  [unknown]             [k] 0xffffffffaa39c08e
+     0.05%  qn_wamr_runner  qn_wamr_runner        [.] wasm_loader_push_pop_frame_ref.constprop.1
+     0.02%  qn_wamr_runner  qn_wamr_runner        [.] wasm_loader_push_frame_ref
+     0.02%  qn_wamr_runner  qn_wamr_runner        [.] load_from_sections
+     0.02%  qn_wamr_runner  qn_wamr_runner        [.] bh_leb_read
+     0.02%  qn_wamr_runner  [unknown]             [k] 0xffffffffa95c2270
+     0.02%  qn_wamr_runner  qn_wamr_runner        [.] wasm_loader_pop_frame_ref
+     0.00%  qn_wamr_runner  ld-linux-x86-64.so.2  [.] _dl_lookup_symbol_x
+     0.00%  qn_wamr_runner  [unknown]             [k] 0xffffffffa95bdac6
+     0.00%  qn_wamr_runner  [unknown]             [k] 0xffffffffa95ae16f
+     0.00%  qn_wamr_runner  ld-linux-x86-64.so.2  [.] _dl_start
+     0.00%  qn_wamr_runner  [unknown]             [k] 0xffffffffa9001ef7
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

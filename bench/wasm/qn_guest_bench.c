@@ -956,6 +956,82 @@ int main(int argc, char **argv) {
 }
 #endif
 
+#if defined(QN_GUEST_NATIVE)
+#include <sys/resource.h>
+#include <time.h>
+#include "qn_runner_common.h"
+/* native twin of the runners' Mode B/C: the canonical PCM stays here and a
+ * plain host memcpy plays the role of the boundary read. Optional arg dumps
+ * the canonical bytes for the E09 tolerance study. */
+static double now_ms_native(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+}
+
+static int bench_pcm_host(const char *outfile) {
+    if (pcm_prepare_locked() != 0) return 1;
+    size_t total = g_pcm.len * sizeof(float);
+    const uint8_t *src = (const uint8_t *)g_pcm.data;
+    uint8_t *hostbuf = malloc(total);
+    if (!hostbuf) return 1;
+    double t0 = now_ms_native();
+    memcpy(hostbuf, src, total);
+    double copy_ms = now_ms_native() - t0;
+    char hex[65];
+    qn_sha256(hostbuf, total, hex);
+    if (outfile) {
+        FILE *of = fopen(outfile, "wb");
+        if (!of || fwrite(hostbuf, 1, total, of) != total) {
+            fprintf(stderr, "cannot write %s\n", outfile);
+            if (of) fclose(of);
+            free(hostbuf);
+            return 1;
+        }
+        fclose(of);
+    }
+    printf("{\"mode\":\"pcm_host\",\"bytes\":%zu,\"copy_ms\":%.3f,"
+           "\"effective_gbps\":%.3f,\"sha256\":\"%s\"}\n",
+           total, copy_ms, copy_ms > 0 ? ((double)total / 1e9) / (copy_ms / 1000.0) : 0.0, hex);
+
+    uint8_t *stage = malloc(1 << 20);
+    int chunk_frames[] = { 256, 1024, 4096 };
+    for (unsigned ci = 0; ci < sizeof(chunk_frames)/sizeof(chunk_frames[0]); ci++) {
+        int32_t chunk_bytes = chunk_frames[ci] * g_pcm.channels * 4;
+        if (chunk_bytes > (1 << 20)) chunk_bytes = (1 << 20);
+        g_pcm_cursor = 0;
+        void *sha = qn_sha_new();
+        double t = now_ms_native();
+        size_t got = 0;
+        int32_t calls = 0, n = 0;
+        double max_call_ms = 0;
+        do {
+            double c0 = now_ms_native();
+            n = bench_pcm_pull((int32_t)(intptr_t)stage, chunk_bytes);
+            double dt = now_ms_native() - c0;
+            if (dt > max_call_ms) max_call_ms = dt;
+            if (n > 0) { qn_sha_feed(sha, stage, (size_t)n); got += (size_t)n; calls++; }
+        } while (n > 0);
+        double total_ms = now_ms_native() - t;
+        char hex3[65] = "";
+        qn_sha_finish(&sha, hex3);
+        printf("{\"mode\":\"pcm_chunk\",\"chunk_frames\":%d,\"chunk_bytes\":%d,"
+               "\"calls\":%d,\"bytes\":%zu,\"total_ms\":%.3f,\"max_call_ms\":%.3f,"
+               "\"calls_per_s\":%.1f,\"sha256\":\"%s\"}\n",
+               chunk_frames[ci], chunk_bytes, calls, got, total_ms, max_call_ms,
+               total_ms > 0 ? ((double)calls * 1000.0) / total_ms : 0.0, hex3);
+    }
+    free(stage);
+    free(hostbuf);
+    { /* runner_stats parity: host peak RSS */
+        struct rusage ru;
+        getrusage(RUSAGE_SELF, &ru);
+        printf("{\"mode\":\"runner_stats\",\"peak_rss_kb\":%ld}\n", ru.ru_maxrss);
+    }
+    return 0;
+}
+#endif
+
 /* ------------------------------------------------------------------ */
 /* native twin entry (not built for wasm; reactor guests have no main)  */
 /* ------------------------------------------------------------------ */
@@ -979,6 +1055,7 @@ int main(int argc, char **argv) {
     bench_bind(0);
     if (strcmp(argv[2], "correct") == 0) return bench_correct();
     if (strcmp(argv[2], "bench") == 0) return bench_bench(argc > 3 ? atoi(argv[3]) : 5);
+    if (strcmp(argv[2], "pcm") == 0) return bench_pcm_host(argc > 3 ? argv[3] : NULL);
     fprintf(stderr, "unknown mode %s\n", argv[2]);
     return 2;
 }

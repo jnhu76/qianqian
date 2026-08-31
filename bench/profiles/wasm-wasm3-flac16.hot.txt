@@ -1,0 +1,264 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 821  of event 'cpu/cycles/Pu'
+# Event count (approx.): 2917723398
+#
+# Overhead  Command          Shared Object         Symbol                          
+# ........  ...............  ....................  ................................
+#
+    22.77%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Add_ss
+            |
+            ---op_i32_Add_ss
+               |          
+               |--17.62%--0
+               |          
+               |--1.25%--0xb
+               |          
+               |--1.11%--0x2
+               |          
+               |--0.91%--0x8
+               |          
+                --0.78%--0xa
+
+    12.46%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i64_Load_i32_r
+            |
+            ---op_i64_Load_i32_r
+               0
+
+     9.55%  qn_wasm3_runner  qn_wasm3_runner       [.] op_SetSlot_i32
+            |
+            ---op_SetSlot_i32
+               |          
+               |--3.87%--0xb
+               |          
+               |--2.46%--0xa
+               |          
+               |--1.97%--0
+               |          
+                --0.90%--0x8
+
+     6.18%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Add_rs
+            |
+            ---op_i32_Add_rs
+               |          
+               |--1.82%--0xb
+               |          
+               |--1.81%--0x8
+               |          
+               |--1.68%--0xa
+               |          
+                --0.73%--0
+
+     5.97%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Load_i32_s
+            |
+            ---op_i32_Load_i32_s
+               |          
+               |--2.32%--0
+               |          
+               |--1.03%--0x8
+               |          
+               |--1.03%--0xa
+               |          
+                --0.88%--0x2
+
+     3.01%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_ShiftRight_ss
+            |
+            ---op_u32_ShiftRight_ss
+               |          
+               |--1.99%--0xb
+               |          
+                --0.78%--0x8
+
+     2.74%  qn_wasm3_runner  qn_wasm3_runner       [.] op_CopySlot_32
+            |
+            ---op_CopySlot_32
+               |          
+               |--1.29%--0xa
+               |          
+                --0.85%--0x12
+
+     2.18%  qn_wasm3_runner  qn_wasm3_runner       [.] op_Loop
+            |
+            ---op_Loop
+               |          
+                --1.33%--0
+
+     1.98%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_LessThan_sr
+            |
+            ---op_u32_LessThan_sr
+               |          
+                --1.85%--0xb
+
+     1.94%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_Rotl_ss
+            |          
+             --1.54%--rotl32 (inlined)
+                       op_u32_Rotl_ss
+                       |          
+                        --1.16%--0xa
+
+     1.84%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i64_Add_rs
+            |
+            ---op_i64_Add_rs
+               0
+
+     1.70%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_LessThan_ss
+            |
+            ---op_u32_LessThan_ss
+               0xb
+
+     1.57%  qn_wasm3_runner  qn_wasm3_runner       [.] op_Select_i32_rss
+            |
+            ---op_Select_i32_rss
+               0xb
+
+     1.48%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_Rotr_ss
+            |          
+             --1.23%--rotr32 (inlined)
+                       op_u32_Rotr_ss
+                       0xb
+
+     1.40%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_Xor_rs
+            |
+            ---op_u32_Xor_rs
+               |          
+                --0.90%--0xa
+
+     1.40%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_And_ss
+            |
+            ---op_u32_And_ss
+               |          
+               |--0.78%--0xa
+               |          
+                --0.62%--0xb
+
+     1.26%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Load_i32_r
+            |
+            ---op_i32_Load_i32_r
+               |          
+                --0.64%--0x8
+
+     1.22%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_NotEqual_rs
+            |
+            ---op_i32_NotEqual_rs
+               |          
+                --0.72%--0xb
+
+     1.05%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_Xor_ss
+            |
+            ---op_u32_Xor_ss
+               0xa
+
+     1.00%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_GreaterThan_ss
+            |
+            ---op_i32_GreaterThan_ss
+               |          
+                --0.88%--0xb
+
+     0.98%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Store_i16_rs
+            |
+            ---op_i32_Store_i16_rs
+               0x2
+
+     0.98%  qn_wasm3_runner  qn_wasm3_runner       [.] op_ContinueLoopIf
+            |          
+             --0.87%--op_ContinueLoopIf
+                       |          
+                        --0.74%--0
+
+     0.85%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Store_i32_ss
+            |
+            ---op_i32_Store_i32_ss
+               0xb
+
+     0.84%  qn_wasm3_runner  qn_wasm3_runner       [.] op_SetSlot_i64
+            |
+            ---op_SetSlot_i64
+               0
+
+     0.76%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_And_rs
+            |
+            ---op_u32_And_rs
+
+     0.76%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_EqualToZero_s
+            |
+            ---op_i32_EqualToZero_s
+               |          
+                --0.50%--op_BranchIf_r
+
+     0.63%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_ShiftLeft_ss
+            |
+            ---op_u32_ShiftLeft_ss
+               0
+
+     0.63%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Store_i32_rs
+            |
+            ---op_i32_Store_i32_rs
+
+     0.52%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Equal_ss
+            |
+            ---op_i32_Equal_ss
+               0xa
+
+     0.50%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_NotEqual_ss
+            |
+            ---op_i32_NotEqual_ss
+
+     0.50%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_ShiftLeft_rs
+            |
+            ---op_u32_ShiftLeft_rs
+               0xb
+
+     0.50%  qn_wasm3_runner  libc.so.6             [.] __memmove_avx_unaligned_erms
+     0.50%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Subtract_sr
+     0.49%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i64_Multiply_rs
+     0.49%  qn_wasm3_runner  qn_wasm3_runner       [.] op_f32_Multiply_rs
+     0.38%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_ShiftRight_sr
+     0.37%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Equal_rs
+     0.37%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_ShiftRight_sr
+     0.37%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_LessThan_sr
+     0.37%  qn_wasm3_runner  qn_wasm3_runner       [.] op_Select_i32_srs
+     0.37%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Load_u8_r
+     0.37%  qn_wasm3_runner  qn_wasm3_runner       [.] op_BranchIf_s
+     0.36%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_ShiftLeft_sr
+     0.36%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_Or_ss
+     0.35%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Load_i16_s
+     0.26%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_Rotl_sr
+     0.26%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i64_Load_i64_s
+     0.26%  qn_wasm3_runner  qn_wasm3_runner       [.] op_f32_Convert_i32_r_r
+     0.25%  qn_wasm3_runner  qn_wasm3_runner       [.] op_CopySlot_64
+     0.25%  qn_wasm3_runner  qn_wasm3_runner       [.] op_BranchIf_r
+     0.25%  qn_wasm3_runner  qn_wasm3_runner       [.] op_Call
+     0.25%  qn_wasm3_runner  qn_wasm3_runner       [.] op_Branch
+     0.24%  qn_wasm3_runner  qn_wasm3_runner       [.] op_Entry
+     0.22%  qn_wasm3_runner  qn_wasm3_runner       [.] ValidateFunction
+     0.16%  qn_wasm3_runner  qn_wasm3_runner       [.] PushConst
+     0.13%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i64_ShiftRight_ss
+     0.13%  qn_wasm3_runner  qn_wasm3_runner       [.] op_u32_Or_rs
+     0.12%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Subtract_rs
+     0.12%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i64_Load_i32_s
+     0.12%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_Subtract_ss
+     0.12%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i64_Load_i64_r
+     0.12%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i32_EqualToZero_r
+     0.09%  qn_wasm3_runner  qn_wasm3_runner       [.] Compile_GetLocal
+     0.08%  qn_wasm3_runner  qn_wasm3_runner       [.] op_i64_Store_i64_ss
+     0.06%  qn_wasm3_runner  qn_wasm3_runner       [.] CompileFunction
+     0.06%  qn_wasm3_runner  libc.so.6             [.] __memset_avx2_unaligned_erms
+     0.05%  qn_wasm3_runner  [unknown]             [k] 0xffffffffaa371e1e
+     0.04%  qn_wasm3_runner  [unknown]             [k] 0xffffffffa9001f05
+     0.04%  qn_wasm3_runner  [unknown]             [k] 0xffffffffaa371ce1
+     0.03%  qn_wasm3_runner  qn_wasm3_runner       [.] ReadLEB_u32
+     0.00%  qn_wasm3_runner  ld-linux-x86-64.so.2  [.] _dl_audit_objopen
+     0.00%  qn_wasm3_runner  ld-linux-x86-64.so.2  [.] __GI___tunables_init
+     0.00%  qn_wasm3_runner  [unknown]             [k] 0xffffffffa9001320
+     0.00%  qn_wasm3_runner  [unknown]             [k] 0xffffffffa92afc33
+     0.00%  qn_wasm3_runner  [unknown]             [k] 0xffffffffa92afb64
+     0.00%  qn_wasm3_runner  ld-linux-x86-64.so.2  [.] _start
+     0.00%  qn_wasm3_runner  [unknown]             [k] 0xffffffffa9000005
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

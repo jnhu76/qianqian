@@ -1,0 +1,21 @@
+# started on Mon Aug 31 13:28:29 2026
+
+
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_native_runner /home/hoo/Source/qianqian/corpus/fixtures/flac-16-44-stereo.flac bench 3':
+
+                 0      context-switches:u               #      0.0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
+               916      page-faults:u                    #  17673.3 faults/sec  page_faults_per_second
+             51.83 msec task-clock:u                     #      0.7 CPUs  CPUs_utilized       
+             60477      branch-misses:u                  #      0.1 %  branch_miss_rate         (50.96%)
+          77955790      branches:u                       #   1504.1 M/sec  branch_frequency     (69.23%)
+         163395454      cpu-cycles:u                     #      3.2 GHz  cycles_frequency       (69.17%)
+         438179991      instructions:u                   #      2.7 instructions  insn_per_cycle  (69.06%)
+           9787697      stalled-cycles-frontend:u        #     0.06 frontend_cycles_idle        (64.45%)
+
+       0.053437211 seconds time elapsed
+
+       0.053607000 seconds user
+       0.000000000 seconds sys
+
+

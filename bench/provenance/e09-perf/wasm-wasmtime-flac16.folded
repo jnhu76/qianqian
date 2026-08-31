@@ -1,0 +1,513 @@
+qn_wasmtime_run 77065357
+qn_wasmtime_run;<&mut cranelift_codegen::cursor::FuncCursor as cranelift_codegen::ir::builder::InstInserterBase>::insert_built_inst 2898751
+qn_wasmtime_run;<<wasmtime::compile::CompileInputs>::collect_inputs_in_translations<[ 220
+qn_wasmtime_run;<<wasmtime::compile::CompileInputs>::collect_inputs_in_translations<[;format_inner;with_capacity;with_capacity<u8>;with_capacity_in<u8, alloc::alloc::Global>;with_capacity_in<u8, alloc::alloc::Global>;with_capacity_in<alloc::alloc::Global>;try_allocate_in<alloc::alloc::Global>;__libc_malloc2 3693
+qn_wasmtime_run;<[regalloc2::ion::data_structures::LiveRangeListEntry]>::sort_unstable_by_key::<regalloc2::ProgPoint, <regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::merge_bundles::{closure#3}> 2730519
+qn_wasmtime_run;<alloc::collections::btree::map::BTreeMap<regalloc2::ion::data_structures::LiveRangeKey, regalloc2::ion::data_structures::LiveRangeIndex>>::insert 37359047
+qn_wasmtime_run;<alloc::collections::btree::map::BTreeMap<regalloc2::ion::data_structures::LiveRangeKey, regalloc2::ion::data_structures::LiveRangeIndex>>::insert;__libc_malloc2;_int_malloc 5872573
+qn_wasmtime_run;<alloc::collections::btree::map::BTreeMap<regalloc2::ion::data_structures::LiveRangeKey, regalloc2::ion::data_structures::LiveRangeIndex>>::range::<regalloc2::ion::data_structures::LiveRangeKey, core::ops::range::RangeFrom<regalloc2::ion::data_structures::LiveRangeKey>> 68450718
+qn_wasmtime_run;<alloc::collections::btree::map::BTreeMap<regalloc2::ion::data_structures::LiveRangeKey, regalloc2::ion::data_structures::LiveRangeIndex>>::remove::<regalloc2::ion::data_structures::LiveRangeKey> 2834157
+qn_wasmtime_run;<alloc::collections::btree::map::BTreeMap<regalloc2::ion::data_structures::LiveRangeKey, regalloc2::ion::data_structures::SpillSetIndex>>::insert;__lll_lock_wait_private;futex_wait;[unknown] 3003597
+qn_wasmtime_run;<alloc::collections::btree::node::Handle<alloc::collections::btree::node::NodeRef<alloc::collections::btree::node::marker::Mut, regalloc2::ion::data_structures::LiveRangeKey, regalloc2::ion::data_structures::LiveRangeIndex, alloc::collections::btree::node::marker::Leaf>, alloc::collections::btree::node::marker::KV>>::remove_leaf_kv::<<alloc::collections::btree::map::entry::OccupiedEntry<regalloc2::ion::data_structures::LiveRangeKey, regalloc2::ion::data_structures::LiveRangeIndex>>::remove_kv::{closure#0}, alloc::alloc::Global> 3052016
+qn_wasmtime_run;<alloc::raw_vec::RawVec<core::option::Option<wasmparser::validator::types::CoreTypeId>>>::grow_one 2842684
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner<_>>::reserve::do_reserve_and_handle::<alloc::alloc::Global> 5882148
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow 12882757
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_malloc2;_int_malloc 5639453
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc 5844694
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;__memmove_avx_unaligned_erms 26358206
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc 11483685
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc;__mprotect;[unknown];[unknown];[unknown];[unknown];[unknown] 3009534
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc;_int_free_chunk 3007960
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc;_int_free_chunk;_int_free_maybe_trim 2958124
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc;_int_free_chunk;_int_free_merge_chunk 5114993
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 11828470
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc;_int_free_maybe_trim 3009233
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc;_int_malloc 41510199
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc;_int_malloc;sysmalloc;[unknown];[unknown];[unknown] 2682542
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc;_int_malloc;tcache_put;tcache_put_n 2844041
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;_int_realloc;_int_malloc;unlink_chunk 9023519
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;arena_for_chunk 2303327
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__libc_realloc;musable 5778609
+qn_wasmtime_run;<alloc::raw_vec::RawVecInner>::finish_grow;__lll_lock_wait_private;futex_wait;[unknown] 1049660
+qn_wasmtime_run;<core::hash::sip::Hasher<core::hash::sip::Sip13Rounds> as core::hash::Hasher>::write 2759594
+qn_wasmtime_run;<cranelift_assembler_x64::inst::Inst<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters> as core::clone::Clone>::clone 28642810
+qn_wasmtime_run;<cranelift_assembler_x64::inst::Inst<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 2876607
+qn_wasmtime_run;<cranelift_assembler_x64::inst::je_d32>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 5936191
+qn_wasmtime_run;<cranelift_assembler_x64::inst::leal_rm<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 5929252
+qn_wasmtime_run;<cranelift_assembler_x64::mem::Amode<cranelift_codegen::isa::x64::inst::args::Gpr>>::as_rex_prefix 2675353
+qn_wasmtime_run;<cranelift_assembler_x64::mem::XmmMem<cranelift_codegen::isa::x64::inst::args::Xmm, cranelift_codegen::isa::x64::inst::args::Gpr> as core::convert::From<cranelift_codegen::isa::x64::inst::args::SyntheticAmode>>::from 2909784
+qn_wasmtime_run;<cranelift_bforest::pool::NodePool<cranelift_bforest::map::MapTypes<cranelift_codegen::ir::entities::Inst, cranelift_codegen::ir::entities::Block>>>::alloc_node 6013949
+qn_wasmtime_run;<cranelift_bitset::compound::CompoundBitSet>::insert 2779702
+qn_wasmtime_run;<cranelift_codegen::alias_analysis::AliasAnalysis>::compute_block_input_states::{closure#1} 2919267
+qn_wasmtime_run;<cranelift_codegen::alias_analysis::AliasAnalysis>::new 5870344
+qn_wasmtime_run;<cranelift_codegen::alias_analysis::LastStores>::update 11254663
+qn_wasmtime_run;<cranelift_codegen::context::Context>::egraph_pass::<&dyn cranelift_codegen::isa::TargetIsa> 2888879
+qn_wasmtime_run;<cranelift_codegen::context::Context>::optimize 35026094
+qn_wasmtime_run;<cranelift_codegen::dominator_tree::DominatorTree>::compute_domtree_preorder 5537924
+qn_wasmtime_run;<cranelift_codegen::egraph::EgraphPass>::run 93349765
+qn_wasmtime_run;<cranelift_codegen::egraph::EgraphPass>::run;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 2902596
+qn_wasmtime_run;<cranelift_codegen::egraph::GVNContext as cranelift_codegen::ctxhash::CtxHash< 5984005
+qn_wasmtime_run;<cranelift_codegen::egraph::OptimizeCtx>::insert_pure_enode 75116892
+qn_wasmtime_run;<cranelift_codegen::egraph::OptimizeCtx>::insert_pure_enode;[unknown] 3052661
+qn_wasmtime_run;<cranelift_codegen::egraph::OptimizeCtx>::insert_pure_enode;[unknown];[unknown];[unknown] 2998393
+qn_wasmtime_run;<cranelift_codegen::egraph::cost::Cost>::of_opcode 5844904
+qn_wasmtime_run;<cranelift_codegen::egraph::elaborate::Elaborator>::elaborate 46356790
+qn_wasmtime_run;<cranelift_codegen::flowgraph::ControlFlowGraph>::add_edge 2759749
+qn_wasmtime_run;<cranelift_codegen::ir::builder::InsertBuilder<&mut cranelift_codegen::cursor::FuncCursor> as cranelift_codegen::ir::builder::InstBuilder>::UnaryImm 5875904
+qn_wasmtime_run;<cranelift_codegen::ir::builder::InsertBuilder<&mut cranelift_codegen::cursor::FuncCursor> as cranelift_codegen::ir::builder::InstBuilder>::iadd 2941434
+qn_wasmtime_run;<cranelift_codegen::ir::builder::InsertBuilder<&mut cranelift_codegen::cursor::FuncCursor> as cranelift_codegen::ir::builder::InstBuilder>::uextend 11699562
+qn_wasmtime_run;<cranelift_codegen::ir::dfg::DataFlowGraph>::clone_inst 5915009
+qn_wasmtime_run;<cranelift_codegen::ir::dfg::DataFlowGraph>::ctrl_typevar 5880492
+qn_wasmtime_run;<cranelift_codegen::ir::dfg::DataFlowGraph>::inst_values 12168759
+qn_wasmtime_run;<cranelift_codegen::ir::dfg::DataFlowGraph>::make_inst_results 13136150
+qn_wasmtime_run;<cranelift_codegen::ir::dfg::DataFlowGraph>::non_tail_call_or_try_call_signature 3037757
+qn_wasmtime_run;<cranelift_codegen::ir::dfg::DataFlowGraph>::value_def 26054654
+qn_wasmtime_run;<cranelift_codegen::ir::function::FunctionStencil>::special_param 5903622
+qn_wasmtime_run;<cranelift_codegen::ir::instructions::InstructionData>::analyze_call 2919561
+qn_wasmtime_run;<cranelift_codegen::ir::instructions::InstructionData>::arguments 11648811
+qn_wasmtime_run;<cranelift_codegen::ir::layout::Layout>::append_inst 2996351
+qn_wasmtime_run;<cranelift_codegen::ir::memflags::AliasRegionSet>::insert 2946336
+qn_wasmtime_run;<cranelift_codegen::ir::memflags::MemFlagsSet>::insert 9035614
+qn_wasmtime_run;<cranelift_codegen::isa::unwind::systemv::UnwindInfo>::to_fde 4962004
+qn_wasmtime_run;<cranelift_codegen::isa::x64::X64Backend as cranelift_codegen::isa::TargetIsa>::compile_function 17733136
+qn_wasmtime_run;<cranelift_codegen::isa::x64::X64Backend as cranelift_codegen::isa::TargetIsa>::default_argument_extension 2917606
+qn_wasmtime_run;<cranelift_codegen::isa::x64::abi::X64ABIMachineSpec as cranelift_codegen::machinst::abi::ABIMachineSpec>::compute_arg_locs 2974397
+qn_wasmtime_run;<cranelift_codegen::isa::x64::abi::X64ABIMachineSpec as cranelift_codegen::machinst::abi::ABIMachineSpec>::gen_clobber_save 3200207
+qn_wasmtime_run;<cranelift_codegen::isa::x64::inst::args::GprMem8>::unwrap_new 5230468
+qn_wasmtime_run;<cranelift_codegen::isa::x64::inst::args::GprMemImm64>::unwrap_new 2889978
+qn_wasmtime_run;<cranelift_codegen::isa::x64::inst::external::AsmCodeSink as cranelift_assembler_x64::api::CodeSink>::put4 2830803
+qn_wasmtime_run;<cranelift_codegen::isa::x64::inst::external::RegallocVisitor<cranelift_codegen::machinst::reg::OperandCollector<<cranelift_codegen::machinst::vcode::VCodeBuilder<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::collect_operands::{closure#0}>> as cranelift_assembler_x64::api::RegisterVisitor<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::write_gpr 5642337
+qn_wasmtime_run;<cranelift_codegen::isa::x64::lower::isle::generated_code::CondResult as core::clone::Clone>::clone 2750286
+qn_wasmtime_run;<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst as core::clone::Clone>::clone 5651359
+qn_wasmtime_run;<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst as cranelift_codegen::machinst::MachInst>::gen_nop_units;__libc_malloc2;_int_malloc 3031558
+qn_wasmtime_run;<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst as cranelift_codegen::machinst::MachInst>::rc_for_type 2837636
+qn_wasmtime_run;<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>::load::<cranelift_codegen::isa::x64::lower::isle::generated_code::Amode> 5884269
+qn_wasmtime_run;<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>::store::<cranelift_codegen::isa::x64::lower::isle::generated_code::Amode> 2911308
+qn_wasmtime_run;<cranelift_codegen::machinst::abi::SigSet>::from_func_sig::<cranelift_codegen::isa::x64::abi::X64ABIMachineSpec> 5928705
+qn_wasmtime_run;<cranelift_codegen::machinst::abi::SigSet>::make_abi_sig_from_ir_signature::<cranelift_codegen::isa::x64::abi::X64ABIMachineSpec> 2890550
+qn_wasmtime_run;<cranelift_codegen::machinst::blockorder::BlockLoweringOrder>::new 20461404
+qn_wasmtime_run;<cranelift_codegen::machinst::buffer::MachBuffer<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::add_uncond_branch 3069856
+qn_wasmtime_run;<cranelift_codegen::machinst::buffer::MachBuffer<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::emit_island_maybe_forced 17646484
+qn_wasmtime_run;<cranelift_codegen::machinst::buffer::MachBuffer<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::finish 2581047
+qn_wasmtime_run;<cranelift_codegen::machinst::buffer::MachBuffer<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::finish;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 2915159
+qn_wasmtime_run;<cranelift_codegen::machinst::buffer::MachTextSectionBuilder<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst> as cranelift_codegen::machinst::TextSectionBuilder>::append 1870531
+qn_wasmtime_run;<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend> as cranelift_codegen::isa::x64::lower::isle::generated_code::Context>::def_inst 2934100
+qn_wasmtime_run;<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend> as cranelift_codegen::isa::x64::lower::isle::generated_code::Context>::emit 19939867
+qn_wasmtime_run;<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend> as cranelift_codegen::isa::x64::lower::isle::generated_code::Context>::emit;__libc_malloc2;_int_malloc 2493654
+qn_wasmtime_run;<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend> as cranelift_codegen::isa::x64::lower::isle::generated_code::Context>::fits_in_64 2641940
+qn_wasmtime_run;<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend> as cranelift_codegen::isa::x64::lower::isle::generated_code::Context>::func_ref_data 2919069
+qn_wasmtime_run;<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend> as cranelift_codegen::isa::x64::lower::isle::generated_code::Context>::gen_call_rets 1482811
+qn_wasmtime_run;<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend> as cranelift_codegen::isa::x64::lower::isle::generated_code::Context>::i64_from_iconst 5775655
+qn_wasmtime_run;<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend> as cranelift_codegen::isa::x64::lower::isle::generated_code::Context>::inst_data_value 3049503
+qn_wasmtime_run;<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend> as cranelift_codegen::isa::x64::lower::isle::generated_code::Context>::sinkable_load_32 2917185
+qn_wasmtime_run;<cranelift_codegen::machinst::lower::Lower<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::finish_ir_inst 21749447
+qn_wasmtime_run;<cranelift_codegen::machinst::lower::Lower<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::get_value_as_source_or_const 14909044
+qn_wasmtime_run;<cranelift_codegen::machinst::lower::Lower<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::lower::<cranelift_codegen::isa::x64::X64Backend> 47987409
+qn_wasmtime_run;<cranelift_codegen::machinst::lower::Lower<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::put_value_in_regs 11333281
+qn_wasmtime_run;<cranelift_codegen::machinst::reg::OperandCollector<<cranelift_codegen::machinst::vcode::VCodeBuilder<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>::collect_operands::{closure#0}> as cranelift_codegen::machinst::reg::OperandVisitor>::add_operand 26379419
+qn_wasmtime_run;<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst> as regalloc2::Function>::block_preds 5532631
+qn_wasmtime_run;<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst> as regalloc2::Function>::block_succs 2672914
+qn_wasmtime_run;<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst> as regalloc2::Function>::inst_clobbers 5669139
+qn_wasmtime_run;<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst> as regalloc2::Function>::inst_operands 36212381
+qn_wasmtime_run;<cranelift_codegen::machinst::vcode::VRegAllocator<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::alloc 20161426
+qn_wasmtime_run;<cranelift_codegen::machinst::vcode::VRegAllocator<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::alloc_with_deferred_error 3071245
+qn_wasmtime_run;<cranelift_codegen::opts::InstDataEtorIter as cranelift_codegen::opts::generated_code::ContextIter>::next 6005486
+qn_wasmtime_run;<cranelift_codegen::scoped_hash_map::ScopedHashMap<cranelift_codegen::ir::entities::Value, cranelift_codegen::egraph::elaborate::ElaboratedValue>>::insert_if_absent_with_depth::<cranelift_codegen::ctxhash::NullCtx> 2972484
+qn_wasmtime_run;<cranelift_codegen::settings::Builder>::lookup 989286
+qn_wasmtime_run;<cranelift_codegen::timing::DefaultProfiler as cranelift_codegen::timing::Profiler>::start_pass;now;cvt<i32>;is_minus_one;__clock_gettime;__vdso_clock_gettime 1103169
+qn_wasmtime_run;<cranelift_entity::list::EntityList<cranelift_codegen::ir::entities::Value>>::push 5816213
+qn_wasmtime_run;<cranelift_entity::list::ListPool<cranelift_codegen::ir::entities::Value>>::free 2913438
+qn_wasmtime_run;<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Block, core::ops::range::Range<usize>>>::resize_for_index_mut 2923264
+qn_wasmtime_run;<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Block, cranelift_codegen::remove_constant_phis::BlockSummary>>::resize_for_index_mut 2805959
+qn_wasmtime_run;<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Block, cranelift_entity::packed_option::PackedOption<cranelift_codegen::ir::entities::Value>>>::resize_for_index_mut 8626720
+qn_wasmtime_run;<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Block, cranelift_frontend::ssa::SSABlockData>>::resize_for_index_mut 5705111
+qn_wasmtime_run;<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Block, smallvec::SmallVec<[cranelift_frontend::variable::Variable: 6]>>>::try_insert 2835665
+qn_wasmtime_run;<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Inst, cranelift_codegen::ir::layout::InstNode>>::resize_for_index_mut 7405126
+qn_wasmtime_run;<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Inst, cranelift_codegen::ir::sourceloc::RelSourceLoc>>::resize_for_index_mut 2820402
+qn_wasmtime_run;<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::UserExternalNameRef, cranelift_entity::packed_option::PackedOption<cranelift_codegen::ir::entities::UserExternalNameRef>>>::resize_for_index_mut 8443616
+qn_wasmtime_run;<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Value, cranelift_codegen::machinst::lower::ValueUseState>>::resize_for_index_mut 2926972
+qn_wasmtime_run;<cranelift_entity::map::SecondaryMap<wasmtime_environ::types::MemoryIndex, cranelift_entity::packed_option::PackedOption<wasmtime_internal_cranelift::translate::heap::Heap>>>::resize_for_index_mut 2839092
+qn_wasmtime_run;<cranelift_frontend::frontend::FuncInstBuilder as cranelift_codegen::ir::builder::InstBuilder>::select 2963622
+qn_wasmtime_run;<cranelift_frontend::frontend::FuncInstBuilder as cranelift_codegen::ir::builder::InstBuilderBase>::build 11845591
+qn_wasmtime_run;<cranelift_frontend::frontend::FuncInstBuilder as cranelift_codegen::ir::builder::InstBuilderBase>::build;<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Value, cranelift_codegen::machinst::valueregs::ValueRegs<cranelift_codegen::machinst::reg::Reg>>>::resize_for_index_mut 2693493
+qn_wasmtime_run;<cranelift_frontend::frontend::FunctionBuilder>::def_var 2930645
+qn_wasmtime_run;<cranelift_frontend::frontend::FunctionBuilder>::ensure_inserted_block 3077766
+qn_wasmtime_run;<cranelift_frontend::frontend::FunctionBuilder>::use_var 2857299
+qn_wasmtime_run;<cranelift_frontend::ssa::SSABuilder>::run_state_machine 3004508
+qn_wasmtime_run;<cranelift_frontend::ssa::SSABuilder>::use_var_nonlocal 46789968
+qn_wasmtime_run;<dyn cranelift_codegen::isa::TargetIsa>::pointer_type 2798665
+qn_wasmtime_run;<hashbrown::map::HashMap<cranelift_codegen::alias_analysis::MemoryLoc, cranelift_codegen::alias_analysis::KnownValue, rustc_hash::FxBuildHasher>>::insert 2974314
+qn_wasmtime_run;<hashbrown::map::HashMap<cranelift_codegen::ir::entities::Value, cranelift_codegen::remove_constant_phis::AbstractValue, rustc_hash::FxBuildHasher>>::insert 2894294
+qn_wasmtime_run;<hashbrown::map::HashMap<regalloc2::index::Block,  2998302
+qn_wasmtime_run;<hashbrown::map::HashMap<regalloc2::ion::data_structures::LiveRangeIndex,  2873147
+qn_wasmtime_run;<hashbrown::raw::RawTable< 61486839
+qn_wasmtime_run;<hashbrown::raw::RawTable<;[unknown];[unknown];[unknown] 2691480
+qn_wasmtime_run;<hashbrown::raw::RawTable<;__libc_malloc2;_int_malloc 2872506
+qn_wasmtime_run;<hashbrown::raw::RawTableInner>::fallible_with_capacity::<alloc::alloc::Global>;<smallvec::SmallVec<[cranelift_codegen::ir::types::Type: 16]> as core::iter::traits::collect::Extend<cranelift_codegen::ir::types::Type>>::extend::<<cranelift_codegen::ir::dfg::DataFlowGraph>::inst_result_types::InstResultTypes> 2856618
+qn_wasmtime_run;<object::write::string::StringTable>::add 3037117
+qn_wasmtime_run;<rayon_core::job::StackJob<rayon_core::latch::LatchRef<rayon_core::latch::LockLatch>, <rayon_core::registry::Registry>::in_worker_cold<rayon_core::join::join_context<rayon::iter::plumbing::bridge_producer_consumer::helper<rayon::vec::DrainProducer<alloc::boxed::Box<dyn for<a> core::ops::function::FnOnce<;<crossbeam_deque::deque::Stealer<rayon_core::job::JobRef>>::steal 2
+qn_wasmtime_run;<rayon_core::job::StackJob<rayon_core::latch::LatchRef<rayon_core::latch::LockLatch>, <rayon_core::registry::Registry>::in_worker_cold<rayon_core::join::join_context<rayon::iter::plumbing::bridge_producer_consumer::helper<rayon::vec::DrainProducer<alloc::boxed::Box<dyn for<a> core::ops::function::FnOnce<;<rayon_core::registry::WorkerThread>::wait_until_cold 1
+qn_wasmtime_run;<rayon_core::job::StackJob<rayon_core::latch::LatchRef<rayon_core::latch::LockLatch>, <rayon_core::registry::Registry>::in_worker_cold<rayon_core::join::join_context<rayon::iter::plumbing::bridge_producer_consumer::helper<rayon::vec::DrainProducer<alloc::boxed::Box<dyn for<a> core::ops::function::FnOnce<;__sched_yield;[unknown];[unknown];[unknown];[unknown];[unknown] 23494
+qn_wasmtime_run;<rayon_core::job::StackJob<rayon_core::latch::SpinLatch, rayon_core::join::join_context::call_b<rayon::iter::collect::consumer::CollectResult<core::result::Result<wasmtime::compile::CompileOutput, wasmtime_internal_core::error::error::Error>>, rayon::iter::plumbing::bridge_producer_consumer::helper<rayon::vec::DrainProducer<alloc::boxed::Box<dyn for<a> core::ops::function::FnOnce< 1
+qn_wasmtime_run;<rayon_core::registry::WorkerThread as core::convert::From<rayon_core::registry::ThreadBuilder>>::from;__libc_calloc2;thread_start;call_once<;[unknown] 6336
+qn_wasmtime_run;<rayon_core::registry::WorkerThread>::wait_until_cold 12
+qn_wasmtime_run;<regalloc2::cfg::CFGInfo>::init::<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>> 9697255
+qn_wasmtime_run;<regalloc2::indexset::IndexSet>::union_with 20421972
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::add_liverange_to_vreg 17709450
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::add_liverange_to_vreg;[unknown] 2594877
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::compute_requirement 11776512
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::get_or_create_spill_bundle 3034433
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::merge_bundle_properties 2810934
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::merge_bundles 11385672
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::recompute_bundle_properties 39211320
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::split_and_requeue_bundle 8184224
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::split_into_minimal_bundles 13248884
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::try_to_allocate_bundle_to_reg 23980295
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>>::init 197160419
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>>::insert_use_into_liverange 3005493
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>>::run 177370091
+qn_wasmtime_run;<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>>::run;_int_free_chunk;_int_free_merge_chunk 2971539
+qn_wasmtime_run;<regalloc2::ion::redundant_moves::RedundantMoveEliminator>::clear_alloc 2832132
+qn_wasmtime_run;<regalloc2::ion::redundant_moves::RedundantMoveEliminator>::process_move 23860701
+qn_wasmtime_run;<regalloc2::ion::reg_traversal::RegTraversalIter as core::iter::traits::iterator::Iterator>::next 37273066
+qn_wasmtime_run;<regalloc2::ion::reg_traversal::RegTraversalIter>::new 11413371
+qn_wasmtime_run;<regalloc2::moves::ParallelMoves<core::option::Option<regalloc2::VReg>>>::resolve 2879240
+qn_wasmtime_run;<smallvec::SmallVec<[cranelift_codegen::ir::entities::Value: 5]> as core::iter::traits::collect::Extend<cranelift_codegen::ir::entities::Value>>::extend::<core::option::Option<cranelift_codegen::ir::entities::Value>> 5807713
+qn_wasmtime_run;<smallvec::SmallVec<[cranelift_codegen::ir::types::Type: 16]> as core::iter::traits::collect::Extend<cranelift_codegen::ir::types::Type>>::extend::<<cranelift_codegen::ir::dfg::DataFlowGraph>::inst_result_types::InstResultTypes> 3034234
+qn_wasmtime_run;<smallvec::SmallVec<[cranelift_codegen::isa::x64::lower::isle::generated_code::MInst: 4]> as core::iter::traits::collect::Extend<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::extend::<smallvec::SmallVec<[cranelift_codegen::isa::x64::lower::isle::generated_code::MInst: 4]>> 2731745
+qn_wasmtime_run;<smallvec::SmallVec<[cranelift_codegen::isa::x64::lower::isle::generated_code::MInst: 4]>>::try_grow;__libc_malloc2;_int_malloc 2852540
+qn_wasmtime_run;<smallvec::SmallVec<[cranelift_codegen::machinst::abi::CallRetPair: 8]> as core::iter::traits::collect::Extend<cranelift_codegen::machinst::abi::CallRetPair>>::extend::<core::iter::adapters::cloned::Cloned<core::slice::iter::Iter<cranelift_codegen::machinst::abi::CallRetPair>>> 2911767
+qn_wasmtime_run;<smallvec::SmallVec<[cranelift_codegen::machinst::buffer::MachLabel: 4]> as core::iter::traits::collect::Extend<cranelift_codegen::machinst::buffer::MachLabel>>::extend::<core::iter::adapters::cloned::Cloned<core::slice::iter::Iter<cranelift_codegen::machinst::buffer::MachLabel>>> 11696993
+qn_wasmtime_run;<smallvec::SmallVec<[cranelift_codegen::machinst::buffer::MachLabelFixup<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>: 16]>>::reserve_one_unchecked;__libc_realloc;__memmove_avx_unaligned_erms;[unknown] 2243234
+qn_wasmtime_run;<smallvec::SmallVec<[regalloc2::Allocation: 4]>>::reserve_one_unchecked 2926777
+qn_wasmtime_run;<smallvec::SmallVec<[regalloc2::index::Block: 16]>>::try_grow;__libc_realloc;_int_realloc;_int_malloc 2957081
+qn_wasmtime_run;<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&cranelift_codegen::ir::ValueLabel> 2952105
+qn_wasmtime_run;<std::hash::random::RandomState as core::hash::BuildHasher>::hash_one::<&cranelift_codegen::ir::extname::UserExternalName> 2765553
+qn_wasmtime_run;<std::thread::local::LocalKey<rayon_core::latch::LockLatch>>::with::<<rayon_core::registry::Registry>::in_worker_cold<rayon_core::join::join_context<rayon::iter::plumbing::bridge_producer_consumer::helper<rayon::vec::DrainProducer<alloc::boxed::Box<dyn for<a> core::ops::function::FnOnce< 1
+qn_wasmtime_run;<tokio::runtime::blocking::pool::Spawner>::spawn_task;[unknown];__pthread_create_2_1;internal_signal_restore_set;create_thread;__clone3;[unknown] 1
+qn_wasmtime_run;<tokio::runtime::blocking::pool::Spawner>::spawn_task;new;__pthread_create_2_1;allocate_stack;create_thread;__clone3;[unknown] 2
+qn_wasmtime_run;<tokio::runtime::blocking::pool::Spawner>::spawn_task;new;__pthread_create_2_1;internal_signal_restore_set;create_thread;__clone3 1
+qn_wasmtime_run;<tokio::runtime::blocking::pool::Spawner>::spawn_task;new;__pthread_create_2_1;internal_signal_restore_set;create_thread;__clone3;[unknown] 3
+qn_wasmtime_run;<wasmparser::binary_reader::BinaryReader>::read_memarg 8914626
+qn_wasmtime_run;<wasmparser::binary_reader::BinaryReader>::read_var_i32_big 3103562
+qn_wasmtime_run;<wasmparser::binary_reader::BinaryReader>::read_var_u32 2831286
+qn_wasmtime_run;<wasmparser::binary_reader::BinaryReader>::visit_operator::<wasmparser::readers::core::operators::FrameStackAdapter<wasmparser::readers::core::operators::OperatorFactory>> 26530106
+qn_wasmtime_run;<wasmparser::readers::core::operators::FrameStackAdapter<wasmparser::readers::core::operators::OperatorFactory> as wasmparser::readers::core::operators::VisitOperator>::visit_block 3072701
+qn_wasmtime_run;<wasmparser::readers::core::operators::Operator>::operator_arity::<wasmparser::validator::func::FuncValidator<wasmparser::validator::core::ValidatorResources>> 7852040
+qn_wasmtime_run;<wasmparser::validator::operators::OperatorValidatorTemp<wasmparser::validator::core::ValidatorResources>>::check_binary_op 3087862
+qn_wasmtime_run;<wasmparser::validator::operators::OperatorValidatorTemp<wasmparser::validator::core::ValidatorResources>>::label_types 3086452
+qn_wasmtime_run;<wasmparser::validator::operators::WasmProposalValidator<wasmparser::validator::core::ValidatorResources> as wasmparser::readers::core::operators::VisitOperator>::visit_br 2903253
+qn_wasmtime_run;<wasmparser::validator::operators::WasmProposalValidator<wasmparser::validator::core::ValidatorResources> as wasmparser::readers::core::operators::VisitOperator>::visit_end 5719996
+qn_wasmtime_run;<wasmparser::validator::operators::WasmProposalValidator<wasmparser::validator::core::ValidatorResources> as wasmparser::readers::core::operators::VisitOperator>::visit_local_get 5674683
+qn_wasmtime_run;<wasmparser::validator::operators::WasmProposalValidator<wasmparser::validator::core::ValidatorResources> as wasmparser::readers::core::operators::VisitOperator>::visit_local_set 2970221
+qn_wasmtime_run;<wasmparser::validator::operators::WasmProposalValidator<wasmparser::validator::core::ValidatorResources> as wasmparser::readers::core::operators::VisitOperator>::visit_operator 8770127
+qn_wasmtime_run;<wasmtime::compile::CompileInputs>::compile 1086832
+qn_wasmtime_run;<wasmtime::compile::CompileInputs>::compile;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 1802
+qn_wasmtime_run;<wasmtime::runtime::func::HostFunc>::array_call_trampoline::<wasmtime_c_api::store::WasmtimeStoreData, <wasmtime::runtime::func::HostFunc>::wrap<wasmtime_c_api::store::WasmtimeStoreData, <wasmtime_wasi::p1::sync::add_wasi_snapshot_preview1_to_linker<wasmtime_c_api::store::WasmtimeStoreData, wasmtime_wasi::p1::WasiP1Ctx, wasmtime_c_api::linker::wasmtime_linker_define_wasi::{closure#0}>::{closure#10} as wasmtime::runtime::func::IntoFunc<wasmtime_c_api::store::WasmtimeStoreData, ;<std::sync::once::Once>::call_once_force::<<std::sync::lazy_lock::LazyLock<tokio::runtime::runtime::Runtime>>::force::{closure#0}>::{closure#0};<tokio::runtime::blocking::pool::Spawner>::spawn_task;new;drop_glue<core::mem::drop_guard::DropGuard<&mut core::mem::maybe_uninit::MaybeUninit<libc::unix::linux_like::linux::gnu::b64::x86_64::pthread_attr_t>, std::sys::thread::unix::{impl#2}::new::{closure_env#0}>>;drop<&mut core::mem::maybe_uninit::MaybeUninit<libc::unix::linux_like::linux::gnu::b64::x86_64::pthread_attr_t>, std::sys::thread::unix::{impl#2}::new::{closure_env#0}>;{closure#0};__pthread_create_2_1;internal_signal_restore_set;create_thread;__clone3;[unknown] 1
+qn_wasmtime_run;<wasmtime_environ::key::FuncKey>::from_raw_parts 2295802
+qn_wasmtime_run;<wasmtime_environ::key::FuncKey>::into_parts 2780800
+qn_wasmtime_run;<wasmtime_environ::types::WasmSubType as core::hash::Hash>::hash_slice::<std::hash::random::DefaultHasher> 2593729
+qn_wasmtime_run;<wasmtime_internal_cranelift::alias_region::AliasRegions<u8>>::region 2932450
+qn_wasmtime_run;<wasmtime_internal_cranelift::alias_region::AliasRegions<u8>>::region;format_inner;expect<;<wasmtime_internal_cranelift::alias_region::AliasRegionKey as core::fmt::Debug>::fmt;write;branch<;write_str;push_str;extend_from_slice<u8, alloc::alloc::Global>;spec_extend<u8, alloc::alloc::Global>;append_elements<u8, alloc::alloc::Global>;copy_nonoverlapping<u8> 2814874
+qn_wasmtime_run;<wasmtime_internal_cranelift::alias_region::AliasRegions<wasmtime_environ::vmoffsets::VMOffsets<u8>>>::region 2947840
+qn_wasmtime_run;<wasmtime_internal_cranelift::alias_region::AliasRegions<wasmtime_environ::vmoffsets::VMOffsets<u8>>>::region;format_inner;expect<;<wasmtime_internal_cranelift::alias_region::AliasRegionKey as core::fmt::Debug>::fmt;write;add<core::fmt::rt::Argument> 2731864
+qn_wasmtime_run;<wasmtime_internal_cranelift::compiled_function::CompiledFunction>::set_address_map 5589522
+qn_wasmtime_run;<wasmtime_internal_cranelift::compiler::Compiler as wasmtime_environ::compile::Compiler>::append_code 2334284
+qn_wasmtime_run;<wasmtime_internal_cranelift::compiler::Compiler>::function_compiler 2769608
+qn_wasmtime_run;<wasmtime_internal_cranelift::compiler::Compiler>::store_values_to_array::<u8> 636726
+qn_wasmtime_run;<wasmtime_internal_cranelift::compiler::FunctionCompiler>::finish_with_info 8554234
+qn_wasmtime_run;<wasmtime_internal_cranelift::func_environ::Call>::exception_table 2684703
+qn_wasmtime_run;<wasmtime_internal_cranelift::func_environ::FuncEnvironment>::emit_global_set 5905093
+qn_wasmtime_run;<wasmtime_internal_cranelift::func_environ::FuncEnvironment>::handle_before_return 3184313
+qn_wasmtime_run;<wasmtime_internal_cranelift::func_environ::FuncEnvironment>::table_get_funcref 2886581
+qn_wasmtime_run;<wasmtime_internal_cranelift::translate::func_translator::FuncTranslator>::translate_body::<wasmparser::validator::core::ValidatorResources> 29842289
+qn_wasmtime_run;<wasmtime_internal_cranelift::translate::func_translator::FuncTranslator>::translate_body::<wasmparser::validator::core::ValidatorResources>;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 2961792
+qn_wasmtime_run;[unknown];<<cranelift_codegen::ir::dfg::DataFlowGraph>::inst_result_types::InstResultTypes as core::iter::traits::iterator::Iterator>::next 5977664
+qn_wasmtime_run;[unknown];<<wasmtime::compile::code_builder::CodeBuilder>::compile_module::{closure#0} as core::ops::function::FnOnce<;[unknown];[unknown];[unknown];[unknown] 1139232
+qn_wasmtime_run;[unknown];<alloc::collections::binary_heap::BinaryHeap<regalloc2::ion::data_structures::PrioQueueEntry>>::pop 2793329
+qn_wasmtime_run;[unknown];<alloc::collections::btree::map::BTreeMap<regalloc2::ion::data_structures::LiveRangeKey, regalloc2::ion::data_structures::LiveRangeIndex>>::range::<regalloc2::ion::data_structures::LiveRangeKey, core::ops::range::RangeFrom<regalloc2::ion::data_structures::LiveRangeKey>> 23527066
+qn_wasmtime_run;[unknown];<alloc::collections::btree::map::BTreeMap<wasmparser::validator::types::CoreTypeId, wasmparser::collections::index_map::detail::SlotIndex> as core::ops::drop::Drop>::drop 37479535
+qn_wasmtime_run;[unknown];<alloc::collections::btree::map::BTreeMap<wasmparser::validator::types::CoreTypeId, wasmparser::collections::index_map::detail::SlotIndex> as core::ops::drop::Drop>::drop;_int_free_chunk;_int_free_merge_chunk 2966214
+qn_wasmtime_run;[unknown];<alloc::collections::btree::map::BTreeMap<wasmparser::validator::types::CoreTypeId, wasmparser::collections::index_map::detail::SlotIndex> as core::ops::drop::Drop>::drop;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 5823378
+qn_wasmtime_run;[unknown];<alloc::collections::btree::map::BTreeMap<wasmparser::validator::types::CoreTypeId, wasmparser::collections::index_map::detail::SlotIndex> as core::ops::drop::Drop>::drop;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk;unlink_chunk 2732512
+qn_wasmtime_run;[unknown];<alloc::collections::btree::map::IntoIter<wasmtime_environ::key::FuncKey, wasmtime::compile::CompileOutput>>::dying_next;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 1164395
+qn_wasmtime_run;[unknown];<alloc::vec::Vec< 10679290
+qn_wasmtime_run;[unknown];<cranelift_assembler_x64::inst::Inst<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 11573915
+qn_wasmtime_run;[unknown];<cranelift_assembler_x64::inst::Inst<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::visit::<cranelift_codegen::isa::x64::inst::external::RegallocVisitor<<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::emit::{closure#3}>> 5938515
+qn_wasmtime_run;[unknown];<cranelift_assembler_x64::inst::addq_mi_sxb<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 2871709
+qn_wasmtime_run;[unknown];<cranelift_assembler_x64::inst::addq_rm<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 2967970
+qn_wasmtime_run;[unknown];<cranelift_assembler_x64::inst::movl_rm<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 2870607
+qn_wasmtime_run;[unknown];<cranelift_assembler_x64::inst::movq_mr<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 8654514
+qn_wasmtime_run;[unknown];<cranelift_assembler_x64::inst::movq_rm<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 2729843
+qn_wasmtime_run;[unknown];<cranelift_assembler_x64::inst::testl_mr<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 2852112
+qn_wasmtime_run;[unknown];<cranelift_assembler_x64::inst::testq_mr<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::encode::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 2943423
+qn_wasmtime_run;[unknown];<cranelift_assembler_x64::mem::GprMem<cranelift_codegen::isa::x64::inst::external::PairedGpr, cranelift_codegen::isa::x64::inst::args::Gpr>>::encode_rex_suffixes::<cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 2940267
+qn_wasmtime_run;[unknown];<cranelift_bforest::pool::NodePool<cranelift_bforest::map::MapTypes<cranelift_codegen::ir::entities::Inst, cranelift_codegen::ir::entities::Block>>>::alloc_node 2713984
+qn_wasmtime_run;[unknown];<cranelift_bitset::compound::CompoundBitSet>::insert 14335326
+qn_wasmtime_run;[unknown];<cranelift_codegen::alias_analysis::AliasAnalysis>::new 3044447
+qn_wasmtime_run;[unknown];<cranelift_codegen::alias_analysis::LastStores>::update 27751395
+qn_wasmtime_run;[unknown];<cranelift_codegen::context::Context>::compile_stencil 2890006
+qn_wasmtime_run;[unknown];<cranelift_codegen::context::Context>::egraph_pass::<&dyn cranelift_codegen::isa::TargetIsa> 11407396
+qn_wasmtime_run;[unknown];<cranelift_codegen::context::Context>::optimize 2818975
+qn_wasmtime_run;[unknown];<cranelift_codegen::dominator_tree::DominatorTree>::compute 3051388
+qn_wasmtime_run;[unknown];<cranelift_codegen::egraph::EgraphPass>::run 11822869
+qn_wasmtime_run;[unknown];<cranelift_codegen::egraph::EgraphPass>::run;__libc_malloc2;_int_malloc 2608927
+qn_wasmtime_run;[unknown];<cranelift_codegen::egraph::EgraphPass>::run;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 2965587
+qn_wasmtime_run;[unknown];<cranelift_codegen::egraph::OptimizeCtx>::insert_pure_enode 12098499
+qn_wasmtime_run;[unknown];<cranelift_codegen::egraph::elaborate::Elaborator>::elaborate 158512267
+qn_wasmtime_run;[unknown];<cranelift_codegen::egraph::elaborate::Elaborator>::elaborate;_int_free_chunk;_int_free_merge_chunk 2881532
+qn_wasmtime_run;[unknown];<cranelift_codegen::ir::dfg::DataFlowGraph>::inst_values 25709820
+qn_wasmtime_run;[unknown];<cranelift_codegen::ir::dfg::DataFlowGraph>::make_inst_results 5650028
+qn_wasmtime_run;[unknown];<cranelift_codegen::ir::dfg::DataFlowGraph>::remove_block_param 2969228
+qn_wasmtime_run;[unknown];<cranelift_codegen::ir::dfg::DataFlowGraph>::value_def 50056917
+qn_wasmtime_run;[unknown];<cranelift_codegen::ir::instructions::InstructionData>::arguments 19389502
+qn_wasmtime_run;[unknown];<cranelift_codegen::ir::instructions::OperandConstraint>::resolve 14007648
+qn_wasmtime_run;[unknown];<cranelift_codegen::ir::layout::Layout>::assign_inst_seq 11674109
+qn_wasmtime_run;[unknown];<cranelift_codegen::isa::x64::X64Backend as cranelift_codegen::isa::TargetIsa>::compile_function 61639613
+qn_wasmtime_run;[unknown];<cranelift_codegen::isa::x64::X64Backend as cranelift_codegen::isa::TargetIsa>::compile_function;_int_free_chunk;_int_free_maybe_trim 2965387
+qn_wasmtime_run;[unknown];<cranelift_codegen::isa::x64::abi::X64ABIMachineSpec as cranelift_codegen::machinst::abi::ABIMachineSpec>::gen_load_stack 8889233
+qn_wasmtime_run;[unknown];<cranelift_codegen::isa::x64::inst::emit_state::EmitState as cranelift_codegen::machinst::MachInstEmitState<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::take_ctrl_plane 2962821
+qn_wasmtime_run;[unknown];<cranelift_codegen::isa::x64::inst::external::RegallocVisitor<<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::emit::{closure#3}> as cranelift_assembler_x64::api::RegisterVisitor<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::read_gpr_mem 5782051
+qn_wasmtime_run;[unknown];<cranelift_codegen::isa::x64::inst::external::RegallocVisitor<<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::emit::{closure#3}> as cranelift_assembler_x64::api::RegisterVisitor<cranelift_codegen::isa::x64::inst::external::CraneliftRegisters>>::read_write_gpr 2980031
+qn_wasmtime_run;[unknown];<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst as cranelift_codegen::machinst::MachInst>::rc_for_type 11308673
+qn_wasmtime_run;[unknown];<cranelift_codegen::machinst::abi::Callee<cranelift_codegen::isa::x64::abi::X64ABIMachineSpec>>::gen_call_args 5844621
+qn_wasmtime_run;[unknown];<cranelift_codegen::machinst::blockorder::BlockLoweringOrder>::new 5824390
+qn_wasmtime_run;[unknown];<cranelift_codegen::machinst::buffer::MachBuffer<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::finish 5890386
+qn_wasmtime_run;[unknown];<cranelift_codegen::machinst::buffer::MachBuffer<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::optimize_branches 23440194
+qn_wasmtime_run;[unknown];<cranelift_codegen::machinst::lower::Lower<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::lower::<cranelift_codegen::isa::x64::X64Backend> 53728439
+qn_wasmtime_run;[unknown];<cranelift_codegen::machinst::reg::OperandCollector<<cranelift_codegen::machinst::vcode::VCodeBuilder<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>::collect_operands::{closure#0}> as cranelift_codegen::machinst::reg::OperandVisitor>::add_operand 11875120
+qn_wasmtime_run;[unknown];<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst> as regalloc2::Function>::block_params 2989901
+qn_wasmtime_run;[unknown];<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst> as regalloc2::Function>::block_preds 2950181
+qn_wasmtime_run;[unknown];<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst> as regalloc2::Function>::inst_clobbers 2240147
+qn_wasmtime_run;[unknown];<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::emit::{closure#0} 5886949
+qn_wasmtime_run;[unknown];<cranelift_codegen::opts::InstDataEtorIter as cranelift_codegen::opts::generated_code::ContextIter>::next 68017841
+qn_wasmtime_run;[unknown];<cranelift_entity::list::EntityList<cranelift_codegen::ir::entities::Value>>::grow 4619372
+qn_wasmtime_run;[unknown];<cranelift_entity::list::EntityList<cranelift_codegen::ir::entities::Value>>::push;[unknown] 69205
+qn_wasmtime_run;[unknown];<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::GlobalValue, u32>>::resize_for_index_mut 2847064
+qn_wasmtime_run;[unknown];<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Value, cranelift_codegen::egraph::elaborate::BestEntry>>::resize_for_index_mut 5887116
+qn_wasmtime_run;[unknown];<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Value, u8>>::resize_for_index_mut 3063261
+qn_wasmtime_run;[unknown];<cranelift_frontend::ssa::SSABuilder>::run_state_machine 20744665
+qn_wasmtime_run;[unknown];<hashbrown::map::HashMap<regalloc2::index::Block,  53974781
+qn_wasmtime_run;[unknown];<hashbrown::map::HashMap<usize, regalloc2::Operand, core::hash::BuildHasherDefault<rustc_hash::FxHasher>>>::insert 2969587
+qn_wasmtime_run;[unknown];<hashbrown::raw::RawTable< 1236786
+qn_wasmtime_run;[unknown];<hashbrown::raw::RawTable<;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 1475514
+qn_wasmtime_run;[unknown];<rayon_core::latch::LockLatch>::wait_and_reset 2
+qn_wasmtime_run;[unknown];<rayon_core::sleep::Sleep>::sleep::<<rayon_core::registry::WorkerThread>::wait_until_cold::{closure#0}> 2
+qn_wasmtime_run;[unknown];<regalloc2::cfg::CFGInfo>::init::<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>> 5691010
+qn_wasmtime_run;[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::add_liverange_to_vreg 8540575
+qn_wasmtime_run;[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::merge_bundle_requirements 3010383
+qn_wasmtime_run;[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::merge_bundles 2904645
+qn_wasmtime_run;[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::recompute_bundle_properties 2963425
+qn_wasmtime_run;[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::try_to_allocate_bundle_to_reg 111936783
+qn_wasmtime_run;[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>>::init 128014218
+qn_wasmtime_run;[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>>::insert_use_into_liverange 30280756
+qn_wasmtime_run;[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>>::run 28352086
+qn_wasmtime_run;[unknown];<regalloc2::ion::redundant_moves::RedundantMoveEliminator>::clear_alloc 11691392
+qn_wasmtime_run;[unknown];<regalloc2::moves::ParallelMoves<core::option::Option<regalloc2::VReg>>>::resolve 2974869
+qn_wasmtime_run;[unknown];<smallvec::SmallVec<[cranelift_codegen::ir::types::Type: 16]> as core::iter::traits::collect::Extend<cranelift_codegen::ir::types::Type>>::extend::<<cranelift_codegen::ir::dfg::DataFlowGraph>::inst_result_types::InstResultTypes> 11643183
+qn_wasmtime_run;[unknown];<smallvec::SmallVec<[cranelift_codegen::isa::x64::lower::isle::generated_code::MInst: 4]> as core::iter::traits::collect::Extend<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::extend::<smallvec::SmallVec<[cranelift_codegen::isa::x64::lower::isle::generated_code::MInst: 16]>> 3087459
+qn_wasmtime_run;[unknown];<smallvec::SmallVec<[cranelift_codegen::machinst::buffer::MachLabel: 16]>>::resize 2646520
+qn_wasmtime_run;[unknown];<smallvec::SmallVec<[regalloc2::index::Block: 16]> as core::iter::traits::collect::Extend<regalloc2::index::Block>>::extend::<smallvec::SmallVec<[regalloc2::index::Block: 16]>> 3027873
+qn_wasmtime_run;[unknown];<smallvec::SmallVec<[u8: 8]> as core::iter::traits::collect::Extend<u8>>::extend::<core::iter::adapters::cloned::Cloned<core::slice::iter::Iter<u8>>> 2618120
+qn_wasmtime_run;[unknown];<wasmparser::validator::operators::OperatorValidatorTemp<wasmparser::validator::core::ValidatorResources>>::check_call_ty 8662514
+qn_wasmtime_run;[unknown];<wasmparser::validator::operators::OperatorValidatorTemp<wasmparser::validator::core::ValidatorResources>>::pop_ctrl 8856092
+qn_wasmtime_run;[unknown];<wasmtime::runtime::func::Func>::call_unchecked_raw::<wasmtime_c_api::store::WasmtimeStoreData>;[perf-2215178.map];[perf-2215178.map];[perf-2215178.map] 24784832
+qn_wasmtime_run;[unknown];<wasmtime::runtime::func::Func>::call_unchecked_raw::<wasmtime_c_api::store::WasmtimeStoreData>;[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map] 12725647
+qn_wasmtime_run;[unknown];<wasmtime::runtime::func::Func>::call_unchecked_raw::<wasmtime_c_api::store::WasmtimeStoreData>;[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map] 132226587
+qn_wasmtime_run;[unknown];<wasmtime::runtime::func::Func>::call_unchecked_raw::<wasmtime_c_api::store::WasmtimeStoreData>;[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map] 3235098
+qn_wasmtime_run;[unknown];<wasmtime::runtime::func::Func>::call_unchecked_raw::<wasmtime_c_api::store::WasmtimeStoreData>;[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map] 3582756
+qn_wasmtime_run;[unknown];<wasmtime::runtime::func::Func>::call_unchecked_raw::<wasmtime_c_api::store::WasmtimeStoreData>;[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map];[perf-2215178.map] 3650040
+qn_wasmtime_run;[unknown];<wasmtime_environ::key::FuncKey>::into_parts 2000619
+qn_wasmtime_run;[unknown];<wasmtime_environ::string_pool::StringPool>::insert;finish_grow<alloc::alloc::Global>;__libc_malloc2;_int_malloc 1150740
+qn_wasmtime_run;[unknown];<wasmtime_internal_core::alloc::vec::TryVec<cranelift_bitset::scalar::ScalarBitSet<usize>> as wasmtime_internal_core::alloc::try_collect::TryExtend<cranelift_bitset::scalar::ScalarBitSet<usize>>>::try_extend::<core::iter::adapters::take::Take<core::iter::sources::repeat::Repeat<cranelift_bitset::scalar::ScalarBitSet<usize>>>> 5977515
+qn_wasmtime_run;[unknown];<wasmtime_internal_cranelift::compiler::Compiler as wasmtime_environ::compile::Compiler>::append_code 3881254
+qn_wasmtime_run;[unknown];<wasmtime_internal_cranelift::compiler::Compiler as wasmtime_environ::compile::Compiler>::compiled_function_relocation_targets 308845
+qn_wasmtime_run;[unknown];<wasmtime_internal_cranelift::compiler::Compiler>::function_compiler;[unknown];[unknown];[unknown];[unknown];[unknown] 25776
+qn_wasmtime_run;[unknown];<wasmtime_internal_cranelift::func_environ::FuncEnvironment>::add_state_slot_local 65727
+qn_wasmtime_run;[unknown];[unknown];<<cranelift_codegen::ir::dfg::DataFlowGraph>::inst_result_types::InstResultTypes as core::iter::traits::iterator::Iterator>::next 2967424
+qn_wasmtime_run;[unknown];[unknown];<alloc::collections::binary_heap::BinaryHeap<regalloc2::ion::data_structures::PrioQueueEntry>>::pop 40902740
+qn_wasmtime_run;[unknown];[unknown];<alloc::vec::Vec<cranelift_entity::packed_option::PackedOption<cranelift_codegen::ir::entities::Inst>> as core::clone::Clone>::clone;__libc_malloc2;_int_malloc 3094693
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::alias_analysis::AliasAnalysis>::compute_block_input_states::{closure#1} 2810331
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::alias_analysis::AliasAnalysis>::new 6028833
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::context::Context>::optimize 5381528
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::ir::dfg::DataFlowGraph>::make_inst_results 14576144
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::ir::dfg::DataFlowGraph>::non_tail_call_or_try_call_signature 5857075
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::ir::instructions::BlockCall>::new::<core::iter::adapters::copied::Copied<core::slice::iter::Iter<cranelift_codegen::ir::instructions::BlockArg>>> 3074200
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::ir::instructions::InstructionData>::analyze_call 13585670
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::ir::instructions::OperandConstraint>::resolve 3053604
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::ir::layout::Layout>::assign_inst_seq 3029983
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::machinst::abi::Callee<cranelift_codegen::isa::x64::abi::X64ABIMachineSpec>>::gen_call_args 5932773
+qn_wasmtime_run;[unknown];[unknown];<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst> as regalloc2::Function>::inst_operands 11523706
+qn_wasmtime_run;[unknown];[unknown];<cranelift_entity::map::SecondaryMap<cranelift_codegen::ir::entities::Block, smallvec::SmallVec<[cranelift_frontend::variable::Variable: 6]>>>::try_insert 2900926
+qn_wasmtime_run;[unknown];[unknown];<cranelift_frontend::frontend::FuncInstBuilder as cranelift_codegen::ir::builder::InstBuilderBase>::build 8671903
+qn_wasmtime_run;[unknown];[unknown];<hashbrown::map::HashMap<cranelift_codegen::ir::entities::Block,  2888922
+qn_wasmtime_run;[unknown];[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::compute_requirement 29117837
+qn_wasmtime_run;[unknown];[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::split_and_requeue_bundle 5963243
+qn_wasmtime_run;[unknown];[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>>::run 56621128
+qn_wasmtime_run;[unknown];[unknown];<regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>>::run;_int_free_chunk;unlink_chunk 1966650
+qn_wasmtime_run;[unknown];[unknown];<regalloc2::ion::reg_traversal::RegTraversalIter>::new 2726751
+qn_wasmtime_run;[unknown];[unknown];<smallvec::SmallVec<[cranelift_codegen::ir::types::Type: 16]> as core::iter::traits::collect::Extend<cranelift_codegen::ir::types::Type>>::extend::<<cranelift_codegen::ir::dfg::DataFlowGraph>::inst_result_types::InstResultTypes> 11894038
+qn_wasmtime_run;[unknown];[unknown];<wasmtime::compile::FunctionIndices>::link_and_append_code;_int_free_chunk;_int_free_merge_chunk 2740290
+qn_wasmtime_run;[unknown];[unknown];<wasmtime_internal_cranelift::compiled_function::CompiledFunction>::new 2900721
+qn_wasmtime_run;[unknown];[unknown];<wasmtime_internal_cranelift::compiler::FunctionCompiler>::finish_with_info 3159556
+qn_wasmtime_run;[unknown];[unknown];<wasmtime_internal_cranelift::translate::func_translator::FuncTranslator>::translate_body::<wasmparser::validator::core::ValidatorResources> 87972
+qn_wasmtime_run;[unknown];[unknown];[unknown];<&<wasmtime::engine::Engine>::run_maybe_parallel<alloc::boxed::Box<dyn for<a> core::ops::function::FnOnce<;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 3078592
+qn_wasmtime_run;[unknown];[unknown];[unknown];<<wasmtime::compile::CompileInputs>::collect_inputs_in_translations<[ 2221
+qn_wasmtime_run;[unknown];[unknown];[unknown];[unknown];[unknown];<crossbeam_epoch::internal::Global>::try_advance 8120
+qn_wasmtime_run;[unknown];[unknown];[unknown];[unknown];[unknown];<rayon_core::registry::Registry>::new::<rayon_core::registry::DefaultSpawn>;new;drop_glue<core::mem::drop_guard::DropGuard<&mut core::mem::maybe_uninit::MaybeUninit<libc::unix::linux_like::linux::gnu::b64::x86_64::pthread_attr_t>, std::sys::thread::unix::{impl#2}::new::{closure_env#0}>>;drop<&mut core::mem::maybe_uninit::MaybeUninit<libc::unix::linux_like::linux::gnu::b64::x86_64::pthread_attr_t>, std::sys::thread::unix::{impl#2}::new::{closure_env#0}>;{closure#0};__pthread_create_2_1;internal_signal_restore_set;create_thread;__clone3;[unknown] 1
+qn_wasmtime_run;[unknown];[unknown];[unknown];rayon::iter::plumbing::bridge_producer_consumer::helper::<rayon::vec::DrainProducer<alloc::boxed::Box<dyn for<a> core::ops::function::FnOnce< 2861533
+qn_wasmtime_run;[unknown];[unknown];__libc_malloc;tcache_get;tcache_get_n 2749873
+qn_wasmtime_run;[unknown];[unknown];core::ptr::drop_glue::<cranelift_codegen::machinst::buffer::MachBufferFinalized<cranelift_codegen::machinst::buffer::Final>> 5654401
+qn_wasmtime_run;[unknown];[unknown];core::ptr::drop_glue::<cranelift_codegen::machinst::buffer::MachBufferFinalized<cranelift_codegen::machinst::buffer::Final>>;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 2832702
+qn_wasmtime_run;[unknown];[unknown];core::slice::sort::unstable::quicksort::quicksort::<regalloc2::ion::data_structures::InsertedMove, <[regalloc2::ion::data_structures::InsertedMove]>::sort_unstable_by_key<u64, <regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::resolve_inserted_moves::{closure#0}>::{closure#0}> 2869304
+qn_wasmtime_run;[unknown];[unknown];run;set<std::thread::spawnhook::SpawnHooks>;initialize_with<core::cell::Cell<std::thread::spawnhook::SpawnHooks>, std::thread::local::{impl#5}::set::{closure_env#0}<std::thread::spawnhook::SpawnHooks>, ;{closure#0}<std::thread::spawnhook::SpawnHooks>;set<std::thread::spawnhook::SpawnHooks>;drop_glue<std::thread::spawnhook::SpawnHooks>;drop_glue<core::option::Option<alloc::sync::Arc<std::thread::spawnhook::SpawnHook, alloc::alloc::Global>>>;__cxa_thread_atexit_impl;__lll_lock_wake;[unknown] 16862
+qn_wasmtime_run;[unknown];[unknown];wasmtime_internal_cranelift::translate::code_translator::translate_operator::<wasmparser::validator::core::ValidatorResources> 2911526
+qn_wasmtime_run;[unknown];__libc_free 11558447
+qn_wasmtime_run;[unknown];__libc_free;arena_for_chunk;heap_for_ptr 2779385
+qn_wasmtime_run;[unknown];__memmove_avx_unaligned_erms 34685622
+qn_wasmtime_run;[unknown];__sched_yield;[unknown];[unknown];[unknown];[unknown] 21959
+qn_wasmtime_run;[unknown];core::iter::adapters::chain::and_then_or_clear::<core::iter::adapters::chain::Chain<core::iter::adapters::copied::Copied<core::slice::iter::Iter<cranelift_codegen::ir::entities::Value>>, core::iter::adapters::flatten::FlatMap<core::slice::iter::Iter<cranelift_codegen::ir::instructions::BlockCall>, core::iter::adapters::filter_map::FilterMap<core::iter::adapters::map::Map<core::slice::iter::Iter<cranelift_codegen::ir::entities::Value>, <cranelift_codegen::ir::instructions::BlockCall>::args::{closure#0}>, <cranelift_codegen::ir::dfg::DataFlowGraph>::inst_values::{closure#0}::{closure#0}>, <cranelift_codegen::ir::dfg::DataFlowGraph>::inst_values::{closure#0}>>, cranelift_codegen::ir::entities::Value, <core::iter::adapters::chain::Chain<core::iter::adapters::copied::Copied<core::slice::iter::Iter<cranelift_codegen::ir::entities::Value>>, core::iter::adapters::flatten::FlatMap<core::slice::iter::Iter<cranelift_codegen::ir::instructions::BlockCall>, core::iter::adapters::filter_map::FilterMap<core::iter::adapters::map::Map<core::slice::iter::Iter<cranelift_codegen::ir::entities::Value>, <cranelift_codegen::ir::instructions::BlockCall>::args::{closure#0}>, <cranelift_codegen::ir::dfg::DataFlowGraph>::inst_values::{closure#0}::{closure#0}>, <cranelift_codegen::ir::dfg::DataFlowGraph>::inst_values::{closure#0}>> as core::iter::traits::iterator::Iterator>::next> 20286268
+qn_wasmtime_run;[unknown];core::iter::adapters::try_process::<alloc::vec::into_iter::IntoIter<core::result::Result<wasmtime::compile::CompileOutput, wasmtime_internal_core::error::error::Error>>, wasmtime::compile::CompileOutput, core::result::Result<core::convert::Infallible, wasmtime_internal_core::error::error::Error>, <core::result::Result<alloc::vec::Vec<wasmtime::compile::CompileOutput>, wasmtime_internal_core::error::error::Error> as core::iter::traits::collect::FromIterator<core::result::Result<wasmtime::compile::CompileOutput, wasmtime_internal_core::error::error::Error>>>::from_iter<alloc::vec::into_iter::IntoIter<core::result::Result<wasmtime::compile::CompileOutput, wasmtime_internal_core::error::error::Error>>>::{closure#0}, alloc::vec::Vec<wasmtime::compile::CompileOutput>> 23992
+qn_wasmtime_run;[unknown];core::ptr::drop_glue::<cranelift_codegen::timing::enabled::DefaultTimingToken> 3174431
+qn_wasmtime_run;[unknown];core::ptr::drop_glue::<smallvec::IntoIter<[cranelift_codegen::isa::x64::lower::isle::generated_code::MInst: 4]>> 5594197
+qn_wasmtime_run;[unknown];cranelift_assembler_x64::mem::emit_modrm_sib_disp::<cranelift_codegen::isa::x64::inst::args::Gpr, cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 2875978
+qn_wasmtime_run;[unknown];cranelift_codegen::inst_predicates::is_pure_for_egraph 2925724
+qn_wasmtime_run;[unknown];cranelift_codegen::ir::dfg::maybe_resolve_aliases 9017350
+qn_wasmtime_run;[unknown];cranelift_codegen::isa::x64::inst::emit::emit 26628926
+qn_wasmtime_run;[unknown];cranelift_codegen::isa::x64::inst::x64_get_operands::<<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>>::emit::{closure#3}> 5529785
+qn_wasmtime_run;[unknown];cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_amode_imm_reg_reg_shift::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2877772
+qn_wasmtime_run;[unknown];cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_lower::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 12097456
+qn_wasmtime_run;[unknown];cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_x64_mov::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 3071944
+qn_wasmtime_run;[unknown];cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_x64_movd_to_xmm::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2965238
+qn_wasmtime_run;[unknown];cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_x64_setcc::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2945311
+qn_wasmtime_run;[unknown];cranelift_codegen::machinst::compile::compile::<cranelift_codegen::isa::x64::X64Backend> 48885494
+qn_wasmtime_run;[unknown];cranelift_codegen::machinst::compile::compile::<cranelift_codegen::isa::x64::X64Backend>;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 3019767
+qn_wasmtime_run;[unknown];cranelift_codegen::machinst::compile::compile::<cranelift_codegen::isa::x64::X64Backend>;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk;unlink_chunk 3045477
+qn_wasmtime_run;[unknown];cranelift_codegen::machinst::lower::compute_use_states 2935253
+qn_wasmtime_run;[unknown];cranelift_codegen::opts::generated_code::constructor_iconst_s::<cranelift_codegen::opts::IsleContext> 2703102
+qn_wasmtime_run;[unknown];cranelift_codegen::opts::generated_code::constructor_simplify::<cranelift_codegen::opts::IsleContext, smallvec::SmallVec<[cranelift_codegen::ir::entities::Value: 5]>> 11237845
+qn_wasmtime_run;[unknown];cranelift_codegen::opts::generated_code::constructor_simplify_skeleton::<cranelift_codegen::opts::IsleContext, smallvec::SmallVec<[cranelift_codegen::opts::generated_code::SkeletonInstSimplification: 5]>> 2984643
+qn_wasmtime_run;[unknown];cranelift_codegen::opts::generated_code::constructor_truthy::<cranelift_codegen::opts::IsleContext, cranelift_codegen::opts::generated_code::ContextIterWrapper<smallvec::SmallVec<[cranelift_codegen::ir::entities::Value: 8]>, cranelift_codegen::opts::IsleContext>> 6029786
+qn_wasmtime_run;[unknown];cranelift_codegen::remove_constant_phis::do_remove_constant_phis 2203482
+qn_wasmtime_run;[unknown];rayon_core::join::join_context::<rayon::iter::plumbing::bridge_producer_consumer::helper<rayon::vec::DrainProducer<alloc::boxed::Box<dyn for<a> core::ops::function::FnOnce< 171
+qn_wasmtime_run;[unknown];wasmtime_internal_cranelift::translate::code_translator::prepare_addr 3006824
+qn_wasmtime_run;__clone3;__ctype_init 9
+qn_wasmtime_run;__clone3;__ctype_init;[unknown] 1
+qn_wasmtime_run;__clone3;start_thread 2
+qn_wasmtime_run;__clone3;start_thread;<std::thread::lifecycle::spawn_unchecked<<rayon_core::registry::DefaultSpawn as rayon_core::registry::ThreadSpawn>::spawn::{closure#0},  132
+qn_wasmtime_run;__clone3;start_thread;<std::thread::lifecycle::spawn_unchecked<<rayon_core::registry::DefaultSpawn as rayon_core::registry::ThreadSpawn>::spawn::{closure#0}, ;std::sys::backtrace::__rust_begin_short_backtrace::<<rayon_core::registry::DefaultSpawn as rayon_core::registry::ThreadSpawn>::spawn::{closure#0},  1835
+qn_wasmtime_run;__clone3;start_thread;[unknown];[unknown];[unknown];[unknown];[unknown];[unknown] 1851
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;__set_vma_name 2648
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;name_stack_maps;__set_vma_name;__is_decorate_maps_enabled 775
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;name_stack_maps;__snprintf 799
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;name_stack_maps;__snprintf;__printf_buffer 1
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;name_stack_maps;__snprintf;__vsnprintf_internal;__printf_buffer_snprintf_done 121
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;name_stack_maps;__snprintf;__vsnprintf_internal;__printf_buffer_snprintf_done;__printf_buffer 2378
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;name_stack_maps;__snprintf;__vsnprintf_internal;__printf_buffer_snprintf_done;__printf_buffer;__memmove_avx_unaligned_erms 2
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;name_stack_maps;__snprintf;__vsnprintf_internal;__printf_buffer_snprintf_done;__printf_buffer;__printf_buffer_write 7
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;name_stack_maps;__snprintf;__vsnprintf_internal;__printf_buffer_snprintf_done;__strchrnul_avx2 169
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;name_stack_maps;__snprintf;__vsnprintf_internal;__printf_buffer_snprintf_done;_itoa_word 333
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;RSEQ_SELF;name_stack_maps;__vsnprintf_internal 17
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;[unknown] 2402
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;[unknown];[unknown] 1231
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;[unknown];[unknown];[unknown];[unknown];[unknown] 1216
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;name_stack_maps;__snprintf;__vsnprintf_internal;__printf_buffer_snprintf_done;[unknown] 1669
+qn_wasmtime_run;__clone3;start_thread;rseq_register_current_thread;name_stack_maps;__snprintf;__vsnprintf_internal;_itoa_word;[unknown] 1149
+qn_wasmtime_run;__clone3;start_thread;std::sys::backtrace::__rust_begin_short_backtrace::<std::thread::lifecycle::spawn_unchecked<<wasmtime_internal_cache::worker::Worker>::start_new::{closure#0}, ;run;set<std::thread::spawnhook::SpawnHooks>;initialize_with<core::cell::Cell<std::thread::spawnhook::SpawnHooks>, std::thread::local::{impl#5}::set::{closure_env#0}<std::thread::spawnhook::SpawnHooks>, ;call_once<std::thread::spawnhook::SPAWN_HOOKS::{constant#0}::{closure_env#0}, ;{closure#0};get<core::cell::Cell<std::thread::spawnhook::SpawnHooks>>;initialize<core::cell::Cell<std::thread::spawnhook::SpawnHooks>>;set<std::sys::thread_local::native::eager::State>;replace<std::sys::thread_local::native::eager::State>;replace<std::sys::thread_local::native::eager::State>;__cxa_thread_atexit_impl;___pthread_mutex_lock 1
+qn_wasmtime_run;__clone3;start_thread;std::sys::backtrace::__rust_begin_short_backtrace::<std::thread::lifecycle::spawn_unchecked<<wasmtime_internal_cache::worker::Worker>::start_new::{closure#0}, ;run;set<std::thread::spawnhook::SpawnHooks>;initialize_with<core::cell::Cell<std::thread::spawnhook::SpawnHooks>, std::thread::local::{impl#5}::set::{closure_env#0}<std::thread::spawnhook::SpawnHooks>, ;call_once<std::thread::spawnhook::SPAWN_HOOKS::{constant#0}::{closure_env#0}, ;{closure#0};get<core::cell::Cell<std::thread::spawnhook::SpawnHooks>>;initialize<core::cell::Cell<std::thread::spawnhook::SpawnHooks>>;set<std::sys::thread_local::native::eager::State>;replace<std::sys::thread_local::native::eager::State>;replace<std::sys::thread_local::native::eager::State>;__cxa_thread_atexit_impl;___pthread_mutex_unlock;__pthread_mutex_unlock_usercnt;lll_mutex_unlock_optimized 1
+qn_wasmtime_run;__clone3;start_thread;std::sys::backtrace::__rust_begin_short_backtrace::<std::thread::lifecycle::spawn_unchecked<<wasmtime_internal_cache::worker::Worker>::start_new::{closure#0}, ;run;set<std::thread::spawnhook::SpawnHooks>;initialize_with<core::cell::Cell<std::thread::spawnhook::SpawnHooks>, std::thread::local::{impl#5}::set::{closure_env#0}<std::thread::spawnhook::SpawnHooks>, ;call_once<std::thread::spawnhook::SPAWN_HOOKS::{constant#0}::{closure_env#0}, ;{closure#0};get<core::cell::Cell<std::thread::spawnhook::SpawnHooks>>;initialize<core::cell::Cell<std::thread::spawnhook::SpawnHooks>>;set<std::sys::thread_local::native::eager::State>;replace<std::sys::thread_local::native::eager::State>;replace<std::sys::thread_local::native::eager::State>;__cxa_thread_atexit_impl;__lll_lock_wake;[unknown];[unknown];[unknown] 10
+qn_wasmtime_run;__clone3;start_thread;std::sys::backtrace::__rust_begin_short_backtrace::<std::thread::lifecycle::spawn_unchecked<<wasmtime_internal_cache::worker::Worker>::start_new::{closure#0}, ;run;set<std::thread::spawnhook::SpawnHooks>;initialize_with<core::cell::Cell<std::thread::spawnhook::SpawnHooks>, std::thread::local::{impl#5}::set::{closure_env#0}<std::thread::spawnhook::SpawnHooks>, ;call_once<std::thread::spawnhook::SPAWN_HOOKS::{constant#0}::{closure_env#0}, ;{closure#0};get<core::cell::Cell<std::thread::spawnhook::SpawnHooks>>;initialize<core::cell::Cell<std::thread::spawnhook::SpawnHooks>>;set<std::sys::thread_local::native::eager::State>;replace<std::sys::thread_local::native::eager::State>;replace<std::sys::thread_local::native::eager::State>;_dl_find_dso_for_object 13623
+qn_wasmtime_run;__clone3;start_thread;thread_start;call_once< 475
+qn_wasmtime_run;__clone3;start_thread;thread_start;call_once<;tcache_free_init;tcache_init 60
+qn_wasmtime_run;__clone3;start_thread;thread_start;call_once<;tcache_free_init;tcache_init;__libc_malloc2;arena_get2;arena_get2;_int_new_arena 7
+qn_wasmtime_run;__clone3;start_thread;thread_start;call_once<;tcache_free_init;tcache_init;__libc_malloc2;arena_get2;arena_get2;_int_new_arena;__mprotect;[unknown] 1
+qn_wasmtime_run;__clone3;start_thread;thread_start;call_once<;tcache_free_init;tcache_init;__libc_malloc2;arena_get2;arena_get2;_int_new_arena;__mprotect;[unknown];[unknown];[unknown] 1
+qn_wasmtime_run;__clone3;start_thread;thread_start;call_once<;tcache_free_init;tcache_init;__libc_malloc2;arena_get2;arena_get2;_int_new_arena;__munmap;[unknown];[unknown] 1
+qn_wasmtime_run;__clone3;start_thread;thread_start;call_once<;tcache_free_init;tcache_init;__libc_malloc2;arena_get2;arena_get2;_int_new_arena;alloc_new_heap;__mmap64;__mmap64;[unknown] 1574
+qn_wasmtime_run;__clone3;start_thread;thread_start;init;clone;clone<alloc::sync::Arc<std::thread::thread::Inner, std::alloc::System>>;clone<std::thread::thread::Inner, std::alloc::System> 8459
+qn_wasmtime_run;__libc_free 40379049
+qn_wasmtime_run;__libc_malloc 17202450
+qn_wasmtime_run;__libc_malloc2 3005868
+qn_wasmtime_run;__libc_malloc;checked_request2size 6133063
+qn_wasmtime_run;__libc_malloc;tcache_get;tcache_get_n 14435027
+qn_wasmtime_run;__memmove_avx_unaligned_erms 128799829
+qn_wasmtime_run;__memmove_avx_unaligned_erms;[unknown] 3155487
+qn_wasmtime_run;__memset_avx2_unaligned_erms 14648014
+qn_wasmtime_run;_dl_start 1
+qn_wasmtime_run;_dl_start;[unknown] 1
+qn_wasmtime_run;_dl_start_user;_dl_setup_hash;[unknown];[unknown] 1222
+qn_wasmtime_run;_dl_start_user;_dl_start;_dl_start_final;_dl_sysdep_start;__tunable_get_val 12049
+qn_wasmtime_run;_dl_start_user;_dl_start;_dl_start_final;_dl_sysdep_start;dl_main;rtld_timer_accum;rtld_timer_stop;_dl_map_object_deps;_dl_catch_exception;set_catch;openaux;_dl_map_new_object;_dl_map_object_from_fd;elf_get_dynamic_info;[unknown] 138287
+qn_wasmtime_run;_dl_start_user;_dl_start;rtld_timer_start;[unknown] 105
+qn_wasmtime_run;_dl_start_user;_dl_start;rtld_timer_start;[unknown];[unknown];[unknown];[unknown] 7
+qn_wasmtime_run;_int_free_chunk 145
+qn_wasmtime_run;_start;[unknown] 1
+qn_wasmtime_run;core::ptr::drop_glue::<core::option::Option<wasmtime_internal_cranelift::compiler::CompilerContext>> 2943450
+qn_wasmtime_run;core::ptr::drop_glue::<cranelift_codegen::ir::function::Function>;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 5690909
+qn_wasmtime_run;core::ptr::drop_glue::<cranelift_codegen::machinst::buffer::MachBufferFinalized<cranelift_codegen::machinst::buffer::Final>>;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 3040028
+qn_wasmtime_run;core::ptr::drop_glue::<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst>> 3025895
+qn_wasmtime_run;core::slice::sort::shared::smallsort::insertion_sort_shift_left::<regalloc2::ion::data_structures::BlockparamIn, <[regalloc2::ion::data_structures::BlockparamIn]>::sort_unstable_by_key<u128, <regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::build_liveranges::{closure#0}>::{closure#0}> 3002576
+qn_wasmtime_run;core::slice::sort::shared::smallsort::sort8_stable::<regalloc2::ion::data_structures::LiveRangeListEntry, <[regalloc2::ion::data_structures::LiveRangeListEntry]>::sort_unstable_by_key<regalloc2::ProgPoint, <regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::merge_bundles::{closure#3}>::{closure#0}> 2763241
+qn_wasmtime_run;core::slice::sort::unstable::quicksort::quicksort::<regalloc2::ion::data_structures::BlockparamIn, <[regalloc2::ion::data_structures::BlockparamIn]>::sort_unstable_by_key<u128, <regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::build_liveranges::{closure#0}>::{closure#0}> 3027498
+qn_wasmtime_run;core::slice::sort::unstable::quicksort::quicksort::<regalloc2::ion::data_structures::BlockparamOut, <[regalloc2::ion::data_structures::BlockparamOut]>::sort_unstable_by_key<u128, <regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::build_liveranges::{closure#1}>::{closure#0}> 3059307
+qn_wasmtime_run;core::slice::sort::unstable::quicksort::quicksort::<regalloc2::ion::data_structures::InsertedMove, <[regalloc2::ion::data_structures::InsertedMove]>::sort_unstable_by_key<u64, <regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::resolve_inserted_moves::{closure#0}>::{closure#0}> 5840916
+qn_wasmtime_run;core::slice::sort::unstable::quicksort::quicksort::<regalloc2::ion::data_structures::LiveRangeListEntry, <[regalloc2::ion::data_structures::LiveRangeListEntry]>::sort_unstable_by_key<regalloc2::ProgPoint, <regalloc2::ion::data_structures::Env<cranelift_codegen::machinst::vcode::VCode<cranelift_codegen::isa::pulley_shared::inst::InstAndKind<cranelift_codegen::isa::pulley32::Pulley32>>>>::merge_bundles::{closure#3}>::{closure#0}> 8664555
+qn_wasmtime_run;cranelift_assembler_x64::mem::emit_modrm_sib_disp::<cranelift_codegen::isa::x64::inst::args::Gpr, cranelift_codegen::isa::x64::inst::external::AsmCodeSink> 2987508
+qn_wasmtime_run;cranelift_codegen::alias_analysis::observe 6094245
+qn_wasmtime_run;cranelift_codegen::inst_predicates::has_lowering_side_effect 11603426
+qn_wasmtime_run;cranelift_codegen::inst_predicates::inst_addr_offset_type 8770131
+qn_wasmtime_run;cranelift_codegen::inst_predicates::is_pure_for_egraph 14426309
+qn_wasmtime_run;cranelift_codegen::inst_predicates::visit_block_succs::<<cranelift_codegen::flowgraph::ControlFlowGraph>::compute_block::{closure#0}> 6022224
+qn_wasmtime_run;cranelift_codegen::ir::dfg::maybe_resolve_aliases 2849354
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::is_mergeable_load 2987957
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_amode_imm_reg::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 3381127
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_cmove::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2909605
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_emit_cmp::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 3020804
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_emit_side_effect::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2828322
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_extend_to_gpr_types::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 3032722
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_is_nonzero::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2913958
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_jmp_cond_result::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2927004
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_lower::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 14123368
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_lower_select_spectre_gpr::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 3001445
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_put_masked_in_imm8_gpr::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2907096
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_to_amode_add::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 5585638
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_with_flags_side_effect::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2933929
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_x64_lea::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 3066629
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_x64_or_raw::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 3010136
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_x64_sar::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2787960
+qn_wasmtime_run;cranelift_codegen::isa::x64::lower::isle::generated_code::constructor_x64_sub::<cranelift_codegen::machinst::isle::IsleContext<cranelift_codegen::isa::x64::lower::isle::generated_code::MInst, cranelift_codegen::isa::x64::X64Backend>> 2696295
+qn_wasmtime_run;cranelift_codegen::machinst::abi::ensure_struct_return_ptr_is_returned 2761135
+qn_wasmtime_run;cranelift_codegen::machinst::compile::compile::<cranelift_codegen::isa::x64::X64Backend> 5935061
+qn_wasmtime_run;cranelift_codegen::machinst::lower::compute_use_states 40146225
+qn_wasmtime_run;cranelift_codegen::opts::generated_code::constructor_simplify::<cranelift_codegen::opts::IsleContext, smallvec::SmallVec<[cranelift_codegen::ir::entities::Value: 5]>> 57906426
+qn_wasmtime_run;cranelift_codegen::opts::generated_code::constructor_simplify_skeleton::<cranelift_codegen::opts::IsleContext, smallvec::SmallVec<[cranelift_codegen::opts::generated_code::SkeletonInstSimplification: 5]>> 11890567
+qn_wasmtime_run;cranelift_codegen::remove_constant_phis::do_remove_constant_phis 29529916
+qn_wasmtime_run;cranelift_codegen::remove_constant_phis::do_remove_constant_phis;_int_free_chunk;_int_free_merge_chunk;_int_free_create_chunk 3171637
+qn_wasmtime_run;cranelift_codegen::timing::enabled::take_current 2699623
+qn_wasmtime_run;rayon_core::registry::global_registry;<std::sync::once::Once>::call_once::<rayon_core::registry::set_global_registry<rayon_core::registry::default_global_registry>::{closure#0}>::{closure#0};<rayon_core::registry::Registry>::new::<rayon_core::registry::DefaultSpawn>;new;__pthread_create_2_1;allocate_stack;setup_stack_prot;create_thread;__clone3;[unknown] 2
+qn_wasmtime_run;rayon_core::registry::global_registry;<std::sync::once::Once>::call_once::<rayon_core::registry::set_global_registry<rayon_core::registry::default_global_registry>::{closure#0}>::{closure#0};<rayon_core::registry::Registry>::new::<rayon_core::registry::DefaultSpawn>;new;__pthread_create_2_1;internal_signal_restore_set;create_thread;__clone3 1
+qn_wasmtime_run;rayon_core::registry::global_registry;<std::sync::once::Once>::call_once::<rayon_core::registry::set_global_registry<rayon_core::registry::default_global_registry>::{closure#0}>::{closure#0};<rayon_core::registry::Registry>::new::<rayon_core::registry::DefaultSpawn>;new;__pthread_create_2_1;internal_signal_restore_set;create_thread;__clone3;[unknown] 5
+qn_wasmtime_run;wasmparser::arity::visit_call_ref 2936421
+qn_wasmtime_run;wasmtime_internal_cranelift::compiler::box_dyn_any_compiler_context;__libc_malloc2 2945458
+qn_wasmtime_run;wasmtime_internal_cranelift::mach_reloc_to_reloc 1986687
+qn_wasmtime_run;wasmtime_internal_cranelift::translate::code_translator::bitcast_wasm_returns 3045268
+qn_wasmtime_run;wasmtime_internal_cranelift::translate::code_translator::canonicalise_then_jump 3010141
+qn_wasmtime_run;wasmtime_internal_cranelift::translate::code_translator::prepare_addr 8707655
+qn_wasmtime_run;wasmtime_internal_cranelift::translate::code_translator::translate_operator::<wasmparser::validator::core::ValidatorResources> 11746791
+tokio-rt-worker;[unknown];[unknown];<tokio::runtime::metrics::worker::WorkerMetrics>::set_thread_id 464
+tokio-rt-worker;[unknown];[unknown];tokio::runtime::task::raw::poll::<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule> 5498
+tokio-rt-worker;[unknown];[unknown];tokio::runtime::task::raw::poll::<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule>;__clock_gettime 14540
+tokio-rt-worker;[unknown];syscall;[unknown];[unknown] 9
+tokio-rt-worker;[unknown];tokio::runtime::task::raw::poll::<tokio::runtime::blocking::task::BlockingTask<<tokio::runtime::scheduler::multi_thread::worker::Launch>::launch::{closure#0}>, tokio::runtime::blocking::schedule::BlockingSchedule> 217
+tokio-rt-worker;__clone3;start_thread;<std::thread::lifecycle::spawn_unchecked<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0},  8206
+tokio-rt-worker;__clone3;start_thread;std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0},  2
+tokio-rt-worker;__clone3;start_thread;std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ;[unknown] 1
+tokio-rt-worker;__clone3;start_thread;std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ;lock_contended;futex_wait;then<i32, fn; i32>_[i] 2
+tokio-rt-worker;__clone3;start_thread;std::sys::backtrace::__rust_begin_short_backtrace::<<tokio::runtime::blocking::pool::Spawner>::spawn_thread::{closure#0}, ;syscall;[unknown] 1
+tokio-rt-worker;__clone3;start_thread;std::sys::backtrace::__rust_begin_short_backtrace::<std::thread::lifecycle::spawn_unchecked<<wasmtime_internal_cache::worker::Worker>::start_new::{closure#0}, ;run;set<std::thread::spawnhook::SpawnHooks>;initialize_with<core::cell::Cell<std::thread::spawnhook::SpawnHooks>, std::thread::local::{impl#5}::set::{closure_env#0}<std::thread::spawnhook::SpawnHooks>, ;call_once<std::thread::spawnhook::SPAWN_HOOKS::{constant#0}::{closure_env#0}, ;{closure#0};get<core::cell::Cell<std::thread::spawnhook::SpawnHooks>>;initialize<core::cell::Cell<std::thread::spawnhook::SpawnHooks>>;set<std::sys::thread_local::native::eager::State>;replace<std::sys::thread_local::native::eager::State>;replace<std::sys::thread_local::native::eager::State>;__cxa_thread_atexit_impl;__libc_calloc2 9871
+tokio-rt-worker;__clone3;start_thread;thread_start;call_once<;tcache_free_init;tcache_init 10286
+tokio-rt-worker;__clone3;start_thread;thread_start;call_once<;tcache_free_init;tcache_init;__libc_malloc2 16678
+tokio-rt-worker;__clone3;start_thread;thread_start;call_once<;tcache_free_init;tcache_init;__libc_malloc2;arena_get2;arena_get2;_int_new_arena;__mprotect;[unknown] 10076
+tokio-rt-worker;hashmap_random_keys 1062
+tokio-rt-worker;tokio::loom::std::rand::seed;hashmap_random_keys;getrandom;getrandom_vdso 4288
+tokio-rt-worker;tokio::loom::std::rand::seed;hashmap_random_keys;getrandom;getrandom_vdso;__vdso_getrandom;[unknown];[unknown];[unknown] 15151

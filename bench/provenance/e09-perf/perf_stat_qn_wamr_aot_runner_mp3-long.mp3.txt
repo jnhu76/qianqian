@@ -1,0 +1,21 @@
+# started on Mon Aug 31 13:29:55 2026
+
+
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_wamr_aot_runner /home/hoo/Source/qianqian/build/artifacts/wasm/qn_guest_bench.aot bench /home/hoo/Source/qianqian/corpus/fixtures/mp3-long.mp3 3':
+
+                 0      context-switches:u               #      0.0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
+              4959      page-faults:u                    #  33376.9 faults/sec  page_faults_per_second
+            148.58 msec task-clock:u                     #      1.0 CPUs  CPUs_utilized       
+            244676      branch-misses:u                  #      0.8 %  branch_miss_rate         (49.68%)
+          30298043      branches:u                       #    203.9 M/sec  branch_frequency     (67.76%)
+         453003319      cpu-cycles:u                     #      3.0 GHz  cycles_frequency       (67.68%)
+        1452663622      instructions:u                   #      3.2 instructions  insn_per_cycle  (67.68%)
+          11256277      stalled-cycles-frontend:u        #     0.03 frontend_cycles_idle        (66.52%)
+
+       0.150559447 seconds time elapsed
+
+       0.130696000 seconds user
+       0.019802000 seconds sys
+
+

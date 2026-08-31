@@ -1,0 +1,987 @@
+{
+ "native": {
+  "flac-16-44-stereo.flac": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 176400,
+    "duration_us": 4000000,
+    "canonical_f32_sha256": "42d1070b2677972af85ec6cdde40601e465cf0a2439c87d206e6ba8b61184727",
+    "open_first_ms": 0.238,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 6.849,
+     "min": 5.861,
+     "max": 7.227
+    },
+    "decode_core_ms": {
+     "median": 4.839,
+     "min": 4.525,
+     "max": 7.602
+    },
+    "xrt_songcore_output": 584.03,
+    "xrt_decode_core": 826.55,
+    "audio_seconds": 4.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 916,
+    "branch-misses": 60477,
+    "branches": 77955790,
+    "cycles": 163395454,
+    "instructions": 438179991,
+    "elapsed_s": 0.053437211,
+    "user_s": 0.053607,
+    "sys_s": 0.0
+   }
+  },
+  "mp3-cbr-id3v23.mp3": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 176400,
+    "duration_us": 4000000,
+    "canonical_f32_sha256": "cb6f0f7e96b93e6d9ba3dcfcdd44ce2ab095ef493d5209d1507f1c492130ea26",
+    "open_first_ms": 0.154,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 3.434,
+     "min": 2.776,
+     "max": 3.757
+    },
+    "decode_core_ms": {
+     "median": 2.713,
+     "min": 2.566,
+     "max": 3.129
+    },
+    "xrt_songcore_output": 1164.7,
+    "xrt_decode_core": 1474.15,
+    "audio_seconds": 4.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 957,
+    "branch-misses": 157912,
+    "branches": 27251054,
+    "cycles": 97236917,
+    "instructions": 325285968,
+    "elapsed_s": 0.032293358,
+    "user_s": 0.032376,
+    "sys_s": 0.0
+   }
+  },
+  "aac-lc-44-stereo.m4a": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 529200,
+    "duration_us": 12000000,
+    "canonical_f32_sha256": "b7aeea4df27d2e3f28f65e270eacd58466f57165a4579848af0b15eff2da5093",
+    "open_first_ms": 0.497,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 10.501,
+     "min": 7.835,
+     "max": 10.671
+    },
+    "decode_core_ms": {
+     "median": 9.554,
+     "min": 7.548,
+     "max": 10.418
+    },
+    "xrt_songcore_output": 1142.78,
+    "xrt_decode_core": 1255.96,
+    "audio_seconds": 12.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 2686,
+    "branch-misses": 476569,
+    "branches": 73439957,
+    "cycles": 276961702,
+    "instructions": 1066196694,
+    "elapsed_s": 0.089333725,
+    "user_s": 0.081345,
+    "sys_s": 0.008134
+   }
+  },
+  "opus-48-stereo.opus": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 48000,
+    "channels": 2,
+    "samples": 576000,
+    "duration_us": 12006500,
+    "canonical_f32_sha256": "bcf34b306af7109bf5612ffa94812834cac2fde793c202ec4b1ed387ef27aab8",
+    "open_first_ms": 0.395,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 31.394,
+     "min": 27.287,
+     "max": 34.487
+    },
+    "decode_core_ms": {
+     "median": 29.365,
+     "min": 28.504,
+     "max": 40.042
+    },
+    "xrt_songcore_output": 382.45,
+    "xrt_decode_core": 408.88,
+    "audio_seconds": 12.007
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 3014,
+    "branch-misses": 3363113,
+    "branches": 271697130,
+    "cycles": 791846938,
+    "instructions": 2377038908,
+    "elapsed_s": 0.240070453,
+    "user_s": 0.224186,
+    "sys_s": 0.016013
+   }
+  },
+  "mp3-long.mp3": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 529200,
+    "duration_us": 12000000,
+    "canonical_f32_sha256": "e7bd0cb1b6fb2d7565e9937684ca66c6eb92eb5baf9515bbd46f91a952c4c3e3",
+    "open_first_ms": 0.171,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 8.55,
+     "min": 8.418,
+     "max": 10.321
+    },
+    "decode_core_ms": {
+     "median": 7.823,
+     "min": 7.807,
+     "max": 8.51
+    },
+    "xrt_songcore_output": 1403.52,
+    "xrt_decode_core": 1533.86,
+    "audio_seconds": 12.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 2347,
+    "branch-misses": 297927,
+    "branches": 71355788,
+    "cycles": 288835836,
+    "instructions": 959948189,
+    "elapsed_s": 0.094256533,
+    "user_s": 0.082025,
+    "sys_s": 0.012303
+   }
+  }
+ },
+ "wamr": {
+  "flac-16-44-stereo.flac": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 176400,
+    "duration_us": 4000000,
+    "canonical_f32_sha256": "42d1070b2677972af85ec6cdde40601e465cf0a2439c87d206e6ba8b61184727",
+    "open_first_ms": 21.158,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 229.915,
+     "min": 223.956,
+     "max": 255.898
+    },
+    "decode_core_ms": {
+     "median": 215.353,
+     "min": 213.204,
+     "max": 216.435
+    },
+    "xrt_songcore_output": 17.4,
+    "xrt_decode_core": 18.57,
+    "audio_seconds": 4.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4547,
+    "branch-misses": 22906415,
+    "branches": 2661444788,
+    "cycles": 7106184038,
+    "instructions": 18101484117,
+    "elapsed_s": 1.972314143,
+    "user_s": 1.955554,
+    "sys_s": 0.015996
+   }
+  },
+  "mp3-cbr-id3v23.mp3": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 176400,
+    "duration_us": 4000000,
+    "canonical_f32_sha256": "01591b8239fea294bc39922bd7625d02b193961c144459d7509572e1edc6f681",
+    "open_first_ms": 14.769,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 301.863,
+     "min": 275.596,
+     "max": 304.631
+    },
+    "decode_core_ms": {
+     "median": 289.051,
+     "min": 277.631,
+     "max": 293.629
+    },
+    "xrt_songcore_output": 13.25,
+    "xrt_decode_core": 13.84,
+    "audio_seconds": 4.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4546,
+    "branch-misses": 87192345,
+    "branches": 2779542312,
+    "cycles": 9150813095,
+    "instructions": 18201956766,
+    "elapsed_s": 2.772831378,
+    "user_s": 2.743566,
+    "sys_s": 0.027995
+   }
+  },
+  "aac-lc-44-stereo.m4a": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 529200,
+    "duration_us": 12000000,
+    "canonical_f32_sha256": "0ae6379d746dbaa305ffa62a29a9cc22af8e160270842e02b7412be5b668cec9",
+    "open_first_ms": 64.686,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 655.469,
+     "min": 653.884,
+     "max": 664.073
+    },
+    "decode_core_ms": {
+     "median": 606.171,
+     "min": 600.929,
+     "max": 610.205
+    },
+    "xrt_songcore_output": 18.31,
+    "xrt_decode_core": 19.8,
+    "audio_seconds": 12.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4548,
+    "branch-misses": 248690406,
+    "branches": 6749617963,
+    "cycles": 22610601533,
+    "instructions": 41246367587,
+    "elapsed_s": 6.258407688,
+    "user_s": 6.244058,
+    "sys_s": 0.012
+   }
+  },
+  "opus-48-stereo.opus": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 48000,
+    "channels": 2,
+    "samples": 576000,
+    "duration_us": 12006500,
+    "canonical_f32_sha256": "bcf34b306af7109bf5612ffa94812834cac2fde793c202ec4b1ed387ef27aab8",
+    "open_first_ms": 30.196,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 3092.422,
+     "min": 2864.335,
+     "max": 3187.959
+    },
+    "decode_core_ms": {
+     "median": 2768.726,
+     "min": 2755.931,
+     "max": 3630.435
+    },
+    "xrt_songcore_output": 3.88,
+    "xrt_decode_core": 4.34,
+    "audio_seconds": 12.007
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4549,
+    "branch-misses": 1427698355,
+    "branches": 19726647869,
+    "cycles": 78755960895,
+    "instructions": 106716181617,
+    "elapsed_s": 22.265111487,
+    "user_s": 22.229708,
+    "sys_s": 0.028007
+   }
+  },
+  "mp3-long.mp3": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 529200,
+    "duration_us": 12000000,
+    "canonical_f32_sha256": "0f656a7309a5e07382afd55da8eb4633dffcd4bf427714f8462d658bb440d5f4",
+    "open_first_ms": 14.686,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 868.589,
+     "min": 831.55,
+     "max": 881.839
+    },
+    "decode_core_ms": {
+     "median": 805.231,
+     "min": 802.112,
+     "max": 838.079
+    },
+    "xrt_songcore_output": 13.82,
+    "xrt_decode_core": 14.9,
+    "audio_seconds": 12.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4546,
+    "branch-misses": 240328215,
+    "branches": 7986433901,
+    "cycles": 24853008408,
+    "instructions": 52879620813,
+    "elapsed_s": 6.817787965,
+    "user_s": 6.795907,
+    "sys_s": 0.019999
+   }
+  }
+ },
+ "wamr_aot": {
+  "flac-16-44-stereo.flac": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 176400,
+    "duration_us": 4000000,
+    "canonical_f32_sha256": "42d1070b2677972af85ec6cdde40601e465cf0a2439c87d206e6ba8b61184727",
+    "open_first_ms": 0.188,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 5.334,
+     "min": 5.139,
+     "max": 5.376
+    },
+    "decode_core_ms": {
+     "median": 5.124,
+     "min": 5.06,
+     "max": 5.158
+    },
+    "xrt_songcore_output": 749.84,
+    "xrt_decode_core": 780.67,
+    "audio_seconds": 4.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4957,
+    "branch-misses": 75924,
+    "branches": 32167783,
+    "cycles": 188383865,
+    "instructions": 449786442,
+    "elapsed_s": 0.066569373,
+    "user_s": 0.05834,
+    "sys_s": 0.008334
+   }
+  },
+  "mp3-cbr-id3v23.mp3": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 176400,
+    "duration_us": 4000000,
+    "canonical_f32_sha256": "01591b8239fea294bc39922bd7625d02b193961c144459d7509572e1edc6f681",
+    "open_first_ms": 0.127,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 4.993,
+     "min": 4.595,
+     "max": 5.002
+    },
+    "decode_core_ms": {
+     "median": 4.91,
+     "min": 4.705,
+     "max": 5.138
+    },
+    "xrt_songcore_output": 801.09,
+    "xrt_decode_core": 814.66,
+    "audio_seconds": 4.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4957,
+    "branch-misses": 140801,
+    "branches": 12170375,
+    "cycles": 168588961,
+    "instructions": 466072508,
+    "elapsed_s": 0.062281188,
+    "user_s": 0.045705,
+    "sys_s": 0.01662
+   }
+  },
+  "aac-lc-44-stereo.m4a": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 529200,
+    "duration_us": 12000000,
+    "canonical_f32_sha256": "0ae6379d746dbaa305ffa62a29a9cc22af8e160270842e02b7412be5b668cec9",
+    "open_first_ms": 0.617,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 9.711,
+     "min": 9.492,
+     "max": 10.763
+    },
+    "decode_core_ms": {
+     "median": 9.466,
+     "min": 9.443,
+     "max": 9.83
+    },
+    "xrt_songcore_output": 1235.71,
+    "xrt_decode_core": 1267.63,
+    "audio_seconds": 12.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4960,
+    "branch-misses": 486073,
+    "branches": 37201971,
+    "cycles": 320984679,
+    "instructions": 1018348250,
+    "elapsed_s": 0.108686335,
+    "user_s": 0.085491,
+    "sys_s": 0.023315
+   }
+  },
+  "opus-48-stereo.opus": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 48000,
+    "channels": 2,
+    "samples": 576000,
+    "duration_us": 12006500,
+    "canonical_f32_sha256": "bcf34b306af7109bf5612ffa94812834cac2fde793c202ec4b1ed387ef27aab8",
+    "open_first_ms": 0.413,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 28.768,
+     "min": 28.319,
+     "max": 29.08
+    },
+    "decode_core_ms": {
+     "median": 27.933,
+     "min": 26.684,
+     "max": 28.076
+    },
+    "xrt_songcore_output": 417.36,
+    "xrt_decode_core": 429.83,
+    "audio_seconds": 12.007
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4959,
+    "branch-misses": 3131114,
+    "branches": 113266526,
+    "cycles": 847159544,
+    "instructions": 2331278330,
+    "elapsed_s": 0.254191034,
+    "user_s": 0.229922,
+    "sys_s": 0.024202
+   }
+  },
+  "mp3-long.mp3": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 529200,
+    "duration_us": 12000000,
+    "canonical_f32_sha256": "0f656a7309a5e07382afd55da8eb4633dffcd4bf427714f8462d658bb440d5f4",
+    "open_first_ms": 0.127,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 15.196,
+     "min": 14.827,
+     "max": 15.261
+    },
+    "decode_core_ms": {
+     "median": 13.621,
+     "min": 13.484,
+     "max": 14.607
+    },
+    "xrt_songcore_output": 789.67,
+    "xrt_decode_core": 880.98,
+    "audio_seconds": 12.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4959,
+    "branch-misses": 244676,
+    "branches": 30298043,
+    "cycles": 453003319,
+    "instructions": 1452663622,
+    "elapsed_s": 0.150559447,
+    "user_s": 0.130696,
+    "sys_s": 0.019802
+   }
+  }
+ },
+ "wasm3": {
+  "flac-16-44-stereo.flac": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 176400,
+    "duration_us": 4000000,
+    "canonical_f32_sha256": "42d1070b2677972af85ec6cdde40601e465cf0a2439c87d206e6ba8b61184727",
+    "open_first_ms": 3.489,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 86.076,
+     "min": 85.66,
+     "max": 86.989
+    },
+    "decode_core_ms": {
+     "median": 82.665,
+     "min": 82.498,
+     "max": 83.852
+    },
+    "xrt_songcore_output": 46.47,
+    "xrt_decode_core": 48.39,
+    "audio_seconds": 4.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4480,
+    "branch-misses": 8059690,
+    "branches": 939145434,
+    "cycles": 2943488104,
+    "instructions": 5803341094,
+    "elapsed_s": 0.806036913,
+    "user_s": 0.79784,
+    "sys_s": 0.008018
+   }
+  },
+  "mp3-cbr-id3v23.mp3": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 176400,
+    "duration_us": 4000000,
+    "canonical_f32_sha256": "01591b8239fea294bc39922bd7625d02b193961c144459d7509572e1edc6f681",
+    "open_first_ms": 2.872,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 164.789,
+     "min": 163.775,
+     "max": 168.057
+    },
+    "decode_core_ms": {
+     "median": 162.413,
+     "min": 162.412,
+     "max": 164.801
+    },
+    "xrt_songcore_output": 24.27,
+    "xrt_decode_core": 24.63,
+    "audio_seconds": 4.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4521,
+    "branch-misses": 97922949,
+    "branches": 906586365,
+    "cycles": 5225084551,
+    "instructions": 6539129818,
+    "elapsed_s": 1.423860176,
+    "user_s": 1.407553,
+    "sys_s": 0.015994
+   }
+  },
+  "aac-lc-44-stereo.m4a": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 529200,
+    "duration_us": 12000000,
+    "canonical_f32_sha256": "0ae6379d746dbaa305ffa62a29a9cc22af8e160270842e02b7412be5b668cec9",
+    "open_first_ms": 11.402,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 283.263,
+     "min": 278.106,
+     "max": 288.822
+    },
+    "decode_core_ms": {
+     "median": 276.063,
+     "min": 275.762,
+     "max": 278.621
+    },
+    "xrt_songcore_output": 42.36,
+    "xrt_decode_core": 43.47,
+    "audio_seconds": 12.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4612,
+    "branch-misses": 133793120,
+    "branches": 1992484232,
+    "cycles": 9692536074,
+    "instructions": 14009385832,
+    "elapsed_s": 2.583941837,
+    "user_s": 2.567185,
+    "sys_s": 0.015994
+   }
+  },
+  "opus-48-stereo.opus": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 48000,
+    "channels": 2,
+    "samples": 576000,
+    "duration_us": 12006500,
+    "canonical_f32_sha256": "bcf34b306af7109bf5612ffa94812834cac2fde793c202ec4b1ed387ef27aab8",
+    "open_first_ms": 7.214,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 853.783,
+     "min": 835.394,
+     "max": 929.747
+    },
+    "decode_core_ms": {
+     "median": 860.749,
+     "min": 844.589,
+     "max": 875.391
+    },
+    "xrt_songcore_output": 14.06,
+    "xrt_decode_core": 13.95,
+    "audio_seconds": 12.007
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4539,
+    "branch-misses": 498403881,
+    "branches": 4240692466,
+    "cycles": 24932805917,
+    "instructions": 28885994961,
+    "elapsed_s": 6.712543338,
+    "user_s": 6.69161,
+    "sys_s": 0.015999
+   }
+  },
+  "mp3-long.mp3": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 529200,
+    "duration_us": 12000000,
+    "canonical_f32_sha256": "0f656a7309a5e07382afd55da8eb4633dffcd4bf427714f8462d658bb440d5f4",
+    "open_first_ms": 3.53,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 533.693,
+     "min": 494.762,
+     "max": 554.572
+    },
+    "decode_core_ms": {
+     "median": 474.874,
+     "min": 470.833,
+     "max": 481.497
+    },
+    "xrt_songcore_output": 22.48,
+    "xrt_decode_core": 25.27,
+    "audio_seconds": 12.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 4521,
+    "branch-misses": 276148431,
+    "branches": 2611327437,
+    "cycles": 14953313399,
+    "instructions": 19103236914,
+    "elapsed_s": 4.030730253,
+    "user_s": 4.021712,
+    "sys_s": 0.008003
+   }
+  }
+ },
+ "wasmtime": {
+  "flac-16-44-stereo.flac": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 176400,
+    "duration_us": 4000000,
+    "canonical_f32_sha256": "42d1070b2677972af85ec6cdde40601e465cf0a2439c87d206e6ba8b61184727",
+    "open_first_ms": 0.258,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 5.948,
+     "min": 5.751,
+     "max": 5.971
+    },
+    "decode_core_ms": {
+     "median": 5.441,
+     "min": 5.391,
+     "max": 5.504
+    },
+    "xrt_songcore_output": 672.46,
+    "xrt_decode_core": 735.18,
+    "audio_seconds": 4.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 14785,
+    "branch-misses": 49540532,
+    "branches": 1179861564,
+    "cycles": 4775044732,
+    "instructions": 7108113184,
+    "elapsed_s": 0.286181649,
+    "user_s": 1.554667,
+    "sys_s": 0.07574
+   }
+  },
+  "mp3-cbr-id3v23.mp3": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 176400,
+    "duration_us": 4000000,
+    "canonical_f32_sha256": "01591b8239fea294bc39922bd7625d02b193961c144459d7509572e1edc6f681",
+    "open_first_ms": 0.178,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 6.639,
+     "min": 6.122,
+     "max": 6.814
+    },
+    "decode_core_ms": {
+     "median": 6.325,
+     "min": 6.195,
+     "max": 8.031
+    },
+    "xrt_songcore_output": 602.51,
+    "xrt_decode_core": 632.38,
+    "audio_seconds": 4.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 14844,
+    "branch-misses": 48854336,
+    "branches": 1135760594,
+    "cycles": 4874132362,
+    "instructions": 7259129497,
+    "elapsed_s": 0.296206912,
+    "user_s": 1.589073,
+    "sys_s": 0.087399
+   }
+  },
+  "aac-lc-44-stereo.m4a": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 529200,
+    "duration_us": 12000000,
+    "canonical_f32_sha256": "0ae6379d746dbaa305ffa62a29a9cc22af8e160270842e02b7412be5b668cec9",
+    "open_first_ms": 0.76,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 11.375,
+     "min": 10.584,
+     "max": 13.108
+    },
+    "decode_core_ms": {
+     "median": 9.639,
+     "min": 8.902,
+     "max": 9.686
+    },
+    "xrt_songcore_output": 1054.97,
+    "xrt_decode_core": 1244.95,
+    "audio_seconds": 12.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 15349,
+    "branch-misses": 49009498,
+    "branches": 1195320000,
+    "cycles": 5108837783,
+    "instructions": 7781834804,
+    "elapsed_s": 0.358320223,
+    "user_s": 1.591471,
+    "sys_s": 0.16691
+   }
+  },
+  "opus-48-stereo.opus": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 48000,
+    "channels": 2,
+    "samples": 576000,
+    "duration_us": 12006500,
+    "canonical_f32_sha256": "bcf34b306af7109bf5612ffa94812834cac2fde793c202ec4b1ed387ef27aab8",
+    "open_first_ms": 0.513,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 32.331,
+     "min": 31.911,
+     "max": 33.448
+    },
+    "decode_core_ms": {
+     "median": 30.676,
+     "min": 30.033,
+     "max": 30.816
+    },
+    "xrt_songcore_output": 371.36,
+    "xrt_decode_core": 391.4,
+    "audio_seconds": 12.007
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 15693,
+    "branch-misses": 52617331,
+    "branches": 1356862244,
+    "cycles": 5497664730,
+    "instructions": 9604466121,
+    "elapsed_s": 0.497252747,
+    "user_s": 1.737751,
+    "sys_s": 0.116627
+   }
+  },
+  "mp3-long.mp3": {
+   "bench": {
+    "mode": "bench",
+    "status": "ok",
+    "sample_rate": 44100,
+    "channels": 2,
+    "samples": 529200,
+    "duration_us": 12000000,
+    "canonical_f32_sha256": "0f656a7309a5e07382afd55da8eb4633dffcd4bf427714f8462d658bb440d5f4",
+    "open_first_ms": 0.19,
+    "iterations": 3,
+    "warmup": 1,
+    "songcore_output_ms": {
+     "median": 25.285,
+     "min": 24.954,
+     "max": 26.972
+    },
+    "decode_core_ms": {
+     "median": 24.038,
+     "min": 23.056,
+     "max": 24.047
+    },
+    "xrt_songcore_output": 474.6,
+    "xrt_decode_core": 499.21,
+    "audio_seconds": 12.0
+   },
+   "perf_stat": {
+    "context-switches": 0,
+    "cpu-migrations": 0,
+    "page-faults": 15422,
+    "branch-misses": 49348142,
+    "branches": 1190328747,
+    "cycles": 5016758932,
+    "instructions": 8421118179,
+    "elapsed_s": 0.40566186,
+    "user_s": 1.633167,
+    "sys_s": 0.095367
+   }
+  }
+ }
+}

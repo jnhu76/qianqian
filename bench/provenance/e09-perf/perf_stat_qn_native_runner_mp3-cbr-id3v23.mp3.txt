@@ -1,0 +1,21 @@
+# started on Mon Aug 31 13:28:29 2026
+
+
+ Performance counter stats for '/home/hoo/Source/qianqian/build/artifacts/qn_native_runner /home/hoo/Source/qianqian/corpus/fixtures/mp3-cbr-id3v23.mp3 bench 3':
+
+                 0      context-switches:u               #      0.0 cs/sec  cs_per_second     
+                 0      cpu-migrations:u                 #      0.0 migrations/sec  migrations_per_second
+               957      page-faults:u                    #  30918.5 faults/sec  page_faults_per_second
+             30.95 msec task-clock:u                     #      0.9 CPUs  CPUs_utilized       
+            157912      branch-misses:u                  #      0.6 %  branch_miss_rate         (44.48%)
+          27251054      branches:u                       #    880.4 M/sec  branch_frequency     (70.24%)
+          97236917      cpu-cycles:u                     #      3.1 GHz  cycles_frequency       (74.11%)
+         325285968      instructions:u                   #      3.3 instructions  insn_per_cycle  (74.23%)
+           3576309      stalled-cycles-frontend:u        #     0.03 frontend_cycles_idle        (68.42%)
+
+       0.032293358 seconds time elapsed
+
+       0.032376000 seconds user
+       0.000000000 seconds sys
+
+

@@ -24,17 +24,21 @@ static void pb_fill(uint8_t seed) {
     for (uint32_t i = 0; i < PB_BYTES; i++) g_buf[i] = (uint8_t)(seed + i);
 }
 
-/* the "boundary": a real function call with the same arg shape as the
- * wasm export, doing the same guest-side memcpy the guest module does */
-static int32_t pb_pull(int32_t dst, int32_t cap) {
-    if (!g_buf || cap <= 0) return -1;
+/* the "boundary": a real function call doing the same guest-side memcpy
+ * the wasm export does. The wasm export takes an int32 APP pointer (valid:
+ * wasm32 linear memory is 32-bit); the native twin must take a real pointer
+ * -- truncating a 64-bit host pointer to int32 segfaults (E09 lesson: the
+ * staged-copy protocol is wasm32-shaped and must not leak to 64-bit hosts). */
+static int32_t pb_pull(uint8_t *dst, int32_t cap) {
+    if (!g_buf || !dst || cap <= 0) return -1;
     uint32_t n = (uint32_t)cap;
     if (n > PB_BYTES) n = PB_BYTES;
-    memcpy((void *)(intptr_t)dst, g_buf, n);
+    memcpy(dst, g_buf, n);
     return (int32_t)n;
 }
 
 static int32_t pb_reset(void) { return 0; } /* fixed-call-overhead baseline */
+static volatile uint8_t pb_sink; /* consumes copy results; defeats DCE */
 
 int main(void) {
     g_buf = malloc(PB_BYTES);
@@ -50,16 +54,20 @@ int main(void) {
         int bytes = sizes[si];
         pb_fill((uint8_t)si);
 
-        /* fixed call overhead */
+        /* fixed call overhead (barrier keeps the empty call alive) */
         double t0 = qn_now_ms();
-        for (int i = 0; i < REPS; i++) pb_reset();
+        for (int i = 0; i < REPS; i++) {
+            pb_reset();
+            pb_sink = (uint8_t)REPS;
+        }
         double noop_ms = qn_now_ms() - t0;
 
         /* call + copy (guest memcpy + host memcpy in the wasm case; here the
          * equivalent is the call-into-memcpy + host copy) */
         t0 = qn_now_ms();
         for (int i = 0; i < REPS; i++) {
-            pb_pull((int32_t)(intptr_t)hostbuf, bytes);
+            pb_pull(hostbuf, bytes);
+            pb_sink = hostbuf[0];
         }
         double call_copy_ms = qn_now_ms() - t0;
 
@@ -67,6 +75,7 @@ int main(void) {
         t0 = qn_now_ms();
         for (int i = 0; i < REPS; i++) {
             memcpy(hostbuf, g_buf, (size_t)bytes);
+            pb_sink = hostbuf[0];
         }
         double direct_ms = qn_now_ms() - t0;
 

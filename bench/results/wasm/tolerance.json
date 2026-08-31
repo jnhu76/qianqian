@@ -1,0 +1,34 @@
+{
+ "method": "canonical f32 PCM dumped from native twin (qn_pcm_dump, 12B header stripped) and WAMR Mode B (qn_wamr_runner pcm <fixture> <outfile>); element-wise f64 delta",
+ "note": "all five wasm runtimes are bit-identical to each other (see correctness.json); this study quantifies native-vs-wasm residual for float-DSP codecs",
+ "fixtures": {
+  "mp3-cbr-id3v23.mp3": {
+   "samples": 352800,
+   "max_abs_delta": 1.7881393432617188e-07,
+   "rms_delta": 2.1954020907045704e-08,
+   "differing_samples": 171618,
+   "max_abs_delta_in_16bit_lsb": 0.005859375
+  },
+  "aac-lc-44-stereo.m4a": {
+   "samples": 1058400,
+   "max_abs_delta": 5.960464477539063e-08,
+   "rms_delta": 1.1433594483272842e-10,
+   "differing_samples": 31,
+   "max_abs_delta_in_16bit_lsb": 0.001953125
+  },
+  "vorbis-44-stereo.ogg": {
+   "samples": 1058400,
+   "max_abs_delta": 0.0,
+   "rms_delta": 0.0,
+   "differing_samples": 0,
+   "max_abs_delta_in_16bit_lsb": 0.0
+  },
+  "opus-48-stereo.opus": {
+   "samples": 1152000,
+   "max_abs_delta": 0.0,
+   "rms_delta": 0.0,
+   "differing_samples": 0,
+   "max_abs_delta_in_16bit_lsb": 0.0
+  }
+ }
+}
