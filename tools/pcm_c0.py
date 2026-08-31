@@ -235,8 +235,15 @@ def parse_config_evidence(stage: str) -> dict:
     flist = d / "oracle" / "libavfilter" / "filter_list.c"
     registered = []
     if flist.is_file() and (d / "oracle" / "libavfilter" / "libavfilter.a").is_file():
-        for sym in re.findall(r"&ff_[a-z]+_([a-z0-9_]+)", flist.read_text()):
-            name = FILTER_ALIAS.get(sym, sym)
+        for sym in re.findall(r"&ff_([a-z0-9_]+)", flist.read_text()):
+            # ff_asrc_abuffer/ff_asink_abuffer -> abuffer/abuffersink; other
+            # classes strip their prefix (ff_af_volume -> volume)
+            if sym in FILTER_ALIAS:
+                name = FILTER_ALIAS[sym]
+            elif "_" in sym:
+                name = sym.split("_", 1)[1]
+            else:
+                name = sym
             if name not in FILTER_VIDEO_BUFFER:
                 registered.append(name)
     return {
