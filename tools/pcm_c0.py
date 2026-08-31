@@ -73,6 +73,10 @@ PROBE_NEEDS_ARESAMPLE["atempo"] = False  # packed-flt candidate; graph proves it
 LTO_STAGES = {"avf-c0", "avf-c1", "avf-c4", "avf-c8"}
 
 FILTER_ALIAS = {"asrc_abuffer": "abuffer", "asink_abuffer": "abuffersink"}
+FILTER_ALWAYS_PRESENT = {"abuffer", "abuffersink"}  # base OBJS of libavfilter,
+# unconditionally appended to filter_list by configure (configure:8953); no
+# CONFIG_*_FILTER variable exists for them
+FILTER_VIDEO_BUFFER = {"buffer"}  # vsrc/vsink_buffer land in filter_list too
 
 
 def sh(cmd: list, **kw) -> subprocess.CompletedProcess:
@@ -163,6 +167,11 @@ def derive_profile(stage: str, tier_ids: list) -> dict:
     if tier_ids:
         enable += ["avfilter"] + (["swresample"] if swr else [])
         disable = [x for x in disable if x not in ("avfilter", "swresample")]
+        # --disable-everything only disables components; libraries stay on by
+        # default, so swresample must stay explicitly disabled when no tier
+        # declares the format-adaptation foundation (c1 leak: 9 swr TUs)
+        if not swr:
+            disable.append("swresample")
         if aresample:
             filters.add("aresample")
     p["libraries"] = {"enable": sorted(set(enable)), "disable": sorted(set(disable))}
@@ -227,7 +236,9 @@ def parse_config_evidence(stage: str) -> dict:
     registered = []
     if flist.is_file() and (d / "oracle" / "libavfilter" / "libavfilter.a").is_file():
         for sym in re.findall(r"&ff_[a-z]+_([a-z0-9_]+)", flist.read_text()):
-            registered.append(FILTER_ALIAS.get(sym, sym))
+            name = FILTER_ALIAS.get(sym, sym)
+            if name not in FILTER_VIDEO_BUFFER:
+                registered.append(name)
     return {
         "filters_enabled_config": sorted(set(filters)),
         "external_libs_enabled": sorted(externals),
@@ -621,8 +632,13 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
         "intended_filters": sorted(stage_filters),
         "config_enabled": config_ev["filters_enabled_config"],
         "filter_list_registered": config_ev["filter_list_registered"],
-        "intended_subset_of_config": stage_filters <= set(config_ev["filters_enabled_config"]),
-        "filter_list_matches_config": set(config_ev["filter_list_registered"]) == set(config_ev["filters_enabled_config"]),
+        "always_present": sorted(FILTER_ALWAYS_PRESENT),
+        "intended_subset_of_config": (
+            stage_filters - FILTER_ALWAYS_PRESENT
+            <= set(config_ev["filters_enabled_config"])),
+        "filter_list_matches_config": (
+            set(config_ev["filter_list_registered"])
+            == set(config_ev["filters_enabled_config"]) | FILTER_ALWAYS_PRESENT),
     }
 
     # ---- xmake replay: plain ----
