@@ -1,0 +1,127 @@
+{
+ "experiment": "e10-a1",
+ "section": "src_performance",
+ "method": "CLOCK_MONOTONIC, block 1024, median of 3 reps; real PCM pre-decoded before timing",
+ "rows": [
+  {
+   "candidate": "swr",
+   "in_rate": 44100,
+   "out_rate": 48000,
+   "stream": "real_songcore_44100",
+   "reps": 3,
+   "ns_per_input_frame_median": 21.132,
+   "xrt": 1022.35,
+   "post_prepare_alloc_calls": 0
+  },
+  {
+   "candidate": "swr",
+   "in_rate": 96000,
+   "out_rate": 44100,
+   "stream": "synthetic_96k_60s",
+   "reps": 3,
+   "ns_per_input_frame_median": 22.085,
+   "xrt": 484.28,
+   "post_prepare_alloc_calls": 0
+  },
+  {
+   "candidate": "swr",
+   "in_rate": 96000,
+   "out_rate": 44100,
+   "stream": "real_songcore_96000",
+   "reps": 3,
+   "ns_per_input_frame_median": 21.101,
+   "xrt": 493.66,
+   "post_prepare_alloc_calls": 0
+  },
+  {
+   "candidate": "soxr",
+   "in_rate": 44100,
+   "out_rate": 48000,
+   "stream": "real_songcore_44100",
+   "reps": 3,
+   "ns_per_input_frame_median": 17.18,
+   "xrt": 1290.55,
+   "post_prepare_alloc_calls": 39
+  },
+  {
+   "candidate": "soxr",
+   "in_rate": 96000,
+   "out_rate": 44100,
+   "stream": "synthetic_96k_60s",
+   "reps": 3,
+   "ns_per_input_frame_median": 10.909,
+   "xrt": 925.02,
+   "post_prepare_alloc_calls": 43
+  },
+  {
+   "candidate": "soxr",
+   "in_rate": 96000,
+   "out_rate": 44100,
+   "stream": "real_songcore_96000",
+   "reps": 3,
+   "ns_per_input_frame_median": 11.561,
+   "xrt": 928.18,
+   "post_prepare_alloc_calls": 43
+  },
+  {
+   "candidate": "r8b",
+   "in_rate": 44100,
+   "out_rate": 48000,
+   "stream": "real_songcore_44100",
+   "reps": 3,
+   "ns_per_input_frame_median": 47.338,
+   "xrt": 479.02,
+   "post_prepare_alloc_calls": 0
+  },
+  {
+   "candidate": "r8b",
+   "in_rate": 96000,
+   "out_rate": 44100,
+   "stream": "synthetic_96k_60s",
+   "reps": 3,
+   "ns_per_input_frame_median": 28.664,
+   "xrt": 363.41,
+   "post_prepare_alloc_calls": 0
+  },
+  {
+   "candidate": "r8b",
+   "in_rate": 96000,
+   "out_rate": 44100,
+   "stream": "real_songcore_96000",
+   "reps": 3,
+   "ns_per_input_frame_median": 28.215,
+   "xrt": 366.96,
+   "post_prepare_alloc_calls": 0
+  },
+  {
+   "candidate": "lsr",
+   "in_rate": 44100,
+   "out_rate": 48000,
+   "stream": "real_songcore_44100",
+   "reps": 3,
+   "ns_per_input_frame_median": 744.194,
+   "xrt": 31.97,
+   "post_prepare_alloc_calls": 0
+  },
+  {
+   "candidate": "lsr",
+   "in_rate": 96000,
+   "out_rate": 44100,
+   "stream": "synthetic_96k_60s",
+   "reps": 3,
+   "ns_per_input_frame_median": 761.876,
+   "xrt": 13.96,
+   "post_prepare_alloc_calls": 0
+  },
+  {
+   "candidate": "lsr",
+   "in_rate": 96000,
+   "out_rate": 44100,
+   "stream": "real_songcore_96000",
+   "reps": 3,
+   "ns_per_input_frame_median": 730.759,
+   "xrt": 14.11,
+   "post_prepare_alloc_calls": 0
+  }
+ ]
+}

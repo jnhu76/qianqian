@@ -28,6 +28,82 @@ def load_a0():
     return json.loads(p.read_text())
 
 
+def load_a1():
+    p = ROOT / "bench/results/pcm-processing/a1-summary.json"
+    if not p.exists():
+        return None
+    return json.loads(p.read_text())
+
+
+def a1_table():
+    a1 = load_a1()
+    if not a1:
+        return None
+    q = a1["quality"]["rows"]
+    perf = a1["performance"]["rows"]
+    shp = a1["shipping"]
+    qrows = {}
+    for r in q:
+        qrows.setdefault(r["candidate"], []).append(r)
+    lines = []
+    # quality summary
+    lines += [
+        "| candidate | THD+N 1k (min..max, dB) | alias rej (downsample, dB) | "
+        "imaging (upsample, dB) | DC gain (min) | near-nyq passband (dB) |",
+        "|---|---|---:|---:|---:|---:|",
+    ]
+    for cand in ["swr", "soxr", "r8b", "lsr"]:
+        rs = qrows.get(cand, [])
+        if not rs:
+            continue
+        thd = [r["thd_n_1k_dB"] for r in rs if r.get("thd_n_1k_dB") is not None]
+        al = [r["alias_rejection_db"] for r in rs
+              if r.get("alias_rejection_db") is not None]
+        im = [r["imaging_above_input_nyquist_db"] for r in rs
+              if r.get("imaging_above_input_nyquist_db") is not None]
+        dc = [r["dc_gain"] for r in rs if r.get("dc_gain") is not None]
+        nn = [r["near_nyquist_gain_db"] for r in rs
+              if r.get("near_nyquist_gain_db") is not None]
+        thd_s = f"{min(thd)}..{max(thd)}" if thd else "n/a"
+        al_s = f"{min(al)}" if al else "n/a"
+        im_s = f"{max(im)}" if im else "n/a"
+        dc_s = f"{min(dc):.6f}" if dc else "n/a"
+        nn_s = f"{min(nn)}..{max(nn)}" if nn else "n/a"
+        lines.append(f"| {cand} | {thd_s} | {al_s} | {im_s} | {dc_s} | {nn_s} |")
+    # performance
+    lines += [
+        "",
+        "| candidate | ns/input frame (real 44.1→48) | ns/input frame "
+        "(real 96→44.1) | xRT (min across streams) | post-prepare alloc "
+        "calls |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for cand in ["swr", "soxr", "r8b", "lsr"]:
+        rows = [r for r in perf if r["candidate"] == cand]
+        if not rows:
+            continue
+        f441 = next((r["ns_per_input_frame_median"] for r in rows
+                     if r["in_rate"] == 44100), None)
+        f96 = next((r["ns_per_input_frame_median"] for r in rows
+                    if r["in_rate"] == 96000), None)
+        xrt = min(r["xrt"] for r in rows)
+        alloc = max(r["post_prepare_alloc_calls"] for r in rows)
+        lines.append(
+            f"| {cand} | {f441:.2f} | {f96:.2f} | {xrt:.1f} | {alloc} |")
+    # shipping
+    lines += [
+        "",
+        "| candidate | runner raw bytes | stripped | xz -9 |",
+        "|---|---:|---:|---:|",
+        f"| bypass (baseline) | {shp['baseline_bypass_bytes']} | - | - |",
+    ]
+    for r in shp["rows"]:
+        lines.append(
+            f"| {r['candidate']} | {r['raw_bytes']} | {r['stripped_bytes']} "
+            f"| {r['xz_bytes']} |")
+    return "\n".join(lines)
+
+
 def gate_table():
     lines = [
         "| gate | verdict |",
@@ -344,6 +420,17 @@ def build_block():
             " 汇编；表格禁止手抄）",
             "",
             a0,
+            "",
+        ]
+    a1 = a1_table()
+    if a1:
+        parts += [
+            "### E10-A1 SRC shootout（BYPASS/swr/soxr/r8b/lsr）",
+            "",
+            "machine authority：`a1-summary.json`（经 `tools/pcm_a1.py` 汇编；"
+            "quality/perf/shipping 数字禁止手抄）",
+            "",
+            a1,
             "",
         ]
     parts += [END]

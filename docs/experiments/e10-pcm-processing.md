@@ -336,6 +336,32 @@ limitations：single Windows host; one active render endpoint (Realtek)；exclus
 
 machine authority：`a0-windows-endpoints.json` / `a0-format-support.json` / `a0-reopen.json` / `a0-summary.json`（`tools/pcm_a0_windows.py` 汇编；`--check` 漂移即 FAIL）。
 
+### E10-A1 SRC shootout（BYPASS/swr/soxr/r8b/lsr）
+
+machine authority：`a1-summary.json`（经 `tools/pcm_a1.py` 汇编；quality/perf/shipping 数字禁止手抄）
+
+| candidate | THD+N 1k (min..max, dB) | alias rej (downsample, dB) | imaging (upsample, dB) | DC gain (min) | near-nyq passband (dB) |
+|---|---|---:|---:|---:|---:|
+| swr | -141.9..-106.6 | -32.7 | -106.8 | 0.999992 | -2.16..-0.02 |
+| soxr | -136.7..-133.8 | -161.4 | -120.0 | 1.000000 | -0.02..-0.0 |
+| r8b | -154.9..-150.5 | -198.2 | -120.0 | 1.000000 | 0.0..0.0 |
+| lsr | -154.9..-145.8 | -172.5 | -120.0 | 1.000000 | -0.0..-0.0 |
+
+| candidate | ns/input frame (real 44.1→48) | ns/input frame (real 96→44.1) | xRT (min across streams) | post-prepare alloc calls |
+|---|---:|---:|---:|---:|
+| swr | 21.13 | 22.09 | 484.3 | 0 |
+| soxr | 17.18 | 10.91 | 925.0 | 43 |
+| r8b | 47.34 | 28.66 | 363.4 | 0 |
+| lsr | 744.19 | 761.88 | 14.0 | 0 |
+
+| candidate | runner raw bytes | stripped | xz -9 |
+|---|---:|---:|---:|
+| bypass (baseline) | 21808 | - | - |
+| swr | 398040 | 370928 | 126892 |
+| soxr | 354504 | 339128 | 121504 |
+| r8b | 150248 | 125224 | 50220 |
+| lsr | 1516920 | 1510024 | 938140 |
+
 <!-- END GENERATED TABLES -->
 
 读数要点（数字一律以上方生成表为准，不在此手抄）：
@@ -404,6 +430,44 @@ machine authority：`a0-windows-endpoints.json` / `a0-format-support.json` / `a0
 局限：单 Windows 主机、单活动渲染端点；silence-only，无 audible
 signal；不推广到其他设备/驱动。多设备矩阵留给 reviewer 或后续
 `a0` 扩展。
+
+## E10-A1 读数要点（SRC shootout）
+
+机器证据见上方生成表（`a1-summary.json`）。方法：确定性信号、
+impulse 测 delay、sine-fit（精确减基波）测 THD+N 与各单音增益、
+Hann 周期图测 imaging；**频率以 Hz 保存**（重采样只改每周期样本
+数），所有单音指标按保存频率测量；downsample 的 alias 音放在目标
+Nyquist 之上 8% 处，量折返点。
+
+- **swr（FFmpeg n9.0.1，默认配置）质量最弱**：THD+N 约 -107 dB
+  （44.1 系转换，其余候选 -134 dB 以下）；downsample 近 Nyquist
+  alias 抑制仅 **-33 dB**（25920 Hz→96k 转 48k，其默认
+  filter_size=32 的过渡带），远处频率才到 -106 dB；DC 增益
+  0.99999（-0.0001）；48→44.1 近 Nyquist 通带有 -2.2 dB 衰减。
+  这是默认配置的实测——swr 可调（filter_size/cutoff），调优后
+  是否追上 soxr/r8b/lsr 属后续项。**swr 已在 Qianqian FFmpeg
+  closure 内**，增量 shipping 只算可达符号，远小于独立 runner。
+- **soxr（HQ）**：质量 -134 dB 级、alias -161 dB；**最快**
+  （10.9-17.2 ns/frame，≥925×RT）；唯一 post-prepare 有分配者
+  （43 次，违反 RT 零分配），若走 RT 路径需预留或换配置。
+- **r8b（线性相位）**：质量最好（THD+N -151 dB、alias -198 dB）、
+  **shipping 最小**（stripped 125 KB / xz 50 KB）、0 分配；但内部
+  double 精度要求 f32↔double 双转换胶水（28-47 ns/frame，含胶水），
+  且**没有干净的 EOF/drain 语义**（需按理想输出帧数喂零收尾，
+  getLatency() 恒 0）。
+- **lsr（BEST）**：质量好（-146..-155 dB、alias -173 dB）、0 分配、
+  drain 语义干净；但 **744 ns/frame（14×RT）慢 30-70 倍**、**shipping
+  巨大**（xz 938 KB，best-quality sinc 系数表）。
+- **duration/latency**：全部候选输出长度误差 ≤1 帧；soxr 首个输出
+  在 768 输入帧后、r8b 在 1536 帧后（lookahead），swr/lsr 立即输出；
+  drain tail = 各自滤波器延迟（swr 17 / soxr 504 / r8b 1795 / lsr 0）。
+- **BYPASS 同率参考**：block 1..4096 全部 bit-identical，延迟 0。
+- **Pareto 初读（不冻结决策）**：质量/速度 sweet spot 是 soxr
+  （但违反 RT 零分配）；质量/shipping 最优是 r8b（但需处理
+  drain 语义与 double 胶水）；“零增量成本”是 swr（但默认质量最弱，
+  近 Nyquist alias 是 96k→48k 的真实风险）；lsr 除质量外无优势。
+  单一候选对四个平台都不显然——生产决策留给 reviewer，
+  本实验只交付证据。
 
 ## 9. 遗留问题（交给 E10-A0 / A1 / B0）
 

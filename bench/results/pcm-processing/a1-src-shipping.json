@@ -1,0 +1,32 @@
+{
+ "experiment": "e10-a1",
+ "section": "src_shipping",
+ "method": "standalone runner per candidate with equivalent responsibility; stripped; xz -9",
+ "baseline_bypass_bytes": 21808,
+ "rows": [
+  {
+   "candidate": "swr",
+   "raw_bytes": 398040,
+   "stripped_bytes": 370928,
+   "xz_bytes": 126892
+  },
+  {
+   "candidate": "soxr",
+   "raw_bytes": 354504,
+   "stripped_bytes": 339128,
+   "xz_bytes": 121504
+  },
+  {
+   "candidate": "r8b",
+   "raw_bytes": 150248,
+   "stripped_bytes": 125224,
+   "xz_bytes": 50220
+  },
+  {
+   "candidate": "lsr",
+   "raw_bytes": 1516920,
+   "stripped_bytes": 1510024,
+   "xz_bytes": 938140
+  }
+ ]
+}
