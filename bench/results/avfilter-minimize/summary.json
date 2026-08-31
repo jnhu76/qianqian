@@ -589,7 +589,7 @@
  ],
  "provenance": {
   "git_branch": "exp/e10-libavfilter-capability-min",
-  "git_commit": "c47598c4714927e863d73f4892adda20c5f41696",
+  "git_commit": "051eb8c94f78a652744f226a66544a0972644ba3",
   "host": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43"
  },
  "scope_statements": {
