@@ -1,0 +1,55 @@
+{
+  "experiment": "e09-wasm-total-cost",
+  "layer": 1,
+  "host": {
+    "os": "linux",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "arch": "x86_64"
+  },
+  "toolchains": [
+    {
+      "name": "wasi-sdk",
+      "version": "34.0",
+      "url": "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-x86_64-linux.tar.gz",
+      "archive_sha256": "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4",
+      "clang": "clang version 23.1.0-wasi-sdk (llvm-project 895aa2c896ada719451be2e3673c83da8ddf1141)"
+    },
+    {
+      "name": "wasm-micro-runtime",
+      "version": "WAMR-2.4.5",
+      "url": "https://github.com/bytecodealliance/wasm-micro-runtime/archive/refs/tags/WAMR-2.4.5.tar.gz",
+      "archive_sha256": "1ab09d51099f276ca4a1d6629f6b589aab2bd0caa01445e05031a4bed22c199b",
+      "interp_build": "classic interp (WASM_ENABLE_FAST_INTERP=0), AOT=1, LIBC_WASI=1",
+      "aot_compiler": "wamrc built from same source against system LLVM 18.1.8 (llvm-18-dev), -DWAMR_BUILD_WITH_CUSTOM_LLVM=1"
+    },
+    {
+      "name": "wasm3",
+      "version": "commit 2b4a5fa4c35def3552a9283c4f7aab39a93f33e9",
+      "url": "https://github.com/wasm3/wasm3/archive/2b4a5fa4c35def3552a9283c4f7aab39a93f33e9.tar.gz",
+      "archive_sha256": "16948f0ff7eb5c44ee349b41335bb88c86a81961c5deceb5c4d17369d6d0982a",
+      "build_note": "linked from runner source with d_m3HasWASI=0; minimal WASI surface implemented in qn_wasm3_runner.c (test-only)"
+    },
+    {
+      "name": "wasmtime",
+      "version": "v48.0.1",
+      "url": "https://github.com/bytecodealliance/wasmtime/releases/download/v48.0.1/wasmtime-v48.0.1-x86_64-linux-c-api.tar.xz",
+      "archive_sha256": "67683d04b416a8b91f0e607e7b4c22bd32f18f947c10b5372eb8c277ae3b883a",
+      "link": "libwasmtime.a (C API)"
+    },
+    {
+      "name": "emsdk",
+      "version": "6.0.8 (emcc aeb67926e7de656da38bc807d83050af93578758)",
+      "url": "https://github.com/emscripten-core/emsdk",
+      "commit": "e5bd3d0874e302a18f13c5b41f5bacf9a40c8e59",
+      "commit_date": "2026-08-20",
+      "note": "git-pinned clone; no upstream tarball sha256 (clone verified by commit id)"
+    },
+    {
+      "name": "FlameGraph",
+      "version": "commit 41fee1f99f92",
+      "url": "https://github.com/brendangregg/FlameGraph/archive/41fee1f99f92.tar.gz",
+      "archive_sha256": "b1ba3aaaf296ab72ced4dca84514377a4b2c8122831d743f726c106d3d339c2a"
+    }
+  ],
+  "network_note": "downloads performed with normal network first; an HTTP proxy was enabled as fallback only. Proxy address is intentionally absent from this file and all provenance."
+}

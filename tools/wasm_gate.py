@@ -27,9 +27,14 @@ TIMEOUT_S = 120
 RUNTIMES = [
     ("native", ROOT / "build/artifacts/qn_native_runner", []),
     ("wamr", ROOT / "build/artifacts/qn_wamr_runner", []),
+    ("wamr_aot", ROOT / "build/artifacts/qn_wamr_aot_runner", []),
     ("wasm3", ROOT / "build/artifacts/qn_wasm3_runner", []),
     ("wasmtime", ROOT / "build/artifacts/qn_wasmtime_runner", []),
 ]
+
+# wamrc artifact (compiled from the patched canonical guest wasm); the AOT
+# runner consumes .aot instead of .wasm.
+AOT_ARTIFACT = ROOT / "build/artifacts/wasm/qn_guest_bench.aot"
 
 
 def load_cases():
@@ -96,10 +101,11 @@ def main():
         if not binary.exists():
             results[rt] = {"_gate": "runner-missing"}
             continue
+        this_guest = AOT_ARTIFACT if rt == "wamr_aot" else guest
         per = {}
         for cid, c in cases.items():
             fx = FIXTURES / c["file"]
-            j = run_correct(binary, guest, fx)
+            j = run_correct(binary, this_guest, fx)
             per[cid] = j
         results[rt] = per
 

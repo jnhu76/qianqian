@@ -52,6 +52,15 @@ int32_t pb_pull(int32_t dst, int32_t cap) {
     return (int32_t)n;
 }
 
+/* host-side staging allocation for the Mode C pull loop (same protocol as
+ * the bench guest's bench_stage_alloc; keeps the harness runtime-agnostic) */
+QN_EXPORT("pb_stage_alloc")
+int32_t pb_stage_alloc(int32_t size) {
+    if (size <= 0) return 0;
+    void *p = malloc((size_t)size);
+    return p ? (int32_t)(intptr_t)p : 0;
+}
+
 QN_EXPORT("pb_reset")
 void pb_reset(void) { /* staging cursor kept for protocol symmetry */ }
 
