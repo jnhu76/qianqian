@@ -1,0 +1,8 @@
+{
+  "experiment": "e10-a0",
+  "section": "windows_render_endpoints",
+  "note": "native Windows enumeration via WASAPI; endpoint ids hashed (FNV-1a) for privacy; friendly names kept as device model only",
+  "endpoints": [
+  {"endpoint_id_hash": "e5f79a1d7dbe679a", "is_default": true, "friendly_name": "\u626c\u58f0\u5668 (Realtek High Definition Audio)"}
+  ]
+}

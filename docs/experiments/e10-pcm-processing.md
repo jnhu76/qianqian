@@ -310,6 +310,32 @@ machine authority：`p0-performance.json`（经 summary 转录）
 
 timed passes = 5 + 1 warmup，每个 timed sample 内重复整条流 32 次（摊销钟/调度噪声；分布见 p0-performance.json）；零拷贝转发路径即管线抽象地板（~8 ns/call @ 256fr stereo）。小 block 行的 overhead 受残余噪声支配，解读以量级为准。
 
+### E10-A0 Windows AudioSink（原生 WASAPI，本主机）
+
+machine authority：`a0-summary.json`（经 `tools/pcm_a0_windows.py` 汇编；表格禁止手抄）
+
+device evidence status：**COLLECTED**（单主机；端点数 1）
+
+| endpoint | app BYPASS（shared 原生率） | Windows SRC | exclusive/source-rate device |
+|---|---|---|---|
+| `e5f79a1d…` | YES (48000 kHz) | YES | NO |
+
+| 端点 | mix format | engine period（default/min, 100ns） |
+|---|---|---|
+| `e5f79a1d…` | 48000 Hz / 2ch / f32 (float) | 100000 / 30000 |
+
+reopen/reconfigure（44.1k→48k→44.1k，每 rate 30 cycles，QPC）：
+
+| rate | total cycle median ms | initialize median ms | min ms | max ms |
+|---|---:|---:|---:|---:|
+| 44100 | 42.45 | 39.56 | 41.20 | 46.99 |
+| 48000 | 42.37 | 39.53 | 40.87 | 45.49 |
+| 44100 | 43.31 | 40.35 | 41.14 | 51.48 |
+
+limitations：single Windows host; one active render endpoint (Realtek)；exclusive-mode IsFormatSupported/Initialize returned AUDCLNT_E_UNSUPPORTED_FORMAT for every rate on this device；no audible signals emitted; silence only；format acceptance is not absence of driver/device DSP。
+
+machine authority：`a0-windows-endpoints.json` / `a0-format-support.json` / `a0-reopen.json` / `a0-summary.json`（`tools/pcm_a0_windows.py` 汇编；`--check` 漂移即 FAIL）。
+
 <!-- END GENERATED TABLES -->
 
 读数要点（数字一律以上方生成表为准，不在此手抄）：
@@ -350,6 +376,34 @@ timed passes = 5 + 1 warmup，每个 timed sample 内重复整条流 32 次（�
   异常尺度（小 block 行的 overhead 受残余计时噪声支配，解读以
   量级为准）。throughput 单位修正后（MiB/s = bytes×1e9/ns/2^20）
   不再是 0.0，并全部通过派生指标 sanity。
+
+## E10-A0 读数要点（Windows-first AudioSink）
+
+机器证据见上方生成表（`a0-summary.json`）。三条路径在本主机
+（Realtek 默认渲染端点）的实测分类：
+
+- **A（app BYPASS）**：shared 模式下只有 mix rate（48000 Hz）是
+  `IsFormatSupported = S_OK`；44.1k/96k/88.2k/176.4k/192k 全部
+  `S_FALSE`（closest = 48000），即引擎需要转换。48k Float32 歌曲
+  可以无 app SRC 直接供给；44.1k 歌曲在 shared 模式下必须有人做
+  SRC（app 或 Windows）。
+- **B（Windows-owned SRC）**：`AUTOCONVERTPCM | SRC_DEFAULT_QUALITY`
+  在 44.1k 上 `Initialize = S_OK`——Windows Audio Engine 会做转换。
+  这是 sink-owned 的免费竞争者，质量/成本需 A1 对照。
+- **C（source-rate device format）**：本设备全部采样率的 exclusive
+  `IsFormatSupported = AUDCLNT_E_UNSUPPORTED_FORMAT`、exclusive
+  `Initialize` 同样失败——**该设备不存在 true source-rate 路径**。
+  若未来有支持 exclusive 的设备，format 接受 ≠ bit-perfect（驱动
+  DSP 仍可能介入），A0 不声称 bit transparency。
+- **reopen cost**：44.1k→48k→44.1k 每次 ~42-43 ms（median），
+  其中 `Initialize` 占 ~40 ms，`Activate/GetMixFormat/Start/Stop`
+  合计 ~2 ms。一次采样率切换的固定成本非零但有限——“常驻 app SRC”
+  与“按需 reopen”之争需要 A1 给出 SRC 的持续 CPU 成本后才有数字
+  结论（本机不决策）。
+
+局限：单 Windows 主机、单活动渲染端点；silence-only，无 audible
+signal；不推广到其他设备/驱动。多设备矩阵留给 reviewer 或后续
+`a0` 扩展。
 
 ## 9. 遗留问题（交给 E10-A0 / A1 / B0）
 

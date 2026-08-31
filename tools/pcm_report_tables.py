@@ -21,6 +21,13 @@ BEGIN = "<!-- BEGIN GENERATED TABLES -->"
 END = "<!-- END GENERATED TABLES -->"
 
 
+def load_a0():
+    p = ROOT / "bench/results/pcm-processing/a0-summary.json"
+    if not p.exists():
+        return None
+    return json.loads(p.read_text())
+
+
 def gate_table():
     lines = [
         "| gate | verdict |",
@@ -229,7 +236,63 @@ def negative_table():
     return "\n".join(lines)
 
 
+def a0_table():
+    a0 = load_a0()
+    if not a0:
+        return None
+    lines = [
+        f"device evidence status：**{a0['device_evidence_status']}**"
+        f"（单主机；端点数 {len(a0['endpoints'])}）",
+        "",
+        "| endpoint | app BYPASS（shared 原生率） | Windows SRC | "
+        "exclusive/source-rate device |",
+        "|---|---|---|---|",
+    ]
+    for c in a0["classification"]:
+        lines.append(
+            f"| `{c['endpoint_id_hash'][:8]}…` | "
+            f"{'YES' if c['app_bypass_possible'] else 'NO'} "
+            f"({', '.join(str(r) for r in c['app_bypass_rates_shared_native'])}"
+            f" kHz) | {'YES' if c['windows_src_available'] else 'NO'} | "
+            f"{'YES' if c['exclusive_source_rate_available'] else 'NO'} |")
+    lines += [
+        "",
+        "| 端点 | mix format | engine period（default/min, 100ns） |",
+        "|---|---|---|",
+    ]
+    for r in a0["endpoint_rows"]:
+        m = r["mix_format"]
+        p = r["engine_period_hns"]
+        lines.append(
+            f"| `{r['endpoint_id_hash'][:8]}…` | "
+            f"{m['rate']} Hz / {m['channels']}ch / f32 "
+            f"({'float' if m.get('subtype_float') else 'other'}) | "
+            f"{p['default']} / {p['minimum']} |")
+    lines += [
+        "",
+        "reopen/reconfigure（44.1k→48k→44.1k，每 rate 30 cycles，QPC）：",
+        "",
+        "| rate | total cycle median ms | initialize median ms | min ms | max ms |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for c in a0["reopen_cost_ms"]:
+        lines.append(
+            f"| {c['rate']} | {c['total_cycle_ms_median']:.2f} "
+            f"| {c['initialize_ms_median']:.2f} | {c['total_cycle_ms_min']:.2f} "
+            f"| {c['total_cycle_ms_max']:.2f} |")
+    lines += [
+        "",
+        "limitations：" + "；".join(a0["limitations"]) + "。",
+        "",
+        "machine authority：`a0-windows-endpoints.json` / "
+        "`a0-format-support.json` / `a0-reopen.json` / `a0-summary.json`"
+        "（`tools/pcm_a0_windows.py` 汇编；`--check` 漂移即 FAIL）。",
+    ]
+    return "\n".join(lines)
+
+
 def build_block():
+    a0 = a0_table()
     parts = [
         BEGIN,
         "### P0 机器 gate",
@@ -272,8 +335,18 @@ def build_block():
         "",
         performance_table(),
         "",
-        END,
     ]
+    if a0:
+        parts += [
+            "### E10-A0 Windows AudioSink（原生 WASAPI，本主机）",
+            "",
+            "machine authority：`a0-summary.json`（经 `tools/pcm_a0_windows.py`"
+            " 汇编；表格禁止手抄）",
+            "",
+            a0,
+            "",
+        ]
+    parts += [END]
     return "\n".join(parts)
 
 
