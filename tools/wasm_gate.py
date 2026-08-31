@@ -22,7 +22,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = ROOT / "corpus" / "fixtures"
 OUT = ROOT / "bench" / "results" / "wasm" / "correctness.json"
-TIMEOUT_S = 120
+# classic-interp engines need real wall time on long fixtures (mp3-long
+# correct ≈ 4 near-full decode passes ≈ 2 min CPU under WAMR interp; perf
+# shows 99.4% wasm_interp_call_func_bytecode — cost, not a hang)
+TIMEOUT_S = 600
 
 RUNTIMES = [
     ("native", ROOT / "build/artifacts/qn_native_runner", []),
@@ -77,6 +80,7 @@ def observable(j):
     seeks = [(s.get("target_us"), s.get("resume_sample"), s.get("status"),
               s.get("suffix_sha256")) for s in j.get("seeks", [])]
     art = j.get("artwork") or {}
+    dec = j.get("decode") or {}
     return {
         "status": "ok",
         "container": j.get("container"),
@@ -86,7 +90,11 @@ def observable(j):
         "duration_us": j.get("duration_us"),
         "metadata": j.get("metadata"),
         "artwork_sha": art.get("sha256"),
-        "decode": j.get("decode"),
+        # decode_ms is wall-clock, not an observable; comparing it turns the
+        # gate into a timing lottery (E09 gate round-1 lesson)
+        "decode": {k: dec.get(k) for k in
+                   ("status", "samples", "frames",
+                    "canonical_f32_sha256", "canonical_len")},
         "eof": j.get("eof"),
         "suffix": j.get("suffix"),
         "seeks": seeks,

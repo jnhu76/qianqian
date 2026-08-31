@@ -438,6 +438,8 @@ if get_config("e09") then
         set_default(false)
         set_targetdir(artifact_dir)
         set_optimize("faster") -- host-side runner code; guest speed is runtime-owned
+        set_symbols("debug")
+        set_strip("none") -- profilation needs iwasm symbols (E09 perf attribution)
         add_files("tools/wasm/qn_wamr_runner.c", "tools/wasm/qn_runner_common.c")
         add_includedirs("tools/wasm", path.join(wamr_root, "core", "iwasm", "include"))
         add_linkdirs(wamr_libdir)
@@ -451,7 +453,8 @@ if get_config("e09") then
         set_default(false)
         set_targetdir(artifact_dir)
         set_optimize("faster")
-        add_files("tools/wasm/qn_wamr_runner.c", "tools/wasm/qn_runner_common.c")
+        set_symbols("debug")
+        set_strip("none")        add_files("tools/wasm/qn_wamr_runner.c", "tools/wasm/qn_runner_common.c")
         add_includedirs("tools/wasm", path.join(wamr_root, "core", "iwasm", "include"))
         add_linkdirs(wamr_libdir)
         add_links("iwasm")
@@ -465,7 +468,8 @@ if get_config("e09") then
         set_default(false)
         set_targetdir(artifact_dir)
         set_optimize("faster")
-        add_files("tools/wasm/qn_wasm3_runner.c", "tools/wasm/qn_runner_common.c")
+        set_symbols("debug")
+        set_strip("none")        add_files("tools/wasm/qn_wasm3_runner.c", "tools/wasm/qn_runner_common.c")
         add_files(path.join(wasm3_root, "source", "*.c"))
         remove_files(path.join(wasm3_root, "source", "m3_api_uvwasi.c"),
                      path.join(wasm3_root, "source", "m3_api_wasi.c"),
@@ -483,7 +487,8 @@ if get_config("e09") then
         set_default(false)
         set_targetdir(artifact_dir)
         set_optimize("faster")
-        add_files("tools/wasm/qn_wasmtime_runner.c", "tools/wasm/qn_runner_common.c")
+        set_symbols("debug")
+        set_strip("none")        add_files("tools/wasm/qn_wasmtime_runner.c", "tools/wasm/qn_runner_common.c")
         add_includedirs("tools/wasm", wasmtime_root .. "/include")
         add_ldflags(wasmtime_root .. "/lib/libwasmtime.a", {force = true})
         if is_plat("linux") then
@@ -496,7 +501,8 @@ if get_config("e09") then
         set_default(false)
         set_targetdir(artifact_dir)
         set_optimize("faster")
-        add_files("tools/wasm/qn_pb_native.c", "tools/wasm/qn_runner_common.c")
+        set_symbols("debug")
+        set_strip("none")        add_files("tools/wasm/qn_pb_native.c", "tools/wasm/qn_runner_common.c")
         add_includedirs("tools/wasm")
         if is_plat("linux") then
             add_syslinks("m")
