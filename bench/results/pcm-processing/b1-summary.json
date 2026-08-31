@@ -1,0 +1,97 @@
+{
+ "experiment": "e10-b1-thin-vs-libavfilter",
+ "authority_files": [
+  "b1-libavfilter-closure.json",
+  "b1-comparison.json",
+  "b1-shipping.json"
+ ],
+ "verdict": "PASS",
+ "closure": {
+  "experiment": "e10-b1",
+  "section": "libavfilter_closure",
+  "configure": "disable-everything + avfilter + filters=volume,equalizer,alimiter,abuffer,abuffersink,anull,aformat,aresample + swresample (aresample requires it for format adaptation)",
+  "pinned_ffmpeg": "n9.0.1 bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+  "translation_units_compiled": {
+   "libavfilter": 22,
+   "libavutil": 95,
+   "libavcodec": 47,
+   "libavformat": 32,
+   "libswresample": 9
+  },
+  "archive_bytes": {
+   "libavfilter": 1905334,
+   "libavutil": 5010622,
+   "libavcodec": 3337092,
+   "libavformat": 3111314,
+   "libswresample": 643210
+  },
+  "note": "aresample auto-inserted because alimiter is double-precision and the equalizer chain is fltp -> a real graph needs the format converter (drags libswresample into the closure)",
+  "thin_dsp_surface": {
+   "source_files": 1,
+   "source_loc": 450,
+   "translation_units": 2
+  }
+ },
+ "comparison": {
+  "experiment": "e10-b1",
+  "section": "comparison",
+  "capability": "gain/volume + 10-band EQ + limiter, Float32 stereo, 48 kHz, block 256",
+  "runs": [
+   {
+    "backend": "avf",
+    "block_frames": 256,
+    "input_frames": 1440000,
+    "ns_per_stream": 80523229.0,
+    "ns_per_input_frame": 55.919,
+    "xrt": 372.5633,
+    "first_output_input_pos": 0,
+    "post_init_alloc_calls": 0,
+    "post_init_alloc_bytes": 0,
+    "sample_scanning_passes": 12
+   },
+   {
+    "backend": "thin",
+    "block_frames": 256,
+    "input_frames": 1440000,
+    "ns_per_stream": 86960533.0,
+    "ns_per_input_frame": 60.389,
+    "xrt": 344.9841,
+    "first_output_input_pos": 0,
+    "post_init_alloc_calls": 0,
+    "post_init_alloc_bytes": 0,
+    "sample_scanning_passes": 12
+   }
+  ],
+  "findings": {
+   "cpu_avf_vs_thin_ratio": 0.926,
+   "post_init_allocs_avf": 0,
+   "post_init_allocs_thin": 0,
+   "sample_scanning_passes_equal": true
+  },
+  "verdict": "PASS"
+ },
+ "shipping": {
+  "experiment": "e10-b1",
+  "section": "shipping",
+  "method": "stripped / xz -9 of each runner with equivalent responsibility",
+  "rows": [
+   {
+    "runner": "b1_avf",
+    "raw_bytes": 2026136,
+    "stripped_bytes": 583928,
+    "xz_bytes": 204744
+   },
+   {
+    "runner": "b1_thin",
+    "raw_bytes": 22760,
+    "stripped_bytes": 18648,
+    "xz_bytes": 5988
+   }
+  ]
+ },
+ "provenance": {
+  "git_parent_commit": "7eea2b0f3be082e55bc0a920b1164ff0173517cd",
+  "git_branch": "exp/e10-src-dsp-lab",
+  "ffmpeg": "n9.0.1 (pinned)"
+ }
+}

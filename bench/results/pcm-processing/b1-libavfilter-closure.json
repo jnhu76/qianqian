@@ -1,0 +1,26 @@
+{
+ "experiment": "e10-b1",
+ "section": "libavfilter_closure",
+ "configure": "disable-everything + avfilter + filters=volume,equalizer,alimiter,abuffer,abuffersink,anull,aformat,aresample + swresample (aresample requires it for format adaptation)",
+ "pinned_ffmpeg": "n9.0.1 bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+ "translation_units_compiled": {
+  "libavfilter": 22,
+  "libavutil": 95,
+  "libavcodec": 47,
+  "libavformat": 32,
+  "libswresample": 9
+ },
+ "archive_bytes": {
+  "libavfilter": 1905334,
+  "libavutil": 5010622,
+  "libavcodec": 3337092,
+  "libavformat": 3111314,
+  "libswresample": 643210
+ },
+ "note": "aresample auto-inserted because alimiter is double-precision and the equalizer chain is fltp -> a real graph needs the format converter (drags libswresample into the closure)",
+ "thin_dsp_surface": {
+  "source_files": 1,
+  "source_loc": 450,
+  "translation_units": 2
+ }
+}

@@ -383,6 +383,25 @@ correctness verdict：**PASS**（gain 0dB bit-identical / -6dB analytical / fusi
 
 machine authority：`b0-correctness.json` / `b0-memory.json` / `b0-dsp-response.json` / `b0-summary.json`
 
+### E10-B1 thin DSP vs trimmed libavfilter
+
+machine authority：`b1-summary.json`（经 `tools/pcm_b1.py` 汇编）
+
+| 维度 | thin DSP | trimmed libavfilter |
+|---|---|---|
+| 编译 TU | 2 (1 源文件) | 205 (avfilter 22 + avutil 95 + avcodec 47 + avformat 32 + swresample 9) |
+| 源码面 | ~450 LOC | FFmpeg 源 （pin n9.0.1） |
+| 格式适配 | 无（in-place） | 需要 aresample（alimiter 为 double，拖进 swresample） |
+| 参数更新 | in-place 系数计算 | 图重建 / 运行时参数 |
+| reset | in-place 清状态 | 图级 |
+
+| runner | ns/frame | xRT | post-init allocs | 输出 stripped/xz |
+|---|---:|---:|---:|---:|
+| avf | 55.9 | 372.6 | 0 | 583928 / 204744 |
+| thin | 60.4 | 345.0 | 0 | 18648 / 5988 |
+
+结论（B1 证据范围）：CPU 与 memory passes 相当（12 passes/block，框架开销非主导）；差异在 closure（205 vs 2 TU）与 shipping（xz 205 KB vs 6 KB，~34×）。libavfilter 对本能力集无必要依赖——`libavfilter production dependency = 0 bytes` 成立。
+
 <!-- END GENERATED TABLES -->
 
 读数要点（数字一律以上方生成表为准，不在此手抄）：
@@ -508,6 +527,26 @@ Nyquist 之上 8% 处，量折返点。
   IIR 状态不被毒化）；**DSP OFF = P0 位透明 bypass**（NaN 原样通过，
   P0 已证）。
 - **分配**：所有链 post-prepare 0 分配（--wrap 计数）。
+
+
+## E10-B1 读数要点（thin DSP vs trimmed libavfilter）
+
+机器证据见上方生成表（`b1-summary.json`）。要点：
+
+- **CPU 与 memory passes 相当**：capability-equivalent 链
+  （volume+10×equalizer+alimiter vs gain+eq10+limiter）均为 12 次
+  样本扫描 pass/block，CPU 55.9 vs 60.4 ns/frame——**框架调度不是
+  主导成本**，滤波数学才是（B0 的 12-pass 结论对两边都成立）。
+- **closure 差异巨大**：libavfilter 需要 205 个编译 TU（含
+  aresample 为格式适配自动插入，因 alimiter 是 double 精度、equalizer
+  链是 fltp，拖进 libswresample）；thin DSP = 1 个源文件、2 TU。
+- **shipping**：avf runner xz 205 KB vs thin 6 KB（~34×）。
+- **libavfilter 对本能力集无必要依赖成立**：`libavfilter production
+  dependency = 0 bytes` 是有效结论（B1 证据范围内）。
+- 局限：本比较在 block 256/48k/30s 流上；未测参数量 >10 band 的
+  图、未测 SIMD（B2）；alimiter 语义与 B0 limiter 不同（B0 是
+  peak-hold 无 lookahead，alimiter 是 lookahead 型）——按 B1
+  fairness 规则分别记录语义差异，不做波形相等断言。
 
 ## 9. 遗留问题（交给 E10-A0 / A1 / B0）
 

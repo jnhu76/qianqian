@@ -411,6 +411,56 @@ def b0_table():
     return "\n".join(lines)
 
 
+def load_b1():
+    p = ROOT / "bench/results/pcm-processing/b1-summary.json"
+    if not p.exists():
+        return None
+    return json.loads(p.read_text())
+
+
+def b1_table():
+    b1 = load_b1()
+    if not b1:
+        return None
+    c = b1["closure"]
+    shp = b1["shipping"]["rows"]
+    runs = b1["comparison"]["runs"]
+    tu = c["translation_units_compiled"]
+    total_tu = sum(tu.values())
+    lines = [
+        "| 维度 | thin DSP | trimmed libavfilter |",
+        "|---|---|---|",
+        f"| 编译 TU | {c['thin_dsp_surface']['translation_units']} "
+        f"({c['thin_dsp_surface']['source_files']} 源文件) | {total_tu} "
+        f"(avfilter {tu['libavfilter']} + avutil {tu['libavutil']} + "
+        f"avcodec {tu['libavcodec']} + avformat {tu['libavformat']} + "
+        f"swresample {tu['libswresample']}) |",
+        f"| 源码面 | ~{c['thin_dsp_surface']['source_loc']} LOC | FFmpeg 源 "
+        f"（pin n9.0.1） |",
+        "| 格式适配 | 无（in-place） | 需要 aresample（alimiter 为 double，"
+        "拖进 swresample） |",
+        "| 参数更新 | in-place 系数计算 | 图重建 / 运行时参数 |",
+        "| reset | in-place 清状态 | 图级 |",
+    ]
+    lines += ["", "| runner | ns/frame | xRT | post-init allocs | 输出 "
+                  "stripped/xz |", "|---|---:|---:|---:|---:|"]
+    for r in runs:
+        name = "avf" if r["backend"] == "avf" else "thin"
+        srow = next(x for x in shp if x["runner"] == f"b1_{name}")
+        lines.append(
+            f"| {name} | {r['ns_per_input_frame']:.1f} | {r['xrt']:.1f} "
+            f"| {r['post_init_alloc_calls']} | "
+            f"{srow['stripped_bytes']} / {srow['xz_bytes']} |")
+    lines += [
+        "",
+        "结论（B1 证据范围）：CPU 与 memory passes 相当（12 passes/block，"
+        "框架开销非主导）；差异在 closure（205 vs 2 TU）与 shipping"
+        "（xz 205 KB vs 6 KB，~34×）。libavfilter 对本能力集无必要依赖——"
+        "`libavfilter production dependency = 0 bytes` 成立。",
+    ]
+    return "\n".join(lines)
+
+
 def build_block():
     a0 = a0_table()
     parts = [
@@ -485,6 +535,16 @@ def build_block():
             "machine authority：`b0-summary.json`（经 `tools/pcm_b0.py` 汇编）",
             "",
             b0,
+            "",
+        ]
+    b1 = b1_table()
+    if b1:
+        parts += [
+            "### E10-B1 thin DSP vs trimmed libavfilter",
+            "",
+            "machine authority：`b1-summary.json`（经 `tools/pcm_b1.py` 汇编）",
+            "",
+            b1,
             "",
         ]
     parts += [END]

@@ -1,0 +1,19 @@
+{
+ "experiment": "e10-b1",
+ "section": "shipping",
+ "method": "stripped / xz -9 of each runner with equivalent responsibility",
+ "rows": [
+  {
+   "runner": "b1_avf",
+   "raw_bytes": 2026136,
+   "stripped_bytes": 583928,
+   "xz_bytes": 204744
+  },
+  {
+   "runner": "b1_thin",
+   "raw_bytes": 22760,
+   "stripped_bytes": 18648,
+   "xz_bytes": 5988
+  }
+ ]
+}

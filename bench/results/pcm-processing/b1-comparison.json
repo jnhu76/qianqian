@@ -1,0 +1,38 @@
+{
+ "experiment": "e10-b1",
+ "section": "comparison",
+ "capability": "gain/volume + 10-band EQ + limiter, Float32 stereo, 48 kHz, block 256",
+ "runs": [
+  {
+   "backend": "avf",
+   "block_frames": 256,
+   "input_frames": 1440000,
+   "ns_per_stream": 80523229.0,
+   "ns_per_input_frame": 55.919,
+   "xrt": 372.5633,
+   "first_output_input_pos": 0,
+   "post_init_alloc_calls": 0,
+   "post_init_alloc_bytes": 0,
+   "sample_scanning_passes": 12
+  },
+  {
+   "backend": "thin",
+   "block_frames": 256,
+   "input_frames": 1440000,
+   "ns_per_stream": 86960533.0,
+   "ns_per_input_frame": 60.389,
+   "xrt": 344.9841,
+   "first_output_input_pos": 0,
+   "post_init_alloc_calls": 0,
+   "post_init_alloc_bytes": 0,
+   "sample_scanning_passes": 12
+  }
+ ],
+ "findings": {
+  "cpu_avf_vs_thin_ratio": 0.926,
+  "post_init_allocs_avf": 0,
+  "post_init_allocs_thin": 0,
+  "sample_scanning_passes_equal": true
+ },
+ "verdict": "PASS"
+}
