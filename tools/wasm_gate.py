@@ -27,7 +27,11 @@ Gate policy (executable, not post-hoc):
            every tolerance-allowed stream (a runtime whose PCM regressed but
            kept correct structure can no longer be hidden behind the
            native<->anchor tolerance);
-        f) the measured numeric max_abs_delta <= TOLERANCE_BOUND.
+        f) the measured numeric max_abs_delta <= TOLERANCE_BOUND for EVERY
+           tolerance-allowed stream — the full decode, each suffix, and each
+           seek re-decode — with the evidence key sets matching the observed
+           streams (a stream with hash evidence but no numeric measurement
+           is rejected, not silently tolerated).
 
   Every case is classified exactly one of: exact_matches / accepted_with_
   tolerance / rejected. A runtime PASS requires rejected == 0. The 28/44
@@ -195,11 +199,56 @@ def _hash_list(field, obs):
     raise ValueError(field)
 
 
-def _numeric_max_delta(ev):
-    """The measured max_abs_delta from the identity-bound evidence."""
+def validate_numeric_evidence(ev, want):
+    """Every tolerance-allowed PCM stream must carry measured numeric
+    evidence, and every measured stream must be within TOLERANCE_BOUND:
+
+      full    required; max_abs_delta <= bound
+      suffix  key set (offsets) must equal the observed suffix streams;
+              each entry's max_abs_delta <= bound
+      seek    key set (target_us) must equal the identity-recorded seek
+              streams (done seeks with a suffix hash); each entry's
+              max_abs_delta <= bound
+
+    The identity binding above already pinned the observed suffix/seek lists
+    to the evidence, so a key mismatch here means a stream has hash evidence
+    but no numeric measurement. Returns None when valid, else a reason."""
     nd = ev.get("numeric_delta") or {}
-    full = nd.get("full") if isinstance(nd.get("full"), dict) else nd
-    return full.get("max_abs_delta")
+    full = nd.get("full") if isinstance(nd.get("full"), dict) else None
+    if not isinstance(full, dict):
+        return "tolerance evidence missing numeric delta (full)"
+    md = full.get("max_abs_delta")
+    if not isinstance(md, (int, float)) or md > TOLERANCE_BOUND:
+        return (f"tolerance evidence max_abs_delta (full)={md} exceeds "
+                f"bound {TOLERANCE_BOUND}")
+
+    suffix = [d for d in (nd.get("suffix") or []) if isinstance(d, dict)]
+    got_sfx = [d.get("offset") for d in suffix]
+    want_sfx = [idx for idx, _ in (want.get("suffix") or [])]
+    if got_sfx != want_sfx:
+        return (f"tolerance evidence suffix key mismatch: expected offsets "
+                f"{want_sfx}, got {got_sfx}")
+    for d in suffix:
+        md = d.get("max_abs_delta")
+        if not isinstance(md, (int, float)) or md > TOLERANCE_BOUND:
+            return (f"tolerance evidence max_abs_delta "
+                    f"(suffix@{d.get('offset')})={md} exceeds "
+                    f"bound {TOLERANCE_BOUND}")
+
+    seek = [d for d in (nd.get("seek") or []) if isinstance(d, dict)]
+    got_seek = [d.get("target_us") for d in seek]
+    want_seek = [t for (t, _r, st, h) in (want.get("seeks") or [])
+                 if st == "done" and h]
+    if got_seek != want_seek:
+        return (f"tolerance evidence seek key mismatch: expected targets "
+                f"{want_seek}, got {got_seek}")
+    for d in seek:
+        md = d.get("max_abs_delta")
+        if not isinstance(md, (int, float)) or md > TOLERANCE_BOUND:
+            return (f"tolerance evidence max_abs_delta "
+                    f"(seek@{d.get('target_us')})={md} exceeds "
+                    f"bound {TOLERANCE_BOUND}")
+    return None
 
 
 def classify(case, want, obs, tol, anchor=None):
@@ -259,10 +308,9 @@ def classify(case, want, obs, tol, anchor=None):
     if ev.get("samples") is not None and \
             ev["samples"] != want.get("decode", {}).get("samples"):
         return "rejected", "tolerance evidence sample count mismatch"
-    md = _numeric_max_delta(ev)
-    if md is None or md > TOLERANCE_BOUND:
-        return "rejected", (f"tolerance evidence max_abs_delta={md} exceeds "
-                            f"bound {TOLERANCE_BOUND}")
+    reason = validate_numeric_evidence(ev, want)
+    if reason is not None:
+        return "rejected", reason
     return "tolerated", None
 
 

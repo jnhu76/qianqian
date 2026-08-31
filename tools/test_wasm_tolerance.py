@@ -18,6 +18,11 @@ Scenarios (synthetic, built from the REAL committed correctness.json rows):
   - stale native evidence: evidence.native hash != current native -> REJECT
   - stale anchor evidence: evidence.wasm_anchor != current anchor  -> REJECT
   - bound exceeded:       measured delta > bound -> REJECT
+  - seek delta exceeded:  seek re-decode (distinct decode path) delta > bound
+                          -> REJECT
+  - missing seek delta:   seek hash evidence present but its numeric
+                          measurement absent -> REJECT
+  - suffix delta exceeded: suffix slice delta > bound -> REJECT
 
 Run:  python3 tools/test_wasm_tolerance.py   (exit 0 = all PASS)
 """
@@ -69,6 +74,13 @@ def build_evidence(case, want, anchor):
         "numeric_delta": {
             "full": {"max_abs_delta": 1e-7, "rms_delta": 1e-9,
                      "differing_samples": 100},
+            "suffix": [{"max_abs_delta": 1e-7, "rms_delta": 1e-9,
+                        "differing_samples": 10, "offset": idx}
+                       for idx, _ in (want.get("suffix") or [])],
+            "seek": [{"max_abs_delta": 1e-7, "rms_delta": 1e-9,
+                      "differing_samples": 10, "target_us": t}
+                     for (t, _r, st, h) in (want.get("seeks") or [])
+                     if st == "done" and h],
         },
     }
 
@@ -114,13 +126,24 @@ def main():
         print("error: no tolerated cases in correctness.json — the tolerance "
               "path cannot be exercised")
         return 2
-    cid = tol_cases[0]
+
+    def has_stream_evidence(o):
+        return (o.get("status") == "ok"
+                and bool(o.get("suffix"))
+                and any(st == "done" and h
+                        for (_t, _r, st, h) in (o.get("seeks") or [])))
+
+    # scenario fixture: a tolerated case with suffix AND done-seek streams, so
+    # the per-stream numeric negative tests (seek/suffix delta, missing seek
+    # evidence) are genuinely exercised against real observed streams.
+    cid = next((c for c in tol_cases if has_stream_evidence(ref.get(c))), None)
+    if cid is None or anchors.get(cid) is None:
+        print("error: no tolerated case with suffix + seek stream evidence "
+              "in correctness.json")
+        return 2
     case = cases[cid]
     want = ref[cid]
     anchor = anchors.get(cid)
-    if anchor is None or want.get("status") != "ok":
-        print(f"error: case {cid} missing ok native/anchor row")
-        return 2
     print(f"scenario fixture: {case['file']} (case {cid}, family "
           f"{case.get('expect', {}).get('codec')})")
     print(f"policy: tolerance bound={TOLERANCE_BOUND}, anchor={ANCHOR_RUNTIME}")
@@ -180,6 +203,32 @@ def main():
         TOLERANCE_BOUND * 10
     kind, reason = classify(case, want, clone(anchor), over, anchor)
     check("NEGATIVE: measured delta > bound -> REJECT", kind == "rejected",
+          reason)
+
+    # 9b. seek re-decode delta > bound (seek is a distinct decode path from
+    # the full stream — the full bound alone must not license it)
+    over = {case["file"]: build_evidence(case, want, anchor)}
+    over[case["file"]]["numeric_delta"]["seek"][0]["max_abs_delta"] = \
+        TOLERANCE_BOUND * 10
+    kind, reason = classify(case, want, clone(anchor), over, anchor)
+    check("NEGATIVE: seek re-decode delta > bound -> REJECT",
+          kind == "rejected", reason)
+
+    # 9c. missing seek numeric evidence (seek hash evidence present, its
+    # numeric measurement absent) -> key-set mismatch must reject
+    missing = {case["file"]: build_evidence(case, want, anchor)}
+    missing[case["file"]]["numeric_delta"]["seek"] = \
+        missing[case["file"]]["numeric_delta"]["seek"][1:]
+    kind, reason = classify(case, want, clone(anchor), missing, anchor)
+    check("NEGATIVE: missing seek numeric evidence -> REJECT",
+          kind == "rejected", reason)
+
+    # 9d. suffix delta > bound (symmetric per-stream bound on the slice)
+    over = {case["file"]: build_evidence(case, want, anchor)}
+    over[case["file"]]["numeric_delta"]["suffix"][0]["max_abs_delta"] = \
+        TOLERANCE_BOUND * 10
+    kind, reason = classify(case, want, clone(anchor), over, anchor)
+    check("NEGATIVE: suffix delta > bound -> REJECT", kind == "rejected",
           reason)
 
     # 10. missing evidence
