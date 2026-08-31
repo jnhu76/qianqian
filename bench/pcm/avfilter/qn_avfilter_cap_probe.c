@@ -180,7 +180,8 @@ typedef struct {
     uint64_t fnv;
     int all_finite;
     int channels;
-    int planar; /* negotiated sink format is planar: data[c] are planes */
+    int planar;       /* negotiated sink format is planar: data[c] are planes */
+    int sample_bytes; /* 4 = float32, 8 = float64 (dynamics are dbl/dblp) */
 } Stats;
 
 static void stats_init(Stats *s, int ch) {
@@ -190,38 +191,33 @@ static void stats_init(Stats *s, int ch) {
     for (int c = 0; c < ch; c++) s->peak[c] = -1.0;
 }
 
+static inline double stats_sample(const Stats *s, uint8_t **data, int c, int i) {
+    int bps = s->sample_bytes;
+    const uint8_t *q = s->planar ? data[c] + (size_t)i * bps
+                                 : data[0] + ((size_t)i * s->channels + c) * bps;
+    if (bps == 8) {
+        double v;
+        memcpy(&v, q, 8);
+        return v;
+    }
+    float v;
+    memcpy(&v, q, 4);
+    return (double)v;
+}
+
 static void stats_feed(Stats *s, uint8_t **data, int frames) {
     const int ch = s->channels;
-    if (!s->planar) {
-        const float *p = (const float *)data[0];
-        for (int i = 0; i < frames * ch; i++) {
-            float v = p[i];
-            uint32_t bits;
-            memcpy(&bits, &v, 4);
-            s->fnv = fnv1a64((uint8_t *)&bits, 4, s->fnv);
+    for (int i = 0; i < frames; i++) {
+        for (int c = 0; c < ch; c++) {
+            double v = stats_sample(s, data, c, i);
+            uint64_t h = s->fnv ^ (uint64_t)(0x9E3779B9u + (uint32_t)s->sample_bytes);
+            s->fnv = fnv1a64((uint8_t *)&v, 8, h);
             if (!isfinite(v)) { s->all_finite = 0; continue; }
-            int c = i % ch;
-            double a = fabs((double)v);
+            double a = fabs(v);
             if (a > s->peak[c]) s->peak[c] = a;
-            s->sumsq[c] += (double)v * v;
+            s->sumsq[c] += v * v;
             s->n[c]++;
             if (s->first_kept < FIRST_KEEP * ch) s->first[s->first_kept++] = v;
-        }
-    } else {
-        for (int c = 0; c < ch; c++) {
-            const float *p = (const float *)data[c];
-            for (int i = 0; i < frames; i++) {
-                float v = p[i];
-                uint32_t bits;
-                memcpy(&bits, &v, 4);
-                s->fnv = fnv1a64((uint8_t *)&bits, 4, s->fnv);
-                if (!isfinite(v)) { s->all_finite = 0; continue; }
-                double a = fabs((double)v);
-                if (a > s->peak[c]) s->peak[c] = a;
-                s->sumsq[c] += (double)v * v;
-                s->n[c]++;
-                if (s->first_kept < FIRST_KEEP * ch) s->first[s->first_kept++] = v;
-            }
         }
     }
     s->out_frames += frames;
@@ -395,6 +391,7 @@ static int run_graph(const char *chain, int rate, int ch, const Signal *sig,
         r->neg_rate = av_buffersink_get_sample_rate(sink);
         int fmt = av_buffersink_get_format(sink);
         r->stats.planar = av_sample_fmt_is_planar(fmt);
+        r->stats.sample_bytes = av_get_bytes_per_sample(fmt);
         const char *fn = av_get_sample_fmt_name(fmt);
         snprintf(r->neg_fmt, sizeof(r->neg_fmt), "%s", fn ? fn : "?");
     }
@@ -534,13 +531,16 @@ static int eval_expect(const char *spec, const GraphRun *r, const GraphRun *base
         return p >= 0 && p <= mx;
     }
     if (!strcmp(kind, "cross_channel")) {
-        int s = (int)spec_val(&save, "src", 0), d = (int)spec_val(&save, "dst", 1);
+        int sp = (int)spec_val(&save, "src", 0), d = (int)spec_val(&save, "dst", 1);
         double mr = spec_val(&save, "min_rms", 1e-5);
-        double rs = r->stats.n[s] ? sqrt(r->stats.sumsq[s] / (double)r->stats.n[s]) : 0;
+        int src_free = (int)spec_val(&save, "src_free", 0);
+        double rs = r->stats.n[sp] ? sqrt(r->stats.sumsq[sp] / (double)r->stats.n[sp]) : 0;
         double rd = r->stats.n[d] ? sqrt(r->stats.sumsq[d] / (double)r->stats.n[d]) : 0;
         *measured = rd;
         snprintf(detail, dlen, "rms src %.6f dst %.6f (min %.1e)", rs, rd, mr);
-        return rd >= mr && rs > rd * 0.01;
+        /* src_free: routes that MOVE the signal off the source channel
+         * (e.g. channelmap swap) legitimately leave the src silent */
+        return rd >= mr && (src_free || rs > rd * 0.01);
     }
     if (!strcmp(kind, "fir")) {
         double tol = 0.02;
