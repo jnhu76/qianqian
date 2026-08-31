@@ -135,10 +135,14 @@ static void jdbl(const char *k, double v) {
     if (isnan(v) || isinf(v)) fprintf(g_out, "\"%s\":null", k);
     else fprintf(g_out, "\"%s\":%.9g", k, v);
 }
-static void jkey(const char *k) { jsep(); fprintf(g_out, "\"%s\":{", k); }
-static void jarr(const char *k) { jsep(); fprintf(g_out, "\"%s\":[", k); }
-static void jend(void) { fputs("}", g_out); }
-static void jarr_end(void) { fputs("]", g_out); }
+static void jkey(const char *k) { jsep(); fprintf(g_out, "\"%s\":{", k); g_json_first = 1; }
+static void jarr(const char *k) { jsep(); fprintf(g_out, "\"%s\":[", k); g_json_first = 1; }
+static void jend(void) { fputs("}", g_out); g_json_first = 0; }
+static void jarr_end(void) { fputs("]", g_out); g_json_first = 0; }
+static void jnum(double v) {
+    if (isnan(v) || isinf(v)) fputs("null", g_out);
+    else fprintf(g_out, "%.9g", v);
+}
 
 /* ---------------- scenario parsing ---------------- */
 
@@ -293,9 +297,11 @@ static int run_graph(const char *chain, int rate, int ch, const Signal *sig,
         g, avfilter_get_by_name("abuffersink"), "out");
     if (!sink) { r->ok = 0; snprintf(r->err, sizeof(r->err), "abuffersink missing"); goto fail; }
     if (constrain_flt) {
+        /* n9 abuffersink constraints are ARRAY options renamed from the old
+         * av_opt_set_bin-era names: "sample_formats" here */
         enum AVSampleFormat flt = AV_SAMPLE_FMT_FLT;
-        ret = av_opt_set_bin(sink, "sample_fmts", (uint8_t *)&flt, sizeof(flt),
-                             AV_OPT_SEARCH_CHILDREN);
+        ret = av_opt_set_array(sink, "sample_formats", AV_OPT_SEARCH_CHILDREN,
+                               0, 1, AV_OPT_TYPE_SAMPLE_FMT, &flt);
         if (ret < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "sink fmt opt: %s", av_err2str(ret)); goto fail; }
     }
     ret = avfilter_init_dict(sink, NULL);
@@ -390,6 +396,11 @@ static int run_graph(const char *chain, int rate, int ch, const Signal *sig,
     while (done < frames) {
         int n = (frames - done > block) ? block : (int)(frames - done);
         gen_block(sig, rate, ch, done, n, gen);
+        /* av_frame_unref below resets these; they must be re-set each block */
+        inf->format = AV_SAMPLE_FMT_FLT;
+        inf->sample_rate = rate;
+        av_channel_layout_uninit(&inf->ch_layout);
+        av_channel_layout_default(&inf->ch_layout, ch);
         inf->nb_samples = n;
         inf->pts = done;
         if (av_frame_get_buffer(inf, 0) < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "frame_get_buffer"); break; }
@@ -657,6 +668,7 @@ int main(int argc, char **argv) {
         }
         if (ok) pass++;
 
+        jsep();
         fprintf(g_out, "{\"kind\":\"graph\",\"id\":\"%s\",\"ok\":%s,\"chain\":\"%s\"",
                 id ? id : "?", ok ? "true" : "false", chain ? chain : "");
         g_json_first = 0;
@@ -684,13 +696,13 @@ int main(int argc, char **argv) {
         jarr("peak");
         for (int c = 0; c < r.stats.channels; c++) {
             if (c) fputc(',', g_out);
-            jdbl("v", r.stats.peak[c]);
+            jnum(r.stats.peak[c]);
         }
         jarr_end();
         jarr("rms");
         for (int c = 0; c < r.stats.channels; c++) {
             if (c) fputc(',', g_out);
-            jdbl("v", r.stats.n[c] ? sqrt(r.stats.sumsq[c] / (double)r.stats.n[c]) : 0);
+            jnum(r.stats.n[c] ? sqrt(r.stats.sumsq[c] / (double)r.stats.n[c]) : 0);
         }
         jarr_end();
         if (expect_ran) { jraw("expect_detail", detail); jdbl("expect_measured", measured); }
