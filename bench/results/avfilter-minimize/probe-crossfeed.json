@@ -1,0 +1,290 @@
+{
+ "config_evidence": {
+  "external_libs_enabled": [],
+  "filter_list_registered": [
+   "abuffer",
+   "abuffersink",
+   "aformat",
+   "anull",
+   "aresample",
+   "crossfeed"
+  ],
+  "filter_list_sha256": "39df5ae4267c3507208a228151b462f28bc45335252a551d04191a8c04aa6469",
+  "filters_enabled_config": [
+   "aformat",
+   "anull",
+   "aresample",
+   "crossfeed"
+  ],
+  "license": "LGPL version 2.1 or later",
+  "misc": {
+   "CONFIG_STATIC": "yes"
+  }
+ },
+ "declared_needs_aresample": true,
+ "delta_vs_avf-c1": {
+  "stripped_bytes": 77824,
+  "units": 11,
+  "xz_bytes": 27412
+ },
+ "filters": [
+  "abuffer",
+  "abuffersink",
+  "aformat",
+  "anull",
+  "aresample",
+  "crossfeed"
+ ],
+ "graph_evidence": [
+  {
+   "auto_inserted": [],
+   "chain": "",
+   "id": "f0_endpoints",
+   "negotiated": {
+    "channels": 2,
+    "fmt": "flt",
+    "layout": "stereo",
+    "rate": 48000
+   },
+   "ok": true
+  },
+  {
+   "auto_inserted": [],
+   "chain": "anull",
+   "id": "f0_anull",
+   "negotiated": {
+    "channels": 2,
+    "fmt": "flt",
+    "layout": "stereo",
+    "rate": 48000
+   },
+   "ok": true
+  },
+  {
+   "auto_inserted": [],
+   "chain": "aformat=sample_fmts=flt:sample_rates=48000",
+   "id": "f0_aformat_flt",
+   "negotiated": {
+    "channels": 2,
+    "fmt": "flt",
+    "layout": "stereo",
+    "rate": 48000
+   },
+   "ok": true
+  },
+  {
+   "auto_inserted": [
+    "auto_aresample_0"
+   ],
+   "chain": "crossfeed",
+   "id": "f3_crossfeed",
+   "negotiated": {
+    "channels": 2,
+    "fmt": "dbl",
+    "layout": "stereo",
+    "rate": 48000
+   },
+   "ok": true
+  }
+ ],
+ "manifest_per_library": {
+  "libavcodec": 72,
+  "libavfilter": 21,
+  "libavformat": 38,
+  "libavutil": 95,
+  "libswresample": 9
+ },
+ "manifest_units": 235,
+ "probe_filter": "crossfeed",
+ "shipping": {
+  "archive_bytes": 2899166,
+  "live": {
+   "compiled_units_by_library": {
+    "libavcodec": 72,
+    "libavfilter": 21,
+    "libavformat": 38,
+    "libavutil": 95,
+    "libswresample": 9
+   },
+   "discarded_bytes_total": 99578,
+   "live_bytes_by_unit_top": [
+    {
+     "bytes": 189317,
+     "unit": "libavcodec/mpegaudiodec_common.o"
+    },
+    {
+     "bytes": 50398,
+     "unit": "libavcodec/mpegaudiodec_float.o"
+    },
+    {
+     "bytes": 36515,
+     "unit": "libavcodec/options.o"
+    },
+    {
+     "bytes": 34383,
+     "unit": "libavutil/crc.o"
+    },
+    {
+     "bytes": 33005,
+     "unit": "libavutil/pixdesc.o"
+    },
+    {
+     "bytes": 26766,
+     "unit": "libavformat/demux.o"
+    },
+    {
+     "bytes": 26364,
+     "unit": "libavcodec/codec_desc.o"
+    },
+    {
+     "bytes": 16162,
+     "unit": "libavutil/opt.o"
+    },
+    {
+     "bytes": 15458,
+     "unit": "libavutil/sha.o"
+    },
+    {
+     "bytes": 14958,
+     "unit": "libavcodec/exif.o"
+    },
+    {
+     "bytes": 12785,
+     "unit": "libavfilter/avfiltergraph.o"
+    },
+    {
+     "bytes": 12766,
+     "unit": "libswresample/rematrix.o"
+    },
+    {
+     "bytes": 11933,
+     "unit": "libavfilter/formats.o"
+    },
+    {
+     "bytes": 11011,
+     "unit": "libavfilter/avfilter.o"
+    },
+    {
+     "bytes": 10669,
+     "unit": "libavutil/eval.o"
+    },
+    {
+     "bytes": 10507,
+     "unit": "libswresample/audioconvert.o"
+    },
+    {
+     "bytes": 10213,
+     "unit": "libavformat/id3v2.o"
+    },
+    {
+     "bytes": 9883,
+     "unit": "libswresample/swresample.o"
+    },
+    {
+     "bytes": 9835,
+     "unit": "libavcodec/decode.o"
+    },
+    {
+     "bytes": 9225,
+     "unit": "libavutil/channel_layout.o"
+    },
+    {
+     "bytes": 9200,
+     "unit": "libavcodec/flacdec.o"
+    },
+    {
+     "bytes": 8876,
+     "unit": "libavutil/avsscanf.o"
+    },
+    {
+     "bytes": 7459,
+     "unit": "libavcodec/mpegaudiodsp_float.o"
+    },
+    {
+     "bytes": 7417,
+     "unit": "libavutil/parseutils.o"
+    },
+    {
+     "bytes": 7387,
+     "unit": "libavfilter/buffersrc.o"
+    },
+    {
+     "bytes": 6634,
+     "unit": "libavcodec/pthread_frame.o"
+    },
+    {
+     "bytes": 6336,
+     "unit": "libavformat/aviobuf.o"
+    },
+    {
+     "bytes": 6027,
+     "unit": "libavcodec/avcodec.o"
+    },
+    {
+     "bytes": 6027,
+     "unit": "libswresample/dither.o"
+    },
+    {
+     "bytes": 5807,
+     "unit": "libavcodec/utils.o"
+    },
+    {
+     "bytes": 5749,
+     "unit": "libavformat/seek.o"
+    },
+    {
+     "bytes": 5552,
+     "unit": "libavutil/frame.o"
+    },
+    {
+     "bytes": 5297,
+     "unit": "libavcodec/flac_parser.o"
+    },
+    {
+     "bytes": 5127,
+     "unit": "libswresample/resample.o"
+    },
+    {
+     "bytes": 5068,
+     "unit": "libavformat/avio.o"
+    },
+    {
+     "bytes": 4583,
+     "unit": "libavutil/log.o"
+    },
+    {
+     "bytes": 4438,
+     "unit": "libavformat/mp3dec.o"
+    },
+    {
+     "bytes": 4119,
+     "unit": "libavcodec/mpegaudiodsp_fixed.o"
+    },
+    {
+     "bytes": 3737,
+     "unit": "libavcodec/vlc.o"
+    },
+    {
+     "bytes": 3589,
+     "unit": "libavfilter/af_aresample.o"
+    }
+   ],
+   "live_bytes_total": 769292,
+   "live_units": 124,
+   "live_units_by_library": {
+    "libavcodec": 44,
+    "libavfilter": 14,
+    "libavformat": 21,
+    "libavutil": 39,
+    "libswresample": 6
+   }
+  },
+  "probe_sizes": {
+   "raw_bytes": 743664,
+   "stripped_bytes": 743664,
+   "xz_bytes": 258236
+  }
+ },
+ "smoke_verdict": "PASS",
+ "stage": "avf-p-crossfeed"
+}

@@ -1,0 +1,3885 @@
+{
+ "capabilities": [
+  "graph plumbing",
+  "volume/preamp",
+  "parametric EQ",
+  "graphic EQ",
+  "custom biquad primitive",
+  "bass/treble tone",
+  "low/high-pass",
+  "compressor",
+  "limiter",
+  "gate",
+  "balance + mono downmix + channel matrix",
+  "channel layout remap",
+  "crossfeed",
+  "stereo width",
+  "echo",
+  "chorus",
+  "flanger",
+  "phaser",
+  "tremolo",
+  "vibrato",
+  "fade in/out",
+  "crossfade",
+  "start delay",
+  "loudness normalization",
+  "dynamic normalization",
+  "ReplayGain",
+  "FIR convolution",
+  "frequency-domain EQ",
+  "surround expansion",
+  "headphone correction"
+ ],
+ "config_evidence": {
+  "external_libs_enabled": [],
+  "filter_list_registered": [
+   "abuffer",
+   "abuffersink",
+   "acompressor",
+   "acrossfade",
+   "adelay",
+   "aecho",
+   "afade",
+   "afir",
+   "aformat",
+   "agate",
+   "alimiter",
+   "anull",
+   "aphaser",
+   "aresample",
+   "bass",
+   "biquad",
+   "channelmap",
+   "chorus",
+   "crossfeed",
+   "dynaudnorm",
+   "equalizer",
+   "firequalizer",
+   "flanger",
+   "headphone",
+   "highpass",
+   "highshelf",
+   "loudnorm",
+   "lowpass",
+   "lowshelf",
+   "pan",
+   "stereowiden",
+   "surround",
+   "treble",
+   "tremolo",
+   "vibrato",
+   "volume"
+  ],
+  "filter_list_sha256": "b67a2edc60d8f3e48535b796830a268de1872cccee24a85144b58d922a3d72a3",
+  "filters_enabled_config": [
+   "acompressor",
+   "acrossfade",
+   "adelay",
+   "aecho",
+   "afade",
+   "afir",
+   "aformat",
+   "agate",
+   "alimiter",
+   "anull",
+   "aphaser",
+   "aresample",
+   "bass",
+   "biquad",
+   "channelmap",
+   "chorus",
+   "crossfeed",
+   "dynaudnorm",
+   "equalizer",
+   "firequalizer",
+   "flanger",
+   "headphone",
+   "highpass",
+   "highshelf",
+   "loudnorm",
+   "lowpass",
+   "lowshelf",
+   "pan",
+   "stereowiden",
+   "surround",
+   "treble",
+   "tremolo",
+   "vibrato",
+   "volume"
+  ],
+  "license": "LGPL version 2.1 or later",
+  "misc": {
+   "CONFIG_STATIC": "yes"
+  }
+ },
+ "cumulative_tiers": [
+  "F0",
+  "F1",
+  "F2",
+  "F3",
+  "F4",
+  "F5",
+  "F6"
+ ],
+ "gates": {
+  "external_libs": {
+   "external": [],
+   "verdict": "PASS"
+  },
+  "registration": {
+   "verdict": "PASS"
+  },
+  "smoke_plain": {
+   "fail": 0,
+   "verdict": "PASS"
+  },
+  "smoke_shipping": {
+   "fail": 0,
+   "verdict": "PASS"
+  },
+  "symbols": {
+   "verdict": "PASS"
+  }
+ },
+ "lto": null,
+ "manifest": {
+  "config_root": "build/minimize/avf-c7/oracle",
+  "generated_units": 0,
+  "per_library": {
+   "libavcodec": 72,
+   "libavfilter": 45,
+   "libavformat": 38,
+   "libavutil": 95,
+   "libswresample": 9
+  },
+  "units": 259
+ },
+ "plain": {
+  "archive_bytes": 3542446,
+  "ldd": [
+   {
+    "lib": "libm.so.6",
+    "path": "/usr/lib/x86_64-linux-gnu/libm.so.6"
+   },
+   {
+    "lib": "libc.so.6",
+    "path": "/usr/lib/x86_64-linux-gnu/libc.so.6"
+   }
+  ],
+  "probe_sha256": "b5d9c3c56940ea48aeeb395773c18f99d03fc194c0821388e2d87ec76d0dca41",
+  "smoke_fail": 0,
+  "smoke_verdict": "PASS"
+ },
+ "profile": {
+  "configure_args": [
+   "--prefix=install",
+   "--disable-everything",
+   "--disable-programs",
+   "--disable-doc",
+   "--disable-debug",
+   "--disable-autodetect",
+   "--disable-x86asm",
+   "--disable-network",
+   "--disable-protocols",
+   "--disable-devices",
+   "--disable-avdevice",
+   "--disable-swscale",
+   "--enable-avcodec",
+   "--enable-avfilter",
+   "--enable-avformat",
+   "--enable-swresample",
+   "--enable-demuxer=flac",
+   "--enable-demuxer=mp3",
+   "--enable-decoder=flac",
+   "--enable-decoder=mp3float",
+   "--enable-parser=mpegaudio",
+   "--enable-filter=abuffer",
+   "--enable-filter=abuffersink",
+   "--enable-filter=acompressor",
+   "--enable-filter=acrossfade",
+   "--enable-filter=adelay",
+   "--enable-filter=aecho",
+   "--enable-filter=afade",
+   "--enable-filter=afir",
+   "--enable-filter=aformat",
+   "--enable-filter=agate",
+   "--enable-filter=alimiter",
+   "--enable-filter=anull",
+   "--enable-filter=aphaser",
+   "--enable-filter=aresample",
+   "--enable-filter=bass",
+   "--enable-filter=biquad",
+   "--enable-filter=channelmap",
+   "--enable-filter=chorus",
+   "--enable-filter=crossfeed",
+   "--enable-filter=dynaudnorm",
+   "--enable-filter=equalizer",
+   "--enable-filter=firequalizer",
+   "--enable-filter=flanger",
+   "--enable-filter=headphone",
+   "--enable-filter=highpass",
+   "--enable-filter=highshelf",
+   "--enable-filter=loudnorm",
+   "--enable-filter=lowpass",
+   "--enable-filter=lowshelf",
+   "--enable-filter=pan",
+   "--enable-filter=stereowiden",
+   "--enable-filter=surround",
+   "--enable-filter=treble",
+   "--enable-filter=tremolo",
+   "--enable-filter=vibrato",
+   "--enable-filter=volume"
+  ],
+  "configure_warnings": [],
+  "profile_sha256": "00be5e531339482ba87b9d83bab21e0d3b6776a204b68b685e0fa7f5b47ca035"
+ },
+ "registration_gate": {
+  "always_present": [
+   "abuffer",
+   "abuffersink"
+  ],
+  "config_enabled": [
+   "acompressor",
+   "acrossfade",
+   "adelay",
+   "aecho",
+   "afade",
+   "afir",
+   "aformat",
+   "agate",
+   "alimiter",
+   "anull",
+   "aphaser",
+   "aresample",
+   "bass",
+   "biquad",
+   "channelmap",
+   "chorus",
+   "crossfeed",
+   "dynaudnorm",
+   "equalizer",
+   "firequalizer",
+   "flanger",
+   "headphone",
+   "highpass",
+   "highshelf",
+   "loudnorm",
+   "lowpass",
+   "lowshelf",
+   "pan",
+   "stereowiden",
+   "surround",
+   "treble",
+   "tremolo",
+   "vibrato",
+   "volume"
+  ],
+  "filter_list_matches_config": true,
+  "filter_list_registered": [
+   "abuffer",
+   "abuffersink",
+   "acompressor",
+   "acrossfade",
+   "adelay",
+   "aecho",
+   "afade",
+   "afir",
+   "aformat",
+   "agate",
+   "alimiter",
+   "anull",
+   "aphaser",
+   "aresample",
+   "bass",
+   "biquad",
+   "channelmap",
+   "chorus",
+   "crossfeed",
+   "dynaudnorm",
+   "equalizer",
+   "firequalizer",
+   "flanger",
+   "headphone",
+   "highpass",
+   "highshelf",
+   "loudnorm",
+   "lowpass",
+   "lowshelf",
+   "pan",
+   "stereowiden",
+   "surround",
+   "treble",
+   "tremolo",
+   "vibrato",
+   "volume"
+  ],
+  "intended_filters": [
+   "abuffer",
+   "abuffersink",
+   "acompressor",
+   "acrossfade",
+   "adelay",
+   "aecho",
+   "afade",
+   "afir",
+   "aformat",
+   "agate",
+   "alimiter",
+   "anull",
+   "aphaser",
+   "aresample",
+   "bass",
+   "biquad",
+   "channelmap",
+   "chorus",
+   "crossfeed",
+   "dynaudnorm",
+   "equalizer",
+   "firequalizer",
+   "flanger",
+   "headphone",
+   "highpass",
+   "highshelf",
+   "loudnorm",
+   "lowpass",
+   "lowshelf",
+   "pan",
+   "stereowiden",
+   "surround",
+   "treble",
+   "tremolo",
+   "vibrato",
+   "volume"
+  ],
+  "intended_subset_of_config": true
+ },
+ "shipping": {
+  "archive_bytes": 3398902,
+  "ldd": [
+   {
+    "lib": "libm.so.6",
+    "path": "/usr/lib/x86_64-linux-gnu/libm.so.6"
+   },
+   {
+    "lib": "libc.so.6",
+    "path": "/usr/lib/x86_64-linux-gnu/libc.so.6"
+   }
+  ],
+  "live": {
+   "compiled_units_by_library": {
+    "libavcodec": 72,
+    "libavfilter": 45,
+    "libavformat": 38,
+    "libavutil": 95,
+    "libswresample": 9
+   },
+   "discarded_bytes_total": 97687,
+   "live_bytes_by_unit_top": [
+    {
+     "bytes": 574833,
+     "unit": "libavutil/tx_double.o"
+    },
+    {
+     "bytes": 316047,
+     "unit": "libavutil/tx_int32.o"
+    },
+    {
+     "bytes": 311646,
+     "unit": "libavutil/tx_float.o"
+    },
+    {
+     "bytes": 189317,
+     "unit": "libavcodec/mpegaudiodec_common.o"
+    },
+    {
+     "bytes": 50398,
+     "unit": "libavcodec/mpegaudiodec_float.o"
+    },
+    {
+     "bytes": 36515,
+     "unit": "libavcodec/options.o"
+    },
+    {
+     "bytes": 34383,
+     "unit": "libavutil/crc.o"
+    },
+    {
+     "bytes": 33980,
+     "unit": "libavfilter/af_biquads.o"
+    },
+    {
+     "bytes": 33005,
+     "unit": "libavutil/pixdesc.o"
+    },
+    {
+     "bytes": 28002,
+     "unit": "libavfilter/af_surround.o"
+    },
+    {
+     "bytes": 26766,
+     "unit": "libavformat/demux.o"
+    },
+    {
+     "bytes": 26364,
+     "unit": "libavcodec/codec_desc.o"
+    },
+    {
+     "bytes": 21241,
+     "unit": "libavfilter/ebur128.o"
+    },
+    {
+     "bytes": 16162,
+     "unit": "libavutil/opt.o"
+    },
+    {
+     "bytes": 15458,
+     "unit": "libavutil/sha.o"
+    },
+    {
+     "bytes": 15412,
+     "unit": "libavfilter/af_afade.o"
+    },
+    {
+     "bytes": 14958,
+     "unit": "libavcodec/exif.o"
+    },
+    {
+     "bytes": 14860,
+     "unit": "libavfilter/af_afir.o"
+    },
+    {
+     "bytes": 13008,
+     "unit": "libswresample/rematrix.o"
+    },
+    {
+     "bytes": 12785,
+     "unit": "libavfilter/avfiltergraph.o"
+    },
+    {
+     "bytes": 12450,
+     "unit": "libavfilter/af_firequalizer.o"
+    },
+    {
+     "bytes": 12149,
+     "unit": "libavfilter/formats.o"
+    },
+    {
+     "bytes": 11469,
+     "unit": "libavfilter/avfilter.o"
+    },
+    {
+     "bytes": 10669,
+     "unit": "libavutil/eval.o"
+    },
+    {
+     "bytes": 10507,
+     "unit": "libswresample/audioconvert.o"
+    },
+    {
+     "bytes": 10374,
+     "unit": "libavfilter/af_dynaudnorm.o"
+    },
+    {
+     "bytes": 10213,
+     "unit": "libavformat/id3v2.o"
+    },
+    {
+     "bytes": 9941,
+     "unit": "libswresample/swresample.o"
+    },
+    {
+     "bytes": 9835,
+     "unit": "libavcodec/decode.o"
+    },
+    {
+     "bytes": 9225,
+     "unit": "libavutil/channel_layout.o"
+    },
+    {
+     "bytes": 9200,
+     "unit": "libavcodec/flacdec.o"
+    },
+    {
+     "bytes": 8876,
+     "unit": "libavutil/avsscanf.o"
+    },
+    {
+     "bytes": 8746,
+     "unit": "libavfilter/af_loudnorm.o"
+    },
+    {
+     "bytes": 8408,
+     "unit": "libavutil/tx.o"
+    },
+    {
+     "bytes": 7459,
+     "unit": "libavcodec/mpegaudiodsp_float.o"
+    },
+    {
+     "bytes": 7417,
+     "unit": "libavutil/parseutils.o"
+    },
+    {
+     "bytes": 7387,
+     "unit": "libavfilter/buffersrc.o"
+    },
+    {
+     "bytes": 6972,
+     "unit": "libavfilter/af_headphone.o"
+    },
+    {
+     "bytes": 6634,
+     "unit": "libavcodec/pthread_frame.o"
+    },
+    {
+     "bytes": 6336,
+     "unit": "libavformat/aviobuf.o"
+    }
+   ],
+   "live_bytes_total": 2181274,
+   "live_units": 152,
+   "live_units_by_library": {
+    "libavcodec": 44,
+    "libavfilter": 38,
+    "libavformat": 21,
+    "libavutil": 43,
+    "libswresample": 6
+   }
+  },
+  "probe_sizes": {
+   "raw_bytes": 1186032,
+   "stripped_bytes": 1186032,
+   "xz_bytes": 383228
+  },
+  "smoke_fail": 0,
+  "smoke_verdict": "PASS"
+ },
+ "smoke_detail": {
+  "plain": {
+   "contract_pin_addr_sum_lowbits": 80,
+   "results": [
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "abuffer",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "abuffersink",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "acompressor",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "acrossfade",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "adelay",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "aecho",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "afade",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "afir",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "aformat",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "agate",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "alimiter",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "anull",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "aphaser",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "aresample",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "bass",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "biquad",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "channelmap",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "chorus",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "crossfeed",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "dynaudnorm",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "equalizer",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "firequalizer",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "flanger",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "headphone",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "highpass",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "highshelf",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "loudnorm",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "lowpass",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "lowshelf",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "pan",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "stereowiden",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "surround",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "treble",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "tremolo",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "vibrato",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "volume",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "aeval",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "amix",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "anequalizer/superequalizer",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "atempo",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "extrastereo",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "haas",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "ladspa",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "replaygain",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "rubberband",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "sofalizer",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "stereotools",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out"
+     ],
+     "id": "f0_endpoints",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 587398,
+      "destroy_ns": 214444,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 29016,
+      "ns_per_out_frame": 25.0353542,
+      "process_ns": 1201697,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "anull",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f0_anull",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 558841,
+      "destroy_ns": 227610,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 12634,
+      "ns_per_out_frame": 26.3475,
+      "process_ns": 1264680,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "aformat=sample_fmts=flt:sample_rates=48000",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f0_aformat_flt",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 539945,
+      "destroy_ns": 192766,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 14077,
+      "ns_per_out_frame": 24.8570833,
+      "process_ns": 1193140,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "volume=volume=-6dB",
+     "drained_eof": true,
+     "expect_detail": "measured -6.000 dB want -6.021+-0.500",
+     "expect_measured": -6.00000049,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f1_volume",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.250593603,
+      0.250593603
+     ],
+     "rms": [
+      0.177196435,
+      0.177196435
+     ],
+     "timing": {
+      "create_config_ns": 708789,
+      "destroy_ns": 2167804,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 14989,
+      "ns_per_out_frame": 29.556375,
+      "process_ns": 1418706,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "equalizer=frequency=1000:gain=6",
+     "drained_eof": true,
+     "expect_detail": "ratio 5.998 dB want [3.500,8.500]",
+     "expect_measured": 5.99829543,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_equalizer",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.997637153,
+      0.997637153
+     ],
+     "rms": [
+      0.705293326,
+      0.705293326
+     ],
+     "timing": {
+      "create_config_ns": 558411,
+      "destroy_ns": 3639203,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 43895,
+      "ns_per_out_frame": 57.1238542,
+      "process_ns": 2741945,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "bass=g=6:f=100",
+     "drained_eof": true,
+     "expect_detail": "ratio 5.952 dB want [4.000,8.500]",
+     "expect_measured": 5.95194498,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_bass",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.992255569,
+      0.992255569
+     ],
+     "rms": [
+      0.701539704,
+      0.701539704
+     ],
+     "timing": {
+      "create_config_ns": 470399,
+      "destroy_ns": 135395,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 47683,
+      "ns_per_out_frame": 60.0503333,
+      "process_ns": 2882416,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "treble=g=6:f=8000",
+     "drained_eof": true,
+     "expect_detail": "ratio 5.921 dB want [3.500,8.500]",
+     "expect_measured": 5.92108213,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_treble",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.931526065,
+      0.931526065
+     ],
+     "rms": [
+      0.699051392,
+      0.699051392
+     ],
+     "timing": {
+      "create_config_ns": 515648,
+      "destroy_ns": 113050,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 51851,
+      "ns_per_out_frame": 59.7338542,
+      "process_ns": 2867225,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "lowshelf=g=6:f=200",
+     "drained_eof": true,
+     "expect_detail": "ratio 4.791 dB want [3.500,8.500]",
+     "expect_measured": 4.79052032,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_lowshelf",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.883867383,
+      0.883867383
+     ],
+     "rms": [
+      0.613735184,
+      0.613735184
+     ],
+     "timing": {
+      "create_config_ns": 585789,
+      "destroy_ns": 118912,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 56430,
+      "ns_per_out_frame": 59.1044167,
+      "process_ns": 2837012,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "highshelf=g=6:f=4000",
+     "drained_eof": true,
+     "expect_detail": "ratio 4.220 dB want [3.500,8.500]",
+     "expect_measured": 4.21977006,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_highshelf",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.774476886,
+      0.774476886
+     ],
+     "rms": [
+      0.574703055,
+      0.574703055
+     ],
+     "timing": {
+      "create_config_ns": 497201,
+      "destroy_ns": 116647,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 54006,
+      "ns_per_out_frame": 65.300375,
+      "process_ns": 3134418,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "lowpass=f=500",
+     "drained_eof": true,
+     "expect_detail": "ratio -12.318 dB want [-30.000,-6.000]",
+     "expect_measured": -12.3183121,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_lowpass",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.209616989,
+      0.209616989
+     ],
+     "rms": [
+      0.0856129371,
+      0.0856129371
+     ],
+     "timing": {
+      "create_config_ns": 496810,
+      "destroy_ns": 106318,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 54346,
+      "ns_per_out_frame": 59.2941458,
+      "process_ns": 2846119,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "highpass=f=500",
+     "drained_eof": true,
+     "expect_detail": "ratio -27.949 dB want [-30.000,-6.000]",
+     "expect_measured": -27.9495,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_highpass",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.0449891649,
+      0.0449891649
+     ],
+     "rms": [
+      0.014157286,
+      0.014157286
+     ],
+     "timing": {
+      "create_config_ns": 488483,
+      "destroy_ns": 122349,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 50228,
+      "ns_per_out_frame": 58.8088333,
+      "process_ns": 2822824,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "alimiter=limit=0.5:level=0",
+     "drained_eof": true,
+     "expect_detail": "peak 0.5000 <= 0.5500",
+     "expect_measured": 0.5,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f2_alimiter",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.296959493,
+      0.29489574
+     ],
+     "timing": {
+      "create_config_ns": 593791,
+      "destroy_ns": 3060368,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 50308,
+      "ns_per_out_frame": 51.2978125,
+      "process_ns": 2462295,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "acompressor=threshold=0.1:ratio=4",
+     "drained_eof": true,
+     "expect_detail": "ratio -16.801 dB want [-30.000,-3.000]",
+     "expect_measured": -16.80086,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f2_acompressor",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      1.02341454,
+      1.63557829
+     ],
+     "rms": [
+      0.154638055,
+      0.153700463
+     ],
+     "timing": {
+      "create_config_ns": 499145,
+      "destroy_ns": 108032,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 31601,
+      "ns_per_out_frame": 42.4023958,
+      "process_ns": 2035315,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "agate=threshold=0.001",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f2_agate",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 491851,
+      "destroy_ns": 113932,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 19618,
+      "ns_per_out_frame": 30.4267292,
+      "process_ns": 1460483,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "pan=stereo|c0=0.5*c0|c1=0.5*c1",
+     "drained_eof": true,
+     "expect_detail": "measured -6.021 dB want -6.021+-0.600",
+     "expect_measured": -6.02059991,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f3_pan_balance",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.25,
+      0.25
+     ],
+     "rms": [
+      0.176776694,
+      0.176776694
+     ],
+     "timing": {
+      "create_config_ns": 574562,
+      "destroy_ns": 123051,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 17955,
+      "ns_per_out_frame": 26.7754167,
+      "process_ns": 1285220,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": false,
+     "auto_inserted": [],
+     "chain": "pan=mono|c0=0.5*c0+0.5*c1",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f3_pan_downmix",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 1,
+      "fmt": "flt",
+      "layout": "mono",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      1.10691981e+38,
+      1082757280000.0
+     ],
+     "rms": [
+      1.60004914e+37,
+      95924618700.0
+     ],
+     "timing": {
+      "create_config_ns": 489285,
+      "destroy_ns": 148981,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 15540,
+      "ns_per_out_frame": 26.5666667,
+      "process_ns": 1275200,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "channelmap=1|0",
+     "drained_eof": true,
+     "expect_detail": "rms src 0.000000 dst 0.125000 (min 5.0e-02)",
+     "expect_measured": 0.125,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f3_channelmap_swap",
+     "in_frames": 64,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 64,
+     "peak": [
+      0,
+      1
+     ],
+     "rms": [
+      0,
+      0.125
+     ],
+     "timing": {
+      "create_config_ns": 536568,
+      "destroy_ns": 119684,
+      "first_out_in_frames": 64,
+      "first_out_ns": 3948,
+      "ns_per_out_frame": 120.703125,
+      "process_ns": 7725,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "crossfeed",
+     "drained_eof": true,
+     "expect_detail": "rms src 0.009749 dst 0.000738 (min 1.0e-04)",
+     "expect_measured": 0.000738241148,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f3_crossfeed",
+     "in_frames": 8192,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 8192,
+     "peak": [
+      0.880109928,
+      0.0362551975
+     ],
+     "rms": [
+      0.00974943977,
+      0.000738241148
+     ],
+     "timing": {
+      "create_config_ns": 531959,
+      "destroy_ns": 1077625,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 8016,
+      "ns_per_out_frame": 24.5267334,
+      "process_ns": 200923,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "stereowiden=delay=20:feedback=0.3:crossfeed=0.3",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f3_stereowiden",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.25,
+      0.25
+     ],
+     "rms": [
+      0.0743303408,
+      0.0743303408
+     ],
+     "timing": {
+      "create_config_ns": 522411,
+      "destroy_ns": 167747,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 13166,
+      "ns_per_out_frame": 27.7393958,
+      "process_ns": 1331491,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "aecho=0.8:0.9:40:0.5",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f4_aecho",
+     "in_frames": 8192,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 10112,
+     "peak": [
+      0.719999969,
+      0
+     ],
+     "rms": [
+      0.00844343114,
+      0
+     ],
+     "timing": {
+      "create_config_ns": 593349,
+      "destroy_ns": 1033529,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 23556,
+      "ns_per_out_frame": 24.7506922,
+      "process_ns": 250279,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "chorus=0.5:0.9:50|60:0.4|0.32:0.25|0.4:2|1.3",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f4_chorus",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 50942,
+     "peak": [
+      0.547767997,
+      0.547767997
+     ],
+     "rms": [
+      0.234006206,
+      0.234006206
+     ],
+     "timing": {
+      "create_config_ns": 4718607,
+      "destroy_ns": 300617,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 28375,
+      "ns_per_out_frame": 36.9362216,
+      "process_ns": 1881605,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "flanger",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f4_flanger",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dblp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.499999974,
+      0.499999973
+     ],
+     "rms": [
+      0.278553925,
+      0.278406071
+     ],
+     "timing": {
+      "create_config_ns": 1909470,
+      "destroy_ns": 212992,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 48505,
+      "ns_per_out_frame": 47.765375,
+      "process_ns": 2292738,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "aphaser",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f4_aphaser",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.246661335,
+      0.246661335
+     ],
+     "rms": [
+      0.113542822,
+      0.113542822
+     ],
+     "timing": {
+      "create_config_ns": 965039,
+      "destroy_ns": 129302,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 17584,
+      "ns_per_out_frame": 31.5979792,
+      "process_ns": 1516703,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "tremolo=f=4:d=0.5",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f4_tremolo",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.499997533,
+      0.499997533
+     ],
+     "rms": [
+      0.272431181,
+      0.272431181
+     ],
+     "timing": {
+      "create_config_ns": 742971,
+      "destroy_ns": 124143,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 17213,
+      "ns_per_out_frame": 30.036375,
+      "process_ns": 1441746,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "vibrato=f=4:d=0.5",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f4_vibrato",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dblp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.499994955,
+      0.499994955
+     ],
+     "rms": [
+      0.352396513,
+      0.352166712
+     ],
+     "timing": {
+      "create_config_ns": 685800,
+      "destroy_ns": 174692,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 22214,
+      "ns_per_out_frame": 34.8207292,
+      "process_ns": 1671395,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "afade=t=in:st=0:d=1",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f5_afade",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.499875009,
+      0.499875009
+     ],
+     "rms": [
+      0.204124139,
+      0.204124139
+     ],
+     "timing": {
+      "create_config_ns": 546909,
+      "destroy_ns": 189194,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 16853,
+      "ns_per_out_frame": 31.5215833,
+      "process_ns": 1513036,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "adelay=20|20",
+     "drained_eof": true,
+     "expect_detail": "dur ratio 1.02000 want 1.02000+-0.010",
+     "expect_measured": 1.02,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f5_adelay",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48960,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.350070018,
+      0.350070018
+     ],
+     "timing": {
+      "create_config_ns": 643578,
+      "destroy_ns": 124724,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 19338,
+      "ns_per_out_frame": 28.8248979,
+      "process_ns": 1411267,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "loudnorm=I=-20:TP=-2:LRA=7",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f5_loudnorm",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 192000
+     },
+     "ok": true,
+     "out_frames": 192000,
+     "peak": [
+      0.100339055,
+      0.100339055
+     ],
+     "rms": [
+      0.0709507243,
+      0.0709507243
+     ],
+     "timing": {
+      "create_config_ns": 9030920,
+      "destroy_ns": 28700758,
+      "first_out_in_frames": 0,
+      "first_out_ns": 0,
+      "ns_per_out_frame": 87.3579323,
+      "process_ns": 16772723,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "dynaudnorm",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f5_dynaudnorm",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dblp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553123,
+      0.353553123
+     ],
+     "timing": {
+      "create_config_ns": 707061,
+      "destroy_ns": 203322,
+      "first_out_in_frames": 0,
+      "first_out_ns": 0,
+      "ns_per_out_frame": 49.7066875,
+      "process_ns": 2385921,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "firequalizer=gain=if(between(f,800,1250),6,0)",
+     "drained_eof": true,
+     "expect_detail": "ratio 5.914 dB want [3.000,9.000]",
+     "expect_measured": 5.91405252,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f6_firequalizer",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48960,
+     "peak": [
+      1.0336864,
+      1.0336864
+     ],
+     "rms": [
+      0.698485875,
+      0.698485875
+     ],
+     "timing": {
+      "create_config_ns": 1313666,
+      "destroy_ns": 198107,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 36412,
+      "ns_per_out_frame": 47.6940768,
+      "process_ns": 2335102,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "surround",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f6_surround",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 6,
+      "fmt": "fltp",
+      "layout": "5.1",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.353620529,
+      0.353620529
+     ],
+     "rms": [
+      0.244602579,
+      0.244602579
+     ],
+     "timing": {
+      "create_config_ns": 1163482,
+      "destroy_ns": 181033,
+      "first_out_in_frames": 2048,
+      "first_out_ns": 384041,
+      "ns_per_out_frame": 175.500354,
+      "process_ns": 8424017,
+      "rebuild_ok": true
+     }
+    }
+   ],
+   "summary": {
+    "fail": 0,
+    "pass": 78,
+    "total": 78,
+    "verdict": "PASS"
+   }
+  },
+  "shipping": {
+   "contract_pin_addr_sum_lowbits": 144,
+   "results": [
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "abuffer",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "abuffersink",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "acompressor",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "acrossfade",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "adelay",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "aecho",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "afade",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "afir",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "aformat",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "agate",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "alimiter",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "anull",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "aphaser",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "aresample",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "bass",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "biquad",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "channelmap",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "chorus",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "crossfeed",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "dynaudnorm",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "equalizer",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "firequalizer",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "flanger",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "headphone",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "highpass",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "highshelf",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "loudnorm",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "lowpass",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "lowshelf",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "pan",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "stereowiden",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "surround",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "treble",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "tremolo",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "vibrato",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "volume",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "aeval",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "amix",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "anequalizer/superequalizer",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "atempo",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "extrastereo",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "haas",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "ladspa",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "replaygain",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "rubberband",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "sofalizer",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "stereotools",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out"
+     ],
+     "id": "f0_endpoints",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 583901,
+      "destroy_ns": 185949,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 27835,
+      "ns_per_out_frame": 25.423875,
+      "process_ns": 1220346,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "anull",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f0_anull",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 525727,
+      "destroy_ns": 671609,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 14959,
+      "ns_per_out_frame": 26.3419167,
+      "process_ns": 1264412,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "aformat=sample_fmts=flt:sample_rates=48000",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f0_aformat_flt",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 539564,
+      "destroy_ns": 190582,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 11523,
+      "ns_per_out_frame": 25.2698125,
+      "process_ns": 1212951,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "volume=volume=-6dB",
+     "drained_eof": true,
+     "expect_detail": "measured -6.000 dB want -6.021+-0.500",
+     "expect_measured": -6.00000049,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f1_volume",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.250593603,
+      0.250593603
+     ],
+     "rms": [
+      0.177196435,
+      0.177196435
+     ],
+     "timing": {
+      "create_config_ns": 482062,
+      "destroy_ns": 2205381,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 12394,
+      "ns_per_out_frame": 25.3050833,
+      "process_ns": 1214644,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "equalizer=frequency=1000:gain=6",
+     "drained_eof": true,
+     "expect_detail": "ratio 5.998 dB want [3.500,8.500]",
+     "expect_measured": 5.99829543,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_equalizer",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.997637153,
+      0.997637153
+     ],
+     "rms": [
+      0.705293326,
+      0.705293326
+     ],
+     "timing": {
+      "create_config_ns": 604421,
+      "destroy_ns": 3594598,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 71029,
+      "ns_per_out_frame": 61.7462708,
+      "process_ns": 2963821,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "bass=g=6:f=100",
+     "drained_eof": true,
+     "expect_detail": "ratio 5.952 dB want [4.000,8.500]",
+     "expect_measured": 5.95194498,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_bass",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.992255569,
+      0.992255569
+     ],
+     "rms": [
+      0.701539704,
+      0.701539704
+     ],
+     "timing": {
+      "create_config_ns": 554634,
+      "destroy_ns": 163273,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 55549,
+      "ns_per_out_frame": 57.5730417,
+      "process_ns": 2763506,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "treble=g=6:f=8000",
+     "drained_eof": true,
+     "expect_detail": "ratio 5.921 dB want [3.500,8.500]",
+     "expect_measured": 5.92108213,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_treble",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.931526065,
+      0.931526065
+     ],
+     "rms": [
+      0.699051392,
+      0.699051392
+     ],
+     "timing": {
+      "create_config_ns": 609722,
+      "destroy_ns": 106077,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 71390,
+      "ns_per_out_frame": 61.9798958,
+      "process_ns": 2975035,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "lowshelf=g=6:f=200",
+     "drained_eof": true,
+     "expect_detail": "ratio 4.791 dB want [3.500,8.500]",
+     "expect_measured": 4.79052032,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_lowshelf",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.883867383,
+      0.883867383
+     ],
+     "rms": [
+      0.613735184,
+      0.613735184
+     ],
+     "timing": {
+      "create_config_ns": 505067,
+      "destroy_ns": 108262,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 53755,
+      "ns_per_out_frame": 57.5404792,
+      "process_ns": 2761943,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "highshelf=g=6:f=4000",
+     "drained_eof": true,
+     "expect_detail": "ratio 4.220 dB want [3.500,8.500]",
+     "expect_measured": 4.21977006,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_highshelf",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.774476886,
+      0.774476886
+     ],
+     "rms": [
+      0.574703055,
+      0.574703055
+     ],
+     "timing": {
+      "create_config_ns": 490468,
+      "destroy_ns": 110446,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 53504,
+      "ns_per_out_frame": 58.371375,
+      "process_ns": 2801826,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "lowpass=f=500",
+     "drained_eof": true,
+     "expect_detail": "ratio -12.318 dB want [-30.000,-6.000]",
+     "expect_measured": -12.3183121,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_lowpass",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.209616989,
+      0.209616989
+     ],
+     "rms": [
+      0.0856129371,
+      0.0856129371
+     ],
+     "timing": {
+      "create_config_ns": 521018,
+      "destroy_ns": 106929,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 53394,
+      "ns_per_out_frame": 60.2835417,
+      "process_ns": 2893610,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "highpass=f=500",
+     "drained_eof": true,
+     "expect_detail": "ratio -27.949 dB want [-30.000,-6.000]",
+     "expect_measured": -27.9495,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f1_highpass",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.0449891649,
+      0.0449891649
+     ],
+     "rms": [
+      0.014157286,
+      0.014157286
+     ],
+     "timing": {
+      "create_config_ns": 499306,
+      "destroy_ns": 115185,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 53885,
+      "ns_per_out_frame": 57.6743958,
+      "process_ns": 2768371,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "alimiter=limit=0.5:level=0",
+     "drained_eof": true,
+     "expect_detail": "peak 0.5000 <= 0.5500",
+     "expect_measured": 0.5,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f2_alimiter",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.296959493,
+      0.29489574
+     ],
+     "timing": {
+      "create_config_ns": 522541,
+      "destroy_ns": 2704176,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 39908,
+      "ns_per_out_frame": 41.0205833,
+      "process_ns": 1968988,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "acompressor=threshold=0.1:ratio=4",
+     "drained_eof": true,
+     "expect_detail": "ratio -16.801 dB want [-30.000,-3.000]",
+     "expect_measured": -16.80086,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f2_acompressor",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      1.02341454,
+      1.63557829
+     ],
+     "rms": [
+      0.154638055,
+      0.153700463
+     ],
+     "timing": {
+      "create_config_ns": 649097,
+      "destroy_ns": 121968,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 41421,
+      "ns_per_out_frame": 44.7179375,
+      "process_ns": 2146461,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "agate=threshold=0.001",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f2_agate",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 600143,
+      "destroy_ns": 126167,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 19758,
+      "ns_per_out_frame": 31.1558958,
+      "process_ns": 1495483,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "pan=stereo|c0=0.5*c0|c1=0.5*c1",
+     "drained_eof": true,
+     "expect_detail": "measured -6.021 dB want -6.021+-0.600",
+     "expect_measured": -6.02059991,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f3_pan_balance",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.25,
+      0.25
+     ],
+     "rms": [
+      0.176776694,
+      0.176776694
+     ],
+     "timing": {
+      "create_config_ns": 509957,
+      "destroy_ns": 123611,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 18025,
+      "ns_per_out_frame": 26.9069792,
+      "process_ns": 1291535,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": false,
+     "auto_inserted": [],
+     "chain": "pan=mono|c0=0.5*c0+0.5*c1",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f3_pan_downmix",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 1,
+      "fmt": "flt",
+      "layout": "mono",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      8.08221761e+36,
+      57512.4102
+     ],
+     "rms": [
+      2.53030168e+35,
+      5095.19179
+     ],
+     "timing": {
+      "create_config_ns": 606416,
+      "destroy_ns": 134553,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 15531,
+      "ns_per_out_frame": 26.5425208,
+      "process_ns": 1274041,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "channelmap=1|0",
+     "drained_eof": true,
+     "expect_detail": "rms src 0.000000 dst 0.125000 (min 5.0e-02)",
+     "expect_measured": 0.125,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f3_channelmap_swap",
+     "in_frames": 64,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 64,
+     "peak": [
+      0,
+      1
+     ],
+     "rms": [
+      0,
+      0.125
+     ],
+     "timing": {
+      "create_config_ns": 518594,
+      "destroy_ns": 106488,
+      "first_out_in_frames": 64,
+      "first_out_ns": 4128,
+      "ns_per_out_frame": 122.75,
+      "process_ns": 7856,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "crossfeed",
+     "drained_eof": true,
+     "expect_detail": "rms src 0.009749 dst 0.000738 (min 1.0e-04)",
+     "expect_measured": 0.000738241148,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f3_crossfeed",
+     "in_frames": 8192,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 8192,
+     "peak": [
+      0.880109928,
+      0.0362551975
+     ],
+     "rms": [
+      0.00974943977,
+      0.000738241148
+     ],
+     "timing": {
+      "create_config_ns": 514716,
+      "destroy_ns": 886613,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 7494,
+      "ns_per_out_frame": 22.7775879,
+      "process_ns": 186594,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "stereowiden=delay=20:feedback=0.3:crossfeed=0.3",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f3_stereowiden",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.25,
+      0.25
+     ],
+     "rms": [
+      0.0743303408,
+      0.0743303408
+     ],
+     "timing": {
+      "create_config_ns": 462804,
+      "destroy_ns": 108321,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 13206,
+      "ns_per_out_frame": 26.4575417,
+      "process_ns": 1269962,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "aecho=0.8:0.9:40:0.5",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f4_aecho",
+     "in_frames": 8192,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 10112,
+     "peak": [
+      0.719999969,
+      0
+     ],
+     "rms": [
+      0.00844343114,
+      0
+     ],
+     "timing": {
+      "create_config_ns": 534154,
+      "destroy_ns": 913245,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 9548,
+      "ns_per_out_frame": 21.5581487,
+      "process_ns": 217996,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "chorus=0.5:0.9:50|60:0.4|0.32:0.25|0.4:2|1.3",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f4_chorus",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 50942,
+     "peak": [
+      0.547767997,
+      0.547767997
+     ],
+     "rms": [
+      0.234006206,
+      0.234006206
+     ],
+     "timing": {
+      "create_config_ns": 7897577,
+      "destroy_ns": 200492,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 24067,
+      "ns_per_out_frame": 35.078187,
+      "process_ns": 1786953,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "flanger",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f4_flanger",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dblp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.499999974,
+      0.499999973
+     ],
+     "rms": [
+      0.278553925,
+      0.278406071
+     ],
+     "timing": {
+      "create_config_ns": 2838378,
+      "destroy_ns": 187793,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 39948,
+      "ns_per_out_frame": 44.5643958,
+      "process_ns": 2139091,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "aphaser",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f4_aphaser",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.246661335,
+      0.246661335
+     ],
+     "rms": [
+      0.113542822,
+      0.113542822
+     ],
+     "timing": {
+      "create_config_ns": 1025725,
+      "destroy_ns": 197837,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 26652,
+      "ns_per_out_frame": 36.1114167,
+      "process_ns": 1733348,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "tremolo=f=4:d=0.5",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f4_tremolo",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.499997533,
+      0.499997533
+     ],
+     "rms": [
+      0.272431181,
+      0.272431181
+     ],
+     "timing": {
+      "create_config_ns": 1075723,
+      "destroy_ns": 135134,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 17695,
+      "ns_per_out_frame": 30.734875,
+      "process_ns": 1475274,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "vibrato=f=4:d=0.5",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f4_vibrato",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dblp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.499994955,
+      0.499994955
+     ],
+     "rms": [
+      0.352396513,
+      0.352166712
+     ],
+     "timing": {
+      "create_config_ns": 805268,
+      "destroy_ns": 119123,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 22314,
+      "ns_per_out_frame": 33.6935833,
+      "process_ns": 1617292,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "afade=t=in:st=0:d=1",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f5_afade",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.499875009,
+      0.499875009
+     ],
+     "rms": [
+      0.204124139,
+      0.204124139
+     ],
+     "timing": {
+      "create_config_ns": 603233,
+      "destroy_ns": 153580,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 21512,
+      "ns_per_out_frame": 31.601125,
+      "process_ns": 1516854,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "adelay=20|20",
+     "drained_eof": true,
+     "expect_detail": "dur ratio 1.02000 want 1.02000+-0.010",
+     "expect_measured": 1.02,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f5_adelay",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48960,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.350070018,
+      0.350070018
+     ],
+     "timing": {
+      "create_config_ns": 503039,
+      "destroy_ns": 153309,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 16022,
+      "ns_per_out_frame": 27.9199755,
+      "process_ns": 1366962,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "loudnorm=I=-20:TP=-2:LRA=7",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f5_loudnorm",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dbl",
+      "layout": "stereo",
+      "rate": 192000
+     },
+     "ok": true,
+     "out_frames": 192000,
+     "peak": [
+      0.100339055,
+      0.100339055
+     ],
+     "rms": [
+      0.0709507243,
+      0.0709507243
+     ],
+     "timing": {
+      "create_config_ns": 8986826,
+      "destroy_ns": 31736473,
+      "first_out_in_frames": 0,
+      "first_out_ns": 0,
+      "ns_per_out_frame": 106.303573,
+      "process_ns": 20410286,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "dynaudnorm",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f5_dynaudnorm",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "dblp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553123,
+      0.353553123
+     ],
+     "timing": {
+      "create_config_ns": 666803,
+      "destroy_ns": 227952,
+      "first_out_in_frames": 0,
+      "first_out_ns": 0,
+      "ns_per_out_frame": 50.6807292,
+      "process_ns": 2432675,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "firequalizer=gain=if(between(f,800,1250),6,0)",
+     "drained_eof": true,
+     "expect_detail": "ratio 5.914 dB want [3.000,9.000]",
+     "expect_measured": 5.91405252,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f6_firequalizer",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "fltp",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48960,
+     "peak": [
+      1.0336864,
+      1.0336864
+     ],
+     "rms": [
+      0.698485875,
+      0.698485875
+     ],
+     "timing": {
+      "create_config_ns": 1339662,
+      "destroy_ns": 222702,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 40148,
+      "ns_per_out_frame": 50.2847631,
+      "process_ns": 2461942,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [
+      "auto_aresample_0"
+     ],
+     "chain": "surround",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0",
+      "auto_aresample_0"
+     ],
+     "id": "f6_surround",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 6,
+      "fmt": "fltp",
+      "layout": "5.1",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.353620529,
+      0.353620529
+     ],
+     "rms": [
+      0.244602579,
+      0.244602579
+     ],
+     "timing": {
+      "create_config_ns": 1229523,
+      "destroy_ns": 150444,
+      "first_out_in_frames": 2048,
+      "first_out_ns": 411078,
+      "ns_per_out_frame": 176.471375,
+      "process_ns": 8470626,
+      "rebuild_ok": true
+     }
+    }
+   ],
+   "summary": {
+    "fail": 0,
+    "pass": 78,
+    "total": 78,
+    "verdict": "PASS"
+   }
+  }
+ },
+ "stage": "avf-c7",
+ "symbol_gate": {
+  "equal": true,
+  "extra_in_xmake": [],
+  "missing_in_xmake": [],
+  "oracle_ff_symbols": 1152,
+  "xmake_ff_symbols": 1152
+ },
+ "tier": "F6"
+}

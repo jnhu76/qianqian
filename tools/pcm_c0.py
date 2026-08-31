@@ -248,6 +248,7 @@ def parse_config_evidence(stage: str) -> dict:
                 registered.append(name)
     return {
         "filters_enabled_config": sorted(set(filters)),
+        "avfilter_in_closure": (d / "oracle" / "libavfilter" / "libavfilter.a").is_file(),
         "external_libs_enabled": sorted(externals),
         "license": license_,
         "misc": misc,
@@ -643,11 +644,13 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
         "filter_list_registered": config_ev["filter_list_registered"],
         "always_present": sorted(FILTER_ALWAYS_PRESENT),
         "intended_subset_of_config": (
-            stage_filters - FILTER_ALWAYS_PRESENT
+            stage_filters - (FILTER_ALWAYS_PRESENT
+                             if config_ev["avfilter_in_closure"] else set())
             <= set(config_ev["filters_enabled_config"])),
         "filter_list_matches_config": (
             set(config_ev["filter_list_registered"])
-            == set(config_ev["filters_enabled_config"]) | FILTER_ALWAYS_PRESENT),
+            == (set(config_ev["filters_enabled_config"]) | FILTER_ALWAYS_PRESENT
+                if config_ev["avfilter_in_closure"] else set())),
     }
 
     # ---- xmake replay: plain ----
@@ -1148,8 +1151,8 @@ def check() -> int:
     begin = text.index(MARK_BEGIN)
     end = text.index(MARK_END)
     rendered = render_tables()
-    have = text[begin + len(MARK_BEGIN):end].rstrip("\n")
-    if have != rendered.rstrip("\n"):
+    have = text[begin + len(MARK_BEGIN):end].strip("\n")
+    if have != rendered.strip("\n"):
         print("DRIFT: doc tables differ from generated (run --report)", file=sys.stderr)
         ok = False
     if ok:
