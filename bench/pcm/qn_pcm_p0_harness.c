@@ -33,6 +33,29 @@ static double now_ns(void) {
     return (double)ts.tv_sec * 1e9 + (double)ts.tv_nsec;
 }
 
+/* Consume raw Float32 bits (never a float->integer cast) so the
+ * anti-elision sink is well-defined for NaN/Inf/1e30/denormal inputs —
+ * a float->int conversion of a hostile value is C undefined behavior
+ * (P0-4). */
+static uint64_t f32_bits(const float *p) {
+    uint32_t b;
+    memcpy(&b, p, sizeof(b));
+    return (uint64_t)b;
+}
+
+static const char *pcm_err_name(int rc) {
+    switch (rc) {
+    case PCM_OK: return "PCM_OK";
+    case PCM_ERR_OUT_CAP: return "PCM_ERR_OUT_CAP";
+    case PCM_ERR_NOT_PREPARED: return "PCM_ERR_NOT_PREPARED";
+    case PCM_ERR_ALLOC: return "PCM_ERR_ALLOC";
+    case PCM_ERR_INVALID_PARAM: return "PCM_ERR_INVALID_PARAM";
+    case PCM_ERR_BYPASS_RATE_MISMATCH: return "PCM_ERR_BYPASS_RATE_MISMATCH";
+    case PCM_ERR_STALE_TOKEN: return "PCM_ERR_STALE_TOKEN";
+    default: return "?";
+    }
+}
+
 static uint64_t sm64(uint64_t *s) {
     uint64_t z = (*s += 0x9E3779B97F4A7C15ULL);
     z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
@@ -116,6 +139,18 @@ static long count_odd_floats(const float *buf, long frames, int ch) {
     return c;
 }
 
+/* Ownership conservation invariant (P0-2 / P1-2):
+ *   free_top + owned_queued_slots + valid_pending_slots == capacity_slabs
+ * plus the structural bounds free_top <= capacity and count <= capacity. */
+static int queue_ownership_ok(const pcm_slab_queue *q) {
+    long pending = (q->pending.slot >= 0) ? 1 : 0;
+    return q->free_top >= 0 &&
+           q->free_top <= q->capacity_slabs &&
+           q->count <= q->capacity_slabs &&
+           q->free_top + q->owned_queued_slots + pending ==
+               q->capacity_slabs;
+}
+
 static int dbl_cmp(const void *a, const void *b) {
     double x = *(const double *)a, y = *(const double *)b;
     return (x > y) - (x < y);
@@ -167,9 +202,10 @@ typedef struct {
 static feed_result feed_stream(pcm_pipeline *p, const float *pcm,
                                long total_frames, int ch,
                                const block_pattern *pat, long max_block,
-                               int expect_zero_copy) {
+                               int expect_zero_copy, float *scratch) {
     feed_result r;
-    float *out = pcm_malloc((size_t)max_block * ch * sizeof(float));
+    float *out = scratch ? scratch
+                         : pcm_malloc((size_t)max_block * ch * sizeof(float));
     long pos = 0;
     int bi = 0;
     memset(&r, 0, sizeof(r));
@@ -219,7 +255,7 @@ static feed_result feed_stream(pcm_pipeline *p, const float *pcm,
         }
         r.out_fnv = fnv1a64_update(r.out_fnv, out_ptr,
                                    (size_t)out_frames * ch * sizeof(float));
-        g_sink ^= (uint64_t)out_ptr[0]; /* consumer reads the output */
+        g_sink ^= f32_bits(out_ptr); /* consumer reads the output */
         pos += consumed;
         r.consumed_total += consumed;
         r.produced_total += out_frames;
@@ -236,7 +272,7 @@ static feed_result feed_stream(pcm_pipeline *p, const float *pcm,
     r.latency_frames = pcm_pipeline_latency_frames(p);
     r.required_input_for_1024 =
         p->rate->ops->required_input_for_output(p->rate, 1024);
-    pcm_free(out);
+    if (!scratch) pcm_free(out);
     return r;
 }
 
@@ -317,7 +353,7 @@ static int run_correctness(FILE *f) {
             all_ok = 0;
             continue;
         }
-        r = feed_stream(&pipe, pcm, total, chans[ci], &pat, 2048, mi);
+        r = feed_stream(&pipe, pcm, total, chans[ci], &pat, 2048, mi, NULL);
         cnt = pcm_pipeline_counters(&pipe);
         frames_ok = (r.consumed_total == total && r.produced_total == total);
         odd_preserved = r.ok &&
@@ -346,7 +382,8 @@ static int run_correctness(FILE *f) {
 
         fprintf(f,
             "%s  {\"case_id\": %ld, \"pattern\": \"%s\", \"channels\": %d, "
-            "\"sample_rate\": %d, \"mode\": \"%s\", \"corpus\": \"%s\", "
+            "\"sample_rate\": %d, \"requested_in_rate\": %d, "
+            "\"requested_out_rate\": %d, \"mode\": \"%s\", \"corpus\": \"%s\", "
             "\"total_frames\": %ld,\n"
             "   \"consumed_frames\": %lld, \"produced_frames\": %lld, "
             "\"boundary_identity\": \"%s\", \"frames_preserved\": %s, "
@@ -361,6 +398,7 @@ static int run_correctness(FILE *f) {
             "\"internal_buffer_capacity_frames\": %lld, "
             "\"state_epoch\": %lld, \"verdict\": \"%s\"}\n",
             first ? "" : ",\n", case_id, pats[pi].name, chans[ci], rates[ri],
+            rates[ri], rates[ri],
             mi ? "zero_copy" : "copy", corpus_name(kinds[ki]), total,
             r.consumed_total, r.produced_total,
             r.ok ? (mi ? "alias_identical" : "bit_identical") : "MISMATCH",
@@ -376,57 +414,102 @@ static int run_correctness(FILE *f) {
         first = 0;
     }
 
-    /* ---------------- lifecycle semantics ---------------- */
-    {
-        const long total = 50000;
-        float *in = pcm_malloc((size_t)total * 2 * sizeof(float));
-        uint64_t fnv_cycle[5];
-        long long epoch_cycle[5];
-        int deterministic = 1;
-        int cyc;
-        pcm_pipeline pipe;
-        feed_result r;
-        block_pattern pat;
+        /* ---------------- lifecycle semantics ---------------- */
+        {
+            const long total = 50000;
+            float *in = pcm_malloc((size_t)total * 2 * sizeof(float));
+            uint64_t fnv_cycle[5];
+            long long epoch_cycle[5];
+            int deterministic = 1, allocs_ok = 1;
+            int cyc;
+            pcm_pipeline pipe;
+            feed_result r;
+            block_pattern pat;
+            long long rt_viol;
+            long long peak_buffered_any = 0;
+            const pcm_counters *cnt;
 
-        pat.blocks = kPatMixed;
-        pat.nblocks = 9;
-        pat.zero_frame_every = 0;
-        fill_pcm(in, total, 2, CORPUS_UNIFORM, 0xE10C0DEULL);
+            pat.blocks = kPatMixed;
+            pat.nblocks = 9;
+            pat.zero_frame_every = 0;
+            fill_pcm(in, total, 2, CORPUS_UNIFORM, 0xE10C0DEULL);
 
-        fprintf(f, "\n  ],\n  \"lifecycle\": {\n");
-        fprintf(f, "    \"reset_determinism\": {\n");
-        fprintf(f,
-                "      \"stream_frames\": %ld, \"channels\": 2, "
-                "\"sample_rate\": 48000, \"cycles\": 5,\n",
-                total);
-        fprintf(f, "      \"cycle_output_fnv1a64\": [");
-        for (cyc = 0; cyc < 5; cyc++) {
+            /* ONE pipeline instance, prepared once: prepare -> process ->
+             * reset -> process (same deterministic stream) x5. This is the
+             * real lifecycle the old test only claimed (P0-3). The feed
+             * scratch is pre-allocated and the whole lifecycle runs inside
+             * the armed (post-prepare) region, so any allocation here is a
+             * counted violation. */
             pcm_pipeline_init(&pipe, 0);
             pipe.rate = pcm_rate_bypass(&pipe.rate_storage, &pipe.cnt);
             if (pcm_pipeline_prepare(&pipe, 48000, 48000, 2, 2048) != PCM_OK)
                 deterministic = 0;
-            if (cyc > 0 && pcm_pipeline_reset(&pipe) != PCM_OK)
-                deterministic = 0;
-            r = feed_stream(&pipe, in, total, 2, &pat, 2048, 0);
-            fnv_cycle[cyc] = r.out_fnv;
-            epoch_cycle[cyc] = pcm_pipeline_counters(&pipe)->state_epoch;
-            if (cyc > 0 && fnv_cycle[cyc] != fnv_cycle[0]) deterministic = 0;
-            if (!r.ok) deterministic = 0;
-            fprintf(f, "%s\"%016llx\"", cyc ? ", " : "",
-                    (unsigned long long)fnv_cycle[cyc]);
-        }
-        fprintf(f, "],\n");
-        fprintf(f, "      \"outputs_bit_identical_across_cycles\": %s,\n",
-                deterministic ? "true" : "false");
-        fprintf(f,
-                "      \"state_epoch_per_cycle\": [%lld, %lld, %lld, %lld, "
-                "%lld],\n",
-                epoch_cycle[0], epoch_cycle[1], epoch_cycle[2], epoch_cycle[3],
-                epoch_cycle[4]);
-        fprintf(f, "      \"verdict\": \"%s\"\n",
-                deterministic ? "pass" : "FAIL");
-        fprintf(f, "    },\n");
-        if (!deterministic) all_ok = 0;
+            cnt = pcm_pipeline_counters(&pipe);
+
+            fprintf(f, "\n  ],\n  \"lifecycle\": {\n");
+            fprintf(f, "    \"reset_determinism\": {\n");
+            fprintf(f,
+                    "      \"stream_frames\": %ld, \"channels\": 2, "
+                    "\"sample_rate\": 48000, \"cycles\": 5, "
+                    "\"same_pipeline_instance\": true,\n",
+                    total);
+            fprintf(f, "      \"cycle_output_fnv1a64\": [");
+            {
+                float *life_scratch = pcm_malloc(2048 * 2 * sizeof(float));
+                if (!life_scratch) deterministic = 0;
+                pcm_alloc_arm();
+                for (cyc = 0; cyc < 5; cyc++) {
+                    if (cyc > 0 && pcm_pipeline_reset(&pipe) != PCM_OK)
+                        deterministic = 0;
+                    r = feed_stream(&pipe, in, total, 2, &pat, 2048, 0,
+                                    life_scratch);
+                    fnv_cycle[cyc] = r.out_fnv;
+                    epoch_cycle[cyc] = cnt->state_epoch;
+                    if (cnt->peak_buffered_frames > peak_buffered_any)
+                        peak_buffered_any = cnt->peak_buffered_frames;
+                    if (cyc > 0 && fnv_cycle[cyc] != fnv_cycle[0])
+                        deterministic = 0;
+                    if (cyc > 0 && epoch_cycle[cyc] <= epoch_cycle[cyc - 1])
+                        deterministic = 0; /* strictly increasing per reset */
+                    if (!r.ok) deterministic = 0;
+                    fprintf(f, "%s\"%016llx\"", cyc ? ", " : "",
+                            (unsigned long long)fnv_cycle[cyc]);
+                }
+                pcm_alloc_disarm();
+                rt_viol = pcm_alloc_stats_get()->rt_violations;
+                if (rt_viol != 0) allocs_ok = 0;
+                pcm_free(life_scratch);
+            }
+            if (peak_buffered_any != 0) deterministic = 0; /* no stale frames */
+            if (!allocs_ok) deterministic = 0;
+            fprintf(f, "],\n");
+            fprintf(f, "      \"outputs_bit_identical_across_cycles\": %s,\n",
+                    deterministic ? "true" : "false");
+            fprintf(f,
+                    "      \"state_epoch_per_cycle\": [%lld, %lld, %lld, %lld, "
+                    "%lld],\n",
+                    epoch_cycle[0], epoch_cycle[1], epoch_cycle[2],
+                    epoch_cycle[3], epoch_cycle[4]);
+            fprintf(f,
+                    "      \"state_epoch_strictly_increasing_on_reset\": %s,\n",
+                    (epoch_cycle[1] > epoch_cycle[0] &&
+                     epoch_cycle[2] > epoch_cycle[1] &&
+                     epoch_cycle[3] > epoch_cycle[2] &&
+                     epoch_cycle[4] > epoch_cycle[3]) ? "true" : "false");
+            fprintf(f, "      \"post_prepare_rt_allocations\": %lld, "
+                       "\"post_prepare_allocations_zero\": %s,\n",
+                    rt_viol, allocs_ok ? "true" : "false");
+            fprintf(f,
+                    "      \"peak_buffered_frames_across_cycles\": %lld,\n",
+                    peak_buffered_any);
+            fprintf(f,
+                    "      \"note\": \"BYPASS is stateless; this proves "
+                    "lifecycle wiring only. Real filter-state reset proof "
+                    "belongs A1/B0\",\n");
+            fprintf(f, "      \"verdict\": \"%s\"\n",
+                    deterministic ? "pass" : "FAIL");
+            fprintf(f, "    },\n");
+            if (!deterministic) all_ok = 0;
 
         /* reprepare / sample-rate transition */
         {
@@ -442,7 +525,7 @@ static int run_correctness(FILE *f) {
             pcm_pipeline_init(&pipe, 0);
             pipe.rate = pcm_rate_bypass(&pipe.rate_storage, &pipe.cnt);
             pcm_pipeline_prepare(&pipe, 44100, 44100, 2, 2048);
-            r = feed_stream(&pipe, in, total, 2, &pat2, 2048, 0);
+            r = feed_stream(&pipe, in, total, 2, &pat2, 2048, 0, NULL);
             if (!r.ok) ok = 0;
             fnv_a = r.out_fnv;
             cnt = pcm_pipeline_counters(&pipe);
@@ -455,7 +538,7 @@ static int run_correctness(FILE *f) {
             dropped = cnt->dropped_frames_on_reconfigure;
             if (epoch_after <= epoch_before) ok = 0;
 
-            r = feed_stream(&pipe, in, total, 2, &pat2, 2048, 0);
+            r = feed_stream(&pipe, in, total, 2, &pat2, 2048, 0, NULL);
             if (!r.ok) ok = 0;
             fnv_b = r.out_fnv;
             if (fnv_a != fnv_b) ok = 0; /* bypass is rate-transparent */
@@ -594,6 +677,295 @@ static int run_correctness(FILE *f) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Negative test suite (P0-1/P0-2/P1-2/P1-3/P1-5)                     */
+/* Emits p0-negative-tests.json. Every check here is a mutation        */
+/* target: the driver compiles each QN_MUT_* and asserts the matching  */
+/* check flips to FAIL. A mutation that does not fail its check is a   */
+/* top-level gate failure.                                             */
+/* ------------------------------------------------------------------ */
+
+typedef struct { int npass, nfail; } neg_acc;
+
+static void neg_row(FILE *f, neg_acc *acc, int pass, const char *id,
+                    const char *expect, const char *got) {
+    fprintf(f, "%s  {\"id\": \"%s\", \"expect\": \"%s\", \"got\": \"%s\", "
+               "\"verdict\": \"%s\"}",
+            acc->npass + acc->nfail == 0 ? "" : ",\n",
+            id, expect, got, pass ? "pass" : "FAIL");
+    if (pass) acc->npass++; else acc->nfail++;
+}
+
+static int run_negative(FILE *f) {
+    neg_acc acc = {0, 0};
+    int ok = 1;
+
+    fprintf(f, "{\n  \"experiment\": \"e10-p0\",\n");
+    fprintf(f, "  \"section\": \"negative_tests\",\n");
+    fprintf(f, "  \"gate_statement\": \"typed rejection of BYPASS rate "
+               "mismatch / non-positive rates, stale queue tokens, queue "
+               "bound + ownership conservation, zero-copy guard, state-epoch "
+               "bumps, BYPASS memcpy presence, variable-frame commit; each "
+               "check is an executable mutation target (P1-5)\",\n");
+    fprintf(f, "  \"checks\": [\n");
+
+    /* --- P0-1: BYPASS typed rate rejection (4 negative cases) --- */
+    {
+        struct { int in_r, out_r; const char *id; } cases[] = {
+            {44100, 48000, "bypass_rejects_rate_mismatch_44100_48000"},
+            {48000, 44100, "bypass_rejects_rate_mismatch_48000_44100"},
+            {0, 48000, "bypass_rejects_zero_in_rate"},
+            {-44100, 48000, "bypass_rejects_negative_in_rate"},
+        };
+        int ci;
+        for (ci = 0; ci < 4; ci++) {
+            pcm_pipeline pipe;
+            int rc;
+            pcm_pipeline_init(&pipe, 0);
+            pipe.rate = pcm_rate_bypass(&pipe.rate_storage, &pipe.cnt);
+            rc = pcm_pipeline_prepare(&pipe, cases[ci].in_r, cases[ci].out_r,
+                                      2, 2048);
+            {
+                int pass = (ci < 2)
+                    ? (rc == PCM_ERR_BYPASS_RATE_MISMATCH)
+                    : (rc == PCM_ERR_INVALID_PARAM);
+                neg_row(f, &acc, pass, cases[ci].id,
+                        ci < 2 ? "PCM_ERR_BYPASS_RATE_MISMATCH"
+                               : "PCM_ERR_INVALID_PARAM",
+                        pcm_err_name(rc));
+                if (!pass) ok = 0;
+            }
+        }
+    }
+
+    /* --- P0-2: stale token after flush + ownership conservation --- */
+    {
+        pcm_slab_queue q;
+        pcm_slab_token tok;
+        float *span;
+        int rc, cons_ok = 1;
+        pcm_slab_entry e;
+        int i;
+        if (pcm_slab_queue_prepare(&q, 4, 256, 2) != PCM_OK) {
+            neg_row(f, &acc, 0, "queue_prepare_ok", "PCM_OK", "PCM_ERR_ALLOC");
+            ok = 0;
+        } else {
+            /* acquire -> flush invalidates the outstanding token */
+            if (pcm_slab_queue_acquire(&q, 256, &tok, &span) != PCM_OK || !span)
+                cons_ok = 0;
+            if (!queue_ownership_ok(&q)) cons_ok = 0; /* pending=1, free=3 */
+            pcm_slab_queue_flush(&q);
+            if (!queue_ownership_ok(&q)) cons_ok = 0; /* free=4 */
+            rc = pcm_slab_queue_commit(&q, &tok, 256); /* stale */
+            neg_row(f, &acc, rc == PCM_ERR_STALE_TOKEN,
+                    "stale_commit_after_flush_rejected",
+                    "PCM_ERR_STALE_TOKEN", pcm_err_name(rc));
+            if (rc != PCM_ERR_STALE_TOKEN) ok = 0;
+            if (q.count != 0 || q.owned_queued_slots != 0) cons_ok = 0;
+            if (!queue_ownership_ok(&q)) cons_ok = 0;
+
+            /* full acquire/commit/pop/retire cycle keeps conservation */
+            for (i = 0; i < 4; i++) {
+                if (pcm_slab_queue_acquire(&q, 256, &tok, &span) != PCM_OK ||
+                    !span) { cons_ok = 0; break; }
+                if (pcm_slab_queue_commit(&q, &tok, 256) != PCM_OK) {
+                    cons_ok = 0; break;
+                }
+                if (!queue_ownership_ok(&q)) cons_ok = 0;
+            }
+            while (q.count > 0) {
+                if (pcm_slab_queue_pop(&q, &e) != PCM_OK) { cons_ok = 0; break; }
+                pcm_slab_queue_retire(&q, &e);
+                if (!queue_ownership_ok(&q)) cons_ok = 0;
+            }
+            /* cancel path returns the slot exactly once */
+            if (pcm_slab_queue_acquire(&q, 256, &tok, &span) != PCM_OK || !span)
+                cons_ok = 0;
+            if (pcm_slab_queue_cancel(&q, &tok) != PCM_OK) cons_ok = 0;
+            if (!queue_ownership_ok(&q)) cons_ok = 0;
+
+            neg_row(f, &acc, cons_ok, "queue_ownership_conservation",
+                    "free_top + owned + pending == capacity at every step",
+                    cons_ok ? "conserved" : "VIOLATED");
+            if (!cons_ok) ok = 0;
+            pcm_slab_queue_release(&q);
+        }
+    }
+
+    /* --- P1-2: queue bound is real (count <= capacity, backpressure) --- */
+    {
+        pcm_slab_queue q;
+        pcm_slab_token tok;
+        float *span;
+        int bound_ok = 1;
+        static float fwd[2][256];
+        pcm_slab_entry e;
+        if (pcm_slab_queue_prepare(&q, 2, 256, 2) != PCM_OK) {
+            neg_row(f, &acc, 0, "queue_bound_prepare_ok", "PCM_OK",
+                    "PCM_ERR_ALLOC");
+            ok = 0;
+        } else {
+            /* occupy both ring slots with forwarded spans: count == cap,
+             * slab storage still fully free */
+            if (pcm_slab_queue_push_forward(&q, fwd[0], 256) != PCM_OK)
+                bound_ok = 0;
+            if (pcm_slab_queue_push_forward(&q, fwd[1], 256) != PCM_OK)
+                bound_ok = 0;
+            /* clean: acquire backpressures (span==NULL). Mutation
+             * QN_MUT_QUEUE_BOUND_BREAK: grants + commit overflows. */
+            if (pcm_slab_queue_acquire(&q, 256, &tok, &span) != PCM_OK)
+                bound_ok = 0;
+            if (span) {
+                if (pcm_slab_queue_commit(&q, &tok, 256) == PCM_OK)
+                    bound_ok = 0;
+            }
+            if (q.count > q.capacity_slabs) bound_ok = 0;
+            neg_row(f, &acc, bound_ok, "queue_bound_enforced",
+                    "count <= capacity; acquire backpressures when full",
+                    bound_ok ? "bounded" : "OVERFLOW");
+            if (!bound_ok) ok = 0;
+            while (q.count > 0) {
+                if (pcm_slab_queue_pop(&q, &e) != PCM_OK) break;
+                pcm_slab_queue_retire(&q, &e);
+            }
+            pcm_slab_queue_flush(&q);
+            pcm_slab_queue_release(&q);
+        }
+    }
+
+    /* --- P1-3: acquire(capacity)+commit(actual) variable frames,
+     * partial tails, drain-tail shape, 1-frame pathological commit --- */
+    {
+        pcm_slab_queue q;
+        pcm_slab_token tok;
+        float *span;
+        pcm_slab_entry e;
+        int var_ok = 1, rc, n = 0;
+        long got_frames[8];
+        static const long wants[] = {256, 7, 1, 128, 3};
+        int i;
+        if (pcm_slab_queue_prepare(&q, 8, 256, 2) != PCM_OK) {
+            neg_row(f, &acc, 0, "queue_var_prepare_ok", "PCM_OK",
+                    "PCM_ERR_ALLOC");
+            ok = 0;
+        } else {
+            for (i = 0; i < 5; i++) {
+                if (pcm_slab_queue_acquire(&q, 256, &tok, &span) != PCM_OK ||
+                    !span) { var_ok = 0; break; }
+                if (pcm_slab_queue_commit(&q, &tok, wants[i]) != PCM_OK) {
+                    var_ok = 0; break;
+                }
+            }
+            /* partial final block: commit fewer frames than capacity */
+            if (var_ok) {
+                if (pcm_slab_queue_acquire(&q, 256, &tok, &span) != PCM_OK ||
+                    !span) var_ok = 0;
+                if (pcm_slab_queue_commit(&q, &tok, 7) != PCM_OK) var_ok = 0;
+            }
+            while (q.count > 0) {
+                if (pcm_slab_queue_pop(&q, &e) != PCM_OK) { var_ok = 0; break; }
+                got_frames[n++] = e.frames;
+                pcm_slab_queue_retire(&q, &e);
+            }
+            if (var_ok) {
+                static const long exp[6] = {256, 7, 1, 128, 3, 7};
+                if (n != 6) var_ok = 0;
+                for (i = 0; i < n && i < 6; i++)
+                    if (got_frames[i] != exp[i]) var_ok = 0;
+            }
+            /* commit with actual > capacity must be rejected */
+            if (pcm_slab_queue_acquire(&q, 256, &tok, &span) != PCM_OK || !span)
+                var_ok = 0;
+            rc = pcm_slab_queue_commit(&q, &tok, 300); /* > capacity_frames */
+            if (rc != PCM_ERR_INVALID_PARAM) var_ok = 0;
+            pcm_slab_queue_cancel(&q, &tok);
+            neg_row(f, &acc, var_ok, "variable_frames_commit",
+                    "commit(actual) preserves exact frame counts; "
+                    "actual > capacity rejected; 1-frame and partial tails",
+                    var_ok ? "variable frames ok" : "frame accounting broken");
+            if (!var_ok) ok = 0;
+            pcm_slab_queue_release(&q);
+        }
+    }
+
+    /* --- P1-5: zero-copy guard with a DSP stage --- */
+    {
+        pcm_pipeline p2;
+        pcm_dsp_stage off;
+        const float *op;
+        long of, co;
+        int guard_ok = 1;
+        float inbuf[512], outbuf[512];
+        pcm_pipeline_init(&p2, 1);
+        p2.rate = pcm_rate_bypass(&p2.rate_storage, &p2.cnt);
+        pcm_pipeline_add_dsp_stage(&p2, pcm_dsp_off(&off, &p2.cnt));
+        if (pcm_pipeline_prepare(&p2, 48000, 48000, 2, 2048) != PCM_OK)
+            guard_ok = 0;
+        if (pcm_pipeline_process(&p2, inbuf, 256, outbuf, 256, &op, &of, &co)
+                != PCM_OK)
+            guard_ok = 0;
+        if (op == inbuf) guard_ok = 0;  /* must NOT alias with a DSP stage */
+        if (op != outbuf) guard_ok = 0;
+        if (of != 256) guard_ok = 0;
+        if (p2.cnt.zero_copy_frames_forwarded != 0) guard_ok = 0;
+        neg_row(f, &acc, guard_ok, "zero_copy_guard_with_dsp_stage",
+                "DSP stage forces the copy path (no aliasing)",
+                guard_ok ? "copy path" : "ALIASED");
+        if (!guard_ok) ok = 0;
+    }
+
+    /* --- P1-5: state_epoch bumps on prepare and reset --- */
+    {
+        pcm_pipeline pipe;
+        long long e0, e1, e2;
+        int epoch_ok = 1;
+        pcm_pipeline_init(&pipe, 0);
+        pipe.rate = pcm_rate_bypass(&pipe.rate_storage, &pipe.cnt);
+        pcm_pipeline_prepare(&pipe, 48000, 48000, 2, 2048);
+        e0 = pcm_pipeline_counters(&pipe)->state_epoch;
+        pcm_pipeline_prepare(&pipe, 48000, 48000, 2, 2048); /* reprepare */
+        e1 = pcm_pipeline_counters(&pipe)->state_epoch;
+        pcm_pipeline_reset(&pipe);
+        e2 = pcm_pipeline_counters(&pipe)->state_epoch;
+        if (!(e1 > e0)) epoch_ok = 0;
+        if (!(e2 > e1)) epoch_ok = 0;
+        neg_row(f, &acc, epoch_ok, "state_epoch_bump_on_prepare_and_reset",
+                "epoch strictly increases on prepare and reset",
+                epoch_ok ? "monotonic" : "STALE");
+        if (!epoch_ok) ok = 0;
+    }
+
+    /* --- P1-5: BYPASS memcpy presence (copy mode) --- */
+    {
+        pcm_pipeline pipe;
+        float inbuf[64 * 2], outbuf[64 * 2];
+        const float *op;
+        long of, co;
+        int copy_ok = 1;
+        pcm_pipeline_init(&pipe, 0);
+        pipe.rate = pcm_rate_bypass(&pipe.rate_storage, &pipe.cnt);
+        pcm_pipeline_prepare(&pipe, 48000, 48000, 2, 2048);
+        if (pcm_pipeline_process(&pipe, inbuf, 64, outbuf, 64, &op, &of, &co)
+                != PCM_OK)
+            copy_ok = 0;
+        if (pipe.cnt.explicit_copy_calls != 1) copy_ok = 0;
+        if (pipe.cnt.explicit_bytes_copied != 64 * 2 * 4) copy_ok = 0;
+        if (op != outbuf) copy_ok = 0;
+        neg_row(f, &acc, copy_ok, "bypass_memcpy_present",
+                "copy mode executes exactly one memcpy per process call",
+                copy_ok ? "copy present" : "COPY MISSING");
+        if (!copy_ok) ok = 0;
+    }
+
+    fprintf(f, "\n  ],\n");
+    fprintf(f, "  \"summary\": {\"checks_total\": %d, \"checks_passed\": %d, "
+               "\"checks_failed\": %d},\n",
+            acc.npass + acc.nfail, acc.npass, acc.nfail);
+    fprintf(f, "  \"verdict\": \"%s\"\n", ok ? "PASS" : "FAIL");
+    fprintf(f, "}\n");
+    return ok;
+}
+
+/* ------------------------------------------------------------------ */
 /* Buffer/copy accounting + allocation gate                            */
 /* ------------------------------------------------------------------ */
 
@@ -633,7 +1005,7 @@ static int acct_stream(pcm_pipeline *p, const float *in, long frames, int ch,
                        (size_t)blk * ch * sizeof(float)) != 0)
                 ok = 0;
         }
-        g_sink ^= (uint64_t)out_ptr[0];
+        g_sink ^= f32_bits(out_ptr);
         pos += consumed;
     }
     {
@@ -678,6 +1050,9 @@ static int run_accounting(FILE *f) {
     pcm_slab_entry e;
     long allocs_rt, rt_violations, queue_slab_allocs;
     long long queue_peak = 0;
+    long q_snap_count = 0, q_snap_free_top = 0;
+    long q_snap_owned = 0, q_snap_pending = 0;
+    int q_snap_ownership = 1;
     const pcm_alloc_stats *st;
     int ok = 1;
     long i;
@@ -742,7 +1117,7 @@ static int run_accounting(FILE *f) {
         if (pcm_pipeline_process(&p_copy, in + (i % 997) * 256 * ch, 256,
                                  scratch, 256, &op, &of, &co) != PCM_OK)
             ok = 0;
-        g_sink ^= (uint64_t)op[0];
+        g_sink ^= f32_bits(op);
         if (i % 7 == 0 && pcm_pipeline_reset(&p_copy) != PCM_OK) ok = 0;
     }
     if (pcm_pipeline_drain(&p_copy, scratch, 256, &op, &of) != PCM_OK || of != 0)
@@ -752,29 +1127,37 @@ static int run_accounting(FILE *f) {
                                  scratch, 256, &op, &of, &co) != PCM_OK)
             ok = 0;
         if (op != in + (i % 499) * 256 * ch) ok = 0; /* alias identity */
-        g_sink ^= (uint64_t)op[0];
+        g_sink ^= f32_bits(op);
     }
-    /* queue cycle under arms: acquire -> pipeline fills -> enqueue ->
-     * pop -> consume -> retire -> flush */
+    /* queue cycle under arms: acquire(token) -> pipeline fills -> commit ->
+     * pop -> consume -> retire -> flush. Every acquired token is committed
+     * or cancelled exactly once; ownership conservation is asserted after
+     * each step (P0-2 / P1-2). */
     for (i = 0; i < 200; i++) {
-        float *slab = pcm_slab_queue_acquire(&q);
-        if (!slab) { /* full: drain one */
+        pcm_slab_token tok;
+        float *slab;
+        if (pcm_slab_queue_acquire(&q, 256, &tok, &slab) != PCM_OK) {
+            ok = 0;
+            break;
+        }
+        if (!slab) { /* full: drain one, retry once */
             if (pcm_slab_queue_pop(&q, &e) != PCM_OK) { ok = 0; break; }
-            g_sink ^= (uint64_t)e.data[0];
+            g_sink ^= f32_bits(e.data);
             pcm_slab_queue_retire(&q, &e);
-            slab = pcm_slab_queue_acquire(&q);
-            if (!slab) { ok = 0; break; }
+            if (pcm_slab_queue_acquire(&q, 256, &tok, &slab) != PCM_OK ||
+                !slab) { ok = 0; break; }
         }
         if (pcm_pipeline_process(&p_copy, in + (i % 251) * 256 * ch, 256, slab,
                                  256, &op, &of, &co) != PCM_OK)
             ok = 0;
-        if (pcm_slab_queue_enqueue_filled(&q) != PCM_OK) ok = 0;
+        if (pcm_slab_queue_commit(&q, &tok, 256) != PCM_OK) ok = 0;
+        if (!queue_ownership_ok(&q)) ok = 0;
         if (i % 3 == 0) {
             if (pcm_slab_queue_push_forward(&q, in + (i % 241) * 256 * ch,
                                             256) != PCM_OK) {
                 /* full is acceptable; drain one then retry once */
                 if (pcm_slab_queue_pop(&q, &e) != PCM_OK) { ok = 0; break; }
-                g_sink ^= (uint64_t)e.data[0];
+                g_sink ^= f32_bits(e.data);
                 pcm_slab_queue_retire(&q, &e);
                 if (pcm_slab_queue_push_forward(&q,
                                                 in + (i % 241) * 256 * ch,
@@ -783,17 +1166,26 @@ static int run_accounting(FILE *f) {
             }
         }
         if (pcm_slab_queue_pop(&q, &e) != PCM_OK) { ok = 0; break; }
-        g_sink ^= (uint64_t)e.data[0];
+        g_sink ^= f32_bits(e.data);
         pcm_slab_queue_retire(&q, &e);
+        if (!queue_ownership_ok(&q)) ok = 0;
         if (q.count > queue_peak) queue_peak = q.count;
     }
     pcm_slab_queue_flush(&q);
+    if (!queue_ownership_ok(&q)) ok = 0;
     pcm_alloc_disarm();
 
     st = pcm_alloc_stats_get();
     allocs_rt = st->allocations - allocs_at_arm; /* armed-region only */
     rt_violations = st->rt_violations;
     ok = ok && rt_violations == 0 && allocs_rt == 0;
+
+    /* snapshot queue ownership before release (release zeroes the struct) */
+    q_snap_count = q.count;
+    q_snap_free_top = q.free_top;
+    q_snap_owned = q.owned_queued_slots;
+    q_snap_pending = (q.pending.slot >= 0) ? 1 : 0;
+    q_snap_ownership = queue_ownership_ok(&q);
     pcm_slab_queue_release(&q);
 
     fprintf(f, "  \"stream\": {\"frames\": %ld, \"channels\": %d, "
@@ -806,13 +1198,18 @@ static int run_accounting(FILE *f) {
         "     \"input_bytes\": %lld, \"output_bytes\": %lld,\n"
         "     \"explicit_copy_calls\": %lld, \"explicit_bytes_copied\": %lld, "
         "\"zero_copy_frames_forwarded\": %lld,\n"
+        "     \"logical_copy_bytes\": %lld, "
+        "\"estimated_memory_traffic_bytes\": %lld,\n"
         "     \"full_memory_passes\": %.6f, \"peak_buffered_frames\": %lld, "
         "\"internal_buffer_capacity_frames\": %lld, "
         "\"allocations_during_prepare\": %lld, \"verdict\": \"%s\"},\n",
         row_copy.input_frames, row_copy.output_frames, row_copy.process_calls,
         row_copy.input_bytes, row_copy.output_bytes,
         row_copy.explicit_copy_calls, row_copy.explicit_bytes_copied,
-        row_copy.zero_copy_frames, row_copy.memory_passes,
+        row_copy.zero_copy_frames,
+        row_copy.explicit_bytes_copied,
+        row_copy.explicit_bytes_copied * 2, /* read+write estimate, not HW truth */
+        row_copy.memory_passes,
         row_copy.peak_buffered, row_copy.capacity,
         row_copy.allocs_during_prepare, row_copy.ok ? "pass" : "FAIL");
     fprintf(f,
@@ -821,13 +1218,16 @@ static int run_accounting(FILE *f) {
         "     \"input_bytes\": %lld, \"output_bytes\": %lld,\n"
         "     \"explicit_copy_calls\": %lld, \"explicit_bytes_copied\": %lld, "
         "\"zero_copy_frames_forwarded\": %lld,\n"
+        "     \"logical_copy_bytes\": 0, "
+        "\"estimated_memory_traffic_bytes\": 0,\n"
         "     \"full_memory_passes\": %.6f, \"peak_buffered_frames\": %lld, "
         "\"internal_buffer_capacity_frames\": %lld, "
         "\"allocations_during_prepare\": %lld, \"verdict\": \"%s\"}\n",
         row_zero.input_frames, row_zero.output_frames, row_zero.process_calls,
         row_zero.input_bytes, row_zero.output_bytes,
         row_zero.explicit_copy_calls, row_zero.explicit_bytes_copied,
-        row_zero.zero_copy_frames, row_zero.memory_passes,
+        row_zero.zero_copy_frames,
+        row_zero.memory_passes,
         row_zero.peak_buffered, row_zero.capacity,
         row_zero.allocs_during_prepare, row_zero.ok ? "pass" : "FAIL");
     fprintf(f, "  ],\n");
@@ -842,16 +1242,28 @@ static int run_accounting(FILE *f) {
             "  },\n",
             queue_slab_allocs, allocs_rt, rt_violations,
             (rt_violations == 0 && allocs_rt == 0 && ok) ? "PASS" : "FAIL");
-    fprintf(f,
-            "  \"buffer_bound\": {\n"
-            "    \"pipeline_internal_capacity_frames\": %lld,\n"
-            "    \"pipeline_peak_buffered_frames\": %lld,\n"
-            "    \"queue_capacity_slabs\": %ld,\n"
-            "    \"queue_peak_slabs_rt_region\": %lld,\n"
-            "    \"verdict\": \"%s\"\n"
-            "  },\n",
-            row_copy.capacity, row_copy.peak_buffered, queue_cap, queue_peak,
-            (row_copy.peak_buffered == 0) ? "PASS" : "FAIL");
+    {
+        int bound_ok = row_copy.peak_buffered <= row_copy.capacity &&
+                       queue_peak <= queue_cap && q_snap_ownership;
+        ok = ok && bound_ok;
+        fprintf(f,
+                "  \"buffer_bound\": {\n"
+                "    \"pipeline_internal_capacity_frames\": %lld,\n"
+                "    \"pipeline_peak_buffered_frames\": %lld,\n"
+                "    \"queue_capacity_slabs\": %ld,\n"
+                "    \"queue_peak_slabs_rt_region\": %lld,\n"
+                "    \"queue_count\": %ld,\n"
+                "    \"queue_free_top\": %ld,\n"
+                "    \"queue_owned_queued_slots\": %ld,\n"
+                "    \"queue_valid_pending_slots\": %ld,\n"
+                "    \"ownership_conservation\": \"%s\",\n"
+                "    \"verdict\": \"%s\"\n"
+                "  },\n",
+                row_copy.capacity, row_copy.peak_buffered, queue_cap,
+                queue_peak, q_snap_count, q_snap_free_top, q_snap_owned,
+                q_snap_pending, q_snap_ownership ? "pass" : "FAIL",
+                bound_ok ? "PASS" : "FAIL");
+    }
     fprintf(f, "  \"verdict\": \"%s\"\n", ok ? "PASS" : "FAIL");
     fprintf(f, "}\n");
     pcm_free(in);
@@ -964,7 +1376,10 @@ static void placement_run(int shape_b, int forward, const float *in,
             t1 = now_ns();                                                 \
             worker_total += t1 - t0;                                       \
         } else {                                                           \
-            float *slab = pcm_slab_queue_acquire(&q);                      \
+            pcm_slab_token tok;                                            \
+            float *slab;                                                   \
+            if (pcm_slab_queue_acquire(&q, PL_SLAB, &tok, &slab) != PCM_OK)\
+                r->ok = 0;                                                 \
             if (slab) {                                                    \
                 const float *op;                                           \
                 long of, co;                                               \
@@ -975,7 +1390,8 @@ static void placement_run(int shape_b, int forward, const float *in,
                     r->ok = 0;                                             \
                 t1 = now_ns();                                             \
                 worker_total += t1 - t0;                                   \
-                if (pcm_slab_queue_enqueue_filled(&q) != PCM_OK) r->ok = 0;\
+                if (pcm_slab_queue_commit(&q, &tok, PL_SLAB) != PCM_OK)    \
+                    r->ok = 0;                                             \
             }                                                              \
         }                                                                  \
         pos += PL_SLAB;                                                    \
@@ -1023,7 +1439,7 @@ static void placement_run(int shape_b, int forward, const float *in,
                     if (t1 - t0 > cb_max) cb_max = t1 - t0;
                     pipe_total += t1 - t0;
                     h = fnv1a64_update(h, op, (size_t)PL_CB * ch * 4);
-                    g_sink ^= (uint64_t)op[0];
+                    g_sink ^= f32_bits(op);
                     pos += PL_CB;
                 } else {
                     pcm_slab_entry e;
@@ -1048,7 +1464,7 @@ static void placement_run(int shape_b, int forward, const float *in,
                     sink_calls_rep++;
                     sink_bytes_rep += PL_CB * ch * 4;
                     h = fnv1a64_update(h, dev, (size_t)PL_CB * ch * 4);
-                    g_sink ^= (uint64_t)dev[0];
+                    g_sink ^= f32_bits(dev);
                     pcm_slab_queue_retire(&q, &e);
                     WORKER_STEP();
                 }
@@ -1233,7 +1649,7 @@ static int run_performance(FILE *f) {
     const int loops = 32; /* stream repeats per timed sample: amortizes
                              clock/scheduler noise at small blocks */
     double dt[16], mdt[16];
-    int ok = 1;
+    int ok = 1, thr_ok = 1;
 
     float *in = pcm_malloc((size_t)frames * 2 * sizeof(float));
     float *scratch = pcm_malloc(2048 * 2 * sizeof(float));
@@ -1264,7 +1680,7 @@ static int run_performance(FILE *f) {
                     while (pos < frames) {
                         memcpy(scratch, in + pos * ch,
                                (size_t)blk * ch * sizeof(float));
-                        g_sink ^= (uint64_t)scratch[0];
+                        g_sink ^= f32_bits(scratch);
                         pos += blk;
                     }
                 }
@@ -1312,7 +1728,7 @@ static int run_performance(FILE *f) {
                                                      scratch, blk, &op, &of,
                                                      &co) != PCM_OK)
                                 ok = 0;
-                            g_sink ^= (uint64_t)op[0];
+                            g_sink ^= f32_bits(op);
                             pos += co;
                         }
                     }
@@ -1336,12 +1752,17 @@ static int run_performance(FILE *f) {
                         snprintf(thr, sizeof(thr), "null");
                         snprintf(ratio, sizeof(ratio), "null");
                     } else {
-                        snprintf(thr, sizeof(thr), "%.1f",
-                                 (double)copy_bytes_expected * loops / med *
-                                     1e3 / (1024.0 * 1024.0));
+                        /* bytes / ns -> MiB/s: *1e9 / (1024^2). The old
+                         * *1e3 was a units bug (P1-1). */
+                        double mbps =
+                            (double)copy_bytes_expected * loops / med *
+                            1e9 / (1024.0 * 1024.0);
+                        snprintf(thr, sizeof(thr), "%.1f", mbps);
                         snprintf(ratio, sizeof(ratio), "%.3f",
                                  ((med - mref_med) / sample_calls) /
                                      (mref_med / sample_calls));
+                        thr_ok = isfinite(mbps) && mbps > 0.0 &&
+                                 med > 0.0 && loops > 0;
                     }
                     fprintf(f,
                         "    {\"block_frames\": %ld, \"channels\": %d, "
@@ -1351,6 +1772,7 @@ static int run_performance(FILE *f) {
                         "%.1f, \"max\": %.1f},\n"
                         "     \"ns_per_frame\": {\"median\": %.4f},\n"
                         "     \"throughput_MBps_copy\": %s,\n"
+                        "     \"throughput_sanity_ok\": %s,\n"
                         "     \"explicit_bytes_copied_per_pass\": %lld,\n"
                         "     \"memcpy_ref_ns_per_call\": {\"median\": %.1f, "
                         "\"min\": %.1f, \"max\": %.1f},\n"
@@ -1360,12 +1782,13 @@ static int run_performance(FILE *f) {
                         med / sample_calls, mn / sample_calls,
                         mx / sample_calls,
                         med / ((double)frames * loops),
-                        thr,
+                        thr, thr_ok ? "true" : "false",
                         copy_bytes_expected,
                         mref_med / sample_calls, mref_min / sample_calls,
                         mref_max / sample_calls,
                         mi ? 0.0 : (med - mref_med) / sample_calls,
                         ratio);
+                    if (!thr_ok) ok = 0;
                     if (bi != 5 || ci != 1 || mi != 1) fprintf(f, ",\n");
                     (void)cnt;
                 }
@@ -1400,43 +1823,76 @@ static FILE *open_out(const char *dir, const char *name) {
 }
 
 int main(int argc, char **argv) {
-    const char *dir;
+    const char *dir = NULL;
+    const char *sections = "correctness,buffer,placement,performance,negative";
     FILE *f;
-    int ok = 1, r;
+    int ok = 1, r, i;
+    int want_corr = 1, want_buf = 1, want_place = 1, want_perf = 1;
+    int want_neg = 1;
 
-    if (argc < 2) {
-        fprintf(stderr, "usage: qn_pcm_p0_harness <output_dir>\n");
+    for (i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--sections") == 0 && i + 1 < argc) {
+            sections = argv[++i];
+        } else if (!dir) {
+            dir = argv[i];
+        }
+    }
+    if (!dir) {
+        fprintf(stderr, "usage: qn_pcm_p0_harness <output_dir> "
+                "[--sections correctness,buffer,placement,performance,"
+                "negative]\n");
         return 2;
     }
-    dir = argv[1];
+    want_corr = strstr(sections, "correctness") != NULL;
+    want_buf  = strstr(sections, "buffer") != NULL;
+    want_place = strstr(sections, "placement") != NULL;
+    want_perf = strstr(sections, "performance") != NULL;
+    want_neg  = strstr(sections, "negative") != NULL;
 
-    f = open_out(dir, "p0-correctness.json");
-    if (!f) return 2;
-    r = run_correctness(f);
-    fclose(f);
-    printf("correctness: %s\n", r ? "PASS" : "FAIL");
-    ok = ok && r;
+    if (want_corr) {
+        f = open_out(dir, "p0-correctness.json");
+        if (!f) return 2;
+        r = run_correctness(f);
+        fclose(f);
+        printf("correctness: %s\n", r ? "PASS" : "FAIL");
+        ok = ok && r;
+    }
 
-    f = open_out(dir, "p0-buffer-accounting.json");
-    if (!f) return 2;
-    r = run_accounting(f);
-    fclose(f);
-    printf("buffer-accounting: %s\n", r ? "PASS" : "FAIL");
-    ok = ok && r;
+    if (want_neg) {
+        f = open_out(dir, "p0-negative-tests.json");
+        if (!f) return 2;
+        r = run_negative(f);
+        fclose(f);
+        printf("negative: %s\n", r ? "PASS" : "FAIL");
+        ok = ok && r;
+    }
 
-    f = open_out(dir, "p0-placement.json");
-    if (!f) return 2;
-    r = run_placement(f);
-    fclose(f);
-    printf("placement: %s\n", r ? "PASS" : "FAIL");
-    ok = ok && r;
+    if (want_buf) {
+        f = open_out(dir, "p0-buffer-accounting.json");
+        if (!f) return 2;
+        r = run_accounting(f);
+        fclose(f);
+        printf("buffer-accounting: %s\n", r ? "PASS" : "FAIL");
+        ok = ok && r;
+    }
 
-    f = open_out(dir, "p0-performance.json");
-    if (!f) return 2;
-    r = run_performance(f);
-    fclose(f);
-    printf("performance: %s\n", r ? "PASS" : "FAIL");
-    ok = ok && r;
+    if (want_place) {
+        f = open_out(dir, "p0-placement.json");
+        if (!f) return 2;
+        r = run_placement(f);
+        fclose(f);
+        printf("placement: %s\n", r ? "PASS" : "FAIL");
+        ok = ok && r;
+    }
+
+    if (want_perf) {
+        f = open_out(dir, "p0-performance.json");
+        if (!f) return 2;
+        r = run_performance(f);
+        fclose(f);
+        printf("performance: %s\n", r ? "PASS" : "FAIL");
+        ok = ok && r;
+    }
 
     printf("P0 harness: %s\n", ok ? "ALL PASS" : "FAILURES PRESENT");
     return ok ? 0 : 1;

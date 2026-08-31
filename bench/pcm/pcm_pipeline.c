@@ -8,6 +8,49 @@
 #include <string.h>
 
 /* ------------------------------------------------------------------ */
+/* Deterministic fault injection (P1-5 reproducible mutation tests).   */
+/* The driver compiles this TU with -DQN_MUT_<NAME> for each mutation; */
+/* each mutation must be caught by exactly one negative test/gate.     */
+/* ------------------------------------------------------------------ */
+
+/* bypass_prepare accepts in_rate != out_rate (P0-1 hole) */
+#ifdef QN_MUT_RATE_MISMATCH_ACCEPT
+#define MUT_RATE_MISMATCH_ACCEPT 1
+#else
+#define MUT_RATE_MISMATCH_ACCEPT 0
+#endif
+/* bypass_process skips the memcpy (break bit identity + accounting) */
+#ifdef QN_MUT_REMOVE_BYPASS_MEMCPY
+#define MUT_REMOVE_BYPASS_MEMCPY 1
+#else
+#define MUT_REMOVE_BYPASS_MEMCPY 0
+#endif
+/* pipeline zero-copy guard ignores DSP stages (aliasing with DSP) */
+#ifdef QN_MUT_WEAK_ZEROCOPY_GUARD
+#define MUT_WEAK_ZEROCOPY_GUARD 1
+#else
+#define MUT_WEAK_ZEROCOPY_GUARD 0
+#endif
+/* prepare does not bump state_epoch (stale state can survive) */
+#ifdef QN_MUT_NO_EPOCH_BUMP
+#define MUT_NO_EPOCH_BUMP 1
+#else
+#define MUT_NO_EPOCH_BUMP 0
+#endif
+/* queue commit accepts a stale (post-flush) token */
+#ifdef QN_MUT_STALE_COMMIT_ALLOWED
+#define MUT_STALE_COMMIT_ALLOWED 1
+#else
+#define MUT_STALE_COMMIT_ALLOWED 0
+#endif
+/* queue acquire/commit drop the ring-capacity bound */
+#ifdef QN_MUT_QUEUE_BOUND_BREAK
+#define MUT_QUEUE_BOUND_BREAK 1
+#else
+#define MUT_QUEUE_BOUND_BREAK 0
+#endif
+
+/* ------------------------------------------------------------------ */
 /* Counting allocator                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -51,13 +94,19 @@ void pcm_free(void *p) {
 
 static int bypass_prepare(pcm_rate_stage *st, int in_rate, int out_rate,
                           int channels, long max_frames) {
-    if (channels <= 0 || max_frames < 0) return PCM_ERR_NOT_PREPARED;
+    if (in_rate <= 0 || out_rate <= 0) return PCM_ERR_INVALID_PARAM;
+    if (channels <= 0) return PCM_ERR_INVALID_PARAM;
+    if (max_frames < 0) return PCM_ERR_INVALID_PARAM;
+    /* BYPASS means in_rate == out_rate: a mismatch is a typed error, not
+     * a silent 1:1 copy (P0-1). */
+    if (in_rate != out_rate && !MUT_RATE_MISMATCH_ACCEPT)
+        return PCM_ERR_BYPASS_RATE_MISMATCH;
     st->in_rate = in_rate;
     st->out_rate = out_rate;
     st->channels = channels;
     st->max_frames = max_frames;
     st->buffered_frames = 0;
-    st->cnt->state_epoch++;   /* rate-dependent state must not survive */
+    if (!MUT_NO_EPOCH_BUMP) st->cnt->state_epoch++;
     st->cnt->internal_buffer_capacity_frames = 0; /* bypass buffers nothing */
     return PCM_OK;
 }
@@ -71,9 +120,13 @@ static int bypass_process(pcm_rate_stage *st, const float *in, long in_frames,
     if (n < 0) n = 0;
     bytes = n * (long)st->channels * (long)sizeof(float);
     if (n > 0) {
-        memcpy(out, in, (size_t)bytes);   /* the one explicit copy */
-        st->cnt->explicit_copy_calls++;
-        st->cnt->explicit_bytes_copied += bytes;
+        if (MUT_REMOVE_BYPASS_MEMCPY) {
+            (void)out; /* fault injection: copy deliberately omitted */
+        } else {
+            memcpy(out, in, (size_t)bytes);   /* the one explicit copy */
+            st->cnt->explicit_copy_calls++;
+            st->cnt->explicit_bytes_copied += bytes;
+        }
     }
     *consumed = n;
     *produced = n;
@@ -229,7 +282,8 @@ int pcm_pipeline_process(pcm_pipeline *p, const float *in, long in_frames,
     /* Zero-copy forward: only when configured AND the shape permits it
      * (bypass rate stage, zero DSP stages). Verified by pointer identity
      * at the call site; nothing is written here. */
-    if (p->allow_zero_copy && p->ndsp == 0 &&
+    if (p->allow_zero_copy &&
+        (MUT_WEAK_ZEROCOPY_GUARD || p->ndsp == 0) &&
         p->rate->ops->process == bypass_process) {
         if (out_cap < in_frames) return PCM_ERR_OUT_CAP;
         if (in_frames > 0) p->cnt.zero_copy_frames_forwarded += in_frames;
@@ -316,7 +370,8 @@ int pcm_slab_queue_prepare(pcm_slab_queue *q, long capacity_slabs,
                            long slab_frames, int channels) {
     long i;
     memset(q, 0, sizeof(*q));
-    q->pending_idx = -1;
+    q->pending.slot = -1;
+    q->pending.generation = -1;
     q->slab_storage = pcm_calloc((size_t)capacity_slabs, sizeof(float *));
     q->free_stack = pcm_calloc((size_t)capacity_slabs, sizeof(long));
     q->ring = pcm_calloc((size_t)capacity_slabs, sizeof(pcm_slab_entry));
@@ -335,31 +390,69 @@ int pcm_slab_queue_prepare(pcm_slab_queue *q, long capacity_slabs,
     return PCM_OK;
 }
 
-float *pcm_slab_queue_acquire(pcm_slab_queue *q) {
-    if (q->count >= q->capacity_slabs || q->free_top == 0)
-        return NULL; /* backpressure: worker must wait */
-    q->pending_idx = q->free_stack[--q->free_top];
-    return q->slab_storage[q->pending_idx];
+int pcm_slab_queue_acquire(pcm_slab_queue *q, long capacity_frames,
+                           pcm_slab_token *tok, float **span) {
+    long slot;
+    if (capacity_frames < 1 || capacity_frames > q->slab_frames)
+        return PCM_ERR_INVALID_PARAM;
+    /* Backpressure: no free ring slot (count) or no free slab slot
+     * (free_top). Returns PCM_OK with *span == NULL, not an error. */
+    if ((!MUT_QUEUE_BOUND_BREAK && q->count >= q->capacity_slabs) ||
+        q->free_top == 0) {
+        *span = NULL;
+        tok->slot = -1;
+        tok->generation = -1;
+        tok->capacity_frames = 0;
+        return PCM_OK;
+    }
+    slot = q->free_stack[--q->free_top];
+    tok->slot = slot;
+    tok->generation = q->generation;
+    tok->capacity_frames = capacity_frames;
+    q->pending = *tok;
+    *span = q->slab_storage[slot];
+    return PCM_OK;
 }
 
-int pcm_slab_queue_enqueue_filled(pcm_slab_queue *q) {
-    if (q->pending_idx < 0) return PCM_ERR_OUT_CAP;
-    q->ring[q->tail].data = q->slab_storage[q->pending_idx];
-    q->ring[q->tail].frames = q->slab_frames;
+int pcm_slab_queue_commit(pcm_slab_queue *q, const pcm_slab_token *tok,
+                          long actual_frames) {
+    if (tok->slot < 0) return PCM_ERR_INVALID_PARAM;
+    if (tok->generation != q->generation || q->pending.slot != tok->slot) {
+        /* Token invalidated by flush/reset, or slot already returned.
+         * Must never enter the queue (P0-2). */
+        if (!MUT_STALE_COMMIT_ALLOWED) return PCM_ERR_STALE_TOKEN;
+    }
+    if (actual_frames < 1 || actual_frames > tok->capacity_frames)
+        return PCM_ERR_INVALID_PARAM;
+    if (!MUT_QUEUE_BOUND_BREAK && q->count >= q->capacity_slabs)
+        return PCM_ERR_OUT_CAP;
+    q->ring[q->tail].data = q->slab_storage[tok->slot];
+    q->ring[q->tail].frames = actual_frames;
     q->ring[q->tail].forwarded = 0;
-    q->ring[q->tail].storage_index = q->pending_idx;
-    q->pending_idx = -1;
+    q->ring[q->tail].storage_index = tok->slot;
+    q->pending.slot = -1;
     q->tail = (q->tail + 1) % q->capacity_slabs;
     q->count++;
+    q->owned_queued_slots++;
     if (q->count > q->peak_count) q->peak_count = q->count;
-    q->enqueued_frames += q->slab_frames;
+    q->enqueued_frames += actual_frames;
+    return PCM_OK;
+}
+
+int pcm_slab_queue_cancel(pcm_slab_queue *q, const pcm_slab_token *tok) {
+    if (tok->slot < 0) return PCM_ERR_INVALID_PARAM;
+    if (tok->generation != q->generation || q->pending.slot != tok->slot)
+        return PCM_ERR_STALE_TOKEN;
+    q->free_stack[q->free_top++] = tok->slot;
+    q->pending.slot = -1;
     return PCM_OK;
 }
 
 int pcm_slab_queue_push_forward(pcm_slab_queue *q, const float *span,
                                 long frames) {
-    if (frames != q->slab_frames) return PCM_ERR_OUT_CAP;
-    if (q->count >= q->capacity_slabs) return PCM_ERR_OUT_CAP;
+    if (frames < 1) return PCM_ERR_INVALID_PARAM;
+    if (!MUT_QUEUE_BOUND_BREAK && q->count >= q->capacity_slabs)
+        return PCM_ERR_OUT_CAP;
     q->ring[q->tail].data = (float *)span; /* borrowed, not copied */
     q->ring[q->tail].frames = frames;
     q->ring[q->tail].forwarded = 1;
@@ -382,16 +475,24 @@ int pcm_slab_queue_pop(pcm_slab_queue *q, pcm_slab_entry *out) {
 }
 
 void pcm_slab_queue_retire(pcm_slab_queue *q, const pcm_slab_entry *e) {
-    if (!e->forwarded && e->storage_index >= 0)
+    if (!e->forwarded && e->storage_index >= 0) {
         q->free_stack[q->free_top++] = e->storage_index;
+        q->owned_queued_slots--;
+    }
 }
 
 long pcm_slab_queue_flush(pcm_slab_queue *q) {
-    long frames = q->count * q->slab_frames;
+    long frames = pcm_slab_queue_frames_buffered(q);
     long i;
     q->dropped_frames += frames;
     q->head = q->tail = q->count = 0;
-    /* All storage returns to the free list (forwarded spans own none). */
+    q->owned_queued_slots = 0;
+    /* Invalidate any outstanding acquire token and rebuild the free list.
+     * A stale commit (old generation) is then rejected before it can
+     * double-own a slot. */
+    q->pending.slot = -1;
+    q->pending.generation = -1;
+    q->generation++;
     for (i = 0; i < q->capacity_slabs; i++)
         q->free_stack[i] = q->capacity_slabs - 1 - i;
     q->free_top = q->capacity_slabs;
@@ -411,5 +512,8 @@ void pcm_slab_queue_release(pcm_slab_queue *q) {
 }
 
 long pcm_slab_queue_frames_buffered(const pcm_slab_queue *q) {
-    return q->count * q->slab_frames;
+    long total = 0, i;
+    for (i = 0; i < q->count; i++)
+        total += q->ring[(q->head + i) % q->capacity_slabs].frames;
+    return total;
 }

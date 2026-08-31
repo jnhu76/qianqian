@@ -164,6 +164,9 @@ pcm_dsp_stage *pcm_dsp_off(pcm_dsp_stage *storage, pcm_counters *cnt);
 #define PCM_ERR_OUT_CAP     -1
 #define PCM_ERR_NOT_PREPARED -2
 #define PCM_ERR_ALLOC        -3
+#define PCM_ERR_INVALID_PARAM -4
+#define PCM_ERR_BYPASS_RATE_MISMATCH -5
+#define PCM_ERR_STALE_TOKEN  -6
 
 typedef struct pcm_pipeline {
     pcm_rate_stage rate_storage;
@@ -205,6 +208,17 @@ const pcm_counters *pcm_pipeline_counters(const pcm_pipeline *p);
 /* ------------------------------------------------------------------ */
 /* Bounded slab queue — Shape B (worker processing) buffering model.   */
 /* Fixed capacity, allocated entirely in prepare; RT path only pops.   */
+/*                                                                     */
+/* Ownership model (must hold at all times):                           */
+/*   free_top + owned_queued_slots + valid_pending_slots               */
+/*       == capacity_slabs                                             */
+/* A worker acquires a writable span + token, fills it, and commits    */
+/* the actual produced frame count. flush()/reset bumps the queue      */
+/* generation and invalidates any outstanding token; a stale commit    */
+/* is rejected with PCM_ERR_STALE_TOKEN and never enters the queue.    */
+/* Forwarded spans are borrowed (own no slab storage) and do not       */
+/* consume slab slots; their lifetime must exceed queue residency      */
+/* (valid until retire()).                                             */
 /* ------------------------------------------------------------------ */
 
 typedef struct pcm_slab_entry {
@@ -214,36 +228,56 @@ typedef struct pcm_slab_entry {
     long storage_index;     /* -1 for forwarded spans                   */
 } pcm_slab_entry;
 
+typedef struct pcm_slab_token {
+    long slot;              /* storage index, -1 if none                */
+    long generation;        /* queue generation at acquire              */
+    long capacity_frames;   /* max frames this span can hold            */
+} pcm_slab_token;
+
 typedef struct pcm_slab_queue {
     float **slab_storage;   /* capacity_slabs pre-allocated buffers     */
     long *free_stack;       /* indices of free slab_storage slots       */
     long free_top;
     pcm_slab_entry *ring;   /* capacity_slabs entries                   */
     long capacity_slabs;
-    long slab_frames;       /* frames per slab                          */
+    long slab_frames;       /* max frames per owned slab                */
     int channels;
     long head, tail, count; /* ring indices                             */
-    long peak_count;        /* max slabs simultaneously occupied        */
+    long peak_count;        /* max entries simultaneously occupied      */
+    long generation;        /* bumped on flush; invalidates tokens      */
+    long owned_queued_slots;/* ring entries currently owning a slot     */
+    pcm_slab_token pending; /* outstanding acquire token (slot=-1 none) */
     long long enqueued_frames, dequeued_frames, dropped_frames;
     long long forward_frames; /* enqueued by pointer (zero-copy handoff)*/
-    long pending_idx;       /* slab handed out by acquire(), -1 if none */
 } pcm_slab_queue;
 
 /* Allocates slab storage via the counting allocator (prepare-time only). */
 int pcm_slab_queue_prepare(pcm_slab_queue *q, long capacity_slabs,
                            long slab_frames, int channels);
-/* Worker, copy mode: borrow a free slab (NULL under backpressure). The
- * worker runs the pipeline into it, then MUST enqueue_filled(). */
-float *pcm_slab_queue_acquire(pcm_slab_queue *q);
-int pcm_slab_queue_enqueue_filled(pcm_slab_queue *q);
-/* Worker, zero-copy mode: enqueue the caller's span by pointer. */
+/* Worker, copy mode: borrow a writable span of up to `capacity_frames`
+ * (<= slab_frames). On backpressure returns PCM_OK with *span == NULL.
+ * The returned token must be committed (actual_frames <= capacity_frames)
+ * or cancelled. */
+int pcm_slab_queue_acquire(pcm_slab_queue *q, long capacity_frames,
+                           pcm_slab_token *tok, float **span);
+/* Commit an acquired token with the actual produced frame count
+ * (1..capacity_frames). A token invalidated by flush/reset, or one whose
+ * slot is no longer pending, is rejected with PCM_ERR_STALE_TOKEN and
+ * never enters the queue. */
+int pcm_slab_queue_commit(pcm_slab_queue *q, const pcm_slab_token *tok,
+                          long actual_frames);
+/* Return an uncommitted token's slab to the free list. */
+int pcm_slab_queue_cancel(pcm_slab_queue *q, const pcm_slab_token *tok);
+/* Worker, zero-copy mode: enqueue the caller's span by pointer (borrowed;
+ * caller must keep it valid until retire()). Any frame count >= 1. */
 int pcm_slab_queue_push_forward(pcm_slab_queue *q, const float *span,
                                 long frames);
 /* Consumer: pops an entry; data stays valid until retire(). Non-forwarded
  * slabs are returned to the free list by retire(), never by pop(). */
 int pcm_slab_queue_pop(pcm_slab_queue *q, pcm_slab_entry *out);
 void pcm_slab_queue_retire(pcm_slab_queue *q, const pcm_slab_entry *e);
-/* Drop everything (reset/flush); returns dropped frames. */
+/* Drop everything (reset/flush); invalidates pending tokens, returns all
+ * storage to the free list; returns dropped frames. */
 long pcm_slab_queue_flush(pcm_slab_queue *q);
 void pcm_slab_queue_release(pcm_slab_queue *q);
 long pcm_slab_queue_frames_buffered(const pcm_slab_queue *q);

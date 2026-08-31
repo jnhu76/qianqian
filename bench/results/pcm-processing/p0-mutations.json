@@ -1,0 +1,80 @@
+{
+ "mutations": [
+  {
+   "mutation": "allow_bypass_rate_mismatch",
+   "define": "QN_MUT_RATE_MISMATCH_ACCEPT",
+   "expected_fail_checks": [
+    "bypass_rejects_rate_mismatch_44100_48000",
+    "bypass_rejects_rate_mismatch_48000_44100"
+   ],
+   "actually_failed_checks": [
+    "bypass_rejects_rate_mismatch_44100_48000",
+    "bypass_rejects_rate_mismatch_48000_44100"
+   ],
+   "unexpected_passing_checks": [],
+   "caught": true
+  },
+  {
+   "mutation": "remove_bypass_memcpy",
+   "define": "QN_MUT_REMOVE_BYPASS_MEMCPY",
+   "expected_fail_checks": [
+    "bypass_memcpy_present"
+   ],
+   "actually_failed_checks": [
+    "bypass_memcpy_present"
+   ],
+   "unexpected_passing_checks": [],
+   "caught": true
+  },
+  {
+   "mutation": "weaken_zero_copy_guard",
+   "define": "QN_MUT_WEAK_ZEROCOPY_GUARD",
+   "expected_fail_checks": [
+    "zero_copy_guard_with_dsp_stage"
+   ],
+   "actually_failed_checks": [
+    "zero_copy_guard_with_dsp_stage"
+   ],
+   "unexpected_passing_checks": [],
+   "caught": true
+  },
+  {
+   "mutation": "remove_state_epoch_bump",
+   "define": "QN_MUT_NO_EPOCH_BUMP",
+   "expected_fail_checks": [
+    "state_epoch_bump_on_prepare_and_reset"
+   ],
+   "actually_failed_checks": [
+    "state_epoch_bump_on_prepare_and_reset"
+   ],
+   "unexpected_passing_checks": [],
+   "caught": true
+  },
+  {
+   "mutation": "allow_stale_queue_commit",
+   "define": "QN_MUT_STALE_COMMIT_ALLOWED",
+   "expected_fail_checks": [
+    "stale_commit_after_flush_rejected"
+   ],
+   "actually_failed_checks": [
+    "stale_commit_after_flush_rejected",
+    "queue_ownership_conservation"
+   ],
+   "unexpected_passing_checks": [],
+   "caught": true
+  },
+  {
+   "mutation": "break_queue_bound",
+   "define": "QN_MUT_QUEUE_BOUND_BREAK",
+   "expected_fail_checks": [
+    "queue_bound_enforced"
+   ],
+   "actually_failed_checks": [
+    "queue_bound_enforced"
+   ],
+   "unexpected_passing_checks": [],
+   "caught": true
+  }
+ ],
+ "all_caught": true
+}

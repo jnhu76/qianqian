@@ -7,10 +7,12 @@
     {"mode": "copy", "input_frames": 1048576, "output_frames": 1048576, "process_calls": 4096,
      "input_bytes": 8388608, "output_bytes": 8388608,
      "explicit_copy_calls": 4096, "explicit_bytes_copied": 8388608, "zero_copy_frames_forwarded": 0,
+     "logical_copy_bytes": 8388608, "estimated_memory_traffic_bytes": 16777216,
      "full_memory_passes": 1.000000, "peak_buffered_frames": 0, "internal_buffer_capacity_frames": 0, "allocations_during_prepare": 0, "verdict": "pass"},
     {"mode": "zero_copy", "input_frames": 1048576, "output_frames": 1048576, "process_calls": 4096,
      "input_bytes": 8388608, "output_bytes": 8388608,
      "explicit_copy_calls": 0, "explicit_bytes_copied": 0, "zero_copy_frames_forwarded": 1048576,
+     "logical_copy_bytes": 0, "estimated_memory_traffic_bytes": 0,
      "full_memory_passes": 0.000000, "peak_buffered_frames": 0, "internal_buffer_capacity_frames": 0, "allocations_during_prepare": 0, "verdict": "pass"}
   ],
   "allocation_gate": {
@@ -25,6 +27,11 @@
     "pipeline_peak_buffered_frames": 0,
     "queue_capacity_slabs": 8,
     "queue_peak_slabs_rt_region": 7,
+    "queue_count": 0,
+    "queue_free_top": 8,
+    "queue_owned_queued_slots": 0,
+    "queue_valid_pending_slots": 0,
+    "ownership_conservation": "pass",
     "verdict": "PASS"
   },
   "verdict": "PASS"

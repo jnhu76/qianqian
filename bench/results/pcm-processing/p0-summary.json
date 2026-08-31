@@ -4,7 +4,11 @@
   "p0-correctness.json",
   "p0-buffer-accounting.json",
   "p0-placement.json",
-  "p0-performance.json"
+  "p0-performance.json",
+  "p0-negative-tests.json",
+  "p0-mutations.json",
+  "p0-correctness-sanitized.json",
+  "p0-negative-tests-sanitized.json"
  ],
  "scope_statements": {
   "selects_no_src": true,
@@ -16,13 +20,20 @@
  "gates": {
   "bypass_pcm_bit_identical": "PASS",
   "no_implicit_clipping_gain_rematrix_rate_change": "PASS",
+  "bypass_rate_mismatch_rejected": "PASS",
   "post_prepare_allocation_gate": "PASS",
   "buffer_bound": "PASS",
-  "reset_deterministic": "PASS",
+  "queue_ownership_conservation": "PASS",
+  "queue_bound_enforced": "PASS",
+  "stale_token_rejected": "PASS",
+  "reset_lifecycle_same_instance": "PASS",
   "reprepare_rate_transition_semantics": "PASS",
+  "zero_copy_guard_with_dsp_stage": "PASS",
   "copy_memory_pass_accounting_present": "PASS",
   "rt_vs_worker_placement_evidence_present": "PASS",
-  "bypass_overhead_measured": "PASS"
+  "bypass_overhead_measured": "PASS",
+  "sanitizer_clean": "PASS",
+  "mutation_tests_caught": "PASS"
  },
  "gates_all_pass": true,
  "verdict": "PASS",
@@ -43,6 +54,8 @@
     "explicit_copy_calls": 4096,
     "explicit_bytes_copied": 8388608,
     "zero_copy_frames_forwarded": 0,
+    "logical_copy_bytes": 8388608,
+    "estimated_memory_traffic_bytes": 16777216,
     "full_memory_passes": 1.0,
     "peak_buffered_frames": 0,
     "internal_buffer_capacity_frames": 0,
@@ -59,6 +72,8 @@
     "explicit_copy_calls": 0,
     "explicit_bytes_copied": 0,
     "zero_copy_frames_forwarded": 1048576,
+    "logical_copy_bytes": 0,
+    "estimated_memory_traffic_bytes": 0,
     "full_memory_passes": 0.0,
     "peak_buffered_frames": 0,
     "internal_buffer_capacity_frames": 0,
@@ -78,6 +93,11 @@
    "pipeline_peak_buffered_frames": 0,
    "queue_capacity_slabs": 8,
    "queue_peak_slabs_rt_region": 7,
+   "queue_count": 0,
+   "queue_free_top": 8,
+   "queue_owned_queued_slots": 0,
+   "queue_valid_pending_slots": 0,
+   "ownership_conservation": "pass",
    "verdict": "PASS"
   },
   "lifecycle": {
@@ -86,6 +106,7 @@
     "channels": 2,
     "sample_rate": 48000,
     "cycles": 5,
+    "same_pipeline_instance": true,
     "cycle_output_fnv1a64": [
      "91cfcd5c9c089496",
      "91cfcd5c9c089496",
@@ -97,10 +118,15 @@
     "state_epoch_per_cycle": [
      1,
      2,
-     2,
-     2,
-     2
+     3,
+     4,
+     5
     ],
+    "state_epoch_strictly_increasing_on_reset": true,
+    "post_prepare_rt_allocations": 0,
+    "post_prepare_allocations_zero": true,
+    "peak_buffered_frames_across_cycles": 0,
+    "note": "BYPASS is stateless; this proves lifecycle wiring only. Real filter-state reset proof belongs A1/B0",
     "verdict": "pass"
    },
    "reprepare_rate_transition": {
@@ -147,19 +173,19 @@
     "shape": "A_rt",
     "mode": "copy",
     "callback_work_total_ns": {
-     "median": 413890.0,
-     "min": 294488.0,
-     "max": 529058.0
+     "median": 247619.0,
+     "min": 177296.0,
+     "max": 297477.0
     },
     "callback_work_max_single_callback_ns": {
-     "median": 1774.0,
-     "min": 681.0,
-     "max": 64214.0
+     "median": 1052.0,
+     "min": 691.0,
+     "max": 16573.0
     },
     "pipeline_work_total_ns": {
-     "median": 413890.0,
-     "min": 294488.0,
-     "max": 529058.0
+     "median": 247619.0,
+     "min": 177296.0,
+     "max": 297477.0
     },
     "sink_copy_total_ns": {
      "median": 0.0,
@@ -185,24 +211,24 @@
     "shape": "B_worker",
     "mode": "copy",
     "callback_work_total_ns": {
-     "median": 98270.0,
-     "min": 96624.0,
-     "max": 105501.0
+     "median": 103854.0,
+     "min": 100154.0,
+     "max": 118473.0
     },
     "callback_work_max_single_callback_ns": {
-     "median": 111.0,
-     "min": 80.0,
-     "max": 9929.0
+     "median": 611.0,
+     "min": 190.0,
+     "max": 4899.0
     },
     "pipeline_work_total_ns": {
-     "median": 300226.0,
-     "min": 282097.0,
-     "max": 371879.0
+     "median": 396118.0,
+     "min": 267196.0,
+     "max": 493625.0
     },
     "sink_copy_total_ns": {
-     "median": 98270.0,
-     "min": 96624.0,
-     "max": 105501.0
+     "median": 103854.0,
+     "min": 100154.0,
+     "max": 118473.0
     },
     "pipeline_copy_calls": 2052,
     "pipeline_copy_bytes": 4202496,
@@ -223,24 +249,24 @@
     "shape": "B_worker",
     "mode": "forward",
     "callback_work_total_ns": {
-     "median": 252322.0,
-     "min": 231519.0,
-     "max": 327235.0
+     "median": 252708.0,
+     "min": 236887.0,
+     "max": 392164.0
     },
     "callback_work_max_single_callback_ns": {
-     "median": 7665.0,
-     "min": 731.0,
-     "max": 25229.0
+     "median": 1022.0,
+     "min": 721.0,
+     "max": 4028.0
     },
     "pipeline_work_total_ns": {
-     "median": 58959.0,
-     "min": 57915.0,
-     "max": 60210.0
+     "median": 62117.0,
+     "min": 59481.0,
+     "max": 76375.0
     },
     "sink_copy_total_ns": {
-     "median": 252322.0,
-     "min": 231519.0,
-     "max": 327235.0
+     "median": 252708.0,
+     "min": 236887.0,
+     "max": 392164.0
     },
     "pipeline_copy_calls": 0,
     "pipeline_copy_bytes": 0,
@@ -266,427 +292,445 @@
     "calls_per_pass": 16384,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 16.1,
-     "min": 14.1,
-     "max": 19.2
+     "median": 12.7,
+     "min": 12.0,
+     "max": 15.7
     },
     "ns_per_frame": {
-     "median": 0.2518
+     "median": 0.1983
     },
-    "throughput_MBps_copy": 0.0,
+    "throughput_MBps_copy": 19238.9,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 4194304,
     "memcpy_ref_ns_per_call": {
-     "median": 3.6,
-     "min": 3.5,
-     "max": 4.8
+     "median": 4.0,
+     "min": 4.0,
+     "max": 4.4
     },
-    "overhead_ns_per_call_vs_memcpy": 12.5,
-    "overhead_ratio_vs_memcpy": 3.439
+    "overhead_ns_per_call_vs_memcpy": 8.7,
+    "overhead_ratio_vs_memcpy": 2.154
    },
    {
     "block_frames": 64,
     "channels": 1,
     "mode": "zero_copy",
     "calls_per_pass": 16384,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 6.8,
-     "min": 6.5,
-     "max": 7.8
-    },
-    "ns_per_frame": {
-     "median": 0.1058
-    },
-    "throughput_MBps_copy": null,
-    "explicit_bytes_copied_per_pass": 0,
-    "memcpy_ref_ns_per_call": {
-     "median": 3.6,
-     "min": 3.5,
-     "max": 4.8
-    },
-    "overhead_ns_per_call_vs_memcpy": 0.0,
-    "overhead_ratio_vs_memcpy": null
-   },
-   {
-    "block_frames": 64,
-    "channels": 2,
-    "mode": "copy",
-    "calls_per_pass": 16384,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 29.7,
-     "min": 20.5,
-     "max": 31.0
-    },
-    "ns_per_frame": {
-     "median": 0.4648
-    },
-    "throughput_MBps_copy": 0.0,
-    "explicit_bytes_copied_per_pass": 8388608,
-    "memcpy_ref_ns_per_call": {
-     "median": 18.0,
-     "min": 12.3,
-     "max": 26.7
-    },
-    "overhead_ns_per_call_vs_memcpy": 11.7,
-    "overhead_ratio_vs_memcpy": 0.65
-   },
-   {
-    "block_frames": 64,
-    "channels": 2,
-    "mode": "zero_copy",
-    "calls_per_pass": 16384,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 8.1,
-     "min": 7.1,
-     "max": 9.4
-    },
-    "ns_per_frame": {
-     "median": 0.1263
-    },
-    "throughput_MBps_copy": null,
-    "explicit_bytes_copied_per_pass": 0,
-    "memcpy_ref_ns_per_call": {
-     "median": 18.0,
-     "min": 12.3,
-     "max": 26.7
-    },
-    "overhead_ns_per_call_vs_memcpy": 0.0,
-    "overhead_ratio_vs_memcpy": null
-   },
-   {
-    "block_frames": 128,
-    "channels": 1,
-    "mode": "copy",
-    "calls_per_pass": 8192,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 19.7,
-     "min": 18.2,
-     "max": 23.2
-    },
-    "ns_per_frame": {
-     "median": 0.154
-    },
-    "throughput_MBps_copy": 0.0,
-    "explicit_bytes_copied_per_pass": 4194304,
-    "memcpy_ref_ns_per_call": {
-     "median": 7.9,
-     "min": 7.5,
-     "max": 8.0
-    },
-    "overhead_ns_per_call_vs_memcpy": 11.8,
-    "overhead_ratio_vs_memcpy": 1.489
-   },
-   {
-    "block_frames": 128,
-    "channels": 1,
-    "mode": "zero_copy",
-    "calls_per_pass": 8192,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 6.3,
-     "min": 6.2,
-     "max": 6.3
-    },
-    "ns_per_frame": {
-     "median": 0.049
-    },
-    "throughput_MBps_copy": null,
-    "explicit_bytes_copied_per_pass": 0,
-    "memcpy_ref_ns_per_call": {
-     "median": 7.9,
-     "min": 7.5,
-     "max": 8.0
-    },
-    "overhead_ns_per_call_vs_memcpy": 0.0,
-    "overhead_ratio_vs_memcpy": null
-   },
-   {
-    "block_frames": 128,
-    "channels": 2,
-    "mode": "copy",
-    "calls_per_pass": 8192,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 40.1,
-     "min": 32.7,
-     "max": 81.6
-    },
-    "ns_per_frame": {
-     "median": 0.3134
-    },
-    "throughput_MBps_copy": 0.0,
-    "explicit_bytes_copied_per_pass": 8388608,
-    "memcpy_ref_ns_per_call": {
-     "median": 36.0,
-     "min": 23.2,
-     "max": 78.4
-    },
-    "overhead_ns_per_call_vs_memcpy": 4.1,
-    "overhead_ratio_vs_memcpy": 0.114
-   },
-   {
-    "block_frames": 128,
-    "channels": 2,
-    "mode": "zero_copy",
-    "calls_per_pass": 8192,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 6.8,
-     "min": 6.7,
-     "max": 7.0
-    },
-    "ns_per_frame": {
-     "median": 0.0533
-    },
-    "throughput_MBps_copy": null,
-    "explicit_bytes_copied_per_pass": 0,
-    "memcpy_ref_ns_per_call": {
-     "median": 36.0,
-     "min": 23.2,
-     "max": 78.4
-    },
-    "overhead_ns_per_call_vs_memcpy": 0.0,
-    "overhead_ratio_vs_memcpy": null
-   },
-   {
-    "block_frames": 256,
-    "channels": 1,
-    "mode": "copy",
-    "calls_per_pass": 4096,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 27.6,
-     "min": 26.0,
-     "max": 34.7
-    },
-    "ns_per_frame": {
-     "median": 0.1077
-    },
-    "throughput_MBps_copy": 0.0,
-    "explicit_bytes_copied_per_pass": 4194304,
-    "memcpy_ref_ns_per_call": {
-     "median": 15.9,
-     "min": 15.6,
-     "max": 19.1
-    },
-    "overhead_ns_per_call_vs_memcpy": 11.6,
-    "overhead_ratio_vs_memcpy": 0.731
-   },
-   {
-    "block_frames": 256,
-    "channels": 1,
-    "mode": "zero_copy",
-    "calls_per_pass": 4096,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
      "median": 6.4,
      "min": 6.3,
-     "max": 6.7
+     "max": 6.6
     },
     "ns_per_frame": {
-     "median": 0.0251
+     "median": 0.1001
     },
     "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 15.9,
-     "min": 15.6,
-     "max": 19.1
+     "median": 4.0,
+     "min": 4.0,
+     "max": 4.4
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
    },
    {
-    "block_frames": 256,
+    "block_frames": 64,
     "channels": 2,
     "mode": "copy",
-    "calls_per_pass": 4096,
+    "calls_per_pass": 16384,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 82.0,
-     "min": 58.8,
-     "max": 116.3
+     "median": 21.6,
+     "min": 18.8,
+     "max": 25.1
     },
     "ns_per_frame": {
-     "median": 0.3204
+     "median": 0.3369
     },
-    "throughput_MBps_copy": 0.0,
+    "throughput_MBps_copy": 22644.4,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 8388608,
     "memcpy_ref_ns_per_call": {
-     "median": 67.3,
-     "min": 49.0,
-     "max": 78.6
+     "median": 9.8,
+     "min": 9.5,
+     "max": 15.4
     },
-    "overhead_ns_per_call_vs_memcpy": 14.7,
-    "overhead_ratio_vs_memcpy": 0.219
+    "overhead_ns_per_call_vs_memcpy": 11.8,
+    "overhead_ratio_vs_memcpy": 1.2
    },
    {
-    "block_frames": 256,
+    "block_frames": 64,
     "channels": 2,
     "mode": "zero_copy",
-    "calls_per_pass": 4096,
+    "calls_per_pass": 16384,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 7.7,
-     "min": 7.5,
+     "median": 7.4,
+     "min": 7.2,
      "max": 8.5
     },
     "ns_per_frame": {
-     "median": 0.0302
+     "median": 0.1154
     },
     "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 67.3,
-     "min": 49.0,
-     "max": 78.6
+     "median": 9.8,
+     "min": 9.5,
+     "max": 15.4
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
    },
    {
-    "block_frames": 512,
+    "block_frames": 128,
     "channels": 1,
     "mode": "copy",
-    "calls_per_pass": 2048,
+    "calls_per_pass": 8192,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 48.7,
-     "min": 48.2,
-     "max": 70.7
+     "median": 21.5,
+     "min": 17.6,
+     "max": 28.9
     },
     "ns_per_frame": {
-     "median": 0.0952
+     "median": 0.1678
     },
-    "throughput_MBps_copy": 0.0,
+    "throughput_MBps_copy": 22733.7,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 4194304,
     "memcpy_ref_ns_per_call": {
-     "median": 32.9,
-     "min": 31.5,
-     "max": 42.7
+     "median": 7.3,
+     "min": 7.2,
+     "max": 8.4
     },
-    "overhead_ns_per_call_vs_memcpy": 15.9,
-    "overhead_ratio_vs_memcpy": 0.484
+    "overhead_ns_per_call_vs_memcpy": 14.2,
+    "overhead_ratio_vs_memcpy": 1.945
    },
    {
-    "block_frames": 512,
+    "block_frames": 128,
     "channels": 1,
     "mode": "zero_copy",
-    "calls_per_pass": 2048,
+    "calls_per_pass": 8192,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 6.6,
-     "min": 6.4,
-     "max": 6.7
+     "median": 6.7,
+     "min": 6.3,
+     "max": 6.9
     },
     "ns_per_frame": {
-     "median": 0.0128
+     "median": 0.052
     },
     "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 32.9,
-     "min": 31.5,
-     "max": 42.7
+     "median": 7.3,
+     "min": 7.2,
+     "max": 8.4
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
    },
    {
-    "block_frames": 512,
+    "block_frames": 128,
     "channels": 2,
     "mode": "copy",
-    "calls_per_pass": 2048,
+    "calls_per_pass": 8192,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 150.6,
-     "min": 122.3,
-     "max": 179.3
+     "median": 29.7,
+     "min": 25.9,
+     "max": 31.5
     },
     "ns_per_frame": {
-     "median": 0.2941
+     "median": 0.2318
     },
-    "throughput_MBps_copy": 0.0,
+    "throughput_MBps_copy": 32907.3,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 8388608,
     "memcpy_ref_ns_per_call": {
-     "median": 102.5,
-     "min": 75.7,
-     "max": 145.6
+     "median": 27.0,
+     "min": 16.3,
+     "max": 34.6
     },
-    "overhead_ns_per_call_vs_memcpy": 48.1,
-    "overhead_ratio_vs_memcpy": 0.47
+    "overhead_ns_per_call_vs_memcpy": 2.6,
+    "overhead_ratio_vs_memcpy": 0.098
    },
    {
-    "block_frames": 512,
+    "block_frames": 128,
     "channels": 2,
     "mode": "zero_copy",
-    "calls_per_pass": 2048,
+    "calls_per_pass": 8192,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 8.5,
-     "min": 8.1,
-     "max": 8.9
+     "median": 7.3,
+     "min": 7.0,
+     "max": 7.4
     },
     "ns_per_frame": {
-     "median": 0.0166
+     "median": 0.0567
     },
     "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 102.5,
-     "min": 75.7,
-     "max": 145.6
+     "median": 27.0,
+     "min": 16.3,
+     "max": 34.6
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
    },
    {
-    "block_frames": 1024,
+    "block_frames": 256,
     "channels": 1,
     "mode": "copy",
-    "calls_per_pass": 1024,
+    "calls_per_pass": 4096,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 73.6,
-     "min": 72.4,
-     "max": 108.3
+     "median": 25.8,
+     "min": 25.1,
+     "max": 26.4
     },
     "ns_per_frame": {
-     "median": 0.0719
+     "median": 0.1007
     },
-    "throughput_MBps_copy": 0.1,
+    "throughput_MBps_copy": 37894.6,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 4194304,
     "memcpy_ref_ns_per_call": {
-     "median": 54.7,
-     "min": 54.0,
-     "max": 60.4
+     "median": 14.7,
+     "min": 14.4,
+     "max": 15.0
     },
-    "overhead_ns_per_call_vs_memcpy": 18.9,
-    "overhead_ratio_vs_memcpy": 0.346
+    "overhead_ns_per_call_vs_memcpy": 11.1,
+    "overhead_ratio_vs_memcpy": 0.752
    },
    {
-    "block_frames": 1024,
+    "block_frames": 256,
     "channels": 1,
     "mode": "zero_copy",
-    "calls_per_pass": 1024,
+    "calls_per_pass": 4096,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
      "median": 6.4,
-     "min": 6.4,
+     "min": 6.2,
+     "max": 6.6
+    },
+    "ns_per_frame": {
+     "median": 0.0248
+    },
+    "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 0,
+    "memcpy_ref_ns_per_call": {
+     "median": 14.7,
+     "min": 14.4,
+     "max": 15.0
+    },
+    "overhead_ns_per_call_vs_memcpy": 0.0,
+    "overhead_ratio_vs_memcpy": null
+   },
+   {
+    "block_frames": 256,
+    "channels": 2,
+    "mode": "copy",
+    "calls_per_pass": 4096,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 139.7,
+     "min": 91.6,
+     "max": 164.1
+    },
+    "ns_per_frame": {
+     "median": 0.5458
+    },
+    "throughput_MBps_copy": 13978.5,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 8388608,
+    "memcpy_ref_ns_per_call": {
+     "median": 57.2,
+     "min": 34.8,
+     "max": 75.5
+    },
+    "overhead_ns_per_call_vs_memcpy": 82.5,
+    "overhead_ratio_vs_memcpy": 1.443
+   },
+   {
+    "block_frames": 256,
+    "channels": 2,
+    "mode": "zero_copy",
+    "calls_per_pass": 4096,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 11.5,
+     "min": 10.1,
+     "max": 13.0
+    },
+    "ns_per_frame": {
+     "median": 0.0448
+    },
+    "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 0,
+    "memcpy_ref_ns_per_call": {
+     "median": 57.2,
+     "min": 34.8,
+     "max": 75.5
+    },
+    "overhead_ns_per_call_vs_memcpy": 0.0,
+    "overhead_ratio_vs_memcpy": null
+   },
+   {
+    "block_frames": 512,
+    "channels": 1,
+    "mode": "copy",
+    "calls_per_pass": 2048,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 60.0,
+     "min": 47.1,
+     "max": 65.3
+    },
+    "ns_per_frame": {
+     "median": 0.1172
+    },
+    "throughput_MBps_copy": 32560.6,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 4194304,
+    "memcpy_ref_ns_per_call": {
+     "median": 40.8,
+     "min": 34.4,
+     "max": 49.7
+    },
+    "overhead_ns_per_call_vs_memcpy": 19.2,
+    "overhead_ratio_vs_memcpy": 0.472
+   },
+   {
+    "block_frames": 512,
+    "channels": 1,
+    "mode": "zero_copy",
+    "calls_per_pass": 2048,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 8.3,
+     "min": 5.9,
+     "max": 9.1
+    },
+    "ns_per_frame": {
+     "median": 0.0163
+    },
+    "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 0,
+    "memcpy_ref_ns_per_call": {
+     "median": 40.8,
+     "min": 34.4,
+     "max": 49.7
+    },
+    "overhead_ns_per_call_vs_memcpy": 0.0,
+    "overhead_ratio_vs_memcpy": null
+   },
+   {
+    "block_frames": 512,
+    "channels": 2,
+    "mode": "copy",
+    "calls_per_pass": 2048,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 122.8,
+     "min": 102.1,
+     "max": 136.8
+    },
+    "ns_per_frame": {
+     "median": 0.2398
+    },
+    "throughput_MBps_copy": 31811.1,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 8388608,
+    "memcpy_ref_ns_per_call": {
+     "median": 91.4,
+     "min": 71.9,
+     "max": 146.8
+    },
+    "overhead_ns_per_call_vs_memcpy": 31.4,
+    "overhead_ratio_vs_memcpy": 0.344
+   },
+   {
+    "block_frames": 512,
+    "channels": 2,
+    "mode": "zero_copy",
+    "calls_per_pass": 2048,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 8.4,
+     "min": 8.2,
+     "max": 8.7
+    },
+    "ns_per_frame": {
+     "median": 0.0164
+    },
+    "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 0,
+    "memcpy_ref_ns_per_call": {
+     "median": 91.4,
+     "min": 71.9,
+     "max": 146.8
+    },
+    "overhead_ns_per_call_vs_memcpy": 0.0,
+    "overhead_ratio_vs_memcpy": null
+   },
+   {
+    "block_frames": 1024,
+    "channels": 1,
+    "mode": "copy",
+    "calls_per_pass": 1024,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 74.9,
+     "min": 73.8,
+     "max": 90.1
+    },
+    "ns_per_frame": {
+     "median": 0.0731
+    },
+    "throughput_MBps_copy": 52164.2,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 4194304,
+    "memcpy_ref_ns_per_call": {
+     "median": 58.5,
+     "min": 58.1,
+     "max": 63.0
+    },
+    "overhead_ns_per_call_vs_memcpy": 16.4,
+    "overhead_ratio_vs_memcpy": 0.28
+   },
+   {
+    "block_frames": 1024,
+    "channels": 1,
+    "mode": "zero_copy",
+    "calls_per_pass": 1024,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 6.1,
+     "min": 6.1,
      "max": 7.1
     },
     "ns_per_frame": {
-     "median": 0.0062
+     "median": 0.006
     },
     "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 54.7,
-     "min": 54.0,
-     "max": 60.4
+     "median": 58.5,
+     "min": 58.1,
+     "max": 63.0
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -698,22 +742,23 @@
     "calls_per_pass": 1024,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 206.8,
-     "min": 193.8,
-     "max": 310.2
+     "median": 218.5,
+     "min": 189.5,
+     "max": 242.8
     },
     "ns_per_frame": {
-     "median": 0.202
+     "median": 0.2134
     },
-    "throughput_MBps_copy": 0.0,
+    "throughput_MBps_copy": 35759.7,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 8388608,
     "memcpy_ref_ns_per_call": {
-     "median": 218.5,
-     "min": 164.1,
-     "max": 275.1
+     "median": 194.1,
+     "min": 168.2,
+     "max": 318.7
     },
-    "overhead_ns_per_call_vs_memcpy": -11.6,
-    "overhead_ratio_vs_memcpy": -0.053
+    "overhead_ns_per_call_vs_memcpy": 24.4,
+    "overhead_ratio_vs_memcpy": 0.126
    },
    {
     "block_frames": 1024,
@@ -722,19 +767,20 @@
     "calls_per_pass": 1024,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 7.2,
-     "min": 7.1,
-     "max": 7.2
+     "median": 7.6,
+     "min": 7.6,
+     "max": 8.3
     },
     "ns_per_frame": {
-     "median": 0.007
+     "median": 0.0075
     },
     "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 218.5,
-     "min": 164.1,
-     "max": 275.1
+     "median": 194.1,
+     "min": 168.2,
+     "max": 318.7
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -746,22 +792,23 @@
     "calls_per_pass": 512,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 141.0,
-     "min": 135.8,
-     "max": 154.3
+     "median": 139.4,
+     "min": 134.7,
+     "max": 179.7
     },
     "ns_per_frame": {
-     "median": 0.0688
+     "median": 0.0681
     },
-    "throughput_MBps_copy": 0.1,
+    "throughput_MBps_copy": 56025.1,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 4194304,
     "memcpy_ref_ns_per_call": {
-     "median": 121.6,
-     "min": 117.1,
-     "max": 150.9
+     "median": 124.9,
+     "min": 122.5,
+     "max": 129.7
     },
-    "overhead_ns_per_call_vs_memcpy": 19.3,
-    "overhead_ratio_vs_memcpy": 0.159
+    "overhead_ns_per_call_vs_memcpy": 14.5,
+    "overhead_ratio_vs_memcpy": 0.116
    },
    {
     "block_frames": 2048,
@@ -770,19 +817,20 @@
     "calls_per_pass": 512,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 6.3,
-     "min": 6.3,
-     "max": 6.3
+     "median": 5.7,
+     "min": 5.7,
+     "max": 6.2
     },
     "ns_per_frame": {
-     "median": 0.0031
+     "median": 0.0028
     },
     "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 121.6,
-     "min": 117.1,
-     "max": 150.9
+     "median": 124.9,
+     "min": 122.5,
+     "max": 129.7
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -794,22 +842,23 @@
     "calls_per_pass": 512,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 449.1,
-     "min": 387.1,
-     "max": 571.1
+     "median": 539.3,
+     "min": 480.9,
+     "max": 681.2
     },
     "ns_per_frame": {
-     "median": 0.2193
+     "median": 0.2633
     },
-    "throughput_MBps_copy": 0.0,
+    "throughput_MBps_copy": 28971.9,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 8388608,
     "memcpy_ref_ns_per_call": {
-     "median": 436.6,
-     "min": 365.6,
-     "max": 649.2
+     "median": 508.6,
+     "min": 360.9,
+     "max": 558.2
     },
-    "overhead_ns_per_call_vs_memcpy": 12.5,
-    "overhead_ratio_vs_memcpy": 0.029
+    "overhead_ns_per_call_vs_memcpy": 30.7,
+    "overhead_ratio_vs_memcpy": 0.06
    },
    {
     "block_frames": 2048,
@@ -818,27 +867,195 @@
     "calls_per_pass": 512,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 6.3,
-     "min": 6.3,
-     "max": 6.4
+     "median": 6.5,
+     "min": 6.5,
+     "max": 9.2
     },
     "ns_per_frame": {
-     "median": 0.0031
+     "median": 0.0032
     },
     "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 436.6,
-     "min": 365.6,
-     "max": 649.2
+     "median": 508.6,
+     "min": 360.9,
+     "max": 558.2
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
    }
-  ]
+  ],
+  "negative_tests": {
+   "checks_total": 11,
+   "checks_passed": 11,
+   "checks_failed": 0
+  },
+  "negative_checks": [
+   {
+    "id": "bypass_rejects_rate_mismatch_44100_48000",
+    "expect": "PCM_ERR_BYPASS_RATE_MISMATCH",
+    "got": "PCM_ERR_BYPASS_RATE_MISMATCH",
+    "verdict": "pass"
+   },
+   {
+    "id": "bypass_rejects_rate_mismatch_48000_44100",
+    "expect": "PCM_ERR_BYPASS_RATE_MISMATCH",
+    "got": "PCM_ERR_BYPASS_RATE_MISMATCH",
+    "verdict": "pass"
+   },
+   {
+    "id": "bypass_rejects_zero_in_rate",
+    "expect": "PCM_ERR_INVALID_PARAM",
+    "got": "PCM_ERR_INVALID_PARAM",
+    "verdict": "pass"
+   },
+   {
+    "id": "bypass_rejects_negative_in_rate",
+    "expect": "PCM_ERR_INVALID_PARAM",
+    "got": "PCM_ERR_INVALID_PARAM",
+    "verdict": "pass"
+   },
+   {
+    "id": "stale_commit_after_flush_rejected",
+    "expect": "PCM_ERR_STALE_TOKEN",
+    "got": "PCM_ERR_STALE_TOKEN",
+    "verdict": "pass"
+   },
+   {
+    "id": "queue_ownership_conservation",
+    "expect": "free_top + owned + pending == capacity at every step",
+    "got": "conserved",
+    "verdict": "pass"
+   },
+   {
+    "id": "queue_bound_enforced",
+    "expect": "count <= capacity; acquire backpressures when full",
+    "got": "bounded",
+    "verdict": "pass"
+   },
+   {
+    "id": "variable_frames_commit",
+    "expect": "commit(actual) preserves exact frame counts; actual > capacity rejected; 1-frame and partial tails",
+    "got": "variable frames ok",
+    "verdict": "pass"
+   },
+   {
+    "id": "zero_copy_guard_with_dsp_stage",
+    "expect": "DSP stage forces the copy path (no aliasing)",
+    "got": "copy path",
+    "verdict": "pass"
+   },
+   {
+    "id": "state_epoch_bump_on_prepare_and_reset",
+    "expect": "epoch strictly increases on prepare and reset",
+    "got": "monotonic",
+    "verdict": "pass"
+   },
+   {
+    "id": "bypass_memcpy_present",
+    "expect": "copy mode executes exactly one memcpy per process call",
+    "got": "copy present",
+    "verdict": "pass"
+   }
+  ],
+  "mutations": {
+   "mutations": [
+    {
+     "mutation": "allow_bypass_rate_mismatch",
+     "define": "QN_MUT_RATE_MISMATCH_ACCEPT",
+     "expected_fail_checks": [
+      "bypass_rejects_rate_mismatch_44100_48000",
+      "bypass_rejects_rate_mismatch_48000_44100"
+     ],
+     "actually_failed_checks": [
+      "bypass_rejects_rate_mismatch_44100_48000",
+      "bypass_rejects_rate_mismatch_48000_44100"
+     ],
+     "unexpected_passing_checks": [],
+     "caught": true
+    },
+    {
+     "mutation": "remove_bypass_memcpy",
+     "define": "QN_MUT_REMOVE_BYPASS_MEMCPY",
+     "expected_fail_checks": [
+      "bypass_memcpy_present"
+     ],
+     "actually_failed_checks": [
+      "bypass_memcpy_present"
+     ],
+     "unexpected_passing_checks": [],
+     "caught": true
+    },
+    {
+     "mutation": "weaken_zero_copy_guard",
+     "define": "QN_MUT_WEAK_ZEROCOPY_GUARD",
+     "expected_fail_checks": [
+      "zero_copy_guard_with_dsp_stage"
+     ],
+     "actually_failed_checks": [
+      "zero_copy_guard_with_dsp_stage"
+     ],
+     "unexpected_passing_checks": [],
+     "caught": true
+    },
+    {
+     "mutation": "remove_state_epoch_bump",
+     "define": "QN_MUT_NO_EPOCH_BUMP",
+     "expected_fail_checks": [
+      "state_epoch_bump_on_prepare_and_reset"
+     ],
+     "actually_failed_checks": [
+      "state_epoch_bump_on_prepare_and_reset"
+     ],
+     "unexpected_passing_checks": [],
+     "caught": true
+    },
+    {
+     "mutation": "allow_stale_queue_commit",
+     "define": "QN_MUT_STALE_COMMIT_ALLOWED",
+     "expected_fail_checks": [
+      "stale_commit_after_flush_rejected"
+     ],
+     "actually_failed_checks": [
+      "stale_commit_after_flush_rejected",
+      "queue_ownership_conservation"
+     ],
+     "unexpected_passing_checks": [],
+     "caught": true
+    },
+    {
+     "mutation": "break_queue_bound",
+     "define": "QN_MUT_QUEUE_BOUND_BREAK",
+     "expected_fail_checks": [
+      "queue_bound_enforced"
+     ],
+     "actually_failed_checks": [
+      "queue_bound_enforced"
+     ],
+     "unexpected_passing_checks": [],
+     "caught": true
+    }
+   ],
+   "all_caught": true
+  },
+  "sanitizer": {
+   "correctness_verdict": "PASS",
+   "negative_verdict": "PASS",
+   "verdict": "PASS",
+   "compiler": "cc",
+   "sanitize_flags": [
+    "-std=c11",
+    "-O1",
+    "-Wall",
+    "-Wextra",
+    "-fsanitize=address,undefined",
+    "-fno-omit-frame-pointer"
+   ]
+  }
  },
  "provenance": {
-  "git_parent_commit": "7ba8bbb76a4698e77bab1aeee2ef962a5de2d190",
+  "git_parent_commit": "504b394ebb197be0cb901985ae097885ca3d65fd",
   "git_branch": "exp/e10-pcm-pipeline-p0",
   "worktree_dirty_at_run_start": true,
   "git_base": "7c8352de36b05c1ecb8c156b25954bedf2fcdc76",
@@ -852,6 +1069,14 @@
    "-Wall",
    "-Wextra"
   ],
+  "sanitize_flags": [
+   "-std=c11",
+   "-O1",
+   "-Wall",
+   "-Wextra",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
   "sources": [
    "bench/pcm/pcm_pipeline.c",
    "bench/pcm/qn_pcm_p0_harness.c"
@@ -859,7 +1084,7 @@
   "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
   "os": "Linux 6.18.33.2-microsoft-standard-WSL2",
   "machine": "x86_64",
-  "generated_utc": "2026-08-31T15:48:31Z",
+  "generated_utc": "2026-08-31T16:19:35Z",
   "note": "timings are single-host; compare via recorded distributions"
  }
 }

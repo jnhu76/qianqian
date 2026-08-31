@@ -43,15 +43,19 @@ def accounting_table():
             f"| {m['process_calls']:,} | {m['explicit_copy_calls']:,} "
             f"| {m['explicit_bytes_copied']:,} "
             f"| {m['zero_copy_frames_forwarded']:,} "
+            f"| {m['logical_copy_bytes']:,} "
+            f"| {m['estimated_memory_traffic_bytes']:,} "
             f"| {m['full_memory_passes']:.3f} "
             f"| {m['peak_buffered_frames']} | "
             f"{m['internal_buffer_capacity_frames']} |")
     g = S["key_numbers"]["allocation_gate"]
+    bb = S["key_numbers"]["buffer_bound"]
     lines = [
         "| 模式 | input frames | output frames | process calls | "
-        "explicit copies | copied bytes | forwarded frames | full memory "
-        "passes | peak buffered | internal capacity |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "explicit copies | copied bytes | forwarded frames | logical copy "
+        "bytes | est. mem traffic bytes | full memory passes | peak buffered "
+        "| internal capacity |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
         *rows,
         "",
         f"allocation gate：{g['instrument']}；armed RT 区间分配 = "
@@ -59,6 +63,15 @@ def accounting_table():
         f"**{g['rt_violations']}**（selftest 证明该 gate 具备 FAIL 能力）。"
         f"queue slab 全部在 prepare 期分配"
         f"（{g['queue_slabs_allocated_during_prepare']} 次）。",
+        "",
+        f"buffer bound：`logical_copy_bytes` 是精确 memcpy 字节；"
+        f"`estimated_memory_traffic_bytes` 按一次拷贝含读+写估算"
+        f"（= logical × 2），**不是硬件计数器 truth**。queue 快照："
+        f"count={bb['queue_count']}，free_top={bb['queue_free_top']}，"
+        f"owned={bb['queue_owned_queued_slots']}，"
+        f"pending={bb['queue_valid_pending_slots']}，capacity="
+        f"{bb['queue_capacity_slabs']}；ownership conservation = "
+        f"**{bb['ownership_conservation']}**（free+owned+pending==capacity）。",
     ]
     return "\n".join(lines)
 
@@ -142,8 +155,17 @@ def correctness_table():
         f"| {c['cases_total']} |",
         f"| bit/alias identical | {c['cases_passed']} / {c['cases_total']} |",
         f"| 逐 call memcmp 总字节 | {c['bytes_compared_total']:,} |",
-        f"| reset→process 5 cycles 输出 bit-identical | "
-        f"{rd['outputs_bit_identical_across_cycles']} |",
+        f"| 同一 pipeline 实例 reset→process 5 cycles 输出 bit-identical | "
+        f"{rd['outputs_bit_identical_across_cycles']} "
+        f"（same instance = {rd['same_pipeline_instance']}） |",
+        f"| state_epoch 逐 reset 严格递增 | "
+        f"{rd['state_epoch_strictly_increasing_on_reset']} "
+        f"（epoch 序列 {rd['state_epoch_per_cycle']}） |",
+        f"| lifecycle armed 区间分配 = 0 | "
+        f"{rd['post_prepare_rt_allocations']} "
+        f"（{rd['post_prepare_allocations_zero']}） |",
+        f"| 跨 cycles 无 stale buffered frames | "
+        f"{rd['peak_buffered_frames_across_cycles']} |",
         f"| reprepare 44.1k→48k 后输出 bit-identical | "
         f"{rt['outputs_bit_identical_across_rates']} |",
         f"| reconfigure 丢弃 buffered frames | "
@@ -152,6 +174,57 @@ def correctness_table():
         f"{zg['verdict']} |",
         f"| partial consume（out_cap<in_frames 可分段重组） | "
         f"{pc['verdict']} |",
+    ]
+    return "\n".join(lines)
+
+
+def negative_table():
+    neg = S["key_numbers"]["negative_tests"]
+    mut = S["key_numbers"]["mutations"]
+    san = S["key_numbers"]["sanitizer"]
+    lines = [
+        "| check | 断言 | verdict |",
+        "|---|---|---|",
+    ]
+    desc = {
+        "bypass_rejects_rate_mismatch_44100_48000":
+            "BYPASS 拒绝 44100→48000",
+        "bypass_rejects_rate_mismatch_48000_44100":
+            "BYPASS 拒绝 48000→44100",
+        "bypass_rejects_zero_in_rate": "BYPASS 拒绝 0 采样率",
+        "bypass_rejects_negative_in_rate": "BYPASS 拒绝负采样率",
+        "stale_commit_after_flush_rejected":
+            "flush 后 stale commit 被拒（PCM_ERR_STALE_TOKEN）",
+        "queue_ownership_conservation":
+            "free+owned+pending == capacity 全程成立",
+        "queue_bound_enforced": "count ≤ capacity；满时 acquire 背压",
+        "variable_frames_commit":
+            "commit(actual) 保留精确帧数（1/partial tail/超容量拒绝）",
+        "zero_copy_guard_with_dsp_stage":
+            "带 DSP stage 时必须走 copy 路径",
+        "state_epoch_bump_on_prepare_and_reset":
+            "prepare/reset 严格递增 state_epoch",
+        "bypass_memcpy_present": "copy 模式每次 process 恰好 1 次 memcpy",
+    }
+    for c in S["key_numbers"]["negative_checks"]:
+        lines.append(f"| `{c['id']}` | {desc.get(c['id'], c['expect'])} "
+                     f"| {c['verdict']} |")
+    lines += [
+        "",
+        f"negative 合计：{neg['checks_passed']} / {neg['checks_total']} "
+        f"pass（{neg['checks_failed']} fail）。",
+        "",
+        f"mutation tests：{len(mut['mutations'])} 个确定性故障注入，"
+        f"全部被对应 check 捕获 = **{mut['all_caught']}**："
+        + "；".join(
+            f"`{m['mutation']}` → {m['define']} → "
+            f"{'/'.join('`'+x+'`' for x in m['actually_failed_checks'])}"
+            for m in mut["mutations"]) + "。",
+        "",
+        f"sanitizer（ASan+UBSan，correctness + negative）："
+        f"{san['verdict']}（correctness={san['correctness_verdict']}，"
+        f"negative={san['negative_verdict']}）——hostile-float sink 已改 "
+        f"raw-bits 消费，sanitizer 成为机器证据。",
     ]
     return "\n".join(lines)
 
@@ -171,6 +244,14 @@ def build_block():
         "machine authority：`p0-correctness.json`（经 summary 转录）",
         "",
         correctness_table(),
+        "",
+        "### P0 negative / mutation / sanitizer",
+        "",
+        "machine authority：`p0-negative-tests.json` / `p0-mutations.json` "
+        "（经 summary 转录；sanitizer 结果来自 "
+        "`p0-correctness-sanitized.json` / `p0-negative-tests-sanitized.json`）",
+        "",
+        negative_table(),
         "",
         "### Buffer / copy accounting（BYPASS，1M frames stereo @48k，256fr blocks）",
         "",
