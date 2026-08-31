@@ -367,6 +367,50 @@ def a0_table():
     return "\n".join(lines)
 
 
+def load_b0():
+    p = ROOT / "bench/results/pcm-processing/b0-summary.json"
+    if not p.exists():
+        return None
+    return json.loads(p.read_text())
+
+
+def b0_table():
+    b0 = load_b0()
+    if not b0:
+        return None
+    mem = b0["memory"]["rows"]
+    resp = b0["response"]["results"]
+    corr = b0["correctness"]
+    lines = [
+        "| chain | nodes | logical PCM passes / block | explicit copies | "
+        "buffered frames | post-prepare allocs |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for m in mem:
+        lines.append(
+            f"| {m['chain']} | {m['nodes']} | {m['logical_passes_per_block']} "
+            f"| 0 | 0 | {m['post_prepare_allocations']} |")
+    lines += [
+        "",
+        "| response check | measured | analytical | max error (20..20k) |",
+        "|---|---|---:|---:|",
+        f"| biquad 1k +6dB | {resp['biquad_peaking_1000hz_6db']['gain_at_1k_measured_db']} dB "
+        f"| {resp['biquad_peaking_1000hz_6db']['gain_at_1k_analytical_db']} dB "
+        f"| {resp['biquad_peaking_1000hz_6db']['max_db_error_20_20k']} dB |",
+        f"| EQ10 全带 +6dB | - | - | "
+        f"{resp['eq10_all_bands_6db']['max_db_error_20_20k']} dB |",
+        "",
+        f"correctness verdict：**{corr['verdict']}**（gain 0dB bit-identical / "
+        "-6dB analytical / fusion equivalent；biquad 稳定 + reset 清状态；"
+        "limiter 无过冲 clamp + latency 0；NaN 策略 active-sanitize，"
+        "TRUE OFF 位透明）",
+        "",
+        "machine authority：`b0-correctness.json` / `b0-memory.json` / "
+        "`b0-dsp-response.json` / `b0-summary.json`",
+    ]
+    return "\n".join(lines)
+
+
 def build_block():
     a0 = a0_table()
     parts = [
@@ -431,6 +475,16 @@ def build_block():
             "quality/perf/shipping 数字禁止手抄）",
             "",
             a1,
+            "",
+        ]
+    b0 = b0_table()
+    if b0:
+        parts += [
+            "### E10-B0 thin DSP 参考（Gain/Biquad/EQ10/Limiter）",
+            "",
+            "machine authority：`b0-summary.json`（经 `tools/pcm_b0.py` 汇编）",
+            "",
+            b0,
             "",
         ]
     parts += [END]

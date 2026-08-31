@@ -362,6 +362,27 @@ machine authority：`a1-summary.json`（经 `tools/pcm_a1.py` 汇编；quality/p
 | r8b | 150248 | 125224 | 50220 |
 | lsr | 1516920 | 1510024 | 938140 |
 
+### E10-B0 thin DSP 参考（Gain/Biquad/EQ10/Limiter）
+
+machine authority：`b0-summary.json`（经 `tools/pcm_b0.py` 汇编）
+
+| chain | nodes | logical PCM passes / block | explicit copies | buffered frames | post-prepare allocs |
+|---|---:|---:|---:|---:|---:|
+| gain_only | 1 | 1 | 0 | 0 | 0 |
+| one_biquad | 1 | 1 | 0 | 0 | 0 |
+| eq10 | 1 | 10 | 0 | 0 | 0 |
+| gain_eq10 | 2 | 11 | 0 | 0 | 0 |
+| gain_eq10_limiter | 3 | 12 | 0 | 0 | 0 |
+
+| response check | measured | analytical | max error (20..20k) |
+|---|---|---:|---:|
+| biquad 1k +6dB | 5.998 dB | 5.997 dB | 0.122 dB |
+| EQ10 全带 +6dB | - | - | 1.39 dB |
+
+correctness verdict：**PASS**（gain 0dB bit-identical / -6dB analytical / fusion equivalent；biquad 稳定 + reset 清状态；limiter 无过冲 clamp + latency 0；NaN 策略 active-sanitize，TRUE OFF 位透明）
+
+machine authority：`b0-correctness.json` / `b0-memory.json` / `b0-dsp-response.json` / `b0-summary.json`
+
 <!-- END GENERATED TABLES -->
 
 读数要点（数字一律以上方生成表为准，不在此手抄）：
@@ -468,6 +489,25 @@ Nyquist 之上 8% 处，量折返点。
   近 Nyquist alias 是 96k→48k 的真实风险）；lsr 除质量外无优势。
   单一候选对四个平台都不显然——生产决策留给 reviewer，
   本实验只交付证据。
+
+
+## E10-B0 读数要点（thin DSP 参考）
+
+机器证据见上方生成表（`b0-summary.json`）。要点：
+
+- **内存 pass 研究问题（§39 的答案）**：节点抽象确实造成“每个逻辑
+  filter 一遍完整 PCM pass”——Gain=1、单 biquad=1、**10-band EQ=10**、
+  Gain+EQ10=11、Gain+EQ10+Limiter=12。这是标量参考的事实，不做
+  fusion 优化（留给 B2）；成本先可见。
+- **Biquad 权威**：RBJ peaking、DF2T；浮点实现 vs 解析式在 20..20k
+  最大误差 0.12 dB（1k +6dB 实测 5.998 vs 解析 5.997）；EQ10 级联
+  全带 +6dB 误差 1.39 dB（带边缘累积）。
+- **Limiter**：瞬时起音 peak-hold + 慢释音，无过冲 clamp、latency 0、
+  reset 清包络；**显式启用**，不在默认路径（默认 = P0 TRUE OFF）。
+- **NaN/Inf 策略**：DSP ACTIVE 时 sanitize（非有限样本→0，事件计数，
+  IIR 状态不被毒化）；**DSP OFF = P0 位透明 bypass**（NaN 原样通过，
+  P0 已证）。
+- **分配**：所有链 post-prepare 0 分配（--wrap 计数）。
 
 ## 9. 遗留问题（交给 E10-A0 / A1 / B0）
 

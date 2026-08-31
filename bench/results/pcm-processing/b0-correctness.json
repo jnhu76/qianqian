@@ -1,0 +1,27 @@
+{
+  "experiment": "e10-b0",
+  "section": "dsp_correctness",
+  "gain": [
+    {"case": "gain_0db_bit_identical", "verdict": "pass"},
+    {"case": "gain_m6db_analytical", "verdict": "pass"},
+    {"case": "gain_fusion_equivalent", "verdict": "pass", "max_abs_diff": 0.000000060}
+  ],
+  "biquad": [
+    {"case": "biquad_dc_finite", "verdict": "pass"},
+    {"case": "biquad_reset_clears_state", "verdict": "pass"}
+  ],
+  "eq10": [
+    {"case": "eq10_impulse_finite", "verdict": "pass"},
+    {"case": "eq10_96k_prepare", "verdict": "pass"}
+  ],
+  "limiter": [
+    {"case": "limiter_below_threshold_untouched", "verdict": "pass"},
+    {"case": "limiter_clamps_peak", "verdict": "pass", "peak": 1.0002},
+    {"case": "limiter_latency_zero", "verdict": "pass", "latency": 0}
+  ],
+  "nan_policy": [
+    {"case": "active_nan_sanitized", "verdict": "pass", "nan_seen": 1},
+    {"case": "active_gain_sanitizes_nan", "verdict": "pass", "nan_seen": 1}
+  ],
+  "verdict": "PASS"
+}
