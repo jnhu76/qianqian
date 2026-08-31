@@ -155,6 +155,8 @@ static int run_bench_mode(wasm_exec_env_t env, wasm_module_inst_t inst, int iter
     return rc;
 }
 
+static const char *g_pcm_outfile; /* optional Mode B dump (E09 tolerance study) */
+
 static int run_pcm(wasm_exec_env_t env, wasm_module_inst_t inst) {
     if (!call_i64(env, inst, "bench_bind", QN_HANDLE))
         { die_on_exception(inst, "bench_bind"); return 1; }
@@ -189,6 +191,15 @@ static int run_pcm(wasm_exec_env_t env, wasm_module_inst_t inst) {
     double copy_ms = qn_now_ms() - t0;
     char hex[65];
     qn_sha256(hostbuf, (size_t)len, hex);
+    if (g_pcm_outfile) {
+        FILE *of = fopen(g_pcm_outfile, "wb");
+        if (!of || fwrite(hostbuf, 1, (size_t)len, of) != (size_t)len) {
+            fprintf(stderr, "cannot write %s\n", g_pcm_outfile);
+            if (of) fclose(of);
+            return 1;
+        }
+        fclose(of);
+    }
     double gbps = copy_ms > 0 ? ((double)len / 1e9) / (copy_ms / 1000.0) : 0;
     printf("{\"mode\":\"pcm_host\",\"bytes\":%d,\"copy_ms\":%.3f,\"effective_gbps\":%.3f,"
            "\"sha256\":\"%s\",\"pages_before\":%d,\"pages_after\":%d}\n",
@@ -256,6 +267,7 @@ int main(int argc, char **argv) {
     const char *mode = argv[2];
     const char *fixture_path = argv[3];
     int iters = argc > 4 ? atoi(argv[4]) : 5;
+    g_pcm_outfile = argc > 4 ? argv[4] : NULL; /* pcm mode: <wasm> pcm <fixture> [outfile] */
 
     if (qn_fixture_load(&g_fixture, fixture_path) != 0) {
         fprintf(stderr, "cannot load fixture %s\n", fixture_path);
