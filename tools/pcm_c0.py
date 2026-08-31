@@ -385,7 +385,22 @@ def parse_live_map(map_path: Path, members: list, manifest: dict) -> dict:
     unrecognized = set()
     in_discarded = False
     member_re = re.compile(r"^(\s*)(\S+)\s+0x[0-9a-f]+\s+0x([0-9a-f]+)\s+(.*)$")
-    for raw in text.splitlines():
+    # GNU ld wraps long input-section names onto their own line:
+    #   .note.gnu.property
+    #                 0x0000000000000000       0x20 <file>
+    # so merge a name-only line with its continuation before matching.
+    lines = text.splitlines()
+    merged = []
+    i = 0
+    while i < len(lines):
+        cur = lines[i]
+        if i + 1 < len(lines) and re.fullmatch(r"\s*\.\S+\s*", cur) \
+                and not re.search(r"0x[0-9a-f]", cur):
+            cur = cur.rstrip() + " " + lines[i + 1].strip()
+            i += 1
+        merged.append(cur)
+        i += 1
+    for raw in merged:
         line = raw.rstrip("\n")
         if line.startswith("Discarded input sections"):
             in_discarded = True

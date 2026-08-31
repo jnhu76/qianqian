@@ -102,6 +102,16 @@ target("qianqian_av")
             if wasm_session then
                 flags = optimize_flags(flags)
             end
+            -- Replay fidelity (E10-C0): mode.release injects -fvisibility=hidden
+            -- and -DNDEBUG ahead of the frozen unit flags (this xmake has no
+            -- target:remove("cxflags") API), which shifts GCC IPA decisions
+            -- away from the upstream-oracle objects this target must
+            -- reproduce. Forced unit flags land after the injected ones, so
+            -- neutralizing here is last-wins.
+            if unit.flag_kind == nil or unit.flag_kind == "cflags" then
+                table.insert(flags, "-fvisibility=default")
+                table.insert(flags, "-UNDEBUG")
+            end
             if #flags > 0 then
                 local force = {}
                 force[unit.flag_kind or "cflags"] = flags
