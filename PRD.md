@@ -135,7 +135,7 @@ API 设计目标不是“覆盖 FFmpeg”，而是**阻止 FFmpeg 泄漏到上�
 | seek | ✅ |
 | PCM 输出 | ✅ |
 | sample-format conversion（packed/planar → Float32） | ✅ |
-| resampling / SRC / channel rematrix | ❌（SongCore 只输出 source-rate / source-layout Float32 PCM；设备侧适配属 AudioSink 协商） |
+| resampling / SRC / channel rematrix | ❌（SongCore 只输出 source-rate / source-layout Float32 PCM；SRC 属 AudioEngine 层，E11 冻结决策 = aresample / libswresample，源匹配时 BYPASS，见 §9） |
 | 视频 decode | ❌ |
 | 视频 encode | ❌ |
 | 音频 encode | ❌ |
@@ -178,13 +178,17 @@ PCM
 
 它不负责 Qianqian 的：
 
-- EQ；
-- ReplayGain policy；
-- spectrum；
+- ReplayGain policy（歌曲级决策在 SongCore 只读取标签，不应用）；
+- spectrum / 可视化 policy；
 - crossfade；
 - UI effects；
 - playlist；
 - playback queue。
+
+产品 DSP（EQ / volume / balance 等）由 **AudioEngine** 层承担，使用**能力裁剪的
+libavfilter**（E10-C0 冻结，capability intent 由人维护、source closure 由机器
+推导）。FFmpeg 在 SongCore 内只扮演 decoder；FFmpeg filter 只在 AudioEngine
+以产品能力出现（见 §11）。
 
 ---
 
@@ -198,11 +202,13 @@ libavcodec
 libavutil
 ```
 
-`libswresample` **不在**基线内（E07 已裁掉）。它只可能因 FFmpeg n9.0.1 某
-decoder 的上游 build 依赖被强制拉入闭包（当前唯一来源：Opus decoder）；
-这是 decoder implementation dependency，不是 SongCore 能力（见 §9）。
+`libswresample` **不在** SongCore decode 基线内（E07 已裁掉）。它只可能因
+FFmpeg n9.0.1 某 decoder 的上游 build 依赖被强制拉入闭包（当前唯一来源：
+Opus decoder）；这是 decoder implementation dependency，不是 SongCore 能力
+（见 §9）。AudioEngine 层的 SRC 显式使用 `aresample` / libswresample（E11
+冻结决策，见 §9）。
 
-明确排除：
+明确排除（SongCore decode 闭包）：
 
 ```text
 libavfilter
@@ -212,6 +218,9 @@ ffmpeg
 ffprobe
 ffplay
 ```
+
+`libavfilter` 不作为 SongCore 的一部分；产品 DSP 的 libavfilter 能力闭包是
+**AudioEngine 的独立裁剪闭包**（E10-C0 逐级成本证据，见 §11）。
 
 构建从：
 
@@ -335,13 +344,23 @@ sample format 统一（packed/planar → interleaved Float32）属于契约内�
 sample rate 与 channel layout 一律保持 source 原样；设备侧适配由 host 的
 AudioSink 能力协商完成。
 
-`libswresample` 出现在构建闭包中的唯一原因：FFmpeg n9.0.1 的 Opus decoder
-在 upstream configure 图中硬依赖 swresample（`Disabled opus_decoder ...
-not all dependencies are satisfied: swresample`）。这是 **decoder
-implementation dependency**，不代表 SongCore 获得 resample 能力；其真实
-成员 pull 由 link audit 计量（E08 实测）。
+`libswresample` 出现在 SongCore 构建闭包中的唯一原因：FFmpeg n9.0.1 的
+Opus decoder 在 upstream configure 图中硬依赖 swresample（`Disabled
+opus_decoder ... not all dependencies are satisfied: swresample`）。这是
+**decoder implementation dependency**，不代表 SongCore 获得 resample 能力；
+其真实成员 pull 由 link audit 计量（E08 实测）。
 
 不要把 implementation dependency 写成 product capability。
+
+## E11 冻结：SRC 决策（2026-09-01）
+
+- **SongCore 输出不变**：source-rate / source-layout interleaved Float32；
+  SongCore 不 resample / rematrix。
+- **AudioEngine SRC**：`aresample`（libswresample）。源 rate/layout 与设备
+  目标一致时 **BYPASS**（不进入 resampler）。
+- 不使用 SoXR / r8brain / libsamplerate / 第二个 EQ 库。
+- 证据：`bench/results/songcore-v1/dsp-src-integration.json`（44.1k→48k 经
+  aresample 的 negotiated rate + duration ratio 机器门）。
 
 ---
 
@@ -401,9 +420,22 @@ Spectrum tap
 AudioSink
 ```
 
-FFmpeg 不提供业务音效。
+## E11 冻结：DSP 决策（2026-09-01）
 
-`libavfilter` 不进入第一阶段。
+- **AudioEngine** 的产品 DSP 使用**能力裁剪的 libavfilter**（E10-C0 证据：
+  capability intent 由人维护于 `bench/dsp-capabilities.json`，source closure
+  由 `tools/pcm_c0.py` + pinned configure oracle 机器推导，逐级成本在
+  `bench/results/avfilter-minimize/*`）。
+- **SongCore 永不运行 libavfilter**：`songcore_ffmpeg.c` 不链接
+  avfilter 能力，ABI 上无任何 filter 概念（见 §9）。
+- 第一版 DSP 能力集（E10-C0 tier F1 "core-gain-eq-tone"）即覆盖 §12 列表：
+  `volume` / `equalizer`（biquad 族）/ `bass` / `treble` / `lowshelf` /
+  `highshelf` / `lowpass` / `highpass`；格式适配 = `aresample`（发现式，
+  非预付）。
+- 不做薄 DSP 对比层、不做第二个 EQ 库（JUCE / KFR / 等）、不做
+  crossfade / limiter 之外的额外效果实现。
+- 证据：`bench/results/songcore-v1/dsp-src-integration.json`（BYPASS 透明
+  形状 + volume/equalizer 有效性机器门）。
 
 ---
 
@@ -411,13 +443,17 @@ FFmpeg 不提供业务音效。
 
 播放器阶段第一批 DSP 仅考虑：
 
-- volume / gain；
-- ReplayGain；
-- 10-band EQ；
-- balance；
-- spectrum tap。
+- volume / gain → libavfilter `volume`；
+- ReplayGain → SongCore 只读标签（E11 已冻结 AV_PKT_DATA_REPLAYGAIN 解析，
+  microbels + peak），应用属 AudioEngine 策略；
+- 10-band EQ → libavfilter biquad 族（`equalizer` 等）；
+- balance → libavfilter `pan`（F3 层能力）；
+- spectrum tap → AudioEngine / consumer 侧，不进入 SongCore。
 
 其他音效未来以插件方式加入，不进入 SongCore。
+
+实现载体 = AudioEngine 的能力裁剪 libavfilter 闭包（§11 E11 冻结决策），
+不是薄 DSP 自研层。
 
 ---
 

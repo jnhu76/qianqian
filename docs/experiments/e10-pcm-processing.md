@@ -8,6 +8,12 @@
 汇编，并携带 `p0-mutations.json` 与 sanitizer 结果）；本文件表格由
 `tools/pcm_report_tables.py` 从 summary 派生，禁止手抄。）
 
+> **Historical evidence（E11 2026-09-01 起）**：本文的“P0 不选择
+> SRC/DSP/libavfilter”是当时的决策状态，已被 E11 冻结取代：
+> AudioEngine SRC = aresample/libswresample（源匹配 BYPASS），DSP 载体 =
+> 能力裁剪 libavfilter（E10-C0）；SongCore 永不运行 libavfilter 且不
+> resample。现行机器权威 = `bench/results/songcore-v1/*`。
+
 ```text
 P0 selects no SRC.
 P0 selects no DSP implementation.

@@ -34,7 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from common_corpus import fixture_path, load_cases, STAGE_CAPABILITIES  # noqa: E402
 
-CONTRACT = ["song_open", "song_probe", "song_read_pcm", "song_seek", "song_close"]
+CONTRACT = ["songcore_abi_version", "song_open", "song_probe", "song_audio_stream_count", "song_audio_stream_info", "song_select_stream", "song_get_metadata", "song_get_metadata_count", "song_get_metadata_entry", "song_get_artwork_count", "song_get_artwork_item", "song_read_pcm", "song_seek", "song_last_error", "song_close"]
 LINKER_NOISE = {"__bss_start", "_edata", "_end", "__TMC_END__", "_init", "_fini",
                 "__data_start", "QIANQIAN_1.0", "data_start"}
 SMOKE_CASES = [

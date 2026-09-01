@@ -1,0 +1,88 @@
+{
+ "scope": "BYPASS shape + 44.1k->48k aresample + volume/equalizer effectiveness on the trimmed libavfilter graph; True frame-level BYPASS bit-exactness is out of machine scope per E11 contract",
+ "graph_input_contract": {
+  "fmt": "flt (Float32 interleaved)",
+  "rate": "source rate",
+  "layout": "source layout",
+  "matches_songcore_output": true
+ },
+ "closure": {
+  "manifest": "build/minimize/avf-c2",
+  "tier": "F1 core-gain-eq-tone (E10-C0)",
+  "units": 236,
+  "production_matrix": false,
+  "production_manifest": "build/minimize/e11-test (c5-opus, no libavfilter)",
+  "filters": {
+   "aresample": true,
+   "volume": true,
+   "equalizer": true,
+   "anull": true,
+   "swresample_present": true
+  }
+ },
+ "probe_summary": "PASS: 4/4",
+ "gates": [
+  {
+   "id": "bypass-anull",
+   "ok": true,
+   "detail": "in 8192 out 8192",
+   "negotiated": {
+    "fmt": "flt",
+    "rate": 44100,
+    "channels": 2,
+    "layout": "stereo"
+   },
+   "auto_inserted": [],
+   "in_frames": 8192,
+   "out_frames": 8192
+  },
+  {
+   "id": "resample-44to48",
+   "ok": true,
+   "detail": "dur ratio 1.08844 want 1.08844+-0.005",
+   "negotiated": {
+    "fmt": "flt",
+    "rate": 48000,
+    "channels": 2,
+    "layout": "stereo"
+   },
+   "auto_inserted": [],
+   "in_frames": 4410,
+   "out_frames": 4800
+  },
+  {
+   "id": "volume-half",
+   "ok": true,
+   "detail": "measured -6.021 dB want -6.021+-0.050",
+   "negotiated": {
+    "fmt": "flt",
+    "rate": 44100,
+    "channels": 2,
+    "layout": "stereo"
+   },
+   "auto_inserted": [],
+   "in_frames": 8192,
+   "out_frames": 8192
+  },
+  {
+   "id": "eq-boost10",
+   "ok": true,
+   "detail": "measured 10.000 dB want 10.000+-2.000",
+   "negotiated": {
+    "fmt": "flt",
+    "rate": 44100,
+    "channels": 2,
+    "layout": "stereo"
+   },
+   "auto_inserted": [
+    "auto_aresample_0",
+    "auto_aresample_1"
+   ],
+   "in_frames": 8192,
+   "out_frames": 8192
+  }
+ ],
+ "all_gates_ok": true,
+ "verdict": "PASS",
+ "problems": []
+}

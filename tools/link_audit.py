@@ -50,7 +50,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # uppercase = global, plus weak defined (V/W), common (C) and GNU unique (u).
 # Local symbols (t/d/b/r/s/g/v/w) can never pull an archive member.
 GLOBAL_DEF_TYPES = set("ABCDGRSTVWu")
-CONTRACT_SYMBOLS = {"song_open", "song_probe", "song_read_pcm", "song_seek", "song_close"}
+CONTRACT_SYMBOLS = {"songcore_abi_version", "song_open", "song_probe", "song_audio_stream_count", "song_audio_stream_info", "song_select_stream", "song_get_metadata", "song_get_metadata_count", "song_get_metadata_entry", "song_get_artwork_count", "song_get_artwork_item", "song_read_pcm", "song_seek", "song_last_error", "song_close"}
 
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:

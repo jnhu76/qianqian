@@ -1,0 +1,80 @@
+{
+ "cases": [
+  {
+   "case": "e11-neg-empty",
+   "record": {
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-neg-empty.bin",
+    "open_status": 104,
+    "probe_status": -2,
+    "read_status": -2,
+    "read_frames": 0,
+    "eof": -2,
+    "diag": null
+   }
+  },
+  {
+   "case": "e11-neg-text",
+   "record": {
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-neg-text.bin",
+    "open_status": 104,
+    "probe_status": -2,
+    "read_status": -2,
+    "read_frames": 0,
+    "eof": -2,
+    "diag": null
+   }
+  },
+  {
+   "case": "e11-neg-png",
+   "record": {
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-neg-png.png",
+    "open_status": 104,
+    "probe_status": -2,
+    "read_status": -2,
+    "read_frames": 0,
+    "eof": -2,
+    "diag": null
+   }
+  },
+  {
+   "case": "e11-neg-videoonly",
+   "record": {
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-neg-videoonly.m4a",
+    "open_status": 0,
+    "probe_status": 105,
+    "read_status": -2,
+    "read_frames": 0,
+    "eof": -2,
+    "diag": {
+     "native": 0,
+     "msg": "no audio stream"
+    }
+   }
+  },
+  {
+   "case": "e11-neg-ac3",
+   "record": {
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-neg-ac3.m4a",
+    "open_status": 0,
+    "probe_status": 106,
+    "read_status": -2,
+    "read_frames": 0,
+    "eof": -2,
+    "diag": {
+     "native": 0,
+     "msg": "no decodable audio codec"
+    }
+   }
+  },
+  {
+   "case": "e11-iofail",
+   "record": {
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/flac-16-44-stereo.flac",
+    "open_status": 103,
+    "probe_status": -2,
+    "read_status": -2,
+    "read_frames": 0
+   }
+  }
+ ]
+}

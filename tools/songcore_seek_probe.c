@@ -80,9 +80,12 @@ static int decode_all(song_handle *song, pcm_buf *out) {
     const size_t chunk = 4096;
     for (;;) {
         if (buf_reserve(out, chunk) < 0) return -1;
-        int64_t n = song_read_pcm(song, out->data + out->frames * (size_t)out->channels, chunk);
-        if (n < 0) return -1;
-        if (n == 0) return 0;
+        uint64_t n = 0;
+        song_status st = song_read_pcm(song,
+                                       out->data + out->frames * (size_t)out->channels,
+                                       chunk, &n);
+        if (st == SONG_EOF) return 0;
+        if (st != SONG_OK) return -1;
         out->frames += (size_t)n;
     }
 }
@@ -179,8 +182,12 @@ static int open_song(const char *path, song_handle **out, file_source *src) {
         return -1;
     }
     song_io io = { .userdata = src, .read = host_read, .seek = host_seek, .size = host_size };
-    *out = song_open(&io);
-    if (!*out) { fclose(src->file); return -1; }
+    song_handle *s = NULL;
+    if (song_open(&io, &s) != SONG_OK) {
+        fclose(src->file);
+        return -1;
+    }
+    *out = s;
     return 0;
 }
 
@@ -230,7 +237,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     song_info info;
-    if (song_probe(song, &info) < 0) {
+    if (song_probe(song, &info) != SONG_OK) {
         fprintf(stderr, "songcore_seek_probe: probe failed\n");
         close_song(&song, &src);
         return 1;
@@ -244,9 +251,10 @@ int main(int argc, char **argv) {
     char head_sha[65] = "";
     int head_ok = 1;
     while (head_got < head_frames) {
-        int64_t n = song_read_pcm(song, head + head_got * (size_t)info.channels,
-                                  head_frames - head_got);
-        if (n < 0) { head_ok = 0; break; }
+        uint64_t n = 0;
+        song_status st = song_read_pcm(song, head + head_got * (size_t)info.channels,
+                                       head_frames - head_got, &n);
+        if (st != SONG_OK && st != SONG_EOF) { head_ok = 0; break; }
         if (n == 0) break;
         head_got += (size_t)n;
     }
@@ -257,7 +265,7 @@ int main(int argc, char **argv) {
 
     /* reference: full sequential decode on a fresh handle */
     if (open_song(path, &song, &src) < 0) return 1;
-    if (song_probe(song, &info) < 0) return 1;
+    if (song_probe(song, &info) != SONG_OK) return 1;
     pcm_buf seq = { .channels = info.channels };
     int seq_ok = decode_all(song, &seq) == 0;
     close_song(&song, &src);
@@ -284,8 +292,8 @@ int main(int argc, char **argv) {
         file_source src2;
         pcm_buf post = { .channels = info.channels };
         int opened = open_song(path, &s2, &src2) == 0;
-        int probed = opened && song_probe(s2, &info) == 0;
-        int seeked = probed && song_seek(s2, target) == 0;
+        int probed = opened && song_probe(s2, &info) == SONG_OK;
+        int seeked = probed && song_seek(s2, target, NULL) == SONG_OK;
         if (!seeked) {
             printf("\"status\":\"%s\",\"target_us\":%" PRId64 "}",
                    opened ? (probed ? "seek_failed" : "probe_failed") : "reopen_failed", target);

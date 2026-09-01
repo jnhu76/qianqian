@@ -51,8 +51,8 @@ int main(int argc, char **argv) {
     }
 
     song_io sio = { .userdata = &io, .read = io_read, .seek = io_seek, .size = io_size };
-    song_handle *h = song_open(&sio);
-    if (!h) {
+    song_handle *h = NULL;
+    if (song_open(&sio, &h) != SONG_OK || !h) {
         printf("{\"status\":\"song_open_failed\"}\n");
         fclose(io.f);
         return 1;
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
 
     song_info info;
     memset(&info, 0, sizeof(info));
-    if (song_probe(h, &info) != 0) {
+    if (song_probe(h, &info) != SONG_OK) {
         printf("{\"status\":\"probe_failed\"}\n");
         song_close(h);
         fclose(io.f);
@@ -70,18 +70,24 @@ int main(int argc, char **argv) {
     /* bounded first slice: one second of frames */
     size_t cap = (size_t)(info.sample_rate > 0 ? info.sample_rate : 48000);
     float *buf = malloc(sizeof(float) * cap * (size_t)(info.channels > 0 ? info.channels : 1));
-    int64_t frames_a = song_read_pcm(h, buf, cap);
+    uint64_t frames_a = 0;
+    song_status st_a = song_read_pcm(h, buf, cap, &frames_a);
 
-    int seeked = song_seek(h, 0);
-    int64_t frames_b = seeked == 0 ? song_read_pcm(h, buf, cap) : -1;
+    int64_t actual = -1;
+    song_status seeked = song_seek(h, 0, &actual);
+    uint64_t frames_b = 0;
+    song_status st_b = seeked == SONG_OK ? song_read_pcm(h, buf, cap, &frames_b) : SONG_ERR_STATE;
 
     printf("{\"status\":\"ok\",\"codec\":\"%s\",\"sample_rate\":%d,\"channels\":%d,"
-           "\"first_read_frames\":%lld,\"seek_rc\":%d,\"post_seek_read_frames\":%lld}\n",
+           "\"first_read_frames\":%llu,\"seek_rc\":%d,\"post_seek_read_frames\":%llu}\n",
            info.codec, info.sample_rate, info.channels,
-           (long long)frames_a, seeked, (long long)frames_b);
+           (unsigned long long)frames_a, (int)seeked, (unsigned long long)frames_b);
 
     free(buf);
     song_close(h);
     fclose(io.f);
-    return (frames_a > 0 && seeked == 0 && frames_b > 0) ? 0 : 1;
+    return (st_a == SONG_OK && frames_a > 0 && seeked == SONG_OK && st_b == SONG_OK &&
+            frames_b > 0)
+               ? 0
+               : 1;
 }

@@ -168,6 +168,20 @@ target("qn_pcm_dump")
         end
     end)
 
+-- E11: SongCore ABI v1 machine-test instrument (bench-only, one JSON per run).
+target("qn_e11_record")
+    set_kind("binary")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("bench/e11/qn_e11_record.c")
+    add_deps("songcore")
+    if is_plat("linux") or is_plat("macosx") then
+        add_syslinks("m", "pthread")
+    end
+    if is_plat("mingw") then
+        add_syslinks("bcrypt")
+    end
+
 -- E10-C0: bench-only libavfilter capability probe. Links the FFmpeg closure
 -- replayed by qianqian_av (whatever --av_manifest points at) and exercises
 -- the filters that closure enables: registration presence/absence,
@@ -353,7 +367,7 @@ if get_config("wasm") then
                 "-sEXPORT_NAME=createSongCore",
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
-                "-sEXPORTED_FUNCTIONS=[\"_song_wasm_open\",\"_song_wasm_probe\",\"_song_wasm_read_pcm\",\"_song_wasm_seek\",\"_song_wasm_close\",\"_malloc\",\"_free\"]",
+                "-sEXPORTED_FUNCTIONS=[\"_song_wasm_abi_version\",\"_song_wasm_open\",\"_song_wasm_probe\",\"_song_wasm_audio_stream_count\",\"_song_wasm_audio_stream_info\",\"_song_wasm_select_stream\",\"_song_wasm_get_metadata\",\"_song_wasm_get_metadata_count\",\"_song_wasm_get_metadata_entry\",\"_song_wasm_get_artwork_count\",\"_song_wasm_get_artwork_item\",\"_song_wasm_read_pcm\",\"_song_wasm_seek\",\"_song_wasm_last_error\",\"_song_wasm_close\",\"_malloc\",\"_free\"]",
                 "-g1", -- keep export symbol names for the JS glue (E09-emscripten-1:
                        -- the door IMPORTS are wired by type signature in
                        -- tools/wasm_em_node_harness.mjs because emscripten minifies

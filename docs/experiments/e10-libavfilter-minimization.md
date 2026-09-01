@@ -4,6 +4,12 @@
 `bench/results/avfilter-minimize/summary.json`,由 `tools/pcm_c0.py`
 从各 stage 证据 JSON 汇编;本文表格全部生成,`--check` 漂移即 FAIL。)
 
+> **Historical evidence（E11 2026-09-01 起）**：本文是 DSP/SRC 决策的
+> evidence base，不是现行实现。E11 已冻结：AudioEngine 的 DSP 载体 =
+> 能力裁剪 libavfilter（本文的成本阶梯即该决策依据），SongCore 永不
+> 运行 libavfilter；SRC = aresample/libswresample（源匹配 BYPASS）。
+> 现行机器权威 = `bench/results/songcore-v1/{dsp-src-integration,summary}.json`。
+
 ```text
 C0 selects no DSP backend.
 C0 does not productionize libavfilter.

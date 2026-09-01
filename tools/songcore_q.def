@@ -1,7 +1,17 @@
 LIBRARY qianqian_songcore
 EXPORTS
+    songcore_abi_version
     song_open
     song_probe
+    song_audio_stream_count
+    song_audio_stream_info
+    song_select_stream
+    song_get_metadata
+    song_get_metadata_count
+    song_get_metadata_entry
+    song_get_artwork_count
+    song_get_artwork_item
     song_read_pcm
     song_seek
+    song_last_error
     song_close

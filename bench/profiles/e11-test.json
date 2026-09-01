@@ -1,0 +1,74 @@
+{
+  "profile": "e11-test",
+  "ladder": "E11",
+  "extends": "c5-opus",
+  "description": "E11 test-only closure: the full Common Formats capability set (C5) plus the Matroska demuxer, used only to construct the container-vs-stream metadata conflict fixture and the two-audio-stream Matroska fixture. This profile exists for the E11 authority run; it is NOT a production closure. Capability intent is test-fixture-driven, not product-driven.",
+  "component_base": "everything-disabled",
+  "libraries": {
+    "enable": [
+      "avformat",
+      "avcodec",
+      "swresample"
+    ],
+    "disable": [
+      "avdevice",
+      "avfilter",
+      "swscale"
+    ]
+  },
+  "disable": [
+    "autodetect",
+    "debug",
+    "devices",
+    "doc",
+    "iconv",
+    "network",
+    "programs",
+    "protocols",
+    "pthreads",
+    "x86asm"
+  ],
+  "components": {
+    "demuxer": [
+      "aac",
+      "flac",
+      "matroska",
+      "mov",
+      "mp3",
+      "ogg",
+      "wav"
+    ],
+    "decoder": [
+      "aac",
+      "alac",
+      "flac",
+      "mp3float",
+      "opus",
+      "vorbis",
+      "pcm_u8",
+      "pcm_s16le",
+      "pcm_s24le",
+      "pcm_s32le",
+      "pcm_f32le",
+      "pcm_f64le"
+    ],
+    "parser": [
+      "mpegaudio"
+    ]
+  },
+  "provenance": {
+    "demuxer:matroska": {
+      "required_by": [
+        "e11-meta-conflict",
+        "e11-multiaudio-mka"
+      ],
+      "reason": "E11 test-only: Matroska is the only Common-Formats-adjacent container in the closure that populates BOTH container (segment) and stream (track) metadata, which the frozen canonical-precedence policy (selected stream overrides container) machine-tests. Never a production capability."
+    },
+    "lib:swresample": {
+      "required_by": [
+        "decoder:opus"
+      ],
+      "reason": "FFmpeg n9.0.1 configure hard dependency of the native Opus decoder (see c5-opus provenance). SongCore does not use swr."
+    }
+  }
+}

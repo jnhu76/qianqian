@@ -1,0 +1,966 @@
+{
+ "cases": [
+  {
+   "case": "e11-meta-none",
+   "sha": "1a12537509913e5477df3b75295c17ecfa5174c503b9b3fd22d7e9c757444d46",
+   "canonical": {
+    "title": "",
+    "has_title": 0,
+    "artist": "",
+    "has_artist": 0,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    }
+   ]
+  },
+  {
+   "case": "e11-meta-simple",
+   "sha": "5ff4853a047f91893ce3a6b41567ed17e9aa48ba672e6e1b40f82fea2ec33ecf",
+   "canonical": {
+    "title": "Simple Title",
+    "has_title": 1,
+    "artist": "Simple Artist",
+    "has_artist": 1,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "title",
+     "value": "Simple Title"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "artist",
+     "value": "Simple Artist"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    }
+   ]
+  },
+  {
+   "case": "e11-meta-album",
+   "sha": "1eea2ea636fee8b39e6e205377b2f2ccc047510074707284ed401c1d9b07d0dc",
+   "canonical": {
+    "title": "Album Track",
+    "has_title": 1,
+    "artist": "Album Artist",
+    "has_artist": 1,
+    "album": "The Album",
+    "has_album": 1,
+    "album_artist": "Album Artist",
+    "has_album_artist": 1,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "title",
+     "value": "Album Track"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "artist",
+     "value": "Album Artist"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "album",
+     "value": "The Album"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "album_artist",
+     "value": "Album Artist"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    }
+   ]
+  },
+  {
+   "case": "e11-meta-utf8",
+   "sha": "2c2b1168901ab492b0fe208f1ae0f348a00115e7ec005afc3e87d82b0f9fb81d",
+   "canonical": {
+    "title": "千千·现代 青花瓷",
+    "has_title": 1,
+    "artist": "测试 Ünïcode",
+    "has_artist": 1,
+    "album": "夜曲 ♪ 山",
+    "has_album": 1,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "title",
+     "value": "千千·现代 青花瓷"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "artist",
+     "value": "测试 Ünïcode"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "album",
+     "value": "夜曲 ♪ 山"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    }
+   ]
+  },
+  {
+   "case": "e11-meta-track",
+   "sha": "6f522f5a6fe415909c582e04a5001175d565d6766680af89312d0f75d1db97d5",
+   "canonical": {
+    "title": "Track Field",
+    "has_title": 1,
+    "artist": "",
+    "has_artist": 0,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 3,
+    "has_track_number": 1,
+    "track_total": 12,
+    "has_track_total": 1,
+    "disc_number": 1,
+    "has_disc_number": 1,
+    "disc_total": 2,
+    "has_disc_total": 1,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "title",
+     "value": "Track Field"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "track",
+     "value": "3/12"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "disc",
+     "value": "1/2"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    }
+   ]
+  },
+  {
+   "case": "e11-meta-full",
+   "sha": "0c2dcdb589404c151207f90d4ad5da997ab3fe34d4c952a416d50c87f9a6d74b",
+   "canonical": {
+    "title": "Full Field",
+    "has_title": 1,
+    "artist": "Full Artist",
+    "has_artist": 1,
+    "album": "Full Album",
+    "has_album": 1,
+    "album_artist": "Full Album Artist",
+    "has_album_artist": 1,
+    "genre": "Instrumental",
+    "has_genre": 1,
+    "composer": "Full Composer",
+    "has_composer": 1,
+    "date": "1999",
+    "has_date": 1,
+    "comment": "Full comment text",
+    "has_comment": 1,
+    "track_number": 7,
+    "has_track_number": 1,
+    "track_total": 9,
+    "has_track_total": 1,
+    "disc_number": 2,
+    "has_disc_number": 1,
+    "disc_total": 2,
+    "has_disc_total": 1,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "title",
+     "value": "Full Field"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "artist",
+     "value": "Full Artist"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "album",
+     "value": "Full Album"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "album_artist",
+     "value": "Full Album Artist"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "genre",
+     "value": "Instrumental"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "composer",
+     "value": "Full Composer"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "date",
+     "value": "1999"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "comment",
+     "value": "Full comment text"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "track",
+     "value": "7/9"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "disc",
+     "value": "2/2"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    }
+   ]
+  },
+  {
+   "case": "e11-meta-replaygain",
+   "sha": "3c63d651c8b256a7a7496c02e0f0eb756d9481684800843f36bbb6b181da2617",
+   "canonical": {
+    "title": "ReplayGain Case",
+    "has_title": 1,
+    "artist": "",
+    "has_artist": 0,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": -602000,
+    "has_track_gain": 1,
+    "track_peak": 96900,
+    "has_track_peak": 1,
+    "album_gain_mb": -810000,
+    "has_album_gain": 1,
+    "album_peak": 97131,
+    "has_album_peak": 1
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "title",
+     "value": "ReplayGain Case"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "REPLAYGAIN_TRACK_GAIN",
+     "value": "-6.02 dB"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "REPLAYGAIN_TRACK_PEAK",
+     "value": "0.969009"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "REPLAYGAIN_ALBUM_GAIN",
+     "value": "-8.10 dB"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "REPLAYGAIN_ALBUM_PEAK",
+     "value": "0.971311"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    }
+   ]
+  },
+  {
+   "case": "e11-meta-mp3",
+   "sha": "68f9bd67a1bd6aed58cb295a0649b311ffce35ce9d9b3a67ee73f5f8894aeb13",
+   "canonical": {
+    "title": "Raw MP3",
+    "has_title": 1,
+    "artist": "Raw Artist",
+    "has_artist": 1,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "title",
+     "value": "Raw MP3"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "artist",
+     "value": "Raw Artist"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "CUSTOM_XKEY",
+     "value": "alpha"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "CUSTOM_YKEY",
+     "value": "beta"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "CUSTOM_ZKEY",
+     "value": "gamma"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavc62.11"
+    }
+   ]
+  },
+  {
+   "case": "e11-meta-conflict",
+   "sha": "d533e571d1f313a56806ea61bb0132490a8ccc8f34c8a35cfbbb040f2f5a6302",
+   "canonical": {
+    "title": "StreamTitle",
+    "has_title": 1,
+    "artist": "",
+    "has_artist": 0,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "StreamGenre",
+    "has_genre": 1,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "title",
+     "value": "ContainerTitle"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "ENCODER",
+     "value": "Lavf62.3.100"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "title",
+     "value": "StreamTitle"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "ENCODER",
+     "value": "Lavc62.11.100 flac"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "GENRE",
+     "value": "StreamGenre"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "DURATION",
+     "value": "00:00:03.000000000"
+    }
+   ]
+  },
+  {
+   "case": "e11-art-mp3-jpeg",
+   "sha": "870344fdce9f0198c26ac896bbb05c423ec498dfab68fc6742b239e87efdb44f",
+   "canonical": {
+    "title": "",
+    "has_title": 0,
+    "artist": "",
+    "has_artist": 0,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavc62.11"
+    }
+   ]
+  },
+  {
+   "case": "e11-art-mp3-multi",
+   "sha": "870344fdce9f0198c26ac896bbb05c423ec498dfab68fc6742b239e87efdb44f",
+   "canonical": {
+    "title": "",
+    "has_title": 0,
+    "artist": "",
+    "has_artist": 0,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavc62.11"
+    }
+   ]
+  },
+  {
+   "case": "e11-art-m4a",
+   "sha": "2f822c71c52794b2d33722b4801a861e9ec85765ad7bcf684a5087300b22f88c",
+   "canonical": {
+    "title": "",
+    "has_title": 0,
+    "artist": "",
+    "has_artist": 0,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "major_brand",
+     "value": "M4A "
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "minor_version",
+     "value": "512"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "compatible_brands",
+     "value": "M4A isomiso2"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "language",
+     "value": "und"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "handler_name",
+     "value": "SoundHandler"
+    }
+   ]
+  },
+  {
+   "case": "e11-multiaudio",
+   "sha": "2f822c71c52794b2d33722b4801a861e9ec85765ad7bcf684a5087300b22f88c",
+   "canonical": {
+    "title": "",
+    "has_title": 0,
+    "artist": "",
+    "has_artist": 0,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "major_brand",
+     "value": "M4A "
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "minor_version",
+     "value": "512"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "compatible_brands",
+     "value": "M4A isomiso2"
+    },
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "encoder",
+     "value": "Lavf62.3.100"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "language",
+     "value": "und"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "handler_name",
+     "value": "SoundHandler"
+    }
+   ]
+  },
+  {
+   "case": "e11-multiaudio-mka",
+   "sha": "c632b7046440efb6072b30104acfda6970db696b67928a7beae5b40b99dec104",
+   "canonical": {
+    "title": "Mkv One",
+    "has_title": 1,
+    "artist": "",
+    "has_artist": 0,
+    "album": "",
+    "has_album": 0,
+    "album_artist": "",
+    "has_album_artist": 0,
+    "genre": "",
+    "has_genre": 0,
+    "composer": "",
+    "has_composer": 0,
+    "date": "",
+    "has_date": 0,
+    "comment": "",
+    "has_comment": 0,
+    "track_number": 0,
+    "has_track_number": 0,
+    "track_total": 0,
+    "has_track_total": 0,
+    "disc_number": 0,
+    "has_disc_number": 0,
+    "disc_total": 0,
+    "has_disc_total": 0,
+    "track_gain_mb": 0,
+    "has_track_gain": 0,
+    "track_peak": 0,
+    "has_track_peak": 0,
+    "album_gain_mb": 0,
+    "has_album_gain": 0,
+    "album_peak": 0,
+    "has_album_peak": 0
+   },
+   "raw": [
+    {
+     "scope": 0,
+     "sequence": 0,
+     "key": "ENCODER",
+     "value": "Lavf62.3.100"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "title",
+     "value": "Mkv One"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "ENCODER",
+     "value": "Lavc62.11.100 flac"
+    },
+    {
+     "scope": 1,
+     "sequence": 0,
+     "key": "DURATION",
+     "value": "00:00:03.000000000"
+    }
+   ]
+  }
+ ]
+}

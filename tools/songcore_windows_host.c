@@ -209,9 +209,12 @@ static int decode_all(song_handle *song, pcm_buf *out) {
     const size_t chunk = 4096;
     for (;;) {
         if (buf_reserve(out, chunk) < 0) return -1;
-        int64_t n = song_read_pcm(song, out->data + out->frames * (size_t)out->channels, chunk);
-        if (n < 0) return -1;
-        if (n == 0) return 0;
+        uint64_t n = 0;
+        song_status st = song_read_pcm(song,
+                                       out->data + out->frames * (size_t)out->channels,
+                                       chunk, &n);
+        if (st == SONG_EOF) return 0;
+        if (st != SONG_OK) return -1;
         out->frames += (size_t)n;
     }
 }
@@ -225,8 +228,12 @@ static int win_open(const wchar_t *wpath, song_handle **out, win_source *src) {
     if (!GetFileSizeEx(src->file, &li)) { CloseHandle(src->file); return -1; }
     src->size = li.QuadPart;
     song_io io = { .userdata = src, .read = host_read, .seek = host_seek, .size = host_size };
-    *out = song_open(&io);
-    if (!*out) { CloseHandle(src->file); return -1; }
+    song_handle *s = NULL;
+    if (song_open(&io, &s) != SONG_OK || !s) {
+        CloseHandle(src->file);
+        return -1;
+    }
+    *out = s;
     return 0;
 }
 
@@ -255,7 +262,7 @@ static int run_contract(const wchar_t *wpath, const char *label) {
         return 1;
     }
     song_info info;
-    if (song_probe(song, &info) < 0) {
+    if (song_probe(song, &info) != SONG_OK) {
         fprintf(stderr, "probe failed for %s\n", label);
         win_close(&song, &src);
         return 1;
@@ -269,11 +276,12 @@ static int run_contract(const wchar_t *wpath, const char *label) {
     size_t head_frames = (size_t)info.sample_rate;
     float *head = (float *)malloc(head_frames * (size_t)info.channels * sizeof(float));
     size_t head_got = 0;
-    if (win_open(wpath, &song, &src) == 0 && song_probe(song, &info) == 0) {
+    if (win_open(wpath, &song, &src) == 0 && song_probe(song, &info) == SONG_OK) {
         while (head_got < head_frames) {
-            int64_t n = song_read_pcm(song, head + head_got * (size_t)info.channels,
-                                      head_frames - head_got);
-            if (n < 0) break;
+            uint64_t n = 0;
+            song_status st = song_read_pcm(song, head + head_got * (size_t)info.channels,
+                                           head_frames - head_got, &n);
+            if (st != SONG_OK && st != SONG_EOF) break;
             if (n == 0) break;
             head_got += (size_t)n;
         }
@@ -290,7 +298,7 @@ static int run_contract(const wchar_t *wpath, const char *label) {
     size_t seq_frames = 0;
     char seq_sha[65] = "";
     pcm_buf seq = { .channels = info.channels };
-    if (win_open(wpath, &song, &src) == 0 && song_probe(song, &info) == 0) {
+    if (win_open(wpath, &song, &src) == 0 && song_probe(song, &info) == SONG_OK) {
         seq_ok = decode_all(song, &seq) == 0;
         seq_frames = seq.frames;
     }
@@ -307,8 +315,8 @@ static int run_contract(const wchar_t *wpath, const char *label) {
         int64_t target = info.duration_us > 0
             ? (int64_t)((double)info.duration_us * (0.25 * (i + 1))) : 0;
         printf("%s{", i ? "," : "");
-        if (win_open(wpath, &song, &src) < 0 || song_probe(song, &info) < 0 ||
-            song_seek(song, target) != 0) {
+        if (win_open(wpath, &song, &src) < 0 || song_probe(song, &info) != SONG_OK ||
+            song_seek(song, target, NULL) != SONG_OK) {
             printf("\"status\":\"seek_failed\",\"target_us\":%" PRId64 "}", target);
             win_close(&song, &src);
             continue;
@@ -443,15 +451,18 @@ static int mode_largefile(void) {
         .userdata = &virt,
         .read = virt_read_prefix, .seek = virt_seek, .size = virt_size,
     };
-    song_handle *song = song_open(&io);
-    if (!song) { fprintf(stderr, "virtual open failed\n"); return 1; }
+    song_handle *song = NULL;
+    if (song_open(&io, &song) != SONG_OK || !song) {
+        fprintf(stderr, "virtual open failed\n");
+        return 1;
+    }
     song_info info;
-    if (song_probe(song, &info) < 0) { fprintf(stderr, "virtual probe failed\n"); return 1; }
+    if (song_probe(song, &info) != SONG_OK) { fprintf(stderr, "virtual probe failed\n"); return 1; }
     printf("{\"label\":\"largefile\",\"sample_rate\":%d,\"channels\":%d,"
            "\"duration_us\":%" PRId64, info.sample_rate, info.channels, info.duration_us);
     int rc = 0;
     int64_t target = (int64_t)((double)info.duration_us * 0.75);
-    if (song_seek(song, target) != 0) { printf(",\"seek_failed\":true}\n"); return 1; }
+    if (song_seek(song, target, NULL) != SONG_OK) { printf(",\"seek_failed\":true}\n"); return 1; }
     /* bounded post-seek decode: the gate proves the >2 GiB offset reached
      * the host and that decode still works afterwards; draining the whole
      * virtual 2.75 GiB stream would only allocate gigabytes of buffer */
@@ -459,8 +470,10 @@ static int mode_largefile(void) {
     int ok = 1;
     for (size_t got = 0; got < 4800 && ok; ) {
         if (buf_reserve(&post, 4096) < 0) { ok = 0; break; }
-        int64_t n = song_read_pcm(song, post.data + post.frames * (size_t)post.channels, 4096);
-        if (n < 0) ok = 0;
+        uint64_t n = 0;
+        song_status st = song_read_pcm(song, post.data + post.frames * (size_t)post.channels,
+                                       4096, &n);
+        if (st != SONG_OK && st != SONG_EOF) ok = 0;
         else if (n == 0) break;
         else { post.frames += (size_t)n; got += (size_t)n; }
     }
@@ -504,7 +517,7 @@ static int mode_robust(const char *path) {
 
     if (win_open(wpath, &song, &src) == 0) {
         song_info info;
-        probe_rc = song_probe(song, &info);
+        probe_rc = (int)song_probe(song, &info);
         if (probe_rc < 0) {
             classification = "PROBE_FAILED";
             win_close(&song, &src);
@@ -516,8 +529,9 @@ static int mode_robust(const char *path) {
             float *buf = (float *)malloc(chunk * (size_t)info.channels * sizeof(float));
             int err = 0;
             while (frames < cap) {
-                int64_t n = song_read_pcm(song, buf, chunk);
-                if (n < 0) { err = 1; break; }
+                uint64_t n = 0;
+                song_status st = song_read_pcm(song, buf, chunk, &n);
+                if (st != SONG_OK && st != SONG_EOF) { err = 1; break; }
                 if (n == 0) break;
                 frames += (size_t)n;
             }
