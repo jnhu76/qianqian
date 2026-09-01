@@ -17,8 +17,8 @@
 优先级：
 
 1. `PRD.md`
-2. `docs/architecture/songcore-boundary.md`
-3. `docs/experiments/*`
+2. `docs/audio-core.md`
+3. `docs/ffmpeg-minimization.md`、`docs/architecture/*`、`docs/history.md`
 4. 当前代码和测试
 5. 外部项目仅作为实现参考
 

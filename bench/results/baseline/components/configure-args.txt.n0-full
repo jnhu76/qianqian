@@ -1,6 +1,0 @@
---prefix=install
---disable-programs
---disable-doc
---disable-debug
---disable-autodetect
---disable-x86asm

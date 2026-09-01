@@ -1,0 +1,25 @@
+{
+  "id": "android-arm64",
+  "platform": "android",
+  "arch": "arm64",
+  "xmake": {
+    "plat": ["android"],
+    "arch": "aarch64"
+  },
+  "ffmpeg": {
+    "target_os": "android",
+    "arch": "aarch64",
+    "cross": true
+  },
+  "toolchain": {
+    "family": "android ndk clang",
+    "identity": "NDK root/sysroot come from environment (xmake --ndk= / ANDROID_NDK_HOME), never from this recipe"
+  },
+  "artifacts": {
+    "static": false,
+    "shared": true,
+    "wasm": false
+  },
+  "status": "planned",
+  "evidence": "No derivation has been run for this target. libsongcore.so is the Android shipping shape; nothing is claimed until an NDK toolchain derives the manifest and links the artifact."
+}

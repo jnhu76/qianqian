@@ -1,0 +1,80 @@
+{
+ "cases": [
+  {
+   "case": "invalid-empty",
+   "record": {
+    "file": "invalid-empty.bin",
+    "open_status": 104,
+    "probe_status": -2,
+    "read_status": -2,
+    "read_frames": 0,
+    "eof": -2,
+    "diag": null
+   }
+  },
+  {
+   "case": "invalid-text",
+   "record": {
+    "file": "invalid-text.bin",
+    "open_status": 104,
+    "probe_status": -2,
+    "read_status": -2,
+    "read_frames": 0,
+    "eof": -2,
+    "diag": null
+   }
+  },
+  {
+   "case": "invalid-png",
+   "record": {
+    "file": "invalid-png.png",
+    "open_status": 104,
+    "probe_status": -2,
+    "read_status": -2,
+    "read_frames": 0,
+    "eof": -2,
+    "diag": null
+   }
+  },
+  {
+   "case": "invalid-videoonly",
+   "record": {
+    "file": "invalid-videoonly.m4a",
+    "open_status": 0,
+    "probe_status": 105,
+    "read_status": -2,
+    "read_frames": 0,
+    "eof": -2,
+    "diag": {
+     "native": 0,
+     "msg": "no audio stream"
+    }
+   }
+  },
+  {
+   "case": "invalid-ac3",
+   "record": {
+    "file": "invalid-ac3.m4a",
+    "open_status": 0,
+    "probe_status": 106,
+    "read_status": -2,
+    "read_frames": 0,
+    "eof": -2,
+    "diag": {
+     "native": 0,
+     "msg": "no decodable audio codec"
+    }
+   }
+  },
+  {
+   "case": "iofail",
+   "record": {
+    "file": "flac-16-44-stereo.flac",
+    "open_status": 103,
+    "probe_status": -2,
+    "read_status": -2,
+    "read_frames": 0
+   }
+  }
+ ]
+}

@@ -1,7 +1,0 @@
-LIBRARY qianqian_songcore
-EXPORTS
-    song_open
-    song_probe
-    song_read_pcm
-    song_seek
-    song_close

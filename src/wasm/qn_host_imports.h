@@ -8,8 +8,8 @@
  * File). 64-bit offsets are preserved end to end.
  *
  * On wasm32 targets these resolve to imports from module "qianqian_host".
- * On native builds (E09 native twin) the same symbols are provided by a
- * plain C translation unit, so identical guest code runs in both worlds.
+ * On native builds (native twin) the same symbols are provided by a plain
+ * C translation unit, so identical guest code runs in both worlds.
  */
 #ifndef QIANQIAN_WASM_HOST_IMPORTS_H
 #define QIANQIAN_WASM_HOST_IMPORTS_H

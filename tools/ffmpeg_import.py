@@ -27,8 +27,15 @@ SRC = ROOT / "build" / "ffmpeg-src"
 OUT = ROOT / "build" / "ffmpeg-xmake"
 ORACLE = OUT / "oracle"
 MANIFEST = OUT / "manifest.json"
-PIN = ROOT / "bench" / "ffmpeg-pin.json"
-PROFILE = ROOT / "bench" / "profiles" / "n3-min-noswr.json"
+PIN = ROOT / "ffmpeg" / "pin.json"
+PROFILE = ROOT / "ffmpeg" / "profiles" / "codec-base.json"
+TARGETS = ROOT / "ffmpeg" / "targets"
+
+# platform.system() -> Xmake platform name (recipe xmake.plat vocabulary)
+HOST_PLAT = {"linux": "linux", "darwin": "macosx", "windows": "windows"}
+# platform.machine() -> Xmake/recipe arch vocabulary
+HOST_ARCH = {"x86_64": "x86_64", "amd64": "x86_64", "arm64": "arm64",
+             "aarch64": "arm64"}
 
 LIB_TARGETS = (
     "libavutil/libavutil.a",
@@ -49,7 +56,7 @@ def lib_targets_for(profile: dict) -> tuple[str, ...]:
 # Object roots accepted as closure members. libswresample is included so
 # profiles that enable it (e.g. the Opus decoder's upstream dependency)
 # capture its translation units; for profiles without it the root simply
-# never matches. libavfilter likewise (E10-C0 capability ladder).
+# never matches. libavfilter likewise (DSP capability ladder).
 OBJECT_ROOTS = ("libavutil/", "libavcodec/", "libavformat/", "libswresample/",
                 "libavfilter/")
 SOURCE_SUFFIXES = (".c", ".S", ".s", ".asm", ".cpp", ".m")
@@ -82,6 +89,92 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _assert_portable_value(value: str, where: str) -> None:
+    if flag_contains_absolute_path(value):
+        raise SystemExit(
+            f"machine-local path leaked into durable intent ({where}): {value}")
+
+
+def load_recipe(target_id: str) -> dict:
+    """Load one machine-readable target recipe (ffmpeg/targets/<id>.json).
+
+    Recipes carry only target facts: platform/arch identities, FFmpeg
+    target_os/arch/cross facts, artifact capability, and honest status.
+    SDK roots and machine-local paths are forbidden here — they belong to
+    the environment at derive time."""
+    path = TARGETS / f"{target_id}.json"
+    if not path.is_file():
+        known = sorted(p.stem for p in TARGETS.glob("*.json"))
+        raise SystemExit(f"unknown target '{target_id}'; known targets: {known}")
+    recipe = json.loads(path.read_text())
+    if recipe.get("id") != target_id:
+        raise SystemExit(f"recipe id mismatch: {path.name} declares {recipe.get('id')!r}")
+
+    def walk(value: object, where: str) -> None:
+        if isinstance(value, str):
+            _assert_portable_value(value, where)
+        elif isinstance(value, dict):
+            for k, v in value.items():
+                walk(v, f"{where}.{k}")
+        elif isinstance(value, list):
+            for i, v in enumerate(value):
+                walk(v, f"{where}[{i}]")
+
+    walk(recipe, target_id)
+    return recipe
+
+
+def find_native_recipe() -> dict:
+    """The target recipe matching THIS host (canonical native import)."""
+    plat = HOST_PLAT.get(platform.system().lower())
+    arch = HOST_ARCH.get(platform.machine().lower())
+    for path in sorted(TARGETS.glob("*.json")):
+        recipe = json.loads(path.read_text())
+        xm = recipe.get("xmake", {})
+        plats = xm.get("plat", [])
+        if isinstance(plats, str):
+            plats = [plats]
+        if plat in plats and xm.get("arch") == arch:
+            return recipe
+    raise SystemExit(
+        f"no ffmpeg/targets recipe matches host "
+        f"{platform.system()}/{platform.machine()} (plat={plat}, arch={arch}); "
+        f"add one before importing")
+
+
+def recipe_configure_args(recipe: dict) -> list[str]:
+    """Deterministic configure arguments implied by the target facts."""
+    ff = recipe.get("ffmpeg", {})
+    args = []
+    if ff.get("cross"):
+        args.append("--enable-cross-compile")
+    if ff.get("target_os"):
+        args.append(f"--target-os={ff['target_os']}")
+    if ff.get("arch"):
+        args.append(f"--arch={ff['arch']}")
+    if ff.get("cross_prefix"):
+        args.append(f"--cross-prefix={ff['cross_prefix']}")
+    return args
+
+
+def target_identity(recipe: dict | None, recipe_sha256: str | None) -> dict:
+    if recipe is None:
+        return {"id": None, "platform": None, "arch": None,
+                "recipe_sha256": None}
+    return {
+        "id": recipe["id"],
+        "platform": recipe.get("platform"),
+        "arch": recipe.get("arch"),
+        "recipe_sha256": recipe_sha256,
+        # Toolchain-family facts bound into the manifest identity so a
+        # replay session can detect recipe drift — or a manifest from a
+        # DIFFERENT toolchain family (MinGW vs MSVC) — by field comparison,
+        # without hashing.
+        "target_os": (recipe.get("ffmpeg") or {}).get("target_os"),
+        "cross_prefix": (recipe.get("ffmpeg") or {}).get("cross_prefix"),
+    }
+
+
 def verified_source(pin: dict) -> None:
     stamp = SRC / ".qianqian-verified"
     expected = f"{pin['ffmpeg_commit_sha']}|{pin['source_sha256']}"
@@ -93,7 +186,7 @@ def verified_source(pin: dict) -> None:
 
 
 def configure_args(profile: dict) -> list[str]:
-    # Mirrors the deterministic ordering used by scripts/build-profile.
+    # Deterministic ordering: profile JSON -> configure argument list.
     args = ["--prefix=install"]
     if profile.get("component_base") == "everything-disabled":
         args.append("--disable-everything")
@@ -269,13 +362,19 @@ def assert_portable_manifest(manifest: dict) -> None:
         for flag in unit["flags"]:
             if flag_contains_absolute_path(flag):
                 raise SystemExit(f"machine-local compile path leaked into manifest: {flag}")
+    for arg in manifest.get("configure_args", []):
+        _assert_portable_value(arg, "configure_args")
+    for key, value in manifest.get("toolchain", {}).items():
+        if isinstance(value, str):
+            _assert_portable_value(value, f"toolchain.{key}")
 
 
 def main() -> None:
     pin = json.loads(PIN.read_text())
     profile = json.loads(PROFILE.read_text())
-    if profile.get("profile") != "n3-min-noswr":
+    if profile.get("profile") != "codec-base":
         raise SystemExit("import profile identity changed unexpectedly")
+    recipe = find_native_recipe()
     verified_source(pin)
 
     log = make_log()
@@ -293,12 +392,14 @@ def main() -> None:
     source_units = sum(u["origin"] == "source" for u in units)
     generated_units = len(units) - source_units
     manifest = {
-        "schema": 1,
+        "schema": 2,
         "ffmpeg_tag": pin["ffmpeg_tag"],
         "ffmpeg_commit_sha": pin["ffmpeg_commit_sha"],
+        "ffmpeg_source_sha256": pin["source_sha256"],
         "profile": profile["profile"],
         "profile_variant": profile.get("variant"),
         "profile_sha256": sha256_file(PROFILE),
+        "target": target_identity(recipe, sha256_file(TARGETS / f"{recipe['id']}.json")),
         "toolchain": toolchain,
         "source_root": "build/ffmpeg-src",
         "config_root": ORACLE.relative_to(ROOT).as_posix(),

@@ -1,0 +1,62 @@
+{
+  "profile": "codec-base",
+  "description": "Production codec base closure: the PRD Common Formats roadmap — MP3, FLAC, AAC/M4A, raw ADTS AAC, ALAC/M4A, PCM WAV (u8/s16le/s24le/s32le/f32le/f64le), Ogg Vorbis, Ogg Opus. This is the canonical import profile (xmake ffmpeg-import) and the codec base the DSP closure derives from; it is the shipping closure inside libsongcore artifacts. Matroska stays out of production (test fixtures only — see songcore-test). SongCore performs the planar->interleaved Float32 conversion itself and never resamples.",
+  "component_base": "everything-disabled",
+  "libraries": {
+    "enable": [
+      "avformat",
+      "avcodec",
+      "swresample"
+    ],
+    "disable": [
+      "avdevice",
+      "avfilter",
+      "swscale"
+    ]
+  },
+  "disable": [
+    "programs",
+    "doc",
+    "debug",
+    "autodetect",
+    "x86asm",
+    "network",
+    "protocols",
+    "devices"
+  ],
+  "components": {
+    "demuxer": [
+      "aac",
+      "flac",
+      "mov",
+      "mp3",
+      "ogg",
+      "wav"
+    ],
+    "decoder": [
+      "aac",
+      "alac",
+      "flac",
+      "mp3float",
+      "opus",
+      "vorbis",
+      "pcm_u8",
+      "pcm_s16le",
+      "pcm_s24le",
+      "pcm_s32le",
+      "pcm_f32le",
+      "pcm_f64le"
+    ],
+    "parser": [
+      "mpegaudio"
+    ]
+  },
+  "provenance": {
+    "lib:swresample": {
+      "required_by": [
+        "decoder:opus"
+      ],
+      "reason": "FFmpeg n9.0.1 configure hard dependency of the native Opus decoder (Disabled opus_decoder ... not all dependencies are satisfied: swresample). SongCore does not use swr; no resampler path exists in SongCore's own PCM conversion."
+    }
+  }
+}

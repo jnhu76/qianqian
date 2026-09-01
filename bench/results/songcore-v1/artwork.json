@@ -1,0 +1,113 @@
+{
+ "cases": [
+  {
+   "case": "metadata-none",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  },
+  {
+   "case": "metadata-simple",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  },
+  {
+   "case": "metadata-album",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  },
+  {
+   "case": "metadata-utf8",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  },
+  {
+   "case": "metadata-track",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  },
+  {
+   "case": "metadata-full",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  },
+  {
+   "case": "metadata-replaygain",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  },
+  {
+   "case": "metadata-mp3",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  },
+  {
+   "case": "metadata-conflict",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  },
+  {
+   "case": "artwork-mp3-jpeg",
+   "items": [
+    {
+     "role": 3,
+     "mime": "image/jpeg",
+     "size": 272,
+     "sha256": "e0224b0d40ab4f7a7fa1146badf9ebbe72d18b99db8826bae844e56b9749acde",
+     "width": -1,
+     "height": -1,
+     "is_front_cover": 1
+    }
+   ],
+   "sha": "3868a058c47f308606a605a6b93dc937dba298b41f330ecefb3ec0fb51cd8fad"
+  },
+  {
+   "case": "artwork-mp3-multi",
+   "items": [
+    {
+     "role": 3,
+     "mime": "image/png",
+     "size": 121,
+     "sha256": "224a0845cd88da879c099e9c1bb0d775eba1e609b0bcefc389d3ec64fa758cff",
+     "width": -1,
+     "height": -1,
+     "is_front_cover": 0
+    },
+    {
+     "role": 3,
+     "mime": "image/png",
+     "size": 349,
+     "sha256": "d101d7fa0beeeb03582b9d47bc50c0f4647d01936ff62f2f863cd6c8dfca4369",
+     "width": -1,
+     "height": -1,
+     "is_front_cover": 0
+    }
+   ],
+   "sha": "7184fe3535a5db631ac899580d566b332a2bbe279226a8a6620b2e1aa27367a3"
+  },
+  {
+   "case": "artwork-m4a",
+   "items": [
+    {
+     "role": 0,
+     "mime": "image/png",
+     "size": 121,
+     "sha256": "224a0845cd88da879c099e9c1bb0d775eba1e609b0bcefc389d3ec64fa758cff",
+     "width": -1,
+     "height": -1,
+     "is_front_cover": 1
+    }
+   ],
+   "sha": "22e0d2ba04e23c8502345dd567b072e2ec750966205ca30dc0836bc2db2f8b64"
+  },
+  {
+   "case": "multiaudio-default-stream",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  },
+  {
+   "case": "multiaudio-default-stream-mka",
+   "items": [],
+   "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+  }
+ ]
+}

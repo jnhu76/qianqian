@@ -1,0 +1,25 @@
+{
+  "id": "ios-arm64",
+  "platform": "ios",
+  "arch": "arm64",
+  "xmake": {
+    "plat": ["iphoneos"],
+    "arch": "arm64"
+  },
+  "ffmpeg": {
+    "target_os": "darwin",
+    "arch": "aarch64",
+    "cross": true
+  },
+  "toolchain": {
+    "family": "apple clang (ios sdk)",
+    "identity": "SDK selection comes from environment (xcodebuild/SDKROOT), never from this recipe"
+  },
+  "artifacts": {
+    "static": true,
+    "shared": false,
+    "wasm": false
+  },
+  "status": "planned",
+  "evidence": "No derivation has been run for this target. Static libsongcore.a is the iOS shipping shape; XCFramework packaging is a later product-side step, not part of this target recipe."
+}

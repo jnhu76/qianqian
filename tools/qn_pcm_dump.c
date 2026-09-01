@@ -106,15 +106,15 @@ int main(int argc, char **argv) {
         .seek = host_seek,
         .size = host_size,
     };
-    song_handle *song = song_open(&io);
-    if (!song) {
+    song_handle *song = NULL;
+    if (song_open(&io, &song) != SONG_OK || !song) {
         fprintf(stderr, "qn_pcm_dump: song_open failed\n");
         fclose(src.file);
         return 1;
     }
 
     song_info info;
-    if (song_probe(song, &info) < 0) {
+    if (song_probe(song, &info) != SONG_OK) {
         fprintf(stderr, "qn_pcm_dump: song_probe failed\n");
         song_close(song);
         fclose(src.file);
@@ -144,9 +144,10 @@ int main(int argc, char **argv) {
 
     int rc = 0;
     for (;;) {
-        int64_t frames = song_read_pcm(song, pcm, frames_per_chunk);
-        if (frames < 0) {
-            fprintf(stderr, "qn_pcm_dump: decode failed\n");
+        uint64_t frames = 0;
+        song_status st = song_read_pcm(song, pcm, frames_per_chunk, &frames);
+        if (st != SONG_OK && st != SONG_EOF) {
+            fprintf(stderr, "qn_pcm_dump: decode failed (status %d)\n", (int)st);
             rc = 1;
             break;
         }

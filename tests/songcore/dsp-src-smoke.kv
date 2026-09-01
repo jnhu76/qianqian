@@ -1,0 +1,22 @@
+# DSP/SRC integration smoke — trimmed libavfilter graph (test-only).
+#
+# The graph input contract is exactly SongCore's output contract:
+# Float32 interleaved at SOURCE rate/source layout (song_read_pcm). The
+# probe synthesizes canonical flt/interleaved input at the declared rate;
+# the same samples flow through the graph as would SongCore PCM.
+#
+# Closure: build/minimize/avf-c2 (tier F1 "core-gain-eq-tone"):
+# volume/equalizer + graph plumbing (anull) + aresample (configure-required
+# format adaptation, pulls libswresample). Test-only; never the production
+# matrix (production = songcore-test / common formats, no libavfilter in
+# SongCore).
+#
+# Scope: BYPASS shape (frames_equal + unity gain, NOT frame-level
+# bit-exact — that stays out of machine scope), 44.1k->48k via aresample,
+# volume + equalizer effectiveness. "No processing unless necessary":
+# the matching-rate anull case negotiates flt/44100/stereo with no
+# auto-inserted converters.
+kind=graph id=bypass-anull chain=anull signal=sine:440:0.5 rate=44100 ch=2 frames=8192 block=1024 sink_fmt=flt want_fmt=flt want_rate=44100 want_channels=2 expect=frames_equal:amplitude_db:db=0:tol=0.01:in_amp=0.5
+kind=graph id=resample-44to48 chain=aresample=48000 signal=sine:440:0.5 rate=44100 ch=2 frames=4410 block=1024 sink_fmt=flt want_fmt=flt want_rate=48000 want_channels=2 expect=duration_ratio:ratio=1.088435:tol=0.005
+kind=graph id=volume-half chain=volume=0.5 signal=sine:440:0.5 rate=44100 ch=2 frames=8192 block=1024 sink_fmt=flt want_fmt=flt want_rate=44100 want_channels=2 expect=amplitude_db:db=-6.0206:tol=0.05:in_amp=0.5
+kind=graph id=eq-boost10 chain=equalizer=f=1000:width_type=h:width=200:g=10 signal=sine:1000:0.25 rate=44100 ch=2 frames=8192 block=1024 sink_fmt=flt want_fmt=flt want_rate=44100 want_channels=2 expect=amplitude_db:db=10:tol=2.0:in_amp=0.25

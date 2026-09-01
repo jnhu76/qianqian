@@ -1,0 +1,298 @@
+{
+ "cases": [
+  {
+   "case": "metadata-none",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 24,
+    "codec": "flac",
+    "container": "flac",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "8abfbb50a6d00a7f7175b2647967ce198e0fb427af7f3b222a9978cf0cbda7e9",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "metadata-simple",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 24,
+    "codec": "flac",
+    "container": "flac",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "8abfbb50a6d00a7f7175b2647967ce198e0fb427af7f3b222a9978cf0cbda7e9",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "metadata-album",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 24,
+    "codec": "flac",
+    "container": "flac",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "8abfbb50a6d00a7f7175b2647967ce198e0fb427af7f3b222a9978cf0cbda7e9",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "metadata-utf8",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 24,
+    "codec": "flac",
+    "container": "flac",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "8abfbb50a6d00a7f7175b2647967ce198e0fb427af7f3b222a9978cf0cbda7e9",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "metadata-track",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 24,
+    "codec": "flac",
+    "container": "flac",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "8abfbb50a6d00a7f7175b2647967ce198e0fb427af7f3b222a9978cf0cbda7e9",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "metadata-full",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 24,
+    "codec": "flac",
+    "container": "flac",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "8abfbb50a6d00a7f7175b2647967ce198e0fb427af7f3b222a9978cf0cbda7e9",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "metadata-replaygain",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 24,
+    "codec": "flac",
+    "container": "flac",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "8abfbb50a6d00a7f7175b2647967ce198e0fb427af7f3b222a9978cf0cbda7e9",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "metadata-mp3",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 0,
+    "codec": "mp3",
+    "container": "mp3",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "0bad15d7120127703416ae90e3dc7eb6585126114a605e40e2f9c5826f2e6cb5",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "metadata-conflict",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 24,
+    "codec": "flac",
+    "container": "matroska,webm",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "8abfbb50a6d00a7f7175b2647967ce198e0fb427af7f3b222a9978cf0cbda7e9",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "artwork-mp3-jpeg",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 0,
+    "codec": "mp3",
+    "container": "mp3",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "0bad15d7120127703416ae90e3dc7eb6585126114a605e40e2f9c5826f2e6cb5",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "artwork-mp3-multi",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 0,
+    "codec": "mp3",
+    "container": "mp3",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "0bad15d7120127703416ae90e3dc7eb6585126114a605e40e2f9c5826f2e6cb5",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "artwork-m4a",
+   "probe": {
+    "sample_rate": 44100,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 16,
+    "codec": "aac",
+    "container": "mov,mp4,m4a,3gp,3g2,mj2",
+    "selected_audio_index": 0,
+    "audio_stream_count": 1
+   },
+   "decode": {
+    "frames": 132300,
+    "pcm_sha256": "2d355fb7a210745cb8c8d317ef6529baa0dd7d4cbbd700e9aa69a4e7d078e3bb",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "multiaudio-default-stream",
+   "probe": {
+    "sample_rate": 48000,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 16,
+    "codec": "aac",
+    "container": "mov,mp4,m4a,3gp,3g2,mj2",
+    "selected_audio_index": 1,
+    "audio_stream_count": 2
+   },
+   "decode": {
+    "frames": 144000,
+    "pcm_sha256": "04f3d5eb75c21917d5bb3265f46b9af3b049e920befe8b3e09d0c81e6a799bbe",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  },
+  {
+   "case": "multiaudio-default-stream-mka",
+   "probe": {
+    "sample_rate": 48000,
+    "channels": 2,
+    "channel_mask": 3,
+    "duration_us": 3000000,
+    "bits_per_sample": 24,
+    "codec": "flac",
+    "container": "matroska,webm",
+    "selected_audio_index": 1,
+    "audio_stream_count": 2
+   },
+   "decode": {
+    "frames": 144000,
+    "pcm_sha256": "3790b8a5a09594e290e6406796b596778f0ec4292ba3d8f9a784f5d92a87fd87",
+    "final_status": 1
+   },
+   "metadata_stable": true,
+   "artwork_stable": true
+  }
+ ]
+}

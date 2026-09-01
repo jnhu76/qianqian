@@ -1,0 +1,19 @@
+{
+ "instrumentation": "address,undefined,leak",
+ "instrumented_units": [
+  "src/songcore_ffmpeg.c",
+  "tests/songcore/songcore_probe.c"
+ ],
+ "closure_linked_uninstrumented": "build/artifacts/libqianqian_av.a",
+ "invocations": 136,
+ "fixture_count": 64,
+ "decoded_frames_total": 10067522,
+ "asan_reports": [],
+ "leak_reports": [],
+ "ubsan_owned": [],
+ "ubsan_upstream_noise": 0,
+ "crashes": [],
+ "verdict": "PASS",
+ "problems": [],
+ "note": "density pass over the SongCore + common-format fixture corpus; ASan/Leak are hard gates, UBSan counts only Qianqian-owned frames as defects"
+}

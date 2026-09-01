@@ -1,0 +1,43 @@
+{
+ "cases": [
+  {
+   "case": "metadata-full.flac",
+   "record": {
+    "file": "metadata-full.flac",
+    "title_saved_ok": true,
+    "artist_saved_ok": true,
+    "raw_saved_ok": true,
+    "seek_status": 0,
+    "read_status": 0,
+    "eof": true,
+    "frames": 133324
+   }
+  },
+  {
+   "case": "metadata-mp3.mp3",
+   "record": {
+    "file": "metadata-mp3.mp3",
+    "title_saved_ok": true,
+    "artist_saved_ok": true,
+    "raw_saved_ok": true,
+    "seek_status": 0,
+    "read_status": 0,
+    "eof": true,
+    "frames": 133277
+   }
+  },
+  {
+   "case": "artwork-mp3-multi.mp3",
+   "record": {
+    "file": "artwork-mp3-multi.mp3",
+    "title_saved_ok": true,
+    "artist_saved_ok": true,
+    "raw_saved_ok": true,
+    "seek_status": 0,
+    "read_status": 0,
+    "eof": true,
+    "frames": 133277
+   }
+  }
+ ]
+}

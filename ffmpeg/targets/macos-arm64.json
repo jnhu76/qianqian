@@ -1,0 +1,25 @@
+{
+  "id": "macos-arm64",
+  "platform": "macos",
+  "arch": "arm64",
+  "xmake": {
+    "plat": ["macosx"],
+    "arch": "arm64"
+  },
+  "ffmpeg": {
+    "target_os": "darwin",
+    "arch": "aarch64",
+    "cross": true
+  },
+  "toolchain": {
+    "family": "apple clang",
+    "identity": "SDK selection comes from environment (xcodebuild/SDKROOT), never from this recipe"
+  },
+  "artifacts": {
+    "static": true,
+    "shared": true,
+    "wasm": false
+  },
+  "status": "planned",
+  "evidence": "No derivation has been run for this target. Enabling the shared artifact here must also add an exported-symbols list gate (ELF --exclude-libs has no Mach-O equivalent wired yet)."
+}
