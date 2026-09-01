@@ -1,0 +1,24 @@
+{
+  "experiment": "e10-a0",
+  "section": "reopen_cost",
+  "method": "native Windows WASAPI; QPC-timed; each cycle = Activate+GetMixFormat+IsFormatSupported+Initialize(shared,AUTOCONVERTPCM|SRC_DEFAULT_QUALITY)+Start+Stop+Release; sequence 44.1k->48k->44.1k; iterations: 30 per rate; silence only; no audible signal",
+  "cycles": [
+  {"rate": 44100, "iterations": 30,
+    "total_cycle_ms": {"median": 42.4496, "min": 41.2007, "max": 46.9877},
+    "activate_ms": {"median": 0.4375},"getmixformat_ms": {"median": 0.8326},"isformatsupported_ms": {"median": 0.0046},
+    "initialize_ms": {"median": 39.5573, "min": 38.2281, "max": 43.7075},
+    "start_ms": {"median": 1.4216},"stop_ms": {"median": 0.2023}}
+,
+  {"rate": 48000, "iterations": 30,
+    "total_cycle_ms": {"median": 42.3717, "min": 40.8702, "max": 45.4950},
+    "activate_ms": {"median": 0.4397},"getmixformat_ms": {"median": 0.8301},"isformatsupported_ms": {"median": 0.0045},
+    "initialize_ms": {"median": 39.5322, "min": 38.0341, "max": 42.2193},
+    "start_ms": {"median": 1.3930},"stop_ms": {"median": 0.2098}}
+,
+  {"rate": 44100, "iterations": 30,
+    "total_cycle_ms": {"median": 43.3117, "min": 41.1399, "max": 51.4838},
+    "activate_ms": {"median": 0.4523},"getmixformat_ms": {"median": 0.8413},"isformatsupported_ms": {"median": 0.0044},
+    "initialize_ms": {"median": 40.3512, "min": 38.2752, "max": 48.2971},
+    "start_ms": {"median": 1.4195},"stop_ms": {"median": 0.2225}}
+  ]
+}

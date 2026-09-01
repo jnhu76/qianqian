@@ -1,0 +1,144 @@
+{
+ "experiment": "e10-a0-windows-audiosink",
+ "authority_files": [
+  "a0-windows-endpoints.json",
+  "a0-format-support.json",
+  "a0-reopen.json"
+ ],
+ "device_evidence_status": "COLLECTED",
+ "note": "single-host Windows device evidence; Path 3 'exclusive' is format acceptance only, NOT bit-perfect; do not generalize across machines without more endpoints",
+ "endpoints": [
+  {
+   "endpoint_id_hash": "e5f79a1d7dbe679a",
+   "is_default": true,
+   "friendly_name": "\u626c\u58f0\u5668 (Realtek High Definition Audio)"
+  }
+ ],
+ "endpoint_rows": [
+  {
+   "endpoint_id_hash": "e5f79a1d7dbe679a",
+   "mix_format": {
+    "rate": 48000,
+    "channels": 2,
+    "bits": 32,
+    "block_align": 8,
+    "tag": 65534,
+    "valid_bits": 32,
+    "subtype_float": 1
+   },
+   "engine_period_hns": {
+    "default": 100000,
+    "minimum": 30000
+   },
+   "rates": {
+    "44100": {
+     "rate": 44100,
+     "format": "f32le stereo",
+     "shared_isformat": "S_FALSE",
+     "shared_closest_rate": 48000,
+     "exclusive_isformat": "AUDCLNT_E_UNSUPPORTED_FORMAT"
+    },
+    "48000": {
+     "rate": 48000,
+     "format": "f32le stereo",
+     "shared_isformat": "S_OK",
+     "shared_closest_rate": 0,
+     "exclusive_isformat": "AUDCLNT_E_UNSUPPORTED_FORMAT"
+    },
+    "96000": {
+     "rate": 96000,
+     "format": "f32le stereo",
+     "shared_isformat": "S_FALSE",
+     "shared_closest_rate": 48000,
+     "exclusive_isformat": "AUDCLNT_E_UNSUPPORTED_FORMAT"
+    },
+    "88200": {
+     "rate": 88200,
+     "format": "f32le stereo",
+     "shared_isformat": "S_FALSE",
+     "shared_closest_rate": 48000,
+     "exclusive_isformat": "AUDCLNT_E_UNSUPPORTED_FORMAT"
+    },
+    "176400": {
+     "rate": 176400,
+     "format": "f32le stereo",
+     "shared_isformat": "S_FALSE",
+     "shared_closest_rate": 48000,
+     "exclusive_isformat": "AUDCLNT_E_UNSUPPORTED_FORMAT"
+    },
+    "192000": {
+     "rate": 192000,
+     "format": "f32le stereo",
+     "shared_isformat": "S_FALSE",
+     "shared_closest_rate": 48000,
+     "exclusive_isformat": "AUDCLNT_E_UNSUPPORTED_FORMAT"
+    }
+   },
+   "paths": {
+    "path1_app_bypass_shared_init": {
+     "rate": 48000,
+     "result": "S_OK"
+    },
+    "path2_windows_src_shared_init": {
+     "rate": 44100,
+     "flags": "AUTOCONVERTPCM|SRC_DEFAULT_QUALITY",
+     "result": "S_OK"
+    },
+    "path3_exclusive_init": {
+     "rate": 44100,
+     "result": "AUDCLNT_E_UNSUPPORTED_FORMAT"
+    }
+   }
+  }
+ ],
+ "reopen_cost_ms": [
+  {
+   "rate": 44100,
+   "iterations": 30,
+   "total_cycle_ms_median": 42.4496,
+   "initialize_ms_median": 39.5573,
+   "total_cycle_ms_min": 41.2007,
+   "total_cycle_ms_max": 46.9877
+  },
+  {
+   "rate": 48000,
+   "iterations": 30,
+   "total_cycle_ms_median": 42.3717,
+   "initialize_ms_median": 39.5322,
+   "total_cycle_ms_min": 40.8702,
+   "total_cycle_ms_max": 45.495
+  },
+  {
+   "rate": 44100,
+   "iterations": 30,
+   "total_cycle_ms_median": 43.3117,
+   "initialize_ms_median": 40.3512,
+   "total_cycle_ms_min": 41.1399,
+   "total_cycle_ms_max": 51.4838
+  }
+ ],
+ "classification": [
+  {
+   "endpoint_id_hash": "e5f79a1d7dbe679a",
+   "app_bypass_possible": true,
+   "app_bypass_rates_shared_native": [
+    "48000"
+   ],
+   "windows_src_available": true,
+   "exclusive_source_rate_available": false,
+   "device_source_rate_exact": false
+  }
+ ],
+ "limitations": [
+  "single Windows host; one active render endpoint (Realtek)",
+  "exclusive-mode IsFormatSupported/Initialize returned AUDCLNT_E_UNSUPPORTED_FORMAT for every rate on this device",
+  "no audible signals emitted; silence only",
+  "format acceptance is not absence of driver/device DSP"
+ ],
+ "provenance": {
+  "git_parent_commit": "dc6ea0b0c514254bce9893049888cf581ebabb8a",
+  "git_branch": "exp/e10-src-dsp-lab",
+  "windows_os": "Linux",
+  "generated_utc": "2026-08-31T16:33:40Z"
+ }
+}

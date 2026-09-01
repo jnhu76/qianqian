@@ -21,6 +21,134 @@ BEGIN = "<!-- BEGIN GENERATED TABLES -->"
 END = "<!-- END GENERATED TABLES -->"
 
 
+def load_a0():
+    p = ROOT / "bench/results/pcm-processing/a0-summary.json"
+    if not p.exists():
+        return None
+    return json.loads(p.read_text())
+
+
+def load_a1():
+    p = ROOT / "bench/results/pcm-processing/a1-summary.json"
+    if not p.exists():
+        return None
+    return json.loads(p.read_text())
+
+
+def a1_table():
+    a1 = load_a1()
+    if not a1:
+        return None
+    q = a1["quality"]["rows"]
+    perf = a1["performance"]["rows"]
+    shp = a1["shipping"]
+    life = a1.get("lifecycle", {})
+    qrows = {}
+    for r in q:
+        qrows.setdefault(r["candidate"], []).append(r)
+    lines = []
+    # quality summary
+    lines += [
+        "| candidate | THD+N 1k (min..max, dB) | alias rej (downsample, dB) | "
+        "imaging (upsample, dB) | DC gain (min) | near-nyq passband (dB) |",
+        "|---|---|---:|---:|---:|---:|",
+    ]
+    for cand in ["swr", "soxr", "r8b", "lsr"]:
+        rs = qrows.get(cand, [])
+        if not rs:
+            continue
+        thd = [r["thd_n_1k_dB"] for r in rs if r.get("thd_n_1k_dB") is not None]
+        al = [r["alias_rejection_db"] for r in rs
+              if r.get("alias_rejection_db") is not None]
+        im = [r["imaging_above_input_nyquist_db"] for r in rs
+              if r.get("imaging_above_input_nyquist_db") is not None]
+        dc = [r["dc_gain"] for r in rs if r.get("dc_gain") is not None]
+        nn = [r["near_nyquist_gain_db"] for r in rs
+              if r.get("near_nyquist_gain_db") is not None]
+        thd_s = f"{min(thd)}..{max(thd)}" if thd else "n/a"
+        al_s = f"{min(al)}" if al else "n/a"
+        im_s = f"{max(im)}" if im else "n/a"
+        dc_s = f"{min(dc):.6f}" if dc else "n/a"
+        nn_s = f"{min(nn)}..{max(nn)}" if nn else "n/a"
+        lines.append(f"| {cand} | {thd_s} | {al_s} | {im_s} | {dc_s} | {nn_s} |")
+    # performance
+    lines += [
+        "",
+        "| candidate | ns/frame (real 44.1→48) | ns/frame (real 96→44.1) | "
+        "xRT (min) | post-prepare allocs |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for cand in ["swr", "soxr", "r8b", "lsr"]:
+        rows = [r for r in perf if r["candidate"] == cand]
+        if not rows:
+            continue
+        f441 = next((r["ns_per_input_frame_median"] for r in rows
+                     if r.get("stream") == "real_songcore_44100"), None)
+        f96 = next((r["ns_per_input_frame_median"] for r in rows
+                    if r.get("stream") == "real_songcore_96000"), None)
+        xrt = min(r["xrt"] for r in rows)
+        alloc = max(r["post_prepare_alloc_calls"] for r in rows)
+        f441_s = f"{f441:.2f}" if f441 is not None else "n/a"
+        f96_s = f"{f96:.2f}" if f96 is not None else "n/a"
+        lines.append(
+            f"| {cand} | {f441_s} | {f96_s} | {xrt:.1f} | {alloc} |")
+    # shipping: artifact size + dynamic dependency surface
+    lines += [
+        "",
+        "| candidate | runner raw | stripped | xz -9 | dynamic NEEDED "
+        "(deployment surface) |",
+        "|---|---:|---:|---:|---|",
+        f"| bypass (baseline) | {shp['baseline_bypass_bytes']} | - | - | - |",
+    ]
+    for r in shp["rows"]:
+        dd = r.get("dynamic_deps", {})
+        deps = ", ".join(dd.get("needed", [])) if dd.get("dynamic") \
+            else "static"
+        lines.append(
+            f"| {r['candidate']} | {r['raw_bytes']} | {r['stripped_bytes']} "
+            f"| {r['xz_bytes']} | {deps} |")
+    lines += [
+        "",
+        "shipping 读数：raw/stripped/xz 是 **runner artifact 尺寸**；"
+        "dynamic NEEDED 是候选在部署上会**新增的运行库依赖面**"
+        "（soxr→libgomp，r8b→libstdc++/libgcc_s），两者不可混同。"
+        "swr 已在 Qianqian FFmpeg closure 内，增量只算可达符号。",
+    ]
+    # lifecycle (review: block matrix previously exercised BYPASS only)
+    if life:
+        lines += [
+            "",
+            "streaming contract lifecycle（同一 adapter 实例：pass A = "
+            "1/64/257 帧块+不均匀尾块+drain → reset → pass B = 1024 帧块"
+            "+尾块+drain；两遍输出必须 bit-identical）：",
+            "",
+            "| candidate | classification | accounting ok | frames equal | "
+            "bit-identical | drain 终止 | verdict |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for r in life.get("rows", []):
+            lines.append(
+                f"| {r.get('candidate')} | `{r.get('classification')}` "
+                f"| {r.get('accounting_ok')} | {r.get('frames_equal')} "
+                f"| {r.get('bit_identical')} | rounds "
+                f"A={r.get('passA_drain_rounds')}/"
+                f"B={r.get('passB_drain_rounds')} "
+                f"| {r.get('verdict')} |")
+        lines += [
+            "",
+            f"lifecycle verdict：**{life.get('verdict')}**。r8b 诚实现分类为 "
+            "`ADAPTER_SEMANTICS_SPECIAL_CASE | NO_NATIVE_EOF`（无 EOF API，"
+            "drain 按累计理想帧数喂零裁剪；本次修复了 reset 未清累计账目、"
+            "drain 未回写累计输出两处 adapter bug）。",
+        ]
+    lines += [
+        "",
+        f"A1 verdict：**{a1.get('verdict')}**"
+        f"（{a1.get('verdict_semantics', 'selection experiment only')}）。",
+    ]
+    return "\n".join(lines)
+
+
 def gate_table():
     lines = [
         "| gate | verdict |",
@@ -229,7 +357,190 @@ def negative_table():
     return "\n".join(lines)
 
 
+def a0_table():
+    a0 = load_a0()
+    if not a0:
+        return None
+    lines = [
+        f"device evidence status：**{a0['device_evidence_status']}**"
+        f"（单主机；端点数 {len(a0['endpoints'])}）",
+        "",
+        "| endpoint | app BYPASS（shared 原生率） | Windows SRC | "
+        "exclusive/source-rate device |",
+        "|---|---|---|---|",
+    ]
+    for c in a0["classification"]:
+        lines.append(
+            f"| `{c['endpoint_id_hash'][:8]}…` | "
+            f"{'YES' if c['app_bypass_possible'] else 'NO'} "
+            f"({', '.join(str(r) for r in c['app_bypass_rates_shared_native'])}"
+            f" kHz) | {'YES' if c['windows_src_available'] else 'NO'} | "
+            f"{'YES' if c['exclusive_source_rate_available'] else 'NO'} |")
+    lines += [
+        "",
+        "| 端点 | mix format | engine period（default/min, 100ns） |",
+        "|---|---|---|",
+    ]
+    for r in a0["endpoint_rows"]:
+        m = r["mix_format"]
+        p = r["engine_period_hns"]
+        lines.append(
+            f"| `{r['endpoint_id_hash'][:8]}…` | "
+            f"{m['rate']} Hz / {m['channels']}ch / f32 "
+            f"({'float' if m.get('subtype_float') else 'other'}) | "
+            f"{p['default']} / {p['minimum']} |")
+    lines += [
+        "",
+        "reopen/reconfigure（44.1k→48k→44.1k，每 rate 30 cycles，QPC）：",
+        "",
+        "| rate | total cycle median ms | initialize median ms | min ms | max ms |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for c in a0["reopen_cost_ms"]:
+        lines.append(
+            f"| {c['rate']} | {c['total_cycle_ms_median']:.2f} "
+            f"| {c['initialize_ms_median']:.2f} | {c['total_cycle_ms_min']:.2f} "
+            f"| {c['total_cycle_ms_max']:.2f} |")
+    lines += [
+        "",
+        "limitations：" + "；".join(a0["limitations"]) + "。",
+        "",
+        "machine authority：`a0-windows-endpoints.json` / "
+        "`a0-format-support.json` / `a0-reopen.json` / `a0-summary.json`"
+        "（`tools/pcm_a0_windows.py` 汇编；`--check` 漂移即 FAIL）。",
+    ]
+    return "\n".join(lines)
+
+
+def load_b0():
+    p = ROOT / "bench/results/pcm-processing/b0-summary.json"
+    if not p.exists():
+        return None
+    return json.loads(p.read_text())
+
+
+def b0_table():
+    b0 = load_b0()
+    if not b0:
+        return None
+    mem = b0["memory"]["rows"]
+    resp = b0["response"]["results"]
+    corr = b0["correctness"]
+    lines = [
+        "| chain | nodes | logical PCM passes / block | explicit copies | "
+        "buffered frames | post-prepare allocs |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for m in mem:
+        lines.append(
+            f"| {m['chain']} | {m['nodes']} | {m['logical_passes_per_block']} "
+            f"| 0 | 0 | {m['post_prepare_allocations']} |")
+    lines += [
+        "",
+        "| response check | measured | analytical | max error (20..20k) |",
+        "|---|---|---:|---:|",
+        f"| biquad 1k +6dB | {resp['biquad_peaking_1000hz_6db']['gain_at_1k_measured_db']} dB "
+        f"| {resp['biquad_peaking_1000hz_6db']['gain_at_1k_analytical_db']} dB "
+        f"| {resp['biquad_peaking_1000hz_6db']['max_db_error_20_20k']} dB |",
+        f"| EQ10 全带 +6dB | - | - | "
+        f"{resp['eq10_all_bands_6db']['max_db_error_20_20k']} dB |",
+        "",
+        f"correctness verdict：**{corr['verdict']}**（gain 0dB bit-identical / "
+        "-6dB analytical / fusion equivalent；biquad 稳定 + reset 清状态；"
+        "limiter 无过冲 clamp + latency 0；NaN 策略 active-sanitize，"
+        "TRUE OFF 位透明）",
+    ]
+    life = corr.get("lifecycle", [])
+    iso = corr.get("instance_isolation", [])
+    if life:
+        lines += [
+            "",
+            "| reprepare lifecycle（prepare 44.1k→process→prepare 48k"
+            "→process→destroy） | allocs | frees | live | verdict |",
+            "|---|---:|---:|---:|---|",
+        ]
+        lines += [
+            f"| {r['case']} | {r['allocs']} | {r['frees']} | "
+            f"{r['live_after_destroy']} | {r['verdict']} |"
+            for r in life
+        ]
+    if iso:
+        lines += ["",
+                  "instance isolation：" + "；".join(
+                      f"`{r['case']}` = {r['verdict']}" for r in iso)
+                  + "（NaN policy 为 per-instance，无隐藏全局可变状态）。"]
+    san = b0.get("sanitizer", {})
+    if san:
+        lines += ["",
+                  f"sanitizer（ASan+UBSan+LSan detect_leaks=1，全 harness）："
+                  f"**{san.get('verdict')}**——reprepare/destroy 所有权与 "
+                  "实例隔离在泄漏检测下成为机器证据。"]
+    lines += ["",
+              "machine authority：`b0-correctness.json` / `b0-memory.json` / "
+              "`b0-dsp-response.json` / `b0-summary.json`"]
+    return "\n".join(lines)
+
+
+def load_b1():
+    p = ROOT / "bench/results/pcm-processing/b1-summary.json"
+    if not p.exists():
+        return None
+    return json.loads(p.read_text())
+
+
+def b1_table():
+    b1 = load_b1()
+    if not b1:
+        return None
+    c = b1["closure"]
+    shp = b1["shipping"]["rows"]
+    runs = b1["comparison"]["runs"]
+    tu = c["translation_units_compiled"]
+    total_tu = sum(tu.values())
+    lines = [
+        "| 维度 | thin DSP | trimmed libavfilter |",
+        "|---|---|---|",
+        f"| 编译 TU | {c['thin_dsp_surface']['translation_units']} "
+        f"({c['thin_dsp_surface']['source_files']} 源文件) | {total_tu} "
+        f"(avfilter {tu['libavfilter']} + avutil {tu['libavutil']} + "
+        f"avcodec {tu['libavcodec']} + avformat {tu['libavformat']} + "
+        f"swresample {tu['libswresample']}) |",
+        f"| 源码面 | ~{c['thin_dsp_surface']['source_loc']} LOC | FFmpeg 源 "
+        f"（pin n9.0.1） |",
+        "| 格式适配 | 无（in-place） | 需要 aresample（alimiter 为 double，"
+        "拖进 swresample） |",
+        "| 参数更新 | in-place 系数计算 | 图重建 / 运行时参数 |",
+        "| reset | in-place 清状态 | 图级 |",
+    ]
+    lines += ["", "| runner | ns/frame | xRT | post-init allocs | 输出 "
+                  "stripped/xz | dynamic NEEDED |", "|---|---:|---:|---:|---:|---|"]
+    for r in runs:
+        name = "avf" if r["backend"] == "avf" else "thin"
+        srow = next(x for x in shp if x["runner"] == f"b1_{name}")
+        dd = srow.get("dynamic_deps", {})
+        deps = ", ".join(dd.get("needed", [])) if dd.get("dynamic") \
+            else "static"
+        lines.append(
+            f"| {name} | {r['ns_per_input_frame']:.1f} | {r['xrt']:.1f} "
+            f"| {r['post_init_alloc_calls']} | "
+            f"{srow['stripped_bytes']} / {srow['xz_bytes']} | {deps} |")
+    lines += [
+        "",
+        "结论（**历史比较，B1 证据范围**）：对 Gain+EQ10+Limiter 这一能力"
+        "子集，thin 实验实现的工程/交付面小得多（2 TU vs 205 TU；xz "
+        "6 KB vs 205 KB），实测 CPU 同量级（55.9 vs 60.4 ns/frame，单"
+        "主机）。两边报告的 12/block 是 **logical DSP filter passes**"
+        "（每边 12 个逻辑滤波级），**不是**实测 PCM memory traffic——"
+        "avfilter 路径还有 packed↔planar / flt↔dbl 适配与 AVFrame 移动，"
+        "本仪器未计量。此结论**不**证明 libavfilter 不适合作为更宽的"
+        "能力仓库；宽能力成本分析由 E10-C0（PR #16）接管并取代本节的"
+        "窄解释。**不是 DSP backend 选择。**",
+    ]
+    return "\n".join(lines)
+
+
 def build_block():
+    a0 = a0_table()
     parts = [
         BEGIN,
         "### P0 机器 gate",
@@ -272,8 +583,49 @@ def build_block():
         "",
         performance_table(),
         "",
-        END,
     ]
+    if a0:
+        parts += [
+            "### E10-A0 Windows AudioSink（原生 WASAPI，本主机）",
+            "",
+            "machine authority：`a0-summary.json`（经 `tools/pcm_a0_windows.py`"
+            " 汇编；表格禁止手抄）",
+            "",
+            a0,
+            "",
+        ]
+    a1 = a1_table()
+    if a1:
+        parts += [
+            "### E10-A1 SRC shootout（BYPASS/swr/soxr/r8b/lsr）",
+            "",
+            "machine authority：`a1-summary.json`（经 `tools/pcm_a1.py` 汇编；"
+            "quality/perf/shipping 数字禁止手抄）",
+            "",
+            a1,
+            "",
+        ]
+    b0 = b0_table()
+    if b0:
+        parts += [
+            "### E10-B0 thin DSP 参考（Gain/Biquad/EQ10/Limiter）",
+            "",
+            "machine authority：`b0-summary.json`（经 `tools/pcm_b0.py` 汇编）",
+            "",
+            b0,
+            "",
+        ]
+    b1 = b1_table()
+    if b1:
+        parts += [
+            "### E10-B1 thin DSP vs trimmed libavfilter",
+            "",
+            "machine authority：`b1-summary.json`（经 `tools/pcm_b1.py` 汇编）",
+            "",
+            b1,
+            "",
+        ]
+    parts += [END]
     return "\n".join(parts)
 
 

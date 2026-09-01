@@ -1,0 +1,31 @@
+{
+ "experiment": "e10-a1",
+ "section": "src_memory",
+ "instrument": "linker --wrap malloc/calloc/realloc/free; post-prepare = process+drain+reset region",
+ "rows": [
+  {
+   "candidate": "lsr",
+   "max_post_prepare_calls": 0,
+   "max_post_prepare_bytes": 0,
+   "runs": 53
+  },
+  {
+   "candidate": "r8b",
+   "max_post_prepare_calls": 0,
+   "max_post_prepare_bytes": 0,
+   "runs": 53
+  },
+  {
+   "candidate": "soxr",
+   "max_post_prepare_calls": 49,
+   "max_post_prepare_bytes": 860760,
+   "runs": 53
+  },
+  {
+   "candidate": "swr",
+   "max_post_prepare_calls": 0,
+   "max_post_prepare_bytes": 0,
+   "runs": 53
+  }
+ ]
+}
