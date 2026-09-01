@@ -1,16 +1,17 @@
-# E11 DSP/SRC integration smoke — trimmed libavfilter graph (bench-only).
+# DSP/SRC integration smoke — trimmed libavfilter graph (test-only).
 #
 # The graph input contract is exactly SongCore's output contract:
 # Float32 interleaved at SOURCE rate/source layout (song_read_pcm). The
 # probe synthesizes canonical flt/interleaved input at the declared rate;
 # the same samples flow through the graph as would SongCore PCM.
 #
-# Closure: build/minimize/avf-c2 (E10-C0 tier F1 "core-gain-eq-tone"):
+# Closure: build/minimize/avf-c2 (tier F1 "core-gain-eq-tone"):
 # volume/equalizer + graph plumbing (anull) + aresample (configure-required
-# format adaptation, pulls libswresample). Bench-only; never the production
-# matrix (production = e11-test / c5-opus, no libavfilter in SongCore).
+# format adaptation, pulls libswresample). Test-only; never the production
+# matrix (production = songcore-test / common formats, no libavfilter in
+# SongCore).
 #
-# Scope per E11: BYPASS shape (frames_equal + unity gain, NOT frame-level
+# Scope: BYPASS shape (frames_equal + unity gain, NOT frame-level
 # bit-exact — that stays out of machine scope), 44.1k->48k via aresample,
 # volume + equalizer effectiveness. "No processing unless necessary":
 # the matching-rate anull case negotiates flt/44100/stereo with no

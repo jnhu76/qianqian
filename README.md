@@ -52,6 +52,7 @@ python3 tests/songcore/dsp_src.py               # DSP/SRC 集成 smoke
 - [PRD](PRD.md) — 产品需求权威。
 - [docs/audio-core.md](docs/audio-core.md) — Native Audio Core 唯一人类权威。
 - [docs/ffmpeg-minimization.md](docs/ffmpeg-minimization.md) — FFmpeg 裁剪工作流。
+- [docs/wasm.md](docs/wasm.md) — WASM 结论（native-first 默认）。
 - [docs/history.md](docs/history.md) — 决策由来（极简）。
 - [docs/architecture/negative-capability-manifest.md](docs/architecture/negative-capability-manifest.md) — 明确不做清单。
 

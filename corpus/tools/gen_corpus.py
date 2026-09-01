@@ -4,7 +4,7 @@
 All audio is synthesized from fixed lavfi expressions (no copyrighted
 material). Encoding uses the host ffmpeg purely as a corpus *generator*;
 the benchmark itself never touches it. Every fixture's bytes, structural
-expectations and PCM checksums are recorded in corpus/manifest/stage-a.json.
+expectations and PCM checksums are recorded in corpus/manifest/mp3-flac.json.
 
 For lossless FLAC the manifest pins:
   - exact sample count
@@ -359,14 +359,14 @@ def main():
          "artwork": None, "seek": "record", "eof": "error_or_eof"}, degraded=True)
 
     manifest = {
-        "corpus_id": "stage-a-v1",
+        "corpus_id": "mp3-flac-v1",
         "canonical_pcm_definition": "Float32 interleaved, source rate/layout, "
             "no resample/rematrix; sha256 over raw f32le bytes",
         "generator": {"tool": tool, "script": "corpus/tools/gen_corpus.py",
                       "regenerate": "python3 corpus/tools/gen_corpus.py"},
         "cases": cases,
     }
-    out = os.path.join(ROOT, "corpus", "manifest", "stage-a.json")
+    out = os.path.join(ROOT, "corpus", "manifest", "mp3-flac.json")
     with open(out, "w") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
         f.write("\n")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the E11 SongCore ABI v1 corpus: deterministic fixtures covering
+"""Generate the SongCore ABI v1 corpus: deterministic fixtures covering
 
   metadata (none / simple / album / UTF-8 / track-disc / full /
             ReplayGain / raw enumeration / container+stream conflict),
@@ -10,10 +10,10 @@
 
 All audio is synthesized from fixed lavfi expressions; images are generated
 PNGs (no copyrighted material). The host ffmpeg is only a corpus *generator*.
-Every fixture's bytes and the expectations the E11 gates assert on it are
+Every fixture's bytes and the expectations the SongCore gates assert on it are
 recorded in corpus/manifest/songcore.json.
 
-Usage: python3 corpus/tools/gen_corpus_e11.py [--out corpus]
+Usage: python3 corpus/tools/gen_corpus_songcore.py [--out corpus]
 """
 import argparse
 import hashlib
@@ -29,7 +29,7 @@ import gen_corpus as base  # deterministic helpers (make_png, ...)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FIXTURES = os.path.join(ROOT, "corpus", "fixtures")
-WORK = os.path.join(ROOT, "build", "corpus-work-e11")
+WORK = os.path.join(ROOT, "build", "corpus-work")
 MANIFEST = os.path.join(ROOT, "corpus", "manifest", "songcore.json")
 
 SIG_STEREO = "aevalsrc=0.55*sin(2*PI*440*t)|0.40*sin(2*PI*554.365*t):s=44100:d={dur}"
@@ -51,13 +51,13 @@ def run(cmd):
 
 
 def png_small():
-    path = os.path.join(WORK, "e11-img-small.png")
+    path = os.path.join(WORK, "img-small.png")
     base.make_png(path, 16, 16)
     return path
 
 
 def png_big():
-    path = os.path.join(WORK, "e11-img-big.png")
+    path = os.path.join(WORK, "img-big.png")
     base.make_png(path, 64, 64)
     return path
 
@@ -113,9 +113,9 @@ def main():
     # ---------------------------------------------------------------- metadata
     dur = 3
 
-    gen_flac(os.path.join(fixtures, "e11-meta-none.flac"), SIG_STEREO.format(dur=dur),
+    gen_flac(os.path.join(fixtures, "metadata-none.flac"), SIG_STEREO.format(dur=dur),
              ["-map_metadata", "-1"])
-    add("e11-meta-none", "e11-meta-none.flac", "record",
+    add("metadata-none", "metadata-none.flac", "record",
         {"container": "flac", "codec": "flac", "sample_rate": 44100,
          "channels": 2, "seek_family": "strict",
          "metadata": {"has_title": False, "has_artist": False,
@@ -127,11 +127,11 @@ def main():
          "artwork_count": 0},
         "no metadata at all")
 
-    gen_flac(os.path.join(fixtures, "e11-meta-simple.flac"),
+    gen_flac(os.path.join(fixtures, "metadata-simple.flac"),
              SIG_STEREO.format(dur=dur),
              ["-metadata", "title=Simple Title",
               "-metadata", "artist=Simple Artist"])
-    add("e11-meta-simple", "e11-meta-simple.flac", "record",
+    add("metadata-simple", "metadata-simple.flac", "record",
         {"container": "flac", "codec": "flac", "sample_rate": 44100,
          "channels": 2, "seek_family": "strict",
          "metadata": {"title": "Simple Title", "artist": "Simple Artist",
@@ -140,25 +140,25 @@ def main():
                       "has_track_number": False, "has_disc_number": False},
          "artwork_count": 0})
 
-    gen_flac(os.path.join(fixtures, "e11-meta-album.flac"),
+    gen_flac(os.path.join(fixtures, "metadata-album.flac"),
              SIG_STEREO.format(dur=dur),
              ["-metadata", "title=Album Track",
               "-metadata", "artist=Album Artist",
               "-metadata", "album=The Album",
               "-metadata", "album_artist=Album Artist"])
-    add("e11-meta-album", "e11-meta-album.flac", "record",
+    add("metadata-album", "metadata-album.flac", "record",
         {"container": "flac", "codec": "flac", "seek_family": "strict",
          "metadata": {"title": "Album Track", "artist": "Album Artist",
                       "album": "The Album", "album_artist": "Album Artist",
                       "has_album": True, "has_album_artist": True},
          "artwork_count": 0})
 
-    gen_flac(os.path.join(fixtures, "e11-meta-utf8.flac"),
+    gen_flac(os.path.join(fixtures, "metadata-utf8.flac"),
              SIG_STEREO.format(dur=dur),
              ["-metadata", "title=千千·现代 青花瓷",
               "-metadata", "artist=测试 Ünïcode",
               "-metadata", "album=夜曲 ♪ 山"])
-    add("e11-meta-utf8", "e11-meta-utf8.flac", "record",
+    add("metadata-utf8", "metadata-utf8.flac", "record",
         {"container": "flac", "codec": "flac", "seek_family": "strict",
          "metadata": {"title": "千千·现代 青花瓷",
                       "artist": "测试 Ünïcode",
@@ -168,12 +168,12 @@ def main():
          "artwork_count": 0},
         "UTF-8 / non-ASCII metadata round-trips byte-exact")
 
-    gen_flac(os.path.join(fixtures, "e11-meta-track.flac"),
+    gen_flac(os.path.join(fixtures, "metadata-track.flac"),
              SIG_STEREO.format(dur=dur),
              ["-metadata", "title=Track Field",
               "-metadata", "track=3/12",
               "-metadata", "disc=1/2"])
-    add("e11-meta-track", "e11-meta-track.flac", "record",
+    add("metadata-track", "metadata-track.flac", "record",
         {"container": "flac", "codec": "flac", "seek_family": "strict",
          "metadata": {"track_number": 3, "has_track_number": True,
                       "track_total": 12, "has_track_total": True,
@@ -181,7 +181,7 @@ def main():
                       "disc_total": 2, "has_disc_total": True},
          "artwork_count": 0})
 
-    gen_flac(os.path.join(fixtures, "e11-meta-full.flac"),
+    gen_flac(os.path.join(fixtures, "metadata-full.flac"),
              SIG_STEREO.format(dur=dur),
              ["-metadata", "title=Full Field",
               "-metadata", "artist=Full Artist",
@@ -193,7 +193,7 @@ def main():
               "-metadata", "comment=Full comment text",
               "-metadata", "track=7/9",
               "-metadata", "disc=2/2"])
-    add("e11-meta-full", "e11-meta-full.flac", "record",
+    add("metadata-full", "metadata-full.flac", "record",
         {"container": "flac", "codec": "flac", "seek_family": "strict",
          "metadata": {"title": "Full Field", "artist": "Full Artist",
                       "album": "Full Album",
@@ -210,14 +210,14 @@ def main():
                       "has_disc_total": True},
          "artwork_count": 0})
 
-    gen_flac(os.path.join(fixtures, "e11-meta-replaygain.flac"),
+    gen_flac(os.path.join(fixtures, "metadata-replaygain.flac"),
              SIG_STEREO.format(dur=dur),
              ["-metadata", "title=ReplayGain Case",
               "-metadata", "REPLAYGAIN_TRACK_GAIN=-6.02 dB",
               "-metadata", "REPLAYGAIN_TRACK_PEAK=0.969009",
               "-metadata", "REPLAYGAIN_ALBUM_GAIN=-8.10 dB",
               "-metadata", "REPLAYGAIN_ALBUM_PEAK=0.971311"])
-    add("e11-meta-replaygain", "e11-meta-replaygain.flac", "record",
+    add("metadata-replaygain", "metadata-replaygain.flac", "record",
         {"container": "flac", "codec": "flac", "seek_family": "strict",
          "metadata": {"has_track_gain": True, "has_track_peak": True,
                       "has_album_gain": True, "has_album_peak": True,
@@ -226,14 +226,14 @@ def main():
         "ReplayGain parsed into microbels / 100000-full-scale")
 
     # MP3 raw-tag enumeration: many distinct TXXX keys stay visible raw.
-    gen_mp3(os.path.join(fixtures, "e11-meta-mp3.mp3"),
+    gen_mp3(os.path.join(fixtures, "metadata-mp3.mp3"),
             SIG_STEREO.format(dur=dur),
             ["-metadata", "title=Raw MP3",
              "-metadata", "artist=Raw Artist",
              "-metadata", "CUSTOM_XKEY=alpha",
              "-metadata", "CUSTOM_YKEY=beta",
              "-metadata", "CUSTOM_ZKEY=gamma"])
-    add("e11-meta-mp3", "e11-meta-mp3.mp3", "record",
+    add("metadata-mp3", "metadata-mp3.mp3", "record",
         {"container": "mp3", "codec": "mp3", "seek_family": "lapped",
          "metadata": {"title": "Raw MP3", "artist": "Raw Artist",
                       "has_title": True, "has_artist": True},
@@ -248,9 +248,9 @@ def main():
            "-metadata", "title=ContainerTitle",
            "-metadata:s:a:0", "title=StreamTitle",
            "-metadata:s:a:0", "genre=StreamGenre",
-           os.path.join(fixtures, "e11-meta-conflict.mka")]
+           os.path.join(fixtures, "metadata-conflict.mka")]
     run(cmd)
-    add("e11-meta-conflict", "e11-meta-conflict.mka", "record",
+    add("metadata-conflict", "metadata-conflict.mka", "record",
         {"container": "matroska", "codec": "flac", "seek_family": "strict",
          "metadata": {"title": "StreamTitle", "genre": "StreamGenre",
                       "has_title": True, "has_genre": True},
@@ -266,17 +266,17 @@ def main():
            "-f", "lavfi", "-i", SIG_STEREO.format(dur=dur), "-i", small,
            "-map", "0:a", "-map", "1:v", "-c:a", "libmp3lame", "-b:a", "128k",
            "-c:v", "png", "-disposition:v", "attached_pic",
-           os.path.join(fixtures, "e11-art-mp3-png.mp3")]
+           os.path.join(fixtures, "artwork-mp3-png.mp3")]
     run(cmd)
-    jpeg = os.path.join(WORK, "e11-img.jpg")
+    jpeg = os.path.join(WORK, "img.jpg")
     run(["ffmpeg", "-v", "error", "-y", "-i", small, "-q:v", "2", jpeg])
     cmd = ["ffmpeg", "-v", "error", "-y", "-fflags", "+bitexact",
            "-f", "lavfi", "-i", SIG_STEREO.format(dur=dur), "-i", jpeg,
            "-map", "0:a", "-map", "1:v", "-c:a", "libmp3lame", "-b:a", "128k",
            "-c:v", "mjpeg", "-disposition:v", "attached_pic",
-           os.path.join(fixtures, "e11-art-mp3-jpeg.mp3")]
+           os.path.join(fixtures, "artwork-mp3-jpeg.mp3")]
     run(cmd)
-    add("e11-art-mp3-jpeg", "e11-art-mp3-jpeg.mp3", "record",
+    add("artwork-mp3-jpeg", "artwork-mp3-jpeg.mp3", "record",
         {"container": "mp3", "codec": "mp3", "seek_family": "lapped",
          "artwork_count": 1,
          "artwork": [{"mime": "image/jpeg", "role": 1, "front": True}]},
@@ -289,10 +289,10 @@ def main():
            "-c:a", "libmp3lame", "-b:a", "128k", "-c:v", "png",
            "-disposition:v:0", "attached_pic",
            "-disposition:v:1", "attached_pic",
-           os.path.join(fixtures, "e11-art-mp3-multi.mp3")]
+           os.path.join(fixtures, "artwork-mp3-multi.mp3")]
     run(cmd)
-    multi_sha = sha256_file(os.path.join(fixtures, "e11-art-mp3-multi.mp3"))
-    add("e11-art-mp3-multi", "e11-art-mp3-multi.mp3", "record",
+    multi_sha = sha256_file(os.path.join(fixtures, "artwork-mp3-multi.mp3"))
+    add("artwork-mp3-multi", "artwork-mp3-multi.mp3", "record",
         {"container": "mp3", "codec": "mp3", "seek_family": "lapped",
          "artwork_count": 2,
          "artwork": [{"mime": "image/png", "front": False},
@@ -304,9 +304,9 @@ def main():
            "-f", "lavfi", "-i", SIG_STEREO.format(dur=dur), "-i", small,
            "-map", "0:a", "-map", "1:v", "-c:a", "aac", "-b:a", "96k",
            "-c:v", "png", "-disposition:v", "attached_pic",
-           os.path.join(fixtures, "e11-art-m4a.m4a")]
+           os.path.join(fixtures, "artwork-m4a.m4a")]
     run(cmd)
-    add("e11-art-m4a", "e11-art-m4a.m4a", "record",
+    add("artwork-m4a", "artwork-m4a.m4a", "record",
         {"container": "mov", "codec": "aac", "seek_family": "lapped",
          "artwork_count": 1,
          "artwork": [{"mime": "image/png", "front": True}]})
@@ -321,9 +321,9 @@ def main():
            "-metadata:s:a:0", "title=Stream Zero",
            "-metadata:s:a:1", "title=Stream One",
            "-disposition:a:1", "default",
-           os.path.join(fixtures, "e11-multiaudio.m4a")]
+           os.path.join(fixtures, "multiaudio-default-stream.m4a")]
     run(cmd)
-    add("e11-multiaudio", "e11-multiaudio.m4a", "record",
+    add("multiaudio-default-stream", "multiaudio-default-stream.m4a", "record",
         {"container": "mov", "codec": "aac", "seek_family": "lapped",
          "audio_stream_count": 2,
          "default_selected": 1,
@@ -344,9 +344,9 @@ def main():
            "-metadata:s:a:0", "title=Mkv Zero",
            "-metadata:s:a:1", "title=Mkv One",
            "-disposition:a:1", "default",
-           os.path.join(fixtures, "e11-multiaudio.mka")]
+           os.path.join(fixtures, "multiaudio-default-stream.mka")]
     run(cmd)
-    add("e11-multiaudio-mka", "e11-multiaudio.mka", "record",
+    add("multiaudio-default-stream-mka", "multiaudio-default-stream.mka", "record",
         {"container": "matroska", "codec": "flac", "seek_family": "strict",
          "audio_stream_count": 2,
          "default_selected": 1,
@@ -360,43 +360,43 @@ def main():
         "two flac streams in Matroska; selection swaps decoder + metadata")
 
     # ------------------------------------------------------------- negatives
-    with open(os.path.join(fixtures, "e11-neg-empty.bin"), "wb"):
+    with open(os.path.join(fixtures, "invalid-empty.bin"), "wb"):
         pass
-    add("e11-neg-empty", "e11-neg-empty.bin", "neg",
+    add("invalid-empty", "invalid-empty.bin", "neg",
         {"open": "UNSUPPORTED_CONTAINER"})
 
-    with open(os.path.join(fixtures, "e11-neg-text.bin"), "w") as f:
+    with open(os.path.join(fixtures, "invalid-text.bin"), "w") as f:
         f.write("this is not a media file\n")
-    add("e11-neg-text", "e11-neg-text.bin", "neg",
+    add("invalid-text", "invalid-text.bin", "neg",
         {"open": "UNSUPPORTED_CONTAINER"})
 
-    shutil.copy(small, os.path.join(fixtures, "e11-neg-png.png"))
-    add("e11-neg-png", "e11-neg-png.png", "neg",
+    shutil.copy(small, os.path.join(fixtures, "invalid-png.png"))
+    add("invalid-png", "invalid-png.png", "neg",
         {"open": "UNSUPPORTED_CONTAINER"})
 
     run(["ffmpeg", "-v", "error", "-y", "-fflags", "+bitexact",
          "-f", "lavfi", "-i", "testsrc=duration=1:size=64x64:rate=10",
          "-c:v", "mpeg4",
-         os.path.join(fixtures, "e11-neg-videoonly.m4a")])
-    add("e11-neg-videoonly", "e11-neg-videoonly.m4a", "neg",
+         os.path.join(fixtures, "invalid-videoonly.m4a")])
+    add("invalid-videoonly", "invalid-videoonly.m4a", "neg",
         {"open": "OK", "probe": "NO_AUDIO_STREAM"},
         "recognized container with no audio stream")
 
     run(["ffmpeg", "-v", "error", "-y", "-fflags", "+bitexact",
          "-f", "lavfi", "-i", SIG_STEREO.format(dur=dur),
          "-c:a", "ac3",
-         os.path.join(fixtures, "e11-neg-ac3.m4a")])
-    add("e11-neg-ac3", "e11-neg-ac3.m4a", "neg",
+         os.path.join(fixtures, "invalid-ac3.m4a")])
+    add("invalid-ac3", "invalid-ac3.m4a", "neg",
         {"open": "OK", "probe": "UNSUPPORTED_CODEC"},
         "M4A with AC-3: mov demuxer present, ac3 decoder absent in closure")
 
     # iofail: host I/O failure mid-read must be a typed IO error.
-    add("e11-iofail", "flac-16-44-stereo.flac", "iofail",
+    add("iofail", "flac-16-44-stereo.flac", "iofail",
         {"open": "OK", "probe": "OK", "read": "IO"})
 
     manifest = {
         "corpus_id": "songcore-v1",
-        "generated_by": "corpus/tools/gen_corpus_e11.py",
+        "generated_by": "corpus/tools/gen_corpus_songcore.py",
         "cases": cases,
     }
     with open(MANIFEST, "w") as f:

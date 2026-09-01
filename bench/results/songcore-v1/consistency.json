@@ -1,7 +1,7 @@
 {
  "cases": [
   {
-   "case": "e11-meta-none",
+   "case": "metadata-none",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -22,7 +22,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-meta-simple",
+   "case": "metadata-simple",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -43,7 +43,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-meta-album",
+   "case": "metadata-album",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -64,7 +64,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-meta-utf8",
+   "case": "metadata-utf8",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -85,7 +85,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-meta-track",
+   "case": "metadata-track",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -106,7 +106,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-meta-full",
+   "case": "metadata-full",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -127,7 +127,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-meta-replaygain",
+   "case": "metadata-replaygain",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -148,7 +148,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-meta-mp3",
+   "case": "metadata-mp3",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -169,7 +169,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-meta-conflict",
+   "case": "metadata-conflict",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -190,7 +190,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-art-mp3-jpeg",
+   "case": "artwork-mp3-jpeg",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -211,7 +211,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-art-mp3-multi",
+   "case": "artwork-mp3-multi",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -232,7 +232,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-art-m4a",
+   "case": "artwork-m4a",
    "probe": {
     "sample_rate": 44100,
     "channels": 2,
@@ -253,7 +253,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-multiaudio",
+   "case": "multiaudio-default-stream",
    "probe": {
     "sample_rate": 48000,
     "channels": 2,
@@ -274,7 +274,7 @@
    "artwork_stable": true
   },
   {
-   "case": "e11-multiaudio-mka",
+   "case": "multiaudio-default-stream-mka",
    "probe": {
     "sample_rate": 48000,
     "channels": 2,

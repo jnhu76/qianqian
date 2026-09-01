@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """DSP/SRC integration smoke (test-only, never ships).
 
-Runs the capability probe (bench/pcm/avfilter/qn_avfilter_cap_probe)
+Runs the capability probe (tests/songcore/dsp_cap_probe)
 against the trimmed libavfilter closure (build/minimize/avf-c2) with the
 DSP/SRC scenario (tests/songcore/dsp-src-smoke.kv) and records the evidence
 in bench/results/songcore-v1/dsp-src-integration.json.
@@ -29,12 +29,12 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT_DIR = os.path.join(ROOT, "bench", "results", "songcore-v1")
-PROBE = os.path.join(ROOT, "build", "artifacts", "qn_avfilter_cap_probe")
+PROBE = os.path.join(ROOT, "build", "artifacts", "dsp_cap_probe")
 SCENARIO = os.path.join(ROOT, "tests", "songcore", "dsp-src-smoke.kv")
 CLOSURE_MANIFEST = os.path.join(ROOT, "build", "minimize", "avf-c2",
                                 "manifest.json")
-PRODUCTION_MANIFEST = os.path.join(ROOT, "build", "minimize", "e11-test",
-                                   "manifest.json")
+PRODUCTION_MANIFEST = os.path.join(ROOT, "build", "minimize",
+                                   "songcore-test", "manifest.json")
 
 # closure evidence: which filter sources the avf-c2 manifest must carry.
 # NB: FFmpeg n9.0.1 implements `equalizer` inside af_biquads.c via
@@ -59,7 +59,7 @@ def closure_evidence():
 
 def run_probe():
     import tempfile
-    tmp = os.path.join(tempfile.gettempdir(), "e11-dsp-src.json")
+    tmp = os.path.join(tempfile.gettempdir(), "dsp-src.json")
     r = subprocess.run([PROBE, SCENARIO, tmp], capture_output=True, text=True)
     summary = r.stdout.strip().splitlines()[-1] if r.stdout else ""
     d = json.load(open(tmp))
@@ -78,7 +78,7 @@ def main():
 
     if not os.path.isfile(PROBE):
         raise SystemExit(f"capability probe missing: {PROBE} (run "
-                         f"`python3 tools/pcm_c0.py --stage avf-c2` first)")
+                         f"`python3 tools/dsp_closure.py --stage avf-c2` first)")
     if not os.path.isfile(CLOSURE_MANIFEST):
         raise SystemExit(f"avf-c2 closure missing: {CLOSURE_MANIFEST}")
 
@@ -128,11 +128,11 @@ def main():
         },
         "closure": {
             "manifest": "build/minimize/avf-c2",
-            "tier": "F1 core-gain-eq-tone (E10-C0)",
+            "tier": "F1 core-gain-eq-tone",
             "units": len(json.load(open(CLOSURE_MANIFEST))["units"]),
             "production_matrix": False,
-            "production_manifest": "build/minimize/e11-test "
-                                   "(c5-opus, no libavfilter)",
+            "production_manifest": "build/minimize/songcore-test "
+                                   "(common formats, no libavfilter)",
             "filters": ce,
         },
         "probe_summary": probe_summary,

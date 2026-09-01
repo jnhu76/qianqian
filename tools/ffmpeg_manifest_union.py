@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manifest union: codec closure + filter closure accounting (E10-C0).
+"""Manifest union: codec closure + filter closure accounting.
 
 Deterministic machine tool for:
 
@@ -105,7 +105,7 @@ def union(codec_manifest: Path, combined_manifest: Path) -> dict:
 
 def union_verdict(data: dict) -> str:
     """Single shared predicate (task §18): codec subset, zero flag conflicts,
-    AND same FFmpeg pin. pcm_c0.run_union must use this, not a re-derivation
+    AND same FFmpeg pin. dsp_closure.run_union must use this, not a re-derivation
     that forgets the pin."""
     v = data["validations"]
     return ("PASS" if v["codec_subset_of_combined"]

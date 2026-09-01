@@ -1,12 +1,18 @@
 {
-  "name": "qianqian-audio-lab",
-  "phase": "M0",
-  "purpose": "Thin local-song playback audio core experiment",
+  "name": "qianqian-native-audio-core",
+  "phase": "core",
+  "purpose": "Thin local-song playback native audio core (decode + metadata + artwork via SongCore ABI v1; DSP/SRC in AudioEngine)",
   "primary_backend": "trimmed native FFmpeg",
-  "experimental_backend": "trimmed FFmpeg WASM",
+  "wasm": "viable future target, native-first default (docs/wasm.md)",
   "initial_formats": [
     "MP3",
-    "FLAC"
+    "FLAC",
+    "AAC / M4A",
+    "ADTS AAC",
+    "ALAC / M4A",
+    "PCM WAV",
+    "Ogg Vorbis",
+    "Ogg Opus"
   ],
   "principles": [
     "Playback-only",
@@ -15,5 +21,5 @@
     "Corpus-driven support",
     "Native-first, WASM-measured"
   ],
-  "generated_at": "2026-08-29T09:50:56.526512"
+  "generated_at": "2026-09-01"
 }

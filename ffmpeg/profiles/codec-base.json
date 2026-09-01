@@ -1,0 +1,24 @@
+{
+  "profile": "codec-base",
+  "description": "Minimal codec base closure: MP3 + FLAC decode with no libswresample. This is the canonical import profile (xmake ffmpeg-import) and the codec base the DSP closure derives from. SongCore performs the planar->interleaved Float32 conversion itself; no resampler is linked.",
+  "component_base": "everything-disabled",
+  "libraries": {
+    "enable": ["avformat", "avcodec"],
+    "disable": ["swresample", "avdevice", "avfilter", "swscale"]
+  },
+  "disable": [
+    "programs",
+    "doc",
+    "debug",
+    "autodetect",
+    "x86asm",
+    "network",
+    "protocols",
+    "devices"
+  ],
+  "components": {
+    "demuxer": ["mp3", "flac"],
+    "decoder": ["flac", "mp3float"],
+    "parser": ["mpegaudio"]
+  }
+}

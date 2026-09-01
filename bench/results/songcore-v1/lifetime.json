@@ -1,9 +1,9 @@
 {
  "cases": [
   {
-   "case": "e11-meta-full.flac",
+   "case": "metadata-full.flac",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-meta-full.flac",
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/metadata-full.flac",
     "title_saved_ok": true,
     "artist_saved_ok": true,
     "raw_saved_ok": true,
@@ -14,9 +14,9 @@
    }
   },
   {
-   "case": "e11-meta-mp3.mp3",
+   "case": "metadata-mp3.mp3",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-meta-mp3.mp3",
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/metadata-mp3.mp3",
     "title_saved_ok": true,
     "artist_saved_ok": true,
     "raw_saved_ok": true,
@@ -27,9 +27,9 @@
    }
   },
   {
-   "case": "e11-art-mp3-multi.mp3",
+   "case": "artwork-mp3-multi.mp3",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-art-mp3-multi.mp3",
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/artwork-mp3-multi.mp3",
     "title_saved_ok": true,
     "artist_saved_ok": true,
     "raw_saved_ok": true,

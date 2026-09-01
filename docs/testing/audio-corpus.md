@@ -6,7 +6,7 @@ Codec 支持不是“FFmpeg 说支持”。
 
 只有进入 corpus 并通过 regression 的格式才算 Qianqian officially supported。
 
-## Stage A Corpus
+## Core Corpus (MP3 / FLAC)
 
 ### MP3
 

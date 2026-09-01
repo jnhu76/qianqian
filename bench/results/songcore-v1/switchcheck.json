@@ -1,9 +1,9 @@
 {
  "cases": [
   {
-   "case": "e11-multiaudio.m4a",
+   "case": "multiaudio-default-stream.m4a",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-multiaudio.m4a",
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/multiaudio-default-stream.m4a",
     "select_a_status": 0,
     "select_b_status": 0,
     "frames_a": 4096,
@@ -14,9 +14,9 @@
    }
   },
   {
-   "case": "e11-multiaudio.mka",
+   "case": "multiaudio-default-stream.mka",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-multiaudio.mka",
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/multiaudio-default-stream.mka",
     "select_a_status": 0,
     "select_b_status": 0,
     "frames_a": 4096,

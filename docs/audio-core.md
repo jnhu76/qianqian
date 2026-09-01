@@ -83,12 +83,14 @@ against the Xmake-built native library. No UI code lives in this repo.
 ```text
 include/songcore.h        public ABI v1 (frozen)
 src/songcore_ffmpeg.c     SongCore implementation over pinned FFmpeg
-ffmpeg/                   pin + capability intent (machine inputs)
+src/wasm/                 WASM bridge (songcore_wasm_bridge.c)
+ffmpeg/                   pin + capability intent + profiles (machine inputs)
 tools/ffmpeg_import.py    FFmpeg import/oracle (see minimization doc)
 xmake.lua                 Native Audio Core build authority
 tests/songcore/           permanent regression (regression.py + probe)
 bench/results/songcore-v1 machine authority tree (fail-closed --check)
 docs/ffmpeg-minimization.md  how FFmpeg is trimmed
+docs/wasm.md                 WASM viability result
 docs/history.md              how the decisions were reached
 ```
 

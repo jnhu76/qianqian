@@ -281,7 +281,7 @@ def main():
     gate = Gate()
 
     # -------------------------------------------------------- SongCore corpus
-    e11 = json.load(open(args.song_manifest))
+    scm = json.load(open(args.song_manifest))
     metadata_evidence = []
     artwork_evidence = []
     stream_evidence = []
@@ -289,7 +289,7 @@ def main():
     error_evidence = []
     consistency_evidence = []
 
-    for case in e11["cases"]:
+    for case in scm["cases"]:
         cid = case["id"]
         path = os.path.join(FIXTURES, case["file"])
         if sha256_file(path) != case["fixture_sha256"]:
@@ -479,7 +479,7 @@ def main():
 
     # ------------------------------------------------- borrowed view lifetime
     lifetime_evidence = []
-    for f in ("e11-meta-full.flac", "e11-meta-mp3.mp3", "e11-art-mp3-multi.mp3"):
+    for f in ("metadata-full.flac", "metadata-mp3.mp3", "artwork-mp3-multi.mp3"):
         path = os.path.join(FIXTURES, f)
         r = run_binary(args.binary, ["lifetime", path])
         rec = parse_json_line(r.stdout)
@@ -503,7 +503,7 @@ def main():
 
     # ------------------------------------------------ stream-switch A==B PCM
     switch_evidence = []
-    for f in ("e11-multiaudio.m4a", "e11-multiaudio.mka"):
+    for f in ("multiaudio-default-stream.m4a", "multiaudio-default-stream.mka"):
         path = os.path.join(FIXTURES, f)
         r = run_binary(args.binary, ["switchcheck", path])
         rec = parse_json_line(r.stdout)
@@ -719,8 +719,8 @@ def revalidate(out_dir):
     verdict is only compared, never trusted. A single edited evidence field
     (even with summary left at PASS) must flip the check to FAIL."""
     failures = []
-    e11 = json.load(open(SONG_MANIFEST))
-    exp_by_id = {c["id"]: c for c in e11["cases"]}
+    scm = json.load(open(SONG_MANIFEST))
+    exp_by_id = {c["id"]: c for c in scm["cases"]}
     cf = json.load(open(COMMON_MANIFEST))
     cf_by_id = {c["id"]: c for c in cf["cases"]}
 

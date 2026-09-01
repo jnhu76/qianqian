@@ -1,7 +1,7 @@
 {
  "cases": [
   {
-   "case": "e11-meta-none",
+   "case": "metadata-none",
    "family": "strict",
    "seeks": [
     {
@@ -28,7 +28,7 @@
    ]
   },
   {
-   "case": "e11-meta-simple",
+   "case": "metadata-simple",
    "family": "strict",
    "seeks": [
     {
@@ -55,7 +55,7 @@
    ]
   },
   {
-   "case": "e11-meta-album",
+   "case": "metadata-album",
    "family": "strict",
    "seeks": [
     {
@@ -82,7 +82,7 @@
    ]
   },
   {
-   "case": "e11-meta-utf8",
+   "case": "metadata-utf8",
    "family": "strict",
    "seeks": [
     {
@@ -109,7 +109,7 @@
    ]
   },
   {
-   "case": "e11-meta-track",
+   "case": "metadata-track",
    "family": "strict",
    "seeks": [
     {
@@ -136,7 +136,7 @@
    ]
   },
   {
-   "case": "e11-meta-full",
+   "case": "metadata-full",
    "family": "strict",
    "seeks": [
     {
@@ -163,7 +163,7 @@
    ]
   },
   {
-   "case": "e11-meta-replaygain",
+   "case": "metadata-replaygain",
    "family": "strict",
    "seeks": [
     {
@@ -190,7 +190,7 @@
    ]
   },
   {
-   "case": "e11-meta-mp3",
+   "case": "metadata-mp3",
    "family": "lapped",
    "seeks": [
     {
@@ -217,7 +217,7 @@
    ]
   },
   {
-   "case": "e11-meta-conflict",
+   "case": "metadata-conflict",
    "family": "strict",
    "seeks": [
     {
@@ -244,7 +244,7 @@
    ]
   },
   {
-   "case": "e11-art-mp3-jpeg",
+   "case": "artwork-mp3-jpeg",
    "family": "lapped",
    "seeks": [
     {
@@ -271,7 +271,7 @@
    ]
   },
   {
-   "case": "e11-art-mp3-multi",
+   "case": "artwork-mp3-multi",
    "family": "lapped",
    "seeks": [
     {
@@ -298,7 +298,7 @@
    ]
   },
   {
-   "case": "e11-art-m4a",
+   "case": "artwork-m4a",
    "family": "lapped",
    "seeks": [
     {
@@ -325,7 +325,7 @@
    ]
   },
   {
-   "case": "e11-multiaudio",
+   "case": "multiaudio-default-stream",
    "family": "lapped",
    "seeks": [
     {
@@ -352,7 +352,7 @@
    ]
   },
   {
-   "case": "e11-multiaudio-mka",
+   "case": "multiaudio-default-stream-mka",
    "family": "strict",
    "seeks": [
     {

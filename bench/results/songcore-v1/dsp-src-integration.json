@@ -8,10 +8,10 @@
  },
  "closure": {
   "manifest": "build/minimize/avf-c2",
-  "tier": "F1 core-gain-eq-tone (E10-C0)",
+  "tier": "F1 core-gain-eq-tone",
   "units": 236,
   "production_matrix": false,
-  "production_manifest": "build/minimize/e11-test (c5-opus, no libavfilter)",
+  "production_manifest": "build/minimize/songcore-test (common formats, no libavfilter)",
   "filters": {
    "aresample": true,
    "volume": true,

@@ -35,7 +35,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 ARTIFACTS = os.path.join(ROOT, "build", "artifacts")
 CLOSURE_LIB = os.path.join(ARTIFACTS, "libqianqian_av.a")
 SOURCE_ROOT = os.path.join(ROOT, "build", "ffmpeg-src")
-ORACLE_ROOT = os.path.join(ROOT, "build", "minimize", "e11-test", "oracle")
+ORACLE_ROOT = os.path.join(ROOT, "build", "minimize", "songcore-test", "oracle")
 OUT_DIR = os.path.join(ROOT, "bench", "results", "songcore-v1")
 SAN_BUILD_DIR = os.path.join(ROOT, "build", "sanitize")
 SAN_BINARY = os.path.join(SAN_BUILD_DIR, "songcore_probe_san")
@@ -160,11 +160,11 @@ def main():
         # dense consume: record + states on every fixture; error fixtures
         # also go through neg; iofail on the fault-injection case only
         modes = [("record", None), ("states", None)]
-        if cid == "e11-iofail":
+        if cid == "iofail":
             modes.append(("neg", None))
             modes.append(("iofail", 0))
             modes.append(("iofail", 512))
-        elif cid.startswith("e11-neg-"):
+        elif cid.startswith("invalid-"):
             modes.append(("neg", None))
         for mode, fa in modes:
             invocations += 1

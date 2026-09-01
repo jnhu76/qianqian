@@ -1,5 +1,5 @@
 /*
- * qn_bench.c — Phase 0 Step 1 native benchmark binary.
+ * qn_bench.c — native benchmark binary (PCM decode + size probes).
  *
  * SongCore-shaped flow over a trimmed FFmpeg, used ONLY by the bench
  * harness. This file is experiment/benchmark code; it must never become

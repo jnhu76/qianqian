@@ -1,52 +1,52 @@
 {
  "cases": [
   {
-   "case": "e11-meta-none",
+   "case": "metadata-none",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   },
   {
-   "case": "e11-meta-simple",
+   "case": "metadata-simple",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   },
   {
-   "case": "e11-meta-album",
+   "case": "metadata-album",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   },
   {
-   "case": "e11-meta-utf8",
+   "case": "metadata-utf8",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   },
   {
-   "case": "e11-meta-track",
+   "case": "metadata-track",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   },
   {
-   "case": "e11-meta-full",
+   "case": "metadata-full",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   },
   {
-   "case": "e11-meta-replaygain",
+   "case": "metadata-replaygain",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   },
   {
-   "case": "e11-meta-mp3",
+   "case": "metadata-mp3",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   },
   {
-   "case": "e11-meta-conflict",
+   "case": "metadata-conflict",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   },
   {
-   "case": "e11-art-mp3-jpeg",
+   "case": "artwork-mp3-jpeg",
    "items": [
     {
      "role": 3,
@@ -61,7 +61,7 @@
    "sha": "3868a058c47f308606a605a6b93dc937dba298b41f330ecefb3ec0fb51cd8fad"
   },
   {
-   "case": "e11-art-mp3-multi",
+   "case": "artwork-mp3-multi",
    "items": [
     {
      "role": 3,
@@ -85,7 +85,7 @@
    "sha": "7184fe3535a5db631ac899580d566b332a2bbe279226a8a6620b2e1aa27367a3"
   },
   {
-   "case": "e11-art-m4a",
+   "case": "artwork-m4a",
    "items": [
     {
      "role": 0,
@@ -100,12 +100,12 @@
    "sha": "22e0d2ba04e23c8502345dd567b072e2ec750966205ca30dc0836bc2db2f8b64"
   },
   {
-   "case": "e11-multiaudio",
+   "case": "multiaudio-default-stream",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   },
   {
-   "case": "e11-multiaudio-mka",
+   "case": "multiaudio-default-stream-mka",
    "items": [],
    "sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
   }

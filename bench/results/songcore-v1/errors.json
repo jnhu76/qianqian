@@ -1,9 +1,9 @@
 {
  "cases": [
   {
-   "case": "e11-neg-empty",
+   "case": "invalid-empty",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-neg-empty.bin",
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/invalid-empty.bin",
     "open_status": 104,
     "probe_status": -2,
     "read_status": -2,
@@ -13,9 +13,9 @@
    }
   },
   {
-   "case": "e11-neg-text",
+   "case": "invalid-text",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-neg-text.bin",
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/invalid-text.bin",
     "open_status": 104,
     "probe_status": -2,
     "read_status": -2,
@@ -25,9 +25,9 @@
    }
   },
   {
-   "case": "e11-neg-png",
+   "case": "invalid-png",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-neg-png.png",
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/invalid-png.png",
     "open_status": 104,
     "probe_status": -2,
     "read_status": -2,
@@ -37,9 +37,9 @@
    }
   },
   {
-   "case": "e11-neg-videoonly",
+   "case": "invalid-videoonly",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-neg-videoonly.m4a",
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/invalid-videoonly.m4a",
     "open_status": 0,
     "probe_status": 105,
     "read_status": -2,
@@ -52,9 +52,9 @@
    }
   },
   {
-   "case": "e11-neg-ac3",
+   "case": "invalid-ac3",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-neg-ac3.m4a",
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/invalid-ac3.m4a",
     "open_status": 0,
     "probe_status": 106,
     "read_status": -2,
@@ -67,7 +67,7 @@
    }
   },
   {
-   "case": "e11-iofail",
+   "case": "iofail",
    "record": {
     "file": "/home/hoo/Source/qianqian/corpus/fixtures/flac-16-44-stereo.flac",
     "open_status": 103,

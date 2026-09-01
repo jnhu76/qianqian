@@ -19,7 +19,7 @@ ORACLE = ROOT / "build" / "ffmpeg-xmake" / "oracle"
 MANIFEST = ROOT / "build" / "ffmpeg-xmake" / "manifest.json"
 ARTIFACTS = ROOT / "build" / "artifacts"
 CORPUS = ROOT / "corpus" / "fixtures"
-CORPUS_MANIFEST = ROOT / "corpus" / "manifest" / "stage-a.json"
+CORPUS_MANIFEST = ROOT / "corpus" / "manifest" / "mp3-flac.json"
 BENCH_SRC = ROOT / "bench" / "native" / "qn_bench.c"
 VERIFY_DIR = ROOT / "build" / "ffmpeg-xmake" / "verify"
 

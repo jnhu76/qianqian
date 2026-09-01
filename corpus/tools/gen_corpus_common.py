@@ -40,7 +40,7 @@ MANIFEST = os.path.join(ROOT, "corpus", "manifest", "common-formats.json")
 PNG_SMALL = "cover-small.png"
 PNG_BIG = "cover-large.png"
 
-# deterministic signal snippets (same family as the stage-a corpus)
+# deterministic signal snippets (same family as the mp3-flac corpus)
 SIG_STEREO_44 = ("aevalsrc=0.55*sin(2*PI*440*t)|0.40*sin(2*PI*554.365*t)"
                  ":s=44100:d={dur}")
 SIG_MONO_44 = "aevalsrc=0.60*sin(2*PI*330*t):s=44100:d={dur}"

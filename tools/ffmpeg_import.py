@@ -28,7 +28,7 @@ OUT = ROOT / "build" / "ffmpeg-xmake"
 ORACLE = OUT / "oracle"
 MANIFEST = OUT / "manifest.json"
 PIN = ROOT / "ffmpeg" / "pin.json"
-PROFILE = ROOT / "bench" / "profiles" / "n3-min-noswr.json"
+PROFILE = ROOT / "ffmpeg" / "profiles" / "codec-base.json"
 
 LIB_TARGETS = (
     "libavutil/libavutil.a",
@@ -49,7 +49,7 @@ def lib_targets_for(profile: dict) -> tuple[str, ...]:
 # Object roots accepted as closure members. libswresample is included so
 # profiles that enable it (e.g. the Opus decoder's upstream dependency)
 # capture its translation units; for profiles without it the root simply
-# never matches. libavfilter likewise (E10-C0 capability ladder).
+# never matches. libavfilter likewise (DSP capability ladder).
 OBJECT_ROOTS = ("libavutil/", "libavcodec/", "libavformat/", "libswresample/",
                 "libavfilter/")
 SOURCE_SUFFIXES = (".c", ".S", ".s", ".asm", ".cpp", ".m")
@@ -93,7 +93,7 @@ def verified_source(pin: dict) -> None:
 
 
 def configure_args(profile: dict) -> list[str]:
-    # Mirrors the deterministic ordering used by scripts/build-profile.
+    # Deterministic ordering: profile JSON -> configure argument list.
     args = ["--prefix=install"]
     if profile.get("component_base") == "everything-disabled":
         args.append("--disable-everything")

@@ -1,7 +1,7 @@
 {
  "cases": [
   {
-   "case": "e11-multiaudio",
+   "case": "multiaudio-default-stream",
    "select": {
     "status": 0,
     "selected": 0,
@@ -34,7 +34,7 @@
    }
   },
   {
-   "case": "e11-multiaudio-mka",
+   "case": "multiaudio-default-stream-mka",
    "select": {
     "status": 0,
     "selected": 0,

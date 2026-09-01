@@ -11,7 +11,7 @@
     "channel_layout": "source layout",
     "note": "Qianqian's graph input is abuffer(flt, source rate/layout); every deviation (fltp/dbl/dblp/resample) is a graph-inserted conversion that must be reported, not hidden in filter cost"
   },
-  "codec_base_profile": "bench/profiles/n3-min-noswr.json",
+  "codec_base_profile": "ffmpeg/profiles/codec-base.json",
   "format_adaptation": {
     "policy": "discovery",
     "discovery_model": "Per stage/probe: (A) build codec(+F0)+target filters with ONLY configure-required dependencies, parsed from the pinned configure's <filter>_filter_deps rules (machine-derived, authoritative); (B) instantiate the actual representative graph on canonical flt/interleaved/source-rate input; (C) on success record the negotiated format and graph-auto-inserted converters; (D) on graph-config failure add the minimal format-adaptation capability (aresample, which configure-requires swresample) and rebuild. Direct closure and effective usable closure are both recorded; the adaptation cost is reported separately from the filter's direct cost.",
@@ -21,7 +21,7 @@
       "configure_dep": "aresample_filter_deps=swresample (pinned configure:4145)",
       "role": "the minimal graph format-adaptation capability; never pre-enabled by capability intent"
     },
-    "note": "Capability intent declares DESIRED FILTERS ONLY. Hidden dependency answers are machine discoveries, not human table rows (E10-C0 review P0-1)."
+    "note": "Capability intent declares DESIRED FILTERS ONLY. Hidden dependency answers are machine discoveries, not human table rows."
   },
   "tiers": [
     {
@@ -62,7 +62,7 @@
         },
         {
           "capability": "graphic EQ",
-          "meaning": "composition of N equalizer bands (B1 precedent: 10x equalizer); no dedicated graphic filter required",
+          "meaning": "composition of N equalizer bands (10x equalizer precedent); no dedicated graphic filter required",
           "filters": [
             "equalizer"
           ]
@@ -109,7 +109,7 @@
     {
       "id": "F2",
       "name": "dynamics",
-      "question": "cost of compressor/limiter/gate and their hidden format requirements (B1: alimiter double-precision hypothesis must be re-proved)",
+      "question": "cost of compressor/limiter/gate and their hidden format requirements",
       "product_capabilities": [
         {
           "capability": "compressor",
@@ -294,7 +294,7 @@
     {
       "id": "F6",
       "name": "advanced-correction",
-      "question": "cost of FIR convolution / headphone / surround correction (expected to expose larger hidden dependencies - measure, do not guess)",
+      "question": "cost of FIR convolution / headphone / surround correction (may expose larger hidden dependencies - measure, do not guess)",
       "product_capabilities": [
         {
           "capability": "FIR convolution",
@@ -339,7 +339,7 @@
       "product_capabilities": [
         {
           "capability": "tempo",
-          "meaning": "atempo; does NOT answer the general SRC question (separate decision, E10-A1)",
+          "meaning": "atempo; does NOT answer the general SRC question (separate decision)",
           "filters": [
             "atempo"
           ]

@@ -1,7 +1,7 @@
 {
  "cases": [
   {
-   "case": "e11-meta-none",
+   "case": "metadata-none",
    "sha": "d17d39fd35860c703237583ab40343a00b998f7a3cd075781686559f225c04aa",
    "canonical": {
     "title": "",
@@ -46,7 +46,7 @@
    ]
   },
   {
-   "case": "e11-meta-simple",
+   "case": "metadata-simple",
    "sha": "b64384f76eb04b0c26046c9b3c95917382c58f006019c00fba7aff11d6cd0a57",
    "canonical": {
     "title": "Simple Title",
@@ -101,7 +101,7 @@
    ]
   },
   {
-   "case": "e11-meta-album",
+   "case": "metadata-album",
    "sha": "698f9e7515ebbf8b148d111ba32ac0bc124c731686280a57a3ba09d537e0757c",
    "canonical": {
     "title": "Album Track",
@@ -166,7 +166,7 @@
    ]
   },
   {
-   "case": "e11-meta-utf8",
+   "case": "metadata-utf8",
    "sha": "344e810f29edf1e9e45aafec0acc426b439fedd02b7a1fd2f07b43bda759cc9a",
    "canonical": {
     "title": "千千·现代 青花瓷",
@@ -226,7 +226,7 @@
    ]
   },
   {
-   "case": "e11-meta-track",
+   "case": "metadata-track",
    "sha": "2bf19fc1d216ffe21583af300558cc30ab4bf14e19c25795f580b398e8989ab4",
    "canonical": {
     "title": "Track Field",
@@ -286,7 +286,7 @@
    ]
   },
   {
-   "case": "e11-meta-full",
+   "case": "metadata-full",
    "sha": "c460d9ce6bcf0893934ee32aed76a53821b81dd8d4c259207a7a3b6f909f16f0",
    "canonical": {
     "title": "Full Field",
@@ -381,7 +381,7 @@
    ]
   },
   {
-   "case": "e11-meta-replaygain",
+   "case": "metadata-replaygain",
    "sha": "b69e38ab948af644ecce7f6322e86154243aee5d04badc3864fcf41ad67864c6",
    "canonical": {
     "title": "ReplayGain Case",
@@ -451,7 +451,7 @@
    ]
   },
   {
-   "case": "e11-meta-mp3",
+   "case": "metadata-mp3",
    "sha": "66b61036f71d75cb56d8f764ff77b112244a1f8e565b39b9670c68d322629398",
    "canonical": {
     "title": "Raw MP3",
@@ -526,7 +526,7 @@
    ]
   },
   {
-   "case": "e11-meta-conflict",
+   "case": "metadata-conflict",
    "sha": "2121bb94195a12807498c586392125d76b6c109668f3058ebb6e7a6275c19071",
    "canonical": {
     "title": "StreamTitle",
@@ -596,7 +596,7 @@
    ]
   },
   {
-   "case": "e11-art-mp3-jpeg",
+   "case": "artwork-mp3-jpeg",
    "sha": "749d78af70c1bd9738c9207aa1d4ae94ea37dbeb8cf8908303a515eb7500a4ee",
    "canonical": {
     "title": "",
@@ -646,7 +646,7 @@
    ]
   },
   {
-   "case": "e11-art-mp3-multi",
+   "case": "artwork-mp3-multi",
    "sha": "749d78af70c1bd9738c9207aa1d4ae94ea37dbeb8cf8908303a515eb7500a4ee",
    "canonical": {
     "title": "",
@@ -696,7 +696,7 @@
    ]
   },
   {
-   "case": "e11-art-m4a",
+   "case": "artwork-m4a",
    "sha": "46db53ce43d1da6b7fe86412f279f70397fbbe62d55403e6615b547eceaec4b4",
    "canonical": {
     "title": "",
@@ -766,7 +766,7 @@
    ]
   },
   {
-   "case": "e11-multiaudio",
+   "case": "multiaudio-default-stream",
    "sha": "46db53ce43d1da6b7fe86412f279f70397fbbe62d55403e6615b547eceaec4b4",
    "canonical": {
     "title": "",
@@ -836,7 +836,7 @@
    ]
   },
   {
-   "case": "e11-multiaudio-mka",
+   "case": "multiaudio-default-stream-mka",
    "sha": "39955fcf43406330ac70a1b2db78b3d07b4671607707a333f2a4a44f82bb5614",
    "canonical": {
     "title": "Mkv One",
