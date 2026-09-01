@@ -1,0 +1,20 @@
+{
+  "experiment": "e10-p0",
+  "section": "negative_tests",
+  "gate_statement": "typed rejection of BYPASS rate mismatch / non-positive rates, stale queue tokens, queue bound + ownership conservation, zero-copy guard, state-epoch bumps, BYPASS memcpy presence, variable-frame commit; each check is an executable mutation target (P1-5)",
+  "checks": [
+  {"id": "bypass_rejects_rate_mismatch_44100_48000", "expect": "PCM_ERR_BYPASS_RATE_MISMATCH", "got": "PCM_ERR_BYPASS_RATE_MISMATCH", "verdict": "pass"},
+  {"id": "bypass_rejects_rate_mismatch_48000_44100", "expect": "PCM_ERR_BYPASS_RATE_MISMATCH", "got": "PCM_ERR_BYPASS_RATE_MISMATCH", "verdict": "pass"},
+  {"id": "bypass_rejects_zero_in_rate", "expect": "PCM_ERR_INVALID_PARAM", "got": "PCM_ERR_INVALID_PARAM", "verdict": "pass"},
+  {"id": "bypass_rejects_negative_in_rate", "expect": "PCM_ERR_INVALID_PARAM", "got": "PCM_ERR_INVALID_PARAM", "verdict": "pass"},
+  {"id": "stale_commit_after_flush_rejected", "expect": "PCM_ERR_STALE_TOKEN", "got": "PCM_ERR_STALE_TOKEN", "verdict": "pass"},
+  {"id": "queue_ownership_conservation", "expect": "free_top + owned + pending == capacity at every step", "got": "conserved", "verdict": "pass"},
+  {"id": "queue_bound_enforced", "expect": "count <= capacity; acquire backpressures when full", "got": "bounded", "verdict": "pass"},
+  {"id": "variable_frames_commit", "expect": "commit(actual) preserves exact frame counts; actual > capacity rejected; 1-frame and partial tails", "got": "variable frames ok", "verdict": "pass"},
+  {"id": "zero_copy_guard_with_dsp_stage", "expect": "DSP stage forces the copy path (no aliasing)", "got": "copy path", "verdict": "pass"},
+  {"id": "state_epoch_bump_on_prepare_and_reset", "expect": "epoch strictly increases on prepare and reset", "got": "monotonic", "verdict": "pass"},
+  {"id": "bypass_memcpy_present", "expect": "copy mode executes exactly one memcpy per process call", "got": "copy present", "verdict": "pass"}
+  ],
+  "summary": {"checks_total": 11, "checks_passed": 11, "checks_failed": 0},
+  "verdict": "PASS"
+}
