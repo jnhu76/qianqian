@@ -25,7 +25,7 @@ guest — all from the same ABI and capability model:
 | Target | Static | Shared | Notes |
 |---|---|---|---|
 | Linux x86_64 | `libsongcore.a` | `libsongcore.so` | **Proven** — reference artifacts, measured + audited on this branch |
-| Windows x86_64 | `songcore.lib` | `songcore.dll` | Planned (recipe: `ffmpeg/targets/windows-x86_64.json`) |
+| Windows x86_64 | (`libsongcore.a`) | `songcore.dll` | **Proven (shared)** — mingw-w64 cross (`--target-os=mingw32`); PE exports audited (15 exactly), real Windows Python ctypes consumer PASS (§8) |
 | Android arm64 | — | `libsongcore.so` | Planned |
 | macOS arm64 | `libsongcore.a` | `libsongcore.dylib` | Planned |
 | iOS arm64 | `libsongcore.a` | — | Planned (XCFramework packaging is a later product-side step) |
@@ -334,3 +334,28 @@ libsongcore.so · songcore.dll · libsongcore.a · static native integration
   reach `song_close` exactly once.
 
 No framework-specific bindings are part of this repository (Phase 0).
+
+## 8. Verified consumers
+
+Every claim above is machine-checked by external consumers that use ONLY
+`songcore.h` and the shipped artifacts — no Qianqian test binary participates.
+Authority: `bench/results/songcore-v1/ffi-consumers.json`, re-executed live by
+`tests/songcore/consumers.py` (`--out` run, `--check` fail-closed revalidation;
+the host-independent gates also run inside `xmake test`).
+
+| Consumer | Path | Evidence |
+|---|---|---|
+| Python ctypes decode | `python3 tools/songcore_ffi_smoke.py <songs...>` — stdlib-only (ctypes/argparse/hashlib/struct); mirrors all 15 symbols and every ABI struct; checks open/probe/metadata/artwork/decode/seek/close plus the typed refusal contracts (zero capacity, invalid stream index); `--play` adds audible output at source rate via sounddevice (no Python-side resampling, no `qn_pcm_dump`) | Linux: 12 Common-Formats fixtures PASS incl. ADTS typed `SONG_ERR_SEEK_UNSUPPORTED`; three real local songs PASS with UTF-8 metadata + JPEG artwork; audible run PASS |
+| Static archive consumer | `tests/consumer/songcore_static_smoke.c`, compiled with the documented one-archive link line `cc -Iinclude … -Lbuild/artifacts -lsongcore -lm -lpthread` | FLAC + M4A decode/seek PASS through the merged self-contained `libsongcore.a` |
+| Shared export audit | exactly the 15 `SONGCORE_API` symbols, nothing else | PASS on Linux ELF and Windows PE |
+| Windows ctypes | real Windows Python 3.13 process → ctypes → `songcore.dll` (PE exports audited: 15 exactly; imports only `bcrypt.dll`/`KERNEL32.dll`/`msvcrt.dll`; zero FFmpeg DLL dependencies) | 7 fixtures PASS (evidence: `bench/results/songcore-v1/win-ffi.json`) |
+| WASM | independent `wasmtime` host instantiates `build/artifacts/wasm/SongCore.wasm` and drives `song_wasm_abi_version/open/probe/metadata/read_pcm/seek/close` over `qianqian_host` read/seek/size imports: `python3 tools/songcore_wasm_smoke.py <songs...>` | 5 fixtures PASS |
+
+Known typed behavior verified against real content: raw ADTS AAC has no
+container seek — `song_seek` returns `SONG_ERR_SEEK_UNSUPPORTED` (the ABI's
+typed "container has no seek"), while indexed/seekable formats
+(FLAC/MP3/M4A/ALAC/OGG/WAV) land within the documented tolerance.
+
+The decode closure inside every artifact is the `codec-base` profile — the
+PRD Common Formats set (MP3, FLAC, AAC/M4A, raw ADTS, ALAC/M4A, PCM WAV,
+Ogg Vorbis, Ogg Opus) — see `ffmpeg/profiles/codec-base.json`.

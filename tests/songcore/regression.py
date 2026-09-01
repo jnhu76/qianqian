@@ -82,13 +82,18 @@ def parse_json_line(stdout):
     """Extract the first JSON object from stdout (FFmpeg may log to stderr,
     but the harness writes pure JSON to stdout)."""
     try:
-        return json.loads(stdout)
+        rec = json.loads(stdout)
     except json.JSONDecodeError:
         # tolerate trailing content after the object
         i = stdout.find("{")
         if i < 0:
             return None
-        return json.loads(stdout[i:].split("\n")[0])
+        rec = json.loads(stdout[i:].split("\n")[0])
+    if isinstance(rec, dict) and isinstance(rec.get("file"), str):
+        # Committed evidence carries the fixture name, never a
+        # machine-local absolute path.
+        rec["file"] = os.path.basename(rec["file"])
+    return rec
 
 
 class Gate:

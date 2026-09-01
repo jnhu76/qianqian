@@ -3,7 +3,7 @@
   {
    "case": "multiaudio-default-stream.m4a",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/multiaudio-default-stream.m4a",
+    "file": "multiaudio-default-stream.m4a",
     "select_a_status": 0,
     "select_b_status": 0,
     "frames_a": 4096,
@@ -16,7 +16,7 @@
   {
    "case": "multiaudio-default-stream.mka",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/multiaudio-default-stream.mka",
+    "file": "multiaudio-default-stream.mka",
     "select_a_status": 0,
     "select_b_status": 0,
     "frames_a": 4096,

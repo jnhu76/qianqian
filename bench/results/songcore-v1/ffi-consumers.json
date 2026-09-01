@@ -1,0 +1,176 @@
+{
+  "tool": "tests/songcore/consumers.py",
+  "platform": "Linux-x86_64",
+  "shared_library": "build/artifacts/shared/libsongcore.so",
+  "shared_library_sha256": "329bbc8e58e7443361808dc8668cb3173627262271c87fc5e3c38b06977b8031",
+  "gates": [
+    {
+      "gate": "shared_export_audit",
+      "verdict": "pass",
+      "detail": "15 exported symbol(s)"
+    },
+    {
+      "gate": "ctypes_decode_consumer",
+      "tool": "tools/songcore_ffi_smoke.py",
+      "fixtures": [
+        "flac-16-44-stereo.flac",
+        "mp3-cbr-id3v23.mp3",
+        "aac-lc-44-stereo.m4a",
+        "aac-adts-44-stereo.aac",
+        "opus-48-stereo.opus",
+        "vorbis-44-stereo.ogg",
+        "wav-s16le-44-stereo.wav"
+      ],
+      "verdict": "pass",
+      "library_sha256": "329bbc8e58e7443361808dc8668cb3173627262271c87fc5e3c38b06977b8031",
+      "abi_version": 1,
+      "songs": [
+        {
+          "song": "flac-16-44-stereo.flac",
+          "verdict": "pass",
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "sha256": "d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2"
+        },
+        {
+          "song": "mp3-cbr-id3v23.mp3",
+          "verdict": "pass",
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "sha256": "feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058"
+        },
+        {
+          "song": "aac-lc-44-stereo.m4a",
+          "verdict": "pass",
+          "container": "mov,mp4,m4a,3gp,3g2,mj2",
+          "codec": "aac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "sha256": "3bad130b2fc84702aa9799a5e40f2ac6cf91e1d81cb7fea68cd62c5ac7fd0864"
+        },
+        {
+          "song": "aac-adts-44-stereo.aac",
+          "verdict": "pass",
+          "container": "aac",
+          "codec": "aac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "sha256": "e2494df357ea26363d61a9ebe86f5940ccb32fc222a4415f08934f8ad4aa3a6a"
+        },
+        {
+          "song": "opus-48-stereo.opus",
+          "verdict": "pass",
+          "container": "ogg",
+          "codec": "opus",
+          "sample_rate": 48000,
+          "channels": 2,
+          "sha256": "c00d25d4182527d797ec67bc84e6228d3c7fb07b4683605078966829d0aa38e6"
+        },
+        {
+          "song": "vorbis-44-stereo.ogg",
+          "verdict": "pass",
+          "container": "ogg",
+          "codec": "vorbis",
+          "sample_rate": 44100,
+          "channels": 2,
+          "sha256": "ba764bf5fb668ddd9700f00b73b3e368fc2f8745a02b7e1bc4370cb1ed0763b5"
+        },
+        {
+          "song": "wav-s16le-44-stereo.wav",
+          "verdict": "pass",
+          "container": "wav",
+          "codec": "pcm_s16le",
+          "sample_rate": 44100,
+          "channels": 2,
+          "sha256": "c7a31488b22bbaec1a4d879cc03508f0373f90dd789e5cc0f59a3c8c60a3dcd4"
+        }
+      ]
+    },
+    {
+      "gate": "static_archive_consumer",
+      "tool": "tests/consumer/songcore_static_smoke.c",
+      "fixtures": [
+        "flac-16-44-stereo.flac",
+        "aac-lc-44-stereo.m4a"
+      ],
+      "link_line": "cc -Iinclude tests/consumer/songcore_static_smoke.c -Lbuild/artifacts -lsongcore -lm -lpthread -o build/consumer/songcore_static_smoke",
+      "runs": [
+        {
+          "fixture": "flac-16-44-stereo.flac",
+          "rc": 0,
+          "output": "static_smoke: PASS corpus/fixtures/flac-16-44-stereo.flac (flac/flac 44100 Hz 2 ch, 44100 frames decoded)"
+        },
+        {
+          "fixture": "aac-lc-44-stereo.m4a",
+          "rc": 0,
+          "output": "static_smoke: PASS corpus/fixtures/aac-lc-44-stereo.m4a (mov,mp4,m4a,3gp,3g2,mj2/aac 44100 Hz 2 ch, 44100 frames decoded)"
+        }
+      ],
+      "verdict": "pass"
+    },
+    {
+      "gate": "wasm_consumer",
+      "tool": "tools/songcore_wasm_smoke.py",
+      "fixtures": [
+        "flac-16-44-stereo.flac",
+        "mp3-cbr-id3v23.mp3",
+        "aac-lc-44-stereo.m4a",
+        "opus-48-stereo.opus",
+        "wav-s16le-44-stereo.wav"
+      ],
+      "verdict": "pass",
+      "wasm_sha256": "2b3f5a654b30c9b183fe23636f99d499718011cf44063229d7fa95df60e84962"
+    },
+    {
+      "gate": "windows_ctypes_consumer",
+      "host": "recorded on the Windows host (not re-runnable here)",
+      "verdict": "pass",
+      "library_file": "songcore.dll (staged on the Windows host; local path omitted)",
+      "library_sha256": "c79f709e55572d3e4ba00964ea29f86c4ee982dbe3f5ed2671ab5cff417ec2d1",
+      "python": "3.13.14",
+      "platform": "Windows-AMD64",
+      "songs": [
+        {
+          "song": "flac-16-44-stereo.flac",
+          "verdict": "pass",
+          "codec": "flac"
+        },
+        {
+          "song": "mp3-cbr-id3v23.mp3",
+          "verdict": "pass",
+          "codec": "mp3"
+        },
+        {
+          "song": "aac-lc-44-stereo.m4a",
+          "verdict": "pass",
+          "codec": "aac"
+        },
+        {
+          "song": "aac-adts-44-stereo.aac",
+          "verdict": "pass",
+          "codec": "aac"
+        },
+        {
+          "song": "opus-48-stereo.opus",
+          "verdict": "pass",
+          "codec": "opus"
+        },
+        {
+          "song": "vorbis-44-stereo.ogg",
+          "verdict": "pass",
+          "codec": "vorbis"
+        },
+        {
+          "song": "wav-s16le-44-stereo.wav",
+          "verdict": "pass",
+          "codec": "pcm_s16le"
+        }
+      ]
+    }
+  ],
+  "verdict": "pass"
+}

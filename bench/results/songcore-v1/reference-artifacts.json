@@ -25,15 +25,15 @@
       "song_select_stream",
       "songcore_abi_version"
     ],
-    "raw_bytes": 981832,
-    "sha256_raw": "789cf70b774895510109888db42891a182112c21dde048d6e84f3ded5f305aa9",
-    "stripped_bytes": 981832,
-    "xz9e_bytes": 353492
+    "raw_bytes": 2288536,
+    "sha256_raw": "329bbc8e58e7443361808dc8668cb3173627262271c87fc5e3c38b06977b8031",
+    "stripped_bytes": 2288536,
+    "xz9e_bytes": 859748
   },
   "static": {
-    "raw_bytes": 30216,
-    "sha256_raw": "7f3f758d4ec76b41fa9a512fc0da10473de88a5c9d5eafc551e6907b8af8f6a1",
-    "stripped_bytes": 18118,
-    "xz9e_bytes": 8444
+    "raw_bytes": 4062836,
+    "sha256_raw": "bdf4ca329a453d1b85b9283d91b63c1aace4d50b272067e94cc2d0cb8e35a2dd",
+    "stripped_bytes": 2762490,
+    "xz9e_bytes": 936836
   }
 }

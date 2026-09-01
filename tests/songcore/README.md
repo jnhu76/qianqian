@@ -36,6 +36,11 @@ python3 tests/songcore/sanitizers.py
 # python3 tools/dsp_closure.py --stage avf-c2  once)
 python3 tests/songcore/dsp_src.py
 
+# external-consumer gates (shared export audit, ctypes decode consumer,
+# static archive consumer; wasm + recorded windows in full mode)
+python3 tests/songcore/consumers.py --out
+python3 tests/songcore/consumers.py --check
+
 # target-identity gate: a manifest derived for one target must not satisfy
 # another target's build session (fail-closed provenance)
 python3 tests/songcore/target_gate_test.py
@@ -63,6 +68,7 @@ python3 tests/songcore/dsp_src.py --check --out bench/results/songcore-v1
 | common-formats.json | MP3/FLAC/AAC/M4A/ADTS/ALAC/WAV(6)/Vorbis/Opus decode + seek families |
 | sanitizers.json | zero ASan/Leak/crash; UBSan clean on Qianqian-owned frames |
 | dsp-src-integration.json | BYPASS shape + 44.1k→48k aresample + volume/equalizer |
+| ffi-consumers.json | external consumers: 15-symbol shared export audit, ctypes decode consumer, one-archive static consumer, wasmtime WASM consumer, recorded Windows ctypes run (`tests/songcore/consumers.py`) |
 
 ## Inputs
 
@@ -79,3 +85,16 @@ python3 tests/songcore/dsp_src.py --check --out bench/results/songcore-v1
 
 - No UI / playlist / audio backend.
 - APE/WMA/AIFF/WavPack (issue #9) remain out of scope.
+
+## Session hygiene (multi-target builds)
+
+All build sessions share `build/artifacts/`. Switching platform/toolchain
+sessions (native ↔ `mingw` ↔ `--wasm=wasi`) must rebuild with `-r`
+(`xmake build -r songcore`), otherwise a stale archive from the previous
+session can be linked silently — this has already produced one bogus
+evidence set (2026-09-01: regression ran against a stale fuller-closure
+probe while the shipping artifacts were codec-base). The
+`ffi-consumers.json` consumer gates and `target_gate_test.py` exist to
+catch exactly this class of drift. The WASM session keeps its merged
+`songcore_static` archive under `build/artifacts/wasm/` so native and
+guest archives never overwrite each other.

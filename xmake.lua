@@ -35,6 +35,10 @@ option("lto")
     set_description("Link with -flto (link-time optimization)")
 
 local artifact_dir = path.join(os.projectdir(), "build", "artifacts")
+-- WASM sessions archive their guest closure here as well; sharing the
+-- native artifact path would let a wasm-format libsongcore.a silently
+-- overwrite the native archive (and vice versa) across sessions.
+local wasm_artifact_dir = path.join(artifact_dir, "wasm")
 local ffmpeg_manifest = function ()
     return path.join(os.projectdir(), get_config("av_manifest"))
 end
@@ -181,10 +185,12 @@ target("qianqian_av")
 -- internals and never appear in the ABI. Shared build logic lives in
 -- songcore_common() — the Xmake-recommended way to avoid duplicating the
 -- definition across static/shared targets.
-local songcore_common = function ()
+local songcore_common = function (dep_av)
     add_files("src/songcore_ffmpeg.c")
     add_includedirs("include", {public = true})
-    add_deps("qianqian_av")
+    if dep_av then
+        add_deps("qianqian_av")
+    end
     if is_plat("linux", "macosx", "android", "iphoneos") then
         add_syslinks("m", "pthread")
     end
@@ -198,8 +204,16 @@ target("songcore_static")
     set_kind("static")
     set_basename("songcore") -- → libsongcore.a / songcore.lib
     set_default(false)
-    set_targetdir(artifact_dir)
-    songcore_common()
+    set_targetdir(get_config("wasm") and wasm_artifact_dir or artifact_dir)
+    -- One self-contained static consumer artifact: the FFmpeg closure
+    -- (qianqian_av) is merged into libsongcore.a by Xmake's supported
+    -- merge policy (ar / lib.exe, cross-toolchain safe), so external
+    -- static consumers link exactly one Qianqian archive plus system
+    -- libraries — no separate internal archive in the documented link
+    -- line. Linkers still drop unreferenced FFmpeg members from the
+    -- merged archive member-wise, so test binaries keep their size.
+    set_policy("build.merge_archive", true)
+    songcore_common(true)
 
 target("songcore_shared")
     set_kind("shared")
@@ -217,7 +231,14 @@ target("songcore_shared")
     if is_plat("linux", "android") then
         add_ldflags("-Wl,--exclude-libs,ALL", {force = true})
     end
-    songcore_common()
+    -- The shared artifact links the SAME merged archive the static
+    -- consumers get. Depending on qianqian_av directly is wrong under
+    -- build.merge_archive: xmake then treats the closure as "merged into
+    -- songcore_static" and drops it from this target's link line, which
+    -- ELF silently accepts as undefined references (hollow artifact) and
+    -- PE rejects at DLL link time.
+    songcore_common(false)
+    add_deps("songcore_static")
 
 -- Build convenience: both artifact kinds under the historical name.
 target("songcore")
@@ -260,8 +281,10 @@ target("songcore_probe")
     if is_plat("mingw") then
         add_syslinks("bcrypt")
     end
-    -- `xmake test`: full SongCore regression + fail-closed --check.
-    -- os.execv raises on nonzero exit, so a gate failure fails the test.
+    -- `xmake test`: full SongCore regression + fail-closed --check, then
+    -- the external-consumer gates (shared export audit, ctypes decode
+    -- consumer, static archive consumer). os.execv raises on nonzero
+    -- exit, so a gate failure fails the test.
     add_tests("default")
     on_test(function (target, opt)
         import("lib.detect.find_tool")
@@ -272,8 +295,11 @@ target("songcore_probe")
         local root = os.projectdir()
         local out = path.join(root, "bench", "results", "songcore-v1")
         local script = path.join(root, "tests", "songcore", "regression.py")
+        local consumers = path.join(root, "tests", "songcore", "consumers.py")
         os.execv(python.program, {script, "--out", out})
         os.execv(python.program, {script, "--check", "--out", out})
+        os.execv(python.program, {consumers, "--out", "--core"})
+        os.execv(python.program, {consumers, "--check", "--core"})
         return true
     end)
 
@@ -287,7 +313,10 @@ target("dsp_cap_probe")
     set_default(false)
     set_targetdir(artifact_dir)
     add_files("tests/songcore/dsp_cap_probe.c")
-    add_deps("qianqian_av", "songcore_static")
+    -- build.merge_archive: the closure (qianqian_av) lives inside the merged
+    -- songcore archive; depending on qianqian_av directly would be silently
+    -- dropped from the link line.
+    add_deps("songcore_static")
     if is_plat("linux") or is_plat("macosx") then
         add_syslinks("m", "pthread")
     end
@@ -385,7 +414,6 @@ toolchain("emcc")
     end)
 
 -- WASM guest artifacts live in their own artifact subdir.
-local wasm_artifact_dir = path.join(artifact_dir, "wasm")
 
 -- Reactor link shape shared by every WASI guest module: no _start, callers
 -- initialize via _initialize, linear memory exported for host-side PCM reads.
@@ -412,7 +440,7 @@ if get_config("wasm") then
         set_optimize("smallest")
         add_files("src/songcore_ffmpeg.c")
         add_includedirs("include", {public = true})
-        add_deps("qianqian_av")
+        add_deps("songcore_static")
 
     target("songcore_wasm")
         set_kind("binary")
@@ -426,7 +454,7 @@ if get_config("wasm") then
         set_optimize("smallest")
         add_files("src/songcore_ffmpeg.c", "src/wasm/songcore_wasm_bridge.c")
         add_includedirs("include", "src/wasm")
-        add_deps("qianqian_av")
+        add_deps("songcore_static")
         if get_config("wasm") == "wasi" then
             add_ldflags(wasi_reactor_ldflags(), {force = true})
         else

@@ -3,11 +3,14 @@
   "platform": "windows",
   "arch": "x86_64",
   "xmake": {
-    "plat": ["mingw", "windows"],
+    "plat": [
+      "mingw",
+      "windows"
+    ],
     "arch": "x86_64"
   },
   "ffmpeg": {
-    "target_os": "win64",
+    "target_os": "mingw32",
     "arch": "x86_64",
     "cross": true,
     "cross_prefix": "x86_64-w64-mingw32-"
@@ -21,6 +24,6 @@
     "shared": true,
     "wasm": false
   },
-  "status": "planned",
-  "evidence": "Historical Common-Formats cross oracle stages existed (build/minimize/win-c6*, regenerable, untracked), but no Windows cross toolchain is present on the current derivation host and no current-ABI-v1 Windows artifact has been built. COMPILE_UNVERIFIED for the current ABI until a mingw/MSVC toolchain derives the manifest and links songcore.lib/songcore.dll."
+  "status": "proven-in-progress",
+  "evidence": "mingw-w64 cross oracle (x86_64-w64-mingw32-gcc 13) derives the codec-base closure on the current host with --target-os=mingw32. The historical win64 value placed configure on the MSVC branch (LIBSUF=.lib, -dll SHFLAGS) which mingw gcc cannot replay; the configure/Make oracle exposed this at import time as designed."
 }

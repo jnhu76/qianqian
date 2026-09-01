@@ -3,7 +3,7 @@
   {
    "case": "invalid-empty",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/invalid-empty.bin",
+    "file": "invalid-empty.bin",
     "open_status": 104,
     "probe_status": -2,
     "read_status": -2,
@@ -15,7 +15,7 @@
   {
    "case": "invalid-text",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/invalid-text.bin",
+    "file": "invalid-text.bin",
     "open_status": 104,
     "probe_status": -2,
     "read_status": -2,
@@ -27,7 +27,7 @@
   {
    "case": "invalid-png",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/invalid-png.png",
+    "file": "invalid-png.png",
     "open_status": 104,
     "probe_status": -2,
     "read_status": -2,
@@ -39,7 +39,7 @@
   {
    "case": "invalid-videoonly",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/invalid-videoonly.m4a",
+    "file": "invalid-videoonly.m4a",
     "open_status": 0,
     "probe_status": 105,
     "read_status": -2,
@@ -54,7 +54,7 @@
   {
    "case": "invalid-ac3",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/invalid-ac3.m4a",
+    "file": "invalid-ac3.m4a",
     "open_status": 0,
     "probe_status": 106,
     "read_status": -2,
@@ -69,7 +69,7 @@
   {
    "case": "iofail",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/flac-16-44-stereo.flac",
+    "file": "flac-16-44-stereo.flac",
     "open_status": 103,
     "probe_status": -2,
     "read_status": -2,

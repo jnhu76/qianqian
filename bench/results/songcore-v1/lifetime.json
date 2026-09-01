@@ -3,7 +3,7 @@
   {
    "case": "metadata-full.flac",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/metadata-full.flac",
+    "file": "metadata-full.flac",
     "title_saved_ok": true,
     "artist_saved_ok": true,
     "raw_saved_ok": true,
@@ -16,7 +16,7 @@
   {
    "case": "metadata-mp3.mp3",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/metadata-mp3.mp3",
+    "file": "metadata-mp3.mp3",
     "title_saved_ok": true,
     "artist_saved_ok": true,
     "raw_saved_ok": true,
@@ -29,7 +29,7 @@
   {
    "case": "artwork-mp3-multi.mp3",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/artwork-mp3-multi.mp3",
+    "file": "artwork-mp3-multi.mp3",
     "title_saved_ok": true,
     "artist_saved_ok": true,
     "raw_saved_ok": true,

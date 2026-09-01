@@ -1,0 +1,431 @@
+{
+  "tool": "songcore_ffi_smoke",
+  "library": "build/artifacts/shared/libsongcore.so",
+  "library_sha256": "329bbc8e58e7443361808dc8668cb3173627262271c87fc5e3c38b06977b8031",
+  "abi_version_expected": 1,
+  "platform": "Linux-x86_64",
+  "python": "3.14.4",
+  "seconds_cap": 3.0,
+  "played": false,
+  "songs": [
+    {
+      "song": "flac-16-44-stereo.flac",
+      "container": "flac",
+      "codec": "flac",
+      "sample_rate": 44100,
+      "channels": 2,
+      "channel_mask": 3,
+      "duration_us": 4000000,
+      "bits_per_sample": 16,
+      "audio_stream_count": 1,
+      "stream0": {
+        "stream_index": 0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "codec": "flac",
+        "is_default": 0
+      },
+      "last_error_after_invalid": "<no diagnostic>",
+      "canonical_metadata": {
+        "title": "Flac Sixteen Fortyfour",
+        "artist": "Qianqian Lab",
+        "album": "Corpus Gamma"
+      },
+      "metadata_count": 4,
+      "metadata_entries": [
+        {
+          "scope": 0,
+          "key": "ALBUM",
+          "value": "Corpus Gamma"
+        },
+        {
+          "scope": 0,
+          "key": "TITLE",
+          "value": "Flac Sixteen Fortyfour"
+        },
+        {
+          "scope": 0,
+          "key": "ARTIST",
+          "value": "Qianqian Lab"
+        },
+        {
+          "scope": 0,
+          "key": "encoder",
+          "value": "Lavf62.3.100"
+        }
+      ],
+      "artwork_count": 0,
+      "decoded_frames": 135168,
+      "decoded_seconds": 3.065034,
+      "pcm_sha256_prefix": "db29d01255e8043d",
+      "peak": 0.549988,
+      "eof_during_decode": false,
+      "seek_requested_us": 2000000,
+      "seek_actual_us": 1985306,
+      "post_seek_frames": 88848,
+      "post_seek_eof": true,
+      "checks": {
+        "abi_version": "pass",
+        "open": "pass",
+        "probe": "pass",
+        "stream_enumeration": "pass",
+        "select_stream_rejects_invalid": "pass",
+        "read_pcm_rejects_zero_capacity": "pass",
+        "metadata": "pass",
+        "artwork": "pass",
+        "close": "pass"
+      },
+      "verdict": "pass",
+      "song_sha256": "d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2",
+      "song_bytes": 146237
+    },
+    {
+      "song": "mp3-cbr-id3v23.mp3",
+      "container": "mp3",
+      "codec": "mp3",
+      "sample_rate": 44100,
+      "channels": 2,
+      "channel_mask": 3,
+      "duration_us": 4000000,
+      "bits_per_sample": 0,
+      "audio_stream_count": 1,
+      "stream0": {
+        "stream_index": 0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "codec": "mp3",
+        "is_default": 0
+      },
+      "last_error_after_invalid": "<no diagnostic>",
+      "canonical_metadata": {
+        "title": "千千测试 CBR",
+        "artist": "Qianqian Lab",
+        "album": "Corpus Alpha"
+      },
+      "metadata_count": 5,
+      "metadata_entries": [
+        {
+          "scope": 0,
+          "key": "title",
+          "value": "千千测试 CBR"
+        },
+        {
+          "scope": 0,
+          "key": "artist",
+          "value": "Qianqian Lab"
+        },
+        {
+          "scope": 0,
+          "key": "album",
+          "value": "Corpus Alpha"
+        },
+        {
+          "scope": 0,
+          "key": "encoder",
+          "value": "Lavf62.3.100"
+        },
+        {
+          "scope": 1,
+          "key": "encoder",
+          "value": "Lavc62.11"
+        }
+      ],
+      "artwork_count": 0,
+      "decoded_frames": 135168,
+      "decoded_seconds": 3.065034,
+      "pcm_sha256_prefix": "631a1a67ff5b5e1b",
+      "peak": 0.527257,
+      "eof_during_decode": false,
+      "seek_requested_us": 2000000,
+      "seek_actual_us": 1985306,
+      "post_seek_frames": 89953,
+      "post_seek_eof": true,
+      "checks": {
+        "abi_version": "pass",
+        "open": "pass",
+        "probe": "pass",
+        "stream_enumeration": "pass",
+        "select_stream_rejects_invalid": "pass",
+        "read_pcm_rejects_zero_capacity": "pass",
+        "metadata": "pass",
+        "artwork": "pass",
+        "close": "pass"
+      },
+      "verdict": "pass",
+      "song_sha256": "feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058",
+      "song_bytes": 65323
+    },
+    {
+      "song": "aac-lc-44-stereo.m4a",
+      "container": "mov,mp4,m4a,3gp,3g2,mj2",
+      "codec": "aac",
+      "sample_rate": 44100,
+      "channels": 2,
+      "channel_mask": 3,
+      "duration_us": 12000000,
+      "bits_per_sample": 16,
+      "audio_stream_count": 1,
+      "stream0": {
+        "stream_index": 0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "codec": "aac",
+        "is_default": 1
+      },
+      "last_error_after_invalid": "<no diagnostic>",
+      "canonical_metadata": {},
+      "metadata_count": 6,
+      "metadata_entries": [
+        {
+          "scope": 0,
+          "key": "major_brand",
+          "value": "M4A "
+        },
+        {
+          "scope": 0,
+          "key": "minor_version",
+          "value": "512"
+        },
+        {
+          "scope": 0,
+          "key": "compatible_brands",
+          "value": "M4A isomiso2"
+        },
+        {
+          "scope": 0,
+          "key": "encoder",
+          "value": "Lavf62.3.100"
+        },
+        {
+          "scope": 1,
+          "key": "language",
+          "value": "und"
+        },
+        {
+          "scope": 1,
+          "key": "handler_name",
+          "value": "SoundHandler"
+        }
+      ],
+      "artwork_count": 0,
+      "decoded_frames": 135168,
+      "decoded_seconds": 3.065034,
+      "pcm_sha256_prefix": "4d68860b2812d96f",
+      "peak": 0.757728,
+      "eof_during_decode": false,
+      "seek_requested_us": 5000000,
+      "seek_actual_us": 4992290,
+      "post_seek_frames": 309040,
+      "post_seek_eof": true,
+      "checks": {
+        "abi_version": "pass",
+        "open": "pass",
+        "probe": "pass",
+        "stream_enumeration": "pass",
+        "select_stream_rejects_invalid": "pass",
+        "read_pcm_rejects_zero_capacity": "pass",
+        "metadata": "pass",
+        "artwork": "pass",
+        "close": "pass"
+      },
+      "verdict": "pass",
+      "song_sha256": "3bad130b2fc84702aa9799a5e40f2ac6cf91e1d81cb7fea68cd62c5ac7fd0864",
+      "song_bytes": 198854
+    },
+    {
+      "song": "aac-adts-44-stereo.aac",
+      "container": "aac",
+      "codec": "aac",
+      "sample_rate": 44100,
+      "channels": 2,
+      "channel_mask": 3,
+      "duration_us": -1,
+      "bits_per_sample": 0,
+      "audio_stream_count": 1,
+      "stream0": {
+        "stream_index": 0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "codec": "aac",
+        "is_default": 0
+      },
+      "last_error_after_invalid": "<no diagnostic>",
+      "canonical_metadata": {},
+      "metadata_count": 0,
+      "metadata_entries": [],
+      "artwork_count": 0,
+      "decoded_frames": 135168,
+      "decoded_seconds": 3.065034,
+      "pcm_sha256_prefix": "503d2188916b78ed",
+      "peak": 0.757728,
+      "eof_during_decode": false,
+      "seek_requested_us": 1000000,
+      "seek_unsupported": true,
+      "checks": {
+        "abi_version": "pass",
+        "open": "pass",
+        "probe": "pass",
+        "stream_enumeration": "pass",
+        "select_stream_rejects_invalid": "pass",
+        "read_pcm_rejects_zero_capacity": "pass",
+        "metadata": "pass",
+        "artwork": "pass",
+        "close": "pass"
+      },
+      "verdict": "pass",
+      "song_sha256": "e2494df357ea26363d61a9ebe86f5940ccb32fc222a4415f08934f8ad4aa3a6a",
+      "song_bytes": 66545
+    },
+    {
+      "song": "opus-48-stereo.opus",
+      "container": "ogg",
+      "codec": "opus",
+      "sample_rate": 48000,
+      "channels": 2,
+      "channel_mask": 3,
+      "duration_us": 12006500,
+      "bits_per_sample": 0,
+      "audio_stream_count": 1,
+      "stream0": {
+        "stream_index": 0,
+        "sample_rate": 48000,
+        "channels": 2,
+        "codec": "opus",
+        "is_default": 0
+      },
+      "last_error_after_invalid": "<no diagnostic>",
+      "canonical_metadata": {},
+      "metadata_count": 1,
+      "metadata_entries": [
+        {
+          "scope": 1,
+          "key": "encoder",
+          "value": "Lavc62.11.100 libopus"
+        }
+      ],
+      "artwork_count": 0,
+      "decoded_frames": 147456,
+      "decoded_seconds": 3.072,
+      "pcm_sha256_prefix": "54463d387bbf02f4",
+      "peak": 0.508658,
+      "eof_during_decode": false,
+      "seek_requested_us": 5000000,
+      "seek_actual_us": 4993500,
+      "post_seek_frames": 336312,
+      "post_seek_eof": true,
+      "checks": {
+        "abi_version": "pass",
+        "open": "pass",
+        "probe": "pass",
+        "stream_enumeration": "pass",
+        "select_stream_rejects_invalid": "pass",
+        "read_pcm_rejects_zero_capacity": "pass",
+        "metadata": "pass",
+        "artwork": "pass",
+        "close": "pass"
+      },
+      "verdict": "pass",
+      "song_sha256": "c00d25d4182527d797ec67bc84e6228d3c7fb07b4683605078966829d0aa38e6",
+      "song_bytes": 167869
+    },
+    {
+      "song": "vorbis-44-stereo.ogg",
+      "container": "ogg",
+      "codec": "vorbis",
+      "sample_rate": 44100,
+      "channels": 2,
+      "channel_mask": 3,
+      "duration_us": 12000000,
+      "bits_per_sample": 0,
+      "audio_stream_count": 1,
+      "stream0": {
+        "stream_index": 0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "codec": "vorbis",
+        "is_default": 0
+      },
+      "last_error_after_invalid": "<no diagnostic>",
+      "canonical_metadata": {},
+      "metadata_count": 1,
+      "metadata_entries": [
+        {
+          "scope": 1,
+          "key": "encoder",
+          "value": "Lavc62.11.100 libvorbis"
+        }
+      ],
+      "artwork_count": 0,
+      "decoded_frames": 135168,
+      "decoded_seconds": 3.065034,
+      "pcm_sha256_prefix": "82d3d283922aadec",
+      "peak": 0.563621,
+      "eof_during_decode": false,
+      "seek_requested_us": 5000000,
+      "seek_actual_us": 4099773,
+      "post_seek_frames": 348400,
+      "post_seek_eof": true,
+      "checks": {
+        "abi_version": "pass",
+        "open": "pass",
+        "probe": "pass",
+        "stream_enumeration": "pass",
+        "select_stream_rejects_invalid": "pass",
+        "read_pcm_rejects_zero_capacity": "pass",
+        "metadata": "pass",
+        "artwork": "pass",
+        "close": "pass"
+      },
+      "verdict": "pass",
+      "song_sha256": "ba764bf5fb668ddd9700f00b73b3e368fc2f8745a02b7e1bc4370cb1ed0763b5",
+      "song_bytes": 42009
+    },
+    {
+      "song": "wav-s16le-44-stereo.wav",
+      "container": "wav",
+      "codec": "pcm_s16le",
+      "sample_rate": 44100,
+      "channels": 2,
+      "channel_mask": 0,
+      "duration_us": 6000000,
+      "bits_per_sample": 16,
+      "audio_stream_count": 1,
+      "stream0": {
+        "stream_index": 0,
+        "sample_rate": 44100,
+        "channels": 2,
+        "codec": "pcm_s16le",
+        "is_default": 0
+      },
+      "last_error_after_invalid": "<no diagnostic>",
+      "canonical_metadata": {},
+      "metadata_count": 0,
+      "metadata_entries": [],
+      "artwork_count": 0,
+      "decoded_frames": 135168,
+      "decoded_seconds": 3.065034,
+      "pcm_sha256_prefix": "db29d01255e8043d",
+      "peak": 0.549988,
+      "eof_during_decode": false,
+      "seek_requested_us": 3000000,
+      "seek_actual_us": 3000000,
+      "post_seek_frames": 132300,
+      "post_seek_eof": true,
+      "checks": {
+        "abi_version": "pass",
+        "open": "pass",
+        "probe": "pass",
+        "stream_enumeration": "pass",
+        "select_stream_rejects_invalid": "pass",
+        "read_pcm_rejects_zero_capacity": "pass",
+        "metadata": "pass",
+        "artwork": "pass",
+        "close": "pass"
+      },
+      "verdict": "pass",
+      "song_sha256": "c7a31488b22bbaec1a4d879cc03508f0373f90dd789e5cc0f59a3c8c60a3dcd4",
+      "song_bytes": 1058444
+    }
+  ],
+  "verdict": "pass"
+}

@@ -49,6 +49,23 @@ python3 tests/songcore/dsp_src.py               # DSP/SRC 集成 smoke
 
 详见 [`tests/songcore/README.md`](tests/songcore/README.md)。
 
+## 快速开始：像外部调用者一样使用产物
+
+```bash
+xmake ffmpeg-import                     # 一次性：FFmpeg source closure
+xmake build songcore_shared             # build/artifacts/shared/libsongcore.so
+python3 tools/songcore_ffi_smoke.py song.flac          # 解码验收（仅标准库）
+python3 tools/songcore_ffi_smoke.py --play --seconds 5 song.flac   # 可听验收
+```
+
+只用 Python 标准库 ctypes 直连 `libsongcore.so / songcore.dll`，覆盖
+open/probe/metadata/artwork/decode/seek/close 与 typed-error 契约；支持
+FLAC / MP3 / AAC(M4A) / ADTS / ALAC / WAV / Ogg Vorbis / Opus。
+静态归档外部消费者见
+[`tests/consumer/songcore_static_smoke.c`](tests/consumer/songcore_static_smoke.c)，
+WASM 独立宿主见 `tools/songcore_wasm_smoke.py`。已验证消费者矩阵：
+[`bench/results/songcore-v1/ffi-consumers.json`](bench/results/songcore-v1/ffi-consumers.json)。
+
 ## 文档导航
 
 | 想了解 | 读 |

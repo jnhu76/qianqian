@@ -3,7 +3,7 @@
   {
    "case": "flac-16-44-stereo.flac",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/flac-16-44-stereo.flac",
+    "file": "flac-16-44-stereo.flac",
     "open_ok": true,
     "pre_read_invalid_status": 100,
     "probe_status": 0,
@@ -20,7 +20,7 @@
   {
    "case": "mp3-short.mp3",
    "record": {
-    "file": "/home/hoo/Source/qianqian/corpus/fixtures/mp3-short.mp3",
+    "file": "mp3-short.mp3",
     "open_ok": true,
     "pre_read_invalid_status": 100,
     "probe_status": 0,

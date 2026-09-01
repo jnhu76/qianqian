@@ -1099,9 +1099,21 @@ song_status song_seek(song_handle *h, int64_t requested_position_us,
                               st->time_base);
     int ret = av_seek_frame(h->fmt, sidx, ts, AVSEEK_FLAG_BACKWARD);
     if (ret < 0) {
-        song_status st = (ret == AVERROR(ENOSYS)) ? SONG_ERR_SEEK_UNSUPPORTED
-                                                  : SONG_ERR_SEEK_ERROR;
-        return set_error(h, st, ret, "container seek failed");
+        /* Raw/unindexed containers (raw ADTS: frames carry no timestamps and
+         * the demuxer defines no read_seek) can never land anywhere; avformat
+         * reports that as a generic -1 rather than ENOSYS. No declared
+         * duration and no stream start/duration is the public-side shape of
+         * such sources. The ABI types this class as SEEK_UNSUPPORTED
+         * ("container has no seek"); SEEK_ERROR stays for seeks that should
+         * work but failed. */
+        int container_has_no_seek =
+            h->fmt->duration == AV_NOPTS_VALUE &&
+            st->start_time == AV_NOPTS_VALUE &&
+            st->duration == AV_NOPTS_VALUE;
+        song_status type =
+            (ret == AVERROR(ENOSYS) || container_has_no_seek)
+                ? SONG_ERR_SEEK_UNSUPPORTED : SONG_ERR_SEEK_ERROR;
+        return set_error(h, type, ret, "container seek failed");
     }
     avcodec_flush_buffers(h->dec);
     reset_decode_state(h);

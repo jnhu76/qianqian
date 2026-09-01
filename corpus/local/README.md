@@ -23,5 +23,22 @@ sha256 用于校验 checkout 后音频文件的完整性。
 ## 使用
 
 ```bash
+# 外部消费者验收（仅标准库 ctypes；解码/seek/metadata/artwork 全链路）
+python3 tools/songcore_ffi_smoke.py corpus/local/yinxing-de-chibi/*.flac \
+    corpus/local/yinxing-de-chibi/*.mp3
+
+# 可听验收（wrapper → songcore_ffi_smoke.py --play）
 python3 tools/play_smoke.py corpus/local/yinxing-de-chibi/mp3-cbr-320-artwork.mp3
 ```
+
+## FFI 验收记录（2026-09-01, libsongcore.so, ABI v1）
+
+三首全部 PASS（证据: `bench/results/songcore-v1/local-corpus-ffi.json`）:
+
+| 文件 | container/codec | rate/ch | metadata | artwork | decode | seek |
+|---|---|---|---|---|---|---|
+| `flac-16-44-artwork.flac` | flac/flac | 44.1k/2 | title=隐形的翅膀 | jpeg 1 件 | PASS | 5s→4.923s |
+| `mp3-cbr-128.mp3` | mp3/mp3 | 44.1k/2 | title=隐形的翅膀 | 无 | PASS | 5s→4.989s |
+| `mp3-cbr-320-artwork.mp3` | mp3/mp3 | 44.1k/2 | title=隐形的翅膀 | jpeg 1 件 | PASS | 5s→4.989s |
+
+可听运行（`--play`，5s 采样，44.1 kHz / 2 ch Float32 直出 PortAudio）PASS。
