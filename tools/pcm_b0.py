@@ -14,6 +14,7 @@ the B0 machine evidence:
 import argparse
 import json
 import math
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -26,6 +27,8 @@ BIN = ROOT / "build/pcm-b0"
 
 SRCS = ["bench/pcm/src/b0_harness.c", "bench/pcm/src/b0_dsp.c"]
 FLAGS = ["-std=c11", "-O2", "-Wall", "-Wextra"]
+SAN_FLAGS = ["-std=c11", "-O1", "-g", "-Wall", "-Wextra",
+             "-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
 WRAP = "-Wl,--wrap=malloc,--wrap=calloc,--wrap=free"
 
 BANDS = [31.25, 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
@@ -40,14 +43,37 @@ def git(*args):
     return r.stdout.strip() if r.returncode == 0 else None
 
 
-def build():
+def build(out_name="b0_harness", flags=None):
+    binpath = BIN / out_name
     BIN.mkdir(parents=True, exist_ok=True)
-    r = sh(["cc", *FLAGS, WRAP, "-I", "bench/pcm/src", *SRCS, "-lm",
-            "-o", str(BIN / "b0_harness")], cwd=ROOT)
+    r = sh(["cc", *(flags or FLAGS), WRAP, "-I", "bench/pcm/src", *SRCS,
+            "-lm", "-o", str(binpath)], cwd=ROOT)
     if r.returncode != 0:
         print(r.stderr, file=sys.stderr)
         raise SystemExit("build failed")
-    return r.returncode
+    return binpath
+
+
+def run_sanitizer():
+    """ASan+UBSan+LSan build/run of the full harness; leak detection is
+    the machine evidence for the reprepare/destroy ownership gates
+    (review: lifecycle tests under sanitizer where available)."""
+    san_bin = build("b0_harness_san", SAN_FLAGS)
+    san_dir = BIN / "sanitized"
+    san_dir.mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ, ASAN_OPTIONS="detect_leaks=1")
+    r = subprocess.run([str(san_bin), str(san_dir)], capture_output=True,
+                       text=True, env=env, cwd=ROOT)
+    clean = (r.returncode == 0 and
+             "ERROR: AddressSanitizer" not in r.stderr and
+             "LeakSanitizer" not in r.stderr and
+             "runtime error:" not in r.stderr)
+    print((r.stdout or "").strip())
+    if not clean:
+        print(r.stderr[-1500:], file=sys.stderr)
+    return {"verdict": "PASS" if clean else "FAIL",
+            "flags": SAN_FLAGS,
+            "leak_detection": "LSan detect_leaks=1"}
 
 
 def rbj_response(sr, f0, q, gain_db, freqs):
@@ -141,11 +167,26 @@ def main():
             sections[name] = json.loads((OUT / name).read_text())
         summary = json.loads((OUT / "b0-summary.json").read_text())
         drift = (summary.get("correctness") != sections["b0-correctness.json"]
-                 or summary.get("memory") != sections["b0-memory.json"])
+                 or summary.get("memory") != sections["b0-memory.json"]
+                 or summary.get("response") != sections["b0-dsp-response.json"])
         if drift:
             print("DRIFT: b0-summary.json differs from section JSONs")
             return 1
-        print("b0-summary.json in sync with section JSONs")
+        # verdict must be derived, not trusted from the stored string
+        derived = (sections["b0-correctness.json"]["verdict"] == "PASS"
+                   and sections["b0-dsp-response.json"]["verdict"] == "PASS"
+                   and summary.get("sanitizer", {}).get("verdict") == "PASS"
+                   and all(m["verdict"] == "pass"
+                           for m in sections["b0-memory.json"]["rows"]))
+        expected = "PASS" if derived else "FAIL"
+        if summary.get("verdict") != expected:
+            print(f"DRIFT: b0-summary verdict {summary.get('verdict')!r} "
+                  f"!= derived {expected!r}")
+            return 1
+        if not derived:
+            print("GATE FAIL: B0 derived verdict is FAIL")
+            return 1
+        print("b0-summary.json in sync with section JSONs; verdict PASS")
         return 0
 
     build()
@@ -161,9 +202,11 @@ def main():
     response = run_response()
     (OUT / "b0-dsp-response.json").write_text(
         json.dumps(response, indent=1) + "\n")
+    sanitizer = run_sanitizer()
 
     ok = (correctness["verdict"] == "PASS" and
           response["verdict"] == "PASS" and
+          sanitizer["verdict"] == "PASS" and
           all(m["verdict"] == "pass" for m in memory["rows"]))
     summary = {
         "experiment": "e10-b0-thin-dsp",
@@ -174,6 +217,7 @@ def main():
         "correctness": correctness,
         "memory": memory,
         "response": response,
+        "sanitizer": sanitizer,
         "provenance": {
             "git_parent_commit": git("rev-parse", "HEAD"),
             "git_branch": git("rev-parse", "--abbrev-ref", "HEAD"),

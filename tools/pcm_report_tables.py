@@ -42,6 +42,7 @@ def a1_table():
     q = a1["quality"]["rows"]
     perf = a1["performance"]["rows"]
     shp = a1["shipping"]
+    life = a1.get("lifecycle", {})
     qrows = {}
     for r in q:
         qrows.setdefault(r["candidate"], []).append(r)
@@ -73,9 +74,8 @@ def a1_table():
     # performance
     lines += [
         "",
-        "| candidate | ns/input frame (real 44.1→48) | ns/input frame "
-        "(real 96→44.1) | xRT (min across streams) | post-prepare alloc "
-        "calls |",
+        "| candidate | ns/frame (real 44.1→48) | ns/frame (real 96→44.1) | "
+        "xRT (min) | post-prepare allocs |",
         "|---|---:|---:|---:|---:|",
     ]
     for cand in ["swr", "soxr", "r8b", "lsr"]:
@@ -83,24 +83,69 @@ def a1_table():
         if not rows:
             continue
         f441 = next((r["ns_per_input_frame_median"] for r in rows
-                     if r["in_rate"] == 44100), None)
+                     if r.get("stream") == "real_songcore_44100"), None)
         f96 = next((r["ns_per_input_frame_median"] for r in rows
-                    if r["in_rate"] == 96000), None)
+                    if r.get("stream") == "real_songcore_96000"), None)
         xrt = min(r["xrt"] for r in rows)
         alloc = max(r["post_prepare_alloc_calls"] for r in rows)
+        f441_s = f"{f441:.2f}" if f441 is not None else "n/a"
+        f96_s = f"{f96:.2f}" if f96 is not None else "n/a"
         lines.append(
-            f"| {cand} | {f441:.2f} | {f96:.2f} | {xrt:.1f} | {alloc} |")
-    # shipping
+            f"| {cand} | {f441_s} | {f96_s} | {xrt:.1f} | {alloc} |")
+    # shipping: artifact size + dynamic dependency surface
     lines += [
         "",
-        "| candidate | runner raw bytes | stripped | xz -9 |",
-        "|---|---:|---:|---:|",
-        f"| bypass (baseline) | {shp['baseline_bypass_bytes']} | - | - |",
+        "| candidate | runner raw | stripped | xz -9 | dynamic NEEDED "
+        "(deployment surface) |",
+        "|---|---:|---:|---:|---|",
+        f"| bypass (baseline) | {shp['baseline_bypass_bytes']} | - | - | - |",
     ]
     for r in shp["rows"]:
+        dd = r.get("dynamic_deps", {})
+        deps = ", ".join(dd.get("needed", [])) if dd.get("dynamic") \
+            else "static"
         lines.append(
             f"| {r['candidate']} | {r['raw_bytes']} | {r['stripped_bytes']} "
-            f"| {r['xz_bytes']} |")
+            f"| {r['xz_bytes']} | {deps} |")
+    lines += [
+        "",
+        "shipping 读数：raw/stripped/xz 是 **runner artifact 尺寸**；"
+        "dynamic NEEDED 是候选在部署上会**新增的运行库依赖面**"
+        "（soxr→libgomp，r8b→libstdc++/libgcc_s），两者不可混同。"
+        "swr 已在 Qianqian FFmpeg closure 内，增量只算可达符号。",
+    ]
+    # lifecycle (review: block matrix previously exercised BYPASS only)
+    if life:
+        lines += [
+            "",
+            "streaming contract lifecycle（同一 adapter 实例：pass A = "
+            "1/64/257 帧块+不均匀尾块+drain → reset → pass B = 1024 帧块"
+            "+尾块+drain；两遍输出必须 bit-identical）：",
+            "",
+            "| candidate | classification | accounting ok | frames equal | "
+            "bit-identical | drain 终止 | verdict |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for r in life.get("rows", []):
+            lines.append(
+                f"| {r.get('candidate')} | `{r.get('classification')}` "
+                f"| {r.get('accounting_ok')} | {r.get('frames_equal')} "
+                f"| {r.get('bit_identical')} | rounds "
+                f"A={r.get('passA_drain_rounds')}/"
+                f"B={r.get('passB_drain_rounds')} "
+                f"| {r.get('verdict')} |")
+        lines += [
+            "",
+            f"lifecycle verdict：**{life.get('verdict')}**。r8b 诚实现分类为 "
+            "`ADAPTER_SEMANTICS_SPECIAL_CASE | NO_NATIVE_EOF`（无 EOF API，"
+            "drain 按累计理想帧数喂零裁剪；本次修复了 reset 未清累计账目、"
+            "drain 未回写累计输出两处 adapter bug）。",
+        ]
+    lines += [
+        "",
+        f"A1 verdict：**{a1.get('verdict')}**"
+        f"（{a1.get('verdict_semantics', 'selection experiment only')}）。",
+    ]
     return "\n".join(lines)
 
 
@@ -404,10 +449,35 @@ def b0_table():
         "-6dB analytical / fusion equivalent；biquad 稳定 + reset 清状态；"
         "limiter 无过冲 clamp + latency 0；NaN 策略 active-sanitize，"
         "TRUE OFF 位透明）",
-        "",
-        "machine authority：`b0-correctness.json` / `b0-memory.json` / "
-        "`b0-dsp-response.json` / `b0-summary.json`",
     ]
+    life = corr.get("lifecycle", [])
+    iso = corr.get("instance_isolation", [])
+    if life:
+        lines += [
+            "",
+            "| reprepare lifecycle（prepare 44.1k→process→prepare 48k"
+            "→process→destroy） | allocs | frees | live | verdict |",
+            "|---|---:|---:|---:|---|",
+        ]
+        lines += [
+            f"| {r['case']} | {r['allocs']} | {r['frees']} | "
+            f"{r['live_after_destroy']} | {r['verdict']} |"
+            for r in life
+        ]
+    if iso:
+        lines += ["",
+                  "instance isolation：" + "；".join(
+                      f"`{r['case']}` = {r['verdict']}" for r in iso)
+                  + "（NaN policy 为 per-instance，无隐藏全局可变状态）。"]
+    san = b0.get("sanitizer", {})
+    if san:
+        lines += ["",
+                  f"sanitizer（ASan+UBSan+LSan detect_leaks=1，全 harness）："
+                  f"**{san.get('verdict')}**——reprepare/destroy 所有权与 "
+                  "实例隔离在泄漏检测下成为机器证据。"]
+    lines += ["",
+              "machine authority：`b0-correctness.json` / `b0-memory.json` / "
+              "`b0-dsp-response.json` / `b0-summary.json`"]
     return "\n".join(lines)
 
 
@@ -443,20 +513,28 @@ def b1_table():
         "| reset | in-place 清状态 | 图级 |",
     ]
     lines += ["", "| runner | ns/frame | xRT | post-init allocs | 输出 "
-                  "stripped/xz |", "|---|---:|---:|---:|---:|"]
+                  "stripped/xz | dynamic NEEDED |", "|---|---:|---:|---:|---:|---|"]
     for r in runs:
         name = "avf" if r["backend"] == "avf" else "thin"
         srow = next(x for x in shp if x["runner"] == f"b1_{name}")
+        dd = srow.get("dynamic_deps", {})
+        deps = ", ".join(dd.get("needed", [])) if dd.get("dynamic") \
+            else "static"
         lines.append(
             f"| {name} | {r['ns_per_input_frame']:.1f} | {r['xrt']:.1f} "
             f"| {r['post_init_alloc_calls']} | "
-            f"{srow['stripped_bytes']} / {srow['xz_bytes']} |")
+            f"{srow['stripped_bytes']} / {srow['xz_bytes']} | {deps} |")
     lines += [
         "",
-        "结论（B1 证据范围）：CPU 与 memory passes 相当（12 passes/block，"
-        "框架开销非主导）；差异在 closure（205 vs 2 TU）与 shipping"
-        "（xz 205 KB vs 6 KB，~34×）。libavfilter 对本能力集无必要依赖——"
-        "`libavfilter production dependency = 0 bytes` 成立。",
+        "结论（**历史比较，B1 证据范围**）：对 Gain+EQ10+Limiter 这一能力"
+        "子集，thin 实验实现的工程/交付面小得多（2 TU vs 205 TU；xz "
+        "6 KB vs 205 KB），实测 CPU 同量级（55.9 vs 60.4 ns/frame，单"
+        "主机）。两边报告的 12/block 是 **logical DSP filter passes**"
+        "（每边 12 个逻辑滤波级），**不是**实测 PCM memory traffic——"
+        "avfilter 路径还有 packed↔planar / flt↔dbl 适配与 AVFrame 移动，"
+        "本仪器未计量。此结论**不**证明 libavfilter 不适合作为更宽的"
+        "能力仓库；宽能力成本分析由 E10-C0（PR #16）接管并取代本节的"
+        "窄解释。**不是 DSP backend 选择。**",
     ]
     return "\n".join(lines)
 

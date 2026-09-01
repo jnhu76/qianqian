@@ -1,6 +1,8 @@
 {
  "experiment": "e10-pcm-processing",
  "verdict": "PASS",
+ "verdict_semantics": "PASS = all stage authorities exist, are mutually consistent, and every stage's own machine gates pass; it does NOT select an SRC/DSP backend and merges nothing",
+ "role": "EXPLORATORY / HISTORICAL EVIDENCE (A0/A1/B0/B1); P0 is the measurement boundary (ruler); no backend selection",
  "stages": {
   "P0": {
    "verdict": "PASS",
@@ -25,7 +27,7 @@
    }
   },
   "A0": {
-   "verdict": "COLLECTED",
+   "verdict": "PASS",
    "authority": "a0-summary.json"
   },
   "A1": {
@@ -45,11 +47,13 @@
   "production_code_changed": false,
   "no_pr_merged": true,
   "no_simd": true,
-  "no_kotlin": true
+  "no_kotlin": true,
+  "selects_no_src": true,
+  "selects_no_dsp": true
  },
  "provenance": {
-  "git_parent_commit": "af875cd0c5b87d3c2683c9e06f99516fa0efc0cb",
+  "git_parent_commit": "afa27718cf823d58df985304fa1f0fa020ab8e9f",
   "git_branch": "exp/e10-src-dsp-lab",
-  "generated_utc": "2026-08-31T17:41:23Z"
+  "generated_utc": "2026-09-01T03:35:32Z"
  }
 }

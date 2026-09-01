@@ -128,6 +128,11 @@ static int r8b_drain(a1_src *s, float *out, long out_cap, long *produced) {
         total += outn;
         remaining -= outn;
     }
+    /* keep the cumulative output accounting consistent: drain feeds
+     * zeros directly into the resamplers (bypassing process()), and the
+     * produced frames must be reflected here or repeated drain() calls
+     * would re-emit the same tail forever (found by the lifecycle run) */
+    r->total_output_produced += total;
     *produced = total;
     return 0;
 }
@@ -135,6 +140,11 @@ static int r8b_drain(a1_src *s, float *out, long out_cap, long *produced) {
 static int r8b_reset(a1_src *s) {
     r8b_t *r = (r8b_t *)s->impl;
     for (auto *p : r->res) p->clear();
+    /* drain() trims to the cumulative ideal output count computed from
+     * total_input_fed/total_output_produced; leaving them stale after a
+     * reset made post-reset drain mis-trim (review blocker). */
+    r->total_input_fed = 0;
+    r->total_output_produced = 0;
     return 0;
 }
 

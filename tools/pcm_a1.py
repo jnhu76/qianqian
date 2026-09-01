@@ -22,6 +22,7 @@ import argparse
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -42,9 +43,40 @@ BLOCK_MATRIX = [1, 64, 1024, 4096]
 
 RNG_SEED = 0xE10A1B00
 
+# Honest per-candidate adapter semantics (review: do not hide adapter
+# limitations behind a generic "contract-compatible" claim). The
+# lifecycle invariants are enforced for EVERY candidate; the
+# classification only documents HOW the candidate satisfies the drain
+# semantics.
+CANDIDATE_CLASSIFICATION = {
+    "swr": {
+        "class": "GENERIC",
+        "rationale": "swr_convert(NULL, 0) is a native flush-to-EOF; "
+                     "reset = swr_close + swr_init",
+    },
+    "soxr": {
+        "class": "GENERIC",
+        "rationale": "soxr_process(NULL, 0) is a native drain; "
+                     "reset = soxr_clear",
+    },
+    "lsr": {
+        "class": "GENERIC",
+        "rationale": "end_of_input on the last process call flushes the "
+                     "filter tail natively; reset = src_reset",
+    },
+    "r8b": {
+        "class": "ADAPTER_SEMANTICS_SPECIAL_CASE | NO_NATIVE_EOF",
+        "rationale": "r8brain has no EOF/drain API: the adapter feeds "
+                     "zeros and trims to the cumulative ideal output "
+                     "count (total_input_fed based); getLatency() is 0. "
+                     "reset() must also zero the cumulative accounting "
+                     "(fixed this branch) or post-reset drain mis-trims",
+    },
+}
+
 SECTION_JSONS = ["a1-src-quality.json", "a1-src-correctness.json",
                  "a1-src-performance.json", "a1-src-memory.json",
-                 "a1-src-shipping.json"]
+                 "a1-src-shipping.json", "a1-src-lifecycle.json"]
 
 
 def sh(cmd, **kw):
@@ -399,28 +431,34 @@ def decode_real_pcm():
     """Decode real SongCore corpus files to raw Float32 via the repo's
     qn_pcm_dump (QPCM container on stdout: 'QPCM' + u32le rate + u16le
     ch + u16le format(1=f32le) + interleaved f32le). Returns list of
-    (path, rate)."""
+    (path, rate). Fail loud: a silent degradation to synthetic-only
+    perf evidence would quietly drop the real-PCM rows the committed
+    claims reference (this actually happened once — caught by the
+    report-table formatter crashing on the missing columns)."""
     dump = ROOT / "build/artifacts/qn_pcm_dump"
     if not dump.exists():
-        return []
+        raise SystemExit("qn_pcm_dump missing — build it with "
+                         "`xmake qn_pcm_dump`; refusing to write perf "
+                         "evidence without the real-SongCore rows")
     result = []
     wanted = [("flac-16-44-stereo.flac", 44100),
               ("wav-s24le-96-stereo.wav", 96000)]
     for fname, rate in wanted:
         src = ROOT / "corpus/fixtures" / fname
         if not src.exists():
-            continue
+            raise SystemExit(f"corpus fixture missing: {src}")
         r = subprocess.run([str(dump), str(src)], capture_output=True)
         data = r.stdout
         if r.returncode != 0 or len(data) < 12:
-            continue
+            raise SystemExit(f"qn_pcm_dump failed on {src}")
         if data[:4] != b"QPCM":
-            continue
+            raise SystemExit(f"unexpected dump format for {src}")
         r_rate = int.from_bytes(data[4:8], "little")
         r_ch = int.from_bytes(data[8:10], "little")
         r_fmt = int.from_bytes(data[10:12], "little")
         if r_fmt != 1 or r_rate != rate or r_ch != 2:
-            continue
+            raise SystemExit(f"unexpected PCM geometry for {src}: "
+                             f"{r_rate} Hz {r_ch}ch fmt={r_fmt}")
         raw = RUN / f"real_{rate}.raw"
         raw.write_bytes(data[12:])
         result.append((str(raw), rate))
@@ -446,10 +484,97 @@ def measure_shipping():
             "raw_bytes": int(raw),
             "stripped_bytes": int(ss),
             "xz_bytes": int(xs),
+            "dynamic_deps": ldd_needed(b),
         })
     bypass = RUN / "a1_run_bypass"
     base = bypass.stat().st_size if bypass.exists() else 0
-    return {"baseline_bypass_bytes": int(base), "rows": rows}
+    return {
+        "baseline_bypass_bytes": int(base),
+        "rows": rows,
+        "deployment_note": "raw/stripped/xz are RUNNER ARTIFACT sizes; "
+                           "dynamic_deps records the dynamic linker "
+                           "NEEDED set (Linux ldd of the unstripped "
+                           "runner) as the new dependency surface the "
+                           "candidate would add to a deployment. Artifact "
+                           "size != deployment footprint (e.g. soxr "
+                           "pulls libgomp via -fopenmp, r8b pulls "
+                           "libstdc++ via g++ linkage).",
+    }
+
+
+def ldd_needed(binpath):
+    """Structured `ldd` NEEDED set of a runner (Linux). Static binaries
+    report dynamic=False."""
+    r = subprocess.run(["ldd", str(binpath)], capture_output=True,
+                       text=True)
+    out = r.stdout.strip()
+    if r.returncode != 0 or "not a dynamic executable" in out:
+        return {"dynamic": False, "needed": []}
+    needed = sorted(set(
+        m.group(1) for m in re.finditer(r"^\s*(\S+\.so[^\s]*)\s+=>", out,
+                                        re.M)))
+    return {"dynamic": True, "needed": needed}
+
+
+def run_lifecycle(signals):
+    """Streaming-contract lifecycle coverage per candidate (review:
+    the block matrix previously exercised BYPASS only). One adapter
+    instance: pass A (1/64/257-frame chunks, uneven tail) -> drain ->
+    reset() -> pass B (1024-frame chunks, uneven tail) -> drain; the two
+    output streams must be bit-identical (deterministic within declared
+    policy) and accounting must conserve input."""
+    lc_dir = RUN / "lifecycle"
+    lc_dir.mkdir(parents=True, exist_ok=True)
+    in_rate, out_rate = 44100, 48000
+    in_raw = signals[("sine1k", in_rate)]
+    rows = []
+    for cand in CANDIDATES:
+        jp = lc_dir / f"lc_{cand}.json"
+        r = subprocess.run(
+            [str(RUN / f"a1_run_{cand}"), "--lifecycle",
+             str(in_rate), str(out_rate), "2", in_raw,
+             str(lc_dir / f"lc_{cand}"), str(jp)],
+            capture_output=True, text=True)
+        if r.returncode != 0:
+            rows.append({"candidate": cand, "verdict": "FAIL",
+                         "error": (r.stderr or r.stdout)[-400:]})
+            continue
+        j = json.loads(jp.read_text())
+        cls = CANDIDATE_CLASSIFICATION[cand]
+        row = {
+            "candidate": cand,
+            "classification": cls["class"],
+            "classification_rationale": cls["rationale"],
+            "conversion": f"{in_rate}->{out_rate}",
+            "passA_blocks": j["passA_blocks"],
+            "passB_blocks": j["passB_blocks"],
+            "passA_frames": j["passA"]["produced_frames"],
+            "passB_frames": j["passB"]["produced_frames"],
+            "passA_drain_rounds": j["passA"]["drain_rounds"],
+            "passB_drain_rounds": j["passB"]["drain_rounds"],
+            "accounting_ok": j["accounting_ok"],
+            "frames_equal": j["frames_equal"],
+            "bit_identical": j["bit_identical"],
+            "verdict": "pass" if (j["accounting_ok"] and
+                                  j["frames_equal"] and
+                                  j["bit_identical"] and
+                                  j["passA"]["drain_rounds"] < 65536 and
+                                  j["passB"]["drain_rounds"] < 65536)
+                       else "FAIL",
+        }
+        rows.append(row)
+    return {
+        "experiment": "e10-a1", "section": "src_lifecycle",
+        "method": "same adapter instance; pass A = 1/64/257-frame chunks "
+                  "with uneven final block + drain; reset(); pass B = "
+                  "1024-frame chunks with uneven final block + drain; "
+                  "outputs must be bit-identical (determinism within "
+                  "declared policy), accounting conserved, drain "
+                  "terminates",
+        "rows": rows,
+        "verdict": "PASS" if all(r.get("verdict") == "pass"
+                                 for r in rows) else "FAIL",
+    }
 
 
 # ---------------------------------------------------------------- #
@@ -466,12 +591,23 @@ def main():
     if args.check:
         sec = load_sections()
         summary = json.loads((OUT / "a1-summary.json").read_text())
-        drift = (summary.get("quality") != sec["a1-src-quality.json"] or
-                 summary.get("correctness") != sec["a1-src-correctness.json"])
+        drift = []
+        for name in SECTION_JSONS:
+            if summary.get(section_key(name)) != sec[name]:
+                drift.append(name)
+        fresh_verdict = derive_verdict(sec)
         if drift:
-            print("DRIFT: a1-summary.json differs from section JSONs")
+            print("DRIFT: a1-summary.json differs from section JSONs: "
+                  + ", ".join(drift))
             return 1
-        print("a1-summary.json in sync with section JSONs")
+        if summary.get("verdict") != fresh_verdict:
+            print(f"DRIFT: a1-summary verdict {summary.get('verdict')!r} "
+                  f"!= derived {fresh_verdict!r}")
+            return 1
+        if fresh_verdict != "PASS":
+            print("GATE FAIL: A1 derived verdict is", fresh_verdict)
+            return 1
+        print("a1-summary.json in sync with section JSONs; verdict PASS")
         return 0
 
     RUN.mkdir(parents=True, exist_ok=True)
@@ -541,6 +677,9 @@ def main():
         performance_rows = run_performance(sigdir, runs_dir)
         shipping = measure_shipping()
 
+    # streaming lifecycle coverage (per candidate)
+    lifecycle = run_lifecycle(signals)
+
     # assemble
     quality_sec = {"experiment": "e10-a1", "section": "src_quality",
                    "rows": quality_rows}
@@ -567,21 +706,39 @@ def main():
     for name, sec in [("a1-src-quality.json", quality_sec),
                       ("a1-src-correctness.json", correctness_sec),
                       ("a1-src-memory.json", memory_sec),
-                      ("a1-src-performance.json", perf_sec)]:
+                      ("a1-src-performance.json", perf_sec),
+                      ("a1-src-lifecycle.json", lifecycle)]:
         (OUT / name).write_text(json.dumps(sec, indent=1) + "\n")
     if shipping_sec:
         (OUT / "a1-src-shipping.json").write_text(
             json.dumps(shipping_sec, indent=1) + "\n")
 
+    sec_for_verdict = {
+        "a1-src-quality.json": quality_sec,
+        "a1-src-correctness.json": correctness_sec,
+        "a1-src-memory.json": memory_sec,
+        "a1-src-performance.json": perf_sec,
+        "a1-src-lifecycle.json": lifecycle,
+        "a1-src-shipping.json": shipping_sec,
+    }
+    verdict = derive_verdict(sec_for_verdict)
     summary = {
         "experiment": "e10-a1-src-shootout",
         "authority_files": SECTION_JSONS,
-        "scope": "selection experiment only; no production decision frozen",
+        "scope": "selection experiment only; no production decision frozen; "
+                 "SRC selection remains deferred",
+        "verdict": verdict,
+        "verdict_semantics": "PASS = evidence internally consistent and "
+                             "every candidate satisfies the RateStage "
+                             "streaming contract (or is honestly "
+                             "classified); it does NOT mean an SRC/DSP "
+                             "backend was selected",
         "quality": quality_sec,
         "correctness": correctness_sec,
         "memory": memory_sec,
         "performance": perf_sec,
         "shipping": shipping_sec,
+        "lifecycle": lifecycle,
         "provenance": {
             "git_parent_commit": git("rev-parse", "HEAD"),
             "git_branch": git("rev-parse", "--abbrev-ref", "HEAD"),
@@ -600,8 +757,8 @@ def main():
         },
     }
     (OUT / "a1-summary.json").write_text(json.dumps(summary, indent=1) + "\n")
-    print("a1-summary written")
-    return 0
+    print("a1-summary written; verdict", verdict)
+    return 0 if verdict == "PASS" else 1
 
 
 def load_sections():
@@ -609,6 +766,56 @@ def load_sections():
     for f in SECTION_JSONS:
         sec[f] = json.loads((OUT / f).read_text())
     return sec
+
+
+def section_key(name):
+    """Summary key under which a section JSON is embedded."""
+    return {
+        "a1-src-quality.json": "quality",
+        "a1-src-correctness.json": "correctness",
+        "a1-src-memory.json": "memory",
+        "a1-src-performance.json": "performance",
+        "a1-src-shipping.json": "shipping",
+        "a1-src-lifecycle.json": "lifecycle",
+    }[name]
+
+
+def derive_verdict(sec):
+    """Fail-closed A1 verdict, derived from machine fields (review: the
+    old top-level composed hard-coded PASS). Every required gate must
+    hold; missing sections fail."""
+    try:
+        life = sec["a1-src-lifecycle.json"]
+        corr = sec["a1-src-correctness.json"]
+        mem = sec["a1-src-memory.json"]
+        perf = sec["a1-src-performance.json"]
+        shp = sec["a1-src-shipping.json"]
+    except (KeyError, FileNotFoundError):
+        return "FAIL"
+    if life.get("verdict") != "PASS":
+        return "FAIL"
+    # bypass same-rate sanity must be bit-identical at every block size
+    if not all(r.get("bit_identical") for r in
+               corr.get("bypass_sanity_same_rate", [])):
+        return "FAIL"
+    # duration accounting: every candidate within declared +-1 frame
+    for r in corr.get("rows", []):
+        d = r.get("duration_error_frames")
+        if d is None or abs(d) > 1:
+            return "FAIL"
+    mem_cands = {r.get("candidate") for r in mem.get("rows", [])}
+    shp_cands = {r.get("candidate") for r in shp.get("rows", [])}
+    if mem_cands < set(CANDIDATES) or shp_cands < set(CANDIDATES):
+        return "FAIL"
+    perf_rows = perf.get("rows", [])
+    if not perf_rows:
+        return "FAIL"
+    # real-SongCore perf rows are part of the claim surface; a run that
+    # silently degrades to synthetic-only must not compose a green verdict
+    if not any(str(r.get("stream", "")).startswith("real_songcore_")
+               for r in perf_rows):
+        return "FAIL"
+    return "PASS"
 
 
 if __name__ == "__main__":

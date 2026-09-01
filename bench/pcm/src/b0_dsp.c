@@ -10,24 +10,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int g_nan_policy_sanitize = 1;
+/* NaN policy is per-instance (b0_dsp.nan_sanitize); there is no hidden
+ * global mutable DSP state. */
 
 void b0_dsp_set_nan_policy(b0_dsp *d, int sanitize_active) {
-    (void)d;
-    g_nan_policy_sanitize = sanitize_active;
+    d->nan_sanitize = sanitize_active;
 }
 
 /* ---------------------------------------------------------------- */
 /* shared: sanitize helper (applies to every active DSP pass)        */
 /* ---------------------------------------------------------------- */
 
-/* Returns 1 if any non-finite sample was found (and, with the policy
- * active, zeroed). */
-static int sanitize_block(float *pcm, long frames, int channels) {
+/* Returns 1 if any non-finite sample was found (and, with the instance
+ * policy active, zeroed). */
+static int sanitize_block(float *pcm, long frames, int channels,
+                          int sanitize) {
     long n = frames * channels;
     long i;
     int found = 0;
-    if (!g_nan_policy_sanitize)
+    if (!sanitize)
         return 0;
     for (i = 0; i < n; i++) {
         float v = pcm[i];
@@ -62,7 +63,8 @@ static int gain_prepare(b0_dsp *d, int sample_rate, int channels,
 static int gain_process(b0_dsp *d, float *pcm, long frames) {
     gain_t *g = (gain_t *)d->impl;
     long n = frames * g->channels, i;
-    if (sanitize_block(pcm, frames, g->channels)) g->nan_seen = 1;
+    if (sanitize_block(pcm, frames, g->channels, d->nan_sanitize))
+        g->nan_seen = 1;
     for (i = 0; i < n; i++) pcm[i] *= g->g;
     return 0;
 }
@@ -93,6 +95,7 @@ int b0_gain_new(b0_dsp *d, float gain_linear) {
     if (!g) return -1;
     d->ops = &kGainOps;
     d->impl = g;
+    d->nan_sanitize = 1;
     g->g = gain_linear;
     return 0;
 }
@@ -136,6 +139,9 @@ static int biquad_prepare(b0_dsp *d, int sample_rate, int channels,
     biquad_t *b = (biquad_t *)d->impl;
     b->channels = channels;
     b->nan_seen = 0;
+    /* re-prepare must not leak the previous state (review blocker) */
+    free(b->s1);
+    free(b->s2);
     b->s1 = (float *)calloc((size_t)channels, sizeof(float));
     b->s2 = (float *)calloc((size_t)channels, sizeof(float));
     if (!b->s1 || !b->s2) return -1;
@@ -146,7 +152,8 @@ static int biquad_prepare(b0_dsp *d, int sample_rate, int channels,
 static int biquad_process(b0_dsp *d, float *pcm, long frames) {
     biquad_t *b = (biquad_t *)d->impl;
     long i;
-    if (sanitize_block(pcm, frames, b->channels)) b->nan_seen = 1;
+    if (sanitize_block(pcm, frames, b->channels, d->nan_sanitize))
+        b->nan_seen = 1;
     for (i = 0; i < frames; i++) {
         int c;
         for (c = 0; c < b->channels; c++) {
@@ -196,6 +203,7 @@ int b0_peaking_new(b0_dsp *d, int sample_rate, float f0, float q,
     }
     d->ops = &kBiquadOps;
     d->impl = b;
+    d->nan_sanitize = 1;
     return 0;
 }
 
@@ -255,6 +263,9 @@ static int eq10_prepare(b0_dsp *d, int sample_rate, int channels,
         e->nactive++;
         b->channels = channels;
         b->nan_seen = 0;
+        /* re-prepare must not leak previous band state (review blocker) */
+        free(b->s1);
+        free(b->s2);
         b->s1 = (float *)calloc((size_t)channels, sizeof(float));
         b->s2 = (float *)calloc((size_t)channels, sizeof(float));
         if (!b->s1 || !b->s2) return -1;
@@ -266,7 +277,8 @@ static int eq10_prepare(b0_dsp *d, int sample_rate, int channels,
 static int eq10_process(b0_dsp *d, float *pcm, long frames) {
     eq10_t *e = (eq10_t *)d->impl;
     int i;
-    if (sanitize_block(pcm, frames, e->channels)) e->nan_seen = 1;
+    if (sanitize_block(pcm, frames, e->channels, d->nan_sanitize))
+        e->nan_seen = 1;
     for (i = 0; i < EQ10_BANDS; i++) {
         biquad_t *b;
         long k;
@@ -332,6 +344,7 @@ int b0_eq10_new(b0_dsp *d, int sample_rate, const float gains_db[10]) {
     }
     d->ops = &kEq10Ops;
     d->impl = e;
+    d->nan_sanitize = 1;
     (void)sample_rate;
     return 0;
 }
@@ -359,6 +372,8 @@ static int limiter_prepare(b0_dsp *d, int sample_rate, int channels,
     l->sample_rate = sample_rate;
     l->nan_seen = 0;
     l->env = 0.0f;
+    /* re-prepare must not leak the previous envelope (review blocker) */
+    free(l->envs);
     l->envs = (float *)calloc((size_t)channels, sizeof(float));
     if (!l->envs) return -1;
     (void)max_frames;
@@ -370,7 +385,8 @@ static int limiter_process(b0_dsp *d, float *pcm, long frames) {
     long i;
     /* instant attack via peak-hold; smooth release */
     double rel = 1.0 - exp(-1.0 / ((double)l->release_coef * l->sample_rate));
-    if (sanitize_block(pcm, frames, l->channels)) l->nan_seen = 1;
+    if (sanitize_block(pcm, frames, l->channels, d->nan_sanitize))
+        l->nan_seen = 1;
     for (i = 0; i < frames; i++) {
         int c;
         for (c = 0; c < l->channels; c++) {
@@ -425,6 +441,7 @@ int b0_limiter_new(b0_dsp *d, int sample_rate, float threshold_db,
     l->release_coef = release_s > 0 ? release_s : 0.1f;
     d->ops = &kLimiterOps;
     d->impl = l;
+    d->nan_sanitize = 1;
     return 0;
 }
 

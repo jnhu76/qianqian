@@ -9,8 +9,8 @@
    "out_rate": 48000,
    "stream": "real_songcore_44100",
    "reps": 3,
-   "ns_per_input_frame_median": 21.132,
-   "xrt": 1022.35,
+   "ns_per_input_frame_median": 21.319,
+   "xrt": 1027.93,
    "post_prepare_alloc_calls": 0
   },
   {
@@ -19,8 +19,8 @@
    "out_rate": 44100,
    "stream": "synthetic_96k_60s",
    "reps": 3,
-   "ns_per_input_frame_median": 22.085,
-   "xrt": 484.28,
+   "ns_per_input_frame_median": 22.006,
+   "xrt": 465.0,
    "post_prepare_alloc_calls": 0
   },
   {
@@ -29,8 +29,8 @@
    "out_rate": 44100,
    "stream": "real_songcore_96000",
    "reps": 3,
-   "ns_per_input_frame_median": 21.101,
-   "xrt": 493.66,
+   "ns_per_input_frame_median": 23.02,
+   "xrt": 478.72,
    "post_prepare_alloc_calls": 0
   },
   {
@@ -39,8 +39,8 @@
    "out_rate": 48000,
    "stream": "real_songcore_44100",
    "reps": 3,
-   "ns_per_input_frame_median": 17.18,
-   "xrt": 1290.55,
+   "ns_per_input_frame_median": 21.021,
+   "xrt": 1063.36,
    "post_prepare_alloc_calls": 39
   },
   {
@@ -49,8 +49,8 @@
    "out_rate": 44100,
    "stream": "synthetic_96k_60s",
    "reps": 3,
-   "ns_per_input_frame_median": 10.909,
-   "xrt": 925.02,
+   "ns_per_input_frame_median": 11.378,
+   "xrt": 936.32,
    "post_prepare_alloc_calls": 43
   },
   {
@@ -59,8 +59,8 @@
    "out_rate": 44100,
    "stream": "real_songcore_96000",
    "reps": 3,
-   "ns_per_input_frame_median": 11.561,
-   "xrt": 928.18,
+   "ns_per_input_frame_median": 11.34,
+   "xrt": 930.31,
    "post_prepare_alloc_calls": 43
   },
   {
@@ -69,8 +69,8 @@
    "out_rate": 48000,
    "stream": "real_songcore_44100",
    "reps": 3,
-   "ns_per_input_frame_median": 47.338,
-   "xrt": 479.02,
+   "ns_per_input_frame_median": 47.645,
+   "xrt": 475.93,
    "post_prepare_alloc_calls": 0
   },
   {
@@ -79,8 +79,8 @@
    "out_rate": 44100,
    "stream": "synthetic_96k_60s",
    "reps": 3,
-   "ns_per_input_frame_median": 28.664,
-   "xrt": 363.41,
+   "ns_per_input_frame_median": 29.191,
+   "xrt": 354.72,
    "post_prepare_alloc_calls": 0
   },
   {
@@ -89,8 +89,8 @@
    "out_rate": 44100,
    "stream": "real_songcore_96000",
    "reps": 3,
-   "ns_per_input_frame_median": 28.215,
-   "xrt": 366.96,
+   "ns_per_input_frame_median": 29.795,
+   "xrt": 356.94,
    "post_prepare_alloc_calls": 0
   },
   {
@@ -99,8 +99,8 @@
    "out_rate": 48000,
    "stream": "real_songcore_44100",
    "reps": 3,
-   "ns_per_input_frame_median": 744.194,
-   "xrt": 31.97,
+   "ns_per_input_frame_median": 728.923,
+   "xrt": 31.11,
    "post_prepare_alloc_calls": 0
   },
   {
@@ -109,8 +109,8 @@
    "out_rate": 44100,
    "stream": "synthetic_96k_60s",
    "reps": 3,
-   "ns_per_input_frame_median": 761.876,
-   "xrt": 13.96,
+   "ns_per_input_frame_median": 770.28,
+   "xrt": 13.52,
    "post_prepare_alloc_calls": 0
   },
   {
@@ -119,8 +119,8 @@
    "out_rate": 44100,
    "stream": "real_songcore_96000",
    "reps": 3,
-   "ns_per_input_frame_median": 730.759,
-   "xrt": 14.11,
+   "ns_per_input_frame_median": 799.246,
+   "xrt": 13.31,
    "post_prepare_alloc_calls": 0
   }
  ]

@@ -16,6 +16,7 @@
 #include <string.h>
 
 static long long g_alloc_calls;
+static long long g_free_calls;
 static int g_armed;
 
 void *__real_malloc(size_t n);
@@ -32,7 +33,10 @@ void *__wrap_calloc(size_t n, size_t s) {
     if (g_armed) g_alloc_calls++;
     return p;
 }
-void __wrap_free(void *p) { __real_free(p); }
+void __wrap_free(void *p) {
+    if (p && g_armed) g_free_calls++;
+    __real_free(p);
+}
 
 static int nearly(float a, float b, float eps) {
     return fabsf(a - b) <= eps;
@@ -98,6 +102,7 @@ static int test_gain(FILE *f) {
         float a[16], b_[16];
         float fused = powf(10.0f, 3.0f / 20.0f) * powf(10.0f, -2.0f / 20.0f);
         for (i = 0; i < 16; i++) { a[i] = (float)i * 0.05f; b_[i] = a[i]; }
+        g.ops->destroy(&g); /* release before re-creating (ASan leak) */
         b0_gain_new(&g, fused);
         g.ops->prepare(&g, 48000, 1, 4096);
         g.ops->process(&g, a, 16);
@@ -317,11 +322,128 @@ static int test_nan_policy(FILE *f) {
 }
 
 /* ---------------------------------------------------------------- */
+/* lifecycle: re-prepare ownership + per-instance NaN policy          */
+/* (review blockers: prepare leaked old state on re-prepare; NaN      */
+/* policy was a hidden file global shared by all instances)           */
+/* ---------------------------------------------------------------- */
+
+/* prepare(rate A) -> process -> prepare(rate B) -> process -> destroy,
+ * with alloc/free counters armed across the whole lifecycle: live
+ * (allocs - frees) must return to 0, i.e. no re-prepare leak. */
+static int reprepare_case(FILE *f, const char *case_name, int is_first,
+                          int kind) {
+    /* kind: 0=biquad 1=eq10 2=limiter */
+    b0_dsp d;
+    float buf[256];
+    long i;
+    long long live;
+    int ok = 1;
+    float gains[10] = {3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+
+    g_alloc_calls = 0;
+    g_free_calls = 0;
+    g_armed = 1;
+    switch (kind) {
+    case 0: b0_peaking_new(&d, 44100, 1000.0f, 1.0f, 6.0f); break;
+    case 1: b0_eq10_new(&d, 44100, gains); break;
+    default: b0_limiter_new(&d, 44100, 0.0f, 0.001f, 0.1f); break;
+    }
+    d.ops->prepare(&d, 44100, 1, 4096);
+    for (i = 0; i < 256; i++) buf[i] = 0.4f * (float)(i % 9) / 9.0f;
+    d.ops->process(&d, buf, 256);
+    /* re-prepare at a different rate: previous state must be released */
+    d.ops->prepare(&d, 48000, 1, 4096);
+    for (i = 0; i < 256; i++) buf[i] = 0.4f * (float)(i % 9) / 9.0f;
+    d.ops->process(&d, buf, 256);
+    {
+        int finite = 1;
+        for (i = 0; i < 256; i++)
+            if (!isfinite(buf[i])) { finite = 0; break; }
+        if (!finite) ok = 0;
+        if (kind != 2) { /* limiter on 0.4 input may stay untouched */
+            int nonzero = 0;
+            for (i = 0; i < 256; i++)
+                if (buf[i] != 0.0f) { nonzero = 1; break; }
+            if (!nonzero) ok = 0;
+        }
+    }
+    d.ops->destroy(&d);
+    live = g_alloc_calls - g_free_calls;
+    g_armed = 0;
+    fprintf(f, "%s    {\"case\": \"%s\", \"allocs\": %lld, \"frees\": %lld, "
+               "\"live_after_destroy\": %lld, \"verdict\": \"%s\"}",
+            is_first ? "" : ",\n", case_name, g_alloc_calls,
+            g_free_calls, live, (ok && live == 0) ? "pass" : "FAIL");
+    return ok && live == 0;
+}
+
+static int test_lifecycle(FILE *f) {
+    int ok = 1;
+    fprintf(f, "  \"lifecycle\": [\n");
+    ok &= reprepare_case(f, "biquad_reprepare_44100_48000_no_leak", 1, 0);
+    ok &= reprepare_case(f, "eq10_reprepare_44100_48000_no_leak", 0, 1);
+    ok &= reprepare_case(f, "limiter_reprepare_44100_48000_no_leak", 0, 2);
+    fprintf(f, "\n  ],\n");
+    return ok;
+}
+
+static int test_instance_isolation(FILE *f) {
+    int ok = 1;
+    b0_dsp b1, b2;
+    float x1[16], x2[16];
+    long i;
+
+    fprintf(f, "  \"instance_isolation\": [\n");
+    b0_peaking_new(&b1, 48000, 1000.0f, 1.0f, 6.0f);
+    b0_peaking_new(&b2, 48000, 1000.0f, 1.0f, 6.0f);
+    b1.ops->prepare(&b1, 48000, 1, 4096);
+    b2.ops->prepare(&b2, 48000, 1, 4096);
+    /* two instances with OPPOSITE policies must behave independently */
+    b0_dsp_set_nan_policy(&b1, 1);
+    b0_dsp_set_nan_policy(&b2, 0);
+    for (i = 0; i < 16; i++) { x1[i] = 0.5f; x2[i] = 0.5f; }
+    x1[0] = NAN;
+    x2[0] = NAN;
+    b1.ops->process(&b1, x1, 16);
+    b2.ops->process(&b2, x2, 16);
+    {
+        int s1 = isfinite(x1[0]) && b0_dsp_nan_seen(&b1) == 1;
+        int p2 = (x2[0] != x2[0]) && b0_dsp_nan_seen(&b2) == 0;
+        /* flip the policies the other way round: still independent.
+         * reset() first — nan_seen is a sticky event flag and the
+         * policy=0 pass poisons b2's IIR state by design. */
+        b0_dsp_set_nan_policy(&b1, 0);
+        b0_dsp_set_nan_policy(&b2, 1);
+        b1.ops->reset(&b1);
+        b2.ops->reset(&b2);
+        for (i = 0; i < 16; i++) { x1[i] = 0.5f; x2[i] = 0.5f; }
+        x1[0] = NAN;
+        x2[0] = NAN;
+        b1.ops->process(&b1, x1, 16);
+        b2.ops->process(&b2, x2, 16);
+        int p1 = (x1[0] != x1[0]) && b0_dsp_nan_seen(&b1) == 0;
+        int s2 = isfinite(x2[0]) && b0_dsp_nan_seen(&b2) == 1;
+        int pass = s1 && p2 && p1 && s2;
+        fprintf(f, "    {\"case\": \"nan_policy_per_instance\", "
+                   "\"verdict\": \"%s\"}", pass ? "pass" : "FAIL");
+        if (!pass) ok = 0;
+    }
+    b1.ops->destroy(&b1);
+    b2.ops->destroy(&b2);
+    fprintf(f, "\n  ],\n");
+    return ok;
+}
+
+/* ---------------------------------------------------------------- */
 /* memory passes                                                     */
 /* ---------------------------------------------------------------- */
 
 static int run_memory(FILE *f) {
-    float buf[256];
+    /* 256 frames x 2 channels: the chains are prepared stereo, so the
+     * buffer must hold frames*channels floats (was float[256], an
+     * out-of-bounds read/write caught by ASan — pre-existing bug) */
+    enum { FRAMES = 256, CHANNELS = 2 };
+    float buf[FRAMES * CHANNELS];
     long i;
     int ok = 1;
     /* chains: [gain], [biquad], [eq10], [gain,eq10], [gain,eq10,limiter] */
@@ -344,7 +466,8 @@ static int run_memory(FILE *f) {
         int nn = 0, k;
         long long allocs_rt = 0;
         float gains[10] = {3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
-        for (i = 0; i < 256; i++) buf[i] = 0.5f * (float)(i % 5) / 5.0f;
+        for (i = 0; i < (long)FRAMES * CHANNELS; i++)
+            buf[i] = 0.5f * (float)(i % 5) / 5.0f;
         if (chains[ci].ngain) {
             b0_gain_new(&nodes[nn], 0.8f);
             nodes[nn].ops->prepare(&nodes[nn], 48000, 2, 4096);
@@ -370,7 +493,7 @@ static int run_memory(FILE *f) {
         g_armed = 1;
         for (k = 0; k < 100; k++)
             for (int n = 0; n < nn; n++)
-                nodes[n].ops->process(&nodes[n], buf, 256);
+                nodes[n].ops->process(&nodes[n], buf, FRAMES);
         g_armed = 0;
         allocs_rt = g_alloc_calls;
         {
@@ -415,6 +538,8 @@ int main(int argc, char **argv) {
     ok &= test_eq10(f);
     ok &= test_limiter(f);
     ok &= test_nan_policy(f);
+    ok &= test_lifecycle(f);
+    ok &= test_instance_isolation(f);
     fprintf(f, "  \"verdict\": \"%s\"\n}\n", ok ? "PASS" : "FAIL");
     fclose(f);
 

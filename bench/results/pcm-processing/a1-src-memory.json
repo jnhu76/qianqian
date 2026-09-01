@@ -7,25 +7,25 @@
    "candidate": "lsr",
    "max_post_prepare_calls": 0,
    "max_post_prepare_bytes": 0,
-   "runs": 47
+   "runs": 53
   },
   {
    "candidate": "r8b",
    "max_post_prepare_calls": 0,
    "max_post_prepare_bytes": 0,
-   "runs": 47
+   "runs": 53
   },
   {
    "candidate": "soxr",
    "max_post_prepare_calls": 49,
    "max_post_prepare_bytes": 860760,
-   "runs": 47
+   "runs": 53
   },
   {
    "candidate": "swr",
    "max_post_prepare_calls": 0,
    "max_post_prepare_bytes": 0,
-   "runs": 47
+   "runs": 53
   }
  ]
 }

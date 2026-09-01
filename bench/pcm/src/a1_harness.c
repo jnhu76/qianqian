@@ -91,8 +91,197 @@ static uint64_t f32_bits(const float *p) {
     return (uint64_t)b;
 }
 
+/* ---------------------------------------------------------------- */
+/* streaming lifecycle audit (review: block matrix was BYPASS-only)   */
+/*                                                                    */
+/* One adapter instance, two full passes over the SAME stream:        */
+/*   pass A: small/ordinary blocks (1 / 64 / 257, uneven tail) + drain*/
+/*   reset() on the same instance (no re-prepare)                     */
+/*   pass B: ordinary blocks (1024, uneven tail) + drain              */
+/* Gates: accounting consumed==input, drain terminates, outputs of    */
+/* both passes bit-identical (determinism within declared policy,     */
+/* proves reset dropped all stale state).                             */
+/* ---------------------------------------------------------------- */
+
+/* FNV-1a over the CONCATENATED output byte stream: state is carried
+ * across chunks, so the final hash is chunk-boundary-invariant (an XOR
+ * of per-chunk hashes would not be). */
+static void fnv1a_update(uint64_t *h, const float *p, long frames,
+                         int channels) {
+    const unsigned char *b = (const unsigned char *)p;
+    size_t n = (size_t)frames * channels * sizeof(float);
+    size_t i;
+    for (i = 0; i < n; i++) {
+        *h ^= b[i];
+        *h *= 0x100000001b3ULL;
+    }
+}
+
+typedef struct {
+    long consumed_total, produced_total, drained_total;
+    long drain_rounds, drain_last;
+    uint64_t hash;
+} pass_stat;
+
+/* feed the whole stream cycling through the given block sizes (last
+ * partial block feeds uneven), then drain until the adapter reports 0
+ * (bounded). Returns 0 on success. */
+static int feed_pass(a1_src *src, const float *in, long in_frames,
+                     int channels, const long *blocks, int nblocks,
+                     float *out, long out_cap, FILE *fo, pass_stat *st) {
+    long pos = 0;
+    long call = 0;
+    memset(st, 0, sizeof(*st));
+    st->hash = 0xcbf29ce484222325ULL;   /* FNV-1a offset basis */
+    while (pos < in_frames) {
+        long blk = blocks[call % nblocks];
+        long consumed = 0, produced = 0;
+        int rc;
+        if (blk > in_frames - pos) blk = in_frames - pos;
+        rc = src->ops->process(src, in + pos * channels, blk, out, out_cap,
+                               &consumed, &produced,
+                               (pos + blk >= in_frames) ? 1 : 0);
+        if (rc != 0) return rc;
+        if (consumed <= 0 && produced <= 0) return -2; /* no progress */
+        if (fo && produced > 0)
+            fwrite(out, sizeof(float), (size_t)produced * channels, fo);
+        fnv1a_update(&st->hash, out, produced, channels);
+        st->consumed_total += consumed;
+        st->produced_total += produced;
+        pos += consumed;
+        call++;
+    }
+    for (;;) {
+        long produced = 0;
+        int rc = src->ops->drain(src, out, out_cap, &produced);
+        if (rc != 0) return rc;
+        st->drain_rounds++;
+        st->drained_total += produced;
+        if (produced > 0) {
+            if (fo) fwrite(out, sizeof(float), (size_t)produced * channels,
+                           fo);
+            fnv1a_update(&st->hash, out, produced, channels);
+            st->drain_last = produced;
+        }
+        if (produced == 0) break;               /* drain terminated */
+        if (st->drain_rounds > 65536) return -3; /* drain must terminate */
+    }
+    st->produced_total += st->drained_total;
+    return 0;
+}
+
+static int lifecycle_main(int argc, char **argv) {
+    /* --lifecycle <in_rate> <out_rate> <channels> <in.raw> <prefix> <json> */
+    if (argc < 7) {
+        fprintf(stderr, "usage: a1_run_<cand> --lifecycle in_rate out_rate "
+                        "channels in.raw out.prefix out.json\n");
+        return 2;
+    }
+    int in_rate = atoi(argv[1]);
+    int out_rate = atoi(argv[2]);
+    int channels = atoi(argv[3]);
+    const char *in_path = argv[4];
+    const char *prefix = argv[5];
+    const char *json_path = argv[6];
+    const long OUT_CAP = 65536;
+
+    FILE *f = fopen(in_path, "rb");
+    if (!f) { perror("open in"); return 2; }
+    fseek(f, 0, SEEK_END);
+    long bytes = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    long in_frames = bytes / (channels * (long)sizeof(float));
+    float *in = malloc((size_t)in_frames * channels * sizeof(float));
+    float *out = malloc((size_t)OUT_CAP * channels * sizeof(float));
+    if (!in || !out ||
+        fread(in, sizeof(float), (size_t)in_frames * channels, f)
+            != (size_t)in_frames * channels) {
+        fprintf(stderr, "read in failed\n");
+        return 2;
+    }
+    fclose(f);
+
+    a1_src src;
+    if (a1_make(CANDIDATE, &src) != 0) {
+        fprintf(stderr, "unknown candidate %s\n", CANDIDATE);
+        return 2;
+    }
+    if (src.ops->prepare(&src, in_rate, out_rate, channels, 4096) != 0) {
+        fprintf(stderr, "prepare failed\n");
+        return 2;
+    }
+
+    char path[1024];
+    pass_stat a, b;
+    int rc;
+    snprintf(path, sizeof(path), "%s.passA.raw", prefix);
+    FILE *fo = fopen(path, "wb");
+    {   /* pass A: 1-frame chunks + ordinary + odd blocks, uneven tail */
+        const long blocksA[3] = {1, 64, 257};
+        rc = feed_pass(&src, in, in_frames, channels, blocksA, 3,
+                       out, OUT_CAP, fo, &a);
+    }
+    if (fo) fclose(fo);
+    if (rc != 0) {
+        fprintf(stderr, "pass A failed: %d\n", rc);
+        return 1;
+    }
+    src.ops->reset(&src);                /* same instance, no re-prepare */
+    snprintf(path, sizeof(path), "%s.passB.raw", prefix);
+    fo = fopen(path, "wb");
+    {   /* pass B: ordinary blocks + uneven tail, same stream */
+        const long blocksB[1] = {1024};
+        rc = feed_pass(&src, in, in_frames, channels, blocksB, 1,
+                       out, OUT_CAP, fo, &b);
+    }
+    if (fo) fclose(fo);
+    if (rc != 0) {
+        fprintf(stderr, "pass B failed: %d\n", rc);
+        return 1;
+    }
+    src.ops->destroy(&src);
+    free(in);
+    free(out);
+
+    FILE *j = fopen(json_path, "w");
+    if (!j) return 2;
+    fprintf(j, "{\n");
+    fprintf(j, "  \"candidate\": \"%s\",\n", CANDIDATE);
+    fprintf(j, "  \"in_rate\": %d, \"out_rate\": %d, \"channels\": %d,\n",
+            in_rate, out_rate, channels);
+    fprintf(j, "  \"input_frames\": %ld,\n", in_frames);
+    fprintf(j, "  \"passA_blocks\": [1, 64, 257], "
+               "\"passB_blocks\": [1024],\n");
+    fprintf(j, "  \"passA\": {\"consumed_frames\": %ld, "
+               "\"produced_frames\": %ld, \"drain_frames\": %ld, "
+               "\"drain_rounds\": %ld, \"drain_terminated\": %s, "
+               "\"fnv1a64\": \"%016llx\"},\n",
+            a.consumed_total, a.produced_total, a.drained_total,
+            a.drain_rounds, "true",
+            (unsigned long long)a.hash);
+    fprintf(j, "  \"passB\": {\"consumed_frames\": %ld, "
+               "\"produced_frames\": %ld, \"drain_frames\": %ld, "
+               "\"drain_rounds\": %ld, \"drain_terminated\": %s, "
+               "\"fnv1a64\": \"%016llx\"},\n",
+            b.consumed_total, b.produced_total, b.drained_total,
+            b.drain_rounds, "true",
+            (unsigned long long)b.hash);
+    fprintf(j, "  \"accounting_ok\": %s,\n",
+            (a.consumed_total == in_frames &&
+             b.consumed_total == in_frames) ? "true" : "false");
+    fprintf(j, "  \"frames_equal\": %s,\n",
+            a.produced_total == b.produced_total ? "true" : "false");
+    fprintf(j, "  \"bit_identical\": %s\n",
+            a.hash == b.hash ? "true" : "false");
+    fprintf(j, "}\n");
+    fclose(j);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     const char *cand = CANDIDATE;
+    if (argc > 1 && strcmp(argv[1], "--lifecycle") == 0)
+        return lifecycle_main(argc - 1, argv + 1);
     if (argc < 8) {
         fprintf(stderr, "usage: a1_run_<cand> in_rate out_rate channels "
                         "block in.raw out.raw out.json\n");

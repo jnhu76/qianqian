@@ -73,6 +73,35 @@
     "nan_seen": 1
    }
   ],
+  "lifecycle": [
+   {
+    "case": "biquad_reprepare_44100_48000_no_leak",
+    "allocs": 5,
+    "frees": 5,
+    "live_after_destroy": 0,
+    "verdict": "pass"
+   },
+   {
+    "case": "eq10_reprepare_44100_48000_no_leak",
+    "allocs": 41,
+    "frees": 41,
+    "live_after_destroy": 0,
+    "verdict": "pass"
+   },
+   {
+    "case": "limiter_reprepare_44100_48000_no_leak",
+    "allocs": 3,
+    "frees": 3,
+    "live_after_destroy": 0,
+    "verdict": "pass"
+   }
+  ],
+  "instance_isolation": [
+   {
+    "case": "nan_policy_per_instance",
+    "verdict": "pass"
+   }
+  ],
   "verdict": "PASS"
  },
  "memory": {
@@ -145,8 +174,21 @@
   },
   "verdict": "PASS"
  },
+ "sanitizer": {
+  "verdict": "PASS",
+  "flags": [
+   "-std=c11",
+   "-O1",
+   "-g",
+   "-Wall",
+   "-Wextra",
+   "-fsanitize=address,undefined",
+   "-fno-omit-frame-pointer"
+  ],
+  "leak_detection": "LSan detect_leaks=1"
+ },
  "provenance": {
-  "git_parent_commit": "82f7ec6b7964c1ae24f1209bdee6bc3a45f41444",
+  "git_parent_commit": "afa27718cf823d58df985304fa1f0fa020ab8e9f",
   "git_branch": "exp/e10-src-dsp-lab",
   "compiler": "cc -std=c11 -O2",
   "biquad_authority": "Audio EQ Cookbook (RBJ) peaking, Direct Form II Transposed"

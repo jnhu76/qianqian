@@ -31,6 +31,10 @@ typedef struct b0_dsp_ops {
 struct b0_dsp {
     const b0_dsp_ops *ops;
     void *impl;
+    /* NaN/Inf policy is PER INSTANCE (review: the old mutable file
+     * global let one DSP instance change another instance's behavior).
+     * 1 = sanitize non-finite samples while active (default). */
+    int nan_sanitize;
 };
 
 /* Gain (linear, fused single multiply). */

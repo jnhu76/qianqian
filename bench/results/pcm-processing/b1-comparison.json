@@ -2,37 +2,41 @@
  "experiment": "e10-b1",
  "section": "comparison",
  "capability": "gain/volume + 10-band EQ + limiter, Float32 stereo, 48 kHz, block 256",
+ "comparison_semantics": "capability-intent equivalent; NOT waveform/latency equivalent (thin limiter = zero-lookahead peak hold, alimiter = lookahead)",
  "runs": [
   {
    "backend": "avf",
    "block_frames": 256,
    "input_frames": 1440000,
-   "ns_per_stream": 80523229.0,
-   "ns_per_input_frame": 55.919,
-   "xrt": 372.5633,
+   "ns_per_stream": 81008061.0,
+   "ns_per_input_frame": 56.256,
+   "xrt": 370.3335,
    "first_output_input_pos": 0,
    "post_init_alloc_calls": 0,
    "post_init_alloc_bytes": 0,
-   "sample_scanning_passes": 12
+   "logical_dsp_filter_passes": 12,
+   "memory_traffic_note": "logical DSP filter passes only; actual PCM memory traffic NOT measured (avfilter adds format adaptation + AVFrame movement not counted here)"
   },
   {
    "backend": "thin",
    "block_frames": 256,
    "input_frames": 1440000,
-   "ns_per_stream": 86960533.0,
-   "ns_per_input_frame": 60.389,
-   "xrt": 344.9841,
+   "ns_per_stream": 89275303.0,
+   "ns_per_input_frame": 61.997,
+   "xrt": 336.0392,
    "first_output_input_pos": 0,
    "post_init_alloc_calls": 0,
    "post_init_alloc_bytes": 0,
-   "sample_scanning_passes": 12
+   "logical_dsp_filter_passes": 12,
+   "memory_traffic_note": "logical DSP filter passes only; actual PCM memory traffic NOT measured (avfilter adds format adaptation + AVFrame movement not counted here)"
   }
  ],
  "findings": {
-  "cpu_avf_vs_thin_ratio": 0.926,
+  "cpu_avf_vs_thin_ratio": 0.907,
   "post_init_allocs_avf": 0,
   "post_init_allocs_thin": 0,
-  "sample_scanning_passes_equal": true
+  "logical_dsp_filter_passes_equal": true,
+  "actual_memory_traffic_measured": false
  },
  "verdict": "PASS"
 }

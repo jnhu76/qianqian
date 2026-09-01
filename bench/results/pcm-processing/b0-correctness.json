@@ -23,5 +23,13 @@
     {"case": "active_nan_sanitized", "verdict": "pass", "nan_seen": 1},
     {"case": "active_gain_sanitizes_nan", "verdict": "pass", "nan_seen": 1}
   ],
+  "lifecycle": [
+    {"case": "biquad_reprepare_44100_48000_no_leak", "allocs": 5, "frees": 5, "live_after_destroy": 0, "verdict": "pass"},
+    {"case": "eq10_reprepare_44100_48000_no_leak", "allocs": 41, "frees": 41, "live_after_destroy": 0, "verdict": "pass"},
+    {"case": "limiter_reprepare_44100_48000_no_leak", "allocs": 3, "frees": 3, "live_after_destroy": 0, "verdict": "pass"}
+  ],
+  "instance_isolation": [
+    {"case": "nan_policy_per_instance", "verdict": "pass"}
+  ],
   "verdict": "PASS"
 }

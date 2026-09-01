@@ -347,20 +347,35 @@ machine authority：`a1-summary.json`（经 `tools/pcm_a1.py` 汇编；quality/p
 | r8b | -154.9..-150.5 | -198.2 | -120.0 | 1.000000 | 0.0..0.0 |
 | lsr | -154.9..-145.8 | -172.5 | -120.0 | 1.000000 | -0.0..-0.0 |
 
-| candidate | ns/input frame (real 44.1→48) | ns/input frame (real 96→44.1) | xRT (min across streams) | post-prepare alloc calls |
+| candidate | ns/frame (real 44.1→48) | ns/frame (real 96→44.1) | xRT (min) | post-prepare allocs |
 |---|---:|---:|---:|---:|
-| swr | 21.13 | 22.09 | 484.3 | 0 |
-| soxr | 17.18 | 10.91 | 925.0 | 43 |
-| r8b | 47.34 | 28.66 | 363.4 | 0 |
-| lsr | 744.19 | 761.88 | 14.0 | 0 |
+| swr | 21.32 | 23.02 | 465.0 | 0 |
+| soxr | 21.02 | 11.34 | 930.3 | 43 |
+| r8b | 47.65 | 29.80 | 354.7 | 0 |
+| lsr | 728.92 | 799.25 | 13.3 | 0 |
 
-| candidate | runner raw bytes | stripped | xz -9 |
-|---|---:|---:|---:|
-| bypass (baseline) | 21808 | - | - |
-| swr | 398040 | 370928 | 126892 |
-| soxr | 354504 | 339128 | 121504 |
-| r8b | 150248 | 125224 | 50220 |
-| lsr | 1516920 | 1510024 | 938140 |
+| candidate | runner raw | stripped | xz -9 | dynamic NEEDED (deployment surface) |
+|---|---:|---:|---:|---|
+| bypass (baseline) | 21976 | - | - | - |
+| swr | 402248 | 375024 | 128400 | libc.so.6, libm.so.6 |
+| soxr | 358768 | 343224 | 123120 | libc.so.6, libgomp.so.1, libm.so.6 |
+| r8b | 150408 | 125224 | 51868 | libc.so.6, libgcc_s.so.1, libm.so.6, libstdc++.so.6 |
+| lsr | 1517088 | 1510024 | 944684 | libc.so.6, libm.so.6 |
+
+shipping 读数：raw/stripped/xz 是 **runner artifact 尺寸**；dynamic NEEDED 是候选在部署上会**新增的运行库依赖面**（soxr→libgomp，r8b→libstdc++/libgcc_s），两者不可混同。swr 已在 Qianqian FFmpeg closure 内，增量只算可达符号。
+
+streaming contract lifecycle（同一 adapter 实例：pass A = 1/64/257 帧块+不均匀尾块+drain → reset → pass B = 1024 帧块+尾块+drain；两遍输出必须 bit-identical）：
+
+| candidate | classification | accounting ok | frames equal | bit-identical | drain 终止 | verdict |
+|---|---|---|---|---|---|---|
+| swr | `GENERIC` | True | True | True | rounds A=2/B=2 | pass |
+| soxr | `GENERIC` | True | True | True | rounds A=2/B=2 | pass |
+| r8b | `ADAPTER_SEMANTICS_SPECIAL_CASE | NO_NATIVE_EOF` | True | True | True | rounds A=2/B=2 | pass |
+| lsr | `GENERIC` | True | True | True | rounds A=1/B=1 | pass |
+
+lifecycle verdict：**PASS**。r8b 诚实现分类为 `ADAPTER_SEMANTICS_SPECIAL_CASE | NO_NATIVE_EOF`（无 EOF API，drain 按累计理想帧数喂零裁剪；本次修复了 reset 未清累计账目、drain 未回写累计输出两处 adapter bug）。
+
+A1 verdict：**PASS**（PASS = evidence internally consistent and every candidate satisfies the RateStage streaming contract (or is honestly classified); it does NOT mean an SRC/DSP backend was selected）。
 
 ### E10-B0 thin DSP 参考（Gain/Biquad/EQ10/Limiter）
 
@@ -381,6 +396,16 @@ machine authority：`b0-summary.json`（经 `tools/pcm_b0.py` 汇编）
 
 correctness verdict：**PASS**（gain 0dB bit-identical / -6dB analytical / fusion equivalent；biquad 稳定 + reset 清状态；limiter 无过冲 clamp + latency 0；NaN 策略 active-sanitize，TRUE OFF 位透明）
 
+| reprepare lifecycle（prepare 44.1k→process→prepare 48k→process→destroy） | allocs | frees | live | verdict |
+|---|---:|---:|---:|---|
+| biquad_reprepare_44100_48000_no_leak | 5 | 5 | 0 | pass |
+| eq10_reprepare_44100_48000_no_leak | 41 | 41 | 0 | pass |
+| limiter_reprepare_44100_48000_no_leak | 3 | 3 | 0 | pass |
+
+instance isolation：`nan_policy_per_instance` = pass（NaN policy 为 per-instance，无隐藏全局可变状态）。
+
+sanitizer（ASan+UBSan+LSan detect_leaks=1，全 harness）：**PASS**——reprepare/destroy 所有权与 实例隔离在泄漏检测下成为机器证据。
+
 machine authority：`b0-correctness.json` / `b0-memory.json` / `b0-dsp-response.json` / `b0-summary.json`
 
 ### E10-B1 thin DSP vs trimmed libavfilter
@@ -395,12 +420,12 @@ machine authority：`b1-summary.json`（经 `tools/pcm_b1.py` 汇编）
 | 参数更新 | in-place 系数计算 | 图重建 / 运行时参数 |
 | reset | in-place 清状态 | 图级 |
 
-| runner | ns/frame | xRT | post-init allocs | 输出 stripped/xz |
-|---|---:|---:|---:|---:|
-| avf | 55.9 | 372.6 | 0 | 583928 / 204744 |
-| thin | 60.4 | 345.0 | 0 | 18648 / 5988 |
+| runner | ns/frame | xRT | post-init allocs | 输出 stripped/xz | dynamic NEEDED |
+|---|---:|---:|---:|---:|---|
+| avf | 56.3 | 370.3 | 0 | 583928 / 204744 | libc.so.6, libm.so.6 |
+| thin | 62.0 | 336.0 | 0 | 18648 / 5988 | libc.so.6, libm.so.6 |
 
-结论（B1 证据范围）：CPU 与 memory passes 相当（12 passes/block，框架开销非主导）；差异在 closure（205 vs 2 TU）与 shipping（xz 205 KB vs 6 KB，~34×）。libavfilter 对本能力集无必要依赖——`libavfilter production dependency = 0 bytes` 成立。
+结论（**历史比较，B1 证据范围**）：对 Gain+EQ10+Limiter 这一能力子集，thin 实验实现的工程/交付面小得多（2 TU vs 205 TU；xz 6 KB vs 205 KB），实测 CPU 同量级（55.9 vs 60.4 ns/frame，单主机）。两边报告的 12/block 是 **logical DSP filter passes**（每边 12 个逻辑滤波级），**不是**实测 PCM memory traffic——avfilter 路径还有 packed↔planar / flt↔dbl 适配与 AVFrame 移动，本仪器未计量。此结论**不**证明 libavfilter 不适合作为更宽的能力仓库；宽能力成本分析由 E10-C0（PR #16）接管并取代本节的窄解释。**不是 DSP backend 选择。**
 
 <!-- END GENERATED TABLES -->
 
@@ -479,22 +504,26 @@ Hann 周期图测 imaging；**频率以 Hz 保存**（重采样只改每周期�
 数），所有单音指标按保存频率测量；downsample 的 alias 音放在目标
 Nyquist 之上 8% 处，量折返点。
 
-- **swr（FFmpeg n9.0.1，默认配置）质量最弱**：THD+N 约 -107 dB
-  （44.1 系转换，其余候选 -134 dB 以下）；downsample 近 Nyquist
-  alias 抑制仅 **-33 dB**（25920 Hz→96k 转 48k，其默认
-  filter_size=32 的过渡带），远处频率才到 -106 dB；DC 增益
-  0.99999（-0.0001）；48→44.1 近 Nyquist 通带有 -2.2 dB 衰减。
-  这是默认配置的实测——swr 可调（filter_size/cutoff），调优后
-  是否追上 soxr/r8b/lsr 属后续项。**swr 已在 Qianqian FFmpeg
-  closure 内**，增量 shipping 只算可达符号，远小于独立 runner。
+- **swr（FFmpeg n9.0.1，默认 preset）**：THD+N 约 -107 dB（44.1 系
+  转换，其余候选 -134 dB 以下）；**默认 preset 在近 Nyquist 过渡带内
+  表现出最宽/最弱的抑制**——downsample alias 抑制仅 **-33 dB**
+  （25920 Hz→96k 转 48k，其默认 filter_size=32 的过渡带），远处频率
+  才到 -106 dB；DC 增益 0.99999（-0.0001）；48→44.1 近 Nyquist 通带
+  有 -2.2 dB 衰减。注意：该 alias 实验音折返到 22.08 kHz，位于
+  20 kHz 产品带外——**这是默认 preset 的过渡带特性证据，不是可听
+  频带质量的最终判定**；stopband/passband 曲线 + 调优（filter_size/
+  cutoff）对比属后续项。**swr 已在 Qianqian FFmpeg closure 内**，
+  增量 shipping 只算可达符号，远小于独立 runner。
 - **soxr（HQ）**：质量 -134 dB 级、alias -161 dB；**最快**
   （10.9-17.2 ns/frame，≥925×RT）；唯一 post-prepare 有分配者
   （43 次，违反 RT 零分配），若走 RT 路径需预留或换配置。
 - **r8b（线性相位）**：质量最好（THD+N -151 dB、alias -198 dB）、
   **shipping 最小**（stripped 125 KB / xz 50 KB）、0 分配；但内部
   double 精度要求 f32↔double 双转换胶水（28-47 ns/frame，含胶水），
-  且**没有干净的 EOF/drain 语义**（需按理想输出帧数喂零收尾，
-  getLatency() 恒 0）。
+  且**没有原生 EOF/drain 语义**（adapter 按累计理想输出帧数喂零裁剪，
+  getLatency() 恒 0）——lifecycle 审计中诚实现分类为
+  `ADAPTER_SEMANTICS_SPECIAL_CASE | NO_NATIVE_EOF`，并借此修掉两个
+  adapter bug（reset 未清累计账目、drain 未回写累计输出，见下）。
 - **lsr（BEST）**：质量好（-146..-155 dB、alias -173 dB）、0 分配、
   drain 语义干净；但 **744 ns/frame（14×RT）慢 30-70 倍**、**shipping
   巨大**（xz 938 KB，best-quality sinc 系数表）。
@@ -502,10 +531,23 @@ Nyquist 之上 8% 处，量折返点。
   在 768 输入帧后、r8b 在 1536 帧后（lookahead），swr/lsr 立即输出；
   drain tail = 各自滤波器延迟（swr 17 / soxr 504 / r8b 1795 / lsr 0）。
 - **BYPASS 同率参考**：block 1..4096 全部 bit-identical，延迟 0。
-- **Pareto 初读（不冻结决策）**：质量/速度 sweet spot 是 soxr
-  （但违反 RT 零分配）；质量/shipping 最优是 r8b（但需处理
-  drain 语义与 double 胶水）；“零增量成本”是 swr（但默认质量最弱，
-  近 Nyquist alias 是 96k→48k 的真实风险）；lsr 除质量外无优势。
+- **streaming contract lifecycle**（review 修复：块矩阵此前只测
+  BYPASS）：同一 adapter 实例上 pass A（1/64/257 帧块 + 不均匀尾块
+  + drain）→ `reset()` → pass B（1024 帧块 + 尾块 + drain），四候选
+  全部满足：input 记账守恒、drain 有界终止、两遍输出 bit-identical
+  （含 1 帧块流式）。r8b 借此修复两个 adapter bug：`reset()` 未清
+  `total_input_fed/total_output_produced`（post-reset drain 会按
+  stale 累计账目错误裁剪）、`drain()` 未回写累计输出（重复 drain
+  会无限重发尾帧）。修复后 r8b 两遍 drain tail 均 1795 帧且一致。
+- **runner artifact ≠ 部署足迹**：ldd NEEDED 记录（见生成表）显示
+  soxr 拉入 `libgomp`（-fopenmp）、r8b 拉入 `libstdc++/libgcc_s`
+  （g++ 链接）；swr/lsr 只有 libc/libm。xz 50 KB 的 r8b artifact
+  不代表其部署依赖面。
+- **Pareto 初读（不冻结决策；SRC 选择保持 deferred）**：质量/速度
+  sweet spot 是 soxr（但违反 RT 零分配 + libgomp 依赖）；质量/
+  artifact 最优是 r8b（但需处理 drain 语义、double 胶水与
+  libstdc++ 依赖面）；“零增量成本”是 swr（但默认 preset 过渡带
+  抑制最弱——过渡带证据，非可听频带终判）；lsr 除质量外无优势。
   单一候选对四个平台都不显然——生产决策留给 reviewer，
   本实验只交付证据。
 
@@ -525,28 +567,50 @@ Nyquist 之上 8% 处，量折返点。
   reset 清包络；**显式启用**，不在默认路径（默认 = P0 TRUE OFF）。
 - **NaN/Inf 策略**：DSP ACTIVE 时 sanitize（非有限样本→0，事件计数，
   IIR 状态不被毒化）；**DSP OFF = P0 位透明 bypass**（NaN 原样通过，
-  P0 已证）。
+  P0 已证）。策略为 **per-instance**（review 修复：原实现是隐藏的
+  文件级全局，一个实例的 setter 会改掉所有实例的行为）；实例隔离
+  测试证明两实例持相反策略时行为互不影响。
+- **reprepare 所有权**（review 修复）：`biquad/eq10/limiter_prepare`
+  原实现重复 prepare 时泄漏旧状态；修复后 prepare 44.1k→process→
+  prepare 48k→process→destroy 全链 `live_after_destroy = 0`
+  （--wrap alloc/free 计数 + ASan/LSan 双重验证，见生成表）。
 - **分配**：所有链 post-prepare 0 分配（--wrap 计数）。
+- **仪器修复**：ASan 审计发现 `run_memory` 的缓冲区按 256 float
+  分配却以 2ch×256 帧（512 float）读写（预先存在的越界 UB，普通
+  构建因栈布局未崩溃）——已修复并重测；`test_gain` 一处实例重建
+  泄漏同样修复。memory-pass 计数是结构量，数值不变。
 
 
-## E10-B1 读数要点（thin DSP vs trimmed libavfilter）
+## E10-B1 读数要点（thin DSP vs trimmed libavfilter——历史比较）
+
+**角色：EXPLORATORY / HISTORICAL EVIDENCE。不是 DSP backend 选择。**
+本节只覆盖 Gain+EQ10+Limiter 这一窄能力子集；宽能力的 libavfilter
+capability-cost 分析由 E10-C0（PR #16）接管并**取代本节解释**。
 
 机器证据见上方生成表（`b1-summary.json`）。要点：
 
-- **CPU 与 memory passes 相当**：capability-equivalent 链
-  （volume+10×equalizer+alimiter vs gain+eq10+limiter）均为 12 次
-  样本扫描 pass/block，CPU 55.9 vs 60.4 ns/frame——**框架调度不是
-  主导成本**，滤波数学才是（B0 的 12-pass 结论对两边都成立）。
-- **closure 差异巨大**：libavfilter 需要 205 个编译 TU（含
-  aresample 为格式适配自动插入，因 alimiter 是 double 精度、equalizer
-  链是 fltp，拖进 libswresample）；thin DSP = 1 个源文件、2 TU。
-- **shipping**：avf runner xz 205 KB vs thin 6 KB（~34×）。
-- **libavfilter 对本能力集无必要依赖成立**：`libavfilter production
-  dependency = 0 bytes` 是有效结论（B1 证据范围内）。
+- **CPU 同量级（实测成立）**：capability-intent equivalent 链
+  （volume+10×equalizer+alimiter vs gain+eq10+limiter）CPU 55.9 vs
+  60.4 ns/frame（单主机）——框架调度不是主导成本，滤波数学才是。
+- **"12 passes" 是 logical DSP filter passes，不是 memory traffic**
+  （review 修复）：两边 runner 各自硬编码报告 12 个逻辑滤波级
+  pass/block；avfilter 路径还实际发生 packed↔planar / flt↔dbl
+  适配（aresample 自动插入）与 AVFrame 移动，这些内存移动未被
+  本仪器计量。`actual_memory_traffic_measured = false` 已显式记录；
+  在实测之前不得声称两边 memory traffic 相等。
+- **closure/shipping 差异**（本能力子集内成立）：libavfilter 需要
+  205 个编译 TU（aresample 为格式适配自动插入，因 alimiter 是
+  double 精度、equalizer 链是 fltp，拖进 libswresample）；thin DSP
+  = 1 个源文件、2 TU。avf runner xz 205 KB vs thin 6 KB（~34×）；
+  两者动态依赖面均只含 libc/libm（ldd NEEDED 已记录）。
+- **不得到的最宽结论**："libavfilter production dependency =
+  0 bytes" 仅对这一窄子集、且按当前架构意图成立；它**不**证明
+  libavfilter 不适合作为更宽的能力仓库（C0 正是以能力驱动方式
+  重新研究该问题）。
 - 局限：本比较在 block 256/48k/30s 流上；未测参数量 >10 band 的
-  图、未测 SIMD（B2）；alimiter 语义与 B0 limiter 不同（B0 是
-  peak-hold 无 lookahead，alimiter 是 lookahead 型）——按 B1
-  fairness 规则分别记录语义差异，不做波形相等断言。
+  图、未测 SIMD（B2）；两 limiter 语义不同（thin = peak-hold 无
+  lookahead，alimiter = lookahead 型）——比较是 capability-intent
+  equivalent，**不是** waveform/latency equivalent。
 
 ## 9. 遗留问题（交给 E10-A0 / A1 / B0）
 

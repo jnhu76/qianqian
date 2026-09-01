@@ -2,31 +2,63 @@
  "experiment": "e10-a1",
  "section": "src_shipping",
  "method": "standalone runner per candidate with equivalent responsibility; stripped; xz -9",
- "baseline_bypass_bytes": 21808,
+ "baseline_bypass_bytes": 21976,
  "rows": [
   {
    "candidate": "swr",
-   "raw_bytes": 398040,
-   "stripped_bytes": 370928,
-   "xz_bytes": 126892
+   "raw_bytes": 402248,
+   "stripped_bytes": 375024,
+   "xz_bytes": 128400,
+   "dynamic_deps": {
+    "dynamic": true,
+    "needed": [
+     "libc.so.6",
+     "libm.so.6"
+    ]
+   }
   },
   {
    "candidate": "soxr",
-   "raw_bytes": 354504,
-   "stripped_bytes": 339128,
-   "xz_bytes": 121504
+   "raw_bytes": 358768,
+   "stripped_bytes": 343224,
+   "xz_bytes": 123120,
+   "dynamic_deps": {
+    "dynamic": true,
+    "needed": [
+     "libc.so.6",
+     "libgomp.so.1",
+     "libm.so.6"
+    ]
+   }
   },
   {
    "candidate": "r8b",
-   "raw_bytes": 150248,
+   "raw_bytes": 150408,
    "stripped_bytes": 125224,
-   "xz_bytes": 50220
+   "xz_bytes": 51868,
+   "dynamic_deps": {
+    "dynamic": true,
+    "needed": [
+     "libc.so.6",
+     "libgcc_s.so.1",
+     "libm.so.6",
+     "libstdc++.so.6"
+    ]
+   }
   },
   {
    "candidate": "lsr",
-   "raw_bytes": 1516920,
+   "raw_bytes": 1517088,
    "stripped_bytes": 1510024,
-   "xz_bytes": 938140
+   "xz_bytes": 944684,
+   "dynamic_deps": {
+    "dynamic": true,
+    "needed": [
+     "libc.so.6",
+     "libm.so.6"
+    ]
+   }
   }
- ]
+ ],
+ "deployment_note": "raw/stripped/xz are RUNNER ARTIFACT sizes; dynamic_deps records the dynamic linker NEEDED set (Linux ldd of the unstripped runner) as the new dependency surface the candidate would add to a deployment. Artifact size != deployment footprint (e.g. soxr pulls libgomp via -fopenmp, r8b pulls libstdc++ via g++ linkage)."
 }
