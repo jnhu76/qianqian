@@ -28,6 +28,7 @@
   "ReplayGain"
  ],
  "config_evidence": {
+  "avfilter_in_closure": true,
   "external_libs_enabled": [],
   "filter_list_registered": [
    "abuffer",
@@ -109,9 +110,87 @@
   "F4",
   "F5"
  ],
+ "direct_closure": {
+  "graph_config_failures": [
+   "f1_equalizer",
+   "f1_bass",
+   "f1_treble",
+   "f1_lowshelf",
+   "f1_highshelf",
+   "f1_lowpass",
+   "f1_highpass",
+   "f2_alimiter",
+   "f2_acompressor",
+   "f2_agate",
+   "f3_channelmap_swap",
+   "f3_crossfeed",
+   "f4_aecho",
+   "f4_chorus",
+   "f4_flanger",
+   "f4_tremolo",
+   "f4_vibrato",
+   "f5_adelay",
+   "f5_loudnorm",
+   "f5_dynaudnorm"
+  ],
+  "manifest_units": 254,
+  "per_library": {
+   "libavcodec": 72,
+   "libavfilter": 40,
+   "libavformat": 38,
+   "libavutil": 95,
+   "libswresample": 9
+  },
+  "profile_sha256": "bac1fc9e6b95ce4498248ff17ac229beb2e6733406d37d94c8e2c94dfe11b6ad"
+ },
+ "experiment_inputs": {
+  "combined_sha256": "deb188e45fa1284eacaf1071e3093343454f0f2893ba7cc5df62458d09c2e230",
+  "ffmpeg_pin": {
+   "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+   "ffmpeg_tag": "n9.0.1",
+   "ffmpeg_version": "9.0.1",
+   "source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+   "source_url": "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n9.0.1.zip",
+   "verification": {
+    "method": "tag-to-commit mapping resolved via GitHub API (2026-08-29, tag object 501bb49457b9dfb25d6a208832e0a6e6cd53108d -> commit bf1b838f); source integrity via zip sha256. GitHub release-archive zips contain no .git, so commit sha is pinned here rather than recomputed from the archive.",
+    "recheck_command": "git ls-remote https://github.com/FFmpeg/FFmpeg 'refs/tags/n9.0.1^{}'"
+   }
+  },
+  "files": {
+   "bench/dsp-capabilities.json": "a268192be4c6b059fa44fd128afac897c6e233af50bcf2c0cea16e492166c995",
+   "bench/ffmpeg-pin.json": "224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85",
+   "bench/pcm/avfilter/qn_avfilter_cap_probe.c": "2ea3e61197552576efed20f08fde84e40075c9ac4e3509191f5479be12aa74e3",
+   "bench/profiles/n3-min-noswr.json": "852112fc5f894109e8def8fb53156266de06e8685beefa79107ef33aecaf24fa",
+   "tools/common_import.py": "d18d91fbbec4a46aa47be936fc9ef8c6411b0e80d1c83f7bf8148270eb0ff2a3",
+   "tools/ffmpeg_import.py": "18afad4e6bb7e447e4c2100f1628560042ebc7feb64bad4bdfec4f532d827238",
+   "tools/ffmpeg_manifest_union.py": "0e8c0f1b2d9f98abf5db562b61cde11e90813f34b8f7a013c17fb7e901baa9eb",
+   "tools/pcm_c0.py": "9aea39163d028dabdad0357986d4a8663e16d8bd078d1464e0f01ce2f0ee947e",
+   "xmake.lua": "478cc115b375a2b585e8793c450347c62ada6b290dac5fff515b0381b8780b6b"
+  }
+ },
+ "format_adaptation": {
+  "added": [
+   "aresample"
+  ],
+  "added_libs": [
+   "libswresample"
+  ],
+  "class": "graph-format-adaptation",
+  "configure_required_deps": {
+   "pan": [
+    "swresample"
+   ]
+  },
+  "discovered_by": "avfilter_graph_config failure on canonical flt input",
+  "required": true
+ },
  "gates": {
   "external_libs": {
    "external": [],
+   "verdict": "PASS"
+  },
+  "no_residual_config_failures": {
+   "failures": [],
    "verdict": "PASS"
   },
   "registration": {
@@ -154,7 +233,7 @@
     "path": "/usr/lib/x86_64-linux-gnu/libc.so.6"
    }
   ],
-  "probe_sha256": "35fe909aa6a1daae7981bef9d1c761fae2e1f3af86ebe64c51df50fb162a27d2",
+  "probe_sha256": "a81d4dc4f9184445aec4c3fb9cd1f202613e865b7ffaa2cf129845f458dbbebf",
   "smoke_fail": 0,
   "smoke_verdict": "PASS"
  },
@@ -214,8 +293,14 @@
    "--enable-filter=vibrato",
    "--enable-filter=volume"
   ],
+  "configure_required_deps": {
+   "pan": [
+    "swresample"
+   ]
+  },
   "configure_warnings": [],
-  "profile_sha256": "1479b8fc1bb70df2e1911432b7ecff12218cae10fe5848968c4a57376fecf843"
+  "format_adaptation_added": true,
+  "profile_sha256": "458576a291067c079eb5f68f83728358cd97f6390baf9d88a4a5d743faba1a97"
  },
  "registration_gate": {
   "always_present": [
@@ -325,6 +410,7 @@
   ],
   "intended_subset_of_config": true
  },
+ "residual_config_failures": [],
  "shipping": {
   "archive_bytes": 3250636,
   "ldd": [
@@ -519,16 +605,17 @@
    }
   },
   "probe_sizes": {
-   "raw_bytes": 915696,
-   "stripped_bytes": 915696,
-   "xz_bytes": 306168
+   "raw_bytes": 919792,
+   "stripped_bytes": 919792,
+   "xz_bytes": 308500
   },
   "smoke_fail": 0,
   "smoke_verdict": "PASS"
  },
  "smoke_detail": {
+  "direct": null,
   "plain": {
-   "contract_pin_addr_sum_lowbits": 16,
+   "contract_pin_addr_sum_lowbits": 144,
    "results": [
     {
      "found": true,
@@ -890,12 +977,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 641164,
-      "destroy_ns": 203320,
+      "create_config_ns": 659732,
+      "destroy_ns": 232074,
       "first_out_in_frames": 1024,
-      "first_out_ns": 29558,
-      "ns_per_out_frame": 26.399125,
-      "process_ns": 1267158,
+      "first_out_ns": 29838,
+      "ns_per_out_frame": 28.3142083,
+      "process_ns": 1359082,
       "rebuild_ok": true
      }
     },
@@ -931,12 +1018,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 561686,
-      "destroy_ns": 161616,
+      "create_config_ns": 816554,
+      "destroy_ns": 152888,
       "first_out_in_frames": 1024,
-      "first_out_ns": 15891,
-      "ns_per_out_frame": 26.9525,
-      "process_ns": 1293720,
+      "first_out_ns": 15020,
+      "ns_per_out_frame": 27.133375,
+      "process_ns": 1302402,
       "rebuild_ok": true
      }
     },
@@ -970,12 +1057,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 656525,
-      "destroy_ns": 149221,
+      "create_config_ns": 543387,
+      "destroy_ns": 128660,
       "first_out_in_frames": 1024,
-      "first_out_ns": 13426,
-      "ns_per_out_frame": 25.4687708,
-      "process_ns": 1222501,
+      "first_out_ns": 12715,
+      "ns_per_out_frame": 27.3934583,
+      "process_ns": 1314886,
       "rebuild_ok": true
      }
     },
@@ -1011,12 +1098,12 @@
       0.177196435
      ],
      "timing": {
-      "create_config_ns": 819203,
-      "destroy_ns": 2412770,
+      "create_config_ns": 557143,
+      "destroy_ns": 2120842,
       "first_out_in_frames": 1024,
-      "first_out_ns": 13196,
-      "ns_per_out_frame": 26.0611875,
-      "process_ns": 1250937,
+      "first_out_ns": 13457,
+      "ns_per_out_frame": 26.9945625,
+      "process_ns": 1295739,
       "rebuild_ok": true
      }
     },
@@ -1055,12 +1142,12 @@
       0.705293326
      ],
      "timing": {
-      "create_config_ns": 702223,
-      "destroy_ns": 4484661,
+      "create_config_ns": 604856,
+      "destroy_ns": 4759531,
       "first_out_in_frames": 1024,
-      "first_out_ns": 77542,
-      "ns_per_out_frame": 70.0534583,
-      "process_ns": 3362566,
+      "first_out_ns": 70777,
+      "ns_per_out_frame": 65.7532292,
+      "process_ns": 3156155,
       "rebuild_ok": true
      }
     },
@@ -1099,12 +1186,12 @@
       0.701539704
      ],
      "timing": {
-      "create_config_ns": 613682,
-      "destroy_ns": 149261,
+      "create_config_ns": 592511,
+      "destroy_ns": 137658,
       "first_out_in_frames": 1024,
-      "first_out_ns": 55949,
-      "ns_per_out_frame": 64.635375,
-      "process_ns": 3102498,
+      "first_out_ns": 61930,
+      "ns_per_out_frame": 67.4636458,
+      "process_ns": 3238255,
       "rebuild_ok": true
      }
     },
@@ -1143,12 +1230,12 @@
       0.699051392
      ],
      "timing": {
-      "create_config_ns": 512643,
-      "destroy_ns": 165293,
+      "create_config_ns": 689530,
+      "destroy_ns": 136846,
       "first_out_in_frames": 1024,
-      "first_out_ns": 64003,
-      "ns_per_out_frame": 62.7881667,
-      "process_ns": 3013832,
+      "first_out_ns": 70347,
+      "ns_per_out_frame": 70.1321875,
+      "process_ns": 3366345,
       "rebuild_ok": true
      }
     },
@@ -1187,12 +1274,12 @@
       0.613735184
      ],
      "timing": {
-      "create_config_ns": 502924,
-      "destroy_ns": 135275,
+      "create_config_ns": 795406,
+      "destroy_ns": 174550,
       "first_out_in_frames": 1024,
-      "first_out_ns": 54737,
-      "ns_per_out_frame": 62.1178542,
-      "process_ns": 2981657,
+      "first_out_ns": 65548,
+      "ns_per_out_frame": 72.726375,
+      "process_ns": 3490866,
       "rebuild_ok": true
      }
     },
@@ -1231,12 +1318,12 @@
       0.574703055
      ],
      "timing": {
-      "create_config_ns": 556959,
-      "destroy_ns": 156382,
+      "create_config_ns": 577002,
+      "destroy_ns": 120745,
       "first_out_in_frames": 1024,
-      "first_out_ns": 57032,
-      "ns_per_out_frame": 64.2596458,
-      "process_ns": 3084463,
+      "first_out_ns": 63864,
+      "ns_per_out_frame": 64.176,
+      "process_ns": 3080448,
       "rebuild_ok": true
      }
     },
@@ -1275,12 +1362,12 @@
       0.0856129371
      ],
      "timing": {
-      "create_config_ns": 496830,
-      "destroy_ns": 122870,
+      "create_config_ns": 585016,
+      "destroy_ns": 117659,
       "first_out_in_frames": 1024,
-      "first_out_ns": 53355,
-      "ns_per_out_frame": 60.5755625,
-      "process_ns": 2907627,
+      "first_out_ns": 59205,
+      "ns_per_out_frame": 65.5987708,
+      "process_ns": 3148741,
       "rebuild_ok": true
      }
     },
@@ -1319,12 +1406,12 @@
       0.014157286
      ],
      "timing": {
-      "create_config_ns": 525758,
-      "destroy_ns": 136792,
+      "create_config_ns": 627625,
+      "destroy_ns": 128990,
       "first_out_in_frames": 1024,
-      "first_out_ns": 56140,
-      "ns_per_out_frame": 62.9820417,
-      "process_ns": 3023138,
+      "first_out_ns": 62391,
+      "ns_per_out_frame": 64.3278958,
+      "process_ns": 3087739,
       "rebuild_ok": true
      }
     },
@@ -1363,12 +1450,12 @@
       0.29489574
      ],
      "timing": {
-      "create_config_ns": 598962,
-      "destroy_ns": 3090965,
+      "create_config_ns": 608673,
+      "destroy_ns": 3194720,
       "first_out_in_frames": 1024,
-      "first_out_ns": 47203,
-      "ns_per_out_frame": 44.4087292,
-      "process_ns": 2131619,
+      "first_out_ns": 44506,
+      "ns_per_out_frame": 45.2043125,
+      "process_ns": 2169807,
       "rebuild_ok": true
      }
     },
@@ -1407,12 +1494,12 @@
       0.153700463
      ],
      "timing": {
-      "create_config_ns": 502483,
-      "destroy_ns": 122249,
+      "create_config_ns": 568244,
+      "destroy_ns": 124391,
       "first_out_in_frames": 1024,
-      "first_out_ns": 35600,
-      "ns_per_out_frame": 45.3059167,
-      "process_ns": 2174684,
+      "first_out_ns": 35619,
+      "ns_per_out_frame": 46.2137917,
+      "process_ns": 2218262,
       "rebuild_ok": true
      }
     },
@@ -1451,12 +1538,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 527342,
-      "destroy_ns": 117951,
+      "create_config_ns": 845863,
+      "destroy_ns": 198306,
       "first_out_in_frames": 1024,
-      "first_out_ns": 21873,
-      "ns_per_out_frame": 34.3751458,
-      "process_ns": 1650007,
+      "first_out_ns": 31141,
+      "ns_per_out_frame": 36.0367292,
+      "process_ns": 1729763,
       "rebuild_ok": true
      }
     },
@@ -1492,12 +1579,12 @@
       0.176776694
      ],
      "timing": {
-      "create_config_ns": 535678,
-      "destroy_ns": 176490,
+      "create_config_ns": 687128,
+      "destroy_ns": 165219,
       "first_out_in_frames": 1024,
-      "first_out_ns": 18766,
-      "ns_per_out_frame": 29.1204792,
-      "process_ns": 1397783,
+      "first_out_ns": 24377,
+      "ns_per_out_frame": 29.9356875,
+      "process_ns": 1436913,
       "rebuild_ok": true
      }
     },
@@ -1523,20 +1610,20 @@
      "ok": true,
      "out_frames": 48000,
      "peak": [
-      4.58370288e+36,
+      5.35222191e+21,
       1.75
      ],
      "rms": [
-      2.73039797e+35,
+      3.26082842e+20,
       0.307180413
      ],
      "timing": {
-      "create_config_ns": 598150,
-      "destroy_ns": 127840,
+      "create_config_ns": 658802,
+      "destroy_ns": 167300,
       "first_out_in_frames": 1024,
-      "first_out_ns": 21152,
-      "ns_per_out_frame": 29.9022292,
-      "process_ns": 1435307,
+      "first_out_ns": 23065,
+      "ns_per_out_frame": 29.2376667,
+      "process_ns": 1403408,
       "rebuild_ok": true
      }
     },
@@ -1575,12 +1662,12 @@
       0.125
      ],
      "timing": {
-      "create_config_ns": 519205,
-      "destroy_ns": 117800,
+      "create_config_ns": 576056,
+      "destroy_ns": 131636,
       "first_out_in_frames": 64,
-      "first_out_ns": 4189,
-      "ns_per_out_frame": 127.4375,
-      "process_ns": 8156,
+      "first_out_ns": 4509,
+      "ns_per_out_frame": 135.421875,
+      "process_ns": 8667,
       "rebuild_ok": true
      }
     },
@@ -1619,12 +1706,12 @@
       0.000738241148
      ],
      "timing": {
-      "create_config_ns": 650111,
-      "destroy_ns": 960248,
+      "create_config_ns": 562183,
+      "destroy_ns": 1035082,
       "first_out_in_frames": 1024,
-      "first_out_ns": 8276,
-      "ns_per_out_frame": 24.1928711,
-      "process_ns": 198188,
+      "first_out_ns": 8887,
+      "ns_per_out_frame": 28.0489502,
+      "process_ns": 229777,
       "rebuild_ok": true
      }
     },
@@ -1660,12 +1747,12 @@
       0.0743303408
      ],
      "timing": {
-      "create_config_ns": 468166,
-      "destroy_ns": 108282,
+      "create_config_ns": 524012,
+      "destroy_ns": 196486,
       "first_out_in_frames": 1024,
-      "first_out_ns": 13316,
-      "ns_per_out_frame": 27.0852708,
-      "process_ns": 1300093,
+      "first_out_ns": 14188,
+      "ns_per_out_frame": 28.7694583,
+      "process_ns": 1380934,
       "rebuild_ok": true
      }
     },
@@ -1702,12 +1789,12 @@
       0
      ],
      "timing": {
-      "create_config_ns": 641699,
-      "destroy_ns": 1022129,
+      "create_config_ns": 654152,
+      "destroy_ns": 1052015,
       "first_out_in_frames": 1024,
-      "first_out_ns": 12594,
-      "ns_per_out_frame": 27.6449763,
-      "process_ns": 279546,
+      "first_out_ns": 14338,
+      "ns_per_out_frame": 28.3214992,
+      "process_ns": 286387,
       "rebuild_ok": true
      }
     },
@@ -1744,12 +1831,12 @@
       0.234006206
      ],
      "timing": {
-      "create_config_ns": 4460815,
-      "destroy_ns": 203398,
+      "create_config_ns": 4990471,
+      "destroy_ns": 304231,
       "first_out_in_frames": 1024,
-      "first_out_ns": 22735,
-      "ns_per_out_frame": 33.7850104,
-      "process_ns": 1721076,
+      "first_out_ns": 34276,
+      "ns_per_out_frame": 36.9586785,
+      "process_ns": 1882749,
       "rebuild_ok": true
      }
     },
@@ -1786,12 +1873,12 @@
       0.278406071
      ],
      "timing": {
-      "create_config_ns": 1673964,
-      "destroy_ns": 280129,
+      "create_config_ns": 1732729,
+      "destroy_ns": 126326,
       "first_out_in_frames": 1024,
-      "first_out_ns": 41431,
-      "ns_per_out_frame": 45.1754375,
-      "process_ns": 2168421,
+      "first_out_ns": 46090,
+      "ns_per_out_frame": 49.6154167,
+      "process_ns": 2381540,
       "rebuild_ok": true
      }
     },
@@ -1825,12 +1912,12 @@
       0.113542822
      ],
      "timing": {
-      "create_config_ns": 1056527,
-      "destroy_ns": 140925,
+      "create_config_ns": 835564,
+      "destroy_ns": 127407,
       "first_out_in_frames": 1024,
-      "first_out_ns": 17995,
-      "ns_per_out_frame": 30.3723333,
-      "process_ns": 1457872,
+      "first_out_ns": 17744,
+      "ns_per_out_frame": 31.9564792,
+      "process_ns": 1533911,
       "rebuild_ok": true
      }
     },
@@ -1869,12 +1956,12 @@
       0.272431181
      ],
      "timing": {
-      "create_config_ns": 726090,
-      "destroy_ns": 128221,
+      "create_config_ns": 743706,
+      "destroy_ns": 143059,
       "first_out_in_frames": 1024,
-      "first_out_ns": 16943,
-      "ns_per_out_frame": 30.4080208,
-      "process_ns": 1459585,
+      "first_out_ns": 17624,
+      "ns_per_out_frame": 31.702875,
+      "process_ns": 1521738,
       "rebuild_ok": true
      }
     },
@@ -1913,12 +2000,12 @@
       0.352166712
      ],
      "timing": {
-      "create_config_ns": 652466,
-      "destroy_ns": 119574,
+      "create_config_ns": 672257,
+      "destroy_ns": 193388,
       "first_out_in_frames": 1024,
-      "first_out_ns": 22204,
-      "ns_per_out_frame": 33.3270625,
-      "process_ns": 1599699,
+      "first_out_ns": 22884,
+      "ns_per_out_frame": 35.5188333,
+      "process_ns": 1704904,
       "rebuild_ok": true
      }
     },
@@ -1954,12 +2041,12 @@
       0.204124139
      ],
      "timing": {
-      "create_config_ns": 509256,
-      "destroy_ns": 122039,
+      "create_config_ns": 676794,
+      "destroy_ns": 215098,
       "first_out_in_frames": 1024,
-      "first_out_ns": 16362,
-      "ns_per_out_frame": 29.873625,
-      "process_ns": 1433934,
+      "first_out_ns": 22053,
+      "ns_per_out_frame": 32.9830833,
+      "process_ns": 1583188,
       "rebuild_ok": true
      }
     },
@@ -1998,12 +2085,12 @@
       0.350070018
      ],
      "timing": {
-      "create_config_ns": 506982,
-      "destroy_ns": 109624,
+      "create_config_ns": 640806,
+      "destroy_ns": 129532,
       "first_out_in_frames": 1024,
-      "first_out_ns": 15751,
-      "ns_per_out_frame": 27.2139706,
-      "process_ns": 1332396,
+      "first_out_ns": 21391,
+      "ns_per_out_frame": 29.8832516,
+      "process_ns": 1463084,
       "rebuild_ok": true
      }
     },
@@ -2040,12 +2127,12 @@
       0.0709507243
      ],
      "timing": {
-      "create_config_ns": 8700356,
-      "destroy_ns": 29221855,
+      "create_config_ns": 10033750,
+      "destroy_ns": 32322021,
       "first_out_in_frames": 0,
       "first_out_ns": 0,
-      "ns_per_out_frame": 88.2380417,
-      "process_ns": 16941704,
+      "ns_per_out_frame": 99.9972188,
+      "process_ns": 19199466,
       "rebuild_ok": true
      }
     },
@@ -2082,25 +2169,43 @@
       0.353553123
      ],
      "timing": {
-      "create_config_ns": 757937,
-      "destroy_ns": 138851,
+      "create_config_ns": 701453,
+      "destroy_ns": 201562,
       "first_out_in_frames": 0,
       "first_out_ns": 0,
-      "ns_per_out_frame": 51.01625,
-      "process_ns": 2448780,
+      "ns_per_out_frame": 59.4207083,
+      "process_ns": 2852194,
       "rebuild_ok": true
      }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "acrossfade=d=1:c1=tri:c2=tri",
+     "drained_eof": true,
+     "id": "mi_acrossfade",
+     "in_frames": 96000,
+     "kind": "graph2",
+     "multi_input": true,
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 144000
     }
    ],
    "summary": {
     "fail": 0,
-    "pass": 76,
-    "total": 76,
+    "pass": 77,
+    "total": 77,
     "verdict": "PASS"
    }
   },
   "shipping": {
-   "contract_pin_addr_sum_lowbits": 208,
+   "contract_pin_addr_sum_lowbits": 80,
    "results": [
     {
      "found": true,
@@ -2462,12 +2567,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 644230,
-      "destroy_ns": 221093,
+      "create_config_ns": 700567,
+      "destroy_ns": 173187,
       "first_out_in_frames": 1024,
-      "first_out_ns": 31652,
-      "ns_per_out_frame": 27.0145208,
-      "process_ns": 1296697,
+      "first_out_ns": 30198,
+      "ns_per_out_frame": 27.8245417,
+      "process_ns": 1335578,
       "rebuild_ok": true
      }
     },
@@ -2503,12 +2608,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 492944,
-      "destroy_ns": 175172,
+      "create_config_ns": 559895,
+      "destroy_ns": 118890,
       "first_out_in_frames": 1024,
-      "first_out_ns": 11723,
-      "ns_per_out_frame": 25.2618958,
-      "process_ns": 1212571,
+      "first_out_ns": 13146,
+      "ns_per_out_frame": 27.1782917,
+      "process_ns": 1304558,
       "rebuild_ok": true
      }
     },
@@ -2542,12 +2647,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 544805,
-      "destroy_ns": 191855,
+      "create_config_ns": 576701,
+      "destroy_ns": 127627,
       "first_out_in_frames": 1024,
-      "first_out_ns": 15491,
-      "ns_per_out_frame": 27.7273542,
-      "process_ns": 1330913,
+      "first_out_ns": 12675,
+      "ns_per_out_frame": 26.9474167,
+      "process_ns": 1293476,
       "rebuild_ok": true
      }
     },
@@ -2583,12 +2688,12 @@
       0.177196435
      ],
      "timing": {
-      "create_config_ns": 527692,
-      "destroy_ns": 2135836,
+      "create_config_ns": 520829,
+      "destroy_ns": 2168506,
       "first_out_in_frames": 1024,
-      "first_out_ns": 15830,
-      "ns_per_out_frame": 26.9259792,
-      "process_ns": 1292447,
+      "first_out_ns": 13727,
+      "ns_per_out_frame": 27.037375,
+      "process_ns": 1297794,
       "rebuild_ok": true
      }
     },
@@ -2627,12 +2732,12 @@
       0.705293326
      ],
      "timing": {
-      "create_config_ns": 968848,
-      "destroy_ns": 3882783,
+      "create_config_ns": 864680,
+      "destroy_ns": 3924113,
       "first_out_in_frames": 1024,
-      "first_out_ns": 73420,
-      "ns_per_out_frame": 57.9812292,
-      "process_ns": 2783099,
+      "first_out_ns": 79044,
+      "ns_per_out_frame": 69.4205625,
+      "process_ns": 3332187,
       "rebuild_ok": true
      }
     },
@@ -2671,12 +2776,12 @@
       0.701539704
      ],
      "timing": {
-      "create_config_ns": 496581,
-      "destroy_ns": 206843,
+      "create_config_ns": 513735,
+      "destroy_ns": 111877,
       "first_out_in_frames": 1024,
-      "first_out_ns": 53485,
-      "ns_per_out_frame": 62.8656667,
-      "process_ns": 3017552,
+      "first_out_ns": 52161,
+      "ns_per_out_frame": 63.247125,
+      "process_ns": 3035862,
       "rebuild_ok": true
      }
     },
@@ -2715,12 +2820,12 @@
       0.699051392
      ],
      "timing": {
-      "create_config_ns": 506761,
-      "destroy_ns": 128151,
+      "create_config_ns": 539775,
+      "destroy_ns": 193786,
       "first_out_in_frames": 1024,
-      "first_out_ns": 51100,
-      "ns_per_out_frame": 59.6343333,
-      "process_ns": 2862448,
+      "first_out_ns": 54736,
+      "ns_per_out_frame": 74.8138125,
+      "process_ns": 3591063,
       "rebuild_ok": true
      }
     },
@@ -2759,12 +2864,12 @@
       0.613735184
      ],
      "timing": {
-      "create_config_ns": 555847,
-      "destroy_ns": 117149,
+      "create_config_ns": 525618,
+      "destroy_ns": 132146,
       "first_out_in_frames": 1024,
-      "first_out_ns": 54597,
-      "ns_per_out_frame": 57.1910208,
-      "process_ns": 2745169,
+      "first_out_ns": 53594,
+      "ns_per_out_frame": 63.3319792,
+      "process_ns": 3039935,
       "rebuild_ok": true
      }
     },
@@ -2803,12 +2908,12 @@
       0.574703055
      ],
      "timing": {
-      "create_config_ns": 514757,
-      "destroy_ns": 119043,
+      "create_config_ns": 547481,
+      "destroy_ns": 134942,
       "first_out_in_frames": 1024,
-      "first_out_ns": 55429,
-      "ns_per_out_frame": 63.4756042,
-      "process_ns": 3046829,
+      "first_out_ns": 56940,
+      "ns_per_out_frame": 62.0913125,
+      "process_ns": 2980383,
       "rebuild_ok": true
      }
     },
@@ -2847,12 +2952,12 @@
       0.0856129371
      ],
      "timing": {
-      "create_config_ns": 515888,
-      "destroy_ns": 178540,
+      "create_config_ns": 600629,
+      "destroy_ns": 180389,
       "first_out_in_frames": 1024,
-      "first_out_ns": 56951,
-      "ns_per_out_frame": 70.4588333,
-      "process_ns": 3382024,
+      "first_out_ns": 66639,
+      "ns_per_out_frame": 76.082,
+      "process_ns": 3651936,
       "rebuild_ok": true
      }
     },
@@ -2891,12 +2996,12 @@
       0.014157286
      ],
      "timing": {
-      "create_config_ns": 595866,
-      "destroy_ns": 127078,
+      "create_config_ns": 621125,
+      "destroy_ns": 121255,
       "first_out_in_frames": 1024,
-      "first_out_ns": 53745,
-      "ns_per_out_frame": 64.2113958,
-      "process_ns": 3082147,
+      "first_out_ns": 56069,
+      "ns_per_out_frame": 67.8884167,
+      "process_ns": 3258644,
       "rebuild_ok": true
      }
     },
@@ -2935,12 +3040,12 @@
       0.29489574
      ],
      "timing": {
-      "create_config_ns": 572129,
-      "destroy_ns": 3121594,
+      "create_config_ns": 616936,
+      "destroy_ns": 3321849,
       "first_out_in_frames": 1024,
-      "first_out_ns": 41752,
-      "ns_per_out_frame": 43.1692292,
-      "process_ns": 2072123,
+      "first_out_ns": 42953,
+      "ns_per_out_frame": 43.9132083,
+      "process_ns": 2107834,
       "rebuild_ok": true
      }
     },
@@ -2979,12 +3084,12 @@
       0.153700463
      ],
      "timing": {
-      "create_config_ns": 540607,
-      "destroy_ns": 117049,
+      "create_config_ns": 640841,
+      "destroy_ns": 138959,
       "first_out_in_frames": 1024,
-      "first_out_ns": 35219,
-      "ns_per_out_frame": 43.65475,
-      "process_ns": 2095428,
+      "first_out_ns": 44095,
+      "ns_per_out_frame": 48.02325,
+      "process_ns": 2305116,
       "rebuild_ok": true
      }
     },
@@ -3023,12 +3128,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 500809,
-      "destroy_ns": 105857,
+      "create_config_ns": 585684,
+      "destroy_ns": 136014,
       "first_out_in_frames": 1024,
-      "first_out_ns": 20710,
-      "ns_per_out_frame": 32.6075208,
-      "process_ns": 1565161,
+      "first_out_ns": 22554,
+      "ns_per_out_frame": 34.7287708,
+      "process_ns": 1666981,
       "rebuild_ok": true
      }
     },
@@ -3064,12 +3169,12 @@
       0.176776694
      ],
      "timing": {
-      "create_config_ns": 523043,
-      "destroy_ns": 157332,
+      "create_config_ns": 600349,
+      "destroy_ns": 123309,
       "first_out_in_frames": 1024,
-      "first_out_ns": 17745,
-      "ns_per_out_frame": 28.3905208,
-      "process_ns": 1362745,
+      "first_out_ns": 21572,
+      "ns_per_out_frame": 30.65775,
+      "process_ns": 1471572,
       "rebuild_ok": true
      }
     },
@@ -3095,20 +3200,20 @@
      "ok": true,
      "out_frames": 48000,
      "peak": [
-      7.39184305e+36,
-      6.38306254e+22
+      3.25447789e+25,
+      1.75
      ],
      "rms": [
-      4.44549612e+35,
-      5.65494085e+21
+      4.62989732e+24,
+      0.307180413
      ],
      "timing": {
-      "create_config_ns": 534115,
-      "destroy_ns": 139994,
+      "create_config_ns": 627436,
+      "destroy_ns": 222818,
       "first_out_in_frames": 1024,
-      "first_out_ns": 20611,
-      "ns_per_out_frame": 30.446,
-      "process_ns": 1461408,
+      "first_out_ns": 22012,
+      "ns_per_out_frame": 33.0076875,
+      "process_ns": 1584369,
       "rebuild_ok": true
      }
     },
@@ -3147,12 +3252,12 @@
       0.125
      ],
      "timing": {
-      "create_config_ns": 517017,
-      "destroy_ns": 109915,
+      "create_config_ns": 579623,
+      "destroy_ns": 150502,
       "first_out_in_frames": 64,
-      "first_out_ns": 4218,
-      "ns_per_out_frame": 127.4375,
-      "process_ns": 8156,
+      "first_out_ns": 5752,
+      "ns_per_out_frame": 171.4375,
+      "process_ns": 10972,
       "rebuild_ok": true
      }
     },
@@ -3191,12 +3296,12 @@
       0.000738241148
      ],
      "timing": {
-      "create_config_ns": 517753,
-      "destroy_ns": 958374,
+      "create_config_ns": 549505,
+      "destroy_ns": 1021950,
       "first_out_in_frames": 1024,
-      "first_out_ns": 7735,
-      "ns_per_out_frame": 25.7852783,
-      "process_ns": 211233,
+      "first_out_ns": 8817,
+      "ns_per_out_frame": 27.5093994,
+      "process_ns": 225357,
       "rebuild_ok": true
      }
     },
@@ -3232,12 +3337,12 @@
       0.0743303408
      ],
      "timing": {
-      "create_config_ns": 479748,
-      "destroy_ns": 117159,
+      "create_config_ns": 538522,
+      "destroy_ns": 133348,
       "first_out_in_frames": 1024,
-      "first_out_ns": 17033,
-      "ns_per_out_frame": 26.736875,
-      "process_ns": 1283370,
+      "first_out_ns": 14568,
+      "ns_per_out_frame": 28.6839167,
+      "process_ns": 1376828,
       "rebuild_ok": true
      }
     },
@@ -3274,12 +3379,12 @@
       0
      ],
      "timing": {
-      "create_config_ns": 537280,
-      "destroy_ns": 960549,
+      "create_config_ns": 750055,
+      "destroy_ns": 1483744,
       "first_out_in_frames": 1024,
-      "first_out_ns": 9338,
-      "ns_per_out_frame": 22.0565665,
-      "process_ns": 223036,
+      "first_out_ns": 13867,
+      "ns_per_out_frame": 23.6227255,
+      "process_ns": 238873,
       "rebuild_ok": true
      }
     },
@@ -3316,12 +3421,12 @@
       0.234006206
      ],
      "timing": {
-      "create_config_ns": 7950138,
-      "destroy_ns": 241331,
+      "create_config_ns": 8393775,
+      "destroy_ns": 276630,
       "first_out_in_frames": 1024,
-      "first_out_ns": 23727,
-      "ns_per_out_frame": 38.7070786,
-      "process_ns": 1971816,
+      "first_out_ns": 26401,
+      "ns_per_out_frame": 36.8026972,
+      "process_ns": 1874803,
       "rebuild_ok": true
      }
     },
@@ -3358,12 +3463,12 @@
       0.278406071
      ],
      "timing": {
-      "create_config_ns": 2971130,
-      "destroy_ns": 122741,
+      "create_config_ns": 3294780,
+      "destroy_ns": 205839,
       "first_out_in_frames": 1024,
-      "first_out_ns": 43035,
-      "ns_per_out_frame": 45.0487292,
-      "process_ns": 2162339,
+      "first_out_ns": 53213,
+      "ns_per_out_frame": 53.1078958,
+      "process_ns": 2549179,
       "rebuild_ok": true
      }
     },
@@ -3397,12 +3502,12 @@
       0.113542822
      ],
      "timing": {
-      "create_config_ns": 794724,
-      "destroy_ns": 119194,
+      "create_config_ns": 880094,
+      "destroy_ns": 172977,
       "first_out_in_frames": 1024,
-      "first_out_ns": 20120,
-      "ns_per_out_frame": 33.0435833,
-      "process_ns": 1586092,
+      "first_out_ns": 22784,
+      "ns_per_out_frame": 36.1210208,
+      "process_ns": 1733809,
       "rebuild_ok": true
      }
     },
@@ -3441,12 +3546,12 @@
       0.272431181
      ],
      "timing": {
-      "create_config_ns": 840163,
-      "destroy_ns": 106007,
+      "create_config_ns": 1184078,
+      "destroy_ns": 130894,
       "first_out_in_frames": 1024,
-      "first_out_ns": 16212,
-      "ns_per_out_frame": 28.5437292,
-      "process_ns": 1370099,
+      "first_out_ns": 23927,
+      "ns_per_out_frame": 31.9583958,
+      "process_ns": 1534003,
       "rebuild_ok": true
      }
     },
@@ -3485,12 +3590,12 @@
       0.352166712
      ],
      "timing": {
-      "create_config_ns": 937134,
-      "destroy_ns": 171907,
+      "create_config_ns": 844627,
+      "destroy_ns": 123860,
       "first_out_in_frames": 1024,
-      "first_out_ns": 26742,
-      "ns_per_out_frame": 32.118625,
-      "process_ns": 1541694,
+      "first_out_ns": 23286,
+      "ns_per_out_frame": 35.3562292,
+      "process_ns": 1697099,
       "rebuild_ok": true
      }
     },
@@ -3526,12 +3631,12 @@
       0.204124139
      ],
      "timing": {
-      "create_config_ns": 808732,
-      "destroy_ns": 110005,
+      "create_config_ns": 572113,
+      "destroy_ns": 141595,
       "first_out_in_frames": 1024,
-      "first_out_ns": 16222,
-      "ns_per_out_frame": 29.5469583,
-      "process_ns": 1418254,
+      "first_out_ns": 17293,
+      "ns_per_out_frame": 30.8364167,
+      "process_ns": 1480148,
       "rebuild_ok": true
      }
     },
@@ -3570,12 +3675,12 @@
       0.350070018
      ],
      "timing": {
-      "create_config_ns": 662515,
-      "destroy_ns": 162347,
+      "create_config_ns": 677979,
+      "destroy_ns": 130122,
       "first_out_in_frames": 1024,
-      "first_out_ns": 16131,
-      "ns_per_out_frame": 27.7337623,
-      "process_ns": 1357845,
+      "first_out_ns": 16943,
+      "ns_per_out_frame": 27.8005923,
+      "process_ns": 1361117,
       "rebuild_ok": true
      }
     },
@@ -3612,12 +3717,12 @@
       0.0709507243
      ],
      "timing": {
-      "create_config_ns": 9465391,
-      "destroy_ns": 31498540,
+      "create_config_ns": 9556863,
+      "destroy_ns": 34920064,
       "first_out_in_frames": 0,
       "first_out_ns": 0,
-      "ns_per_out_frame": 102.918297,
-      "process_ns": 19760313,
+      "ns_per_out_frame": 115.360771,
+      "process_ns": 22149268,
       "rebuild_ok": true
      }
     },
@@ -3654,25 +3759,48 @@
       0.353553123
      ],
      "timing": {
-      "create_config_ns": 870583,
-      "destroy_ns": 216623,
+      "create_config_ns": 692345,
+      "destroy_ns": 289130,
       "first_out_in_frames": 0,
       "first_out_ns": 0,
-      "ns_per_out_frame": 54.1845,
-      "process_ns": 2600856,
+      "ns_per_out_frame": 62.7271875,
+      "process_ns": 3010905,
       "rebuild_ok": true
      }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "acrossfade=d=1:c1=tri:c2=tri",
+     "drained_eof": true,
+     "id": "mi_acrossfade",
+     "in_frames": 96000,
+     "kind": "graph2",
+     "multi_input": true,
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 144000
     }
    ],
    "summary": {
     "fail": 0,
-    "pass": 76,
-    "total": 76,
+    "pass": 77,
+    "total": 77,
     "verdict": "PASS"
    }
   }
  },
+ "source": {
+  "git_branch": "exp/e10-libavfilter-capability-min",
+  "measured_source_commit": "ff5540c4b0a3932c5114e88910424cd2aa1985e6"
+ },
  "stage": "avf-c6",
+ "stage_identity_sha256": "09696e8ffe39afb4103dd2ef22b0bb6bfd4dc9d523c472d8d4788cce5db73ac5",
  "symbol_gate": {
   "equal": true,
   "extra_in_xmake": [],

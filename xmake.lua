@@ -21,6 +21,17 @@ option("av_manifest")
     set_showmenu(true)
     set_description("FFmpeg compile-closure manifest to replay")
 
+-- E10-C0 bench-only replay-fidelity normalization. mode.release injects
+-- -fvisibility=hidden / -DNDEBUG ahead of the frozen unit flags, which
+-- shifts GCC IPA decisions away from the upstream-oracle objects the C0
+-- replay must reproduce. Enabling this neutralizes both for every replayed
+-- C unit of qianqian_av. NEVER enable outside E10-C0 oracle-equivalence
+-- builds: normal production builds keep mode.release semantics unchanged.
+option("av_replay_exact")
+    set_default(false)
+    set_showmenu(true)
+    set_description("C0-only: normalize replayed C units (-fvisibility=default -UNDEBUG) for upstream-oracle equivalence")
+
 -- S4 experiment: garbage-collect unreferenced sections in the final binary.
 option("gc_sections")
     set_default(false)
@@ -102,13 +113,13 @@ target("qianqian_av")
             if wasm_session then
                 flags = optimize_flags(flags)
             end
-            -- Replay fidelity (E10-C0): mode.release injects -fvisibility=hidden
-            -- and -DNDEBUG ahead of the frozen unit flags (this xmake has no
-            -- target:remove("cxflags") API), which shifts GCC IPA decisions
-            -- away from the upstream-oracle objects this target must
-            -- reproduce. Forced unit flags land after the injected ones, so
-            -- neutralizing here is last-wins.
-            if unit.flag_kind == nil or unit.flag_kind == "cflags" then
+            -- Replay fidelity (E10-C0): see the av_replay_exact option.
+            -- Forced unit flags land after the injected ones, so
+            -- neutralizing here is last-wins. Default (unset) builds keep
+            -- production mode.release semantics identical to the parent
+            -- branch.
+            if get_config("av_replay_exact")
+                    and (unit.flag_kind == nil or unit.flag_kind == "cflags") then
                 table.insert(flags, "-fvisibility=default")
                 table.insert(flags, "-UNDEBUG")
             end

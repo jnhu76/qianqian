@@ -3,6 +3,7 @@
   "graph plumbing"
  ],
  "config_evidence": {
+  "avfilter_in_closure": true,
   "external_libs_enabled": [],
   "filter_list_registered": [
    "abuffer",
@@ -23,9 +24,57 @@
  "cumulative_tiers": [
   "F0"
  ],
+ "direct_closure": {
+  "graph_config_failures": [],
+  "manifest_units": 224,
+  "per_library": {
+   "libavcodec": 72,
+   "libavfilter": 19,
+   "libavformat": 38,
+   "libavutil": 95
+  },
+  "profile_sha256": "c85e1a3addb37ad9536b220363417dd5dfea25dc53369a652fc1d5bc209a4117"
+ },
+ "experiment_inputs": {
+  "combined_sha256": "deb188e45fa1284eacaf1071e3093343454f0f2893ba7cc5df62458d09c2e230",
+  "ffmpeg_pin": {
+   "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+   "ffmpeg_tag": "n9.0.1",
+   "ffmpeg_version": "9.0.1",
+   "source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+   "source_url": "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n9.0.1.zip",
+   "verification": {
+    "method": "tag-to-commit mapping resolved via GitHub API (2026-08-29, tag object 501bb49457b9dfb25d6a208832e0a6e6cd53108d -> commit bf1b838f); source integrity via zip sha256. GitHub release-archive zips contain no .git, so commit sha is pinned here rather than recomputed from the archive.",
+    "recheck_command": "git ls-remote https://github.com/FFmpeg/FFmpeg 'refs/tags/n9.0.1^{}'"
+   }
+  },
+  "files": {
+   "bench/dsp-capabilities.json": "a268192be4c6b059fa44fd128afac897c6e233af50bcf2c0cea16e492166c995",
+   "bench/ffmpeg-pin.json": "224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85",
+   "bench/pcm/avfilter/qn_avfilter_cap_probe.c": "2ea3e61197552576efed20f08fde84e40075c9ac4e3509191f5479be12aa74e3",
+   "bench/profiles/n3-min-noswr.json": "852112fc5f894109e8def8fb53156266de06e8685beefa79107ef33aecaf24fa",
+   "tools/common_import.py": "d18d91fbbec4a46aa47be936fc9ef8c6411b0e80d1c83f7bf8148270eb0ff2a3",
+   "tools/ffmpeg_import.py": "18afad4e6bb7e447e4c2100f1628560042ebc7feb64bad4bdfec4f532d827238",
+   "tools/ffmpeg_manifest_union.py": "0e8c0f1b2d9f98abf5db562b61cde11e90813f34b8f7a013c17fb7e901baa9eb",
+   "tools/pcm_c0.py": "9aea39163d028dabdad0357986d4a8663e16d8bd078d1464e0f01ce2f0ee947e",
+   "xmake.lua": "478cc115b375a2b585e8793c450347c62ada6b290dac5fff515b0381b8780b6b"
+  }
+ },
+ "format_adaptation": {
+  "added": [],
+  "added_libs": [],
+  "class": "none",
+  "configure_required_deps": {},
+  "discovered_by": null,
+  "required": false
+ },
  "gates": {
   "external_libs": {
    "external": [],
+   "verdict": "PASS"
+  },
+  "no_residual_config_failures": {
+   "failures": [],
    "verdict": "PASS"
   },
   "registration": {
@@ -44,11 +93,11 @@
   }
  },
  "lto": {
-  "archive_bytes": 7301590,
+  "archive_bytes": 7302094,
   "sizes": {
-   "raw_bytes": 633072,
-   "stripped_bytes": 633072,
-   "xz_bytes": 220800
+   "raw_bytes": 637168,
+   "stripped_bytes": 637168,
+   "xz_bytes": 223288
   }
  },
  "manifest": {
@@ -74,7 +123,7 @@
     "path": "/usr/lib/x86_64-linux-gnu/libc.so.6"
    }
   ],
-  "probe_sha256": "41f76d640d9c13f2def47993868283e7938120a547166b37f4010784d337af3d",
+  "probe_sha256": "5d00d604c9ba4a97f6d085f8eb95f595bda3ad5c2fbf56f71b6dfb304ec2e7aa",
   "smoke_fail": 0,
   "smoke_verdict": "PASS"
  },
@@ -106,8 +155,10 @@
    "--enable-filter=aformat",
    "--enable-filter=anull"
   ],
+  "configure_required_deps": {},
   "configure_warnings": [],
-  "profile_sha256": "efc08fde2afa0a4576982b0b90be71d1935b167e7ba440063a9f6d1ca2acdec2"
+  "format_adaptation_added": false,
+  "profile_sha256": "c85e1a3addb37ad9536b220363417dd5dfea25dc53369a652fc1d5bc209a4117"
  },
  "registration_gate": {
   "always_present": [
@@ -133,6 +184,7 @@
   ],
   "intended_subset_of_config": true
  },
+ "residual_config_failures": [],
  "shipping": {
   "archive_bytes": 2735286,
   "ldd": [
@@ -325,16 +377,16 @@
    }
   },
   "probe_sizes": {
-   "raw_bytes": 665840,
-   "stripped_bytes": 665840,
-   "xz_bytes": 230824
+   "raw_bytes": 669936,
+   "stripped_bytes": 669936,
+   "xz_bytes": 233204
   },
   "smoke_fail": 0,
   "smoke_verdict": "PASS"
  },
  "smoke_detail": {
-  "plain": {
-   "contract_pin_addr_sum_lowbits": 16,
+  "direct": {
+   "contract_pin_addr_sum_lowbits": 144,
    "results": [
     {
      "found": true,
@@ -689,12 +741,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 658859,
-      "destroy_ns": 263210,
+      "create_config_ns": 620947,
+      "destroy_ns": 166203,
       "first_out_in_frames": 1024,
-      "first_out_ns": 26823,
-      "ns_per_out_frame": 24.9628125,
-      "process_ns": 1198215,
+      "first_out_ns": 26331,
+      "ns_per_out_frame": 27.38425,
+      "process_ns": 1314444,
       "rebuild_ok": true
      }
     },
@@ -730,12 +782,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 547654,
-      "destroy_ns": 192374,
+      "create_config_ns": 684680,
+      "destroy_ns": 262981,
       "first_out_in_frames": 1024,
-      "first_out_ns": 12675,
-      "ns_per_out_frame": 24.66725,
-      "process_ns": 1184028,
+      "first_out_ns": 12444,
+      "ns_per_out_frame": 27.1644583,
+      "process_ns": 1303894,
       "rebuild_ok": true
      }
     },
@@ -769,12 +821,465 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 623681,
-      "destroy_ns": 205634,
+      "create_config_ns": 691269,
+      "destroy_ns": 168548,
       "first_out_in_frames": 1024,
-      "first_out_ns": 15711,
-      "ns_per_out_frame": 26.8681875,
-      "process_ns": 1289673,
+      "first_out_ns": 14208,
+      "ns_per_out_frame": 26.774125,
+      "process_ns": 1285158,
+      "rebuild_ok": true
+     }
+    }
+   ],
+   "summary": {
+    "fail": 0,
+    "pass": 49,
+    "total": 49,
+    "verdict": "PASS"
+   }
+  },
+  "plain": {
+   "contract_pin_addr_sum_lowbits": 144,
+   "results": [
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "abuffer",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "abuffersink",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "aformat",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": true,
+     "kind": "registration",
+     "name": "anull",
+     "ok": true,
+     "want": "present"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "acompressor",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "acrossfade",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "adelay",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "aecho",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "aeval",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "afade",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "afir",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "agate",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "alimiter",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "amix",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "anequalizer/superequalizer",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "aphaser",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "atempo",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "bass",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "biquad",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "channelmap",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "chorus",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "crossfeed",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "dynaudnorm",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "equalizer",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "extrastereo",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "firequalizer",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "flanger",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "haas",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "headphone",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "highpass",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "highshelf",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "ladspa",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "loudnorm",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "lowpass",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "lowshelf",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "pan",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "replaygain",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "rubberband",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "sofalizer",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "stereotools",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "stereowiden",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "surround",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "treble",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "tremolo",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "vibrato",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "found": false,
+     "kind": "registration",
+     "name": "volume",
+     "ok": true,
+     "want": "absent"
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out"
+     ],
+     "id": "f0_endpoints",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 873478,
+      "destroy_ns": 208256,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 40128,
+      "ns_per_out_frame": 34.3527083,
+      "process_ns": 1648930,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "anull",
+     "drained_eof": true,
+     "expect_detail": "in 48000 out 48000",
+     "expect_measured": 48000,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f0_anull",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 612121,
+      "destroy_ns": 140013,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 14969,
+      "ns_per_out_frame": 28.0404167,
+      "process_ns": 1345940,
+      "rebuild_ok": true
+     }
+    },
+    {
+     "all_finite": true,
+     "auto_inserted": [],
+     "chain": "aformat=sample_fmts=flt:sample_rates=48000",
+     "drained_eof": true,
+     "graph_filters": [
+      "in",
+      "out",
+      "n0"
+     ],
+     "id": "f0_aformat_flt",
+     "in_frames": 48000,
+     "kind": "graph",
+     "negotiated": {
+      "channels": 2,
+      "fmt": "flt",
+      "layout": "stereo",
+      "rate": 48000
+     },
+     "ok": true,
+     "out_frames": 48000,
+     "peak": [
+      0.5,
+      0.5
+     ],
+     "rms": [
+      0.353553387,
+      0.353553387
+     ],
+     "timing": {
+      "create_config_ns": 699083,
+      "destroy_ns": 149962,
+      "first_out_in_frames": 1024,
+      "first_out_ns": 15971,
+      "ns_per_out_frame": 31.5234583,
+      "process_ns": 1513126,
       "rebuild_ok": true
      }
     }
@@ -787,7 +1292,7 @@
    }
   },
   "shipping": {
-   "contract_pin_addr_sum_lowbits": 208,
+   "contract_pin_addr_sum_lowbits": 80,
    "results": [
     {
      "found": true,
@@ -1142,12 +1647,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 719691,
-      "destroy_ns": 204774,
+      "create_config_ns": 659200,
+      "destroy_ns": 157035,
       "first_out_in_frames": 1024,
-      "first_out_ns": 31722,
-      "ns_per_out_frame": 26.4060417,
-      "process_ns": 1267490,
+      "first_out_ns": 27984,
+      "ns_per_out_frame": 27.3748125,
+      "process_ns": 1313991,
       "rebuild_ok": true
      }
     },
@@ -1183,12 +1688,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 544005,
-      "destroy_ns": 199360,
+      "create_config_ns": 495041,
+      "destroy_ns": 130914,
       "first_out_in_frames": 1024,
-      "first_out_ns": 12825,
-      "ns_per_out_frame": 26.6400625,
-      "process_ns": 1278723,
+      "first_out_ns": 12164,
+      "ns_per_out_frame": 26.5832917,
+      "process_ns": 1275998,
       "rebuild_ok": true
      }
     },
@@ -1222,12 +1727,12 @@
       0.353553387
      ],
      "timing": {
-      "create_config_ns": 622277,
-      "destroy_ns": 201043,
+      "create_config_ns": 489601,
+      "destroy_ns": 111016,
       "first_out_in_frames": 1024,
-      "first_out_ns": 12374,
-      "ns_per_out_frame": 26.554875,
-      "process_ns": 1274634,
+      "first_out_ns": 11944,
+      "ns_per_out_frame": 26.0595625,
+      "process_ns": 1250859,
       "rebuild_ok": true
      }
     }
@@ -1240,7 +1745,12 @@
    }
   }
  },
+ "source": {
+  "git_branch": "exp/e10-libavfilter-capability-min",
+  "measured_source_commit": "ff5540c4b0a3932c5114e88910424cd2aa1985e6"
+ },
  "stage": "avf-c1",
+ "stage_identity_sha256": "ccc8e500994ec36f36f436be5655aad333b2bbbd11115f39ab1aaa9b36cebaad",
  "symbol_gate": {
   "equal": true,
   "extra_in_xmake": [],

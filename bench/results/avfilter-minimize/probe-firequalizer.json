@@ -1,5 +1,6 @@
 {
  "config_evidence": {
+  "avfilter_in_closure": true,
   "external_libs_enabled": [],
   "filter_list_registered": [
    "abuffer",
@@ -21,11 +22,96 @@
    "CONFIG_STATIC": "yes"
   }
  },
- "declared_needs_aresample": true,
+ "cost_split": {
+  "adaptation_units": 10,
+  "adaptation_xz_bytes": 24784,
+  "direct_xz_bytes": 290584,
+  "note": "direct = codec+F0+filter(+configure-required deps); adaptation = discovered minimal conversion capability; the old +xz figure mixed both"
+ },
  "delta_vs_avf-c1": {
-  "stripped_bytes": 278528,
+  "stripped_bytes": 282624,
   "units": 11,
-  "xz_bytes": 82100
+  "xz_bytes": 82164
+ },
+ "discovery": {
+  "configure_required_libs": {},
+  "direct_closure": {
+   "graph_config_failures": [
+    "f6_firequalizer"
+   ],
+   "graph_error_sample": "graph_config: Invalid argument",
+   "manifest_per_library": {
+    "libavcodec": 72,
+    "libavfilter": 20,
+    "libavformat": 38,
+    "libavutil": 95
+   },
+   "manifest_units": 225,
+   "profile_sha256": "20023cbd8fbc0e418e115ea9098f3fc8aafea2e498bb48e00dd1411c1b628527",
+   "usable_with_canonical_flt_input": false,
+   "xz_bytes": 290584
+  },
+  "effective_closure": {
+   "auto_inserted": [
+    "auto_aresample_0"
+   ],
+   "manifest_per_library": {
+    "libavcodec": 72,
+    "libavfilter": 21,
+    "libavformat": 38,
+    "libavutil": 95,
+    "libswresample": 9
+   },
+   "manifest_units": 235,
+   "xz_bytes": 315368
+  },
+  "format_adaptation": {
+   "added": [
+    "aresample"
+   ],
+   "added_libs": [
+    "libswresample"
+   ],
+   "class": "graph-format-adaptation",
+   "discovered_by": "avfilter_graph_config failure on canonical flt input",
+   "required": true
+  }
+ },
+ "experiment_inputs": {
+  "combined_sha256": "deb188e45fa1284eacaf1071e3093343454f0f2893ba7cc5df62458d09c2e230",
+  "ffmpeg_pin": {
+   "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+   "ffmpeg_tag": "n9.0.1",
+   "ffmpeg_version": "9.0.1",
+   "source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+   "source_url": "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n9.0.1.zip",
+   "verification": {
+    "method": "tag-to-commit mapping resolved via GitHub API (2026-08-29, tag object 501bb49457b9dfb25d6a208832e0a6e6cd53108d -> commit bf1b838f); source integrity via zip sha256. GitHub release-archive zips contain no .git, so commit sha is pinned here rather than recomputed from the archive.",
+    "recheck_command": "git ls-remote https://github.com/FFmpeg/FFmpeg 'refs/tags/n9.0.1^{}'"
+   }
+  },
+  "files": {
+   "bench/dsp-capabilities.json": "a268192be4c6b059fa44fd128afac897c6e233af50bcf2c0cea16e492166c995",
+   "bench/ffmpeg-pin.json": "224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85",
+   "bench/pcm/avfilter/qn_avfilter_cap_probe.c": "2ea3e61197552576efed20f08fde84e40075c9ac4e3509191f5479be12aa74e3",
+   "bench/profiles/n3-min-noswr.json": "852112fc5f894109e8def8fb53156266de06e8685beefa79107ef33aecaf24fa",
+   "tools/common_import.py": "d18d91fbbec4a46aa47be936fc9ef8c6411b0e80d1c83f7bf8148270eb0ff2a3",
+   "tools/ffmpeg_import.py": "18afad4e6bb7e447e4c2100f1628560042ebc7feb64bad4bdfec4f532d827238",
+   "tools/ffmpeg_manifest_union.py": "0e8c0f1b2d9f98abf5db562b61cde11e90813f34b8f7a013c17fb7e901baa9eb",
+   "tools/pcm_c0.py": "9aea39163d028dabdad0357986d4a8663e16d8bd078d1464e0f01ce2f0ee947e",
+   "xmake.lua": "478cc115b375a2b585e8793c450347c62ada6b290dac5fff515b0381b8780b6b"
+  }
+ },
+ "fft_foundation": {
+  "first_user": false,
+  "foundation_in_direct_closure": false,
+  "note": "no new FFT foundation units",
+  "units": [
+   "libavutil/tx.c",
+   "libavutil/tx_double.c",
+   "libavutil/tx_float.c",
+   "libavutil/tx_int32.c"
+  ]
  },
  "filters": [
   "abuffer",
@@ -35,11 +121,13 @@
   "aresample",
   "firequalizer"
  ],
+ "gate_verdict": "PASS",
  "graph_evidence": [
   {
    "auto_inserted": [],
    "chain": "",
    "id": "f0_endpoints",
+   "kind": "graph",
    "negotiated": {
     "channels": 2,
     "fmt": "flt",
@@ -52,6 +140,7 @@
    "auto_inserted": [],
    "chain": "anull",
    "id": "f0_anull",
+   "kind": "graph",
    "negotiated": {
     "channels": 2,
     "fmt": "flt",
@@ -64,6 +153,7 @@
    "auto_inserted": [],
    "chain": "aformat=sample_fmts=flt:sample_rates=48000",
    "id": "f0_aformat_flt",
+   "kind": "graph",
    "negotiated": {
     "channels": 2,
     "fmt": "flt",
@@ -78,6 +168,7 @@
    ],
    "chain": "firequalizer=gain=if(between(f,800,1250),6,0)",
    "id": "f6_firequalizer",
+   "kind": "graph",
    "negotiated": {
     "channels": 2,
     "fmt": "fltp",
@@ -95,196 +186,31 @@
   "libswresample": 9
  },
  "manifest_units": 235,
+ "multi_input_status": null,
  "probe_filter": "firequalizer",
  "shipping": {
   "archive_bytes": 2919716,
-  "live": {
-   "compiled_units_by_library": {
-    "libavcodec": 72,
-    "libavfilter": 21,
-    "libavformat": 38,
-    "libavutil": 95,
-    "libswresample": 9
+  "ldd": [
+   {
+    "lib": "libm.so.6",
+    "path": "/usr/lib/x86_64-linux-gnu/libm.so.6"
    },
-   "discarded_bytes_total": 100435,
-   "live_bytes_by_unit_top": [
-    {
-     "bytes": 574833,
-     "unit": "libavutil/tx_double.o"
-    },
-    {
-     "bytes": 316047,
-     "unit": "libavutil/tx_int32.o"
-    },
-    {
-     "bytes": 311646,
-     "unit": "libavutil/tx_float.o"
-    },
-    {
-     "bytes": 189317,
-     "unit": "libavcodec/mpegaudiodec_common.o"
-    },
-    {
-     "bytes": 50398,
-     "unit": "libavcodec/mpegaudiodec_float.o"
-    },
-    {
-     "bytes": 36515,
-     "unit": "libavcodec/options.o"
-    },
-    {
-     "bytes": 34383,
-     "unit": "libavutil/crc.o"
-    },
-    {
-     "bytes": 33005,
-     "unit": "libavutil/pixdesc.o"
-    },
-    {
-     "bytes": 26766,
-     "unit": "libavformat/demux.o"
-    },
-    {
-     "bytes": 26364,
-     "unit": "libavcodec/codec_desc.o"
-    },
-    {
-     "bytes": 16162,
-     "unit": "libavutil/opt.o"
-    },
-    {
-     "bytes": 15458,
-     "unit": "libavutil/sha.o"
-    },
-    {
-     "bytes": 14958,
-     "unit": "libavcodec/exif.o"
-    },
-    {
-     "bytes": 12785,
-     "unit": "libavfilter/avfiltergraph.o"
-    },
-    {
-     "bytes": 12766,
-     "unit": "libswresample/rematrix.o"
-    },
-    {
-     "bytes": 12450,
-     "unit": "libavfilter/af_firequalizer.o"
-    },
-    {
-     "bytes": 11933,
-     "unit": "libavfilter/formats.o"
-    },
-    {
-     "bytes": 10813,
-     "unit": "libavfilter/avfilter.o"
-    },
-    {
-     "bytes": 10669,
-     "unit": "libavutil/eval.o"
-    },
-    {
-     "bytes": 10507,
-     "unit": "libswresample/audioconvert.o"
-    },
-    {
-     "bytes": 10213,
-     "unit": "libavformat/id3v2.o"
-    },
-    {
-     "bytes": 9883,
-     "unit": "libswresample/swresample.o"
-    },
-    {
-     "bytes": 9835,
-     "unit": "libavcodec/decode.o"
-    },
-    {
-     "bytes": 9225,
-     "unit": "libavutil/channel_layout.o"
-    },
-    {
-     "bytes": 9200,
-     "unit": "libavcodec/flacdec.o"
-    },
-    {
-     "bytes": 8876,
-     "unit": "libavutil/avsscanf.o"
-    },
-    {
-     "bytes": 8408,
-     "unit": "libavutil/tx.o"
-    },
-    {
-     "bytes": 7459,
-     "unit": "libavcodec/mpegaudiodsp_float.o"
-    },
-    {
-     "bytes": 7417,
-     "unit": "libavutil/parseutils.o"
-    },
-    {
-     "bytes": 7387,
-     "unit": "libavfilter/buffersrc.o"
-    },
-    {
-     "bytes": 6634,
-     "unit": "libavcodec/pthread_frame.o"
-    },
-    {
-     "bytes": 6336,
-     "unit": "libavformat/aviobuf.o"
-    },
-    {
-     "bytes": 6027,
-     "unit": "libavcodec/avcodec.o"
-    },
-    {
-     "bytes": 6027,
-     "unit": "libswresample/dither.o"
-    },
-    {
-     "bytes": 5807,
-     "unit": "libavcodec/utils.o"
-    },
-    {
-     "bytes": 5749,
-     "unit": "libavformat/seek.o"
-    },
-    {
-     "bytes": 5552,
-     "unit": "libavutil/frame.o"
-    },
-    {
-     "bytes": 5297,
-     "unit": "libavcodec/flac_parser.o"
-    },
-    {
-     "bytes": 5127,
-     "unit": "libswresample/resample.o"
-    },
-    {
-     "bytes": 5068,
-     "unit": "libavformat/avio.o"
-    }
-   ],
-   "live_bytes_total": 1989076,
-   "live_units": 128,
-   "live_units_by_library": {
-    "libavcodec": 44,
-    "libavfilter": 14,
-    "libavformat": 21,
-    "libavutil": 43,
-    "libswresample": 6
+   {
+    "lib": "libc.so.6",
+    "path": "/usr/lib/x86_64-linux-gnu/libc.so.6"
    }
-  },
+  ],
   "probe_sizes": {
-   "raw_bytes": 944368,
-   "stripped_bytes": 944368,
-   "xz_bytes": 312924
+   "raw_bytes": 952560,
+   "stripped_bytes": 952560,
+   "xz_bytes": 315368
   }
  },
  "smoke_verdict": "PASS",
- "stage": "avf-p-firequalizer"
+ "source": {
+  "git_branch": "exp/e10-libavfilter-capability-min",
+  "measured_source_commit": "ff5540c4b0a3932c5114e88910424cd2aa1985e6"
+ },
+ "stage": "avf-p-firequalizer",
+ "stage_identity_sha256": "2df1d19cd7e918f2737fa47687fb73bdcb033465e9b2baf063a60700d8b9bb75"
 }

@@ -133,7 +133,7 @@
    "capability": "FIR convolution",
    "classifications": [
     "product-required",
-    "no graph-inserted conversion observed in linear flt chain"
+    "format-adaptation: probe graph inserted ['auto_aresample_0', 'auto_aresample_1']"
    ],
    "probe_stage": "avf-p-afir",
    "tier": "F6"
@@ -402,5 +402,5 @@
    "tier": "F1"
   }
  },
- "notes": "classification per filter: configure-required (dep rule in pinned configure), graph-required (auto-inserted at graph config), format-adaptation (native formats differ from flt), shared-foundation, external-optional"
+ "notes": "classification per filter: configure-required (dep rule in pinned configure), graph-required (auto-inserted at graph config), format-adaptation (discovered by graph config failure), shared-foundation, external-optional"
 }

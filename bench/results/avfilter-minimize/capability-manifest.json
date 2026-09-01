@@ -1,6 +1,6 @@
 {
  "capability_manifest": "bench/dsp-capabilities.json",
- "capability_manifest_sha256": "6f66cb558af42bce5c6a1896d0cead09ad512315e1b9148753f2ef7552ad4f40",
+ "capability_manifest_sha256": "a268192be4c6b059fa44fd128afac897c6e233af50bcf2c0cea16e492166c995",
  "experiment": "e10-c0",
  "ffmpeg": {
   "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
@@ -18,6 +18,7 @@
    "filters": [],
    "gates": {
     "external_libs": "PASS",
+    "no_residual_config_failures": "PASS",
     "registration": "PASS",
     "smoke_plain": "PASS",
     "smoke_shipping": "PASS",
@@ -35,6 +36,7 @@
    ],
    "gates": {
     "external_libs": "PASS",
+    "no_residual_config_failures": "PASS",
     "registration": "PASS",
     "smoke_plain": "PASS",
     "smoke_shipping": "PASS",
@@ -62,6 +64,7 @@
    ],
    "gates": {
     "external_libs": "PASS",
+    "no_residual_config_failures": "PASS",
     "registration": "PASS",
     "smoke_plain": "PASS",
     "smoke_shipping": "PASS",
@@ -92,6 +95,7 @@
    ],
    "gates": {
     "external_libs": "PASS",
+    "no_residual_config_failures": "PASS",
     "registration": "PASS",
     "smoke_plain": "PASS",
     "smoke_shipping": "PASS",
@@ -126,6 +130,7 @@
    ],
    "gates": {
     "external_libs": "PASS",
+    "no_residual_config_failures": "PASS",
     "registration": "PASS",
     "smoke_plain": "PASS",
     "smoke_shipping": "PASS",
@@ -166,6 +171,7 @@
    ],
    "gates": {
     "external_libs": "PASS",
+    "no_residual_config_failures": "PASS",
     "registration": "PASS",
     "smoke_plain": "PASS",
     "smoke_shipping": "PASS",
@@ -211,6 +217,7 @@
    ],
    "gates": {
     "external_libs": "PASS",
+    "no_residual_config_failures": "PASS",
     "registration": "PASS",
     "smoke_plain": "PASS",
     "smoke_shipping": "PASS",
@@ -260,6 +267,7 @@
    ],
    "gates": {
     "external_libs": "PASS",
+    "no_residual_config_failures": "PASS",
     "registration": "PASS",
     "smoke_plain": "PASS",
     "smoke_shipping": "PASS",
@@ -310,6 +318,7 @@
    ],
    "gates": {
     "external_libs": "PASS",
+    "no_residual_config_failures": "PASS",
     "registration": "PASS",
     "smoke_plain": "PASS",
     "smoke_shipping": "PASS",

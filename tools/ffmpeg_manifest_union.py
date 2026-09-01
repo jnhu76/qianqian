@@ -103,6 +103,16 @@ def union(codec_manifest: Path, combined_manifest: Path) -> dict:
     }
 
 
+def union_verdict(data: dict) -> str:
+    """Single shared predicate (task §18): codec subset, zero flag conflicts,
+    AND same FFmpeg pin. pcm_c0.run_union must use this, not a re-derivation
+    that forgets the pin."""
+    v = data["validations"]
+    return ("PASS" if v["codec_subset_of_combined"]
+            and v["shared_flag_conflicts"]
+            and v["combined_same_ffmpeg_pin"] else "FAIL")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--codec-manifest", required=True)
@@ -111,10 +121,7 @@ def main() -> int:
     args = ap.parse_args()
 
     data = union(Path(args.codec_manifest), Path(args.combined_manifest))
-    data["verdict"] = ("PASS" if data["validations"]["codec_subset_of_combined"]
-                       and data["validations"]["shared_flag_conflicts"]
-                       and data["validations"]["combined_same_ffmpeg_pin"]
-                       else "FAIL")
+    data["verdict"] = union_verdict(data)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n")

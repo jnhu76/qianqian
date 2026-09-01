@@ -702,6 +702,12 @@
      "fmt": "dbl",
      "layout": "stereo",
      "rate": 192000
+    },
+    "mi_acrossfade": {
+     "channels": 2,
+     "fmt": "flt",
+     "layout": "stereo",
+     "rate": 48000
     }
    },
    "plain": {
@@ -716,7 +722,8 @@
   },
   {
    "auto_inserted_anywhere": [
-    "auto_aresample_0"
+    "auto_aresample_0",
+    "auto_aresample_1"
    ],
    "negotiated_formats": {
     "f0_aformat_flt": {
@@ -904,6 +911,24 @@
      "fmt": "fltp",
      "layout": "5.1",
      "rate": 48000
+    },
+    "mi_acrossfade": {
+     "channels": 2,
+     "fmt": "flt",
+     "layout": "stereo",
+     "rate": 48000
+    },
+    "mi_afir": {
+     "channels": 2,
+     "fmt": "fltp",
+     "layout": "stereo",
+     "rate": 48000
+    },
+    "mi_headphone": {
+     "channels": 2,
+     "fmt": "flt",
+     "layout": "stereo",
+     "rate": 48000
     }
    },
    "plain": {
@@ -918,7 +943,8 @@
   },
   {
    "auto_inserted_anywhere": [
-    "auto_aresample_0"
+    "auto_aresample_0",
+    "auto_aresample_1"
    ],
    "negotiated_formats": {
     "f0_aformat_flt": {
@@ -1111,6 +1137,24 @@
      "channels": 1,
      "fmt": "flt",
      "layout": "mono",
+     "rate": 48000
+    },
+    "mi_acrossfade": {
+     "channels": 2,
+     "fmt": "flt",
+     "layout": "stereo",
+     "rate": 48000
+    },
+    "mi_afir": {
+     "channels": 2,
+     "fmt": "fltp",
+     "layout": "stereo",
+     "rate": 48000
+    },
+    "mi_headphone": {
+     "channels": 2,
+     "fmt": "flt",
+     "layout": "stereo",
      "rate": 48000
     }
    },

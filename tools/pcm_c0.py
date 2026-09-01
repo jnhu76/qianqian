@@ -68,9 +68,42 @@ PROBE_FILTERS = ["alimiter", "loudnorm", "afir", "firequalizer", "surround",
                  "headphone", "atempo", "crossfeed", "chorus", "flanger"]
 # which probe filters are expected to need the format-adaptation foundation
 # (aresample+swresample); declared hypothesis, machine-verified by graph runs
-PROBE_NEEDS_ARESAMPLE = {f: True for f in PROBE_FILTERS}
-PROBE_NEEDS_ARESAMPLE["atempo"] = False  # packed-flt candidate; graph proves it
+# Review P0-1: the old PROBE_NEEDS_ARESAMPLE pre-declaration is REMOVED.
+# Nothing is pre-paid: configure-required dependencies are parsed from the
+# pinned configure; format adaptation is discovered by instantiating the
+# graph and, only on a graph-config failure, adding the minimal conversion
+# capability (aresample) and rebuilding.
 LTO_STAGES = {"avf-c0", "avf-c1", "avf-c4", "avf-c8"}
+
+PINNED_CONFIGURE = ROOT / "build" / "ffmpeg-src" / "configure"
+FFMPEG_LIBS = {"avutil", "avcodec", "avformat", "avfilter", "swresample",
+               "swscale", "postproc"}
+EXPECTED_LICENSE_PREFIX = "LGPL"
+ALLOWED_DYNAMIC_LIBS = {"libc.so.6", "libm.so.6"}
+def sig(name, freq=1000.0, amp=0.5):
+    return f"{name}:{freq}:{amp}"
+
+
+# multi-input filters: minimal functional 2-input smokes (review P1-1
+# Option A). chain is exactly ONE filter; the second input feeds pad 1.
+MULTI_INPUT_SMOKE = {
+    "afir": {"chain": "afir", "signal": sig("sine"), "signal_b": sig("impulse", 0, 1.0),
+             "ch": 2, "ch_b": 2, "frames": 48000, "frames_b": 64},
+    "acrossfade": {"chain": "acrossfade=d=1:c1=tri:c2=tri", "signal": sig("sine"),
+                   "signal_b": sig("sine", 400, 0.4), "ch": 2, "ch_b": 2,
+                   "frames": 96000, "frames_b": 96000},
+    "headphone": {"chain": "headphone=map=FL|FR:hrir=multich", "signal": sig("sine"),
+                  "signal_b": sig("impulse", 0, 1.0), "ch": 2, "ch_b": 4,
+                  "frames": 48000, "frames_b": 64},
+}
+
+# experiment-defining inputs (review P1-2/P0-2 provenance): results bind
+# these hashes, NOT a self-referential git commit pointer.
+INPUT_FILES = ["bench/dsp-capabilities.json", "tools/pcm_c0.py",
+               "tools/common_import.py", "tools/ffmpeg_import.py",
+               "tools/ffmpeg_manifest_union.py",
+               "bench/pcm/avfilter/qn_avfilter_cap_probe.c", "xmake.lua",
+               "bench/profiles/n3-min-noswr.json", "bench/ffmpeg-pin.json"]
 
 FILTER_ALIAS = {"asrc_abuffer": "abuffer", "asink_abuffer": "abuffersink"}
 FILTER_ALWAYS_PRESENT = {"abuffer", "abuffersink"}  # base OBJS of libavfilter,
@@ -111,6 +144,58 @@ def jload(path: Path):
 
 
 # --------------------------------------------------------------------------
+# provenance: experiment-defining inputs (review P1-2)
+# --------------------------------------------------------------------------
+
+def experiment_inputs() -> dict:
+    files = {f: sha256_file(ROOT / f) for f in INPUT_FILES}
+    combined = hashlib.sha256(
+        "\n".join(f"{k}:{v}" for k, v in sorted(files.items())).encode()
+    ).hexdigest()
+    pin = jload(ROOT / "bench" / "ffmpeg-pin.json")
+    return {"files": files, "combined_sha256": combined, "ffmpeg_pin": pin}
+
+
+def git_info() -> dict:
+    """Supplementary context only (review §24): authority is the input
+    hashes, not a self-referential commit pointer."""
+    return {"measured_source_commit":
+            must(["git", "rev-parse", "HEAD"]).strip(),
+            "git_branch":
+            must(["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip()}
+
+
+def configure_required_libs(filters) -> dict:
+    """Parse <filter>_filter_deps from the pinned upstream configure.
+    These are authoritative hard dependencies (review task §15); anything
+    NOT here is a graph-format-adaptation question answered by executing
+    the graph, never by pre-declaration."""
+    if not PINNED_CONFIGURE.is_file():
+        raise SystemExit(f"pinned configure missing: {PINNED_CONFIGURE} "
+                         "(run the repo's FFmpeg source fetch/import first)")
+    text = PINNED_CONFIGURE.read_text(errors="replace")
+    out = {}
+    for f in sorted(filters):
+        m = re.search(rf"^{re.escape(f)}_filter_deps=\"([^\"]*)\"",
+                      text, re.M)
+        if m:
+            libs = [d for d in m.group(1).split() if d in FFMPEG_LIBS]
+            if libs:
+                out[f] = sorted(libs)
+    return out
+
+
+def graph_config_failures(smoke: dict) -> list:
+    """Graph checks that failed specifically at avfilter_graph_config —
+    the discovery signal that a format conversion is required but the
+    closure has no conversion filter."""
+    return [r for r in smoke.get("results", [])
+            if r.get("kind") in ("graph", "graph2")
+            and not r.get("ok")
+            and str(r.get("error", "")).startswith("graph_config")]
+
+
+# --------------------------------------------------------------------------
 # stage model
 # --------------------------------------------------------------------------
 
@@ -146,7 +231,13 @@ def stage_result_file(stage: str) -> Path:
     return RESULTS / f"{stage}.json"
 
 
-def derive_profile(stage: str, tier_ids: list) -> dict:
+def derive_profile(stage: str, tier_ids: list, extra_filters=(),
+                   adaptation: bool = False) -> dict:
+    """Capability intent (tier filters + probe filter) + configure-required
+    dependencies parsed from the pinned configure. NO pre-paid format
+    adaptation: with adaptation=True the minimal conversion capability
+    (aresample -> swresample) is added as a DISCOVERED requirement, and the
+    result records that explicitly."""
     base = jload(CODEC_PROFILE)
     caps = caps_doc()
     by_id = {t["id"]: t for t in caps["tiers"]}
@@ -155,35 +246,46 @@ def derive_profile(stage: str, tier_ids: list) -> dict:
     p["experiment"] = "e10-c0"
     p["derived_from"] = CODEC_PROFILE.name
     p["description"] = f"E10-C0 ladder: codec closure + tiers {tier_ids or '[]'}"
-    filters: set = set()
-    aresample = swr = False
+    filters: set = set(extra_filters)
     for tid in tier_ids:
-        t = by_id[tid]
-        filters |= set(t["filters"])
-        aresample |= bool(t["aresample"])
-        swr |= bool(t["swresample"])
+        filters |= set(by_id[tid]["filters"])
+    req = configure_required_libs(filters)
+    req_libs = sorted({l for libs in req.values() for l in libs})
     enable = list(p["libraries"]["enable"])
     disable = list(p["libraries"]["disable"])
-    if tier_ids:
-        enable += ["avfilter"] + (["swresample"] if swr else [])
-        disable = [x for x in disable if x not in ("avfilter", "swresample")]
-        # --disable-everything only disables components; libraries stay on by
-        # default, so swresample must stay explicitly disabled when no tier
-        # declares the format-adaptation foundation (c1 leak: 9 swr TUs)
-        if not swr:
-            disable.append("swresample")
-        if aresample:
-            filters.add("aresample")
+    if filters:  # avf-c0 stays codec-only
+        enable.append("avfilter")
+        enable += req_libs
+    disable = [x for x in disable if x not in ("avfilter", "swresample")]
+    # --disable-everything only disables components; libraries stay on by
+    # default, so swresample must stay explicitly disabled unless a
+    # configure-required dep (pan) or a discovered adaptation needs it
+    if "swresample" not in enable:
+        disable.append("swresample")
+    if adaptation:
+        filters.add("aresample")   # aresample_filter_deps=swresample
+        enable.append("swresample")
+        disable = [x for x in disable if x != "swresample"]
     p["libraries"] = {"enable": sorted(set(enable)), "disable": sorted(set(disable))}
     p.setdefault("components", {})["filter"] = sorted(filters)
+    p["configure_required_deps"] = req
+    p["format_adaptation_added"] = bool(adaptation)
     return p
 
 
-def write_profile(stage: str, tier_ids: list) -> Path:
+def write_profile(stage: str, tier_ids: list, extra_filters=(),
+                  adaptation: bool = False) -> Path:
     d = stage_dir(stage)
     d.mkdir(parents=True, exist_ok=True)
     pf = d / "profile.json"
-    pf.write_text(json.dumps(derive_profile(stage, tier_ids), indent=1) + "\n")
+    prof = derive_profile(stage, tier_ids, extra_filters, adaptation)
+    if adaptation:
+        # persist the direct (pre-adaptation) profile alongside for
+        # provenance; the oracle imports d/profile.json
+        direct = json.loads(pf.read_text()) if pf.is_file() else None
+        if direct and not direct.get("format_adaptation_added"):
+            (d / "profile-direct.json").write_text(json.dumps(direct, indent=1) + "\n")
+    pf.write_text(json.dumps(prof, indent=1) + "\n")
     return pf
 
 
@@ -195,8 +297,18 @@ def run_oracle(stage: str, tier_ids: list, force: bool = False,
                rewrite_profile: bool = True) -> None:
     d = stage_dir(stage)
     if (d / "manifest.json").is_file() and not force:
-        print(f"[{stage}] oracle manifest exists, skipping import")
-        return
+        m = jload(d / "manifest.json")
+        want = sha256_file(d / "profile.json")
+        if m.get("profile_sha256") == want:
+            print(f"[{stage}] oracle manifest exists and matches profile, "
+                  "skipping import")
+            return
+        # the oracle import is itself a cached stage whose identity is the
+        # derived profile; a stale manifest would silently measure the OLD
+        # closure (this actually happened once and poisoned direct-vs-
+        # effective accounting — caught and re-run)
+        print(f"[{stage}] oracle manifest profile MISMATCH (stale), "
+              "re-importing")
     if rewrite_profile:
         write_profile(stage, tier_ids)
     pf = d / "profile.json"
@@ -302,8 +414,11 @@ def xmake_build(manifest_rel: str, gc=False, lto=False, link_map: Path | None = 
                 no_avfilter: bool = False) -> None:
     shutil.rmtree(ROOT / BUILDIR, ignore_errors=True)
     shutil.rmtree(ARTIFACTS, ignore_errors=True)
+    # av_replay_exact=y is C0-only (review P0-3): it normalizes the replayed
+    # C units (-fvisibility=default -UNDEBUG) for upstream-oracle equivalence.
+    # Normal production builds never set it and keep mode.release semantics.
     cfg = ["xmake", "f", "-o", BUILDIR, "-m", "release",
-           f"--av_manifest={manifest_rel}", "-y"]
+           f"--av_manifest={manifest_rel}", "--av_replay_exact=y", "-y"]
     if gc:
         cfg.append("--gc_sections=y")
     if lto:
@@ -483,10 +598,6 @@ def oracle_archive_set(stage: str) -> set:
 # scenarios
 # --------------------------------------------------------------------------
 
-def sig(name, freq=1000.0, amp=0.5):
-    return f"{name}:{freq}:{amp}"
-
-
 def graph_smoke_table():
     """(tier, id, chain, signal, rate, ch, frames, kwargs) per capability.
     Two-input filters (afir, acrossfade, headphone) are intentionally absent:
@@ -595,6 +706,17 @@ def scenario_checks(stage_tier_ids: list, stage_filters: set,
              "rate": rate, "ch": ch, "frames": frames, "block": 1024}
         c.update(kw)
         checks.append(c)
+    # multi-input filters (review P1-1 Option A): minimal functional
+    # 2-input smokes for every such filter this stage enables
+    all_filters = set(stage_filters) | ({extra_filter} if extra_filter else set())
+    for mf, spec in MULTI_INPUT_SMOKE.items():
+        if mf in all_filters:
+            c = {"kind": "graph2", "id": f"mi_{mf}", "chain": spec["chain"],
+                 "signal": spec["signal"], "signal_b": spec["signal_b"],
+                 "rate": 48000, "ch": spec["ch"], "ch_b": spec["ch_b"],
+                 "frames": spec["frames"], "frames_b": spec["frames_b"],
+                 "block": 1024}
+            checks.append(c)
     return checks
 
 
@@ -604,11 +726,11 @@ def write_scenario(path: Path, checks: list) -> Path:
         if c["kind"] in ("present", "absent"):
             lines.append(f"kind={c['kind']} name={c['name']}")
             continue
-        parts = [f"kind=graph", f"id={c['id']}", f"chain={c['chain']}",
+        parts = [f"kind={c['kind']}", f"id={c['id']}", f"chain={c['chain']}",
                  f"signal={c['signal']}", f"rate={c['rate']}", f"ch={c['ch']}",
                  f"frames={c['frames']}", f"block={c['block']}"]
         for k in ("sink_fmt", "want_fmt", "want_rate", "want_channels",
-                  "expect", "lifecycle"):
+                  "expect", "lifecycle", "signal_b", "ch_b", "frames_b"):
             if k in c:
                 parts.append(f"{k}={c[k]}")
         lines.append(" ".join(parts))
@@ -621,20 +743,62 @@ def write_scenario(path: Path, checks: list) -> Path:
 # one ladder/probe stage end-to-end
 # --------------------------------------------------------------------------
 
+def stage_identity(stage: str, tier_ids: list, extra_filters=()) -> str:
+    """Hash of the stage's derived DIRECT profile (the experiment-defining
+    identity for cache-freshness decisions)."""
+    prof = derive_profile(stage, tier_ids, extra_filters, adaptation=False)
+    return hashlib.sha256(
+        json.dumps(prof, sort_keys=True).encode()).hexdigest()
+
+
 def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
     d = stage_dir(stage)
     res_file = stage_result_file(stage)
     manifest_rel = f"build/minimize/{stage}/manifest.json"
-    if res_file.is_file() and not force:
-        print(f"[{stage}] evidence exists ({res_file.name}), skipping")
-        return jload(res_file)
+    no_avf = stage == "avf-c0"
 
+    # cache freshness (review P1-2/§23): reuse cached evidence only when the
+    # experiment-defining inputs, the FFmpeg pin and the stage identity all
+    # still match; otherwise the evidence is STALE and the stage reruns.
+    if res_file.is_file() and not force:
+        cached = jload(res_file)
+        cur = experiment_inputs()
+        if (cached.get("experiment_inputs", {}).get("combined_sha256")
+                == cur["combined_sha256"]
+                and cached.get("experiment_inputs", {}).get("ffmpeg_pin")
+                == cur["ffmpeg_pin"]
+                and cached.get("stage_identity_sha256")
+                == stage_identity(stage, tier_ids)):
+            print(f"[{stage}] evidence fresh ({res_file.name}), skipping")
+            return cached
+        print(f"[{stage}] cached evidence STALE (input/identity hash "
+              f"mismatch), rerunning")
+
+    # ---- pass A: DIRECT closure — configure-required deps only ----
+    write_profile(stage, tier_ids)
     run_oracle(stage, tier_ids, force=force)
-    manifest = jload(d / "manifest.json")
-    config_ev = parse_config_evidence(stage)
+    manifest_a = jload(d / "manifest.json")
+    filters_a = set(manifest_a and
+                    jload(d / "profile.json")["components"].get("filter", []))
+    scenario_a = write_scenario(d / "scenario.kv",
+                                scenario_checks(tier_ids, filters_a))
+    xmake_build(manifest_rel, gc=False, lto=False, no_avfilter=no_avf)
+    smoke_a = run_probe(scenario_a, d / "smoke-direct.json")
+    failures = graph_config_failures(smoke_a)
+
+    # ---- pass B (only on discovery): minimal format adaptation ----
+    adaptation_needed = bool(failures)
+    if adaptation_needed:
+        print(f"[{stage}] discovered format-adaptation requirement: "
+              f"{[f['id'] for f in failures]} -> adding aresample")
+        write_profile(stage, tier_ids, adaptation=True)
+        run_oracle(stage, tier_ids, force=True, rewrite_profile=False)
+        smoke_a = None  # re-run the plain evidence on the effective closure
 
     profile = jload(d / "profile.json")
     stage_filters = set(profile["components"].get("filter", []))
+    manifest = jload(d / "manifest.json")
+    config_ev = parse_config_evidence(stage)
     tier_ids_eff = list(tier_ids)
 
     # registration gates from generated provenance + config
@@ -653,9 +817,10 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
                 if config_ev["avfilter_in_closure"] else set())),
     }
 
-    # ---- xmake replay: plain ----
+    # ---- xmake replay: plain (final = effective closure) ----
+    scenario = write_scenario(d / "scenario.kv",
+                              scenario_checks(tier_ids_eff, stage_filters))
     plain_map = d / "plain.map"
-    no_avf = stage == "avf-c0"
     xmake_build(manifest_rel, gc=False, lto=False, link_map=plain_map,
                 no_avfilter=no_avf)
     plain_archive_bytes = ARCHIVE.stat().st_size
@@ -670,8 +835,6 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
         "extra_in_xmake": sorted(xmake_syms - oracle_syms)[:20],
     }
 
-    scenario = write_scenario(d / "scenario.kv",
-                              scenario_checks(tier_ids_eff, stage_filters))
     smoke_plain = run_probe(scenario, d / "smoke-plain.json")
     plain_ldd = ldd_probe()
 
@@ -685,7 +848,11 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
     smoke_ship = run_probe(scenario, d / "smoke-shipping.json")
     shipping_ldd = ldd_probe()
     members = archive_members(ARCHIVE)
-    live = parse_live_map(ship_map, members, jload(d / "manifest-shipping.json"))
+    live = parse_live_map(ship_map, members,
+                          jload(d / "manifest-shipping.json"))
+
+    # residual discovery failures on the effective closure are hard errors
+    residual = graph_config_failures(smoke_ship)
 
     # ---- xmake replay: lto (representative points only) ----
     lto_data = None
@@ -696,6 +863,7 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
         lto_data = {"sizes": binary_sizes(PROBE, d, "probe-lto"),
                     "archive_bytes": ARCHIVE.stat().st_size}
 
+    req = profile.get("configure_required_deps", {})
     data = {
         "stage": stage,
         "tier": tier_ids_eff[-1] if tier_ids_eff else None,
@@ -707,6 +875,30 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
             "configure_args": manifest["configure_args"],
             "configure_warnings": manifest.get("configure_warnings", []),
             "profile_sha256": manifest["profile_sha256"],
+            "configure_required_deps": req,
+            "format_adaptation_added":
+                profile.get("format_adaptation_added", False),
+        },
+        "stage_identity_sha256": stage_identity(stage, tier_ids),
+        "experiment_inputs": experiment_inputs(),
+        "source": git_info(),
+        "direct_closure": {
+            "manifest_units": manifest_a["closure"]["translation_units"],
+            "per_library": per_library_units(manifest_a),
+            "profile_sha256": manifest_a["profile_sha256"],
+            "graph_config_failures": [f["id"] for f in failures],
+        },
+        "format_adaptation": {
+            "required": adaptation_needed,
+            "added": ["aresample"] if adaptation_needed else [],
+            "added_libs": ["libswresample"] if adaptation_needed else [],
+            "class": ("graph-format-adaptation" if adaptation_needed else
+                      ("configure-required" if req.get("swresample") and
+                       any(v == ["swresample"] for v in req.values()) else
+                      "none")),
+            "configure_required_deps": req,
+            "discovered_by": ("avfilter_graph_config failure on canonical "
+                              "flt input") if adaptation_needed else None,
         },
         "config_evidence": config_ev,
         "registration_gate": reg_gate,
@@ -733,7 +925,9 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
             "live": live,
         },
         "lto": lto_data,
-        "smoke_detail": {"plain": smoke_plain, "shipping": smoke_ship},
+        "smoke_detail": {"plain": smoke_plain, "shipping": smoke_ship,
+                         "direct": smoke_a},
+        "residual_config_failures": [f["id"] for f in residual],
     }
 
     gates = gates_for(data)
@@ -761,6 +955,10 @@ def gates_for(data: dict) -> dict:
         "verdict": "PASS" if not data["config_evidence"]["external_libs_enabled"]
                    else "FAIL",
         "external": data["config_evidence"]["external_libs_enabled"]}
+    g["no_residual_config_failures"] = {
+        "verdict": "PASS" if not data.get("residual_config_failures")
+                   else "FAIL",
+        "failures": data.get("residual_config_failures", [])}
     return g
 
 
@@ -768,64 +966,170 @@ def gates_for(data: dict) -> dict:
 # add-one probes
 # --------------------------------------------------------------------------
 
+def tx_units(manifest: dict) -> list:
+    """libavutil transform/FFT foundation units — the shared FFT cost."""
+    return sorted(u["path"] for u in manifest["units"]
+                  if re.search(r"libavutil/.*?(tx|fft|avfft)", u["path"]))
+
+
+def probe_verdict(data: dict) -> str:
+    """Recompute a probe's verdict from its raw graph evidence (fail-closed;
+    the stored smoke string is never trusted)."""
+    graphs = [g for g in data.get("graph_evidence", [])]
+    if not graphs:
+        return "FAIL"
+    return "PASS" if all(g.get("ok") for g in graphs) else "FAIL"
+
+
 def run_probe_stage(flt: str, force: bool = False) -> dict:
     stage = f"avf-p-{flt}"
     res_file = stage_result_file(stage)
+    manifest_rel = f"build/minimize/{stage}/manifest.json"
+
+    # cache freshness (review P1-2/§23)
     if res_file.is_file() and not force:
-        print(f"[{stage}] evidence exists, skipping")
-        return jload(res_file)
+        cached = jload(res_file)
+        cur = experiment_inputs()
+        if (cached.get("experiment_inputs", {}).get("combined_sha256")
+                == cur["combined_sha256"]
+                and cached.get("experiment_inputs", {}).get("ffmpeg_pin")
+                == cur["ffmpeg_pin"]
+                and cached.get("stage_identity_sha256")
+                == stage_identity(stage, ["F0"], {flt})):
+            print(f"[{stage}] evidence fresh, skipping")
+            return cached
+        print(f"[{stage}] cached evidence STALE, rerunning")
 
-    # base = codec + F0; probe = base + single filter (+declared adaptation)
-    base_tiers = ["F0"]
+    # base = codec + F0; probe filter adds ONLY its configure-required deps
     d = stage_dir(stage)
-    pf = write_profile(stage, base_tiers)
-    p = jload(pf)
-    p["profile"] = stage
-    p["components"]["filter"] = sorted(set(p["components"]["filter"]) | {flt})
-    if PROBE_NEEDS_ARESAMPLE.get(flt, True):
-        p["components"]["filter"] = sorted(set(p["components"]["filter"]) | {"aresample"})
-        libs = set(p["libraries"]["enable"]) | {"swresample"}
-        p["libraries"] = {"enable": sorted(libs),
-                          "disable": [x for x in p["libraries"]["disable"]
-                                      if x not in ("avfilter", "swresample")]}
-    pf.write_text(json.dumps(p, indent=1) + "\n")
 
-    run_oracle(stage, base_tiers, force=force, rewrite_profile=False)
-    manifest = jload(d / "manifest.json")
+    def build_and_smoke():
+        ship_manifest = projected_manifest(stage, "shipping")
+        ship_map = d / "shipping.map"
+        xmake_build(f"build/minimize/{stage}/manifest-shipping.json",
+                    gc=True, lto=False, link_map=ship_map)
+        sizes = binary_sizes(PROBE, d, "probe")
+        scenario = write_scenario(
+            d / "scenario.kv",
+            scenario_checks(["F0"], stage_filters_now(), extra_filter=flt))
+        smoke = run_probe(scenario, d / "smoke-shipping.json")
+        return projected_manifest, sizes, smoke
+
+    def stage_filters_now():
+        return set(jload(d / "profile.json")["components"].get("filter", []))
+
+    # ---- pass A: DIRECT closure ----
+    write_profile(stage, ["F0"], extra_filters={flt})
+    run_oracle(stage, ["F0"], force=force, rewrite_profile=False)
+    manifest_a = jload(d / "manifest.json")
+    _, sizes_a, smoke_a = build_and_smoke()
+    failures = graph_config_failures(smoke_a)
+
+    # ---- pass B (only on discovery): minimal format adaptation ----
+    adaptation = bool(failures)
+    if adaptation:
+        print(f"[{stage}] discovered format-adaptation requirement "
+              f"({[f['id'] for f in failures]}) -> adding aresample+swresample")
+        write_profile(stage, ["F0"], extra_filters={flt}, adaptation=True)
+        run_oracle(stage, ["F0"], force=True, rewrite_profile=False)
+        _, sizes, smoke = build_and_smoke()
+        manifest = jload(d / "manifest.json")
+    else:
+        sizes, smoke, manifest = sizes_a, smoke_a, manifest_a
+
     config_ev = parse_config_evidence(stage)
-    stage_filters = set(p["components"]["filter"])
+    stage_filters = set(jload(d / "profile.json")["components"].get("filter", []))
 
-    # shipping authority only (marginal delta = shipping vs avf-c1 shipping)
-    ship_manifest = projected_manifest(stage, "shipping")
-    ship_map = d / "shipping.map"
-    xmake_build(f"build/minimize/{stage}/manifest-shipping.json", gc=True,
-                lto=False, link_map=ship_map)
-    sizes = binary_sizes(PROBE, d, "probe")
-    smoke = run_probe(write_scenario(d / "scenario.kv",
-                                     scenario_checks(base_tiers, stage_filters,
-                                                     extra_filter=flt)),
-                      d / "smoke-shipping.json")
-    members = archive_members(ARCHIVE)
-    live = parse_live_map(ship_map, members, jload(d / "manifest-shipping.json"))
+    # multi-input functional status (review P1-1): graph2 rows actually ran
+    # for afir/acrossfade/headphone; anything else is typed honestly
+    mi_rows = [r for r in smoke.get("results", [])
+               if r.get("kind") == "graph2" and r.get("id") == f"mi_{flt}"]
+    if mi_rows:
+        mi_status = ("FUNCTIONAL_SMOKE_PASS (2-input graph2: config+process"
+                     "+drain+finite+non-empty)" if mi_rows[0].get("ok")
+                     else "FUNCTIONAL_SMOKE_FAIL")
+    elif flt in MULTI_INPUT_SMOKE:
+        mi_status = "REGISTRATION_PASS|CLOSURE_PASS|FUNCTIONAL_SMOKE_NOT_RUN"
+    else:
+        mi_status = None  # single-input filter: normal graph rows cover it
 
     base1 = jload(RESULTS / "f0-framework.json")
+    tx_base = tx_units(jload(stage_dir("avf-c1") / "manifest.json"))
+    tx_direct, tx_b = tx_units(manifest_a), tx_units(manifest)
+    # first FFT/avtx user = brings transform foundation the F0 base lacks
+    fft_first_user = len(tx_b) > len(tx_base)
+    fft_foundation_in_direct = len(tx_direct) > len(tx_base)
+    delta_eff = delta_stage(base1, {
+        "manifest": {"units": manifest["closure"]["translation_units"]},
+        "shipping": {"archive_bytes": ARCHIVE.stat().st_size,
+                     "probe_sizes": sizes}})
     data = {
         "stage": stage,
         "probe_filter": flt,
-        "declared_needs_aresample": PROBE_NEEDS_ARESAMPLE.get(flt, True),
         "filters": sorted(stage_filters),
+        "stage_identity_sha256": stage_identity(stage, ["F0"], {flt}),
+        "experiment_inputs": experiment_inputs(),
+        "source": git_info(),
         "config_evidence": config_ev,
+        "discovery": {
+            "configure_required_libs": configure_required_libs(
+                stage_filters - {"aresample"}),
+            "direct_closure": {
+                "manifest_units": manifest_a["closure"]["translation_units"],
+                "manifest_per_library": per_library_units(manifest_a),
+                "profile_sha256": manifest_a["profile_sha256"],
+                "graph_config_failures": [f["id"] for f in failures],
+                "graph_error_sample": next(
+                    (f.get("error") for f in failures), None),
+                "xz_bytes": sizes_a["xz_bytes"],
+                "usable_with_canonical_flt_input": not failures,
+            },
+            "format_adaptation": {
+                "required": adaptation,
+                "added": ["aresample"] if adaptation else [],
+                "added_libs": ["libswresample"] if adaptation else [],
+                "class": ("graph-format-adaptation" if adaptation
+                          else "none"),
+                "discovered_by": ("avfilter_graph_config failure on "
+                                  "canonical flt input") if adaptation
+                                 else None,
+            },
+            "effective_closure": {
+                "manifest_units": manifest["closure"]["translation_units"],
+                "manifest_per_library": per_library_units(manifest),
+                "auto_inserted": sorted({a for g in graph_evidence(smoke)
+                                         for a in g["auto_inserted"]}),
+                "xz_bytes": sizes["xz_bytes"],
+            },
+        },
+        "cost_split": {
+            "direct_xz_bytes": sizes_a["xz_bytes"],
+            "adaptation_xz_bytes": sizes["xz_bytes"] - sizes_a["xz_bytes"],
+            "adaptation_units": manifest["closure"]["translation_units"]
+                                - manifest_a["closure"]["translation_units"],
+            "note": "direct = codec+F0+filter(+configure-required deps); "
+                    "adaptation = discovered minimal conversion capability; "
+                    "the old +xz figure mixed both",
+        },
+        "fft_foundation": {
+            "first_user": fft_first_user,
+            "foundation_in_direct_closure": fft_foundation_in_direct,
+            "units": tx_b,
+            "note": ("first FFT/avtx user: its DIRECT closure already "
+                     "carries the shared transform foundation; later FFT "
+                     "users pay only the incremental filter cost") if
+                    fft_first_user else "no new FFT foundation units",
+        },
+        "multi_input_status": mi_status,
         "manifest_units": manifest["closure"]["translation_units"],
         "manifest_per_library": per_library_units(manifest),
         "shipping": {"archive_bytes": ARCHIVE.stat().st_size,
                      "probe_sizes": sizes,
-                     "live": live},
+                     "ldd": ldd_probe()},
         "smoke_verdict": smoke["summary"]["verdict"],
-        "delta_vs_avf-c1": delta_stage(base1, {
-            "manifest": {"units": manifest["closure"]["translation_units"]},
-            "shipping": {"archive_bytes": ARCHIVE.stat().st_size,
-                         "probe_sizes": sizes},
-        }),
+        "gate_verdict": probe_verdict({
+            "graph_evidence": graph_evidence(smoke)}),
+        "delta_vs_avf-c1": delta_eff,
         "graph_evidence": graph_evidence(smoke),
     }
     jwrite(res_file, data)
@@ -845,12 +1149,16 @@ def delta_stage(prev: dict, cur: dict) -> dict:
 
 
 def graph_evidence(smoke: dict) -> list:
-    """Which graphs required graph-inserted conversion / what formats won."""
+    """Which graphs required graph-inserted conversion / what formats won.
+    Includes graph2 (multi-input functional) rows — they carry gate
+    weight: a multi-input filter must pass its functional smoke, not
+    just registration (review P1-1)."""
     out = []
     for r in smoke["results"]:
-        if r.get("kind") != "graph":
+        if r.get("kind") not in ("graph", "graph2"):
             continue
-        out.append({"id": r["id"], "chain": r["chain"],
+        out.append({"id": r["id"], "kind": r.get("kind"),
+                    "chain": r["chain"],
                     "auto_inserted": r.get("auto_inserted", []),
                     "negotiated": r.get("negotiated"),
                     "ok": r["ok"]})
@@ -865,9 +1173,9 @@ def run_union() -> dict:
     import ffmpeg_manifest_union as fmu
     data = fmu.union(stage_dir("avf-c0") / "manifest.json",
                      stage_dir("avf-c8") / "manifest.json")
-    data["verdict"] = ("PASS" if data["validations"]["codec_subset_of_combined"]
-                       and data["validations"]["shared_flag_conflicts"]
-                       else "FAIL")
+    # task §18: the SAME predicate as the wrapper, including the pin check
+    data["verdict"] = fmu.union_verdict(data)
+    data["experiment_inputs"] = experiment_inputs()
     jwrite(RESULTS / "manifest-union.json", data)
     return data
 
@@ -891,91 +1199,193 @@ def load_probe_data() -> list:
             if (RESULTS / f"probe-{f}.json").is_file()]
 
 
-def aggregate() -> dict:
-    stages = load_stage_data()
-    probes = load_probe_data()
-    c0 = next((s for s in stages if s["stage"] == "avf-c0"), None)
+def compute_summary(stages: list, probes: list) -> dict:
+    """Derive the fail-closed summary from RAW evidence (review P0-2).
+    Gate predicates are recomputed here from section fields; serialized
+    verdict strings are never trusted."""
+    # 1. ladder stage gates — recomputed
+    stage_gates = {}
+    for st in stages:
+        fresh = gates_for(st)
+        stage_gates[st["stage"]] = {k: g.get("verdict")
+                                    for k, g in fresh.items()}
+    ladder_ok = all(all(v == "PASS" for v in g.values())
+                    for g in stage_gates.values())
+
+    # 2. add-one probe gates — recomputed from graph evidence
+    probe_gates = {p["probe_filter"]: probe_verdict(p) for p in probes}
+    probes_ok = all(v == "PASS" for v in probe_gates.values())
+
+    # 3. manifest union verdict (shared predicate incl. pin)
+    ufile = RESULTS / "manifest-union.json"
+    union_data = jload(ufile) if ufile.is_file() else {
+        "verdict": "FAIL", "validations": {}}
+    union_ok = union_data.get("verdict") == "PASS"
+    pin_ok = bool(union_data.get("validations", {})
+                  .get("combined_same_ffmpeg_pin"))
+    cur_pin = jload(ROOT / "bench" / "ffmpeg-pin.json")
+    pin_ok = pin_ok and all(
+        s.get("experiment_inputs", {}).get("ffmpeg_pin") == cur_pin
+        for s in stages) if stages else False
+
+    # 4. license policy: every avfilter-bearing stage stays expected LGPL
+    license_rows = {st["stage"]: (st.get("config_evidence") or {})
+                    .get("license") for st in stages}
+    license_ok = bool(stages) and all(
+        l and l.startswith(EXPECTED_LICENSE_PREFIX)
+        for l in license_rows.values())
+
+    # 5. external dependency policy: no optional externals enabled, and the
+    # linked probe's dynamic deps stay inside the allowed libc/libm set
+    externals = {st["stage"]: (st.get("config_evidence") or {})
+                 .get("external_libs_enabled", []) for st in stages}
+    ldd_ok = True
+    unexpected_libs = {}
+    for st in stages:
+        for dep in (st.get("shipping") or {}).get("ldd", []):
+            if dep.get("lib") not in ALLOWED_DYNAMIC_LIBS:
+                unexpected_libs.setdefault(st["stage"], []).append(dep["lib"])
+        if unexpected_libs:
+            ldd_ok = False
+    deps_ok = (not any(externals.values())) and ldd_ok
 
     marginal = {"experiment": "e10-c0", "ladder": [], "probes": []}
+    c1_xz = next((st["shipping"]["probe_sizes"]["xz_bytes"]
+                  for st in stages if st["stage"] == "avf-c1"), None)
     prev = None
-    for s in stages:
+    for st in stages:
         row = {
-            "stage": s["stage"], "tier": s.get("tier"),
-            "capabilities": s["capabilities"],
-            "filters": s["registration_gate"]["intended_filters"],
-            "units": s["manifest"]["units"],
+            "stage": st["stage"], "tier": st.get("tier"),
+            "capabilities": st["capabilities"],
+            "filters": st["registration_gate"]["intended_filters"],
+            "units": st["manifest"]["units"],
             "units_delta": None if prev is None else
-                s["manifest"]["units"] - prev["manifest"]["units"],
-            "stripped_bytes": s["shipping"]["probe_sizes"]["stripped_bytes"],
+                st["manifest"]["units"] - prev["manifest"]["units"],
+            "stripped_bytes": st["shipping"]["probe_sizes"]["stripped_bytes"],
             "stripped_delta": None if prev is None else
-                s["shipping"]["probe_sizes"]["stripped_bytes"] - prev["shipping"]["probe_sizes"]["stripped_bytes"],
-            "xz_bytes": s["shipping"]["probe_sizes"]["xz_bytes"],
+                st["shipping"]["probe_sizes"]["stripped_bytes"] - prev["shipping"]["probe_sizes"]["stripped_bytes"],
+            "xz_bytes": st["shipping"]["probe_sizes"]["xz_bytes"],
             "xz_delta": None if prev is None else
-                s["shipping"]["probe_sizes"]["xz_bytes"] - prev["shipping"]["probe_sizes"]["xz_bytes"],
-            "live_units": s["shipping"]["live"]["live_units"],
-            "live_bytes": s["shipping"]["live"]["live_bytes_total"],
-            "new_external_libs": s["config_evidence"]["external_libs_enabled"],
+                st["shipping"]["probe_sizes"]["xz_bytes"] - prev["shipping"]["probe_sizes"]["xz_bytes"],
+            "live_units": st["shipping"]["live"]["live_units"],
+            "live_bytes": st["shipping"]["live"]["live_bytes_total"],
+            "new_external_libs": st["config_evidence"]["external_libs_enabled"],
+            "format_adaptation": st.get("format_adaptation", {}).get("required", False),
+            "direct_units": st.get("direct_closure", {}).get("manifest_units"),
         }
         marginal["ladder"].append(row)
-        prev = s
+        prev = st
     for p in probes:
+        d = p.get("discovery", {})
+        eff = d.get("effective_closure", {})
         marginal["probes"].append({
             "filter": p["probe_filter"],
             "units": p["manifest_units"],
             "units_delta_vs_c1": p["delta_vs_avf-c1"]["units"],
             "stripped_delta_vs_c1": p["delta_vs_avf-c1"]["stripped_bytes"],
             "xz_delta_vs_c1": p["delta_vs_avf-c1"]["xz_bytes"],
-            "auto_inserted_conversion": sorted({a for g in p["graph_evidence"]
-                                                for a in g["auto_inserted"]}),
-            "smoke": p["smoke_verdict"],
+            "direct_delta_xz_vs_c1": (d.get("direct_closure", {}).get(
+                "xz_bytes") - c1_xz) if c1_xz else None,
+            "adaptation_xz_bytes": p.get("cost_split", {}).get(
+                "adaptation_xz_bytes"),
+            "adaptation_class": d.get("format_adaptation", {}).get("class"),
+            "auto_inserted_conversion": eff.get("auto_inserted", []),
+            "fft_first_user": p.get("fft_foundation", {}).get("first_user"),
+            "fft_units": p.get("fft_foundation", {}).get("units", []),
+            "multi_input_status": p.get("multi_input_status"),
+            "gate": probe_verdict(p),
         })
-    jwrite(RESULTS / "marginal-cost.json", marginal)
+
+    predicates = {
+        "ladder_stage_gates": "PASS" if ladder_ok else "FAIL",
+        "add_one_probe_gates": "PASS" if probes_ok else "FAIL",
+        "manifest_union": "PASS" if union_ok else "FAIL",
+        "ffmpeg_pin_equal": "PASS" if pin_ok else "FAIL",
+        "license_policy": "PASS" if license_ok else "FAIL",
+        "external_dependency_policy": "PASS" if deps_ok else "FAIL",
+    }
+    all_pass = all(v == "PASS" for v in predicates.values())
+    summary = {
+        "experiment": "e10-c0-libavfilter-capability-min",
+        "predicates": predicates,
+        "verdict": "PASS" if all_pass else "FAIL",
+        "verdict_semantics": "PASS requires: every ladder stage gate, every "
+                             "add-one probe gate, manifest-union verdict, "
+                             "FFmpeg pin equality, license policy and "
+                             "external-dependency policy — all derived from "
+                             "raw evidence, never from stored verdicts",
+        "stages": stage_gates,
+        "probe_gates": probe_gates,
+        "multi_input_filters": {p["probe_filter"]: p.get("multi_input_status")
+                                for p in probes
+                                if p.get("multi_input_status")},
+        "ladder": marginal["ladder"],
+        "probes": marginal["probes"],
+        "union": union_data,
+        "license": license_rows,
+        "unexpected_dynamic_libs": unexpected_libs,
+        "scope_statements": {
+            "production_code_changed": False,
+            "production_build_semantics_changed": False,
+            "dsp_backend_selected": False,
+            "pr_merged": False,
+        },
+        # provenance authority = input hashes (review §24): git pointers are
+        # supplementary only and live in the raw per-stage results recorded
+        # at measurement time; embedding HEAD here made the derived summary
+        # self-invalidate on every commit
+        "provenance": {
+            "experiment_inputs": experiment_inputs(),
+            "host": platform.platform(),
+        },
+    }
+    return {"marginal": marginal, "summary": summary}
+
+
+def compute_aggregate() -> dict:
+    """Pure recomputation of every derived authority object. No writes."""
+    stages = load_stage_data()
+    probes = load_probe_data()
+    out = compute_summary(stages, probes)
+    marginal, summary = out["marginal"], out["summary"]
 
     shipping = {"experiment": "e10-c0", "method": "final linked product-shaped "
                 "probe (qn_avfilter_cap_probe); stripped + xz -9; archive bytes "
                 "diagnostic only", "stages": [
-                    {"stage": s["stage"],
-                     "archive_bytes": s["shipping"]["archive_bytes"],
-                     "linked_raw": s["shipping"]["probe_sizes"]["raw_bytes"],
-                     "stripped": s["shipping"]["probe_sizes"]["stripped_bytes"],
-                     "xz": s["shipping"]["probe_sizes"]["xz_bytes"],
-                     "lto": s.get("lto")} for s in stages]}
-    jwrite(RESULTS / "shipping.json", shipping)
-
+                    {"stage": st["stage"],
+                     "archive_bytes": st["shipping"]["archive_bytes"],
+                     "linked_raw": st["shipping"]["probe_sizes"]["raw_bytes"],
+                     "stripped": st["shipping"]["probe_sizes"]["stripped_bytes"],
+                     "xz": st["shipping"]["probe_sizes"]["xz_bytes"],
+                     "lto": st.get("lto")} for st in stages]}
     live_doc = {"experiment": "e10-c0", "note": "compiled closure vs linked "
                 "live closure (gc-sections link map); live units <= compiled",
-                "stages": [{"stage": s["stage"],
-                            "compiled_units": s["manifest"]["units"],
-                            "live_units": s["shipping"]["live"]["live_units"],
-                            "live_bytes": s["shipping"]["live"]["live_bytes_total"],
-                            "discarded_bytes": s["shipping"]["live"]["discarded_bytes_total"],
-                            "compiled_by_library": s["shipping"]["live"]["compiled_units_by_library"],
-                            "live_by_library": s["shipping"]["live"]["live_units_by_library"]}
-                           for s in stages]}
-    jwrite(RESULTS / "live-sections.json", live_doc)
-
+                "stages": [{"stage": st["stage"],
+                            "compiled_units": st["manifest"]["units"],
+                            "live_units": st["shipping"]["live"]["live_units"],
+                            "live_bytes": st["shipping"]["live"]["live_bytes_total"],
+                            "discarded_bytes": st["shipping"]["live"]["discarded_bytes_total"],
+                            "compiled_by_library": st["shipping"]["live"]["compiled_units_by_library"],
+                            "live_by_library": st["shipping"]["live"]["live_units_by_library"]}
+                           for st in stages]}
     smoke = {"experiment": "e10-c0", "stages": [
-        {"stage": s["stage"],
-         "plain": {"verdict": s["plain"]["smoke_verdict"],
-                   "fail": s["plain"]["smoke_fail"]},
-         "shipping": {"verdict": s["shipping"]["smoke_verdict"],
-                      "fail": s["shipping"]["smoke_fail"]},
+        {"stage": st["stage"],
+         "plain": {"verdict": st["plain"]["smoke_verdict"],
+                   "fail": st["plain"]["smoke_fail"]},
+         "shipping": {"verdict": st["shipping"]["smoke_verdict"],
+                      "fail": st["shipping"]["smoke_fail"]},
          "auto_inserted_anywhere": sorted({a for r in
-             s["smoke_detail"]["shipping"]["results"] if r.get("kind") == "graph"
+             st["smoke_detail"]["shipping"]["results"] if r.get("kind") in ("graph", "graph2")
              for a in r.get("auto_inserted", [])}),
          "negotiated_formats": {r["id"]: r["negotiated"] for r in
-             s["smoke_detail"]["shipping"]["results"] if r.get("kind") == "graph"}}
-        for s in stages]}
-    jwrite(RESULTS / "correctness-smoke.json", smoke)
-
+             st["smoke_detail"]["shipping"]["results"] if r.get("kind") in ("graph", "graph2")}}
+        for st in stages]}
     prov = {"experiment": "e10-c0",
             "filters": dependency_provenance(stages, probes),
             "notes": "classification per filter: configure-required (dep rule "
                      "in pinned configure), graph-required (auto-inserted at "
-                     "graph config), format-adaptation (native formats differ "
-                     "from flt), shared-foundation, external-optional"}
-    jwrite(RESULTS / "dependency-provenance.json", prov)
-
+                     "graph config), format-adaptation (discovered by graph "
+                     "config failure), shared-foundation, external-optional"}
     caps = caps_doc()
     pin = jload(ROOT / "bench" / "ffmpeg-pin.json")
     cap_manifest = {
@@ -984,41 +1394,29 @@ def aggregate() -> dict:
         "capability_manifest": "bench/dsp-capabilities.json",
         "capability_manifest_sha256": sha256_file(CAPS),
         "ffmpeg": pin,
-        "stages": {s["stage"]: {
-            "filters": s["registration_gate"]["intended_filters"],
-            "license": s["config_evidence"]["license"],
-            "units": s["manifest"]["units"],
-            "gates": {k: g["verdict"] for k, g in s["gates"].items()},
-        } for s in stages},
+        "stages": {st["stage"]: {
+            "filters": st["registration_gate"]["intended_filters"],
+            "license": st["config_evidence"]["license"],
+            "units": st["manifest"]["units"],
+            "gates": {k: g.get("verdict") for k, g in st["gates"].items()},
+        } for st in stages},
     }
-    jwrite(RESULTS / "capability-manifest.json", cap_manifest)
+    return {"marginal": marginal, "summary": summary, "shipping": shipping,
+            "live_doc": live_doc, "smoke": smoke, "prov": prov,
+            "cap_manifest": cap_manifest}
 
-    all_gates = []
-    for s in stages:
-        for k, g in s["gates"].items():
-            all_gates.append((s["stage"], k, g.get("verdict")))
-    summary = {
-        "experiment": "e10-c0-libavfilter-capability-min",
-        "verdict": "PASS" if all(v == "PASS" for _, _, v in all_gates) else "FAIL",
-        "stages": {s["stage"]: {"gates": {k: g.get("verdict") for k, g in s["gates"].items()}}
-                   for s in stages},
-        "ladder": marginal["ladder"],
-        "probes": marginal["probes"],
-        "union": jload(RESULTS / "manifest-union.json") if (RESULTS / "manifest-union.json").is_file() else None,
-        "license": stages[-1]["config_evidence"]["license"] if stages else None,
-        "scope_statements": {
-            "production_code_changed": False,
-            "dsp_backend_selected": False,
-            "pr_merged": False,
-        },
-        "provenance": {
-            "git_branch": must(["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip(),
-            "git_commit": must(["git", "rev-parse", "HEAD"]).strip(),
-            "host": platform.platform(),
-        },
-    }
-    jwrite(RESULTS / "summary.json", summary)
-    return summary
+
+def aggregate() -> dict:
+    out = compute_aggregate()
+    jwrite(RESULTS / "marginal-cost.json", out["marginal"])
+    jwrite(RESULTS / "shipping.json", out["shipping"])
+    jwrite(RESULTS / "live-sections.json", out["live_doc"])
+    jwrite(RESULTS / "correctness-smoke.json", out["smoke"])
+    jwrite(RESULTS / "dependency-provenance.json", out["prov"])
+    jwrite(RESULTS / "capability-manifest.json", out["cap_manifest"])
+    jwrite(RESULTS / "summary.json", out["summary"])
+    print(f"summary written (verdict {out['summary']['verdict']})")
+    return out["summary"]
 
 
 def dependency_provenance(stages: list, probes: list) -> dict:
@@ -1096,14 +1494,26 @@ def render_tables() -> str:
     lines.append("")
     lines.append("### 单项探针（base = codec + F0；machine authority：`summary.json.probes`）")
     lines.append("")
-    lines.append("| probe | +TU vs c1 | +stripped vs c1 | +xz vs c1 | 图内自动插入转换 | smoke |")
-    lines.append("|---|--:|--:|--:|---|---|")
+    lines.append("| probe | +TU vs c1 | direct Δxz vs c1 | adaptation Δxz | "
+                 "effective Δxz vs c1 | 适配类别 | 图内自动插入转换 | gate |")
+    lines.append("|---|--:|--:|--:|--:|---|---|---|")
     for p in summary["probes"]:
         conv = ",".join(p["auto_inserted_conversion"]) or "none"
-        lines.append(f"| {p['filter']} | {p['units_delta_vs_c1']} "
-                     f"| {fmt_int(p['stripped_delta_vs_c1'])} "
-                     f"| {fmt_int(p['xz_delta_vs_c1'])} | {conv} | {p['smoke']} |")
-    lines.append("")
+        lines.append(
+            f"| {p['filter']} | {p['units_delta_vs_c1']} "
+            f"| {fmt_int(p.get('direct_delta_xz_vs_c1'))} "
+            f"| {fmt_int(p.get('adaptation_xz_bytes'))} "
+            f"| {fmt_int(p['xz_delta_vs_c1'])} "
+            f"| {p.get('adaptation_class')} | {conv} | {p.get('gate')} |")
+    lines += ["",
+              "读法：`direct xz` = 只含 filter 本体 + configure-required "
+              "依赖的闭包（适配失败时的可用性见 gate）；`adaptation xz` = "
+              "由图实例化失败**发现**的最小转换能力（aresample+swresample）"
+              "增量。两者不得合并为一个模糊边际数。",
+              "",
+              "多输入 filter（afir/acrossfade/headphone）由 2-input graph2 "
+              "功能性 smoke 覆盖（config+process+drain+finite+non-empty）。",
+              ""]
     lines.append("### 闭包记账（machine authority：`manifest-union.json`）")
     lines.append("")
     lines.append(f"| codec-only | filter-only | shared | combined | 配置宏差异数 | 校验 |")
@@ -1120,9 +1530,13 @@ def render_tables() -> str:
     lines.append("| stage | gates |")
     lines.append("|---|---|")
     for st, gd in summary["stages"].items():
-        allp = all(v == "PASS" for v in gd["gates"].values())
-        lines.append(f"| {st} | {'PASS' if allp else 'FAIL ' + str({k: v for k, v in gd['gates'].items() if v != 'PASS'})} |")
-    lines.append("")
+        allp = all(v == "PASS" for v in gd.values())
+        bad = {k: v for k, v in gd.items() if v != "PASS"}
+        lines.append(f"| {st} | {'PASS' if allp else 'FAIL ' + str(bad)} |")
+    lines += ["",
+              f"**顶层 verdict：{summary['verdict']}** "
+              f"（谓词：{'; '.join(f'{k}={v}' for k, v in summary['predicates'].items())}）",
+              ""]
     return "\n".join(lines)
 
 
@@ -1140,23 +1554,74 @@ def write_report() -> None:
 
 
 def check() -> int:
+    """STRICTLY READ-ONLY (review P0-2/§19): recompute every derived
+    authority object in memory from raw stage evidence, compare with the
+    committed aggregates, validate all top-level predicates and the
+    report tables. Never writes a file."""
     ok = True
-    summary = jload(RESULTS / "summary.json")
-    fresh = aggregate()
-    if summary["stages"] != fresh["stages"] or summary["ladder"] != fresh["ladder"] \
-            or summary["probes"] != fresh["probes"]:
-        print("DRIFT: summary.json stale vs stage evidence", file=sys.stderr)
+
+    def fail(msg):
+        nonlocal ok
         ok = False
+        print("FAIL:", msg, file=sys.stderr)
+
+    # 0. every result must be bound to the current experiment inputs
+    cur = experiment_inputs()
+    for f in sorted(RESULTS.glob("*.json")):
+        if f.name in ("summary.json", "marginal-cost.json", "shipping.json",
+                      "live-sections.json", "correctness-smoke.json",
+                      "dependency-provenance.json", "capability-manifest.json",
+                      "manifest-union.json"):
+            continue
+        d = jload(f)
+        if d.get("experiment_inputs", {}).get("combined_sha256") \
+                != cur["combined_sha256"]:
+            fail(f"{f.name}: stale experiment-input hash")
+
+    # 1. stage gates recomputed from raw fields (not stored verdicts)
+    stages = load_stage_data()
+    if len(stages) < len(list(ladder())):
+        fail("missing ladder stage evidence")
+    for st in stages:
+        fresh = gates_for(st)
+        stored = st.get("gates", {})
+        for k, g in fresh.items():
+            if stored.get(k, {}).get("verdict") != g["verdict"]:
+                fail(f"{st['stage']}.gates.{k}: stored "
+                     f"{stored.get(k, {}).get('verdict')} != derived "
+                     f"{g['verdict']}")
+
+    # 2. derived aggregates recomputed in memory vs committed
+    out = compute_aggregate()
+    committed = {
+        "marginal-cost.json": out["marginal"],
+        "shipping.json": out["shipping"],
+        "live-sections.json": out["live_doc"],
+        "correctness-smoke.json": out["smoke"],
+        "dependency-provenance.json": out["prov"],
+        "capability-manifest.json": out["cap_manifest"],
+        "summary.json": out["summary"],
+    }
+    for name, want in committed.items():
+        have = jload(RESULTS / name)
+        if have != want:
+            fail(f"{name}: drift vs recomputed authority")
+
+    # 3. top-level predicates must all hold
+    for k, v in out["summary"]["predicates"].items():
+        if v != "PASS":
+            fail(f"predicate {k} = {v}")
+
+    # 4. report tables in sync (in-memory render, no writes)
     text = DOC.read_text()
     begin = text.index(MARK_BEGIN)
     end = text.index(MARK_END)
-    rendered = render_tables()
     have = text[begin + len(MARK_BEGIN):end].strip("\n")
-    if have != rendered.strip("\n"):
-        print("DRIFT: doc tables differ from generated (run --report)", file=sys.stderr)
-        ok = False
+    if have != render_tables().strip("\n"):
+        fail("doc tables differ from generated (run --report)")
+
     if ok:
-        print("E10-C0 authority tree: ALL CHECKS PASS")
+        print("E10-C0 authority tree: ALL CHECKS PASS (read-only)")
         return 0
     return 1
 
@@ -1177,7 +1642,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.check:
-        return check()
+        return check()   # read-only: never aggregates/writes
     if args.report:
         write_report()
         return 0

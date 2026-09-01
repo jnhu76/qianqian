@@ -249,6 +249,7 @@ typedef struct {
     int ok, config_failed, drained_eof, rebuild_ok;
     char err[512];
     char neg_fmt[16], neg_layout[64];
+    char b_layout[32];
     int neg_rate, neg_channels;
     char filters[MAX_CHAIN + 2][64];
     int n_filters;
@@ -477,6 +478,220 @@ fail_nograph:
 }
 #endif /* !QN_PROBE_NO_AVFILTER */
 
+/* ---------------- two-input graph runner (E10-C0 review P1-1) ----------------
+ *
+ * Minimal functional harness for the multi-input filters the linear probe
+ * cannot reach (afir: signal+IR, acrossfade: A+B, headphone: signal+HRIR).
+ * Only proves: graph config succeeds, process succeeds, drain reaches EOF,
+ * output finite and non-empty. No audio-quality competition.
+ *
+ * filter_spec = exactly ONE filter (name[=opts]); input A feeds in-pad 0,
+ * input B feeds in-pad 1. */
+#ifdef QN_PROBE_NO_AVFILTER
+static int run_graph2(const char *filter_spec, int rate, int ch,
+                      const Signal *sig_a, long long frames_a,
+                      int ch_b, const Signal *sig_b, long long frames_b,
+                      int block, GraphRun *r) {
+    (void)filter_spec; (void)rate; (void)ch; (void)sig_a; (void)frames_a;
+    (void)ch_b; (void)sig_b; (void)frames_b; (void)block;
+    memset(r, 0, sizeof(*r));
+    r->ok = 0;
+    snprintf(r->err, sizeof(r->err), "backend none: closure has no libavfilter");
+    return 1;
+}
+#else
+static int run_graph2(const char *filter_spec, int rate, int ch,
+                      const Signal *sig_a, long long frames_a,
+                      int ch_b, const Signal *sig_b, long long frames_b,
+                      int block, GraphRun *r) {
+    memset(r, 0, sizeof(*r));
+    r->ok = 1;
+    stats_init(&r->stats, ch);
+
+    AVFilterGraph *g = avfilter_graph_alloc();
+    if (!g) { r->ok = 0; snprintf(r->err, sizeof(r->err), "graph_alloc failed"); return 1; }
+
+    char asrc_args[128];
+    snprintf(asrc_args, sizeof(asrc_args),
+             "time_base=1/%d:sample_rate=%d:sample_fmt=flt:channel_layout=%s",
+             rate, rate, ch == 1 ? "mono" : "stereo");
+    AVFilterContext *src_a = NULL, *src_b = NULL;
+    int ret = avfilter_graph_create_filter(&src_a, avfilter_get_by_name("abuffer"),
+                                           "inA", asrc_args, NULL, g);
+    if (ret < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "abufferA: %s", av_err2str(ret)); goto fail; }
+    {
+        char bsrc_args[128];
+        const char *lay_b = ch_b == 1 ? "mono" : ch_b == 2 ? "stereo"
+                          : ch_b == 4 ? "quad" : ch_b == 6 ? "5.1" : "stereo";
+        snprintf(r->b_layout, sizeof(r->b_layout), "%s", lay_b);
+        snprintf(bsrc_args, sizeof(bsrc_args),
+                 "time_base=1/%d:sample_rate=%d:sample_fmt=flt:channel_layout=%s",
+                 rate, rate, lay_b);
+        ret = avfilter_graph_create_filter(&src_b, avfilter_get_by_name("abuffer"),
+                                          "inB", bsrc_args, NULL, g);
+        if (ret < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "abufferB: %s", av_err2str(ret)); goto fail; }
+    }
+
+    AVFilterContext *sink = avfilter_graph_alloc_filter(
+        g, avfilter_get_by_name("abuffersink"), "out");
+    if (!sink) { r->ok = 0; snprintf(r->err, sizeof(r->err), "abuffersink missing"); goto fail; }
+    ret = avfilter_init_dict(sink, NULL);
+    if (ret < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "sink init: %s", av_err2str(ret)); goto fail; }
+
+    /* the single multi-input filter */
+    {
+        char specbuf[512], name[64], opts[384];
+        snprintf(specbuf, sizeof(specbuf), "%s", filter_spec);
+        char *eq = strchr(specbuf, '=');
+        if (eq) {
+            size_t nl = (size_t)(eq - specbuf);
+            if (nl >= sizeof(name)) nl = sizeof(name) - 1;
+            memcpy(name, specbuf, nl); name[nl] = 0;
+            snprintf(opts, sizeof(opts), "%s", eq + 1);
+        } else {
+            snprintf(name, sizeof(name), "%s", specbuf);
+            opts[0] = 0;
+        }
+        const AVFilter *f = avfilter_get_by_name(name);
+        if (!f) {
+            r->ok = 0;
+            snprintf(r->err, sizeof(r->err), "filter not registered: %s", name);
+            goto fail;
+        }
+        AVFilterContext *ctx = NULL;
+        ret = avfilter_graph_create_filter(&ctx, f, "m", opts, NULL, g);
+        if (ret < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "init %s: %s", name, av_err2str(ret)); goto fail; }
+        if (ret = avfilter_link(src_a, 0, ctx, 0), ret < 0) {
+            r->ok = 0; snprintf(r->err, sizeof(r->err), "linkA %s: %s", name, av_err2str(ret)); goto fail;
+        }
+        if (ret = avfilter_link(src_b, 0, ctx, 1), ret < 0) {
+            r->ok = 0; snprintf(r->err, sizeof(r->err), "linkB %s: %s", name, av_err2str(ret)); goto fail;
+        }
+        if (ret = avfilter_link(ctx, 0, sink, 0), ret < 0) {
+            r->ok = 0; snprintf(r->err, sizeof(r->err), "link sink: %s", av_err2str(ret)); goto fail;
+        }
+    }
+
+    ret = avfilter_graph_config(g, NULL);
+    if (ret < 0) {
+        r->ok = 0;
+        r->config_failed = 1;
+        snprintf(r->err, sizeof(r->err), "graph_config: %s", av_err2str(ret));
+        goto fail;
+    }
+
+    for (unsigned i = 0; i < g->nb_filters; i++) {
+        AVFilterContext *fc = g->filters[i];
+        if (r->n_filters < MAX_CHAIN + 2)
+            snprintf(r->filters[r->n_filters++], 64, "%s", fc->name);
+        if (!strncmp(fc->name, "auto_", 5) && r->n_auto < 8)
+            snprintf(r->auto_ins[r->n_auto++], 64, "%s", fc->name);
+    }
+    {
+        AVChannelLayout lay = {0};
+        if (av_buffersink_get_ch_layout(sink, &lay) == 0) {
+            av_channel_layout_describe(&lay, r->neg_layout, sizeof(r->neg_layout));
+            r->neg_channels = lay.nb_channels;
+            av_channel_layout_uninit(&lay);
+        }
+        r->neg_rate = av_buffersink_get_sample_rate(sink);
+        int fmt = av_buffersink_get_format(sink);
+        r->stats.planar = av_sample_fmt_is_planar(fmt);
+        r->stats.sample_bytes = av_get_bytes_per_sample(fmt);
+        const char *fn = av_get_sample_fmt_name(fmt);
+        snprintf(r->neg_fmt, sizeof(r->neg_fmt), "%s", fn ? fn : "?");
+    }
+
+    AVFrame *inf = av_frame_alloc();
+    AVFrame *outf = av_frame_alloc();
+    float *gen = malloc(sizeof(float) * (size_t)block * (size_t)(ch > ch_b ? ch : ch_b));
+    if (!inf || !outf || !gen) {
+        r->ok = 0; snprintf(r->err, sizeof(r->err), "oom");
+        av_frame_free(&inf); av_frame_free(&outf); free(gen);
+        goto fail;
+    }
+
+    long long done_a = 0, done_b = 0;
+    int eof_b = 0, got_first = 0;
+    while (done_a < frames_a || !eof_b) {
+        if (done_a < frames_a) {
+            long long n = (frames_a - done_a > block) ? block : (frames_a - done_a);
+            gen_block(sig_a, rate, ch, done_a, (int)n, gen);
+            inf->format = AV_SAMPLE_FMT_FLT;
+            inf->sample_rate = rate;
+            av_channel_layout_uninit(&inf->ch_layout);
+            av_channel_layout_default(&inf->ch_layout, ch);
+            inf->nb_samples = (int)n;
+            inf->pts = done_a;
+            if (av_frame_get_buffer(inf, 0) < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "frame_get_buffer"); break; }
+            memcpy(inf->data[0], gen, sizeof(float) * (size_t)n * (size_t)ch);
+            r->stats.in_frames_pushed += n;
+            ret = av_buffersrc_add_frame(src_a, inf);
+            av_frame_unref(inf);
+            if (ret < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "addA: %s", av_err2str(ret)); break; }
+            done_a += n;
+        }
+        if (done_b < frames_b) {
+            long long n = (frames_b - done_b > block) ? block : (frames_b - done_b);
+            gen_block(sig_b, rate, ch_b, done_b, (int)n, gen);
+            inf->format = AV_SAMPLE_FMT_FLT;
+            inf->sample_rate = rate;
+            av_channel_layout_uninit(&inf->ch_layout);
+            /* use the SAME layout string the abuffer was configured with;
+             * default(N) masks need not match named layouts (quad vs 4.0) */
+            if (av_channel_layout_from_string(&inf->ch_layout, r->b_layout) < 0)
+                av_channel_layout_default(&inf->ch_layout, ch_b);
+            inf->nb_samples = (int)n;
+            inf->pts = done_b;
+            if (av_frame_get_buffer(inf, 0) < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "frameB_get_buffer"); break; }
+            memcpy(inf->data[0], gen, sizeof(float) * (size_t)n * (size_t)ch_b);
+            ret = av_buffersrc_add_frame(src_b, inf);
+            av_frame_unref(inf);
+            if (ret < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "addB: %s", av_err2str(ret)); break; }
+            done_b += n;
+            if (done_b >= frames_b) {
+                ret = av_buffersrc_add_frame(src_b, NULL); /* B reached EOF */
+                if (ret < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "eofB: %s", av_err2str(ret)); break; }
+                eof_b = 1;
+            }
+        }
+        while ((ret = av_buffersink_get_frame(sink, outf)) >= 0) {
+            if (!got_first) got_first = 1;
+            stats_feed(&r->stats, outf->data, outf->nb_samples);
+            av_frame_unref(outf);
+        }
+        if (ret != AVERROR(EAGAIN)) { r->ok = 0; snprintf(r->err, sizeof(r->err), "sink pull: %s", av_err2str(ret)); break; }
+    }
+    if (r->ok) {
+        ret = av_buffersrc_add_frame(src_a, NULL);
+        if (ret < 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "eof push A: %s", av_err2str(ret)); }
+        else {
+            while ((ret = av_buffersink_get_frame(sink, outf)) >= 0) {
+                stats_feed(&r->stats, outf->data, outf->nb_samples);
+                av_frame_unref(outf);
+            }
+            r->drained_eof = (ret == AVERROR_EOF);
+            if (!r->drained_eof) { r->ok = 0; snprintf(r->err, sizeof(r->err), "drain: %s", av_err2str(ret)); }
+        }
+    }
+    /* functional smoke success: configured, processed, drained, finite,
+     * non-empty output */
+    if (r->ok) {
+        if (r->stats.out_frames <= 0) { r->ok = 0; snprintf(r->err, sizeof(r->err), "empty output"); }
+        else if (!r->stats.all_finite) { r->ok = 0; snprintf(r->err, sizeof(r->err), "non-finite output"); }
+    }
+    r->stats.fnv = fnv1a64((const uint8_t *)&r->stats.out_frames, sizeof(long long),
+                           r->stats.fnv);
+    av_frame_free(&inf);
+    av_frame_free(&outf);
+    free(gen);
+
+fail:
+    avfilter_graph_free(&g);
+    return r->ok ? 0 : 1;
+}
+#endif /* !QN_PROBE_NO_AVFILTER */
+
 /* ---------------- expectations ---------------- */
 
 /* scan remaining "k=v" tokens of an expect spec */
@@ -626,6 +841,73 @@ int main(int argc, char **argv) {
             fprintf(g_out, "{\"kind\":\"registration\",\"want\":\"%s\",\"name\":\"%s\","
                            "\"found\":%s,\"ok\":%s}",
                     kind, name, found ? "true" : "false", ok ? "true" : "false");
+            continue;
+        }
+        if (!strcmp(kind, "graph2")) {
+            const char *id = NULL, *chain = NULL, *sigstr = NULL, *s = NULL;
+            const char *sigbstr = NULL;
+            long long rate = 48000, ch = 2, frames = 48000, block = 1024;
+            long long frames_b = 64, ch_b = 0;
+            tok_get(toks, n, "id", &id);
+            tok_get(toks, n, "chain", &chain);
+            tok_get(toks, n, "signal", &sigstr);
+            tok_get(toks, n, "signal_b", &sigbstr);
+            if (tok_get(toks, n, "rate", &s)) rate = atoll(s);
+            if (tok_get(toks, n, "ch", &s)) ch = atoll(s);
+            if (tok_get(toks, n, "ch_b", &s)) ch_b = atoll(s);
+            if (!ch_b) ch_b = ch;
+            if (tok_get(toks, n, "frames", &s)) frames = atoll(s);
+            if (tok_get(toks, n, "frames_b", &s)) frames_b = atoll(s);
+            if (tok_get(toks, n, "block", &s)) block = atoll(s);
+            if (!chain || !sigstr || !sigbstr) { total--; continue; }
+
+            Signal sa = {0, 1000.0, 0.5}, sb = {0, 1000.0, 0.5};
+            {
+                char sb2[128];
+                const char *specs[2] = { sigstr, sigbstr };
+                Signal *dst[2] = { &sa, &sb };
+                for (int k = 0; k < 2; k++) {
+                    snprintf(sb2, sizeof(sb2), "%s", specs[k]);
+                    char *c1 = strchr(sb2, ':');
+                    if (c1) {
+                        char *c2 = strchr(c1 + 1, ':');
+                        if (c2) { dst[k]->amp = atof(c2 + 1); *c2 = 0; }
+                        dst[k]->freq = atof(c1 + 1);
+                        *c1 = 0;
+                    }
+                    dst[k]->type = !strcmp(sb2, "sine") ? 0
+                                 : !strcmp(sb2, "impulse") ? 1 : 2;
+                }
+            }
+
+            GraphRun r;
+            run_graph2(chain, (int)rate, (int)ch, &sa, frames, (int)ch_b,
+                       &sb, frames_b, (int)block, &r);
+            int ok = r.ok;   /* config + process + drain + finite + non-empty */
+            if (ok) pass++;
+
+            jsep();
+            fprintf(g_out, "{\"kind\":\"graph2\",\"multi_input\":true,"
+                           "\"id\":\"%s\",\"ok\":%s,\"chain\":\"%s\"",
+                    id ? id : "?", ok ? "true" : "false", chain ? chain : "");
+            g_json_first = 0;
+            if (!r.ok) jraw("error", r.err);
+            jkey("negotiated");
+            jraw("fmt", r.neg_fmt); jint("rate", r.neg_rate);
+            jint("channels", r.neg_channels); jraw("layout", r.neg_layout);
+            jend();
+            jarr("auto_inserted");
+            for (int i = 0; i < r.n_auto; i++) {
+                if (i) fputc(',', g_out);
+                fprintf(g_out, "\"%s\"", r.auto_ins[i]);
+            }
+            jarr_end();
+            jbool("all_finite", r.stats.all_finite);
+            jbool("drained_eof", r.drained_eof);
+            jint("in_frames", r.stats.in_frames_pushed);
+            jint("out_frames", r.stats.out_frames);
+            fputs("}", g_out);
+            g_json_first = 0;
             continue;
         }
         if (strcmp(kind, "graph")) continue;

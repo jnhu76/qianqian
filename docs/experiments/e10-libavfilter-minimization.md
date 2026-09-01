@@ -55,9 +55,24 @@ bench/results/avfilter-minimize/*.json
 - **registration 机器门(§19)**:oracle 生成的 `filter_list.c` 名单 ==
   config.mak 启用名单 == 能力意图;nm 的 `ff_*` 符号集合 oracle 归档 ==
   Xmake 重放归档;运行时 `avfilter_get_by_name` present/absent 双向抽查。
-- **格式策略(§22)**:probe 报告每张图的协商格式与 auto-inserted 转换
-  filter(instance 名 `auto_*`,来自 pinned `avfiltergraph.c`),不把
+- **格式适配 = 发现,不是预付(review P0-1 修复)**:能力意图只声明
+  **期望的 filter**;configure-required 依赖由 pinned configure 的
+  `<filter>_filter_deps` 规则机器解析(权威,如 pan→swresample),
+  除此之外不预付任何东西。每个 stage/探针先构建"直接闭包"
+  (codec+F0+目标 filter+configure 依赖),用 canonical flt 输入真实
+  实例化代表图;图配置失败 → 才加最小格式适配(aresample,其
+  configure 依赖为 swresample)并重建。**直接闭包**与**有效可用闭包**
+  分别记账,适配成本与 filter 本体成本分开报告。probe 报告每张图的
+  协商格式与 auto-inserted 转换 filter(instance 名 `auto_*`),不把
   flt↔fltp/dbl 转换藏进"filter 成本"。
+- **多输入 filter(afir/acrossfade/headphone,review P1-1)**:probe
+  增加 2-input `graph2` 功能性 smoke(signal+IR / A+B / signal+HRIR),
+  只证明 config+process+drain+finite+non-empty,不做音质竞赛。
+- **重放保真 flag 隔离(review P0-3)**:oracle 等价所需的
+  `-fvisibility=default -UNDEBUG` 中和移入 xmake 选项
+  `--av_replay_exact`(C0-only);默认生产构建语义与父分支一致
+  (机器验证:同 manifest 下默认 session 的 `libqianqian_av.a`
+  与父分支逐字节/符号集相等)。
 - **live-bytes(§18)**:shipping link map 逐 member 对齐 manifest,
   compiled closure vs live closure 分开报告。
 - avf-c0(codec-only)无 libavfilter 可链,probe 以 `QN_PROBE_NO_AVFILTER`
@@ -69,7 +84,7 @@ bench/results/avfilter-minimize/*.json
 C0 = codec closure only(n3-min-noswr)
 C1 = C0 + F0(abuffer/abuffersink/anull/aformat,无 aresample)
 C2 = C1 + F1(volume/equalizer/biquad/bass/treble/lowshelf/highshelf/
-         lowpass/highpass;+aresample+swresample 假设,图证据验证)
+         lowpass/highpass;aresample+swresample 若且仅当被图发现)
 C3 = C2 + F2(acompressor/alimiter/agate)
 C4 = C3 + F3(pan/channelmap/crossfeed/stereowiden)
 C5 = C4 + F4(aecho/chorus/flanger/aphaser/tremolo/vibrato)
@@ -89,36 +104,40 @@ filter、rubberband/libmysofa/LADSPA 一律不进默认闭包。
 
 | stage | tier | filters | compiled TU | +TU | live TU | live bytes | stripped | +stripped | xz | +xz |
 |---|---|---|---:|--:|--:|--:|--:|--:|--:|--:|
-| avf-c0 | codec-only | 0 | 205 | - | 104 | 651,151 | 588,016 | - | 201,456 | - |
-| avf-c1 | F0 | 4 | 224 | 19 | 116 | 707,971 | 665,840 | 77,824 | 230,824 | 29,368 |
-| avf-c2 | F1 | 14 | 236 | 12 | 125 | 804,521 | 796,912 | 131,072 | 268,500 | 37,676 |
-| avf-c3 | F2 | 17 | 239 | 3 | 128 | 815,960 | 813,296 | 16,384 | 273,488 | 4,988 |
-| avf-c4 | F3 | 21 | 243 | 4 | 132 | 828,471 | 829,680 | 16,384 | 279,628 | 6,140 |
-| avf-c5 | F4 | 27 | 250 | 7 | 139 | 846,198 | 850,160 | 20,480 | 286,508 | 6,880 |
-| avf-c6 | F5 | 32 | 255 | 5 | 144 | 907,974 | 915,696 | 65,536 | 306,168 | 19,660 |
-| avf-c7 | F6 | 36 | 259 | 4 | 152 | 2,181,274 | 1,186,032 | 270,336 | 383,228 | 77,060 |
-| avf-c8 | F7 | 37 | 260 | 1 | 153 | 2,188,319 | 1,190,128 | 4,096 | 386,620 | 3,392 |
+| avf-c0 | codec-only | 0 | 205 | - | 104 | 651,151 | 588,016 | - | 202,168 | - |
+| avf-c1 | F0 | 4 | 224 | 19 | 116 | 707,971 | 669,936 | 81,920 | 233,204 | 31,036 |
+| avf-c2 | F1 | 14 | 236 | 12 | 125 | 804,521 | 801,008 | 131,072 | 270,504 | 37,300 |
+| avf-c3 | F2 | 17 | 239 | 3 | 128 | 815,960 | 821,488 | 20,480 | 275,972 | 5,468 |
+| avf-c4 | F3 | 21 | 243 | 4 | 132 | 828,471 | 833,776 | 12,288 | 282,032 | 6,060 |
+| avf-c5 | F4 | 27 | 250 | 7 | 139 | 846,198 | 858,352 | 24,576 | 289,000 | 6,968 |
+| avf-c6 | F5 | 32 | 255 | 5 | 144 | 907,974 | 919,792 | 61,440 | 308,500 | 19,500 |
+| avf-c7 | F6 | 36 | 259 | 4 | 152 | 2,181,274 | 1,190,128 | 270,336 | 385,656 | 77,156 |
+| avf-c8 | F7 | 37 | 260 | 1 | 153 | 2,188,319 | 1,198,320 | 8,192 | 389,080 | 3,424 |
 
 ### 单项探针（base = codec + F0；machine authority：`summary.json.probes`）
 
-| probe | +TU vs c1 | +stripped vs c1 | +xz vs c1 | 图内自动插入转换 | smoke |
-|---|--:|--:|--:|---|---|
-| alimiter | 11 | 77,824 | 28,664 | auto_aresample_0 | PASS |
-| loudnorm | 12 | 90,112 | 33,036 | auto_aresample_0 | PASS |
-| afir | 11 | 282,624 | 82,792 | none | PASS |
-| firequalizer | 11 | 278,528 | 82,100 | auto_aresample_0 | PASS |
-| surround | 11 | 299,008 | 87,396 | auto_aresample_0 | PASS |
-| headphone | 11 | 270,336 | 79,676 | none | PASS |
-| atempo | 1 | 200,704 | 54,792 | none | PASS |
-| crossfeed | 11 | 77,824 | 27,412 | auto_aresample_0 | PASS |
-| chorus | 12 | 77,824 | 27,932 | auto_aresample_0 | PASS |
-| flanger | 12 | 77,824 | 27,444 | auto_aresample_0 | PASS |
+| probe | +TU vs c1 | direct Δxz vs c1 | adaptation Δxz | effective Δxz vs c1 | 适配类别 | 图内自动插入转换 | gate |
+|---|--:|--:|--:|--:|---|---|---|
+| alimiter | 11 | 3,300 | 25,724 | 29,024 | graph-format-adaptation | auto_aresample_0 | PASS |
+| loudnorm | 12 | 7,604 | 25,544 | 33,148 | graph-format-adaptation | auto_aresample_0 | PASS |
+| afir | 11 | 57,476 | 25,352 | 82,828 | graph-format-adaptation | auto_aresample_0,auto_aresample_1 | PASS |
+| firequalizer | 11 | 57,380 | 24,784 | 82,164 | graph-format-adaptation | auto_aresample_0 | PASS |
+| surround | 11 | 62,432 | 25,016 | 87,448 | graph-format-adaptation | auto_aresample_0 | PASS |
+| headphone | 1 | 54,324 | 0 | 54,324 | none | none | PASS |
+| atempo | 1 | 54,336 | 0 | 54,336 | none | none | PASS |
+| crossfeed | 11 | 2,000 | 25,640 | 27,640 | graph-format-adaptation | auto_aresample_0 | PASS |
+| chorus | 12 | 2,356 | 25,292 | 27,648 | graph-format-adaptation | auto_aresample_0 | PASS |
+| flanger | 12 | 2,044 | 25,572 | 27,616 | graph-format-adaptation | auto_aresample_0 | PASS |
+
+读法：`direct xz` = 只含 filter 本体 + configure-required 依赖的闭包（适配失败时的可用性见 gate）；`adaptation xz` = 由图实例化失败**发现**的最小转换能力（aresample+swresample）增量。两者不得合并为一个模糊边际数。
+
+多输入 filter（afir/acrossfade/headphone）由 2-input graph2 功能性 smoke 覆盖（config+process+drain+finite+non-empty）。
 
 ### 闭包记账（machine authority：`manifest-union.json`）
 
 | codec-only | filter-only | shared | combined | 配置宏差异数 | 校验 |
 |--:|--:|--:|--:|--:|---|
-| 0 | 55 | 205 | 260 | 44 | codec⊆combined=True flag conflicts=True |
+| 0 | 55 | 205 | 260 | 39 | codec⊆combined=True flag conflicts=True |
 
 ### gate 总表（machine authority：`summary.json.stages`）
 
@@ -133,38 +152,47 @@ filter、rubberband/libmysofa/LADSPA 一律不进默认闭包。
 | avf-c6 | PASS |
 | avf-c7 | PASS |
 | avf-c8 | PASS |
+
+**顶层 verdict：PASS** （谓词：add_one_probe_gates=PASS; external_dependency_policy=PASS; ffmpeg_pin_equal=PASS; ladder_stage_gates=PASS; license_policy=PASS; manifest_union=PASS）
 <!-- END GENERATED C0 TABLES -->
 
-### 4.1 读数要点(解读以上生成表,不在 prose 重复数字口径之外的新数字)
+### 4.1 读数要点(解读以上生成表;所有数字出自生成表,不新增手抄口径)
 
-- **框架入口 F0 是一次性门票**:图基础设施(缓冲端点 + 协商 + 图引擎)
-  的成本几乎全部落在 C1,之后每个能力组的编译 TU 增量都只有个位数。
-  注意 c1 的 +stripped 里含 probe 程序自身从"无 avfilter 后端 stub"变为
-  "真后端"的胶水代码差——这是 F0 档测量口径的一部分,如实计入。
-- **F1(增益/EQ/音调)= 最大的核心档**,因为产品能力同时引入
-  aresample+swresample(格式适配基础,biquad 族是 fltp 原生)。
-  biquad 族 8 个 filter 共享一个源 TU(`af_biquads.c`),能力语义不塌缩,
-  成本上自然去重。
-- **F2/F3/F4/F7 每档只有 +3..7 TU / +16..20 KB stripped(+3..7 KB xz)**
-  ——经典播放器效果族的边际成本是小且可预测的。
-- **F6(FIR/卷积/hdr EQ/surround/headphone)= 绝对主导项**:+270 KB
-  stripped(+77 KB xz),因为它引入 av_tx 变换基础库(n9 的 FFT 框架)。
-  单项探针显示 afir/firequalizer/surround/headphone 每个对 c1 基座都是
-  +270..300 KB——第一个 FFT 用户付基础设施钱,之后的所有 FFT 用户
-  近乎免费(c8 的 atempo 在 F6 之上只 +4 KB)。
-- **loudnorm 的隐藏重采样被机器捕获**:c6 冒烟记录其图协商输出为
-  `dbl @ 192000 Hz`——这是 §22 要求的"转换可见"证据;它只回答格式
-  适配事实,不回答 SRC 选型(那是 E10-A1 的独立问题)。
-- **live vs compiled 差异巨大**:c0 是 104/205,c8 是 153/260。报
-  "compiled TU shipping"是错的;link-map 账本(`live-sections.json`)
-  是权威。tx_*.o 在被拉入后 ~1.2 MB live(浮点/双精度/int32 三套
-  codelet 表经内部函数指针表互相钉住,section GC 无法裁剪)——这是
-  "F6 贵"的机械原因。
-- **单项探针 vs 阶梯读法**:探针的 delta 以 c1 为基座,代表"产品里
-  还没有该 filter 的任何基础依赖时的真实启用成本"(例如 alimiter 的
-  +77.8 KB 含 swresample+aresample 基础 ~60 KB;atempo 的 +200 KB 含
-  av_tx);阶梯 delta 则是这些基础在累计闭包里的摊销值。两者都进
-  `marginal-cost.json`,不可混读。
+- **框架入口 F0 是一次性门票**:+19 TU / +31 KB xz——图基础设施
+  (缓冲端点、格式协商、图引擎、filter 注册)几乎全部落在 C1;
+  `av_tx` 变换 TU(tx/tx_float/tx_double/tx_int32)是 libavutil 的
+  **无条件成员,从 C1 起就在编译闭包里**(pinned libavutil/Makefile
+  198-201 行,不受任何 filter config 控制)——"FFT 基础由 F6 引入"
+  是编译层错觉;F6 的真实成本发生在**链接期**(见下)。
+- **F1(增益/EQ/音调)自身只值 +2 TU**(volume + biquad 族共享 TU);
+  生成表里的 +12 是**图发现**出来的格式适配(aresample+swresample
+  共 10 TU,biquad 族是 fltp 原生,canonical flt 输入图配置失败后被
+  发现)加上 filter 本体。review P0-1 之前这个 +12 被当成"F1 的
+  编译成本"报告——现在 direct/effective 分开记账。
+- **F2/F3/F4/F5/F7 每档 +1..7 TU / +3..20 KB xz**(effective,
+  与前档的差值;适配基础已在前档闭包中,不重复计)。
+- **F6(FIR/firequalizer/surround/headphone)= 主导项**:+4 TU compiled
+  但 live bytes 从 908 KB 跳到 2,181 KB(+1.27 MB):四个 FFT filter
+  的代码把已在闭包里的 av_tx codelet 表**变 live**。单项探针口径:
+  afir direct Δxz +57 KB(含 tx live 化),firequalizer/surround 同级,
+  之后无新增(atempo 在 C7 之上只 +3.4 KB)——**第一个 FFT 用户付
+  live 化的钱,之后的 FFT 用户近乎免费**。
+- **loudnorm 的隐藏重采样被机器捕获**:冒烟记录其图协商输出
+  `dbl @ 192000 Hz`——格式适配事实,不回答 SRC 选型(A1 的独立问题)。
+- **live vs compiled 差异巨大**:c0 是 104/205,c8 是 153/260;shipping
+  权威是最终链接 probe 的 stripped/xz,报 compiled TU 是错的。
+- **单项探针的 honest 读法**(生成表第 2 节):`direct Δxz vs c1` =
+  只含 filter 本体 + configure-required 依赖的闭包增量(alimiter
+  只有 +3.3 KB!);`adaptation Δxz` = 图配置失败后**被发现**的最小
+  转换能力(≈ +25 KB,aresample+swresample);`effective Δxz` = 两者
+  之和。review P0-1 之前这三者混在一个模糊数字里。headphone
+  (multich HRIR)与 atempo 直接吃 canonical flt,**不需要适配**——
+  旧证据为 headphone 预付的适配成本(+25 KB)是错的。
+- **多输入 filter 有真实功能证据**:afir(signal+微型 IR,双输入
+  各被自动插入一个 aresample,协商 fltp)、acrossfade(A+B,原生
+  flt)、headphone(signal+quad multich HRIR,原生 flt)都由
+  2-input graph2 功能性 smoke 覆盖并计入 gate(review P1-1 修复;
+  不再是"只有注册证据")。
 
 ### 4.2 配置兼容性与记账(§12 的机器证明)
 
@@ -182,7 +210,10 @@ manifest,union 工具只做记账与冲突检测。
   能力意图;运行时 `avfilter_get_by_name` present/absent 双向抽查。
   中途真实抓到过一次保真度 bug:xmake 注入的 `-fvisibility=hidden`/
   `-DNDEBUG` 改变 GCC IPA 决策,重放对象出现 oracle 没有的
-  `.part.0` 拆分——修复(注入 flag 末尾中和)后符号集合精确相等。
+  `.part.0` 拆分——修复后符号集合精确相等。该中和最初被无条件
+  注入 `qianqian_av`(review P0-3 指出这改变了生产构建语义),
+  现已隔离进 C0-only 选项 `--av_replay_exact`;默认构建与父分支
+  逐字节/符号集机器验证一致。
 - ~~"未选中的 filter 真的不在"~~:每 stage 的 absent 抽查(未启用层
   的 filter + rubberband/sofalizer/ladspa + not-justified 名单)全 PASS。
 - ~~"codec 闭包没变"~~:c0 复现 canonical `n3-min-noswr` 闭包
@@ -192,10 +223,12 @@ manifest,union 工具只做记账与冲突检测。
   44 条配置宏差异被记录为"不许拼接"的证据而非被掩盖。
 - ~~"archive 大小 = shipping"~~:本报告从不这样声称;archive 字节仅
   为诊断列,shipping 权威是最终链接 probe 的 stripped/xz。
-- ~~"alimiter 真的需要 swresample"~~:**B1 假设被证实且更精确**——
-  alimiter 协商 packed double(`dbl`),图自动插入 `auto_aresample_0`,
-  而 aresample 的 configure 依赖是 swresample;冒烟还捕获了它的默认
-  auto-level 行为(归一化回满幅),smoke 断言因此显式 `level=0`。
+- ~~"alimiter 真的需要 swresample"~~:**B1 假设被证实,且归因方式
+  已修正**——alimiter 的 configure 依赖为空(机器解析 pinned
+  configure 为证);它的 swr 需求完全来自格式适配:图配置失败被发现,
+  加 aresample 后协商 packed double(`dbl`),图自动插入
+  `auto_aresample_0`。冒烟捕获其默认 auto-level 行为(归一化回满幅),
+  smoke 断言因此显式 `level=0`。
 - ~~"FIR 很贵"~~:证实,见 4.1(且贵在 av_tx 基础,不在 afir 本身)。
 - ~~"205 compiled TU = 205 live TU"~~:证伪,见 4.1。
 - ~~"没有引入外部依赖"~~:external-libs gate 逐 stage PASS(rubberband/
@@ -217,9 +250,12 @@ manifest,union 工具只做记账与冲突检测。
 - 单主机(Linux x86_64, WSL2);Windows/WASM 闭包必须重新求
   (manifest 记录 toolchain 身份,`--configure-extra` 支持交叉 oracle),
   本任务未做 Windows 重放。
-- 冒烟 = 闭包可用性证明,不是音质竞赛(§20);acrossfade/afir/
-  headphone 是双输入 filter,在线性 probe 范围外,只有注册与闭包
-  成本证据(记录于 `correctness-smoke.json` 与能力清单)。
+- 冒烟 = 闭包可用性证明,不是音质竞赛(§20)。acrossfade/afir/
+  headphone 原先只有注册+闭包证据(review P1-1),现由 2-input
+  `graph2` 功能性 smoke 覆盖(afir=signal+微型 IR、acrossfade=A+B、
+  headphone=signal+quad multich HRIR;只断言 config+process+drain+
+  finite+非空,状态记录于各证据 JSON 的 `multi_input_status`)。
+- alimiter 的 auto-level 行为断言(`level=0`)保持。
 - probe 程序自身的体积差(stub↔真后端)计入 F0 档,未单独剥离。
 - 图 lifecycle 只在代表性 filter 上测(create/destroy/重建一致性,
   `smoke-*.json.timing`);运行时性能不是本实验目标。
@@ -227,11 +263,15 @@ manifest,union 工具只做记账与冲突检测。
 ### 4.5 LIBAVFILTER VIABILITY(§35 分类,不选 DSP backend)
 
 **B — VIABLE:核心 DSP 便宜;高级组应保持可选。**
+(分类按修复后的测量重推;不是沿用旧 verdict。)
 
-- 主流核心能力(F0+F1+F2)= +72 KB xz(+224 KB stripped)于 codec
-  基线之上,含格式适配基础;F3/F4/F7 各 +3..7 KB xz;能力→成本的
-  映射在每次新增时都可以通过"manifest 编辑 → oracle → 重放 → 冒烟"
-  机器化复读,这正是北极星目标。
+- 主流核心能力(C3 = F0+F1+F2 effective)= codec 基线 +73.8 KB xz,
+  其中 F1 自身 filter 只占 2 TU,swresample 基础是一次性格式适配
+  (发现所得,非某 filter 的本体成本);F4/F5 各 +6..7 KB xz、F7
+  +3.4 KB xz;能力→成本的映射在每次新增时都可以通过"manifest 编辑
+  → oracle → 重放 → 图实例化 → 冒烟"机器化复读,这正是北极星目标。
+- 单项读法更狠:limiter 本体 direct Δxz 只有 +3.3 KB;任何"某 filter
+  贵"的判断必须先区分本体、configure 依赖与发现的格式适配三层。
 - F6(FIR/surround/headphone 类)+77 KB xz 应保持独立可选层——它的
   成本来自 av_tx 基础设施,一旦产品需要任何 FFT 用户即可摊销。
 - 无新增外部依赖;LGPL-2.1-or-later 许可证据逐 stage 记录。
@@ -262,7 +302,17 @@ oracle 环境与 pinned FFmpeg(n9.0.1 bf1b838f)由 `bench/ffmpeg-pin.json`
 
 ## 6. 范围声明
 
-- 生产代码(`src/`、`include/`)零改动;xmake.lua 仅新增 bench-only 目标。
+```text
+production source changed:             NO
+production build semantics changed:    NO  (replay-fidelity flags isolated
+                                            behind C0-only --av_replay_exact;
+                                            default build proven identical
+                                            to parent branch)
+```
+
+- 生产代码(`src/`、`include/`)零改动;xmake.lua 新增 bench-only 目标
+  `qn_avfilter_cap_probe` 与 C0-only 选项 `av_replay_exact`(默认
+  false;默认 session 的编译/链接语义与父分支机器验证一致)。
 - 不选择 DSP backend;不合并 PR;不动 B2/SIMD;不动 UI/Kotlin。
 - SRC 决策不受本实验影响(aresample 的出现只证明格式适配需求,不回答
   高质量 SRC 选型——那是 E10-A1 的独立问题)。
