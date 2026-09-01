@@ -30,13 +30,39 @@ extern "C" {
 #endif
 
 /* -------------------------------------------------------------------------
+ * Symbol visibility (SONGCORE_API)
+ *
+ * The shared library must export ONLY the frozen ABI below. Contract:
+ *   - default (no macro defined): plain declarations — static linking.
+ *   - SONGCORE_BUILD_SHARED: defined by the SongCore build when compiling
+ *     the shared library; exports the ABI (dllexport on Windows, default
+ *     visibility on ELF/Mach-O; pair with hidden default visibility).
+ *   - SONGCORE_DLL: defined by consumers that link the shared library on
+ *     Windows; imports the ABI (dllimport). Optional elsewhere.
+ * ---------------------------------------------------------------------- */
+
+#if defined(SONGCORE_BUILD_SHARED)
+#  if defined(_WIN32)
+#    define SONGCORE_API __declspec(dllexport)
+#  elif defined(__GNUC__) && (__GNUC__ >= 4)
+#    define SONGCORE_API __attribute__((visibility("default")))
+#  else
+#    define SONGCORE_API
+#  endif
+#elif defined(SONGCORE_DLL) && defined(_WIN32)
+#  define SONGCORE_API __declspec(dllimport)
+#else
+#  define SONGCORE_API
+#endif
+
+/* -------------------------------------------------------------------------
  * ABI version
  * ---------------------------------------------------------------------- */
 
 #define SONGCORE_ABI_VERSION 1u
 
 /* Returns SONGCORE_ABI_VERSION. Callable at any time. */
-uint32_t songcore_abi_version(void);
+SONGCORE_API uint32_t songcore_abi_version(void);
 
 /* Opaque handle. SongCore-owned until song_close. */
 typedef struct song_handle song_handle;
@@ -83,7 +109,7 @@ typedef struct song_error {
 
 /* Diagnostic of the last error on this handle, or SONG_OK when the last
  * call succeeded (out_error is then filled with a NULL message). */
-song_status song_last_error(song_handle *handle, const song_error **out_error);
+SONGCORE_API song_status song_last_error(song_handle *handle, const song_error **out_error);
 
 /* -------------------------------------------------------------------------
  * Host I/O
@@ -191,7 +217,7 @@ typedef struct song_stream_info {
  * SONG_ERR_UNSUPPORTED_CONTAINER / SONG_ERR_IO / SONG_ERR_OUT_OF_MEMORY;
  * *out_handle is then untouched. No diagnostic is available for song_open
  * failures (no handle exists). */
-song_status song_open(const song_io *io, song_handle **out_handle);
+SONGCORE_API song_status song_open(const song_io *io, song_handle **out_handle);
 
 /* Parse the container, enumerate decodable audio streams, select the
  * default one (policy: decodable audio streams only; prefer
@@ -200,14 +226,14 @@ song_status song_open(const song_io *io, song_handle **out_handle);
  * snapshot. Errors: SONG_ERR_NOT_OPEN, SONG_ERR_IO,
  * SONG_ERR_UNSUPPORTED_CONTAINER, SONG_ERR_NO_AUDIO_STREAM,
  * SONG_ERR_UNSUPPORTED_CODEC, SONG_ERR_CORRUPT_DATA, SONG_ERR_OUT_OF_MEMORY. */
-song_status song_probe(song_handle *handle, song_info *out_info);
+SONGCORE_API song_status song_probe(song_handle *handle, song_info *out_info);
 
 /* Number of decodable audio streams (excludes non-audio and
  * attached-picture streams). Requires a probed handle. */
-song_status song_audio_stream_count(song_handle *handle, uint32_t *out_count);
+SONGCORE_API song_status song_audio_stream_count(song_handle *handle, uint32_t *out_count);
 
 /* Info for one decodable audio stream (audio_index in 0..count-1). */
-song_status song_audio_stream_info(song_handle *handle, uint32_t audio_index,
+SONGCORE_API song_status song_audio_stream_info(song_handle *handle, uint32_t audio_index,
                                    song_stream_info *out_info);
 
 /* Explicitly select another decodable audio stream (audio_index).
@@ -221,7 +247,7 @@ song_status song_audio_stream_info(song_handle *handle, uint32_t audio_index,
  *   - song_info (rate/layout/selected_audio_index) is updated;
  *   - PCM and decoder state from the old stream are gone.
  * Invalid audio_index -> SONG_ERR_INVALID_ARGUMENT. */
-song_status song_select_stream(song_handle *handle, uint32_t audio_index);
+SONGCORE_API song_status song_select_stream(song_handle *handle, uint32_t audio_index);
 
 /* -------------------------------------------------------------------------
  * Metadata
@@ -262,7 +288,7 @@ typedef struct song_metadata {
 } song_metadata;
 
 /* Returns a pointer to the immutable metadata snapshot (borrowed). */
-song_status song_get_metadata(song_handle *handle, const song_metadata **out_meta);
+SONGCORE_API song_status song_get_metadata(song_handle *handle, const song_metadata **out_meta);
 
 /* Raw metadata enumeration — unknown/future tags never need an ABI change.
  * Entries are ordered deterministically: container/global scope first, then
@@ -282,8 +308,8 @@ typedef struct song_metadata_entry {
     uint32_t     reserved;
 } song_metadata_entry;
 
-song_status song_get_metadata_count(song_handle *handle, uint32_t *out_count);
-song_status song_get_metadata_entry(song_handle *handle, uint32_t index,
+SONGCORE_API song_status song_get_metadata_count(song_handle *handle, uint32_t *out_count);
+SONGCORE_API song_status song_get_metadata_entry(song_handle *handle, uint32_t index,
                                 song_metadata_entry *out_entry);
 
 /* -------------------------------------------------------------------------
@@ -317,8 +343,8 @@ typedef struct song_artwork_item {
     uint32_t       reserved;
 } song_artwork_item;
 
-song_status song_get_artwork_count(song_handle *handle, uint32_t *out_count);
-song_status song_get_artwork_item(song_handle *handle, uint32_t index,
+SONGCORE_API song_status song_get_artwork_count(song_handle *handle, uint32_t *out_count);
+SONGCORE_API song_status song_get_artwork_item(song_handle *handle, uint32_t index,
                               song_artwork_item *out_item);
 
 /* -------------------------------------------------------------------------
@@ -343,7 +369,7 @@ song_status song_get_artwork_item(song_handle *handle, uint32_t index,
  * The caller owns dst. frame_capacity == 0 -> SONG_ERR_INVALID_ARGUMENT.
  * ---------------------------------------------------------------------- */
 
-song_status song_read_pcm(song_handle *handle, float *dst,
+SONGCORE_API song_status song_read_pcm(song_handle *handle, float *dst,
                           uint64_t frame_capacity,
                           uint64_t *out_frames_produced);
 
@@ -375,13 +401,13 @@ song_status song_read_pcm(song_handle *handle, float *dst,
  * the landing frame cannot be converted (fail-closed).
  * ---------------------------------------------------------------------- */
 
-song_status song_seek(song_handle *handle, int64_t requested_position_us,
+SONGCORE_API song_status song_seek(song_handle *handle, int64_t requested_position_us,
                       int64_t *out_actual_position_us);
 
 /* Close the handle and free every SongCore-owned resource. All views
  * returned by the handle are invalidated. Safe on any state; NULL is a
  * no-op. */
-void song_close(song_handle *handle);
+SONGCORE_API void song_close(song_handle *handle);
 
 #ifdef __cplusplus
 }

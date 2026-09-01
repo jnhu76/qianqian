@@ -36,8 +36,10 @@ platform AudioBackend (future)
 
 ```bash
 xmake ffmpeg-import                 # 一次性：解析 FFmpeg source closure
-xmake f -o build/xmake              # native session
-xmake build songcore songcore_probe # 核心库 + 回归 instrument
+xmake f -m release                  # native session
+xmake build songcore                # 静态 + 动态两种产物
+                                    #   build/artifacts/libsongcore.a
+                                    #   build/artifacts/shared/libsongcore.so
 
 python3 tests/songcore/regression.py            # 主回归 + 权威树
 python3 tests/songcore/regression.py --check    # 只读 fail-closed 校验
@@ -47,14 +49,17 @@ python3 tests/songcore/dsp_src.py               # DSP/SRC 集成 smoke
 
 详见 [`tests/songcore/README.md`](tests/songcore/README.md)。
 
-## 文档
+## 文档导航
 
-- [PRD](PRD.md) — 产品需求权威。
-- [docs/audio-core.md](docs/audio-core.md) — Native Audio Core 唯一人类权威。
-- [docs/ffmpeg-minimization.md](docs/ffmpeg-minimization.md) — FFmpeg 裁剪工作流。
-- [docs/wasm.md](docs/wasm.md) — WASM 结论（native-first 默认）。
-- [docs/history.md](docs/history.md) — 决策由来（极简）。
-- [docs/architecture/negative-capability-manifest.md](docs/architecture/negative-capability-manifest.md) — 明确不做清单。
+| 想了解 | 读 |
+|---|---|
+| 架构（Audio Core 是什么） | [docs/audio-core.md](docs/audio-core.md) |
+| FFmpeg 裁剪 / 构建 / target recipe | [docs/ffmpeg-minimization.md](docs/ffmpeg-minimization.md) |
+| **怎么调用这个库（调用方 API 文档）** | [docs/songcore-api.md](docs/songcore-api.md) |
+| WASM 结论 | [docs/wasm.md](docs/wasm.md) |
+| 产品需求权威 | [PRD.md](PRD.md) |
+| 决策由来 | [docs/history.md](docs/history.md) |
+| 明确不做清单 | [docs/architecture/negative-capability-manifest.md](docs/architecture/negative-capability-manifest.md) |
 
 ## 明确不做（Phase 0）
 

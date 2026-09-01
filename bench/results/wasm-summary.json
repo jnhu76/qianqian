@@ -1,6 +1,23 @@
 {
   "summary": "WASM viability result for SongCore — durable machine summary (archived 2026-09-01 from the WASM total-cost evaluation; raw tournament trees were pruned, git history preserves the detail)",
   "method": "Same SongCore capability intent rebuilt for a WASM target; same ABI exercised from native twin vs WAMR (interp + AOT), wasm3, Wasmtime, and Emscripten/V8 (node harness); PCM compared per fixture.",
+  "artifact_terminology": {
+    "purpose": "Size numbers below are NOT the same artifact. These definitions are normative; never quote one under another's name.",
+    "guest_module_only": "the SongCore.wasm guest module by itself, no runtime (xz -9e unless stated)",
+    "aot_guest_module_only": "the wamrc-compiled SongCore.aot guest by itself, replaces the .wasm module in AOT deployments",
+    "runtime_only": "the host runner / embedded runtime binary without any guest",
+    "runtime_plus_guest_bundle": "the shipping package total: runtime + guest module(s)",
+    "guest_module_only_values": {
+      "file": "SongCore.wasm",
+      "raw_bytes": 1292868,
+      "xz9e_bytes": 432416
+    },
+    "aot_guest_module_only_values": {
+      "file": "SongCore.aot",
+      "raw_bytes": 3555004,
+      "xz9e_bytes": 1146836
+    }
+  },
   "correctness": {
     "fixtures_total": 44,
     "per_runtime": {
@@ -32,10 +49,33 @@
     "wasm3": 0.012
   },
   "shipping_xz9e": {
-    "native": {"raw_bytes": 1505608, "xz9e_bytes": 580792},
-    "wamr_interpreter": {"raw_bytes": 1757924, "xz9e_bytes": 591664},
-    "wasm3": {"raw_bytes": 1500300, "xz9e_bytes": 499524},
-    "wamr_aot": {"raw_bytes": 4020060, "xz9e_bytes": 1306528, "note": "AOT guest ≈ 3.55 MB raw (SongCore.aot)"}
+    "note": "Every entry is a runtime_plus_guest_bundle (the deployment total), decomposed into runtime_only and guest module. Historical prose figures resolve as: 1.29 MB = guest_module_only (SongCore.wasm); 3.55 MB = aot_guest_module_only (SongCore.aot); 4.02 MB / 1.30 MB xz = the WAMR-AOT bundle (runtime + AOT guest), not a single artifact.",
+    "native": {
+      "artifact_definition": "runtime_plus_guest_bundle — single native binary, no separate runtime",
+      "raw_bytes": 1505608,
+      "xz9e_bytes": 580792
+    },
+    "wamr_interpreter": {
+      "artifact_definition": "runtime_plus_guest_bundle",
+      "raw_bytes": 1757924,
+      "xz9e_bytes": 591664,
+      "runtime_only": {"file": "qn_wamr_runner", "raw_bytes": 465056, "xz9e_bytes": 159464},
+      "guest_module_only": {"file": "SongCore.wamr-workaround.wasm", "raw_bytes": 1292868, "xz9e_bytes": 432200}
+    },
+    "wasm3": {
+      "artifact_definition": "runtime_plus_guest_bundle",
+      "raw_bytes": 1500300,
+      "xz9e_bytes": 499524,
+      "runtime_only": {"file": "qn_wasm3_runner", "raw_bytes": 207432, "xz9e_bytes": 67108},
+      "guest_module_only": {"file": "SongCore.wasm", "raw_bytes": 1292868, "xz9e_bytes": 432416}
+    },
+    "wamr_aot": {
+      "artifact_definition": "runtime_plus_guest_bundle — the AOT guest replaces the .wasm module",
+      "raw_bytes": 4020060,
+      "xz9e_bytes": 1306528,
+      "runtime_only": {"file": "qn_wamr_aot_runner", "raw_bytes": 465056, "xz9e_bytes": 159692},
+      "aot_guest_module_only": {"file": "SongCore.aot", "raw_bytes": 3555004, "xz9e_bytes": 1146836}
+    }
   },
   "conclusion": "WASM is viable but native-first remains the default architecture: same capability definition rebuilds for WASM, and AOT/JIT close the performance gap, but the native artifact is smaller and carries no runtime tax."
 }

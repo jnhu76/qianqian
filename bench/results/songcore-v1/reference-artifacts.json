@@ -1,0 +1,39 @@
+{
+  "abi_version": 1,
+  "shared": {
+    "dynamic_dependencies": [
+      "/lib64/ld-linux-x86-64.so.2",
+      "libc.so.6",
+      "libm.so.6"
+    ],
+    "exact_contract": true,
+    "export_count": 15,
+    "exports": [
+      "song_audio_stream_count",
+      "song_audio_stream_info",
+      "song_close",
+      "song_get_artwork_count",
+      "song_get_artwork_item",
+      "song_get_metadata",
+      "song_get_metadata_count",
+      "song_get_metadata_entry",
+      "song_last_error",
+      "song_open",
+      "song_probe",
+      "song_read_pcm",
+      "song_seek",
+      "song_select_stream",
+      "songcore_abi_version"
+    ],
+    "raw_bytes": 981832,
+    "sha256_raw": "789cf70b774895510109888db42891a182112c21dde048d6e84f3ded5f305aa9",
+    "stripped_bytes": 981832,
+    "xz9e_bytes": 353492
+  },
+  "static": {
+    "raw_bytes": 30216,
+    "sha256_raw": "7f3f758d4ec76b41fa9a512fc0da10473de88a5c9d5eafc551e6907b8af8f6a1",
+    "stripped_bytes": 18118,
+    "xz9e_bytes": 8444
+  }
+}

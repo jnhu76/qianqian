@@ -13,12 +13,14 @@ xmake ffmpeg-import
 # SongCore regression test closure (Common Formats + Matroska):
 python3 tools/ffmpeg_profile_import.py --stage songcore-test \
     --profile ffmpeg/profiles/songcore-test.json
-xmake f -o build/xmake-test --av_manifest=build/minimize/songcore-test/manifest.json -y
-xmake build songcore_probe
+xmake f -o build/xmake-test -m release \
+    --av_manifest=build/minimize/songcore-test/manifest.json -y
+xmake build songcore_probe songcore_shared
 ```
 
 The `songcore_probe` instrument is test-only and never links into a
-shipping graph.
+shipping graph. `songcore_shared` is built too so the regression's shared
+export audit (15-symbol gate, no FFmpeg leakage) has an artifact to inspect.
 
 ## Run
 
@@ -34,6 +36,10 @@ python3 tests/songcore/sanitizers.py
 # python3 tools/dsp_closure.py --stage avf-c2  once)
 python3 tests/songcore/dsp_src.py
 
+# target-identity gate: a manifest derived for one target must not satisfy
+# another target's build session (fail-closed provenance)
+python3 tests/songcore/target_gate_test.py
+
 # read-only fail-closed validation
 python3 tests/songcore/regression.py --check --out bench/results/songcore-v1
 python3 tests/songcore/sanitizers.py --check --out bench/results/songcore-v1
@@ -44,7 +50,7 @@ python3 tests/songcore/dsp_src.py --check --out bench/results/songcore-v1
 
 | Evidence file | Predicates recomputed by --check |
 |---|---|
-| abi.json | every frozen contract symbol defined in libsongcore.a; header leaks no FFmpeg type |
+| abi.json | every frozen contract symbol defined in libsongcore.a; header leaks no FFmpeg type; shared library exports exactly the 15-symbol contract (no av_/ff_/swr_ leakage) when built |
 | metadata.json | canonical values + has_* vs manifest; raw key presence; precedence (stream overrides container) |
 | artwork.json | count / mime / role / front-cover policy per manifest |
 | consistency.json | decode ends EOF (typed error only for degraded fixtures); >0 frames; metadata/artwork snapshot stable across decode/seek |

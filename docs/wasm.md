@@ -51,9 +51,23 @@ from WAMR (interpreter + AOT), wasm3, Wasmtime, and Emscripten/V8:
 - **Bridge (PCM transfer) tax**: WAMR AOT ≈ 17%, Wasmtime ≈ 4%,
   Emscripten/V8 ≈ 10% — the PCM copy across the boundary is small but not
   free; it shrinks relative to decode as decode cost grows.
-- **Shipping size (xz -9e)**: native ≈ 1.51 MB raw / 581 KB xz; WASM guest
-  ≈ 1.29 MB (same SongCore.wasm for WAMR/wasm3); WAMR AOT guest ≈ 3.55 MB
-  raw. Native is the smallest artifact with zero runtime tax.
+- **Shipping size (xz -9e)**: native bundle ≈ 1.51 MB raw / 581 KB xz
+  (single binary, no separate runtime); WASM guest module ≈ 1.29 MB raw /
+  432 KB xz; WAMR AOT guest module ≈ 3.55 MB raw; the WAMR-AOT shipping
+  bundle (runtime + AOT guest) ≈ 4.02 MB raw / 1.30 MB xz. Native is the
+  smallest bundle with zero runtime tax.
+
+### Artifact terminology (normative)
+
+Size numbers in this document and in `bench/results/wasm-summary.json` are
+different artifacts and must never be mixed:
+
+| Term | Meaning | Reference values (raw / xz -9e) |
+|---|---|---|
+| guest module | `SongCore.wasm` alone, no runtime | 1.29 MB / 432 KB |
+| AOT guest module | `SongCore.aot` alone (replaces the .wasm in AOT deployments) | 3.55 MB / 1.15 MB |
+| runtime only | host runner / embedded runtime without a guest | 465 KB (WAMR runner) / 159 KB |
+| runtime + guest bundle | the shipping package total | 1.50 MB native · 1.76 MB WAMR-interp · 1.50 MB wasm3 · 4.02 MB WAMR-AOT |
 
 Durable machine summary: `bench/results/wasm-summary.json`. Full detail was
 archived from the evaluation trees; git history preserves the raw runs.

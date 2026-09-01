@@ -39,6 +39,60 @@ local ffmpeg_manifest = function ()
     return path.join(os.projectdir(), get_config("av_manifest"))
 end
 
+-- Fail-closed target identity (docs/ffmpeg-minimization.md): the replayed
+-- manifest must have been derived for THIS session's target. A Linux
+-- manifest carries generated config headers and architecture sources that
+-- are not portable, so it must never silently satisfy a Windows/WASM
+-- session. The expected id comes from ffmpeg/targets/*.json — recipes are
+-- the machine-readable target intent, Xmake only matches them.
+local expected_target_id = function (target, json)
+    local wasm = get_config("wasm")
+    if wasm == "wasi" then return "wasm-wasi" end
+    if wasm == "emscripten" then return "wasm-emscripten" end
+    local found = nil
+    local targets_dir = path.join(os.projectdir(), "ffmpeg", "targets")
+    for _, recipe_file in ipairs(os.files(path.join(targets_dir, "*.json")) or {}) do
+        local r = json.loadfile(recipe_file)
+        local plats = (r.xmake or {}).plat or {}
+        if type(plats) == "string" then plats = {plats} end
+        local plat_ok = false
+        for _, p in ipairs(plats) do
+            if p == target:plat() then plat_ok = true end
+        end
+        if plat_ok and (r.xmake or {}).arch == target:arch() then
+            found = r.id
+            break
+        end
+    end
+    return found
+end
+
+-- Returns nil when the manifest identity is acceptable for this session,
+-- else a fail-closed error message (raise happens in the callback scope).
+local manifest_target_problem = function (manifest_path, target, json)
+    local m = json.loadfile(manifest_path)
+    local mt = m.target or {}
+    if not mt.id then
+        return format(
+            "%s predates target identity (schema < 2). Re-derive it:\n" ..
+            "  native session : xmake ffmpeg-import\n" ..
+            "  other targets  : python3 tools/ffmpeg_profile_import.py " ..
+            "--target <id> --profile ffmpeg/profiles/<capability>.json",
+            get_config("av_manifest"))
+    end
+    local expect = expected_target_id(target, json)
+    if expect and mt.id ~= expect then
+        return format(
+            "manifest target mismatch: %s was derived for '%s' but this " ..
+            "session builds '%s'. Derive the matching closure and point " ..
+            "--av_manifest at it:\n" ..
+            "  python3 tools/ffmpeg_profile_import.py --target %s " ..
+            "--profile ffmpeg/profiles/<capability>.json",
+            get_config("av_manifest"), mt.id, expect, expect)
+    end
+    return nil
+end
+
 -- Import is intentionally separate from normal builds. It may invoke FFmpeg's
 -- configure/Make once as an upstream oracle, then freezes the exact compile
 -- closure in build/ffmpeg-xmake/manifest.json. Normal xmake builds never call
@@ -111,26 +165,72 @@ target("qianqian_av")
             end
         end
     end)
-    before_build(function ()
+    before_build(function (target)
         if not os.isfile(ffmpeg_manifest()) then
             raise("FFmpeg source closure is missing. Run `xmake ffmpeg-import` first, then rerun xmake.")
         end
+        import("core.base.json")
+        local problem = manifest_target_problem(ffmpeg_manifest(), target, json)
+        if problem then
+            raise(problem)
+        end
     end)
 
-target("songcore")
-    set_kind("static")
-    set_default(false)
-    set_targetdir(artifact_dir)
+-- One conceptual native library (songcore), two artifact kinds. The public
+-- ABI is include/songcore.h (ABI v1); the target names below are build
+-- internals and never appear in the ABI. Shared build logic lives in
+-- songcore_common() — the Xmake-recommended way to avoid duplicating the
+-- definition across static/shared targets.
+local songcore_common = function ()
     add_files("src/songcore_ffmpeg.c")
     add_includedirs("include", {public = true})
     add_deps("qianqian_av")
+    if is_plat("linux", "macosx", "android", "iphoneos") then
+        add_syslinks("m", "pthread")
+    end
+    if is_plat("mingw", "windows") then
+        -- FFmpeg's av_random_bytes uses BCryptGenRandom on Windows
+        add_syslinks("bcrypt")
+    end
+end
+
+target("songcore_static")
+    set_kind("static")
+    set_basename("songcore") -- → libsongcore.a / songcore.lib
+    set_default(false)
+    set_targetdir(artifact_dir)
+    songcore_common()
+
+target("songcore_shared")
+    set_kind("shared")
+    set_basename("songcore") -- → libsongcore.so / songcore.dll
+    set_default(false)
+    -- Own subdir: a co-located libsongcore.so would win the linker's -l
+    -- search over the static archive and silently flip every test binary
+    -- to a dynamic dependency (same subdir convention as artifacts/wasm/).
+    set_targetdir(path.join(artifact_dir, "shared"))
+    add_defines("SONGCORE_BUILD_SHARED")
+    -- Hide by default; only SONGCORE_API declarations stay exported. The
+    -- statically-linked FFmpeg closure is forced local at link time on ELF
+    -- (no Mach-O equivalent yet — macos-arm64 recipe notes this).
+    set_symbols("hidden")
+    if is_plat("linux", "android") then
+        add_ldflags("-Wl,--exclude-libs,ALL", {force = true})
+    end
+    songcore_common()
+
+-- Build convenience: both artifact kinds under the historical name.
+target("songcore")
+    set_kind("phony")
+    set_default(false)
+    add_deps("songcore_static", "songcore_shared")
 
 target("qn_pcm_dump")
     set_kind("binary")
     set_default(false)
     set_targetdir(artifact_dir)
     add_files("tools/qn_pcm_dump.c")
-    add_deps("songcore")
+    add_deps("songcore_static")
     if is_plat("linux") or is_plat("macosx") then
         add_syslinks("m", "pthread")
     end
@@ -153,7 +253,7 @@ target("songcore_probe")
     set_default(false)
     set_targetdir(artifact_dir)
     add_files("tests/songcore/songcore_probe.c")
-    add_deps("songcore")
+    add_deps("songcore_static")
     if is_plat("linux") or is_plat("macosx") then
         add_syslinks("m", "pthread")
     end
@@ -187,7 +287,7 @@ target("dsp_cap_probe")
     set_default(false)
     set_targetdir(artifact_dir)
     add_files("tests/songcore/dsp_cap_probe.c")
-    add_deps("qianqian_av", "songcore")
+    add_deps("qianqian_av", "songcore_static")
     if is_plat("linux") or is_plat("macosx") then
         add_syslinks("m", "pthread")
     end

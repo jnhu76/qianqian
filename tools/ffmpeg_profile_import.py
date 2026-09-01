@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
-"""Import an arbitrary capability profile and freeze its compile closure.
+"""Derive a target-specific FFmpeg compile closure from intent + target recipe.
 
-Takes a full capability profile path and imports it as a replay stage: the
-FFmpeg configure/Make oracle runs ONCE for this profile's capability set,
-and the resulting compile closure is frozen into
-build/minimize/<stage>/manifest.json. Normal builds replay the manifest
-through Xmake and never touch FFmpeg Makefiles.
+Normal conceptual invocation — target in, manifest out:
 
-    python3 tools/ffmpeg_profile_import.py --stage songcore-test \
-        --profile ffmpeg/profiles/songcore-test.json
+    python3 tools/ffmpeg_profile_import.py \
+        --target linux-x86_64 \
+        --profile ffmpeg/profiles/codec-base.json
+
+writes build/manifests/<target>/<profile>/manifest.json. The FFmpeg
+configure/Make oracle runs ONCE for this (profile, target) pair; the target's
+configure facts come from ffmpeg/targets/<target>.json, not from hand-typed
+--configure-extra. Xmake replays the manifest into the platform artifact and
+fails closed when the pointed manifest was derived for a different target.
+
+--stage remains for test/DSP capability stages (build/minimize/<stage>/);
+those still bind the native host target identity so the Xmake gate can
+verify them.
 """
 from __future__ import annotations
 
@@ -57,26 +64,37 @@ def validate_profile(profile: dict, source: Path) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage", required=True, help="stage id, e.g. c1")
+    mode = ap.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--target", help="target recipe id, e.g. linux-x86_64")
+    mode.add_argument("--stage", help="legacy test/DSP stage id (native host target)")
     ap.add_argument("--profile", required=True, help="capability profile JSON path")
     ap.add_argument("--configure-extra", action="append", default=[],
-                    help="extra configure argument (target-specific oracles, e.g. Windows cross)")
+                    help="extra configure argument (SDK toolchain selection "
+                         "for cross oracles; use env/PATH-relative values)")
     ap.add_argument("--force", action="store_true",
                     help="re-derive the closure even if this stage's manifest exists")
     args = ap.parse_args()
-
-    stage_dir = ROOT / "build" / "minimize" / args.stage
-    manifest_path = stage_dir / "manifest.json"
-    if manifest_path.is_file() and not args.force:
-        print(f"stage {args.stage}: manifest exists, skipping import "
-              f"(use --force to re-derive)")
-        return
 
     profile_path = Path(args.profile)
     if not profile_path.is_absolute():
         profile_path = ROOT / profile_path
     profile = json.loads(profile_path.read_text())
     validate_profile(profile, profile_path)
+
+    if args.target:
+        recipe = fi.load_recipe(args.target)
+        stage_dir = ROOT / "build" / "manifests" / recipe["id"] / profile["profile"]
+        target_args = fi.recipe_configure_args(recipe)
+    else:
+        recipe = fi.find_native_recipe()
+        stage_dir = ROOT / "build" / "minimize" / args.stage
+        target_args = []
+
+    manifest_path = stage_dir / "manifest.json"
+    if manifest_path.is_file() and not args.force:
+        print(f"{stage_dir.name}: manifest exists, skipping import "
+              f"(use --force to re-derive)")
+        return
 
     # Profiles that enable swresample (the Opus decoder's upstream build
     # dependency) must also make its archive an oracle build target, or its
@@ -98,7 +116,7 @@ def main() -> None:
 
     # fi module globals carry the stage's profile/oracle paths; the oracle run
     # itself lives here so target-specific oracles can add configure arguments
-    # (e.g. Windows cross flags) while keeping the deterministic ordering.
+    # while keeping the deterministic ordering (profile -> recipe -> extra).
     pin = json.loads(fi.PIN.read_text())
     fi.verified_source(pin)
 
@@ -107,7 +125,8 @@ def main() -> None:
     oracle = stage_dir / "oracle"
     shutil.rmtree(oracle, ignore_errors=True)
     oracle.mkdir(parents=True)
-    cmd = [str(fi.SRC / "configure"), *fi.configure_args(profile), *args.configure_extra]
+    cmd = [str(fi.SRC / "configure"), *fi.configure_args(profile),
+           *target_args, *args.configure_extra]
     configure_log = fi.run(cmd, cwd=oracle, capture=True)
     (stage_dir / "configure.log").write_text(configure_log)
     # Capability-intent mismatches surface as configure demotions (e.g. a
@@ -119,7 +138,7 @@ def main() -> None:
     log = fi.run(["make", "-j", jobs, "V=1", *fi.LIB_TARGETS], cwd=oracle, capture=True)
 
     units = fi.closure_from_log(log)
-    cargs = fi.configure_args(profile) + list(args.configure_extra)
+    cargs = fi.configure_args(profile) + target_args + list(args.configure_extra)
     toolchain = fi.toolchain_identity()
 
     refs = {}
@@ -131,13 +150,16 @@ def main() -> None:
 
     source_units = sum(u["origin"] == "source" for u in units)
     manifest = {
-        "schema": 1,
-        "stage": args.stage,
+        "schema": 2,
+        "stage": args.stage or recipe["id"],
         "ffmpeg_tag": pin["ffmpeg_tag"],
         "ffmpeg_commit_sha": pin["ffmpeg_commit_sha"],
+        "ffmpeg_source_sha256": pin["source_sha256"],
         "profile": profile["profile"],
         "profile_variant": profile.get("variant"),
         "profile_sha256": fi.sha256_file(profile_path),
+        "target": fi.target_identity(
+            recipe, fi.sha256_file(fi.TARGETS / f"{recipe['id']}.json")),
         "toolchain": toolchain,
         "source_root": "build/ffmpeg-src",
         "config_root": fi.ORACLE.relative_to(ROOT).as_posix(),
@@ -157,7 +179,8 @@ def main() -> None:
     (stage_dir / "oracle-build.log").write_text(log)
 
     print(f"wrote {manifest_path.relative_to(ROOT)}")
-    print(f"stage {args.stage} closure: {len(units)} translation units "
+    print(f"target {recipe['id']} | {args.stage or profile['profile']} closure: "
+          f"{len(units)} translation units "
           f"({len(units) - source_units} generated)")
     print(f"toolchain: {toolchain}")
     if configure_warnings:

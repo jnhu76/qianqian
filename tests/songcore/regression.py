@@ -614,6 +614,27 @@ CONTRACT_SYMBOLS = [
 ]
 
 
+def shared_surface():
+    """Shared-library export audit: when build/artifacts/shared/libsongcore.so
+    is present it must export EXACTLY the frozen ABI — no internal helpers,
+    no av_*/ff_/swr_* FFmpeg leakage (the closure is statically linked in)."""
+    so_path = os.path.join(ARTIFACT_DIR, "shared", "libsongcore.so")
+    if not os.path.isfile(so_path):
+        return None
+    r = subprocess.run(["nm", "-D", "--defined-only", so_path],
+                       capture_output=True, text=True)
+    exports = sorted(line.split()[-1] for line in r.stdout.splitlines()
+                     if line.split())
+    forbidden = sorted(s for s in exports if not s.startswith("song"))
+    return {
+        "path": "build/artifacts/shared/libsongcore.so",
+        "exports": exports,
+        "export_count": len(exports),
+        "exact_contract": exports == sorted(CONTRACT_SYMBOLS),
+        "unexpected_exports": forbidden,
+    }
+
+
 def abi_surface(binary):
     """ABI surface evidence: every frozen contract symbol must be defined by
     the shipped static library (libsongcore.a). The harness binary itself is
@@ -653,6 +674,7 @@ def abi_surface(binary):
                        if wasm_exports is not None else [],
         },
         "no_ffmpeg_types_in_header": True,  # enforced by include/songcore.h
+        "shared": shared_surface(),
     }
 
 
@@ -738,6 +760,14 @@ def revalidate(out_dir):
         fail("abi: all_contract_linked is not true")
     if abi.get("no_ffmpeg_types_in_header") is not True:
         fail("abi: no_ffmpeg_types_in_header is not true")
+    shared = abi.get("shared")
+    if shared is not None:
+        if shared.get("exports") != sorted(CONTRACT_SYMBOLS):
+            fail(f"abi: shared exports are not exactly the frozen contract: "
+                 f"{shared.get('exports')}")
+        if shared.get("unexpected_exports"):
+            fail(f"abi: shared library leaks non-ABI symbols: "
+                 f"{shared['unexpected_exports'][:10]}")
 
     # corpus integrity: recorded fixtures must still match the manifest pins
     for cid, case in exp_by_id.items():
