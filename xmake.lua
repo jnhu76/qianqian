@@ -168,12 +168,12 @@ target("qn_pcm_dump")
         end
     end)
 
--- E11: SongCore ABI v1 machine-test instrument (bench-only, one JSON per run).
-target("qn_e11_record")
+-- SongCore ABI v1 machine-test instrument (test-only, one JSON per run).
+target("songcore_probe")
     set_kind("binary")
     set_default(false)
     set_targetdir(artifact_dir)
-    add_files("bench/e11/qn_e11_record.c")
+    add_files("tests/songcore/songcore_probe.c")
     add_deps("songcore")
     if is_plat("linux") or is_plat("macosx") then
         add_syslinks("m", "pthread")
@@ -181,6 +181,22 @@ target("qn_e11_record")
     if is_plat("mingw") then
         add_syslinks("bcrypt")
     end
+    -- `xmake test`: full SongCore regression + fail-closed --check.
+    -- os.execv raises on nonzero exit, so a gate failure fails the test.
+    add_tests("default")
+    on_test(function (target, opt)
+        import("lib.detect.find_tool")
+        local python = find_tool("python3") or find_tool("python")
+        if not python then
+            return false, "python3 is required for the SongCore regression"
+        end
+        local root = os.projectdir()
+        local out = path.join(root, "bench", "results", "songcore-v1")
+        local script = path.join(root, "tests", "songcore", "regression.py")
+        os.execv(python.program, {script, "--out", out})
+        os.execv(python.program, {script, "--check", "--out", out})
+        return true
+    end)
 
 -- E10-C0: bench-only libavfilter capability probe. Links the FFmpeg closure
 -- replayed by qianqian_av (whatever --av_manifest points at) and exercises

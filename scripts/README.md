@@ -5,7 +5,7 @@
 ## Step 1 benchmark 入口
 
 ```text
-scripts/fetch-ffmpeg            下载并验证 pinned FFmpeg（bench/ffmpeg-pin.json）
+scripts/fetch-ffmpeg            下载并验证 pinned FFmpeg（ffmpeg/pin.json）
 scripts/build-profile <p>       按 bench/profiles/<p>.json 构建 + 产出元数据/体积
 scripts/probe-necessity [p]     单组件删除实验 → bench/provenance/
 scripts/bench-native            fetch + build all + 跑 harness（端到端）
@@ -57,7 +57,7 @@ S1 audit 的硬证据标准（`tools/link_audit.py`）：
 - real GNU ld `-Map` 的 pulled-member 多重集必须与模拟**完全相等**（硬 gate）；
 - full-archive 链接 vs reduced-archive 链接必须整 ELF SHA256 相等（回退：逐 section SHA256）。
 
-实验文档：`docs/experiments/e07-source-minimization.md`。
+
 
 ## Step 1 benchmark 产物
 

@@ -1,5 +1,5 @@
 {
- "scope": "BYPASS shape + 44.1k->48k aresample + volume/equalizer effectiveness on the trimmed libavfilter graph; True frame-level BYPASS bit-exactness is out of machine scope per E11 contract",
+ "scope": "BYPASS shape + 44.1k->48k aresample + volume/equalizer effectiveness on the trimmed libavfilter graph; True frame-level BYPASS bit-exactness is out of machine scope per SongCore contract",
  "graph_input_contract": {
   "fmt": "flt (Float32 interleaved)",
   "rate": "source rate",

@@ -423,7 +423,7 @@ AudioSink
 ## E11 冻结：DSP 决策（2026-09-01）
 
 - **AudioEngine** 的产品 DSP 使用**能力裁剪的 libavfilter**（E10-C0 证据：
-  capability intent 由人维护于 `bench/dsp-capabilities.json`，source closure
+  capability intent 由人维护于 `ffmpeg/capabilities/dsp.json`，source closure
   由 `tools/pcm_c0.py` + pinned configure oracle 机器推导，逐级成本在
   `bench/results/avfilter-minimize/*`）。
 - **SongCore 永不运行 libavfilter**：`songcore_ffmpeg.c` 不链接

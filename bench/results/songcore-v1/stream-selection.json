@@ -16,9 +16,9 @@
      "selected_audio_index": 0,
      "audio_stream_count": 2
     },
-    "decode_frames": 132300,
-    "pcm_sha256": "b3c1e52a667ec5e5dee9197894d115460cde99911219fb2b0ef160250bcd7fc5",
-    "metadata_sha": "2f822c71c52794b2d33722b4801a861e9ec85765ad7bcf684a5087300b22f88c",
+    "decode_frames": 131276,
+    "pcm_sha256": "0f145f93b6fdae218aad975bcca22489068ac5ca4a543f8a8ac3ad97de9515b3",
+    "metadata_sha": "46db53ce43d1da6b7fe86412f279f70397fbbe62d55403e6615b547eceaec4b4",
     "artwork_sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
    },
    "info": {
@@ -51,7 +51,7 @@
     },
     "decode_frames": 132300,
     "pcm_sha256": "8abfbb50a6d00a7f7175b2647967ce198e0fb427af7f3b222a9978cf0cbda7e9",
-    "metadata_sha": "71c3d7465198c20818e6bab1768fba26841115edc595bfd07a4bff82a6127d2c",
+    "metadata_sha": "940a564897c0a48eea7a56fbd64a14ceff0f8bd91051c587d3c653709f896813",
     "artwork_sha": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
    },
    "info": {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """E10-P0 driver: build + run the PCM-pipeline harness, enforce gates,
 write bench/results/pcm-processing/p0-summary.json (the single machine
-authority consumed by tools/pcm_report_tables.py) plus the machine
+authority) plus the machine
 evidence files p0-negative-tests.json, p0-mutations.json and the
 sanitizer results.
 

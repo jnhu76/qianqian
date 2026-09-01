@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "purpose": "Machine source-of-truth for which audio codecs and containers SongCore must decode. Humans edit intent here; the machine derives the FFmpeg source closure from the pinned upstream configure oracle (see docs/ffmpeg-minimization.md). Never hand-edit derived manifests.",
+  "output_contract": {
+    "sample_format": "flt (Float32 interleaved)",
+    "sample_rate": "source rate",
+    "channel_layout": "source layout",
+    "note": "SongCore decodes only; SRC/DSP live in AudioEngine, never here."
+  },
+  "codecs": {
+    "mp3": {
+      "decoders": ["mp3float"],
+      "demuxers": ["mp3"],
+      "parsers": ["mpegaudio"]
+    },
+    "flac": {
+      "decoders": ["flac"],
+      "demuxers": ["flac"]
+    },
+    "aac": {
+      "decoders": ["aac"],
+      "demuxers": ["mov", "aac"],
+      "note": "M4A (mov demuxer) and raw ADTS (aac demuxer)."
+    },
+    "alac": {
+      "decoders": ["alac"],
+      "demuxers": ["mov"]
+    },
+    "vorbis": {
+      "decoders": ["vorbis"],
+      "demuxers": ["ogg"]
+    },
+    "opus": {
+      "decoders": ["opus"],
+      "demuxers": ["ogg"],
+      "note": "The native Opus decoder pulls libswresample via FFmpeg's own build graph; SongCore does not use swr for its PCM contract."
+    },
+    "wav_pcm": {
+      "decoders": ["pcm_u8", "pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le", "pcm_f64le"],
+      "demuxers": ["wav"]
+    }
+  },
+  "containers": ["mp3", "flac", "mov", "aac", "ogg", "wav"],
+  "test_only": {
+    "matroska": {
+      "demuxer": "matroska",
+      "reason": "Test closure only: Matroska populates both container (segment) and stream (track) metadata, which the frozen canonical-precedence policy machine-tests."
+    }
+  }
+}

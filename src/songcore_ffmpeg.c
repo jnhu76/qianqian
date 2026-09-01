@@ -100,7 +100,6 @@ struct song_handle {
  * ---------------------------------------------------------------------- */
 
 static void clear_error(song_handle *h) {
-    h->err.struct_size = sizeof(h->err);
     h->err.message = NULL;
     h->err.message_len = 0;
     h->err.native_code = 0;
@@ -109,7 +108,6 @@ static void clear_error(song_handle *h) {
 
 static song_status set_error(song_handle *h, song_status st, int native,
                              const char *msg) {
-    h->err.struct_size = sizeof(h->err);
     h->err.native_code = native;
     h->err.reserved = 0;
     snprintf(h->err_msg, sizeof(h->err_msg), "%s", msg ? msg : "error");
@@ -387,45 +385,6 @@ static int frame_to_f32(song_handle *h, const AVFrame *f) {
  * Metadata snapshot
  * ---------------------------------------------------------------------- */
 
-typedef struct strbuf {
-    char *data;
-    size_t len;
-    size_t cap;
-} strbuf;
-
-static int sb_reserve(strbuf *sb, size_t extra) {
-    if (sb->len + extra + 1 <= sb->cap) return 0;
-    size_t ncap = sb->cap ? sb->cap * 2 : 256;
-    while (ncap < sb->len + extra + 1) ncap *= 2;
-    if (ncap > SIZE_MAX) return -1;
-    char *nd = (char *)realloc(sb->data, ncap);
-    if (!nd) return -1;
-    sb->data = nd;
-    sb->cap = ncap;
-    return 0;
-}
-
-static const char *sb_store(strbuf *sb, const char *s, size_t n,
-                            uint32_t *out_len) {
-    if (sb_reserve(sb, n) < 0) return NULL;
-    if (n > 0) memcpy(sb->data + sb->len, s, n);
-    sb->data[sb->len + n] = '\0';
-    const char *p = sb->data + sb->len;
-    if (out_len) *out_len = (uint32_t)n;
-    sb->len += n + 1;
-    return p;
-}
-
-static void meta_set_str(song_metadata *m, strbuf *sb, const char **dst,
-                         uint32_t *len, uint32_t *has, const char *val) {
-    if (!val) return;
-    const char *p = sb_store(sb, val, strlen(val), len);
-    if (p) {
-        *dst = p;
-        *has = 1;
-    }
-}
-
 /* Parse "N[/M]" into number and optional total. */
 static void parse_pair(const AVStream *st, const AVFormatContext *fmt,
                        const char *key, int32_t *num, uint32_t *has_num,
@@ -456,30 +415,14 @@ static uint32_t dict_count(const AVDictionary *d) {
     return n;
 }
 
-static uint32_t collect_dict(const AVDictionary *d, uint32_t scope,
-                             song_metadata_entry *out, uint32_t idx,
-                             strbuf *sb) {
-    const AVDictionaryEntry *e = NULL;
-    while ((e = av_dict_iterate(d, e))) {
-        song_metadata_entry *ent = &out[idx];
-        memset(ent, 0, sizeof(*ent));
-        ent->scope = scope;
-        ent->key = sb_store(sb, e->key, strlen(e->key), &ent->key_len);
-        ent->value = sb_store(sb, e->value ? e->value : "",
-                              e->value ? strlen(e->value) : 0, &ent->value_len);
-        if (!ent->key || !ent->value) return idx; /* OOM: stop collecting */
-        idx++;
-    }
-    return idx;
-}
-
-/* Build the immutable metadata snapshot for the selected stream.
- * Returns 0 on success, -1 on allocation failure (handle unchanged, but
- * partially built snapshot is discarded by the caller).
- *
- * Canonical field strings and raw entry strings live in SEPARATE buffers:
- * a realloc of one must never invalidate pointers into the other (all
- * returned views stay valid until stream selection / close). */
+/* Build the immutable metadata snapshot for the selected stream with a
+ * two-pass strategy so every returned view is stable:
+ *   pass 1: measure the exact byte totals of the canonical and raw string
+ *           buffers;
+ *   pass 2: allocate once and copy, constructing views into fixed buffers.
+ * No realloc ever moves a view after it is published.
+ * Returns 0 on success, -1 on allocation failure (the partial snapshot is
+ * freed by the next build or by cleanup). */
 static int metadata_build(song_handle *h) {
     free(h->meta_buf);
     h->meta_buf = NULL;
@@ -494,10 +437,6 @@ static int metadata_build(song_handle *h) {
     AVStream *st = h->fmt->streams[h->audio_streams[h->selected]];
     song_metadata *m = &h->meta;
     memset(m, 0, sizeof(*m));
-    m->struct_size = sizeof(*m);
-
-    strbuf sb = {0};
-    strbuf raw_sb = {0};
 
     /* Canonical fields: selected stream overrides container. */
     struct canon {
@@ -516,12 +455,63 @@ static int metadata_build(song_handle *h) {
         {"date", &m->date, &m->date_len, &m->has_date},
         {"comment", &m->comment, &m->comment_len, &m->has_comment},
     };
+
+    const char *canon_val[sizeof(canon) / sizeof(canon[0])] = {0};
+    size_t meta_bytes = 0;
     for (size_t i = 0; i < sizeof(canon) / sizeof(canon[0]); ++i) {
         const AVDictionaryEntry *e = av_dict_get(st->metadata, canon[i].key,
                                                  NULL, 0);
         if (!e) e = av_dict_get(h->fmt->metadata, canon[i].key, NULL, 0);
-        meta_set_str(m, &sb, canon[i].dst, canon[i].len, canon[i].has,
-                     e ? e->value : NULL);
+        if (e && e->value) {
+            canon_val[i] = e->value;
+            meta_bytes += strlen(e->value) + 1;
+        }
+    }
+
+    /* Raw enumeration: container scope first, then selected-stream scope,
+     * each in source parse order (deterministic for a given file). */
+    uint32_t cc = dict_count(h->fmt->metadata);
+    uint32_t sc = dict_count(st->metadata);
+    uint32_t total = cc + sc;
+    size_t raw_bytes = 0;
+    if (total > 0) {
+        const AVDictionaryEntry *e = NULL;
+        while ((e = av_dict_iterate(h->fmt->metadata, e)))
+            raw_bytes += strlen(e->key) + 1 +
+                         (e->value ? strlen(e->value) + 1 : 1);
+        e = NULL;
+        while ((e = av_dict_iterate(st->metadata, e)))
+            raw_bytes += strlen(e->key) + 1 +
+                         (e->value ? strlen(e->value) + 1 : 1);
+    }
+
+    /* Single allocations: after this point no buffer is ever reallocated. */
+    if (meta_bytes > 0) {
+        h->meta_buf = (char *)malloc(meta_bytes);
+        if (!h->meta_buf) return -1;
+    }
+    if (raw_bytes > 0) {
+        h->raw_buf = (char *)malloc(raw_bytes);
+        if (!h->raw_buf) return -1;
+    }
+    if (total > 0) {
+        h->raw = (song_metadata_entry *)calloc(total, sizeof(*h->raw));
+        if (!h->raw) return -1;
+    }
+    h->meta_buf_len = meta_bytes;
+    h->raw_buf_len = raw_bytes;
+
+    /* Pass 2: copy strings and construct stable views. */
+    char *p = h->meta_buf;
+    for (size_t i = 0; i < sizeof(canon) / sizeof(canon[0]); ++i) {
+        if (!canon_val[i]) continue;
+        size_t n = strlen(canon_val[i]);
+        memcpy(p, canon_val[i], n);
+        p[n] = '\0';
+        *canon[i].dst = p;
+        *canon[i].len = (uint32_t)n;
+        *canon[i].has = 1;
+        p += n + 1;
     }
 
     parse_pair(st, h->fmt, "track", &m->track_number, &m->has_track_number,
@@ -557,31 +547,32 @@ static int metadata_build(song_handle *h) {
         }
     }
 
-    /* Raw enumeration: container scope first, then selected-stream scope,
-     * each in source parse order (deterministic for a given file). Raw
-     * strings go into raw_sb, NOT sb (see header comment). */
-    uint32_t cc = dict_count(h->fmt->metadata);
-    uint32_t sc = dict_count(st->metadata);
-    uint32_t total = cc + sc;
-    if (total > 0) {
-        h->raw = (song_metadata_entry *)calloc(total, sizeof(*h->raw));
-        if (!h->raw) {
-            free(sb.data);
-            free(raw_sb.data);
-            return -1;
+    char *r = h->raw_buf;
+    uint32_t idx = 0;
+    for (int pass = 0; pass < 2; ++pass) {
+        const AVDictionary *d = pass == 0 ? h->fmt->metadata : st->metadata;
+        uint32_t scope = pass == 0 ? SONG_METADATA_SCOPE_CONTAINER
+                                   : SONG_METADATA_SCOPE_STREAM;
+        const AVDictionaryEntry *e = NULL;
+        while ((e = av_dict_iterate(d, e))) {
+            song_metadata_entry *ent = &h->raw[idx];
+            size_t kn = strlen(e->key);
+            size_t vn = e->value ? strlen(e->value) : 0;
+            ent->scope = scope;
+            memcpy(r, e->key, kn);
+            r[kn] = '\0';
+            ent->key = r;
+            ent->key_len = (uint32_t)kn;
+            r += kn + 1;
+            if (vn > 0) memcpy(r, e->value, vn);
+            r[vn] = '\0';
+            ent->value = r;
+            ent->value_len = (uint32_t)vn;
+            r += vn + 1;
+            idx++;
         }
-        uint32_t idx = collect_dict(h->fmt->metadata,
-                                    SONG_METADATA_SCOPE_CONTAINER, h->raw, 0,
-                                    &raw_sb);
-        idx = collect_dict(st->metadata, SONG_METADATA_SCOPE_STREAM, h->raw,
-                           idx, &raw_sb);
-        h->raw_count = idx;
     }
-
-    h->meta_buf = sb.data;
-    h->meta_buf_len = sb.len;
-    h->raw_buf = raw_sb.data;
-    h->raw_buf_len = raw_sb.len;
+    h->raw_count = idx;
     return 0;
 }
 
@@ -895,7 +886,6 @@ song_status song_probe(song_handle *h, song_info *out_info) {
 
     AVStream *st = h->fmt->streams[h->audio_streams[h->selected]];
     memset(out_info, 0, sizeof(*out_info));
-    out_info->struct_size = sizeof(*out_info);
     out_info->sample_rate = h->sample_rate;
     out_info->channels = h->channels;
     out_info->channel_mask = h->channel_mask;
@@ -926,7 +916,6 @@ song_status song_audio_stream_info(song_handle *h, uint32_t audio_index,
     if (audio_index >= h->audio_count) return SONG_ERR_INVALID_ARGUMENT;
     AVStream *st = h->fmt->streams[h->audio_streams[audio_index]];
     memset(out_info, 0, sizeof(*out_info));
-    out_info->struct_size = sizeof(*out_info);
     out_info->audio_index = audio_index;
     out_info->stream_index = h->audio_streams[audio_index];
     out_info->sample_rate = st->codecpar->sample_rate;
@@ -946,6 +935,17 @@ song_status song_audio_stream_info(song_handle *h, uint32_t audio_index,
     return SONG_OK;
 }
 
+/* Reposition demux/IO state to the container start so the newly selected
+ * stream decodes from its beginning (ABI: a switched stream starts from
+ * start). Returns 0 on success, <0 when the container cannot rewind. */
+static int rewind_demux(song_handle *h) {
+    int sidx = h->audio_streams[h->selected];
+    int ret = av_seek_frame(h->fmt, sidx, 0, AVSEEK_FLAG_BACKWARD);
+    if (ret < 0)
+        ret = av_seek_frame(h->fmt, -1, 0, AVSEEK_FLAG_BACKWARD);
+    return ret;
+}
+
 song_status song_select_stream(song_handle *h, uint32_t audio_index) {
     if (!h) return SONG_ERR_INVALID_ARGUMENT;
     if (!h->probed) return SONG_ERR_NOT_OPEN;
@@ -956,12 +956,16 @@ song_status song_select_stream(song_handle *h, uint32_t audio_index) {
     if (st != SONG_OK)
         return set_error(h, st, 0, "cannot open selected stream decoder");
 
-    /* Swap decoders, reset decode + PCM state, rebuild the metadata
-     * snapshot. Artwork is container-level and stays valid. */
+    /* Swap decoders, rewind the source, reset decode + PCM state, rebuild
+     * the metadata snapshot. Artwork is container-level and stays valid. */
     avcodec_free_context(&h->dec);
     h->dec = new_dec;
     h->selected = audio_index;
     reset_decode_state(h);
+
+    if (rewind_demux(h) < 0)
+        return set_error(h, SONG_ERR_SEEK_ERROR, 0,
+                         "cannot rewind source for stream switch");
 
     AVStream *st_ = h->fmt->streams[h->audio_streams[audio_index]];
     h->sample_rate = st_->codecpar->sample_rate;
@@ -1110,7 +1114,17 @@ song_status song_seek(song_handle *h, int64_t requested_position_us,
         int conv = frame_to_f32(h, h->frame);
         int64_t pts = h->frame->best_effort_timestamp;
         av_frame_unref(h->frame);
-        if (conv == 0 && pts != AV_NOPTS_VALUE && out_actual_position_us)
+        if (conv < 0) {
+            /* Fail-closed: a landing frame that cannot be converted must
+             * not be silently skipped behind a SONG_OK. */
+            song_status st = (conv == -2) ? SONG_ERR_STREAM_CHANGE
+                                          : SONG_ERR_DECODE_ERROR;
+            h->fatal_error = st;
+            return set_error(h, st, 0, conv == -2
+                                 ? "decoder changed format after seek"
+                                 : "sample format conversion failed after seek");
+        }
+        if (pts != AV_NOPTS_VALUE && out_actual_position_us)
             *out_actual_position_us =
                 av_rescale_q(pts, st->time_base,
                              (AVRational){1, AV_TIME_BASE});

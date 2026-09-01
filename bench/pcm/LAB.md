@@ -18,5 +18,5 @@ B1  Thin DSP vs trimmed libavfilter (volume/equalizer/alimiter),
 ```
 
 Every claim must be backed by machine JSON under
-`bench/results/pcm-processing/` (see `docs/experiments/e10-pcm-processing.md`).
+`bench/results/pcm-processing/`.
 No SIMD (B2) before the reviewer sees B0/B1.

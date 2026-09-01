@@ -6,12 +6,12 @@
 # Result: build/ffmpeg-src/  (untracked) + build/downloads/ffmpeg-<tag>.zip cache
 #
 # The source tree is NOT committed to the repo. Integrity comes from:
-#   1. zip sha256 recorded in bench/ffmpeg-pin.json
-#   2. tag -> commit sha recorded in bench/ffmpeg-pin.json
+#   1. zip sha256 recorded in ffmpeg/pin.json
+#   2. tag -> commit sha recorded in ffmpeg/pin.json
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PIN="$ROOT/bench/ffmpeg-pin.json"
+PIN="$ROOT/ffmpeg/pin.json"
 BUILD="$ROOT/build"
 DOWNLOADS="$BUILD/downloads"
 SRC="$BUILD/ffmpeg-src"

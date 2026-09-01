@@ -9,7 +9,7 @@ Answers (with machine evidence, no DSP-backend selection):
 
 Pipeline (all machine-owned, resumable per stage):
 
-  bench/dsp-capabilities.json (human-maintained capability intent)
+  ffmpeg/capabilities/dsp.json (human-maintained capability intent)
       ↓ derive profile (codec base + tier filters)
   tools/common_import.py  → upstream configure/Make oracle (import-time only)
       ↓ V=1 compile-closure manifest (build/minimize/<stage>/manifest.json)
@@ -19,7 +19,7 @@ Pipeline (all machine-owned, resumable per stage):
       ↓
   bench/results/avfilter-minimize/*.json  (authority tree)
       ↓
-  docs/experiments/e10-libavfilter-minimization.md (generated tables)
+  bench/results/avfilter-minimize/ (per-stage evidence)
 
   python3 tools/pcm_c0.py                 # run everything missing
   python3 tools/pcm_c0.py --stage avf-c2  # (re)run one ladder stage
@@ -45,7 +45,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-CAPS = ROOT / "bench" / "dsp-capabilities.json"
+CAPS = ROOT / "ffmpeg" / "capabilities" / "dsp.json"
 CODEC_PROFILE = ROOT / "bench" / "profiles" / "n3-min-noswr.json"
 RESULTS = ROOT / "bench" / "results" / "avfilter-minimize"
 STAGES = ROOT / "build" / "minimize"
@@ -99,11 +99,11 @@ MULTI_INPUT_SMOKE = {
 
 # experiment-defining inputs (review P1-2/P0-2 provenance): results bind
 # these hashes, NOT a self-referential git commit pointer.
-INPUT_FILES = ["bench/dsp-capabilities.json", "tools/pcm_c0.py",
+INPUT_FILES = ["ffmpeg/capabilities/dsp.json", "tools/pcm_c0.py",
                "tools/common_import.py", "tools/ffmpeg_import.py",
                "tools/ffmpeg_manifest_union.py",
                "bench/pcm/avfilter/qn_avfilter_cap_probe.c", "xmake.lua",
-               "bench/profiles/n3-min-noswr.json", "bench/ffmpeg-pin.json"]
+               "bench/profiles/n3-min-noswr.json", "ffmpeg/pin.json"]
 
 FILTER_ALIAS = {"asrc_abuffer": "abuffer", "asink_abuffer": "abuffersink"}
 FILTER_ALWAYS_PRESENT = {"abuffer", "abuffersink"}  # base OBJS of libavfilter,
@@ -152,7 +152,7 @@ def experiment_inputs() -> dict:
     combined = hashlib.sha256(
         "\n".join(f"{k}:{v}" for k, v in sorted(files.items())).encode()
     ).hexdigest()
-    pin = jload(ROOT / "bench" / "ffmpeg-pin.json")
+    pin = jload(ROOT / "ffmpeg" / "pin.json")
     return {"files": files, "combined_sha256": combined, "ffmpeg_pin": pin}
 
 
@@ -1223,7 +1223,7 @@ def compute_summary(stages: list, probes: list) -> dict:
     union_ok = union_data.get("verdict") == "PASS"
     pin_ok = bool(union_data.get("validations", {})
                   .get("combined_same_ffmpeg_pin"))
-    cur_pin = jload(ROOT / "bench" / "ffmpeg-pin.json")
+    cur_pin = jload(ROOT / "ffmpeg" / "pin.json")
     pin_ok = pin_ok and all(
         s.get("experiment_inputs", {}).get("ffmpeg_pin") == cur_pin
         for s in stages) if stages else False
@@ -1387,11 +1387,11 @@ def compute_aggregate() -> dict:
                      "graph config), format-adaptation (discovered by graph "
                      "config failure), shared-foundation, external-optional"}
     caps = caps_doc()
-    pin = jload(ROOT / "bench" / "ffmpeg-pin.json")
+    pin = jload(ROOT / "ffmpeg" / "pin.json")
     cap_manifest = {
         "version": caps["version"],
         "experiment": "e10-c0",
-        "capability_manifest": "bench/dsp-capabilities.json",
+        "capability_manifest": "ffmpeg/capabilities/dsp.json",
         "capability_manifest_sha256": sha256_file(CAPS),
         "ffmpeg": pin,
         "stages": {st["stage"]: {

@@ -83,7 +83,7 @@ def main() -> None:
                   "families by manifest source path, so duplicate basenames "
                   "(aacdec decoder vs ADTS demuxer) are attributed exactly. "
                   "Upper bound of post-gc live bytes; live .so total is cross-checked "
-                  "in docs/experiments/e08-common-formats.md",
+                  "in docs/history.md",
         "base": {"stage": args.base,
                  "pulled_units": sum(1 for v in base_pulled.values() if v)},
         "stage": {"stage": args.stage,

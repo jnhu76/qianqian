@@ -1,0 +1,435 @@
+{
+  "corpus_id": "songcore-v1",
+  "generated_by": "corpus/tools/gen_corpus_e11.py",
+  "cases": [
+    {
+      "id": "e11-meta-none",
+      "file": "e11-meta-none.flac",
+      "mode": "record",
+      "fixture_sha256": "350b6ef307721be4d5179c250d6edb2fad18bcf0942f986ef9e15f693dbd2cf7",
+      "fixture_bytes": 341697,
+      "expect": {
+        "container": "flac",
+        "codec": "flac",
+        "sample_rate": 44100,
+        "channels": 2,
+        "seek_family": "strict",
+        "metadata": {
+          "has_title": false,
+          "has_artist": false,
+          "has_album": false,
+          "has_album_artist": false,
+          "has_genre": false,
+          "has_composer": false,
+          "has_date": false,
+          "has_comment": false,
+          "has_track_number": false,
+          "has_disc_number": false,
+          "has_track_gain": false,
+          "has_album_gain": false
+        },
+        "artwork_count": 0
+      },
+      "notes": "no metadata at all"
+    },
+    {
+      "id": "e11-meta-simple",
+      "file": "e11-meta-simple.flac",
+      "mode": "record",
+      "fixture_sha256": "ad5fdea8d7bc8a5548cf906605017b47752fa31a4754cfa5ff6fd8ed6888aa04",
+      "fixture_bytes": 341743,
+      "expect": {
+        "container": "flac",
+        "codec": "flac",
+        "sample_rate": 44100,
+        "channels": 2,
+        "seek_family": "strict",
+        "metadata": {
+          "title": "Simple Title",
+          "artist": "Simple Artist",
+          "has_title": true,
+          "has_artist": true,
+          "has_album": false,
+          "has_album_artist": false,
+          "has_track_number": false,
+          "has_disc_number": false
+        },
+        "artwork_count": 0
+      },
+      "notes": ""
+    },
+    {
+      "id": "e11-meta-album",
+      "file": "e11-meta-album.flac",
+      "mode": "record",
+      "fixture_sha256": "99b6d546f39971b72faf0c782ecdfc62b6373dde3bfa667519d6a4e860041ae3",
+      "fixture_bytes": 341788,
+      "expect": {
+        "container": "flac",
+        "codec": "flac",
+        "seek_family": "strict",
+        "metadata": {
+          "title": "Album Track",
+          "artist": "Album Artist",
+          "album": "The Album",
+          "album_artist": "Album Artist",
+          "has_album": true,
+          "has_album_artist": true
+        },
+        "artwork_count": 0
+      },
+      "notes": ""
+    },
+    {
+      "id": "e11-meta-utf8",
+      "file": "e11-meta-utf8.flac",
+      "mode": "record",
+      "fixture_sha256": "46b4f6adaf4eee3420ac377ab357db0252ee25ff86de7ac21599dde55eb35eec",
+      "fixture_bytes": 341782,
+      "expect": {
+        "container": "flac",
+        "codec": "flac",
+        "seek_family": "strict",
+        "metadata": {
+          "title": "\u5343\u5343\u00b7\u73b0\u4ee3 \u9752\u82b1\u74f7",
+          "artist": "\u6d4b\u8bd5 \u00dcn\u00efcode",
+          "album": "\u591c\u66f2 \u266a \u5c71",
+          "has_title": true,
+          "has_artist": true,
+          "has_album": true
+        },
+        "artwork_count": 0
+      },
+      "notes": "UTF-8 / non-ASCII metadata round-trips byte-exact"
+    },
+    {
+      "id": "e11-meta-track",
+      "file": "e11-meta-track.flac",
+      "mode": "record",
+      "fixture_sha256": "4b716f093c2a5acabd06e516bd6d85ed2471997cecacc0b332f67e6f33e708b2",
+      "fixture_bytes": 341756,
+      "expect": {
+        "container": "flac",
+        "codec": "flac",
+        "seek_family": "strict",
+        "metadata": {
+          "track_number": 3,
+          "has_track_number": true,
+          "track_total": 12,
+          "has_track_total": true,
+          "disc_number": 1,
+          "has_disc_number": true,
+          "disc_total": 2,
+          "has_disc_total": true
+        },
+        "artwork_count": 0
+      },
+      "notes": ""
+    },
+    {
+      "id": "e11-meta-full",
+      "file": "e11-meta-full.flac",
+      "mode": "record",
+      "fixture_sha256": "f56c1b652566c6bd82642c51fd7a6328a55b07392b21f2fbee2e0aaa49881690",
+      "fixture_bytes": 341923,
+      "expect": {
+        "container": "flac",
+        "codec": "flac",
+        "seek_family": "strict",
+        "metadata": {
+          "title": "Full Field",
+          "artist": "Full Artist",
+          "album": "Full Album",
+          "album_artist": "Full Album Artist",
+          "genre": "Instrumental",
+          "composer": "Full Composer",
+          "date": "1999",
+          "comment": "Full comment text",
+          "track_number": 7,
+          "track_total": 9,
+          "disc_number": 2,
+          "disc_total": 2,
+          "has_title": true,
+          "has_artist": true,
+          "has_album": true,
+          "has_album_artist": true,
+          "has_genre": true,
+          "has_composer": true,
+          "has_date": true,
+          "has_comment": true,
+          "has_track_number": true,
+          "has_track_total": true,
+          "has_disc_number": true,
+          "has_disc_total": true
+        },
+        "artwork_count": 0
+      },
+      "notes": ""
+    },
+    {
+      "id": "e11-meta-replaygain",
+      "file": "e11-meta-replaygain.flac",
+      "mode": "record",
+      "fixture_sha256": "646f0033bcdc98c2e5a6b87d603a435b9bb0c9d9472deb69e02513947ff2d4f7",
+      "fixture_bytes": 341858,
+      "expect": {
+        "container": "flac",
+        "codec": "flac",
+        "seek_family": "strict",
+        "metadata": {
+          "has_track_gain": true,
+          "has_track_peak": true,
+          "has_album_gain": true,
+          "has_album_peak": true,
+          "title": "ReplayGain Case"
+        },
+        "artwork_count": 0
+      },
+      "notes": "ReplayGain parsed into microbels / 100000-full-scale"
+    },
+    {
+      "id": "e11-meta-mp3",
+      "file": "e11-meta-mp3.mp3",
+      "mode": "record",
+      "fixture_sha256": "5faaa3a651063f2eb29b1b6ced92b322e4f425c084599c7a654a7d1f32bd4177",
+      "fixture_bytes": 49071,
+      "expect": {
+        "container": "mp3",
+        "codec": "mp3",
+        "seek_family": "lapped",
+        "metadata": {
+          "title": "Raw MP3",
+          "artist": "Raw Artist",
+          "has_title": true,
+          "has_artist": true
+        },
+        "raw_keys": [
+          "CUSTOM_XKEY",
+          "CUSTOM_YKEY",
+          "CUSTOM_ZKEY"
+        ],
+        "artwork_count": 0
+      },
+      "notes": "raw metadata enumeration exposes unknown tags without ABI change"
+    },
+    {
+      "id": "e11-meta-conflict",
+      "file": "e11-meta-conflict.mka",
+      "mode": "record",
+      "fixture_sha256": "8abeba9b55277e6c9210cfb708d14a5e82add69bdf70715ea83c71886d860c8a",
+      "fixture_bytes": 334265,
+      "expect": {
+        "container": "matroska,webm",
+        "codec": "flac",
+        "seek_family": "strict",
+        "metadata": {
+          "title": "StreamTitle",
+          "genre": "StreamGenre",
+          "has_title": true,
+          "has_genre": true
+        },
+        "artwork_count": 0
+      },
+      "notes": "canonical precedence: selected stream overrides container"
+    },
+    {
+      "id": "e11-art-mp3-jpeg",
+      "file": "e11-art-mp3-jpeg.mp3",
+      "mode": "record",
+      "fixture_sha256": "265768b18fef15635363d2788119b8f33f24474dafbbd7a647998e16d7ef61d1",
+      "fixture_bytes": 49240,
+      "expect": {
+        "container": "mp3",
+        "codec": "mp3",
+        "seek_family": "lapped",
+        "artwork_count": 1,
+        "artwork": [
+          {
+            "mime": "image/jpeg",
+            "role": 3,
+            "front": true
+          }
+        ]
+      },
+      "notes": "MP3 APIC JPEG: single artwork is the front cover"
+    },
+    {
+      "id": "e11-art-mp3-multi",
+      "file": "e11-art-mp3-multi.mp3",
+      "mode": "record",
+      "fixture_sha256": "848f693672d9f9bc2bcf686b1b39ade62d9feec920ebedb849f8df0ad8059c12",
+      "fixture_bytes": 49460,
+      "expect": {
+        "container": "mp3",
+        "codec": "mp3",
+        "seek_family": "lapped",
+        "artwork_count": 2,
+        "artwork": [
+          {
+            "mime": "image/png",
+            "front": false
+          },
+          {
+            "mime": "image/png",
+            "front": false
+          }
+        ]
+      },
+      "notes": "multiple artwork items; only explicit front covers are flagged; fixture_sha256=848f693672d9f9bc2bcf686b1b39ade62d9feec920ebedb849f8df0ad8059c12"
+    },
+    {
+      "id": "e11-art-m4a",
+      "file": "e11-art-m4a.m4a",
+      "mode": "record",
+      "fixture_sha256": "9c535a63e519b6f4029baf3104f7c0b80f67373525f3c944262eb49adc885ea3",
+      "fixture_bytes": 37911,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "aac",
+        "seek_family": "lapped",
+        "artwork_count": 1,
+        "artwork": [
+          {
+            "mime": "image/png",
+            "front": true
+          }
+        ]
+      },
+      "notes": ""
+    },
+    {
+      "id": "e11-multiaudio",
+      "file": "e11-multiaudio.m4a",
+      "mode": "record",
+      "fixture_sha256": "b073b2a0b793471f4a54e3fd673e540e062fd810b48c7cb97659a34ee9c5f361",
+      "fixture_bytes": 64227,
+      "expect": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codec": "aac",
+        "seek_family": "lapped",
+        "audio_stream_count": 2,
+        "default_selected": 1,
+        "streams": [
+          {
+            "sample_rate": 44100,
+            "is_default": 0,
+            "codec": "aac"
+          },
+          {
+            "sample_rate": 48000,
+            "is_default": 1,
+            "codec": "aac"
+          }
+        ],
+        "select": {
+          "index": 0,
+          "sample_rate": 44100,
+          "metadata_title": "Stream Zero"
+        },
+        "artwork_count": 0
+      },
+      "notes": "two AAC streams (44.1k/48k); default disposition selects stream 1"
+    },
+    {
+      "id": "e11-multiaudio-mka",
+      "file": "e11-multiaudio.mka",
+      "mode": "record",
+      "fixture_sha256": "680ccd5606ba411772037f2003f8d74bffcf246a2a9bb15c0869d9e2e2879d55",
+      "fixture_bytes": 711009,
+      "expect": {
+        "container": "matroska,webm",
+        "codec": "flac",
+        "seek_family": "strict",
+        "audio_stream_count": 2,
+        "default_selected": 1,
+        "streams": [
+          {
+            "sample_rate": 44100,
+            "is_default": 0,
+            "codec": "flac"
+          },
+          {
+            "sample_rate": 48000,
+            "is_default": 1,
+            "codec": "flac"
+          }
+        ],
+        "select": {
+          "index": 0,
+          "sample_rate": 44100,
+          "metadata_title": "Mkv Zero"
+        },
+        "artwork_count": 0
+      },
+      "notes": "two flac streams in Matroska; selection swaps decoder + metadata"
+    },
+    {
+      "id": "e11-neg-empty",
+      "file": "e11-neg-empty.bin",
+      "mode": "neg",
+      "fixture_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fixture_bytes": 0,
+      "expect": {
+        "open": "UNSUPPORTED_CONTAINER"
+      },
+      "notes": ""
+    },
+    {
+      "id": "e11-neg-text",
+      "file": "e11-neg-text.bin",
+      "mode": "neg",
+      "fixture_sha256": "aeb322a2b4cd3969bd3764b7801a5b83625e24683e296baf1b59ecc05cba1296",
+      "fixture_bytes": 25,
+      "expect": {
+        "open": "UNSUPPORTED_CONTAINER"
+      },
+      "notes": ""
+    },
+    {
+      "id": "e11-neg-png",
+      "file": "e11-neg-png.png",
+      "mode": "neg",
+      "fixture_sha256": "d10d32213102277c1b28271a19ce56aac0553bc784023e2640b9713a5ef10677",
+      "fixture_bytes": 556,
+      "expect": {
+        "open": "UNSUPPORTED_CONTAINER"
+      },
+      "notes": ""
+    },
+    {
+      "id": "e11-neg-videoonly",
+      "file": "e11-neg-videoonly.m4a",
+      "mode": "neg",
+      "fixture_sha256": "0ada3484a1366b011d583503b15ecffe44b6bad7bfcfb7fd11ee6f037fdd02c8",
+      "fixture_bytes": 6681,
+      "expect": {
+        "open": "OK",
+        "probe": "NO_AUDIO_STREAM"
+      },
+      "notes": "recognized container with no audio stream"
+    },
+    {
+      "id": "e11-neg-ac3",
+      "file": "e11-neg-ac3.m4a",
+      "mode": "neg",
+      "fixture_sha256": "87460a6fb1bff6b39bdcceb3634a266125d5e6e9b62bfcd09abe2f0260732f5a",
+      "fixture_bytes": 73781,
+      "expect": {
+        "open": "OK",
+        "probe": "UNSUPPORTED_CODEC"
+      },
+      "notes": "M4A with AC-3: mov demuxer present, ac3 decoder absent in closure"
+    },
+    {
+      "id": "e11-iofail",
+      "file": "flac-16-44-stereo.flac",
+      "mode": "iofail",
+      "fixture_sha256": "d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2",
+      "fixture_bytes": 146237,
+      "expect": {
+        "status": "IO"
+      },
+      "notes": ""
+    }
+  ]
+}

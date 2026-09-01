@@ -27,7 +27,7 @@ SRC = ROOT / "build" / "ffmpeg-src"
 OUT = ROOT / "build" / "ffmpeg-xmake"
 ORACLE = OUT / "oracle"
 MANIFEST = OUT / "manifest.json"
-PIN = ROOT / "bench" / "ffmpeg-pin.json"
+PIN = ROOT / "ffmpeg" / "pin.json"
 PROFILE = ROOT / "bench" / "profiles" / "n3-min-noswr.json"
 
 LIB_TARGETS = (

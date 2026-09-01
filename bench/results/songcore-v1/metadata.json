@@ -2,7 +2,7 @@
  "cases": [
   {
    "case": "e11-meta-none",
-   "sha": "1a12537509913e5477df3b75295c17ecfa5174c503b9b3fd22d7e9c757444d46",
+   "sha": "d17d39fd35860c703237583ab40343a00b998f7a3cd075781686559f225c04aa",
    "canonical": {
     "title": "",
     "has_title": 0,
@@ -40,7 +40,6 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     }
@@ -48,7 +47,7 @@
   },
   {
    "case": "e11-meta-simple",
-   "sha": "5ff4853a047f91893ce3a6b41567ed17e9aa48ba672e6e1b40f82fea2ec33ecf",
+   "sha": "b64384f76eb04b0c26046c9b3c95917382c58f006019c00fba7aff11d6cd0a57",
    "canonical": {
     "title": "Simple Title",
     "has_title": 1,
@@ -86,19 +85,16 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "title",
      "value": "Simple Title"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "artist",
      "value": "Simple Artist"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     }
@@ -106,7 +102,7 @@
   },
   {
    "case": "e11-meta-album",
-   "sha": "1eea2ea636fee8b39e6e205377b2f2ccc047510074707284ed401c1d9b07d0dc",
+   "sha": "698f9e7515ebbf8b148d111ba32ac0bc124c731686280a57a3ba09d537e0757c",
    "canonical": {
     "title": "Album Track",
     "has_title": 1,
@@ -144,31 +140,26 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "title",
      "value": "Album Track"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "artist",
      "value": "Album Artist"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "album",
      "value": "The Album"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "album_artist",
      "value": "Album Artist"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     }
@@ -176,7 +167,7 @@
   },
   {
    "case": "e11-meta-utf8",
-   "sha": "2c2b1168901ab492b0fe208f1ae0f348a00115e7ec005afc3e87d82b0f9fb81d",
+   "sha": "344e810f29edf1e9e45aafec0acc426b439fedd02b7a1fd2f07b43bda759cc9a",
    "canonical": {
     "title": "千千·现代 青花瓷",
     "has_title": 1,
@@ -214,25 +205,21 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "title",
      "value": "千千·现代 青花瓷"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "artist",
      "value": "测试 Ünïcode"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "album",
      "value": "夜曲 ♪ 山"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     }
@@ -240,7 +227,7 @@
   },
   {
    "case": "e11-meta-track",
-   "sha": "6f522f5a6fe415909c582e04a5001175d565d6766680af89312d0f75d1db97d5",
+   "sha": "2bf19fc1d216ffe21583af300558cc30ab4bf14e19c25795f580b398e8989ab4",
    "canonical": {
     "title": "Track Field",
     "has_title": 1,
@@ -278,25 +265,21 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "title",
      "value": "Track Field"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "track",
      "value": "3/12"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "disc",
      "value": "1/2"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     }
@@ -304,7 +287,7 @@
   },
   {
    "case": "e11-meta-full",
-   "sha": "0c2dcdb589404c151207f90d4ad5da997ab3fe34d4c952a416d50c87f9a6d74b",
+   "sha": "c460d9ce6bcf0893934ee32aed76a53821b81dd8d4c259207a7a3b6f909f16f0",
    "canonical": {
     "title": "Full Field",
     "has_title": 1,
@@ -342,67 +325,56 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "title",
      "value": "Full Field"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "artist",
      "value": "Full Artist"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "album",
      "value": "Full Album"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "album_artist",
      "value": "Full Album Artist"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "genre",
      "value": "Instrumental"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "composer",
      "value": "Full Composer"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "date",
      "value": "1999"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "comment",
      "value": "Full comment text"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "track",
      "value": "7/9"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "disc",
      "value": "2/2"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     }
@@ -410,7 +382,7 @@
   },
   {
    "case": "e11-meta-replaygain",
-   "sha": "3c63d651c8b256a7a7496c02e0f0eb756d9481684800843f36bbb6b181da2617",
+   "sha": "b69e38ab948af644ecce7f6322e86154243aee5d04badc3864fcf41ad67864c6",
    "canonical": {
     "title": "ReplayGain Case",
     "has_title": 1,
@@ -448,37 +420,31 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "title",
      "value": "ReplayGain Case"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "REPLAYGAIN_TRACK_GAIN",
      "value": "-6.02 dB"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "REPLAYGAIN_TRACK_PEAK",
      "value": "0.969009"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "REPLAYGAIN_ALBUM_GAIN",
      "value": "-8.10 dB"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "REPLAYGAIN_ALBUM_PEAK",
      "value": "0.971311"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     }
@@ -486,7 +452,7 @@
   },
   {
    "case": "e11-meta-mp3",
-   "sha": "68f9bd67a1bd6aed58cb295a0649b311ffce35ce9d9b3a67ee73f5f8894aeb13",
+   "sha": "66b61036f71d75cb56d8f764ff77b112244a1f8e565b39b9670c68d322629398",
    "canonical": {
     "title": "Raw MP3",
     "has_title": 1,
@@ -524,43 +490,36 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "title",
      "value": "Raw MP3"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "artist",
      "value": "Raw Artist"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "CUSTOM_XKEY",
      "value": "alpha"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "CUSTOM_YKEY",
      "value": "beta"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "CUSTOM_ZKEY",
      "value": "gamma"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavc62.11"
     }
@@ -568,7 +527,7 @@
   },
   {
    "case": "e11-meta-conflict",
-   "sha": "d533e571d1f313a56806ea61bb0132490a8ccc8f34c8a35cfbbb040f2f5a6302",
+   "sha": "2121bb94195a12807498c586392125d76b6c109668f3058ebb6e7a6275c19071",
    "canonical": {
     "title": "StreamTitle",
     "has_title": 1,
@@ -606,37 +565,31 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "title",
      "value": "ContainerTitle"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "ENCODER",
      "value": "Lavf62.3.100"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "title",
      "value": "StreamTitle"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "ENCODER",
      "value": "Lavc62.11.100 flac"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "GENRE",
      "value": "StreamGenre"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "DURATION",
      "value": "00:00:03.000000000"
     }
@@ -644,7 +597,7 @@
   },
   {
    "case": "e11-art-mp3-jpeg",
-   "sha": "870344fdce9f0198c26ac896bbb05c423ec498dfab68fc6742b239e87efdb44f",
+   "sha": "749d78af70c1bd9738c9207aa1d4ae94ea37dbeb8cf8908303a515eb7500a4ee",
    "canonical": {
     "title": "",
     "has_title": 0,
@@ -682,13 +635,11 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavc62.11"
     }
@@ -696,7 +647,7 @@
   },
   {
    "case": "e11-art-mp3-multi",
-   "sha": "870344fdce9f0198c26ac896bbb05c423ec498dfab68fc6742b239e87efdb44f",
+   "sha": "749d78af70c1bd9738c9207aa1d4ae94ea37dbeb8cf8908303a515eb7500a4ee",
    "canonical": {
     "title": "",
     "has_title": 0,
@@ -734,13 +685,11 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavc62.11"
     }
@@ -748,7 +697,7 @@
   },
   {
    "case": "e11-art-m4a",
-   "sha": "2f822c71c52794b2d33722b4801a861e9ec85765ad7bcf684a5087300b22f88c",
+   "sha": "46db53ce43d1da6b7fe86412f279f70397fbbe62d55403e6615b547eceaec4b4",
    "canonical": {
     "title": "",
     "has_title": 0,
@@ -786,37 +735,31 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "major_brand",
      "value": "M4A "
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "minor_version",
      "value": "512"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "compatible_brands",
      "value": "M4A isomiso2"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "language",
      "value": "und"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "handler_name",
      "value": "SoundHandler"
     }
@@ -824,7 +767,7 @@
   },
   {
    "case": "e11-multiaudio",
-   "sha": "2f822c71c52794b2d33722b4801a861e9ec85765ad7bcf684a5087300b22f88c",
+   "sha": "46db53ce43d1da6b7fe86412f279f70397fbbe62d55403e6615b547eceaec4b4",
    "canonical": {
     "title": "",
     "has_title": 0,
@@ -862,37 +805,31 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "major_brand",
      "value": "M4A "
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "minor_version",
      "value": "512"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "compatible_brands",
      "value": "M4A isomiso2"
     },
     {
      "scope": 0,
-     "sequence": 0,
      "key": "encoder",
      "value": "Lavf62.3.100"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "language",
      "value": "und"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "handler_name",
      "value": "SoundHandler"
     }
@@ -900,7 +837,7 @@
   },
   {
    "case": "e11-multiaudio-mka",
-   "sha": "c632b7046440efb6072b30104acfda6970db696b67928a7beae5b40b99dec104",
+   "sha": "39955fcf43406330ac70a1b2db78b3d07b4671607707a333f2a4a44f82bb5614",
    "canonical": {
     "title": "Mkv One",
     "has_title": 1,
@@ -938,25 +875,21 @@
    "raw": [
     {
      "scope": 0,
-     "sequence": 0,
      "key": "ENCODER",
      "value": "Lavf62.3.100"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "title",
      "value": "Mkv One"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "ENCODER",
      "value": "Lavc62.11.100 flac"
     },
     {
      "scope": 1,
-     "sequence": 0,
      "key": "DURATION",
      "value": "00:00:03.000000000"
     }

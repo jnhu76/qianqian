@@ -54,7 +54,6 @@ CHECKS = [
     ["python3", "tools/pcm_a1.py", "--check"],
     ["python3", "tools/pcm_b0.py", "--check"],
     ["python3", "tools/pcm_b1.py", "--check"],
-    ["python3", "tools/pcm_report_tables.py", "--check"],
 ]
 
 

@@ -1,0 +1,30 @@
+{
+ "cases": [
+  {
+   "case": "e11-multiaudio.m4a",
+   "record": {
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-multiaudio.m4a",
+    "select_a_status": 0,
+    "select_b_status": 0,
+    "frames_a": 4096,
+    "frames_b": 4096,
+    "pcm_sha_a": "fafe5745489d2593184d5c93a1c7ca3576fc4f69ced83e1c8b1709cfbc9de85e",
+    "pcm_sha_b": "fafe5745489d2593184d5c93a1c7ca3576fc4f69ced83e1c8b1709cfbc9de85e",
+    "pcm_equal": true
+   }
+  },
+  {
+   "case": "e11-multiaudio.mka",
+   "record": {
+    "file": "/home/hoo/Source/qianqian/corpus/fixtures/e11-multiaudio.mka",
+    "select_a_status": 0,
+    "select_b_status": 0,
+    "frames_a": 4096,
+    "frames_b": 4096,
+    "pcm_sha_a": "5af0ce9253a327a1a480af9db9042d5e4e962c033793843b7b56ee5f378a022f",
+    "pcm_sha_b": "5af0ce9253a327a1a480af9db9042d5e4e962c033793843b7b56ee5f378a022f",
+    "pcm_equal": true
+   }
+  }
+ ]
+}

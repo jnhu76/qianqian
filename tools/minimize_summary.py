@@ -107,7 +107,7 @@ def main() -> None:
     doc = {
         "schema": 2,
         "experiment": "e07-source-minimization",
-        "ffmpeg": json.loads((ROOT / "bench" / "ffmpeg-pin.json").read_text())["ffmpeg_tag"],
+        "ffmpeg": json.loads((ROOT / "ffmpeg" / "pin.json").read_text())["ffmpeg_tag"],
         "gate": "tools/minimize_gate.py (corpus 15/15 oracle-equivalence incl. bench seek, "
                 "SongCore PCM canonical hashes, SongCore-level seek probes, real-song full decodes)",
         "shipping_metric": "qn_pcm_dump linked stripped bytes (raw and stripped+xz also recorded per stage)",
