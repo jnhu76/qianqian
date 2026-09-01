@@ -44,6 +44,14 @@ from WAMR (interpreter + AOT), wasm3, Wasmtime, and Emscripten/V8:
 - **Correctness**: every WASM runtime produced matching SongCore behavior —
   28 bit-exact + 16 within the declared float tolerance (max abs delta
   1e-6), 0 rejected. Inter-runtime gate: PASS, 0 mismatches over 44 cases.
+  Re-proven per fixture against the Linux/Windows backends by
+  `tests/songcore/ffi_consistency.py` (lossless PCM byte-exact).
+- **Guest protocol**: the guest exports exactly the 15 contract mirrors plus
+  three bridge-infrastructure exports — `song_wasm_alloc`/`song_wasm_free`
+  (guest-heap buffers, so the host never guesses addresses; leak-checked by
+  the smoke) and `song_wasm_layout` (machine-readable sizeof/offsetof table
+  compiled from `songcore.h`, so no host hardcodes struct layout). See
+  `tools/songcore_wasm_smoke.py` for the proven host side.
 - **Interpreters carry a large runtime tax**: WAMR interpreter ≈ 41–76×
   slower than native; wasm3 ≈ 12–42×.
 - **AOT/JIT approaches native-order performance**: WAMR AOT ≈ 0.72–1.27×,

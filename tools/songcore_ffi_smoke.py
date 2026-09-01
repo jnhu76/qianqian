@@ -35,6 +35,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 SONGCORE_ABI_VERSION = 1
 
+# Cross-backend PCM comparison window: the first N frames (bytes, f32
+# interleaved) of the decode window, dumped when --pcm-dump-dir is given.
+# Never committed — consumed in-place by the consistency gate.
+PCM_DUMP_BYTES = 8192 * 2 * 4  # 8192 stereo frames
+
 SONG_OK = 0
 SONG_EOF = 1
 SONG_ERR_INVALID_ARGUMENT = 100
@@ -77,8 +82,8 @@ class SongIo(ctypes.Structure):
 
 class SongError(ctypes.Structure):
     _fields_ = [
-        ("message", ctypes.c_char_p),
-        ("message_len", ctypes.c_uint32),
+        ("message", ctypes.c_void_p),        # borrowed pointer, NOT c_char_p:
+        ("message_len", ctypes.c_uint32),    # the ABI is pointer+length
         ("native_code", ctypes.c_int32),
         ("reserved", ctypes.c_uint32),
     ]
@@ -116,15 +121,17 @@ class SongStreamInfo(ctypes.Structure):
 
 
 class SongMetadata(ctypes.Structure):
+    # Every string is a borrowed (pointer, length) pair — modeled as c_void_p
+    # so ctypes never auto-converts or NUL-terminates. Read with utf8_view().
     _fields_ = [
-        ("title", ctypes.c_char_p), ("title_len", ctypes.c_uint32), ("has_title", ctypes.c_uint32),
-        ("artist", ctypes.c_char_p), ("artist_len", ctypes.c_uint32), ("has_artist", ctypes.c_uint32),
-        ("album", ctypes.c_char_p), ("album_len", ctypes.c_uint32), ("has_album", ctypes.c_uint32),
-        ("album_artist", ctypes.c_char_p), ("album_artist_len", ctypes.c_uint32), ("has_album_artist", ctypes.c_uint32),
-        ("genre", ctypes.c_char_p), ("genre_len", ctypes.c_uint32), ("has_genre", ctypes.c_uint32),
-        ("composer", ctypes.c_char_p), ("composer_len", ctypes.c_uint32), ("has_composer", ctypes.c_uint32),
-        ("date", ctypes.c_char_p), ("date_len", ctypes.c_uint32), ("has_date", ctypes.c_uint32),
-        ("comment", ctypes.c_char_p), ("comment_len", ctypes.c_uint32), ("has_comment", ctypes.c_uint32),
+        ("title", ctypes.c_void_p), ("title_len", ctypes.c_uint32), ("has_title", ctypes.c_uint32),
+        ("artist", ctypes.c_void_p), ("artist_len", ctypes.c_uint32), ("has_artist", ctypes.c_uint32),
+        ("album", ctypes.c_void_p), ("album_len", ctypes.c_uint32), ("has_album", ctypes.c_uint32),
+        ("album_artist", ctypes.c_void_p), ("album_artist_len", ctypes.c_uint32), ("has_album_artist", ctypes.c_uint32),
+        ("genre", ctypes.c_void_p), ("genre_len", ctypes.c_uint32), ("has_genre", ctypes.c_uint32),
+        ("composer", ctypes.c_void_p), ("composer_len", ctypes.c_uint32), ("has_composer", ctypes.c_uint32),
+        ("date", ctypes.c_void_p), ("date_len", ctypes.c_uint32), ("has_date", ctypes.c_uint32),
+        ("comment", ctypes.c_void_p), ("comment_len", ctypes.c_uint32), ("has_comment", ctypes.c_uint32),
         ("track_number", ctypes.c_int32), ("has_track_number", ctypes.c_uint32),
         ("track_total", ctypes.c_int32), ("has_track_total", ctypes.c_uint32),
         ("disc_number", ctypes.c_int32), ("has_disc_number", ctypes.c_uint32),
@@ -139,9 +146,9 @@ class SongMetadata(ctypes.Structure):
 class SongMetadataEntry(ctypes.Structure):
     _fields_ = [
         ("scope", ctypes.c_uint32),
-        ("key", ctypes.c_char_p),
+        ("key", ctypes.c_void_p),
         ("key_len", ctypes.c_uint32),
-        ("value", ctypes.c_char_p),
+        ("value", ctypes.c_void_p),
         ("value_len", ctypes.c_uint32),
         ("reserved", ctypes.c_uint32),
     ]
@@ -150,7 +157,7 @@ class SongMetadataEntry(ctypes.Structure):
 class SongArtworkItem(ctypes.Structure):
     _fields_ = [
         ("role", ctypes.c_uint32),
-        ("mime", ctypes.c_char_p),
+        ("mime", ctypes.c_void_p),
         ("mime_len", ctypes.c_uint32),
         ("data", ctypes.POINTER(ctypes.c_uint8)),
         ("data_len", ctypes.c_uint64),
@@ -159,6 +166,17 @@ class SongArtworkItem(ctypes.Structure):
         ("is_front_cover", ctypes.c_uint32),
         ("reserved", ctypes.c_uint32),
     ]
+
+
+def utf8_view(ptr: int, length: int) -> str:
+    """Decode a borrowed ABI string view (pointer + explicit length).
+
+    The authority is the PAIR — NUL termination is never assumed, matching
+    the frozen contract that future Kotlin/JNI/Swift bindings must copy.
+    """
+    if not ptr or length == 0:
+        return ""
+    return ctypes.string_at(ptr, length).decode("utf-8", "replace")
 
 
 def bind_library(lib: ctypes.CDLL) -> None:
@@ -304,13 +322,14 @@ class Smoke:
     """One full open->probe->decode->seek->close pass over one song."""
 
     def __init__(self, lib, song: Path, seconds: float, play: bool,
-                 device, verbose: bool):
+                 device, verbose: bool, pcm_dump_dir: Path | None = None):
         self.lib = lib
         self.song = song
         self.seconds = seconds
         self.play = play
         self.device = device
         self.verbose = verbose
+        self.pcm_dump_dir = pcm_dump_dir
         self.checks: list[Check] = []
         self.result: dict = {"song": song.name}
 
@@ -329,7 +348,7 @@ class Smoke:
         err = err_ptr.contents
         if not err.message:
             return "<no diagnostic>"
-        return err.message.decode("utf-8", "replace")
+        return utf8_view(err.message, err.message_len)
 
     def run(self) -> bool:
         src = FileSource(self.song)
@@ -451,9 +470,8 @@ class Smoke:
                 break
             entries.append({
                 "scope": entry.scope,
-                "key": entry.key.decode("utf-8", "replace"),
-                "value": entry.value.decode("utf-8", "replace")
-                if entry.value else "",
+                "key": utf8_view(entry.key, entry.key_len),
+                "value": utf8_view(entry.value, entry.value_len),
             })
         meta_ptr = ctypes.POINTER(SongMetadata)()
         st_m = lib.song_get_metadata(handle, ctypes.byref(meta_ptr))
@@ -464,7 +482,8 @@ class Smoke:
             for field in ("title", "artist", "album", "album_artist", "genre",
                           "composer", "date", "comment"):
                 if getattr(m, f"has_{field}"):
-                    canon[field] = getattr(m, field).decode("utf-8", "replace")
+                    canon[field] = utf8_view(getattr(m, field),
+                                             getattr(m, f"{field}_len"))
             self.result["canonical_metadata"] = canon
         self.check("metadata", meta_ok,
                    f"{meta_count.value} entries"
@@ -476,15 +495,29 @@ class Smoke:
         art_count = ctypes.c_uint32()
         st = lib.song_get_artwork_count(handle, ctypes.byref(art_count))
         art_ok = st == SONG_OK
+        item = SongArtworkItem()
+        art_summary = None
         if art_ok and art_count.value:
-            item = SongArtworkItem()
             st_i = lib.song_get_artwork_item(handle, 0, ctypes.byref(item))
             art_ok = (st_i == SONG_OK and item.data_len > 0
-                      and bool(item.mime))
+                      and item.mime_len > 0)
+            if art_ok:
+                art_hasher = hashlib.sha256()
+                art_hasher.update(ctypes.string_at(item.data, item.data_len))
+                art_summary = {
+                    "mime": utf8_view(item.mime, item.mime_len),
+                    "data_len": item.data_len,
+                    "sha256": art_hasher.hexdigest(),
+                    "width": item.width,
+                    "height": item.height,
+                    "is_front_cover": item.is_front_cover,
+                }
+                self.result["artwork0"] = art_summary
         self.check("artwork", art_ok,
                    f"{art_count.value} item(s)"
-                   + (f", first mime={item.mime.decode() if art_ok and art_count.value else '-'}"
-                      if art_count.value else ""))
+                   + (f", first mime={art_summary['mime']}, "
+                      f"sha256={art_summary['sha256'][:16]}…"
+                      if art_summary else ""))
         self.result["artwork_count"] = art_count.value if art_ok else None
 
         # -- decode ------------------------------------------------------------
@@ -532,6 +565,7 @@ class Smoke:
                   f"-> PortAudio (no SRC in Python)")
 
         out = {"_ok": True}
+        dump = bytearray() if self.pcm_dump_dir is not None else None
         try:
             if stream is not None:
                 stream.start()
@@ -556,6 +590,8 @@ class Smoke:
                 n = produced.value * info.channels
                 raw = ctypes.string_at(buf, n * 4)
                 hasher.update(raw)
+                if dump is not None and len(dump) < PCM_DUMP_BYTES:
+                    dump += raw[:PCM_DUMP_BYTES - len(dump)]
                 floats = struct.unpack(f"<{n}f", raw)
                 peak = max(peak, max(abs(v) for v in floats))
                 total_frames += produced.value
@@ -568,19 +604,34 @@ class Smoke:
 
         if total_frames <= 0:
             return {"_ok": self.check("decode", False, "no frames decoded")}
+        self.check("decode", True,
+                   f"{total_frames} frames decoded, eof={eof_reached}")
 
         print(f"    [PASS] decode — {total_frames} frames "
               f"({total_frames / info.sample_rate:.3f}s) "
               f"peak={peak:.4f} sha256={hasher.hexdigest()[:16]}… "
               f"eof={eof_reached}")
-        return {
+        result = {
             "_ok": True,
             "decoded_frames": total_frames,
             "decoded_seconds": round(total_frames / info.sample_rate, 6),
+            # Full-window hash: the cross-platform PCM authority consumes
+            # this (lossless formats must be identical across backends).
+            "pcm_sha256": hasher.hexdigest(),
             "pcm_sha256_prefix": hasher.hexdigest()[:16],
             "peak": round(peak, 6),
             "eof_during_decode": eof_reached,
         }
+        if dump is not None:
+            self.pcm_dump_dir.mkdir(parents=True, exist_ok=True)
+            dump_path = self.pcm_dump_dir / f"{self.song.name}.f32.dump"
+            dump_path.write_bytes(bytes(dump))
+            result["pcm_dump"] = {
+                "file": dump_path.name,
+                "frames": len(dump) // (info.channels * 4),
+                "sha256": hashlib.sha256(dump).hexdigest(),
+            }
+        return result
 
     def _seek_and_read(self, handle, info: SongInfo) -> dict:
         """Seek to min(duration/2, 5 s) and prove PCM flows after landing."""
@@ -596,6 +647,7 @@ class Smoke:
             # contract PASS; only generic/wrong failures fail the gate.
             print(f"    [PASS] seek — SONG_ERR_SEEK_UNSUPPORTED "
                   f"(unseekable container, target={target / 1e6:.3f}s)")
+            self.check("seek", True, "SONG_ERR_SEEK_UNSUPPORTED (typed)")
             return {
                 "_ok": True,
                 "seek_requested_us": target,
@@ -626,6 +678,7 @@ class Smoke:
                     f"post-seek {status_name(st)}: {self.last_error(handle)}")}
             post_frames += produced.value
         ok = post_frames > 0
+        self.check("seek", ok, detail)
         print(f"    [{'PASS' if ok else 'FAIL'}] seek — {detail}, "
               f"{post_frames} post-seek frames, eof={eof}")
         return {
@@ -662,6 +715,10 @@ def main() -> int:
                     help="sounddevice output device id/name for --play")
     ap.add_argument("--json", type=Path, default=None,
                     help="write machine-readable results to this path")
+    ap.add_argument("--pcm-dump-dir", type=Path, default=None,
+                    help="write per-song bounded PCM sample dumps (start of "
+                         "the decode window) here, for the cross-backend "
+                         "consistency gate")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -690,7 +747,7 @@ def main() -> int:
     for song in args.songs:
         print(f"  -- {song}")
         smoke = Smoke(lib, song, args.seconds or None, args.play,
-                      args.device, args.verbose)
+                      args.device, args.verbose, args.pcm_dump_dir)
         ok = smoke.run()
         all_ok = all_ok and ok
         result = dict(smoke.result)

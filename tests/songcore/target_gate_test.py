@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """Negative gate test: a manifest derived for one target must not satisfy a
-build session for another (target provenance is fail-closed).
+build session for another (target provenance is fail-closed, identity-bound).
 
-Mutates the canonical manifest's target identity to windows-x86_64, points a
-scratch Xmake session at it, and requires the build to FAIL with the
-mismatch instruction. As a positive control, the pristine manifest builds in
-the same scratch session. Everything lives under build/ (regenerable).
+Mutates the canonical manifest's target identity and requires the Xmake
+build to FAIL with the mismatch instruction:
+  1. relabel: linux manifest claimed as windows-mingw-x86_64 -> mismatch,
+  2. toolchain drift: cross_prefix from another toolchain family -> stale/
+     foreign toolchain,
+  3. platform: manifest platform drifted from the recipe -> identity mismatch.
+(recipe_sha256 staleness is NOT asserted here: the xmake sandbox cannot
+hash files. It is enforced by the pinning validator in consumers.py and
+proven by the wasm-sha / windows-identity mutations.)
+As a positive control, the pristine manifest builds in the same scratch
+session. Everything lives under build/ (regenerable).
 """
 import json
 import shutil
@@ -27,41 +34,52 @@ def xmake(args, check=True):
     return p
 
 
-def with_manifest(mutate_target=None):
+def with_manifest(mutate=None):
     work = SCRATCH_CFG
     shutil.rmtree(work, ignore_errors=True)
     work.mkdir(parents=True)
     manifest = json.loads(CANONICAL.read_text())
-    if mutate_target:
-        manifest["target"]["id"] = mutate_target
+    if mutate:
+        mutate(manifest)
     path = work / "manifest.json"
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     return path
+
+
+def require_rejected(label, needle):
+    xmake(["f", "-o", SCRATCH_BLD, "-m", "release",
+           f"--av_manifest={with_manifest(label[0]).relative_to(ROOT)}", "-y"])
+    p = xmake(["build", "qianqian_av"], check=False)
+    combined = p.stdout + p.stderr
+    if p.returncode == 0:
+        raise SystemExit(f"GATE BROKEN: {label[1]} satisfied the "
+                         f"linux-x86_64 session")
+    if needle not in combined:
+        raise SystemExit(f"build failed, but not by the {needle!r} gate:\n"
+                         f"{combined[-2000:]}")
+    print(f"negative gate: {label[1]} rejected (fail-closed) — PASS")
 
 
 def main():
     if not CANONICAL.is_file():
         raise SystemExit("missing canonical manifest; run `xmake ffmpeg-import`")
 
-    # --- negative: windows manifest must not satisfy the linux session ----
-    mutated = with_manifest(mutate_target="windows-x86_64")
-    xmake(["f", "-o", SCRATCH_BLD, "-m", "release",
-           f"--av_manifest={mutated.relative_to(ROOT)}", "-y"])
-    p = xmake(["build", "qianqian_av"], check=False)
-    combined = p.stdout + p.stderr
-    if p.returncode == 0:
-        raise SystemExit("GATE BROKEN: a windows-x86_64 manifest satisfied "
-                         "the linux-x86_64 session")
-    if "manifest target mismatch" not in combined:
-        raise SystemExit("build failed, but not by the target-identity gate:\n"
-                         f"{combined[-2000:]}")
-    print("negative gate: windows-x86_64 manifest rejected by the linux "
-          "session (fail-closed) — PASS")
+    require_rejected(
+        (lambda m: m["target"].__setitem__("id", "windows-mingw-x86_64"),
+         "a windows-mingw-x86_64-labeled manifest"),
+        "manifest target mismatch")
+    require_rejected(
+        (lambda m: m["target"].__setitem__("target_os", "mingw32"),
+         "a manifest with a foreign-toolchain target_os"),
+        "stale or from another toolchain family")
+    require_rejected(
+        (lambda m: m["target"].__setitem__("platform", "msdos"),
+         "a manifest with drifted platform identity"),
+        "manifest target identity mismatch")
 
     # --- positive control: the pristine manifest builds the same session --
-    pristine = with_manifest()
     xmake(["f", "-o", SCRATCH_BLD, "-m", "release",
-           f"--av_manifest={pristine.relative_to(ROOT)}", "-y"])
+           f"--av_manifest={with_manifest(None).relative_to(ROOT)}", "-y"])
     xmake(["build", "qianqian_av"])
     print("positive control: linux-x86_64 manifest replayed — PASS")
 

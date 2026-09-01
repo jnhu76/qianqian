@@ -1,8 +1,34 @@
 {
   "tool": "songcore_wasm_smoke",
   "wasm": "build/artifacts/wasm/SongCore.wasm",
-  "wasm_sha256": "2b3f5a654b30c9b183fe23636f99d499718011cf44063229d7fa95df60e84962",
+  "wasm_sha256": "b6a7f89fa12bec46f6c534ff0d5a5c6e0d0ef5bb55f27eac53c3979cc0673793",
   "abi_version_expected": 1,
+  "export_surface": {
+    "verdict": "pass",
+    "detail": "15 contract + 3 bridge exports",
+    "contract": [
+      "song_wasm_abi_version",
+      "song_wasm_open",
+      "song_wasm_probe",
+      "song_wasm_audio_stream_count",
+      "song_wasm_audio_stream_info",
+      "song_wasm_select_stream",
+      "song_wasm_get_metadata",
+      "song_wasm_get_metadata_count",
+      "song_wasm_get_metadata_entry",
+      "song_wasm_get_artwork_count",
+      "song_wasm_get_artwork_item",
+      "song_wasm_read_pcm",
+      "song_wasm_seek",
+      "song_wasm_last_error",
+      "song_wasm_close"
+    ],
+    "bridge": [
+      "song_wasm_alloc",
+      "song_wasm_free",
+      "song_wasm_layout"
+    ]
+  },
   "platform": "Linux-x86_64",
   "seconds_cap": 3.0,
   "songs": [
@@ -15,18 +41,51 @@
       "duration_us": 4000000,
       "audio_stream_count": 1,
       "metadata_count": 4,
-      "canonical_metadata": {},
+      "canonical_metadata": {
+        "title": "Flac Sixteen Fortyfour",
+        "artist": "Qianqian Lab",
+        "album": "Corpus Gamma"
+      },
+      "raw_metadata": [
+        {
+          "scope": 0,
+          "key": "ALBUM",
+          "value": "Corpus Gamma"
+        },
+        {
+          "scope": 0,
+          "key": "TITLE",
+          "value": "Flac Sixteen Fortyfour"
+        },
+        {
+          "scope": 0,
+          "key": "ARTIST",
+          "value": "Qianqian Lab"
+        },
+        {
+          "scope": 0,
+          "key": "encoder",
+          "value": "Lavf62.3.100"
+        }
+      ],
       "decoded_frames": 135168,
+      "pcm_sha256": "db29d01255e8043d00e80fa8c25c8e117d5a2b5f1ccec887fbdfc5cf3c7a9913",
       "pcm_sha256_prefix": "db29d01255e8043d",
       "peak": 0.549988,
       "post_seek_frames": 88848,
       "checks": {
+        "layout": "pass",
         "abi_version": "pass",
         "open": "pass",
         "probe": "pass",
         "stream_enumeration": "pass",
         "metadata": "pass",
-        "close": "pass"
+        "raw_metadata": "pass",
+        "artwork": "pass",
+        "decode": "pass",
+        "seek": "pass",
+        "close": "pass",
+        "guest_memory": "pass"
       },
       "song_sha256": "d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2",
       "verdict": "pass"
@@ -40,18 +99,56 @@
       "duration_us": 4000000,
       "audio_stream_count": 1,
       "metadata_count": 5,
-      "canonical_metadata": {},
+      "canonical_metadata": {
+        "title": "千千测试 CBR",
+        "artist": "Qianqian Lab",
+        "album": "Corpus Alpha"
+      },
+      "raw_metadata": [
+        {
+          "scope": 0,
+          "key": "title",
+          "value": "千千测试 CBR"
+        },
+        {
+          "scope": 0,
+          "key": "artist",
+          "value": "Qianqian Lab"
+        },
+        {
+          "scope": 0,
+          "key": "album",
+          "value": "Corpus Alpha"
+        },
+        {
+          "scope": 0,
+          "key": "encoder",
+          "value": "Lavf62.3.100"
+        },
+        {
+          "scope": 1,
+          "key": "encoder",
+          "value": "Lavc62.11"
+        }
+      ],
       "decoded_frames": 135168,
+      "pcm_sha256": "7124ac4001346c07c033121108f6d1627fe9a01d991995492eb73fa6b58219cc",
       "pcm_sha256_prefix": "7124ac4001346c07",
       "peak": 0.527257,
       "post_seek_frames": 89953,
       "checks": {
+        "layout": "pass",
         "abi_version": "pass",
         "open": "pass",
         "probe": "pass",
         "stream_enumeration": "pass",
         "metadata": "pass",
-        "close": "pass"
+        "raw_metadata": "pass",
+        "artwork": "pass",
+        "decode": "pass",
+        "seek": "pass",
+        "close": "pass",
+        "guest_memory": "pass"
       },
       "song_sha256": "feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058",
       "verdict": "pass"
@@ -66,17 +163,56 @@
       "audio_stream_count": 1,
       "metadata_count": 6,
       "canonical_metadata": {},
+      "raw_metadata": [
+        {
+          "scope": 0,
+          "key": "major_brand",
+          "value": "M4A "
+        },
+        {
+          "scope": 0,
+          "key": "minor_version",
+          "value": "512"
+        },
+        {
+          "scope": 0,
+          "key": "compatible_brands",
+          "value": "M4A isomiso2"
+        },
+        {
+          "scope": 0,
+          "key": "encoder",
+          "value": "Lavf62.3.100"
+        },
+        {
+          "scope": 1,
+          "key": "language",
+          "value": "und"
+        },
+        {
+          "scope": 1,
+          "key": "handler_name",
+          "value": "SoundHandler"
+        }
+      ],
       "decoded_frames": 135168,
+      "pcm_sha256": "bf2f638b37d7da265c14893d451d6f41b5cdb19e7b1588a25f8c4cd82d1dbdf0",
       "pcm_sha256_prefix": "bf2f638b37d7da26",
       "peak": 0.757728,
       "post_seek_frames": 309040,
       "checks": {
+        "layout": "pass",
         "abi_version": "pass",
         "open": "pass",
         "probe": "pass",
         "stream_enumeration": "pass",
         "metadata": "pass",
-        "close": "pass"
+        "raw_metadata": "pass",
+        "artwork": "pass",
+        "decode": "pass",
+        "seek": "pass",
+        "close": "pass",
+        "guest_memory": "pass"
       },
       "song_sha256": "3bad130b2fc84702aa9799a5e40f2ac6cf91e1d81cb7fea68cd62c5ac7fd0864",
       "verdict": "pass"
@@ -91,17 +227,31 @@
       "audio_stream_count": 1,
       "metadata_count": 1,
       "canonical_metadata": {},
+      "raw_metadata": [
+        {
+          "scope": 1,
+          "key": "encoder",
+          "value": "Lavc62.11.100 libopus"
+        }
+      ],
       "decoded_frames": 147456,
+      "pcm_sha256": "54463d387bbf02f461c0d42fb0bd937e251b86616eee2d7dfd9d75dec9cff0ae",
       "pcm_sha256_prefix": "54463d387bbf02f4",
       "peak": 0.508658,
       "post_seek_frames": 336312,
       "checks": {
+        "layout": "pass",
         "abi_version": "pass",
         "open": "pass",
         "probe": "pass",
         "stream_enumeration": "pass",
         "metadata": "pass",
-        "close": "pass"
+        "raw_metadata": "pass",
+        "artwork": "pass",
+        "decode": "pass",
+        "seek": "pass",
+        "close": "pass",
+        "guest_memory": "pass"
       },
       "song_sha256": "c00d25d4182527d797ec67bc84e6228d3c7fb07b4683605078966829d0aa38e6",
       "verdict": "pass"
@@ -116,19 +266,79 @@
       "audio_stream_count": 1,
       "metadata_count": 0,
       "canonical_metadata": {},
+      "raw_metadata": [],
       "decoded_frames": 135168,
+      "pcm_sha256": "db29d01255e8043d00e80fa8c25c8e117d5a2b5f1ccec887fbdfc5cf3c7a9913",
       "pcm_sha256_prefix": "db29d01255e8043d",
       "peak": 0.549988,
       "post_seek_frames": 132300,
       "checks": {
+        "layout": "pass",
         "abi_version": "pass",
         "open": "pass",
         "probe": "pass",
         "stream_enumeration": "pass",
         "metadata": "pass",
-        "close": "pass"
+        "raw_metadata": "pass",
+        "artwork": "pass",
+        "decode": "pass",
+        "seek": "pass",
+        "close": "pass",
+        "guest_memory": "pass"
       },
       "song_sha256": "c7a31488b22bbaec1a4d879cc03508f0373f90dd789e5cc0f59a3c8c60a3dcd4",
+      "verdict": "pass"
+    },
+    {
+      "song": "artwork-mp3-jpeg.mp3",
+      "container": "mp3",
+      "codec": "mp3",
+      "sample_rate": 44100,
+      "channels": 2,
+      "duration_us": 3000000,
+      "audio_stream_count": 1,
+      "metadata_count": 2,
+      "canonical_metadata": {},
+      "raw_metadata": [
+        {
+          "scope": 0,
+          "key": "encoder",
+          "value": "Lavf62.3.100"
+        },
+        {
+          "scope": 1,
+          "key": "encoder",
+          "value": "Lavc62.11"
+        }
+      ],
+      "artwork0": {
+        "mime": "image/jpeg",
+        "data_len": 272,
+        "sha256": "e0224b0d40ab4f7a7fa1146badf9ebbe72d18b99db8826bae844e56b9749acde",
+        "width": -1,
+        "height": -1,
+        "is_front_cover": 1
+      },
+      "decoded_frames": 132300,
+      "pcm_sha256": "9507b7202b5f7128185323c6ab0f0deda42ac9098e997fced7e1c0cc3ece8d0f",
+      "pcm_sha256_prefix": "9507b7202b5f7128",
+      "peak": 0.527257,
+      "post_seek_frames": 67741,
+      "checks": {
+        "layout": "pass",
+        "abi_version": "pass",
+        "open": "pass",
+        "probe": "pass",
+        "stream_enumeration": "pass",
+        "metadata": "pass",
+        "raw_metadata": "pass",
+        "artwork": "pass",
+        "decode": "pass",
+        "seek": "pass",
+        "close": "pass",
+        "guest_memory": "pass"
+      },
+      "song_sha256": "265768b18fef15635363d2788119b8f33f24474dafbbd7a647998e16d7ef61d1",
       "verdict": "pass"
     }
   ],

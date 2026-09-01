@@ -1,0 +1,52 @@
+{
+ "cases": [
+  {
+   "case": "flac-16-44-stereo.flac",
+   "record": {
+    "file": "flac-16-44-stereo.flac",
+    "probe_status": 0,
+    "select_invalid_status": 100,
+    "select_invalid_diag_len": 16,
+    "probe2_status": 0,
+    "probe2_msg_null": true,
+    "probe2_diag_len": 0,
+    "zero_capacity_status": 100,
+    "zero_capacity_diag_len": 16,
+    "decode_final_status": 1,
+    "eof_msg_null": true,
+    "eof_diag_len": 0,
+    "entry_invalid_status": 100,
+    "entry_invalid_diag_len": 16,
+    "art_invalid_status": 100,
+    "art_invalid_diag_len": 16,
+    "seek_status": 0,
+    "seek_msg_null": true,
+    "seek_diag_len": 0
+   }
+  },
+  {
+   "case": "mp3-cbr-id3v23.mp3",
+   "record": {
+    "file": "mp3-cbr-id3v23.mp3",
+    "probe_status": 0,
+    "select_invalid_status": 100,
+    "select_invalid_diag_len": 16,
+    "probe2_status": 0,
+    "probe2_msg_null": true,
+    "probe2_diag_len": 0,
+    "zero_capacity_status": 100,
+    "zero_capacity_diag_len": 16,
+    "decode_final_status": 1,
+    "eof_msg_null": true,
+    "eof_diag_len": 0,
+    "entry_invalid_status": 100,
+    "entry_invalid_diag_len": 16,
+    "art_invalid_status": 100,
+    "art_invalid_diag_len": 16,
+    "seek_status": 0,
+    "seek_msg_null": true,
+    "seek_diag_len": 0
+   }
+  }
+ ]
+}

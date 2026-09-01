@@ -73,6 +73,10 @@ end
 
 -- Returns nil when the manifest identity is acceptable for this session,
 -- else a fail-closed error message (raise happens in the callback scope).
+-- Binds: target id, platform, arch, and the toolchain-family facts
+-- (target_os / cross_prefix) the manifest was derived from — so a MinGW
+-- manifest can never satisfy an MSVC session (or vice versa), and a
+-- manifest derived from an outdated recipe revision is stale.
 local manifest_target_problem = function (manifest_path, target, json)
     local m = json.loadfile(manifest_path)
     local mt = m.target or {}
@@ -85,7 +89,16 @@ local manifest_target_problem = function (manifest_path, target, json)
             get_config("av_manifest"))
     end
     local expect = expected_target_id(target, json)
-    if expect and mt.id ~= expect then
+    if not expect then
+        return format(
+            "no target recipe in ffmpeg/targets/ matches this session " ..
+            "(plat '%s', arch '%s'). Target provenance is fail-closed: a " ..
+            "session may only replay a manifest derived for a proven " ..
+            "target recipe (e.g. MSVC is not yet derived; MinGW " ..
+            "manifests do not satisfy MSVC sessions).",
+            target:plat(), target:arch())
+    end
+    if mt.id ~= expect then
         return format(
             "manifest target mismatch: %s was derived for '%s' but this " ..
             "session builds '%s'. Derive the matching closure and point " ..
@@ -93,6 +106,42 @@ local manifest_target_problem = function (manifest_path, target, json)
             "  python3 tools/ffmpeg_profile_import.py --target %s " ..
             "--profile ffmpeg/profiles/<capability>.json",
             get_config("av_manifest"), mt.id, expect, expect)
+    end
+    local recipe_file = path.join(os.projectdir(), "ffmpeg", "targets",
+                                  expect .. ".json")
+    local recipe = json.loadfile(recipe_file)
+    if not recipe then
+        return format("target recipe '%s' is missing from ffmpeg/targets/",
+                      expect)
+    end
+    if mt.platform ~= recipe.platform or mt.arch ~= recipe.arch then
+        return format(
+            "manifest target identity mismatch: %s records %s/%s but the " ..
+            "'%s' recipe says %s/%s. Re-derive the closure:\n" ..
+            "  python3 tools/ffmpeg_profile_import.py --target %s " ..
+            "--profile ffmpeg/profiles/<capability>.json",
+            get_config("av_manifest"), mt.platform or "?", mt.arch or "?",
+            expect, recipe.platform, recipe.arch, expect)
+    end
+    local ff = recipe.ffmpeg or {}
+    local rederive = format(
+        " Re-derive the closure:\n" ..
+        "  python3 tools/ffmpeg_profile_import.py --target %s " ..
+        "--profile ffmpeg/profiles/<capability>.json", expect)
+    if ff.target_os and mt.target_os ~= ff.target_os then
+        return format(
+            "manifest is stale or from another toolchain family: %s was " ..
+            "derived with target_os '%s' but the '%s' recipe binds '%s'.",
+            get_config("av_manifest"), mt.target_os or "?", expect,
+            ff.target_os) .. rederive
+    end
+    if ff.cross_prefix and mt.cross_prefix ~= ff.cross_prefix then
+        return format(
+            "manifest is stale or from another toolchain family: %s was " ..
+            "derived with cross_prefix '%s' but the '%s' recipe binds " ..
+            "'%s'.",
+            get_config("av_manifest"), mt.cross_prefix or "?", expect,
+            ff.cross_prefix) .. rederive
     end
     return nil
 end
@@ -467,7 +516,7 @@ if get_config("wasm") then
                 "-sEXPORT_NAME=createSongCore",
                 "-sINVOKE_RUN=0",
                 "-sEXPORTED_RUNTIME_METHODS=HEAPU8,HEAPF32",
-                "-sEXPORTED_FUNCTIONS=[\"_song_wasm_abi_version\",\"_song_wasm_open\",\"_song_wasm_probe\",\"_song_wasm_audio_stream_count\",\"_song_wasm_audio_stream_info\",\"_song_wasm_select_stream\",\"_song_wasm_get_metadata\",\"_song_wasm_get_metadata_count\",\"_song_wasm_get_metadata_entry\",\"_song_wasm_get_artwork_count\",\"_song_wasm_get_artwork_item\",\"_song_wasm_read_pcm\",\"_song_wasm_seek\",\"_song_wasm_last_error\",\"_song_wasm_close\",\"_malloc\",\"_free\"]",
+                "-sEXPORTED_FUNCTIONS=[\"_song_wasm_abi_version\",\"_song_wasm_open\",\"_song_wasm_probe\",\"_song_wasm_audio_stream_count\",\"_song_wasm_audio_stream_info\",\"_song_wasm_select_stream\",\"_song_wasm_get_metadata\",\"_song_wasm_get_metadata_count\",\"_song_wasm_get_metadata_entry\",\"_song_wasm_get_artwork_count\",\"_song_wasm_get_artwork_item\",\"_song_wasm_read_pcm\",\"_song_wasm_seek\",\"_song_wasm_last_error\",\"_song_wasm_close\",\"_song_wasm_alloc\",\"_song_wasm_free\",\"_song_wasm_layout\",\"_malloc\",\"_free\"]",
                 "-g1", -- keep export symbol names for the JS glue
                 "-sENVIRONMENT=node,web",
             }, {force = true})

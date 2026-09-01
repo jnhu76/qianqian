@@ -166,6 +166,12 @@ def target_identity(recipe: dict | None, recipe_sha256: str | None) -> dict:
         "platform": recipe.get("platform"),
         "arch": recipe.get("arch"),
         "recipe_sha256": recipe_sha256,
+        # Toolchain-family facts bound into the manifest identity so a
+        # replay session can detect recipe drift — or a manifest from a
+        # DIFFERENT toolchain family (MinGW vs MSVC) — by field comparison,
+        # without hashing.
+        "target_os": (recipe.get("ffmpeg") or {}).get("target_os"),
+        "cross_prefix": (recipe.get("ffmpeg") or {}).get("cross_prefix"),
     }
 
 

@@ -7,7 +7,7 @@
  "closure_linked_uninstrumented": "build/artifacts/libqianqian_av.a",
  "invocations": 136,
  "fixture_count": 64,
- "decoded_frames_total": 9791222,
+ "decoded_frames_total": 10067522,
  "asan_reports": [],
  "leak_reports": [],
  "ubsan_owned": [],

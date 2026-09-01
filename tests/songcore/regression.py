@@ -62,7 +62,8 @@ BOUNDED_RESUME_SAMPLES = 65536
 
 EVIDENCE_FILES = ("metadata", "artwork", "stream-selection", "seek", "errors",
                   "consistency", "states", "lifetime", "switchcheck",
-                  "common-formats", "sanitizers", "dsp-src-integration")
+                  "common-formats", "sanitizers", "dsp-src-integration",
+                  "last-error")
 
 
 def sha256_file(path):
@@ -482,6 +483,46 @@ def main():
                    "invalid stream index not typed INVALID_ARGUMENT")
         states_evidence.append({"case": f, "record": rec})
 
+    # ------------------------------------------------- song_last_error contract
+    # Diagnostics: promised on every typed failure with a valid handle,
+    # cleared by SONG_OK/SONG_EOF, reported (not cleared) by song_last_error.
+    # Message text is NOT asserted verbatim.
+    lasterror_evidence = []
+    lasterror_expected = {
+        # (status key, expected status name)
+        "select_invalid_status": "INVALID_ARGUMENT",
+        "zero_capacity_status": "INVALID_ARGUMENT",
+        "entry_invalid_status": "INVALID_ARGUMENT",
+        "art_invalid_status": "INVALID_ARGUMENT",
+    }
+    for f in ("flac-16-44-stereo.flac", "mp3-cbr-id3v23.mp3"):
+        path = os.path.join(FIXTURES, f)
+        r = run_binary(args.binary, ["lasterror", path])
+        rec = parse_json_line(r.stdout)
+        if rec is None:
+            gate.check(False, f"lasterror:{f}", "unparseable lasterror output")
+            continue
+        gate.add(rec)
+        cid = f"lasterror:{f}"
+        gate.check(rec.get("probe_status") == 0 and
+                   rec.get("probe2_status") == 0, cid, "probe failed")
+        for key, want in lasterror_expected.items():
+            gate.check(rec.get(key) == NAME_TO_STATUS[want], cid,
+                       f"{key} not typed {want}")
+            diag = rec.get(key.replace("_status", "_diag_len"))
+            gate.check(isinstance(diag, int) and diag > 0, cid,
+                       f"{key} returned an error without a diagnostic")
+        gate.check(rec.get("probe2_msg_null") is True, cid,
+                   "successful probe did not clear the diagnostic")
+        gate.check(rec.get("decode_final_status") == NAME_TO_STATUS["EOF"],
+                   cid, "decode did not end at SONG_EOF")
+        gate.check(rec.get("eof_msg_null") is True, cid,
+                   "SONG_EOF did not clear the diagnostic")
+        gate.check(rec.get("seek_status") == 0 and
+                   rec.get("seek_msg_null") is True, cid,
+                   "successful seek did not clear the diagnostic")
+        lasterror_evidence.append({"case": f, "record": rec})
+
     # ------------------------------------------------- borrowed view lifetime
     lifetime_evidence = []
     for f in ("metadata-full.flac", "metadata-mp3.mp3", "artwork-mp3-multi.mp3"):
@@ -600,6 +641,7 @@ def main():
         "lifetime": lifetime_evidence,
         "switchcheck": switch_evidence,
         "common-formats": common_evidence,
+        "last-error": lasterror_evidence,
     }, gate, abi_evidence)
 
     verdict = "PASS" if not gate.failures else "FAIL"
@@ -706,6 +748,7 @@ def write_authority(out_dir, data, gate, abi):
         "lifetime.json": {"cases": data["lifetime"]},
         "switchcheck.json": {"cases": data["switchcheck"]},
         "common-formats.json": {"cases": data["common-formats"]},
+        "last-error.json": {"cases": data["last-error"]},
         "summary.json": {
             "verdict": "PASS" if not gate.failures else "FAIL",
             "gate_failures": gate.failures,

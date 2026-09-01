@@ -1,0 +1,99 @@
+{
+  "matrix_version": 1,
+  "branch": "feat/e11-songcore-v1-freeze",
+  "head": "ffea8c5 (reviewed) + merge-fixes commit",
+  "abi": {
+    "version": 1,
+    "symbols": 15,
+    "abi_header_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536"
+  },
+  "verdicts": {
+    "linux_regression": "PASS",
+    "sanitizers": "PASS",
+    "consumer_gates_full": {
+      "shared_export_audit": "pass",
+      "ctypes_decode_consumer": "pass",
+      "static_archive_consumer": "pass",
+      "wasm_consumer": "pass",
+      "windows_ctypes_consumer": "pass"
+    },
+    "consumer_gates_core": {
+      "shared_export_audit": "pass",
+      "ctypes_decode_consumer": "pass",
+      "static_archive_consumer": "pass"
+    },
+    "cross_backend_consistency": "pass",
+    "windows": {
+      "target": "windows-mingw-x86_64",
+      "fixtures": 13,
+      "all_pass": true,
+      "library_sha256": "11c3e70323a196f53ea624bf10b07f09bdd89130ea4f9676dad5de51524d17c8",
+      "python": "3.13.14",
+      "platform": "Windows-AMD64",
+      "pinning": {
+        "target": "windows-mingw-x86_64",
+        "recipe_sha256": "df70fba379946b35815a73fcb7d89431c6b3ce6776c1b59e86fbfab0ce6225c9",
+        "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+        "ffmpeg_source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+        "profile_sha256": "57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa",
+        "abi_header_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+        "artifact_sha256": "11c3e70323a196f53ea624bf10b07f09bdd89130ea4f9676dad5de51524d17c8"
+      }
+    },
+    "wasm": {
+      "target": "wasm-wasi",
+      "fixtures": 6,
+      "checks_complete": true,
+      "wasm_sha256": "b6a7f89fa12bec46f6c534ff0d5a5c6e0d0ef5bb55f27eac53c3979cc0673793",
+      "pinning": {
+        "target": "wasm-wasi",
+        "recipe_sha256": "fe970aba870fb3801ffaec69ccf3cd9744b6a4ad559490814b87d29911b95423",
+        "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+        "ffmpeg_source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+        "profile_sha256": "57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa",
+        "abi_header_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+        "artifact_sha256": "b6a7f89fa12bec46f6c534ff0d5a5c6e0d0ef5bb55f27eac53c3979cc0673793"
+      }
+    },
+    "mutations": {
+      "wasm_sha_drift": "caught",
+      "windows_identity_drift": "caught",
+      "wasm_metadata_erasure": "caught",
+      "target_identity_relabel": "caught (xmake fail-closed)",
+      "target_toolchain_drift": "caught (xmake fail-closed)",
+      "target_platform_drift": "caught (xmake fail-closed)"
+    },
+    "not_started": [
+      "Kotlin/KMP UI",
+      "AudioBackend",
+      "WASAPI/CoreAudio/AAudio",
+      "playlist/library"
+    ]
+  },
+  "evidence_files": [
+    "abi.json",
+    "artwork.json",
+    "common-formats.json",
+    "consistency.json",
+    "dsp-src-integration.json",
+    "errors.json",
+    "ffi-consistency.json",
+    "ffi-consumers-core.json",
+    "ffi-consumers.json",
+    "ffi-ctypes-run.json",
+    "ffi-wasm-run.json",
+    "last-error.json",
+    "lifetime.json",
+    "local-corpus-ffi.json",
+    "manifest.json",
+    "metadata.json",
+    "reference-artifacts.json",
+    "sanitizers.json",
+    "seek.json",
+    "states.json",
+    "stream-selection.json",
+    "summary.json",
+    "switchcheck.json",
+    "win-ffi.json"
+  ]
+}

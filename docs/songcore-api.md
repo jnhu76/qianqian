@@ -25,7 +25,7 @@ guest — all from the same ABI and capability model:
 | Target | Static | Shared | Notes |
 |---|---|---|---|
 | Linux x86_64 | `libsongcore.a` | `libsongcore.so` | **Proven** — reference artifacts, measured + audited on this branch |
-| Windows x86_64 | (`libsongcore.a`) | `songcore.dll` | **Proven (shared)** — mingw-w64 cross (`--target-os=mingw32`); PE exports audited (15 exactly), real Windows Python ctypes consumer PASS (§8) |
+| Windows x86_64 | (`libsongcore.a`) | `songcore.dll` | **Proven (shared)** — target `windows-mingw-x86_64`, mingw-w64 cross (`target_os=mingw32`, `cross_prefix=x86_64-w64-mingw32-`); PE exports audited (15 exactly), real Windows Python ctypes consumer PASS with full PCM authority (§8). MSVC is a separate target recipe and is still Planned — a MinGW manifest never satisfies an MSVC session (fail-closed identity gate) |
 | Android arm64 | — | `libsongcore.so` | Planned |
 | macOS arm64 | `libsongcore.a` | `libsongcore.dylib` | Planned |
 | iOS arm64 | `libsongcore.a` | — | Planned (XCFramework packaging is a later product-side step) |
@@ -276,9 +276,17 @@ seek), `SONG_ERR_SEEK_ERROR`, `SONG_ERR_STREAM_CHANGE` /
 **`song_status song_last_error(song_handle *handle, const song_error **out_error)`**
 — diagnostic for the last failed operation on this handle: NUL-terminated
 UTF-8 `message` (+`message_len`), backend `native_code`. For logs only —
-callers branch on `song_status`, never on message text. Valid until the
-next SongCore call on the same handle; after a successful call the
-message is NULL. Not available for `song_open` failures (no handle).
+callers branch on `song_status`, never on message text. Contract:
+
+- every typed failure (`status >= 100`) on a valid handle leaves a
+  diagnostic readable here;
+- `SONG_OK` and `SONG_EOF` clear it (the message reads back NULL);
+- reading via `song_last_error` never clears the diagnostic — only the
+  next operation on the handle does;
+- not available for `song_open` failures (no handle survives).
+
+Machine-checked per function by `tests/songcore/regression.py`
+(`last-error.json` evidence).
 
 ## 5. Error model
 
@@ -327,7 +335,9 @@ libsongcore.so · songcore.dll · libsongcore.a · static native integration
 - Gate library load on `songcore_abi_version()`.
 - Copy metadata/artwork out into managed objects if they must outlive the
   native borrowed-view lifetime (§4); otherwise borrow within the stated
-  lifetime.
+  lifetime. Borrowed string fields are (pointer, length) pairs — never
+  read them as NUL-terminated (the ctypes consumer proves this with
+  `c_void_p` + explicit length).
 - PCM buffers should avoid unnecessary copies where the platform FFI
   permits (e.g. direct Float32 buffers over JNI, `HEAPF32` over WASM).
 - One wrapper object ⇔ one native handle; a `close()` in the wrapper must
@@ -345,11 +355,12 @@ the host-independent gates also run inside `xmake test`).
 
 | Consumer | Path | Evidence |
 |---|---|---|
-| Python ctypes decode | `python3 tools/songcore_ffi_smoke.py <songs...>` — stdlib-only (ctypes/argparse/hashlib/struct); mirrors all 15 symbols and every ABI struct; checks open/probe/metadata/artwork/decode/seek/close plus the typed refusal contracts (zero capacity, invalid stream index); `--play` adds audible output at source rate via sounddevice (no Python-side resampling, no `qn_pcm_dump`) | Linux: 12 Common-Formats fixtures PASS incl. ADTS typed `SONG_ERR_SEEK_UNSUPPORTED`; three real local songs PASS with UTF-8 metadata + JPEG artwork; audible run PASS |
+| Python ctypes decode | `python3 tools/songcore_ffi_smoke.py <songs...>` — stdlib-only (ctypes/argparse/hashlib/struct); mirrors all 15 symbols and every ABI struct; borrowed strings consumed as pointer+length (never NUL-terminated); checks open/probe/metadata/raw-metadata/artwork/decode/seek/close plus the typed refusal contracts (zero capacity, invalid stream index); every song records `decoded_frames`/full-window `pcm_sha256`/`peak`; `--pcm-dump-dir` writes bounded PCM samples for the cross-backend gate; `--play` adds audible output at source rate via sounddevice (no Python-side resampling, no `qn_pcm_dump`) | Linux: 13-fixture matrix PASS incl. ADTS typed `SONG_ERR_SEEK_UNSUPPORTED`; three real local songs PASS with UTF-8 metadata + JPEG artwork; audible run PASS |
 | Static archive consumer | `tests/consumer/songcore_static_smoke.c`, compiled with the documented one-archive link line `cc -Iinclude … -Lbuild/artifacts -lsongcore -lm -lpthread` | FLAC + M4A decode/seek PASS through the merged self-contained `libsongcore.a` |
 | Shared export audit | exactly the 15 `SONGCORE_API` symbols, nothing else | PASS on Linux ELF and Windows PE |
-| Windows ctypes | real Windows Python 3.13 process → ctypes → `songcore.dll` (PE exports audited: 15 exactly; imports only `bcrypt.dll`/`KERNEL32.dll`/`msvcrt.dll`; zero FFmpeg DLL dependencies) | 7 fixtures PASS (evidence: `bench/results/songcore-v1/win-ffi.json`) |
-| WASM | independent `wasmtime` host instantiates `build/artifacts/wasm/SongCore.wasm` and drives `song_wasm_abi_version/open/probe/metadata/read_pcm/seek/close` over `qianqian_host` read/seek/size imports: `python3 tools/songcore_wasm_smoke.py <songs...>` | 5 fixtures PASS |
+| Windows ctypes (recorded) | real Windows Python 3.13 process → ctypes → `songcore.dll` (PE exports audited: 15 exactly; imports only `bcrypt.dll`/`KERNEL32.dll`/`msvcrt.dll`; zero FFmpeg DLL dependencies); per-song PCM authority (`decoded_frames`/`pcm_sha256`/`peak`) + explicit per-gate checks | 13-fixture matrix PASS (evidence: `bench/results/songcore-v1/win-ffi.json`, pinned to the `windows-mingw-x86_64` recipe/header/artifact hashes) |
+| WASM | independent `wasmtime` host instantiates `build/artifacts/wasm/SongCore.wasm` and drives the 15 contract mirrors over `qianqian_host` read/seek/size imports: `python3 tools/songcore_wasm_smoke.py <songs...>`. All guest-side buffers are allocated through the bridge exports `song_wasm_alloc`/`song_wasm_free` (host never guesses addresses; leak-checked per run); struct layouts are machine-read from `song_wasm_layout` (host never hardcodes offsets); export surface audited (15 contract + 3 bridge exports, nothing else) | 6 fixtures PASS with semantic metadata assertions (exact UTF-8 titles), raw-metadata, artwork (SHA-256 of compressed bytes), decode/seek, per-check explicit PASS map |
+| Cross-backend consistency | `python3 tests/songcore/ffi_consistency.py --check` — the same fixture through Linux shared / Windows DLL / WASM guest must mean the same song: lossless PCM (FLAC/ALAC/PCM WAV) SHA-256 exactly equal; lossy within the established 1e-6 authority; metadata semantic-match; artwork exact | PASS (`bench/results/songcore-v1/ffi-consistency.json`): all lossless pairs byte-exact, lossy max\|Δ\| ≤ 1.2e-07 |
 
 Known typed behavior verified against real content: raw ADTS AAC has no
 container seek — `song_seek` returns `SONG_ERR_SEEK_UNSUPPORTED` (the ABI's

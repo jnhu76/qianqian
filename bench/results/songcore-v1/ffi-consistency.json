@@ -1,0 +1,138 @@
+{
+  "tool": "tests/songcore/ffi_consistency.py",
+  "policy": {
+    "lossless_pcm": "exact (full-window SHA-256 equality)",
+    "lossy_pcm": "max_abs_delta <= 1e-06 (established WASM viability authority)",
+    "metadata": "canonical semantic match",
+    "artwork": "exact (compressed bytes)"
+  },
+  "records": {
+    "linux": "/home/hoo/Source/qianqian/bench/results/songcore-v1/ffi-ctypes-run.json",
+    "windows": "/home/hoo/Source/qianqian/bench/results/songcore-v1/win-ffi.json",
+    "wasm": "/home/hoo/Source/qianqian/bench/results/songcore-v1/ffi-wasm-run.json"
+  },
+  "backends_available": {
+    "linux": true,
+    "windows": true,
+    "wasm": true
+  },
+  "rows": [
+    {
+      "fixture": "flac-16-44-stereo.flac",
+      "pair": "windows-linux",
+      "class": "lossless",
+      "pcm": "exact",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "mp3-cbr-id3v23.mp3",
+      "pair": "windows-linux",
+      "class": "lossy",
+      "max_abs_delta": 0.0,
+      "pcm": "exact",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "aac-lc-44-stereo.m4a",
+      "pair": "windows-linux",
+      "class": "lossy",
+      "max_abs_delta": 5.960464477539063e-08,
+      "pcm": "tolerance-pass",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "opus-48-stereo.opus",
+      "pair": "windows-linux",
+      "class": "lossy",
+      "max_abs_delta": 0.0,
+      "pcm": "exact",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "wav-s16le-44-stereo.wav",
+      "pair": "windows-linux",
+      "class": "lossless",
+      "pcm": "exact",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "artwork-mp3-jpeg.mp3",
+      "pair": "windows-linux",
+      "class": "lossy",
+      "max_abs_delta": 0.0,
+      "pcm": "exact",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "flac-16-44-stereo.flac",
+      "pair": "wasm-linux",
+      "class": "lossless",
+      "pcm": "exact",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "mp3-cbr-id3v23.mp3",
+      "pair": "wasm-linux",
+      "class": "lossy",
+      "max_abs_delta": 1.1920928955078125e-07,
+      "pcm": "tolerance-pass",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "aac-lc-44-stereo.m4a",
+      "pair": "wasm-linux",
+      "class": "lossy",
+      "max_abs_delta": 5.960464477539063e-08,
+      "pcm": "tolerance-pass",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "opus-48-stereo.opus",
+      "pair": "wasm-linux",
+      "class": "lossy",
+      "max_abs_delta": 0.0,
+      "pcm": "exact",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "wav-s16le-44-stereo.wav",
+      "pair": "wasm-linux",
+      "class": "lossless",
+      "pcm": "exact",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    },
+    {
+      "fixture": "artwork-mp3-jpeg.mp3",
+      "pair": "wasm-linux",
+      "class": "lossy",
+      "max_abs_delta": 1.1920928955078125e-07,
+      "pcm": "tolerance-pass",
+      "metadata": "semantic-match",
+      "artwork": "exact",
+      "verdict": "pass"
+    }
+  ],
+  "verdict": "pass"
+}

@@ -116,6 +116,36 @@ static song_status set_error(song_handle *h, song_status st, int native,
     return st;
 }
 
+/* Centralized exit helpers — the song_last_error contract (songcore.h):
+ *   - a function that returns an error status (>= 100) with a valid handle
+ *     MUST leave a diagnostic behind (fail);
+ *   - SONG_OK and SONG_EOF clear the previous diagnostic (ok / eof);
+ *   - song_last_error reports the diagnostic without clearing it.
+ * Only callers holding a valid handle use these; argument rejections that
+ * cannot name a handle expose typed status only. */
+static song_status ok(song_handle *h) {
+    clear_error(h);
+    return SONG_OK;
+}
+
+static song_status eof(song_handle *h) {
+    clear_error(h);
+    return SONG_EOF;
+}
+
+static song_status fail(song_handle *h, song_status st, int native,
+                        const char *msg) {
+    return set_error(h, st, native, msg);
+}
+
+static song_status fail_arg(song_handle *h) {
+    return fail(h, SONG_ERR_INVALID_ARGUMENT, 0, "invalid argument");
+}
+
+static song_status fail_not_open(song_handle *h) {
+    return fail(h, SONG_ERR_NOT_OPEN, 0, "handle is not probed");
+}
+
 /* Copy a FFmpeg channel layout mask into SongCore's own bit convention.
  * The bit numbering is SongCore-owned and stable; for native layouts it
  * coincides with the conventional FFmpeg/SMPTE numbering. 0 == unknown. */
@@ -802,19 +832,19 @@ song_status song_open(const song_io *io, song_handle **out_handle) {
 }
 
 song_status song_probe(song_handle *h, song_info *out_info) {
-    if (!h || !out_info) return SONG_ERR_INVALID_ARGUMENT;
-    if (!h->fmt) return SONG_ERR_NOT_OPEN;
+    if (!h) return SONG_ERR_INVALID_ARGUMENT;
+    if (!out_info) return fail_arg(h);
+    if (!h->fmt) return fail_not_open(h);
 
     if (!h->probed) {
         int ret = avformat_find_stream_info(h->fmt, NULL);
         if (ret < 0) {
             if (ret == AVERROR(EIO))
-                return set_error(h, SONG_ERR_IO, ret, "stream info failed");
+                return fail(h, SONG_ERR_IO, ret, "stream info failed");
             if (ret == AVERROR(ENOMEM))
-                return set_error(h, SONG_ERR_OUT_OF_MEMORY, ret,
-                                 "stream info failed");
-            return set_error(h, SONG_ERR_CORRUPT_DATA, ret,
-                             "stream info failed");
+                return fail(h, SONG_ERR_OUT_OF_MEMORY, ret,
+                            "stream info failed");
+            return fail(h, SONG_ERR_CORRUPT_DATA, ret, "stream info failed");
         }
 
         /* Enumerate decodable audio streams (exclude non-audio and
@@ -834,13 +864,15 @@ song_status song_probe(song_handle *h, song_info *out_info) {
                     has_audio = 1;
                     break;
                 }
-            return set_error(h, has_audio ? SONG_ERR_UNSUPPORTED_CODEC
-                                          : SONG_ERR_NO_AUDIO_STREAM,
-                             0, has_audio ? "no decodable audio codec"
-                                          : "no audio stream");
+            return fail(h, has_audio ? SONG_ERR_UNSUPPORTED_CODEC
+                                     : SONG_ERR_NO_AUDIO_STREAM,
+                        0, has_audio ? "no decodable audio codec"
+                                     : "no audio stream");
         }
         h->audio_streams = (int *)malloc(count * sizeof(int));
-        if (!h->audio_streams) return SONG_ERR_OUT_OF_MEMORY;
+        if (!h->audio_streams)
+            return fail(h, SONG_ERR_OUT_OF_MEMORY, 0,
+                        "stream enumeration allocation failed");
         h->audio_count = count;
         uint32_t idx = 0;
         for (unsigned i = 0; i < h->fmt->nb_streams; ++i) {
@@ -863,25 +895,27 @@ song_status song_probe(song_handle *h, song_info *out_info) {
 
         song_status st = open_decoder_for(h, sel, &h->dec);
         if (st != SONG_OK)
-            return set_error(h, st, 0, "cannot open audio decoder");
+            return fail(h, st, 0, "cannot open audio decoder");
 
         AVStream *st_ = h->fmt->streams[h->audio_streams[sel]];
         h->sample_rate = st_->codecpar->sample_rate;
         h->channels = st_->codecpar->ch_layout.nb_channels;
         h->channel_mask = channel_mask_from_layout(&st_->codecpar->ch_layout);
         if (h->sample_rate <= 0 || h->channels <= 0)
-            return set_error(h, SONG_ERR_CORRUPT_DATA, 0,
-                             "invalid stream parameters");
+            return fail(h, SONG_ERR_CORRUPT_DATA, 0,
+                        "invalid stream parameters");
 
         h->packet = av_packet_alloc();
         h->frame = av_frame_alloc();
-        if (!h->packet || !h->frame) return SONG_ERR_OUT_OF_MEMORY;
+        if (!h->packet || !h->frame)
+            return fail(h, SONG_ERR_OUT_OF_MEMORY, 0,
+                        "decode state allocation failed");
 
         if (metadata_build(h) < 0 || artwork_build(h) < 0)
-            return SONG_ERR_OUT_OF_MEMORY;
+            return fail(h, SONG_ERR_OUT_OF_MEMORY, 0,
+                        "snapshot allocation failed");
 
         h->probed = 1;
-        clear_error(h);
     }
 
     AVStream *st = h->fmt->streams[h->audio_streams[h->selected]];
@@ -899,21 +933,23 @@ song_status song_probe(song_handle *h, song_info *out_info) {
               h->fmt->iformat ? h->fmt->iformat->name : NULL);
     out_info->selected_audio_index = h->selected;
     out_info->audio_stream_count = h->audio_count;
-    return SONG_OK;
+    return ok(h);
 }
 
 song_status song_audio_stream_count(song_handle *h, uint32_t *out_count) {
-    if (!h || !out_count) return SONG_ERR_INVALID_ARGUMENT;
-    if (!h->probed) return SONG_ERR_NOT_OPEN;
+    if (!h) return SONG_ERR_INVALID_ARGUMENT;
+    if (!out_count) return fail_arg(h);
+    if (!h->probed) return fail_not_open(h);
     *out_count = h->audio_count;
-    return SONG_OK;
+    return ok(h);
 }
 
 song_status song_audio_stream_info(song_handle *h, uint32_t audio_index,
                                    song_stream_info *out_info) {
-    if (!h || !out_info) return SONG_ERR_INVALID_ARGUMENT;
-    if (!h->probed) return SONG_ERR_NOT_OPEN;
-    if (audio_index >= h->audio_count) return SONG_ERR_INVALID_ARGUMENT;
+    if (!h) return SONG_ERR_INVALID_ARGUMENT;
+    if (!out_info) return fail_arg(h);
+    if (!h->probed) return fail_not_open(h);
+    if (audio_index >= h->audio_count) return fail_arg(h);
     AVStream *st = h->fmt->streams[h->audio_streams[audio_index]];
     memset(out_info, 0, sizeof(*out_info));
     out_info->audio_index = audio_index;
@@ -932,7 +968,7 @@ song_status song_audio_stream_info(song_handle *h, uint32_t audio_index,
     copy_name(out_info->codec, avcodec_get_name(st->codecpar->codec_id));
     out_info->is_default =
         (st->disposition & AV_DISPOSITION_DEFAULT) ? 1 : 0;
-    return SONG_OK;
+    return ok(h);
 }
 
 /* Reposition demux/IO state to the container start so the newly selected
@@ -948,13 +984,13 @@ static int rewind_demux(song_handle *h) {
 
 song_status song_select_stream(song_handle *h, uint32_t audio_index) {
     if (!h) return SONG_ERR_INVALID_ARGUMENT;
-    if (!h->probed) return SONG_ERR_NOT_OPEN;
-    if (audio_index >= h->audio_count) return SONG_ERR_INVALID_ARGUMENT;
+    if (!h->probed) return fail_not_open(h);
+    if (audio_index >= h->audio_count) return fail_arg(h);
 
     AVCodecContext *new_dec = NULL;
     song_status st = open_decoder_for(h, audio_index, &new_dec);
     if (st != SONG_OK)
-        return set_error(h, st, 0, "cannot open selected stream decoder");
+        return fail(h, st, 0, "cannot open selected stream decoder");
 
     /* Swap decoders, rewind the source, reset decode + PCM state, rebuild
      * the metadata snapshot. Artwork is container-level and stays valid. */
@@ -964,54 +1000,60 @@ song_status song_select_stream(song_handle *h, uint32_t audio_index) {
     reset_decode_state(h);
 
     if (rewind_demux(h) < 0)
-        return set_error(h, SONG_ERR_SEEK_ERROR, 0,
-                         "cannot rewind source for stream switch");
+        return fail(h, SONG_ERR_SEEK_ERROR, 0,
+                    "cannot rewind source for stream switch");
 
     AVStream *st_ = h->fmt->streams[h->audio_streams[audio_index]];
     h->sample_rate = st_->codecpar->sample_rate;
     h->channels = st_->codecpar->ch_layout.nb_channels;
     h->channel_mask = channel_mask_from_layout(&st_->codecpar->ch_layout);
 
-    if (metadata_build(h) < 0) return SONG_ERR_OUT_OF_MEMORY;
-    clear_error(h);
-    return SONG_OK;
+    if (metadata_build(h) < 0)
+        return fail(h, SONG_ERR_OUT_OF_MEMORY, 0,
+                    "snapshot allocation failed");
+    return ok(h);
 }
 
 song_status song_get_metadata(song_handle *h, const song_metadata **out_meta) {
-    if (!h || !out_meta) return SONG_ERR_INVALID_ARGUMENT;
-    if (!h->probed) return SONG_ERR_NOT_OPEN;
+    if (!h) return SONG_ERR_INVALID_ARGUMENT;
+    if (!out_meta) return fail_arg(h);
+    if (!h->probed) return fail_not_open(h);
     *out_meta = &h->meta;
-    return SONG_OK;
+    return ok(h);
 }
 
 song_status song_get_metadata_count(song_handle *h, uint32_t *out_count) {
-    if (!h || !out_count) return SONG_ERR_INVALID_ARGUMENT;
-    if (!h->probed) return SONG_ERR_NOT_OPEN;
+    if (!h) return SONG_ERR_INVALID_ARGUMENT;
+    if (!out_count) return fail_arg(h);
+    if (!h->probed) return fail_not_open(h);
     *out_count = h->raw_count;
-    return SONG_OK;
+    return ok(h);
 }
 
 song_status song_get_metadata_entry(song_handle *h, uint32_t index,
                                 song_metadata_entry *out_entry) {
-    if (!h || !out_entry) return SONG_ERR_INVALID_ARGUMENT;
-    if (!h->probed) return SONG_ERR_NOT_OPEN;
-    if (index >= h->raw_count) return SONG_ERR_INVALID_ARGUMENT;
+    if (!h) return SONG_ERR_INVALID_ARGUMENT;
+    if (!out_entry) return fail_arg(h);
+    if (!h->probed) return fail_not_open(h);
+    if (index >= h->raw_count) return fail_arg(h);
     *out_entry = h->raw[index];
-    return SONG_OK;
+    return ok(h);
 }
 
 song_status song_get_artwork_count(song_handle *h, uint32_t *out_count) {
-    if (!h || !out_count) return SONG_ERR_INVALID_ARGUMENT;
-    if (!h->probed) return SONG_ERR_NOT_OPEN;
+    if (!h) return SONG_ERR_INVALID_ARGUMENT;
+    if (!out_count) return fail_arg(h);
+    if (!h->probed) return fail_not_open(h);
     *out_count = h->art_count;
-    return SONG_OK;
+    return ok(h);
 }
 
 song_status song_get_artwork_item(song_handle *h, uint32_t index,
                               song_artwork_item *out_item) {
-    if (!h || !out_item) return SONG_ERR_INVALID_ARGUMENT;
-    if (!h->probed) return SONG_ERR_NOT_OPEN;
-    if (index >= h->art_count) return SONG_ERR_INVALID_ARGUMENT;
+    if (!h) return SONG_ERR_INVALID_ARGUMENT;
+    if (!out_item) return fail_arg(h);
+    if (!h->probed) return fail_not_open(h);
+    if (index >= h->art_count) return fail_arg(h);
     const struct art_item *it = &h->art[index];
     memset(out_item, 0, sizeof(*out_item));
     out_item->role = it->role;
@@ -1022,15 +1064,16 @@ song_status song_get_artwork_item(song_handle *h, uint32_t index,
     out_item->width = it->width;
     out_item->height = it->height;
     out_item->is_front_cover = it->is_front_cover;
-    return SONG_OK;
+    return ok(h);
 }
 
 song_status song_read_pcm(song_handle *h, float *dst, uint64_t frame_capacity,
                           uint64_t *out_frames_produced) {
-    if (!h || !dst || !out_frames_produced) return SONG_ERR_INVALID_ARGUMENT;
+    if (!h) return SONG_ERR_INVALID_ARGUMENT;
+    if (!dst || !out_frames_produced) return fail_arg(h);
     *out_frames_produced = 0;
-    if (frame_capacity == 0) return SONG_ERR_INVALID_ARGUMENT;
-    if (!h->probed || !h->dec) return SONG_ERR_NOT_OPEN;
+    if (frame_capacity == 0) return fail_arg(h);
+    if (!h->probed || !h->dec) return fail_not_open(h);
     if (h->fatal_error != SONG_OK)
         return set_error(h, h->fatal_error, h->last_native,
                          "pending decode error");
@@ -1076,17 +1119,17 @@ song_status song_read_pcm(song_handle *h, float *dst, uint64_t frame_capacity,
     }
 
     *out_frames_produced = produced;
-    if (produced > 0) return SONG_OK;
+    if (produced > 0) return ok(h);
     if (h->fatal_error != SONG_OK) return h->fatal_error;
-    return SONG_EOF;
+    return eof(h);
 }
 
 song_status song_seek(song_handle *h, int64_t requested_position_us,
                       int64_t *out_actual_position_us) {
     if (!h) return SONG_ERR_INVALID_ARGUMENT;
     if (out_actual_position_us) *out_actual_position_us = -1;
-    if (!h->probed || !h->dec) return SONG_ERR_NOT_OPEN;
-    if (requested_position_us < 0) return SONG_ERR_INVALID_ARGUMENT;
+    if (!h->probed || !h->dec) return fail_not_open(h);
+    if (requested_position_us < 0) return fail_arg(h);
 
     int64_t target = requested_position_us;
     if (h->fmt->duration != AV_NOPTS_VALUE && h->fmt->duration > 0 &&
@@ -1113,11 +1156,10 @@ song_status song_seek(song_handle *h, int64_t requested_position_us,
         song_status type =
             (ret == AVERROR(ENOSYS) || container_has_no_seek)
                 ? SONG_ERR_SEEK_UNSUPPORTED : SONG_ERR_SEEK_ERROR;
-        return set_error(h, type, ret, "container seek failed");
+        return fail(h, type, ret, "container seek failed");
     }
     avcodec_flush_buffers(h->dec);
     reset_decode_state(h);
-    clear_error(h);
 
     /* Measure the effective landing from the first decoded frame after the
      * seek. The frame is held and returned by the next song_read_pcm. */
@@ -1132,7 +1174,7 @@ song_status song_seek(song_handle *h, int64_t requested_position_us,
             song_status st = (conv == -2) ? SONG_ERR_STREAM_CHANGE
                                           : SONG_ERR_DECODE_ERROR;
             h->fatal_error = st;
-            return set_error(h, st, 0, conv == -2
+            return fail(h, st, 0, conv == -2
                                  ? "decoder changed format after seek"
                                  : "sample format conversion failed after seek");
         }
@@ -1143,10 +1185,10 @@ song_status song_seek(song_handle *h, int64_t requested_position_us,
         /* else: landing unknown; actual stays -1 (explicit). */
     } else if (decoded < 0) {
         av_frame_unref(h->frame);
-        return set_error(h, SONG_ERR_SEEK_ERROR, h->last_native,
-                         "could not reach a landing point");
+        return fail(h, SONG_ERR_SEEK_ERROR, h->last_native,
+                    "could not reach a landing point");
     }
-    return SONG_OK;
+    return ok(h);
 }
 
 song_status song_last_error(song_handle *h, const song_error **out_error) {

@@ -2,7 +2,7 @@
   "tool": "tests/songcore/consumers.py",
   "platform": "Linux-x86_64",
   "shared_library": "build/artifacts/shared/libsongcore.so",
-  "shared_library_sha256": "329bbc8e58e7443361808dc8668cb3173627262271c87fc5e3c38b06977b8031",
+  "shared_library_sha256": "110e8dd3698698694ceea519494bb2f9a2f18430f4436717d333ceeaa7bcd3fc",
   "gates": [
     {
       "gate": "shared_export_audit",
@@ -14,15 +14,21 @@
       "tool": "tools/songcore_ffi_smoke.py",
       "fixtures": [
         "flac-16-44-stereo.flac",
+        "flac-24-96.flac",
         "mp3-cbr-id3v23.mp3",
+        "mp3-vbr-id3v24.mp3",
         "aac-lc-44-stereo.m4a",
         "aac-adts-44-stereo.aac",
+        "alac-16-44-stereo.m4a",
         "opus-48-stereo.opus",
         "vorbis-44-stereo.ogg",
-        "wav-s16le-44-stereo.wav"
+        "wav-s16le-44-stereo.wav",
+        "wav-f32le-44-stereo.wav",
+        "wav-u8-44-mono.wav",
+        "artwork-mp3-jpeg.mp3"
       ],
       "verdict": "pass",
-      "library_sha256": "329bbc8e58e7443361808dc8668cb3173627262271c87fc5e3c38b06977b8031",
+      "library_sha256": "110e8dd3698698694ceea519494bb2f9a2f18430f4436717d333ceeaa7bcd3fc",
       "abi_version": 1,
       "songs": [
         {
@@ -35,6 +41,15 @@
           "sha256": "d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2"
         },
         {
+          "song": "flac-24-96.flac",
+          "verdict": "pass",
+          "container": "flac",
+          "codec": "flac",
+          "sample_rate": 96000,
+          "channels": 2,
+          "sha256": "600cff5e38782a5ca5455d7418f6dd00de79ebe822906526077d5b314a530a1d"
+        },
+        {
           "song": "mp3-cbr-id3v23.mp3",
           "verdict": "pass",
           "container": "mp3",
@@ -42,6 +57,15 @@
           "sample_rate": 44100,
           "channels": 2,
           "sha256": "feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058"
+        },
+        {
+          "song": "mp3-vbr-id3v24.mp3",
+          "verdict": "pass",
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "sha256": "d903161e7d9bdcc0992dda25f6aa3b96e4e6f9301ecbc599835b31fbe97f07e2"
         },
         {
           "song": "aac-lc-44-stereo.m4a",
@@ -60,6 +84,15 @@
           "sample_rate": 44100,
           "channels": 2,
           "sha256": "e2494df357ea26363d61a9ebe86f5940ccb32fc222a4415f08934f8ad4aa3a6a"
+        },
+        {
+          "song": "alac-16-44-stereo.m4a",
+          "verdict": "pass",
+          "container": "mov,mp4,m4a,3gp,3g2,mj2",
+          "codec": "alac",
+          "sample_rate": 44100,
+          "channels": 2,
+          "sha256": "0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3"
         },
         {
           "song": "opus-48-stereo.opus",
@@ -87,6 +120,33 @@
           "sample_rate": 44100,
           "channels": 2,
           "sha256": "c7a31488b22bbaec1a4d879cc03508f0373f90dd789e5cc0f59a3c8c60a3dcd4"
+        },
+        {
+          "song": "wav-f32le-44-stereo.wav",
+          "verdict": "pass",
+          "container": "wav",
+          "codec": "pcm_f32le",
+          "sample_rate": 44100,
+          "channels": 2,
+          "sha256": "7211919e07e9ca6ef573f8727c1c94bc3a23733cfbe28e7bbf695313d33d05dd"
+        },
+        {
+          "song": "wav-u8-44-mono.wav",
+          "verdict": "pass",
+          "container": "wav",
+          "codec": "pcm_u8",
+          "sample_rate": 44100,
+          "channels": 1,
+          "sha256": "ee6ec3dbfd0ec07fb39588ee44e21ae703eb21517ca40728fc4db78a94506533"
+        },
+        {
+          "song": "artwork-mp3-jpeg.mp3",
+          "verdict": "pass",
+          "container": "mp3",
+          "codec": "mp3",
+          "sample_rate": 44100,
+          "channels": 2,
+          "sha256": "265768b18fef15635363d2788119b8f33f24474dafbbd7a647998e16d7ef61d1"
         }
       ]
     },

@@ -742,6 +742,122 @@ static int mode_neg(const char *path) {
 }
 
 /* -------------------------------------------------------------------------
+ * lasterror mode: the song_last_error contract (diagnostics are promised on
+ * every typed failure with a valid handle, and cleared by SONG_OK/EOF)
+ * ---------------------------------------------------------------------- */
+
+static int mode_lasterror(const char *path) {
+    FILE *f = stdout;
+    song_handle *song = NULL;
+    file_source src;
+    if (open_song(path, &song, &src, -1) < 0) {
+        printf("{\"file\":");
+        json_escape(f, path, strlen(path));
+        printf(",\"phase\":\"open_failed\"}\n");
+        return 1;
+    }
+
+    song_info info;
+    memset(&info, 0, sizeof(info));
+    int probe_status = (int)song_probe(song, &info);
+    fprintf(f, "{\"file\":");
+    json_escape(f, path, strlen(path));
+    fprintf(f, ",\"probe_status\":%d", probe_status);
+
+    const song_error *e = NULL;
+
+    /* 1) invalid stream index -> typed INVALID_ARGUMENT + diagnostic */
+    int sel_status = (int)song_select_stream(song, info.audio_stream_count + 7);
+    int sel_diag_len = -1;
+    if (song_last_error(song, &e) == SONG_OK && e)
+        sel_diag_len = e->message ? (int)e->message_len : -1;
+    fprintf(f, ",\"select_invalid_status\":%d,\"select_invalid_diag_len\":%d",
+            sel_status, sel_diag_len);
+
+    /* 2) success clears: probe again -> SONG_OK + NULL message */
+    int probe2_status = (int)song_probe(song, &info);
+    int probe2_diag_len = -1;
+    int probe2_msg_null = -1;
+    if (song_last_error(song, &e) == SONG_OK && e) {
+        probe2_msg_null = e->message == NULL;
+        probe2_diag_len = (int)e->message_len;
+    }
+    fprintf(f, ",\"probe2_status\":%d,\"probe2_msg_null\":%s,"
+               "\"probe2_diag_len\":%d",
+            probe2_status, probe2_msg_null == 1 ? "true" : "false",
+            probe2_diag_len);
+
+    /* 3) zero decode capacity -> INVALID_ARGUMENT + diagnostic */
+    uint64_t n = 0;
+    int zero_status = (int)song_read_pcm(song, NULL, 0, &n);
+    int zero_diag_len = -1;
+    if (song_last_error(song, &e) == SONG_OK && e)
+        zero_diag_len = e->message ? (int)e->message_len : -1;
+    fprintf(f, ",\"zero_capacity_status\":%d,\"zero_capacity_diag_len\":%d",
+            zero_status, zero_diag_len);
+
+    /* 4) EOF is not an error: decode to end -> SONG_EOF + NULL message */
+    float buf[8192];
+    int final_status = -2;
+    for (;;) {
+        uint64_t got = 0;
+        uint64_t cap = sizeof(buf) / (sizeof(buf[0]) *
+                        (uint64_t)(info.channels > 0 ? info.channels : 2));
+        song_status st = song_read_pcm(song, buf, cap, &got);
+        if (st != SONG_OK) { final_status = (int)st; break; }
+    }
+    int eof_diag_len = -1;
+    int eof_msg_null = -1;
+    if (song_last_error(song, &e) == SONG_OK && e) {
+        eof_msg_null = e->message == NULL;
+        eof_diag_len = (int)e->message_len;
+    }
+    fprintf(f, ",\"decode_final_status\":%d,\"eof_msg_null\":%s,"
+               "\"eof_diag_len\":%d",
+            final_status, eof_msg_null == 1 ? "true" : "false",
+            eof_diag_len);
+
+    /* 5) metadata entry out of range -> INVALID_ARGUMENT + diagnostic */
+    uint32_t raw_count = 0;
+    song_get_metadata_count(song, &raw_count);
+    song_metadata_entry ent;
+    int ent_status = (int)song_get_metadata_entry(song, raw_count + 3, &ent);
+    int ent_diag_len = -1;
+    if (song_last_error(song, &e) == SONG_OK && e)
+        ent_diag_len = e->message ? (int)e->message_len : -1;
+    fprintf(f, ",\"entry_invalid_status\":%d,\"entry_invalid_diag_len\":%d",
+            ent_status, ent_diag_len);
+
+    /* 6) artwork out of range (count is 0 or item exists; +5 is always
+     * invalid) -> INVALID_ARGUMENT + diagnostic */
+    uint32_t art_count = 0;
+    song_get_artwork_count(song, &art_count);
+    song_artwork_item art;
+    int art_status = (int)song_get_artwork_item(song, art_count + 5, &art);
+    int art_diag_len = -1;
+    if (song_last_error(song, &e) == SONG_OK && e)
+        art_diag_len = e->message ? (int)e->message_len : -1;
+    fprintf(f, ",\"art_invalid_status\":%d,\"art_invalid_diag_len\":%d",
+            art_status, art_diag_len);
+
+    /* 7) seek success clears again */
+    int seek_status = (int)song_seek(song, 0, NULL);
+    int seek_diag_len = -1;
+    int seek_msg_null = -1;
+    if (song_last_error(song, &e) == SONG_OK && e) {
+        seek_msg_null = e->message == NULL;
+        seek_diag_len = (int)e->message_len;
+    }
+    fprintf(f, ",\"seek_status\":%d,\"seek_msg_null\":%s,\"seek_diag_len\":%d",
+            seek_status,
+            seek_msg_null == 1 ? "true" : "false", seek_diag_len);
+
+    fputs("}\n", f);
+    close_song(&song, &src);
+    return 0;
+}
+
+/* -------------------------------------------------------------------------
  * states mode: deterministic fuzz-like call sequences
  * ---------------------------------------------------------------------- */
 
@@ -1113,8 +1229,10 @@ int main(int argc, char **argv) {
                 "       %s states <file>\n"
                 "       %s iofail <file> <fail_after_bytes>\n"
                 "       %s lifetime <file>\n"
-                "       %s switchcheck <file>\n",
-                argv[0], argv[0], argv[0], argv[0], argv[0], argv[0]);
+                "       %s switchcheck <file>\n"
+                "       %s lasterror <file>\n",
+                argv[0], argv[0], argv[0], argv[0], argv[0], argv[0],
+                argv[0]);
         return 2;
     }
     const char *mode = argv[1];
@@ -1132,6 +1250,7 @@ int main(int argc, char **argv) {
     if (!strcmp(mode, "states")) return mode_states(path);
     if (!strcmp(mode, "lifetime")) return mode_lifetime(path);
     if (!strcmp(mode, "switchcheck")) return mode_switchcheck(path);
+    if (!strcmp(mode, "lasterror")) return mode_lasterror(path);
     if (!strcmp(mode, "iofail") && argc >= 4)
         return mode_iofail(path, atoll(argv[3]));
     fprintf(stderr, "unknown mode\n");
