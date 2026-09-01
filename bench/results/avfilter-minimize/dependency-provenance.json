@@ -1,0 +1,406 @@
+{
+ "experiment": "e10-c0",
+ "filters": {
+  "_ladder_graph_inserted": {
+   "auto_inserted_anywhere": [
+    "auto_aresample_0"
+   ],
+   "per_graph": {
+    "f0_aformat_flt": [],
+    "f0_anull": [],
+    "f0_endpoints": [],
+    "f1_bass": [
+     "auto_aresample_0"
+    ],
+    "f1_equalizer": [
+     "auto_aresample_0"
+    ],
+    "f1_highpass": [
+     "auto_aresample_0"
+    ],
+    "f1_highshelf": [
+     "auto_aresample_0"
+    ],
+    "f1_lowpass": [
+     "auto_aresample_0"
+    ],
+    "f1_lowshelf": [
+     "auto_aresample_0"
+    ],
+    "f1_treble": [
+     "auto_aresample_0"
+    ],
+    "f1_volume": [],
+    "f2_acompressor": [
+     "auto_aresample_0"
+    ],
+    "f2_agate": [
+     "auto_aresample_0"
+    ],
+    "f2_alimiter": [
+     "auto_aresample_0"
+    ],
+    "f3_channelmap_swap": [
+     "auto_aresample_0"
+    ],
+    "f3_crossfeed": [
+     "auto_aresample_0"
+    ],
+    "f3_pan_balance": [],
+    "f3_pan_downmix": [],
+    "f3_stereowiden": [],
+    "f4_aecho": [
+     "auto_aresample_0"
+    ],
+    "f4_aphaser": [],
+    "f4_chorus": [
+     "auto_aresample_0"
+    ],
+    "f4_flanger": [
+     "auto_aresample_0"
+    ],
+    "f4_tremolo": [
+     "auto_aresample_0"
+    ],
+    "f4_vibrato": [
+     "auto_aresample_0"
+    ],
+    "f5_adelay": [
+     "auto_aresample_0"
+    ],
+    "f5_afade": [],
+    "f5_dynaudnorm": [
+     "auto_aresample_0"
+    ],
+    "f5_loudnorm": [
+     "auto_aresample_0"
+    ],
+    "f6_firequalizer": [
+     "auto_aresample_0"
+    ],
+    "f6_surround": [
+     "auto_aresample_0"
+    ],
+    "f7_atempo": []
+   },
+   "shared_foundation": {
+    "swresample": "enters at F1 via aresample (format adaptation) and pan (configure dep); it is shared foundation for every later tier, not a per-filter cost"
+   }
+  },
+  "acompressor": {
+   "capability": "compressor",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F2"
+  },
+  "acrossfade": {
+   "capability": "crossfade",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F5"
+  },
+  "adelay": {
+   "capability": "start delay",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F5"
+  },
+  "aecho": {
+   "capability": "echo",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F4"
+  },
+  "aeval": {
+   "capability": null,
+   "classifications": [
+    "not-justified: expression-based source synthesis; not a player capability"
+   ],
+   "tier": null
+  },
+  "afade": {
+   "capability": "fade in/out",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F5"
+  },
+  "afir": {
+   "capability": "FIR convolution",
+   "classifications": [
+    "product-required",
+    "format-adaptation: probe graph inserted ['auto_aresample_0', 'auto_aresample_1']"
+   ],
+   "probe_stage": "avf-p-afir",
+   "tier": "F6"
+  },
+  "agate": {
+   "capability": "gate",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F2"
+  },
+  "alimiter": {
+   "capability": "limiter",
+   "classifications": [
+    "product-required",
+    "format-adaptation: probe graph inserted ['auto_aresample_0']"
+   ],
+   "probe_stage": "avf-p-alimiter",
+   "tier": "F2"
+  },
+  "amix": {
+   "capability": null,
+   "classifications": [
+    "not-justified: multi-input mixing has no single-stream local-player capability; crossfade is acrossfade (F5)"
+   ],
+   "tier": null
+  },
+  "anequalizer/superequalizer": {
+   "capability": null,
+   "classifications": [
+    "not-justified: graphic EQ covered by equalizer composition (F1) and firequalizer (F6); no third EQ implementation"
+   ],
+   "tier": null
+  },
+  "aphaser": {
+   "capability": "phaser",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F4"
+  },
+  "atempo": {
+   "capability": "tempo",
+   "classifications": [
+    "product-required",
+    "no graph-inserted conversion observed in linear flt chain"
+   ],
+   "probe_stage": "avf-p-atempo",
+   "tier": "F7"
+  },
+  "bass": {
+   "capability": "bass/treble tone",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F1"
+  },
+  "biquad": {
+   "capability": "custom biquad primitive",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F1"
+  },
+  "channelmap": {
+   "capability": "channel layout remap",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F3"
+  },
+  "chorus": {
+   "capability": "chorus",
+   "classifications": [
+    "product-required",
+    "format-adaptation: probe graph inserted ['auto_aresample_0']"
+   ],
+   "probe_stage": "avf-p-chorus",
+   "tier": "F4"
+  },
+  "crossfeed": {
+   "capability": "crossfeed",
+   "classifications": [
+    "product-required",
+    "format-adaptation: probe graph inserted ['auto_aresample_0']"
+   ],
+   "probe_stage": "avf-p-crossfeed",
+   "tier": "F3"
+  },
+  "dynaudnorm": {
+   "capability": "dynamic normalization",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F5"
+  },
+  "equalizer": {
+   "capability": "graphic EQ",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F1"
+  },
+  "extrastereo": {
+   "capability": null,
+   "classifications": [
+    "not-justified: width covered by stereowiden (F3); one implementation per capability"
+   ],
+   "tier": null
+  },
+  "firequalizer": {
+   "capability": "frequency-domain EQ",
+   "classifications": [
+    "product-required",
+    "format-adaptation: probe graph inserted ['auto_aresample_0']"
+   ],
+   "probe_stage": "avf-p-firequalizer",
+   "tier": "F6"
+  },
+  "flanger": {
+   "capability": "flanger",
+   "classifications": [
+    "product-required",
+    "format-adaptation: probe graph inserted ['auto_aresample_0']"
+   ],
+   "probe_stage": "avf-p-flanger",
+   "tier": "F4"
+  },
+  "haas": {
+   "capability": null,
+   "classifications": [
+    "not-justified: pseudo-stereo widening is a novelty variant of width; not a distinct product capability"
+   ],
+   "tier": null
+  },
+  "headphone": {
+   "capability": "headphone correction",
+   "classifications": [
+    "product-required",
+    "no graph-inserted conversion observed in linear flt chain"
+   ],
+   "probe_stage": "avf-p-headphone",
+   "tier": "F6"
+  },
+  "highpass": {
+   "capability": "low/high-pass",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F1"
+  },
+  "highshelf": {
+   "capability": "bass/treble tone",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F1"
+  },
+  "ladspa": {
+   "capability": "LADSPA plugin ecosystem",
+   "classifications": [
+    "external-optional (ladspa+libdl)"
+   ],
+   "tier": null
+  },
+  "loudnorm": {
+   "capability": "loudness normalization",
+   "classifications": [
+    "product-required",
+    "format-adaptation: probe graph inserted ['auto_aresample_0']"
+   ],
+   "probe_stage": "avf-p-loudnorm",
+   "tier": "F5"
+  },
+  "lowpass": {
+   "capability": "low/high-pass",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F1"
+  },
+  "lowshelf": {
+   "capability": "bass/treble tone",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F1"
+  },
+  "pan": {
+   "capability": "balance + mono downmix + channel matrix",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F3"
+  },
+  "replaygain": {
+   "capability": null,
+   "classifications": [
+    "not-justified: ReplayGain is metadata->scalar->volume (product-owned); adding a filter where a control value suffices"
+   ],
+   "tier": null
+  },
+  "rubberband": {
+   "capability": "high-quality tempo/pitch",
+   "classifications": [
+    "external-optional (librubberband)"
+   ],
+   "tier": null
+  },
+  "sofalizer": {
+   "capability": "SOFA HRTF correction",
+   "classifications": [
+    "external-optional (libmysofa)"
+   ],
+   "tier": null
+  },
+  "stereotools": {
+   "capability": null,
+   "classifications": [
+    "not-justified: width/balance covered by stereowiden (F3) + pan (F3)"
+   ],
+   "tier": null
+  },
+  "stereowiden": {
+   "capability": "stereo width",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F3"
+  },
+  "surround": {
+   "capability": "surround expansion",
+   "classifications": [
+    "product-required",
+    "format-adaptation: probe graph inserted ['auto_aresample_0']"
+   ],
+   "probe_stage": "avf-p-surround",
+   "tier": "F6"
+  },
+  "treble": {
+   "capability": "bass/treble tone",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F1"
+  },
+  "tremolo": {
+   "capability": "tremolo",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F4"
+  },
+  "vibrato": {
+   "capability": "vibrato",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F4"
+  },
+  "volume": {
+   "capability": "volume/preamp",
+   "classifications": [
+    "product-required"
+   ],
+   "tier": "F1"
+  }
+ },
+ "notes": "classification per filter: configure-required (dep rule in pinned configure), graph-required (auto-inserted at graph config), format-adaptation (discovered by graph config failure), shared-foundation, external-optional"
+}

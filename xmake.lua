@@ -21,6 +21,17 @@ option("av_manifest")
     set_showmenu(true)
     set_description("FFmpeg compile-closure manifest to replay")
 
+-- E10-C0 bench-only replay-fidelity normalization. mode.release injects
+-- -fvisibility=hidden / -DNDEBUG ahead of the frozen unit flags, which
+-- shifts GCC IPA decisions away from the upstream-oracle objects the C0
+-- replay must reproduce. Enabling this neutralizes both for every replayed
+-- C unit of qianqian_av. NEVER enable outside E10-C0 oracle-equivalence
+-- builds: normal production builds keep mode.release semantics unchanged.
+option("av_replay_exact")
+    set_default(false)
+    set_showmenu(true)
+    set_description("C0-only: normalize replayed C units (-fvisibility=default -UNDEBUG) for upstream-oracle equivalence")
+
 -- S4 experiment: garbage-collect unreferenced sections in the final binary.
 option("gc_sections")
     set_default(false)
@@ -102,6 +113,16 @@ target("qianqian_av")
             if wasm_session then
                 flags = optimize_flags(flags)
             end
+            -- Replay fidelity (E10-C0): see the av_replay_exact option.
+            -- Forced unit flags land after the injected ones, so
+            -- neutralizing here is last-wins. Default (unset) builds keep
+            -- production mode.release semantics identical to the parent
+            -- branch.
+            if get_config("av_replay_exact")
+                    and (unit.flag_kind == nil or unit.flag_kind == "cflags") then
+                table.insert(flags, "-fvisibility=default")
+                table.insert(flags, "-UNDEBUG")
+            end
             if #flags > 0 then
                 local force = {}
                 force[unit.flag_kind or "cflags"] = flags
@@ -144,6 +165,41 @@ target("qn_pcm_dump")
         end
         if get_config("lto") then
             target:add("ldflags", "-flto=auto")
+        end
+    end)
+
+-- E10-C0: bench-only libavfilter capability probe. Links the FFmpeg closure
+-- replayed by qianqian_av (whatever --av_manifest points at) and exercises
+-- the filters that closure enables: registration presence/absence,
+-- negotiated formats, correctness smokes, graph lifecycle. Bench-only: no
+-- production semantics, no decode path.
+target("qn_avfilter_cap_probe")
+    set_kind("binary")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("bench/pcm/avfilter/qn_avfilter_cap_probe.c")
+    add_deps("qianqian_av", "songcore")
+    if is_plat("linux") or is_plat("macosx") then
+        add_syslinks("m", "pthread")
+    end
+    on_load(function (target)
+        if get_config("gc_sections") then
+            target:add("ldflags", "-Wl,--gc-sections")
+        end
+        if get_config("lto") then
+            target:add("cflags", "-flto")
+            target:add("ldflags", "-flto=auto")
+        end
+        -- Optional link map for the C0 live-bytes ledger; opt-in via env so
+        -- normal builds are untouched.
+        local link_map = os.getenv("QN_LINK_MAP")
+        if link_map and #link_map > 0 then
+            target:add("ldflags", "-Wl,-Map=" .. link_map)
+        end
+        -- avf-c0 (codec-only closure) has no libavfilter to link: the probe
+        -- compiles its fail-closed stub backend instead.
+        if os.getenv("QN_PROBE_NO_AVFILTER") then
+            target:add("defines", "QN_PROBE_NO_AVFILTER")
         end
     end)
 

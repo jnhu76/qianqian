@@ -81,11 +81,16 @@ def main() -> None:
 
     # Profiles that enable swresample (the Opus decoder's upstream build
     # dependency) must also make its archive an oracle build target, or its
-    # translation units would never enter the replay manifest.
+    # translation units would never enter the replay manifest. Same for
+    # libavfilter (E10-C0 capability ladder).
+    extra_targets = []
     if "swresample" in profile.get("libraries", {}).get("enable", []):
-        swr = "libswresample/libswresample.a"
-        if swr not in fi.LIB_TARGETS:
-            fi.LIB_TARGETS = fi.LIB_TARGETS + (swr,)
+        extra_targets.append("libswresample/libswresample.a")
+    if "avfilter" in profile.get("libraries", {}).get("enable", []):
+        extra_targets.append("libavfilter/libavfilter.a")
+    for t in extra_targets:
+        if t not in fi.LIB_TARGETS:
+            fi.LIB_TARGETS = fi.LIB_TARGETS + (t,)
 
     fi.PROFILE = profile_path
     fi.OUT = stage_dir

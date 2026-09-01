@@ -1,0 +1,201 @@
+{
+ "config_evidence": {
+  "avfilter_in_closure": true,
+  "external_libs_enabled": [],
+  "filter_list_registered": [
+   "abuffer",
+   "abuffersink",
+   "aformat",
+   "anull",
+   "atempo"
+  ],
+  "filter_list_sha256": "c77ab8d31b2302a5834cf689ae092c8813a61aa3bd135d5e3d154935d09195b0",
+  "filters_enabled_config": [
+   "aformat",
+   "anull",
+   "atempo"
+  ],
+  "license": "LGPL version 2.1 or later",
+  "misc": {
+   "CONFIG_STATIC": "yes"
+  }
+ },
+ "cost_split": {
+  "adaptation_units": 0,
+  "adaptation_xz_bytes": 0,
+  "direct_xz_bytes": 287540,
+  "note": "direct = codec+F0+filter(+configure-required deps); adaptation = discovered minimal conversion capability; the old +xz figure mixed both"
+ },
+ "delta_vs_avf-c1": {
+  "stripped_bytes": 200704,
+  "units": 1,
+  "xz_bytes": 54336
+ },
+ "discovery": {
+  "configure_required_libs": {},
+  "direct_closure": {
+   "graph_config_failures": [],
+   "graph_error_sample": null,
+   "manifest_per_library": {
+    "libavcodec": 72,
+    "libavfilter": 20,
+    "libavformat": 38,
+    "libavutil": 95
+   },
+   "manifest_units": 225,
+   "profile_sha256": "b56c2d76e476100dd394689555f8e33403b0d73c4a9533ac237cd40428c3199b",
+   "usable_with_canonical_flt_input": true,
+   "xz_bytes": 287540
+  },
+  "effective_closure": {
+   "auto_inserted": [],
+   "manifest_per_library": {
+    "libavcodec": 72,
+    "libavfilter": 20,
+    "libavformat": 38,
+    "libavutil": 95
+   },
+   "manifest_units": 225,
+   "xz_bytes": 287540
+  },
+  "format_adaptation": {
+   "added": [],
+   "added_libs": [],
+   "class": "none",
+   "discovered_by": null,
+   "required": false
+  }
+ },
+ "experiment_inputs": {
+  "combined_sha256": "deb188e45fa1284eacaf1071e3093343454f0f2893ba7cc5df62458d09c2e230",
+  "ffmpeg_pin": {
+   "ffmpeg_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+   "ffmpeg_tag": "n9.0.1",
+   "ffmpeg_version": "9.0.1",
+   "source_sha256": "d16837ddbb0963753aa2739971a09b07fe14fe855a6e84f253f851127f99c746",
+   "source_url": "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n9.0.1.zip",
+   "verification": {
+    "method": "tag-to-commit mapping resolved via GitHub API (2026-08-29, tag object 501bb49457b9dfb25d6a208832e0a6e6cd53108d -> commit bf1b838f); source integrity via zip sha256. GitHub release-archive zips contain no .git, so commit sha is pinned here rather than recomputed from the archive.",
+    "recheck_command": "git ls-remote https://github.com/FFmpeg/FFmpeg 'refs/tags/n9.0.1^{}'"
+   }
+  },
+  "files": {
+   "bench/dsp-capabilities.json": "a268192be4c6b059fa44fd128afac897c6e233af50bcf2c0cea16e492166c995",
+   "bench/ffmpeg-pin.json": "224ad3d5f70b5ecdebf2fe688d2eb2f976a499c6818d336cbf984bc9ff2aff85",
+   "bench/pcm/avfilter/qn_avfilter_cap_probe.c": "2ea3e61197552576efed20f08fde84e40075c9ac4e3509191f5479be12aa74e3",
+   "bench/profiles/n3-min-noswr.json": "852112fc5f894109e8def8fb53156266de06e8685beefa79107ef33aecaf24fa",
+   "tools/common_import.py": "d18d91fbbec4a46aa47be936fc9ef8c6411b0e80d1c83f7bf8148270eb0ff2a3",
+   "tools/ffmpeg_import.py": "18afad4e6bb7e447e4c2100f1628560042ebc7feb64bad4bdfec4f532d827238",
+   "tools/ffmpeg_manifest_union.py": "0e8c0f1b2d9f98abf5db562b61cde11e90813f34b8f7a013c17fb7e901baa9eb",
+   "tools/pcm_c0.py": "9aea39163d028dabdad0357986d4a8663e16d8bd078d1464e0f01ce2f0ee947e",
+   "xmake.lua": "478cc115b375a2b585e8793c450347c62ada6b290dac5fff515b0381b8780b6b"
+  }
+ },
+ "fft_foundation": {
+  "first_user": false,
+  "foundation_in_direct_closure": false,
+  "note": "no new FFT foundation units",
+  "units": [
+   "libavutil/tx.c",
+   "libavutil/tx_double.c",
+   "libavutil/tx_float.c",
+   "libavutil/tx_int32.c"
+  ]
+ },
+ "filters": [
+  "abuffer",
+  "abuffersink",
+  "aformat",
+  "anull",
+  "atempo"
+ ],
+ "gate_verdict": "PASS",
+ "graph_evidence": [
+  {
+   "auto_inserted": [],
+   "chain": "",
+   "id": "f0_endpoints",
+   "kind": "graph",
+   "negotiated": {
+    "channels": 2,
+    "fmt": "flt",
+    "layout": "stereo",
+    "rate": 48000
+   },
+   "ok": true
+  },
+  {
+   "auto_inserted": [],
+   "chain": "anull",
+   "id": "f0_anull",
+   "kind": "graph",
+   "negotiated": {
+    "channels": 2,
+    "fmt": "flt",
+    "layout": "stereo",
+    "rate": 48000
+   },
+   "ok": true
+  },
+  {
+   "auto_inserted": [],
+   "chain": "aformat=sample_fmts=flt:sample_rates=48000",
+   "id": "f0_aformat_flt",
+   "kind": "graph",
+   "negotiated": {
+    "channels": 2,
+    "fmt": "flt",
+    "layout": "stereo",
+    "rate": 48000
+   },
+   "ok": true
+  },
+  {
+   "auto_inserted": [],
+   "chain": "atempo=0.5",
+   "id": "f7_atempo",
+   "kind": "graph",
+   "negotiated": {
+    "channels": 1,
+    "fmt": "flt",
+    "layout": "mono",
+    "rate": 48000
+   },
+   "ok": true
+  }
+ ],
+ "manifest_per_library": {
+  "libavcodec": 72,
+  "libavfilter": 20,
+  "libavformat": 38,
+  "libavutil": 95
+ },
+ "manifest_units": 225,
+ "multi_input_status": null,
+ "probe_filter": "atempo",
+ "shipping": {
+  "archive_bytes": 2753874,
+  "ldd": [
+   {
+    "lib": "libm.so.6",
+    "path": "/usr/lib/x86_64-linux-gnu/libm.so.6"
+   },
+   {
+    "lib": "libc.so.6",
+    "path": "/usr/lib/x86_64-linux-gnu/libc.so.6"
+   }
+  ],
+  "probe_sizes": {
+   "raw_bytes": 870640,
+   "stripped_bytes": 870640,
+   "xz_bytes": 287540
+  }
+ },
+ "smoke_verdict": "PASS",
+ "source": {
+  "git_branch": "exp/e10-libavfilter-capability-min",
+  "measured_source_commit": "ff5540c4b0a3932c5114e88910424cd2aa1985e6"
+ },
+ "stage": "avf-p-atempo",
+ "stage_identity_sha256": "67a1bde1bef46ba890b3e411ce8e77ff3a728f1f5b4c2bc3f75ad0de5c0db5cf"
+}
