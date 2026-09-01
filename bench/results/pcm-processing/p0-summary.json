@@ -173,19 +173,19 @@
     "shape": "A_rt",
     "mode": "copy",
     "callback_work_total_ns": {
-     "median": 247619.0,
-     "min": 177296.0,
-     "max": 297477.0
+     "median": 297573.0,
+     "min": 265631.0,
+     "max": 356319.0
     },
     "callback_work_max_single_callback_ns": {
-     "median": 1052.0,
-     "min": 691.0,
-     "max": 16573.0
+     "median": 1873.0,
+     "min": 892.0,
+     "max": 20741.0
     },
     "pipeline_work_total_ns": {
-     "median": 247619.0,
-     "min": 177296.0,
-     "max": 297477.0
+     "median": 297573.0,
+     "min": 265631.0,
+     "max": 356319.0
     },
     "sink_copy_total_ns": {
      "median": 0.0,
@@ -211,24 +211,24 @@
     "shape": "B_worker",
     "mode": "copy",
     "callback_work_total_ns": {
-     "median": 103854.0,
-     "min": 100154.0,
-     "max": 118473.0
+     "median": 98681.0,
+     "min": 97151.0,
+     "max": 130149.0
     },
     "callback_work_max_single_callback_ns": {
-     "median": 611.0,
-     "min": 190.0,
-     "max": 4899.0
+     "median": 652.0,
+     "min": 611.0,
+     "max": 32343.0
     },
     "pipeline_work_total_ns": {
-     "median": 396118.0,
-     "min": 267196.0,
-     "max": 493625.0
+     "median": 444255.0,
+     "min": 398697.0,
+     "max": 496375.0
     },
     "sink_copy_total_ns": {
-     "median": 103854.0,
-     "min": 100154.0,
-     "max": 118473.0
+     "median": 98681.0,
+     "min": 97151.0,
+     "max": 130149.0
     },
     "pipeline_copy_calls": 2052,
     "pipeline_copy_bytes": 4202496,
@@ -249,24 +249,24 @@
     "shape": "B_worker",
     "mode": "forward",
     "callback_work_total_ns": {
-     "median": 252708.0,
-     "min": 236887.0,
-     "max": 392164.0
+     "median": 235626.0,
+     "min": 202295.0,
+     "max": 273424.0
     },
     "callback_work_max_single_callback_ns": {
-     "median": 1022.0,
-     "min": 721.0,
-     "max": 4028.0
+     "median": 1403.0,
+     "min": 712.0,
+     "max": 14859.0
     },
     "pipeline_work_total_ns": {
-     "median": 62117.0,
-     "min": 59481.0,
-     "max": 76375.0
+     "median": 56054.0,
+     "min": 55135.0,
+     "max": 65570.0
     },
     "sink_copy_total_ns": {
-     "median": 252708.0,
-     "min": 236887.0,
-     "max": 392164.0
+     "median": 235626.0,
+     "min": 202295.0,
+     "max": 273424.0
     },
     "pipeline_copy_calls": 0,
     "pipeline_copy_bytes": 0,
@@ -292,23 +292,23 @@
     "calls_per_pass": 16384,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 12.7,
-     "min": 12.0,
-     "max": 15.7
+     "median": 13.2,
+     "min": 13.1,
+     "max": 13.9
     },
     "ns_per_frame": {
-     "median": 0.1983
+     "median": 0.207
     },
-    "throughput_MBps_copy": 19238.9,
+    "throughput_MBps_copy": 18431.8,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 4194304,
     "memcpy_ref_ns_per_call": {
-     "median": 4.0,
-     "min": 4.0,
-     "max": 4.4
+     "median": 3.3,
+     "min": 3.2,
+     "max": 3.5
     },
-    "overhead_ns_per_call_vs_memcpy": 8.7,
-    "overhead_ratio_vs_memcpy": 2.154
+    "overhead_ns_per_call_vs_memcpy": 9.9,
+    "overhead_ratio_vs_memcpy": 2.997
    },
    {
     "block_frames": 64,
@@ -317,20 +317,20 @@
     "calls_per_pass": 16384,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 6.4,
-     "min": 6.3,
-     "max": 6.6
+     "median": 6.3,
+     "min": 6.2,
+     "max": 6.3
     },
     "ns_per_frame": {
-     "median": 0.1001
+     "median": 0.0985
     },
     "throughput_MBps_copy": null,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 4.0,
-     "min": 4.0,
-     "max": 4.4
+     "median": 3.3,
+     "min": 3.2,
+     "max": 3.5
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -342,23 +342,23 @@
     "calls_per_pass": 16384,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 21.6,
-     "min": 18.8,
-     "max": 25.1
+     "median": 18.7,
+     "min": 17.4,
+     "max": 24.9
     },
     "ns_per_frame": {
-     "median": 0.3369
+     "median": 0.2922
     },
-    "throughput_MBps_copy": 22644.4,
+    "throughput_MBps_copy": 26109.6,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 8388608,
     "memcpy_ref_ns_per_call": {
-     "median": 9.8,
-     "min": 9.5,
-     "max": 15.4
+     "median": 9.7,
+     "min": 9.1,
+     "max": 13.3
     },
-    "overhead_ns_per_call_vs_memcpy": 11.8,
-    "overhead_ratio_vs_memcpy": 1.2
+    "overhead_ns_per_call_vs_memcpy": 9.0,
+    "overhead_ratio_vs_memcpy": 0.936
    },
    {
     "block_frames": 64,
@@ -367,20 +367,20 @@
     "calls_per_pass": 16384,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 7.4,
-     "min": 7.2,
-     "max": 8.5
+     "median": 7.8,
+     "min": 7.5,
+     "max": 8.1
     },
     "ns_per_frame": {
-     "median": 0.1154
+     "median": 0.1222
     },
     "throughput_MBps_copy": null,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 9.8,
-     "min": 9.5,
-     "max": 15.4
+     "median": 9.7,
+     "min": 9.1,
+     "max": 13.3
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -392,23 +392,23 @@
     "calls_per_pass": 8192,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 21.5,
+     "median": 17.9,
      "min": 17.6,
-     "max": 28.9
+     "max": 18.2
     },
     "ns_per_frame": {
-     "median": 0.1678
+     "median": 0.1402
     },
-    "throughput_MBps_copy": 22733.7,
+    "throughput_MBps_copy": 27215.5,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 4194304,
     "memcpy_ref_ns_per_call": {
-     "median": 7.3,
-     "min": 7.2,
-     "max": 8.4
+     "median": 7.2,
+     "min": 7.1,
+     "max": 10.2
     },
-    "overhead_ns_per_call_vs_memcpy": 14.2,
-    "overhead_ratio_vs_memcpy": 1.945
+    "overhead_ns_per_call_vs_memcpy": 10.8,
+    "overhead_ratio_vs_memcpy": 1.499
    },
    {
     "block_frames": 128,
@@ -417,20 +417,20 @@
     "calls_per_pass": 8192,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 6.7,
-     "min": 6.3,
+     "median": 6.5,
+     "min": 6.4,
      "max": 6.9
     },
     "ns_per_frame": {
-     "median": 0.052
+     "median": 0.0508
     },
     "throughput_MBps_copy": null,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 7.3,
-     "min": 7.2,
-     "max": 8.4
+     "median": 7.2,
+     "min": 7.1,
+     "max": 10.2
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -442,23 +442,23 @@
     "calls_per_pass": 8192,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 29.7,
-     "min": 25.9,
-     "max": 31.5
+     "median": 35.2,
+     "min": 32.3,
+     "max": 41.9
     },
     "ns_per_frame": {
-     "median": 0.2318
+     "median": 0.2749
     },
-    "throughput_MBps_copy": 32907.3,
+    "throughput_MBps_copy": 27754.3,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 8388608,
     "memcpy_ref_ns_per_call": {
-     "median": 27.0,
-     "min": 16.3,
-     "max": 34.6
+     "median": 18.6,
+     "min": 18.5,
+     "max": 23.4
     },
-    "overhead_ns_per_call_vs_memcpy": 2.6,
-    "overhead_ratio_vs_memcpy": 0.098
+    "overhead_ns_per_call_vs_memcpy": 16.6,
+    "overhead_ratio_vs_memcpy": 0.892
    },
    {
     "block_frames": 128,
@@ -467,20 +467,20 @@
     "calls_per_pass": 8192,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 7.3,
-     "min": 7.0,
-     "max": 7.4
+     "median": 7.0,
+     "min": 6.8,
+     "max": 7.1
     },
     "ns_per_frame": {
-     "median": 0.0567
+     "median": 0.0548
     },
     "throughput_MBps_copy": null,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 27.0,
-     "min": 16.3,
-     "max": 34.6
+     "median": 18.6,
+     "min": 18.5,
+     "max": 23.4
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -492,23 +492,23 @@
     "calls_per_pass": 4096,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 25.8,
-     "min": 25.1,
-     "max": 26.4
+     "median": 24.9,
+     "min": 23.7,
+     "max": 27.6
     },
     "ns_per_frame": {
-     "median": 0.1007
+     "median": 0.0972
     },
-    "throughput_MBps_copy": 37894.6,
+    "throughput_MBps_copy": 39265.8,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 4194304,
     "memcpy_ref_ns_per_call": {
-     "median": 14.7,
-     "min": 14.4,
-     "max": 15.0
+     "median": 14.3,
+     "min": 14.2,
+     "max": 14.6
     },
-    "overhead_ns_per_call_vs_memcpy": 11.1,
-    "overhead_ratio_vs_memcpy": 0.752
+    "overhead_ns_per_call_vs_memcpy": 10.6,
+    "overhead_ratio_vs_memcpy": 0.745
    },
    {
     "block_frames": 256,
@@ -517,9 +517,9 @@
     "calls_per_pass": 4096,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 6.4,
+     "median": 6.3,
      "min": 6.2,
-     "max": 6.6
+     "max": 6.5
     },
     "ns_per_frame": {
      "median": 0.0248
@@ -528,9 +528,9 @@
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 14.7,
-     "min": 14.4,
-     "max": 15.0
+     "median": 14.3,
+     "min": 14.2,
+     "max": 14.6
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -542,23 +542,23 @@
     "calls_per_pass": 4096,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 139.7,
-     "min": 91.6,
-     "max": 164.1
+     "median": 109.0,
+     "min": 70.5,
+     "max": 120.3
     },
     "ns_per_frame": {
-     "median": 0.5458
+     "median": 0.4257
     },
-    "throughput_MBps_copy": 13978.5,
+    "throughput_MBps_copy": 17922.9,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 8388608,
     "memcpy_ref_ns_per_call": {
-     "median": 57.2,
-     "min": 34.8,
-     "max": 75.5
+     "median": 39.7,
+     "min": 35.0,
+     "max": 71.4
     },
-    "overhead_ns_per_call_vs_memcpy": 82.5,
-    "overhead_ratio_vs_memcpy": 1.443
+    "overhead_ns_per_call_vs_memcpy": 69.2,
+    "overhead_ratio_vs_memcpy": 1.743
    },
    {
     "block_frames": 256,
@@ -567,20 +567,20 @@
     "calls_per_pass": 4096,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 11.5,
-     "min": 10.1,
-     "max": 13.0
+     "median": 7.5,
+     "min": 7.4,
+     "max": 8.2
     },
     "ns_per_frame": {
-     "median": 0.0448
+     "median": 0.0294
     },
     "throughput_MBps_copy": null,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 57.2,
-     "min": 34.8,
-     "max": 75.5
+     "median": 39.7,
+     "min": 35.0,
+     "max": 71.4
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -592,95 +592,95 @@
     "calls_per_pass": 2048,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 60.0,
-     "min": 47.1,
-     "max": 65.3
+     "median": 47.7,
+     "min": 46.9,
+     "max": 49.4
     },
     "ns_per_frame": {
-     "median": 0.1172
+     "median": 0.0931
     },
-    "throughput_MBps_copy": 32560.6,
+    "throughput_MBps_copy": 40981.5,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 4194304,
     "memcpy_ref_ns_per_call": {
-     "median": 40.8,
-     "min": 34.4,
-     "max": 49.7
+     "median": 32.0,
+     "min": 30.8,
+     "max": 32.8
     },
-    "overhead_ns_per_call_vs_memcpy": 19.2,
-    "overhead_ratio_vs_memcpy": 0.472
+    "overhead_ns_per_call_vs_memcpy": 15.7,
+    "overhead_ratio_vs_memcpy": 0.49
    },
    {
     "block_frames": 512,
     "channels": 1,
+    "mode": "zero_copy",
+    "calls_per_pass": 2048,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 6.5,
+     "min": 6.3,
+     "max": 9.0
+    },
+    "ns_per_frame": {
+     "median": 0.0128
+    },
+    "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 0,
+    "memcpy_ref_ns_per_call": {
+     "median": 32.0,
+     "min": 30.8,
+     "max": 32.8
+    },
+    "overhead_ns_per_call_vs_memcpy": 0.0,
+    "overhead_ratio_vs_memcpy": null
+   },
+   {
+    "block_frames": 512,
+    "channels": 2,
+    "mode": "copy",
+    "calls_per_pass": 2048,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 165.3,
+     "min": 117.7,
+     "max": 255.6
+    },
+    "ns_per_frame": {
+     "median": 0.3229
+    },
+    "throughput_MBps_copy": 23625.1,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 8388608,
+    "memcpy_ref_ns_per_call": {
+     "median": 95.8,
+     "min": 85.6,
+     "max": 268.1
+    },
+    "overhead_ns_per_call_vs_memcpy": 69.6,
+    "overhead_ratio_vs_memcpy": 0.726
+   },
+   {
+    "block_frames": 512,
+    "channels": 2,
     "mode": "zero_copy",
     "calls_per_pass": 2048,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
      "median": 8.3,
-     "min": 5.9,
+     "min": 8.0,
      "max": 9.1
     },
     "ns_per_frame": {
-     "median": 0.0163
+     "median": 0.0161
     },
     "throughput_MBps_copy": null,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 40.8,
-     "min": 34.4,
-     "max": 49.7
-    },
-    "overhead_ns_per_call_vs_memcpy": 0.0,
-    "overhead_ratio_vs_memcpy": null
-   },
-   {
-    "block_frames": 512,
-    "channels": 2,
-    "mode": "copy",
-    "calls_per_pass": 2048,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 122.8,
-     "min": 102.1,
-     "max": 136.8
-    },
-    "ns_per_frame": {
-     "median": 0.2398
-    },
-    "throughput_MBps_copy": 31811.1,
-    "throughput_sanity_ok": true,
-    "explicit_bytes_copied_per_pass": 8388608,
-    "memcpy_ref_ns_per_call": {
-     "median": 91.4,
-     "min": 71.9,
-     "max": 146.8
-    },
-    "overhead_ns_per_call_vs_memcpy": 31.4,
-    "overhead_ratio_vs_memcpy": 0.344
-   },
-   {
-    "block_frames": 512,
-    "channels": 2,
-    "mode": "zero_copy",
-    "calls_per_pass": 2048,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 8.4,
-     "min": 8.2,
-     "max": 8.7
-    },
-    "ns_per_frame": {
-     "median": 0.0164
-    },
-    "throughput_MBps_copy": null,
-    "throughput_sanity_ok": true,
-    "explicit_bytes_copied_per_pass": 0,
-    "memcpy_ref_ns_per_call": {
-     "median": 91.4,
-     "min": 71.9,
-     "max": 146.8
+     "median": 95.8,
+     "min": 85.6,
+     "max": 268.1
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -692,23 +692,23 @@
     "calls_per_pass": 1024,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 74.9,
-     "min": 73.8,
-     "max": 90.1
+     "median": 76.8,
+     "min": 74.7,
+     "max": 79.9
     },
     "ns_per_frame": {
-     "median": 0.0731
+     "median": 0.075
     },
-    "throughput_MBps_copy": 52164.2,
+    "throughput_MBps_copy": 50868.7,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 4194304,
     "memcpy_ref_ns_per_call": {
-     "median": 58.5,
-     "min": 58.1,
-     "max": 63.0
+     "median": 57.3,
+     "min": 56.7,
+     "max": 63.2
     },
-    "overhead_ns_per_call_vs_memcpy": 16.4,
-    "overhead_ratio_vs_memcpy": 0.28
+    "overhead_ns_per_call_vs_memcpy": 19.5,
+    "overhead_ratio_vs_memcpy": 0.341
    },
    {
     "block_frames": 1024,
@@ -717,20 +717,20 @@
     "calls_per_pass": 1024,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 6.1,
-     "min": 6.1,
-     "max": 7.1
+     "median": 6.6,
+     "min": 6.4,
+     "max": 7.3
     },
     "ns_per_frame": {
-     "median": 0.006
+     "median": 0.0064
     },
     "throughput_MBps_copy": null,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 58.5,
-     "min": 58.1,
-     "max": 63.0
+     "median": 57.3,
+     "min": 56.7,
+     "max": 63.2
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -742,23 +742,23 @@
     "calls_per_pass": 1024,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 218.5,
-     "min": 189.5,
-     "max": 242.8
+     "median": 221.4,
+     "min": 163.2,
+     "max": 286.0
     },
     "ns_per_frame": {
-     "median": 0.2134
+     "median": 0.2162
     },
-    "throughput_MBps_copy": 35759.7,
+    "throughput_MBps_copy": 35287.5,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 8388608,
     "memcpy_ref_ns_per_call": {
-     "median": 194.1,
-     "min": 168.2,
-     "max": 318.7
+     "median": 187.9,
+     "min": 156.4,
+     "max": 313.4
     },
-    "overhead_ns_per_call_vs_memcpy": 24.4,
-    "overhead_ratio_vs_memcpy": 0.126
+    "overhead_ns_per_call_vs_memcpy": 33.5,
+    "overhead_ratio_vs_memcpy": 0.178
    },
    {
     "block_frames": 1024,
@@ -767,20 +767,20 @@
     "calls_per_pass": 1024,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 7.6,
-     "min": 7.6,
-     "max": 8.3
+     "median": 7.3,
+     "min": 7.2,
+     "max": 7.9
     },
     "ns_per_frame": {
-     "median": 0.0075
+     "median": 0.0071
     },
     "throughput_MBps_copy": null,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 194.1,
-     "min": 168.2,
-     "max": 318.7
+     "median": 187.9,
+     "min": 156.4,
+     "max": 313.4
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -792,34 +792,84 @@
     "calls_per_pass": 512,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
-     "median": 139.4,
-     "min": 134.7,
-     "max": 179.7
+     "median": 145.1,
+     "min": 139.3,
+     "max": 180.0
     },
     "ns_per_frame": {
-     "median": 0.0681
+     "median": 0.0708
     },
-    "throughput_MBps_copy": 56025.1,
+    "throughput_MBps_copy": 53846.2,
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 4194304,
     "memcpy_ref_ns_per_call": {
-     "median": 124.9,
-     "min": 122.5,
-     "max": 129.7
+     "median": 126.7,
+     "min": 121.9,
+     "max": 128.7
     },
-    "overhead_ns_per_call_vs_memcpy": 14.5,
-    "overhead_ratio_vs_memcpy": 0.116
+    "overhead_ns_per_call_vs_memcpy": 18.4,
+    "overhead_ratio_vs_memcpy": 0.145
    },
    {
     "block_frames": 2048,
     "channels": 1,
+    "mode": "zero_copy",
+    "calls_per_pass": 512,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 6.0,
+     "min": 6.0,
+     "max": 8.6
+    },
+    "ns_per_frame": {
+     "median": 0.0029
+    },
+    "throughput_MBps_copy": null,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 0,
+    "memcpy_ref_ns_per_call": {
+     "median": 126.7,
+     "min": 121.9,
+     "max": 128.7
+    },
+    "overhead_ns_per_call_vs_memcpy": 0.0,
+    "overhead_ratio_vs_memcpy": null
+   },
+   {
+    "block_frames": 2048,
+    "channels": 2,
+    "mode": "copy",
+    "calls_per_pass": 512,
+    "stream_loops_per_sample": 32,
+    "ns_per_call": {
+     "median": 375.1,
+     "min": 320.1,
+     "max": 592.8
+    },
+    "ns_per_frame": {
+     "median": 0.1832
+    },
+    "throughput_MBps_copy": 41654.6,
+    "throughput_sanity_ok": true,
+    "explicit_bytes_copied_per_pass": 8388608,
+    "memcpy_ref_ns_per_call": {
+     "median": 416.2,
+     "min": 336.4,
+     "max": 504.9
+    },
+    "overhead_ns_per_call_vs_memcpy": -41.0,
+    "overhead_ratio_vs_memcpy": -0.099
+   },
+   {
+    "block_frames": 2048,
+    "channels": 2,
     "mode": "zero_copy",
     "calls_per_pass": 512,
     "stream_loops_per_sample": 32,
     "ns_per_call": {
      "median": 5.7,
-     "min": 5.7,
-     "max": 6.2
+     "min": 5.6,
+     "max": 5.8
     },
     "ns_per_frame": {
      "median": 0.0028
@@ -828,59 +878,9 @@
     "throughput_sanity_ok": true,
     "explicit_bytes_copied_per_pass": 0,
     "memcpy_ref_ns_per_call": {
-     "median": 124.9,
-     "min": 122.5,
-     "max": 129.7
-    },
-    "overhead_ns_per_call_vs_memcpy": 0.0,
-    "overhead_ratio_vs_memcpy": null
-   },
-   {
-    "block_frames": 2048,
-    "channels": 2,
-    "mode": "copy",
-    "calls_per_pass": 512,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 539.3,
-     "min": 480.9,
-     "max": 681.2
-    },
-    "ns_per_frame": {
-     "median": 0.2633
-    },
-    "throughput_MBps_copy": 28971.9,
-    "throughput_sanity_ok": true,
-    "explicit_bytes_copied_per_pass": 8388608,
-    "memcpy_ref_ns_per_call": {
-     "median": 508.6,
-     "min": 360.9,
-     "max": 558.2
-    },
-    "overhead_ns_per_call_vs_memcpy": 30.7,
-    "overhead_ratio_vs_memcpy": 0.06
-   },
-   {
-    "block_frames": 2048,
-    "channels": 2,
-    "mode": "zero_copy",
-    "calls_per_pass": 512,
-    "stream_loops_per_sample": 32,
-    "ns_per_call": {
-     "median": 6.5,
-     "min": 6.5,
-     "max": 9.2
-    },
-    "ns_per_frame": {
-     "median": 0.0032
-    },
-    "throughput_MBps_copy": null,
-    "throughput_sanity_ok": true,
-    "explicit_bytes_copied_per_pass": 0,
-    "memcpy_ref_ns_per_call": {
-     "median": 508.6,
-     "min": 360.9,
-     "max": 558.2
+     "median": 416.2,
+     "min": 336.4,
+     "max": 504.9
     },
     "overhead_ns_per_call_vs_memcpy": 0.0,
     "overhead_ratio_vs_memcpy": null
@@ -1055,11 +1055,11 @@
   }
  },
  "provenance": {
-  "git_parent_commit": "504b394ebb197be0cb901985ae097885ca3d65fd",
+  "git_parent_commit": "4e2de7dd048e5920c1ce0d2af630c37d2e229da6",
   "git_branch": "exp/e10-pcm-pipeline-p0",
   "worktree_dirty_at_run_start": true,
   "git_base": "7c8352de36b05c1ecb8c156b25954bedf2fcdc76",
-  "production_code_changed": true,
+  "production_code_changed": false,
   "production_paths_touched": [],
   "compiler": "cc",
   "compiler_version": "cc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
@@ -1084,7 +1084,7 @@
   "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
   "os": "Linux 6.18.33.2-microsoft-standard-WSL2",
   "machine": "x86_64",
-  "generated_utc": "2026-08-31T16:19:35Z",
+  "generated_utc": "2026-09-01T02:58:31Z",
   "note": "timings are single-host; compare via recorded distributions"
  }
 }

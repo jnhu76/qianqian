@@ -210,7 +210,9 @@ def production_changed():
     touched = [p for p in changed.splitlines()
                if any(p.startswith(pref) or p == pref.rstrip("/")
                       for pref in PRODUCTION_PATHS)]
-    return (len(touched) == 0), touched
+    # Field semantics: True only when production paths were actually
+    # touched (the old value stored "unchanged" under a "changed" name).
+    return (len(touched) > 0), touched
 
 
 def key_numbers(sec, mut_result, san_result):
