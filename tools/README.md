@@ -28,3 +28,9 @@ minimization method or SongCore validation.
 Build workflow: `docs/ffmpeg-minimization.md`. Regression:
 `tests/songcore/README.md`. Verified-consumer matrix:
 `bench/results/songcore-v1/ffi-consumers.json`.
+
+## PlayerEngine reference model (Phase 1)
+
+| Tool | Role |
+|---|---|
+| `player_model/scenarios.py` | Executable semantic oracle for the PlayerEngine (`docs/player-engine.md`): 20 deterministic + seeded-randomized gates — ring invariants/wraparound, T1–T15 lifecycle (seek epoch / stale-frame, EOF drain, pause/stop, clock, error injection), randomized stress with invariants checked after every op, buffer-duration sweep. Pure stdlib. Not shipping code. |

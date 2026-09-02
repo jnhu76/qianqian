@@ -90,6 +90,8 @@ xmake.lua                 Native Audio Core build authority
 tests/songcore/           permanent regression (regression.py + probe)
 bench/results/songcore-v1 machine authority tree (fail-closed --check)
 docs/songcore-api.md      how callers call the library (permanent)
+docs/player-engine.md     PlayerEngine v1 semantics (frozen by the
+                          tools/player_model Phase-1 oracle)
 docs/ffmpeg-minimization.md  how FFmpeg is trimmed
 docs/wasm.md                 WASM viability result
 docs/history.md              how the decisions were reached
