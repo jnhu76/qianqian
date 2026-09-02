@@ -1,0 +1,7 @@
+headers = probe_abi.h
+headerFilter = probe_abi.h player_engine.h songcore.h probe_stdio.h
+package = qianqian
+compilerOpts.linux = -Iinclude -Itests/kotlin_probe
+compilerOpts.mingw = -Iinclude -I.
+linkerOpts.linux = -Lbuild/artifacts/runtime -lqianqian
+linkerOpts.mingw = -Llib -lqianqian
