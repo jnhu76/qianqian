@@ -482,6 +482,11 @@ OutputFillResult PlayerEngine::fill_output(float* dst,
     }
     const std::uint64_t period = requested_output_frames;
     const std::int32_t channels = ring_.channels();  // active count (admitted)
+    // Format facts for the production backend (negotiation only). Same
+    // admitted window as the ring stride read above: a commit's reset is
+    // ordered before the next admission by the seq_cst admission protocol.
+    r.source_rate = source_rate_;
+    r.channels = channels;
     const std::uint64_t readable = ring_.readable();
     const std::uint64_t m =
         ring_.read(dst, period < readable ? period : readable);
