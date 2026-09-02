@@ -1,0 +1,118 @@
+abi_version 1
+enum song_status SONG_OK 0
+enum song_status SONG_EOF 1
+enum song_status SONG_ERR_INVALID_ARGUMENT 100
+enum song_status SONG_ERR_STATE 101
+enum song_status SONG_ERR_NOT_OPEN 102
+enum song_status SONG_ERR_IO 103
+enum song_status SONG_ERR_UNSUPPORTED_CONTAINER 104
+enum song_status SONG_ERR_NO_AUDIO_STREAM 105
+enum song_status SONG_ERR_UNSUPPORTED_CODEC 106
+enum song_status SONG_ERR_CORRUPT_DATA 107
+enum song_status SONG_ERR_DECODE_ERROR 108
+enum song_status SONG_ERR_SEEK_UNSUPPORTED 109
+enum song_status SONG_ERR_SEEK_ERROR 110
+enum song_status SONG_ERR_STREAM_CHANGE 111
+enum song_status SONG_ERR_OUT_OF_MEMORY 112
+enum song_status SONG_ERR_INTERNAL_ERROR 113
+enum song_metadata_scope SONG_METADATA_SCOPE_CONTAINER 0
+enum song_metadata_scope SONG_METADATA_SCOPE_STREAM 1
+enum song_artwork_role SONG_ARTWORK_UNKNOWN 0
+enum song_artwork_role SONG_ARTWORK_FRONT_COVER 1
+enum song_artwork_role SONG_ARTWORK_BACK_COVER 2
+enum song_artwork_role SONG_ARTWORK_OTHER 3
+enum channel SONG_CH_FRONT_LEFT 1
+enum channel SONG_CH_FRONT_RIGHT 2
+enum channel SONG_CH_FRONT_CENTER 4
+enum channel SONG_CH_LOW_FREQUENCY 8
+enum channel SONG_CH_BACK_LEFT 16
+enum channel SONG_CH_BACK_RIGHT 32
+enum channel SONG_CH_SIDE_LEFT 512
+enum channel SONG_CH_SIDE_RIGHT 1024
+enum channel SONG_CH_MASK_UNKNOWN 0
+enum channel SONG_CH_MONO 4
+enum channel SONG_CH_STEREO 3
+struct song_io size 32
+offset song_io userdata 0
+offset song_io read 8
+offset song_io seek 16
+offset song_io size 24
+struct song_error size 24
+offset song_error message 0
+offset song_error message_len 8
+offset song_error native_code 12
+offset song_error reserved 16
+struct song_info size 120
+offset song_info sample_rate 0
+offset song_info channels 4
+offset song_info channel_mask 8
+offset song_info duration_us 16
+offset song_info bits_per_sample 24
+offset song_info codec 28
+offset song_info container 60
+offset song_info selected_audio_index 92
+offset song_info audio_stream_count 96
+offset song_info flags 100
+offset song_info reserved 104
+struct song_stream_info size 88
+offset song_stream_info audio_index 0
+offset song_stream_info stream_index 4
+offset song_stream_info sample_rate 8
+offset song_stream_info channels 12
+offset song_stream_info channel_mask 16
+offset song_stream_info duration_us 24
+offset song_stream_info bits_per_sample 32
+offset song_stream_info codec 36
+offset song_stream_info is_default 68
+offset song_stream_info reserved 72
+struct song_metadata size 192
+offset song_metadata title 0
+offset song_metadata title_len 8
+offset song_metadata has_title 12
+offset song_metadata artist 16
+offset song_metadata album 32
+offset song_metadata album_artist 48
+offset song_metadata genre 64
+offset song_metadata composer 80
+offset song_metadata date 96
+offset song_metadata comment 112
+offset song_metadata track_number 128
+offset song_metadata track_total 136
+offset song_metadata disc_number 144
+offset song_metadata disc_total 152
+offset song_metadata track_gain_mb 160
+offset song_metadata track_peak 168
+offset song_metadata album_gain_mb 176
+offset song_metadata album_peak 184
+struct song_metadata_entry size 40
+offset song_metadata_entry scope 0
+offset song_metadata_entry key 8
+offset song_metadata_entry key_len 16
+offset song_metadata_entry value 24
+offset song_metadata_entry value_len 32
+offset song_metadata_entry reserved 36
+struct song_artwork_item size 56
+offset song_artwork_item role 0
+offset song_artwork_item mime 8
+offset song_artwork_item mime_len 16
+offset song_artwork_item data 24
+offset song_artwork_item data_len 32
+offset song_artwork_item width 40
+offset song_artwork_item height 44
+offset song_artwork_item is_front_cover 48
+offset song_artwork_item reserved 52
+func songcore_abi_version
+func song_open
+func song_probe
+func song_audio_stream_count
+func song_audio_stream_info
+func song_select_stream
+func song_get_metadata
+func song_get_metadata_count
+func song_get_metadata_entry
+func song_get_artwork_count
+func song_get_artwork_item
+func song_read_pcm
+func song_seek
+func song_last_error
+func song_close
