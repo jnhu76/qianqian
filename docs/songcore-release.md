@@ -86,7 +86,35 @@ profile enables none of these and no external `lib*` component, so the
 effective license is **LGPL-2.1-or-later (FFmpeg)**, with the authoritative
 FFmpeg license texts and the static-distribution relink note shipped in
 `LICENSES/`. The Qianqian sources carry no open-source license yet; the
-package grants none.
+package grants none. This names the FFmpeg closure only — it is never a
+claim that SongCore itself is LGPL-licensed ("SongCore is
+LGPL-2.1-or-later" is not a statement this project makes); the
+Qianqian/SongCore-owned code stays under the project's separate,
+current licensing status.
+
+## Release classification (current truth)
+
+SongCore v0.1.0 is an **engineering freeze artifact**. It freezes the
+ABI, binary shape, provenance, reproducibility, and external-consumer
+contract — so the artifact is independently consumable by its holder.
+
+The current Qianqian repository does **not** grant a public
+redistribution license for the Qianqian/SongCore-owned portions. Public
+redistribution requires a separate licensing/compliance decision and
+must not be inferred from the FFmpeg LGPL notices. Accordingly,
+`songcore-v0.1.0` is classified **ENGINEERING_FREEZE**, not
+`PUBLIC_DISTRIBUTION_APPROVED`.
+
+Upgrading a release to `PUBLIC_DISTRIBUTION_APPROVED` requires
+re-confirming, at minimum:
+
+1. an explicit Qianqian/SongCore distribution license;
+2. the exact corresponding FFmpeg source availability;
+3. the FFmpeg build/configure provenance;
+4. the required LGPL relinkability obligations;
+5. notices and license texts;
+6. `nonfree = false`;
+7. GPL/version3 propagation if enabled.
 
 ## Reproducibility
 
@@ -102,6 +130,15 @@ Frozen: `songcore.h` ABI v1; the Float32 PCM contract; open/probe/read/
 seek/close semantics; the FFmpeg minimization profile needed by the
 supported formats; the static artifact contract (one merged archive, no
 internal dependency); the release manifest schema v1.
+
+Tag scope: `songcore-v0.1.0` freezes the binary/artifact tree at
+`522c16d`. Post-tag commits that only clarify repository distribution
+policy do not change SongCore ABI, artifact, provenance, or binary
+bits; the tag is not re-cut for them. The published v0.1.0 package
+predates the classification wording in this document; its
+redistribution posture is stated in its own
+`LICENSES/THIRD_PARTY_NOTICES.txt` (Qianqian terms are NOT granted by
+the package).
 
 Allowed fixes after the freeze: correctness bugs, security issues,
 license/compliance issues, build portability bugs, confirmed codec

@@ -294,8 +294,9 @@ FFmpeg
 Qianqian
   The Qianqian sources (songcore.h and the SongCore implementation) carry
   no open-source license yet; distribution terms are owned by the project
-  and are NOT granted by this package. This is an engineering statement,
-  not legal advice.
+  and are NOT granted by this package. Classification:
+  ENGINEERING_FREEZE — this package is not a public redistribution grant.
+  This is an engineering statement, not legal advice.
 """)
 
     release_manifest = {
@@ -394,6 +395,16 @@ machine-derived closure profile sha256, artifact sha256 and the
 reproducibility record. Effective license: {effective}. See `LICENSES/`
 (FFmpeg license texts + third-party notices; LGPL static-distribution
 obligations are described there).
+
+## Distribution status
+
+This package is an engineering freeze artifact (classification:
+ENGINEERING_FREEZE, not PUBLIC_DISTRIBUTION_APPROVED): the ABI, binary
+shape, provenance and external-consumer contract are frozen. It grants
+no public redistribution license for the Qianqian/SongCore-owned
+portions; public redistribution requires a separate
+licensing/compliance decision and must not be inferred from the FFmpeg
+LGPL notices above.
 
 ## Known limitations
 
