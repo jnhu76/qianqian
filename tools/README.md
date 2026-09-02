@@ -28,3 +28,11 @@ minimization method or SongCore validation.
 Build workflow: `docs/ffmpeg-minimization.md`. Regression:
 `tests/songcore/README.md`. Verified-consumer matrix:
 `bench/results/songcore-v1/ffi-consumers.json`.
+
+## PlayerEngine
+
+The PlayerEngine semantics were originally validated against an executable
+reference model (`tools/player_model`, Phase 1); that model was retired once
+the permanent native regression suite (`tests/player/`) took ownership of
+the contracts. See `docs/player-engine.md` for the frozen semantics and
+§11 for the validation inventory.

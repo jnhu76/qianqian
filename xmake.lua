@@ -385,6 +385,117 @@ target("dsp_cap_probe")
     end)
 
 -- ====================================================================
+-- PlayerEngine (Phase 1.5): native engine + deterministic NullAudioBackend.
+--
+-- C++17 internal implementation calling ONLY the frozen SongCore C ABI
+-- (include/songcore.h). Test binaries link tests/player/fake_songcore.cpp
+-- INSTEAD of the real songcore target: the engine calls the production ABI
+-- and the fake replaces its symbols at link time — no test abstraction
+-- leaks into the engine. player_core therefore depends on no songcore
+-- target; production linkage pairs it with songcore_static.
+-- ====================================================================
+
+option("player_san")
+    set_default("none")
+    set_values("none", "asan", "ubsan", "tsan")
+    set_showmenu(true)
+    set_description("Sanitizer for player targets (asan/ubsan/tsan)")
+
+local player_san_flags = function ()
+    local san = get_config("player_san")
+    if san == "asan" then return {"-fsanitize=address", "-fno-omit-frame-pointer"} end
+    if san == "ubsan" then return {"-fsanitize=undefined", "-fno-omit-frame-pointer"} end
+    if san == "tsan" then return {"-fsanitize=thread", "-fno-omit-frame-pointer"} end
+    return {}
+end
+
+local player_common = function ()
+    set_languages("c++17")
+    if is_plat("linux", "macosx", "android", "iphoneos") then
+        add_syslinks("pthread")
+    end
+    on_load(function (target)
+        local flags = player_san_flags()
+        if #flags > 0 then
+            target:add("cxflags", flags, {force = true})
+            target:add("ldflags", flags, {force = true})
+        end
+    end)
+end
+
+target("player_core")
+    set_kind("static")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("src/player/*.cpp")
+    add_includedirs("include", "src/player", {public = true})
+    player_common()
+
+-- Native semantic + realtime-contract gates (ring unit/property/SPSC,
+-- lifecycle/clock/EOF semantics, thread stress, realtime bounds, GAP
+-- zero-fill, admission quiescence, overflow, snapshot coherence).
+-- Binary exit code gates.
+target("player_gates")
+    set_kind("binary")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("tests/player/pcm_ring_test.cpp", "tests/player/engine_gates_test.cpp",
+              "tests/player/thread_stress_test.cpp", "tests/player/gates_main.cpp",
+              "tests/player/realtime_bounds_test.cpp", "tests/player/fake_songcore.cpp")
+    add_deps("player_core")
+    player_common()
+    add_tests("default")
+
+-- Tiny external consumer: a pure-C99 TU
+-- including ONLY the product C ABI headers, compiled by a C compiler and
+-- linked against libplayer_core + the test-only backend driver — proof the
+-- product surface is self-contained, C++-leak-free, and ABI-linkable from a
+-- foreign TU WITHOUT any audio-backend knowledge. Links the test-only
+-- SongCore stand-in instead of real SongCore (link-time substitution, like
+-- every other player test).
+target("player_consumer_c")
+    set_kind("binary")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("tests/player/consumer_c/main.c", "tests/player/fake_songcore.cpp",
+              "tests/player/player_test_driver.cpp")
+    add_includedirs("tests/player") -- stand-in "filesystem" header only
+    add_deps("player_core")
+    player_common()
+    set_languages("c99", "c++17")
+    add_tests("default")
+
+-- Real-SongCore integration gate: the ONE
+-- player test that links the REAL SongCore archive (not the stand-in) and
+-- drives REAL corpus fixtures (FLAC + MP3) through host FILE* I/O. Proves
+-- the frozen product semantics end to end: open -> play -> ENDED at the
+-- real media duration, seek landing, stop -> READY @0, missing-file error
+-- path. Drives the NullAudioBackend via the test-only backend driver.
+target("player_real_songcore_smoke")
+    set_kind("binary")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("tests/player/real_songcore_smoke.c",
+              "tests/player/player_test_driver.cpp")
+    add_deps("player_core", "songcore_static")
+    player_common()
+    set_languages("c99", "c++17")
+    if is_plat("linux") or is_plat("macosx") then
+        add_syslinks("m", "pthread")
+    end
+    if is_plat("mingw") then
+        add_syslinks("bcrypt")
+    end
+    add_tests("default")
+    on_test(function (target, opt)
+        local root = os.projectdir()
+        os.execv(target:targetfile(),
+                 {path.join(root, "corpus", "fixtures", "flac-16-44-stereo.flac"),
+                  path.join(root, "corpus", "fixtures", "mp3-short.mp3")})
+        return true
+    end)
+
+-- ====================================================================
 -- WASM target (independent session; the native default session above is
 -- untouched).
 --
