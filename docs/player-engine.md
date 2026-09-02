@@ -710,3 +710,60 @@ offset invariance. Failures print seed, operation trace, and a full
 domain-labeled snapshot (generation, ring state, decode/media/device
 positions, underrun accounting). The native implementation replays these
 traces as its model-equivalence gate.
+
+## Implementation status (Phase 1.5 closeout)
+
+```text
+Python oracle (tools/player_model)      PROVEN — 36 gates, deterministic
+Native PlayerEngine + NullAudioBackend  PROVEN — 46 native gates, model
+                                        equivalence vs the oracle
+C ABI (include/player_engine.h)         PROVEN — pure-C external consumer
+WASAPI / real backend                   NOT STARTED (explicitly out of
+                                        scope for Phase 1.5)
+```
+
+Native layout: `src/player/` (PcmRing, PlaybackTimeline, NullAudioBackend,
+PlayerEngine, C shim), `tests/player/` (fake SongCore link-time
+substitution, gate suite, trace runner, C consumer), target
+`player_core`. The engine carries no test abstraction: test binaries link
+`tests/player/fake_songcore.cpp` INSTEAD of real SongCore at the frozen C
+ABI, and observability hooks are mutex-guarded debug setters, never
+production inputs.
+
+Gate inventory (native): ring unit/property/SPSC-thread gates; engine
+gates T1–T20, S1–S10, state-illegal probes, clock model,
+estimated-segment offset invariance, capacity sweep, mutation gates
+(§74: skip-epoch-guard, advance-on-submit, gap-counts-as-media,
+end-without-pending — each provably caught by the suite); thread stress
+(destruction, seek/stop/open vs decode via before-publish barriers,
+render vs control, EOF vs control, play-to-end); C consumer lifecycle
+gate. `xmake test` runs `player_gates`, `player_trace_runner`
+(200 seeds × 300 ops equivalence), and `player_consumer_c`; sanitizer
+variants build with `xmake f --player_san=asan|ubsan|tsan`.
+
+Evidence (2026-09-02, Linux x86_64, gcc 15):
+
+```text
+native gates (plain / ASan / UBSan)   46/46 PASS each
+native gates (TSan)                   3 runs, 46/46 PASS, 0 warnings
+model equivalence                     200×300 PASS (xmake test) and
+                                      1000 seeds × 500 ops PASS
+SongCore sources/ABI                  untouched (engine consumes the
+                                      frozen ABI only)
+audio PCM                             unchanged (engine is above SongCore;
+                                      tests consume fake PCM)
+```
+
+Two harness-level normalizations keep op-boundary equivalence exact
+(docs §45): the trace runner injects the fake's remaining-frames truth
+via `debug_set_source_hint` (the frozen SongCore ABI cannot report
+remaining; production derives the duration estimate), and folds the
+frozen ABI's separate 0-frame SONG_EOF read into the oracle's
+eof-flag-on-last-chunk.
+
+Known oracle edge (found during Phase 1.5, oracle left frozen): a
+randomized trace that seeks to exactly the end boundary can make the
+ORACLE's producer issue `read_pcm(0)` (ValueError) — the native engine
+handles the same state via its EOF poll. The equivalence generator
+rejects such landings; the engine's native coverage of this state is the
+EOF-poll gates.

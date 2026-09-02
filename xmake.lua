@@ -385,6 +385,105 @@ target("dsp_cap_probe")
     end)
 
 -- ====================================================================
+-- PlayerEngine (Phase 1.5): native engine + deterministic NullAudioBackend.
+--
+-- C++17 internal implementation calling ONLY the frozen SongCore C ABI
+-- (include/songcore.h). Test binaries link tests/player/fake_songcore.cpp
+-- INSTEAD of the real songcore target: the engine calls the production ABI
+-- and the fake replaces its symbols at link time — no test abstraction
+-- leaks into the engine. player_core therefore depends on no songcore
+-- target; production linkage pairs it with songcore_static.
+-- ====================================================================
+
+option("player_san")
+    set_default("none")
+    set_values("none", "asan", "ubsan", "tsan")
+    set_showmenu(true)
+    set_description("Sanitizer for player targets (asan/ubsan/tsan)")
+
+local player_san_flags = function ()
+    local san = get_config("player_san")
+    if san == "asan" then return {"-fsanitize=address", "-fno-omit-frame-pointer"} end
+    if san == "ubsan" then return {"-fsanitize=undefined", "-fno-omit-frame-pointer"} end
+    if san == "tsan" then return {"-fsanitize=thread", "-fno-omit-frame-pointer"} end
+    return {}
+end
+
+local player_common = function ()
+    set_languages("c++17")
+    if is_plat("linux", "macosx", "android", "iphoneos") then
+        add_syslinks("pthread")
+    end
+    on_load(function (target)
+        local flags = player_san_flags()
+        if #flags > 0 then
+            target:add("cxflags", flags, {force = true})
+            target:add("ldflags", flags, {force = true})
+        end
+    end)
+end
+
+target("player_core")
+    set_kind("static")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("src/player/*.cpp")
+    add_includedirs("include", "src/player", {public = true})
+    player_common()
+
+-- Deterministic trace replayer consumed by the Python↔native equivalence
+-- gate (tools/player_model/model_equivalence.py).
+target("player_trace_runner")
+    set_kind("binary")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("tests/player/trace_runner.cpp", "tests/player/fake_songcore.cpp")
+    add_deps("player_core")
+    player_common()
+    add_tests("default")
+    on_test(function (target, opt)
+        import("lib.detect.find_tool")
+        local python = find_tool("python3") or find_tool("python")
+        if not python then
+            return false, "python3 is required for the model-equivalence gate"
+        end
+        local script = path.join(os.projectdir(), "tools", "player_model",
+                                 "model_equivalence.py")
+        os.execv(python.program, {script, "--runner", target:targetfile(),
+                                  "--seeds", "200", "--ops", "300"})
+        return true
+    end)
+
+-- Native semantic gates (ring unit/property, T1..T20/S1..S10 equivalents,
+-- mutation/negative gates, thread stress). Binary exit code gates.
+target("player_gates")
+    set_kind("binary")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("tests/player/pcm_ring_test.cpp", "tests/player/engine_gates_test.cpp",
+              "tests/player/thread_stress_test.cpp", "tests/player/gates_main.cpp",
+              "tests/player/fake_songcore.cpp")
+    add_deps("player_core")
+    player_common()
+    add_tests("default")
+
+-- Tiny external consumer (§64-69): a pure-C99 TU including ONLY the C ABI
+-- headers, compiled by a C compiler and linked against libplayer_core —
+-- proof the frozen C surface is self-contained and ABI-linkable from a
+-- foreign TU. Links the test-only SongCore stand-in instead of real
+-- SongCore (link-time substitution, like every other player test).
+target("player_consumer_c")
+    set_kind("binary")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("tests/player/consumer_c/main.c", "tests/player/fake_songcore.cpp")
+    add_includedirs("tests/player") -- stand-in "filesystem" header only
+    add_deps("player_core")
+    player_common()
+    set_languages("c99", "c++17")
+    add_tests("default")
+
+-- ====================================================================
 -- WASM target (independent session; the native default session above is
 -- untouched).
 --
