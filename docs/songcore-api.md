@@ -37,6 +37,8 @@ nothing is claimed until a toolchain derives it (see
 `ffmpeg/targets/*.json` `status` fields).
 
 Xmake targets: `songcore_static`, `songcore_shared`, aggregate `songcore`.
+For the frozen release package (staging, provenance, license, freeze
+policy) read [songcore-release.md](songcore-release.md).
 
 ```bash
 xmake ffmpeg-import        # once per checkout: derive the FFmpeg closure
