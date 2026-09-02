@@ -35,6 +35,14 @@ option("lto")
     set_description("Link with -flto (link-time optimization)")
 
 local artifact_dir = path.join(os.projectdir(), "build", "artifacts")
+-- The linux/macos default session owns build/artifacts directly (historical
+-- layout). A mingw/windows session redirects every artifact into a platform
+-- subdir: sharing one dir would let a mingw libsongcore.a silently replace
+-- the linux archive (and vice versa) across sessions — the same trap the
+-- wasm session avoids with artifacts/wasm below.
+if is_plat("mingw", "windows") then
+    artifact_dir = path.join(artifact_dir, "windows-mingw-x86_64")
+end
 -- WASM sessions archive their guest closure here as well; sharing the
 -- native artifact path would let a wasm-format libsongcore.a silently
 -- overwrite the native archive (and vice versa) across sessions.
@@ -423,12 +431,25 @@ local player_common = function ()
     end)
 end
 
+-- Shared player-source wiring: like songcore_common(), the player sources
+-- are compiled per consuming artifact — a shared target needs its own
+-- -fPIC objects (xmake adds them automatically), so the runtime does not
+-- link the non-PIC libplayer_core.a that test binaries use. Callers decide
+-- the wasapi_renderer.cpp question themselves (remove_files is
+-- target-global and would undo a later re-add).
+local player_sources = function ()
+    add_files("src/player/*.cpp")
+    add_includedirs("include", "src/player", {public = true})
+end
+
 target("player_core")
     set_kind("static")
     set_default(false)
     set_targetdir(artifact_dir)
-    add_files("src/player/*.cpp")
-    add_includedirs("include", "src/player", {public = true})
+    player_sources()
+    -- wasapi_renderer.cpp is compiled ONLY by the qianqian_runtime Windows
+    -- flavor (its COM/syslink surface must not enter test link lines).
+    remove_files("src/player/wasapi_renderer.cpp")
     player_common()
 
 -- Native semantic + realtime-contract gates (ring unit/property/SPSC,
@@ -492,6 +513,90 @@ target("player_real_songcore_smoke")
         os.execv(target:targetfile(),
                  {path.join(root, "corpus", "fixtures", "flac-16-44-stereo.flac"),
                   path.join(root, "corpus", "fixtures", "mp3-short.mp3")})
+        return true
+    end)
+
+-- ====================================================================
+-- Qianqian runtime: the ONE application-facing dynamic library
+-- (docs/wasapi-native-runtime-closure.md). Exports exactly the two frozen
+-- C ABIs (songcore.h + player_engine.h); SongCore/FFmpeg/PlayerEngine
+-- internals stay private — same hidden-visibility recipe as the audited
+-- songcore.dll. On Windows the runtime flavor composes the WASAPI render
+-- thread into pe_create/pe_destroy; on other platforms the runtime is the
+-- engine-only ABI surface (no backend yet).
+-- ====================================================================
+target("qianqian_runtime")
+    set_kind("shared")
+    set_basename("qianqian") -- → libqianqian.so / qianqian.dll
+    set_default(false)
+    set_targetdir(path.join(artifact_dir, "runtime"))
+    set_languages("c11", "c++17")
+    -- Own PIC player objects + own songcore TU (SONGCORE_BUILD_SHARED):
+    -- the songcore_static dep supplies only the FFmpeg closure archive;
+    -- its own songcore_ffmpeg.c member is never pulled because the
+    -- dllexport'd definitions here resolve every song_* reference.
+    add_files("src/songcore_ffmpeg.c")
+    player_sources()
+    if is_plat("mingw", "windows") then
+        -- WASAPI render-thread flavor (docs/wasapi-native-runtime-closure.md §3)
+        add_files("src/player/wasapi_renderer.cpp")
+        add_defines("QN_QIANQIAN_RUNTIME")
+        add_syslinks("ole32")
+        -- Keep the runtime dependency closure at system DLLs only (no
+        -- libstdc++/libgcc side-by-side DLLs next to qianqian.dll). This
+        -- xmake maps shared-link driver flags through shflags, not ldflags.
+        add_shflags("-static-libgcc", "-static-libstdc++", {force = true})
+        -- Keep the runtime dependency closure at system DLLs only: no
+        -- libstdc++/libgcc side-by-side DLLs next to qianqian.dll.
+        add_ldflags("-static-libgcc", "-static-libstdc++", {force = true})
+        -- FFmpeg's av_random_bytes uses BCryptGenRandom on Windows
+        add_syslinks("bcrypt")
+    else
+        remove_files("src/player/wasapi_renderer.cpp")
+    end
+    add_defines("SONGCORE_BUILD_SHARED", "PLAYER_ENGINE_BUILD_SHARED")
+    set_symbols("hidden")
+    if is_plat("mingw", "windows") then
+        set_prefixname("") -- qianqian.dll (Windows convention), not libqianqian.dll
+    end
+    if is_plat("linux", "android") then
+        add_ldflags("-Wl,--exclude-libs,ALL", {force = true})
+    end
+    if is_plat("linux", "macosx", "android", "iphoneos") then
+        add_syslinks("m", "pthread")
+    end
+    add_deps("songcore_static")
+
+-- External FFI smoke (closure spec §32/§50): a pure-C consumer that knows
+-- ONLY include/player_engine.h and the location of the runtime library.
+-- No internal headers, no implementation archives — it loads the shared
+-- library at run time (LoadLibraryA / dlopen) exactly like the future KMP
+-- consumer will.
+target("ffi_smoke")
+    set_kind("binary")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("tests/ffi_smoke/ffi_smoke.c")
+    add_includedirs("include")
+    set_languages("c11")
+    if is_plat("linux", "macosx") then
+        add_syslinks("dl")
+    end
+    add_tests("default")
+    on_test(function (target, opt)
+        -- The smoke consumes the runtime as a pure external consumer would;
+        -- make sure the artifact exists without linking it into this target.
+        import("core.project.task")
+        local root = os.projectdir()
+        local runtime_dir = path.join(artifact_dir, "runtime")
+        local lib = is_plat("mingw", "windows") and
+                    path.join(runtime_dir, "qianqian.dll") or
+                    path.join(runtime_dir, "libqianqian.so")
+        if not os.isfile(lib) then
+            task.run("build", {"qianqian_runtime"})
+        end
+        os.execv(target:targetfile(), {lib,
+                 path.join(root, "corpus", "fixtures", "flac-16-44-stereo.flac")})
         return true
     end)
 
