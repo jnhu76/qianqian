@@ -319,11 +319,32 @@ Backend ownership rule: `fill_output()` and `advance_render()` are
 serialized by the AudioBackend's SINGLE realtime/device thread — one
 event-driven render thread for WASAPI that calls `fill_output` then
 queries/advances the device render clock. `PlaybackTimeline` is therefore
-NOT a concurrent multi-writer structure and takes no locks. The control
-thread may run concurrently ONLY through the admission/quiesce protocol
-(§10): a commit closes backend admission, drains counted in-flight ops,
-resets ring/timeline/backend, then re-opens admission. No other
-concurrency pattern is supported.
+NOT a concurrent multi-writer structure and takes no locks: the device
+thread is its one runtime owner. The control thread may run concurrently
+ONLY through the admission/quiesce protocol (§10): a commit closes backend
+admission, drains counted in-flight ops, resets ring/timeline/backend, then
+re-opens admission. No other concurrency pattern is supported.
+
+Consequences of the ownership rule, all enforced by the seam:
+
+- The timeline's scalar accounting counters are atomics so the control
+  plane's POLLED SNAPSHOT may read them lock-free while the device thread
+  mutates (individually coherent values; cross-field conservation holds at
+  quiescence). The span store itself stays single-owner.
+- ENDED is committed BY the device thread: when the frozen §7 condition
+  holds (playing, source_eof, queue empty, nothing in flight, AND
+  `pending_media() == 0` — the owner reads its own timeline), it commits
+  ENDED through the atomic state surface, the realtime path's only legal
+  transition (same as overflow → ERROR). The decode worker publishes ONLY
+  `source_eof` / decode state and NEVER reads the timeline. Control
+  transitions cannot silently clobber an async ENDED/ERROR: pause and play
+  commit by CAS, and a successful seek re-affirms its entry play state
+  after the commit (an in-flight op that drained during the quiesce may
+  lawfully have committed ENDED for the dying generation).
+- The decode worker never receives a wakeup from the lock-free seam (a
+  mutex-free notify would race the predicate check), so its backpressure/
+  idle sleep is bounded and re-checked on a short timeout; ring-ahead
+  buffering makes the poll latency irrelevant.
 
 Diagnostics for UI are a polled snapshot (state, media position, decode
 position, duration(+known flag), buffered, underrun/preroll/stale counters,
@@ -400,7 +421,8 @@ player_gates (native suite, binary exit-code gates):
   buffer, timeline no-alloc ops, 6-hour long-run bounded memory,
   pathological alternation bounded, production-seam overflow → ERROR,
   admission quiescence close-first + waits-for-inflight, snapshot rate
-  coherence 44.1k/48k × polls, realtime-seam ENDED signal)
+  coherence 44.1k/48k × polls, realtime-seam ENDED commit, EOF-publish vs
+  timeline-writer ownership regression + real-topology ENDED soak)
 player_consumer_c    pure-C TU over the product ABI (lifecycle, snapshot,
                      no-crash probes)
 player_real_songcore_smoke  REAL SongCore + REAL corpus fixtures (FLAC/MP3)

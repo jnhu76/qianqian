@@ -164,6 +164,15 @@ pe_status pe_seek(pe_engine* engine, int64_t position_us, int64_t* out_landing_u
 }
 
 pe_status pe_get_snapshot(pe_engine* engine, pe_snapshot* out) {
+    // Deterministic default BEFORE validation (the header contract: every
+    // field is written on every return path where `out` itself is valid —
+    // including engine == NULL): EMPTY, unknown duration (-1), quiet
+    // counters, empty last_error.
+    if (out != nullptr) {
+        std::memset(out, 0, sizeof *out);
+        out->state = PE_STATE_EMPTY;
+        out->duration_us = -1;
+    }
     if (engine == nullptr || out == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
         const qn::PlayerEngine* e = reinterpret_cast<const qn::PlayerEngine*>(engine);

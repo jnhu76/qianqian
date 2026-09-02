@@ -1,6 +1,7 @@
 #include "player_engine.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -146,39 +147,52 @@ PlayerStatus PlayerEngine::open(const song_io& io, std::int32_t* out_song_status
 PlayerStatus PlayerEngine::play() {
     std::lock_guard<std::mutex> sg(src_mtx_);
     std::lock_guard<std::mutex> g(state_mtx_);
-    const PlayerState st = state_.load();
-    if (st == PlayerState::Playing) return PlayerStatus::Ok;  // idempotent
-    if (st == PlayerState::Ready || st == PlayerState::Paused) {
-        state_.store(PlayerState::Playing);
-        work_cv_.notify_all();
-        return PlayerStatus::Ok;
-    }
-    if (st == PlayerState::Ended) {
-        // Frozen restart policy: play after ENDED replays from the beginning;
-        // a failed restart seek lands in ERROR (fail-closed, like any seek).
-        invalidate();
-        std::int64_t actual = 0;
-        song_status sst = song_seek(handle_, 0, &actual);
-        auto landing = landing_of(sst, actual, 0);
-        if (!landing) {
-            state_.store(PlayerState::Error);
-            last_error_ = "restart seek failure, status=" + std::to_string(sst);
-            return PlayerStatus::ErrSeekFailed;
+    for (;;) {
+        PlayerState st = state_.load();
+        if (st == PlayerState::Playing) return PlayerStatus::Ok;  // idempotent
+        if (st == PlayerState::Ready || st == PlayerState::Paused) {
+            // CAS: the realtime seam may concurrently commit Error
+            // (timeline overflow) — a losing race re-reads the winner
+            // instead of silently overwriting an async transition.
+            if (state_.compare_exchange_strong(st, PlayerState::Playing)) {
+                work_cv_.notify_all();
+                return PlayerStatus::Ok;
+            }
+            continue;
         }
-        commit_landing(landing->first, landing->second);
-        state_.store(PlayerState::Playing);
-        work_cv_.notify_all();
-        return PlayerStatus::Ok;
+        if (st == PlayerState::Ended) {
+            // Frozen restart policy: play after ENDED replays from the
+            // beginning; a failed restart seek lands in ERROR (fail-closed,
+            // like any seek). Safe against a concurrent realtime ENDED
+            // commit: invalidate() quiesces the backend first, and the
+            // commit below stores the fresh segment's state explicitly.
+            invalidate();
+            std::int64_t actual = 0;
+            song_status sst = song_seek(handle_, 0, &actual);
+            auto landing = landing_of(sst, actual, 0);
+            if (!landing) {
+                state_.store(PlayerState::Error);
+                last_error_ = "restart seek failure, status=" + std::to_string(sst);
+                return PlayerStatus::ErrSeekFailed;
+            }
+            commit_landing(landing->first, landing->second);
+            state_.store(PlayerState::Playing);
+            work_cv_.notify_all();
+            return PlayerStatus::Ok;
+        }
+        return PlayerStatus::ErrIllegalCall;  // Empty / Error
     }
-    return PlayerStatus::ErrIllegalCall;  // Empty / Error
 }
 
 void PlayerEngine::pause() {
     std::lock_guard<std::mutex> sg(src_mtx_);
     std::lock_guard<std::mutex> g(state_mtx_);
     // Frozen: audible progression stops, position freezes, buffer retained.
-    // READY / PAUSED / ENDED / EMPTY are documented no-ops.
-    if (state_.load() == PlayerState::Playing) state_.store(PlayerState::Paused);
+    // READY / PAUSED / ENDED / EMPTY are documented no-ops. CAS (not
+    // load+store) so a concurrently committed realtime ENDED can never be
+    // silently clobbered back to PAUSED.
+    PlayerState expected = PlayerState::Playing;
+    state_.compare_exchange_strong(expected, PlayerState::Paused);
 }
 
 PlayerStatus PlayerEngine::stop(std::int32_t* out_song_status) {
@@ -259,7 +273,12 @@ PlayerStatus PlayerEngine::seek(std::int64_t position_us, std::int64_t* out_land
         return PlayerStatus::ErrSeekFailed;
     }
     commit_landing(landing->first, landing->second);
-    if (was_ended) state_.store(PlayerState::Ready);
+    // Re-affirm the resulting state explicitly: an in-flight realtime op
+    // that drained during invalidate()'s quiesce may lawfully have committed
+    // ENDED for the DYING generation (full playout of what it saw). The seek
+    // succeeded, so the entry play state is the truth for the new segment —
+    // never the dying generation's async commit.
+    state_.store(was_ended ? PlayerState::Ready : st);
     if (out_landing_frames) *out_landing_frames = landing->first;
     if (out_song_status) *out_song_status = SONG_OK;
     work_cv_.notify_all();
@@ -370,9 +389,12 @@ StepReport PlayerEngine::worker_step() {
             // SONG_EOF is the frozen way the engine learns exhaustion: the
             // frozen model's chunk.eof flag arrives with the final data chunk,
             // the
-            // real ABI reports EOF on the next read.
+            // real ABI reports EOF on the next read. The worker's job ENDS
+            // here: it publishes the flag and never reads the timeline —
+            // the ENDED commit belongs to the timeline's runtime owner
+            // (fill_output/advance_render), which observes the flag through
+            // the atomic.
             source_eof_.store(true);
-            maybe_end();
             return StepReport{StepOutcome::Idle};
         }
         if (st != SONG_OK || produced == 0) {
@@ -398,8 +420,15 @@ void PlayerEngine::worker_loop() {
         if (shutdown_) return;
         if (rep.outcome == StepOutcome::Idle || rep.outcome == StepOutcome::Backpressure) {
             // Wake when work may have become available: state change, source
-            // reset, or ring space freed by a submit.
-            work_cv_.wait(g, [this] {
+            // reset, or ring space freed by a submit. The PRODUCTION device
+            // thread frees ring space in fill_output and cannot notify this
+            // CV — a lock-free notify would race the predicate check (lost
+            // wakeup) and the realtime path takes no mutex — so the sleep
+            // is BOUNDED and the predicate re-checked on a short timeout.
+            // Seconds of ring-ahead buffering make the poll latency
+            // irrelevant; tests drive the locked manual path and are
+            // unaffected.
+            work_cv_.wait_for(g, std::chrono::milliseconds(5), [this] {
                 if (shutdown_) return true;
                 if (state_.load() != PlayerState::Playing || source_eof_.load())
                     return false;
@@ -433,11 +462,14 @@ OutputFillResult PlayerEngine::fill_output(float* dst,
         r.kind = "idle";
         return r;
     }
-    // Test-only barrier: plain atomics, no mutex, no allocation. Unarmed
-    // (production) = two relaxed loads, no effect.
-    if (fill_barrier_armed_.load(std::memory_order_relaxed)) {
-        fill_barrier_entered_.store(true, std::memory_order_relaxed);
-        while (!fill_barrier_release_.load(std::memory_order_relaxed)) {
+    // Test-only barrier: atomics, no mutex, no allocation. Unarmed
+    // (production) = two no-effect loads. Seq_cst (repo convention) so the
+    // release side is a proper synchronizes-with edge: a barrier-released
+    // callback must observe everything that happened before the release,
+    // including writes made by threads the releaser joined.
+    if (fill_barrier_armed_.load()) {
+        fill_barrier_entered_.store(true);
+        while (!fill_barrier_release_.load()) {
             std::this_thread::yield();
         }
     }
@@ -506,11 +538,10 @@ OutputFillResult PlayerEngine::fill_output(float* dst,
             eos_silence_output_frames_.fetch_add(shortfall);
         }
     }
-    // Frozen ENDED condition (docs §7), computed lock-free for the realtime
-    // seam. The control plane performs the state transition on its side.
-    if (end_condition() && timeline_.pending_media() == 0) {
-        end_pending_.store(true);
-    }
+    // Frozen ENDED condition (docs §7), evaluated BY the timeline's runtime
+    // owner. The atomic state store is the realtime path's legal transition
+    // surface — the same one the overflow→Error path uses.
+    try_commit_ended();
     r.kind = kind;
     r.media_frames = m;
     r.silence_frames = gap_kind != nullptr ? shortfall : 0;
@@ -551,9 +582,7 @@ RenderReport PlayerEngine::advance_render(std::int64_t frames,
     const std::uint64_t advance = wanted < pending ? wanted : pending;
     const PlaybackTimeline::RenderSplit split = timeline_.advance(advance);
     rendered_media_frames_.fetch_add(split.media);
-    if (end_condition() && timeline_.pending_media() == 0) {
-        end_pending_.store(true);
-    }
+    try_commit_ended();
     rep.kind = "rendered";
     rep.rendered_output_frames = advance;
     rep.rendered_media_frames = split.media;
@@ -588,7 +617,6 @@ SubmitReport PlayerEngine::submit(std::uint64_t period_frames) {
         last_error_ = "timeline capacity exhausted";
         state_.store(PlayerState::Error);
     }
-    maybe_end();
     if (r.media_frames > 0) work_cv_.notify_all();  // ring space freed
     return rep;
 }
@@ -604,7 +632,6 @@ RenderReport PlayerEngine::backend_render(std::int64_t frames,
         last_error_ = "timeline capacity exhausted";
         state_.store(PlayerState::Error);
     }
-    maybe_end();
     return rep;
 }
 
@@ -694,22 +721,21 @@ void PlayerEngine::debug_set_publish_hook(std::function<void()> fn) {
 }
 
 void PlayerEngine::debug_set_fill_barrier_armed(bool armed) {
-    // Plain atomics: the realtime path reads these without any mutex;
-    // arming never blocks a fill unless it enters the armed window, and
-    // release is a plain atomic store.
-    fill_barrier_armed_.store(armed, std::memory_order_relaxed);
+    // Seq_cst atomics: no mutex on the realtime path, and the release load
+    // in fill_output is a synchronizes-with edge for barrier-ordered tests.
+    fill_barrier_armed_.store(armed);
     if (armed) {
-        fill_barrier_entered_.store(false, std::memory_order_relaxed);
-        fill_barrier_release_.store(false, std::memory_order_relaxed);
+        fill_barrier_entered_.store(false);
+        fill_barrier_release_.store(false);
     }
 }
 
 bool PlayerEngine::debug_fill_barrier_entered() const {
-    return fill_barrier_entered_.load(std::memory_order_relaxed);
+    return fill_barrier_entered_.load();
 }
 
 void PlayerEngine::debug_release_fill_barrier() {
-    fill_barrier_release_.store(true, std::memory_order_relaxed);
+    fill_barrier_release_.store(true);
 }
 
 void PlayerEngine::debug_set_control_hook(std::function<void()> fn) {
@@ -806,7 +832,6 @@ void PlayerEngine::invalidate() {
     backend_.reset();
     ring_.flush();
     source_eof_.store(false);
-    end_pending_.store(false);
     timeline_overflow_.store(false);
     AudioEngineBypass aes;
     aes.reset();
@@ -833,14 +858,17 @@ bool PlayerEngine::end_condition() const {
            in_flight_frames_.load() == 0 && ring_.readable() == 0;
 }
 
-void PlayerEngine::maybe_end() {
+void PlayerEngine::try_commit_ended() {
     // ENDED requires the complete audible drain: source exhausted, queue
     // empty, nothing in flight, and no pending MEDIA output. Trailing EOS
-    // padding must not postpone it (docs §7).
+    // padding must not postpone it (docs §7). OWNER-ONLY: reads
+    // timeline_.pending_media(), so only fill_output/advance_render (the
+    // single device thread; control post-quiesce via the same code) may call
+    // this. seq_cst state store: a snapshot that observes Ended also
+    // observes the pending==0 accounting that justified it.
     if (!end_condition()) return;
     if (timeline_.pending_media() != 0) return;
     state_.store(PlayerState::Ended);
-    end_pending_.store(false);
     AudioEngineBypass aes;
     aes.drain();
 }

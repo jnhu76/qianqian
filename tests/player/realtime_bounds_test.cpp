@@ -627,8 +627,10 @@ GATE(quiesce_closes_admission_first) {
 }
 
 // ---------------------------------------------------------------------------
-// §7: the realtime seam raises the ENDED signal once the frozen ENDED
-// condition holds (control plane performs the state transition).
+// §7 + timeline-ownership fix: the realtime seam IS the timeline's runtime
+// owner and commits ENDED itself (atomic state surface) once the frozen
+// condition holds — source exhausted, queue empty, nothing in flight, and
+// every submitted media frame rendered.
 // ---------------------------------------------------------------------------
 
 GATE(realtime_seam_end_signal) {
@@ -639,22 +641,26 @@ GATE(realtime_seam_end_signal) {
     s.e->play();
     s.drain_to_eof();
     QN_CHECK(s.e->snapshot().source_eof, "seam-end: source not exhausted");
+    QN_CHECK(s.e->snapshot().state == PlayerState::Playing,
+             "seam-end: EOF alone must not end playback");
 
-    // Drive the realtime seam (not the locked test API) to full playout.
+    // Drive the realtime seam (not the locked test API) to full playout;
+    // the seam commits ENDED exactly when the last media frame renders.
     int guard = 0;
-    while (!s.e->debug_end_pending()) {
+    while (s.e->snapshot().state != PlayerState::Ended) {
         s.e->fill_output(s.buf.data(), 512);
         s.e->advance_render(512);
-        QN_CHECK(++guard < 10000, "seam-end: ENDED signal never raised");
+        QN_CHECK(++guard < 10000, "seam-end: ENDED never committed");
     }
-    QN_CHECK(s.e->snapshot().state == PlayerState::Playing,
-             "seam-end: realtime seam must not transition state itself");
-    // The control plane (here: the manual-tick submit) performs the
-    // transition once the signal is observed.
-    s.e->submit(512);
-    QN_CHECK(s.e->snapshot().state == PlayerState::Ended, "seam-end: no transition");
-    QN_CHECK(s.e->snapshot().media_position_frames == 3000, "seam-end: ENDED @duration");
-    std::printf("  realtime seam raises ENDED signal; control plane transitions\n");
+    const EngineSnapshot done = s.e->snapshot();
+    QN_CHECK(done.pending_media_frames == 0, "seam-end: ENDED with pending media");
+    QN_CHECK(done.media_position_frames == 3000, "seam-end: ENDED @duration");
+    // Post-ENDED the seam is inert: a further fill is idle (GAP cannot
+    // resurrect output), and the state sticks.
+    const OutputFillResult after = s.e->fill_output(s.buf.data(), 512);
+    QN_CHECK(std::strcmp(after.kind, "idle") == 0, "seam-end: post-ENDED fill");
+    QN_CHECK(s.e->snapshot().state == PlayerState::Ended, "seam-end: ENDED not sticky");
+    std::printf("  realtime seam commits ENDED at full playout; post-ENDED inert\n");
 }
 
 // ---------------------------------------------------------------------------

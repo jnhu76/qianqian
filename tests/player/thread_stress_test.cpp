@@ -353,6 +353,138 @@ GATE(stress_eof_vs_control) {
     std::printf("  30x short-song EOF drain vs pause/stop/seek: ENDED only after playout\n");
 }
 
+// ---------------------------------------------------------------------------
+// THE timeline-ownership regression (docs §9): the decode side reaches
+// SONG_EOF while the production realtime seam — lock-free fill_output/
+// advance_render, NO state_mtx_ — is actively mutating PlaybackTimeline.
+// The worker path may only publish source_eof (atomics); the timeline's
+// runtime owner (the device thread) commits ENDED. TSan is the structural
+// enforcer; the assertions pin the frozen end semantics for ANY
+// interleaving of the forced overlap.
+//
+// Part 1 forces the exact overlap deterministically: all media is decoded
+// and submitted to the timeline (ring empty, EOF not yet published), a fill
+// is parked on the atomic test barrier (admitted, touching nothing yet), a
+// second thread hammers advance_render as the live timeline writer, and the
+// worker surrogate publishes EOF inside that window — precisely the read
+// the old worker-side maybe_end() performed. Then: EOF alone must not end
+// playback while media is pending; the parked fill completes as EOS GAP
+// (zero media duration); ENDED lands exactly when the LAST media frame
+// renders; post-ENDED the seam is inert.
+//
+// Part 2 soaks the true production topology — real decode worker thread +
+// real device thread driving the lock-free seam + control polling — to a
+// natural ENDED, repeatedly, under the sanitizers.
+// ---------------------------------------------------------------------------
+GATE(stress_eof_vs_realtime_seam) {
+    // -- Part 1: forced EOF-publish vs timeline-writer overlap --------------
+    for (int round = 0; round < 25; ++round) {
+        SongKeep keep;
+        auto e = make_engine(false);  // worker surrogate = this thread
+        QN_CHECK(open_into(*e, add_song(keep, 3000)) == PlayerStatus::Ok,
+                 "eof-vs-seam");
+        e->play();
+        // Produce the whole 3000-frame source: 1024 + 1024 + 952 published,
+        // EOF deliberately NOT yet read (that is the overlap trigger).
+        for (int i = 0; i < 6; ++i) e->worker_step();
+        const EngineSnapshot produced = e->snapshot();
+        QN_CHECK(produced.queued_media_frames == 3000 && !produced.source_eof,
+                 "eof-vs-seam: pre-state");
+
+        // Submit everything to the timeline: ring empty, media pending.
+        std::vector<float> all_buf(static_cast<std::size_t>(3000 * 8));
+        const OutputFillResult all = e->fill_output(all_buf.data(), 3000);
+        QN_CHECK(all.media_frames == 3000 && all.silence_frames == 0 &&
+                     std::strcmp(all.kind, "audio") == 0,
+                 "eof-vs-seam: submit-all");
+
+        // Parked fill (device thread, admitted, touches nothing yet) + live
+        // timeline writer on a second thread.
+        e->debug_set_fill_barrier_armed(true);
+        std::vector<float> dev_buf(static_cast<std::size_t>(512 * 8));
+        OutputFillResult parked;  // T1's result, read after join
+        std::thread parked_fill([&] { parked = e->fill_output(dev_buf.data(), 512); });
+        while (!e->debug_fill_barrier_entered()) std::this_thread::yield();
+        std::thread advancer([&] {
+            for (int i = 0; i < 40; ++i) e->advance_render(37);  // 1480 < 3000
+        });
+
+        // THE overlap: EOF publish while a timeline writer runs. The old
+        // code read timeline_.pending_media() right here from this thread.
+        e->worker_step();
+        const EngineSnapshot at_eof = e->snapshot();
+        QN_CHECK(at_eof.source_eof, "eof-vs-seam: EOF not published");
+        QN_CHECK_MSG(at_eof.state == PlayerState::Playing, "eof-vs-seam",
+                     "EOF published early-ENDED with %llu media pending",
+                     (unsigned long long)at_eof.pending_media_frames);
+
+        advancer.join();
+        e->debug_release_fill_barrier();
+        parked_fill.join();
+        e->debug_set_fill_barrier_armed(false);
+
+        // The parked fill completes as EOS GAP: the device has no more media
+        // to pull (all submitted), zero media duration (docs §5/§7).
+        QN_CHECK(std::strcmp(parked.kind, "eos") == 0 && parked.media_frames == 0 &&
+                     parked.silence_frames == 512,
+                 "eof-vs-seam: parked fill not EOS GAP");
+
+        // ENDED exactly when the last MEDIA frame renders — never earlier
+        // (media still pending), never later.
+        int guard = 0;
+        for (;;) {
+            const EngineSnapshot s = e->snapshot();
+            if (s.state == PlayerState::Ended) break;
+            QN_CHECK(s.pending_media_frames > 0, "eof-vs-seam: Playing w/o pending");
+            e->advance_render(64);
+            QN_CHECK(++guard < 10000, "eof-vs-seam: ENDED never committed");
+        }
+        const EngineSnapshot done = e->snapshot();
+        QN_CHECK(done.pending_media_frames == 0 && done.queued_media_frames == 0,
+                 "eof-vs-seam: ENDED with residue");
+        QN_CHECK(done.rendered_media_frames == 3000, "eof-vs-seam: media playout");
+        QN_CHECK(done.media_position_frames == 3000 &&
+                     done.media_position_frames == done.duration_frames,
+                 "eof-vs-seam: ENDED @duration");
+        check_conservation(*e, "eof-vs-seam");
+    }
+    std::printf("  25x forced EOF-publish vs timeline-writer: no early ENDED, "
+                "EOS GAP inert, ENDED at last media frame\n");
+
+    // -- Part 2: true production topology soak ------------------------------
+    for (int round = 0; round < 3; ++round) {
+        SongKeep keep;
+        auto e = make_engine(true);  // REAL decode worker thread
+        QN_CHECK(open_into(*e, add_song(keep, 48000)) == PlayerStatus::Ok,
+                 "eof-vs-seam-soak");
+        e->play();
+        std::vector<float> dev_buf(static_cast<std::size_t>(512 * 8));
+        std::atomic<bool> dev_done{false};
+        // The device thread: the production lock-free seam, NO state_mtx_,
+        // committing ENDED as the timeline owner.
+        std::thread device([&] {
+            while (!dev_done.load()) {
+                e->fill_output(dev_buf.data(), 512);
+                e->advance_render(512);
+            }
+        });
+        int guard = 0;
+        while (e->snapshot().state != PlayerState::Ended) {
+            QN_CHECK(++guard < 200000, "eof-vs-seam-soak: never ENDED");
+        }
+        dev_done = true;
+        device.join();
+        const EngineSnapshot s = e->snapshot();
+        QN_CHECK(s.source_eof && s.pending_media_frames == 0 &&
+                     s.queued_media_frames == 0 && s.in_flight_frames == 0,
+                 "eof-vs-seam-soak: ENDED without full playout");
+        QN_CHECK(s.media_position_frames == s.duration_frames,
+                 "eof-vs-seam-soak: ENDED @duration");
+        check_conservation(*e, "eof-vs-seam-soak");
+    }
+    std::printf("  3x real worker + real device thread to natural ENDED\n");
+}
+
 // Soak: full pipeline to ENDED under the threaded worker with random
 // pacing; the final state must be a clean, complete playout.
 GATE(stress_play_to_end) {

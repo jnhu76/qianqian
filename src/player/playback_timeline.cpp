@@ -9,10 +9,10 @@ void PlaybackTimeline::reset() {
     render_off_ = 0;
     trimmed_output_ = 0;
     trimmed_media_ = 0;
-    output_endpoint_ = 0;
-    rendered_output_ = 0;
-    span_media_total_ = 0;
-    span_media_rendered_ = 0;
+    output_endpoint_.store(0);
+    rendered_output_.store(0);
+    span_media_total_.store(0);
+    span_media_rendered_.store(0);
     overflow_ = false;
 }
 
@@ -34,11 +34,11 @@ bool PlaybackTimeline::append(SpanKind kind, std::uint64_t frames) {
             const bool cursor_past_end = (render_rel_ == count_);
             const std::uint64_t old_len = last.output_end - last.output_begin;
             last.output_end += frames;
-            output_endpoint_ += frames;
-            submitted_output_total_ += frames;
+            output_endpoint_.fetch_add(frames);
+            submitted_output_total_.fetch_add(frames);
             if (kind == SpanKind::Media) {
-                span_media_total_ += frames;
-                submitted_media_total_ += frames;
+                span_media_total_.fetch_add(frames);
+                submitted_media_total_.fetch_add(frames);
             }
             if (cursor_past_end) {
                 // The whole old span was already rendered and the cursor sat
@@ -62,13 +62,13 @@ bool PlaybackTimeline::append(SpanKind kind, std::uint64_t frames) {
         }
     }
     spans_[(head_ + count_) % kCapacity] =
-        Span{output_endpoint_, output_endpoint_ + frames, kind};
+        Span{output_endpoint_.load(), output_endpoint_.load() + frames, kind};
     ++count_;
-    output_endpoint_ += frames;
-    submitted_output_total_ += frames;
+    output_endpoint_.fetch_add(frames);
+    submitted_output_total_.fetch_add(frames);
     if (kind == SpanKind::Media) {
-        span_media_total_ += frames;
-        submitted_media_total_ += frames;
+        span_media_total_.fetch_add(frames);
+        submitted_media_total_.fetch_add(frames);
     }
     return true;
 }
@@ -83,7 +83,7 @@ PlaybackTimeline::RenderSplit PlaybackTimeline::advance(std::uint64_t frames) {
         const std::uint64_t take = avail < remaining ? avail : remaining;
         if (span.kind == SpanKind::Media) {
             split.media += take;
-            span_media_rendered_ += take;
+            span_media_rendered_.fetch_add(take);
         } else {
             split.gap += take;
         }
@@ -95,18 +95,18 @@ PlaybackTimeline::RenderSplit PlaybackTimeline::advance(std::uint64_t frames) {
         }
     }
     const std::uint64_t advanced = frames - remaining;
-    rendered_output_ += advanced;
-    rendered_output_total_ += advanced;
-    rendered_media_total_ += split.media;
-    rendered_gap_total_ += split.gap;
+    rendered_output_.fetch_add(advanced);
+    rendered_output_total_.fetch_add(advanced);
+    rendered_media_total_.fetch_add(split.media);
+    rendered_gap_total_.fetch_add(split.gap);
     if (count_ >= kSoftTrimLimit) trim_rendered();
     return split;
 }
 
 PlaybackTimeline::Discard PlaybackTimeline::invalidate() {
     Discard d{pending_output(), pending_media()};
-    discarded_output_total_ += d.output;
-    discarded_media_total_ += d.media;
+    discarded_output_total_.fetch_add(d.output);
+    discarded_media_total_.fetch_add(d.media);
     reset();
     return d;
 }

@@ -24,10 +24,12 @@
 //                    control commit closes admission BEFORE waiting for
 //                    in-flight ops, so a counted op is always waited out
 //                    and an uncounted one never touches a mid-reset
-//                    ring/timeline. The manual-tick submit()/
-//                    backend_render() are the deterministic TEST entry
-//                    points (NullAudioBackend): they hold state_mtx_ and
-//                    additionally drive the test backend's content log.
+//                    ring/timeline. As the timeline's runtime owner, the
+//                    device thread also commits ENDED (atomic state store)
+//                    once the frozen ENDED condition holds. The manual-tick
+//                    submit()/backend_render() are the deterministic TEST
+//                    entry points (NullAudioBackend): they hold state_mtx_
+//                    and additionally drive the test backend's content log.
 //
 // One engine owns one song at a time. The SongCore handle is not internally
 // thread-safe: every song_* call happens under src_mtx_.
@@ -233,10 +235,6 @@ public:
     std::int32_t source_rate() const { return source_rate_; }
     // Test-only: ring lifetime diagnostics (atomics; safe unlocked).
     const PcmRing& ring_debug() const { return ring_; }
-    // Test-only: the realtime seam's end-of-playout signal (set lock-free by
-    // fill/advance when the frozen ENDED condition holds; the control plane
-    // performs the state transition).
-    bool debug_end_pending() const { return end_pending_.load(); }
 
     // -- test-only hooks (never on the production ABI) -------------------------
     // Worker read sizing: the frozen backpressure rule is
@@ -296,7 +294,14 @@ private:
     // Frozen ENDED condition (docs §7): playing, source exhausted, queue
     // empty, nothing in flight. Reads atomics — safe from the realtime path.
     bool end_condition() const;
-    void maybe_end();
+    // ENDED commit — TIMELINE-OWNER ONLY (fill_output/advance_render, the
+    // single device thread; control reaches it post-quiesce through the same
+    // code). Evaluates the frozen condition INCLUDING timeline_.pending_media()
+    // and commits ENDED through the atomic state surface (the realtime path's
+    // legal transition surface, like the overflow→Error store). The decode
+    // worker never calls this: it publishes source_eof/decode state only and
+    // never reads the timeline.
+    void try_commit_ended();
     std::int64_t source_remaining() const;  // duration-derived estimate, -1 if unknown
     std::int64_t position_frames_locked() const;
 
@@ -340,7 +345,6 @@ private:
     // observation can never disagree (see admission_enter/exit).
     std::atomic<bool> backend_accepting_{true};
     std::atomic<std::uint64_t> active_backend_ops_{0};  // admitted ops in flight
-    std::atomic<bool> end_pending_{false};              // ENDED condition observed
     std::atomic<bool> timeline_overflow_{false};        // fail-closed span store
 
     // Buffers (preallocated; sized at construction).
@@ -364,9 +368,10 @@ private:
     std::function<void()> publish_hook_;
     std::function<void()> control_hook_;
     std::function<void()> quiesce_hook_;
-    // Test-only realtime barrier: PLAIN ATOMICS so the realtime path can
-    // honor it without a mutex, allocation, or std::function copy. Armed=
-    // false is the production state (two relaxed loads, no effect).
+    // Test-only realtime barrier: plain ATOMIC FLAGS so the realtime path
+    // can honor it without a mutex or allocation (armed = false is the
+    // production state: two no-effect loads). Seq_cst so a release is a
+    // real synchronizes-with edge for barrier-ordered interleavings.
     std::atomic<bool> fill_barrier_armed_{false};
     std::atomic<bool> fill_barrier_entered_{false};
     std::atomic<bool> fill_barrier_release_{false};

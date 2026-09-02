@@ -39,6 +39,7 @@
 #define QIANQIAN_PLAYER_PLAYBACK_TIMELINE_HPP
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
@@ -46,6 +47,13 @@ namespace qn {
 
 enum class SpanKind : std::uint8_t { Media, Gap };
 
+// Concurrency model (docs §9): the span store and its cursors have exactly
+// ONE runtime owner — the single backend/device thread that calls
+// append()/advance(); the control thread touches them only after quiescing
+// the backend (commit path). The scalar accounting counters below are
+// ATOMIC so the control plane's polled snapshot (pe_get_snapshot may be
+// polled concurrently) can read them lock-free while the owner mutates;
+// individually coherent, cross-field conservation holds at quiescence.
 class PlaybackTimeline {
 public:
     // Fixed internal span capacity. Live spans are bounded far below this by
@@ -93,14 +101,14 @@ public:
     // -- queries ---------------------------------------------------------------
     // Pending output of the CURRENT generation (submitted - rendered).
     std::uint64_t pending_output() const {
-        return output_endpoint_ - rendered_output_;
+        return output_endpoint_.load() - rendered_output_.load();
     }
     // Pending MEDIA payload of the current generation.
     std::uint64_t pending_media() const {
-        return span_media_total_ - span_media_rendered_;
+        return span_media_total_.load() - span_media_rendered_.load();
     }
-    std::uint64_t submitted_endpoint() const { return output_endpoint_; }
-    std::uint64_t rendered_current() const { return rendered_output_; }
+    std::uint64_t submitted_endpoint() const { return output_endpoint_.load(); }
+    std::uint64_t rendered_current() const { return rendered_output_.load(); }
 
     // Map an output-domain position onto the media timeline relative to the
     // segment base (docs §2.5; the s3 gate probes this mapping). GAP spans
@@ -111,13 +119,13 @@ public:
     std::uint64_t media_at_output(std::uint64_t output_pos) const;
 
     // Lifetime totals (conservation laws above).
-    std::uint64_t submitted_output_total() const { return submitted_output_total_; }
-    std::uint64_t rendered_output_total() const { return rendered_output_total_; }
-    std::uint64_t discarded_output_total() const { return discarded_output_total_; }
-    std::uint64_t submitted_media_total() const { return submitted_media_total_; }
-    std::uint64_t rendered_media_total() const { return rendered_media_total_; }
-    std::uint64_t rendered_gap_total() const { return rendered_gap_total_; }
-    std::uint64_t discarded_media_total() const { return discarded_media_total_; }
+    std::uint64_t submitted_output_total() const { return submitted_output_total_.load(); }
+    std::uint64_t rendered_output_total() const { return rendered_output_total_.load(); }
+    std::uint64_t discarded_output_total() const { return discarded_output_total_.load(); }
+    std::uint64_t submitted_media_total() const { return submitted_media_total_.load(); }
+    std::uint64_t rendered_media_total() const { return rendered_media_total_.load(); }
+    std::uint64_t rendered_gap_total() const { return rendered_gap_total_.load(); }
+    std::uint64_t discarded_media_total() const { return discarded_media_total_.load(); }
 
     std::size_t span_count() const { return count_; }
     std::uint64_t trimmed_output() const { return trimmed_output_; }
@@ -143,20 +151,21 @@ private:
     std::uint64_t trimmed_output_ = 0;
     std::uint64_t trimmed_media_ = 0;
 
-    // Per-generation accounting.
-    std::uint64_t output_endpoint_ = 0;   // submitted output this generation
-    std::uint64_t rendered_output_ = 0;   // rendered output this generation
-    std::uint64_t span_media_total_ = 0;  // media payload submitted (gen)
-    std::uint64_t span_media_rendered_ = 0;
+    // Per-generation accounting (atomics: the polled snapshot reads these
+    // while the device thread owns mutation; single writer otherwise).
+    std::atomic<std::uint64_t> output_endpoint_{0};   // submitted output this generation
+    std::atomic<std::uint64_t> rendered_output_{0};   // rendered output this generation
+    std::atomic<std::uint64_t> span_media_total_{0};  // media payload submitted (gen)
+    std::atomic<std::uint64_t> span_media_rendered_{0};
 
-    // Lifetime totals.
-    std::uint64_t submitted_output_total_ = 0;
-    std::uint64_t rendered_output_total_ = 0;
-    std::uint64_t discarded_output_total_ = 0;
-    std::uint64_t submitted_media_total_ = 0;
-    std::uint64_t rendered_media_total_ = 0;
-    std::uint64_t rendered_gap_total_ = 0;
-    std::uint64_t discarded_media_total_ = 0;
+    // Lifetime totals (same reader/writer split).
+    std::atomic<std::uint64_t> submitted_output_total_{0};
+    std::atomic<std::uint64_t> rendered_output_total_{0};
+    std::atomic<std::uint64_t> discarded_output_total_{0};
+    std::atomic<std::uint64_t> submitted_media_total_{0};
+    std::atomic<std::uint64_t> rendered_media_total_{0};
+    std::atomic<std::uint64_t> rendered_gap_total_{0};
+    std::atomic<std::uint64_t> discarded_media_total_{0};
 
     bool overflow_ = false;  // sticky fail-closed diagnostic
 };
