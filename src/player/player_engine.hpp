@@ -107,11 +107,17 @@ struct RenderReport {
 
 // Result of the realtime output-fill seam. `dst` received
 // media_frames of interleaved PCM; silence_frames are device-duration GAP
-// padding (zero media duration). kind is a static literal.
+// padding (zero media duration). kind is a static literal. source_rate /
+// channels describe the format of the PCM written to `dst` (0 on an idle
+// return, where dst is untouched): a production backend needs them to
+// negotiate its device stream, and they are read in the SAME admitted
+// window as the ring's data stride — never across a commit boundary.
 struct OutputFillResult {
     std::uint64_t segment = 0;
     std::uint64_t media_frames = 0;
     std::uint64_t silence_frames = 0;
+    std::int32_t source_rate = 0;
+    std::int32_t channels = 0;
     // "audio" | "underrun" | "preroll" | "eos" | "idle"
     const char* kind = "idle";
 };

@@ -16,7 +16,32 @@
 #include "player_engine.h"
 #include "player_engine.hpp"
 
+// Application-facing runtime flavor (docs/wasapi-native-runtime-closure.md):
+// the qianqian_runtime Windows build composes the WASAPI render thread into
+// pe_create/pe_destroy so the public C ABI drives real output. Tests and
+// non-Windows builds never define QN_QIANQIAN_RUNTIME and keep the pure
+// engine shim below — the NullAudioBackend stays the single seam consumer.
+#if defined(QN_QIANQIAN_RUNTIME) && defined(_WIN32)
+#include "wasapi_renderer.hpp"
+#endif
+
 namespace {
+
+#if defined(QN_QIANQIAN_RUNTIME) && defined(_WIN32)
+// Runtime flavor: the C handle owns the engine AND its platform renderer.
+struct pe_runtime_handle {
+    qn::PlayerEngine* engine;
+    qn::WasapiRenderer* renderer;
+};
+
+qn::PlayerEngine* self(pe_engine* e) {
+    return reinterpret_cast<pe_runtime_handle*>(e)->engine;
+}
+#else
+qn::PlayerEngine* self(pe_engine* e) {
+    return reinterpret_cast<qn::PlayerEngine*>(e);
+}
+#endif
 
 static_assert((int)PE_OK == (int)qn::PlayerStatus::Ok);
 static_assert((int)PE_ERR_ILLEGAL_CALL == (int)qn::PlayerStatus::ErrIllegalCall);
@@ -75,19 +100,47 @@ extern "C" {
 uint32_t player_engine_abi_version(void) { return PLAYER_ENGINE_ABI_VERSION; }
 
 pe_engine* pe_create(const pe_config* config) {
+    qn::PlayerEngine* engine = nullptr;
     try {
-        return reinterpret_cast<pe_engine*>(new qn::PlayerEngine(to_engine_config(config)));
-    } catch (const std::bad_alloc&) {
-        return nullptr;
+        engine = new qn::PlayerEngine(to_engine_config(config));
     } catch (...) {
         return nullptr;
     }
+#if defined(QN_QIANQIAN_RUNTIME) && defined(_WIN32)
+    // Compose the platform render thread. A renderer failure (e.g. thread
+    // spawn) degrades to a silent runtime — create's contract stays "NULL
+    // only on allocation failure", and the frozen position in the snapshot
+    // is the honest "no output" signal.
+    pe_runtime_handle* handle = new (std::nothrow) pe_runtime_handle{engine, nullptr};
+    if (handle == nullptr) {
+        delete engine;
+        return nullptr;
+    }
+    try {
+        handle->renderer = new qn::WasapiRenderer(*engine);
+    } catch (...) {
+        handle->renderer = nullptr;
+    }
+    return reinterpret_cast<pe_engine*>(handle);
+#else
+    return reinterpret_cast<pe_engine*>(engine);
+#endif
 }
 
 void pe_destroy(pe_engine* engine) {
     if (engine == nullptr) return;
     try {
+#if defined(QN_QIANQIAN_RUNTIME) && defined(_WIN32)
+        pe_runtime_handle* handle = reinterpret_cast<pe_runtime_handle*>(engine);
+        // Hard requirement: after destroy returns, no render thread may
+        // touch the engine — the renderer destructor stops and joins its
+        // thread before the engine is destroyed.
+        delete handle->renderer;
+        delete handle->engine;
+        delete handle;
+#else
         delete reinterpret_cast<qn::PlayerEngine*>(engine);
+#endif
     } catch (...) {
         // Destructors must not throw; if one ever does, never let it cross.
     }
@@ -98,7 +151,7 @@ pe_status pe_open(pe_engine* engine, const song_io* io, int32_t* out_song_status
     if (engine == nullptr || io == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
         return static_cast<pe_status>(
-            reinterpret_cast<qn::PlayerEngine*>(engine)->open(*io, out_song_status));
+            self(engine)->open(*io, out_song_status));
     } catch (const std::bad_alloc&) {
         return PE_ERR_NO_MEMORY;
     } catch (...) {
@@ -109,7 +162,7 @@ pe_status pe_open(pe_engine* engine, const song_io* io, int32_t* out_song_status
 pe_status pe_play(pe_engine* engine) {
     if (engine == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
-        return static_cast<pe_status>(reinterpret_cast<qn::PlayerEngine*>(engine)->play());
+        return static_cast<pe_status>(self(engine)->play());
     } catch (const std::bad_alloc&) {
         return PE_ERR_NO_MEMORY;
     } catch (...) {
@@ -120,7 +173,7 @@ pe_status pe_play(pe_engine* engine) {
 pe_status pe_pause(pe_engine* engine) {
     if (engine == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
-        reinterpret_cast<qn::PlayerEngine*>(engine)->pause();
+        self(engine)->pause();
         return PE_OK;
     } catch (...) {
         return PE_ERR_INTERNAL;
@@ -132,7 +185,7 @@ pe_status pe_stop(pe_engine* engine, int32_t* out_song_status) {
     if (engine == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
         return static_cast<pe_status>(
-            reinterpret_cast<qn::PlayerEngine*>(engine)->stop(out_song_status));
+            self(engine)->stop(out_song_status));
     } catch (const std::bad_alloc&) {
         return PE_ERR_NO_MEMORY;
     } catch (...) {
@@ -145,7 +198,7 @@ pe_status pe_seek(pe_engine* engine, int64_t position_us, int64_t* out_landing_u
     init_seek_outs(out_landing_us, out_song_status);
     if (engine == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
-        qn::PlayerEngine* e = reinterpret_cast<qn::PlayerEngine*>(engine);
+        qn::PlayerEngine* e = self(engine);
         std::int64_t landing_frames = 0;
         const pe_status st = static_cast<pe_status>(
             e->seek(position_us, &landing_frames, out_song_status));
@@ -175,7 +228,7 @@ pe_status pe_get_snapshot(pe_engine* engine, pe_snapshot* out) {
     }
     if (engine == nullptr || out == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
-        const qn::PlayerEngine* e = reinterpret_cast<const qn::PlayerEngine*>(engine);
+        const qn::PlayerEngine* e = self(engine);
         const qn::EngineSnapshot s = e->snapshot();
         // One coherent instant: position, duration and
         // sample_rate all derive from the rate captured inside the snapshot
