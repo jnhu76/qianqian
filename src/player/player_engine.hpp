@@ -8,18 +8,28 @@
 // details.
 //
 // This is the INTERNAL native API: not a frozen ABI. The C ABI header
-// (include/player_engine.h) is designed only after the native gates pass.
+// (include/player_engine.h) exposes only the product control/observation
+// surface; everything here (manual submit/render, debug hooks, the
+// backend seam) is internal C++.
 //
-// Thread model (docs §9), mirrored from the oracle's call discipline:
+// Thread model (docs §9, corrective §7–§8), mirrored from the oracle's
+// call discipline:
 //   control thread   open/play/pause/stop/seek — serialized, take
 //                    src_mtx_ THEN state_mtx_ (epoch must rise inside the
 //                    src_mtx_ section so a decode's epoch and its data can
-//                    never be paired across a seek)
+//                    never be paired across a seek). Control ops may block:
+//                    they quiesce the backend before touching ring/timeline.
 //   decode worker    worker_step(): SongCore read under src_mtx_ (outside
 //                    state_mtx_), publication under state_mtx_ with the
 //                    epoch guard — stale results die at publish time
-//   backend side     submit()/backend_render() under state_mtx_ (NullBackend
-//                    is manual-tick; WASAPI revisits the realtime path)
+//   backend side     fill_output()/advance_render() are the PRODUCTION
+//                    realtime seam (corrective §6): no heap allocation, no
+//                    SongCore, no filesystem, no logging, and NO wait on
+//                    state_mtx_. They touch only the lock-free SPSC ring,
+//                    the bounded timeline, and atomics. The manual-tick
+//                    submit()/backend_render() are the deterministic TEST
+//                    entry points (NullAudioBackend): they hold state_mtx_
+//                    and additionally drive the test backend's content log.
 //
 // One engine owns one song at a time. The SongCore handle is not internally
 // thread-safe: every song_* call happens under src_mtx_.
@@ -51,7 +61,7 @@ enum class PlayerState : std::uint8_t {
 enum class LandingQuality : std::uint8_t { Confirmed, Estimated };
 
 // Typed control result. The oracle raises EngineError/SongSeekError; the
-// native API returns codes (the future C ABI maps 1:1).
+// native API returns codes (the C ABI maps 1:1).
 enum class PlayerStatus : std::int32_t {
     Ok = 0,
     ErrIllegalCall = 1,   // call not allowed in current state
@@ -95,8 +105,20 @@ struct RenderReport {
     std::uint64_t generation = 0;
 };
 
+// Result of the realtime output-fill seam (corrective §6). `dst` received
+// media_frames of interleaved PCM; silence_frames are device-duration GAP
+// padding (zero media duration). kind is a static literal.
+struct OutputFillResult {
+    std::uint64_t segment = 0;
+    std::uint64_t media_frames = 0;
+    std::uint64_t silence_frames = 0;
+    // "audio" | "underrun" | "preroll" | "eos" | "idle"
+    const char* kind = "idle";
+};
+
 // Mirrors the oracle's EngineSnapshot field-for-field (frame domain; names
-// carry their domain per docs §2.6).
+// carry their domain per docs §2.6). INTERNAL diagnostics — the product C
+// snapshot (include/player_engine.h) is the small time-domain view.
 struct EngineSnapshot {
     PlayerState state = PlayerState::Empty;
     std::int64_t media_position_frames = 0;
@@ -164,19 +186,33 @@ public:
     StepReport worker_step();
 
     // -- backend side ----------------------------------------------------------------
-    // One backend callback: move up to `period_frames` of real PCM from the
-    // queue into the backend, padding shortfalls with classified GAP
-    // silence. Never blocks, never decodes. Submitting is NOT audible.
+    // PRODUCTION REALTIME SEAM (corrective §6–§8): one bounded output fill.
+    // Copies up to requested_output_frames from the queue into `dst`
+    // (caller-preallocated, >= requested frames * channels), appends the
+    // MEDIA/GAP spans to the bounded timeline, updates atomic counters.
+    // Contract: no heap allocation, no vector growth, no logging, no
+    // SongCore, no filesystem, no blocking mutex. Callable concurrently
+    // with control commits — a commit quiesces first (waits for the fill to
+    // finish) before touching the ring/timeline.
+    OutputFillResult fill_output(float* dst, std::uint64_t requested_output_frames);
+
+    // PRODUCTION REALTIME SEAM: render-clock progression. `frames` of
+    // device output are proven rendered; generation == kCurrentGeneration
+    // = current, any other value is a literal dead generation whose late
+    // event is dropped. Same realtime contract as fill_output.
+    RenderReport advance_render(std::int64_t frames,
+                                std::int64_t generation = kCurrentGeneration);
+
+    // Deterministic manual-tick entry points (TEST-ONLY; NullAudioBackend
+    // drives the rendered-content log for the content-continuity oracle).
+    // submit() = fill_output into an internal buffer + test backend log.
     SubmitReport submit(std::uint64_t period_frames);
-    // Device/render progression: the device consumed `frames` output frames.
-    // generation == kCurrentGeneration = current; any other value (including
-    // negatives) is a literal generation — a dead generation's late event
-    // is dropped. The sentinel must not collide with real dead-generation
-    // ids (epoch - back can be any integer).
-    static constexpr std::int64_t kCurrentGeneration =
-        std::numeric_limits<std::int64_t>::min();
+    // backend_render() = advance_render + test backend log.
     RenderReport backend_render(std::int64_t frames,
                                 std::int64_t generation = kCurrentGeneration);
+
+    static constexpr std::int64_t kCurrentGeneration =
+        std::numeric_limits<std::int64_t>::min();
 
     // -- observability ---------------------------------------------------------------
     EngineSnapshot snapshot() const;
@@ -191,9 +227,15 @@ public:
     // formula's second term; check_all uses it directly).
     std::int64_t segment_rendered_media() const;
     const NullAudioBackend& backend() const { return backend_; }
-    std::uint64_t in_flight_frames() const;
+    const PlaybackTimeline& timeline_debug() const { return timeline_; }
+    std::uint64_t in_flight_frames() const { return in_flight_frames_.load(); }
+    std::int32_t source_rate() const { return source_rate_; }
     // Test-only: ring lifetime diagnostics (atomics; safe unlocked).
     const PcmRing& ring_debug() const { return ring_; }
+    // Test-only: the realtime seam's end-of-playout signal (set lock-free by
+    // fill/advance when the frozen ENDED condition holds; the control plane
+    // performs the state transition).
+    bool debug_end_pending() const { return end_pending_.load(); }
 
     // -- test-only hooks (never on the production ABI; docs §53) -------------------
     // Worker read sizing: the frozen backpressure rule is
@@ -219,8 +261,19 @@ public:
     // never race the invocation itself.
     void debug_set_publish_hook(std::function<void()> fn);  // before epoch check
     void debug_set_read_hook(std::function<void()> fn);     // after song_read_pcm
+    void debug_set_fill_hook(std::function<void()> fn);     // mid-fill (realtime seam)
+    void debug_set_control_hook(std::function<void()> fn);  // under state_mtx_
+    void debug_set_quiesce_hook(std::function<void()> fn);  // control waits on active fill
 
 private:
+    enum MutBits : std::uint32_t {
+        kMutSkipEpochGuard = 1u << 0,
+        kMutAdvanceOnSubmit = 1u << 1,
+        kMutGapCountsAsMedia = 1u << 2,
+        kMutEndWithoutPending = 1u << 3,
+    };
+    bool mut(std::uint32_t bit) const { return (mutations_.load() & bit) != 0; }
+
     // One decode result in flight, not yet published. Carries the epoch it
     // was decoded under — the entire stale-frame defense. (The oracle's
     // chunk.eof flag has no native counterpart: the frozen ABI reports EOF
@@ -240,6 +293,13 @@ private:
     // Commit machinery (caller holds src_mtx_ AND state_mtx_).
     void invalidate();
     void commit_landing(std::int64_t landing_frames, LandingQuality quality);
+    // Wait until no realtime fill/advance is mid-flight. The realtime path
+    // never blocks on state_mtx_, so the wait is bounded; called from
+    // control commits (under state_mtx_) before touching ring/timeline.
+    void quiesce_backend();
+    // Frozen ENDED condition (docs §7): playing, source exhausted, queue
+    // empty, nothing in flight. Reads atomics — safe from the realtime path.
+    bool end_condition() const;
     void maybe_end();
     std::int64_t source_remaining() const;  // hint if set, else estimate
     std::int64_t position_frames_locked() const;
@@ -259,43 +319,54 @@ private:
     std::int64_t duration_frames_ = 0;  // -1 = unknown
     bool duration_known_ = false;
 
-    // Engine state (under state_mtx_).
+    // Engine state. The realtime seam (fill_output/advance_render) reads the
+    // ATOMIC members below lock-free; the control plane and decode worker
+    // write them (usually under state_mtx_ — atomics are safe either way).
     mutable std::mutex src_mtx_;   // serializes song_* calls (outer lock)
     mutable std::mutex state_mtx_;  // engine state machine (inner lock)
-    PlayerState state_ = PlayerState::Empty;
-    std::uint64_t epoch_ = 0;
-    std::uint64_t segment_ = 0;
+    std::atomic<PlayerState> state_{PlayerState::Empty};
+    std::atomic<std::uint64_t> epoch_{0};
+    std::atomic<std::uint64_t> segment_{0};
     std::vector<std::int64_t> segment_anchors_{0};
     std::vector<LandingQuality> segment_qualities_{LandingQuality::Confirmed};
     std::int64_t base_frame_ = 0;          // current segment landing
-    std::uint64_t rendered_media_frames_ = 0;  // per-segment, media domain
-    bool submitted_media_this_segment_ = false;
-    bool source_eof_ = false;
-    std::optional<InFlight> in_flight_;
+    std::atomic<std::uint64_t> rendered_media_frames_{0};  // per-segment, media domain
+    std::atomic<bool> submitted_media_this_segment_{false};
+    std::atomic<bool> source_eof_{false};
+    std::optional<InFlight> in_flight_;    // decode worker only (state_mtx_)
+    std::atomic<std::uint64_t> in_flight_frames_{0};  // realtime mirror
     std::int64_t decoded_since_commit_ = 0;
+
+    // Realtime seam signals (lock-free).
+    std::atomic<std::uint64_t> active_fill_{0};   // fills/advances in flight
+    std::atomic<bool> end_pending_{false};        // ENDED condition observed
+    std::atomic<bool> timeline_overflow_{false};  // fail-closed span store
 
     // Buffers (preallocated; sized at construction).
     std::vector<float> chunk_buf_;
     std::vector<float> submit_buf_;
 
-    // Diagnostics.
-    std::uint64_t decoded_source_frames_ = 0;
-    std::uint64_t discarded_stale_media_frames_ = 0;
-    std::uint64_t stale_render_events_ = 0;
-    std::uint64_t underrun_count_ = 0;
-    std::uint64_t underrun_silence_output_frames_ = 0;
-    std::uint64_t preroll_events_ = 0;
-    std::uint64_t preroll_silence_output_frames_ = 0;
-    std::uint64_t eos_silence_output_frames_ = 0;
+    // Diagnostics (atomic where the realtime seam writes them).
+    std::uint64_t decoded_source_frames_ = 0;  // worker only (state_mtx_)
+    std::atomic<std::uint64_t> discarded_stale_media_frames_{0};
+    std::atomic<std::uint64_t> stale_render_events_{0};
+    std::atomic<std::uint64_t> underrun_count_{0};
+    std::atomic<std::uint64_t> underrun_silence_output_frames_{0};
+    std::atomic<std::uint64_t> preroll_events_{0};
+    std::atomic<std::uint64_t> preroll_silence_output_frames_{0};
+    std::atomic<std::uint64_t> eos_silence_output_frames_{0};
     std::string last_error_;
 
     // Test hooks / mutations (see accessors).
     mutable std::mutex hook_mtx_;
     std::function<void()> publish_hook_;
     std::function<void()> read_hook_;
+    std::function<void()> fill_hook_;
+    std::function<void()> control_hook_;
+    std::function<void()> quiesce_hook_;
     std::int64_t remaining_hint_ = -1;
     std::uint64_t work_steps_ = 1;
-    DebugMutations mutations_;
+    std::atomic<std::uint32_t> mutations_{0};
 
     // Worker thread.
     std::thread worker_;

@@ -589,22 +589,70 @@ position = base(landing) + rendered_media_frames / media_rate
 
 ```text
 control thread   open / play / pause / stop / seek (serialized)
-decode worker    SongCore read → AudioEngine → queue publish (epoch-checked)
-render callback  queue read → backend buffer submit, counters only (§5 rules)
-device clock     backend render progression → mapping → media position
+decode worker    SongCore read → PCM ring → publish (epoch-checked)
+audio callback   fill_output: ring read → device buffer, GAP on underrun
+                 (§5 rules) — lock-free, no control mutex, no allocation
+device clock     advance_render: proven render progression → mapping →
+                 media position
 ```
 
 Diagnostics for UI are a polled snapshot (state, media position, decode
 position, duration(+known flag), buffered, underrun/preroll/stale
 counters, submitted/rendered/pending output counters, position quality,
 last error) at UI cadence (5–10 Hz); no native→Kotlin callbacks, none
-from the realtime path.
+from the realtime path. The product snapshot reports the media timeline
+in MICROSECONDS (`position_us` / `duration_us`) — the UI never needs a
+sample rate.
 
-## 10. AudioEngine boundary
+## 10. Production boundary: two layers (corrective §62)
 
-`process(frames) / reset() / drain()`; v1 is BYPASS. SRC stays frozen:
-BYPASS when source rate/layout == device requirement, else
-`aresample` / libswresample — owned by AudioEngine, never SongCore.
+The engine ships two distinct surfaces; only one is public. The realtime
+path never touches the control mutex and never allocates; the backend
+seam is internalized so a managed caller (KMP) knows nothing about how
+audio is driven (corrective P0-A/P0-B).
+
+**Layer 1 — product C ABI** (`include/player_engine.h`, the ONLY public
+surface). Control + polled observation:
+`pe_create / pe_destroy / pe_open / pe_play / pe_pause / pe_stop /
+pe_seek / pe_get_snapshot` plus `player_engine_abi_version`. No audio
+backend, no manual render ticks, no queue internals, no worker mode, no
+SongCore surface beyond the `song_io` open() travels through. Every call
+returns a typed `pe_status`; invalid caller input never aborts and no C++
+exception crosses the boundary (P0-D). Control calls are caller-
+serialized (the engine also serializes internally); `pe_get_snapshot` may
+be polled concurrently.
+
+**Layer 2 — internal AudioBackend seam** (never public). The boundary
+between the engine and whatever drives the device, deliberately narrow so
+WASAPI can implement it without re-opening the engine:
+
+- `fill_output(float *dst, uint64_t requested_frames)` — the audio
+  callback: reads the PCM ring into `dst`, appends a GAP span (underrun /
+  preroll / EOS silence, §5) when the ring underflows. Lock-free
+  (`active_fill_` count + atomics), no control mutex, no allocation.
+- `advance_render(int64_t frames, int64_t generation)` — the device
+  clock evidence: proven-rendered output advanced through the timeline →
+  media position. Same realtime properties.
+
+`NullAudioBackend` implements the device side in-process (deterministic,
+no wall clock); `submit()` / `backend_render()` are TEST-ONLY locked
+wrappers over the seam (the C consumer drives them through
+`player_test_driver.h`, standing in for WASAPI's callback). A control
+commit (seek/stop/open) calls `quiesce_backend()` before touching
+ring/timeline — a consumer mid-fill is deterministically waited out, and
+no resurrected frames survive the commit (corrective §11/§50). SRC stays
+frozen: BYPASS when source rate/layout == device requirement, else
+`aresample` / libswresample — owned by the device side, never SongCore.
+
+**Realtime-path proof**: a test binary with a global operator-new counter
+proves `fill_output` / `advance_render` / timeline ops perform ZERO
+heap allocations, and a control thread provably holding the state mutex
+does not block a concurrent fill. The bounded timeline (corrective
+§12–§18) is a fixed-capacity span ring (256 spans) that coalesces
+contiguous same-kind spans and lazily trims fully-rendered history into
+prefix anchors; a pathological window that still exhausts the store
+FAILS CLOSED (sticky overflow → deterministic diagnostic Error) — never
+growth, never corruption.
 
 ## 11. Native mapping notes (Phase 1.5)
 
@@ -711,24 +759,48 @@ domain-labeled snapshot (generation, ring state, decode/media/device
 positions, underrun accounting). The native implementation replays these
 traces as its model-equivalence gate.
 
-## Implementation status (Phase 1.5 closeout)
+## Implementation status (Phase 1.5 corrective closeout)
 
 ```text
 Python oracle (tools/player_model)      PROVEN — 36 gates, deterministic
-Native PlayerEngine + NullAudioBackend  PROVEN — 46 native gates, model
+Native PlayerEngine + NullAudioBackend  PROVEN — 53 native gates, model
                                         equivalence vs the oracle
-C ABI (include/player_engine.h)         PROVEN — pure-C external consumer
+C product ABI (include/player_engine.h) PROVEN — pure-C external consumer,
+                                        no backend/test symbols
+Real SongCore integration               PROVEN — player_real_songcore_smoke:
+                                        REAL SongCore + REAL corpus
+                                        fixtures (FLAC/MP3) + host FILE I/O
 WASAPI / real backend                   NOT STARTED (explicitly out of
-                                        scope for Phase 1.5)
+                                        scope; the internal seam is ready —
+                                        next phase)
 ```
 
 Native layout: `src/player/` (PcmRing, PlaybackTimeline, NullAudioBackend,
 PlayerEngine, C shim), `tests/player/` (fake SongCore link-time
-substitution, gate suite, trace runner, C consumer), target
-`player_core`. The engine carries no test abstraction: test binaries link
-`tests/player/fake_songcore.cpp` INSTEAD of real SongCore at the frozen C
-ABI, and observability hooks are mutex-guarded debug setters, never
-production inputs.
+substitution, gate suite, trace runner, C consumer, real-SongCore smoke),
+targets `player_core`, `player_gates`, `player_trace_runner`,
+`player_consumer_c`, `player_real_songcore_smoke`. The engine carries no
+test abstraction: test binaries link `tests/player/fake_songcore.cpp`
+INSTEAD of real SongCore at the frozen C ABI — except
+`player_real_songcore_smoke`, the one gate that links the REAL SongCore
+archive and drives real fixtures through host I/O (P1-B). Observability
+hooks are mutex-guarded debug setters, never production inputs.
+
+Corrective production boundary (P0-A/P0-B/P0-C/P0-D): the public C ABI is
+control + observation only — `pe_submit/pe_render/PE_CURRENT_GENERATION/
+worker_thread/max_submit_frames` were removed, and the AudioBackend seam
+was internalized. The product snapshot carries `position_us` /
+`duration_us` directly (time authority, §58). The bounded timeline
+(corrective §12–§18) uses a fixed-capacity span ring with coalescing,
+lazy trimming into prefix anchors, and fail-closed overflow; a
+coalesce-vs-render-cursor race found during the corrective closeout
+(extending the very span the render cursor is inside) was fixed by never
+extending the cursor's own span, and the trim soft limit was tightened to
+8 so the store stays ≤ 8 live spans under pathological MEDIA/GAP
+alternation-with-render. The long-run gate paces underruns the way the
+real device sees them (an underrun REPLACES the period's output, docs §5)
+so submission == rendering and the store provably stays bounded for
+arbitrarily long playback.
 
 Gate inventory (native): ring unit/property/SPSC-thread gates; engine
 gates T1–T20, S1–S10, state-illegal probes, clock model,
@@ -737,21 +809,32 @@ estimated-segment offset invariance, capacity sweep, mutation gates
 end-without-pending — each provably caught by the suite); thread stress
 (destruction, seek/stop/open vs decode via before-publish barriers,
 render vs control, EOF vs control, play-to-end); C consumer lifecycle
-gate. `xmake test` runs `player_gates`, `player_trace_runner`
-(200 seeds × 300 ops equivalence), and `player_consumer_c`; sanitizer
-variants build with `xmake f --player_san=asan|ubsan|tsan`.
+gate; realtime-bound gates (corrective §47–§50): zero-allocation +
+no-control-lock realtime path, timeline no-alloc ops, 6-hour long-run
+bounded memory, pathological alternation bounded / fail-closed overflow,
+reset-race quiesce, realtime-seam ENDED signal. `xmake test` runs
+`player_gates`, `player_trace_runner` (200 seeds × 300 ops equivalence),
+`player_consumer_c`, `player_real_songcore_smoke` (real fixtures), and
+the SongCore regression; sanitizer variants build with
+`xmake f --player_san=asan|ubsan|tsan`.
 
 Evidence (2026-09-02, Linux x86_64, gcc 15):
 
 ```text
-native gates (plain / ASan / UBSan)   46/46 PASS each
-native gates (TSan)                   3 runs, 46/46 PASS, 0 warnings
+native gates (plain / ASan / UBSan)   53/53 PASS each
+native gates (TSan)                   3 runs, 53/53 PASS, 0 warnings
 model equivalence                     200×300 PASS (xmake test) and
                                       1000 seeds × 500 ops PASS
+C consumer (product ABI)              PASS under plain/ASan/UBSan/TSan
+real-SongCore smoke (FLAC + MP3)      PASS under plain/ASan/UBSan/TSan:
+                                      ENDED @ true duration, seek landing
+                                      in SongCore tolerance, READY @0 after
+                                      stop, missing-file error path
 SongCore sources/ABI                  untouched (engine consumes the
                                       frozen ABI only)
 audio PCM                             unchanged (engine is above SongCore;
-                                      tests consume fake PCM)
+                                      tests consume fake PCM; real smoke
+                                      decodes the real fixtures)
 ```
 
 Two harness-level normalizations keep op-boundary equivalence exact
@@ -759,7 +842,11 @@ Two harness-level normalizations keep op-boundary equivalence exact
 via `debug_set_source_hint` (the frozen SongCore ABI cannot report
 remaining; production derives the duration estimate), and folds the
 frozen ABI's separate 0-frame SONG_EOF read into the oracle's
-eof-flag-on-last-chunk.
+eof-flag-on-last-chunk. The real-SongCore smoke paces its test driver
+(~1 ms per period) because the test-only locked driver stand-in hammers
+the control mutex if driven in a zero-pause tight loop; production is
+immune — WASAPI's callback uses the lock-free seam, never the control
+mutex (see §10).
 
 Known oracle edge (found during Phase 1.5, oracle left frozen): a
 randomized trace that seeks to exactly the end boundary can make the

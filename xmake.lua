@@ -462,26 +462,59 @@ target("player_gates")
     set_targetdir(artifact_dir)
     add_files("tests/player/pcm_ring_test.cpp", "tests/player/engine_gates_test.cpp",
               "tests/player/thread_stress_test.cpp", "tests/player/gates_main.cpp",
-              "tests/player/fake_songcore.cpp")
+              "tests/player/realtime_bounds_test.cpp", "tests/player/fake_songcore.cpp")
     add_deps("player_core")
     player_common()
     add_tests("default")
 
--- Tiny external consumer (§64-69): a pure-C99 TU including ONLY the C ABI
--- headers, compiled by a C compiler and linked against libplayer_core —
--- proof the frozen C surface is self-contained and ABI-linkable from a
--- foreign TU. Links the test-only SongCore stand-in instead of real
--- SongCore (link-time substitution, like every other player test).
+-- Tiny external consumer (§64-69, corrective §31-32): a pure-C99 TU
+-- including ONLY the product C ABI headers, compiled by a C compiler and
+-- linked against libplayer_core + the test-only backend driver — proof the
+-- product surface is self-contained, C++-leak-free, and ABI-linkable from a
+-- foreign TU WITHOUT any audio-backend knowledge. Links the test-only
+-- SongCore stand-in instead of real SongCore (link-time substitution, like
+-- every other player test).
 target("player_consumer_c")
     set_kind("binary")
     set_default(false)
     set_targetdir(artifact_dir)
-    add_files("tests/player/consumer_c/main.c", "tests/player/fake_songcore.cpp")
+    add_files("tests/player/consumer_c/main.c", "tests/player/fake_songcore.cpp",
+              "tests/player/player_test_driver.cpp")
     add_includedirs("tests/player") -- stand-in "filesystem" header only
     add_deps("player_core")
     player_common()
     set_languages("c99", "c++17")
     add_tests("default")
+
+-- Real-SongCore integration gate (corrective §33-39/§64-65, P1-B): the ONE
+-- player test that links the REAL SongCore archive (not the stand-in) and
+-- drives REAL corpus fixtures (FLAC + MP3) through host FILE* I/O. Proves
+-- the frozen product semantics end to end: open -> play -> ENDED at the
+-- real media duration, seek landing, stop -> READY @0, missing-file error
+-- path. Drives the NullAudioBackend via the test-only backend driver.
+target("player_real_songcore_smoke")
+    set_kind("binary")
+    set_default(false)
+    set_targetdir(artifact_dir)
+    add_files("tests/player/real_songcore_smoke.c",
+              "tests/player/player_test_driver.cpp")
+    add_deps("player_core", "songcore_static")
+    player_common()
+    set_languages("c99", "c++17")
+    if is_plat("linux") or is_plat("macosx") then
+        add_syslinks("m", "pthread")
+    end
+    if is_plat("mingw") then
+        add_syslinks("bcrypt")
+    end
+    add_tests("default")
+    on_test(function (target, opt)
+        local root = os.projectdir()
+        os.execv(target:targetfile(),
+                 {path.join(root, "corpus", "fixtures", "flac-16-44-stereo.flac"),
+                  path.join(root, "corpus", "fixtures", "mp3-short.mp3")})
+        return true
+    end)
 
 -- ====================================================================
 -- WASM target (independent session; the native default session above is

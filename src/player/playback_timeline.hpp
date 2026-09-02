@@ -1,4 +1,4 @@
-// playback_timeline.hpp — device→media mapping + output accounting (native).
+// playback_timeline.hpp — bounded device→media mapping + output accounting.
 //
 // Native mirror of the Phase-1 oracle's OutputSpan model
 // (tools/player_model/player_model.py). The output domain and the media
@@ -13,12 +13,27 @@
 // are per-generation: each commit (open/seek/stop/restart) restarts the
 // output timeline at 0.
 //
-// Representation: spans of the CURRENT generation are kept appended for the
-// whole generation (the mapping is queryable over already-rendered history,
-// like the oracle's list) and dropped wholesale at the commit. Growth is
-// bounded by one generation's total submitted output (media duration plus
-// gap silence) — the engine's bounded ring bounds submission, and every
-// commit clears it.
+// Production representation (corrective §12–§18): the span store is a
+// FIXED-CAPACITY ring of preallocated spans (kCapacity). append() coalesces
+// a contiguous same-kind span into its predecessor and advance() trims
+// fully-rendered spans from the front, folding them into accumulated prefix
+// anchors (trimmed_output_/trimmed_media_). Live memory is therefore bounded
+// by the backend pending/output window, NOT by song duration: an arbitrarily
+// long playback keeps span_count() small. append()/advance()/media_at_output()
+// never allocate and never grow. The oracle's growable deque was an
+// implementation prior; the mapping semantics are unchanged.
+//
+// Mapping over trimmed history: positions at or after the render cursor map
+// exactly (prefix anchor + live spans). A position inside already-trimmed
+// history maps to the prefix anchor — the corrective explicitly allows this
+// ("retain an accumulated prefix anchor"); production only ever maps
+// positions at/after the render cursor (the device clock reads the current
+// output position).
+//
+// Capacity policy (§17): if a pathological pattern still fills the store
+// after coalescing and trimming, append() FAILS CLOSED (returns false and
+// sets a sticky overflow flag) instead of growing or corrupting the mapping.
+// The engine treats that as a deterministic diagnostic stop.
 //
 // Lifetime conservation, maintained here and checked after every engine op:
 //   submitted_output == pending_output + rendered_output + discarded_output
@@ -27,9 +42,9 @@
 #ifndef QIANQIAN_PLAYER_PLAYBACK_TIMELINE_HPP
 #define QIANQIAN_PLAYER_PLAYBACK_TIMELINE_HPP
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <vector>
 
 namespace qn {
 
@@ -37,6 +52,21 @@ enum class SpanKind : std::uint8_t { Media, Gap };
 
 class PlaybackTimeline {
 public:
+    // Fixed internal span capacity. Live spans are bounded far below this by
+    // coalescing + trimming; the headroom is a safety margin so only a truly
+    // pathological pattern can reach it (then fail-closed).
+    static constexpr std::size_t kCapacity = 256;
+
+    // Trimming is lazy: fully-rendered spans are folded into the prefix
+    // anchors only once the live store grows past this soft limit. Small
+    // generations (the semantic gate's mapping probes) therefore keep their
+    // ENTIRE history exact — the oracle's whole-generation mapping — while
+    // arbitrarily long playback stays bounded to this window + headroom.
+    // 8 is the smallest bound that keeps whole-history exactness for the
+    // semantic gate (3 spans) and holds the pathological MEDIA/GAP
+    // alternation-with-render store to <= 8 live spans (§49).
+    static constexpr std::size_t kSoftTrimLimit = 8;
+
     struct RenderSplit {
         std::uint64_t media;  // MEDIA frames proven rendered
         std::uint64_t gap;    // GAP frames proven rendered
@@ -45,12 +75,16 @@ public:
     void reset();  // generation restart (commit); keeps lifetime totals
 
     // -- submit side (engine audio callback, current generation) ------------
-    // Appends one span at the end of the submitted output.
-    void append(SpanKind kind, std::uint64_t frames);
+    // Appends one span at the end of the submitted output, coalescing a
+    // contiguous same-kind span into its predecessor. Never allocates.
+    // Returns false (and sets the sticky overflow flag) when the fixed store
+    // is full after trimming — fail-closed, never growth, never corruption.
+    bool append(SpanKind kind, std::uint64_t frames);
 
     // -- render side (device clock evidence) ---------------------------------
     // Advance `frames` of proven-rendered output through the span list from
     // the render cursor. Rendering never exceeds the submitted endpoint.
+    // Trims fully-rendered spans into the prefix anchors. Never allocates.
     RenderSplit advance(std::uint64_t frames);
 
     // -- commit side ----------------------------------------------------------
@@ -74,9 +108,10 @@ public:
 
     // Map an output-domain position onto the media timeline relative to the
     // segment base (docs §2.5; the s3 gate probes this mapping). GAP spans
-    // contribute zero media; positions beyond the submitted endpoint clamp
-    // to the last mapped media endpoint. Valid for the whole generation,
-    // including already-rendered history.
+    // contribute zero media; positions at or beyond the live submitted
+    // endpoint clamp to the last mapped media endpoint. Positions inside the
+    // trimmed rendered history map to the trimmed prefix anchor. Never
+    // allocates.
     std::uint64_t media_at_output(std::uint64_t output_pos) const;
 
     // Lifetime totals (conservation laws above).
@@ -88,7 +123,10 @@ public:
     std::uint64_t rendered_gap_total() const { return rendered_gap_total_; }
     std::uint64_t discarded_media_total() const { return discarded_media_total_; }
 
-    std::size_t span_count() const { return spans_.size(); }
+    std::size_t span_count() const { return count_; }
+    std::uint64_t trimmed_output() const { return trimmed_output_; }
+    std::uint64_t trimmed_media() const { return trimmed_media_; }
+    bool overflow() const { return overflow_; }
 
 private:
     struct Span {
@@ -97,9 +135,17 @@ private:
         SpanKind kind;
     };
 
-    std::vector<Span> spans_;        // whole current generation
-    std::size_t render_span_ = 0;    // first span not fully rendered
-    std::uint64_t render_off_ = 0;   // rendered frames inside spans_[render_span_]
+    void trim_rendered();  // fold fully-rendered spans into the anchors
+
+    std::array<Span, kCapacity> spans_;  // fixed store, never grows
+    std::size_t head_ = 0;               // oldest live span (circular)
+    std::size_t count_ = 0;              // live span count
+    std::size_t render_rel_ = 0;         // live-relative first unrendered span
+    std::uint64_t render_off_ = 0;       // rendered frames inside that span
+
+    // Prefix anchors for trimmed rendered history.
+    std::uint64_t trimmed_output_ = 0;
+    std::uint64_t trimmed_media_ = 0;
 
     // Per-generation accounting.
     std::uint64_t output_endpoint_ = 0;   // submitted output this generation
@@ -115,6 +161,8 @@ private:
     std::uint64_t rendered_media_total_ = 0;
     std::uint64_t rendered_gap_total_ = 0;
     std::uint64_t discarded_media_total_ = 0;
+
+    bool overflow_ = false;  // sticky fail-closed diagnostic
 };
 
 }  // namespace qn

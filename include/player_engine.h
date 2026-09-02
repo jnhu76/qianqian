@@ -1,28 +1,35 @@
 /*
- * player_engine.h — Qianqian PlayerEngine C ABI v1.
+ * player_engine.h — Qianqian PlayerEngine product C ABI.
  *
- * The narrow control surface over the native PlayerEngine (docs/
- * player-engine.md §11): lifecycle control, the backend-side manual
- * submit/render ticks, and a polled snapshot struct for diagnostics.
- * Semantics are the frozen ones — this header only transcribes the
- * internal C++ API (src/player/player_engine.hpp) 1:1.
+ * The narrow control and observation surface over the native PlayerEngine
+ * (docs/player-engine.md). This is the ONLY public PlayerEngine surface:
+ * lifecycle control (create/open/play/pause/stop/seek/destroy), a polled
+ * time-domain snapshot, and typed error reporting. It exposes no audio
+ * backend, no manual render ticks, no worker mode, no queue internals —
+ * a managed caller (KMP) needs to know nothing about how audio is driven.
  *
- *   control thread    pe_open / pe_play / pe_pause / pe_stop / pe_seek
- *   decode worker     internal (pe_config.worker_thread) or pe-free
- *                     manual stepping through the tests only
- *   backend side      pe_submit (callback refill) and pe_render (device
- *                     progression) stay separate entry points
+ * Threading contract:
+ *   - Control calls (pe_open/pe_play/pe_pause/pe_stop/pe_seek) must be
+ *     serialized by the caller (the engine also serializes them internally);
+ *     they may block (seek/stop wait for the audio path to quiesce).
+ *   - pe_get_snapshot may be polled concurrently from another thread.
+ *   - The engine owns its decode worker thread; the caller never drives it.
  *
- * ABI v1 layout is FIXED. Compatible additions use reserved fields or new
- * functions; a layout/semantic break requires ABI v2
- * (PLAYER_ENGINE_ABI_VERSION bump). No FFmpeg type and no C++ type ever
- * crosses this header. Reuses songcore.h's song_io / song_status: the
- * engine owns a SongCore handle, and open() travels through both.
+ * Semantics are the frozen ones (docs/player-engine.md): submitted !=
+ * rendered, device time != media time, GAP has zero media duration, seek
+ * fail-closed, CONFIRMED/ESTIMATED landing, pause freezes audible
+ * progression, EOF waits for real media playout. The snapshot reports the
+ * MEDIA timeline in MICROSECONDS directly (position_us / duration_us) so
+ * a UI renders progress without knowing any sample rate.
  *
- * Threading: control calls may be made from any single control thread
- * (serialized by the engine); pe_submit / pe_render / pe_get_snapshot are
- * safe concurrently with the decode worker, mirroring the internal lock
- * model. One engine owns one song at a time.
+ * Error contract: every function returns a typed pe_status (or NULL for
+ * pe_create); invalid caller input never aborts, asserts, or terminates the
+ * process, and no C++ exception can cross this boundary. Out parameters are
+ * written on every return path where their parent pointer is valid.
+ *
+ * No FFmpeg type and no C++ type crosses this header. Reuses songcore.h's
+ * song_io / song_status: the engine owns a SongCore handle, and open()
+ * travels through both.
  */
 
 #ifndef QIANQIAN_PLAYER_ENGINE_H
@@ -66,21 +73,20 @@ PE_API uint32_t player_engine_abi_version(void);
 /* Opaque engine. */
 typedef struct pe_engine pe_engine;
 
-/* Sentinel for pe_render's `generation`: "the current one". Any other
- * value (including negatives) is a literal dead generation id whose late
- * render events are dropped (stale-output guard). */
-#define PE_CURRENT_GENERATION ((int64_t)INT64_MIN)
-
 /* -------------------------------------------------------------------------
- * Typed status / state model — numeric values match the internal
- * PlayerStatus / PlayerState enums (asserted in the implementation).
+ * Typed status. Numeric values match the internal PlayerStatus where they
+ * overlap (asserted in the implementation); the shim adds its own
+ * validation statuses.
  * ---------------------------------------------------------------------- */
 
 typedef enum pe_status {
-    PE_OK               = 0, /* success */
-    PE_ERR_ILLEGAL_CALL = 1, /* call not allowed in current state */
-    PE_ERR_OPEN_FAILED  = 2, /* *out_song_status carries the song_open status */
-    PE_ERR_SEEK_FAILED  = 3, /* *out_song_status carries the song_seek status */
+    PE_OK                  = 0, /* success */
+    PE_ERR_ILLEGAL_CALL    = 1, /* call not allowed in current state */
+    PE_ERR_OPEN_FAILED     = 2, /* *out_song_status carries the song_open status */
+    PE_ERR_SEEK_FAILED     = 3, /* *out_song_status carries the song_seek status */
+    PE_ERR_INVALID_ARGUMENT = 4, /* NULL/invalid argument */
+    PE_ERR_NO_MEMORY       = 5, /* allocation failed */
+    PE_ERR_INTERNAL        = 6, /* unexpected internal failure */
 } pe_status;
 
 typedef enum pe_state {
@@ -97,93 +103,46 @@ typedef enum pe_state {
 #define PE_QUALITY_ESTIMATED 1 /* landing unknown; clamped requested target */
 
 /* -------------------------------------------------------------------------
- * Configuration (fail-closed: pe_create returns NULL on a zero field or
- * read_chunk_frames > capacity_frames).
+ * Configuration. The only product-relevant knob is the queue size (buffer
+ * latency); 0 selects the internal default. A NULL config is equivalent to
+ * the default. No test or backend implementation knobs are exposed.
  * ---------------------------------------------------------------------- */
 
 typedef struct pe_config {
-    uint64_t capacity_frames;   /* the ONLY queue sizing */
-    uint64_t read_chunk_frames; /* song_read_pcm capacity per chunk */
-    uint64_t max_submit_frames; /* largest pe_submit() period supported */
-    int32_t max_channels;       /* ring slot stride; songs may use fewer */
-    int32_t worker_thread;      /* 0 = manual stepping (tests), 1 = spawn */
+    uint64_t capacity_frames; /* queue sizing in frames; 0 = internal default */
 } pe_config;
 
 /* -------------------------------------------------------------------------
- * Backend-side reports (kind strings are static literals, valid forever).
- * ---------------------------------------------------------------------- */
-
-typedef struct pe_submit_report {
-    uint64_t    segment;       /* segment the PCM was tagged with */
-    uint64_t    media_frames;  /* real frames moved queue -> backend */
-    uint64_t    silence_frames;/* GAP frames injected (device time only) */
-    const char *kind;          /* "audio"|"underrun"|"preroll"|"eos"|"idle" */
-} pe_submit_report;
-
-typedef struct pe_render_report {
-    uint64_t    segment;                /* segment at render time */
-    const char *kind;   /* "rendered" | "paused" | "stale" */
-    uint64_t    rendered_output_frames; /* device frames proven rendered */
-    uint64_t    rendered_media_frames;  /* media subset of the above */
-    int64_t     generation;             /* generation the event ran under */
-} pe_render_report;
-
-/* -------------------------------------------------------------------------
- * Polled snapshot (diagnostics; UI cadence 5-10 Hz). One call = one
- * coherent instant: every counter is captured under the same internal
- * lock hold, so the conservation laws below hold across the struct.
+ * Polled snapshot (UI cadence 5-10 Hz). One call = one coherent instant.
+ * position_us / duration_us are the MEDIA timeline in microseconds — the
+ * product authority. duration_us == -1 means the duration is unknown
+ * (duration_known == 0); it is never a fake 0. Frame-domain fields are
+ * diagnostics only.
  * ---------------------------------------------------------------------- */
 
 typedef struct pe_snapshot {
     pe_state  state;
-    int64_t   media_position_frames;
-    uint8_t   position_quality;      /* PE_QUALITY_* */
-    int64_t   decoded_source_position; /* engine-observable estimate */
-    int64_t   duration_frames;         /* -1 = unknown, never fake 0 */
+    int64_t   position_us;       /* audible media position, microseconds */
+    int64_t   duration_us;       /* media duration, microseconds; -1 = unknown */
     uint32_t  duration_known;
-    uint64_t  queued_media_frames;
-    uint64_t  capacity_frames;
-    uint64_t  epoch;
-    uint64_t  segment;
-    uint32_t  source_eof;
-    uint64_t  underrun_count;
-    uint64_t  underrun_silence_output_frames;
-    uint64_t  preroll_events;
-    uint64_t  preroll_silence_output_frames;
-    uint64_t  eos_silence_output_frames;
-    uint64_t  decoded_source_frames;
-    uint64_t  submitted_output_frames;
-    uint64_t  rendered_output_frames;
-    uint64_t  pending_output_frames;
-    uint64_t  discarded_output_frames;
-    uint64_t  submitted_media_frames;
-    uint64_t  rendered_media_frames;
-    uint64_t  rendered_gap_output_frames;
-    uint64_t  pending_media_frames;
-    uint64_t  discarded_output_media_frames;
-    uint64_t  discarded_stale_media_frames;
-    uint64_t  stale_render_events;
-    /* Coherent decode-accounting inputs (same lock hold as above):
-       decoded_source_frames == ring_produced_total +
-       discarded_stale_media_frames + in_flight_frames. */
-    uint64_t  in_flight_frames;
-    uint64_t  ring_produced_total;
-    uint64_t  ring_consumed_total;
-    uint64_t  ring_discarded_total;
-    char      last_error[96]; /* "" = none; normalized category prefixes */
+    uint8_t   position_quality;  /* PE_QUALITY_*; ESTIMATED is not an error */
+    uint64_t  buffered_frames;   /* queued media frames (diagnostic) */
+    uint64_t  underrun_count;    /* cumulative underruns (diagnostic) */
+    int32_t   sample_rate;       /* current source rate; 0 = no song */
+    char      last_error[96];    /* "" = none; normalized category prefixes */
 } pe_snapshot;
 
 /* -------------------------------------------------------------------------
  * Lifecycle
  * ---------------------------------------------------------------------- */
 
-/* Creates an engine. Returns NULL on an invalid config (null pointer,
- * zero field, or read_chunk_frames > capacity_frames) — fail-closed,
- * never a partially-configured engine. */
+/* Creates an engine with the default decode worker thread. Returns NULL on
+ * an allocation failure. A NULL config, or capacity_frames == 0, selects
+ * the internal default queue size. */
 PE_API pe_engine *pe_create(const pe_config *config);
 
-/* Destroys the engine: stops publications, joins the decode worker (if
- * any), closes the SongCore handle. NULL is a no-op. */
+/* Destroys the engine: stops publications, joins the decode worker,
+ * quiesces the audio path, closes the SongCore handle. NULL is a no-op. */
 PE_API void pe_destroy(pe_engine *engine);
 
 /* open(song): stop everything, drop the previous handle, start the new
@@ -210,30 +169,15 @@ PE_API pe_status pe_pause(pe_engine *engine);
 PE_API pe_status pe_stop(pe_engine *engine, int32_t *out_song_status);
 
 /* seek(T) from READY/PLAYING/PAUSED (and ENDED -> READY). On success
- * *out_landing_frames carries the landing the clock was rebased on.
- * *out_song_status (when non-NULL) always receives the SongCore status
- * (SONG_OK on success, the failing song_seek status otherwise). */
+ * *out_landing_us carries the landing the clock was rebased on, in media
+ * microseconds. *out_song_status (when non-NULL) always receives the
+ * SongCore status (SONG_OK on success, the failing song_seek status
+ * otherwise). A failed seek lands the engine in ERROR (fail-closed). */
 PE_API pe_status pe_seek(pe_engine *engine, int64_t position_us,
-                         int64_t *out_landing_frames,
-                         int32_t *out_song_status);
+                         int64_t *out_landing_us, int32_t *out_song_status);
 
-/* -------------------------------------------------------------------------
- * Backend side — the manual-tick device (NullAudioBackend today; WASAPI
- * later maps its callback/refill onto these same two entry points).
- * ---------------------------------------------------------------------- */
-
-/* One backend callback: move up to `period_frames` of real PCM from the
- * queue into the backend, padding shortfalls with classified GAP silence.
- * Never blocks, never decodes. Submitting is NOT audible. */
-PE_API pe_submit_report pe_submit(pe_engine *engine, uint64_t period_frames);
-
-/* Device/render progression: the device consumed `frames` output frames.
- * generation == PE_CURRENT_GENERATION means the current one; any other
- * value is a literal dead generation whose late event is dropped. */
-PE_API pe_render_report pe_render(pe_engine *engine, int64_t frames,
-                                  int64_t generation);
-
-/* One coherent instant of all diagnostics (see pe_snapshot). */
+/* One coherent instant of the product snapshot. Every field is written on
+ * every return path where `out` is valid. */
 PE_API pe_status pe_get_snapshot(pe_engine *engine, pe_snapshot *out);
 
 #ifdef __cplusplus

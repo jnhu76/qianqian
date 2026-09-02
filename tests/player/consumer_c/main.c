@@ -1,18 +1,25 @@
 /*
- * main.c — tiny external consumer of the PlayerEngine C ABI (§64-69).
+ * main.c — tiny external consumer of the PlayerEngine product C ABI.
  *
  * A pure-C99 translation unit that includes ONLY the C ABI headers
- * (player_engine.h + the stand-in filesystem factory), compiled by a C
- * compiler and linked against libplayer_core: proof that the frozen C
- * surface is self-contained, C++-leak-free, and ABI-linkable from a
- * foreign TU. Drives one full lifecycle with the threaded decode worker:
- * open -> play -> ENDED with snapshot conservation -> seek -> stop.
+ * (player_engine.h + the stand-in filesystem factory) and links against
+ * libplayer_core: proof that the product surface is self-contained,
+ * C++-leak-free, and ABI-linkable from a foreign TU. It uses ONLY the
+ * product control/observation API — create/open/play/pause/seek/stop/
+ * snapshot/destroy — and never touches the audio backend: an internal
+ * test driver (player_test_driver.h, tests-only) manually ticks the
+ * NullAudioBackend behind the scenes, standing in for WASAPI's callback.
+ *
+ * Drives one full lifecycle with the engine-owned decode worker:
+ * open -> play -> ENDED with time-domain snapshot -> seek -> stop, plus
+ * no-crash boundary probes (corrective §56).
  */
 #include <stdio.h>
 #include <string.h>
 
 #include "fake_songcore_c.h"
 #include "player_engine.h"
+#include "player_test_driver.h"
 
 static int failures = 0;
 
@@ -33,53 +40,44 @@ static int failures = 0;
         }                                                                  \
     } while (0)
 
-static void check_conservation(const pe_snapshot *sn) {
-    CHECK(sn->ring_produced_total ==
-          sn->ring_consumed_total + sn->queued_media_frames +
-              sn->ring_discarded_total);
-    CHECK(sn->decoded_source_frames ==
-          sn->ring_produced_total + sn->discarded_stale_media_frames +
-              sn->in_flight_frames);
-    CHECK(sn->submitted_output_frames ==
-          sn->pending_output_frames + sn->rendered_output_frames +
-              sn->discarded_output_frames);
-    CHECK(sn->submitted_media_frames ==
-          sn->pending_media_frames + sn->rendered_media_frames +
-              sn->discarded_output_media_frames);
-    CHECK(sn->rendered_output_frames ==
-          sn->rendered_media_frames + sn->rendered_gap_output_frames);
-}
-
 int main(void) {
     CHECK(player_engine_abi_version() == PLAYER_ENGINE_ABI_VERSION);
 
+    /* --- fail-closed creation probes: NULL config and zero capacity both
+     * select the internal default; never a dead process. ---------------- */
+    pe_engine *eng = pe_create(NULL);
+    CHECK(eng != NULL);
+    if (eng == NULL) return 1;
+
     pe_config cfg;
     memset(&cfg, 0, sizeof cfg);
-    cfg.capacity_frames = 4096;
-    cfg.read_chunk_frames = 1024;
-    cfg.max_submit_frames = 8192;
-    cfg.max_channels = 2;
-    cfg.worker_thread = 1;
+    pe_engine *eng2 = pe_create(&cfg); /* capacity 0 -> default */
+    CHECK(eng2 != NULL);
+    if (eng2 != NULL) pe_destroy(eng2);
 
-    /* fail-closed creation probes */
-    pe_config bad = cfg;
-    bad.capacity_frames = 0;
-    CHECK(pe_create(&bad) == NULL);
-    bad = cfg;
-    bad.read_chunk_frames = cfg.capacity_frames * 2;
-    CHECK(pe_create(&bad) == NULL);
-    CHECK(pe_create(NULL) == NULL);
-
-    pe_engine *eng = pe_create(&cfg);
-    CHECK(eng != NULL);
-    if (eng == NULL) return 1; /* cannot continue without an engine */
-
+    /* --- product snapshot is time-domain, EMPTY at creation -------------- */
     pe_snapshot sn;
     CHECK(pe_get_snapshot(eng, &sn) == PE_OK);
     CHECK(sn.state == PE_STATE_EMPTY);
-    CHECK(pe_get_snapshot(NULL, &sn) == PE_ERR_ILLEGAL_CALL);
-    CHECK(pe_open(NULL, NULL, NULL) == PE_ERR_ILLEGAL_CALL);
+    CHECK(sn.position_us == 0);
+    CHECK(sn.duration_known == 0u);
 
+    /* --- boundary probes: invalid caller input is a typed result, never
+     * an abort / assert / uncaught exception. ---------------------------- */
+    CHECK(pe_get_snapshot(NULL, &sn) == PE_ERR_INVALID_ARGUMENT);
+    CHECK(pe_get_snapshot(eng, NULL) == PE_ERR_INVALID_ARGUMENT);
+    CHECK(pe_open(NULL, NULL, NULL) == PE_ERR_INVALID_ARGUMENT);
+    CHECK(pe_open(eng, NULL, NULL) == PE_ERR_INVALID_ARGUMENT);
+    CHECK(pe_play(NULL) == PE_ERR_INVALID_ARGUMENT);
+    CHECK(pe_pause(NULL) == PE_ERR_INVALID_ARGUMENT);
+    CHECK(pe_stop(NULL, NULL) == PE_ERR_INVALID_ARGUMENT);
+    CHECK(pe_seek(NULL, 0, NULL, NULL) == PE_ERR_INVALID_ARGUMENT);
+    CHECK(pe_seek(eng, 0, NULL, NULL) == PE_ERR_ILLEGAL_CALL); /* EMPTY */
+    CHECK(pe_play(eng) == PE_ERR_ILLEGAL_CALL);                /* EMPTY */
+    CHECK(pe_pause(eng) == PE_OK);                             /* no-op */
+    CHECK(pe_seek(eng, -1000000, NULL, NULL) == PE_ERR_ILLEGAL_CALL); /* EMPTY */
+
+    /* --- open a 4 s / 48 kHz synthetic song ------------------------------ */
     song_io io;
     CHECK(fake_song_make_io(&io, 48000 * 4, 48000, 2) == SONG_OK);
     CHECK(fake_song_make_io(NULL, 1, 1, 1) == SONG_ERR_INVALID_ARGUMENT);
@@ -88,44 +86,53 @@ int main(void) {
     CHECK(pe_open(eng, &io, &song_status) == PE_OK && song_status == SONG_OK);
     CHECK(pe_get_snapshot(eng, &sn) == PE_OK && sn.state == PE_STATE_READY);
     CHECK(sn.position_quality == PE_QUALITY_CONFIRMED);
-    CHECK(sn.duration_known == 1u && sn.duration_frames == 48000 * 4);
-    CHECK(sn.media_position_frames == 0 && sn.segment == 1);
-    check_conservation(&sn);
+    CHECK(sn.duration_known == 1u && sn.duration_us == 4000000);
+    CHECK(sn.position_us == 0);
+    CHECK(sn.sample_rate == 48000);
 
+    /* --- play to ENDED via the test driver (backend stand-in) ------------ */
     CHECK(pe_play(eng) == PE_OK);
-
-    /* lockstep device: drive a complete playout to ENDED */
     int guard = 0;
     for (;;) {
-        pe_submit(eng, 512);
-        pe_render(eng, 512, PE_CURRENT_GENERATION);
+        CHECK(pe_test_drive(eng, 512) == 0);
         CHECK(pe_get_snapshot(eng, &sn) == PE_OK);
         if (sn.state == PE_STATE_ENDED) break;
         CHECK_RUNAWAY(guard);
     }
-    CHECK(sn.media_position_frames == sn.duration_frames);
-    CHECK(sn.pending_media_frames == 0);
-    CHECK(sn.queued_media_frames == 0);
-    CHECK(sn.source_eof == 1u);
-    CHECK(sn.rendered_media_frames > 0);
-    check_conservation(&sn);
-
-    /* seek reopens a segment; the landing is CONFIRMED and nonzero */
-    int64_t landing = -1;
-    CHECK(pe_seek(eng, 1000000, &landing, &song_status) == PE_OK &&
-          song_status == SONG_OK);
-    CHECK(landing >= 0);
-    CHECK(pe_get_snapshot(eng, &sn) == PE_OK);
-    CHECK(sn.state == PE_STATE_READY && sn.segment == 2);
+    CHECK(sn.position_us == 4000000);      /* ENDED = full media duration */
+    CHECK(sn.duration_us == 4000000);
+    CHECK(sn.buffered_frames == 0);
     CHECK(sn.position_quality == PE_QUALITY_CONFIRMED);
-    CHECK(sn.media_position_frames == landing);
-    check_conservation(&sn);
+    CHECK(strlen(sn.last_error) == 0);
 
-    /* stop() rebuilds to READY @0 */
+    /* --- seek to midpoint: landing reported in media microseconds -------- */
+    int64_t landing_us = -1;
+    CHECK(pe_seek(eng, 2000000, &landing_us, &song_status) == PE_OK &&
+          song_status == SONG_OK);
+    CHECK(landing_us == 2000000);
+    CHECK(pe_get_snapshot(eng, &sn) == PE_OK);
+    CHECK(sn.state == PE_STATE_READY);
+    CHECK(sn.position_us == 2000000);
+    CHECK(sn.position_quality == PE_QUALITY_CONFIRMED);
+
+    /* --- negative / huge seeks are typed results, never crashes ---------- */
+    CHECK(pe_seek(eng, -1000000, &landing_us, NULL) == PE_OK); /* clamps to 0 */
+    CHECK(landing_us == 0);
+    CHECK(pe_seek(eng, (int64_t)1 << 40, &landing_us, NULL) == PE_OK); /* clamps */
+    CHECK(landing_us == 4000000);
+
+    /* --- play a little, pause, resume, then stop ------------------------- */
+    CHECK(pe_play(eng) == PE_OK);
+    CHECK(pe_test_drive(eng, 512) == 0);
+    CHECK(pe_pause(eng) == PE_OK);
+    CHECK(pe_get_snapshot(eng, &sn) == PE_OK && sn.state == PE_STATE_PAUSED);
+    CHECK(pe_play(eng) == PE_OK);
+    CHECK(pe_test_drive(eng, 512) == 0);
+
+    /* --- stop() rebuilds to READY @0 ------------------------------------- */
     CHECK(pe_stop(eng, &song_status) == PE_OK && song_status == SONG_OK);
     CHECK(pe_get_snapshot(eng, &sn) == PE_OK);
-    CHECK(sn.state == PE_STATE_READY && sn.media_position_frames == 0);
-    check_conservation(&sn);
+    CHECK(sn.state == PE_STATE_READY && sn.position_us == 0);
 
     pe_destroy(eng);
     pe_destroy(NULL); /* documented no-op */
@@ -134,6 +141,7 @@ int main(void) {
         printf("CONSUMER FAIL: %d check(s) failed\n", failures);
         return 1;
     }
-    printf("CONSUMER OK: C ABI lifecycle, snapshot conservation, fail-closed probes\n");
+    printf("CONSUMER OK: product-only ABI lifecycle, time-domain snapshot, "
+           "no-crash probes\n");
     return 0;
 }
