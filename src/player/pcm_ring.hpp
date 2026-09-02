@@ -1,10 +1,9 @@
 // pcm_ring.hpp — bounded, preallocated, frame-based PCM queue (native).
 //
-// Native mirror of tools/player_model/pcm_ring.py (the Phase-1 oracle). The
-// accounting unit is the FRAME: one frame = one sample for every channel.
-// Capacity is fixed at construction; the ring never grows, never overwrites
-// unread frames, never reads unwritten frames, and never allocates in
-// write/read/flush.
+// The accounting unit is the FRAME: one frame = one sample for every
+// channel. Capacity is fixed at construction; the ring never grows, never
+// overwrites unread frames, never reads unwritten frames, and never
+// allocates in write/read/flush.
 //
 // SPSC by design: producer = decode worker (write), consumer = the backend
 // submission side (read). flush() empties the queue at commit boundaries
@@ -17,8 +16,8 @@
 //     produced_total == consumed_total + buffered + discarded_total
 //
 // Memory ordering: seq_cst everywhere. Correctness is preferred over
-// memory-order cleverness (docs §"Do not over-optimize lock-free code");
-// the acquire/release pairs actually required are a strict subset.
+// memory-order cleverness; the acquire/release pairs actually required are
+// a strict subset.
 #ifndef QIANQIAN_PLAYER_PCM_RING_HPP
 #define QIANQIAN_PLAYER_PCM_RING_HPP
 

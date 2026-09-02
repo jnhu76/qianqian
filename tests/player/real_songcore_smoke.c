@@ -1,5 +1,5 @@
 /*
- * real_songcore_smoke.c — corrective §33–§39/§64–§65: PlayerEngine over
+ * real_songcore_smoke.c — PlayerEngine over
  * REAL SongCore + REAL corpus fixtures + host file I/O.
  *
  * Every other player gate links the SongCore stand-in (link-time C ABI

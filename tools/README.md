@@ -29,9 +29,10 @@ Build workflow: `docs/ffmpeg-minimization.md`. Regression:
 `tests/songcore/README.md`. Verified-consumer matrix:
 `bench/results/songcore-v1/ffi-consumers.json`.
 
-## PlayerEngine reference model (Phase 1)
+## PlayerEngine
 
-| Tool | Role |
-|---|---|
-| `player_model/scenarios.py` | Executable semantic oracle for the PlayerEngine (`docs/player-engine.md`): 20 deterministic + seeded-randomized gates — ring invariants/wraparound, T1–T15 lifecycle (seek epoch / stale-frame, EOF drain, pause/stop, clock, error injection), randomized stress with invariants checked after every op, buffer-duration sweep. Pure stdlib. Not shipping code. |
-| `player_model/model_equivalence.py` | Python↔native equivalence gate driver: replays generated traces against the oracle and the native trace runner (`tests/player/trace_runner.cpp`), comparing every observable after every op; prints seed/op/first-diff on failure. Run via `xmake test player_trace_runner` (200×300) or `--seeds 1000 --ops 500` for the heavy gate. |
+The PlayerEngine semantics were originally validated against an executable
+reference model (`tools/player_model`, Phase 1); that model was retired once
+the permanent native regression suite (`tests/player/`) took ownership of
+the contracts. See `docs/player-engine.md` for the frozen semantics and
+§11 for the validation inventory.

@@ -1,7 +1,7 @@
 // fake_songcore.cpp — SongCore C-ABI fake for PlayerEngine tests.
 //
-// Contract mirror of song_open/probe/read_pcm/seek/close with the exact
-// injection surface of the Python oracle's FakeSongCore: typed decode
+// Contract mirror of song_open/probe/read_pcm/seek/close with a test
+// injection surface: typed decode
 // failure with partial-success framing, seek failure statuses, genuinely
 // unknown landings (-1, never manufactured), unknown duration (-1), landing
 // offsets, and reopen failure. Not thread-safe by itself — the engine

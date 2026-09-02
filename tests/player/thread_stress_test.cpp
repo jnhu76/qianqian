@@ -1,16 +1,15 @@
-// thread_stress_test.cpp — real-thread adversarial stress (§52, §56).
+// thread_stress_test.cpp — real-thread adversarial stress.
 //
-// The Python oracle is deterministic and single-threaded; native concurrency
-// introduces the races it cannot express. These gates race the real decode
-// worker thread against control commits (seek / stop / open) and race render
-// progression against everything, using deterministic barriers where the
-// interesting interleaving must be forced, then assert the frozen
-// conservation laws at quiescence. The sanitizers (ASan/UBSan/TSan via
-// --player_san) are the second half of the evidence.
+// Native concurrency introduces races a single-threaded model cannot
+// express. These gates race the real decode worker thread against control
+// commits (seek / stop / open) and race render progression against
+// everything, using deterministic barriers where the interesting
+// interleaving must be forced, then assert the frozen conservation laws at
+// quiescence. The sanitizers (ASan/UBSan/TSan via --player_san) are the
+// second half of the evidence.
 //
-// Determinism note: stress workers run WITHOUT the trace runner's
-// remaining-hint injection — production behavior (duration-derived
-// estimate) is what races here.
+// Determinism note: stress workers run WITHOUT any decode hints — production
+// behavior (duration-derived estimate) is what races here.
 #include <atomic>
 #include <cmath>
 #include <cstring>
@@ -157,7 +156,7 @@ void check_final_segment_continuity(PlayerEngine& e, const char* ctx) {
 
 }  // namespace
 
-// §56: repeated create/open/play/destroy with in-flight work — the
+// Repeated create/open/play/destroy with in-flight work — the
 // destruction order (stop publications, join worker, close source) must be
 // race-free. Evidence = sanitizers + no hang; loop count keeps runtime sane.
 GATE(stress_destruction) {
@@ -180,7 +179,7 @@ GATE(stress_destruction) {
     std::printf("  120x create/open/play/<commit>/destroy under worker thread OK\n");
 }
 
-// §52: decode completion vs seek — forced interleaving via the
+// Decode completion vs seek — forced interleaving via the
 // before-publish barrier: the seek commits while the chunk is decoded but
 // unpublished; publication must see the dead epoch and discard.
 GATE(stress_seek_vs_decode) {
@@ -227,7 +226,7 @@ GATE(stress_seek_vs_decode) {
     std::printf("  40x barrier-forced seek-during-decode: stale discard observed\n");
 }
 
-// §52: decode completion vs stop / vs open.
+// Decode completion vs stop / vs open.
 GATE(stress_stop_open_vs_decode) {
     for (int round = 0; round < 30; ++round) {
         SongKeep keep;
@@ -271,7 +270,7 @@ GATE(stress_stop_open_vs_decode) {
     std::printf("  30x barrier-forced stop/open-during-decode: stale discard observed\n");
 }
 
-// §52: submit/render vs pause, render vs seek, render vs open — a render
+// Submit/render vs pause, render vs seek, render vs open — a render
 // thread hammers backend_render while the main thread commits.
 GATE(stress_render_vs_control) {
     for (int round = 0; round < 20; ++round) {
@@ -322,7 +321,7 @@ GATE(stress_render_vs_control) {
     std::printf("  20x render-thread vs pause/seek/stop/open: guards + conservation hold\n");
 }
 
-// §52: EOF vs pause / EOF vs stop — a short song finishing while control
+// EOF vs pause / EOF vs stop — a short song finishing while control
 // commits race the drain; ENDED must only ever appear after full playout.
 GATE(stress_eof_vs_control) {
     for (int round = 0; round < 30; ++round) {

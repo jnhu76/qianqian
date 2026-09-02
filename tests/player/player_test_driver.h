@@ -6,7 +6,7 @@
  * to understand how audio is driven. This internal helper is the stand-in
  * for WASAPI's callback — it manually ticks the engine's NullAudioBackend
  * from inside the test binary. It lives in tests/, is never part of
- * include/player_engine.h, and is not shipped (corrective §32).
+ * include/player_engine.h, and is not shipped.
  */
 
 #ifndef QIANQIAN_TESTS_PLAYER_PLAYER_TEST_DRIVER_H

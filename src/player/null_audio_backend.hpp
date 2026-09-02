@@ -1,17 +1,16 @@
 // null_audio_backend.hpp — deterministic manual-tick audio backend.
 //
-// The Phase-1.5 stand-in for WASAPI (docs/player-engine.md §11): a fake
-// device driven entirely by explicit submit/render ticks. It depends on no
-// wall clock, no sleeps, no OS audio API, and no hardware; tests drive it
-// manually and the submit/render entry points stay separate so the suite can
-// prove that submitted output is not rendered output (docs §2.4):
+// The stand-in for WASAPI (docs/player-engine.md): a fake device driven
+// entirely by explicit submit/render ticks. It depends on no wall clock, no
+// sleeps, no OS audio API, and no hardware; tests drive it manually and the
+// submit/render entry points stay separate so the suite can prove that
+// submitted output is not rendered output (docs §2.4):
 //
 //   submit_media/submit_silence   PCM queue -> backend buffer (NOT audible)
 //   render(n)                     device consumes n frames — proof of
 //                                 playout; the deterministic device-domain
 //                                 authority standing in for the future
-//                                 IAudioClock reading (docs §"No real
-//                                 device clock yet")
+//                                 IAudioClock reading
 //
 // This backend is test scaffolding shipped until the WASAPI phase: its
 // buffers may allocate (std::vector/std::deque), which the production
@@ -44,9 +43,9 @@ public:
     // -- render progression (device clock) -------------------------------------
     // The device has consumed up to `frames` of pending output; returns the
     // count actually rendered (<= pending). Rendered media PCM is preserved
-    // in the per-segment rendered log for the content-continuity oracle.
+    // in the per-segment rendered log for the content-continuity check.
     // The frame identities live in the TEST FAKE's sample encoding — a
-    // production engine never sees them (docs §Content continuity).
+    // production engine never sees them.
     std::uint64_t render(std::uint64_t frames);
 
     // -- queries -----------------------------------------------------------------

@@ -1,20 +1,18 @@
 // fake_songcore.hpp — deterministic SongCore stand-in (test-only).
 //
-// Native mirror of tools/player_model/fake_decoder.py. Implements the frozen
-// C ABI (include/songcore.h) exactly as the contract allows, backed by a
-// synthetic frame-indexed source. Test binaries link this INSTEAD of the
-// real songcore target: the engine calls the production ABI, and the fake
-// replaces its symbols at link time — no abstraction layer is added to the
-// engine.
+// Implements the frozen C ABI (include/songcore.h) exactly as the contract
+// allows, backed by a synthetic frame-indexed source. Test binaries link
+// this INSTEAD of the real songcore target: the engine calls the production
+// ABI, and the fake replaces its symbols at link time — no abstraction
+// layer is added to the engine.
 //
-// Frame identity encoding (test-only oracle truth, docs §Content
-// continuity): media frame f is written as sample[c] = f + 0.25f +
-// 0.125f*c, so the trace runner can decode rendered PCM back to frame tags;
-// GAP silence is all-zero and stays distinguishable (L >= 0.25f iff media).
+// Frame identity encoding (test-only truth, docs §6): media frame f is
+// written as sample[c] = f + 0.25f + 0.125f*c, so rendered PCM can be
+// decoded back to frame tags; GAP silence is all-zero and stays
+// distinguishable (L >= 0.25f iff media).
 //
-// The state block survives engine stop()-recovery reopens (mirroring the
-// oracle's decoder object); the runner resets it when a trace OP open
-// starts a fresh song.
+// The state block survives engine stop()-recovery reopens; tests reset it
+// when a fresh song starts.
 #ifndef QIANQIAN_TESTS_PLAYER_FAKE_SONGCORE_HPP
 #define QIANQIAN_TESTS_PLAYER_FAKE_SONGCORE_HPP
 
@@ -46,7 +44,7 @@ struct SongConfig {
     std::shared_ptr<SongState> live;  // non-null after song_open
 };
 
-// Remaining frames per the fake's truth (what the oracle's decoder knows).
+// Remaining frames per the fake's truth.
 std::int64_t remaining(const SongConfig& cfg);
 
 }  // namespace qn::fake

@@ -1,10 +1,8 @@
 // playback_timeline.hpp — bounded device→media mapping + output accounting.
 //
-// Native mirror of the Phase-1 oracle's OutputSpan model
-// (tools/player_model/player_model.py). The output domain and the media
-// domain are two coordinate systems; the timeline keeps the submitted-output
-// span list that maps a rendered device position back onto the media
-// timeline (docs/player-engine.md §2.5):
+// The output domain and the media domain are two coordinate systems; the
+// timeline keeps the submitted-output span list that maps a rendered device
+// position back onto the media timeline (docs/player-engine.md §2.5):
 //
 //   OutputSpan { output_begin, output_end, kind = MEDIA | GAP }
 //
@@ -13,27 +11,25 @@
 // are per-generation: each commit (open/seek/stop/restart) restarts the
 // output timeline at 0.
 //
-// Production representation (corrective §12–§18): the span store is a
-// FIXED-CAPACITY ring of preallocated spans (kCapacity). append() coalesces
-// a contiguous same-kind span into its predecessor and advance() trims
-// fully-rendered spans from the front, folding them into accumulated prefix
-// anchors (trimmed_output_/trimmed_media_). Live memory is therefore bounded
-// by the backend pending/output window, NOT by song duration: an arbitrarily
-// long playback keeps span_count() small. append()/advance()/media_at_output()
-// never allocate and never grow. The oracle's growable deque was an
-// implementation prior; the mapping semantics are unchanged.
+// Production representation: the span store is a FIXED-CAPACITY ring of
+// preallocated spans (kCapacity). append() coalesces a contiguous same-kind
+// span into its predecessor and advance() trims fully-rendered spans from
+// the front, folding them into accumulated prefix anchors (trimmed_output_/
+// trimmed_media_). Live memory is therefore bounded by the backend pending/
+// output window, NOT by song duration: an arbitrarily long playback keeps
+// span_count() small. append()/advance()/media_at_output() never allocate
+// and never grow.
 //
 // Mapping over trimmed history: positions at or after the render cursor map
 // exactly (prefix anchor + live spans). A position inside already-trimmed
-// history maps to the prefix anchor — the corrective explicitly allows this
-// ("retain an accumulated prefix anchor"); production only ever maps
-// positions at/after the render cursor (the device clock reads the current
-// output position).
+// history maps to the prefix anchor; production only ever maps positions
+// at/after the render cursor (the device clock reads the current output
+// position).
 //
-// Capacity policy (§17): if a pathological pattern still fills the store
-// after coalescing and trimming, append() FAILS CLOSED (returns false and
-// sets a sticky overflow flag) instead of growing or corrupting the mapping.
-// The engine treats that as a deterministic diagnostic stop.
+// Capacity policy: if a pathological pattern still fills the store after
+// coalescing and trimming, append() FAILS CLOSED (returns false and sets a
+// sticky overflow flag) instead of growing or corrupting the mapping. The
+// engine treats that as a deterministic diagnostic stop.
 //
 // Lifetime conservation, maintained here and checked after every engine op:
 //   submitted_output == pending_output + rendered_output + discarded_output
@@ -60,11 +56,11 @@ public:
     // Trimming is lazy: fully-rendered spans are folded into the prefix
     // anchors only once the live store grows past this soft limit. Small
     // generations (the semantic gate's mapping probes) therefore keep their
-    // ENTIRE history exact — the oracle's whole-generation mapping — while
-    // arbitrarily long playback stays bounded to this window + headroom.
-    // 8 is the smallest bound that keeps whole-history exactness for the
-    // semantic gate (3 spans) and holds the pathological MEDIA/GAP
-    // alternation-with-render store to <= 8 live spans (§49).
+    // ENTIRE history exact while arbitrarily long playback stays bounded to
+    // this window + headroom. 8 is the smallest bound that keeps
+    // whole-history exactness for the semantic gate (3 spans) and holds the
+    // pathological MEDIA/GAP alternation-with-render store to <= 8 live
+    // spans.
     static constexpr std::size_t kSoftTrimLimit = 8;
 
     struct RenderSplit {

@@ -1,10 +1,9 @@
 // pcm_ring_test.cpp — native ring unit + property gates.
 //
-// Mirrors scenarios.py g_ring_unit / g_ring_property plus a real-thread SPSC
-// stress (the oracle is single-threaded; the native ring's lock-free
-// contract gets its own evidence). The gate registry lives here and is
-// shared with engine_gates_test / thread_stress_test; player_gates' main
-// runs everything.
+// Ring unit semantics, a randomized property test against a deque reference,
+// and a real-thread SPSC stress (the ring's lock-free contract gets its own
+// evidence). The gate registry lives here and is shared with the other
+// player test binaries; player_gates' main runs everything.
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
@@ -17,7 +16,7 @@
 
 namespace qn::test {
 
-// -- ring helpers: tags are single-float frames (stride 1), like the oracle --
+// -- ring helpers: tags are single-float frames (stride 1) --
 static std::uint64_t rw_write(PcmRing& r, int lo, int n) {
     std::vector<float> v;
     for (int i = 0; i < n; ++i) v.push_back(static_cast<float>(lo + i));

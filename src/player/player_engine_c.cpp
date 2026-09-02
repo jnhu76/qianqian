@@ -1,10 +1,10 @@
 // player_engine_c.cpp — product C ABI over the internal PlayerEngine.
 //
 // The C surface is deliberately narrow (include/player_engine.h): control +
-// polled time-domain snapshot. No backend/test symbols appear (corrective
-// P0-A). Every entry point is wrapped so no C++ exception can cross
-// extern "C" (corrective §26), and no caller-controlled input can abort the
-// process (corrective P0-D/§25) — invalid input returns a typed status.
+// polled time-domain snapshot. No backend/test symbols appear. Every entry
+// point is wrapped so no C++ exception can cross extern "C", and no
+// caller-controlled input can abort the process — invalid input returns a
+// typed status.
 //
 // Enum parity with the internal engine is asserted statically where they
 // overlap; the shim adds its own validation statuses.
@@ -33,9 +33,8 @@ static_assert((int)PE_STATE_ERROR == (int)qn::PlayerState::Error);
 static_assert((int)PE_QUALITY_CONFIRMED == (int)qn::LandingQuality::Confirmed);
 static_assert((int)PE_QUALITY_ESTIMATED == (int)qn::LandingQuality::Estimated);
 
-// Internal production defaults (corrective §29/§39): the engine owns its
-// decode worker thread; the queue is the only product knob. capacity 0 ->
-// ~1 second at 48 kHz.
+// Internal production defaults: the engine owns its decode worker thread;
+// the queue is the only product knob. capacity 0 -> ~1 second at 48 kHz.
 constexpr std::uint64_t kDefaultCapacityFrames = 48000;
 
 qn::EngineConfig to_engine_config(const pe_config* c) {
@@ -55,16 +54,15 @@ qn::EngineConfig to_engine_config(const pe_config* c) {
 // Convert a frame-domain value to microseconds at the rate the frame counts
 // were captured with. Control ops (pe_seek) pass the engine's current rate —
 // safe because the caller serializes control calls — and pe_get_snapshot
-// passes the rate captured INSIDE the snapshot hold (corrective P0-5/§16),
-// never a post-lock read.
+// passes the rate captured INSIDE the snapshot hold, never a post-lock read.
 std::int64_t frames_to_us(std::int64_t frames, std::int32_t rate) {
     return rate > 0 ? qn::frames_to_us(frames, rate) : 0;
 }
 
-// Corrective §19 Option A: every public out parameter receives a
-// deterministic value BEFORE validation/try, so "written on every return
-// path where the pointer is valid" holds even for invalid-argument and
-// exception paths (the engine then overwrites on success).
+// Every public out parameter receives a deterministic value BEFORE
+// validation/try, so "written on every return path where the pointer is
+// valid" holds even for invalid-argument and exception paths (the engine
+// then overwrites on success).
 void init_seek_outs(std::int64_t* out_landing_us, std::int32_t* out_song_status) {
     if (out_landing_us) *out_landing_us = -1;
     if (out_song_status) *out_song_status = SONG_ERR_INVALID_ARGUMENT;
@@ -96,7 +94,7 @@ void pe_destroy(pe_engine* engine) {
 }
 
 pe_status pe_open(pe_engine* engine, const song_io* io, int32_t* out_song_status) {
-    if (out_song_status) *out_song_status = SONG_ERR_INVALID_ARGUMENT;  // §19 A
+    if (out_song_status) *out_song_status = SONG_ERR_INVALID_ARGUMENT;
     if (engine == nullptr || io == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
         return static_cast<pe_status>(
@@ -130,7 +128,7 @@ pe_status pe_pause(pe_engine* engine) {
 }
 
 pe_status pe_stop(pe_engine* engine, int32_t* out_song_status) {
-    if (out_song_status) *out_song_status = SONG_ERR_INVALID_ARGUMENT;  // §19 A
+    if (out_song_status) *out_song_status = SONG_ERR_INVALID_ARGUMENT;
     if (engine == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
         return static_cast<pe_status>(
@@ -144,7 +142,7 @@ pe_status pe_stop(pe_engine* engine, int32_t* out_song_status) {
 
 pe_status pe_seek(pe_engine* engine, int64_t position_us, int64_t* out_landing_us,
                   int32_t* out_song_status) {
-    init_seek_outs(out_landing_us, out_song_status);  // §19 Option A
+    init_seek_outs(out_landing_us, out_song_status);
     if (engine == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
         qn::PlayerEngine* e = reinterpret_cast<qn::PlayerEngine*>(engine);
@@ -153,7 +151,7 @@ pe_status pe_seek(pe_engine* engine, int64_t position_us, int64_t* out_landing_u
             e->seek(position_us, &landing_frames, out_song_status));
         if (st == PE_OK && out_landing_us != nullptr) {
             // Landing on success only; a failed seek leaves the deterministic
-            // -1 default (corrective §19). The engine's seek writes
+            // -1 default. The engine's seek writes
             // *out_song_status on every internal path.
             *out_landing_us = frames_to_us(landing_frames, e->source_rate());
         }
@@ -170,7 +168,7 @@ pe_status pe_get_snapshot(pe_engine* engine, pe_snapshot* out) {
     try {
         const qn::PlayerEngine* e = reinterpret_cast<const qn::PlayerEngine*>(engine);
         const qn::EngineSnapshot s = e->snapshot();
-        // One coherent instant (corrective P0-5/§16): position, duration and
+        // One coherent instant: position, duration and
         // sample_rate all derive from the rate captured inside the snapshot
         // hold — never a post-lock e->source_rate() read.
         const std::int32_t rate = s.source_rate;

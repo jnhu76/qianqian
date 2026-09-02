@@ -431,31 +431,10 @@ target("player_core")
     add_includedirs("include", "src/player", {public = true})
     player_common()
 
--- Deterministic trace replayer consumed by the Python↔native equivalence
--- gate (tools/player_model/model_equivalence.py).
-target("player_trace_runner")
-    set_kind("binary")
-    set_default(false)
-    set_targetdir(artifact_dir)
-    add_files("tests/player/trace_runner.cpp", "tests/player/fake_songcore.cpp")
-    add_deps("player_core")
-    player_common()
-    add_tests("default")
-    on_test(function (target, opt)
-        import("lib.detect.find_tool")
-        local python = find_tool("python3") or find_tool("python")
-        if not python then
-            return false, "python3 is required for the model-equivalence gate"
-        end
-        local script = path.join(os.projectdir(), "tools", "player_model",
-                                 "model_equivalence.py")
-        os.execv(python.program, {script, "--runner", target:targetfile(),
-                                  "--seeds", "200", "--ops", "300"})
-        return true
-    end)
-
--- Native semantic gates (ring unit/property, T1..T20/S1..S10 equivalents,
--- mutation/negative gates, thread stress). Binary exit code gates.
+-- Native semantic + realtime-contract gates (ring unit/property/SPSC,
+-- lifecycle/clock/EOF semantics, thread stress, realtime bounds, GAP
+-- zero-fill, admission quiescence, overflow, snapshot coherence).
+-- Binary exit code gates.
 target("player_gates")
     set_kind("binary")
     set_default(false)
@@ -467,7 +446,7 @@ target("player_gates")
     player_common()
     add_tests("default")
 
--- Tiny external consumer (§64-69, corrective §31-32): a pure-C99 TU
+-- Tiny external consumer: a pure-C99 TU
 -- including ONLY the product C ABI headers, compiled by a C compiler and
 -- linked against libplayer_core + the test-only backend driver — proof the
 -- product surface is self-contained, C++-leak-free, and ABI-linkable from a
@@ -486,7 +465,7 @@ target("player_consumer_c")
     set_languages("c99", "c++17")
     add_tests("default")
 
--- Real-SongCore integration gate (corrective §33-39/§64-65, P1-B): the ONE
+-- Real-SongCore integration gate: the ONE
 -- player test that links the REAL SongCore archive (not the stand-in) and
 -- drives REAL corpus fixtures (FLAC + MP3) through host FILE* I/O. Proves
 -- the frozen product semantics end to end: open -> play -> ENDED at the

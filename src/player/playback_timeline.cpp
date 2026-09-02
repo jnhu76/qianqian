@@ -55,8 +55,8 @@ bool PlaybackTimeline::append(SpanKind kind, std::uint64_t frames) {
         trim_rendered();
         if (count_ == kCapacity) {
             // No representation left: fail closed rather than grow or
-            // corrupt. Correctness is no longer representable (corrective
-            // §17); the engine stops submission with a diagnostic.
+            // corrupt. Correctness is no longer representable; the engine
+            // stops submission with a diagnostic.
             overflow_ = true;
             return false;
         }

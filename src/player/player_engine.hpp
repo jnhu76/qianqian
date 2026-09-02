@@ -1,19 +1,13 @@
-// player_engine.hpp — native PlayerEngine (Phase 1.5 internal API).
+// player_engine.hpp — native PlayerEngine (internal C++ API).
 //
-// Behavioral mirror of the frozen Phase-1 oracle
-// (tools/player_model/player_model.py + docs/player-engine.md). It
-// reproduces the oracle's OBSERVABLE semantics — state machine, epoch-
-// guarded seek, bounded queue lifecycle, EOF drain, the device/media
-// timeline split, submitted-vs-rendered output — not its implementation
-// details.
+// Implements the frozen PlayerEngine semantics (docs/player-engine.md):
+// state machine, epoch-guarded seek, bounded queue lifecycle, EOF drain,
+// the device/media timeline split, submitted-vs-rendered output. Not a
+// frozen ABI — the product C ABI (include/player_engine.h) exposes only
+// control/observation; everything here (manual submit/render, debug hooks,
+// the backend seam) is internal.
 //
-// This is the INTERNAL native API: not a frozen ABI. The C ABI header
-// (include/player_engine.h) exposes only the product control/observation
-// surface; everything here (manual submit/render, debug hooks, the
-// backend seam) is internal C++.
-//
-// Thread model (docs §9, corrective §7–§8), mirrored from the oracle's
-// call discipline:
+// Thread model (docs §9):
 //   control thread   open/play/pause/stop/seek — serialized, take
 //                    src_mtx_ THEN state_mtx_ (epoch must rise inside the
 //                    src_mtx_ section so a decode's epoch and its data can
@@ -23,17 +17,17 @@
 //                    state_mtx_), publication under state_mtx_ with the
 //                    epoch guard — stale results die at publish time
 //   backend side     fill_output()/advance_render() are the PRODUCTION
-//                    realtime seam (corrective §6–§9): no heap allocation,
-//                    no SongCore, no filesystem, no logging, and NO MUTEX of
-//                    any kind — only the lock-free SPSC ring, the bounded
-//                    timeline, and atomics. They enter through the admission
-//                    gate (corrective P0-3/§8): a control commit closes
-//                    admission BEFORE waiting for in-flight ops, so a counted
-//                    op is always waited out and an uncounted one never
-//                    touches a mid-reset ring/timeline. The manual-tick
-//                    submit()/backend_render() are the deterministic TEST
-//                    entry points (NullAudioBackend): they hold state_mtx_
-//                    and additionally drive the test backend's content log.
+//                    realtime seam: no heap allocation, no SongCore, no
+//                    filesystem, no logging, and NO MUTEX of any kind —
+//                    only the lock-free SPSC ring, the bounded timeline,
+//                    and atomics. They enter through the admission gate: a
+//                    control commit closes admission BEFORE waiting for
+//                    in-flight ops, so a counted op is always waited out
+//                    and an uncounted one never touches a mid-reset
+//                    ring/timeline. The manual-tick submit()/
+//                    backend_render() are the deterministic TEST entry
+//                    points (NullAudioBackend): they hold state_mtx_ and
+//                    additionally drive the test backend's content log.
 //
 // One engine owns one song at a time. The SongCore handle is not internally
 // thread-safe: every song_* call happens under src_mtx_.
@@ -64,8 +58,8 @@ enum class PlayerState : std::uint8_t {
 
 enum class LandingQuality : std::uint8_t { Confirmed, Estimated };
 
-// Typed control result. The oracle raises EngineError/SongSeekError; the
-// native API returns codes (the C ABI maps 1:1).
+// Typed control result. The frozen model raises errors; the native API
+// returns codes (the C ABI maps 1:1).
 enum class PlayerStatus : std::int32_t {
     Ok = 0,
     ErrIllegalCall = 1,   // call not allowed in current state
@@ -109,7 +103,7 @@ struct RenderReport {
     std::uint64_t generation = 0;
 };
 
-// Result of the realtime output-fill seam (corrective §6). `dst` received
+// Result of the realtime output-fill seam. `dst` received
 // media_frames of interleaved PCM; silence_frames are device-duration GAP
 // padding (zero media duration). kind is a static literal.
 struct OutputFillResult {
@@ -120,9 +114,9 @@ struct OutputFillResult {
     const char* kind = "idle";
 };
 
-// Mirrors the oracle's EngineSnapshot field-for-field (frame domain; names
-// carry their domain per docs §2.6). INTERNAL diagnostics — the product C
-// snapshot (include/player_engine.h) is the small time-domain view.
+// Frame-domain diagnostics; names carry their domain per docs §2.6.
+// INTERNAL — the product C snapshot (include/player_engine.h) is the small
+// time-domain view.
 struct EngineSnapshot {
     PlayerState state = PlayerState::Empty;
     std::int64_t media_position_frames = 0;
@@ -131,8 +125,8 @@ struct EngineSnapshot {
     std::int64_t duration_frames = 0;          // -1 = unknown, never fake 0
     bool duration_known = false;
     std::int32_t source_rate = 0;  // captured in the SAME state_mtx_ hold as
-                                   // the frames above (corrective P0-5): the
-                                   // C shim converts exclusively with it
+                                   // the frames above — the C shim converts
+                                   // exclusively with it
     std::uint64_t queued_media_frames = 0;
     std::uint64_t capacity_frames = 0;
     std::uint64_t epoch = 0;
@@ -188,19 +182,19 @@ public:
                       std::int32_t* out_song_status = nullptr);
 
     // -- decode worker ------------------------------------------------------------
-    // One worker quantum (oracle producer_step). Safe from the worker thread
-    // or, in manual mode, the test thread.
+    // One worker quantum (the frozen producer step). Safe from the worker
+    // thread or, in manual mode, the test thread.
     StepReport worker_step();
 
     // -- backend side ----------------------------------------------------------------
-    // PRODUCTION REALTIME SEAM (corrective §6–§8): one bounded output fill.
-    // Copies up to requested_output_frames from the queue into `dst`
-    // (caller-preallocated, >= requested frames * channels), appends the
-    // MEDIA/GAP spans to the bounded timeline, updates atomic counters.
-    // Contract: no heap allocation, no vector growth, no logging, no
-    // SongCore, no filesystem, no blocking mutex. Callable concurrently
-    // with control commits — a commit quiesces first (waits for the fill to
-    // finish) before touching the ring/timeline.
+    // PRODUCTION REALTIME SEAM: one bounded output fill. Copies up to
+    // requested_output_frames from the queue into `dst` (caller-preallocated,
+    // >= requested frames * channels), appends the MEDIA/GAP spans to the
+    // bounded timeline, updates atomic counters. Contract: no heap
+    // allocation, no vector growth, no logging, no SongCore, no filesystem,
+    // no blocking mutex. Callable concurrently with control commits — a
+    // commit quiesces first (waits for the fill to finish) before touching
+    // the ring/timeline.
     OutputFillResult fill_output(float* dst, std::uint64_t requested_output_frames);
 
     // PRODUCTION REALTIME SEAM: render-clock progression. `frames` of
@@ -211,7 +205,7 @@ public:
                                 std::int64_t generation = kCurrentGeneration);
 
     // Deterministic manual-tick entry points (TEST-ONLY; NullAudioBackend
-    // drives the rendered-content log for the content-continuity oracle).
+    // drives the rendered-content log for the content-continuity check).
     // submit() = fill_output into an internal buffer + test backend log.
     SubmitReport submit(std::uint64_t period_frames);
     // backend_render() = advance_render + test backend log.
@@ -227,7 +221,7 @@ public:
     // (current generation) to a media-timeline position.
     std::int64_t media_position_at_output(std::uint64_t output_pos) const;
     // Per-segment landing anchors / landing quality (content-continuity
-    // oracle inputs; hidden truth stays in the fake, never here).
+    // inputs; hidden truth stays in the fake, never here).
     std::int64_t segment_anchor(std::uint64_t segment) const;
     LandingQuality segment_landing_quality(std::uint64_t segment) const;
     // Media frames of the CURRENT segment proven rendered (the frozen clock
@@ -244,30 +238,19 @@ public:
     // performs the state transition).
     bool debug_end_pending() const { return end_pending_.load(); }
 
-    // -- test-only hooks (never on the production ABI; docs §53) -------------------
+    // -- test-only hooks (never on the production ABI) -------------------------
     // Worker read sizing: the frozen backpressure rule is
-    // `begin iff writable >= min(chunk, remaining)`. `remaining` is truth in
-    // the oracle but unknowable through the frozen SongCore ABI; production
-    // derives an estimate (CONFIRMED landings: exact). The trace runner
-    // injects the fake's truth so decision sequences match the oracle 1:1.
-    void debug_set_source_hint(std::int64_t remaining_frames);  // <0 = clear
-    // In-flight decode latency in worker quanta (the fake's work_steps).
+    // `begin iff writable >= min(chunk, remaining)`. `remaining` is
+    // unknowable through the frozen SongCore ABI; production derives an
+    // estimate (CONFIRMED landings: exact). The in-flight decode latency in
+    // worker quanta (work_steps) makes the BEGIN..publish window
+    // deterministic for the seek-epoch and thread-race regressions.
     void debug_set_work_steps(std::uint64_t steps);
-    // Mutation gates (§74): each intentionally breaks one semantic; the
-    // corresponding test asserts the suite CATCHES it.
-    struct DebugMutations {
-        bool skip_epoch_guard = false;      // stale decode may publish
-        bool advance_on_submit = false;     // submission advances media clock
-        bool gap_counts_as_media = false;   // GAP spans advance media time
-        bool end_without_pending = false;   // ENDED ignores pending media
-    };
-    void debug_set_mutations(const DebugMutations& m);
     // Thread-stress barriers: invoked at the labeled points when set. The
     // worker copies the hook under a lock and invokes the copy with no
     // engine locks held, so assigning/clearing from the control thread can
     // never race the invocation itself.
     void debug_set_publish_hook(std::function<void()> fn);  // before epoch check
-    void debug_set_read_hook(std::function<void()> fn);     // after song_read_pcm
     void debug_set_fill_barrier_armed(bool armed);
     bool debug_fill_barrier_entered() const;
     void debug_release_fill_barrier();
@@ -275,22 +258,13 @@ public:
     void debug_set_control_hook(std::function<void()> fn);  // under state_mtx_
     void debug_set_quiesce_hook(std::function<void()> fn);  // admission closed,
                                                             // control drains
-    // Admitted in-flight backend ops (corrective §11): proves a quiesced
-    // callback never became active.
+    // Admitted in-flight backend ops: proves a quiesced callback never
+    // became active.
     std::uint64_t debug_active_backend_ops() const { return active_backend_ops_.load(); }
-    // Test-only: the realtime seam's end-of-playout signal (set lock-free by
 
 private:
-    enum MutBits : std::uint32_t {
-        kMutSkipEpochGuard = 1u << 0,
-        kMutAdvanceOnSubmit = 1u << 1,
-        kMutGapCountsAsMedia = 1u << 2,
-        kMutEndWithoutPending = 1u << 3,
-    };
-    bool mut(std::uint32_t bit) const { return (mutations_.load() & bit) != 0; }
-
     // One decode result in flight, not yet published. Carries the epoch it
-    // was decoded under — the entire stale-frame defense. (The oracle's
+    // was decoded under — the entire stale-frame defense. (The frozen model's
     // chunk.eof flag has no native counterpart: the frozen ABI reports EOF
     // as a separate 0-frame SONG_EOF read, which the worker issues next.)
     struct InFlight {
@@ -311,19 +285,19 @@ private:
     // Wait until no realtime fill/advance is mid-flight. The realtime path
     // never blocks on state_mtx_, so the wait is bounded; called from
     // control commits (under state_mtx_) before touching ring/timeline.
-    // Corrective P0-3/§8: closes admission FIRST, then drains — a commit
-    // can never observe "no ops" and reset while a new op slips in.
+    // Closes admission FIRST, then drains — a commit can never observe
+    // "no ops" and reset while a new op slips in.
     void quiesce_backend();
-    // Realtime admission protocol (corrective §8–§9). enter() returns true
-    // only while admission is open AND the op is counted; a false return
-    // means the caller must not touch ring/timeline/counters. All seq_cst.
+    // Realtime admission protocol. enter() returns true only while admission
+    // is open AND the op is counted; a false return means the caller must
+    // not touch ring/timeline/counters. All seq_cst.
     bool admission_enter();
     void admission_exit();
     // Frozen ENDED condition (docs §7): playing, source exhausted, queue
     // empty, nothing in flight. Reads atomics — safe from the realtime path.
     bool end_condition() const;
     void maybe_end();
-    std::int64_t source_remaining() const;  // hint if set, else estimate
+    std::int64_t source_remaining() const;  // duration-derived estimate, -1 if unknown
     std::int64_t position_frames_locked() const;
 
     // Config / collaborators.
@@ -359,11 +333,11 @@ private:
     std::atomic<std::uint64_t> in_flight_frames_{0};  // realtime mirror
     std::int64_t decoded_since_commit_ = 0;
 
-    // Realtime seam admission (corrective P0-3/§7–§9). Control commits close
-    // admission BEFORE waiting for in-flight ops, then drain, then reset, then
-    // re-open — so no fill/advance can start against a ring/timeline that is
-    // mid-reset. All seq_cst (one total order): the admission re-check and the
-    // drain observation can never disagree (see admission_enter/exit).
+    // Realtime seam admission. Control commits close admission BEFORE
+    // waiting for in-flight ops, then drain, then reset, then re-open — so
+    // no fill/advance can start against a ring/timeline that is mid-reset.
+    // All seq_cst (one total order): the admission re-check and the drain
+    // observation can never disagree (see admission_enter/exit).
     std::atomic<bool> backend_accepting_{true};
     std::atomic<std::uint64_t> active_backend_ops_{0};  // admitted ops in flight
     std::atomic<bool> end_pending_{false};              // ENDED condition observed
@@ -384,23 +358,19 @@ private:
     std::atomic<std::uint64_t> eos_silence_output_frames_{0};
     std::string last_error_;
 
-    // Test hooks / mutations (see accessors).
+    // Test hooks (see accessors).
     mutable std::mutex hook_mtx_;  // control-path hooks only — NEVER on the
-                                   // realtime path (corrective P0-1/§2)
+                                   // realtime path
     std::function<void()> publish_hook_;
-    std::function<void()> read_hook_;
     std::function<void()> control_hook_;
     std::function<void()> quiesce_hook_;
-    // Test-only realtime barrier (corrective P0-1/§2): PLAIN ATOMICS so the
-    // realtime path can honor it without a mutex, allocation, or
-    // std::function copy. Armed=false is the production state (two relaxed
-    // loads, no effect).
+    // Test-only realtime barrier: PLAIN ATOMICS so the realtime path can
+    // honor it without a mutex, allocation, or std::function copy. Armed=
+    // false is the production state (two relaxed loads, no effect).
     std::atomic<bool> fill_barrier_armed_{false};
     std::atomic<bool> fill_barrier_entered_{false};
     std::atomic<bool> fill_barrier_release_{false};
-    std::int64_t remaining_hint_ = -1;
     std::uint64_t work_steps_ = 1;
-    std::atomic<std::uint32_t> mutations_{0};
 
     // Worker thread.
     std::thread worker_;
@@ -408,7 +378,7 @@ private:
     bool shutdown_ = false;
 };
 
-// Exact integer us<->frame conversions (oracle fake_decoder.py formulas).
+// Exact integer us<->frame conversions (docs §1).
 std::int64_t us_to_frames_floor(std::int64_t us, std::int64_t rate);
 std::int64_t us_to_frames_nearest(std::int64_t us, std::int64_t rate);
 std::int64_t frames_to_us(std::int64_t frames, std::int64_t rate);

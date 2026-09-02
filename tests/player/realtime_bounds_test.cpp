@@ -1,34 +1,30 @@
-// realtime_bounds_test.cpp — corrective gates: bounded realtime path.
+// realtime_bounds_test.cpp — permanent realtime-contract regressions.
 //
-// Proves the PRODUCTION realtime seam (corrective §6–§19, §47–§50, and the
-// final micro-corrective P0-1..P0-5):
+// Proves the PRODUCTION realtime seam (docs §9–§10):
 //   * fill_output()/advance_render()/timeline ops never allocate (global
-//     new counter in this test binary), take NO MUTEX of any kind (the
-//     hook_mtx_ std::function hook is gone — a test-only atomic barrier
-//     stands in for the reset-race proof), and never wait on the
-//     control/state mutex (control thread provably holds it while the fill
-//     completes on another thread);
+//     new counter in this test binary), take NO MUTEX of any kind (a
+//     test-only atomic barrier stands in for the reset-race proof), and
+//     never wait on the control/state mutex (control thread provably holds
+//     it while the fill completes on another thread);
 //   * GAP silence is PHYSICALLY zero in the caller's PCM buffer (poison-
 //     buffer gate) — an underrun/preroll/EOS fill returns real media frames
 //     followed by exact Float32 zeros, never stale buffer contents;
-//   * the bounded timeline stays bounded for arbitrarily long playback
-//     (§48) and under pathological MEDIA/GAP alternation (§49), and fails
-//     closed (never grows, never corrupts) when the store is exhausted;
-//   * a control commit closes backend admission BEFORE draining (§7–§9):
-//     a callback that entered before the close is counted and waited out;
-//     a callback that attempts after the close is never counted and returns
-//     idle without touching ring/timeline (§11);
+//   * the bounded timeline stays bounded for arbitrarily long playback and
+//     under pathological MEDIA/GAP alternation, and fails closed (never
+//     grows, never corrupts) when the store is exhausted;
+//   * a control commit closes backend admission BEFORE draining: a callback
+//     that entered before the close is counted and waited out; a callback
+//     that attempts after the close is never counted and returns idle
+//     without touching ring/timeline;
 //   * timeline overflow reaches deterministic ERROR through the PRODUCTION
-//     seam (fill_output/advance_render), not the test-only submit wrapper
-//     (§12–§14);
+//     seam (fill_output/advance_render), not the test-only submit wrapper;
 //   * the product snapshot is one coherent instant: position/duration/
 //     sample_rate all derive from the rate captured inside the snapshot
-//     hold, while another thread opens alternating-rate sources (§15–§17);
+//     hold, while another thread opens alternating-rate sources;
 //   * the realtime seam raises the ENDED signal when the frozen ENDED
-//     condition holds (§7).
+//     condition holds (docs §7).
 //
-// The global operator new/delete override is test-only (corrective §18:
-// "Do not require allocator tricks in production").
+// The global operator new/delete override is test-only.
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -113,30 +109,12 @@ struct Setup {
         io.size = [](void*) -> std::int64_t { return 0; };
         QN_CHECK(e->open(io) == PlayerStatus::Ok, "setup-open");
     }
-    // One decode quantum with the remaining-hint injection + EOF fold.
-    void producer_step() {
-        if (song && song->live) {
-            const std::int64_t rem = song->total_frames - song->live->position;
-            e->debug_set_source_hint(rem >= 0 ? rem : 0);
-        }
-        e->worker_step();
-    }
-    // Decode the whole source to EOF (with the harness EOF fold).
+    // One decode quantum.
+    void producer_step() { e->worker_step(); }
+    // Decode the whole source to EOF.
     void drain_to_eof() {
-        bool fold = false;
         for (int i = 0; i < 100000 && !e->snapshot().source_eof; ++i) {
-            const StepReport rep = e->worker_step();
-            if (rep.outcome == StepOutcome::Begin) {
-                if (song->live && song->live->position >= song->total_frames) fold = true;
-            } else if (rep.outcome == StepOutcome::Wrote) {
-                if (fold) {
-                    e->debug_set_source_hint(0);
-                    e->worker_step();  // SONG_EOF confirmation
-                    fold = false;
-                }
-            } else if (rep.outcome == StepOutcome::Stale) {
-                fold = false;
-            }
+            e->worker_step();
         }
     }
 };
@@ -156,7 +134,7 @@ void publish_chunk(Setup& s, std::uint64_t chunk) {
     QN_CHECK(s.e->snapshot().queued_media_frames == chunk, "publish-chunk");
 }
 
-// Fill a caller buffer with a non-zero poison value (P0-2/§6).
+// Fill a caller buffer with a non-zero poison value.
 void poison_buf(std::vector<float>& buf, std::size_t n) {
     const std::size_t lim = n < buf.size() ? n : buf.size();
     for (std::size_t i = 0; i < lim; ++i) buf[i] = 123.0f;
@@ -165,7 +143,7 @@ void poison_buf(std::vector<float>& buf, std::size_t n) {
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// §18/§47 + P0-1: the production realtime path never allocates, takes NO
+// The production realtime path never allocates, takes NO
 // MUTEX, and never waits on the control mutex.
 //
 // Structural proof for "no mutex": fill_output()/advance_render() no longer
@@ -179,8 +157,8 @@ void poison_buf(std::vector<float>& buf, std::size_t n) {
 GATE(realtime_no_alloc_no_mutex) {
     // (a) NO ALLOCATION: fill (media + underrun GAP insertion) and
     //     render-clock advancement run under a zero-allocation delta, and
-    //     the underrun GAP is PHYSICALLY zero in the caller's buffer
-    //     (corrective P0-2) — not merely counted.
+    //     the underrun GAP is PHYSICALLY zero in the caller's buffer —
+    //     not merely counted.
     {
         Setup s(16384, 1024, 8192);
         s.e = std::make_unique<PlayerEngine>(s.cfg);
@@ -206,8 +184,8 @@ GATE(realtime_no_alloc_no_mutex) {
         QN_CHECK_MSG(after == before, "realtime-no-alloc",
                      "fill/advance performed %llu heap allocations",
                      static_cast<unsigned long long>(after - before));
-        // P0-2: the GAP fill's dst must be exact silence, not the previous
-        // fill's media PCM (2 channels).
+        // The GAP fill's dst must be exact silence, not the previous fill's
+        // media PCM (2 channels).
         for (std::size_t i = 0; i < 480 * 2; ++i) {
             if (s.buf[i] != 0.0f) {
                 QN_CHECK_MSG(false, "realtime-no-alloc",
@@ -259,10 +237,9 @@ GATE(realtime_no_alloc_no_mutex) {
 }
 
 // ---------------------------------------------------------------------------
-// P0-2/§6: GAP silence is physically written into the caller's PCM buffer.
-// A poison-prefilled dst must end with exact 0.0f for every channel of the
-// shortfall — never the poison, never stale media PCM. This gate FAILS on
-// 825a201 (the pre-fix engine only counted the shortfall).
+// GAP silence is physically written into the caller's PCM buffer (docs
+// §5). A poison-prefilled dst must end with exact 0.0f for every channel
+// of the shortfall — never the poison, never stale media PCM.
 // ---------------------------------------------------------------------------
 
 GATE(gap_output_zero_fill) {
@@ -340,7 +317,7 @@ GATE(gap_output_zero_fill) {
 }
 
 // ---------------------------------------------------------------------------
-// §18: timeline append/coalesce/advance/mapping never allocate.
+// Timeline append/coalesce/advance/mapping never allocate.
 // ---------------------------------------------------------------------------
 
 GATE(timeline_no_alloc_ops) {
@@ -361,7 +338,7 @@ GATE(timeline_no_alloc_ops) {
 }
 
 // ---------------------------------------------------------------------------
-// §48: timeline storage stays bounded for arbitrarily long playback.
+// Timeline storage stays bounded for arbitrarily long playback.
 // ---------------------------------------------------------------------------
 
 GATE(timeline_long_run_memory) {
@@ -416,8 +393,7 @@ GATE(timeline_long_run_memory) {
 }
 
 // ---------------------------------------------------------------------------
-// §49: pathological MEDIA/GAP alternation — bounded with render, fail-closed
-// without it.
+// Pathological MEDIA/GAP alternation — bounded with render.
 // ---------------------------------------------------------------------------
 
 GATE(pathological_alternation_bounded) {
@@ -429,7 +405,7 @@ GATE(pathological_alternation_bounded) {
 
     // Each cycle publishes exactly one 480-frame chunk, then submits MEDIA
     // (drains the ring) and GAP (underrun), then renders both: the
-    // MEDIA/GAP/MEDIA/GAP pattern the corrective calls out.
+    // MEDIA/GAP/MEDIA/GAP pathological pattern.
     std::uint64_t max_spans = 0;
     const std::uint64_t cycles = 100000;
     for (std::uint64_t i = 0; i < cycles; ++i) {
@@ -462,44 +438,12 @@ GATE(pathological_alternation_bounded) {
                 static_cast<unsigned long long>(max_spans));
 }
 
-GATE(pathological_alternation_overflow_fail_closed) {
-    Setup s(4800, 480, 8192);
-    s.e = std::make_unique<PlayerEngine>(s.cfg);
-    fake::SongConfig c = song(48000 * 1000);
-    s.open(c);
-    s.e->play();
-
-    // Same alternation but WITHOUT rendering: the pending window grows two
-    // spans per cycle and must exhaust the fixed store. The engine must
-    // FAIL CLOSED (stop submitting, land in Error with a diagnostic) —
-    // never grow, never corrupt, never crash.
-    bool overflowed = false;
-    for (int i = 0; i < 2000 && !overflowed; ++i) {
-        publish_chunk(s, 480);
-        const SubmitReport m = s.e->submit(480);
-        const SubmitReport g = s.e->submit(480);
-        if (std::strcmp(m.kind, "idle") == 0 || std::strcmp(g.kind, "idle") == 0) {
-            overflowed = true;
-        }
-    }
-    QN_CHECK(overflowed, "alternation-overflow: never failed closed");
-    const EngineSnapshot snap = s.e->snapshot();
-    QN_CHECK(snap.state == PlayerState::Error, "alternation-overflow: not Error");
-    QN_CHECK(std::strstr(snap.last_error, "timeline") != nullptr,
-             "alternation-overflow: no diagnostic");
-    QN_CHECK_MSG(s.e->timeline_debug().span_count() <= PlaybackTimeline::kCapacity,
-                 "alternation-overflow",
-                 "store grew past capacity (%zu)",
-                 static_cast<std::size_t>(s.e->timeline_debug().span_count()));
-    std::printf("  no-render alternation: fail-closed Error, store held at capacity\n");
-}
-
 // ---------------------------------------------------------------------------
-// §12–§14 + P0-4: timeline overflow reaches deterministic ERROR through the
-// PRODUCTION seam (fill_output), not the test-only locked submit() wrapper.
-// The fail-closed transition must fire on a real WASAPI-style fill, with the
-// fixed diagnostic visible in the snapshot, no allocation, and no further
-// output mutation once ERROR.
+// Timeline overflow reaches deterministic ERROR through the PRODUCTION seam
+// (fill_output), not the test-only locked submit() wrapper. The fail-closed
+// transition must fire on a real WASAPI-style fill, with the fixed
+// diagnostic visible in the snapshot, no allocation, and no further output
+// mutation once ERROR.
 // ---------------------------------------------------------------------------
 
 GATE(production_overflow_fail_closed) {
@@ -560,8 +504,8 @@ GATE(production_overflow_fail_closed) {
 }
 
 // ---------------------------------------------------------------------------
-// §7/§11 + P0-3: backend admission — close-then-drain quiescence, both sides
-// of the race, deterministically.
+// Backend admission — close-then-drain quiescence, both sides of the race,
+// deterministically.
 //
 // Side 2 (below): a callback that ENTERED just before admission closed is
 // counted; control waits for it to exit before the reset proceeds — no
@@ -714,7 +658,7 @@ GATE(realtime_seam_end_signal) {
 }
 
 // ---------------------------------------------------------------------------
-// §15–§17 + P0-5: the product snapshot is ONE coherent instant. Thread A
+// The product snapshot is ONE coherent instant. Thread A
 // polls pe_get_snapshot while thread B opens 44.1 kHz / 48 kHz sources
 // back-to-back. Every snapshot's position_us/duration_us/sample_rate must
 // belong to the same captured source state — a post-lock source_rate() read

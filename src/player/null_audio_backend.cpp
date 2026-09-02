@@ -34,7 +34,8 @@ std::uint64_t NullAudioBackend::render(std::uint64_t frames) {
         const std::uint64_t avail = b.frames - b.rendered;
         const std::uint64_t take = avail < remaining ? avail : remaining;
         if (b.media && take > 0) {
-            // Preserve the rendered media payload for the content oracle.
+            // Preserve the rendered media payload for the content-continuity
+            // check.
             RenderedLog* log = nullptr;
             if (!rendered_log_.empty() && rendered_log_.back().segment == b.segment) {
                 log = &rendered_log_.back();

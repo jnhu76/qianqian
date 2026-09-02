@@ -12,7 +12,7 @@
  *
  * Drives one full lifecycle with the engine-owned decode worker:
  * open -> play -> ENDED with time-domain snapshot -> seek -> stop, plus
- * no-crash boundary probes (corrective §56).
+ * no-crash boundary probes.
  */
 #include <stdio.h>
 #include <string.h>

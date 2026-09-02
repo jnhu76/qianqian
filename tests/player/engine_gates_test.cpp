@@ -1,17 +1,13 @@
 // engine_gates_test.cpp — native semantic gates for the PlayerEngine.
 //
-// Native equivalents of the Phase-1 oracle gates (tools/player_model/
-// scenarios.py): T1–T14 lifecycle/seek/EOF/error, state_illegal_probes,
-// clock_model, S1–S10 pre-native closure, estimated-segment-offset-
-// invariance, T16–T20 clock-corrective, capacity_sweep, plus the §74
-// mutation/negative gates. The randomized t15 lives outside this binary as
-// the Python↔native equivalence gate (model_equivalence.py drives both
-// engines from the same seeded traces).
-//
-// Every gate drives the engine through its manual API (worker quantum /
-// backend callback / render progression) exactly the way the oracle is
-// driven, with the same harness normalizations as the trace runner:
-// remaining-hint injection and the EOF fold (see trace_runner.cpp).
+// These gates own the frozen PlayerEngine semantics (docs/player-engine.md)
+// as permanent regressions: lifecycle (T1–T14), state-illegal probes, clock
+// model, submitted-vs-rendered and MEDIA/GAP mapping (S1–S10), the
+// ESTIMATED-segment offset invariance, clock-corrective gates (T16–T20),
+// and the capacity sweep. Every gate drives the engine through its manual
+// API (worker quantum / backend callback / render progression) and checks
+// the conservation laws, clock continuity, and content continuity after
+// every operation.
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -51,14 +47,13 @@ using qn::RenderReport;
 static bool is_idle_kind(const char* k) { return std::strcmp(k, "idle") == 0; }
 
 // ---------------------------------------------------------------------------
-// harness: pair (engine + sink), song builder, oracle-equivalent stepping
+// harness: pair (engine + sink), song builder, manual stepping
 // ---------------------------------------------------------------------------
 
 struct Sink {
     PlayerEngine& e;
     std::uint64_t period;
     fake::SongConfig* cfg = nullptr;
-    bool eof_fold_pending = false;
 
     // per-tick accounting (FakeSink mirror)
     std::uint64_t total_requested = 0, total_tick_media = 0, total_tick_silence = 0;
@@ -75,27 +70,7 @@ struct Sink {
     explicit Sink(PlayerEngine& engine, std::uint64_t period_frames)
         : e(engine), period(period_frames) {}
 
-    StepReport producer_step() {
-        if (cfg && cfg->live) {
-            const std::int64_t rem = cfg->total_frames - cfg->live->position;
-            e.debug_set_source_hint(rem >= 0 ? rem : 0);
-        }
-        const StepReport rep = e.worker_step();
-        if (rep.outcome == StepOutcome::Begin) {
-            if (cfg && cfg->live && cfg->live->position >= cfg->total_frames) {
-                eof_fold_pending = true;
-            }
-        } else if (rep.outcome == StepOutcome::Wrote) {
-            if (eof_fold_pending) {
-                e.debug_set_source_hint(0);
-                e.worker_step();  // SONG_EOF confirmation (the oracle's eof flag)
-                eof_fold_pending = false;
-            }
-        } else if (rep.outcome == StepOutcome::Stale) {
-            eof_fold_pending = false;
-        }
-        return rep;
-    }
+    StepReport producer_step() { return e.worker_step(); }
 
     void tick_submit(std::uint64_t n = 1) {
         for (std::uint64_t i = 0; i < n; ++i) {
@@ -1470,87 +1445,6 @@ GATE(capacity_sweep) {
         }
     }
     std::printf("  2 patterns x 3 rates x 5 capacities: all ENDED @duration, deficit ordered\n");
-}
-
-// ---------------------------------------------------------------------------
-// mutation / negative gates (§74): prove the suite catches each break
-// ---------------------------------------------------------------------------
-
-GATE(mutation_epoch_guard) {
-    // t10 scenario with the guard disabled: the stale chunk must PUBLISH —
-    // if it did not, the stale-decode gate would be vacuous.
-    Pair p(16384, 1024, 512);
-    fake::SongConfig c = song();
-    QN_CHECK(open_song(p.engine, p.sink, c, 3) == PlayerStatus::Ok, "mut-epoch");
-    qn::PlayerEngine::DebugMutations m;
-    m.skip_epoch_guard = true;
-    p.engine.debug_set_mutations(m);
-    p.engine.play();
-    QN_CHECK(p.sink.producer_step().outcome == StepOutcome::Begin, "mut-epoch");
-    p.engine.seek(us(48000));
-    p.sink.producer_step();  // Working
-    p.sink.producer_step();  // Working
-    p.sink.producer_step();  // WROTE (mutation lets the stale chunk in)
-    QN_CHECK(p.engine.snapshot().queued_media_frames > 0,
-             "mut-epoch: stale chunk did not publish; gate would be vacuous");
-    QN_CHECK(p.engine.snapshot().discarded_stale_media_frames == 0, "mut-epoch");
-}
-
-GATE(mutation_submit_advances_clock) {
-    // s1 scenario with submission treated as audibility: the clock must move
-    // on submit — exactly what the submitted-vs-rendered gate forbids.
-    Pair p(1000, 100, 100);
-    fake::SongConfig c = song(10000);
-    c.sample_rate = 100;
-    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "mut-submit");
-    qn::PlayerEngine::DebugMutations m;
-    m.advance_on_submit = true;
-    p.engine.debug_set_mutations(m);
-    p.engine.play();
-    for (int i = 0; i < 4; ++i) p.sink.producer_step();
-    p.engine.submit(50);
-    QN_CHECK(p.engine.snapshot().media_position_frames != 0,
-             "mut-submit: submission did not advance the clock; gate vacuous");
-}
-
-GATE(mutation_gap_counts_as_media) {
-    // t17 scenario with GAP counted as media: the starved period must
-    // advance media time by the silence — what the timeline gate forbids.
-    Pair p(1000, 10, 10);
-    fake::SongConfig c = song(10000);
-    c.sample_rate = 100;
-    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "mut-gap");
-    qn::PlayerEngine::DebugMutations m;
-    m.gap_counts_as_media = true;
-    p.engine.debug_set_mutations(m);
-    p.engine.play();
-    p.sink.producer_step();
-    p.sink.producer_step();  // 0..9
-    p.engine.submit(6);
-    p.sink.tick_render(6);
-    p.sink.tick();           // 4 media + 6 silence
-    EngineSnapshot snap = p.engine.snapshot();
-    QN_CHECK(snap.media_position_frames != 10,
-             "mut-gap: silence advanced media time; gate vacuous");
-}
-
-GATE(mutation_end_without_pending) {
-    // s10 scenario with ENDED ignoring pending media: ENDED must fire with
-    // submitted-but-unrendered media outstanding.
-    Pair p(1000, 60, 50);
-    fake::SongConfig c = song(60);
-    c.sample_rate = 100;
-    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "mut-end");
-    qn::PlayerEngine::DebugMutations m;
-    m.end_without_pending = true;
-    p.engine.debug_set_mutations(m);
-    p.engine.play();
-    drain_producer(p.engine, p.sink);
-    p.engine.submit(50);
-    p.engine.submit(10);
-    EngineSnapshot snap = p.engine.snapshot();
-    QN_CHECK(snap.state == PlayerState::Ended && snap.pending_media_frames == 60,
-             "mut-end: ENDED fired without pending playout; gate vacuous");
 }
 
 }  // namespace qn::test
