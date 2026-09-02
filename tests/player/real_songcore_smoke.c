@@ -186,10 +186,16 @@ static void run_lifecycle(const char *path, const char *label,
     CHECK(pe_play(eng) == PE_OK);
     int guard = 0;
     for (;;) {
-        CHECK(pe_test_drive(eng, 1024) == 0);
+        /* The drive may return idle once ENDED has landed: the ENDED
+         * transition is performed by whichever side wins the final-drain
+         * race — the drive's own submit, or the worker's EOF poll between
+         * drives. Both are the same frozen transition; only an idle drive
+         * that is NOT followed by ENDED is a fault. */
+        const int drive_idle = pe_test_drive(eng, 1024);
         pace_ms(1); /* let the decode worker run, like a real audio callback */
         CHECK(pe_get_snapshot(eng, &sn) == PE_OK);
         if (sn.state == PE_STATE_ENDED) break;
+        CHECK_MSG(drive_idle == 0, "%s: drive idle before ENDED", label);
         CHECK_MSG(++guard < 5000, "%s: ENDED never reached", label);
         if (guard >= 5000) break;
     }

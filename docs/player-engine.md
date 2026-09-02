@@ -591,10 +591,20 @@ position = base(landing) + rendered_media_frames / media_rate
 control thread   open / play / pause / stop / seek (serialized)
 decode worker    SongCore read → PCM ring → publish (epoch-checked)
 audio callback   fill_output: ring read → device buffer, GAP on underrun
-                 (§5 rules) — lock-free, no control mutex, no allocation
+                 (§5 rules) — lock-free, no mutex, no allocation
 device clock     advance_render: proven render progression → mapping →
                  media position
 ```
+
+Backend ownership rule (final micro-corrective §18): `fill_output()` and
+`advance_render()` are serialized by the AudioBackend's SINGLE
+realtime/device thread — one event-driven render thread for WASAPI that
+calls `fill_output` then queries/advances the device render clock.
+`PlaybackTimeline` is therefore NOT a concurrent multi-writer structure and
+takes no locks. The control thread may run concurrently ONLY through the
+admission/quiesce protocol (§10): a commit closes backend admission, drains
+counted in-flight ops, resets ring/timeline/backend, then re-opens
+admission. No other concurrency pattern is supported.
 
 Diagnostics for UI are a polled snapshot (state, media position, decode
 position, duration(+known flag), buffered, underrun/preroll/stale
@@ -628,8 +638,12 @@ WASAPI can implement it without re-opening the engine:
 
 - `fill_output(float *dst, uint64_t requested_frames)` — the audio
   callback: reads the PCM ring into `dst`, appends a GAP span (underrun /
-  preroll / EOS silence, §5) when the ring underflows. Lock-free
-  (`active_fill_` count + atomics), no control mutex, no allocation.
+  preroll / EOS silence, §5) when the ring underflows. GAP silence is
+  PHYSICALLY zeroed in `dst` (corrective P0-2) — a real backend consumes
+  the buffer as returned, so stale/uninitialized PCM after the media
+  frames would be audible garbage. Lock-free and MUTEX-FREE (the old
+  `std::function` fill hook is gone; only atomics remain), zero heap
+  allocation.
 - `advance_render(int64_t frames, int64_t generation)` — the device
   clock evidence: proven-rendered output advanced through the timeline →
   media position. Same realtime properties.
@@ -639,20 +653,35 @@ no wall clock); `submit()` / `backend_render()` are TEST-ONLY locked
 wrappers over the seam (the C consumer drives them through
 `player_test_driver.h`, standing in for WASAPI's callback). A control
 commit (seek/stop/open) calls `quiesce_backend()` before touching
-ring/timeline — a consumer mid-fill is deterministically waited out, and
-no resurrected frames survive the commit (corrective §11/§50). SRC stays
-frozen: BYPASS when source rate/layout == device requirement, else
-`aresample` / libswresample — owned by the device side, never SongCore.
+ring/timeline, and the quiesce is a CLOSE-THEN-DRAIN admission protocol
+(corrective P0-3/§7–§11): admission is closed FIRST (so a callback that
+attempts entry after the close returns idle and is never counted), then
+counted in-flight ops are waited out — a consumer that entered just
+before the close is deterministically drained, and no resurrected frames
+survive the commit. Only after the reset completes does the commit
+re-open admission. Timeline overflow is a deterministic ERROR on the
+PRODUCTION seam itself (corrective P0-4/§12–§14): `fill_output` sets the
+atomic overflow flag AND the atomic Error state, and the snapshot
+translates it into the fixed `"timeline capacity exhausted"` diagnostic —
+a real WASAPI backend can never keep seeing `PLAYING` after the span
+store is exhausted. SRC stays frozen: BYPASS when source rate/layout ==
+device requirement, else `aresample` / libswresample — owned by the
+device side, never SongCore.
 
 **Realtime-path proof**: a test binary with a global operator-new counter
 proves `fill_output` / `advance_render` / timeline ops perform ZERO
-heap allocations, and a control thread provably holding the state mutex
-does not block a concurrent fill. The bounded timeline (corrective
-§12–§18) is a fixed-capacity span ring (256 spans) that coalesces
-contiguous same-kind spans and lazily trims fully-rendered history into
-prefix anchors; a pathological window that still exhausts the store
-FAILS CLOSED (sticky overflow → deterministic diagnostic Error) — never
-growth, never corruption.
+heap allocations and take NO MUTEX, and a control thread provably holding
+the state mutex does not block a concurrent fill. The bounded timeline
+(corrective §12–§18) is a fixed-capacity span ring (256 spans) that
+coalesces contiguous same-kind spans and lazily trims fully-rendered
+history into prefix anchors; a pathological window that still exhausts
+the store FAILS CLOSED (sticky overflow → deterministic diagnostic Error)
+— never growth, never corruption. The product snapshot is ONE coherent
+instant (corrective P0-5/§15–§17): `position_us` / `duration_us` /
+`sample_rate` all derive from the source rate captured inside the
+snapshot's lock hold — never a post-lock read — so polling concurrently
+with open() can never mix one song's frame counts with another song's
+rate.
 
 ## 11. Native mapping notes (Phase 1.5)
 
@@ -763,7 +792,7 @@ traces as its model-equivalence gate.
 
 ```text
 Python oracle (tools/player_model)      PROVEN — 36 gates, deterministic
-Native PlayerEngine + NullAudioBackend  PROVEN — 53 native gates, model
+Native PlayerEngine + NullAudioBackend  PROVEN — 57 native gates, model
                                         equivalence vs the oracle
 C product ABI (include/player_engine.h) PROVEN — pure-C external consumer,
                                         no backend/test symbols
@@ -802,6 +831,27 @@ real device sees them (an underrun REPLACES the period's output, docs §5)
 so submission == rendering and the store provably stays bounded for
 arbitrarily long playback.
 
+Final micro-corrective (2026-09-02, P0-1..P0-5): the realtime path takes
+NO MUTEX of any kind — the `std::function` fill hook and its `hook_mtx_`
+are deleted, replaced by a test-only ATOMIC fill barrier (the reset-race
+proof keeps its interleavings, without a mutex on the seam). GAP silence
+is physically zeroed in the caller's buffer (poison-buffer gate). Backend
+quiescence is a close-then-drain admission protocol (`backend_accepting_`
++ `active_backend_ops_`, both seq_cst) applied to `fill_output` AND
+`advance_render`: admission closes before the drain, so a callback that
+entered before the close is counted and waited out while one that
+attempts after the close returns idle and is never counted (both race
+sides are pinned by gates). Timeline overflow reaches deterministic
+ERROR on the PRODUCTION seam (`fill_output` sets the atomic flag AND the
+atomic Error state; the snapshot translates the fixed diagnostic) —
+never only in the test-only `submit()` wrapper. The product snapshot is
+one coherent instant: `source_rate` is captured inside the snapshot's
+lock hold and the C shim converts exclusively with it (no post-lock
+`source_rate()` read); a concurrent open(44.1k/48k) × snapshot-poll gate
+plus TSan prove it. Public out parameters are deterministically
+initialized before validation (corrective §19 Option A): failed seeks
+leave `out_landing_us = -1`, never a stale value.
+
 Gate inventory (native): ring unit/property/SPSC-thread gates; engine
 gates T1–T20, S1–S10, state-illegal probes, clock model,
 estimated-segment offset invariance, capacity sweep, mutation gates
@@ -809,10 +859,13 @@ estimated-segment offset invariance, capacity sweep, mutation gates
 end-without-pending — each provably caught by the suite); thread stress
 (destruction, seek/stop/open vs decode via before-publish barriers,
 render vs control, EOF vs control, play-to-end); C consumer lifecycle
-gate; realtime-bound gates (corrective §47–§50): zero-allocation +
-no-control-lock realtime path, timeline no-alloc ops, 6-hour long-run
-bounded memory, pathological alternation bounded / fail-closed overflow,
-reset-race quiesce, realtime-seam ENDED signal. `xmake test` runs
+gate; realtime-bound gates (corrective §47–§50 + final micro-corrective):
+zero-allocation + no-mutex realtime path, GAP zero-fill (poison buffer),
+timeline no-alloc ops, 6-hour long-run bounded memory, pathological
+alternation bounded / fail-closed overflow, production-seam overflow →
+ERROR, admission quiescence (close-first + waits-for-inflight), snapshot
+rate coherence (concurrent 44.1k/48k opens × polls), realtime-seam ENDED
+signal. `xmake test` runs
 `player_gates`, `player_trace_runner` (200 seeds × 300 ops equivalence),
 `player_consumer_c`, `player_real_songcore_smoke` (real fixtures), and
 the SongCore regression; sanitizer variants build with
@@ -821,8 +874,8 @@ the SongCore regression; sanitizer variants build with
 Evidence (2026-09-02, Linux x86_64, gcc 15):
 
 ```text
-native gates (plain / ASan / UBSan)   53/53 PASS each
-native gates (TSan)                   3 runs, 53/53 PASS, 0 warnings
+native gates (plain / ASan / UBSan)   57/57 PASS each
+native gates (TSan)                   3 runs, 57/57 PASS, 0 warnings
 model equivalence                     200×300 PASS (xmake test) and
                                       1000 seeds × 500 ops PASS
 C consumer (product ABI)              PASS under plain/ASan/UBSan/TSan
@@ -832,6 +885,7 @@ real-SongCore smoke (FLAC + MP3)      PASS under plain/ASan/UBSan/TSan:
                                       stop, missing-file error path
 SongCore sources/ABI                  untouched (engine consumes the
                                       frozen ABI only)
+Python oracle                         untouched (tools/player_model frozen)
 audio PCM                             unchanged (engine is above SongCore;
                                       tests consume fake PCM; real smoke
                                       decodes the real fixtures)

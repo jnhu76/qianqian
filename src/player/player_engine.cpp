@@ -16,6 +16,15 @@ struct AudioEngineBypass {
     void reset() {}
     void drain() {}
 };
+
+// Realtime-safe zero fill (corrective P0-2/§5): writes exact Float32 silence
+// for `frames` interleaved frames. Callers pass the ACTIVE channel count on
+// the admitted path (stable under the admission gate); never called with a
+// count that could exceed the caller's dst stride. No allocation, bounded.
+void zero_fill(float* dst, std::uint64_t frames, std::int32_t channels) {
+    if (dst == nullptr || frames == 0 || channels <= 0) return;
+    std::memset(dst, 0, static_cast<std::size_t>(frames * channels) * sizeof(float));
+}
 }  // namespace
 
 std::int64_t us_to_frames_floor(std::int64_t us, std::int64_t rate) {
@@ -421,21 +430,34 @@ void PlayerEngine::worker_loop() {
 OutputFillResult PlayerEngine::fill_output(float* dst,
                                            std::uint64_t requested_output_frames) {
     OutputFillResult r;
-    active_fill_.fetch_add(1, std::memory_order_acq_rel);
-    std::function<void()> hook;
-    {
-        std::lock_guard<std::mutex> hk(hook_mtx_);
-        hook = fill_hook_;
+    if (!admission_enter()) {
+        // Quiesced (corrective §10): a control commit is mid-flight and has
+        // closed admission. Touch NOTHING (ring/timeline/counters) and return
+        // idle. dst is deliberately untouched — an idle return means "no
+        // output this period", the same contract as the not-playing path, and
+        // the backend is expected to stop its device callback during a commit
+        // (zeroing with the active channel count would race the commit's
+        // format reset).
+        r.kind = "idle";
+        return r;
     }
-    if (hook) hook();  // test barrier, no engine locks held
+    // Test-only barrier (corrective P0-1/§2): plain atomics, no mutex, no
+    // allocation. Unarmed (production) = two relaxed loads, no effect.
+    if (fill_barrier_armed_.load(std::memory_order_relaxed)) {
+        fill_barrier_entered_.store(true, std::memory_order_relaxed);
+        while (!fill_barrier_release_.load(std::memory_order_relaxed)) {
+            std::this_thread::yield();
+        }
+    }
 
     r.segment = segment_.load();
     if (state_.load() != PlayerState::Playing || timeline_overflow_.load()) {
         r.kind = "idle";  // not playing, or fail-closed span-store overflow
-        active_fill_.fetch_sub(1, std::memory_order_acq_rel);
+        admission_exit();
         return r;
     }
     const std::uint64_t period = requested_output_frames;
+    const std::int32_t channels = ring_.channels();  // active count (admitted)
     const std::uint64_t readable = ring_.readable();
     const std::uint64_t m =
         ring_.read(dst, period < readable ? period : readable);
@@ -456,9 +478,23 @@ OutputFillResult PlayerEngine::fill_output(float* dst,
             gap_kind = kind = "underrun";
         }
     }
+    if (shortfall > 0) {
+        // GAP silence must be PHYSICALLY zero in dst (corrective P0-2/§4–§5):
+        // the caller's buffer is the real device payload — a WASAPI backend
+        // consumes dst as returned, so old/stale/uninitialized PCM after the
+        // M media frames would be audible garbage. Float32 zero is the
+        // required silence representation.
+        zero_fill(dst + m * static_cast<std::uint64_t>(channels), shortfall,
+                  channels);
+    }
     if (m > 0) {
         if (!timeline_.append(SpanKind::Media, m)) {
             timeline_overflow_.store(true);
+            // Fail-closed on the PRODUCTION seam (corrective P0-4/§13): the
+            // atomic state is the realtime path's only legal transition
+            // surface; the snapshot/control side translates the flag into the
+            // fixed diagnostic. No allocation, no logging here.
+            state_.store(PlayerState::Error);
         }
         submitted_media_this_segment_.store(true);
     }
@@ -468,6 +504,7 @@ OutputFillResult PlayerEngine::fill_output(float* dst,
             mut(kMutGapCountsAsMedia) ? SpanKind::Media : SpanKind::Gap;
         if (!timeline_.append(gk, shortfall)) {
             timeline_overflow_.store(true);
+            state_.store(PlayerState::Error);
         }
         if (gap_kind == std::string_view("preroll")) {
             preroll_events_.fetch_add(1);
@@ -487,14 +524,19 @@ OutputFillResult PlayerEngine::fill_output(float* dst,
     r.kind = kind;
     r.media_frames = m;
     r.silence_frames = gap_kind != nullptr ? shortfall : 0;
-    active_fill_.fetch_sub(1, std::memory_order_acq_rel);
+    admission_exit();
     return r;
 }
 
 RenderReport PlayerEngine::advance_render(std::int64_t frames,
                                           std::int64_t generation) {
     RenderReport rep;
-    active_fill_.fetch_add(1, std::memory_order_acq_rel);
+    if (!admission_enter()) {
+        // Quiesced (corrective §10): no ring/timeline/counter mutation. The
+        // event is dropped — it belongs to a timeline a commit is resetting.
+        rep.kind = "idle";
+        return rep;
+    }
     rep.segment = segment_.load();
     const std::uint64_t epoch = epoch_.load();
     rep.generation = generation == kCurrentGeneration
@@ -505,13 +547,13 @@ RenderReport PlayerEngine::advance_render(std::int64_t frames,
         // output accounting can never advance the current media timeline.
         stale_render_events_.fetch_add(1);
         rep.kind = "stale";
-        active_fill_.fetch_sub(1, std::memory_order_acq_rel);
+        admission_exit();
         return rep;
     }
     if (state_.load() == PlayerState::Paused) {
         // Pause freezes render advancement; pending output stays pending.
         rep.kind = "paused";
-        active_fill_.fetch_sub(1, std::memory_order_acq_rel);
+        admission_exit();
         return rep;
     }
     const std::uint64_t pending = timeline_.pending_output();
@@ -525,7 +567,7 @@ RenderReport PlayerEngine::advance_render(std::int64_t frames,
     rep.kind = "rendered";
     rep.rendered_output_frames = advance;
     rep.rendered_media_frames = split.media;
-    active_fill_.fetch_sub(1, std::memory_order_acq_rel);
+    admission_exit();
     return rep;
 }
 
@@ -598,6 +640,10 @@ EngineSnapshot PlayerEngine::snapshot() const {
         handle_ != nullptr ? base_frame_ + decoded_since_commit_ : 0;
     s.duration_frames = handle_ != nullptr ? (duration_known_ ? duration_frames_ : -1) : 0;
     s.duration_known = handle_ != nullptr && duration_known_;
+    // Coherent source rate (corrective P0-5/§16): captured in the SAME lock
+    // hold as the frame-domain fields above — the C shim converts
+    // position/duration with this rate, never with a post-snapshot read.
+    s.source_rate = source_rate_;
     s.queued_media_frames = ring_.readable();
     s.capacity_frames = ring_.capacity();
     s.epoch = epoch_.load();
@@ -624,7 +670,14 @@ EngineSnapshot PlayerEngine::snapshot() const {
     s.ring_produced_total = ring_.produced_total();
     s.ring_consumed_total = ring_.consumed_total();
     s.ring_discarded_total = ring_.discarded_total();
-    std::snprintf(s.last_error, sizeof s.last_error, "%s", last_error_.c_str());
+    if (timeline_overflow_.load()) {
+        // Fail-closed diagnostic translated for the snapshot (corrective
+        // P0-4/§13): the realtime path only sets the atomic flag + state; the
+        // fixed string lives here, never in realtime code.
+        std::snprintf(s.last_error, sizeof s.last_error, "timeline capacity exhausted");
+    } else {
+        std::snprintf(s.last_error, sizeof s.last_error, "%s", last_error_.c_str());
+    }
     return s;
 }
 
@@ -679,9 +732,23 @@ void PlayerEngine::debug_set_read_hook(std::function<void()> fn) {
     read_hook_ = std::move(fn);
 }
 
-void PlayerEngine::debug_set_fill_hook(std::function<void()> fn) {
-    std::lock_guard<std::mutex> g(hook_mtx_);
-    fill_hook_ = std::move(fn);
+void PlayerEngine::debug_set_fill_barrier_armed(bool armed) {
+    // Plain atomics (corrective P0-1/§2): the realtime path reads these
+    // without any mutex; arming never blocks a fill unless it enters the
+    // armed window, and release is a plain atomic store.
+    fill_barrier_armed_.store(armed, std::memory_order_relaxed);
+    if (armed) {
+        fill_barrier_entered_.store(false, std::memory_order_relaxed);
+        fill_barrier_release_.store(false, std::memory_order_relaxed);
+    }
+}
+
+bool PlayerEngine::debug_fill_barrier_entered() const {
+    return fill_barrier_entered_.load(std::memory_order_relaxed);
+}
+
+void PlayerEngine::debug_release_fill_barrier() {
+    fill_barrier_release_.store(true, std::memory_order_relaxed);
 }
 
 void PlayerEngine::debug_set_control_hook(std::function<void()> fn) {
@@ -715,22 +782,44 @@ std::optional<std::pair<std::int64_t, LandingQuality>> PlayerEngine::landing_of(
     return std::make_pair(target, LandingQuality::Estimated);
 }
 
+bool PlayerEngine::admission_enter() {
+    // Corrective P0-3/§8: double-checked admission. Control closes admission
+    // BEFORE draining, so an op that passes the re-check is counted before
+    // control can observe the drain; an op that misses it backs out and must
+    // not touch ring/timeline. seq_cst gives one total order, so the re-check
+    // load and control's drain observation can never disagree.
+    if (!backend_accepting_.load(std::memory_order_seq_cst)) return false;
+    active_backend_ops_.fetch_add(1, std::memory_order_seq_cst);
+    if (!backend_accepting_.load(std::memory_order_seq_cst)) {
+        // Admission closed between the first check and the count increment:
+        // never become an active op against a mid-reset ring/timeline.
+        active_backend_ops_.fetch_sub(1, std::memory_order_seq_cst);
+        return false;
+    }
+    return true;
+}
+
+void PlayerEngine::admission_exit() {
+    active_backend_ops_.fetch_sub(1, std::memory_order_seq_cst);
+}
+
 void PlayerEngine::quiesce_backend() {
-    // Realtime fill/advance never block on state_mtx_, so this wait is
-    // bounded. In the manual-tick (NullBackend) test model the only
-    // concurrent caller is a stress thread driving the realtime seam;
-    // control commits wait for it to finish before touching ring/timeline.
-    if (active_fill_.load(std::memory_order_acquire) == 0) return;
+    // Close admission FIRST, then drain (corrective P0-3/§7): waiting for
+    // in-flight ops before closing admission would let a new op slip in
+    // between the "active == 0" observation and the reset. With the gate
+    // closed, an op that passed it is counted and waited out; an op that
+    // misses it returns idle without touching ring/timeline. The caller
+    // re-opens admission (invalidate) only after the reset is complete.
+    backend_accepting_.store(false, std::memory_order_seq_cst);
     std::function<void()> hook;
     {
         std::lock_guard<std::mutex> hk(hook_mtx_);
         hook = quiesce_hook_;
     }
-    // Test barrier: fires (with both control locks held) only when a real
-    // quiesce wait is actually required. The hook must not call back into
-    // the engine — state_mtx_ is held.
+    // Test barrier (control path, both locks held): fires AFTER admission is
+    // closed — the deterministic "close happened first" checkpoint (§11).
     if (hook) hook();
-    while (active_fill_.load(std::memory_order_acquire) != 0) {
+    while (active_backend_ops_.load(std::memory_order_seq_cst) != 0) {
         std::this_thread::yield();
     }
 }
@@ -761,6 +850,11 @@ void PlayerEngine::invalidate() {
     timeline_overflow_.store(false);
     AudioEngineBypass aes;
     aes.reset();
+    // Re-open admission (corrective §8): the reset is complete and published
+    // (seq_cst store) — subsequent fills/advances observe the fresh
+    // ring/timeline. Only reached via control commits; the destructor calls
+    // quiesce_backend directly and never re-opens.
+    backend_accepting_.store(true, std::memory_order_seq_cst);
 }
 
 void PlayerEngine::commit_landing(std::int64_t landing_frames, LandingQuality quality) {

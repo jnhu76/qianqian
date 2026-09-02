@@ -52,11 +52,22 @@ qn::EngineConfig to_engine_config(const pe_config* c) {
     return cfg;
 }
 
-// Convert a frame-domain value to microseconds using the engine's current
-// source rate (the only correct authority — never the device rate).
-std::int64_t frames_to_us(const qn::PlayerEngine* e, std::int64_t frames) {
-    const std::int32_t rate = e->source_rate();
+// Convert a frame-domain value to microseconds at the rate the frame counts
+// were captured with. Control ops (pe_seek) pass the engine's current rate —
+// safe because the caller serializes control calls — and pe_get_snapshot
+// passes the rate captured INSIDE the snapshot hold (corrective P0-5/§16),
+// never a post-lock read.
+std::int64_t frames_to_us(std::int64_t frames, std::int32_t rate) {
     return rate > 0 ? qn::frames_to_us(frames, rate) : 0;
+}
+
+// Corrective §19 Option A: every public out parameter receives a
+// deterministic value BEFORE validation/try, so "written on every return
+// path where the pointer is valid" holds even for invalid-argument and
+// exception paths (the engine then overwrites on success).
+void init_seek_outs(std::int64_t* out_landing_us, std::int32_t* out_song_status) {
+    if (out_landing_us) *out_landing_us = -1;
+    if (out_song_status) *out_song_status = SONG_ERR_INVALID_ARGUMENT;
 }
 
 }  // namespace
@@ -85,6 +96,7 @@ void pe_destroy(pe_engine* engine) {
 }
 
 pe_status pe_open(pe_engine* engine, const song_io* io, int32_t* out_song_status) {
+    if (out_song_status) *out_song_status = SONG_ERR_INVALID_ARGUMENT;  // §19 A
     if (engine == nullptr || io == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
         return static_cast<pe_status>(
@@ -118,6 +130,7 @@ pe_status pe_pause(pe_engine* engine) {
 }
 
 pe_status pe_stop(pe_engine* engine, int32_t* out_song_status) {
+    if (out_song_status) *out_song_status = SONG_ERR_INVALID_ARGUMENT;  // §19 A
     if (engine == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
         return static_cast<pe_status>(
@@ -131,15 +144,18 @@ pe_status pe_stop(pe_engine* engine, int32_t* out_song_status) {
 
 pe_status pe_seek(pe_engine* engine, int64_t position_us, int64_t* out_landing_us,
                   int32_t* out_song_status) {
+    init_seek_outs(out_landing_us, out_song_status);  // §19 Option A
     if (engine == nullptr) return PE_ERR_INVALID_ARGUMENT;
     try {
         qn::PlayerEngine* e = reinterpret_cast<qn::PlayerEngine*>(engine);
         std::int64_t landing_frames = 0;
         const pe_status st = static_cast<pe_status>(
             e->seek(position_us, &landing_frames, out_song_status));
-        if (out_landing_us != nullptr) {
-            // Written on every return path (corrective §28).
-            *out_landing_us = frames_to_us(e, landing_frames);
+        if (st == PE_OK && out_landing_us != nullptr) {
+            // Landing on success only; a failed seek leaves the deterministic
+            // -1 default (corrective §19). The engine's seek writes
+            // *out_song_status on every internal path.
+            *out_landing_us = frames_to_us(landing_frames, e->source_rate());
         }
         return st;
     } catch (const std::bad_alloc&) {
@@ -154,14 +170,19 @@ pe_status pe_get_snapshot(pe_engine* engine, pe_snapshot* out) {
     try {
         const qn::PlayerEngine* e = reinterpret_cast<const qn::PlayerEngine*>(engine);
         const qn::EngineSnapshot s = e->snapshot();
+        // One coherent instant (corrective P0-5/§16): position, duration and
+        // sample_rate all derive from the rate captured inside the snapshot
+        // hold — never a post-lock e->source_rate() read.
+        const std::int32_t rate = s.source_rate;
         out->state = static_cast<pe_state>(s.state);
-        out->position_us = frames_to_us(e, s.media_position_frames);
-        out->duration_us = s.duration_frames < 0 ? -1 : frames_to_us(e, s.duration_frames);
+        out->position_us = frames_to_us(s.media_position_frames, rate);
+        out->duration_us =
+            s.duration_frames < 0 ? -1 : frames_to_us(s.duration_frames, rate);
         out->duration_known = s.duration_known ? 1u : 0u;
         out->position_quality = static_cast<uint8_t>(s.position_quality);
         out->buffered_frames = s.queued_media_frames;
         out->underrun_count = s.underrun_count;
-        out->sample_rate = e->source_rate();
+        out->sample_rate = rate;
         std::memcpy(out->last_error, s.last_error, sizeof out->last_error);
         return PE_OK;
     } catch (const std::bad_alloc&) {

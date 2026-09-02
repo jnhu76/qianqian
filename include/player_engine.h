@@ -25,7 +25,10 @@
  * Error contract: every function returns a typed pe_status (or NULL for
  * pe_create); invalid caller input never aborts, asserts, or terminates the
  * process, and no C++ exception can cross this boundary. Out parameters are
- * written on every return path where their parent pointer is valid.
+ * written on every return path where their parent pointer is valid: each is
+ * initialized to a deterministic value before validation (corrective §19),
+ * then overwritten on success (out_landing_us = -1 and out_song_status =
+ * SONG_ERR_INVALID_ARGUMENT before any failure path; SONG_OK on success).
  *
  * No FFmpeg type and no C++ type crosses this header. Reuses songcore.h's
  * song_io / song_status: the engine owns a SongCore handle, and open()
@@ -128,7 +131,8 @@ typedef struct pe_snapshot {
     uint8_t   position_quality;  /* PE_QUALITY_*; ESTIMATED is not an error */
     uint64_t  buffered_frames;   /* queued media frames (diagnostic) */
     uint64_t  underrun_count;    /* cumulative underruns (diagnostic) */
-    int32_t   sample_rate;       /* current source rate; 0 = no song */
+    int32_t   sample_rate;       /* source rate of THIS captured instant
+                                    (position_us/duration_us convert with it) */
     char      last_error[96];    /* "" = none; normalized category prefixes */
 } pe_snapshot;
 
@@ -170,9 +174,10 @@ PE_API pe_status pe_stop(pe_engine *engine, int32_t *out_song_status);
 
 /* seek(T) from READY/PLAYING/PAUSED (and ENDED -> READY). On success
  * *out_landing_us carries the landing the clock was rebased on, in media
- * microseconds. *out_song_status (when non-NULL) always receives the
- * SongCore status (SONG_OK on success, the failing song_seek status
- * otherwise). A failed seek lands the engine in ERROR (fail-closed). */
+ * microseconds; on any failure it is the deterministic default -1.
+ * *out_song_status (when non-NULL) always receives the SongCore status
+ * (SONG_OK on success, the failing song_seek status otherwise). A failed
+ * seek lands the engine in ERROR (fail-closed). */
 PE_API pe_status pe_seek(pe_engine *engine, int64_t position_us,
                          int64_t *out_landing_us, int32_t *out_song_status);
 

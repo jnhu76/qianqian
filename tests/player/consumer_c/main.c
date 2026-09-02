@@ -94,9 +94,15 @@ int main(void) {
     CHECK(pe_play(eng) == PE_OK);
     int guard = 0;
     for (;;) {
-        CHECK(pe_test_drive(eng, 512) == 0);
+        /* The drive may return idle once ENDED has landed: the ENDED
+         * transition is performed by whichever side wins the final-drain
+         * race — the drive's own submit, or the worker's EOF poll between
+         * drives. Both are the same frozen transition; only an idle drive
+         * that is NOT followed by ENDED is a fault. */
+        const int drive_idle = pe_test_drive(eng, 512);
         CHECK(pe_get_snapshot(eng, &sn) == PE_OK);
         if (sn.state == PE_STATE_ENDED) break;
+        CHECK(drive_idle == 0); /* idle before ENDED = left PLAYING wrongly */
         CHECK_RUNAWAY(guard);
     }
     CHECK(sn.position_us == 4000000);      /* ENDED = full media duration */
@@ -120,6 +126,15 @@ int main(void) {
     CHECK(landing_us == 0);
     CHECK(pe_seek(eng, (int64_t)1 << 40, &landing_us, NULL) == PE_OK); /* clamps */
     CHECK(landing_us == 4000000);
+
+    /* --- re-home to mid-song so the play/pause test below is
+     * deterministic: the end-boundary landing above leaves the source
+     * exhausted, and playing an already-exhausted source races the
+     * worker's EOF poll against the first drive — the engine correctly
+     * ends (drain of zero media), but WHICH tick observes ENDED is a
+     * timing artifact. From mid-song the play/pause outcome is fixed. --- */
+    CHECK(pe_seek(eng, 1000000, &landing_us, NULL) == PE_OK);
+    CHECK(landing_us == 1000000);
 
     /* --- play a little, pause, resume, then stop ------------------------- */
     CHECK(pe_play(eng) == PE_OK);

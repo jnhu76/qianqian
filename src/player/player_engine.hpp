@@ -23,10 +23,14 @@
 //                    state_mtx_), publication under state_mtx_ with the
 //                    epoch guard — stale results die at publish time
 //   backend side     fill_output()/advance_render() are the PRODUCTION
-//                    realtime seam (corrective §6): no heap allocation, no
-//                    SongCore, no filesystem, no logging, and NO wait on
-//                    state_mtx_. They touch only the lock-free SPSC ring,
-//                    the bounded timeline, and atomics. The manual-tick
+//                    realtime seam (corrective §6–§9): no heap allocation,
+//                    no SongCore, no filesystem, no logging, and NO MUTEX of
+//                    any kind — only the lock-free SPSC ring, the bounded
+//                    timeline, and atomics. They enter through the admission
+//                    gate (corrective P0-3/§8): a control commit closes
+//                    admission BEFORE waiting for in-flight ops, so a counted
+//                    op is always waited out and an uncounted one never
+//                    touches a mid-reset ring/timeline. The manual-tick
 //                    submit()/backend_render() are the deterministic TEST
 //                    entry points (NullAudioBackend): they hold state_mtx_
 //                    and additionally drive the test backend's content log.
@@ -126,6 +130,9 @@ struct EngineSnapshot {
     std::int64_t decoded_source_position = 0;  // engine-observable estimate
     std::int64_t duration_frames = 0;          // -1 = unknown, never fake 0
     bool duration_known = false;
+    std::int32_t source_rate = 0;  // captured in the SAME state_mtx_ hold as
+                                   // the frames above (corrective P0-5): the
+                                   // C shim converts exclusively with it
     std::uint64_t queued_media_frames = 0;
     std::uint64_t capacity_frames = 0;
     std::uint64_t epoch = 0;
@@ -261,9 +268,17 @@ public:
     // never race the invocation itself.
     void debug_set_publish_hook(std::function<void()> fn);  // before epoch check
     void debug_set_read_hook(std::function<void()> fn);     // after song_read_pcm
-    void debug_set_fill_hook(std::function<void()> fn);     // mid-fill (realtime seam)
+    void debug_set_fill_barrier_armed(bool armed);
+    bool debug_fill_barrier_entered() const;
+    void debug_release_fill_barrier();
+    // Control-path barriers (mutex-guarded — the control plane may block).
     void debug_set_control_hook(std::function<void()> fn);  // under state_mtx_
-    void debug_set_quiesce_hook(std::function<void()> fn);  // control waits on active fill
+    void debug_set_quiesce_hook(std::function<void()> fn);  // admission closed,
+                                                            // control drains
+    // Admitted in-flight backend ops (corrective §11): proves a quiesced
+    // callback never became active.
+    std::uint64_t debug_active_backend_ops() const { return active_backend_ops_.load(); }
+    // Test-only: the realtime seam's end-of-playout signal (set lock-free by
 
 private:
     enum MutBits : std::uint32_t {
@@ -296,7 +311,14 @@ private:
     // Wait until no realtime fill/advance is mid-flight. The realtime path
     // never blocks on state_mtx_, so the wait is bounded; called from
     // control commits (under state_mtx_) before touching ring/timeline.
+    // Corrective P0-3/§8: closes admission FIRST, then drains — a commit
+    // can never observe "no ops" and reset while a new op slips in.
     void quiesce_backend();
+    // Realtime admission protocol (corrective §8–§9). enter() returns true
+    // only while admission is open AND the op is counted; a false return
+    // means the caller must not touch ring/timeline/counters. All seq_cst.
+    bool admission_enter();
+    void admission_exit();
     // Frozen ENDED condition (docs §7): playing, source exhausted, queue
     // empty, nothing in flight. Reads atomics — safe from the realtime path.
     bool end_condition() const;
@@ -337,10 +359,15 @@ private:
     std::atomic<std::uint64_t> in_flight_frames_{0};  // realtime mirror
     std::int64_t decoded_since_commit_ = 0;
 
-    // Realtime seam signals (lock-free).
-    std::atomic<std::uint64_t> active_fill_{0};   // fills/advances in flight
-    std::atomic<bool> end_pending_{false};        // ENDED condition observed
-    std::atomic<bool> timeline_overflow_{false};  // fail-closed span store
+    // Realtime seam admission (corrective P0-3/§7–§9). Control commits close
+    // admission BEFORE waiting for in-flight ops, then drain, then reset, then
+    // re-open — so no fill/advance can start against a ring/timeline that is
+    // mid-reset. All seq_cst (one total order): the admission re-check and the
+    // drain observation can never disagree (see admission_enter/exit).
+    std::atomic<bool> backend_accepting_{true};
+    std::atomic<std::uint64_t> active_backend_ops_{0};  // admitted ops in flight
+    std::atomic<bool> end_pending_{false};              // ENDED condition observed
+    std::atomic<bool> timeline_overflow_{false};        // fail-closed span store
 
     // Buffers (preallocated; sized at construction).
     std::vector<float> chunk_buf_;
@@ -358,12 +385,19 @@ private:
     std::string last_error_;
 
     // Test hooks / mutations (see accessors).
-    mutable std::mutex hook_mtx_;
+    mutable std::mutex hook_mtx_;  // control-path hooks only — NEVER on the
+                                   // realtime path (corrective P0-1/§2)
     std::function<void()> publish_hook_;
     std::function<void()> read_hook_;
-    std::function<void()> fill_hook_;
     std::function<void()> control_hook_;
     std::function<void()> quiesce_hook_;
+    // Test-only realtime barrier (corrective P0-1/§2): PLAIN ATOMICS so the
+    // realtime path can honor it without a mutex, allocation, or
+    // std::function copy. Armed=false is the production state (two relaxed
+    // loads, no effect).
+    std::atomic<bool> fill_barrier_armed_{false};
+    std::atomic<bool> fill_barrier_entered_{false};
+    std::atomic<bool> fill_barrier_release_{false};
     std::int64_t remaining_hint_ = -1;
     std::uint64_t work_steps_ = 1;
     std::atomic<std::uint32_t> mutations_{0};
