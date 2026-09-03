@@ -43,6 +43,13 @@ COMMON_MANIFEST = os.path.join(ROOT, "corpus", "manifest", "common-formats.json"
 FIXTURES = os.path.join(ROOT, "corpus", "fixtures")
 DEFAULT_BINARY = os.path.join(ROOT, "build", "artifacts", "songcore_probe")
 ARTIFACT_DIR = os.path.join(ROOT, "build", "artifacts")
+# The SongCore regression authority closure (tests/songcore/README.md).
+DEFAULT_EXPECTED_MANIFEST = os.path.join(ROOT, "build", "minimize",
+                                         "songcore-test", "manifest.json")
+# Canonical closure identity fields of a schema-2 FFmpeg manifest
+# (tools/ffmpeg_profile_import.py). The probe must carry exactly these.
+IDENTITY_FIELDS = ("profile", "profile_sha256", "target",
+                   "ffmpeg_source_sha256")
 
 STATUS_NAMES = {
     0: "OK", 1: "EOF",
@@ -95,6 +102,106 @@ def parse_json_line(stdout):
         # machine-local absolute path.
         rec["file"] = os.path.basename(rec["file"])
     return rec
+
+
+# --------------------------------------------------------------------------
+# Probe closure identity preflight
+#
+# The regression corpus is only meaningful when driven by a songcore_probe
+# built from the authority closure (songcore-test). A probe built from
+# codec-base or any other manifest used to run silently until the first
+# Matroska fixture failed with a downstream symptom. The preflight therefore
+# compares the canonical identity fields embedded in the binary at build
+# time (xmake.lua reads them from the replayed manifest) against the
+# expected manifest's own canonical fields, and fails closed BEFORE any
+# corpus case. Identity comes from build provenance (manifest content),
+# never from mtime or binary bytes. A probe without valid identity is not
+# authority-capable: no warning-and-continue.
+# --------------------------------------------------------------------------
+
+
+def manifest_identity(manifest_path):
+    """Canonical closure identity fields of a schema-2 manifest."""
+    with open(manifest_path) as f:
+        m = json.load(f)
+    target = m.get("target") or {}
+    return {
+        "profile": m.get("profile"),
+        "profile_sha256": m.get("profile_sha256"),
+        "target": target.get("id") if isinstance(target, dict) else None,
+        "ffmpeg_source_sha256": m.get("ffmpeg_source_sha256"),
+    }
+
+
+def probe_identity(binary):
+    """Ask the probe for its embedded closure identity. Returns
+    (identity, None) or (None, problem). Any failure to produce a complete
+    identity record is a preflight failure."""
+    try:
+        r = run_binary(binary, ["identity"], timeout=30)
+    except OSError as e:
+        return None, f"identity command could not be executed: {e}"
+    if r.returncode != 0:
+        return None, (f"identity command exited {r.returncode} "
+                      f"(stderr: {r.stderr.strip()[:200] or '<empty>'})")
+    rec = parse_json_line(r.stdout)
+    if not isinstance(rec, dict) or \
+            rec.get("kind") != "songcore-probe-identity":
+        return None, f"unparseable identity output: {r.stdout[:200]!r}"
+    identity = {k: rec.get(k) for k in IDENTITY_FIELDS}
+    missing = sorted(k for k, v in identity.items()
+                     if not isinstance(v, str) or not v)
+    if missing:
+        return None, f"identity record lacks fields {missing}"
+    return identity, None
+
+
+def identity_preflight(binary, expected_manifest):
+    """Fail closed (exit 2) unless the probe carries exactly the canonical
+    identity of the expected test-closure manifest. Runs before any corpus
+    case; nothing is written anywhere on failure."""
+    if not os.path.isfile(expected_manifest):
+        raise SystemExit(
+            f"expected test-closure manifest not found: {expected_manifest}\n"
+            "Derive the SongCore regression closure first (see "
+            "tests/songcore/README.md).")
+    expected = manifest_identity(expected_manifest)
+    missing = sorted(k for k, v in expected.items()
+                     if not isinstance(v, str) or not v)
+    if missing:
+        raise SystemExit(
+            f"expected test-closure manifest lacks canonical identity "
+            f"fields {missing}: {expected_manifest}\n"
+            "Re-derive it with tools/ffmpeg_profile_import.py.")
+    actual, problem = probe_identity(binary)
+    print("probe closure identity:")
+    for k in IDENTITY_FIELDS:
+        print(f"  expected {k}: {expected[k]}")
+        got = actual.get(k) if actual else "<unavailable>"
+        print(f"  actual   {k}: {got}")
+    if actual == expected and problem is None:
+        print("identity gate: PASS")
+        return
+    print()
+    print("FATAL: songcore_probe closure identity mismatch — the binary was "
+          "not built from the regression authority closure.")
+    if problem:
+        print(f"  problem: {problem}")
+    print(f"  expected (from {os.path.relpath(expected_manifest, ROOT)}): "
+          f"{expected['profile']} / {expected['profile_sha256']}")
+    print(f"  actual   ({os.path.relpath(binary, ROOT) if os.path.exists(binary) else binary}): "
+          f"{actual['profile'] if actual else '?'} / "
+          f"{actual['profile_sha256'] if actual else '?'}")
+    print()
+    print("The regression corpus has NOT been executed.")
+    print()
+    print("Rebuild the SongCore test closure and probe before retrying:")
+    print("  python3 tools/ffmpeg_profile_import.py --stage songcore-test \\")
+    print("      --profile ffmpeg/profiles/songcore-test.json")
+    print("  xmake f -o build/xmake-test -m release \\")
+    print("      --av_manifest=build/minimize/songcore-test/manifest.json -y")
+    print("  xmake build -r songcore_probe songcore_shared")
+    raise SystemExit(2)
 
 
 class Gate:
@@ -266,6 +373,9 @@ def main():
     ap.add_argument("--out", default=os.path.join(ROOT, "bench", "results",
                                                   "songcore-v1"))
     ap.add_argument("--binary", default=DEFAULT_BINARY)
+    ap.add_argument("--expected-manifest", default=DEFAULT_EXPECTED_MANIFEST,
+                    help="manifest whose canonical closure identity the "
+                         "probe must carry (fail-closed preflight)")
     ap.add_argument("--song-manifest", default=SONG_MANIFEST)
     ap.add_argument("--common-manifest", default=COMMON_MANIFEST)
     ap.add_argument("--check", action="store_true",
@@ -277,9 +387,15 @@ def main():
     if args.check:
         return revalidate(out_dir)
 
-    os.makedirs(out_dir, exist_ok=True)
     if not os.path.isfile(args.binary):
         raise SystemExit(f"harness binary not found: {args.binary}")
+
+    # Fail-closed identity gate: a probe built from any closure other than
+    # the expected test manifest must never reach a corpus case (and this
+    # path writes nothing — out_dir is only created after the gate).
+    identity_preflight(args.binary, args.expected_manifest)
+
+    os.makedirs(out_dir, exist_ok=True)
     for f in (args.song_manifest, args.common_manifest):
         if not os.path.isfile(f):
             raise SystemExit(f"manifest not found: {f}")
