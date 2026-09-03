@@ -15,12 +15,27 @@ python3 tools/ffmpeg_profile_import.py --stage songcore-test \
     --profile ffmpeg/profiles/songcore-test.json
 xmake f -o build/xmake-test -m release \
     --av_manifest=build/minimize/songcore-test/manifest.json -y
-xmake build songcore_probe songcore_shared
+xmake build -r songcore_probe songcore_shared
 ```
 
 The `songcore_probe` instrument is test-only and never links into a
 shipping graph. `songcore_shared` is built too so the regression's shared
 export audit (15-symbol gate, no FFmpeg leakage) has an artifact to inspect.
+At build time Xmake embeds the replayed manifest's canonical closure
+identity (profile, profile_sha256, target.id, ffmpeg_source_sha256) into the
+probe — `./build/artifacts/songcore_probe identity` prints it as one JSON
+line.
+
+## Probe closure identity gate
+
+`regression.py` verifies the probe's embedded identity against the expected
+test-closure manifest (`build/minimize/songcore-test/manifest.json`,
+overridable with `--expected-manifest`) BEFORE running any corpus case. A
+probe built from `codec-base` or any other/stale closure fails closed
+(exit 2, expected vs actual reported, nothing written) — the same drift
+class as the 2026-09-01 stale-artifact incident, caught at the source.
+`tests/songcore/identity_gate_test.py` is the adversarial gate for this
+preflight.
 
 ## Run
 
@@ -44,6 +59,10 @@ python3 tests/songcore/consumers.py --check
 # target-identity gate: a manifest derived for one target must not satisfy
 # another target's build session (fail-closed provenance)
 python3 tests/songcore/target_gate_test.py
+
+# probe closure identity gate: wrong-closure / stale / identity-less probes
+# must be rejected before any corpus case (see "Probe closure identity gate")
+python3 tests/songcore/identity_gate_test.py
 
 # read-only fail-closed validation
 python3 tests/songcore/regression.py --check --out bench/results/songcore-v1

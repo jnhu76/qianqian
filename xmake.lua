@@ -338,6 +338,28 @@ target("songcore_probe")
     if is_plat("mingw") then
         add_syslinks("bcrypt")
     end
+    -- Test-closure provenance: embed the canonical identity fields of the
+    -- replayed FFmpeg manifest (written by tools/ffmpeg_profile_import.py)
+    -- so tests/songcore/regression.py can verify this binary was built from
+    -- the closure it expects — a codec-base-built probe must fail closed
+    -- before any corpus case. No manifest here defers to qianqian_av's
+    -- before_build gate; the probe then reports "unknown" and the
+    -- regression preflight rejects it.
+    on_load(function (target)
+        import("core.base.json")
+        local manifest_path = ffmpeg_manifest()
+        if not os.isfile(manifest_path) then
+            return
+        end
+        local m = json.loadfile(manifest_path)
+        local define = function (name, value)
+            target:add("defines", format("%s=\"%s\"", name, value or "unknown"))
+        end
+        define("QN_TEST_AV_PROFILE", m.profile)
+        define("QN_TEST_AV_PROFILE_SHA256", m.profile_sha256)
+        define("QN_TEST_AV_TARGET", (m.target or {}).id)
+        define("QN_TEST_AV_FFMPEG_SOURCE_SHA256", m.ffmpeg_source_sha256)
+    end)
     -- `xmake test`: full SongCore regression + fail-closed --check, then
     -- the external-consumer gates (shared export audit, ctypes decode
     -- consumer, static archive consumer). os.execv raises on nonzero

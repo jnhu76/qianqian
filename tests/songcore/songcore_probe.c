@@ -14,6 +14,9 @@
  *   - negative cases produce the expected typed status (no generic -1)
  *
  * Modes (exactly one JSON line on stdout):
+ *   identity                       embedded test-closure identity (which
+ *                                  FFmpeg manifest this binary was built
+ *                                  from; regression preflight consumes it)
  *   record  <file> [--select <i>]   full happy-path lifecycle
  *   neg     <file>                  typed open/probe/read statuses
  *   states  <file>                  deterministic fuzz-like state sequences
@@ -37,6 +40,25 @@
 #include <string.h>
 #if !defined(_WIN32)
 #include <sys/types.h>
+#endif
+
+/* -------------------------------------------------------------------------
+ * Test-closure identity (test-only provenance, injected by xmake.lua from
+ * the canonical identity fields of the replayed FFmpeg manifest; see
+ * tests/songcore/README.md). A probe compiled without this plumbing reports
+ * "unknown" and the regression preflight rejects it fail-closed.
+ * ---------------------------------------------------------------------- */
+#if !defined(QN_TEST_AV_PROFILE)
+#define QN_TEST_AV_PROFILE "unknown"
+#endif
+#if !defined(QN_TEST_AV_PROFILE_SHA256)
+#define QN_TEST_AV_PROFILE_SHA256 "unknown"
+#endif
+#if !defined(QN_TEST_AV_TARGET)
+#define QN_TEST_AV_TARGET "unknown"
+#endif
+#if !defined(QN_TEST_AV_FFMPEG_SOURCE_SHA256)
+#define QN_TEST_AV_FFMPEG_SOURCE_SHA256 "unknown"
 #endif
 
 /* -------------------------------------------------------------------------
@@ -1221,10 +1243,34 @@ static int mode_switchcheck(const char *path) {
     return 0;
 }
 
+/* -------------------------------------------------------------------------
+ * identity mode: embedded test-closure identity (regression preflight)
+ * ---------------------------------------------------------------------- */
+
+static void identity_field(const char *name, const char *value) {
+    fputs(",\"", stdout);
+    fputs(name, stdout);
+    fputs("\":", stdout);
+    json_escape(stdout, value, strlen(value));
+}
+
+static int mode_identity(void) {
+    fputs("{\"kind\":\"songcore-probe-identity\"", stdout);
+    identity_field("profile", QN_TEST_AV_PROFILE);
+    identity_field("profile_sha256", QN_TEST_AV_PROFILE_SHA256);
+    identity_field("target", QN_TEST_AV_TARGET);
+    identity_field("ffmpeg_source_sha256", QN_TEST_AV_FFMPEG_SOURCE_SHA256);
+    fputs("}\n", stdout);
+    return 0;
+}
+
 int main(int argc, char **argv) {
+    const char *mode = argc >= 2 ? argv[1] : "";
+    if (!strcmp(mode, "identity")) return mode_identity();
     if (argc < 3) {
         fprintf(stderr,
-                "usage: %s record <file> [--select <i>]\n"
+                "usage: %s identity\n"
+                "       %s record <file> [--select <i>]\n"
                 "       %s neg <file>\n"
                 "       %s states <file>\n"
                 "       %s iofail <file> <fail_after_bytes>\n"
@@ -1232,10 +1278,9 @@ int main(int argc, char **argv) {
                 "       %s switchcheck <file>\n"
                 "       %s lasterror <file>\n",
                 argv[0], argv[0], argv[0], argv[0], argv[0], argv[0],
-                argv[0]);
+                argv[0], argv[0]);
         return 2;
     }
-    const char *mode = argv[1];
     const char *path = argv[2];
 
     if (!strcmp(mode, "record")) {
