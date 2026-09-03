@@ -8,10 +8,11 @@ import kotlin.system.exitProcess
 
 private object WinHost : ProbeHost {
     override fun sleep(ms: Int) = Sleep(ms.toUInt())
-    /* mingw long is 32-bit */
+    /* _fseeki64/_ftelli64, not fseek/ftell: mingw long is 32-bit and would
+     * clip the frozen song_io 64-bit offsets to +/-2GB. */
     override fun seek(f: CPointer<FILE>, offset: Long, whence: Int): Boolean =
-        fseek(f, offset.toInt(), whence) == 0
-    override fun tell(f: CPointer<FILE>): Long = ftell(f).toLong()
+        _fseeki64(f, offset, whence) == 0
+    override fun tell(f: CPointer<FILE>): Long = _ftelli64(f)
 }
 
 fun main(args: Array<String>) {

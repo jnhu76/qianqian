@@ -42,12 +42,21 @@ Kotlin/Native 2.1.21-RC2, `cinterop` over a 7-line `.def` whose binding
 surface is `include/player_engine.h` (+ `include/songcore.h`) plus a
 minimal local CRT stdio declaration header for the host `FILE*`
 `song_io`. One thin `ProbeHost` seam absorbs platform differences
-(sleep; 32-bit mingw vs 64-bit glibc `long`). Link: against the runtime
+(sleep; CRT seek/tell surface — `_fseeki64`/`_ftelli64` on Windows,
+`fseek`/`ftell` on Linux). Link: against the runtime
 import library (`qianqian.dll.a` on Windows, `libqianqian.so` on Linux).
 No private header, no implementation archive, no backend knowledge.
 
+Corrective (post first REAL pass): the Windows host initially bound
+`fseek` and cast the frozen 64-bit `song_io` offsets to mingw's 32-bit
+`long` — silent ±2GB clipping that the 9MB target song never exercises.
+The Windows binding now declares `_fseeki64`/`_ftelli64` so the probe
+expresses the full frozen contract; Linux keeps `fseek`/`ftell`
+(glibc `long` is 64-bit). Probe-only change: no `src/`, no ABI delta.
+
 Windows (qianqian.dll + WASAPI render thread, default endpoint), target
-song 隐形的翅膀 (MP3, 44100 Hz stereo, duration 224080544 us):
+song 隐形的翅膀 (MP3, 44100 Hz stereo, duration 224080544 us), re-run
+after the corrective:
 
 ```text
 create -> EMPTY snapshot
@@ -55,7 +64,7 @@ open   -> READY, duration known
 play   -> PLAYING, REAL render progression (position_us advancing)
 monotonic position while PLAYING
 pause  -> PAUSED, position frozen; resume -> PLAYING
-seek   -> landing 212062040 us (CONFIRMED)
+seek   -> target 212080544 us, landing 212062040 us (CONFIRMED)
 ENDED  reached through the real output at position == duration
          (224080544 us, exact)
 stop   -> READY @0
@@ -83,7 +92,8 @@ target above.
 ## ABI audit
 
 ```text
-qianqian.dll (rebuilt from this commit, mingw):
+qianqian.dll (rebuilt from this commit, mingw; re-audited after the
+                                                probe corrective: unchanged):
   9 pe_* + 15 song_* = 24 exports, nothing else
   imports: bcrypt / KERNEL32 / msvcrt / ole32 only
 libqianqian.so (linux): same 24 dynamic exports, nothing else
@@ -101,6 +111,8 @@ consumers.py --core (export audit, ctypes, static archive): PASS.
 SongCore regression: 6 .mka gate failures — PRE-EXISTING on this
   machine's main (recorded during the runtime-closure session, before
   this branch; this branch has zero src/ delta). Untouched.
+Post-corrective re-run: Linux probe rebuilt + PASS (SIMULATED, exit 0);
+  Windows probe rebuilt, MP3 REAL lifecycle exit 0 (twice), ABI 24/24.
 ```
 
 ## Reproduce
@@ -134,9 +146,10 @@ next to `qianqian.dll`.
 - Declarations arriving from SYSTEM headers through an include chain
   (`<stdio.h>`) are not bound, and listing unrelated headers separately
   in `headers` loses the second header's declarations. Both are avoided
-  by one local binding header (`probe_abi.h` -> `probe_stdio.h` with six
-  explicit CRT declarations) — a binding-surface concern only, no native
-  change.
+  by one local binding header (`probe_abi.h` -> `probe_stdio.h`, seven
+  explicit CRT declarations: fopen/fclose/fread shared, seek/tell split
+  per platform — `_fseeki64`/`_ftelli64` on Windows, `fseek`/`ftell`
+  on Linux) — a binding-surface concern only, no native change.
 - Forward-declared opaque handles (`typedef struct song_handle
   song_handle;`) resolve under `cnames.structs.*`, not the library
   package.

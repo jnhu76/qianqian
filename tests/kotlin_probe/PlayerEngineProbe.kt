@@ -9,9 +9,9 @@
  * destroy, plus a direct song_* lifecycle over the same runtime for the
  * API matrix.
  *
- * Platform specifics (sleep + CRT long widths) live behind ProbeHost and
- * the two entry files (ProbeWin.kt / ProbeLinux.kt) — plain Kotlin/Native
- * modules do not allow expect/actual.
+ * Platform specifics (sleep + the platform CRT seek/tell surface) live
+ * behind ProbeHost and the two entry files (ProbeWin.kt / ProbeLinux.kt)
+ * — plain Kotlin/Native modules do not allow expect/actual.
  *
  * This is a boundary proof, not an application architecture.
  */
@@ -21,7 +21,7 @@ import kotlinx.cinterop.*
 import cnames.structs.song_handle
 import qianqian.*
 
-/* Platform seam: sleep plus the CRT seek/tell width casts. */
+/* Platform seam: sleep plus the platform CRT seek/tell surface. */
 interface ProbeHost {
     fun sleep(ms: Int)
     fun seek(f: CPointer<FILE>, offset: Long, whence: Int): Boolean
