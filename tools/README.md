@@ -9,9 +9,9 @@ minimization method or SongCore validation.
 | Tool | Role |
 |---|---|
 | `ffmpeg_import.py` | Canonical import: runs pinned FFmpeg configure/Make **once** as an oracle, freezes the compile closure into `build/ffmpeg-xmake/manifest.json` (host target recipe, schema 2). Invoked via `xmake ffmpeg-import`. |
-| `ffmpeg_profile_import.py` | Target-aware import: `--target <recipe-id>` derives `build/manifests/<target>/<profile>/manifest.json` from the target recipe (`ffmpeg/targets/*.json`); `--stage` remains for test/DSP stages under `build/minimize/<stage>/`. |
+| `ffmpeg_profile_import.py` | Target-aware import: `--target <recipe-id>` derives `build/manifests/<target>/<profile>/manifest.json` from the target recipe (`native/ffmpeg/targets/*.json`); `--stage` remains for test/DSP stages under `build/minimize/<stage>/`. |
 | `ffmpeg_manifest_union.py` | Codec-closure + filter-closure union accounting (conflict-detecting). |
-| `dsp_closure.py` | DSP capability closure driver: `ffmpeg/capabilities/dsp.json` (intent) → profile → oracle import → Xmake replay → `dsp_cap_probe` → `bench/results/avfilter-minimize/`. The retained aggregate evidence is a frozen reference; re-run the ladder to regenerate on an FFmpeg upgrade. |
+| `dsp_closure.py` | DSP capability closure driver: `native/ffmpeg/capabilities/dsp.json` (intent) → profile → oracle import → Xmake replay → `dsp_cap_probe` → `bench/results/avfilter-minimize/`. The retained aggregate evidence is a frozen reference; re-run the ladder to regenerate on an FFmpeg upgrade. |
 
 ## SongCore validation
 
@@ -29,13 +29,13 @@ minimization method or SongCore validation.
 
 Build workflow: `docs/architecture/ffmpeg-minimization.md` +
 `docs/development/build-native.md`. Regression:
-`tests/songcore/README.md`. Release: `docs/development/release.md`.
+`native/tests/songcore/README.md`. Release: `docs/development/release.md`.
 Verified-consumer matrix: `bench/results/songcore-v1/ffi-consumers.json`.
 
 ## PlayerEngine
 
 The PlayerEngine semantics were originally validated against an executable
 reference model (`tools/player_model`, Phase 1); that model was retired once
-the permanent native regression suite (`tests/player/`) took ownership of
+the permanent native regression suite (`native/tests/player/`) took ownership of
 the contracts. See `docs/contracts/player-api.md` for the frozen semantics
 and `docs/architecture/player-runtime.md` for the validation inventory.

@@ -1,7 +1,7 @@
 # PlayerEngine API
 
 > Authority: Normative
-> Scope: PlayerEngine 公开 C ABI（`include/player_engine.h`，v1）对外承诺的
+> Scope: PlayerEngine 公开 C ABI（`native/include/player_engine.h`，v1）对外承诺的
 > 行为，以及内部 AudioBackend seam 的实时性规则。运行时如何组成见
 > [architecture/player-runtime.md](../architecture/player-runtime.md)。
 
@@ -10,12 +10,12 @@
 Freeze what the user hears and what the timeline means; do not freeze how
 the implementation happens to achieve it. This contract is the authority
 for playback state, position meaning, seek/EOF lifecycle, silence, and
-threading rules. The permanent native regression suite in `tests/player/`
+threading rules. The permanent native regression suite in `native/tests/player/`
 owns the executable verification of these rules.
 
 ## Public surface
 
-**Layer 1 — product C ABI** (`include/player_engine.h`, the ONLY public
+**Layer 1 — product C ABI** (`native/include/player_engine.h`, the ONLY public
 surface). Control + polled observation: `pe_create / pe_destroy /
 pe_open / pe_play / pe_pause / pe_stop / pe_seek / pe_get_snapshot` plus
 `player_engine_abi_version`. No audio backend, no manual render ticks, no
@@ -398,7 +398,7 @@ Implementation priors, NOT frozen ABI semantics:
 
 ## Required verification
 
-`tests/player/` owns the executable verification: `player_gates` (native
+`native/tests/player/` owns the executable verification: `player_gates` (native
 suite — lifecycle, clock model, submitted-vs-rendered mapping, ESTIMATED
 offset invariance, thread stress, realtime contract), `player_consumer_c`
 (pure-C TU over the product ABI), `player_real_songcore_smoke` (REAL

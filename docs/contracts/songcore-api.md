@@ -1,7 +1,7 @@
 # SongCore API
 
 > Authority: Normative
-> Scope: SongCore 公开 C ABI（`include/songcore.h`，v1）的调用契约
+> Scope: SongCore 公开 C ABI（`native/include/songcore.h`，v1）的调用契约
 
 How to call the SongCore native library. This is the permanent CALLER
 document: it explains how to open a file, read PCM, seek, and close — for
@@ -12,7 +12,7 @@ read any implementation file to use the library correctly.
 For architecture (why SongCore exists, what AudioEngine does) read
 [audio-core.md](../architecture/audio-core.md). For the FFmpeg closure
 method read [ffmpeg-minimization.md](../architecture/ffmpeg-minimization.md).
-The ABI authority is [`include/songcore.h`](../../include/songcore.h) —
+The ABI authority is [`native/include/songcore.h`](../../native/include/songcore.h) —
 ABI v1, frozen.
 
 - ABI version: `SONGCORE_ABI_VERSION` = 1. Layout is fixed; compatible
@@ -33,12 +33,12 @@ guest — all from the same ABI and capability model:
 | Android arm64 | — | `libsongcore.so` | Planned |
 | macOS arm64 | `libsongcore.a` | `libsongcore.dylib` | Planned |
 | iOS arm64 | `libsongcore.a` | — | Planned (XCFramework packaging is a later product-side step) |
-| WASM (wasi / emscripten) | — | — | Proven as guest module `SongCore.wasm` — uses the WASM bridge (`src/wasm/`), not native FFI; see [wasm.md](../research/wasm.md) |
+| WASM (wasi / emscripten) | — | — | Proven as guest module `SongCore.wasm` — uses the WASM bridge (`native/src/wasm/`), not native FFI; see [wasm.md](../research/wasm.md) |
 
 "Proven" means: oracle-derived manifest, Xmake replay, corpus/PCM/ABI gates
 all green on this repository's evidence. "Planned" means the recipe exists,
 nothing is claimed until a toolchain derives it (see
-`ffmpeg/targets/*.json` `status` fields).
+`native/ffmpeg/targets/*.json` `status` fields).
 
 Xmake targets: `songcore_static`, `songcore_shared`, aggregate `songcore`.
 For the frozen release package (staging, provenance, license, freeze
@@ -59,7 +59,7 @@ Symbol visibility contract (`SONGCORE_API` in `songcore.h`):
 
 The shared library exports exactly the 15 ABI symbols. FFmpeg is statically
 linked inside and never leaks a symbol (audited by
-`tests/songcore/regression.py` and `tools/measure_songcore_artifacts.py`).
+`native/tests/songcore/regression.py` and `tools/measure_songcore_artifacts.py`).
 Shared dynamic dependencies on Linux: `libm`, `libc` only.
 
 ## 2. Lifecycle at a glance
@@ -291,7 +291,7 @@ callers branch on `song_status`, never on message text. Contract:
   next operation on the handle does;
 - not available for `song_open` failures (no handle survives).
 
-Machine-checked per function by `tests/songcore/regression.py`
+Machine-checked per function by `native/tests/songcore/regression.py`
 (`last-error.json` evidence).
 
 ## 5. Error model
@@ -356,17 +356,17 @@ No framework-specific bindings are part of this repository.
 Every claim above is machine-checked by external consumers that use ONLY
 `songcore.h` and the shipped artifacts — no Qianqian test binary participates.
 Authority: `bench/results/songcore-v1/ffi-consumers.json`, re-executed live by
-`tests/songcore/consumers.py` (`--out` run, `--check` fail-closed revalidation;
+`native/tests/songcore/consumers.py` (`--out` run, `--check` fail-closed revalidation;
 the host-independent gates also run inside `xmake test`).
 
 | Consumer | Path | Evidence |
 |---|---|---|
 | Python ctypes decode | `python3 tools/songcore_ffi_smoke.py <songs...>` — stdlib-only (ctypes/argparse/hashlib/struct); mirrors all 15 symbols and every ABI struct; borrowed strings consumed as pointer+length (never NUL-terminated); checks open/probe/metadata/raw-metadata/artwork/decode/seek/close plus the typed refusal contracts (zero capacity, invalid stream index); every song records `decoded_frames`/full-window `pcm_sha256`/`peak`; `--pcm-dump-dir` writes bounded PCM samples for the cross-backend gate; `--play` adds audible output at source rate via sounddevice (no Python-side resampling, no `qn_pcm_dump`) | Linux: 13-fixture matrix PASS incl. ADTS typed `SONG_ERR_SEEK_UNSUPPORTED`; three real local songs PASS with UTF-8 metadata + JPEG artwork; audible run PASS |
-| Static archive consumer | `tests/consumer/songcore_static_smoke.c`, compiled with the documented one-archive link line `cc -Iinclude … -Lbuild/artifacts -lsongcore -lm -lpthread` | FLAC + M4A decode/seek PASS through the merged self-contained `libsongcore.a` |
+| Static archive consumer | `native/tests/consumer/songcore_static_smoke.c`, compiled with the documented one-archive link line `cc -Iinclude … -Lbuild/artifacts -lsongcore -lm -lpthread` | FLAC + M4A decode/seek PASS through the merged self-contained `libsongcore.a` |
 | Shared export audit | exactly the 15 `SONGCORE_API` symbols, nothing else | PASS on Linux ELF and Windows PE |
 | Windows ctypes (recorded) | real Windows Python 3.13 process → ctypes → `songcore.dll` (PE exports audited: 15 exactly; imports only `bcrypt.dll`/`KERNEL32.dll`/`msvcrt.dll`; zero FFmpeg DLL dependencies); per-song PCM authority (`decoded_frames`/`pcm_sha256`/`peak`) + explicit per-gate checks | 13-fixture matrix PASS (evidence: `bench/results/songcore-v1/win-ffi.json`, pinned to the `windows-mingw-x86_64` recipe/header/artifact hashes) |
 | WASM | independent `wasmtime` host instantiates `build/artifacts/wasm/SongCore.wasm` and drives the 15 contract mirrors over `qianqian_host` read/seek/size imports: `python3 tools/songcore_wasm_smoke.py <songs...>`. All guest-side buffers are allocated through the bridge exports `song_wasm_alloc`/`song_wasm_free` (host never guesses addresses; leak-checked per run); struct layouts are machine-read from `song_wasm_layout` (host never hardcodes offsets); export surface audited (15 contract + 3 bridge exports, nothing else) | 6 fixtures PASS with semantic metadata assertions (exact UTF-8 titles), raw-metadata, artwork (SHA-256 of compressed bytes), decode/seek, per-check explicit PASS map |
-| Cross-backend consistency | `python3 tests/songcore/ffi_consistency.py --check` — the same fixture through Linux shared / Windows DLL / WASM guest must mean the same song: lossless PCM (FLAC/ALAC/PCM WAV) SHA-256 exactly equal; lossy within the established 1e-6 authority; metadata semantic-match; artwork exact | PASS (`bench/results/songcore-v1/ffi-consistency.json`): all lossless pairs byte-exact, lossy max\|Δ\| ≤ 1.2e-07 |
+| Cross-backend consistency | `python3 native/tests/songcore/ffi_consistency.py --check` — the same fixture through Linux shared / Windows DLL / WASM guest must mean the same song: lossless PCM (FLAC/ALAC/PCM WAV) SHA-256 exactly equal; lossy within the established 1e-6 authority; metadata semantic-match; artwork exact | PASS (`bench/results/songcore-v1/ffi-consistency.json`): all lossless pairs byte-exact, lossy max\|Δ\| ≤ 1.2e-07 |
 
 Known typed behavior verified against real content: raw ADTS AAC has no
 container seek — `song_seek` returns `SONG_ERR_SEEK_UNSUPPORTED` (the ABI's
@@ -375,4 +375,4 @@ typed "container has no seek"), while indexed/seekable formats
 
 The decode closure inside every artifact is the `codec-base` profile — the
 PRD Common Formats set (MP3, FLAC, AAC/M4A, raw ADTS, ALAC/M4A, PCM WAV,
-Ogg Vorbis, Ogg Opus) — see `ffmpeg/profiles/codec-base.json`.
+Ogg Vorbis, Ogg Opus) — see `native/ffmpeg/profiles/codec-base.json`.

@@ -12,7 +12,7 @@
 ## Decision
 
 - **AudioEngine 的产品 DSP 使用能力裁剪的 libavfilter**：
-  - capability intent 由人维护于 `ffmpeg/capabilities/dsp.json`；
+  - capability intent 由人维护于 `native/ffmpeg/capabilities/dsp.json`；
   - source closure 由 `tools/dsp_closure.py` + pinned configure oracle
     机器推导；
   - 逐级成本证据在 `bench/results/avfilter-minimize/*`。

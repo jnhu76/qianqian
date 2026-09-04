@@ -19,7 +19,7 @@
 ## Required authorities
 
 - `docs/architecture/audio-core.md` before changing the SongCore build or
-  `include/songcore.h`.
+  `native/include/songcore.h`.
 - `docs/architecture/ffmpeg-minimization.md` before changing
   `build/ffmpeg.lua` or `ffmpeg/` (closure derivation, identity gate,
   upgrade rule).

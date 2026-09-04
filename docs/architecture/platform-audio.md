@@ -8,7 +8,7 @@
 
 ## Components
 
-- **WasapiRenderer** (`src/player/wasapi_renderer.*`, Windows-only,
+- **WasapiRenderer** (`native/src/player/wasapi_renderer.*`, Windows-only,
   compiled solely in the runtime flavor) — the AudioBackend seam's first
   real implementation: default render endpoint, shared mode, one playback
   stream, event-driven.
@@ -16,7 +16,7 @@
 
 ```text
 qianqian_runtime (shared, basename "qianqian" → qianqian.dll / libqianqian.so)
-  files    src/player/player_engine_c.cpp  (+ wasapi_renderer.cpp, Windows)
+  files    native/src/player/player_engine_c.cpp  (+ wasapi_renderer.cpp, Windows)
   defines  SONGCORE_BUILD_SHARED, PLAYER_ENGINE_BUILD_SHARED
   symbols  hidden (dllexport only) — same recipe as the audited songcore.dll
   deps     player_core + songcore_static (FFmpeg closure merged inside)
@@ -130,7 +130,7 @@ playing: event-driven. This thread is the single owner that serializes
 
 ## Verification
 
-- `tests/ffi_smoke/ffi_smoke.c` — pure C99 external consumer, loads the
+- `integration/ffi/ffi_smoke.c` — pure C99 external consumer, loads the
   runtime through `LoadLibraryA` / `dlopen`, drives create → open → play →
   polled snapshots → seek → stop → destroy. On Windows, PLAYING with
   `position_us` advancing proves real render progression through WASAPI;

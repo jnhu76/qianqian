@@ -12,7 +12,7 @@ stored verdict) and fails closed.
 xmake ffmpeg-import
 # SongCore regression test closure (Common Formats + Matroska):
 python3 tools/ffmpeg_profile_import.py --stage songcore-test \
-    --profile ffmpeg/profiles/songcore-test.json
+    --profile native/ffmpeg/profiles/songcore-test.json
 xmake f -o build/xmake-test -m release \
     --av_manifest=build/minimize/songcore-test/manifest.json -y
 xmake build -r songcore_probe songcore_shared
@@ -34,7 +34,7 @@ overridable with `--expected-manifest`) BEFORE running any corpus case. A
 probe built from `codec-base` or any other/stale closure fails closed
 (exit 2, expected vs actual reported, nothing written) — the same drift
 class as the 2026-09-01 stale-artifact incident, caught at the source.
-`tests/songcore/identity_gate_test.py` is the adversarial gate for this
+`native/tests/songcore/identity_gate_test.py` is the adversarial gate for this
 preflight.
 
 ## Run
@@ -42,32 +42,32 @@ preflight.
 ```bash
 # main regression: abi / metadata / artwork / stream-selection / seek /
 # errors / consistency / states / lifetime / switchcheck / common-formats
-python3 tests/songcore/regression.py --out bench/results/songcore-v1
+python3 native/tests/songcore/regression.py --out bench/results/songcore-v1
 
 # sanitizer density (ASan/UBSan/leak, 136 invocations, ~10M frames)
-python3 tests/songcore/sanitizers.py
+python3 native/tests/songcore/sanitizers.py
 
 # DSP/SRC integration smoke (needs the trimmed libavfilter closure avf-c2:
 # python3 tools/dsp_closure.py --stage avf-c2  once)
-python3 tests/songcore/dsp_src.py
+python3 native/tests/songcore/dsp_src.py
 
 # external-consumer gates (shared export audit, ctypes decode consumer,
 # static archive consumer; wasm + recorded windows in full mode)
-python3 tests/songcore/consumers.py --out
-python3 tests/songcore/consumers.py --check
+python3 native/tests/songcore/consumers.py --out
+python3 native/tests/songcore/consumers.py --check
 
 # target-identity gate: a manifest derived for one target must not satisfy
 # another target's build session (fail-closed provenance)
-python3 tests/songcore/target_gate_test.py
+python3 native/tests/songcore/target_gate_test.py
 
 # probe closure identity gate: wrong-closure / stale / identity-less probes
 # must be rejected before any corpus case (see "Probe closure identity gate")
-python3 tests/songcore/identity_gate_test.py
+python3 native/tests/songcore/identity_gate_test.py
 
 # read-only fail-closed validation
-python3 tests/songcore/regression.py --check --out bench/results/songcore-v1
-python3 tests/songcore/sanitizers.py --check --out bench/results/songcore-v1
-python3 tests/songcore/dsp_src.py --check --out bench/results/songcore-v1
+python3 native/tests/songcore/regression.py --check --out bench/results/songcore-v1
+python3 native/tests/songcore/sanitizers.py --check --out bench/results/songcore-v1
+python3 native/tests/songcore/dsp_src.py --check --out bench/results/songcore-v1
 ```
 
 ## What is gated
@@ -87,7 +87,7 @@ python3 tests/songcore/dsp_src.py --check --out bench/results/songcore-v1
 | common-formats.json | MP3/FLAC/AAC/M4A/ADTS/ALAC/WAV(6)/Vorbis/Opus decode + seek families |
 | sanitizers.json | zero ASan/Leak/crash; UBSan clean on Qianqian-owned frames |
 | dsp-src-integration.json | BYPASS shape + 44.1k→48k aresample + volume/equalizer |
-| ffi-consumers.json | external consumers: 15-symbol shared export audit, ctypes decode consumer, one-archive static consumer, wasmtime WASM consumer, recorded Windows ctypes run (`tests/songcore/consumers.py`) |
+| ffi-consumers.json | external consumers: 15-symbol shared export audit, ctypes decode consumer, one-archive static consumer, wasmtime WASM consumer, recorded Windows ctypes run (`native/tests/songcore/consumers.py`) |
 
 ## Inputs
 
@@ -96,9 +96,9 @@ python3 tests/songcore/dsp_src.py --check --out bench/results/songcore-v1
 - manifests: `corpus/manifest/songcore.json` (SongCore cases) and
   `corpus/manifest/common-formats.json`.
 - test closure: `build/minimize/songcore-test` (Common Formats + matroska
-  demuxer; profile: `ffmpeg/profiles/songcore-test.json`).
+  demuxer; profile: `native/ffmpeg/profiles/songcore-test.json`).
   DSP/SRC closure: `build/minimize/avf-c2` (intent in
-  `ffmpeg/capabilities/dsp.json`).
+  `native/ffmpeg/capabilities/dsp.json`).
 
 ## Boundaries
 

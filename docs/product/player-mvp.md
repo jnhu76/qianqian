@@ -22,7 +22,7 @@ Native playback runtime 已完成并通过 native regression 验证：
 
 支持的格式集合（Core Common Formats）：MP3、FLAC、AAC/M4A、raw ADTS AAC、
 ALAC/M4A、PCM WAV、Ogg Vorbis、Ogg Opus。机器权威是
-`ffmpeg/capabilities/songcore.json`；只有进入 corpus 并通过 regression 的
+`native/ffmpeg/capabilities/songcore.json`；只有进入 corpus 并通过 regression 的
 格式才算 officially supported
 （[standards/testing.md](../standards/testing.md)）。
 

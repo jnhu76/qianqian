@@ -1,6 +1,6 @@
 # Scripts
 
-Small operational entry points. The build authority is `xmake.lua`; these
+Small operational entry points. The build authority is `native/xmake.lua` (+ `native/build/`); these
 scripts only fetch the pinned upstream source.
 
 ## fetch-ffmpeg
@@ -10,7 +10,7 @@ scripts/fetch-ffmpeg [--force]
 ```
 
 Downloads and verifies the pinned FFmpeg source tree
-(`ffmpeg/pin.json` → `build/ffmpeg-src/` + a local zip cache). Integrity
+(`native/ffmpeg/pin.json` → `build/ffmpeg-src/` + a local zip cache). Integrity
 comes from the zip sha256 and the tag→commit sha recorded in the pin.
 The source tree is never committed to the repo.
 

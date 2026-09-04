@@ -41,8 +41,8 @@ local byte source
 - Output: **Float32, interleaved, source sample rate, source channel
   layout** — always, for every codec（normative 契约见
   [contracts/songcore-api.md](../contracts/songcore-api.md)）。
-- Decode backend: **trimmed FFmpeg n9.0.1**（pin: `ffmpeg/pin.json`，
-  capability intent: `ffmpeg/capabilities/songcore.json`，方法见
+- Decode backend: **trimmed FFmpeg n9.0.1**（pin: `native/ffmpeg/pin.json`，
+  capability intent: `native/ffmpeg/capabilities/songcore.json`，方法见
   [ffmpeg-minimization.md](ffmpeg-minimization.md)）。
 - SongCore does **not** resample, rematrix, run DSP/EQ/ReplayGain,
   normalize, limit, crossfade, or touch a device（决策：
@@ -61,7 +61,7 @@ otherwise                                →  aresample / libswresample
 ```
 
 DSP is a capability-trimmed libavfilter graph (intent:
-`ffmpeg/capabilities/dsp.json`): volume/preamp, parametric/graphic EQ,
+`native/ffmpeg/capabilities/dsp.json`): volume/preamp, parametric/graphic EQ,
 tone, filters, and graph plumbing. Processing is opt-in per capability;
 nothing runs unless a pipeline asks for it. ReplayGain 应用属 AudioEngine
 策略（SongCore 只读取标签——metadata 中的 microbels + peak）。
@@ -104,8 +104,8 @@ NullAudioBackend 驱动同一 seam。
 | DSP | capability-trimmed libavfilter (AudioEngine) | [ADR-0003](../adr/0003-dsp-libavfilter-audioengine.md) |
 | SRC | aresample / libswresample, conditional BYPASS | [ADR-0002](../adr/0002-songcore-src-boundary.md) |
 | Runtime strategy | native-first; WASM measured, future target | [ADR-0001](../adr/0001-native-first-wasm-viable.md) |
-| Native build | Xmake (`xmake.lua`) | — |
-| Public ABI | `include/songcore.h` v1, `include/player_engine.h` v1 | — |
+| Native build | Xmake (`native/xmake.lua` + `native/build/`) | — |
+| Public ABI | `native/include/songcore.h` v1, `native/include/player_engine.h` v1 | — |
 
 ## Dependencies
 

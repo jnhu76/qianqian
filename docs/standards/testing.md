@@ -3,7 +3,7 @@
 > Authority: Normative（工程测试标准）
 > Scope: 什么算 officially supported、corpus 覆盖要求、音质验证要求与
 > repository corpus 规则。具体回归命令与机器证据权威在
-> [tests/songcore/README.md](../../tests/songcore/README.md) 与
+> [native/tests/songcore/README.md](../../native/tests/songcore/README.md) 与
 > `bench/results/`。
 
 ## Supported-format principle

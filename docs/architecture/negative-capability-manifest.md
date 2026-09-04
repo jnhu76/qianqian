@@ -5,7 +5,7 @@
 > 能力默认不存在，只有真实歌曲播放需求才能将它加入。每项准入必须回答：
 > 没有它，哪一首正常歌曲播不了？
 
-## Permanently out of core unless PRD changes
+## Permanently out of Native Audio Core unless the core/product policy is explicitly changed through the normal authority process
 
 - video
 - video decoder

@@ -15,7 +15,7 @@
 | PlayerEngine | SongCore 之上的播放状态机：timeline / clock / queue / epochs | [docs/architecture/player-runtime.md](docs/architecture/player-runtime.md)、[docs/contracts/player-api.md](docs/contracts/player-api.md) |
 | AudioBackend | 平台输出层：设备协商、buffering、clock（当前实现：Windows WASAPI renderer） | [docs/architecture/platform-audio.md](docs/architecture/platform-audio.md) |
 | FFmpeg closure | pin → capability intent → configure oracle → compile manifest → Xmake replay 的机器推导最小 FFmpeg source slice | [docs/architecture/ffmpeg-minimization.md](docs/architecture/ffmpeg-minimization.md) |
-| ABI | 冻结的 C 边界：`include/songcore.h`（v1）、`include/player_engine.h`（v1）；FFmpeg 类型永不穿越 | 对应 public header |
+| ABI | 冻结的 C 边界：`native/include/songcore.h`（v1）、`native/include/player_engine.h`（v1）；FFmpeg 类型永不穿越 | 对应 public header |
 | PCM contract | SongCore 恒输出 Float32、interleaved、source sample rate、source channel layout | [docs/contracts/songcore-api.md](docs/contracts/songcore-api.md) |
 | Corpus | 只有进入 corpus 并通过 regression 的格式才是 officially supported | [docs/standards/testing.md](docs/standards/testing.md) |
 | Evidence | Native vs WASM、性能、音质、codec 支持等问题必须以 corpus / benchmark / reproducible 结果回答 | [AGENTS.md](AGENTS.md) |

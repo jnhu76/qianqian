@@ -17,7 +17,7 @@ bug / feature / research 模板；research issue 允许负结果。
 ## Development setup
 
 构建命令的权威：[docs/development/build-native.md](docs/development/build-native.md)。
-回归与验证命令的权威：[tests/songcore/README.md](tests/songcore/README.md)；
+回归与验证命令的权威：[native/tests/songcore/README.md](native/tests/songcore/README.md)；
 测试标准：[docs/standards/testing.md](docs/standards/testing.md)。
 
 ## Focused changes
