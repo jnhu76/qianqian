@@ -51,17 +51,22 @@ object NativeRuntimeLoader {
      * mode consumes this staged copy, never the repository build output
      * directory itself; a production/package runtime would ship its own
      * location and pass it explicitly.
+     *
+     * Current campaign scope is Windows x86_64 (product) + Linux x86_64
+     * (dev/WSL); any other host fails closed instead of guessing a layout.
      */
     fun devStagedLibraryPath(buildDirectory: Path): Path {
         val os = System.getProperty("os.name").lowercase()
         val arch = System.getProperty("os.arch").lowercase()
-        val platform = when {
-            os.contains("win") -> "windows-x86_64"
-            os.contains("linux") && (arch == "amd64" || arch == "x86_64") -> "linux-x86_64"
-            os.contains("mac") -> "macos-x86_64"
-            else -> error("unsupported desktop platform: $os/$arch")
+        val isX86_64 = arch == "amd64" || arch == "x86_64"
+        val (platform, fileName) = when {
+            os.contains("win") && isX86_64 -> "windows-x86_64" to "qianqian.dll"
+            os.contains("linux") && isX86_64 -> "linux-x86_64" to "libqianqian.so"
+            else -> throw IllegalStateException(
+                "unsupported desktop staging platform: $os/$arch " +
+                    "(campaign scope: windows-x86_64 + linux-x86_64)",
+            )
         }
-        val fileName = if (platform.startsWith("windows")) "qianqian.dll" else "libqianqian.so"
         return Paths.get(buildDirectory.toString(), "native-dev", platform, fileName)
     }
 }
