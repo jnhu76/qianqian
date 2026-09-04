@@ -24,6 +24,8 @@
 
 KiteCodec、FFmpegKitNext、libav.js 等都不是架构权威。
 
+权威按事实类型划分（fact-type authority），完整模型见 `docs/standards/documentation.md`；文档与 code/tests 冲突时触发 reality audit，不静默站队。
+
 ## 3. 不允许 FFmpeg 类型泄漏
 
 上层不得出现：
@@ -102,3 +104,26 @@ Production decode 路径只允许依赖：
 - FFmpeg `configure/Make` 可以在 import / upstream upgrade 时充当 oracle；normal production-oriented build 应由 Qianqian 自有构建系统重放冻结的 compile manifest。
 - 升级 FFmpeg 时重新求 closure 并审查 source/flag/size/symbol/corpus/PCM drift，不得直接复制旧版本 source list。
 - 未在真实环境运行的 selective-build 或 audible smoke 只能标记 `CODE_COMPLETE_PENDING_VALIDATION`，不能写 PASS。
+
+## 10. 文档分类与模板
+
+创建任何长期 Markdown 文档前：先按 fact-type 分类，再使用
+`docs/standards/templates/` 中对应 class 的 canonical template。禁止在
+AGENTS 里复制模板内容。路由：
+
+```text
+AGENTS.md → docs/README.md → docs/standards/documentation.md
+          → docs/standards/templates/<document-class>.md
+```
+
+## 11. AGENTS 继承模型
+
+```text
+root AGENTS.md → nearest applicable local AGENTS.md
+```
+
+Local AGENTS **extends** root：只允许 genuinely local 规则（local scope、
+forbidden dependencies、required authorities、local verification）。不得复制
+root 内容、不得重新定义 global authority、不得复制 architecture contract。
+没有真正的 local divergence 就不要创建 local AGENTS；目录尚不存在时只记录
+规则，不预建文件。模板：`docs/standards/templates/local-agents.md`。
