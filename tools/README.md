@@ -22,13 +22,14 @@ minimization method or SongCore validation.
 | `qn_pcm_dump.c` | Thinnest native SongCore host: feeds SongCore and writes a self-describing Float32 PCM stream. No FFmpeg types, no audio device. Built by xmake as `qn_pcm_dump` (test/reference transport, not a consumer gate). |
 | `verify_xmake_core.py` | Proves the Xmake-replayed single archive reproduces the FFmpeg oracle: benchmark binary linked two ways (upstream archives vs `libqianqian_av.a`) plus byte-identical SongCore PCM on representative fixtures. |
 | `measure_songcore_artifacts.py` | Measures the current ABI v1 reference artifacts (`libsongcore.a` / `libsongcore.so`): raw/stripped/xz sizes, sha256, shared exports, dynamic deps → `bench/results/songcore-v1/reference-artifacts.json`. |
-| `check_api_doc.py` | Fails unless `docs/songcore-api.md` documents every `SONGCORE_API` symbol in the header and the shared export table matches the header exactly. |
+| `check_api_doc.py` | Fails unless `docs/contracts/songcore-api.md` documents every `SONGCORE_API` symbol in the header and the shared export table matches the header exactly. |
 | `play_smoke.py` | Thin wrapper forwarding to `songcore_ffi_smoke.py --play` — one canonical audible path. Test-only sounddevice sink by rule (AGENTS.md §8); never decodes compressed audio itself. |
-| `songcore_release.py` | The ONE release command (`docs/songcore-release.md`): production-closure session gate, provenance, build, archive/ABI/license/consumer gates, forced-rebuild reproducibility check, then stages `build/release/songcore-v<version>-<target>/` fail-closed. Never publishes. |
+| `songcore_release.py` | The ONE release command (`docs/development/release.md`): production-closure session gate, provenance, build, archive/ABI/license/consumer gates, forced-rebuild reproducibility check, then stages `build/release/songcore-v<version>-<target>/` fail-closed. Never publishes. |
 | `songcore_abi_dump.c` | ABI v1 layout snapshot generator (functions, enum values, struct sizes + offsets from `songcore.h` alone); its output is the frozen snapshot the release ABI gate diffs against. |
 
-Build workflow: `docs/ffmpeg-minimization.md`. Regression:
-`tests/songcore/README.md`. Release: `docs/songcore-release.md`.
+Build workflow: `docs/architecture/ffmpeg-minimization.md` +
+`docs/development/build-native.md`. Regression:
+`tests/songcore/README.md`. Release: `docs/development/release.md`.
 Verified-consumer matrix: `bench/results/songcore-v1/ffi-consumers.json`.
 
 ## PlayerEngine
@@ -36,5 +37,5 @@ Verified-consumer matrix: `bench/results/songcore-v1/ffi-consumers.json`.
 The PlayerEngine semantics were originally validated against an executable
 reference model (`tools/player_model`, Phase 1); that model was retired once
 the permanent native regression suite (`tests/player/`) took ownership of
-the contracts. See `docs/player-engine.md` for the frozen semantics and
-§11 for the validation inventory.
+the contracts. See `docs/contracts/player-api.md` for the frozen semantics
+and `docs/architecture/player-runtime.md` for the validation inventory.

@@ -3,7 +3,7 @@
   "phase": "core",
   "purpose": "Thin local-song playback native audio core (decode + metadata + artwork via SongCore ABI v1; DSP/SRC in AudioEngine)",
   "primary_backend": "trimmed native FFmpeg",
-  "wasm": "viable future target, native-first default (docs/wasm.md)",
+  "wasm": "viable future target, native-first default (docs/research/wasm.md)",
   "initial_formats": [
     "MP3",
     "FLAC",

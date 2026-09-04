@@ -35,7 +35,7 @@ Gates, in order, each failing closed (exit 1, nothing staged):
   9. stage + checksums — package written, checksums generated last.
 
 The release is NEVER published here: tagging/upload is a separate human step
-(docs/songcore-release.md).
+(docs/development/release.md).
 """
 from __future__ import annotations
 
@@ -342,7 +342,7 @@ Qianqian
         json.dumps(release_manifest, indent=1) + "\n")
 
     # package README — the outside-integrator entry point (kept short; the
-    # full caller document lives in the repository: docs/songcore-api.md)
+    # full caller document lives in the repository: docs/contracts/songcore-api.md)
     tested = ("FLAC, MP3, AAC/M4A (mov), ADTS AAC, ALAC, PCM WAV "
               "(u8/s16le/s24le/s32le/f32le/f64le), Ogg Vorbis, Ogg Opus")
     (pkg / "README.md").write_text(f"""\
@@ -378,7 +378,7 @@ when consuming the DLL on Windows).
     song_close(h);
 
 EOF is `SONG_EOF` with zero frames — a normal terminal condition, not an
-error. `song_probe`/`song_read_pcm` semantics: docs/songcore-api.md in the
+error. `song_probe`/`song_read_pcm` semantics: docs/contracts/songcore-api.md in the
 source repository. An example external consumer is in
 `metadata/external-consumer-example.c`.
 

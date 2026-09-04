@@ -2,7 +2,7 @@
 //
 // The output domain and the media domain are two coordinate systems; the
 // timeline keeps the submitted-output span list that maps a rendered device
-// position back onto the media timeline (docs/player-engine.md §2.5):
+// position back onto the media timeline (docs/architecture/player-runtime.md):
 //
 //   OutputSpan { output_begin, output_end, kind = MEDIA | GAP }
 //

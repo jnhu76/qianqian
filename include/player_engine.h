@@ -2,7 +2,7 @@
  * player_engine.h — Qianqian PlayerEngine product C ABI.
  *
  * The narrow control and observation surface over the native PlayerEngine
- * (docs/player-engine.md). This is the ONLY public PlayerEngine surface:
+ * (docs/contracts/player-api.md). This is the ONLY public PlayerEngine surface:
  * lifecycle control (create/open/play/pause/stop/seek/destroy), a polled
  * time-domain snapshot, and typed error reporting. It exposes no audio
  * backend, no manual render ticks, no worker mode, no queue internals —
@@ -15,7 +15,7 @@
  *   - pe_get_snapshot may be polled concurrently from another thread.
  *   - The engine owns its decode worker thread; the caller never drives it.
  *
- * Semantics are the frozen ones (docs/player-engine.md): submitted !=
+ * Semantics are the frozen ones (docs/contracts/player-api.md): submitted !=
  * rendered, device time != media time, GAP has zero media duration, seek
  * fail-closed, CONFIRMED/ESTIMATED landing, pause freezes audible
  * progression, EOF waits for real media playout. The snapshot reports the

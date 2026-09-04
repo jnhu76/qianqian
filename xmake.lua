@@ -51,7 +51,7 @@ local ffmpeg_manifest = function ()
     return path.join(os.projectdir(), get_config("av_manifest"))
 end
 
--- Fail-closed target identity (docs/ffmpeg-minimization.md): the replayed
+-- Fail-closed target identity (docs/architecture/ffmpeg-minimization.md): the replayed
 -- manifest must have been derived for THIS session's target. A Linux
 -- manifest carries generated config headers and architecture sources that
 -- are not portable, so it must never silently satisfy a Windows/WASM
@@ -540,7 +540,7 @@ target("player_real_songcore_smoke")
 
 -- ====================================================================
 -- Qianqian runtime: the ONE application-facing dynamic library
--- (docs/wasapi-native-runtime-closure.md). Exports exactly the two frozen
+-- (docs/architecture/platform-audio.md). Exports exactly the two frozen
 -- C ABIs (songcore.h + player_engine.h); SongCore/FFmpeg/PlayerEngine
 -- internals stay private — same hidden-visibility recipe as the audited
 -- songcore.dll. On Windows the runtime flavor composes the WASAPI render
@@ -560,7 +560,7 @@ target("qianqian_runtime")
     add_files("src/songcore_ffmpeg.c")
     player_sources()
     if is_plat("mingw", "windows") then
-        -- WASAPI render-thread flavor (docs/wasapi-native-runtime-closure.md §3)
+        -- WASAPI render-thread flavor (docs/architecture/platform-audio.md)
         add_files("src/player/wasapi_renderer.cpp")
         add_defines("QN_QIANQIAN_RUNTIME")
         add_syslinks("ole32")
@@ -636,7 +636,7 @@ target("ffi_smoke")
 --         --av_manifest=build/ffmpeg-xmake-emscripten/manifest.json
 --     xmake build songcore_wasm
 --
--- WASM viability was verified against machine evidence (see docs/wasm.md
+-- WASM viability was verified against machine evidence (see docs/research/wasm.md
 -- and bench/results/wasm-summary.json); native remains the shipping default.
 -- ====================================================================
 

@@ -14,7 +14,7 @@ bench/results/
                         FROZEN reference, regenerable only by re-running the
                         DSP closure ladder (tools/dsp_closure.py)
   wasm-summary.json     WASM viability result (durable machine summary;
-                        see docs/wasm.md)
+                        see docs/research/wasm.md)
   runs/                 UNTRACKED local runs (bench/results/runs is
                         gitignored)
 ```

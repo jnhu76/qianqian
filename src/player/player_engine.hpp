@@ -1,6 +1,6 @@
 // player_engine.hpp — native PlayerEngine (internal C++ API).
 //
-// Implements the frozen PlayerEngine semantics (docs/player-engine.md):
+// Implements the frozen PlayerEngine semantics (docs/contracts/player-api.md):
 // state machine, epoch-guarded seek, bounded queue lifecycle, EOF drain,
 // the device/media timeline split, submitted-vs-rendered output. Not a
 // frozen ABI — the product C ABI (include/player_engine.h) exposes only
