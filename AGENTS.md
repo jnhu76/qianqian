@@ -12,19 +12,15 @@
 
 无法回答时，不应加入。
 
-## 2. 架构权威
+## 2. Authority routing
 
-优先级：
+不同事实类型使用不同 canonical authority，不采用全局线性文档排名。
 
-1. `PRD.md`
-2. `docs/audio-core.md`
-3. `docs/ffmpeg-minimization.md`、`docs/architecture/*`、`docs/history.md`
-4. 当前代码和测试
-5. 外部项目仅作为实现参考
+- 完整 authority model：`docs/standards/documentation.md`
+- 当前物理文档位置与迁移期映射：`docs/README.md`
+- 文档与 code/tests 冲突时必须执行 reality audit，不得静默选择一边。
 
 KiteCodec、FFmpegKitNext、libav.js 等都不是架构权威。
-
-权威按事实类型划分（fact-type authority），完整模型见 `docs/standards/documentation.md`；文档与 code/tests 冲突时触发 reality audit，不静默站队。
 
 ## 3. 不允许 FFmpeg 类型泄漏
 
@@ -62,19 +58,14 @@ KiteCodec、FFmpegKitNext、libav.js 等都不是架构权威。
 
 必须给出 corpus、benchmark 或 reproducible evidence。
 
-## 6. 不提前实现播放器功能
+## 6. Scope and layer discipline
 
-Phase 0 不实现：
+只实现当前 Issue / task 明确授权的能力，不因顺手或未来需求扩大 scope。
 
-- UI
-- playlist
-- skin
-- lyrics UI
-- online services
-- converter
-- editor
-
-除非 PRD 明确升级阶段。
+- Product / UI 需求优先在 application / product 层解决；
+- 不得为 presentation convenience 扩张 SongCore 或 native runtime；
+- 只有现有 cross-layer contract 被证明确实不足时，才允许提出 native contract change；
+- 不得把 playlist、library、navigation、UI copy 等 product policy 下沉到 SongCore。
 
 ## 7. 修改后的最低证据
 
