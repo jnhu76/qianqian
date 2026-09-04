@@ -1,92 +1,90 @@
-# Qianqian Native Audio Core
+# Qianqian / 千千·现代
 
-> 一个只为“本地歌曲播放”服务的极薄跨平台原生音频核心。
+> 一个只为“本地歌曲播放”服务的极薄跨平台本地音乐播放器。不是通用媒体
+> 框架，也不是 FFmpeg wrapper。
 
-Qianqian Native Audio Core 是「千千·现代」的音频底层：一个小的、可复用
-的 Native Audio Core，通过稳定 C ABI 暴露给任意 UI 技术。
+## What is Qianqian?
 
-```text
-Product / UI (Kotlin / KMP / Swift / Qt / ...)
-        │  stable FFI / C ABI (include/songcore.h)
-        ▼
-Native Audio Core
-        ├── SongCore     parse · metadata · artwork · stream selection ·
-        │                decode · seek · typed errors
-        └── AudioEngine  SRC = aresample / libswresample
-                         DSP = capability-trimmed libavfilter
-        ▼
-platform AudioBackend (future)
-```
-
-**不是播放器**，也不是通用 FFmpeg wrapper。第一阶段只回答一个问题：
-
-> 如果我们只想稳定、高质量地播放本地歌曲，FFmpeg 真正不可约的能力集合是什么？
-
-## 核心决策（已冻结）
-
-- **Decode** = trimmed FFmpeg n9.0.1（SongCore，输出 source-rate Float32
-  interleaved PCM + metadata + artwork）。
-- **SRC** = aresample / libswresample，源匹配时 BYPASS。
-- **DSP** = capability-trimmed libavfilter（AudioEngine 层，SongCore 永不
-  运行）。
-- **Native build** = Xmake；UI/产品构建独立（Gradle / KMP），只通过 ABI
-  接入。
-
-## 构建与回归
-
-```bash
-xmake ffmpeg-import                 # 一次性：解析 FFmpeg source closure
-xmake f -m release                  # native session
-xmake build songcore                # 静态 + 动态两种产物
-                                    #   build/artifacts/libsongcore.a
-                                    #   build/artifacts/shared/libsongcore.so
-
-python3 tests/songcore/regression.py            # 主回归 + 权威树
-python3 tests/songcore/regression.py --check    # 只读 fail-closed 校验
-python3 tests/songcore/sanitizers.py            # ASan/UBSan/leak 密度
-python3 tests/songcore/dsp_src.py               # DSP/SRC 集成 smoke
-```
-
-详见 [`tests/songcore/README.md`](tests/songcore/README.md)。
-
-## 快速开始：像外部调用者一样使用产物
-
-```bash
-xmake ffmpeg-import                     # 一次性：FFmpeg source closure
-xmake build songcore_shared             # build/artifacts/shared/libsongcore.so
-python3 tools/songcore_ffi_smoke.py song.flac          # 解码验收（仅标准库）
-python3 tools/songcore_ffi_smoke.py --play --seconds 5 song.flac   # 可听验收
-```
-
-只用 Python 标准库 ctypes 直连 `libsongcore.so / songcore.dll`，覆盖
-open/probe/metadata/artwork/decode/seek/close 与 typed-error 契约；支持
-FLAC / MP3 / AAC(M4A) / ADTS / ALAC / WAV / Ogg Vorbis / Opus。
-静态归档外部消费者见
-[`tests/consumer/songcore_static_smoke.c`](tests/consumer/songcore_static_smoke.c)，
-WASM 独立宿主见 `tools/songcore_wasm_smoke.py`。已验证消费者矩阵：
-[`bench/results/songcore-v1/ffi-consumers.json`](bench/results/songcore-v1/ffi-consumers.json)。
-
-## 文档导航
-
-| 想了解 | 读 |
-|---|---|
-| 架构（Audio Core 是什么） | [docs/audio-core.md](docs/audio-core.md) |
-| FFmpeg 裁剪 / 构建 / target recipe | [docs/ffmpeg-minimization.md](docs/ffmpeg-minimization.md) |
-| **怎么调用这个库（调用方 API 文档）** | [docs/songcore-api.md](docs/songcore-api.md) |
-| WASM 结论 | [docs/wasm.md](docs/wasm.md) |
-| 产品需求权威 | [PRD.md](PRD.md) |
-| 决策由来 | [docs/history.md](docs/history.md) |
-| 明确不做清单 | [docs/architecture/negative-capability-manifest.md](docs/architecture/negative-capability-manifest.md) |
-
-## 明确不做（Phase 0）
-
-- UI / Compose / playlist / 媒体库 / 歌词 / 皮肤
-- 均衡器 UI / 转码 / 编码 / 导出 / 网络流媒体
-- WASAPI / CoreAudio / AAudio 等音频后端（AudioBackend 属下一阶段）
-- 通用 FFmpeg CLI wrapper
-
-## 第一条规则
+「千千·现代」是简洁、轻量、纯粹的跨平台**本地音乐播放器**：local-first、
+playback-only、显式 DSP、极致减法。核心原则一句话：
 
 > **任何新增能力都必须回答：没有它，哪一首正常歌曲播不了？**
 
-答不上来，就不进入 SongCore。
+产品定位与边界：[docs/product/product.md](docs/product/product.md)。
+
+## What works today
+
+Native playback runtime 已完成并通过 native regression：
+
+- **SongCore**（ABI v1）：本地歌曲 open / probe / metadata / artwork /
+  decode / seek，输出 source-rate Float32 PCM；Core Common Formats
+  （MP3 / FLAC / AAC-M4A / ADTS / ALAC / WAV / Vorbis / Opus）。
+- **PlayerEngine**（ABI v1）：播放状态机 + timeline/epochs，Windows 上经
+  WASAPI 真实出声；一个 `qianqian` runtime library 只导出冻结的
+  `song_*` + `pe_*` C ABI。
+- Application / UI 层尚未开始（见
+  [docs/product/player-mvp.md](docs/product/player-mvp.md)）。
+
+## 30-second architecture
+
+```text
+Application (Kotlin / KMP consumer)
+    │  stable C ABI (song_* + pe_*, one qianqian runtime library)
+    ▼
+Player Runtime (PlayerEngine + WASAPI backend)
+    ▼
+SongCore ── machine-derived minimal FFmpeg closure
+```
+
+详见 [docs/architecture/overview.md](docs/architecture/overview.md)。
+
+## Quick start
+
+```bash
+python3 scripts/fetch-ffmpeg       # 拉取 pinned FFmpeg source（一次）
+xmake ffmpeg-import                # 推导 FFmpeg source closure
+xmake f -m release && xmake build songcore
+xmake test                         # SongCore + Player regression
+```
+
+构建细节与多 target 推导：[docs/development/build-native.md](docs/development/build-native.md)。
+
+像外部调用者一样验证产物：
+
+```bash
+xmake build songcore_shared
+python3 tools/songcore_ffi_smoke.py song.flac                        # 解码验收
+python3 tools/songcore_ffi_smoke.py --play --seconds 5 song.flac    # 可听验收
+```
+
+## Repository map
+
+| Path | 内容 |
+|---|---|
+| `include/` | 公共 ABI（`songcore.h` / `player_engine.h`，v1） |
+| `src/` | SongCore、Player runtime、WASM bridge |
+| `ffmpeg/` | pin + capability intent + target recipes + profiles |
+| `tests/` | SongCore regression、player gates、external consumers、Kotlin probe |
+| `bench/` | benchmark harness 与机器证据（`bench/results/`） |
+| `corpus/` | fixtures、manifests、本地音乐库（不进 Git 的部分） |
+| `tools/` | import / 审计 / smoke 工具 |
+| `docs/` | 文档（从 router 进入） |
+
+## Documentation map
+
+所有文档从 [docs/README.md](docs/README.md) 的 routing matrix 进入：按任务
+加载最小相关集合，不要递归通读。
+
+- 产品：[docs/product/](docs/product/README.md)
+- 架构：[docs/architecture/](docs/architecture/README.md)
+- 契约：[docs/contracts/](docs/contracts/)
+- 构建 / 发布：[docs/development/](docs/development/)
+- 研究证据：[docs/research/](docs/research/README.md)
+- 决策记录：[docs/adr/](docs/adr/)
+- 历史：[docs/archive/](docs/archive/README.md)
+
+## Contributing
+
+Issue-first；一个 PR 只做一件事。见
+[CONTRIBUTING.md](CONTRIBUTING.md)；agent 工作规则见
+[AGENTS.md](AGENTS.md)。

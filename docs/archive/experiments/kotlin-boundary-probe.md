@@ -1,6 +1,11 @@
 # Kotlin / Native Boundary Probe v0 — Evidence Record
 
-Status: **BOUNDARY PROOF COMPLETE** (docs/kmp-ffi-handoff.md exit evidence).
+> Historical / non-authoritative。one-time 集成实验证据。durable FFI 边界
+> 契约：[contracts/ffi-boundary.md](../../contracts/ffi-boundary.md)；
+> phase 记录：[../closeouts/kmp-ffi-handoff.md](../closeouts/kmp-ffi-handoff.md)。
+
+Status: **BOUNDARY PROOF COMPLETE**（phase exit evidence，见
+[../closeouts/kmp-ffi-handoff.md](../closeouts/kmp-ffi-handoff.md)）。
 
 This is a boundary proof, not a new application architecture. Zero production
 native code changed; the probe consumes the frozen runtime exactly as a

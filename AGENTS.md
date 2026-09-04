@@ -17,7 +17,7 @@
 不同事实类型使用不同 canonical authority，不采用全局线性文档排名。
 
 - 完整 authority model：`docs/standards/documentation.md`
-- 当前物理文档位置与迁移期映射：`docs/README.md`
+- 文档 router（按任务加载最小相关集合）：`docs/README.md`
 - 文档与 code/tests 冲突时必须执行 reality audit，不得静默选择一边。
 
 KiteCodec、FFmpegKitNext、libav.js 等都不是架构权威。
