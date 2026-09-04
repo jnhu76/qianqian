@@ -1,6 +1,6 @@
 // wasapi_renderer.hpp — production Windows output (runtime flavor only).
 //
-// The AudioBackend seam's first real implementation (docs/player-engine.md
+// The AudioBackend seam's first real implementation (docs/contracts/player-api.md
 // §9/§10): exactly ONE backend-owned, event-driven render thread that calls
 // the engine's mutex-free production seam — fill_output() for PCM, then
 // advance_render() with padding-proven playout — into a WASAPI shared-mode
@@ -8,7 +8,7 @@
 // text on purpose (no windows.h); every Windows type lives in the .cpp,
 // which is compiled only by the qianqian_runtime Windows flavor.
 //
-// Ownership (docs/wasapi-native-runtime-closure.md §4): the renderer is
+// (docs/architecture/platform-audio.md): the renderer is
 // created after the engine and destroyed BEFORE it — the destructor
 // requests stop, joins the thread, and releases the device, so after
 // pe_destroy returns no thread can touch the engine again.

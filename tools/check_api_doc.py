@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify docs/songcore-api.md stays in lockstep with the frozen ABI.
+"""Verify docs/contracts/songcore-api.md stays in lockstep with the frozen ABI.
 
 Extracts the SONGCORE_API declarations from include/songcore.h and requires
 the API document to mention every one of them. When the shared artifact is
@@ -17,7 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 HEADER = ROOT / "include" / "songcore.h"
-DOC = ROOT / "docs" / "songcore-api.md"
+DOC = ROOT / "docs" / "contracts" / "songcore-api.md"
 SO = ROOT / "build" / "artifacts" / "shared" / "libsongcore.so"
 
 
@@ -42,7 +42,7 @@ def main() -> int:
                         f"freezes 15 — was the ABI changed without a v2 bump?")
     for sym in symbols:
         if sym not in doc:
-            problems.append(f"docs/songcore-api.md does not document {sym}")
+            problems.append(f"docs/contracts/songcore-api.md does not document {sym}")
 
     if SO.is_file():
         r = subprocess.run(["nm", "-D", "--defined-only", str(SO)],

@@ -16,7 +16,7 @@
 #include "player_engine.h"
 #include "player_engine.hpp"
 
-// Application-facing runtime flavor (docs/wasapi-native-runtime-closure.md):
+// Application-facing runtime flavor (docs/architecture/platform-audio.md):
 // the qianqian_runtime Windows build composes the WASAPI render thread into
 // pe_create/pe_destroy so the public C ABI drives real output. Tests and
 // non-Windows builds never define QN_QIANQIAN_RUNTIME and keep the pure

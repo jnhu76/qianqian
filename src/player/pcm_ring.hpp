@@ -12,7 +12,7 @@
 // correctness mechanism (proven by pcm_ring_test without external locking)
 // and stay correct for a future lock-free render path.
 //
-// Ring-level lifetime accounting (docs/player-engine.md §4):
+// Ring-level lifetime accounting (docs/architecture/player-runtime.md):
 //     produced_total == consumed_total + buffered + discarded_total
 //
 // Memory ordering: seq_cst everywhere. Correctness is preferred over

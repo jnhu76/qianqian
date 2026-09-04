@@ -1,12 +1,17 @@
 # SongCore release
 
-How SongCore becomes a frozen, independently consumable artifact. This is
-the current-truth release document: what SongCore is, how the artifact is
-produced, audited, and what freezes with v0.1.
+> Authority: Normative（release operational workflow）
+> Scope: SongCore 如何成为冻结的、可独立消费的 artifact——产物、审计、
+> 许可与 v0.1 的冻结范围。
 
-For the caller contract read [songcore-api.md](songcore-api.md); for the
-architecture read [audio-core.md](audio-core.md); for how the FFmpeg closure
-is derived read [ffmpeg-minimization.md](ffmpeg-minimization.md).
+How SongCore becomes a frozen, independently consumable artifact.
+
+For the caller contract read
+[songcore-api.md](../contracts/songcore-api.md); for the architecture read
+[audio-core.md](../architecture/audio-core.md); for how the FFmpeg closure
+is derived read
+[ffmpeg-minimization.md](../architecture/ffmpeg-minimization.md); for the
+build commands read [build-native.md](build-native.md).
 
 ## What SongCore is
 
@@ -66,15 +71,14 @@ mode), provenance-pinned so a stale PASS cannot survive an artifact change.
 
 ## ABI freeze (v1)
 
-`SONGCORE_ABI_VERSION` = 1. The frozen surface: function list, enum numeric
-values, struct sizes and field offsets (`bench/results/songcore-v1/
-abi-layout-<target>-v1.txt`), the 15-symbol export set, and the open /
-probe / read / seek / close semantics in [songcore-api.md](songcore-api.md).
-Any layout or semantic break is ABI v2 — an explicit `SONGCORE_ABI_VERSION`
-bump plus a new layout snapshot. Thread-safety: a handle is externally
-serialized; IO callback lifetime = handle lifetime; PCM format is Float32
-interleaved, source rate/layout, native endianness; EOF is `SONG_EOF` with
-zero frames; no C++ exception crosses the ABI; no FFmpeg type ever does.
+`SONGCORE_ABI_VERSION` = 1. The release freezes the ABI surface against
+the layout snapshots in `bench/results/songcore-v1/
+abi-layout-<target>-v1.txt` (function list, enum numeric values, struct
+sizes and field offsets) plus the 15-symbol export set. The normative
+open / probe / read / seek / close semantics, threading and error model
+are owned by [songcore-api.md](../contracts/songcore-api.md) — this
+document does not restate them. Any layout or semantic break is ABI v2 —
+an explicit `SONGCORE_ABI_VERSION` bump plus a new layout snapshot.
 
 ## License profile (engineering compliance, not legal advice)
 

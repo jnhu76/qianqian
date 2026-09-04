@@ -190,7 +190,7 @@ int main(int argc, char **argv) {
                (long long)sn.position_us, sn.sample_rate);
         /* Playout window: position must advance monotonically, then the
          * 4 s fixture reaches ENDED at its duration through the real
-         * output (EOF lifecycle, docs/player-engine.md §7). */
+         * output (EOF lifecycle, docs/contracts/player-api.md). */
         int64_t last = sn.position_us;
         int ended = 0;
         for (int i = 0; i < 100; ++i) { /* ≤ 10 s guard */

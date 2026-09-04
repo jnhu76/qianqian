@@ -6,7 +6,7 @@
  * values, public struct sizes and field offsets. The output is compared
  * against the frozen snapshot (bench/results/songcore-v1/abi-layout-<target>-v1.txt)
  * by tools/songcore_release.py; any drift means the ABI changed and must be
- * an explicit SONGCORE_ABI_VERSION bump (docs/songcore-release.md).
+ * an explicit SONGCORE_ABI_VERSION bump (docs/development/release.md).
  *
  * No SongCore symbol is called, so no library is needed to link:
  *

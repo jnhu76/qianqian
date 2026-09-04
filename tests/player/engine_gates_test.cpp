@@ -1,6 +1,6 @@
 // engine_gates_test.cpp — native semantic gates for the PlayerEngine.
 //
-// These gates own the frozen PlayerEngine semantics (docs/player-engine.md)
+// These gates own the frozen PlayerEngine semantics (docs/contracts/player-api.md)
 // as permanent regressions: lifecycle (T1–T14), state-illegal probes, clock
 // model, submitted-vs-rendered and MEDIA/GAP mapping (S1–S10), the
 // ESTIMATED-segment offset invariance, clock-corrective gates (T16–T20),

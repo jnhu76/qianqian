@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "purpose": "Machine source-of-truth for which audio codecs and containers SongCore must decode. Humans edit intent here; the machine derives the FFmpeg source closure from the pinned upstream configure oracle (see docs/ffmpeg-minimization.md). Never hand-edit derived manifests.",
+  "purpose": "Machine source-of-truth for which audio codecs and containers SongCore must decode. Humans edit intent here; the machine derives the FFmpeg source closure from the pinned upstream configure oracle (see docs/architecture/ffmpeg-minimization.md). Never hand-edit derived manifests.",
   "output_contract": {
     "sample_format": "flt (Float32 interleaved)",
     "sample_rate": "source rate",

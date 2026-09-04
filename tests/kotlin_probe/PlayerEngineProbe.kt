@@ -4,7 +4,7 @@
  * Proves a Kotlin-owned process can consume the application-facing runtime
  * (qianqian.dll / libqianqian.so) through include/player_engine.h +
  * include/songcore.h ONLY: no private header, no implementation archive,
- * no backend knowledge. docs/kmp-ffi-handoff.md exit evidence: create ->
+ * no backend knowledge. docs/contracts/ffi-boundary.md (boundary proof: see docs/archive/experiments/kotlin-boundary-probe.md): create ->
  * open -> play -> polled snapshots -> monotonic progress -> ENDED ->
  * destroy, plus a direct song_* lifecycle over the same runtime for the
  * API matrix.

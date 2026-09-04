@@ -1,4 +1,15 @@
-# PRD — Qianqian Audio Lab / 千千·现代 Phase 0
+# PRD — Qianqian Audio Lab / 千千·现代 Phase 0 (superseded)
+
+> Historical / non-authoritative。root PRD 已由 DOCS-IA-2（issue #26）
+> 分解退役：产品语义 → [product/](../../product/)，冻结决策 →
+> [ADR-0002](../../adr/0002-songcore-src-boundary.md) /
+> [ADR-0003](../../adr/0003-dsp-libavfilter-audioengine.md) /
+> [ADR-0004](../../adr/0004-ffmpeg-machine-derived-closure.md)，
+> 当前架构 → [architecture/](../../architecture/)。本副本按原文保留
+> 作为 founding evidence（仅为满足 one-H1 调整了 heading 层级，
+> 文字未改动）。其中的 phase 状态（Ready for implementation、
+> Phase 0、S0–S6 等）是历史事实，不是当前状态。
+
 
 **状态**：Ready for implementation  
 **产品阶段**：Phase 0 — Thin Audio Lab  
@@ -9,7 +20,7 @@
 
 ---
 
-# 1. 为什么先不做播放器
+## 1. 为什么先不做播放器
 
 「千千·现代」最终目标仍然是一款简洁、轻量、纯粹的跨平台本地音乐播放器。
 
@@ -41,7 +52,7 @@
 
 ---
 
-# 2. 第一阶段产品定义
+## 2. 第一阶段产品定义
 
 Qianqian Audio Lab 是一个 **Song Playback Appliance**。
 
@@ -61,7 +72,7 @@ Qianqian Audio Lab 是一个 **Song Playback Appliance**。
 
 ---
 
-# 3. SongCore 最小能力
+## 3. SongCore 最小能力
 
 第一阶段公开能力仅允许：
 
@@ -122,7 +133,7 @@ API 设计目标不是“覆盖 FFmpeg”，而是**阻止 FFmpeg 泄漏到上�
 
 ---
 
-# 4. 负能力清单（Negative Capability Manifest）
+## 4. 负能力清单（Negative Capability Manifest）
 
 默认规则：**能力默认不存在，只有真实歌曲播放需求才能将它加入 allow-list。**
 
@@ -155,7 +166,7 @@ API 设计目标不是“覆盖 FFmpeg”，而是**阻止 FFmpeg 泄漏到上�
 
 ---
 
-# 5. FFmpeg 的角色
+## 5. FFmpeg 的角色
 
 FFmpeg 只负责：
 
@@ -192,7 +203,7 @@ libavfilter**（冻结，capability intent 由人维护、source closure 由机�
 
 ---
 
-# 6. 极限裁剪目标
+## 6. 极限裁剪目标
 
 初始基线：
 
@@ -256,9 +267,9 @@ FFmpeg 只看到字节，不获得网络或平台文件系统权限。
 
 ---
 
-# 7. 格式路线
+## 7. 格式路线
 
-## Core Common Formats（当前核心）
+### Core Common Formats（当前核心）
 
 ```text
 MP3
@@ -282,7 +293,7 @@ open
 → EOF
 ```
 
-## Future compatibility（不在 Common Formats 核心内，issue #9）
+### Future compatibility（不在 Common Formats 核心内，issue #9）
 
 ```text
 APE
@@ -296,9 +307,9 @@ WavPack
 
 ---
 
-# 8. Audio Quality 原则
+## 8. Audio Quality 原则
 
-## 8.1 默认透明路径
+### 8.1 默认透明路径
 
 当用户没有启用任何音效时：
 
@@ -329,7 +340,7 @@ AudioSink
 
 ---
 
-# 9. SongCore 不提供 resample —— 与 libswresample 的关系
+## 9. SongCore 不提供 resample —— 与 libswresample 的关系
 
 SongCore 的 PCM 契约是：
 
@@ -351,7 +362,7 @@ opus_decoder ... not all dependencies are satisfied: swresample`）。这是
 
 不要把 implementation dependency 写成 product capability。
 
-## 冻结：SRC 决策（2026-09-01）
+### 冻结：SRC 决策（2026-09-01）
 
 - **SongCore 输出不变**：source-rate / source-layout interleaved Float32；
   SongCore 不 resample / rematrix。
@@ -363,7 +374,7 @@ opus_decoder ... not all dependencies are satisfied: swresample`）。这是
 
 ---
 
-# 10. 内部 PCM
+## 10. 内部 PCM
 
 DSP 路径统一使用：
 
@@ -389,7 +400,7 @@ Float32 → 最后一步量化 → device
 
 ---
 
-# 11. DSP 与 Decode 必须分层
+## 11. DSP 与 Decode 必须分层
 
 AudioCore：
 
@@ -419,7 +430,7 @@ Spectrum tap
 AudioSink
 ```
 
-## 冻结：DSP 决策（2026-09-01）
+### 冻结：DSP 决策（2026-09-01）
 
 - **AudioEngine** 的产品 DSP 使用**能力裁剪的 libavfilter**（机器证据：
   capability intent 由人维护于 `ffmpeg/capabilities/dsp.json`，source closure
@@ -438,7 +449,7 @@ AudioSink
 
 ---
 
-# 12. 第一版 DSP
+## 12. 第一版 DSP
 
 播放器阶段第一批 DSP 仅考虑：
 
@@ -456,13 +467,13 @@ AudioSink
 
 ---
 
-# 13. 音质验证
+## 13. 音质验证
 
 “音质好”不能依赖主观描述。
 
 项目必须验证：
 
-## Decode correctness
+### Decode correctness
 
 对 lossless 格式：
 
@@ -480,7 +491,7 @@ SongCore decode
 - PCM checksum（在可严格等价时）；
 - 或 Float PCM tolerance。
 
-## DSP bypass
+### DSP bypass
 
 当：
 
@@ -500,7 +511,7 @@ input PCM == output PCM
 
 而不是“把 EQ 各段设成 0 dB 后仍然走完整滤波链”。
 
-## EQ correctness
+### EQ correctness
 
 使用：
 
@@ -518,11 +529,11 @@ input PCM == output PCM
 
 ---
 
-# 14. Native First，WASM 第二步
+## 14. Native First，WASM 第二步
 
 Phase 0 不同时把所有路线都做完。
 
-## Step 1：Native
+### Step 1：Native
 
 先验证：
 
@@ -542,7 +553,7 @@ trimmed native FFmpeg
 - audio quality tests；
 - Windows baseline。
 
-## Step 2：WASM
+### Step 2：WASM
 
 只有 Native baseline 稳定后，再实现：
 
@@ -556,7 +567,7 @@ WASM 不改变上层接口。
 
 ---
 
-# 15. WASM 的研究问题
+## 15. WASM 的研究问题
 
 WASM 不是“更现代所以更好”。
 
@@ -576,7 +587,7 @@ WASM 不是“更现代所以更好”。
 
 ---
 
-# 16. 不重新发明别人已经做好的工作
+## 16. 不重新发明别人已经做好的工作
 
 Phase 0 明确把以下项目作为 reference，而不是架构权威：
 
@@ -594,13 +605,13 @@ Phase 0 明确把以下项目作为 reference，而不是架构权威：
 
 ---
 
-# 17. 项目成功标准
+## 17. 项目成功标准
 
 Phase 0 成功不是 Feature 多。
 
 而是：
 
-### S0
+#### S0
 
 MP3 / FLAC：
 
@@ -610,7 +621,7 @@ open → metadata → PCM → seek → EOF
 
 全部稳定。
 
-### S1
+#### S1
 
 裁剪 profile 有完整 manifest。
 
@@ -618,15 +629,15 @@ open → metadata → PCM → seek → EOF
 
 > 哪一类真实歌曲需要它。
 
-### S2
+#### S2
 
 无 DSP decode 路径通过透明性测试。
 
-### S3
+#### S3
 
 同一 corpus 可持续 regression。
 
-### S4
+#### S4
 
 有可靠 baseline：
 
@@ -639,11 +650,11 @@ open → metadata → PCM → seek → EOF
 - peak memory；
 - CPU。
 
-### S5
+#### S5
 
 WASM 后端使用相同 contract 完成对比。
 
-### S6
+#### S6
 
 根据数据做出明确决策：
 
@@ -656,7 +667,7 @@ WASM eligible for production
 
 ---
 
-# 18. 第二阶段：千千·现代播放器
+## 18. 第二阶段：千千·现代播放器
 
 只有 SongCore 基线稳定后，才建立产品：
 
@@ -683,7 +694,7 @@ Qianqian Modern
 
 ---
 
-# 19. 产品哲学
+## 19. 产品哲学
 
 整个音频层坚持一句话：
 

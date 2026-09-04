@@ -1,7 +1,7 @@
 // wasapi_renderer.cpp — WASAPI shared-mode render thread (Windows only;
 // compiled solely by the qianqian_runtime Windows flavor).
 //
-// Loop shape (docs/wasapi-native-runtime-closure.md §4):
+// Loop shape (docs/architecture/platform-audio.md):
 //
 //   idle    probe fill_output(nullptr, 0) — "idle" → bounded sleep, retry.
 //           An idle return never touches dst, so nothing is submitted.

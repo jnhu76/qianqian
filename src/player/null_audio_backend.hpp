@@ -1,6 +1,6 @@
 // null_audio_backend.hpp — deterministic manual-tick audio backend.
 //
-// The stand-in for WASAPI (docs/player-engine.md): a fake device driven
+// The stand-in for WASAPI (docs/contracts/player-api.md): a fake device driven
 // entirely by explicit submit/render ticks. It depends on no wall clock, no
 // sleeps, no OS audio API, and no hardware; tests drive it manually and the
 // submit/render entry points stay separate so the suite can prove that

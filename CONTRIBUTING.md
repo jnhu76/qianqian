@@ -5,8 +5,9 @@
 
 ## Before you start
 
-- 读 [README.md](README.md)（是什么、怎么构建）和 [PRD.md](PRD.md)（产品边界）；
-- 本仓库是“极致减法”项目：新增任何能力前先回答——**没有它，哪一首正常歌曲播不了？**（见 [AGENTS.md](AGENTS.md)）。
+- 读 [README.md](README.md)（是什么、怎么构建）和
+  [docs/product/product.md](docs/product/product.md)（产品边界）；
+- 本仓库是“极致减法”项目，admission 分双轨：native / audio-core 扩张先回答——**没有它，哪一首正常歌曲播不了？**；product / application capability 须证明用户/产品价值并由当前 Issue 授权（见 [AGENTS.md](AGENTS.md) §1）。
 
 ## Issues
 
@@ -15,13 +16,9 @@ bug / feature / research 模板；research issue 允许负结果。
 
 ## Development setup
 
-```bash
-python3 scripts/fetch-ffmpeg       # 拉取 pinned FFmpeg source
-xmake ffmpeg-import                # 推导 FFmpeg source closure
-xmake f -m release && xmake build songcore
-```
-
-回归与验证命令的权威：[tests/songcore/README.md](tests/songcore/README.md)。
+构建命令的权威：[docs/development/build-native.md](docs/development/build-native.md)。
+回归与验证命令的权威：[tests/songcore/README.md](tests/songcore/README.md)；
+测试标准：[docs/standards/testing.md](docs/standards/testing.md)。
 
 ## Focused changes
 
@@ -52,7 +49,7 @@ xmake f -m release && xmake build songcore
   与新增函数，破坏即 v2；
 - FFmpeg 类型不得穿越边界；production decode 路径只依赖 pinned FFmpeg 最小
   source closure + Qianqian 自有代码（AGENTS 规则）；
-- 跨层契约变更必须同步对应 contract 文档并给出验证证据。
+- 跨层契约变更必须同步对应 contract 文档（[docs/contracts/](docs/contracts/)）并给出验证证据。
 
 ## Where deeper documentation lives
 

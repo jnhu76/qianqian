@@ -37,6 +37,7 @@ body:
     attributes:
       label: Scope / component
       options:
+        - Application / UI
         - SongCore
         - PlayerEngine
         - AudioEngine / DSP / SRC
