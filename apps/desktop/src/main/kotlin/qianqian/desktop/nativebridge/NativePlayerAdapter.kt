@@ -3,6 +3,7 @@ package qianqian.desktop.nativebridge
 import com.sun.jna.Pointer
 import com.sun.jna.ptr.IntByReference
 import com.sun.jna.ptr.LongByReference
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
@@ -156,12 +157,23 @@ class NativePlayerAdapter private constructor(
     }
 
     private suspend inline fun <T> withControl(crossinline block: () -> T): T {
-        if (closed.get()) throw BridgeClosedException()
+        if (closed.get()) throw BridgeClosedException() // fast path only
         try {
-            return withContext(controlDispatcher) { block() }
+            return withContext(controlDispatcher) {
+                // Authoritative lifecycle gate: re-checked ON the control
+                // thread, in FIFO order against the queued pe_destroy. A
+                // command that raced close() before the flag flip either
+                // runs strictly before destroy (dispatcher serialization)
+                // or sees `closed` here and never reaches native.
+                if (closed.get()) throw BridgeClosedException()
+                block()
+            }
         } catch (e: PlayerBridgeException) {
             throw e
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            // e.g. dispatch into the already-shut-down executor after close
             if (closed.get()) throw BridgeClosedException()
             throw e
         }
@@ -200,10 +212,15 @@ class NativePlayerAdapter private constructor(
 
         /**
          * Create the engine (on a background thread) and start observation.
-         * [api] must already be ABI-gated.
+         *
+         * This is the engine-creation authority: BOTH frozen ABI versions
+         * are validated here, before any engine can exist — no matter how
+         * the caller obtained the [NativeApi]. A mismatch is a typed
+         * fail-fast with `pe_create` never invoked.
          */
-        suspend fun connect(api: NativeApi): NativePlayerAdapter =
-            withContext(Dispatchers.Default) {
+        suspend fun connect(api: NativeApi): NativePlayerAdapter {
+            NativeRuntimeLoader.validateAbi(api)
+            return withContext(Dispatchers.Default) {
                 val engine = api.peCreate() ?: throw EngineCreationFailure()
                 try {
                     NativePlayerAdapter(api, engine)
@@ -212,6 +229,7 @@ class NativePlayerAdapter private constructor(
                     throw e
                 }
             }
+        }
 
         /** Load the staged runtime, gate the ABI, and connect. */
         suspend fun connect(libraryPath: Path): NativePlayerAdapter =

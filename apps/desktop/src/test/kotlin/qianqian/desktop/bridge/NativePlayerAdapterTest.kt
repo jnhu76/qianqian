@@ -2,6 +2,7 @@ package qianqian.desktop.bridge
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Collections
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,6 +18,7 @@ import kotlinx.coroutines.withTimeout
 import qianqian.desktop.nativebridge.NativePlayerAdapter
 import qianqian.desktop.nativebridge.PeState
 import qianqian.desktop.nativebridge.PeStatus
+import qianqian.desktop.player.AbiMismatch
 import qianqian.desktop.player.BridgeClosedException
 import qianqian.desktop.player.ControlFailure
 import qianqian.desktop.player.EngineCreationFailure
@@ -59,6 +61,40 @@ class NativePlayerAdapterTest {
         }
         assertEquals(emptyList<String>(), api.controlOverlaps)
         adapter.close()
+    }
+
+    @Test
+    fun commandsRacingCloseNeverReachNativeAfterDestroy() = runBlocking {
+        val api = FakeNativeApi()
+        val adapter = NativePlayerAdapter.connect(api)
+        val errors = Collections.synchronizedList(mutableListOf<Throwable>())
+        coroutineScope {
+            launch(Dispatchers.Default) { adapter.close() }
+            repeat(32) {
+                launch(Dispatchers.Default) {
+                    try {
+                        adapter.play()
+                    } catch (e: Throwable) {
+                        errors.add(e)
+                    }
+                }
+            }
+        }
+        // Destroy exactly once, and NOTHING touches the engine afterwards:
+        // the poller is joined before destroy, and any command that lost
+        // the race must have been gated on the control thread (no fake
+        // call logged) instead of reaching a destroyed handle.
+        assertEquals(1, api.destroyCount.get())
+        val destroyIdx = api.callLog.indexOf("pe_destroy")
+        assertTrue(destroyIdx >= 0)
+        assertTrue(
+            api.callLog.drop(destroyIdx + 1).isEmpty(),
+            "native calls observed after pe_destroy: ${api.callLog.drop(destroyIdx + 1)}",
+        )
+        assertTrue(
+            errors.all { it is BridgeClosedException },
+            "racing commands failed with non-bridge errors: $errors",
+        )
     }
 
     @Test
@@ -144,6 +180,25 @@ class NativePlayerAdapterTest {
         val api = FakeNativeApi()
         api.createResult = null
         assertFailsWith<EngineCreationFailure> { NativePlayerAdapter.connect(api) }
+        assertEquals(0, api.destroyCount.get())
+    }
+
+    @Test
+    fun connectRefusesWrongSongcoreAbiBeforeEngineCreation() = runBlocking {
+        val api = FakeNativeApi(songAbi = 99)
+        val e = assertFailsWith<AbiMismatch> { NativePlayerAdapter.connect(api) }
+        assertEquals("SongCore", e.component)
+        // "before any engine can exist" is literal: pe_create never runs.
+        assertEquals(0, api.callLog.count { it == "pe_create" })
+        assertEquals(0, api.destroyCount.get())
+    }
+
+    @Test
+    fun connectRefusesWrongEngineAbiBeforeEngineCreation() = runBlocking {
+        val api = FakeNativeApi(engineAbi = 2)
+        val e = assertFailsWith<AbiMismatch> { NativePlayerAdapter.connect(api) }
+        assertEquals("PlayerEngine", e.component)
+        assertEquals(0, api.callLog.count { it == "pe_create" })
         assertEquals(0, api.destroyCount.get())
     }
 
