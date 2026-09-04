@@ -1,0 +1,62 @@
+name: Research
+description: 提出一个需要证据才能回答的问题（允许负结果）
+labels: ["research"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: 要回答的问题本身
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: 对哪个决策有影响
+    validations:
+      required: true
+  - type: textarea
+    id: prior-art
+    attributes:
+      label: Existing evidence / prior art
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hypothesis
+  - type: textarea
+    id: candidates
+    attributes:
+      label: Candidates
+  - type: textarea
+    id: method
+    attributes:
+      label: Method
+    validations:
+      required: true
+  - type: textarea
+    id: measurement
+    attributes:
+      label: Measurement
+      description: corpus / benchmark / 指标与产物
+  - type: textarea
+    id: falsification
+    attributes:
+      label: Falsification / STOP criteria
+      description: 什么结果即证伪或停止
+    validations:
+      required: true
+  - type: textarea
+    id: non-goals
+    attributes:
+      label: Non-goals
+  - type: textarea
+    id: decision-impact
+    attributes:
+      label: Expected decision impact
+  - type: markdown
+    attributes:
+      value: |
+        > 研究不默认要求“证明想法成立”：负结果是合法产出。
+        > 结论写入 `docs/research/`（模板见 `docs/standards/templates/research.md`），
+        > 证据不得自动成为 current architecture authority。

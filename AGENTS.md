@@ -12,15 +12,13 @@
 
 无法回答时，不应加入。
 
-## 2. 架构权威
+## 2. Authority routing
 
-优先级：
+不同事实类型使用不同 canonical authority，不采用全局线性文档排名。
 
-1. `PRD.md`
-2. `docs/audio-core.md`
-3. `docs/ffmpeg-minimization.md`、`docs/architecture/*`、`docs/history.md`
-4. 当前代码和测试
-5. 外部项目仅作为实现参考
+- 完整 authority model：`docs/standards/documentation.md`
+- 当前物理文档位置与迁移期映射：`docs/README.md`
+- 文档与 code/tests 冲突时必须执行 reality audit，不得静默选择一边。
 
 KiteCodec、FFmpegKitNext、libav.js 等都不是架构权威。
 
@@ -60,19 +58,14 @@ KiteCodec、FFmpegKitNext、libav.js 等都不是架构权威。
 
 必须给出 corpus、benchmark 或 reproducible evidence。
 
-## 6. 不提前实现播放器功能
+## 6. Scope and layer discipline
 
-Phase 0 不实现：
+只实现当前 Issue / task 明确授权的能力，不因顺手或未来需求扩大 scope。
 
-- UI
-- playlist
-- skin
-- lyrics UI
-- online services
-- converter
-- editor
-
-除非 PRD 明确升级阶段。
+- Product / UI 需求优先在 application / product 层解决；
+- 不得为 presentation convenience 扩张 SongCore 或 native runtime；
+- 只有现有 cross-layer contract 被证明确实不足时，才允许提出 native contract change；
+- 不得把 playlist、library、navigation、UI copy 等 product policy 下沉到 SongCore。
 
 ## 7. 修改后的最低证据
 
@@ -102,3 +95,26 @@ Production decode 路径只允许依赖：
 - FFmpeg `configure/Make` 可以在 import / upstream upgrade 时充当 oracle；normal production-oriented build 应由 Qianqian 自有构建系统重放冻结的 compile manifest。
 - 升级 FFmpeg 时重新求 closure 并审查 source/flag/size/symbol/corpus/PCM drift，不得直接复制旧版本 source list。
 - 未在真实环境运行的 selective-build 或 audible smoke 只能标记 `CODE_COMPLETE_PENDING_VALIDATION`，不能写 PASS。
+
+## 10. 文档分类与模板
+
+创建任何长期 Markdown 文档前：先按 fact-type 分类，再使用
+`docs/standards/templates/` 中对应 class 的 canonical template。禁止在
+AGENTS 里复制模板内容。路由：
+
+```text
+AGENTS.md → docs/README.md → docs/standards/documentation.md
+          → docs/standards/templates/<document-class>.md
+```
+
+## 11. AGENTS 继承模型
+
+```text
+root AGENTS.md → nearest applicable local AGENTS.md
+```
+
+Local AGENTS **extends** root：只允许 genuinely local 规则（local scope、
+forbidden dependencies、required authorities、local verification）。不得复制
+root 内容、不得重新定义 global authority、不得复制 architecture contract。
+没有真正的 local divergence 就不要创建 local AGENTS；目录尚不存在时只记录
+规则，不预建文件。模板：`docs/standards/templates/local-agents.md`。

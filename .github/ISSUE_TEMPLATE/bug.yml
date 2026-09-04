@@ -1,0 +1,50 @@
+name: Bug report
+description: 报告一个可复现的行为缺陷
+labels: ["bug"]
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      description: 实际观察到的行为
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: 最小复现步骤 / 命令 / 输入文件
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS / toolchain / commit / build profile
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: 日志、PCM hash、corpus 结果等客观证据
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope / component
+      options:
+        - SongCore
+        - PlayerEngine
+        - AudioEngine / DSP / SRC
+        - AudioBackend
+        - FFmpeg closure / build
+        - WASM
+        - KMP / FFI boundary
+        - tests / bench / tools
+        - docs
+    validations:
+      required: true
