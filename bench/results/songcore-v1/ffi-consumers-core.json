@@ -1,5 +1,5 @@
 {
-  "tool": "tests/songcore/consumers.py",
+  "tool": "native/tests/songcore/consumers.py",
   "platform": "Linux-x86_64",
   "shared_library": "build/artifacts/shared/libsongcore.so",
   "shared_library_sha256": "110e8dd3698698694ceea519494bb2f9a2f18430f4436717d333ceeaa7bcd3fc",
@@ -152,12 +152,12 @@
     },
     {
       "gate": "static_archive_consumer",
-      "tool": "tests/consumer/songcore_static_smoke.c",
+      "tool": "native/tests/consumer/songcore_static_smoke.c",
       "fixtures": [
         "flac-16-44-stereo.flac",
         "aac-lc-44-stereo.m4a"
       ],
-      "link_line": "cc -Iinclude tests/consumer/songcore_static_smoke.c -Lbuild/artifacts -lsongcore -lm -lpthread -o build/consumer/songcore_static_smoke",
+      "link_line": "cc -Inative/include native/tests/consumer/songcore_static_smoke.c -Lbuild/artifacts -lsongcore -lm -lpthread -o build/consumer/songcore_static_smoke",
       "runs": [
         {
           "fixture": "flac-16-44-stereo.flac",

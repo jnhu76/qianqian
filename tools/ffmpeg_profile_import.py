@@ -5,11 +5,11 @@ Normal conceptual invocation — target in, manifest out:
 
     python3 tools/ffmpeg_profile_import.py \
         --target linux-x86_64 \
-        --profile ffmpeg/profiles/codec-base.json
+        --profile native/ffmpeg/profiles/codec-base.json
 
 writes build/manifests/<target>/<profile>/manifest.json. The FFmpeg
 configure/Make oracle runs ONCE for this (profile, target) pair; the target's
-configure facts come from ffmpeg/targets/<target>.json, not from hand-typed
+configure facts come from native/ffmpeg/targets/<target>.json, not from hand-typed
 --configure-extra. Xmake replays the manifest into the platform artifact and
 fails closed when the pointed manifest was derived for a different target.
 

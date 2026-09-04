@@ -1,7 +1,7 @@
 {
  "corpus_id": "songcore-v1",
- "qianqian_git_sha": "e7ad16065b9c0a0d9d36a7d00da3a8b00bc1ccaf",
+ "qianqian_git_sha": "d466bc9d5dfbc06451235d112b04b28f2c512939",
  "abi_version": 1,
- "run_id": "songcore-20260902-210538",
+ "run_id": "songcore-20260904-232527",
  "platform": "linux"
 }

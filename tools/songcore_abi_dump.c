@@ -10,7 +10,7 @@
  *
  * No SongCore symbol is called, so no library is needed to link:
  *
- *   cc -Iinclude tools/songcore_abi_dump.c -o abi_dump && ./abi_dump
+ *   cc -Inative/include tools/songcore_abi_dump.c -o abi_dump && ./abi_dump
  */
 #include "songcore.h"
 
