@@ -54,8 +54,8 @@ end
 -- the wasapi_renderer.cpp question themselves (remove_files is
 -- target-global and would undo a later re-add).
 local player_sources = function ()
-    add_files("$(projectdir)/src/player/*.cpp")
-    add_includedirs("$(projectdir)/include", "$(projectdir)/src/player", {public = true})
+    add_files("$(projectdir)/native/src/player/*.cpp")
+    add_includedirs("$(projectdir)/native/include", "$(projectdir)/native/src/player", {public = true})
 end
 
 target("player_core")
@@ -65,7 +65,7 @@ target("player_core")
     player_sources()
     -- wasapi_renderer.cpp is compiled ONLY by the qianqian_runtime Windows
     -- flavor (its COM/syslink surface must not enter test link lines).
-    remove_files("$(projectdir)/src/player/wasapi_renderer.cpp")
+    remove_files("$(projectdir)/native/src/player/wasapi_renderer.cpp")
     player_common()
 
 -- Native semantic + realtime-contract gates (ring unit/property/SPSC,
@@ -151,11 +151,11 @@ target("qianqian_runtime")
     -- the songcore_static dep supplies only the FFmpeg closure archive;
     -- its own songcore_ffmpeg.c member is never pulled because the
     -- dllexport'd definitions here resolve every song_* reference.
-    add_files("$(projectdir)/src/songcore_ffmpeg.c")
+    add_files("$(projectdir)/native/src/songcore_ffmpeg.c")
     player_sources()
     if is_plat("mingw", "windows") then
         -- WASAPI render-thread flavor (docs/architecture/platform-audio.md)
-        add_files("$(projectdir)/src/player/wasapi_renderer.cpp")
+        add_files("$(projectdir)/native/src/player/wasapi_renderer.cpp")
         add_defines("QN_QIANQIAN_RUNTIME")
         add_syslinks("ole32")
         -- Keep the runtime dependency closure at system DLLs only (no
@@ -168,7 +168,7 @@ target("qianqian_runtime")
         -- FFmpeg's av_random_bytes uses BCryptGenRandom on Windows
         add_syslinks("bcrypt")
     else
-        remove_files("$(projectdir)/src/player/wasapi_renderer.cpp")
+        remove_files("$(projectdir)/native/src/player/wasapi_renderer.cpp")
     end
     add_defines("SONGCORE_BUILD_SHARED", "PLAYER_ENGINE_BUILD_SHARED")
     set_symbols("hidden")

@@ -40,8 +40,8 @@ option("lto")
 -- songcore_common() — the Xmake-recommended way to avoid duplicating the
 -- definition across static/shared targets.
 local songcore_common = function (dep_av)
-    add_files("$(projectdir)/src/songcore_ffmpeg.c")
-    add_includedirs("$(projectdir)/include", {public = true})
+    add_files("$(projectdir)/native/src/songcore_ffmpeg.c")
+    add_includedirs("$(projectdir)/native/include", {public = true})
     if dep_av then
         add_deps("qianqian_av")
     end

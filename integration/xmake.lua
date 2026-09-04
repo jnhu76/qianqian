@@ -22,7 +22,7 @@ target("ffi_smoke")
     set_default(false)
     set_targetdir(artifact_dir)
     add_files("$(projectdir)/tests/ffi_smoke/ffi_smoke.c")
-    add_includedirs("$(projectdir)/include")
+    add_includedirs("$(projectdir)/native/include")
     set_languages("c11")
     if is_plat("linux", "macosx") then
         add_syslinks("dl")

@@ -115,8 +115,8 @@ if get_config("wasm") then
         set_default(false)
         set_targetdir(wasm_artifact_dir)
         set_optimize("smallest")
-        add_files("$(projectdir)/src/songcore_ffmpeg.c")
-        add_includedirs("$(projectdir)/include", {public = true})
+        add_files("$(projectdir)/native/src/songcore_ffmpeg.c")
+        add_includedirs("$(projectdir)/native/include", {public = true})
         add_deps("songcore_static")
 
     target("songcore_wasm")
@@ -129,8 +129,8 @@ if get_config("wasm") then
             set_extension(".js") -- MODULARIZE glue + .wasm side by side
         end
         set_optimize("smallest")
-        add_files("$(projectdir)/src/songcore_ffmpeg.c", "$(projectdir)/src/wasm/songcore_wasm_bridge.c")
-        add_includedirs("$(projectdir)/include", "$(projectdir)/src/wasm")
+        add_files("$(projectdir)/native/src/songcore_ffmpeg.c", "$(projectdir)/native/src/wasm/songcore_wasm_bridge.c")
+        add_includedirs("$(projectdir)/native/include", "$(projectdir)/native/src/wasm")
         add_deps("songcore_static")
         if get_config("wasm") == "wasi" then
             add_ldflags(wasi_reactor_ldflags(), {force = true})

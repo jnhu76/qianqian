@@ -114,16 +114,16 @@ def rel(path: Path) -> str:
 def pinned_identity(target_id: str) -> dict:
     """Provenance binding for recorded external evidence: if any of these
     values drifts, previously recorded consumer PASSes are stale."""
-    pin = json.loads((ROOT / "ffmpeg" / "pin.json").read_text())
-    recipe_file = ROOT / "ffmpeg" / "targets" / f"{target_id}.json"
+    pin = json.loads((ROOT / "native" / "ffmpeg" / "pin.json").read_text())
+    recipe_file = ROOT / "native" / "ffmpeg" / "targets" / f"{target_id}.json"
     return {
         "target": target_id,
         "recipe_sha256": sha256_file(recipe_file),
         "ffmpeg_commit_sha": pin["ffmpeg_commit_sha"],
         "ffmpeg_source_sha256": pin["source_sha256"],
-        "profile_sha256": sha256_file(ROOT / "ffmpeg" / "profiles"
+        "profile_sha256": sha256_file(ROOT / "native" / "ffmpeg" / "profiles"
                                       / "codec-base.json"),
-        "abi_header_sha256": sha256_file(ROOT / "include" / "songcore.h"),
+        "abi_header_sha256": sha256_file(ROOT / "native" / "include" / "songcore.h"),
     }
 
 
@@ -183,10 +183,10 @@ def gate_static_consumer() -> dict:
     exe = ROOT / exe_rel
     exe.parent.mkdir(parents=True, exist_ok=True)
     if sys.platform == "win32":
-        cc = ["gcc", "-Iinclude", "tests/consumer/songcore_static_smoke.c",
+        cc = ["gcc", "-Inative/include", "tests/consumer/songcore_static_smoke.c",
               "-Lbuild/artifacts", "-lsongcore", "-lbcrypt", "-o", exe_rel]
     else:
-        cc = ["cc", "-Iinclude", "tests/consumer/songcore_static_smoke.c",
+        cc = ["cc", "-Inative/include", "tests/consumer/songcore_static_smoke.c",
               "-Lbuild/artifacts", "-lsongcore", "-lm", "-lpthread", "-o", exe_rel]
     proc = run(cc)
     if proc.returncode != 0:

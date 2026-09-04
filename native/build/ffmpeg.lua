@@ -29,14 +29,14 @@ end
 -- manifest must have been derived for THIS session's target. A Linux
 -- manifest carries generated config headers and architecture sources that
 -- are not portable, so it must never silently satisfy a Windows/WASM
--- session. The expected id comes from ffmpeg/targets/*.json — recipes are
+-- session. The expected id comes from native/ffmpeg/targets/*.json — recipes are
 -- the machine-readable target intent, Xmake only matches them.
 local expected_target_id = function (target, json)
     local wasm = get_config("wasm")
     if wasm == "wasi" then return "wasm-wasi" end
     if wasm == "emscripten" then return "wasm-emscripten" end
     local found = nil
-    local targets_dir = path.join(os.projectdir(), "ffmpeg", "targets")
+    local targets_dir = path.join(os.projectdir(), "native", "ffmpeg", "targets")
     for _, recipe_file in ipairs(os.files(path.join(targets_dir, "*.json")) or {}) do
         local r = json.loadfile(recipe_file)
         local plats = (r.xmake or {}).plat or {}
@@ -67,13 +67,13 @@ local manifest_target_problem = function (manifest_path, target, json)
             "%s predates target identity (schema < 2). Re-derive it:\n" ..
             "  native session : xmake ffmpeg-import\n" ..
             "  other targets  : python3 tools/ffmpeg_profile_import.py " ..
-            "--target <id> --profile ffmpeg/profiles/<capability>.json",
+            "--target <id> --profile native/ffmpeg/profiles/<capability>.json",
             get_config("av_manifest"))
     end
     local expect = expected_target_id(target, json)
     if not expect then
         return format(
-            "no target recipe in ffmpeg/targets/ matches this session " ..
+            "no target recipe in native/ffmpeg/targets/ matches this session " ..
             "(plat '%s', arch '%s'). Target provenance is fail-closed: a " ..
             "session may only replay a manifest derived for a proven " ..
             "target recipe (e.g. MSVC is not yet derived; MinGW " ..
@@ -86,14 +86,14 @@ local manifest_target_problem = function (manifest_path, target, json)
             "session builds '%s'. Derive the matching closure and point " ..
             "--av_manifest at it:\n" ..
             "  python3 tools/ffmpeg_profile_import.py --target %s " ..
-            "--profile ffmpeg/profiles/<capability>.json",
+            "--profile native/ffmpeg/profiles/<capability>.json",
             get_config("av_manifest"), mt.id, expect, expect)
     end
-    local recipe_file = path.join(os.projectdir(), "ffmpeg", "targets",
+    local recipe_file = path.join(os.projectdir(), "native", "ffmpeg", "targets",
                                   expect .. ".json")
     local recipe = json.loadfile(recipe_file)
     if not recipe then
-        return format("target recipe '%s' is missing from ffmpeg/targets/",
+        return format("target recipe '%s' is missing from native/ffmpeg/targets/",
                       expect)
     end
     if mt.platform ~= recipe.platform or mt.arch ~= recipe.arch then
@@ -101,7 +101,7 @@ local manifest_target_problem = function (manifest_path, target, json)
             "manifest target identity mismatch: %s records %s/%s but the " ..
             "'%s' recipe says %s/%s. Re-derive the closure:\n" ..
             "  python3 tools/ffmpeg_profile_import.py --target %s " ..
-            "--profile ffmpeg/profiles/<capability>.json",
+            "--profile native/ffmpeg/profiles/<capability>.json",
             get_config("av_manifest"), mt.platform or "?", mt.arch or "?",
             expect, recipe.platform, recipe.arch, expect)
     end
@@ -109,7 +109,7 @@ local manifest_target_problem = function (manifest_path, target, json)
     local rederive = format(
         " Re-derive the closure:\n" ..
         "  python3 tools/ffmpeg_profile_import.py --target %s " ..
-        "--profile ffmpeg/profiles/<capability>.json", expect)
+        "--profile native/ffmpeg/profiles/<capability>.json", expect)
     if ff.target_os and mt.target_os ~= ff.target_os then
         return format(
             "manifest is stale or from another toolchain family: %s was " ..
