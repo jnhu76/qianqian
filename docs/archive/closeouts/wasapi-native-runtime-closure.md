@@ -1,9 +1,19 @@
-# Native Runtime Closure v1 — WASAPI Minimal Backend + Stable KMP/FFI Boundary
+# Native Runtime Closure v1 — WASAPI Minimal Backend + Stable KMP/FFI Boundary (closed)
+
+> Historical / non-authoritative。这是 Native Runtime Closure v1 的 phase
+> document，阶段已完成并验证。current truth 拆分至：
+> WASAPI renderer 与 runtime 组成 →
+> [architecture/platform-audio.md](../../architecture/platform-audio.md)；
+> seam 行为规则 → [contracts/player-api.md](../../contracts/player-api.md)；
+> FFI 边界 → [contracts/ffi-boundary.md](../../contracts/ffi-boundary.md)。
+> 文中引用的文档路径已指向 current 位置；`spec §NN` 是当期 phase 文档的
+> 内部编号，仅作历史线索。
+
 
 Phase document (spec §46): the audit results, the frozen contracts this
 phase builds on, and the minimal composition that closes the native
-playback runtime. Authority order unchanged (PRD → audio-core → player-engine
-→ this document).
+playback runtime. 当期 authority order（历史）：PRD → audio-core → player-engine →
+this document；现已由 DOCS-IA-2 taxonomy 取代。
 
 ## 1. Current ABI (audit answer A/B/F)
 
@@ -20,7 +30,7 @@ composition, not API growth.
 
 ## 2. The seam (audit answer D/E)
 
-docs/player-engine.md §9/§10 fixes the production topology: ONE
+player-engine（现 contracts/player-api.md）§9/§10 fixes the production topology: ONE
 backend-owned event-driven render thread calls
 `fill_output(float* dst, uint64_t frames)` then `advance_render(int64_t)`.
 Both are mutex-free, allocation-free, admission-gated (close-then-drain on
@@ -82,7 +92,7 @@ reference + ctor/dtor only), `src/player/wasapi_renderer.cpp`
   match and accept it iff it is float32 (any rate/channel count): the
   device then runs the closest format and the renderer converts with
   **libswresample** — the device-side SRC the frozen design names
-  (audio-core.md: "SRC = aresample / libswresample"; player-engine.md §10:
+  (audio-core（现 architecture/audio-core.md）: "SRC = aresample / libswresample"; player-engine（现 contracts/player-api.md）§10:
   "BYPASS when source rate/layout == device requirement, else
   aresample / libswresample — owned by the device side"). Machine evidence
   (this host): `IsFormatSupported(44.1k f32 stereo)` → S_FALSE closest

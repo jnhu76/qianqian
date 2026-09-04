@@ -1,5 +1,8 @@
 # SongCore API
 
+> Authority: Normative
+> Scope: SongCore 公开 C ABI（`include/songcore.h`，v1）的调用契约
+
 How to call the SongCore native library. This is the permanent CALLER
 document: it explains how to open a file, read PCM, seek, and close — for
 C/C++ programs and for FFI wrapper authors (Kotlin/JVM, Kotlin/Native,
@@ -7,9 +10,10 @@ Swift/ObjC, Qt). It does not require FFmpeg knowledge and you do not need to
 read any implementation file to use the library correctly.
 
 For architecture (why SongCore exists, what AudioEngine does) read
-[audio-core.md](audio-core.md). For the FFmpeg trimming method read
-[ffmpeg-minimization.md](ffmpeg-minimization.md). The ABI authority is
-[`include/songcore.h`](../include/songcore.h) — ABI v1, frozen.
+[audio-core.md](../architecture/audio-core.md). For the FFmpeg closure
+method read [ffmpeg-minimization.md](../architecture/ffmpeg-minimization.md).
+The ABI authority is [`include/songcore.h`](../../include/songcore.h) —
+ABI v1, frozen.
 
 - ABI version: `SONGCORE_ABI_VERSION` = 1. Layout is fixed; compatible
   additions use reserved fields or new functions, and any break is ABI v2.
@@ -29,7 +33,7 @@ guest — all from the same ABI and capability model:
 | Android arm64 | — | `libsongcore.so` | Planned |
 | macOS arm64 | `libsongcore.a` | `libsongcore.dylib` | Planned |
 | iOS arm64 | `libsongcore.a` | — | Planned (XCFramework packaging is a later product-side step) |
-| WASM (wasi / emscripten) | — | — | Proven as guest module `SongCore.wasm` — uses the WASM bridge (`src/wasm/`), not native FFI; see [wasm.md](wasm.md) |
+| WASM (wasi / emscripten) | — | — | Proven as guest module `SongCore.wasm` — uses the WASM bridge (`src/wasm/`), not native FFI; see [wasm.md](../research/wasm.md) |
 
 "Proven" means: oracle-derived manifest, Xmake replay, corpus/PCM/ABI gates
 all green on this repository's evidence. "Planned" means the recipe exists,
@@ -38,7 +42,7 @@ nothing is claimed until a toolchain derives it (see
 
 Xmake targets: `songcore_static`, `songcore_shared`, aggregate `songcore`.
 For the frozen release package (staging, provenance, license, freeze
-policy) read [songcore-release.md](songcore-release.md).
+policy) read [release.md](../development/release.md).
 
 ```bash
 xmake ffmpeg-import        # once per checkout: derive the FFmpeg closure
