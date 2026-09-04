@@ -53,7 +53,7 @@ BUILDIR = "build/xmake-avf"
 ARTIFACTS = ROOT / "build" / "artifacts"
 ARCHIVE = ARTIFACTS / "libqianqian_av.a"
 PROBE = ARTIFACTS / "dsp_cap_probe"
-DOC = ROOT / "docs" / "ffmpeg-minimization.md"
+DOC = ROOT / "docs" / "research" / "ffmpeg-minimization.md"
 
 TIER_FILE = {  # tier id -> results filename (task §27 naming)
     "F0": "f0-framework.json", "F1": "f1-core-eq.json", "F2": "f2-dynamics.json",

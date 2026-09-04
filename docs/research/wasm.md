@@ -1,8 +1,14 @@
-# WASM
+# WASM — can the same trimmed SongCore run as WASM?
 
-Can the same trimmed SongCore run as WASM? Yes — and it was verified against
-machine evidence. WASM is a documented future target, not the default path;
-the architecture stays native-first.
+> Status: concluded
+> Decision authority: no
+> Related decision: [ADR-0001](../adr/0001-native-first-wasm-viable.md)
+
+Yes — and it was verified against machine evidence. WASM is a documented
+future target, not the default path; native-first 是冻结决策
+（[ADR-0001](../adr/0001-native-first-wasm-viable.md)），本文只保存证据与
+推理。WASM 不是当前 shipping path 这一点的 current-truth 表述由
+[architecture/](../architecture/) 与 ADR 拥有。
 
 ## Architecture result
 
