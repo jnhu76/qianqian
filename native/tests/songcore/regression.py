@@ -37,7 +37,7 @@ import os
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 SONG_MANIFEST = os.path.join(ROOT, "corpus", "manifest", "songcore.json")
 COMMON_MANIFEST = os.path.join(ROOT, "corpus", "manifest", "common-formats.json")
 FIXTURES = os.path.join(ROOT, "corpus", "fixtures")
@@ -197,7 +197,7 @@ def identity_preflight(binary, expected_manifest):
     print()
     print("Rebuild the SongCore test closure and probe before retrying:")
     print("  python3 tools/ffmpeg_profile_import.py --stage songcore-test \\")
-    print("      --profile ffmpeg/profiles/songcore-test.json")
+    print("      --profile native/ffmpeg/profiles/songcore-test.json")
     print("  xmake f -o build/xmake-test -m release \\")
     print("      --av_manifest=build/minimize/songcore-test/manifest.json -y")
     print("  xmake build -r songcore_probe songcore_shared")

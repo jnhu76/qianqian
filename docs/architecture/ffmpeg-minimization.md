@@ -10,9 +10,9 @@
 ## Pipeline
 
 ```text
-FFmpeg pin                    (ffmpeg/pin.json)
-capability intent             (ffmpeg/capabilities/*.json, human-maintained)
-target recipe                 (ffmpeg/targets/<id>.json, machine-readable)
+FFmpeg pin                    (native/ffmpeg/pin.json)
+capability intent             (native/ffmpeg/capabilities/*.json, human-maintained)
+target recipe                 (native/ffmpeg/targets/<id>.json, machine-readable)
         ↓  import/oracle only
 target-specific FFmpeg configure/Make oracle
         ↓  machine compile manifest (build/manifests/<target>/<profile>/)
@@ -64,7 +64,7 @@ That is the main durable result of the entire minimization work.
   closure from the same intent + its own target recipe. Xmake enforces this
   fail-closed: a manifest derived for one target cannot satisfy a build
   session for another (negative-tested in
-  `tests/songcore/target_gate_test.py`).
+  `native/tests/songcore/target_gate_test.py`).
 - **The shipping size authority is the final linked artifact**, never a
   source-count or directory-size proxy.
 
@@ -90,11 +90,11 @@ That is the main durable result of the entire minimization work.
 
 | File | Meaning |
 |---|---|
-| `ffmpeg/pin.json` | pinned upstream tag + commit + source sha256 |
-| `ffmpeg/capabilities/songcore.json` | codecs/containers SongCore must decode |
-| `ffmpeg/capabilities/dsp.json` | libavfilter capabilities AudioEngine may use |
-| `ffmpeg/targets/*.json` | machine-readable target recipes (platform/arch facts, artifact capability, honest proven status) |
-| `ffmpeg/profiles/*.json` | capability profiles (codec base, test closure) |
+| `native/ffmpeg/pin.json` | pinned upstream tag + commit + source sha256 |
+| `native/ffmpeg/capabilities/songcore.json` | codecs/containers SongCore must decode |
+| `native/ffmpeg/capabilities/dsp.json` | libavfilter capabilities AudioEngine may use |
+| `native/ffmpeg/targets/*.json` | machine-readable target recipes (platform/arch facts, artifact capability, honest proven status) |
+| `native/ffmpeg/profiles/*.json` | capability profiles (codec base, test closure) |
 | `build/.../manifest.json` | machine-derived closure for one (target, profile) pair (regenerable) |
 
 ## Upgrade flow
@@ -109,7 +109,7 @@ forward.
 The reusable result is not "one Linux `libsongcore.a`" but the whole
 pipeline: pin + capability intent + target recipe + oracle method +
 manifest + Xmake replay. Which targets are proven vs planned is recorded
-per-target in `ffmpeg/targets/*.json` (`status` fields); the API caller's
+per-target in `native/ffmpeg/targets/*.json` (`status` fields); the API caller's
 view of the artifacts is
 [../contracts/songcore-api.md](../contracts/songcore-api.md). Measured
 evidence: [../research/ffmpeg-minimization.md](../research/ffmpeg-minimization.md).

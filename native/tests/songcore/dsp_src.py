@@ -27,7 +27,7 @@ import os
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 OUT_DIR = os.path.join(ROOT, "bench", "results", "songcore-v1")
 PROBE = os.path.join(ROOT, "build", "artifacts", "dsp_cap_probe")
 SCENARIO = os.path.join(ROOT, "tests", "songcore", "dsp-src-smoke.kv")

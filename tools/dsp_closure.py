@@ -9,7 +9,7 @@ Answers (with machine evidence, no DSP-backend selection):
 
 Pipeline (all machine-owned, resumable per stage):
 
-  ffmpeg/capabilities/dsp.json (human-maintained capability intent)
+  native/ffmpeg/capabilities/dsp.json (human-maintained capability intent)
       ↓ derive profile (codec base + tier filters)
   tools/ffmpeg_profile_import.py  → upstream configure/Make oracle (import-time only)
       ↓ V=1 compile-closure manifest (build/minimize/<stage>/manifest.json)
@@ -45,8 +45,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-CAPS = ROOT / "ffmpeg" / "capabilities" / "dsp.json"
-CODEC_PROFILE = ROOT / "ffmpeg" / "profiles" / "codec-base.json"
+CAPS = ROOT / "native" / "ffmpeg" / "capabilities" / "dsp.json"
+CODEC_PROFILE = ROOT / "native" / "ffmpeg" / "profiles" / "codec-base.json"
 RESULTS = ROOT / "bench" / "results" / "avfilter-minimize"
 STAGES = ROOT / "build" / "minimize"
 BUILDIR = "build/xmake-avf"
@@ -99,11 +99,11 @@ MULTI_INPUT_SMOKE = {
 
 # experiment-defining inputs : results bind
 # these hashes, NOT a self-referential git commit pointer.
-INPUT_FILES = ["ffmpeg/capabilities/dsp.json", "tools/dsp_closure.py",
+INPUT_FILES = ["native/ffmpeg/capabilities/dsp.json", "tools/dsp_closure.py",
                "tools/ffmpeg_profile_import.py", "tools/ffmpeg_import.py",
                "tools/ffmpeg_manifest_union.py",
-               "tests/songcore/dsp_cap_probe.c", "xmake.lua",
-               "ffmpeg/profiles/codec-base.json", "ffmpeg/pin.json"]
+               "native/tests/songcore/dsp_cap_probe.c", "native/build/ffmpeg.lua", "native/build/songcore.lua",
+               "native/ffmpeg/profiles/codec-base.json", "native/ffmpeg/pin.json"]
 
 FILTER_ALIAS = {"asrc_abuffer": "abuffer", "asink_abuffer": "abuffersink"}
 FILTER_ALWAYS_PRESENT = {"abuffer", "abuffersink"}  # base OBJS of libavfilter,
@@ -152,7 +152,7 @@ def experiment_inputs() -> dict:
     combined = hashlib.sha256(
         "\n".join(f"{k}:{v}" for k, v in sorted(files.items())).encode()
     ).hexdigest()
-    pin = jload(ROOT / "ffmpeg" / "pin.json")
+    pin = jload(ROOT / "native" / "ffmpeg" / "pin.json")
     return {"files": files, "combined_sha256": combined, "ffmpeg_pin": pin}
 
 
@@ -1222,7 +1222,7 @@ def compute_summary(stages: list, probes: list) -> dict:
     union_ok = union_data.get("verdict") == "PASS"
     pin_ok = bool(union_data.get("validations", {})
                   .get("combined_same_ffmpeg_pin"))
-    cur_pin = jload(ROOT / "ffmpeg" / "pin.json")
+    cur_pin = jload(ROOT / "native" / "ffmpeg" / "pin.json")
     pin_ok = pin_ok and all(
         s.get("experiment_inputs", {}).get("ffmpeg_pin") == cur_pin
         for s in stages) if stages else False
@@ -1386,11 +1386,11 @@ def compute_aggregate() -> dict:
                      "graph config), format-adaptation (discovered by graph "
                      "config failure), shared-foundation, external-optional"}
     caps = caps_doc()
-    pin = jload(ROOT / "ffmpeg" / "pin.json")
+    pin = jload(ROOT / "native" / "ffmpeg" / "pin.json")
     cap_manifest = {
         "version": caps["version"],
         "experiment": "e10-c0",
-        "capability_manifest": "ffmpeg/capabilities/dsp.json",
+        "capability_manifest": "native/ffmpeg/capabilities/dsp.json",
         "capability_manifest_sha256": sha256_file(CAPS),
         "ffmpeg": pin,
         "stages": {st["stage"]: {

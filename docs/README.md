@@ -21,7 +21,7 @@
 | FFmpeg 闭包方法 | [architecture/ffmpeg-minimization.md](architecture/ffmpeg-minimization.md)（证据：[research/ffmpeg-minimization.md](research/ffmpeg-minimization.md)） |
 | Build / install | [development/build-native.md](development/build-native.md) |
 | Release | [development/release.md](development/release.md) |
-| Testing | [standards/testing.md](standards/testing.md) + [tests/songcore/README.md](../tests/songcore/README.md) |
+| Testing | [standards/testing.md](standards/testing.md) + [native/tests/songcore/README.md](../native/tests/songcore/README.md) |
 | 新建长期文档 | [standards/documentation.md](standards/documentation.md) + [standards/templates/](standards/templates/) |
 | Research | [research/README.md](research/README.md) |
 | 历史证据 | [archive/README.md](archive/README.md) |

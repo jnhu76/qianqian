@@ -62,10 +62,12 @@ python3 tools/songcore_ffi_smoke.py --play --seconds 5 song.flac    # 可听验�
 
 | Path | 内容 |
 |---|---|
-| `include/` | 公共 ABI（`songcore.h` / `player_engine.h`，v1） |
-| `src/` | SongCore、Player runtime、WASM bridge |
-| `ffmpeg/` | pin + capability intent + target recipes + profiles |
-| `tests/` | SongCore regression、player gates、external consumers、Kotlin probe |
+| `native/include/` | 公共 ABI（`songcore.h` / `player_engine.h`，v1） |
+| `native/src/` | SongCore、Player runtime、WASM bridge |
+| `native/ffmpeg/` | pin + capability intent + target recipes + profiles |
+| `native/tests/` | SongCore regression、player gates、external consumers |
+| `native/xmake.lua` + `native/build/` | native 构建路由 + 所有权构建模块（根 `xmake.lua` 是薄 workspace 入口） |
+| `integration/` | 跨边界消费者侧证明（FFI smoke、Kotlin probe） |
 | `bench/` | benchmark harness 与机器证据（`bench/results/`） |
 | `corpus/` | fixtures、manifests、本地音乐库（不进 Git 的部分） |
 | `tools/` | import / 审计 / smoke 工具 |

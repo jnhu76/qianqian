@@ -11,9 +11,9 @@ Qianqian 需要一个基于 FFmpeg 的、体积极小的本地歌曲解码核心
 
 ## Decision
 
-- **Pin 上游**：pinned upstream FFmpeg tag/commit（`ffmpeg/pin.json`），
+- **Pin 上游**：pinned upstream FFmpeg tag/commit（`native/ffmpeg/pin.json`），
   upstream tree 保持 pristine，从不打补丁。
-- **capability intent 由人维护**（`ffmpeg/capabilities/*.json`）；
+- **capability intent 由人维护**（`native/ffmpeg/capabilities/*.json`）；
   **source-file closure 由机器推导**：import 时以 pinned tag 的
   `configure`/`Make` 为 oracle 求出真实依赖图与 per-TU 编译语义，冻结为
   compile manifest。
@@ -46,4 +46,4 @@ Qianqian 需要一个基于 FFmpeg 的、体积极小的本地歌曲解码核心
 
 - 方法与流水线：[architecture/ffmpeg-minimization.md](../architecture/ffmpeg-minimization.md)。
 - 实测证据：[research/ffmpeg-minimization.md](../research/ffmpeg-minimization.md)。
-- fail-closed target 身份负测试：`tests/songcore/target_gate_test.py`。
+- fail-closed target 身份负测试：`native/tests/songcore/target_gate_test.py`。

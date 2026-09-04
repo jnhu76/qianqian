@@ -27,9 +27,9 @@ SRC = ROOT / "build" / "ffmpeg-src"
 OUT = ROOT / "build" / "ffmpeg-xmake"
 ORACLE = OUT / "oracle"
 MANIFEST = OUT / "manifest.json"
-PIN = ROOT / "ffmpeg" / "pin.json"
-PROFILE = ROOT / "ffmpeg" / "profiles" / "codec-base.json"
-TARGETS = ROOT / "ffmpeg" / "targets"
+PIN = ROOT / "native" / "ffmpeg" / "pin.json"
+PROFILE = ROOT / "native" / "ffmpeg" / "profiles" / "codec-base.json"
+TARGETS = ROOT / "native" / "ffmpeg" / "targets"
 
 # platform.system() -> Xmake platform name (recipe xmake.plat vocabulary)
 HOST_PLAT = {"linux": "linux", "darwin": "macosx", "windows": "windows"}
@@ -96,7 +96,7 @@ def _assert_portable_value(value: str, where: str) -> None:
 
 
 def load_recipe(target_id: str) -> dict:
-    """Load one machine-readable target recipe (ffmpeg/targets/<id>.json).
+    """Load one machine-readable target recipe (native/ffmpeg/targets/<id>.json).
 
     Recipes carry only target facts: platform/arch identities, FFmpeg
     target_os/arch/cross facts, artifact capability, and honest status.

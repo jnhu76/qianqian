@@ -27,7 +27,7 @@ Float32 interleaved PCM, source rate + layout
 
 One merged static archive plus one shared library, one public header:
 
-- public ABI: `include/songcore.h` — **ABI v1**, 15 symbols + version.
+- public ABI: `native/include/songcore.h` — **ABI v1**, 15 symbols + version.
 - primary artifact: `libsongcore.a` — the FFmpeg closure is merged inside;
   a consumer links one Qianqian archive + system libraries, nothing else.
 - secondary: `libsongcore.so` — exports exactly the same 15 symbols
@@ -62,11 +62,11 @@ is never automated by the tool.
 
 ## External consumers
 
-`tests/consumer/songcore_static_smoke.c` is the outside-integrator proof:
+`native/tests/consumer/songcore_static_smoke.c` is the outside-integrator proof:
 it sees only `songcore.h` + the documented link line. The ctypes consumer
 and playback demo consume the shared library with zero Qianqian code in the
 loop. All three run inside the release tool; the permanent chain is
-`tests/songcore/consumers.py` (WASM + recorded-Windows evidence in full
+`native/tests/songcore/consumers.py` (WASM + recorded-Windows evidence in full
 mode), provenance-pinned so a stale PASS cannot survive an artifact change.
 
 ## ABI freeze (v1)

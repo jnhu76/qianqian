@@ -126,13 +126,13 @@ def main() -> int:
          "'xmake f --av_manifest=build/ffmpeg-xmake/manifest.json -y' for release")
 
     # ---- 2. provenance -------------------------------------------------------
-    pin = json.loads((ROOT / "ffmpeg" / "pin.json").read_text())
+    pin = json.loads((ROOT / "native" / "ffmpeg" / "pin.json").read_text())
     gate("provenance: ffmpeg pin commit",
          manifest.get("ffmpeg_commit_sha") == pin["ffmpeg_commit_sha"])
-    profile_path = ROOT / "ffmpeg" / "profiles" / f"{PRODUCTION_PROFILE}.json"
+    profile_path = ROOT / "native" / "ffmpeg" / "profiles" / f"{PRODUCTION_PROFILE}.json"
     gate("provenance: profile sha",
          manifest.get("profile_sha256") == sha256(profile_path))
-    recipe_path = ROOT / "ffmpeg" / "targets" / f"{args.target}.json"
+    recipe_path = ROOT / "native" / "ffmpeg" / "targets" / f"{args.target}.json"
     recipe = json.loads(recipe_path.read_text())
     gate("provenance: target recipe id",
          manifest.get("target", {}).get("id") == recipe["id"],
@@ -176,7 +176,7 @@ def main() -> int:
     # ---- 5. ABI gate -----------------------------------------------------------
     dump_bin = ROOT / "build" / "release" / "abi_dump"
     dump_bin.parent.mkdir(parents=True, exist_ok=True)
-    cc = run(["cc", "-Iinclude", "tools/songcore_abi_dump.c", "-o", dump_bin])
+    cc = run(["cc", "-Inative/include", "tools/songcore_abi_dump.c", "-o", dump_bin])
     if cc.returncode != 0:
         gate("abi: layout dump compiles", False)
         return 1
@@ -190,14 +190,14 @@ def main() -> int:
         return 1
     gate("abi: layout == frozen v1 snapshot", dump == snapshot.read_text(),
          "any drift requires an explicit SONGCORE_ABI_VERSION bump")
-    abi_hdr = sha256(ROOT / "include" / "songcore.h")
+    abi_hdr = sha256(ROOT / "native" / "include" / "songcore.h")
 
     # ---- 6. consumers (external view) --------------------------------------------
     # --core: the three host-independent gates on THIS build. The run also
     # refreshes bench/results/songcore-v1/ffi-consumers-core.json — the
     # permanent `xmake test` chain re-records it on the test closure, so run
     # the test chain AFTER a release when both evidences are needed.
-    cons = run([sys.executable, "tests/songcore/consumers.py", "--out", "--core"])
+    cons = run([sys.executable, "native/tests/songcore/consumers.py", "--out", "--core"])
     core_report = json.loads((ROOT / "bench" / "results" / "songcore-v1" /
                               "ffi-consumers-core.json").read_text())
     core_gates = {g["gate"]: g["verdict"] for g in core_report.get("gates", [])}
@@ -254,11 +254,11 @@ def main() -> int:
     (pkg / "metadata").mkdir(parents=True)
     (pkg / "LICENSES").mkdir(parents=True)
 
-    shutil.copy2(ROOT / "include" / "songcore.h", pkg / "include" / "songcore.h")
+    shutil.copy2(ROOT / "native" / "include" / "songcore.h", pkg / "include" / "songcore.h")
     shutil.copy2(static_lib, pkg / "lib" / "libsongcore.a")
     shutil.copy2(shared_lib, pkg / "lib" / "shared" / "libsongcore.so")
     for f in ("songcore_static_smoke.c",):
-        src = ROOT / "tests" / "consumer" / f
+        src = ROOT / "native" / "tests" / "consumer" / f
         if src.exists():
             shutil.copy2(src, pkg / "metadata" / "external-consumer-example.c")
 

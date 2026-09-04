@@ -83,9 +83,9 @@ before any native change is authorized.
 ## Required verification
 
 - External consumers compile against ONLY the public headers + the
-  documented link line (`tests/consumer/songcore_static_smoke.c`).
+  documented link line (`native/tests/consumer/songcore_static_smoke.c`).
 - Shared/PE export audits: exactly the frozen symbol set, nothing else
-  (`tests/songcore/regression.py`, `bench/results/songcore-v1/`).
+  (`native/tests/songcore/regression.py`, `bench/results/songcore-v1/`).
 - The Kotlin/Native boundary probe (historical evidence:
   [archive/experiments/kotlin-boundary-probe.md](../archive/experiments/kotlin-boundary-probe.md))
   proved a Kotlin-owned process completing a real playback lifecycle

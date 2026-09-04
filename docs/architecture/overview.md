@@ -36,8 +36,11 @@ AudioEngine (post-decode SRC/DSP；显式启用，源匹配时 BYPASS)
 ## Physical layout note
 
 以上是 semantic 分层，不等于目录树。application 层尚未开始实现（没有
-application 目录）；native runtime 位于 `src/player/`，SongCore 位于
-`src/songcore_ffmpeg.c`，公共 ABI 位于 `include/`。
+application 目录）；native runtime 位于 `native/src/player/`，SongCore 位于
+`native/src/songcore_ffmpeg.c`，公共 ABI 位于 `native/include/`。构建定义按
+所有权拆分：根 `xmake.lua` 是薄 workspace 入口，native 构建路由是
+`native/xmake.lua`，所有权模块在 `native/build/`，跨边界的消费者侧证明在
+`integration/`。
 
 ## Component ↔ contract map
 

@@ -20,7 +20,7 @@ decode-core vs songcore-output). `tools/verify_xmake_core.py` links it two
 ways (upstream archives vs the Xmake-replayed `libqianqian_av.a`) and
 asserts byte-identical PCM.
 
-The permanent SongCore regression lives in `tests/songcore/`
+The permanent SongCore regression lives in `native/tests/songcore/`
 (`regression.py` + `songcore_probe`), which is the authority tree that
 matters; `qn_bench.c` here exists to prove the Xmake replay is faithful to
 the oracle.

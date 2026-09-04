@@ -20,7 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 CANONICAL = ROOT / "build" / "ffmpeg-xmake" / "manifest.json"
 SCRATCH_CFG = ROOT / "build" / "target-gate-test"
 SCRATCH_BLD = "build/xmake-target-gate"

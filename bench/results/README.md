@@ -7,7 +7,7 @@ bench/results/
   README.md             this file
   schema.json           field contract for result documents
   songcore-v1/          SongCore ABI v1 machine authority tree (fail-closed
-                        --check; see tests/songcore/README.md)
+                        --check; see native/tests/songcore/README.md)
   common-formats/       Common Formats compatibility summary
   avfilter-minimize/    DSP closure capability summary (capability intent,
                         dependency provenance, shipping size, verdict) —
@@ -27,7 +27,7 @@ owning script from stable inputs (corpus + build + manifests):
 
 | Path | Status |
 |---|---|
-| `bench/results/songcore-v1/` | tracked — SongCore authority, validated read-only by `tests/songcore/regression.py --check` |
+| `bench/results/songcore-v1/` | tracked — SongCore authority, validated read-only by `native/tests/songcore/regression.py --check` |
 | `bench/results/common-formats/` | tracked — Common Formats compatibility summary (frozen reference) |
 | `bench/results/avfilter-minimize/` | tracked — DSP closure capability summary (frozen reference; re-run `tools/dsp_closure.py` on an FFmpeg upgrade) |
 | `bench/results/wasm-summary.json` | tracked — WASM viability summary (frozen reference) |

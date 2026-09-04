@@ -44,7 +44,7 @@ shared library statically contains the whole FFmpeg closure with a
 - **libavfilter DSP closure** (`bench/results/avfilter-minimize/shipping.json`):
   F1 core-gain-eq-tone 801,008 B stripped / 270,504 B xz; full F0–F7 DSP
   envelope 1,198,320 B stripped / 389,080 B xz. The permanent DSP/SRC smoke
-  is `tests/songcore/dsp_src.py`.
+  is `native/tests/songcore/dsp_src.py`.
 
 ## Interpretation
 

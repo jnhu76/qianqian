@@ -13,14 +13,14 @@ future target, not the default path; native-first 是冻结决策
 ## Architecture result
 
 ```text
-SongCore C ABI  (include/songcore.h, frozen v1)
+SongCore C ABI  (native/include/songcore.h, frozen v1)
         ↓
-WASM bridge     (src/wasm/songcore_wasm_bridge.c — host I/O imports, PCM export)
+WASM bridge     (native/src/wasm/songcore_wasm_bridge.c — host I/O imports, PCM export)
         ↓
 SongCore.wasm
 ```
 
-The same capability intent (`ffmpeg/capabilities/*.json`) and the same
+The same capability intent (`native/ffmpeg/capabilities/*.json`) and the same
 configure-oracle → manifest → Xmake replay method produce the WASM closure;
 only the toolchain differs. Nothing about SongCore itself is WASM-specific.
 
@@ -51,7 +51,7 @@ from WAMR (interpreter + AOT), wasm3, Wasmtime, and Emscripten/V8:
   28 bit-exact + 16 within the declared float tolerance (max abs delta
   1e-6), 0 rejected. Inter-runtime gate: PASS, 0 mismatches over 44 cases.
   Re-proven per fixture against the Linux/Windows backends by
-  `tests/songcore/ffi_consistency.py` (lossless PCM byte-exact).
+  `native/tests/songcore/ffi_consistency.py` (lossless PCM byte-exact).
 - **Guest protocol**: the guest exports exactly the 15 contract mirrors plus
   three bridge-infrastructure exports — `song_wasm_alloc`/`song_wasm_free`
   (guest-heap buffers, so the host never guesses addresses; leak-checked by
