@@ -3,7 +3,7 @@
 > Purpose: native 侧的构建操作——从 fresh checkout 到产物落盘的命令。
 > Scope: operational how-to。方法与规则见
 > [../architecture/ffmpeg-minimization.md](../architecture/ffmpeg-minimization.md)；
-> 回归命令权威见 [tests/songcore/README.md](../../../tests/songcore/README.md)。
+> 回归命令权威见 [tests/songcore/README.md](../../tests/songcore/README.md)。
 
 ## Canonical build
 
@@ -39,7 +39,7 @@ environment at derive time — machine-local absolute paths are rejected from
 recipes and manifests.
 
 Test/DSP closures use `--stage`（如 `songcore-test`、`avf-c2`），命令见
-[tests/songcore/README.md](../../../tests/songcore/README.md)。
+[tests/songcore/README.md](../../tests/songcore/README.md)。
 
 ## Build system scope
 
@@ -54,7 +54,7 @@ the native artifact through FFI / JNI / cinterop.
 All build sessions share `build/artifacts/`. Switching platform/toolchain
 sessions (native ↔ `mingw` ↔ `--wasm=wasi`) must rebuild with `-r`
 （细节与历史事故见
-[tests/songcore/README.md](../../../tests/songcore/README.md) 的 session
+[tests/songcore/README.md](../../tests/songcore/README.md) 的 session
 hygiene 一节）。
 
 ## Release

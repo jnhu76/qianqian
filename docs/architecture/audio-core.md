@@ -63,7 +63,21 @@ otherwise                                →  aresample / libswresample
 DSP is a capability-trimmed libavfilter graph (intent:
 `ffmpeg/capabilities/dsp.json`): volume/preamp, parametric/graphic EQ,
 tone, filters, and graph plumbing. Processing is opt-in per capability;
-nothing runs unless a pipeline asks for it.
+nothing runs unless a pipeline asks for it. ReplayGain 应用属 AudioEngine
+策略（SongCore 只读取标签——metadata 中的 microbels + peak）。
+
+### Data representation
+
+DSP 路径统一使用 **Float32 PCM**：适合 EQ / gain / FFT；headroom 更充足；
+避免多次整数截断；各平台 AudioSink 普遍可较自然地接入；容易 SIMD 优化。
+
+若最终设备必须使用整数 PCM：
+
+```text
+Float32 → 最后一步量化 → device
+```
+
+需要降位深时才考虑 dithering。
 
 ### AudioBackend
 

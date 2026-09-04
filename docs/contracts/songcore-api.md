@@ -349,7 +349,7 @@ libsongcore.so · songcore.dll · libsongcore.a · static native integration
 - One wrapper object ⇔ one native handle; a `close()` in the wrapper must
   reach `song_close` exactly once.
 
-No framework-specific bindings are part of this repository (Phase 0).
+No framework-specific bindings are part of this repository.
 
 ## 8. Verified consumers
 
