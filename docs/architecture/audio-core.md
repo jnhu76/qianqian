@@ -89,9 +89,9 @@ NullAudioBackend 驱动同一 seam。
 
 ## Boundaries
 
-- UI 层（Kotlin/KMP/Compose/Swift/Qt/etc.）只通过稳定 C ABI
-  （`songcore.h` / `player_engine.h`）经 JNI / JNA / cinterop 访问核心；
-  UI code 不在本仓库。FFMpeg 类型永不穿越边界
+- UI / application 层（Kotlin/KMP/Compose/Swift/Qt/etc.）不属于 Native
+  Audio Core，只通过稳定 C ABI（`songcore.h` / `player_engine.h`）经
+  JNI / JNA / cinterop 访问核心。FFMpeg 类型永不穿越边界
   （[contracts/ffi-boundary.md](../contracts/ffi-boundary.md)）。
 - 明确不做的能力清单：
   [negative-capability-manifest.md](negative-capability-manifest.md)。

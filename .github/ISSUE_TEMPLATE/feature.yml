@@ -39,7 +39,7 @@ body:
     attributes:
       label: Affected layer
       options:
-        - product / PRD
+        - Product / application
         - SongCore
         - PlayerEngine
         - AudioEngine / DSP / SRC

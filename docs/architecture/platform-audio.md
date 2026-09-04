@@ -33,9 +33,12 @@ Tests never define the runtime macro, so `player_consumer_c` and the
 gates keep driving the NullAudioBackend manually (single-consumer seam
 rule preserved).
 
-`songcore_static` / `songcore_shared` remain internal build artifacts;
-consumers never link them directly
-([contracts/ffi-boundary.md](../contracts/ffi-boundary.md)).
+`songcore_static` / `songcore_shared` remain internal to the qianqian
+product runtime; the product application never links them directly
+([contracts/ffi-boundary.md](../contracts/ffi-boundary.md)). Standalone
+SongCore integrators are the separate, legitimate consumer of
+`libsongcore.a` / `libsongcore.so` / `songcore.dll`
+([contracts/songcore-api.md](../contracts/songcore-api.md)).
 
 ## Device scope
 

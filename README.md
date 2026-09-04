@@ -6,9 +6,10 @@
 ## What is Qianqian?
 
 「千千·现代」是简洁、轻量、纯粹的跨平台**本地音乐播放器**：local-first、
-playback-only、显式 DSP、极致减法。核心原则一句话：
+playback-only、显式 DSP、极致减法。核心 admission 双轨：
 
-> **任何新增能力都必须回答：没有它，哪一首正常歌曲播不了？**
+> **native / audio-core 扩张必须回答：没有它，哪一首正常歌曲播不了？
+> product / application capability 必须证明用户/产品价值，并由当前 Issue 授权。**
 
 产品定位与边界：[docs/product/product.md](docs/product/product.md)。
 

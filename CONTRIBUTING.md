@@ -7,7 +7,7 @@
 
 - 读 [README.md](README.md)（是什么、怎么构建）和
   [docs/product/product.md](docs/product/product.md)（产品边界）；
-- 本仓库是“极致减法”项目：新增任何能力前先回答——**没有它，哪一首正常歌曲播不了？**（见 [AGENTS.md](AGENTS.md)）。
+- 本仓库是“极致减法”项目，admission 分双轨：native / audio-core 扩张先回答——**没有它，哪一首正常歌曲播不了？**；product / application capability 须证明用户/产品价值并由当前 Issue 授权（见 [AGENTS.md](AGENTS.md) §1）。
 
 ## Issues
 

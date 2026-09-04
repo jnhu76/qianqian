@@ -40,7 +40,11 @@ The application MUST NOT know about or depend on:
 - native render-thread ownership or lifecycle details.
 
 Implementation archives (`songcore_static` / `songcore_shared`) stay
-internal build artifacts.
+internal to the qianqian product runtime: the product application never
+links them. This rule does not retire the standalone SongCore consumer
+path (`libsongcore.a` / `libsongcore.so` / `songcore.dll`), which is
+owned by [songcore-api.md](songcore-api.md) and
+[../development/release.md](../development/release.md).
 
 ## Cross-layer change rule
 

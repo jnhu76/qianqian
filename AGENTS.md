@@ -4,13 +4,18 @@
 
 ## 1. 项目不是通用 FFmpeg wrapper
 
-本项目只服务本地歌曲播放。
+本项目只服务本地歌曲播放。新增能力按所在层适用不同的 admission criterion：
 
-任何新增 API、FFmpeg component、依赖或 abstraction 都必须回答：
+- **Native / audio-core expansion**（新增 API、FFmpeg component、依赖或
+  abstraction）必须回答：
 
-> 没有它，哪一首正常歌曲播不了？
+  > 没有它，哪一首正常歌曲播不了？
 
-无法回答时，不应加入。
+  无法回答时，不应加入。
+
+- **Product / application capability**（playlist、library、UI state 等）
+  必须证明 user / product value，并由当前 Issue 明确授权；不得以此为理由
+  无证据扩张 native contract。
 
 ## 2. Authority routing
 
