@@ -127,7 +127,7 @@ target("songcore_probe")
     set_kind("binary")
     set_default(false)
     set_targetdir(artifact_dir)
-    add_files("$(projectdir)/tests/songcore/songcore_probe.c")
+    add_files("$(projectdir)/native/tests/songcore/songcore_probe.c")
     add_deps("songcore_static")
     if is_plat("linux") or is_plat("macosx") then
         add_syslinks("m", "pthread")
@@ -170,8 +170,8 @@ target("songcore_probe")
         end
         local root = os.projectdir()
         local out = path.join(root, "bench", "results", "songcore-v1")
-        local script = path.join(root, "tests", "songcore", "regression.py")
-        local consumers = path.join(root, "tests", "songcore", "consumers.py")
+        local script = path.join(root, "native", "tests", "songcore", "regression.py")
+        local consumers = path.join(root, "native", "tests", "songcore", "consumers.py")
         os.execv(python.program, {script, "--out", out})
         os.execv(python.program, {script, "--check", "--out", out})
         os.execv(python.program, {consumers, "--out", "--core"})
@@ -188,7 +188,7 @@ target("dsp_cap_probe")
     set_kind("binary")
     set_default(false)
     set_targetdir(artifact_dir)
-    add_files("$(projectdir)/tests/songcore/dsp_cap_probe.c")
+    add_files("$(projectdir)/native/tests/songcore/dsp_cap_probe.c")
     -- build.merge_archive: the closure (qianqian_av) lives inside the merged
     -- songcore archive; depending on qianqian_av directly would be silently
     -- dropped from the link line.

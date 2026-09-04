@@ -44,7 +44,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 RESULTS = ROOT / "bench" / "results" / "songcore-v1"
 FIXTURES = ROOT / "corpus" / "fixtures"
 
@@ -177,16 +177,16 @@ def gate_ctypes(lib: Path) -> dict:
 
 def gate_static_consumer() -> dict:
     gate = {"gate": "static_archive_consumer",
-            "tool": "tests/consumer/songcore_static_smoke.c",
+            "tool": "native/tests/consumer/songcore_static_smoke.c",
             "fixtures": STATIC_FIXTURES}
     exe_rel = "build/consumer/songcore_static_smoke"
     exe = ROOT / exe_rel
     exe.parent.mkdir(parents=True, exist_ok=True)
     if sys.platform == "win32":
-        cc = ["gcc", "-Inative/include", "tests/consumer/songcore_static_smoke.c",
+        cc = ["gcc", "-Inative/include", "native/tests/consumer/songcore_static_smoke.c",
               "-Lbuild/artifacts", "-lsongcore", "-lbcrypt", "-o", exe_rel]
     else:
-        cc = ["cc", "-Inative/include", "tests/consumer/songcore_static_smoke.c",
+        cc = ["cc", "-Inative/include", "native/tests/consumer/songcore_static_smoke.c",
               "-Lbuild/artifacts", "-lsongcore", "-lm", "-lpthread", "-o", exe_rel]
     proc = run(cc)
     if proc.returncode != 0:
@@ -312,7 +312,7 @@ def run_all(out: Path, core: bool = False) -> int:
     if not core:
         gates += [gate_wasm(), gate_windows_recorded()]
     report = {
-        "tool": "tests/songcore/consumers.py",
+        "tool": "native/tests/songcore/consumers.py",
         "platform": f"{platform.system()}-{platform.machine()}",
         "shared_library": rel(lib),
         "shared_library_sha256": sha256_file(lib) if lib.is_file() else None,
@@ -461,7 +461,7 @@ def mutation(name: str) -> int:
                                 "NOT caught by the consumer gate")
 
     if name in ("all", "target-identity"):
-        xmake_gate = ROOT / "tests" / "songcore" / "target_gate_test.py"
+        xmake_gate = ROOT / "native" / "tests" / "songcore" / "target_gate_test.py"
         r = run([sys.executable, str(xmake_gate)])
         if r.returncode != 0:
             failures.append("target-identity: xmake-level negative gate "

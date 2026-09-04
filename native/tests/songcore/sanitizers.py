@@ -31,7 +31,7 @@ import os
 import subprocess
 import sys
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 ARTIFACTS = os.path.join(ROOT, "build", "artifacts")
 CLOSURE_LIB = os.path.join(ARTIFACTS, "libqianqian_av.a")
 SOURCE_ROOT = os.path.join(ROOT, "build", "ffmpeg-src")
@@ -47,7 +47,7 @@ COMMON_MANIFEST = os.path.join(ROOT, "corpus", "manifest", "common-formats.json"
 OWNED_PREFIXES = (
     os.path.join(ROOT, "src", "songcore_ffmpeg.c"),
     os.path.join(ROOT, "tests", "songcore", "songcore_probe.c"),
-    os.path.join(ROOT, "include", "songcore.h"),
+    os.path.join(ROOT, "native", "include", "songcore.h"),
 )
 UPSTREAM_PREFIX = os.path.join(ROOT, "build", "ffmpeg-src")
 
@@ -73,7 +73,7 @@ def build_binary():
     ]
     r = run(["gcc", "-O1", "-g", "-fno-omit-frame-pointer",
              "-fsanitize=address,undefined",
-             "-I" + os.path.join(ROOT, "include"),
+             "-I" + os.path.join(ROOT, "native", "include"),
              "-I" + SOURCE_ROOT, "-I" + ORACLE_ROOT,
              *src, CLOSURE_LIB, "-lm", "-lpthread",
              "-o", SAN_BINARY])
@@ -237,8 +237,8 @@ def main():
 
     evidence = {
         "instrumentation": "address,undefined,leak",
-        "instrumented_units": ["src/songcore_ffmpeg.c",
-                               "tests/songcore/songcore_probe.c"],
+        "instrumented_units": ["native/src/songcore_ffmpeg.c",
+                               "native/tests/songcore/songcore_probe.c"],
         "closure_linked_uninstrumented": "build/artifacts/libqianqian_av.a",
         "invocations": invocations,
         "fixture_count": len(list_fixtures()),

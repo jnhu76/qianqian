@@ -38,7 +38,7 @@ import struct
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 RESULTS = ROOT / "bench" / "results" / "songcore-v1"
 
 # The established cross-backend float tolerance (WASM viability authority).
@@ -187,7 +187,7 @@ def compute() -> dict:
                else "partial" if (missing or any(
                    r["verdict"] != "pass" for r in rows)) else "pass")
     return {
-        "tool": "tests/songcore/ffi_consistency.py",
+        "tool": "native/tests/songcore/ffi_consistency.py",
         "policy": {
             "lossless_pcm": "exact (full-window SHA-256 equality)",
             "lossy_pcm": f"max_abs_delta <= {LOSSY_MAX_ABS_DELTA:g} "

@@ -76,9 +76,9 @@ target("player_gates")
     set_kind("binary")
     set_default(false)
     set_targetdir(artifact_dir)
-    add_files("$(projectdir)/tests/player/pcm_ring_test.cpp", "$(projectdir)/tests/player/engine_gates_test.cpp",
-              "$(projectdir)/tests/player/thread_stress_test.cpp", "$(projectdir)/tests/player/gates_main.cpp",
-              "$(projectdir)/tests/player/realtime_bounds_test.cpp", "$(projectdir)/tests/player/fake_songcore.cpp")
+    add_files("$(projectdir)/native/tests/player/pcm_ring_test.cpp", "$(projectdir)/native/tests/player/engine_gates_test.cpp",
+              "$(projectdir)/native/tests/player/thread_stress_test.cpp", "$(projectdir)/native/tests/player/gates_main.cpp",
+              "$(projectdir)/native/tests/player/realtime_bounds_test.cpp", "$(projectdir)/native/tests/player/fake_songcore.cpp")
     add_deps("player_core")
     player_common()
     add_tests("default")
@@ -94,9 +94,9 @@ target("player_consumer_c")
     set_kind("binary")
     set_default(false)
     set_targetdir(artifact_dir)
-    add_files("$(projectdir)/tests/player/consumer_c/main.c", "$(projectdir)/tests/player/fake_songcore.cpp",
-              "$(projectdir)/tests/player/player_test_driver.cpp")
-    add_includedirs("$(projectdir)/tests/player") -- stand-in "filesystem" header only
+    add_files("$(projectdir)/native/tests/player/consumer_c/main.c", "$(projectdir)/native/tests/player/fake_songcore.cpp",
+              "$(projectdir)/native/tests/player/player_test_driver.cpp")
+    add_includedirs("$(projectdir)/native/tests/player") -- stand-in "filesystem" header only
     add_deps("player_core")
     player_common()
     set_languages("c99", "c++17")
@@ -112,8 +112,8 @@ target("player_real_songcore_smoke")
     set_kind("binary")
     set_default(false)
     set_targetdir(artifact_dir)
-    add_files("$(projectdir)/tests/player/real_songcore_smoke.c",
-              "$(projectdir)/tests/player/player_test_driver.cpp")
+    add_files("$(projectdir)/native/tests/player/real_songcore_smoke.c",
+              "$(projectdir)/native/tests/player/player_test_driver.cpp")
     add_deps("player_core", "songcore_static")
     player_common()
     set_languages("c99", "c++17")
