@@ -12,7 +12,7 @@ library behind a stable C ABI.
 ## Responsibility
 
 ```text
-Product / UI (Kotlin / KMP / future desktop app)
+Product / UI (Kotlin / desktop app)
         │  stable FFI / C ABI (song_* + pe_*, one qianqian runtime library)
         ▼
 Player Runtime (PlayerEngine + AudioBackend)
