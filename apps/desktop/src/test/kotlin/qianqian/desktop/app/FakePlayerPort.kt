@@ -12,7 +12,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * The smallest application-test fake over [PlayerPort]: records commands,
  * publishes ONLY the snapshots a test explicitly injects via [emit],
  * and fails operations when a test configures a typed error. It simulates
- * no playback engine semantics.
+ * no playback engine semantics. [events] and [playGate] are deterministic
+ * test synchronization (ordering, in-flight suspension) — not engine
+ * behavior.
  */
 class FakePlayerPort : PlayerPort {
 
@@ -24,6 +26,12 @@ class FakePlayerPort : PlayerPort {
     val stopCalls = AtomicInteger(0)
     val seekCalls = AtomicInteger(0)
     val closeCalls = AtomicInteger(0)
+
+    /** Ordered command/close event log for lifecycle-ordering assertions. */
+    val events: MutableList<String> = Collections.synchronizedList(ArrayList())
+
+    /** When set, `play` suspends on this gate before returning. */
+    var playGate: (suspend () -> Unit)? = null
 
     /** Landing value `seek` reports on success (native: actual landing). */
     var seekLandingUs: Long = 5_000_000
@@ -42,7 +50,9 @@ class FakePlayerPort : PlayerPort {
     }
 
     override suspend fun play() {
+        events.add("play")
         playCalls.incrementAndGet()
+        playGate?.invoke()
     }
 
     override suspend fun pause() {
@@ -60,6 +70,7 @@ class FakePlayerPort : PlayerPort {
     }
 
     override suspend fun close() {
+        events.add("port:close")
         closeCalls.incrementAndGet()
     }
 }

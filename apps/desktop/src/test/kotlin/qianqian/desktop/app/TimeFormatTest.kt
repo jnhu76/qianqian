@@ -1,9 +1,18 @@
 package qianqian.desktop.app
 
+import java.util.Locale
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class TimeFormatTest {
+
+    private val originalLocale: Locale = Locale.getDefault()
+
+    @AfterTest
+    fun restoreLocale() {
+        Locale.setDefault(originalLocale)
+    }
 
     @Test
     fun zeroFormatsAsZeroMinutes() {
@@ -46,5 +55,15 @@ class TimeFormatTest {
     fun negativeMeansUnknown() {
         assertEquals(TimeFormat.UNKNOWN, TimeFormat.formatUs(-1))
         assertEquals("--:--", TimeFormat.UNKNOWN)
+    }
+
+    @Test
+    fun formattingIsLocaleStable() {
+        // A locale whose default formatting uses non-Latin digits must not
+        // change media-time output (Locale.ROOT formatting).
+        Locale.setDefault(Locale.forLanguageTag("ar-EG"))
+        assertEquals("0:00", TimeFormat.formatUs(0))
+        assertEquals("1:05", TimeFormat.formatUs(65_000_000))
+        assertEquals("1:01:01", TimeFormat.formatUs(3_661_000_000))
     }
 }
