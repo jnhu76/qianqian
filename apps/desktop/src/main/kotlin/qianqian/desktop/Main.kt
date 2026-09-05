@@ -13,6 +13,14 @@ import qianqian.desktop.player.PlayerPort
 import java.nio.file.Path
 import java.nio.file.Paths
 
+/**
+ * Application entry point.
+ *
+ * Note: `onExit` runs on the appScope teardown coroutine — it only mutates
+ * a Compose snapshot, and Compose schedules the application closure back
+ * onto the main event loop (verified against Compose Desktop 1.12.0
+ * behavior). No main-dispatcher abstraction is added for this.
+ */
 fun main() {
     // The one application-lifetime scope (no GlobalScope). It hosts the
     // startup connection and the exit-path teardown.

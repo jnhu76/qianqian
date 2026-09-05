@@ -1,5 +1,6 @@
 package qianqian.desktop.app
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.launch
@@ -47,6 +48,8 @@ class AppRuntime(
                         parentScope = appScope,
                     ),
                 )
+            } catch (e: CancellationException) {
+                throw e // shutdown cancellation is not a runtime failure
             } catch (e: Exception) {
                 // Startup bridge loading failure must be a visible
                 // application state, never a crash before the window.
@@ -60,6 +63,11 @@ class AppRuntime(
      * Window close request: close the screen model / player port first,
      * THEN exit the application event loop. Idempotent; never blocks the
      * EDT (teardown runs on the app scope).
+     *
+     * MVP limitation: while the startup connection is still pending, exit
+     * waits for the connection outcome — a hung startup connection can
+     * delay exit. No timeout policy exists at this scope; add one only if
+     * evidence demands it.
      */
     fun requestExit(onExit: () -> Unit) {
         if (!exitRequested.compareAndSet(false, true)) return
