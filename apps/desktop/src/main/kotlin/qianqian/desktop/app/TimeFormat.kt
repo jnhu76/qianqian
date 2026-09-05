@@ -1,12 +1,16 @@
 package qianqian.desktop.app
 
+import java.util.Locale
+
 /**
  * Minimal media-time display formatting (mm:ss, h:mm:ss for tracks >= 1 h).
  *
  * Input is the native media unit (microseconds) — no locale/time-zone
- * machinery, pure arithmetic. Negative input means "unknown" and formats
- * as [UNKNOWN]; seconds are floored (0.9 s shows as 0:00), matching
- * standard media-player display behavior.
+ * machinery, pure arithmetic, formatted with [Locale.ROOT] so digits and
+ * separators are identical in every process locale (`0:00`, `1:05`,
+ * `1:01:01`). Negative input means "unknown" and formats as [UNKNOWN];
+ * seconds are floored (0.9 s shows as 0:00), matching standard
+ * media-player display behavior.
  */
 object TimeFormat {
 
@@ -20,9 +24,9 @@ object TimeFormat {
         val minutes = (totalSeconds % 3_600) / 60
         val seconds = totalSeconds % 60
         return if (hours > 0) {
-            "%d:%02d:%02d".format(hours, minutes, seconds)
+            "%d:%02d:%02d".format(Locale.ROOT, hours, minutes, seconds)
         } else {
-            "%d:%02d".format(minutes, seconds)
+            "%d:%02d".format(Locale.ROOT, minutes, seconds)
         }
     }
 }
