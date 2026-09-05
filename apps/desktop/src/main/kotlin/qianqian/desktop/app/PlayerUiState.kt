@@ -16,9 +16,10 @@ import java.nio.file.Path
  *  - [seekPreviewUs] — where the user is currently dragging (never sent
  *    to native during the drag).
  *  - [committedSeekUs] — the landing the engine itself reported from the
- *    last committed seek, shown until a snapshot confirms that position
- *    (so the slider does not snap back between commit and the next 10 Hz
- *    poll).
+ *    last committed seek, shown until a snapshot lands inside that
+ *    position's window (so the slider does not snap back between commit
+ *    and the next 10 Hz poll). Display reconciliation only — not a claim
+ *    that a snapshot causally confirms the seek.
  *
  * Legal-action booleans are a small enablement projection of the native
  * state per `docs/contracts/player-api.md` — a projection, not a second

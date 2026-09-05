@@ -1,11 +1,12 @@
 package qianqian.desktop.app
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -50,11 +51,12 @@ class PlayerScreenModel(
     parentScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
     /**
-     * Hosts the snapshot projection and in-flight command coroutines.
-     * Owned by the model; cancelled by [close] before the port closes.
+     * The model-owned job hosting the snapshot projection and every
+     * user-command coroutine. Parented on the caller's job; [close]
+     * cancels and drains it BEFORE the port closes.
      */
-    private val scope =
-        CoroutineScope(SupervisorJob(parentScope.coroutineContext[Job]) + Dispatchers.Default)
+    private val modelJob = SupervisorJob(parentScope.coroutineContext[Job])
+    private val scope = CoroutineScope(modelJob + Dispatchers.Default)
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -70,8 +72,10 @@ class PlayerScreenModel(
                 _uiState.update { state ->
                     state.copy(
                         snapshot = snap,
-                        // A committed seek is displayed until a snapshot
-                        // reaches its landing; then snapshot truth resumes.
+                        // A committed seek stays displayed until a snapshot
+                        // lands inside its window; then snapshot truth
+                        // resumes. Display reconciliation only — the ABI
+                        // carries no seek generation to causally confirm.
                         committedSeekUs = clearCaughtUpSeek(state, snap),
                     )
                 }
@@ -90,6 +94,8 @@ class PlayerScreenModel(
         beginOperation()
         val chosen = try {
             picker.selectAudioFile()
+        } catch (e: CancellationException) {
+            throw e // shutdown cancellation is control flow, not a product error
         } catch (e: Exception) {
             failOperation(PlayerUiError(PlayerUiErrorCategory.FileDialogFailed))
             return@launchCommand
@@ -103,9 +109,17 @@ class PlayerScreenModel(
 
     /**
      * Open a concrete file. Semantics follow the native contract: open
-     * succeeds → READY, never autoplay; the candidate is promoted to
-     * [PlayerUiState.selectedFile] ONLY on success, so a failed file is
-     * never displayed as the current track.
+     * succeeds → READY, never autoplay. Source identity mirrors native
+     * ownership truth:
+     *
+     *  - [SourceOpenFailure] (JVM read failed BEFORE `pe_open`): the
+     *    previous source is untouched and stays displayed; only the
+     *    candidate failed.
+     *  - [OpenFailure] (`pe_open` ran and failed): `pe_open` is
+     *    destructive — native dropped the previous source and owns
+     *    nothing, so the projection stops displaying it as current.
+     *
+     * A failed candidate is never promoted to [PlayerUiState.selectedFile].
      */
     suspend fun openFile(path: Path) {
         beginOperation()
@@ -113,7 +127,19 @@ class PlayerScreenModel(
             port.open(path)
         } catch (e: BridgeClosedException) {
             return // shutting down; not a product error
+        } catch (e: CancellationException) {
+            throw e // shutdown cancellation is control flow, not a product error
+        } catch (e: SourceOpenFailure) {
+            failOperation(
+                PlayerUiError(PlayerUiErrorCategory.FileUnavailable, path.fileName?.toString()),
+            )
+            return
         } catch (e: PlayerBridgeException) {
+            // pe_open already ran and failed → native EMPTY, bridge owns no
+            // source. The old file must not stay displayed as current.
+            _uiState.update {
+                it.copy(selectedFile = null, seekPreviewUs = null, committedSeekUs = null)
+            }
             failOperation(openError(e, path))
             return
         } catch (e: Exception) {
@@ -135,10 +161,12 @@ class PlayerScreenModel(
     /**
      * The one playback control: Play from READY/PAUSED/ENDED, Pause from
      * PLAYING. No optimistic state — the button label follows the snapshot.
+     * Non-suspending user entrypoint: the model owns the command coroutine
+     * and its admission.
      */
-    suspend fun togglePlayback() {
+    fun togglePlayback() = launchCommand {
         val state = _uiState.value.snapshot.state
-        if (state == PlayerState.EMPTY || state == PlayerState.ERROR) return
+        if (state == PlayerState.EMPTY || state == PlayerState.ERROR) return@launchCommand
         beginOperation()
         try {
             when (state) {
@@ -146,24 +174,28 @@ class PlayerScreenModel(
                 else -> port.play() // READY, PAUSED, ENDED (ENDED replays from 0)
             }
         } catch (e: BridgeClosedException) {
-            return // shutting down
+            return@launchCommand // shutting down
         } catch (e: PlayerBridgeException) {
             failOperation(commandError(e))
-            return
+            return@launchCommand
         }
         endOperation()
     }
 
-    /** Native `stop` → READY @0; the UI follows the snapshot, no local reset. */
-    suspend fun stopPlayback() {
+    /**
+     * Native `stop` → READY @0; the UI follows the snapshot, no local reset.
+     * Non-suspending user entrypoint: the model owns the command coroutine
+     * and its admission.
+     */
+    fun stopPlayback() = launchCommand {
         beginOperation()
         try {
             port.stop()
         } catch (e: BridgeClosedException) {
-            return // shutting down
+            return@launchCommand // shutting down
         } catch (e: PlayerBridgeException) {
             failOperation(commandError(e))
-            return
+            return@launchCommand
         }
         _uiState.update {
             it.copy(operationInFlight = false, seekPreviewUs = null, committedSeekUs = null)
@@ -181,10 +213,12 @@ class PlayerScreenModel(
 
     /**
      * Slider release: commit exactly one native seek. The engine-reported
-     * landing stays displayed until a snapshot confirms it (or the
-     * requested target when the landing is genuinely unknown). On failure
-     * the preview is cleared, the error is shown, and the native snapshot
-     * remains the timeline authority.
+     * landing stays displayed until a snapshot reaches the committed
+     * landing window (or the requested target when the landing is
+     * genuinely unknown) — display reconciliation, not a causal fence:
+     * the snapshot ABI carries no seek generation. On failure the preview
+     * is cleared, the error is shown, and the native snapshot remains the
+     * timeline authority.
      */
     fun onSeekCommit() {
         val target = _uiState.value.seekPreviewUs ?: return
@@ -210,23 +244,28 @@ class PlayerScreenModel(
     // ---- lifecycle -------------------------------------------------------
 
     /**
-     * Shut down exactly once: stop the model's coroutines first, then close
-     * the port (the port's own close is idempotent; [NonCancellable] keeps
-     * the teardown running even when called from a cancelled scope).
+     * Shut down exactly once, in a strict order: refuse new commands →
+     * cancel and DRAIN every model-owned coroutine (commands + snapshot
+     * projection) → close the port last, so no command can touch it after
+     * (or during) teardown. The port's own close is idempotent;
+     * [NonCancellable] keeps the teardown running even when the caller's
+     * scope is being cancelled. Must not be called from a coroutine the
+     * model itself owns (draining would wait on the caller).
      */
     suspend fun close() {
         if (!closed.compareAndSet(false, true)) return
-        scope.cancel()
+        modelJob.cancelAndJoin()
         withContext(NonCancellable) { port.close() }
     }
 
     // ---- internals -------------------------------------------------------
 
     /**
-     * One-command-at-a-time admission, enforced synchronously so a
-     * double-click cannot double-dispatch. Rejected clicks are dropped —
-     * the native bridge remains the serialization authority; this is only
-     * click-spam sanity.
+     * One-command-at-a-time admission, enforced synchronously at the
+     * entrypoint so a click storm cannot stack user commands: at most one
+     * application-level user command is admitted; later ones are dropped
+     * until it finishes. The native bridge remains the serialization
+     * authority; this is only click-spam sanity.
      */
     private fun launchCommand(block: suspend () -> Unit) {
         if (closed.get()) return
@@ -264,15 +303,24 @@ class PlayerScreenModel(
         _uiState.update { it.copy(operationInFlight = false, error = error) }
     }
 
-    /** Clear the committed-seek display once the snapshot reaches it. */
+    /**
+     * Clear the committed-seek display once a snapshot lands inside its
+     * window (symmetric tolerance). Until then the landing stays shown —
+     * including against a stale pre-seek snapshot that is HIGHER than the
+     * landing after a backward seek. Positions are non-negative
+     * microseconds, so this subtraction cannot overflow.
+     */
     private fun clearCaughtUpSeek(state: PlayerUiState, snap: PlayerSnapshot): Long? {
         val committed = state.committedSeekUs ?: return null
-        return if (snap.positionUs >= committed - SEEK_CATCHUP_TOLERANCE_US) null else committed
+        val delta = if (snap.positionUs >= committed) {
+            snap.positionUs - committed
+        } else {
+            committed - snap.positionUs
+        }
+        return if (delta <= SEEK_CATCHUP_TOLERANCE_US) null else committed
     }
 
     private fun openError(e: PlayerBridgeException, path: Path): PlayerUiError = when (e) {
-        is SourceOpenFailure ->
-            PlayerUiError(PlayerUiErrorCategory.FileUnavailable, path.fileName?.toString())
         is OpenFailure ->
             PlayerUiError(PlayerUiErrorCategory.CouldNotOpenTrack, path.fileName?.toString())
         is RuntimeLoadFailure, is AbiMismatch, is EngineCreationFailure ->

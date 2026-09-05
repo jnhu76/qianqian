@@ -12,10 +12,8 @@ import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 
 /**
  * The one minimal player screen: Open File, current track, native state,
@@ -23,13 +21,13 @@ import kotlinx.coroutines.launch
  *
  * Every playback value rendered here comes from the projected
  * [PlayerUiState] (native snapshot underneath); no handler mutates
- * playback state locally. Native commands are issued through launched
- * coroutines — never blocking on the Compose UI thread.
+ * playback state locally. Handlers pass user intent to the screen model
+ * only — the model owns every user-command coroutine, its admission, and
+ * its cancellation; this composable owns no scope and launches nothing.
  */
 @Composable
 fun PlayerScreen(model: PlayerScreenModel) {
     val state by model.uiState.collectAsState()
-    val screenScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -54,13 +52,13 @@ fun PlayerScreen(model: PlayerScreenModel) {
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
-                onClick = { screenScope.launch { model.togglePlayback() } },
+                onClick = model::togglePlayback,
                 enabled = state.canTogglePlayback,
             ) {
                 Text(if (state.isPlaying) "Pause" else "Play")
             }
             Button(
-                onClick = { screenScope.launch { model.stopPlayback() } },
+                onClick = model::stopPlayback,
                 enabled = state.canStop,
             ) {
                 Text("Stop")
