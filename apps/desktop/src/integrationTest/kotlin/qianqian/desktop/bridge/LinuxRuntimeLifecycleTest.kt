@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.junit.Assume.assumeTrue
 import qianqian.desktop.nativebridge.NativePlayerAdapter
 import qianqian.desktop.nativebridge.NativeRuntimeLoader
 import qianqian.desktop.nativebridge.SongIoSession
@@ -25,11 +26,19 @@ import qianqian.desktop.player.PlayerState
  * engine-only ABI flavor — it has NO real audio output backend. Control
  * lifecycle, `song_io` callbacks, decode, seek, and snapshots are real;
  * audible render progression and ENDED-through-render are NOT exercisable
- * here and are never claimed.
+ * here and are never claimed. Windows truth lives in
+ * WindowsRuntimeLifecycleTest.
  *
  * Requires `./gradlew stageNativeRuntime` first.
  */
 class LinuxRuntimeLifecycleTest {
+
+    init {
+        assumeTrue(
+            "Linux engine-only proof; Windows truth lives in WindowsRuntimeLifecycleTest",
+            System.getProperty("os.name").lowercase().contains("linux"),
+        )
+    }
 
     private val repoRoot: Path =
         Paths.get("..", "..").toAbsolutePath().normalize()
