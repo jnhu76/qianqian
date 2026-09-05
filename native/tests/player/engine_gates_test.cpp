@@ -18,6 +18,7 @@
 
 #include "fake_songcore.hpp"
 #include "player_engine.hpp"
+#include "stream_discontinuity.hpp"
 #include "test_support.hpp"
 
 namespace qn::test {
@@ -1386,6 +1387,109 @@ GATE(t20_eof_after_underrun_duration) {
     Seen seen;
     check_all(p.engine, p.sink, seen, "t20");
     std::printf("  10 s song + 0.5 s underrun: ENDED @10.0 s media / 10.5 s device\n");
+}
+
+// ---------------------------------------------------------------------------
+// #40 corrective: the renderer-side commit detection, Linux-testable half.
+//
+// The Windows WasapiRenderer probes every device period with a zero-frame
+// fill and drops the device buffer (Stop+Reset+accounting rebase+swr drain)
+// when the observed segment differs from the segment it last submitted
+// (native/src/player/stream_discontinuity.hpp + wasapi_renderer.cpp). The
+// two gates below pin the contracts that mapping relies on: the engine's
+// zero-frame probe semantics, and the exactly-once discontinuity decision.
+// ---------------------------------------------------------------------------
+
+GATE(t21_zero_frame_probe_commit_segment) {
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t21");
+    p.engine.play();
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(2);
+    const EngineSnapshot before = p.engine.snapshot();
+    QN_CHECK(before.state == PlayerState::Playing, "t21");
+    QN_CHECK(before.segment == 1, "t21");
+    QN_CHECK(before.underrun_count == 0 && before.preroll_events == 0, "t21");
+
+    // Zero-frame probe: current segment, nothing moved, NO side effects —
+    // the renderer may run it every device period.
+    const qn::OutputFillResult probe = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(std::strcmp(probe.kind, "audio") == 0, "t21");
+    QN_CHECK(probe.segment == 1, "t21");
+    QN_CHECK(probe.media_frames == 0 && probe.silence_frames == 0, "t21");
+    QN_CHECK(probe.source_rate == 48000 && probe.channels == 2, "t21");
+    const EngineSnapshot after = p.engine.snapshot();
+    QN_CHECK(after.state == PlayerState::Playing, "t21");
+    QN_CHECK(after.underrun_count == 0 && after.preroll_events == 0 &&
+                 after.eos_silence_output_frames == 0,
+             "t21: probe must not fake GAP events");
+    QN_CHECK(after.pending_output_frames == before.pending_output_frames &&
+                 after.submitted_output_frames == before.submitted_output_frames &&
+                 after.submitted_media_frames == before.submitted_media_frames &&
+                 after.queued_media_frames == before.queued_media_frames,
+             "t21: probe must not touch ring/timeline accounting");
+
+    // Playing seek: the very next probe carries the new segment — the exact
+    // signal the renderer's discontinuity guard consumes.
+    QN_CHECK(p.engine.seek(us(48000 * 2)) == PlayerStatus::Ok, "t21");
+    const qn::OutputFillResult post = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(std::strcmp(post.kind, "audio") == 0, "t21");
+    QN_CHECK(post.segment == 2, "t21");
+    QN_CHECK(post.media_frames == 0 && post.silence_frames == 0, "t21");
+
+    // Paused: idle with the current segment — the renderer keeps its
+    // session and re-checks the segment before the next Start.
+    p.engine.pause();
+    const qn::OutputFillResult paused = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(std::strcmp(paused.kind, "idle") == 0, "t21");
+    QN_CHECK(paused.segment == 2, "t21");
+    std::printf("  zero-frame probe: side-effect-free, sees the commit segment bump\n");
+}
+
+GATE(t22_discontinuity_decision_exactly_once) {
+    qn::StreamDiscontinuity d;
+    // Fresh session: no device PCM — any segment is acceptable.
+    QN_CHECK(d.on_engine_segment(1) ==
+                 qn::StreamDiscontinuity::Action::Unchanged,
+             "t22");
+
+    // Segment N submitted: steady playback never fires.
+    d.submitted(1);
+    QN_CHECK(d.holds_pcm() && d.segment() == 1, "t22");
+    QN_CHECK(d.on_engine_segment(1) ==
+                 qn::StreamDiscontinuity::Action::Unchanged,
+             "t22");
+
+    // Commit (seek/stop/open/restart): fires exactly once, and the dropped
+    // buffer cannot re-fire until new PCM is submitted.
+    QN_CHECK(d.on_engine_segment(2) ==
+                 qn::StreamDiscontinuity::Action::DropDeviceBuffer,
+             "t22");
+    d.device_buffer_dropped();
+    QN_CHECK(!d.holds_pcm(), "t22");
+    QN_CHECK(d.on_engine_segment(2) ==
+                 qn::StreamDiscontinuity::Action::Unchanged,
+             "t22: decision must fire exactly once per commit");
+
+    // Pause keeps the device buffer (frozen pause semantics): resume with
+    // the SAME segment must not drop; a paused seek (new segment) must.
+    d.submitted(3);
+    QN_CHECK(d.on_engine_segment(3) ==
+                 qn::StreamDiscontinuity::Action::Unchanged,
+             "t22: pause/resume is not a discontinuity");
+    QN_CHECK(d.on_engine_segment(4) ==
+                 qn::StreamDiscontinuity::Action::DropDeviceBuffer,
+             "t22");
+
+    // Re-opened stream: fresh, empty buffer accepts anything.
+    d.device_buffer_dropped();
+    d.stream_opened();
+    QN_CHECK(!d.holds_pcm(), "t22");
+    QN_CHECK(d.on_engine_segment(9) ==
+                 qn::StreamDiscontinuity::Action::Unchanged,
+             "t22");
+    std::printf("  decision: fires exactly once per commit; pause/resume unchanged\n");
 }
 
 // ---------------------------------------------------------------------------

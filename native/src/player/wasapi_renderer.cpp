@@ -23,6 +23,15 @@
 //           quiesced commit or not-playing) → Stop() + Reset() so
 //           submitted-but-unrendered frames die with the commit's timeline
 //           reset — stale PCM can never replay.
+//   commit  EVERY period probes the engine with a zero-frame fill first.
+//           A playing commit used to be invisible here (#40): with the
+//           buffer topped up, available == 0 short-circuited before any
+//           fill_output, so the new segment queued behind stale device PCM
+//           and played only after it. The probe sees the commit's segment
+//           bump; a segment mismatch with PCM still pending in the device
+//           buffer is a discontinuity: Stop + Reset, accounting rebased to
+//           a fresh origin, resampler delay drained, then the new segment
+//           fills a clean buffer.
 //
 // Failure model: any WASAPI/COM failure tears the stream down and leaves
 // the renderer silent with a bounded retry (format change or 2 s). No
@@ -32,6 +41,7 @@
 #include "wasapi_renderer.hpp"
 
 #include "player_engine.hpp"
+#include "stream_discontinuity.hpp"
 
 #include <windows.h>
 #include <audioclient.h>
@@ -128,6 +138,11 @@ struct WasapiRenderer::State {
     std::int32_t attempted_rate = 0; // last failed negotiation request
     std::int32_t attempted_channels = 0;
 
+    // Segment-discontinuity decision (#40): tracks which engine segment the
+    // open device stream holds PCM of, so a commit can drop the buffer
+    // before the new segment queues behind stale audio.
+    StreamDiscontinuity discontinuity;
+
     // Device-side SRC (the frozen aresample/libswresample owner). Null in
     // BYPASS mode, i.e. when the device accepted the source format as is.
     SwrContext* swr = nullptr;
@@ -141,13 +156,21 @@ struct WasapiRenderer::State {
     static void idle_sleep(State* s);
     static void teardown_stream(State* s);
     static bool open_stream(State* s, std::int32_t rate, std::int32_t channels);
-    // Shared idle branch after a (possibly empty) buffer acquisition:
-    // releases `frames` back, then distinguishes pause (pending output
-    // stays pending and resumes with content on play) from a quiesced
-    // commit / not-playing (submitted-but-unrendered frames die with the
-    // commit's timeline reset — render accounting restarts so no phantom
-    // advance can report dropped frames as played). Returns false: the
-    // loop must leave the started state.
+    // Commit boundary: every submitted-but-unrendered frame of the open
+    // stream dies — Stop (idempotent) then Reset (requires the stopped
+    // state; flushes the device buffer) — render accounting restarts at a
+    // fresh origin so no phantom advance can report dropped frames as
+    // played, and the resampler's delayed input, still old-segment PCM, is
+    // drained and discarded. The engine side of the same commit has already
+    // discarded the dead generation's pending timeline spans.
+    static void drop_device_buffer(State* s);
+    // Shared idle branch with nothing to submit: distinguishes pause
+    // (pending output stays pending and resumes with content on play) from
+    // a quiesced commit / not-playing (commit boundary → drop). Returns
+    // false: the loop must leave the started state.
+    static bool idle_after_probe(State* s);
+    // Same decision after a (possibly empty) buffer acquisition: releases
+    // `frames` back first.
     static bool idle_after_acquire(State* s, std::uint32_t frames);
     // Returns false when the loop must leave the started state: either the
     // session failed (teardown) or the engine went idle (stream stopped;
@@ -176,6 +199,7 @@ void WasapiRenderer::State::teardown_stream(State* s) {
         swr_free(&s->swr);
         s->swr = nullptr;
     }
+    s->discontinuity.device_buffer_dropped();
     s->buffer_frames = 0;
     s->stream_rate = 0;
     s->stream_channels = 0;
@@ -320,6 +344,7 @@ bool WasapiRenderer::State::open_stream(State* s, std::int32_t src_rate,
     s->stream_channels = accepted_channels;
     s->written_total = 0;
     s->last_advanced = 0;
+    s->discontinuity.stream_opened();
 
     // SRC setup: only when the accepted device format differs from the
     // source format. Both sides are float32 interleaved, so swr is a pure
@@ -358,14 +383,8 @@ bool WasapiRenderer::State::open_stream(State* s, std::int32_t src_rate,
     return true;
 }
 
-bool WasapiRenderer::State::idle_after_acquire(State* s,
-                                               std::uint32_t frames) {
-    s->render->ReleaseBuffer(frames, 0);
-    const RenderReport probe = s->engine.advance_render(0);
+void WasapiRenderer::State::drop_device_buffer(State* s) {
     s->client->Stop();
-    if (std::strcmp(probe.kind, "paused") == 0) {
-        return false;  // session kept; the probe loop re-Starts on resume
-    }
     s->client->Reset();
     s->written_total = 0;
     s->last_advanced = 0;
@@ -383,7 +402,23 @@ bool WasapiRenderer::State::idle_after_acquire(State* s,
                0) {
         }
     }
+    s->discontinuity.device_buffer_dropped();
+}
+
+bool WasapiRenderer::State::idle_after_probe(State* s) {
+    const RenderReport probe = s->engine.advance_render(0);
+    if (std::strcmp(probe.kind, "paused") == 0) {
+        s->client->Stop();
+        return false;  // session kept; the probe loop re-Starts on resume
+    }
+    drop_device_buffer(s);
     return false;
+}
+
+bool WasapiRenderer::State::idle_after_acquire(State* s,
+                                               std::uint32_t frames) {
+    s->render->ReleaseBuffer(frames, 0);
+    return idle_after_probe(s);
 }
 
 bool WasapiRenderer::State::playing_period(State* s) {
@@ -391,6 +426,21 @@ bool WasapiRenderer::State::playing_period(State* s) {
         WaitForSingleObject(s->buffer_event, kEventTimeout.count());
     if (s->stop.load(std::memory_order_seq_cst)) return false;
     if (waited != WAIT_OBJECT_0) return true;  // timeout: nothing free yet
+
+    // Commit probe (#40): a zero-frame fill — admission-safe, moves no ring
+    // data, appends no timeline span, touches no GAP counter — reports the
+    // engine's CURRENT segment. A segment change with PCM still pending in
+    // the device buffer is a physical discontinuity: drop the buffer before
+    // anything new can queue behind the old audio.
+    const OutputFillResult probe = s->engine.fill_output(nullptr, 0);
+    if (std::strcmp(probe.kind, "idle") == 0) {
+        return idle_after_probe(s);  // no acquisition outstanding
+    }
+    if (s->discontinuity.on_engine_segment(probe.segment) ==
+        StreamDiscontinuity::Action::DropDeviceBuffer) {
+        drop_device_buffer(s);
+        return false;  // re-Start through the probe loop on a clean buffer
+    }
 
     std::uint32_t padding = 0;
     if (FAILED(s->client->GetCurrentPadding(&padding))) {
@@ -408,13 +458,14 @@ bool WasapiRenderer::State::playing_period(State* s) {
     }
 
     std::uint32_t submitted = 0;
+    OutputFillResult r;  // both branches fill into ONE result: the guard
+                         // below must see the segment this fill served
     if (s->swr == nullptr) {
         // BYPASS: the device buffer IS the fill destination — fill_output
         // zeroes GAP spans in place, and an idle return leaves the
         // acquisition to be released empty; untouched dst is never
         // submitted.
-        const OutputFillResult r =
-            s->engine.fill_output(reinterpret_cast<float*>(device_bytes),
+        r = s->engine.fill_output(reinterpret_cast<float*>(device_bytes),
                                   available);
         if (std::strcmp(r.kind, "idle") == 0) {
             idle_after_acquire(s, 0);
@@ -433,7 +484,7 @@ bool WasapiRenderer::State::playing_period(State* s) {
             1;
         const std::uint64_t capacity_in = s->in_stage.size() / static_cast<std::uint64_t>(s->engine_channels);
         const std::uint64_t pull = need_in < capacity_in ? need_in : capacity_in;
-        const OutputFillResult r = s->engine.fill_output(s->in_stage.data(), pull);
+        r = s->engine.fill_output(s->in_stage.data(), pull);
         if (std::strcmp(r.kind, "idle") == 0) {
             idle_after_acquire(s, 0);
             return false;
@@ -458,8 +509,28 @@ bool WasapiRenderer::State::playing_period(State* s) {
         // delay): release the acquisition empty and let the next period's
         // larger `available` pull more input.
     }
+    if (s->discontinuity.on_engine_segment(r.segment) ==
+        StreamDiscontinuity::Action::DropDeviceBuffer) {
+        // A commit landed between the probe and this fill: `r` carries the
+        // NEW segment, but the device still holds old-segment PCM this
+        // acquisition must not queue behind. Release the acquisition EMPTY
+        // (Reset fails while a buffer operation is pending), reconcile the
+        // frames the fill already consumed — the fill moved r.media_frames
+        // from the ring into pending timeline spans that can now never
+        // render, so proving them rendered keeps pending/ENDED accounting
+        // honest (a ≤ 1-period media skip, bounded by the dropped device
+        // window) — then drop.
+        s->render->ReleaseBuffer(0, 0);
+        if (r.media_frames > 0) {
+            s->engine.advance_render(
+                static_cast<std::int64_t>(r.media_frames));
+        }
+        drop_device_buffer(s);
+        return false;
+    }
     s->render->ReleaseBuffer(submitted, 0);
     s->written_total += submitted;
+    if (submitted > 0) s->discontinuity.submitted(r.segment);
 
     // Proven playout: frames no longer pending in the device buffer. In
     // converted mode the media equivalent uses the exact integer ratio;
@@ -525,6 +596,15 @@ void WasapiRenderer::State::render_loop_inner(State* s) {
                 idle_sleep(s);  // silent, bounded retry (gate inside)
                 continue;
             }
+        }
+        // Paused-seek resume (#40): a commit that landed while the stream
+        // was stopped-for-pause left old-segment PCM pending in the device
+        // buffer. Drop it before Start so the new segment never queues
+        // behind it (Reset is legal here — the stream is stopped).
+        if (s->discontinuity.on_engine_segment(probe.segment) ==
+            StreamDiscontinuity::Action::DropDeviceBuffer) {
+            drop_device_buffer(s);
+            continue;
         }
         if (FAILED(s->client->Start())) {
             teardown_stream(s);

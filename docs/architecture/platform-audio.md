@@ -82,6 +82,27 @@ equivalent of proven playout (exact integer ratio
 `out_rendered × src_rate / dst_rate`; ≤ 1 frame over-report, clamped by
 the engine's pending clamp so it can never exceed appended media).
 
+## Commit detection (playing discontinuity)
+
+Every period FIRST runs a zero-frame fill probe (`fill_output(nullptr, 0)` —
+admission-safe, moves no ring data, appends no timeline span, touches no GAP
+counter) and compares the reported `segment` with the segment whose PCM the
+device buffer still holds (`StreamDiscontinuity`,
+`native/src/player/stream_discontinuity.hpp`). A commit (open / seek / stop
+/ restart-from-ENDED) bumps the segment; a mismatch with pending device PCM
+is a physical discontinuity (#40: with the buffer topped up, `available ==
+0` used to short-circuit before any fill, so a playing seek's new segment
+queued behind stale audio and played only after it):
+
+`Stop() + Reset()` (flushes every submitted-but-unrendered frame),
+`written_total`/`last_advanced` rebased to a fresh origin, the resampler
+delay drained, then the stream re-Starts and the new segment fills a clean
+buffer. The rare commit-that-lands-between-probe-and-fill releases its
+acquisition empty, proves the already-consumed frames rendered (a ≤ 1-period
+media skip, bounded by the dropped device window), and drops. A paused
+session keeps its pending buffer (frozen pause semantics); the same segment
+check runs before the next `Start()`, so a paused seek also lands clean.
+
 ## Idle and format-change handling
 
 - `fill_output` returns `idle` → `ReleaseBuffer(0)`, then an
@@ -91,10 +112,12 @@ the engine's pending clamp so it can never exceed appended media).
   submitted-but-unrendered frames die, matching the commit's timeline
   reset; render accounting is rebased so no phantom advance). Never submit
   untouched `dst` (no uninitialized/stale PCM).
-- Format change: only possible across a commit, and every commit passes
-  through `idle`; the renderer re-initializes its client when the first
-  post-idle activation requests a different format. Playing stretches
-  never span a format change, so the steady path never re-inits.
+- Format change: only possible across a commit, and every commit is
+  observed — through `idle` (quiesced window / not playing) or through the
+  per-period segment probe (playing); the renderer re-initializes its
+  client when the first post-commit activation requests a different format.
+  Playing stretches never span a format change, so the steady path never
+  re-inits.
 
 ## Failure behavior
 
@@ -122,8 +145,10 @@ playing: event-driven. This thread is the single owner that serializes
   requested when admitted and playing (underrun/preroll/EOS spans
   zero-filled), so `ReleaseBuffer` never sends uninitialized bytes; `idle`
   periods submit nothing. Stale PCM cannot replay: commits drop the device
-  buffer via `Reset` and the epoch/generation guard drops late render
-  events.
+  buffer via `Reset` — detected on the playing path by the per-period
+  segment probe, not only in the idle window (#40 corrective) — and the
+  epoch/generation guard drops late render events. The machine clock stays
+  honest while dropped audio is never counted as rendered.
 - Export surface: the runtime exports exactly the 24 frozen ABI symbols;
   FFmpeg stays statically merged inside with hidden visibility
   (machine-audited).
