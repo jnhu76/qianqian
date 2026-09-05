@@ -94,13 +94,21 @@ class NativePlayerAdapter private constructor(
         val songStatus = IntByReference()
         val st = api.peOpen(engine, newSession.io, songStatus)
         if (st != PeStatus.OK) {
-            newSession.close()
+            // pe_open is destructive to the previous source: the engine
+            // song_close'd it BEFORE probing the new one, so every open
+            // failure leaves native EMPTY with no handle. The bridge must
+            // release BOTH JVM sessions and own neither — a retained
+            // previous channel would pretend an active source exists.
+            releaseSession(newSession)
+            releaseSession(session)
+            session = null
             throw OpenFailure(st, songStatus.value)
         }
         // The engine quiesced and dropped the previous handle during
         // pe_open; only now may the previous session's file be released.
-        session?.close()
+        val previous = session
         session = newSession
+        releaseSession(previous)
     }
 
     override suspend fun play(): Unit = control("play") {
@@ -142,6 +150,20 @@ class NativePlayerAdapter private constructor(
     }
 
     // ---- internals ------------------------------------------------------
+
+    /**
+     * Release a session during `open`'s ownership transfer. The already
+     * established native outcome (failure status, or the newly installed
+     * session) is authoritative, so a JVM-side cleanup failure is
+     * suppressed instead of replacing the real result.
+     */
+    private fun releaseSession(s: SongIoSession?) {
+        try {
+            s?.close()
+        } catch (_: Exception) {
+            // suppressed by ownership-transfer policy
+        }
+    }
 
     /**
      * Run a control call on the confined dispatcher and map a non-OK
