@@ -1,7 +1,6 @@
 package qianqian.desktop.nativebridge
 
 import com.sun.jna.Memory
-import com.sun.jna.Native
 
 import com.sun.jna.Pointer
 import java.nio.ByteBuffer
@@ -41,7 +40,10 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class SongIoSession private constructor(val path: Path) : AutoCloseable {
 
-    private val tokenSlot = Memory(Native.LONG_SIZE.toLong())
+    // Exactly 8 bytes: the token is a Kotlin Long. Native.LONG_SIZE would
+    // size this to the C `long` (4 bytes on Win64) and every set/get of the
+    // token would throw IndexOutOfBoundsException there.
+    private val tokenSlot = Memory(8)
     private val channel: FileChannel = FileChannel.open(
         path,
         StandardOpenOption.READ,
