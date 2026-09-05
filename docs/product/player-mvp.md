@@ -41,15 +41,17 @@ ALAC/M4A、PCM WAV、Ogg Vorbis、Ogg Opus。机器权威是
 
 ## What does not exist yet
 
-- 桌面 application / UI 的可用产品形态（`apps/desktop/` 仅有 Compose
-  Desktop bootstrap 外壳，native runtime 尚未接入）；
 - playlist、媒体库、歌词、皮肤、spectrum/EQ UI；
 - Windows 以外的平台音频输出后端。
 
-Application 层已启动（DESKTOP-BOOTSTRAP-1）；runtime 接入
-（DESKTOP-NATIVE-BRIDGE-1）以 JVM 消费者能在冻结 ABI 上完成真实播放
-生命周期为前提（boundary proof 已完成，见
-[contracts/ffi-boundary.md](../contracts/ffi-boundary.md)）。
+Application 层已启动（DESKTOP-BOOTSTRAP-1）、runtime 已接入
+（DESKTOP-NATIVE-BRIDGE-1，JVM 消费者仅通过冻结 ABI 完成真实播放生命周期，
+见 [contracts/ffi-boundary.md](../contracts/ffi-boundary.md)），并交付了
+最小本地文件播放工作流（DESKTOP-PLAYER-MVP-1）：Open File → READY（不自动
+播放）→ Play/Pause/Resume → 拖动释放式 Seek → 观察 native 状态/位置/时长 →
+Stop → 类型化产品错误。桌面 UI 仍不是完整产品形态（无播放队列、媒体库、
+设置等），Windows 真值（qianqian.dll、WASAPI 出声、真实进度推进、ENDED）
+仍待 Windows 验证（`CODE_COMPLETE_PENDING_WINDOWS_VALIDATION`）。
 
 ## Related
 
