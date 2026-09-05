@@ -3,20 +3,61 @@
 The Qianqian desktop application: a Windows-first local music player built as
 a plain Kotlin/JVM Compose Desktop application.
 
-## Current stage: DESKTOP-NATIVE-BRIDGE-1 (#33)
+## Current stage: DESKTOP-PLAYER-MVP-1 (#35)
 
-The application shell now consumes the frozen native runtime through a
-narrow typed JVM adapter:
+The application now has a minimal, functional local-file player UI on top of
+the production native bridge (PR #32, PR #34):
 
-> The production Desktop JVM application can load the staged qianqian
-> runtime, gate both frozen ABI versions, create an engine, serve real
-> `song_io` host I/O from JVM file callbacks, and drive a legal control
-> lifecycle — using only the public C ABI (`songcore.h` +
-> `player_engine.h`).
+> Launch the app, choose one local audio file through the platform file
+> chooser, open (→ READY, never autoplay), Play / Pause / Resume, Seek by
+> drag-release commit, observe native state / position / duration, Stop,
+> and see typed product errors — with the native engine as the single
+> playback truth.
 
-Still intentionally absent: player UI (file picker, transport controls,
-seek bar), product recovery policy, playlists. Those belong to later
-DESKTOP stages. The bootstrap window is unchanged.
+Intentionally still absent: playlists/queue, library, settings, metadata
+display (filename only), artwork, volume, design system, keyboard shortcuts,
+packaging. Those belong to later DESKTOP stages.
+
+## Player architecture (application layer)
+
+```text
+Compose UI (PlayerScreen)
+        ↓ collects
+PlayerUiState (app projection: enablement, seek preview, product errors)
+        ↓ coordinated by
+PlayerScreenModel (application coordination owner)
+        ↓ commands / snapshot flow
+PlayerPort (suspend boundary)
+        ↓
+NativePlayerAdapter → JNA → frozen C ABI → PlayerEngine → SongCore → FFmpeg
+```
+
+- **Single playback truth**: the native `PlayerEngine` state machine. The UI
+  never sets a playback state optimistically; every rendered playback value
+  (state, position, duration) comes from `PlayerSnapshot` via the 10 Hz
+  poller. App-owned state is limited to operation-in-flight, seek
+  preview/commit display, selected file, and product error classification.
+- **Open semantics**: open → READY, no autoplay (native contract preserved).
+  A failed candidate is never promoted to "current track"; the previous
+  successfully opened track remains displayed. Per the frozen contract, a
+  failed `pe_open` leaves the engine EMPTY (the previous handle is dropped
+  during open) — the UI reflects that truthfully and recovery is "choose
+  another file".
+- **Seek UX**: dragging only updates a local preview (zero native calls);
+  releasing commits exactly one native seek; the engine-reported landing
+  stays displayed until a snapshot confirms it. Unknown duration renders
+  truthfully as `--:--` with the slider disabled — never a fake `0:00`.
+- **File picker**: the JDK platform dialog (`java.awt.FileDialog`) — real
+  native chooser on Windows/GTK, single selection, cancel-safe, no new
+  dependencies. No extension filter: filename is not codec truth; native
+  open stays authoritative.
+- **Threading**: UI handlers launch coroutines into the suspend port; no
+  blocking native call ever runs on the Compose EDT. Window close closes
+  the `PlayerPort` exactly once before the application exits.
+- **Errors**: typed bridge failures classify into a minimal product set
+  (file unavailable / could not open track / command failed / runtime
+  unavailable / chooser failed). Diagnostic strings are never parsed;
+  `snapshot.lastError` is log-only.
 
 ## Native bridge
 
@@ -25,6 +66,10 @@ DESKTOP stages. The bootstrap window is unchanged.
   production interface maps only the symbols this stage needs (both ABI
   version gates + the 8 `pe_*` lifecycle/observation functions).
 - **Bridge layout** (`qianqian.desktop`):
+  - `app/` — application layer: `PlayerScreenModel` + `PlayerUiState`
+    (coordination/projection), `PlayerScreen` (Compose), `FilePicker` +
+    `AwtFileDialogPicker`, `AppRuntime` (startup connection + exit
+    ownership), `TimeFormat` (pure mm:ss / h:mm:ss formatting).
   - `player/` — application-safe surface: `PlayerPort`, `PlayerSnapshot`
     (immutable; media microseconds preserved as reported by native),
     typed `PlayerBridgeException` hierarchy (status-code based).
@@ -39,30 +84,31 @@ DESKTOP stages. The bootstrap window is unchanged.
   serialized on one daemon executor. `pe_get_snapshot` is polled
   concurrently (contract-legal). Native decode threads attach to the JVM
   through JNA for callbacks; callbacks touch only file I/O.
-- **Windows truth**: pending. qianqian.dll loading, Windows JNA calling
-  convention, and WASAPI render progression require real Windows evidence
-  (`CODE_COMPLETE_PENDING_WINDOWS_VALIDATION`). On x86-64 Windows there is
-  a single calling convention, so the plain-C JNA mapping is expected to
-  hold — but that is not a substitute for a Windows run.
+- **Windows truth**: pending. qianqian.dll loading, the Windows file
+  chooser, WASAPI render progression, audible playback, ENDED-through-render,
+  and jpackage require real Windows evidence
+  (`CODE_COMPLETE_PENDING_WINDOWS_VALIDATION`).
 
 ## WSL/Linux proof scope
 
 The Linux runtime is the engine-only ABI flavor: no real audio output
-backend. Linux runs therefore prove — with real staged `libqianqian.so`
-and real corpus files — ABI gating, engine lifecycle, real JVM `song_io`
-callbacks, decode, seek, snapshots, GC-stress callback survival, and
-resource release. They do NOT (and cannot) prove audible playback,
-render progression, or ENDED-through-render; Linux `play()` legally
-reports PLAYING with no advancing media position. Windows remains the
-product playback truth.
+backend. The WSLg GUI smoke therefore proves — with real staged
+`libqianqian.so` and real corpus files — the full interaction slice:
+window + real platform file chooser, open → READY with real duration,
+play/pause/resume/stop state projection, one-commit seek, product error
+paths, and clean shutdown. It does NOT (and cannot) prove audible playback,
+render progression, or ENDED-through-render: Linux `play()` legally reports
+PLAYING with position holding at the seek/segment landing. Windows remains
+the product playback truth.
 
 ## Technology
 
 - Plain Kotlin/JVM (no Kotlin Multiplatform source sets).
 - [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/)
-  Desktop (JVM) for the window/toolkit.
+  Desktop (JVM) for the window/toolkit; Material 2 (the layer already
+  present at bootstrap).
 - JNA for the native bridge; kotlinx-coroutines for confinement and
-  `StateFlow`.
+  `StateFlow`. No DI/state/navigation framework, no file-picker library.
 - Gradle is self-contained inside `apps/desktop/`; the repository root
   remains the Xmake workspace for the native runtime. Gradle never
   compiles native code — it only invokes Xmake and copies the canonical
@@ -71,8 +117,8 @@ product playback truth.
 ## Development environment
 
 Development happens under WSL/Linux; the product target is Windows Desktop.
-WSL runs prove compile, unit tests, and the real-runtime bridge
-integration tests. Windows-specific truth (jpackage packages,
+WSL runs prove compile, unit tests, the real-runtime bridge integration
+tests, and the WSLg GUI smoke. Windows-specific truth (jpackage packages,
 `qianqian.dll`, WASAPI playback) is explicitly out of scope for WSL
 validation.
 
@@ -97,13 +143,16 @@ directory.
 
 ```bash
 cd apps/desktop
-./gradlew test                        # pure JVM bridge logic (no native)
+./gradlew test                        # pure JVM application + bridge logic (no native)
 ./gradlew stageNativeRuntime          # build + stage the runtime (Xmake)
 ./gradlew nativeBridgeIntegrationTest # real-runtime lifecycle proof
 ```
 
-`test` covers pure JVM behavior (ABI fail-fast, snapshot mapping, control
-serialization, close semantics, poller lifetime) with a fake `NativeApi`.
+`test` covers pure JVM behavior: application coordination over a fake
+`PlayerPort` (open/play/pause/stop/seek/error/close paths, seek-call
+bounding, no optimistic state), UI-state projections, time formatting, and
+bridge logic (ABI fail-fast, snapshot mapping, control serialization,
+close semantics, poller lifetime) with a fake `NativeApi`.
 `nativeBridgeIntegrationTest` is a separate task because it requires the
 staged native runtime; staging stays an explicit developer action.
 
@@ -114,19 +163,25 @@ cd apps/desktop
 ./gradlew run
 ```
 
-A window titled "Qianqian" with the text `Desktop bootstrap OK` should
-open. (The window is still the bootstrap shell; the bridge is exercised
-through tests, not UI.) Requires a JDK 17+ and a GUI environment. Under
-WSLg, Skiko's hardware OpenGL path may fail (`Cannot create Linux GL
+A window titled "Qianqian" opens with the minimal player screen:
+Open File, current track, native state, snapshot timeline, Play/Pause +
+Stop, and product error text. Requires a JDK 17+ and a GUI environment.
+Under WSLg, Skiko's hardware OpenGL path may fail (`Cannot create Linux GL
 context`); run with software rendering in that case:
 
 ```bash
 SKIKO_RENDER_API=SOFTWARE ./gradlew run
 ```
 
+The runtime is loaded at startup from the staged location
+(`NativeRuntimeLoader.devStagedLibraryPath`); a missing/unrejected staged
+runtime shows a truthful "Playback runtime unavailable." state instead of
+crashing.
+
 ## Intentionally absent (do not add here without an issue)
 
-Player UI (transport, file picker, seek bar, timeline), playlists,
-library, settings, themes/design system, packaging claims, product
-recovery policy. See the DESKTOP campaign stages and `AGENTS.md` in this
-directory.
+Playlists/queue, library, folder scan, settings, search, metadata display
+(beyond filename), artwork, lyrics, EQ/DSP, volume system, device
+selector, system tray, hotkeys, media-session, visualizer, skins/themes,
+custom title bar, keyboard shortcuts, packaging claims, telemetry. See
+the DESKTOP campaign stages and `AGENTS.md` in this directory.
