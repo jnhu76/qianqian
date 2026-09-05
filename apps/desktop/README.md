@@ -45,15 +45,18 @@ NativePlayerAdapter → JNA → frozen C ABI → PlayerEngine → SongCore → F
   another file".
 - **Seek UX**: dragging only updates a local preview (zero native calls);
   releasing commits exactly one native seek; the engine-reported landing
-  stays displayed until a snapshot confirms it. Unknown duration renders
+  stays displayed until a snapshot lands within its window (display
+  reconciliation, not a causal fence). Unknown duration renders
   truthfully as `--:--` with the slider disabled — never a fake `0:00`.
 - **File picker**: the JDK platform dialog (`java.awt.FileDialog`) — real
   native chooser on Windows/GTK, single selection, cancel-safe, no new
   dependencies. No extension filter: filename is not codec truth; native
   open stays authoritative.
-- **Threading**: UI handlers launch coroutines into the suspend port; no
-  blocking native call ever runs on the Compose EDT. Window close closes
-  the `PlayerPort` exactly once before the application exits.
+- **Command ownership**: Compose passes user intent only; the
+  `PlayerScreenModel` owns every user-command coroutine, its admission
+  (at most one in flight), and cancel-and-drain. No blocking native call
+  ever runs on a Compose EDT. Window close drains model-owned coroutines,
+  then closes the `PlayerPort` exactly once before the application exits.
 - **Errors**: typed bridge failures classify into a minimal product set
   (file unavailable / could not open track / command failed / runtime
   unavailable / chooser failed). Diagnostic strings are never parsed;
