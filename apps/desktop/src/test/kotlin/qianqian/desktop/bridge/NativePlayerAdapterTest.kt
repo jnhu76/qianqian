@@ -18,6 +18,7 @@ import kotlinx.coroutines.withTimeout
 import qianqian.desktop.nativebridge.NativePlayerAdapter
 import qianqian.desktop.nativebridge.PeState
 import qianqian.desktop.nativebridge.PeStatus
+import qianqian.desktop.nativebridge.SongIoSession
 import qianqian.desktop.player.AbiMismatch
 import qianqian.desktop.player.BridgeClosedException
 import qianqian.desktop.player.ControlFailure
@@ -164,6 +165,53 @@ class NativePlayerAdapterTest {
         assertEquals(PeStatus.ERR_OPEN_FAILED, e.peStatus)
         assertEquals(107, e.songStatus)
         adapter.close()
+    }
+
+    @Test
+    fun destructiveOpenFailureReleasesBothSessionsAndOwnsNeither() = runBlocking {
+        val api = FakeNativeApi()
+        val adapter = NativePlayerAdapter.connect(api)
+        adapter.open(tempFile()) // A becomes the active source
+        val openedBefore = SongIoSession.sessionsOpened.get()
+        val closedBefore = SongIoSession.sessionsClosed.get()
+
+        api.openStatus = PeStatus.ERR_OPEN_FAILED
+        api.openSongStatus = 107 // SONG_ERR_CORRUPT_DATA
+        assertFailsWith<OpenFailure> { adapter.open(tempFile()) }
+
+        // Native truth: the previous source was dropped before the probe
+        // (fake models the same EMPTY); the bridge must release BOTH the
+        // failed candidate and the destroyed predecessor.
+        assertEquals(PeState.EMPTY, api.snapshotState)
+        assertEquals(openedBefore + 1, SongIoSession.sessionsOpened.get())
+        assertEquals(closedBefore + 2, SongIoSession.sessionsClosed.get())
+        val closedAtFailure = SongIoSession.sessionsClosed.get()
+
+        // Subsequent close must not double-close sessions.
+        adapter.close()
+        assertEquals(closedAtFailure, SongIoSession.sessionsClosed.get())
+    }
+
+    @Test
+    fun sourceAcquisitionFailureNeverReachesNativeAndPreservesActiveSource() = runBlocking {
+        val api = FakeNativeApi()
+        val adapter = NativePlayerAdapter.connect(api)
+        adapter.open(tempFile()) // A is the active source
+        val peOpensBefore = api.callLog.count { it == "pe_open" }
+        val closedBefore = SongIoSession.sessionsClosed.get()
+
+        assertFailsWith<SourceOpenFailure> {
+            adapter.open(Path.of("/nonexistent/dir/other.flac"))
+        }
+
+        // pe_open was NEVER invoked for B, and A remains owned: the old
+        // native source is intact, so the old JVM session stays valid.
+        assertEquals(peOpensBefore, api.callLog.count { it == "pe_open" })
+        assertEquals(closedBefore, SongIoSession.sessionsClosed.get())
+
+        // A's session is released exactly once — at adapter teardown.
+        adapter.close()
+        assertEquals(closedBefore + 1, SongIoSession.sessionsClosed.get())
     }
 
     @Test

@@ -72,7 +72,15 @@ class FakeNativeApi(
     override fun peOpen(engine: Pointer, io: SongIo, outSongStatus: IntByReference): Int =
         exclusive("pe_open") {
             outSongStatus.value = openSongStatus
-            if (openStatus == PeStatus.OK) snapshotState = PeState.READY
+            if (openStatus == PeStatus.OK) {
+                snapshotState = PeState.READY
+            } else {
+                // Frozen PlayerEngine::open drops the previous source
+                // BEFORE probing the new one; every failure path leaves
+                // the engine EMPTY with no handle.
+                snapshotState = PeState.EMPTY
+                snapshotPositionUs = 0L
+            }
             openStatus
         }
 
