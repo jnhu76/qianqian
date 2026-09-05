@@ -1,6 +1,5 @@
 package qianqian.desktop.bridge
 
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.test.Test
@@ -26,15 +25,10 @@ import qianqian.desktop.nativebridge.SongIoSession
  */
 class JnaCallbackPerformanceTest {
 
-    private fun stagedLibrary(): Path {
-        val p = Paths.get(
-            "build", "native-dev", "linux-x86_64", "libqianqian.so",
-        ).toAbsolutePath().normalize()
-        check(Files.isRegularFile(p)) {
-            "staged runtime missing: $p — run ./gradlew stageNativeRuntime"
-        }
-        return p
-    }
+    private fun stagedLibrary(): Path =
+        NativeRuntimeLoader.devStagedLibraryPath(
+            Paths.get("build").toAbsolutePath().normalize(),
+        )
 
     /** Real committed corpus song (8.8 MB CBR-320 MP3 with artwork). */
     private fun bigSong(): Path =
