@@ -87,10 +87,16 @@ NativePlayerAdapter → JNA → frozen C ABI → PlayerEngine → SongCore → F
   serialized on one daemon executor. `pe_get_snapshot` is polled
   concurrently (contract-legal). Native decode threads attach to the JVM
   through JNA for callbacks; callbacks touch only file I/O.
-- **Windows truth**: pending. qianqian.dll loading, the Windows file
-  chooser, WASAPI render progression, audible playback, ENDED-through-render,
-  and jpackage require real Windows evidence
-  (`CODE_COMPLETE_PENDING_WINDOWS_VALIDATION`).
+- **Windows truth**: validated (DESKTOP-WINDOWS-VALIDATION-1, #39) on a
+  native Windows checkout: the staged mingw x86_64 `qianqian.dll` (WASAPI
+  runtime flavor) loads through the explicit staged path, both ABI gates
+  pass on the Windows JVM, `song_io` JVM callbacks serve real decode, real
+  FLAC playback is audible, media position progresses from WASAPI render
+  truth, and a short fixture reaches ENDED with replay-from-ENDED —
+  machine evidence in `WindowsRuntimeLifecycleTest` plus the human audible
+  gate. Known residual: playing seeks replay up to one device buffer of
+  pre-seek audio before the new position lands audibly (#40, separate
+  native corrective). jpackage app-image validation remains open.
 
 ## WSL/Linux proof scope
 
@@ -121,9 +127,26 @@ the product playback truth.
 
 Development happens under WSL/Linux; the product target is Windows Desktop.
 WSL runs prove compile, unit tests, the real-runtime bridge integration
-tests, and the WSLg GUI smoke. Windows-specific truth (jpackage packages,
-`qianqian.dll`, WASAPI playback) is explicitly out of scope for WSL
-validation.
+tests, and the WSLg GUI smoke. Windows validation (verified commands,
+DESKTOP-WINDOWS-VALIDATION-1):
+
+```powershell
+# native runtime (one-time mingw session config; SDK at C:\mingw64, WinLibs GCC 13.3 UCRT)
+xmake f -p mingw --mingw=C:\mingw64 -m release --av_manifest=build/manifests/windows-mingw-x86_64/codec-base/manifest.json
+xmake build -y qianqian_runtime     # → build\artifacts\windows-mingw-x86_64\runtime\qianqian.dll
+
+cd apps\desktop
+.\gradlew.bat stageNativeRuntime            # stage into build\native-dev\windows-x86_64\
+.\gradlew.bat test                          # pure JVM suite
+.\gradlew.bat nativeBridgeIntegrationTest   # real-runtime proof (WindowsRuntimeLifecycleTest)
+.\gradlew.bat run                           # audible playback through WASAPI
+```
+
+The FFmpeg compile closure for the mingw session is machine-derived once
+(`windows-mingw-x86_64` target recipe) and replayed by Xmake from
+`build/manifests/`; the manifest path is passed via `--av_manifest`. The
+mingw `bin` directory must be on PATH while running until the runtime
+stops importing `libwinpthread-1.dll` (deferred packaging finding).
 
 ## Native runtime staging
 

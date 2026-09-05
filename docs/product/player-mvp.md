@@ -50,8 +50,15 @@ Application 层已启动（DESKTOP-BOOTSTRAP-1）、runtime 已接入
 最小本地文件播放工作流（DESKTOP-PLAYER-MVP-1）：Open File → READY（不自动
 播放）→ Play/Pause/Resume → 拖动释放式 Seek → 观察 native 状态/位置/时长 →
 Stop → 类型化产品错误。桌面 UI 仍不是完整产品形态（无播放队列、媒体库、
-设置等），Windows 真值（qianqian.dll、WASAPI 出声、真实进度推进、ENDED）
-仍待 Windows 验证（`CODE_COMPLETE_PENDING_WINDOWS_VALIDATION`）。
+设置等）。
+
+Windows 真值已在真实 Windows 上验证（DESKTOP-WINDOWS-VALIDATION-1，
+#39）：qianqian.dll（mingw x86_64，WASAPI runtime flavor）加载、ABI 门、
+song_io 回调、真实 FLAC 可听播放、WASAPI render 时钟驱动的位置推进、
+ENDED-through-render 均通过机器证据 + 人工试听门。已知残留：playing 中
+seek 的可听落地存在一个设备缓冲时长的陈旧音频回放（#40，独立 native
+corrective）；打包分发（app image / installer 的端到端验证）仍待后续
+stage。
 
 ## Related
 
