@@ -12,7 +12,8 @@ Do not recursively read archived or historical material by default.
 | Stable vocabulary | `../CONTEXT.md` |
 | Current architecture | `architecture/overview.md` |
 | Component boundary / plugin granularity / interaction algebra | `architecture/composition-kernel.md` boundary-design sections + issue #53 + audit result `architecture/component-boundary-a0.md` |
-| Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | **Only after #53 passes**; then read `architecture/composition-kernel.md` + the implementation issue |
+| Composition Kernel semantics design (#67) | `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel.md` + issue #67 |
+| Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | **Only after #67 passes**; then read `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + the implementation issue |
 | Product introduction / current repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | Rust workspace/build/test | Current `Cargo.toml` / crate manifests / CI once present; do not invent a separate manual before repeated operational complexity exists. |
@@ -32,7 +33,8 @@ agent work rules                 -> AGENTS.md
 stable vocabulary                -> CONTEXT.md
 current architecture             -> docs/architecture/overview.md
 component-decomposition gate     -> issue #53 + composition-kernel boundary sections
-composition-kernel semantics     -> docs/architecture/composition-kernel.md
+composition-kernel-0 semantics   -> docs/architecture/composition-kernel-0-design.md + issue #67
+composition-kernel invariants    -> docs/architecture/composition-kernel.md
 implemented behavior             -> code + tests + current contracts
 historical experimental fact     -> preserved reference/history
 current task scope               -> current issue/task
