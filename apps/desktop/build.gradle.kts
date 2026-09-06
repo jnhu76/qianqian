@@ -64,6 +64,21 @@ tasks.register<Copy>("stageNativeRuntime") {
     into(layout.buildDirectory.dir("native-dev/$nativePlatform"))
 }
 
+// Packaged-distribution runtime (§ packaged app image): the canonical
+// artifact is staged into the Compose app resources; the launcher sets
+// `compose.application.resources.dir` at runtime, which the bridge's
+// resolver consumes. No repository build path, PATH, or working directory
+// participates in the packaged app.
+val appResourcesDir = layout.projectDirectory.dir("resources")
+
+tasks.register<Copy>("stagePackagedNativeRuntime") {
+    group = "qianqian native bridge"
+    description = "Stage the canonical runtime artifact into the app resources."
+    dependsOn("buildNativeRuntime")
+    from(runtimeArtifact)
+    into(appResourcesDir.dir("native/$nativePlatform"))
+}
+
 // ---------------------------------------------------------------------
 // Tests: `test` covers pure JVM bridge logic (no native artifact needed);
 // `nativeBridgeIntegrationTest` is a separate task for the real-runtime
@@ -113,6 +128,12 @@ compose.desktop {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Qianqian"
             packageVersion = "0.1.0"
+            appResourcesRootDir.set(appResourcesDir)
         }
     }
+}
+
+// The resources sync must see the staged runtime before it packages.
+tasks.matching { it.name == "prepareAppResources" }.configureEach {
+    dependsOn("stagePackagedNativeRuntime")
 }

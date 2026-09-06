@@ -31,7 +31,7 @@ fun main() {
     // until the connection lands, and a truthful unavailable state if the
     // staged runtime is missing or rejected by the ABI gates).
     val port: Deferred<PlayerPort> = appScope.async {
-        NativePlayerAdapter.connect(devStagedRuntimePath())
+        NativePlayerAdapter.connect(runtimePath())
     }
 
     application {
@@ -44,10 +44,11 @@ fun main() {
 }
 
 /**
- * The app-owned dev staging location (`build/native-dev/<platform>/…`),
- * resolved through the bridge's staging authority — the repository build
- * output is never consumed directly. `./gradlew run` sets the working
- * directory to `apps/desktop`, so `user.dir` is the Gradle project root.
+ * The runtime location resolved through the bridge's one explicit resolver:
+ * a packaged app image consumes its bundled copy (Compose sets
+ * `compose.application.resources.dir`); development (`./gradlew run`, cwd =
+ * `apps/desktop`) consumes the app-owned staging location. The repository
+ * build output, PATH, and the working directory never participate.
  */
-private fun devStagedRuntimePath(): Path =
-    NativeRuntimeLoader.devStagedLibraryPath(Paths.get(System.getProperty("user.dir"), "build"))
+private fun runtimePath(): Path =
+    NativeRuntimeLoader.resolveLibraryPath(Paths.get(System.getProperty("user.dir"), "build"))
