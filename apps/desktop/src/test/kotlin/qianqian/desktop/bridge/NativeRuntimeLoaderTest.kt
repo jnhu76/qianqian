@@ -1,5 +1,6 @@
 package qianqian.desktop.bridge
 
+import java.nio.file.Files
 import java.nio.file.Paths
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,8 +11,10 @@ import qianqian.desktop.nativebridge.NativeRuntimeLoader
 /**
  * The one runtime resolver (§ packaged runtime resolution): a packaged app
  * image consumes its bundled copy via Compose's resources-dir property;
- * development consumes the app-owned staged location. No PATH, working
- * directory, or filesystem search participates in either case.
+ * development consumes the app-owned staged location. The property alone is
+ * not a packaged-mode marker (Compose Desktop 1.12's `run` task sets it
+ * too), so the packaged path wins only when its runtime file exists. No
+ * PATH, working directory, or filesystem search participates.
  */
 class NativeRuntimeLoaderTest {
 
@@ -38,13 +41,39 @@ class NativeRuntimeLoaderTest {
     }
 
     @Test
-    fun resolverPrefersThePackagedResourcesPropertyWhenSet() {
-        System.setProperty("compose.application.resources.dir", "C:\\app\\resources")
+    fun resolverPrefersThePackagedResourcesFileWhenPresent() {
+        val resourcesDir = Files.createTempDirectory("qq-resources")
         try {
-            val p = NativeRuntimeLoader.resolveLibraryPath(buildDir)
+            System.setProperty(
+                "compose.application.resources.dir",
+                resourcesDir.toString(),
+            )
+            val packaged = NativeRuntimeLoader.packagedLibraryPath(resourcesDir)
+            Files.createDirectories(packaged.parent)
+            Files.createFile(packaged)
             assertEquals(
-                NativeRuntimeLoader.packagedLibraryPath(Paths.get("C:\\app\\resources")),
-                p,
+                packaged,
+                NativeRuntimeLoader.resolveLibraryPath(buildDir),
+            )
+        } finally {
+            System.clearProperty("compose.application.resources.dir")
+        }
+    }
+
+    @Test
+    fun resolverFallsBackToTheDevStagedLocationWhenPackagedFileMissing() {
+        val resourcesDir = Files.createTempDirectory("qq-resources")
+        try {
+            // `gradlew run` sets the same property to the plugin's own
+            // unpacked resources; without a staged runtime file there,
+            // development must consume the staged location.
+            System.setProperty(
+                "compose.application.resources.dir",
+                resourcesDir.toString(),
+            )
+            assertEquals(
+                NativeRuntimeLoader.devStagedLibraryPath(buildDir),
+                NativeRuntimeLoader.resolveLibraryPath(buildDir),
             )
         } finally {
             System.clearProperty("compose.application.resources.dir")

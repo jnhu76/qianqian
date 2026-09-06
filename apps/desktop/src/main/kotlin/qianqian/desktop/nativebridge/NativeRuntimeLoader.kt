@@ -1,6 +1,7 @@
 package qianqian.desktop.nativebridge
 
 import qianqian.desktop.player.AbiMismatch
+import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -69,17 +70,22 @@ object NativeRuntimeLoader {
         return Paths.get(resourcesDir.toString(), "native", platform, fileName)
     }
 
-    /**
-     * The one runtime resolver. A packaged app image launches with Compose's
-     * `compose.application.resources.dir` system property set and consumes
-     * the bundled copy; development (`gradlew run`) never sets it and
-     * consumes the staged location. No PATH, working-directory, or
-     * filesystem search participates in either case.
-     */
-    fun resolveLibraryPath(buildDirectory: Path): Path =
-        System.getProperty("compose.application.resources.dir")
-            ?.let { packagedLibraryPath(Paths.get(it)) }
-            ?: devStagedLibraryPath(buildDirectory)
+/**
+ * The one runtime resolver. A packaged app image launches with Compose's
+ * `compose.application.resources.dir` system property set and consumes
+ * the bundled copy. The property is NOT a packaged-mode marker on its
+ * own: Compose Desktop 1.12's `run` task sets it too (to its own
+ * unpacked runtime resources), so the packaged path wins only when the
+ * runtime file actually exists there; development (`gradlew run`)
+ * otherwise consumes the staged location. No PATH, working-directory,
+ * or filesystem search participates in either case.
+ */
+fun resolveLibraryPath(buildDirectory: Path): Path {
+    val packaged = System.getProperty("compose.application.resources.dir")
+        ?.let { packagedLibraryPath(Paths.get(it)) }
+    if (packaged != null && Files.isRegularFile(packaged)) return packaged
+    return devStagedLibraryPath(buildDirectory)
+}
 
     private fun platformLayout(): Pair<String, String> {
         val os = System.getProperty("os.name").lowercase()
