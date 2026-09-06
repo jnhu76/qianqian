@@ -93,10 +93,14 @@ NativePlayerAdapter → JNA → frozen C ABI → PlayerEngine → SongCore → F
   pass on the Windows JVM, `song_io` JVM callbacks serve real decode, real
   FLAC playback is audible, media position progresses from WASAPI render
   truth, and a short fixture reaches ENDED with replay-from-ENDED —
-  machine evidence in `WindowsRuntimeLifecycleTest` plus the human audible
-  gate. Known residual: playing seeks replay up to one device buffer of
-  pre-seek audio before the new position lands audibly (#40, separate
-  native corrective). jpackage app-image validation remains open.
+  machine evidence in `WindowsRuntimeLifecycleTest` plus loopback
+  content-level evidence. The #40 seek residual (playing commits could
+  replay up to one device buffer of pre-seek audio) was corrected by the
+  separate native PR #42 and re-validated on this updated stack:
+  forward/backward/repeated playing seeks land with no device-buffer-scale
+  stale playback (WASAPI loopback content analysis: old segment leaves
+  within in-flight mixing, new segment content arrives promptly).
+  jpackage app-image validation remains open.
 
 ## WSL/Linux proof scope
 

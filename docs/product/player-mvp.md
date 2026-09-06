@@ -55,10 +55,13 @@ Stop → 类型化产品错误。桌面 UI 仍不是完整产品形态（无播�
 Windows 真值已在真实 Windows 上验证（DESKTOP-WINDOWS-VALIDATION-1，
 #39）：qianqian.dll（mingw x86_64，WASAPI runtime flavor）加载、ABI 门、
 song_io 回调、真实 FLAC 可听播放、WASAPI render 时钟驱动的位置推进、
-ENDED-through-render 均通过机器证据 + 人工试听门。已知残留：playing 中
-seek 的可听落地存在一个设备缓冲时长的陈旧音频回放（#40，独立 native
-corrective）；打包分发（app image / installer 的端到端验证）仍待后续
-stage。
+ENDED-through-render 均通过机器证据（WindowsRuntimeLifecycleTest +
+WASAPI loopback 内容级分析）。首次 Windows 验证发现的 playing-seek
+陈旧音频回放（#40）已由独立 native corrective（PR #42，commit-flush
+ordering）修复；在更新后的 Desktop 栈上重验：前向/后向/连续多次 playing
+seek 落地后旧段内容在 in-flight 混合范围内消退，无设备缓冲时长的陈旧
+回放，新增内容立即可听。打包分发（app image / installer 的端到端验证）
+仍待后续 stage。
 
 ## Related
 
