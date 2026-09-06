@@ -2,7 +2,14 @@
 
 This document is the canonical Architecture v2 authority for Qianqian's generic composition/control-plane kernel.
 
-It defines what belongs in the kernel, what must stay outside it, and the observable invariants the implementation must prove.
+It defines both:
+
+1. the **preconditions** that must hold before a kernel implementation is justified; and
+2. the invariants the eventual kernel must enforce.
+
+Current design gate: **#53 COMPONENT-BOUNDARY-A0**.
+
+No new Composition Kernel implementation/API is authorized until that gate passes.
 
 ## Kernel constitution
 
@@ -10,7 +17,7 @@ It defines what belongs in the kernel, what must stay outside it, and the observ
 
 The generic kernel maintains composition rules. It does not implement the product.
 
-It may know:
+Its expected primitive budget remains:
 
 ```text
 Context
@@ -25,26 +32,84 @@ It must not know:
 ```text
 Track
 PCM
-Decoder formats
+codec formats
 FFmpeg
 WASAPI
 PocketJS
 KuiklyUI
-playlist rules
+playlist policy
 music commands
 UI payload schemas
 ```
 
-The product should be able to grow substantially while the generic kernel stays small.
+But the primitive list is **not** the architecture starting point.
+
+## Boundary design comes first
+
+Before implementing Context/Fiber/Effect/Reconcile, Qianqian must decide how the real product is decomposed.
+
+Required design order:
+
+```text
+Component Granularity
+        ↓
+Capability / dependency boundary
+        ↓
+Interaction Algebra
+        ↓
+Effect / System Boundary
+        ↓
+Global lifecycle ordering
+        ↓
+Confluence oracle
+        ↓
+Composition Kernel implementation
+```
+
+The calculus gives strong properties only after component/key/operation boundaries are good enough.
+
+It does not provide a unique automatic decomposition.
+
+### Component granularity
+
+A component is not independent because it has a different feature name.
+
+For every candidate boundary, review:
+
+```text
+state/resource ownership
+required capabilities
+provided capabilities
+cross-boundary operations/data edges
+observable contract
+operation locality
+commutativity / explicit ordering
+recoverable system boundary
+provider/consumer lifecycle dependency
+configuration/naming/cognitive cost
+```
+
+Apparent cycles such as:
+
+```text
+A requires B
+B requires A
+```
+
+should trigger a mediation/integration-component audit. Bidirectional interaction may sometimes be decomposed into clearer one-way bindings.
+
+However, finer decomposition is not automatically better. Component count, configuration and cognitive cost are first-class engineering costs.
+
+Current concrete audit authority: **#53**.
 
 ## Control plane vs data plane
 
-The kernel belongs to the control/composition plane.
+The Composition Kernel belongs to the control plane.
 
 ```text
                          CONTROL PLANE
 
-                 Profile / desired tree
+                 desired composition
                           |
                           v
                       Reconcile
@@ -57,7 +122,6 @@ The kernel belongs to the control/composition plane.
                           |
                           v
                  Context / Capability
-                  Fiber / Effect state
 
 -------------------------------------------------------------
                           |
@@ -73,186 +137,74 @@ The kernel belongs to the control/composition plane.
       MediaSource -> Decoder -> Processing -> AudioOutput
 ```
 
-The kernel decides **who can reach whom**, **who owns which mutation/resource**, and **which component should be alive**.
+The kernel decides:
 
-It does not own the payload being processed after those relationships exist.
+```text
+who may reach whom
+which dependency is satisfied
+who owns a mutation/resource
+which component should be alive
+```
 
-Therefore:
+It does not own the application payload after the relationship is established.
 
 > **Capability plane != Data plane.**
 
-## Primitive 1: Context
+PCM/data blocks must not travel through Context or a generic event bus per callback/block.
 
-A Context is the world visible to a fiber.
+## Capability / service definition
 
-At minimum it provides a capability/dependency view:
-
-```text
-visible capability definitions
-active providers/bindings
-consumer requirements
-effect ownership scope
-parent/child scope information when scopes are introduced
-```
-
-Context is not merely a global `HashMap<TypeId, Any>`.
-
-It must support lifecycle semantics: provider availability and removal affect dependents.
-
-Context must not become:
+A Capability identifies a contract that can be required and provided.
 
 ```text
-global product state
-universal event bus
-arbitrary message broker
-PCM buffer store
-UI payload store
-service-locator escape hatch that ignores declared requirements
+Capability / Service Definition
+             ^
+        +----+----+
+        |         |
+    Provider   Consumer
 ```
 
-A consumer should normally declare what it requires rather than performing arbitrary opportunistic lookup.
+Across plugin seams, consumers depend on the definition rather than a concrete provider implementation.
 
-Cross-key dependency must be explicit. An operation associated with one capability/coeffect key must not secretly read or mutate unrelated shared keys or hidden globals.
+The public operations of that capability are part of its composability contract.
 
-Child contexts, isolation, interception, and overrides are plausible future extensions, but they are not required before the base lifecycle calculus works.
-
-## Primitive 2: Capability
-
-A Capability identifies a service/contract that can be provided and required.
-
-```text
-Service/Capability Definition
-          ^
-          |
-     +----+----+
-     |         |
- Provider   Consumer
-```
-
-The provider implementation is not the capability identity.
-
-Across plugin seams, consumers depend on capability/service definitions rather than concrete providers.
-
-The first Rust representation should prefer type-safe identities/contracts over unstructured string-only keys where practical.
-
-Do not prematurely build semver solvers, schema registries, or capability marketplaces.
-
-### Operations are part of the capability contract
-
-A shared capability is not only `key -> value`. Its public operations determine whether multiple fibers can compose safely.
-
-For each shared mutable capability, the provider/service definition must make clear:
+For each shared mutable capability, boundary design must make clear:
 
 ```text
 what state each operation may read/write
-what observable result it exposes
-what inverse/disposer removes only the caller's contribution
-which operations may coexist independently
+what result is intentionally observable
+which contributions can coexist independently
+how a caller removes only its own contribution
 which operations are order-sensitive
 ```
 
-Interface design therefore participates directly in composability.
+An operation on one key/capability must not secretly read/write unrelated shared keys or hidden global state. Cross-key dependency must be explicit.
 
-Opaque handles/tokens are preferred when exposing incidental physical identity would create unnecessary observable ordering or non-commutativity.
+Type-safe identities/contracts are preferred over unstructured string-only keys when practical, but version/schema/marketplace machinery is not currently authorized.
 
-## Primitive 3: Fiber
+## Interaction algebra
 
-A Fiber is a live plugin instance.
+### Revertibility is not independence
 
-The fiber—not a crate, module, package, shared library, or plugin definition—is the unit the composition kernel schedules and owns.
+Within one component/Fiber, an effect may produce an inverse and later unwind in LIFO order.
 
-A fiber owns at least:
+That only proves local revertibility.
 
-```text
-identity
-parent/scope relationship
-plugin definition/configuration
-requirements
-provided capabilities/context bindings
-owned effects
-lifecycle state
-in-flight transition state as needed
-```
-
-One plugin definition may have multiple fiber instances in different contexts/configurations.
-
-### Lifecycle semantics
-
-The target lifecycle is equivalent to:
-
-```text
-PENDING --dependencies satisfied--> LOADING --> ACTIVE
-   ^                                      |
-   |                                      |
-   +---------- UNLOADING <---------------+
-                  |
-                  +--> PENDING
-                  +--> DISPOSED
-
-Activation failure may enter FAILED according to the implementation contract.
-```
-
-Hard invariants:
-
-- a fiber must not be ACTIVE while a required capability is unsatisfied;
-- dependency appearance can make a pending fiber eligible to load;
-- dependency disappearance must proactively remove the dependent from ACTIVE state;
-- component teardown must be dependency-aware, not deferred until a later failed service call;
-- transitions must avoid impossible overlap/reentrancy states.
-
-Provider teardown must preserve dependency ordering: the provider is logically withdrawn from new resolution, dependents leave ACTIVE while teardown access is still safe where required, then provider-owned bindings/resources are finally removed.
-
-## Primitive 4: Effect
-
-Effect is the ownership/write boundary for kernel-visible reversible mutation.
-
-The purpose is to eliminate split-brain lifecycle code such as:
-
-```text
-activate(): register A, B, C
-shutdown(): hopefully remember to unregister C, B, A
-```
-
-Instead, a fiber owns the mutations/resources it introduces.
-
-Typical reversible local effects include:
-
-```text
-provide/bind a capability
-register a listener
-create a timer
-mount a child fiber
-register a watcher
-own a local runtime handle
-```
-
-The effect record must retain enough teardown/inverse information for deterministic disposal.
-
-Within one fiber, owned effects should normally unwind in reverse/LIFO order unless a stronger contract proves otherwise.
-
-### LIFO is not cross-fiber composability
-
-An inverse only proves that an effect can undo itself in the state for which that inverse was produced.
-
-If another fiber has modified the world in between, this is not automatically enough:
+If:
 
 ```text
 S0 --A--> S1 --B--> S2
+```
 
+and:
+
+```text
 A^-1(S1) = S0
 ```
 
-does not by itself prove that `A^-1(S2)` correctly removes only A while preserving B.
+this does **not** prove that applying `A^-1` in `S2` preserves B.
 
-Therefore:
-
-> **Revertibility is necessary but not sufficient for independent removal.**
-
-Cross-fiber composition additionally requires **Independence** and **Commutativity** properties at the shared-operation boundary.
-
-### Independence / commutativity contract
-
-For two effects/components A and B to be independently removable, the relevant forward and inverse transformations must not interfere with one another. Engineering review must consider at least the equivalent relationships of:
+For cross-component independent removal, design/review must account for the relevant forward/inverse interactions, conceptually including:
 
 ```text
 A    with B
@@ -261,232 +213,215 @@ A^-1 with B
 A^-1 with B^-1
 ```
 
-Foreign transformations must also not change the other component's intended inverse/continuation in a way that changes its public contract.
-
-This is stronger than checking only that forward(A) and forward(B) look harmless.
+Foreign transformations also must not alter another component's intended inverse/continuation/public behavior in a way that breaks its contract.
 
 ### Different keys
 
-Operations confined to genuinely distinct capability/coeffect keys should be designed so that they do not read or write one another's state. This is the preferred route to independence.
+Operations on genuinely distinct keys should be key-local and independent by construction.
+
+This property is lost if implementation escapes into hidden globals or undeclared cross-key state.
 
 ### Same key
 
-When multiple fibers mutate the same shared key, independence is not automatic.
+Multiple contributions to one shared interface are not automatically commutative.
 
-The key/provider interface must locally define or demonstrate how concurrent/interleaved operations compose.
-
-A good shape is often contribution-based:
+When the semantics fit, contribution-oriented operations may help:
 
 ```text
 register(value) -> opaque token
 unregister(token)
 ```
 
-where removing token A cannot damage token B.
+where removing A's token cannot damage B's contribution.
+
+Opaque identity is useful when exposing incidental sequence/position information would create needless observable non-commutativity.
 
 ### Non-commutative relationships
 
-Some interactions are inherently ordered.
-
-Example:
+If:
 
 ```text
-middleware A -> B
+A -> B != B -> A
 ```
 
-may not be observationally equivalent to:
+then the interaction is ordered.
 
-```text
-middleware B -> A
-```
+Freeze:
 
-Such interactions must **not** be mislabeled as independent effects.
-
-Freeze this rule:
-
-> **Commutative relation -> independent effect composition.**
+> **Commutative relation -> may compose as independent effects.**
 >
 > **Non-commutative relation -> explicit dependency/order/integration structure.**
 
-The architecture does not try to eliminate ordering. It requires ordering to be explicit.
+DSP/pipeline ordering is a canonical example. Semantic topology must never depend on registration timing, hash iteration, or incidental mount order.
 
-### Effect is not magical rollback
+The architecture does not eliminate order; it makes order explicit.
 
-Not every action is reversible.
+## Effect and system boundary
 
-External network writes, destructive filesystem operations, money movement, or third-party side effects may require:
+An Effect records kernel-visible mutation/resource provenance owned by a component/Fiber.
+
+Typical locally reversible examples:
 
 ```text
-transactional semantics
-compensating action
-explicit irreversible classification
+capability binding
+listener/callback registration
+timer registration
+child Fiber mount
+watcher registration
+local handle/resource ownership
+buffer allocation owned by the runtime
 ```
 
-Do not claim correctness by wrapping an irreversible action in an `Effect` closure.
+Within one Fiber, deterministic reverse/LIFO unwind is the default local rule unless a stronger contract says otherwise.
+
+But not every action is reversible.
+
+Classify effects when relevant as:
+
+```text
+Reversible
+Transactional
+Compensatable
+Irreversible / emitted outside system boundary
+```
+
+For a player, already-rendered audio is outside rollback: the runtime cannot “unplay” sound already emitted to the physical world.
+
+Do not wrap an irreversible action in an Effect closure and call that rollback correctness.
 
 ## Observational equivalence
 
-Correct restoration does not require private physical state to become bit-for-bit identical to its prior representation.
+Recovery/removal correctness does not require private implementation state to become bit-for-bit identical.
 
-Opaque IDs, allocator layouts, generations, or internal handles may differ after undo.
+The relevant oracle is public/architecturally observable behavior.
 
-The correctness criterion is public behavior:
+After removing A:
 
-> After removing A, the observable system should be equivalent to a world where A never contributed, while independent B/C contributions remain present.
+> the system should be observationally equivalent to a world where A never contributed, while independent B/C contributions remain.
 
-Tests should therefore prefer public/observable invariants such as:
-
-```text
-which capabilities are reachable
-which fibers are ACTIVE/PENDING/DISPOSED
-which public service behavior remains
-which contribution tokens/bindings remain
-whether owned effects have been retired
-```
-
-Do not overfit tests to irrelevant private bit identity.
-
-## Boundary design and decomposition
-
-The calculus does not magically discover the one correct component/key split.
-
-Architecture work must decide:
+Useful observable facts include:
 
 ```text
-who owns the state
-which capabilities are truly required
-what state an operation may read/write
-whether operations commute
-whether an ordering dependency is real
-whether an API exposes unnecessary observable information
-whether an inverse removes only the caller's contribution
-whether the state lies inside the recoverable system boundary
-whether finer decomposition improves composability enough to justify complexity
+reachable capabilities
+active/pending/disposed lifecycle truth
+public service behavior
+remaining contributions/bindings
+absence of ghost effects/resources
 ```
 
-A mathematically fine-grained decomposition can still be an engineering failure if it produces excessive components, naming, configuration, or cognitive cost.
+Opaque IDs, allocator layout, private generations and incidental token values need not match.
 
-Conversely, a convenient coarse component is not acceptable if it relies on arbitrary shared references or hidden global mutation.
+## Global lifecycle ordering
 
-## Primitive 5: Reconcile
+Provider disappearance is a dependency-order problem.
 
-Reconcile converts desired composition into a running Fiber graph.
+Required semantic shape:
 
 ```text
-Profile / Patch / desired tree
-            |
-            v
-        Reconcile
-            |
-            v
-      Fiber Graph
+provider begins withdrawal
+        ↓
+provider stops satisfying new dependency resolution
+        ↓
+dependents detect invalidation and deactivate
+        ↓
+dependents complete teardown while required teardown access is valid
+        ↓
+provider finally removes/reclaims binding/resources
 ```
 
-This prevents application composition from silently becoming a privileged imperative `boot()` function.
+Do not physically destroy the provider first and let dependents fail later.
 
-The first implementation does not need a rich config language or patch system. A minimal in-memory desired composition is enough if it proves that mount/unmount/lifecycle changes are mediated by the same kernel protocol.
+The eventual Fiber lifecycle must enforce this invariant even if the internal state-machine names differ.
 
-Do not add YAML, dynamic loading, filesystem watching, HMR, or remote plugin discovery before the base reconciler semantics exist.
+## Confluence
 
-## Everything is a plugin
+A major correctness target is **confluence at quiescence**:
 
-In Qianqian, this means:
+> **After any legal load/unload/replacement history reaches quiescence, the observable runtime is equivalent to a clean construction of the final desired composition.**
 
-> Every long-lived product capability that participates in application runtime composition must enter through the same Context/Capability/Fiber/Effect lifecycle protocol.
+Example history:
+
+```text
+load source A
+insert EQ
+switch output
+remove EQ
+replace decoder
+settle
+```
+
+If the final desired composition is:
+
+```text
+source A + decoder B + output C
+```
+
+then the settled runtime should match a clean root directly composed as that final graph in all relevant observable respects.
+
+This is stronger than:
+
+```text
+no crash
+all disposers ran
+zero leaked handles
+```
+
+because it also detects history-dependent topology, stale bindings and ghost contributions.
+
+## Event semantics
+
+A generic public EventBus is not automatically a Composition Kernel primitive.
+
+If a product/domain needs event semantics, model that initially as a normal Event Service/plugin. Listener ownership may still be tracked as Effects.
+
+Kernel-internal dependency invalidation is not the same thing as a public product event bus.
+
+## Future kernel primitives
+
+Only after #53 passes may an implementation task concretize:
+
+### Context
+
+Capability/dependency view visible to a Fiber. Not a global `HashMap<TypeId, Any>` escape hatch and not a payload bus.
+
+### Fiber
+
+Live plugin instance owning identity, scope/parent, requirements, provided bindings, effects and lifecycle state.
+
+### Effect
+
+Owned kernel-visible mutation/recovery provenance.
+
+### Reconcile
+
+Moves a running Fiber graph toward desired composition without collapsing the architecture into a privileged imperative `boot()` function.
+
+Exact Rust APIs/state enum names remain unfrozen until the implementation task is authorized.
+
+## Everything is a Plugin
+
+In Qianqian this means:
+
+> Every **justified** long-lived runtime capability eventually participates in the common composition/lifecycle protocol.
 
 It does not mean:
 
 ```text
-everything is a shared library
-everything is runtime downloaded
-everything uses string keys
-every payload is an event
-every function call goes through Context
+one feature name == one plugin
+one plugin == one crate
+one plugin == one dynamic library
+everything is hot-loaded
+everything is rollbackable
+every payload goes through Context
 ```
 
-Examples of future ordinary plugins include:
-
-```text
-Music
-AudioRuntime
-Decoder provider
-Processing/DSP provider
-AudioOutput provider
-Presentation
-UiHost
-Library
-MediaKeys
-FilePicker
-Analyzer
-```
-
-Some plugins may own internal domain kernels/graphs/runtimes. They remain ordinary residents from the generic kernel's perspective.
-
-## Service calls and business payloads
-
-Once capability resolution has produced a provider/service endpoint, application payload should normally move directly through that contract.
-
-```text
-Consumer requirement
-       |
-       v
-     Context
-       |
-    resolves
-       v
-Service endpoint/provider
-       |
-       v
-service.method(payload)
-```
-
-Context participates in resolution/binding, not necessarily every payload byte or realtime operation.
-
-This distinction is mandatory for media/realtime paths.
-
-## Events
-
-A general application Event Bus is not one of the five generic kernel primitives.
-
-If product/domain event semantics are required, they should initially be modeled as a normal Event Service/plugin.
-
-The kernel may own listener-registration teardown as Effects.
-
-Kernel-internal dependency notifications are part of capability/fiber lifecycle implementation and are not a public product event bus.
-
-## Replacement and provider disappearance
-
-Provider replacement/disappearance must be expressible without privileged product logic.
-
-```text
-B requires X
-A1 provides X
-
-A1 active -> B active
-unmount A1 -> B leaves active state
-mount A2 providing X -> B becomes eligible to activate again
-```
-
-A consumer must not continue running under a satisfied-dependency assumption after its provider has been logically withdrawn.
-
-## Root disposal
-
-After successful root disposal, the kernel should be observationally equivalent to a clean root:
-
-```text
-zero active fibers
-zero visible service/capability bindings owned by disposed fibers
-zero outstanding owned reversible effects
-no dependent remains active against a removed provider
-```
-
-This is the anti-ghost-state oracle.
+Candidate boundaries currently include Music, MediaSource, Decoder, AudioRuntime, DSP stages, AudioOutput, Presentation, UiHost, Library, Analyzer and platform capabilities, but #53 must decide their actual granularity.
 
 ## Realtime specialization boundary
 
 The generic Composition Kernel is not the audio engine.
 
-A future AudioRuntime plugin may own:
+A future AudioRuntime component may own:
 
 ```text
 AudioGraph
@@ -494,115 +429,80 @@ clock
 buffer pool
 format negotiation
 RT scheduling
-graph swap/publication
+graph publication/swap
 ```
 
-The realtime thread must not perform generic kernel operations per block/callback:
+Realtime callback/block execution must not perform:
 
 ```text
 Context lookup
 capability resolution
-reconciliation
+Fiber reconciliation
 arbitrary generic event dispatch
-unbounded allocation/blocking
+filesystem/network I/O
 UI/runtime round trips
+unbounded allocation/blocking
 ```
 
-Graph changes should be prepared on the control plane and published at a realtime-safe boundary.
-
-PCM/data blocks travel directly through pre-bound graph edges.
+PCM travels through pre-bound data-plane graph edges.
 
 ## Relationship to MusicKernel
 
-`MusicKernel` remains a domain semantic authority.
+`MusicKernel` remains a music-domain semantic authority, not the application composition authority.
 
-It is expected to live inside/behind a Music plugin rather than serve as the application's generic kernel.
+A future justified Music component may own it and expose domain services/capabilities.
 
-```text
-Composition Kernel
-       |
-       v
-   Music Fiber
-       |
-       +-- owns MusicKernel
-       +-- requires media/audio capabilities
-       +-- provides music/transport/state services
-```
+The exact Music/Transport/Presentation split is part of #53 boundary design and is not frozen here.
 
 ## R0 migration authority
 
-RUST-ARCH-R0 created constructor-only composition as a bootstrap proof.
-
-The following shapes are explicitly provisional:
+RUST-ARCH-R0 created provisional bootstrap shapes:
 
 ```text
 qianqian-core::base
-qianqian-runtime::AppRuntime constructor composition
+qianqian-runtime::AppRuntime
+AppRuntime::new()
 with_audio_output()
 other direct R0 capability fields/accessors
 ```
 
-The Composition Kernel implementation task is authorized to remove/refactor them.
+They are not compatibility contracts.
 
-Do not maintain R0 API compatibility unless a real current consumer requires it.
+However:
 
-## First implementation oracle
+> **Do not replace them with a new Composition Kernel implementation until #53 passes.**
 
-The first kernel implementation should remain intentionally small and prove:
+## Current gate
 
-```text
-1. mount Consumer B requiring X
-   -> B PENDING
-
-2. mount Provider A1 providing X
-   -> A1 ACTIVE
-   -> X available
-   -> B ACTIVE
-
-3. mount independent Provider/Consumer pair on Y
-   -> Y-side contribution becomes observable
-
-4. unmount A1
-   -> X logically withdrawn
-   -> B leaves ACTIVE
-   -> B-owned effects unwind
-   -> A1 teardown completes
-   -> Y-side observable contribution remains intact
-
-5. mount Provider A2 providing X
-   -> B may activate again
-
-6. dispose root
-   -> observationally equivalent to clean root
-```
-
-Tests must separately prove:
+Current authority:
 
 ```text
-single-Fiber LIFO cleanup
-cross-Fiber independence
-same-key contribution safety where introduced
-non-commutative relations rejected or made explicitly ordered
+#53 COMPONENT-BOUNDARY-A0
+        ↓ PASS / human review
+future COMPOSITION-KERNEL-0
 ```
 
-The task does not need audio, FFmpeg, UI, async networking, dynamic libraries, config files, or HMR.
-
-## Non-goals for the first kernel task
-
-Do not automatically add:
+#53 must first establish:
 
 ```text
-string-key plugin marketplace
-semver dependency solver
-dynamic library loading
-filesystem plugin discovery
-YAML/TOML profile parser
-hot reload / HMR
-remote plugins
-full child-context isolation/interception system
-generic event middleware stack
-audio graph runtime
-FFmpeg/WASAPI/PocketJS/KuiklyUI
+component boundaries
+ownership
+requires/provides graph
+cycle/integration-component decisions
+interaction algebra
+explicit ordering
+recoverable system boundary
+provider-disappearance ordering
+confluence scenarios/oracle
+minimal first Windows playback decomposition
 ```
 
-Prove the calculus before growing the ecosystem.
+Until then:
+
+```text
+NO qianqian-kernel implementation
+NO Context API freeze
+NO Fiber lifecycle implementation
+NO Reconcile implementation
+NO FFmpeg/WASAPI/PocketJS integration
+```
