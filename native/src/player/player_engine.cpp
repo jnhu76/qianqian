@@ -88,10 +88,11 @@ PlayerStatus PlayerEngine::open(const song_io& io, std::int32_t* out_song_status
     std::lock_guard<std::mutex> sg(src_mtx_);
     std::lock_guard<std::mutex> g(state_mtx_);
     if (!invalidate()) {
-        // Commit abandoned (flush not proven / cancelled): the previous
-        // generation is logically intact and keeps playing. SongCore was
-        // never consulted, so this is ErrInternal and *out_song_status is
-        // deliberately NOT written (it carries no SongCore verdict here).
+        // Commit-flush abort before SongCore is consulted: a cancellation
+        // before renderer claim leaves the previous generation intact; a
+        // definitive failure after claim poisons that generation to Error.
+        // Either way this is ErrInternal and *out_song_status is deliberately
+        // NOT written because there is no SongCore verdict to report.
         return PlayerStatus::ErrInternal;
     }
 
@@ -216,8 +217,9 @@ PlayerStatus PlayerEngine::stop(std::int32_t* out_song_status) {
     // the rewind seek fails) the handle is not trusted — drop and reopen. If
     // even the reopen fails, ERROR persists and only open() recovers.
     if (!invalidate()) {
-        // Commit abandoned (flush not proven / cancelled): the old
-        // generation keeps playing. SongCore was never consulted —
+        // Commit-flush abort before SongCore is consulted: cancellation
+        // leaves the old generation usable, while a claimed physical failure
+        // poisons it to Error and keeps the realtime seam closed. Both map to
         // ErrInternal, and *out_song_status is deliberately NOT written.
         return PlayerStatus::ErrInternal;
     }
@@ -272,12 +274,12 @@ PlayerStatus PlayerEngine::seek(std::int64_t position_us, std::int64_t* out_land
         return PlayerStatus::ErrIllegalCall;
     }
     const bool was_ended = st == PlayerState::Ended;
-    // Fail-closed commit order: invalidate the generation and flush FIRST,
+    // Fail-closed commit order: quiesce and settle the physical flush FIRST,
     // then attempt SongCore — a failed seek must never resume the old
-    // timeline (docs §3.1). An aborted device flush abandons the commit
-    // before any mutation: the old generation keeps playing logically and
-    // the seek reports ErrInternal (SongCore was never consulted, so this
-    // is not a song_seek failure and *out_song_status is left alone).
+    // timeline (docs §3.1). A pre-claim cancellation returns ErrInternal
+    // with the old generation intact; a definitive failure after renderer
+    // claim invalidates that generation and stores Error. In either abort
+    // SongCore was never consulted and *out_song_status is left alone.
     if (!invalidate()) return PlayerStatus::ErrInternal;
     std::int64_t actual = 0;
     song_status sst = song_seek(handle_, position_us, &actual);
@@ -839,13 +841,14 @@ void PlayerEngine::quiesce_backend() {
 }
 
 bool PlayerEngine::invalidate() {
-    // Kill the current generation. The commit-flush hook runs FIRST (a
-    // cancel/fail aborts before anything moves); then the epoch bump
-    // invalidates producer output, pending output is discarded
-    // (submitted-but-unrendered spans can never advance the next segment),
-    // and the queue is flushed. The media clock is intentionally NOT
-    // touched: position stays at the last audible endpoint until a new
-    // landing commits (or freezes forever in ERROR).
+    // Settle the physical commit-flush outcome before the normal logical
+    // generation reset. A pre-claim cancellation aborts with no mutation and
+    // re-opens the old generation; a definitive post-claim failure instead
+    // invalidates that generation immediately and poisons the engine to Error.
+    // Only a proven flush continues into the normal epoch/timeline/ring reset
+    // and later landing. The media clock is intentionally NOT touched:
+    // position stays at the last audible endpoint until a new landing commits
+    // (or freezes forever in ERROR).
     // No realtime fill/advance may be mid-flight while the ring/timeline
     // are reset. Callers hold state_mtx_, so the manual-tick path is already
     // serialized; the wait covers the production lock-free seam.
@@ -860,10 +863,10 @@ bool PlayerEngine::invalidate() {
     // drained, generation not yet reset — so the physical device buffer is
     // PROVEN empty before segment N+1 can land. No fill/advance can slip
     // through the closed admission window, which is what turns the audible
-    // segment invariant from detection into ordering. Fail-closed: an
-    // unproven flush abandons the commit before ANY mutation (epoch below
-    // has not run); re-open admission so the old generation keeps playing
-    // and the caller surfaces the error.
+    // segment invariant from detection into ordering. Fail-closed split:
+    // cancellation before renderer claim abandons the commit before mutation
+    // and re-opens admission; a definitive failure after claim invalidates the
+    // dead generation, stores Error, and keeps admission closed.
     std::function<CommitFlushResult()> flush;
     {
         std::lock_guard<std::mutex> hk(hook_mtx_);
