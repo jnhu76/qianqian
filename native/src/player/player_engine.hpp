@@ -67,6 +67,34 @@ enum class PlayerStatus : std::int32_t {
     ErrIllegalCall = 1,   // call not allowed in current state
     ErrOpenFailed = 2,    // *out_song_status carries the song_open status
     ErrSeekFailed = 3,    // *out_song_status carries the song_seek status
+    // Backend-internal failure (e.g. the commit-flush protocol of #40).
+    // NOT a SongCore verdict — SongCore was never consulted, so
+    // *out_song_status carries no SongCore status on these paths (the C
+    // shim's deterministic pre-value must not be read as a root cause).
+    // Matches PE_ERR_INTERNAL (asserted in the C shim).
+    ErrInternal = 6,
+};
+
+// Verdict of the commit-flush hook (#40):
+//   kPerformed — the device buffer was physically PROVEN flushed (Stop +
+//                Reset succeeded, or there was no stream to flush); the
+//                commit may land.
+//   kCancelled — the request was cancelled before the renderer claimed it:
+//                no physical side effect, the operation never began; the
+//                old generation is intact.
+//   kFailed    — the renderer claimed the flush and the physical outcome is
+//                definitive but NOT a proven flush: the backend tore the
+//                session down, so the old segment's pending physical output
+//                can never playout. By the segment-ownership rule (ADR-0005)
+//                ring/timeline/device-pending share one segment lifetime —
+//                the engine therefore invalidates the whole generation
+//                (epoch bump, pending timeline/ring discard) and stores
+//                Error instead of resuming playback as if the commit had
+//                merely been rejected.
+enum class CommitFlushResult : std::uint8_t {
+    kPerformed,
+    kCancelled,
+    kFailed,
 };
 
 enum class StepOutcome : std::uint8_t {
@@ -189,6 +217,28 @@ public:
     PlayerStatus seek(std::int64_t position_us, std::int64_t* out_landing_frames = nullptr,
                       std::int32_t* out_song_status = nullptr);
 
+    // Commit-boundary device flush (#40). The production backend registers
+    // one hook; every commit (open / play-after-ENDED / stop / seek) invokes
+    // it inside invalidate(), AFTER the realtime seam is drained (admission
+    // closed) and BEFORE the epoch/timeline reset and the segment bump. The
+    // hook runs the protocol's control side: it publishes a flush request to
+    // the backend's render thread and returns only a definitive outcome —
+    // kPerformed (the physical Stop/Reset is PROVEN; the commit lands),
+    // kCancelled (cancelled before the renderer claimed it: no physical
+    // side effect, the operation never began), or kFailed (claimed, then
+    // definitively not a proven flush — the backend tore the session down).
+    // kCancelled abandons the commit before any mutation: the old
+    // generation stays intact and keeps playing (admission re-opened).
+    // kFailed poisons the old generation: its pending timeline/ring can
+    // never playout, so the engine discards them and stores Error rather
+    // than resuming playback. Both surface ErrInternal (SongCore was never
+    // consulted). Called on the
+    // control thread under src_mtx_ + state_mtx_ — the hook may block, but
+    // must never re-enter the engine. Audible-segment invariant by
+    // ORDERING: once segment N+1 has committed, the device buffer was
+    // already proven empty, so no PCM of segment N can become audible.
+    void set_commit_flush_hook(std::function<CommitFlushResult()> fn);
+
     // -- decode worker ------------------------------------------------------------
     // One worker quantum (the frozen producer step). Safe from the worker
     // thread or, in manual mode, the test thread.
@@ -265,6 +315,9 @@ public:
     // Admitted in-flight backend ops: proves a quiesced callback never
     // became active.
     std::uint64_t debug_active_backend_ops() const { return active_backend_ops_.load(); }
+    // Lock-free segment read for observations made inside control-path hooks
+    // (snapshot() takes state_mtx_ and would deadlock there).
+    std::uint64_t debug_segment() const { return segment_.load(); }
 
 private:
     // One decode result in flight, not yet published. Carries the epoch it
@@ -283,8 +336,20 @@ private:
     // nullopt = the seek failed (fail-closed; caller goes to Error).
     std::optional<std::pair<std::int64_t, LandingQuality>> landing_of(
         song_status status, std::int64_t actual_us, std::int64_t requested_us) const;
-    // Commit machinery (caller holds src_mtx_ AND state_mtx_).
-    void invalidate();
+    // Commit machinery (caller holds src_mtx_ AND state_mtx_). invalidate()
+    // returns false when the registered commit-flush hook does not report a
+    // PROVEN flush, and the verdict decides how the abort looks:
+    //   kCancelled (before the renderer claimed): the operation never began
+    //     — nothing mutated (epoch/segment/ring/timeline untouched),
+    //     admission re-opened, the old generation keeps playing.
+    //   kFailed (after the claim): the physical session is gone, so the old
+    //     generation's pending output can never playout — the engine
+    //     invalidates the generation (epoch bump, pending timeline/ring
+    //     discard) and stores Error; admission stays closed until the next
+    //     successful commit re-opens it.
+    // Either way SongCore was never consulted, last_error_ distinguishes
+    // the two, and the caller surfaces ErrInternal.
+    bool invalidate();
     void commit_landing(std::int64_t landing_frames, LandingQuality quality);
     // Wait until no realtime fill/advance is mid-flight. The realtime path
     // never blocks on state_mtx_, so the wait is bounded; called from
@@ -374,6 +439,7 @@ private:
     std::function<void()> publish_hook_;
     std::function<void()> control_hook_;
     std::function<void()> quiesce_hook_;
+    std::function<CommitFlushResult()> commit_flush_hook_;
     // Test-only realtime barrier: plain ATOMIC FLAGS so the realtime path
     // can honor it without a mutex or allocation (armed = false is the
     // production state: two no-effect loads). Seq_cst so a release is a

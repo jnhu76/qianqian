@@ -82,6 +82,68 @@ equivalent of proven playout (exact integer ratio
 `out_rendered × src_rate / dst_rate`; ≤ 1 frame over-report, clamped by
 the engine's pending clamp so it can never exceed appended media).
 
+## Commit flush handshake (playing discontinuity)
+
+A commit (open / seek / stop / restart-from-ENDED) never relies on the
+renderer noticing it (#40: with the buffer topped up, `available == 0`
+used to short-circuit before any fill, so a playing seek's new segment
+queued behind stale audio and played only after it). Instead the engine's
+commit boundary — `invalidate()`, with the realtime seam quiesced — runs
+the control side of the commit-flush protocol (`CommitFlushHandshake`):
+it publishes a flush REQUEST to the render thread and waits for that
+request's definitive verdict before touching the generation. The flush
+executes on the render thread, serialized with every other WASAPI touch
+of the session: the renderer CLAIMS the request (the protocol's point of
+no return), runs `Stop() + Reset()` (flushing every
+submitted-but-unrendered frame), rebases `written_total`/`last_advanced`
+to a fresh origin, drains the resampler delay, and COMPLETES the request
+with its verdict. Only then does the engine bump the epoch, reset
+ring/timeline, and land segment N+1.
+
+Ordering — not post-hoc detection — enforces the audible segment
+invariant: at the instant segment N+1 lands, the device buffer is PROVEN
+empty, and no fill can cross the closed admission window, so no PCM of
+segment N can become audible or be submitted after the commit. The
+renderer needs no segment awareness at all; it leaves the started state
+at the claim, and the probe loop re-Starts on the clean buffer once the
+commit has landed (a paused seek is covered the same way — the flush's
+Reset clears the pending buffer; plain pause without a commit keeps it by
+frozen semantics).
+
+Failure is fail-closed at both ends, and the verdicts split it honestly:
+
+- Every `Stop`/`Reset`/`ReleaseBuffer` HRESULT is checked; any flush
+  failure escalates to `teardown_stream` (a released client cannot leave
+  audible PCM behind) and the verdict is failure. Accounting moves only
+  after the physical API operation that establishes it succeeds.
+- Cancelled BEFORE the claim: the operation never began. The control
+  side's bounded (2 s) REQUESTED-phase wait cancels the request
+  atomically; the commit is abandoned with the old generation intact.
+- Claimed, then definitively failed: the backend has already torn the
+  session down, so the old segment's pending output can never playout.
+  By the segment-ownership rule (ADR-0005) ring, timeline spans, and
+  device-pending PCM share one segment lifetime — the engine therefore
+  invalidates the generation (epoch bump, pending timeline/ring discard),
+  stores `Error` instead of resuming playback, and keeps the seam closed
+  until the next successful commit re-opens it. It never reports the
+  physical state as untouched, and never resumes `Playing` as if the
+  commit had merely been rejected.
+- Claimed, outcome pending: there is no timeout and no fake rollback —
+  the definitive outcome is awaited, however long the device takes. The
+  claim→complete window on the render thread is exactly-once by
+  construction (no-throw physical path, catch-all backstop): a verdict
+  is always published, so the claimed-phase wait cannot wedge.
+
+The protocol's id binding closes the residual races: a cancelled request
+can never execute later (the claim CAS refuses it), a claimed request can
+never be cancelled, and a stale ACK can never satisfy a newer request.
+Either abort surfaces as the internal error (`PE_ERR_INTERNAL`) —
+SongCore was never consulted, so it is never reported as a fake
+open/seek failure, and `out_song_status` carries no SongCore verdict on
+that path. The control thread never touches render-thread-owned WASAPI
+handles (no `SetEvent` on `buffer_event`): the render loop discovers
+requests itself, within one event timeout.
+
 ## Idle and format-change handling
 
 - `fill_output` returns `idle` → `ReleaseBuffer(0)`, then an
@@ -91,10 +153,11 @@ the engine's pending clamp so it can never exceed appended media).
   submitted-but-unrendered frames die, matching the commit's timeline
   reset; render accounting is rebased so no phantom advance). Never submit
   untouched `dst` (no uninitialized/stale PCM).
-- Format change: only possible across a commit, and every commit passes
-  through `idle`; the renderer re-initializes its client when the first
-  post-idle activation requests a different format. Playing stretches
-  never span a format change, so the steady path never re-inits.
+- Format change: only possible across a commit, and every commit is
+  flushed before it lands (the handshake above), so the post-commit probe
+  loop re-negotiates: the renderer re-initializes its client when the
+  first post-commit activation requests a different format. Playing
+  stretches never span a format change, so the steady path never re-inits.
 
 ## Failure behavior
 
@@ -121,9 +184,11 @@ playing: event-driven. This thread is the single owner that serializes
   every submitted span. `fill_output` guarantees media+silence ==
   requested when admitted and playing (underrun/preroll/EOS spans
   zero-filled), so `ReleaseBuffer` never sends uninitialized bytes; `idle`
-  periods submit nothing. Stale PCM cannot replay: commits drop the device
-  buffer via `Reset` and the epoch/generation guard drops late render
-  events.
+  periods submit nothing. Stale PCM cannot replay: the commit-flush
+  handshake proves the device buffer empty BEFORE the commit's segment
+  lands, and the epoch/generation guard drops late render events. The
+  machine clock stays honest while dropped audio is never counted as
+  rendered.
 - Export surface: the runtime exports exactly the 24 frozen ABI symbols;
   FFmpeg stays statically merged inside with hidden visibility
   (machine-audited).

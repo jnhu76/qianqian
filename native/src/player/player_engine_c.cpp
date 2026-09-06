@@ -47,6 +47,7 @@ static_assert((int)PE_OK == (int)qn::PlayerStatus::Ok);
 static_assert((int)PE_ERR_ILLEGAL_CALL == (int)qn::PlayerStatus::ErrIllegalCall);
 static_assert((int)PE_ERR_OPEN_FAILED == (int)qn::PlayerStatus::ErrOpenFailed);
 static_assert((int)PE_ERR_SEEK_FAILED == (int)qn::PlayerStatus::ErrSeekFailed);
+static_assert((int)PE_ERR_INTERNAL == (int)qn::PlayerStatus::ErrInternal);
 
 static_assert((int)PE_STATE_EMPTY == (int)qn::PlayerState::Empty);
 static_assert((int)PE_STATE_READY == (int)qn::PlayerState::Ready);
@@ -204,8 +205,10 @@ pe_status pe_seek(pe_engine* engine, int64_t position_us, int64_t* out_landing_u
             e->seek(position_us, &landing_frames, out_song_status));
         if (st == PE_OK && out_landing_us != nullptr) {
             // Landing on success only; a failed seek leaves the deterministic
-            // -1 default. The engine's seek writes
-            // *out_song_status on every internal path.
+            // -1 default. PE_ERR_OPEN_FAILED / PE_ERR_SEEK_FAILED carry a
+            // SongCore status in *out_song_status; PE_ERR_INTERNAL does not
+            // (SongCore was never consulted on that path) — the pre-value
+            // below stays and must not be read as a root cause.
             *out_landing_us = frames_to_us(landing_frames, e->source_rate());
         }
         return st;

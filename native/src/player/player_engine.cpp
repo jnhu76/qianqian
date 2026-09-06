@@ -87,7 +87,14 @@ PlayerEngine::~PlayerEngine() {
 PlayerStatus PlayerEngine::open(const song_io& io, std::int32_t* out_song_status) {
     std::lock_guard<std::mutex> sg(src_mtx_);
     std::lock_guard<std::mutex> g(state_mtx_);
-    invalidate();
+    if (!invalidate()) {
+        // Commit-flush abort before SongCore is consulted: a cancellation
+        // before renderer claim leaves the previous generation intact; a
+        // definitive failure after claim poisons that generation to Error.
+        // Either way this is ErrInternal and *out_song_status is deliberately
+        // NOT written because there is no SongCore verdict to report.
+        return PlayerStatus::ErrInternal;
+    }
 
     if (handle_) {
         song_close(handle_);
@@ -166,7 +173,9 @@ PlayerStatus PlayerEngine::play() {
             // like any seek). Safe against a concurrent realtime ENDED
             // commit: invalidate() quiesces the backend first, and the
             // commit below stores the fresh segment's state explicitly.
-            invalidate();
+            // A commit-flush abort is internal: SongCore was never
+            // consulted (the restart seek below has not run either).
+            if (!invalidate()) return PlayerStatus::ErrInternal;
             std::int64_t actual = 0;
             song_status sst = song_seek(handle_, 0, &actual);
             auto landing = landing_of(sst, actual, 0);
@@ -207,7 +216,13 @@ PlayerStatus PlayerEngine::stop(std::int32_t* out_song_status) {
     // handle is trusted — rewind in place via seek(0). From ERROR (or when
     // the rewind seek fails) the handle is not trusted — drop and reopen. If
     // even the reopen fails, ERROR persists and only open() recovers.
-    invalidate();
+    if (!invalidate()) {
+        // Commit-flush abort before SongCore is consulted: cancellation
+        // leaves the old generation usable, while a claimed physical failure
+        // poisons it to Error and keeps the realtime seam closed. Both map to
+        // ErrInternal, and *out_song_status is deliberately NOT written.
+        return PlayerStatus::ErrInternal;
+    }
     std::optional<std::pair<std::int64_t, LandingQuality>> landing;
     if (state_.load() != PlayerState::Error) {
         std::int64_t actual = 0;
@@ -259,10 +274,13 @@ PlayerStatus PlayerEngine::seek(std::int64_t position_us, std::int64_t* out_land
         return PlayerStatus::ErrIllegalCall;
     }
     const bool was_ended = st == PlayerState::Ended;
-    // Fail-closed commit order: invalidate the generation and flush FIRST,
+    // Fail-closed commit order: quiesce and settle the physical flush FIRST,
     // then attempt SongCore — a failed seek must never resume the old
-    // timeline (docs §3.1).
-    invalidate();
+    // timeline (docs §3.1). A pre-claim cancellation returns ErrInternal
+    // with the old generation intact; a definitive failure after renderer
+    // claim invalidates that generation and stores Error. In either abort
+    // SongCore was never consulted and *out_song_status is left alone.
+    if (!invalidate()) return PlayerStatus::ErrInternal;
     std::int64_t actual = 0;
     song_status sst = song_seek(handle_, position_us, &actual);
     if (out_song_status) *out_song_status = sst;
@@ -753,6 +771,12 @@ void PlayerEngine::debug_set_quiesce_hook(std::function<void()> fn) {
     quiesce_hook_ = std::move(fn);
 }
 
+void PlayerEngine::set_commit_flush_hook(
+    std::function<CommitFlushResult()> fn) {
+    std::lock_guard<std::mutex> g(hook_mtx_);
+    commit_flush_hook_ = std::move(fn);
+}
+
 // ---------------------------------------------------------------------------
 // internals — all callers hold src_mtx_ AND state_mtx_ unless noted
 // ---------------------------------------------------------------------------
@@ -816,12 +840,15 @@ void PlayerEngine::quiesce_backend() {
     }
 }
 
-void PlayerEngine::invalidate() {
-    // Kill the current generation: epoch bump FIRST (invalidates producer
-    // output), discard pending output (submitted-but-unrendered spans can
-    // never advance the next segment), flush the queue. The media clock is
-    // intentionally NOT touched: position stays at the last audible endpoint
-    // until a new landing commits (or freezes forever in ERROR).
+bool PlayerEngine::invalidate() {
+    // Settle the physical commit-flush outcome before the normal logical
+    // generation reset. A pre-claim cancellation aborts with no mutation and
+    // re-opens the old generation; a definitive post-claim failure instead
+    // invalidates that generation immediately and poisons the engine to Error.
+    // Only a proven flush continues into the normal epoch/timeline/ring reset
+    // and later landing. The media clock is intentionally NOT touched:
+    // position stays at the last audible endpoint until a new landing commits
+    // (or freezes forever in ERROR).
     // No realtime fill/advance may be mid-flight while the ring/timeline
     // are reset. Callers hold state_mtx_, so the manual-tick path is already
     // serialized; the wait covers the production lock-free seam.
@@ -832,6 +859,59 @@ void PlayerEngine::invalidate() {
     }
     if (hook) hook();  // test barrier, both locks held
     quiesce_backend();
+    // Commit boundary (#40): the backend's flush hook runs HERE — seam
+    // drained, generation not yet reset — so the physical device buffer is
+    // PROVEN empty before segment N+1 can land. No fill/advance can slip
+    // through the closed admission window, which is what turns the audible
+    // segment invariant from detection into ordering. Fail-closed split:
+    // cancellation before renderer claim abandons the commit before mutation
+    // and re-opens admission; a definitive failure after claim invalidates the
+    // dead generation, stores Error, and keeps admission closed.
+    std::function<CommitFlushResult()> flush;
+    {
+        std::lock_guard<std::mutex> hk(hook_mtx_);
+        flush = commit_flush_hook_;
+    }
+    if (flush) {
+        const CommitFlushResult r = flush();
+        if (r == CommitFlushResult::kCancelled) {
+            // Fail-closed BEFORE any mutation (epoch below has not run):
+            // cancelled before the renderer claimed — no physical side
+            // effect, the operation never began, the old generation is
+            // genuinely intact and keeps serving. SongCore was never
+            // consulted, so callers report ErrInternal and leave
+            // *out_song_status alone.
+            backend_accepting_.store(true, std::memory_order_seq_cst);
+            last_error_ = "commit flush cancelled before claim";
+            return false;
+        }
+        if (r == CommitFlushResult::kFailed) {
+            // The renderer claimed, the physical outcome is definitively
+            // not a proven flush, and the backend tore the session down:
+            // the old segment's pending output can never playout. Keeping
+            // the logical generation would claim PCM that was physically
+            // discarded — ADR-0005: ring, timeline spans, and device-pending
+            // PCM share one segment lifetime, they cannot be killed
+            // selectively. So invalidate the generation exactly like a
+            // commit would (epoch bump kills in-flight producer results;
+            // pending timeline + ring die) but store Error instead of
+            // committing a landing: playback must NOT resume as if nothing
+            // happened, and there is no landing to commit. Admission stays
+            // closed — a dead generation serves nothing; the next
+            // successful commit re-opens the seam.
+            ++epoch_;
+            timeline_.invalidate();
+            backend_.reset();
+            ring_.flush();
+            source_eof_.store(false);
+            timeline_overflow_.store(false);
+            AudioEngineBypass aes;
+            aes.reset();
+            last_error_ = "commit flush failed after renderer claim";
+            state_.store(PlayerState::Error);
+            return false;
+        }
+    }
     ++epoch_;
     timeline_.invalidate();
     backend_.reset();
@@ -845,6 +925,7 @@ void PlayerEngine::invalidate() {
     // reached via control commits; the destructor calls quiesce_backend
     // directly and never re-opens.
     backend_accepting_.store(true, std::memory_order_seq_cst);
+    return true;
 }
 
 void PlayerEngine::commit_landing(std::int64_t landing_frames, LandingQuality quality) {

@@ -16,9 +16,11 @@
 #include <string>
 #include <vector>
 
+#include "commit_flush_handshake.hpp"
 #include "fake_songcore.hpp"
 #include "player_engine.hpp"
 #include "test_support.hpp"
+#include "wasapi_submit_accounting.hpp"
 
 namespace qn::test {
 
@@ -1386,6 +1388,535 @@ GATE(t20_eof_after_underrun_duration) {
     Seen seen;
     check_all(p.engine, p.sink, seen, "t20");
     std::printf("  10 s song + 0.5 s underrun: ENDED @10.0 s media / 10.5 s device\n");
+}
+
+// ---------------------------------------------------------------------------
+// #40 corrective v2/v3/v4: the commit-flush protocol.
+//
+// invalidate() invokes the registered backend hook between the admission
+// drain and the generation reset; the Windows renderer claims the request,
+// executes the physical Stop+Reset on its own thread there, and completes
+// it with a definitive verdict. Ordering — not renderer-side detection —
+// now enforces the audible segment invariant: once segment N+1 has
+// committed, the device buffer was already proven empty and no fill can
+// cross the closed admission window, so no PCM of segment N can become
+// audible. The gates below pin that ordering, the two race windows a
+// periodic probe could never close (review findings on the first
+// corrective), and the protocol's own timeout/cancellation/ABA semantics:
+// cancel before claim is a safe never-began abort (t26), a claim can never
+// be cancelled and its outcome is definitive (t27), completions are
+// id-bound (t28), and the failure classification is INTERNAL, never a fake
+// SongCore verdict (t29). v4 splits the abort outcomes by physical truth:
+// kCancelled keeps the old generation intact (t26/t29), while kFailed —
+// the session is torn down, pending output can never playout — poisons the
+// generation to Error on every caller (t25, t31). t30 pins the extracted
+// submit-accounting rule the WASAPI period loop installs.
+// ---------------------------------------------------------------------------
+
+GATE(t22_commit_flush_orders_before_landing) {
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t22");
+    p.engine.play();
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(2);
+    const EngineSnapshot before = p.engine.snapshot();
+    QN_CHECK(before.state == PlayerState::Playing, "t22");
+    const std::uint64_t seg0 = before.segment;
+    const std::uint64_t readable0 = p.engine.ring_debug().readable();
+
+    // Hook-side observations must be lock-free (the hook runs under
+    // src_mtx_ + state_mtx_): segment still OLD, seam fully drained, queue
+    // not yet flushed — the physical flush strictly precedes the reset and
+    // the landing.
+    int calls = 0;
+    std::uint64_t seg_at_flush = 99, active_at_flush = 99;
+    std::uint64_t readable_at_flush = 99;
+    p.engine.set_commit_flush_hook([&] {
+        ++calls;
+        seg_at_flush = p.engine.debug_segment();
+        active_at_flush = p.engine.debug_active_backend_ops();
+        readable_at_flush = p.engine.ring_debug().readable();
+        return qn::CommitFlushResult::kPerformed;
+    });
+    QN_CHECK(p.engine.seek(us(48000 * 2)) == PlayerStatus::Ok, "t22");
+    QN_CHECK(calls == 1, "t22: exactly one flush per commit");
+    QN_CHECK(seg_at_flush == seg0, "t22: flush precedes the landing (old segment)");
+    QN_CHECK(active_at_flush == 0, "t22: flush runs with the seam drained");
+    QN_CHECK(readable_at_flush == readable0, "t22: flush precedes the queue flush");
+    QN_CHECK(p.engine.snapshot().segment == seg0 + 1,
+             "t22: segment landed only after the ACK");
+    p.engine.set_commit_flush_hook({});
+
+    // Post-commit the queue holds only the new generation: the first fill
+    // is preroll silence (the queue was flushed after the ACK), and the
+    // next media carries segment N+1.
+    p.sink.tick_submit(1);
+    QN_CHECK(p.sink.last_submit.segment == seg0 + 1, "t22");
+    QN_CHECK(p.sink.last_submit.kind != nullptr &&
+                 std::strcmp(p.sink.last_submit.kind, "preroll") == 0 &&
+                 p.sink.last_submit.media_frames == 0,
+             "t22: no old-generation media survived the commit");
+    p.sink.tick_render(static_cast<std::int64_t>(p.sink.period));
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(4);
+    Seen seen;
+    check_all(p.engine, p.sink, seen, "t22");
+    std::printf("  handshake: flush(ACK) -> reset -> landing, exactly once per commit\n");
+}
+
+GATE(t23_race_a_fill_cannot_cross_commit) {
+    // Race A (review): fill/probe segment N, commit N+1, fill again. Under
+    // the first corrective's periodic probe, the second fill could consume
+    // segment-N media that then had to be "reconciled" as rendered without
+    // ever being audible. Under the handshake, once seek() returns the
+    // queue holds no N media, so the next fill can only serve preroll
+    // silence or N+1 — nothing to reconcile, no phantom advance.
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t23");
+    p.engine.play();
+    for (int i = 0; i < 4; ++i) p.sink.producer_step();
+    p.sink.tick(1);
+    const std::uint64_t seg0 = p.engine.snapshot().segment;
+    QN_CHECK(seg0 == 1, "t23");
+    const qn::OutputFillResult probe = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(probe.segment == seg0, "t23: pre-commit fill sees segment N");
+
+    p.engine.set_commit_flush_hook([] { return qn::CommitFlushResult::kPerformed; });
+    QN_CHECK(p.engine.seek(us(48000 * 2)) == PlayerStatus::Ok, "t23");
+    p.engine.set_commit_flush_hook({});
+
+    p.sink.tick_submit(1);
+    QN_CHECK(p.sink.last_submit.segment == seg0 + 1, "t23");
+    QN_CHECK(p.sink.last_submit.media_frames == 0,
+             "t23: post-commit fill must not consume segment-N media");
+    p.sink.tick_render(static_cast<std::int64_t>(p.sink.period));
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(4);
+    Seen seen;
+    check_all(p.engine, p.sink, seen, "t23");
+    std::printf("  race A: post-commit fills serve N+1 only, nothing fake-rendered\n");
+}
+
+GATE(t24_race_b_submit_never_crosses_commit) {
+    // Race B (review): a fill of segment N returns, the commit lands, the
+    // backend submits. Under the periodic probe, segment-N PCM crossed the
+    // physical ReleaseBuffer AFTER segment N+1 had committed. Under the
+    // handshake the commit blocks until the render thread ACKs the flush,
+    // and the ACK is ordered after every submission that thread made — so,
+    // deterministically on the engine side: every submit after seek()
+    // returned carries the new segment, and the rendered log gains no
+    // segment-N content past the commit.
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t24");
+    p.engine.play();
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(3);
+    const std::uint64_t seg0 = p.engine.snapshot().segment;
+
+    p.engine.set_commit_flush_hook([] { return qn::CommitFlushResult::kPerformed; });
+    QN_CHECK(p.engine.seek(us(48000 * 2)) == PlayerStatus::Ok, "t24");
+    p.engine.set_commit_flush_hook({});
+
+    const std::size_t log0 = p.engine.backend().rendered_log().size();
+    for (int i = 0; i < 12; ++i) {
+        p.sink.producer_step();
+        p.sink.tick();
+    }
+    const auto& log = p.engine.backend().rendered_log();
+    for (std::size_t i = log0; i < log.size(); ++i) {
+        QN_CHECK_MSG(log[i].segment == seg0 + 1, "t24",
+                     "segment %llu media crossed the landed commit",
+                     (unsigned long long)log[i].segment);
+    }
+    Seen seen;
+    check_all(p.engine, p.sink, seen, "t24");
+    std::printf("  race B: no post-commit submit attributed to the old segment\n");
+}
+
+GATE(t25_flush_failure_poisons_generation) {
+    // A claimed flush whose definitive outcome is NOT a proven flush
+    // (kFailed — the backend escalates to teardown) must NEVER let playback
+    // resume as if the commit had merely been rejected: the physical
+    // session is gone, so the old segment's pending output can never
+    // playout (ADR-0005: ring/timeline/device-pending share one segment
+    // lifetime). The engine therefore invalidates the generation (epoch
+    // bump kills in-flight producer results; pending timeline and ring
+    // die), stores Error, and keeps the realtime seam closed; the control
+    // op still reports the INTERNAL failure — never a fake SongCore seek
+    // failure, with the out params untouched (SongCore was never
+    // consulted). A fresh open with a proven flush recovers.
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t25");
+    p.engine.play();
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(2);
+    const EngineSnapshot before = p.engine.snapshot();
+    const std::uint64_t seg0 = before.segment;
+    const std::uint64_t epoch0 = before.epoch;
+    const int seek0 = c.live->seek_count;
+
+    p.engine.set_commit_flush_hook(
+        [] { return qn::CommitFlushResult::kFailed; });
+    std::int64_t landing = -5;
+    std::int32_t sst = 7777;
+    QN_CHECK(p.engine.seek(us(48000), &landing, &sst) ==
+                 PlayerStatus::ErrInternal, "t25");
+    QN_CHECK(landing == -5 && sst == 7777,
+             "t25: out params untouched (no SongCore verdict to report)");
+    QN_CHECK(c.live->seek_count == seek0,
+             "t25: song_seek was never consulted");
+    const EngineSnapshot after = p.engine.snapshot();
+    QN_CHECK(after.state == PlayerState::Error,
+             "t25: a dead physical generation must not resume as Playing");
+    QN_CHECK(after.epoch == epoch0 + 1,
+             "t25: generation invalidated (epoch bumped) — unlike cancel");
+    QN_CHECK(after.segment == seg0,
+             "t25: no landing was committed, so no segment bump");
+    QN_CHECK(std::strcmp(after.last_error,
+                         "commit flush failed after renderer claim") == 0,
+             "t25: failure after claim is its own category");
+    const qn::OutputFillResult r = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(std::strcmp(r.kind, "idle") == 0,
+             "t25: the dead generation serves nothing (fail-closed seam)");
+
+    // Recovery: a fresh open with a PROVEN flush rebuilds from Error to
+    // Ready and commits normally afterwards.
+    fake::SongConfig c2 = song();
+    p.engine.set_commit_flush_hook(
+        [] { return qn::CommitFlushResult::kPerformed; });
+    QN_CHECK(open_song(p.engine, p.sink, c2) == PlayerStatus::Ok,
+             "t25: open recovers from the poisoned generation");
+    QN_CHECK(p.engine.snapshot().state == PlayerState::Ready, "t25");
+    p.engine.play();
+    for (int i = 0; i < 4; ++i) p.sink.producer_step();
+    p.sink.tick(1);
+    QN_CHECK(p.engine.snapshot().state == PlayerState::Playing,
+             "t25: playback resumes in the new segment");
+    p.engine.set_commit_flush_hook({});
+    Seen seen;
+    check_all(p.engine, p.sink, seen, "t25");
+    std::printf("  flush failure after claim: generation poisoned to Error, open recovers\n");
+}
+
+GATE(t26_timeout_before_claim_cancels) {
+    // Timeout BEFORE the renderer claims (v3 review, T26): the request is
+    // cancelled atomically — the operation never began — and the protocol
+    // itself refuses every late renderer action: a cancelled request can
+    // never be claimed or completed (I3). Engine-side, the cancelled
+    // flush aborts the commit fail-closed with the old generation intact
+    // and reports the INTERNAL failure; the next commit (request B) then
+    // commits normally. (The Windows control side derives kCancelled from
+    // its bounded REQUESTED-phase wait; these are the transition rules
+    // that timeout policy stands on.)
+    qn::CommitFlushHandshake hs;
+    const std::uint64_t a = hs.request();
+    QN_CHECK(hs.phase() == qn::CommitFlushHandshake::kRequested, "t26");
+    QN_CHECK(hs.try_cancel(a), "t26: cancel before claim succeeds");
+    QN_CHECK(!hs.claim(a),
+             "t26: a cancelled request can never be claimed (I3)");
+    hs.complete(a, true);  // a late renderer "ACK" for A
+    QN_CHECK(hs.cancelled(a) && !hs.completed(a),
+             "t26: a late completion cannot revive a cancelled request");
+
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t26");
+    p.engine.play();
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(2);
+    const EngineSnapshot before = p.engine.snapshot();
+    const std::uint64_t seg0 = before.segment;
+    const std::uint64_t epoch0 = before.epoch;
+
+    p.engine.set_commit_flush_hook(
+        [] { return qn::CommitFlushResult::kCancelled; });
+    std::int64_t landing = -5;
+    std::int32_t sst = 7777;
+    QN_CHECK(p.engine.seek(us(48000), &landing, &sst) ==
+                 PlayerStatus::ErrInternal, "t26");
+    QN_CHECK(landing == -5 && sst == 7777,
+             "t26: out params untouched (SongCore never consulted)");
+    p.engine.set_commit_flush_hook({});
+    const EngineSnapshot after = p.engine.snapshot();
+    QN_CHECK(after.segment == seg0 && after.epoch == epoch0,
+             "t26: commit abandoned without any mutation");
+    QN_CHECK(after.state == PlayerState::Playing,
+             "t26: old generation logically intact");
+    QN_CHECK(std::strcmp(after.last_error,
+                         "commit flush cancelled before claim") == 0,
+             "t26: cancelled-before-claim is its own category");
+    const qn::OutputFillResult r = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(std::strcmp(r.kind, "audio") == 0 && r.segment == seg0,
+             "t26: admission re-opened against the untouched generation");
+
+    // Request B: the protocol slot is reusable and the commit lands.
+    p.engine.set_commit_flush_hook(
+        [] { return qn::CommitFlushResult::kPerformed; });
+    QN_CHECK(p.engine.seek(us(48000 * 2)) == PlayerStatus::Ok, "t26");
+    p.engine.set_commit_flush_hook({});
+    QN_CHECK(p.engine.snapshot().segment == seg0 + 1,
+             "t26: the next commit commits normally");
+    Seen seen;
+    check_all(p.engine, p.sink, seen, "t26");
+    std::printf("  timeout before claim: cancel + late-action refusal, engine aborts, retry OK\n");
+}
+
+GATE(t27_claimed_flush_cannot_be_cancelled) {
+    // Timeout AFTER the renderer claimed (v3 review, T27): the claim is
+    // the protocol's point of no return — control cannot cancel (I4) and
+    // must await the definitive outcome, whichever it is. (The Windows
+    // control side waits without a bound once claimed; these are the
+    // transition rules that policy stands on. The engine-side mapping of
+    // a definitive claimed failure is gate t25.)
+    qn::CommitFlushHandshake ok;
+    const std::uint64_t a = ok.request();
+    QN_CHECK(ok.claim(a), "t27: renderer claims");
+    QN_CHECK(ok.phase() == qn::CommitFlushHandshake::kClaimed, "t27");
+    QN_CHECK(!ok.try_cancel(a),
+             "t27: a claimed request can never be cancelled (I4)");
+    ok.complete(a, true);
+    QN_CHECK(ok.completed(a) && ok.outcome(), "t27: definitive success");
+
+    qn::CommitFlushHandshake bad;
+    const std::uint64_t b = bad.request();
+    QN_CHECK(bad.claim(b), "t27");
+    QN_CHECK(!bad.try_cancel(b), "t27: cancel refused past the claim (I4)");
+    bad.complete(b, false);
+    QN_CHECK(bad.completed(b) && !bad.outcome(),
+             "t27: definitive failure");
+    std::printf("  claimed flush: cancel refused, definitive outcome awaited (both verdicts)\n");
+}
+
+GATE(t28_stale_ack_never_satisfies_new_request) {
+    // Stale ACK / ABA (v3 review, T28): request A cancelled before the
+    // claim, request B published into the slot — a late completion for A
+    // can never resolve B (I5); only B's own claim/complete sequence
+    // resolves B.
+    qn::CommitFlushHandshake hs;
+    const std::uint64_t a = hs.request();
+    QN_CHECK(hs.try_cancel(a), "t28: A cancelled before the claim");
+    QN_CHECK(hs.cancelled(a) && !hs.claimed(a) && !hs.completed(a),
+             "t28: A's terminal state is CANCELLED while observable");
+    const std::uint64_t b = hs.request();
+    QN_CHECK(b == a + 1, "t28: request ids are monotonic");
+    QN_CHECK(hs.pending_request() == b, "t28: B is the serviceable request");
+    QN_CHECK(!hs.cancelled(b) && !hs.completed(b), "t28");
+    hs.complete(a, true);  // the stale, late "ACK" for A
+    QN_CHECK(!hs.completed(b) && hs.pending_request() == b,
+             "t28: ACK(A) cannot complete B (I5)");
+    QN_CHECK(hs.claim(b), "t28: B remains claimable");
+    hs.complete(b, true);
+    QN_CHECK(hs.completed(b) && hs.outcome(), "t28: ACK(B) resolves B");
+    // The slot is single flight by design: once B supersedes A, A's phase
+    // is no longer addressable — which is exactly the ABA protection (a
+    // stale actor cannot even find A in the slot to act on it).
+    std::printf("  stale ACK: id-bound completions, no ABA\n");
+}
+
+GATE(t29_internal_error_classification_all_callers) {
+    // A commit-flush protocol failure is an ENGINE-INTERNAL failure for
+    // every commit caller (v3 review, T29): it surfaces as ErrInternal —
+    // never as a fake SongCore open/seek failure — with *out_song_status
+    // untouched and the SongCore callback counts unchanged (the abort
+    // happens before SongCore is consulted). Logical mutation matches the
+    // before-claim policy: none (epoch/segment/state unchanged; the
+    // per-caller failures below plus t25/t26 pin it).
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t29");
+    p.engine.play();
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(2);
+    const EngineSnapshot baseline = p.engine.snapshot();
+    const int seek0 = c.live->seek_count;
+    const int reopen0 = c.live->reopen_count;
+
+    p.engine.set_commit_flush_hook(
+        [] { return qn::CommitFlushResult::kCancelled; });
+
+    // seek
+    std::int64_t landing = -5;
+    std::int32_t sst = 7777;
+    QN_CHECK(p.engine.seek(us(48000), &landing, &sst) ==
+                 PlayerStatus::ErrInternal, "t29: seek");
+    QN_CHECK(landing == -5 && sst == 7777, "t29: seek out params untouched");
+
+    // open (a second open while the first song lives: the abort must
+    // happen before song_open, so no reopen is recorded either)
+    song_io io{};
+    io.userdata = &c;
+    io.read = [](void*, std::uint8_t*, std::size_t) -> std::int64_t { return 0; };
+    io.seek = [](void*, std::int64_t) -> std::int64_t { return 0; };
+    io.size = [](void*) -> std::int64_t { return 0; };
+    sst = 7777;
+    QN_CHECK(p.engine.open(io, &sst) == PlayerStatus::ErrInternal,
+             "t29: open");
+    QN_CHECK(sst == 7777, "t29: open out param untouched");
+
+    // stop
+    sst = 7777;
+    QN_CHECK(p.engine.stop(&sst) == PlayerStatus::ErrInternal, "t29: stop");
+    QN_CHECK(sst == 7777, "t29: stop out param untouched");
+    p.engine.set_commit_flush_hook({});
+    QN_CHECK(c.live->seek_count == seek0 && c.live->reopen_count == reopen0,
+             "t29: SongCore was never consulted on the abort paths");
+    const EngineSnapshot mid = p.engine.snapshot();
+    QN_CHECK(mid.state == PlayerState::Playing &&
+                 mid.segment == baseline.segment &&
+                 mid.epoch == baseline.epoch,
+             "t29: aborted commits left the generation untouched");
+
+    // play after ENDED
+    p.engine.set_commit_flush_hook(
+        [] { return qn::CommitFlushResult::kCancelled; });
+    drain_producer(p.engine, p.sink);
+    int guard = 0;
+    while (p.engine.snapshot().state != PlayerState::Ended) {
+        QN_CHECK(++guard < 100000, "t29: runaway");
+        // The 8 s song dwarfs the queue: keep producing while draining or
+        // the source never reaches EOF (the sweep-gate idiom).
+        for (int i = 0; i < 4; ++i) p.sink.producer_step();
+        p.sink.tick();
+    }
+    const EngineSnapshot ended0 = p.engine.snapshot();
+    QN_CHECK(p.engine.play() == PlayerStatus::ErrInternal,
+             "t29: play-after-ENDED");
+    const EngineSnapshot ended1 = p.engine.snapshot();
+    QN_CHECK(ended1.state == PlayerState::Ended &&
+                 ended1.segment == ended0.segment &&
+                 ended1.epoch == ended0.epoch,
+             "t29: ENDED restart aborted without mutation");
+    QN_CHECK(c.live->seek_count == seek0, "t29: restart seek never ran");
+    p.engine.set_commit_flush_hook({});
+    Seen seen;
+    check_all(p.engine, p.sink, seen, "t29");
+    std::printf("  seek/open/stop/play-ENDED: INTERNAL classification, SongCore untouched\n");
+}
+
+GATE(t30_release_failure_never_advances_accounting) {
+    // I6 (v3 review), pinned at the extracted decision the Windows period
+    // loop installs verbatim: ReleaseBuffer SUCCESS is what advances
+    // written_total; a failure must leave the accounting untouched, flag
+    // the teardown, and never fabricate advance_render evidence. (The
+    // WASAPI call itself cannot run on Linux; the mingw codegen build
+    // proves the call site compiles against this helper.)
+    const qn::SubmitAccounting released =
+        qn::apply_release_result(true, 512, 1000);
+    QN_CHECK(released.written_total == 1512 && !released.teardown,
+             "t30: accepted frames advance written_total");
+    const qn::SubmitAccounting failed =
+        qn::apply_release_result(false, 512, 1000);
+    QN_CHECK(failed.written_total == 1000 && failed.teardown,
+             "t30: a failed release moves nothing and fails closed");
+    const qn::SubmitAccounting empty =
+        qn::apply_release_result(false, 0, 1000);
+    QN_CHECK(empty.written_total == 1000 && empty.teardown,
+             "t30: even a zero-frame release failure fails closed");
+    std::printf("  release accounting: success advances, failure tears down, no reconciliation\n");
+}
+
+GATE(t31_flush_failure_poisons_open_and_stop) {
+    // The v4 generation-poisoning applies to EVERY commit caller: open and
+    // stop under kFailed also leave the engine in Error — never silently
+    // READY/Playing — with SongCore untouched (the abort precedes song_open
+    // / song_stop) and out params untouched. A later open with a proven
+    // flush recovers to READY@0.
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t31");
+    p.engine.play();
+    for (int i = 0; i < 4; ++i) p.sink.producer_step();
+    const int reopen0 = c.live->reopen_count;
+
+    p.engine.set_commit_flush_hook(
+        [] { return qn::CommitFlushResult::kFailed; });
+
+    // stop under kFailed
+    std::int32_t sst = 7777;
+    QN_CHECK(p.engine.stop(&sst) == PlayerStatus::ErrInternal, "t31: stop");
+    QN_CHECK(sst == 7777, "t31: stop out param untouched");
+    QN_CHECK(p.engine.snapshot().state == PlayerState::Error,
+             "t31: stop failure poisons the generation too");
+
+    // open under kFailed
+    song_io io{};
+    io.userdata = &c;
+    io.read = [](void*, std::uint8_t*, std::size_t) -> std::int64_t { return 0; };
+    io.seek = [](void*, std::int64_t) -> std::int64_t { return 0; };
+    io.size = [](void*) -> std::int64_t { return 0; };
+    sst = 7777;
+    QN_CHECK(p.engine.open(io, &sst) == PlayerStatus::ErrInternal,
+             "t31: open");
+    QN_CHECK(sst == 7777, "t31: open out param untouched");
+    QN_CHECK(c.live->reopen_count == reopen0,
+             "t31: song_open was never consulted");
+    QN_CHECK(p.engine.snapshot().state == PlayerState::Error,
+             "t31: still Error after the aborted open");
+
+    // Recovery with a proven flush
+    p.engine.set_commit_flush_hook(
+        [] { return qn::CommitFlushResult::kPerformed; });
+    fake::SongConfig c2 = song();
+    QN_CHECK(open_song(p.engine, p.sink, c2) == PlayerStatus::Ok,
+             "t31: open recovers with a proven flush");
+    const EngineSnapshot rec = p.engine.snapshot();
+    QN_CHECK(rec.state == PlayerState::Ready && rec.media_position_frames == 0,
+             "t31: clean rebuild to READY@0");
+    p.engine.set_commit_flush_hook({});
+    std::printf("  open/stop under kFailed: generation poisoned to Error, recoverable\n");
+}
+
+GATE(t21_zero_frame_probe_commit_segment) {
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t21");
+    p.engine.play();
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(2);
+    const EngineSnapshot before = p.engine.snapshot();
+    QN_CHECK(before.state == PlayerState::Playing, "t21");
+    QN_CHECK(before.segment == 1, "t21");
+    QN_CHECK(before.underrun_count == 0 && before.preroll_events == 0, "t21");
+
+    // Zero-frame probe: current segment, nothing moved, NO side effects —
+    // the admission-safe activation check the renderer's idle loop runs.
+    const qn::OutputFillResult probe = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(std::strcmp(probe.kind, "audio") == 0, "t21");
+    QN_CHECK(probe.segment == 1, "t21");
+    QN_CHECK(probe.media_frames == 0 && probe.silence_frames == 0, "t21");
+    QN_CHECK(probe.source_rate == 48000 && probe.channels == 2, "t21");
+    const EngineSnapshot after = p.engine.snapshot();
+    QN_CHECK(after.state == PlayerState::Playing, "t21");
+    QN_CHECK(after.underrun_count == 0 && after.preroll_events == 0 &&
+                 after.eos_silence_output_frames == 0,
+             "t21: probe must not fake GAP events");
+    QN_CHECK(after.pending_output_frames == before.pending_output_frames &&
+                 after.submitted_output_frames == before.submitted_output_frames &&
+                 after.submitted_media_frames == before.submitted_media_frames &&
+                 after.queued_media_frames == before.queued_media_frames,
+             "t21: probe must not touch ring/timeline accounting");
+
+    // Playing seek: the very next probe carries only the new segment —
+    // the commit-flush protocol already cleared the old segment's device
+    // PCM before this segment landed.
+    QN_CHECK(p.engine.seek(us(48000 * 2)) == PlayerStatus::Ok, "t21");
+    const qn::OutputFillResult post = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(std::strcmp(post.kind, "audio") == 0, "t21");
+    QN_CHECK(post.segment == 2, "t21");
+    QN_CHECK(post.media_frames == 0 && post.silence_frames == 0, "t21");
+
+    // Paused: idle with the current segment — the renderer keeps its
+    // session; the commit flush already cleared its pending buffer before
+    // the new segment landed, so the resume re-Starts clean.
+    p.engine.pause();
+    const qn::OutputFillResult paused = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(std::strcmp(paused.kind, "idle") == 0, "t21");
+    QN_CHECK(paused.segment == 2, "t21");
+    std::printf("  zero-frame probe: side-effect-free, sees the commit segment bump\n");
 }
 
 // ---------------------------------------------------------------------------
