@@ -1,131 +1,119 @@
 # Qianqian / 千千·现代
 
-Qianqian is a local-first, lightweight, cross-platform music player and a testbed for a Rust composability kernel.
+Qianqian is a local-first, lightweight, cross-platform music player and a testbed for Rust composability/runtime architecture.
 
-The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the new implementation is being rebuilt around a generic Composition Kernel plus domain plugins.
+The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the new implementation is being rebuilt as a boundary-first plugin graph with a small generic Composition Kernel.
 
 ## Architecture in 30 seconds
-
-```text
-                         CONTROL PLANE
-
-                 Profile / desired tree
-                          |
-                          v
-                      Reconcile
-                          |
-                          v
-                     Fiber Graph
-                          |
-                 provide / require
-                    owned effects
-                          |
-                          v
-              +-------------------------+
-              |   Composition Kernel    |
-              | Context / Capability    |
-              | Fiber / Effect          |
-              | Reconcile               |
-              +------------+------------+
-                           |
-                    resolve / bind
-                           |
--------------------------------------------------------------
-                           |
-                         DATA PLANE
-                           |
-       +-------------------+-------------------+
-       |                   |                   |
-       v                   v                   v
-   Music Plugin       Audio Runtime        UiHost Plugin
-       |                   |                   |
- domain semantics    direct audio graph    presentation/UI
-                           |
-          Media -> Decoder -> DSP -> Output -> device
-```
 
 The central rule is:
 
 > **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
 
-Related rules:
+But the project does **not** start by writing kernel APIs.
 
-> **Domain kernels own domain semantics.**
->
-> **Capabilities expose contracts; providers own mechanisms.**
->
-> **Fibers own plugin-instance lifetime.**
->
-> **Effects make kernel-visible mutation attributable and reversible where reversal is valid.**
->
-> **Profiles declare desired composition; reconciliation determines the running fiber graph.**
-
-Rust is the product architecture language.
-
-## Everything is a plugin
-
-In Qianqian, “everything is a plugin” means long-lived product capabilities participate in one composition/lifecycle protocol:
+Current design order:
 
 ```text
-Plugin -> Fiber
-           |
-           +-- requires capabilities
-           +-- provides capabilities
-           +-- owns effects
-           +-- activates/deactivates with dependency availability
+Component Granularity
+        ↓
+Capability / dependency boundary
+        ↓
+Interaction Algebra
+        ↓
+Effect / System Boundary
+        ↓
+Global lifecycle ordering
+        ↓
+Confluence oracle
+        ↓
+Composition Kernel implementation
 ```
 
-It does **not** mean every component is a dynamic library or must be runtime-downloaded.
+Current gate: **#53 COMPONENT-BOUNDARY-A0**.
 
-Music, decoder, processing, audio output, presentation, UI host, library, media keys, and future product capabilities should not receive privileged runtime bypasses merely because they are convenient to construct directly.
+Until that design gate passes, no new `qianqian-kernel`, Context API, Fiber lifecycle engine, or Reconcile implementation is authorized.
 
-## Context is not a bus
-
-Context is the capability namespace/dependency view. It decides **who can reach whom** and **which provider satisfies which requirement**.
-
-It must not carry all product data.
+## Control plane and data plane
 
 ```text
-Capability plane != Data plane
+                         CONTROL PLANE
+
+                 desired composition
+                          |
+                          v
+                 Composition Kernel
+             Context / Capability / Fiber
+                  Effect / Reconcile
+                          |
+                    resolve / bind
+                          |
+-------------------------------------------------------------
+                          |
+                         DATA PLANE
+                          |
+      MediaSource -> Decoder -> DSP -> AudioOutput
+
+      input -> domain/presentation service -> provider
 ```
 
-After binding, business data normally flows through the service contract or a direct data edge.
+> **Capability plane != Data plane.**
 
-For audio, PCM must flow directly:
+Context controls reachability/dependency truth. It does not carry PCM blocks or become a universal product message bus.
+
+## Everything is a Plugin
+
+In Qianqian, “everything is a plugin” means every **justified** long-lived runtime capability ultimately participates in one common composition/lifecycle protocol.
+
+It does **not** mean:
 
 ```text
-Decoder -> Processing -> AudioOutput
+one feature name == one plugin
+one plugin == one crate
+one plugin == one dynamic library
+everything is hot-loaded
+everything is rollbackable
 ```
 
-not:
+The exact granularity of Music, Decoder, DSP, AudioOutput, Presentation, UiHost and other candidates is deliberately being audited before kernel implementation.
 
-```text
-Decoder -> Context/EventBus -> Processing -> Context/EventBus -> Output
-```
+## Interaction correctness
 
-Realtime audio must not perform Context lookup, dependency resolution, reconciliation, arbitrary event dispatch, or UI/runtime round trips per callback/block.
+A disposer/inverse is not enough to prove that independently mounted components can be removed safely.
+
+Architecture v2 distinguishes:
+
+> **Commutative relation -> may compose as independent effects.**
+>
+> **Non-commutative relation -> explicit dependency/order/integration structure.**
+
+DSP ordering is the obvious player example: `EQ -> Compressor` is generally not equivalent to `Compressor -> EQ`. Registration timing or container iteration must never become hidden semantic topology.
+
+Restoration is judged by **observational equivalence**, not private bit-for-bit identity.
+
+## Confluence target
+
+A future core correctness oracle is:
+
+> **After any legal load/unload/replacement history settles, the observable runtime is equivalent to a clean construction of the final desired composition.**
+
+This is stronger than “no crash” or “all disposers ran”; it should catch ghost bindings, stale lifecycle state and history-dependent composition.
+
+## System boundary
+
+`Everything is Plugin` does not mean `Everything is rollbackable`.
+
+Local registrations/handles may be reversible; external emissions may not be. Already-rendered sound cannot be “unplayed”. Architecture work must distinguish reversible, transactional, compensatable and irreversible/outside-boundary effects where relevant.
 
 ## Domain semantics
 
 `MusicKernel` remains the authority for music/player meaning, but it is a **domain kernel**, not the global composition kernel.
 
-Conceptually:
-
-```text
-Music Plugin
-   |
-   +-- owns MusicKernel
-   +-- requires media/audio capabilities
-   +-- provides transport/player-state capabilities
-```
-
-Mechanism layers provide evidence; the domain semantic owner decides what that evidence means to the product.
+Its exact surrounding Music/Transport/Presentation component boundary is part of the current #53 audit rather than frozen prematurely.
 
 ## UI strategy
 
-UI is an ordinary plugin/capability axis.
-
-Current direction:
+Current platform intent remains:
 
 ```text
 Windows   -> PocketJS UiHost
@@ -133,10 +121,10 @@ Linux     -> PocketJS UiHost
 Android   -> KuiklyUI UiHost
 iOS       -> KuiklyUI UiHost
 HarmonyOS -> KuiklyUI UiHost
-macOS     -> KuiklyUI by default, replaceable by composition/profile
+macOS     -> KuiklyUI candidate / replaceable
 ```
 
-The shared contract is product/presentation semantics, not pixels.
+UiHost is a plugin/capability candidate. UI owns rendering/input mechanism, not music semantics or realtime correctness.
 
 ## Current implementation status
 
@@ -148,7 +136,9 @@ qianqian-runtime
 qianqian-headless
 ```
 
-The R0 `base` module and constructor-only `AppRuntime` composition are intentionally provisional. They are not compatibility contracts and may be replaced by the Composition Kernel implementation.
+R0 `base` and constructor-only `AppRuntime` composition are bootstrap witnesses, not compatibility contracts.
+
+They may later be replaced, but **not before #53 establishes the decomposition that the Composition Kernel is meant to host**.
 
 Build/test authority:
 
@@ -177,15 +167,14 @@ The playback reference is a behavioral oracle, not a source-layout template.
 
 ## Repository entry points
 
-- `AGENTS.md` — repository-wide agent governance and hard invariants.
+- `AGENTS.md` — repository-wide agent governance and hard gates.
 - `CONTEXT.md` — stable vocabulary and mental model.
 - `docs/README.md` — task-oriented documentation router.
-- `docs/architecture/overview.md` — Architecture v2 semantic overview.
-- `docs/architecture/composition-kernel.md` — Composition Kernel authority.
+- `docs/architecture/overview.md` — Architecture v2 overview.
+- `docs/architecture/composition-kernel.md` — detailed Composition Kernel/precondition authority.
+- issue **#53** — current component-boundary design gate.
 - `CONTRIBUTING.md` — contribution entry point.
 
 ## Scope
 
-Qianqian is still a music player, not a generic framework product. The Composition Kernel exists because this repository deliberately tests whether spatiotemporal/plugin composability can survive a real media runtime with strict lifecycle and realtime constraints.
-
-Kernel mechanisms should stay generic; music/media/UI policy should stay outside the kernel.
+Qianqian is still a music player, not a generic framework product. The composability work exists to test whether strong component/lifecycle properties survive a real media runtime with explicit ordering, system-boundary and realtime constraints.
