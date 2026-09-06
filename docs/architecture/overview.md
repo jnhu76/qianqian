@@ -24,6 +24,10 @@ Architecture v2 further distinguishes:
 >
 > **Profiles declare desired composition; reconciliation determines the running graph.**
 
+Cross-Fiber removal adds one more rule:
+
+> **A disposer/inverse is not sufficient evidence of composability; independent removal also needs independence/commutativity, or explicit order when operations do not commute.**
+
 Rust is the product architecture language.
 
 Native/platform/UI technologies are implementation substrates and plugins above the generic Composition Kernel.
@@ -113,8 +117,6 @@ See [`composition-kernel.md`](composition-kernel.md) for the detailed model and 
 ## Everything is a plugin
 
 Every long-lived product capability should enter the runtime through the same composition/lifecycle protocol.
-
-Conceptually:
 
 ```text
 Plugin definition
@@ -302,7 +304,7 @@ If a domain needs event semantics, it may provide an Event Service/plugin. Liste
 
 Kernel-internal dependency invalidation is an implementation concern of capability/fiber lifecycle and should not be confused with a public product event bus.
 
-## Effects and reversibility
+## Effects, independence, and restoration
 
 Effects are the kernel write/ownership boundary for reversible local runtime mutation.
 
@@ -316,7 +318,22 @@ child fiber mount
 watcher/local handle registration
 ```
 
-A fiber unload/dispose should unwind its owned effects deterministically in reverse order.
+Within one Fiber, owned effects normally unwind in reverse/LIFO order.
+
+That does **not** prove cross-Fiber independent removal. When effects from multiple Fibers interleave, the shared operations must satisfy the relevant independence/commutativity contract, or the interaction must carry explicit ordering/dependency semantics.
+
+Useful interface shape:
+
+```text
+register(value) -> opaque token
+unregister(token)
+```
+
+where each caller removes only its own contribution.
+
+An ordered middleware/pipeline interaction that changes behavior under reordering is not an independent effect and must be modeled as ordered composition.
+
+Restoration is judged by **observational equivalence** through public contracts rather than bit-for-bit restoration of incidental private state.
 
 Not every external action is reversible. Transactional, compensating, or irreversible effects require explicit semantics when such behavior is introduced.
 
@@ -387,6 +404,7 @@ The architecture does not require:
 - audio-specific types in the generic kernel;
 - UI frameworks in the generic kernel;
 - restoring the old repository hierarchy;
+- treating a disposer as proof of cross-Fiber composability;
 - pretending irreversible external actions can always be rolled back.
 
 Implementation should grow one verified invariant at a time.
