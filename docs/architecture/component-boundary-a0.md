@@ -6,6 +6,8 @@ Status: **design audit, not implementation authorization.** Nothing here freezes
 
 BASE audited: `dae8dba` on clean `main`. Workspace tests green at audit time (2 passed).
 
+Revision 2 (Corrective-1, 2026-09-06): applies the four corrections from human review round 1 on PR #66 — composition confluence split from domain continuity (§H); explicit ownership/lifetime for the RT data edge (§B.1, §B.3, §C, §E); CLAIMED protocol point-of-no-return distinguished from the physical emission boundary (§B.3, §F); Music component vs MusicKernel ownership distinction (§B.1, §I).
+
 ---
 
 ## A. Reality audit
@@ -41,7 +43,7 @@ apps/headless      prints and constructs an empty runtime
 | `native/ffmpeg/profiles/*.json`, `capabilities/*.json` | One FFmpeg dependency-closure authority with build profiles (`codec-base`, `songcore-test`); codec coverage is provider configuration, not a runtime layer |
 | `apps/desktop/**` (Kotlin) | Proven UI seam: `PlayerPort`/`PlayerSnapshot` polled 5–10 Hz, `NativePlayerAdapter`, `FilePicker` living in the host app |
 
-Project memory corroboration: the timeline-ownership fix (splitting timeline accounting across submit/render sides was a real bug source) and the RT-island corrective (zero mutex on the render hot path) both argue for single-owner timeline + pre-bound data edges.
+Project memory corroboration: the timeline-ownership fix (splitting timeline accounting across submit/render sides was a real bug source) and the RT-island corrective (zero mutex on the render hot path) both argue for single-owner timeline + RT data edges established outside the audio path (binding ownership frozen in §B.3).
 
 Historical implementations are evidence of *behavior and ownership truth*, not of the future component layout.
 
@@ -55,17 +57,17 @@ Three runtime components are proposed for the first Windows slice. Full matrix f
 
 | Field | Analysis |
 |---|---|
-| Component | `Music` — one component owning the player domain kernel (historical PlayerEngine semantics). |
-| Owns | Playback state machine (EMPTY/READY/PLAYING/PAUSED/ENDED/ERROR); media-timeline truth (position/duration µs, CONFIRMED/ESTIMATED landing, GAP = zero media time); the active track session (including the open Decoder handle); decode worker thread; PCM ring; the RT-safe publication boundary (commit/flush); stop-recovery reopen policy. Future queue semantics stay here (domain kernel), not in a new component. |
-| Requires | `Decoder` (open/probe/decode/seek/EOF, stream info, metadata) — cardinality 1. `PcmSink` from AudioOutput (bind/negotiate, RT fill seam, render evidence) — cardinality 1. Unsatisfied requirement ⇒ component stays inactive/degraded; it never crashes the root (see §K). |
+| Component | `Music` — one runtime component. The component is the composition unit; internally it is **MusicKernel + cohesive MVP playback mechanisms** (ownership split below). |
+| Owns | Playback state machine (EMPTY/READY/PLAYING/PAUSED/ENDED/ERROR); media-timeline truth (position/duration µs, CONFIRMED/ESTIMATED landing, GAP = zero media time); the active track session (including the open Decoder handle); decode worker thread; PCM ring; the RT-safe publication boundary (commit/flush); stop-recovery reopen policy. Future queue semantics stay here (domain kernel), not in a new component. **Ownership split (frozen):** the *Music component* owns the domain semantics **plus** these cohesive MVP playback mechanisms (session/worker/ring/timeline mechanism/RT publication), because the frozen PlayerEngine proves their cohesion and its public ABI states "the engine owns its decode worker". **`MusicKernel` owns only the domain semantics** — state-machine meaning, track/session/playback/ENDED meaning, timeline interpretation. Mechanisms must never be folded into `MusicKernel`; `struct MusicKernel { worker, ring, renderer_handle }` would contradict "domain kernels own domain semantics" (#46). Whether the mechanisms live as separate modules inside the component is a later implementation choice, not frozen here. |
+| Requires | `Decoder` (open/probe/decode/seek/EOF, stream info, metadata) — cardinality 1. `PcmSink` from AudioOutput (bind/negotiate, RT fill endpoint, render evidence) — cardinality 1. Unsatisfied requirement ⇒ component stays inactive/degraded; it never crashes the root (see §K). |
 | Provides | `PlaybackControl` (open/play/pause/stop/seek with frozen pe_* semantics); `PlaybackSnapshot` (polled coherent instant + track metadata view + diagnostics). `PlayerView`/`PlayerAction` (Presentation) is the *payload vocabulary* of these services, not a separate capability or component. |
-| Operations / data edge | Control calls: synchronous, caller-serialized. Snapshot: concurrent poll. PCM: pre-bound RT data edge — sink render thread pulls blocks through the engine's mutex-free fill seam (realtime island; no Context/resolution per block). Render evidence (playout padding, underruns) returns over the same RT seam. Dependency loss arrives via kernel invalidation push, never as a direct reverse callback (see §D). |
+| Operations / data edge | Control calls: synchronous, caller-serialized. Snapshot: concurrent poll. PCM: Music resolves the `PcmSink` capability, then **binds its own fill endpoint** — conceptually `PcmSink.bind(PcmSourceEndpoint) → SinkSession` (lifetime shape, not a Rust API freeze). The sink's RT thread pulls blocks only through the endpoint handed to that session (realtime island; no Context/resolution per block). **Music owns the SinkSession binding effect** — creation, quiesce, teardown — and the binding's teardown is explicit and precedes provider final release (§G.2). Render evidence returns over the same session. No composition-root pointer wiring exists or is permitted (§J). Dependency loss arrives via kernel invalidation push, never as a direct reverse callback (see §D). |
 | Observable contract | State; position/duration on the MEDIA timeline; landing quality; buffered/underrun diagnostics; typed errors with Decoder verdict attribution on open/seek failure. Frozen from `pe_snapshot`. |
 | Commutativity | Multiple snapshot/control listeners commute → contribution-oriented `register -> token`. Control operations on one session do **not** commute (open/play/seek/stop order is the state machine). |
 | Ordering | State-machine transitions; seek-landing vs ENDED (probes tolerate idle-in-band); commit/flush single-flight (REQUESTED/CLAIMED/COMPLETED/CANCELLED, I3/I4/I5). |
 | Effects | Session open (Decoder handle): reversible via close, with teardown-access window. Ring/worker allocations: reversible, owned inside. Listener registration: reversible token. |
 | System boundary | Audio actually rendered by the sink is outside rollback (submitted ≠ rendered; claimed physical flush is irreversible per I4). Host-IO side effects during decode belong to the host, not to Music. |
-| Lifecycle dependency | Dependent of Decoder and of AudioOutput: must quiesce worker, park the pipeline, and close the handle (teardown access still valid) before either provider's final release. Historical proof: `pe_destroy` order; renderer destroyed before engine. |
+| Lifecycle dependency | Dependent of Decoder and of AudioOutput: must quiesce the worker, park the pipeline, **tear down its SinkSession binding**, and close the handle (teardown access still valid) before either provider's final release. Historical proof: `pe_destroy` order; renderer destroyed before engine. |
 | Granularity cost | Splitting Transport/Session/Timeline/Worker apart re-exposes the dual-timeline-accounting bug class over one coherent state machine; no split is justified at MVP. |
 
 ### B.2 Decoder (decode mechanism provider; historical SongCore)
@@ -91,14 +93,14 @@ Three runtime components are proposed for the first Windows slice. Full matrix f
 |---|---|
 | Component | `AudioOutput` — one component owning the device session and the render mechanism island. |
 | Owns | Device session (endpoint activation, negotiated format, event-driven render thread); submit/playout accounting (padding-proven advance, underruns); format conversion to the device format (SRC — provisional placement, see §I); bounded-retry device-loss degradation. |
-| Requires | Nothing at the capability plane (the device is platform, not a capability). The data-plane pull from Music's fill seam is a **pre-bound edge established by the composition root**, not a requirement — if no Music is bound, the output never activates a session. This direction is what keeps the graph acyclic (§D). |
-| Provides | `PcmSink`: bind/negotiate → sink session with RT-safe swap/flush (commit/flush handshake). `OutputDeviceDiscovery`: read-only endpoint enumeration, when a consumer needs it. Two capabilities, one provider. |
-| Operations / data edge | Sink session: bind at composition/control time; per-block pull over the pre-bound RT edge; evidence counters observable; flush/swap via the single-flight handshake. |
+| Requires | Nothing at the capability plane (the device is platform, not a capability). The data-plane pull is **not root-wired and not a reverse requirement**: the edge exists only inside a `SinkSession` created by the dependent's explicit `PcmSink.bind(PcmSourceEndpoint)` on the resolved capability. AudioOutput holds only the endpoint handed to that session and can never reach Music as a capability — if no session is bound, the output never activates. This direction is what keeps the graph acyclic (§D). |
+| Provides | `PcmSink`: `bind(PcmSourceEndpoint) → SinkSession` (format negotiated at bind; RT-safe swap/flush via the commit/flush handshake) — conceptual lifetime shape, not a Rust API freeze. `OutputDeviceDiscovery`: read-only endpoint enumeration, when a consumer needs it. Two capabilities, one provider. |
+| Operations / data edge | SinkSession: created by the dependent's explicit bind at control time; per-block pull happens only through the session's endpoint (no control-plane work per block); evidence counters observable; flush/swap via the single-flight handshake. |
 | Observable contract | Bind success/failure + negotiated format; render evidence (underruns, playout); device list. |
 | Commutativity | Discovery reads commute. Evidence listeners (future) would commute via tokens. Sink sessions: exactly one per composition (cardinality follows from Music's requirement). |
 | Ordering | bind → negotiate → start; any graph/format swap is a single-flight commit/flush (I3/I4/I5). |
-| Effects | Session open/close: reversible. Render thread spawn/join: reversible. Format renegotiation: transactional swap through the handshake. |
-| System boundary | Once a flush is CLAIMED, the physical device action may start and can never be cancelled (I4) — that is the precise crossing point outside the recoverable boundary. Device state itself is outside runtime ownership. |
+| Effects | SinkSession binding: an effect **owned by Music** (the dependent) — explicit bind/teardown, and the teardown precedes provider final release. Session resources and render thread inside AudioOutput: reversible, owned here. Format renegotiation: transactional swap through the handshake. |
+| System boundary | Two distinct notions, kept separate (corrective P1-3): a **CLAIMED flush is the protocol point-of-no-return** — from CLAIMED, cancellation/rollback is no longer promised and control must await the definitive outcome (I4); the **physical render is the external emission boundary** — the actual crossing where sound leaves the recoverable system. The claimed flush stays classified Irreversible (rollback authority ends at CLAIMED; the flush may itself irreversibly discard device-buffer state), but the two notions must not be conflated: a claimed flush can complete without anything being emitted (e.g., muted device). Device state itself is outside runtime ownership. |
 | Lifecycle dependency | Music (the PcmSink consumer) must park/quiesce its RT edge before sink-session release: renderer destroyed before engine (proven rule). |
 | Granularity cost | DeviceSession/Renderer split forces the device handle or per-block calls across a seam inside one RT island — mechanism leakage for zero gain. Discovery-as-separate-component rejected (capability, not component). |
 
@@ -116,15 +118,15 @@ Three runtime components are proposed for the first Windows slice. Full matrix f
  |  Decoder  |<----------|  Music  |---------->| AudioOutput |
  +-----------+  capability (domain  capability +-------------+
        ^         data edge: kernel)   data edge:  ^
-       |        PCM blocks,           RT fill seam|
-     host IO     host IO payload      pull (pre-bound)
-     (payload,       ^                        |
+       |        PCM blocks,           SinkSession |
+     host IO     host IO payload      bound by    |
+     (payload,       ^                Music       |
       data edge)     |                  render evidence
-                  source file          (same RT seam)
+                  source file          (same session)
 ```
 
 - Capability edges: Music → Decoder, Music → AudioOutput. Decoder and AudioOutput require no capabilities. The graph is a DAG.
-- Payload/data edges (not capabilities): file/IO callbacks into Decoder; PCM blocks from Decoder into Music's ring; RT fill-seam pull from AudioOutput into Music's ring.
+- Payload/data edges (not capabilities): file/IO callbacks into Decoder; PCM blocks from Decoder into Music's ring; the RT pull from the sink thread into Music's fill endpoint — created only by Music's explicit `PcmSink.bind(...) → SinkSession` and owned by Music as a binding effect. **A data edge is not a capability edge, but every data edge still has explicit ownership, provenance and teardown**; none is wired by the composition root behind the capability plane (§J).
 
 ## D. Cycle / integration audit
 
@@ -145,7 +147,7 @@ Frozen rule: **commutative relation → may compose as independent effects; non-
 | Multiple snapshot/control listeners (UI, media keys, logging) | **Commutative**, independently removable | Contribution-oriented `register -> opaque token`; removal of one token cannot damage others |
 | Control operations on one Music session (open/play/seek/stop) | **Ordered** | Music's state machine; single owner, explicit transitions (frozen pe_* semantics) |
 | Replace/open track session | **Ordered, transactional fail-closed** | open stops everything, drops the previous handle, lands READY @0 or ERROR; it is replace-with-fail-closed, not rollback-to-previous (honest semantics from the frozen ABI) |
-| Per-block PCM fill through the RT seam | Single-owner sequential (not a shared-key problem) | Pre-bound edge; no cross-component same-key algebra per block |
+| Per-block PCM fill through the SinkSession | Single-owner sequential (not a shared-key problem) | Edge created by Music's explicit bind and owned by Music as a binding effect; no cross-component same-key algebra per block; no root wiring |
 | **DSP chain: EQ → Compressor vs Compressor → EQ** | **Ordered (non-commutative)** | Explicit ordered processing graph owned by the PCM-path owner; node positions are declared in desired composition and published RT-safely via commit/flush. **Never** registration order, mount order, hash iteration, or discovery order |
 | Resampler placement (before/after DSP) | **Ordered** | Format negotiation result; becomes an explicit graph node when a graph owner exists (§I.4) |
 | Visualizer/Analyzer taps (future) | **Commutative** | Read-only observers of the PCM path; observation never mutates; token removal independent. This is the deliberate algebraic *contrast* with transforms: taps commute, transforms do not |
@@ -166,17 +168,18 @@ Frozen rule: **commutative relation → may compose as independent effects; non-
 | Decoder handle (open session) | Reversible with teardown-access window | Music (handle), Decoder (mechanism) | `song_close` must remain valid during Decoder withdrawal (§G) |
 | PCM ring, decode worker thread | Reversible | Music | Spawn/join, alloc/free owned inside Music |
 | AudioOutput device session + render thread | Reversible open; transactional swap | AudioOutput | Format/device change goes through single-flight handshake |
+| SinkSession binding (Music's RT data edge) | Reversible | **Music** (binding effect) | Created by Music's explicit `PcmSink.bind(...)`; torn down by Music, before provider final release (§G.2); never root-wired |
 | Seek | Transactional (fail-closed) | Music | Success = CONFIRMED landing; failure = ERROR, never a half-seek |
 | Track open | Transactional (replace-with-fail-closed) | Music | READY @0 or ERROR; no rollback-to-previous-track promise |
 | Stop-recovery reopen | Compensatable | Music | Deterministic rebuild to READY @0; reopen on failure |
 | Output device switch (planned or loss) | Compensatable | Music + AudioOutput | Park at last CONFIRMED landing → rebind → resume by policy; cannot restore the un-played interim (silence is the honest outcome) |
-| Claimed physical device flush | **Irreversible** | AudioOutput mechanism | I4: a claimed flush can never be cancelled; control must await the verdict |
-| **Already-rendered audio** | **Outside recoverable boundary** | Physical world | `Everything is Plugin` ≠ `Everything is rollbackable`; submitted ≠ rendered is the accounting that keeps this truth visible |
+| Claimed flush — protocol point-of-no-return | **Irreversible** | AudioOutput mechanism | From CLAIMED, cancellation/rollback is no longer promised and control must await the definitive outcome (I4). Distinct from the external emission boundary below: a claimed flush may complete without audible emission |
+| **Physically rendered audio — external emission boundary** | **Outside recoverable boundary** | Physical world | The actual crossing into the external world; `Everything is Plugin` ≠ `Everything is rollbackable`; submitted ≠ rendered is the accounting that keeps this truth visible |
 | Host filesystem/network reads during decode | Outside boundary (host-owned) | Host via data edge | Runtime may observe failure, not roll it back |
 | UI pixels already painted | Compensatable (repaint) | UiHost (future) | Never part of playback correctness |
 | Library writes / playlist edits (future) | Compensatable (journal) | Library | Not in MVP; noted to preempt "everything is reversible" drift |
 
-The system-boundary crossing point is **precise and historically encoded**: a flush becomes unrecoverable at CLAIMED (I4), and sound becomes unrecoverable at physical render. The architecture must never wrap either in an Effect closure and call the result rollback.
+Two boundaries must never be conflated (corrective P1-3): **CLAIMED is the protocol point-of-no-return** — the runtime loses rollback/cancellation authority and must await the outcome (I4) — while the **physical render is the external emission boundary**, where sound actually leaves the recoverable system. The claimed flush remains an irreversible effect because rollback authority ends at CLAIMED (and a flush may irreversibly discard device-buffer state), but "past the point of no return" and "emitted into the world" are different facts. The architecture must never wrap either in an Effect closure and call the result rollback.
 
 ## G. Lifecycle ordering (provider disappearance)
 
@@ -193,43 +196,54 @@ provider begins withdrawal
 
 **G.1 Decoder withdrawal/replacement during playback.** No new `open` resolves → Music is invalidated → Music quiesces the decode worker and closes the open handle (`song_close` — teardown access still valid) → only then does the Decoder provider release the FFmpeg closure. On replacement, Reconcile rebinds and Music recovers via the proven stop-recovery reopen (same source, per policy). Failure to keep the teardown-access window = use-after-unload; this is a kernel-0 invariant, not a convention.
 
-**G.2 AudioOutput / device replacement.** Output withdrawal (planned switch or device loss) → no new bind/resolution → Music invalidated on the PcmSink edge → Music parks the pipeline at the last CONFIRMED landing (media-time truth preserved by submitted ≠ rendered accounting; GAP = zero media time) → Music quiesces the RT edge via the commit/flush handshake → AudioOutput releases the device session → new output binds, format renegotiates (SRC parameters may change) → Music resumes by policy. The historical bounded-retry renderer is the degradation shape when no replacement exists: position freezes, state honest.
+**G.2 AudioOutput / device replacement.** Output withdrawal (planned switch or device loss) → no new bind/resolution → Music invalidated on the PcmSink edge → Music parks the pipeline at the last CONFIRMED landing (media-time truth preserved by submitted ≠ rendered accounting; GAP = zero media time) → Music quiesces the RT edge via the commit/flush handshake and **tears down its SinkSession binding (the effect Music owns)** → AudioOutput releases the device session → Music re-binds by presenting its fill endpoint to the new capability; format renegotiates (SRC parameters may change) → Music resumes by policy. The historical bounded-retry renderer is the degradation shape when no replacement exists: position freezes, state honest.
 
 **G.3 AudioRuntime replacement (future).** The graph owner's withdrawal invalidates both Music's path and DSP node contributions; nodes tear down their contributions (tokens), Music parks, buffers are released last by the graph owner. Design-level only; triggers in §J.
 
 **G.4 UiHost removal.** UiHost is a dependent, never a playback provider. Withdrawal invalidates nothing except its own registrations: listeners unregister by token (independent removal), playback continues untouched. Headless operation is the standing proof that no playback path requires UiHost.
 
-**G.5 Root disposal.** Reverse of activation: dependents before providers — Music deactivates (stop publications → join worker → quiesce audio path → close handle; the documented `pe_destroy` order), then Decoder and AudioOutput release. On the output side the proven rule is renderer destroyed before engine.
+**G.5 Root disposal.** Reverse of activation: dependents before providers — Music deactivates (stop publications → join worker → quiesce audio path, including tearing down its SinkSession binding → close handle; the documented `pe_destroy` order), then Decoder and AudioOutput release. On the output side the proven rule is renderer destroyed before engine.
 
 ## H. Confluence oracle
 
-> After any legal load/unload/replacement history reaches quiescence, the observable runtime is equivalent to a clean construction of the final desired composition.
+The oracle has **two layers that must never be conflated** (corrective P0-1). The final plugin graph determines *composition truth*; it does not by itself determine historical media position or playback state. A domain session fact survives a mutation history only if an explicit continuity policy preserves it — and that policy (§K.3) is not frozen yet.
 
-**Compared (public truth):**
+### H.a Composition confluence
+
+> After any legal load/unload/replacement history reaches quiescence, the composition truth — capability/Context reachability, Fiber/component lifecycle, effect/binding ownership, and pipeline topology — is observationally equivalent to a clean construction of the final desired composition.
+
+**Compared (public composition truth):**
 
 1. Reachable capability set (PlaybackControl/PlaybackSnapshot present iff Music present; required bindings resolved).
 2. Fiber/component lifecycle truth (active set == desired set; nothing pending/zombie).
-3. Public service behavior probes: a fresh open→play→seek→pause→stop sequence on the settled graph behaves like the same sequence on a clean graph (same states, same error taxonomy).
-4. Pipeline topology: MVP trivially `Music → ring → sink`; once DSP exists, the explicit ordered node list equals the desired order.
-5. Contribution registries: listener sets equal by semantic identity (not token values); dispatch count == registered count.
-6. Ownership counts: exactly one device session, one decode worker, one open handle per active Music session — the session-leak detector.
-7. Position/state semantics: state equal; position within an honest equivalence band (±render quantum) because wall-clock differs; ENDED probes tolerate idle-in-band.
+3. Pipeline topology: MVP trivially `Music → SinkSession → device`; once DSP exists, the explicit ordered node list equals the desired order.
+4. Contribution registries: listener sets equal by semantic identity (not token values); dispatch count == registered count.
+5. Ownership counts: exactly one device session, one decode worker, one open handle per active Music session, one live SinkSession per bound output — the session-leak detector.
 
 **Never compared:** allocator addresses, opaque token values, worker thread IDs, private generations, exact `buffered_frames`/`underrun_count` values (bands/invariants only).
 
-**Histories:**
+### H.b Domain continuity / recovery (separate oracle)
 
-| # | History (→ settle) | Clean baseline | Extra assertion |
-|---|---|---|---|
-| H0 | Root without UiHost (headless, null output) | Same root | The confluence baseline itself; playback fully correct |
-| H1 | open A, play → switch output X→Y → settle | clean open A on Y | State PLAYING; one device session; position in band |
-| H2 | open A → replace decoder provider (same source) → settle | clean A on new provider | Recovery reopen per policy; old closure released (ownership counts) |
-| H3 | Output flapped X→Y→X→… (N times) → settle on Y | clean Y | Exactly one session total — flap must not leak sessions |
-| H4 | Decoder replaced while PLAYING / while PAUSED / after ENDED (three runs) | same clean target | All three settle to the same observable profile |
-| H5 | Listeners added/removed in opposite orders → settle | clean set | Final dispatch set identical (commutativity proof) |
-| H6 | UiHost removed mid-playback → settle | root without UiHost | Playback observables unchanged |
-| H7 | (Future, DSP) insert EQ → switch output → remove EQ → replace decoder → settle | clean Music+Decoder B+Output C | Node list == desired order; no ghost nodes/taps |
-| H8 | Root disposal from any quiescent state | n/a | Zero owned resources remain: device closed, worker joined, handle closed |
+Playback state and media position are **domain session facts, not composition facts**. A clean rebuild of the final graph does not magically reconstruct a historical playing position. Continuity is judged only when an explicit policy says what must survive, in one of two legal forms:
+
+1. **Checkpoint/apply:** capture an explicit domain checkpoint on the pre-mutation graph — source, last CONFIRMED landing, desired play/pause intent — apply the same checkpoint to both the settled graph and a clean build of the final composition, and compare the resulting playback semantics (state-machine outcomes, landing quality, media-time behavior, error taxonomy).
+2. **Behavioral probes:** run identical post-settle probe sequences (fresh open→play→seek→pause→stop) on both graphs and compare outcomes — same states, same error taxonomy.
+
+Position/PLAYING equality after a replacement history is asserted **only** under a frozen continuity/resume policy (§K.3: proposed default — pause at last CONFIRMED landing). Until that policy is frozen, no history below claims position or PLAYING equality as a confluence conclusion; histories assert composition confluence (H.a) unconditionally and continuity (H.b) only as policy-conditional probes.
+
+### H.c Histories
+
+| # | History (→ settle) | Clean baseline | Composition assertions (§H.a, unconditional) | Continuity probes (§H.b, policy-conditional) |
+|---|---|---|---|---|
+| H0 | Root without UiHost (headless, null output) | Same root | The composition baseline itself: full capability/fiber/ownership truth without UI | n/a |
+| H1 | open A, play → switch output X→Y → settle | clean A on Y | Capability set equal; exactly one device session on Y; one live SinkSession; lifecycle truth clean | Identical post-settle probe sequence matches; position-band equality asserted only once the resume policy (§K.3) is frozen |
+| H2 | open A → replace decoder provider (same source) → settle | clean A on new provider | Old closure released (ownership counts); bindings clean | Recovery reopen compared via checkpoint/apply once the reopen policy is frozen |
+| H3 | Output flapped X→Y→X→… (N times) → settle on Y | clean Y | Exactly one session total — flap must not leak sessions or leave ghost SinkSessions | n/a |
+| H4 | Decoder replaced while PLAYING / while PAUSED / after ENDED (three runs) | same clean target | All three runs settle to identical composition truth | Continuity compared only via identical applied checkpoint/intent per run — never raw historical position equality |
+| H5 | Listeners added/removed in opposite orders → settle | clean set | Final dispatch set identical (commutativity proof) | n/a |
+| H6 | UiHost removed mid-playback → settle | root without UiHost | Playback capability/fiber truth unchanged by removal of a pure consumer | Domain-session stability: removing the UI must not perturb the playing session (compared pre/post, same graph) |
+| H7 | (Future, DSP) insert EQ → switch output → remove EQ → replace decoder → settle | clean Music+Decoder B+Output C | Node list == desired order; no ghost nodes/taps | Per policy once frozen |
+| H8 | Root disposal from any quiescent state | n/a | Zero owned resources remain: device closed, worker joined, handle closed, SinkSession torn down | n/a |
 
 H0–H3, H5, H6, H8 are expressible with the MVP decomposition alone; H4 needs decoder replacement; H7 needs DSP. All are design-level oracles now; they become executable tests only when the kernel exists (§K.6).
 
@@ -239,7 +253,7 @@ H0–H3, H5, H6, H8 are expressible with the MVP decomposition alone; H4 needs d
 
 ```text
 Profile: windows-mvp (desired composition)
-  Music      requires Decoder, PcmSink
+  Music      requires Decoder, PcmSink; binds its fill endpoint -> SinkSession
   Decoder    (FFmpeg closure provider; SongCore semantics behind the capability)
   AudioOutput providers PcmSink + OutputDeviceDiscovery
     - real provider: WASAPI shared-mode (historical renderer semantics)
@@ -248,6 +262,8 @@ File input: CLI argument/path in headless (FilePicker deferred with UiHost)
 ```
 
 Target functionality mapping: open local file (Decoder open + Music session), play/pause/seek/stop (PlaybackControl), position/duration + ENDED (PlaybackSnapshot media-time truth), basic metadata (probe result surfaced through Music's track view).
+
+**Component vs kernel (frozen distinction, corrective P1-4):** the runtime unit is the **Music component**. It internally owns the domain semantics *and* the cohesive MVP playback mechanisms (session, decode worker, PCM ring, timeline mechanism, RT publication) because the frozen PlayerEngine proves that cohesion. **`MusicKernel` remains only the domain-semantic authority** — state-machine meaning, track/session/playback/ENDED meaning, timeline interpretation. This audit does not authorize a `MusicKernel` that owns threads, rings, or renderer handles; whether the mechanisms live as separate modules inside the Music component is a later implementation choice, not frozen here.
 
 **Explicit answers:**
 
@@ -268,7 +284,7 @@ Target functionality mapping: open local file (Decoder open + Music session), pl
 | Per-codec Decoder plugins (MP3/FLAC/… plugins) | Rejected | Splits one FFmpeg dependency-closure authority into many; codec selection is intra-provider dispatch; zero composability gain |
 | Probe/metadata split from decode | Rejected | Breaks the proven one-file-one-coherent-snapshot contract; forces two handles over one file |
 | Transport vs Timeline/Session split | Rejected | Re-creates the dual-timeline-accounting bug class; one coherent state machine owns both |
-| Decode worker/ring as a separate "AudioRuntime" now | Deferred, not rejected | With zero DSP the "graph" is one edge; AudioRuntime is the future integration component for the ordered PCM graph. Triggers: (a) DSP nodes as independent components, (b) multiple sinks, (c) graph publication independent of domain state. Its required contract (pre-bound RT edges, RT-safe swap) is already frozen by this audit |
+| Decode worker/ring as a separate "AudioRuntime" now | Deferred, not rejected | With zero DSP the "graph" is one edge; AudioRuntime is the future integration component for the ordered PCM graph. Triggers: (a) DSP nodes as independent components, (b) multiple sinks, (c) graph publication independent of domain state. Its required contract (explicitly owned, teardown-able RT edges per §B.3; RT-safe swap) is already frozen by this audit |
 | Resampler as a user-composable plugin | Rejected | SRC placement is derived from format negotiation (mechanism), not user composition; forcing it into the plugin set creates fake freedom with real ordering hazards |
 | EQ/Gain/Compressor as independent runtime plugins now | Rejected for MVP | Not in target functionality; when they exist they are ordered graph nodes, and their algebra (non-commutative) is already frozen — building them as order-free plugins now would be wrong *by construction* |
 | Mixer | Rejected for MVP | Single source; same-key contribution case (float-addition associativity caveat recorded); revisit with multi-source |
@@ -279,6 +295,7 @@ Target functionality mapping: open local file (Decoder open + Music session), pl
 | "AudioOutput requires Music" (device-loss callback) | Rejected | Invented cycle; invalidation direction already solves it (§D.1) |
 | Opaque sequence numbers as contribution tokens | Rejected | Leaks insertion order; creates artificial non-commutativity (§E) |
 | `AppRuntime::audio_output()` concrete accessor as the seam | Rejected as a contract | Bootstrap witness only; bypasses capability identity |
+| Composition root wiring the RT data edge directly (`root: sink.source = music.fill_endpoint`) | Rejected | A privileged bypass of the capability plane with no ownership, provenance or teardown; the edge exists only as the SinkSession created by the dependent's explicit `PcmSink.bind(...)` (§B.3, §C) |
 
 ## K. Blocking unknowns
 
@@ -286,11 +303,11 @@ None blocks designing COMPOSITION-KERNEL-0. The following are **kernel-0 design 
 
 1. **Capability-contract shape in Rust** (trait objects vs typed ports; SongCore ABI v1 as *the* Decoder seam vs as one provider implementation behind it). The audit's position: the capability is the `Decoder` service definition; the frozen SongCore ABI is a preservation asset and a candidate implementation, not necessarily the kernel seam.
 2. **Async invalidation mechanism** (callback vs channel vs poll) — push invalidation and the teardown-access window are frozen; the transport is implementation.
-3. **Resume policy after provider replacement** — proposed default: pause at last CONFIRMED landing (deterministic, honest); must be fixed before confluence tests can assert H1/H2/H4 exactly.
+3. **Resume/continuity policy after provider replacement** — proposed default: pause at last CONFIRMED landing (deterministic, honest). Until frozen, the continuity probes of §H.b remain policy-conditional; only the §H.a composition-confluence assertions are unconditional.
 4. **Device-surprise policy for MVP** — proposed: fail-closed into the G.2 invalidation sequence with bounded-retry degradation; automatic rebind deferred.
 5. **Degraded/inactive semantics** — when a required capability is unsatisfied (root without output), the dependent is inactive, not crashed. This is a real Reconcile/Fiber requirement discovered by the audit; expressible with the five-primitive budget.
 6. **How confluence oracles become executable** (what the kernel exposes for observing capability/fiber/ownership truth) — kernel-0 design work, properly sequenced after this gate.
-7. **Realtime-island enforcement** — the pre-bound edge is designed; how the kernel *guarantees* no per-block resolution (type-system vs discipline vs audit) is kernel-0/implementation concern.
+7. **Realtime-island enforcement** — the explicitly bound RT data edge (SinkSession, §B.3) is designed; how the kernel *guarantees* no per-block resolution (type-system vs discipline vs audit) is kernel-0/implementation concern.
 
 No audit finding requires a kernel primitive beyond `Context / Capability / Fiber / Effect / Reconcile`.
 
@@ -298,6 +315,13 @@ No audit finding requires a kernel primitive beyond `Context / Capability / Fibe
 
 ## Verdict
 
-**PASS.** The music-player domain decomposes into three justified MVP components (Music, Decoder, AudioOutput) with an acyclic capability graph, frozen interaction algebra (commutative contributions vs explicitly ordered graphs), a precisely located irreversibility boundary (CLAIMED flush / physically rendered audio), dependency-directed lifecycle ordering with a teardown-access window, and a confluence oracle with concrete histories and public-truth comparisons.
+Human review round 1 (PR #66): **PASS_WITH_CORRECTIVES** — four corrections required. Revision 2 (this revision) applies all four:
 
-PASS means: **enough boundary evidence exists to design `COMPOSITION-KERNEL-0`.** It does not authorize implementing the kernel, freezing a Rust API, or starting FFmpeg/WASAPI/PocketJS integration in this task. Kernel-0 must adopt the decisions frozen here (§B–§I) and resolve §K as design inputs.
+1. **P0-1** Composition confluence split from domain continuity/recovery — §H is now two oracles (H.a composition truth vs clean build; H.b continuity only under an explicit frozen policy), and H1/H2/H4 no longer claim position/PLAYING equality as confluence conclusions.
+2. **P1-2** The RT data edge has explicit ownership/lifetime — created only by the dependent's `PcmSink.bind(PcmSourceEndpoint) → SinkSession`, owned by Music as a binding effect, torn down before provider final release; composition-root wiring is rejected (§B.1, §B.3, §C, §E, §F, §G.2, §J).
+3. **P1-3** CLAIMED is the protocol point-of-no-return, distinct from the physical-render external emission boundary; the flush stays classified Irreversible without conflating the two (§B.3, §F).
+4. **P1-4** Music component vs MusicKernel: the component owns domain semantics plus cohesive MVP mechanisms; `MusicKernel` owns only domain semantics and must never absorb worker/ring/RT machinery (§B.1, §I).
+
+Proposed verdict: **PASS**, pending second human review.
+
+PASS still means only: **enough boundary evidence exists to design `COMPOSITION-KERNEL-0`.** It does not authorize implementing the kernel, freezing a Rust API, or starting FFmpeg/WASAPI/PocketJS integration in this task. Kernel-0 must adopt the decisions frozen here (§B–§I) and resolve §K as design inputs.
