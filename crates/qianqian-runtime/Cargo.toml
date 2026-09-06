@@ -1,0 +1,7 @@
+[package]
+name = "qianqian-runtime"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+qianqian-core = { path = "../qianqian-core" }

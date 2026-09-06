@@ -1,0 +1,4 @@
+[package]
+name = "qianqian-core"
+version.workspace = true
+edition.workspace = true
