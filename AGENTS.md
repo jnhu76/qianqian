@@ -31,6 +31,10 @@ Architecture v2 is governed by these rules:
 >
 > **Profiles declare desired composition; reconciliation determines the running fiber graph.**
 
+And one important composability rule:
+
+> **Inverse is not enough: independent removal also requires independence/commutativity, or explicit ordering when operations do not commute.**
+
 Rust is the product architecture language.
 
 The generic Composition Kernel must not know music, PCM, FFmpeg, WASAPI, PocketJS, KuiklyUI, tracks, playlists, or UI payload schemas. Product and platform behavior lives in plugins and domain services above it.
@@ -93,18 +97,6 @@ Remember:
 > **Capability plane != data plane.**
 
 After a consumer is bound to a provider, ordinary business payload should flow through the service contract or a pre-bound direct data edge.
-
-Examples:
-
-```text
-Context resolves AudioOutput
-        |
-        v
-consumer holds/binds service endpoint
-        |
-        v
-business/control calls go directly to provider
-```
 
 For realtime audio:
 
@@ -184,9 +176,51 @@ other local runtime registrations
 
 A fiber must not rely on a separately handwritten “remember to undo everything” shutdown path when the mutation can be represented as an owned effect.
 
-Owned effects are unwound in deterministic reverse order when their fiber unloads/disposes.
+Within one Fiber, owned effects normally unwind in deterministic reverse/LIFO order.
 
 Do not pretend every side effect is reversible. External writes such as network requests, irreversible filesystem mutation, money movement, or other non-local actions need explicit transactional/compensating/irreversible semantics when they eventually exist. `Effect` is not magic rollback.
+
+## Independent removal and shared operations
+
+A disposer/inverse proves only local revertibility. It does **not** automatically prove that a Fiber can be removed after other Fibers have modified shared state.
+
+For cross-Fiber composability, review the shared-operation contract.
+
+### Different keys
+
+Operations on distinct capability/coeffect keys should be local: they must not secretly read/write unrelated keys or hidden global shared state.
+
+### Same key
+
+When multiple Fibers mutate one shared key, do not assume the operations commute.
+
+The provider/service definition must establish how contributions compose and how one caller's inverse removes only that caller's contribution.
+
+Prefer contribution-oriented interfaces when semantically appropriate, for example:
+
+```text
+register(value) -> opaque token
+unregister(token)
+```
+
+### Non-commutative interactions
+
+If order changes observable behavior, represent that order explicitly through dependency/composition/integration structure.
+
+Do not hide ordered middleware/pipeline semantics behind a false “independent effects” abstraction.
+
+### Restoration oracle
+
+Judge restoration by **observational equivalence** through public contracts, not by irrelevant bit-for-bit identity of private IDs/layout/generations.
+
+Kernel tests must separately distinguish:
+
+```text
+single-Fiber LIFO cleanup
+cross-Fiber independence
+same-key contribution safety
+explicit handling of non-commutative order
+```
 
 ## Reconciliation
 
@@ -204,7 +238,7 @@ desired plugin tree / profile
    running Fiber graph
 ```
 
-The initial implementation may be deliberately small, but product composition should evolve through the same protocol rather than hard-coding privileged product services into the bootstrap runtime.
+The initial implementation may be deliberately small, but product composition should evolve through the same protocol rather than hard-coding privileged product services into bootstrap runtime.
 
 ## Events are not a generic kernel payload primitive
 
@@ -275,9 +309,10 @@ Use reality-first development:
 
 - inspect before designing around assumed files or APIs;
 - make the smallest implementation that proves the requested invariant;
-- use adversarial tests for lifecycle, dependency removal, rollback/unwind, and stale state;
+- use adversarial tests for lifecycle, dependency removal, rollback/unwind, stale state, independence, and ordering;
 - do not create parallel registries, service locators, DI containers, or hidden global state beside the Composition Kernel;
 - do not move domain payloads into Context for convenience;
+- do not treat a disposer as proof of cross-Fiber composability;
 - do not perform unrelated cleanup in the same task.
 
 When a task conflicts with repository reality, classify the mismatch and either make the smallest authorized corrective or stop with evidence.
@@ -312,7 +347,8 @@ provider arrival activates dependent
 provider loss deactivates dependent before provider teardown completes
 replacement provider can reactivate dependent
 fiber disposal unwinds owned effects
-root disposal leaves no live fibers/bindings/effects
+independent Y contribution survives removal of X-side fiber
+root disposal is observationally equivalent to a clean root
 ```
 
 Report what was actually verified and never label an unrun platform/device check as PASS.
