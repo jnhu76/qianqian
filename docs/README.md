@@ -11,13 +11,14 @@ Do not recursively read archived or historical material by default.
 | Repository/agent rules | `../AGENTS.md` |
 | Stable vocabulary | `../CONTEXT.md` |
 | Current architecture | `architecture/overview.md` |
-| Composition Kernel / Context / Capability / Fiber / Effect / Reconcile | `architecture/composition-kernel.md` + current issue/task |
+| Component boundary / plugin granularity / interaction algebra | `architecture/composition-kernel.md` boundary-design sections + issue #53 |
+| Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | **Only after #53 passes**; then read `architecture/composition-kernel.md` + the implementation issue |
 | Product introduction / current repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | Rust workspace/build/test | Current `Cargo.toml` / crate manifests / CI once present; do not invent a separate manual before repeated operational complexity exists. |
-| Music/domain semantics | Current issue + `architecture/overview.md` + the implemented Music plugin/kernel tests/contracts created by that work. |
-| Decoder / Processing / AudioOutput | Current issue + `architecture/overview.md`; remember the generic Composition Kernel does not own media payload contracts. |
-| Realtime audio graph/runtime | Current issue + `architecture/overview.md` + Composition Kernel control/data-plane boundary; realtime data must stay off Context/event routing. |
+| Music/domain semantics | Current issue + `architecture/overview.md` + implemented Music plugin/kernel tests/contracts. |
+| Decoder / Processing / AudioOutput | Current issue + `architecture/overview.md`; generic Composition Kernel does not own media payload contracts. |
+| Realtime audio graph/runtime | Current issue + `architecture/overview.md`; realtime data must stay off Context/event routing. |
 | UiHost / presentation | Current issue + `architecture/overview.md` + implementation-local presentation/UiHost contract when established. |
 | Historical playback evidence | Inspect `research/playback-reference-v1` / `playback-reference-v1` only when the task needs behavioral evidence. |
 | Pre-Rust repository history | Inspect `archive/pre-rust-v2` / `pre-rust-v2` only when the task explicitly needs historical source/docs. |
@@ -30,6 +31,7 @@ Use the authority closest to the fact:
 agent work rules                 -> AGENTS.md
 stable vocabulary                -> CONTEXT.md
 current architecture             -> docs/architecture/overview.md
+component-decomposition gate     -> issue #53 + composition-kernel boundary sections
 composition-kernel semantics     -> docs/architecture/composition-kernel.md
 implemented behavior             -> code + tests + current contracts
 historical experimental fact     -> preserved reference/history
@@ -38,9 +40,33 @@ current task scope               -> current issue/task
 
 When documentation and implementation disagree, do not silently choose one. Audit the repository, identify whether drift is in code, docs, or the task premise, and make only the authorized correction.
 
-## Core routing distinction
+## Architecture design order
 
-For architecture questions, first classify the subject:
+For plugin/composition work, do **not** start from API shape.
+
+Use this order:
+
+```text
+Component Granularity
+        ↓
+Capability / dependency boundary
+        ↓
+Interaction Algebra
+        ↓
+Effect / System Boundary
+        ↓
+Global lifecycle ordering
+        ↓
+Confluence oracle
+        ↓
+Context / Fiber / Effect / Reconcile implementation
+```
+
+Current gate is #53 `COMPONENT-BOUNDARY-A0`.
+
+Until #53 passes, implementation work on a new `qianqian-kernel`, Context API, Fiber state machine, or Reconcile engine is not authorized.
+
+## Core routing distinction
 
 ### Composition/control plane
 
@@ -75,6 +101,23 @@ domain events
 belong to the relevant domain/plugin contract, not Context.
 
 Do not solve a data-plane problem by expanding Context into a universal bus.
+
+## Boundary-design questions
+
+Before a candidate becomes a plugin/capability, ask:
+
+```text
+who owns its state/resources?
+what does it require/provide?
+what operations cross the boundary?
+which operations commute?
+where is non-commutative order explicit?
+what is reversible vs outside the system boundary?
+which dependents must exit before provider teardown?
+does finer granularity justify its cognitive/configuration cost?
+```
+
+A different feature name is not evidence of component independence.
 
 ## Documentation growth rule
 
