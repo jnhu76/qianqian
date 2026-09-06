@@ -22,6 +22,12 @@ This file carries stable vocabulary and the repository mental model. It is not a
 | Control Plane | Composition data: profiles, reconciliation, fiber lifecycle, capability resolution, effect ownership, and dependency invalidation. |
 | Data Plane | Real application payload flow after bindings exist: service calls, direct media/audio edges, domain events, streams, and other product data. |
 | Capability plane != Data plane | Context decides who should be connected/visible; payload normally flows directly through the resolved service/data edge rather than through Context. |
+| Independence | The property that one component/effect can be removed without damaging the observable contribution of another interleaved component/effect. Revertibility alone does not imply independence. |
+| Commutativity | A property of shared operations and their inverses that allows independent ordering/removal. Same-key mutation is not assumed commutative; its provider/interface must establish the contract. |
+| Non-commutative relation | An interaction whose behavior depends on order. It must be represented by explicit dependency/order/integration structure rather than mislabeled as an independent effect. |
+| Observational Equivalence | Restoration correctness criterion: public behavior is equivalent to the world where the removed contribution never existed, even if private IDs/layout/generations are not bit-identical. |
+| Operation locality | A capability/coeffect operation should read/write only the state represented by its declared shared key/contract. Hidden cross-key/global mutation breaks the composability model. |
+| Recoverable system boundary | The state the runtime can legitimately own and restore/compensate. External or concurrently modified real-world state may require transactional, compensating, or irreversible semantics. |
 | Domain Kernel | A semantic authority inside a domain plugin, such as `MusicKernel`. It owns domain meaning but is not the global composition authority. |
 | Music Kernel | The music/player semantic authority: track/session/state, playback intent, queue behavior, buffering interpretation, recovery, and user-visible playback truth. It should be owned/exposed by a normal Music plugin. |
 | Presentation | Domain-to-UI seam exposing stable UI-facing state/actions. Presentation is product/domain data, not a Composition Kernel primitive. |
@@ -54,6 +60,12 @@ Fibers own lifetime.
 Effects own reversible mutation provenance.
 Profiles declare desired composition.
 ```
+
+A second rule is equally important:
+
+> **Inverse is not enough: independent removal also needs operation independence/commutativity, or explicit ordering when operations do not commute.**
+
+Restoration is judged by **observational equivalence**, not irrelevant private bit identity.
 
 Conceptually:
 
