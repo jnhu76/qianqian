@@ -119,12 +119,20 @@ Failure is fail-closed at both ends, and the verdicts split it honestly:
 - Cancelled BEFORE the claim: the operation never began. The control
   side's bounded (2 s) REQUESTED-phase wait cancels the request
   atomically; the commit is abandoned with the old generation intact.
-- Claimed, then definitively failed: a physical side effect may already
-  have hit the device. The commit is still abandoned, but the old
-  generation is NOT described as physically untouched — the renderer's
-  bounded retry re-establishes the stream.
+- Claimed, then definitively failed: the backend has already torn the
+  session down, so the old segment's pending output can never playout.
+  By the segment-ownership rule (ADR-0005) ring, timeline spans, and
+  device-pending PCM share one segment lifetime — the engine therefore
+  invalidates the generation (epoch bump, pending timeline/ring discard),
+  stores `Error` instead of resuming playback, and keeps the seam closed
+  until the next successful commit re-opens it. It never reports the
+  physical state as untouched, and never resumes `Playing` as if the
+  commit had merely been rejected.
 - Claimed, outcome pending: there is no timeout and no fake rollback —
-  the definitive outcome is awaited, however long the device takes.
+  the definitive outcome is awaited, however long the device takes. The
+  claim→complete window on the render thread is exactly-once by
+  construction (no-throw physical path, catch-all backstop): a verdict
+  is always published, so the claimed-phase wait cannot wedge.
 
 The protocol's id binding closes the residual races: a cancelled request
 can never execute later (the claim CAS refuses it), a claimed request can

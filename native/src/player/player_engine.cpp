@@ -871,22 +871,41 @@ bool PlayerEngine::invalidate() {
     }
     if (flush) {
         const CommitFlushResult r = flush();
-        if (r != CommitFlushResult::kPerformed) {
-            // Fail-closed: abandon BEFORE any mutation (epoch below has not
-            // run) and re-open admission so the old generation keeps
-            // serving. kCancelled: cancelled before the renderer claimed —
-            // no physical side effect, the operation never began, the old
-            // generation is genuinely intact. kFailed: the renderer already
-            // claimed and the outcome is definitively not a proven flush —
-            // the logical generation is unchanged, but the physical device
-            // state must not be described as untouched (the backend's
-            // teardown/retry path re-establishes the stream). Either way
-            // SongCore was never consulted, so callers report ErrInternal
-            // and leave *out_song_status alone.
+        if (r == CommitFlushResult::kCancelled) {
+            // Fail-closed BEFORE any mutation (epoch below has not run):
+            // cancelled before the renderer claimed — no physical side
+            // effect, the operation never began, the old generation is
+            // genuinely intact and keeps serving. SongCore was never
+            // consulted, so callers report ErrInternal and leave
+            // *out_song_status alone.
             backend_accepting_.store(true, std::memory_order_seq_cst);
-            last_error_ = r == CommitFlushResult::kCancelled
-                              ? "commit flush cancelled before claim"
-                              : "commit flush failed after renderer claim";
+            last_error_ = "commit flush cancelled before claim";
+            return false;
+        }
+        if (r == CommitFlushResult::kFailed) {
+            // The renderer claimed, the physical outcome is definitively
+            // not a proven flush, and the backend tore the session down:
+            // the old segment's pending output can never playout. Keeping
+            // the logical generation would claim PCM that was physically
+            // discarded — ADR-0005: ring, timeline spans, and device-pending
+            // PCM share one segment lifetime, they cannot be killed
+            // selectively. So invalidate the generation exactly like a
+            // commit would (epoch bump kills in-flight producer results;
+            // pending timeline + ring die) but store Error instead of
+            // committing a landing: playback must NOT resume as if nothing
+            // happened, and there is no landing to commit. Admission stays
+            // closed — a dead generation serves nothing; the next
+            // successful commit re-opens the seam.
+            ++epoch_;
+            timeline_.invalidate();
+            backend_.reset();
+            ring_.flush();
+            source_eof_.store(false);
+            timeline_overflow_.store(false);
+            AudioEngineBypass aes;
+            aes.reset();
+            last_error_ = "commit flush failed after renderer claim";
+            state_.store(PlayerState::Error);
             return false;
         }
     }

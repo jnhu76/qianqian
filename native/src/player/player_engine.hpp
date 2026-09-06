@@ -83,10 +83,14 @@ enum class PlayerStatus : std::int32_t {
 //                no physical side effect, the operation never began; the
 //                old generation is intact.
 //   kFailed    — the renderer claimed the flush and the physical outcome is
-//                definitive but NOT a proven flush (teardown): a side
-//                effect may already have hit the device, so the old
-//                generation must not be described as physically untouched
-//                (its logical state is unchanged either way).
+//                definitive but NOT a proven flush: the backend tore the
+//                session down, so the old segment's pending physical output
+//                can never playout. By the segment-ownership rule (ADR-0005)
+//                ring/timeline/device-pending share one segment lifetime —
+//                the engine therefore invalidates the whole generation
+//                (epoch bump, pending timeline/ring discard) and stores
+//                Error instead of resuming playback as if the commit had
+//                merely been rejected.
 enum class CommitFlushResult : std::uint8_t {
     kPerformed,
     kCancelled,
@@ -222,9 +226,13 @@ public:
     // kPerformed (the physical Stop/Reset is PROVEN; the commit lands),
     // kCancelled (cancelled before the renderer claimed it: no physical
     // side effect, the operation never began), or kFailed (claimed, then
-    // definitively not a proven flush — a side effect may have hit the
-    // device). Cancel/fail abandon the commit fail-closed: nothing mutated,
-    // admission re-opened, the caller surfaces ErrInternal. Called on the
+    // definitively not a proven flush — the backend tore the session down).
+    // kCancelled abandons the commit before any mutation: the old
+    // generation stays intact and keeps playing (admission re-opened).
+    // kFailed poisons the old generation: its pending timeline/ring can
+    // never playout, so the engine discards them and stores Error rather
+    // than resuming playback. Both surface ErrInternal (SongCore was never
+    // consulted). Called on the
     // control thread under src_mtx_ + state_mtx_ — the hook may block, but
     // must never re-enter the engine. Audible-segment invariant by
     // ORDERING: once segment N+1 has committed, the device buffer was
@@ -330,13 +338,17 @@ private:
         song_status status, std::int64_t actual_us, std::int64_t requested_us) const;
     // Commit machinery (caller holds src_mtx_ AND state_mtx_). invalidate()
     // returns false when the registered commit-flush hook does not report a
-    // PROVEN flush (kCancelled before the renderer claimed it, or kFailed
-    // after the claim): the commit is abandoned BEFORE any mutation
-    // (epoch/segment/ring/timeline untouched, admission re-opened,
-    // last_error_ distinguishes the two) and the caller surfaces
-    // ErrInternal. kCancelled leaves the old generation intact; kFailed
-    // leaves its logical state unchanged while the physical device state
-    // must not be described as untouched.
+    // PROVEN flush, and the verdict decides how the abort looks:
+    //   kCancelled (before the renderer claimed): the operation never began
+    //     — nothing mutated (epoch/segment/ring/timeline untouched),
+    //     admission re-opened, the old generation keeps playing.
+    //   kFailed (after the claim): the physical session is gone, so the old
+    //     generation's pending output can never playout — the engine
+    //     invalidates the generation (epoch bump, pending timeline/ring
+    //     discard) and stores Error; admission stays closed until the next
+    //     successful commit re-opens it.
+    // Either way SongCore was never consulted, last_error_ distinguishes
+    // the two, and the caller surfaces ErrInternal.
     bool invalidate();
     void commit_landing(std::int64_t landing_frames, LandingQuality quality);
     // Wait until no realtime fill/advance is mid-flight. The realtime path

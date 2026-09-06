@@ -114,26 +114,32 @@ sequenceDiagram
     participant DEV as WASAPI
 
     APP->>PE: seek(T)
-    PE->>PE: close admission; epoch N -> N+1
-    PE->>PCM: drop old PCM and pending spans
+    PE->>PE: close admission; quiesce realtime seam
+    PE->>WR: commit-flush REQUEST (control side)
+    WR->>DEV: Stop + Reset on the render thread
+    WR->>WR: rebase render accounting; drop SRC delayed state
+    WR-->>PE: verdict: device buffer PROVEN empty
+    Note over PE,DEV: a cancelled (never-claimed) request aborts the seek with the generation intact
+    PE->>PE: epoch N -> N+1; drop old PCM and pending spans
     PE->>SC: song_seek(T)
     SC->>CACHE: seek/read source byte ranges
     Note over CACHE: valid source-owned ranges may survive
     SC-->>PE: actual landing
     PE->>PE: commit landing; segment N -> N+1
     PE->>PE: reopen admission
-    WR->>PE: observe current segment
-    PE-->>WR: segment N+1
-    alt device still holds segment N
-        WR->>DEV: Stop + Reset
-        WR->>WR: rebase render accounting
-        WR->>WR: discard device-SRC delayed state
-    end
     SC->>PCM: decode segment N+1
     WR->>PE: fill output
     PE-->>WR: segment N+1 PCM
     WR->>DEV: submit clean new-segment output
 ```
+
+The flush precedes the commit: the device buffer is proven empty BEFORE
+segment N+1 exists, so the invariant is enforced by ordering rather than
+by a renderer noticing the segment change after the fact. A claimed flush
+that definitively fails (the session must be torn down) has no landing to
+commit and no physical state to keep: the engine invalidates the whole
+generation and stores `Error` — it never resumes playback as if the seek
+had merely been rejected.
 
 The invariant is:
 
@@ -153,6 +159,7 @@ Pause/resume is not a discontinuity and does not create a new segment.
 | stop to READY at 0 | may keep | reset | drop | drop | drop | drop |
 | replay from ENDED | may keep | reset | drop | drop | drop | drop |
 | open different source | replace source owner | replace | drop | drop | drop | drop |
+| commit flush fails after claim | unaffected | reset | drop (engine → `Error`) | drop (engine → `Error`) | drop | dropped with the session (teardown) |
 | renderer teardown only | unaffected | engine-owned | engine-owned | engine-owned | drop | drop |
 
 `May keep` means the architecture does not require invalidation; a bounded cache may still evict data according to its own policy.

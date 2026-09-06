@@ -233,9 +233,11 @@ void WasapiRenderer::State::teardown_stream(State* s) {
     s->written_total = 0;
     s->last_advanced = 0;
     s->in_stage.clear();
-    s->in_stage.shrink_to_fit();
+    // No shrink_to_fit: teardown runs inside the claimed flush window and
+    // in the failure path, where a reallocation throw would wedge the
+    // protocol verdict (a CLAIMED slot without a completion hangs pe_*).
+    // Capacity is period-sized and dies with the State.
     s->out_stage.clear();
-    s->out_stage.shrink_to_fit();
 }
 
 // Accept the closest match iff it is float32 — rate/channel count are free
@@ -458,9 +460,14 @@ CommitFlushResult WasapiRenderer::State::commit_flush(State* s) {
         // If the renderer's claim won the race, try_cancel fails: the
         // physical flush may have started, so no rollback is faked — the
         // definitive outcome is awaited however long the device takes.
+        // The 100 ms slices are a lost-notify backstop, not a timeout: the
+        // predicate is re-checked on every wake, so a missed notification
+        // costs latency, never correctness.
         if (s->handshake.try_cancel(id)) return CommitFlushResult::kCancelled;
         std::unique_lock<std::mutex> lk(s->sleep_mtx);
-        s->wake.wait(lk, resolved);
+        while (!resolved()) {
+            s->wake.wait_for(lk, std::chrono::milliseconds(100));
+        }
     }
     return s->handshake.outcome() ? CommitFlushResult::kPerformed
                                   : CommitFlushResult::kFailed;
@@ -472,10 +479,24 @@ void WasapiRenderer::State::commit_flush_execute(State* s, std::uint64_t id) {
     // flush that cannot be PROVEN escalates to teardown — a released
     // client cannot leave audible PCM behind — and reports kFailed so the
     // engine aborts the commit instead of landing on an unverified buffer.
+    // EXACTLY-ONCE verdict: nothing between claim and complete may escape —
+    // a throw would leave the slot CLAIMED forever and hang the control
+    // thread's pe_* call on the claimed-phase wait. The physical path is
+    // no-throw by construction (Win32 HRESULTs + C-library calls only;
+    // teardown_stream never reallocates), and the catch-all keeps that
+    // true even if a future edit breaks the construction.
     if (!s->handshake.claim(id)) return;  // cancelled/superseded: never execute
     bool ok = true;
-    if (s->client.get() != nullptr) ok = drop_device_buffer(s);
-    if (!ok) teardown_stream(s);
+    try {
+        if (s->client.get() != nullptr) ok = drop_device_buffer(s);
+        if (!ok) teardown_stream(s);
+    } catch (...) {
+        try {
+            teardown_stream(s);  // idempotent: every step is null-checked
+        } catch (...) {
+        }
+        ok = false;
+    }
     s->handshake.complete(id, ok);
     {
         std::lock_guard<std::mutex> lk(s->sleep_mtx);
