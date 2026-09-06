@@ -23,17 +23,22 @@
 //           not playing) → Stop() + Reset() so submitted-but-unrendered
 //           frames die with the engine's timeline reset.
 //   commit  the engine's commit boundary (open / play-after-ENDED / stop /
-//           seek) COMMANDS the physical flush through the registered
-//           commit-flush hook and blocks until this thread ACKs (#40): the
-//           flush (Stop + Reset, accounting rebased, resampler delay
-//           drained) runs HERE, on the COM-owning thread, BEFORE the
-//           engine's epoch/timeline reset and segment N+1 land. Ordering,
-//           not post-hoc detection, enforces the audible segment invariant:
-//           once segment N+1 has committed, the buffer was already proven
-//           empty, and the closed admission window means no fill can cross
-//           the boundary. A playing commit used to be invisible here (#40):
-//           with the buffer topped up, the new segment queued behind stale
-//           device PCM and played only after it.
+//           seek) runs the commit-flush protocol's CONTROL side
+//           (CommitFlushHandshake): it publishes a request and waits for
+//           this thread to claim it, run the physical flush (Stop + Reset,
+//           accounting rebased, resampler delay drained) HERE on the
+//           COM-owning thread, and complete it with a definitive verdict —
+//           all BEFORE the engine's epoch/timeline reset and segment N+1
+//           land. A request cancelled before the claim can never execute
+//           here (the claim CAS refuses it); a claimed request can never be
+//           cancelled — the engine waits for this verdict instead of
+//           faking a rollback. Ordering, not post-hoc detection, enforces
+//           the audible segment invariant: once segment N+1 has committed,
+//           the buffer was already proven empty, and the closed admission
+//           window means no fill can cross the boundary. A playing commit
+//           used to be invisible here (#40): with the buffer topped up, the
+//           new segment queued behind stale device PCM and played only
+//           after it.
 //
 // Failure model: any WASAPI/COM failure tears the stream down and leaves
 // the renderer silent with a bounded retry (format change or 2 s). No
@@ -42,7 +47,9 @@
 
 #include "wasapi_renderer.hpp"
 
+#include "commit_flush_handshake.hpp"
 #include "player_engine.hpp"
+#include "wasapi_submit_accounting.hpp"
 
 #include <windows.h>
 #include <audioclient.h>
@@ -81,7 +88,11 @@ constexpr GUID kSubFormatIEEEFloat = {
 constexpr std::chrono::milliseconds kIdleSleep{10};     // probe cadence
 constexpr std::chrono::milliseconds kEventTimeout{100}; // stop latency bound
 constexpr std::chrono::seconds kRetryGate{2};           // device-failure retry gate
-constexpr std::chrono::seconds kFlushAckTimeout{2};     // commit-flush ACK bound
+// Bound on the REQUESTED phase of a commit flush (cancel before claim is
+// the only timeout outcome). Once the renderer CLAIMS a request its
+// physical outcome is definitive and awaited without a bound — a faked
+// rollback past a claim is the one thing the protocol must never do.
+constexpr std::chrono::seconds kFlushAckTimeout{2};
 
 // Minimal local RAII — deliberately NOT a COM framework.
 template <typename T>
@@ -140,16 +151,16 @@ struct WasapiRenderer::State {
     std::int32_t attempted_rate = 0; // last failed negotiation request
     std::int32_t attempted_channels = 0;
 
-    // Commit-flush handshake (#40). The engine's commit boundary (control
-    // thread, inside invalidate()) sets `flush_requested`, kicks this
-    // thread, and blocks — bounded — until this thread ACKs via
-    // `flush_done`. Only kernel objects cross threads (two atomic flags,
-    // the sleep cv, the auto-reset buffer event); every WASAPI call stays
-    // on this, the COM-owning thread. seq_cst: the ACK is a real
-    // synchronizes-with edge — the engine's segment N+1 lands strictly
+    // Commit-flush handshake (#40 v3): the protocol state machine lives in
+    // CommitFlushHandshake; only its atomics and the sleep cv cross
+    // threads. The control thread NEVER touches buffer_event (render-
+    // thread-owned): this loop discovers requests at its top, so a playing
+    // period notices within one event timeout and an idle/paused sleep
+    // within kIdleSleep — both far inside the control side's
+    // kFlushAckTimeout. seq_cst inside the handshake makes a completion a
+    // real synchronizes-with edge: the engine's segment N+1 lands strictly
     // after the physical Stop+Reset.
-    std::atomic<bool> flush_requested{false};
-    std::atomic<bool> flush_done{false};
+    CommitFlushHandshake handshake;
 
     // Device-side SRC (the frozen aresample/libswresample owner). Null in
     // BYPASS mode, i.e. when the device accepted the source format as is.
@@ -173,13 +184,15 @@ struct WasapiRenderer::State {
     // escalate to teardown_stream — a buffer that cannot be PROVEN flushed
     // must never be claimed clean.
     static bool drop_device_buffer(State* s);
-    // Control side of the commit-flush handshake: runs on the engine's
-    // commit thread, kicks the render thread out of any wait and blocks,
-    // bounded, until the ACK. False = unproven flush (the engine fails the
-    // commit fail-closed; it never lands unflushed).
-    static bool commit_flush(State* s);
-    // Render side: execute the commanded flush on THIS thread, then ACK.
-    static void commit_flush_execute(State* s);
+    // Control side of the commit-flush protocol: publish a request, wake
+    // the render thread's idle/paused sleep, and wait for THIS request's
+    // definitive outcome. Bounded while REQUESTED (timeout -> cancel before
+    // the claim — the only safe rollback); once the renderer claims, the
+    // outcome is definitive and awaited without a bound.
+    static CommitFlushResult commit_flush(State* s);
+    // Render side: claim the request, execute the physical flush on THIS
+    // thread, publish the verdict. A cancelled request is never claimed.
+    static void commit_flush_execute(State* s, std::uint64_t id);
     // Shared idle branch with nothing to submit: distinguishes pause
     // (pending output stays pending and resumes with content on play) from
     // not-playing (Stop + Reset, matching the engine's timeline reset).
@@ -420,36 +433,54 @@ bool WasapiRenderer::State::drop_device_buffer(State* s) {
     return true;
 }
 
-bool WasapiRenderer::State::commit_flush(State* s) {
-    // Control thread (engine commit boundary inside invalidate(), admission
-    // closed). Kick the render thread out of the event wait (SetEvent) or
-    // the idle sleep (notify), then wait for the ACK. The predicate re-check
-    // under sleep_mtx makes a fast ACK (flush done before the wait starts)
-    // impossible to miss.
-    std::unique_lock<std::mutex> lk(s->sleep_mtx);
-    s->flush_done.store(false, std::memory_order_seq_cst);
-    s->flush_requested.store(true, std::memory_order_seq_cst);
-    s->wake.notify_all();
-    if (s->buffer_event != nullptr) SetEvent(s->buffer_event);
-    return s->wake.wait_for(lk, kFlushAckTimeout, [&] {
-        return s->flush_done.load(std::memory_order_seq_cst);
-    });
-}
-
-void WasapiRenderer::State::commit_flush_execute(State* s) {
-    // Render thread: the physical flush happens HERE, serialized with every
-    // other WASAPI touch of this session. An unproven flush escalates to
-    // teardown — a released client cannot leave audible PCM behind, which
-    // keeps the ACK honest in every state this thread can reach.
-    if (s->client.get() != nullptr && !drop_device_buffer(s)) {
-        teardown_stream(s);
-    }
-    s->flush_requested.store(false, std::memory_order_seq_cst);
+CommitFlushResult WasapiRenderer::State::commit_flush(State* s) {
+    // Control thread (the engine's commit boundary inside invalidate(),
+    // admission closed, seam drained). Publish the request, wake the
+    // render thread's idle/paused sleep, and wait for THIS request id to
+    // resolve. The id binding is the ABA defense: a stale completion can
+    // never satisfy a newer request.
+    const std::uint64_t id = s->handshake.request();
     {
         std::lock_guard<std::mutex> lk(s->sleep_mtx);
-        s->flush_done.store(true, std::memory_order_seq_cst);
+        s->wake.notify_all();
     }
-    s->wake.notify_all();
+    const auto resolved = [s, id] {
+        return s->handshake.completed(id) || s->handshake.cancelled(id);
+    };
+    bool done = false;
+    {
+        std::unique_lock<std::mutex> lk(s->sleep_mtx);
+        done = s->wake.wait_for(lk, kFlushAckTimeout, resolved);
+    }
+    if (!done) {
+        // Timeout while REQUESTED: cancel atomically — the only safe
+        // "old generation continues" outcome (the operation never began).
+        // If the renderer's claim won the race, try_cancel fails: the
+        // physical flush may have started, so no rollback is faked — the
+        // definitive outcome is awaited however long the device takes.
+        if (s->handshake.try_cancel(id)) return CommitFlushResult::kCancelled;
+        std::unique_lock<std::mutex> lk(s->sleep_mtx);
+        s->wake.wait(lk, resolved);
+    }
+    return s->handshake.outcome() ? CommitFlushResult::kPerformed
+                                  : CommitFlushResult::kFailed;
+}
+
+void WasapiRenderer::State::commit_flush_execute(State* s, std::uint64_t id) {
+    // Render thread. The claim is the protocol's point of no return: past
+    // it, control can no longer cancel and must await this verdict. A
+    // flush that cannot be PROVEN escalates to teardown — a released
+    // client cannot leave audible PCM behind — and reports kFailed so the
+    // engine aborts the commit instead of landing on an unverified buffer.
+    if (!s->handshake.claim(id)) return;  // cancelled/superseded: never execute
+    bool ok = true;
+    if (s->client.get() != nullptr) ok = drop_device_buffer(s);
+    if (!ok) teardown_stream(s);
+    s->handshake.complete(id, ok);
+    {
+        std::lock_guard<std::mutex> lk(s->sleep_mtx);
+        s->wake.notify_all();
+    }
 }
 
 bool WasapiRenderer::State::idle_after_probe(State* s) {
@@ -496,7 +527,14 @@ bool WasapiRenderer::State::playing_period(State* s) {
             s->engine.fill_output(reinterpret_cast<float*>(device_bytes),
                                   available);
         if (std::strcmp(r.kind, "idle") == 0) {
-            s->render->ReleaseBuffer(0, 0);
+            // A discarded acquisition must actually be released: a silent
+            // failure would make the later Reset fail
+            // (AUDCLNT_E_BUFFER_OPERATION_PENDING) and turn a kept session
+            // into a torn-down one. Fail closed immediately instead.
+            if (FAILED(s->render->ReleaseBuffer(0, 0))) {
+                teardown_stream(s);
+                return false;
+            }
             idle_after_probe(s);
             return false;
         }
@@ -515,7 +553,10 @@ bool WasapiRenderer::State::playing_period(State* s) {
         const std::uint64_t pull = need_in < capacity_in ? need_in : capacity_in;
         const OutputFillResult r = s->engine.fill_output(s->in_stage.data(), pull);
         if (std::strcmp(r.kind, "idle") == 0) {
-            s->render->ReleaseBuffer(0, 0);
+            if (FAILED(s->render->ReleaseBuffer(0, 0))) {
+                teardown_stream(s);
+                return false;
+            }
             idle_after_probe(s);
             return false;
         }
@@ -540,11 +581,21 @@ bool WasapiRenderer::State::playing_period(State* s) {
         // larger `available` pull more input.
     }
     // Submission is the period's linearization: with the commit-flush
-    // handshake, a commit cannot complete until this thread ACKs, and the
-    // ACK happens after THIS ReleaseBuffer — old-segment PCM can never
-    // cross a landed commit.
-    s->render->ReleaseBuffer(submitted, 0);
-    s->written_total += submitted;
+    // protocol, a commit cannot complete until this thread completes the
+    // flush request, and that happens after THIS ReleaseBuffer —
+    // old-segment PCM can never cross a landed commit. I6: accounting
+    // moves only after the physical release SUCCEEDS — a failed release
+    // means the device did not accept the frames, so written_total must
+    // not advance, no advance_render evidence may be fabricated, and the
+    // session is torn down.
+    const HRESULT released = s->render->ReleaseBuffer(submitted, 0);
+    const SubmitAccounting accounting =
+        apply_release_result(SUCCEEDED(released), submitted, s->written_total);
+    if (accounting.teardown) {
+        teardown_stream(s);
+        return false;
+    }
+    s->written_total = accounting.written_total;
 
     // Proven playout: frames no longer pending in the device buffer. In
     // converted mode the media equivalent uses the exact integer ratio;
@@ -592,15 +643,15 @@ void WasapiRenderer::State::render_loop_inner(State* s) {
     const bool com_owner = SUCCEEDED(coinit);
     bool started = false;
     while (!s->stop.load(std::memory_order_seq_cst)) {
-        // Commit boundary (#40): the engine's commit hook commands the
-        // physical flush and waits for this ACK, so a commit can never land
-        // while stale PCM is pending and the renderer never has to detect
-        // one after the fact. Leaving the started state routes the next
-        // iterations through the probe: after the commit lands, the probe
-        // re-negotiates the format (commits may change it) and re-Starts on
-        // the clean buffer.
-        if (s->flush_requested.load(std::memory_order_seq_cst)) {
-            commit_flush_execute(s);
+        // Commit boundary (#40): the engine's commit hook waits for this
+        // thread's verdict on the pending request, so a commit can never
+        // land while stale PCM is pending and the renderer never has to
+        // detect one after the fact. Leaving the started state routes the
+        // next iterations through the probe: after the commit lands, the
+        // probe re-negotiates the format (commits may change it) and
+        // re-Starts on the clean buffer.
+        if (const std::uint64_t flush_id = s->handshake.pending_request()) {
+            commit_flush_execute(s, flush_id);
             started = false;
             continue;
         }
@@ -652,12 +703,16 @@ WasapiRenderer::WasapiRenderer(PlayerEngine& engine)
 }
 
 WasapiRenderer::~WasapiRenderer() {
-    // The engine outlives the renderer (the render thread dereferences it
-    // up to the join), so unregistration is legal and removes the last
-    // cross-thread entry into this object. A commit already executing the
-    // hook uses its own copy and finishes bounded (kFlushAckTimeout); the
-    // stop flag below unblocks the render thread, and the destructor of a
-    // runtime mid-commit is an owner contract violation either way.
+    // Lifecycle proof (v3 review): control calls are serialized by the
+    // caller (player_engine.h threading contract) and the runtime's
+    // pe_destroy runs on that same control thread, so no commit-flush hook
+    // invocation can be in flight here. Unregistration removes the last
+    // cross-thread entry into this object BEFORE any later control op
+    // could copy the hook; the render thread is then the only remaining
+    // user, and the engine outlives it (the render thread dereferences it
+    // up to the join). The handshake state lives and dies with this
+    // State, so no request id can outlive the renderer and be completed
+    // by a future instance.
     state_->engine.set_commit_flush_hook(nullptr);
     state_->stop.store(true, std::memory_order_seq_cst);
     state_->wake.notify_all();

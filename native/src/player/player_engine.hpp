@@ -67,6 +67,30 @@ enum class PlayerStatus : std::int32_t {
     ErrIllegalCall = 1,   // call not allowed in current state
     ErrOpenFailed = 2,    // *out_song_status carries the song_open status
     ErrSeekFailed = 3,    // *out_song_status carries the song_seek status
+    // Backend-internal failure (e.g. the commit-flush protocol of #40).
+    // NOT a SongCore verdict — SongCore was never consulted, so
+    // *out_song_status carries no SongCore status on these paths (the C
+    // shim's deterministic pre-value must not be read as a root cause).
+    // Matches PE_ERR_INTERNAL (asserted in the C shim).
+    ErrInternal = 6,
+};
+
+// Verdict of the commit-flush hook (#40):
+//   kPerformed — the device buffer was physically PROVEN flushed (Stop +
+//                Reset succeeded, or there was no stream to flush); the
+//                commit may land.
+//   kCancelled — the request was cancelled before the renderer claimed it:
+//                no physical side effect, the operation never began; the
+//                old generation is intact.
+//   kFailed    — the renderer claimed the flush and the physical outcome is
+//                definitive but NOT a proven flush (teardown): a side
+//                effect may already have hit the device, so the old
+//                generation must not be described as physically untouched
+//                (its logical state is unchanged either way).
+enum class CommitFlushResult : std::uint8_t {
+    kPerformed,
+    kCancelled,
+    kFailed,
 };
 
 enum class StepOutcome : std::uint8_t {
@@ -193,15 +217,19 @@ public:
     // one hook; every commit (open / play-after-ENDED / stop / seek) invokes
     // it inside invalidate(), AFTER the realtime seam is drained (admission
     // closed) and BEFORE the epoch/timeline reset and the segment bump. The
-    // hook physically flushes the device buffer on the backend's own thread
-    // and returns true only when that flush is PROVEN; a false return
-    // abandons the commit fail-closed (nothing mutated, admission re-opened,
-    // caller surfaces its error). Called on the control thread under
-    // src_mtx_ + state_mtx_ — the hook may block, but must never re-enter
-    // the engine. Audible-segment invariant by ORDERING: once segment N+1
-    // has committed, the device buffer was already proven empty, so no PCM
-    // of segment N can become audible.
-    void set_commit_flush_hook(std::function<bool()> fn);
+    // hook runs the protocol's control side: it publishes a flush request to
+    // the backend's render thread and returns only a definitive outcome —
+    // kPerformed (the physical Stop/Reset is PROVEN; the commit lands),
+    // kCancelled (cancelled before the renderer claimed it: no physical
+    // side effect, the operation never began), or kFailed (claimed, then
+    // definitively not a proven flush — a side effect may have hit the
+    // device). Cancel/fail abandon the commit fail-closed: nothing mutated,
+    // admission re-opened, the caller surfaces ErrInternal. Called on the
+    // control thread under src_mtx_ + state_mtx_ — the hook may block, but
+    // must never re-enter the engine. Audible-segment invariant by
+    // ORDERING: once segment N+1 has committed, the device buffer was
+    // already proven empty, so no PCM of segment N can become audible.
+    void set_commit_flush_hook(std::function<CommitFlushResult()> fn);
 
     // -- decode worker ------------------------------------------------------------
     // One worker quantum (the frozen producer step). Safe from the worker
@@ -301,9 +329,14 @@ private:
     std::optional<std::pair<std::int64_t, LandingQuality>> landing_of(
         song_status status, std::int64_t actual_us, std::int64_t requested_us) const;
     // Commit machinery (caller holds src_mtx_ AND state_mtx_). invalidate()
-    // returns false when the registered commit-flush hook fails: the commit
-    // is abandoned BEFORE any mutation (epoch/segment/ring/timeline
-    // untouched, admission re-opened) and the caller surfaces its error.
+    // returns false when the registered commit-flush hook does not report a
+    // PROVEN flush (kCancelled before the renderer claimed it, or kFailed
+    // after the claim): the commit is abandoned BEFORE any mutation
+    // (epoch/segment/ring/timeline untouched, admission re-opened,
+    // last_error_ distinguishes the two) and the caller surfaces
+    // ErrInternal. kCancelled leaves the old generation intact; kFailed
+    // leaves its logical state unchanged while the physical device state
+    // must not be described as untouched.
     bool invalidate();
     void commit_landing(std::int64_t landing_frames, LandingQuality quality);
     // Wait until no realtime fill/advance is mid-flight. The realtime path
@@ -394,7 +427,7 @@ private:
     std::function<void()> publish_hook_;
     std::function<void()> control_hook_;
     std::function<void()> quiesce_hook_;
-    std::function<bool()> commit_flush_hook_;
+    std::function<CommitFlushResult()> commit_flush_hook_;
     // Test-only realtime barrier: plain ATOMIC FLAGS so the realtime path
     // can honor it without a mutex or allocation (armed = false is the
     // production state: two no-effect loads). Seq_cst so a release is a

@@ -142,12 +142,17 @@ Frozen policies:
 Control thread commits a seek in this exact order:
 
 ```text
-epoch += 1                      ← invalidates producer output FIRST
+close backend admission, drain the realtime seam
+commit-flush hook: device buffer PROVEN empty   ← cancel/fail abandons the
+                                                  commit (INTERNAL error;
+                                                  generation intact)
+epoch += 1                      ← invalidates producer output
 flush PCM queue
 discard pending output          ← submitted-but-unrendered spans die here
 SongCore seek(T) → status + actual landing
 AudioEngine.reset()
-[on failure → ERROR; on success:]
+[on SongCore failure → ERROR; on commit-flush abort → internal error with
+ the generation intact; on success:]
 clock rebase: base = landing, rendered_media = 0, new segment
 resume according to previous play/pause state
 ```

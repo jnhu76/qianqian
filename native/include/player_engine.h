@@ -29,6 +29,12 @@
  * initialized to a deterministic value before validation (corrective §19),
  * then overwritten on success (out_landing_us = -1 and out_song_status =
  * SONG_ERR_INVALID_ARGUMENT before any failure path; SONG_OK on success).
+ * out_song_status is a SONGCORE verdict only for PE_ERR_OPEN_FAILED (the
+ * failing song_open/song_probe status) and PE_ERR_SEEK_FAILED (the failing
+ * song_seek status). PE_ERR_INTERNAL is an engine-internal failure (e.g.
+ * the audio backend's commit-flush protocol) on which SongCore was never
+ * consulted: out_song_status then holds its deterministic pre-value and
+ * carries NO root cause — callers must not interpret it.
  *
  * No FFmpeg type and no C++ type crosses this header. Reuses songcore.h's
  * song_io / song_status: the engine owns a SongCore handle, and open()
