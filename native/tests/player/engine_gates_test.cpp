@@ -18,7 +18,6 @@
 
 #include "fake_songcore.hpp"
 #include "player_engine.hpp"
-#include "stream_discontinuity.hpp"
 #include "test_support.hpp"
 
 namespace qn::test {
@@ -1390,15 +1389,176 @@ GATE(t20_eof_after_underrun_duration) {
 }
 
 // ---------------------------------------------------------------------------
-// #40 corrective: the renderer-side commit detection, Linux-testable half.
+// #40 corrective v2: the commit-flush handshake (engine-side half).
 //
-// The Windows WasapiRenderer probes every device period with a zero-frame
-// fill and drops the device buffer (Stop+Reset+accounting rebase+swr drain)
-// when the observed segment differs from the segment it last submitted
-// (native/src/player/stream_discontinuity.hpp + wasapi_renderer.cpp). The
-// two gates below pin the contracts that mapping relies on: the engine's
-// zero-frame probe semantics, and the exactly-once discontinuity decision.
+// invalidate() invokes the registered backend hook between the admission
+// drain and the generation reset; the Windows renderer executes the
+// physical Stop+Reset on its own thread there and ACKs. Ordering — not
+// renderer-side detection — now enforces the audible segment invariant:
+// once segment N+1 has committed, the device buffer was already proven
+// empty and no fill can cross the closed admission window, so no PCM of
+// segment N can become audible. The gates below pin that ordering
+// deterministically, including the two race windows a periodic probe could
+// never close (review findings on the first corrective).
 // ---------------------------------------------------------------------------
+
+GATE(t22_commit_flush_orders_before_landing) {
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t22");
+    p.engine.play();
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(2);
+    const EngineSnapshot before = p.engine.snapshot();
+    QN_CHECK(before.state == PlayerState::Playing, "t22");
+    const std::uint64_t seg0 = before.segment;
+    const std::uint64_t readable0 = p.engine.ring_debug().readable();
+
+    // Hook-side observations must be lock-free (the hook runs under
+    // src_mtx_ + state_mtx_): segment still OLD, seam fully drained, queue
+    // not yet flushed — the physical flush strictly precedes the reset and
+    // the landing.
+    int calls = 0;
+    std::uint64_t seg_at_flush = 99, active_at_flush = 99;
+    std::uint64_t readable_at_flush = 99;
+    p.engine.set_commit_flush_hook([&] {
+        ++calls;
+        seg_at_flush = p.engine.debug_segment();
+        active_at_flush = p.engine.debug_active_backend_ops();
+        readable_at_flush = p.engine.ring_debug().readable();
+        return true;
+    });
+    QN_CHECK(p.engine.seek(us(48000 * 2)) == PlayerStatus::Ok, "t22");
+    QN_CHECK(calls == 1, "t22: exactly one flush per commit");
+    QN_CHECK(seg_at_flush == seg0, "t22: flush precedes the landing (old segment)");
+    QN_CHECK(active_at_flush == 0, "t22: flush runs with the seam drained");
+    QN_CHECK(readable_at_flush == readable0, "t22: flush precedes the queue flush");
+    QN_CHECK(p.engine.snapshot().segment == seg0 + 1,
+             "t22: segment landed only after the ACK");
+    p.engine.set_commit_flush_hook({});
+
+    // Post-commit the queue holds only the new generation: the first fill
+    // is preroll silence (the queue was flushed after the ACK), and the
+    // next media carries segment N+1.
+    p.sink.tick_submit(1);
+    QN_CHECK(p.sink.last_submit.segment == seg0 + 1, "t22");
+    QN_CHECK(p.sink.last_submit.kind != nullptr &&
+                 std::strcmp(p.sink.last_submit.kind, "preroll") == 0 &&
+                 p.sink.last_submit.media_frames == 0,
+             "t22: no old-generation media survived the commit");
+    p.sink.tick_render(static_cast<std::int64_t>(p.sink.period));
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(4);
+    Seen seen;
+    check_all(p.engine, p.sink, seen, "t22");
+    std::printf("  handshake: flush(ACK) -> reset -> landing, exactly once per commit\n");
+}
+
+GATE(t23_race_a_fill_cannot_cross_commit) {
+    // Race A (review): fill/probe segment N, commit N+1, fill again. Under
+    // the first corrective's periodic probe, the second fill could consume
+    // segment-N media that then had to be "reconciled" as rendered without
+    // ever being audible. Under the handshake, once seek() returns the
+    // queue holds no N media, so the next fill can only serve preroll
+    // silence or N+1 — nothing to reconcile, no phantom advance.
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t23");
+    p.engine.play();
+    for (int i = 0; i < 4; ++i) p.sink.producer_step();
+    p.sink.tick(1);
+    const std::uint64_t seg0 = p.engine.snapshot().segment;
+    QN_CHECK(seg0 == 1, "t23");
+    const qn::OutputFillResult probe = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(probe.segment == seg0, "t23: pre-commit fill sees segment N");
+
+    p.engine.set_commit_flush_hook([] { return true; });
+    QN_CHECK(p.engine.seek(us(48000 * 2)) == PlayerStatus::Ok, "t23");
+    p.engine.set_commit_flush_hook({});
+
+    p.sink.tick_submit(1);
+    QN_CHECK(p.sink.last_submit.segment == seg0 + 1, "t23");
+    QN_CHECK(p.sink.last_submit.media_frames == 0,
+             "t23: post-commit fill must not consume segment-N media");
+    p.sink.tick_render(static_cast<std::int64_t>(p.sink.period));
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(4);
+    Seen seen;
+    check_all(p.engine, p.sink, seen, "t23");
+    std::printf("  race A: post-commit fills serve N+1 only, nothing fake-rendered\n");
+}
+
+GATE(t24_race_b_submit_never_crosses_commit) {
+    // Race B (review): a fill of segment N returns, the commit lands, the
+    // backend submits. Under the periodic probe, segment-N PCM crossed the
+    // physical ReleaseBuffer AFTER segment N+1 had committed. Under the
+    // handshake the commit blocks until the render thread ACKs the flush,
+    // and the ACK is ordered after every submission that thread made — so,
+    // deterministically on the engine side: every submit after seek()
+    // returned carries the new segment, and the rendered log gains no
+    // segment-N content past the commit.
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t24");
+    p.engine.play();
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(3);
+    const std::uint64_t seg0 = p.engine.snapshot().segment;
+
+    p.engine.set_commit_flush_hook([] { return true; });
+    QN_CHECK(p.engine.seek(us(48000 * 2)) == PlayerStatus::Ok, "t24");
+    p.engine.set_commit_flush_hook({});
+
+    const std::size_t log0 = p.engine.backend().rendered_log().size();
+    for (int i = 0; i < 12; ++i) {
+        p.sink.producer_step();
+        p.sink.tick();
+    }
+    const auto& log = p.engine.backend().rendered_log();
+    for (std::size_t i = log0; i < log.size(); ++i) {
+        QN_CHECK_MSG(log[i].segment == seg0 + 1, "t24",
+                     "segment %llu media crossed the landed commit",
+                     (unsigned long long)log[i].segment);
+    }
+    Seen seen;
+    check_all(p.engine, p.sink, seen, "t24");
+    std::printf("  race B: no post-commit submit attributed to the old segment\n");
+}
+
+GATE(t25_flush_failure_fails_closed) {
+    // An unproven flush must NEVER land the commit: the old generation
+    // keeps playing untouched (epoch/segment/ring/timeline intact,
+    // admission re-opened) and the control op reports failure. A later
+    // commit with a verified flush succeeds.
+    Pair p(16384, 1024, 512);
+    fake::SongConfig c = song();
+    QN_CHECK(open_song(p.engine, p.sink, c) == PlayerStatus::Ok, "t25");
+    p.engine.play();
+    for (int i = 0; i < 6; ++i) p.sink.producer_step();
+    p.sink.tick(2);
+    const EngineSnapshot before = p.engine.snapshot();
+    const std::uint64_t seg0 = before.segment;
+    const std::uint64_t epoch0 = before.epoch;
+
+    p.engine.set_commit_flush_hook([] { return false; });
+    QN_CHECK(p.engine.seek(us(48000)) == PlayerStatus::ErrSeekFailed, "t25");
+    p.engine.set_commit_flush_hook({});
+    const EngineSnapshot after = p.engine.snapshot();
+    QN_CHECK(after.segment == seg0 && after.epoch == epoch0,
+             "t25: commit abandoned without any mutation");
+    QN_CHECK(after.state == PlayerState::Playing, "t25: old generation intact");
+    const qn::OutputFillResult r = p.engine.fill_output(nullptr, 0);
+    QN_CHECK(std::strcmp(r.kind, "audio") == 0 && r.segment == seg0,
+             "t25: admission re-opened against the untouched generation");
+
+    p.engine.set_commit_flush_hook([] { return true; });
+    QN_CHECK(p.engine.seek(us(48000 * 2)) == PlayerStatus::Ok, "t25");
+    p.engine.set_commit_flush_hook({});
+    QN_CHECK(p.engine.snapshot().segment == seg0 + 1, "t25: retry commits");
+    Seen seen;
+    check_all(p.engine, p.sink, seen, "t25");
+    std::printf("  flush failure: commit abandoned, old generation untouched, retry OK\n");
+}
 
 GATE(t21_zero_frame_probe_commit_segment) {
     Pair p(16384, 1024, 512);
@@ -1445,51 +1605,6 @@ GATE(t21_zero_frame_probe_commit_segment) {
     QN_CHECK(std::strcmp(paused.kind, "idle") == 0, "t21");
     QN_CHECK(paused.segment == 2, "t21");
     std::printf("  zero-frame probe: side-effect-free, sees the commit segment bump\n");
-}
-
-GATE(t22_discontinuity_decision_exactly_once) {
-    qn::StreamDiscontinuity d;
-    // Fresh session: no device PCM — any segment is acceptable.
-    QN_CHECK(d.on_engine_segment(1) ==
-                 qn::StreamDiscontinuity::Action::Unchanged,
-             "t22");
-
-    // Segment N submitted: steady playback never fires.
-    d.submitted(1);
-    QN_CHECK(d.holds_pcm() && d.segment() == 1, "t22");
-    QN_CHECK(d.on_engine_segment(1) ==
-                 qn::StreamDiscontinuity::Action::Unchanged,
-             "t22");
-
-    // Commit (seek/stop/open/restart): fires exactly once, and the dropped
-    // buffer cannot re-fire until new PCM is submitted.
-    QN_CHECK(d.on_engine_segment(2) ==
-                 qn::StreamDiscontinuity::Action::DropDeviceBuffer,
-             "t22");
-    d.device_buffer_dropped();
-    QN_CHECK(!d.holds_pcm(), "t22");
-    QN_CHECK(d.on_engine_segment(2) ==
-                 qn::StreamDiscontinuity::Action::Unchanged,
-             "t22: decision must fire exactly once per commit");
-
-    // Pause keeps the device buffer (frozen pause semantics): resume with
-    // the SAME segment must not drop; a paused seek (new segment) must.
-    d.submitted(3);
-    QN_CHECK(d.on_engine_segment(3) ==
-                 qn::StreamDiscontinuity::Action::Unchanged,
-             "t22: pause/resume is not a discontinuity");
-    QN_CHECK(d.on_engine_segment(4) ==
-                 qn::StreamDiscontinuity::Action::DropDeviceBuffer,
-             "t22");
-
-    // Re-opened stream: fresh, empty buffer accepts anything.
-    d.device_buffer_dropped();
-    d.stream_opened();
-    QN_CHECK(!d.holds_pcm(), "t22");
-    QN_CHECK(d.on_engine_segment(9) ==
-                 qn::StreamDiscontinuity::Action::Unchanged,
-             "t22");
-    std::printf("  decision: fires exactly once per commit; pause/resume unchanged\n");
 }
 
 // ---------------------------------------------------------------------------

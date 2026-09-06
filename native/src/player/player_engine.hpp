@@ -189,6 +189,20 @@ public:
     PlayerStatus seek(std::int64_t position_us, std::int64_t* out_landing_frames = nullptr,
                       std::int32_t* out_song_status = nullptr);
 
+    // Commit-boundary device flush (#40). The production backend registers
+    // one hook; every commit (open / play-after-ENDED / stop / seek) invokes
+    // it inside invalidate(), AFTER the realtime seam is drained (admission
+    // closed) and BEFORE the epoch/timeline reset and the segment bump. The
+    // hook physically flushes the device buffer on the backend's own thread
+    // and returns true only when that flush is PROVEN; a false return
+    // abandons the commit fail-closed (nothing mutated, admission re-opened,
+    // caller surfaces its error). Called on the control thread under
+    // src_mtx_ + state_mtx_ — the hook may block, but must never re-enter
+    // the engine. Audible-segment invariant by ORDERING: once segment N+1
+    // has committed, the device buffer was already proven empty, so no PCM
+    // of segment N can become audible.
+    void set_commit_flush_hook(std::function<bool()> fn);
+
     // -- decode worker ------------------------------------------------------------
     // One worker quantum (the frozen producer step). Safe from the worker
     // thread or, in manual mode, the test thread.
@@ -265,6 +279,9 @@ public:
     // Admitted in-flight backend ops: proves a quiesced callback never
     // became active.
     std::uint64_t debug_active_backend_ops() const { return active_backend_ops_.load(); }
+    // Lock-free segment read for observations made inside control-path hooks
+    // (snapshot() takes state_mtx_ and would deadlock there).
+    std::uint64_t debug_segment() const { return segment_.load(); }
 
 private:
     // One decode result in flight, not yet published. Carries the epoch it
@@ -283,8 +300,11 @@ private:
     // nullopt = the seek failed (fail-closed; caller goes to Error).
     std::optional<std::pair<std::int64_t, LandingQuality>> landing_of(
         song_status status, std::int64_t actual_us, std::int64_t requested_us) const;
-    // Commit machinery (caller holds src_mtx_ AND state_mtx_).
-    void invalidate();
+    // Commit machinery (caller holds src_mtx_ AND state_mtx_). invalidate()
+    // returns false when the registered commit-flush hook fails: the commit
+    // is abandoned BEFORE any mutation (epoch/segment/ring/timeline
+    // untouched, admission re-opened) and the caller surfaces its error.
+    bool invalidate();
     void commit_landing(std::int64_t landing_frames, LandingQuality quality);
     // Wait until no realtime fill/advance is mid-flight. The realtime path
     // never blocks on state_mtx_, so the wait is bounded; called from
@@ -374,6 +394,7 @@ private:
     std::function<void()> publish_hook_;
     std::function<void()> control_hook_;
     std::function<void()> quiesce_hook_;
+    std::function<bool()> commit_flush_hook_;
     // Test-only realtime barrier: plain ATOMIC FLAGS so the realtime path
     // can honor it without a mutex or allocation (armed = false is the
     // production state: two no-effect loads). Seq_cst so a release is a

@@ -87,7 +87,12 @@ PlayerEngine::~PlayerEngine() {
 PlayerStatus PlayerEngine::open(const song_io& io, std::int32_t* out_song_status) {
     std::lock_guard<std::mutex> sg(src_mtx_);
     std::lock_guard<std::mutex> g(state_mtx_);
-    invalidate();
+    if (!invalidate()) {
+        // Commit abandoned before any mutation: the previous generation is
+        // intact and keeps playing. SongCore was never consulted.
+        if (out_song_status) *out_song_status = SONG_OK;
+        return PlayerStatus::ErrOpenFailed;
+    }
 
     if (handle_) {
         song_close(handle_);
@@ -166,7 +171,7 @@ PlayerStatus PlayerEngine::play() {
             // like any seek). Safe against a concurrent realtime ENDED
             // commit: invalidate() quiesces the backend first, and the
             // commit below stores the fresh segment's state explicitly.
-            invalidate();
+            if (!invalidate()) return PlayerStatus::ErrSeekFailed;
             std::int64_t actual = 0;
             song_status sst = song_seek(handle_, 0, &actual);
             auto landing = landing_of(sst, actual, 0);
@@ -207,7 +212,12 @@ PlayerStatus PlayerEngine::stop(std::int32_t* out_song_status) {
     // handle is trusted — rewind in place via seek(0). From ERROR (or when
     // the rewind seek fails) the handle is not trusted — drop and reopen. If
     // even the reopen fails, ERROR persists and only open() recovers.
-    invalidate();
+    if (!invalidate()) {
+        // Commit abandoned before any mutation: the old generation keeps
+        // playing. SongCore was never consulted.
+        if (out_song_status) *out_song_status = SONG_OK;
+        return PlayerStatus::ErrOpenFailed;
+    }
     std::optional<std::pair<std::int64_t, LandingQuality>> landing;
     if (state_.load() != PlayerState::Error) {
         std::int64_t actual = 0;
@@ -261,8 +271,10 @@ PlayerStatus PlayerEngine::seek(std::int64_t position_us, std::int64_t* out_land
     const bool was_ended = st == PlayerState::Ended;
     // Fail-closed commit order: invalidate the generation and flush FIRST,
     // then attempt SongCore — a failed seek must never resume the old
-    // timeline (docs §3.1).
-    invalidate();
+    // timeline (docs §3.1). An unproven device flush abandons the commit
+    // before any mutation: the old generation keeps playing and the seek
+    // reports failure.
+    if (!invalidate()) return PlayerStatus::ErrSeekFailed;
     std::int64_t actual = 0;
     song_status sst = song_seek(handle_, position_us, &actual);
     if (out_song_status) *out_song_status = sst;
@@ -753,6 +765,11 @@ void PlayerEngine::debug_set_quiesce_hook(std::function<void()> fn) {
     quiesce_hook_ = std::move(fn);
 }
 
+void PlayerEngine::set_commit_flush_hook(std::function<bool()> fn) {
+    std::lock_guard<std::mutex> g(hook_mtx_);
+    commit_flush_hook_ = std::move(fn);
+}
+
 // ---------------------------------------------------------------------------
 // internals — all callers hold src_mtx_ AND state_mtx_ unless noted
 // ---------------------------------------------------------------------------
@@ -816,7 +833,7 @@ void PlayerEngine::quiesce_backend() {
     }
 }
 
-void PlayerEngine::invalidate() {
+bool PlayerEngine::invalidate() {
     // Kill the current generation: epoch bump FIRST (invalidates producer
     // output), discard pending output (submitted-but-unrendered spans can
     // never advance the next segment), flush the queue. The media clock is
@@ -832,6 +849,24 @@ void PlayerEngine::invalidate() {
     }
     if (hook) hook();  // test barrier, both locks held
     quiesce_backend();
+    // Commit boundary (#40): the backend's flush hook runs HERE — seam
+    // drained, generation not yet reset — so the physical device buffer is
+    // PROVEN empty before segment N+1 can land. No fill/advance can slip
+    // through the closed admission window, which is what turns the audible
+    // segment invariant from detection into ordering. Fail-closed: an
+    // unproven flush abandons the commit before ANY mutation (epoch below
+    // has not run); re-open admission so the old generation keeps playing
+    // and the caller surfaces the error.
+    std::function<bool()> flush;
+    {
+        std::lock_guard<std::mutex> hk(hook_mtx_);
+        flush = commit_flush_hook_;
+    }
+    if (flush && !flush()) {
+        backend_accepting_.store(true, std::memory_order_seq_cst);
+        last_error_ = "commit flush unverified";
+        return false;
+    }
     ++epoch_;
     timeline_.invalidate();
     backend_.reset();
@@ -845,6 +880,7 @@ void PlayerEngine::invalidate() {
     // reached via control commits; the destructor calls quiesce_backend
     // directly and never re-opens.
     backend_accepting_.store(true, std::memory_order_seq_cst);
+    return true;
 }
 
 void PlayerEngine::commit_landing(std::int64_t landing_frames, LandingQuality quality) {
