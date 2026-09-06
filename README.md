@@ -86,9 +86,12 @@ The implementation tree will be created by Architecture v2 work. Do not infer fu
 
 ## Build and run
 
-Architecture v2 implementation has not yet established a canonical build/run command on `main`.
+The Rust workspace is the build authority (RUST-ARCH-R0):
 
-When the Rust workspace is bootstrapped, this section should point to the actual repository build authority rather than preserving historical commands.
+```bash
+cargo run -p qianqian-headless   # headless bootstrap of Architecture v2
+cargo test --workspace           # workspace verification
+```
 
 ## Scope
 
