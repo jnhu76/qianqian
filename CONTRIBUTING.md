@@ -1,6 +1,6 @@
 # Contributing to Qianqian
 
-Qianqian is rebuilding on Architecture v2. Contributions should preserve the new ownership model rather than restore assumptions from the archived repository.
+Qianqian is rebuilding on Architecture v2 around a generic Rust Composition Kernel and domain/product plugins.
 
 ## Before you start
 
@@ -11,72 +11,142 @@ Read:
 3. `CONTEXT.md`;
 4. the minimum relevant documents selected through `docs/README.md`.
 
+For Composition Kernel work, read `docs/architecture/composition-kernel.md` before coding.
+
 Do not recursively preload historical docs or use `archive/pre-rust-v2` as current architecture authority.
 
 ## Issue-first changes
 
-Architecture, capability, platform, media, UI-host, and cross-layer contract changes should have a clearly scoped issue/task before implementation.
+Architecture, kernel, capability/service, plugin lifecycle, platform, media, UI-host, and cross-layer contract changes should have a clearly scoped issue/task before implementation.
 
 A focused task should state:
 
-- the behavior or architecture truth being established;
+- the invariant or behavior being established;
 - what is explicitly out of scope;
 - the evidence/verification required;
-- the gate for stopping before the next phase.
+- the STOP gate before the next phase.
+
+## Architecture model
+
+The central rule is:
+
+> **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
+
+The generic Composition Kernel is responsible for:
+
+```text
+Context
+Capability
+Fiber
+Effect
+Reconcile
+```
+
+Domain/product plugins own:
+
+```text
+music semantics
+media/audio behavior
+UI behavior
+library/product behavior
+service payload schemas
+```
+
+Do not put product payloads into Context merely because Context is globally reachable.
+
+## Plugin entry checklist
+
+For a long-lived product capability entering the runtime, be able to answer:
+
+```text
+What is the plugin definition?
+What fiber instance owns its lifetime?
+What capabilities/services does it require?
+What capabilities/services does it provide?
+What effects/resources does it own?
+What disappears when the fiber unloads?
+What should happen when a required provider disappears and later returns?
+```
+
+If those questions cannot be answered, the component is probably bypassing the composition model or the kernel contract is incomplete.
+
+## Service/provider separation
+
+Consumers should depend on capability/service definitions rather than concrete provider implementations across plugin boundaries.
+
+Prefer:
+
+```text
+AudioOutput definition
+    ^
+    +-- Wasapi provider
+    +-- PipeWire provider
+    +-- Music/Audio consumer
+```
+
+Avoid hard-coded topology such as `Music -> WasapiOutput` when the semantic dependency is `Music -> AudioOutput`.
+
+## Context and data flow
+
+Remember:
+
+```text
+Capability plane != Data plane
+```
+
+Context resolves/binds capabilities. Ordinary payload flows through the resolved service or direct data edge.
+
+Do not route PCM blocks, realtime buffers, UI payloads, or arbitrary product messages through Context.
+
+A domain Event Service may exist when needed, but a general event bus is not automatically a Composition Kernel primitive.
+
+## Effects and teardown
+
+Kernel-visible reversible mutation should be owned by a fiber and represented through the Effect protocol rather than duplicated activate/deactivate bookkeeping.
+
+Examples include service binding, listener registration, timers, child fibers, and local runtime handles.
+
+Do not claim an external irreversible action is safely rollback-able merely because it is wrapped in an Effect. Use explicit transactional/compensating/irreversible semantics when that class of behavior appears.
 
 ## Focused implementation
 
-Prefer the smallest cohesive change that proves the requested boundary or behavior.
+Prefer the smallest cohesive change that proves the requested invariant.
 
-Do not combine unrelated cleanup, speculative framework work, UI redesign, platform expansion, and media-core changes in one PR.
+Do not combine unrelated cleanup, speculative platform work, UI redesign, media integration, and kernel evolution in one PR.
 
-In particular, avoid preemptively creating:
+In particular, do not create:
 
-- plugin registries;
-- service locators;
-- large dependency-injection frameworks;
-- dynamic loading systems;
-- many empty crates/modules;
+- a second registry beside Context;
+- an unrelated DI/service-locator framework;
+- hidden global product state;
+- product-specific types inside the generic Composition Kernel;
+- a universal Context payload/message bus;
+- dynamic-library infrastructure merely to satisfy the word “plugin”;
+- many empty crates/modules without a dependency or ownership reason;
 - local `AGENTS.md` files without genuine local divergence.
 
-## Architecture changes
+## R0 compatibility policy
 
-Current architecture is summarized in `docs/architecture/overview.md`.
+RUST-ARCH-R0 APIs were bootstrap witnesses.
 
-The core rules are:
-
-```text
-Kernel owns semantics
-Capability owns mechanism
-Profile chooses implementation
-```
-
-If implementation pressure appears to require violating one of these rules, surface that conflict explicitly for review rather than working around it silently.
-
-## Historical code reuse
-
-The old repository and playback experiment are preserved as refs. They may be inspected for behavior, measurements, build research, algorithms, or proven mechanism code.
-
-Do not copy an old component into `main` merely because it already exists.
-
-Reuse should answer:
-
-- what proven behavior or mechanism is being retained;
-- why its old ownership still fits Architecture v2, or how an adapter narrows it;
-- what historical assumptions are deliberately not restored.
+`qianqian-core::base`, `AppRuntime::new()`, `with_audio_output()`, and similar R0 composition shapes may be removed or redesigned when implementing the Composition Kernel. Do not preserve them for compatibility unless a real current consumer makes that compatibility valuable.
 
 ## Tests and verification
 
 Verification must match the changed surface.
 
-Examples include:
+Composition Kernel work should emphasize adversarial lifecycle tests, including:
 
-- Rust compile/test/lint gates once the workspace exists;
-- deterministic Music Kernel tests for product semantics;
-- headless integration tests for playback correctness;
-- corpus/regression evidence for decoder changes;
-- physical-device evidence for platform audio claims;
-- UI-host tests for presentation/render/input behavior.
+```text
+consumer pending when dependency is absent
+provider arrival activates dependent
+provider loss deactivates dependent before teardown finishes
+replacement provider reactivates dependent
+fiber disposal unwinds owned effects in deterministic order
+root disposal leaves zero live bindings/fibers/effects
+```
+
+Media/realtime work additionally needs direct data-plane and realtime-safety evidence. Physical-device claims require physical-device validation.
 
 Do not report an unrun platform/device check as PASS.
 
@@ -84,16 +154,22 @@ Do not report an unrun platform/device check as PASS.
 
 Keep durable documentation small and authoritative.
 
-Use `docs/README.md` as the router. Add a new long-lived document only when the current task creates a durable fact that needs a stable home.
+Use `docs/README.md` as the router. Add a new long-lived document only when the task creates a durable fact that needs a stable home.
 
-Do not duplicate the same architecture rule across many files. Link to the canonical document instead.
+Do not duplicate detailed kernel semantics across README, AGENTS, issues, and implementation comments; link to `docs/architecture/composition-kernel.md` for the canonical model.
+
+## Historical code reuse
+
+The old repository and playback experiment may be inspected for behavior, measurements, algorithms, or proven mechanism code.
+
+Do not copy an old component into `main` merely because it already exists. Reuse must fit the current plugin/capability/lifecycle ownership model.
 
 ## PR expectations
 
 A PR should explain:
 
 - what changed;
-- why this is the smallest useful change;
+- which invariant it establishes;
 - verification performed;
 - architecture/dependency impact;
 - explicit non-scope;

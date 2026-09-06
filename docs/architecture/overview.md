@@ -2,56 +2,165 @@
 
 This document is the repository-local semantic overview for Qianqian Architecture v2.
 
-It describes ownership and dependency direction. It does not require a specific future directory tree, crate split, binary split, or dynamic-plugin system.
+It describes ownership and dependency direction. Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md).
 
-## Core rules
+## Architecture constitution
 
-Architecture v2 is governed by:
+The central rule is:
 
-> **Kernel owns semantics.**
+> **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
+
+Architecture v2 further distinguishes:
+
+> **Composition Kernel owns composition invariants.**
 >
-> **Capability owns mechanism.**
+> **Domain kernels own domain semantics.**
 >
-> **Profile chooses implementation.**
+> **Capabilities expose contracts; providers own mechanisms.**
+>
+> **Fibers own plugin-instance lifetime.**
+>
+> **Effects own reversible mutation provenance.**
+>
+> **Profiles declare desired composition; reconciliation determines the running graph.**
 
 Rust is the product architecture language.
 
-Native/platform/UI technologies are implementation substrates behind explicit boundaries.
+Native/platform/UI technologies are implementation substrates and plugins above the generic Composition Kernel.
 
-## Logical layers
+## Control plane and data plane
+
+Architecture v2 separates composition/control from application data flow.
 
 ```text
-Layer 0  Rust Base Kernel
-         composition / lifecycle / profile assembly
+                         CONTROL PLANE
 
-Layer 1  Rust Music Kernel
-         player and music-domain semantics
+                 Profile / desired tree
+                          |
+                          v
+                      Reconcile
+                          |
+                          v
+                     Fiber Graph
+                          |
+                 provide / require
+                    owned effects
+                          |
+                          v
+               Composition Kernel
+            Context / Capability / Fiber
+                Effect / Reconcile
 
-Layer 2  Rust Presentation
-         stable UI-facing state/actions
+-------------------------------------------------------------
+                          |
+                    resolve / bind
+                          v
+                         DATA PLANE
 
-Layer 3  Capabilities / host implementations
-         Decoder / Processing / AudioOutput / UiHost / platform services
+      service.method(payload) -------> provider
 
-Below   Native and platform mechanism substrate
-        FFmpeg / DSP / WASAPI / CoreAudio / PipeWire / Android audio / UI runtimes
+      MediaSource -> Decoder -> Processing -> AudioOutput
+
+      domain event -> Event Service/listeners (when needed)
 ```
 
-The physical repository layout should emerge from implementation pressure. Do not create one crate per box merely to mirror this diagram.
+The control plane decides **who can reach whom, who owns a change, and who should be alive**.
 
-## Base Kernel
+The data plane carries **what the product is actually processing**.
 
-The Base Kernel should remain domain-light.
+Therefore:
 
-It owns explicit composition, lifecycle ordering, profile construction, and startup validation when those needs become real.
+> **Capability plane != Data plane.**
 
-It should not become a service locator, runtime registry, plugin marketplace, or dependency-injection framework by default.
+Context must not become a universal message bus, product-state bag, or audio-buffer transport.
 
-MVP composition should prefer ordinary Rust construction and static profile assembly.
+## Composition Kernel
 
-## Music Kernel
+The generic kernel is centered on five concepts:
 
-The Music Kernel is the authority for music/player product semantics, including as they are implemented over time:
+```text
+Context
+Capability
+Fiber
+Effect
+Reconcile
+```
+
+It must remain domain-agnostic. It does not know:
+
+```text
+Track
+PCM
+Decoder internals
+FFmpeg
+WASAPI
+PocketJS
+KuiklyUI
+playlist semantics
+UI payload schemas
+```
+
+The Composition Kernel establishes:
+
+- capability/service visibility and binding;
+- provider/consumer dependency relationships;
+- plugin-instance lifecycle through fibers;
+- mutation/resource ownership through effects;
+- desired-vs-running composition reconciliation.
+
+See [`composition-kernel.md`](composition-kernel.md) for the detailed model and invariants.
+
+## Everything is a plugin
+
+Every long-lived product capability should enter the runtime through the same composition/lifecycle protocol.
+
+Conceptually:
+
+```text
+Plugin definition
+      |
+      v
+Fiber instance
+      |
+      +-- requires Capability A/B
+      +-- provides Capability C
+      +-- owns Effects
+      +-- activates/deactivates with dependency availability
+```
+
+This does not require one crate, process, dynamic library, or downloaded package per plugin.
+
+The runtime composition unit is the **Fiber**, not the source package.
+
+No product capability should become globally privileged merely because it was historically constructed directly inside `AppRuntime`.
+
+## Service definition, provider, consumer
+
+A capability/service definition is distinct from its provider.
+
+```text
+              AudioOutput definition
+                    ^
+          +---------+----------+
+          |                    |
+     Wasapi provider      PipeWire provider
+          ^                    ^
+          +---------+----------+
+                    |
+               Consumer
+```
+
+Across plugin boundaries, consumers should depend on definitions/capabilities rather than concrete providers.
+
+This preserves replaceability without requiring dynamic loading.
+
+## Domain kernels
+
+A domain kernel is the semantic authority for one domain but is an ordinary resident above the Composition Kernel.
+
+### Music Kernel
+
+`MusicKernel` owns music/player semantics as they are implemented over time:
 
 - current track and playback session;
 - play/pause/stop intent;
@@ -63,35 +172,35 @@ The Music Kernel is the authority for music/player product semantics, including 
 - recovery and product-level error meaning;
 - ENDED semantics.
 
-It must not depend on FFmpeg object types, platform audio-device handles, PocketJS/KuiklyUI widget trees, or UI runtime internals.
-
-Mechanism layers produce evidence. The Music Kernel decides product meaning.
-
-## Presentation
-
-UI frameworks do not consume Music Kernel internals directly.
-
-The intended seam is:
+Conceptually it is owned by a Music plugin:
 
 ```text
-Music Kernel
-     |
-Presentation
-     |
-   UiHost
+Music Plugin
+   |
+   +-- owns MusicKernel
+   +-- requires media/audio capabilities
+   +-- provides transport/player-state/domain services
 ```
 
-Presentation exposes UI-relevant state/actions without leaking session generations, decoder objects, PCM ownership, audio-device handles, or other mechanism internals.
+It is **not** the global composition authority.
 
-The exact Rust types and serialization/ABI are not frozen until implementation establishes them.
+Mechanism layers produce facts/evidence. Domain semantic owners decide product meaning.
 
-## UiHost
+## Presentation and UiHost
 
-`UiHost` is a capability/plugin boundary for presentation rendering and user-input translation.
+Presentation is a domain/product seam, not a generic kernel primitive.
 
-Plugin means a replaceable architecture boundary. It does not imply runtime discovery or a dynamic library.
+```text
+Music/domain semantics
+        |
+   Presentation
+        |
+     UiHost
+```
 
-Current profile intent:
+`UiHost` is an ordinary plugin/capability for rendering/input adaptation.
+
+Current direction:
 
 ```text
 Windows   -> PocketJS UiHost
@@ -99,28 +208,14 @@ Linux     -> PocketJS UiHost
 Android   -> KuiklyUI UiHost
 iOS       -> KuiklyUI UiHost
 HarmonyOS -> KuiklyUI UiHost
-macOS     -> KuiklyUI UiHost by default, replaceable by profile
+macOS     -> KuiklyUI UiHost by default, replaceable by composition/profile
 ```
 
-A UiHost may own framework-specific rendering/state adaptation and window-level UI lifecycle integration. It does not own music semantics.
+UI frameworks do not own music semantics and do not participate in realtime audio correctness.
 
-## Capability rule
+## Media and audio data plane
 
-Do not create a capability merely because an interface can be imagined.
-
-A capability should be justified by at least one real pressure such as:
-
-- multiple real implementations;
-- a platform variation axis;
-- a research/replacement axis;
-- deterministic fake/testing value;
-- independent resource/lifecycle ownership.
-
-Logical capability boundaries do not require one crate, static library, shared library, or dynamically loaded plugin per capability.
-
-## Native media
-
-The media boundary keeps Decoder and Processing logically distinct:
+Decoder, Processing, and AudioOutput remain logical media capabilities:
 
 ```text
 Decoder    encoded media -> canonical PCM
@@ -128,50 +223,140 @@ Processing canonical PCM -> canonical PCM
 AudioOutput canonical PCM -> physical device + output evidence
 ```
 
-When FFmpeg is reintroduced, Decoder and Processing must share one FFmpeg closure authority rather than each shipping duplicated dependencies.
+But PCM is **data-plane data**.
 
-The canonical PCM contract must be established explicitly by implementation work: sample representation, rate/layout semantics, frame units, ownership/lifetime, partial production, and EOF/drain behavior.
-
-Do not add steady-state PCM copies merely to make abstraction boundaries look cleaner.
-
-## Realtime island
-
-The audio realtime path is a mechanism island.
-
-It must not perform per-period round trips through PocketJS, KuiklyUI, general UI state, filesystem/network logic, or unbounded control work.
-
-Native/Rust realtime mechanisms may retain only the physical state needed for bounded correctness, such as submitted/rendered counters, buffer occupancy, flush completion, device failure, or stale-rejection tokens.
-
-The Music Kernel consumes bounded evidence/snapshots/events and determines product semantics.
-
-## Product profiles
-
-A profile selects implementations without changing shared product semantics.
-
-Initial Windows direction:
+Do not design:
 
 ```text
-Rust Core
-+ PocketJS UiHost
-+ Decoder backed by the proven media work as it is reintroduced
-+ Processing (bypass first unless real DSP is authorized)
-+ WASAPI AudioOutput
+Decoder -> Context/EventBus -> Processing -> Context/EventBus -> Output
 ```
 
-Android is the second architecture test:
+The eventual audio graph should use pre-bound direct edges:
 
 ```text
-same Rust Music Kernel
-same Presentation semantics
-+ KuiklyUI UiHost
-+ Android platform capabilities
+MediaSource -> Decoder -> Processing -> AudioOutput
 ```
 
-Android integration must not create a second Track/Queue/PlaybackSession/ENDED/seek semantic implementation. If a platform appears to require such a fork, review the architecture instead of copying the domain layer.
+When FFmpeg is reintroduced, Decoder and Processing should share one FFmpeg closure authority rather than duplicate dependency closure.
+
+The canonical PCM contract must be established by media implementation work, not by the generic Composition Kernel.
+
+## Audio Runtime specialization
+
+The generic kernel should not grow audio-specific scheduling or format concepts.
+
+A future `AudioRuntime` is expected to be a normal domain/runtime plugin that may own:
+
+```text
+AudioGraph
+clock
+buffer pool
+format negotiation
+realtime scheduling
+graph publication/swap policy
+```
+
+This allows different implementations—realtime desktop, offline renderer, web/AudioWorklet, etc.—without contaminating the generic Composition Kernel.
+
+## Realtime boundary
+
+The audio realtime path is a data-plane mechanism island.
+
+Per callback/block it must not perform:
+
+```text
+Context lookup
+capability resolution
+fiber reconciliation
+arbitrary generic event dispatch
+filesystem/network I/O
+UI/JS/managed-runtime round trips
+unbounded allocation/blocking
+```
+
+When runtime graph mutation exists, the expected pattern is:
+
+```text
+Control plane builds/prepares Graph B
+          |
+          v
+validate / acquire resources
+          |
+          v
+publish at RT-safe boundary
+          |
+          v
+Audio thread switches Graph A -> Graph B
+          |
+          v
+retire/reclaim Graph A off realtime path
+```
+
+The exact mechanism is not frozen yet.
+
+## Events
+
+A generic application event bus is not automatically a Composition Kernel primitive.
+
+If a domain needs event semantics, it may provide an Event Service/plugin. Listener registrations can still be owned/unwound through Effects.
+
+Kernel-internal dependency invalidation is an implementation concern of capability/fiber lifecycle and should not be confused with a public product event bus.
+
+## Effects and reversibility
+
+Effects are the kernel write/ownership boundary for reversible local runtime mutation.
+
+Typical examples:
+
+```text
+service/capability binding
+listener registration
+timer registration
+child fiber mount
+watcher/local handle registration
+```
+
+A fiber unload/dispose should unwind its owned effects deterministically in reverse order.
+
+Not every external action is reversible. Transactional, compensating, or irreversible effects require explicit semantics when such behavior is introduced.
+
+## Reconciliation
+
+Profiles describe desired composition rather than hard-coding a privileged imperative boot graph.
+
+```text
+desired plugin tree
+        |
+        v
+    Reconcile
+        |
+        v
+ running Fiber graph
+```
+
+The reconciler is responsible for mount/unmount/update decisions consistent with dependency/lifecycle rules.
+
+Early versions may support only a minimal subset, but the architecture should not silently regress into a monolithic `boot()` function that bypasses the plugin protocol.
+
+## Current R0 implementation and migration
+
+RUST-ARCH-R0 established three packages:
+
+```text
+qianqian-core
+qianqian-runtime
+qianqian-headless
+```
+
+The current `qianqian-core::base` module and `qianqian-runtime::AppRuntime` constructor-only composition are bootstrap witnesses.
+
+They are **not compatibility contracts**.
+
+The next Composition Kernel task is authorized to refactor/delete/replace those R0 shapes to establish the Context/Capability/Fiber/Effect/Reconcile model.
+
+A dedicated dependency-pure kernel crate is a likely design because it creates a strong firewall against music/media/UI concepts, but the physical split should still be justified by the implementation task rather than treated as a diagram requirement.
 
 ## Historical evidence
-
-Architecture v2 does not discard the earlier engineering work.
 
 Complete pre-Rust tree:
 
@@ -189,18 +374,19 @@ playback-reference-v1
 
 The playback reference is a behavioral oracle, not a source-layout template. It proved a complete Windows playback path and important physical truths around decode/queue/submit/render, seek/flush, stale rejection, timeline, and physical drain.
 
-Architecture v2 may change language, ownership, directories, types, and composition while preserving those proven behaviors when the corresponding functionality is rebuilt.
+Architecture v2 may change language, ownership, directories, types, and composition while preserving those verified behaviors when functionality is rebuilt.
 
 ## Non-goals
 
-Architecture v2 does not currently require:
+The architecture does not require:
 
-- one UI framework for every platform;
-- runtime UI hot swapping;
-- a plugin marketplace;
-- dynamic dependency resolution;
-- one crate or binary per capability;
-- rewriting proven C/C++ solely for language uniformity;
-- restoring the old repository hierarchy.
+- every plugin to be dynamically loaded;
+- one crate/binary per capability;
+- Context to transport all application data;
+- a universal global event bus;
+- audio-specific types in the generic kernel;
+- UI frameworks in the generic kernel;
+- restoring the old repository hierarchy;
+- pretending irreversible external actions can always be rolled back.
 
-Implementation should grow one verified slice at a time.
+Implementation should grow one verified invariant at a time.
