@@ -1,30 +1,66 @@
 # Contributing to Qianqian
 
-Qianqian is rebuilding on Architecture v2 around a generic Rust Composition Kernel and domain/product plugins.
+Qianqian is rebuilding on Architecture v2 as a boundary-first plugin architecture with a small generic Rust Composition Kernel.
 
 ## Before you start
 
 Read:
 
-1. the current issue or task;
+1. the current issue/task;
 2. `AGENTS.md`;
 3. `CONTEXT.md`;
 4. the minimum relevant documents selected through `docs/README.md`.
 
-For Composition Kernel work, read `docs/architecture/composition-kernel.md` before coding.
+For plugin/composition work, read `docs/architecture/composition-kernel.md`.
+
+Current design gate: **#53 COMPONENT-BOUNDARY-A0**.
 
 Do not recursively preload historical docs or use `archive/pre-rust-v2` as current architecture authority.
 
-## Issue-first changes
+## Boundary-first contribution rule
 
-Architecture, kernel, capability/service, plugin lifecycle, platform, media, UI-host, and cross-layer contract changes should have a clearly scoped issue/task before implementation.
+Do not start architecture work by inventing `Context`, `Fiber`, `Effect`, registry, loader, or Reconcile APIs.
 
-A focused task should state:
+The required order is:
 
-- the invariant or behavior being established;
-- what is explicitly out of scope;
-- the evidence/verification required;
-- the STOP gate before the next phase.
+```text
+Component Granularity
+        ↓
+Capability / dependency boundary
+        ↓
+Interaction Algebra
+        ↓
+Effect / System Boundary
+        ↓
+Global lifecycle ordering
+        ↓
+Confluence oracle
+        ↓
+Composition Kernel implementation
+```
+
+Until #53 passes, implementation of a new generic kernel runtime is out of scope.
+
+## Component entry checklist
+
+Before proposing a long-lived plugin/component, answer:
+
+```text
+What state/resources does it own?
+What capabilities does it require?
+What capabilities does it provide?
+What operations/data edges cross the boundary?
+What information is intentionally observable?
+Which shared operations commute?
+Where is order explicit when they do not commute?
+Which effects are reversible/transactional/compensatable/irreversible?
+Which consumers must deactivate before provider teardown?
+Does finer granularity justify the extra configuration/naming/cognitive cost?
+```
+
+A different feature name is not evidence that something deserves a separate plugin.
+
+If A/B appear mutually dependent, audit whether an integration/mediation component should expose the real one-way relations. Do not accept cycles casually, but do not fragment the product endlessly merely to obtain a prettier graph.
 
 ## Architecture model
 
@@ -32,7 +68,7 @@ The central rule is:
 
 > **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
 
-The generic Composition Kernel is responsible for:
+The future generic Composition Kernel is expected to stay centered on:
 
 ```text
 Context
@@ -42,7 +78,7 @@ Effect
 Reconcile
 ```
 
-Domain/product plugins own:
+Domain/product components own:
 
 ```text
 music semantics
@@ -52,127 +88,177 @@ library/product behavior
 service payload schemas
 ```
 
-Do not put product payloads into Context merely because Context is globally reachable.
-
-## Plugin entry checklist
-
-For a long-lived product capability entering the runtime, be able to answer:
-
-```text
-What is the plugin definition?
-What fiber instance owns its lifetime?
-What capabilities/services does it require?
-What capabilities/services does it provide?
-What effects/resources does it own?
-What disappears when the fiber unloads?
-What should happen when a required provider disappears and later returns?
-```
-
-If those questions cannot be answered, the component is probably bypassing the composition model or the kernel contract is incomplete.
+The five primitive names are a mechanism budget, not permission to implement them before the decomposition is reviewed.
 
 ## Service/provider separation
 
 Consumers should depend on capability/service definitions rather than concrete provider implementations across plugin boundaries.
 
-Prefer:
-
 ```text
-AudioOutput definition
-    ^
-    +-- Wasapi provider
-    +-- PipeWire provider
-    +-- Music/Audio consumer
+Capability Definition
+        ^
+   +----+----+
+   |         |
+Provider  Consumer
 ```
 
-Avoid hard-coded topology such as `Music -> WasapiOutput` when the semantic dependency is `Music -> AudioOutput`.
+Do not hard-wire `Music -> WasapiOutput` when the semantic dependency is on an AudioOutput contract.
 
 ## Context and data flow
 
 Remember:
 
-```text
-Capability plane != Data plane
-```
+> **Capability plane != Data plane.**
 
-Context resolves/binds capabilities. Ordinary payload flows through the resolved service or direct data edge.
+Context resolves/binds capabilities. Real application payload normally flows through the resolved service or a direct/pre-bound data edge.
 
 Do not route PCM blocks, realtime buffers, UI payloads, or arbitrary product messages through Context.
 
-A domain Event Service may exist when needed, but a general event bus is not automatically a Composition Kernel primitive.
+## Interaction algebra
 
-## Effects and teardown
+A disposer/inverse proves only local revertibility.
 
-Kernel-visible reversible mutation should be owned by a fiber and represented through the Effect protocol rather than duplicated activate/deactivate bookkeeping.
+Cross-component independent removal additionally requires the shared operations to satisfy the relevant independence/commutativity properties.
 
-Examples include service binding, listener registration, timers, child fibers, and local runtime handles.
+Freeze:
 
-Do not claim an external irreversible action is safely rollback-able merely because it is wrapped in an Effect. Use explicit transactional/compensating/irreversible semantics when that class of behavior appears.
+> **Commutative relation -> may compose as independent effects.**
+>
+> **Non-commutative relation -> explicit dependency/order/integration structure.**
+
+For same-key contribution-style interfaces, designs such as:
+
+```text
+register(value) -> opaque token
+unregister(token)
+```
+
+may be useful when they genuinely match the semantics.
+
+Do not use this pattern to disguise an intrinsically ordered pipeline. DSP topology is a required adversarial example.
+
+## Effects and system boundary
+
+Kernel-visible local mutation/resources should have explicit ownership.
+
+Do not claim every effect is rollbackable. Distinguish when relevant:
+
+```text
+Reversible
+Transactional
+Compensatable
+Irreversible / outside system boundary
+```
+
+Already-rendered audio, for example, cannot be undone.
+
+Restoration correctness uses observational equivalence through public/relevant contracts rather than private bit identity.
+
+## Provider disappearance
+
+Provider teardown must preserve dependency ordering:
+
+```text
+provider starts withdrawal
+        ↓
+no new resolution sees it as available
+        ↓
+dependents deactivate / teardown
+        ↓
+provider finally removes/reclaims binding/resources
+```
+
+Do not destroy a provider first and let dependents fail later.
+
+## Confluence
+
+Architecture work should preserve a future test oracle:
+
+> **After any legal load/unload/replacement history reaches quiescence, the observable runtime is equivalent to a clean construction of the final desired composition.**
+
+This should detect history-dependent state, ghost bindings and leaked contributions—not only crashes or handle leaks.
 
 ## Focused implementation
 
-Prefer the smallest cohesive change that proves the requested invariant.
+Prefer the smallest cohesive change that proves the current requested invariant.
 
-Do not combine unrelated cleanup, speculative platform work, UI redesign, media integration, and kernel evolution in one PR.
+Do not combine unrelated cleanup, platform work, UI redesign, media integration and kernel evolution in one PR.
 
-In particular, do not create:
+Do not create:
 
-- a second registry beside Context;
-- an unrelated DI/service-locator framework;
 - hidden global product state;
-- product-specific types inside the generic Composition Kernel;
+- arbitrary concrete cross-plugin references;
+- undeclared cross-key mutation;
+- implicit semantic order from startup/registration/map iteration;
 - a universal Context payload/message bus;
 - dynamic-library infrastructure merely to satisfy the word “plugin”;
-- many empty crates/modules without a dependency or ownership reason;
+- many empty crates/modules without ownership/dependency evidence;
 - local `AGENTS.md` files without genuine local divergence.
 
 ## R0 compatibility policy
 
-RUST-ARCH-R0 APIs were bootstrap witnesses.
+RUST-ARCH-R0 APIs are bootstrap witnesses.
 
-`qianqian-core::base`, `AppRuntime::new()`, `with_audio_output()`, and similar R0 composition shapes may be removed or redesigned when implementing the Composition Kernel. Do not preserve them for compatibility unless a real current consumer makes that compatibility valuable.
+`qianqian-core::base`, `AppRuntime::new()`, `with_audio_output()`, and similar R0 composition shapes are not compatibility contracts.
 
-## Tests and verification
-
-Verification must match the changed surface.
-
-Composition Kernel work should emphasize adversarial lifecycle tests, including:
+They may later be redesigned, but current authority is:
 
 ```text
-consumer pending when dependency is absent
-provider arrival activates dependent
-provider loss deactivates dependent before teardown finishes
-replacement provider reactivates dependent
-fiber disposal unwinds owned effects in deterministic order
-root disposal leaves zero live bindings/fibers/effects
+#53 boundary design
+       ↓ PASS
+future Composition Kernel implementation
 ```
 
-Media/realtime work additionally needs direct data-plane and realtime-safety evidence. Physical-device claims require physical-device validation.
+Do not prematurely replace them before #53 passes.
 
-Do not report an unrun platform/device check as PASS.
+## Verification
+
+Verification must match the phase.
+
+### Boundary-design work
+
+Evidence is architectural analysis, matrices, graphs, adversarial cases and explicit unresolved blockers—not green Cargo tests.
+
+### Later Composition Kernel work
+
+Tests must distinguish:
+
+```text
+single-Fiber local cleanup
+cross-Fiber independent removal
+same-key contribution safety
+explicit non-commutative ordering
+provider-disappearance ordering
+history-vs-clean-build confluence
+```
+
+### Media/realtime work
+
+Requires direct data-plane/realtime-safety evidence. Physical-device claims require physical-device validation.
+
+Never report an unrun platform/device check as PASS.
 
 ## Documentation
 
 Keep durable documentation small and authoritative.
 
-Use `docs/README.md` as the router. Add a new long-lived document only when the task creates a durable fact that needs a stable home.
-
-Do not duplicate detailed kernel semantics across README, AGENTS, issues, and implementation comments; link to `docs/architecture/composition-kernel.md` for the canonical model.
+Use `docs/README.md` as the router and `docs/architecture/composition-kernel.md` as the detailed composition authority. Current boundary decisions/results belong in the current design issue until they become durable architecture facts.
 
 ## Historical code reuse
 
 The old repository and playback experiment may be inspected for behavior, measurements, algorithms, or proven mechanism code.
 
-Do not copy an old component into `main` merely because it already exists. Reuse must fit the current plugin/capability/lifecycle ownership model.
+Do not copy an old component into `main` merely because it already exists. Reuse must fit the current boundary/ownership/interaction model.
 
 ## PR expectations
 
 A PR should explain:
 
 - what changed;
-- which invariant it establishes;
-- verification performed;
+- which invariant/design fact it establishes;
+- verification/evidence performed;
 - architecture/dependency impact;
 - explicit non-scope;
-- any remaining environmental/manual validation.
+- unresolved blockers/manual validation.
 
-Do not automatically continue into the next milestone after the current task passes.
+STOP at the current gate. Do not automatically continue into the next milestone.
