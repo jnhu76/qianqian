@@ -2,58 +2,149 @@
 
 This document is the repository-local semantic overview for Qianqian Architecture v2.
 
-It describes ownership and dependency direction. Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md).
+Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). The current design gate is GitHub issue **#53 COMPONENT-BOUNDARY-A0**.
 
 ## Architecture constitution
 
-The central rule is:
-
 > **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
 
-Architecture v2 further distinguishes:
+Architecture v2 also distinguishes:
 
-> **Composition Kernel owns composition invariants.**
->
 > **Domain kernels own domain semantics.**
 >
 > **Capabilities expose contracts; providers own mechanisms.**
 >
 > **Fibers own plugin-instance lifetime.**
 >
-> **Effects own reversible mutation provenance.**
+> **Effects own attributable mutation/recovery provenance.**
 >
-> **Profiles declare desired composition; reconciliation determines the running graph.**
+> **Profiles declare desired composition; Reconcile determines the running graph.**
 
-Cross-Fiber removal adds one more rule:
+But these are not permission to start by implementing a kernel API.
 
-> **A disposer/inverse is not sufficient evidence of composability; independent removal also needs independence/commutativity, or explicit order when operations do not commute.**
+## Boundary-first architecture
 
-Rust is the product architecture language.
+The first architecture question is not “how should `ctx.effect()` look?”
 
-Native/platform/UI technologies are implementation substrates and plugins above the generic Composition Kernel.
+It is:
+
+> **How should the product be decomposed so that ownership, dependencies, interactions, ordering and recovery boundaries are explicit enough for composability to mean something?**
+
+Current design order:
+
+```text
+Component Granularity
+        ↓
+Capability / dependency boundary
+        ↓
+Interaction Algebra
+        ↓
+Effect / System Boundary
+        ↓
+Global lifecycle ordering
+        ↓
+Confluence oracle
+        ↓
+Composition Kernel implementation
+```
+
+A feature name is not a component proof. `Decoder`, `AudioOutput`, `UI`, `DSP`, etc. remain candidate boundaries until the decomposition audit justifies their exact granularity.
+
+## Component granularity
+
+Component boundaries are judged by:
+
+```text
+ownership
+requires/provides relationships
+state/resource lifetime
+operation locality
+interaction ordering
+recoverability boundary
+configuration/naming/cognitive cost
+```
+
+An apparent cycle:
+
+```text
+A requires B
+B requires A
+```
+
+is a signal to inspect whether a mediation/integration component should make the real one-way relationships explicit.
+
+However, finer decomposition is not automatically better. A mathematically elegant graph can still be an engineering failure if it explodes component count/configuration/cognitive load.
+
+## Capability and interaction boundary
+
+Across plugin seams, consumers should depend on service/capability definitions rather than concrete providers.
+
+```text
+Capability Definition
+        ^
+   +----+----+
+   |         |
+Provider  Consumer
+```
+
+Cross-component interaction should not rely on arbitrary concrete references, hidden globals, undeclared cross-key mutation, or implicit startup order.
+
+After capability resolution/binding, real payload normally flows directly through the service/data edge.
+
+## Interaction algebra
+
+A disposer/inverse is not sufficient evidence of independent composition.
+
+For relationships expected to be independently removable, the shared operations and their inverse behavior must satisfy the relevant independence/commutativity contract.
+
+Freeze:
+
+> **Commutative relation -> may compose as independent effects.**
+>
+> **Non-commutative relation -> explicit dependency/order/integration structure.**
+
+The canonical player example is DSP ordering:
+
+```text
+EQ -> Compressor
+```
+
+is generally not equivalent to:
+
+```text
+Compressor -> EQ
+```
+
+Therefore registration timing, mount timing, map order or iteration order must never silently become DSP topology.
+
+Where semantically valid, a contribution-oriented interface such as:
+
+```text
+register(value) -> opaque token
+unregister(token)
+```
+
+can make independent ownership/removal explicit. It is not a trick for making genuinely ordered pipelines commutative.
+
+## Observational equivalence
+
+Correct removal/recovery is judged by observable contract behavior, not bit-identical private implementation state.
+
+After removing A, the system should behave like a world where A never contributed, while independent B/C contributions still exist.
+
+Opaque tokens, allocator layouts, internal generations and incidental IDs may differ.
 
 ## Control plane and data plane
-
-Architecture v2 separates composition/control from application data flow.
 
 ```text
                          CONTROL PLANE
 
-                 Profile / desired tree
+                 desired composition
                           |
                           v
-                      Reconcile
-                          |
-                          v
-                     Fiber Graph
-                          |
-                 provide / require
-                    owned effects
-                          |
-                          v
-               Composition Kernel
-            Context / Capability / Fiber
-                Effect / Reconcile
+                  Composition Kernel
+             Context / Capability / Fiber
+                  Effect / Reconcile
 
 -------------------------------------------------------------
                           |
@@ -64,23 +155,85 @@ Architecture v2 separates composition/control from application data flow.
       service.method(payload) -------> provider
 
       MediaSource -> Decoder -> Processing -> AudioOutput
-
-      domain event -> Event Service/listeners (when needed)
 ```
-
-The control plane decides **who can reach whom, who owns a change, and who should be alive**.
-
-The data plane carries **what the product is actually processing**.
-
-Therefore:
 
 > **Capability plane != Data plane.**
 
 Context must not become a universal message bus, product-state bag, or audio-buffer transport.
 
+## System boundary
+
+`Everything is Plugin` does not mean `Everything is rollbackable`.
+
+Effects/resources must be classified when relevant:
+
+```text
+Reversible
+Transactional
+Compensatable
+Irreversible / emitted outside system boundary
+```
+
+Examples:
+
+```text
+listener/callback registration -> reversible
+buffer/local handle            -> locally reversible
+already-rendered sound         -> outside rollback boundary
+```
+
+The architecture must not promise an inverse for a real-world emission that cannot be undone.
+
+## Global lifecycle
+
+Provider disappearance is a global dependency-order problem, not merely a registry delete.
+
+Required semantic shape:
+
+```text
+provider begins withdrawal
+        ↓
+provider stops satisfying new resolution
+        ↓
+dependents are invalidated and deactivate
+        ↓
+dependents finish required teardown
+        ↓
+provider finally removes/reclaims binding/resources
+```
+
+Do not destroy a provider first and let consumers discover failure later.
+
+## Confluence
+
+A major future correctness oracle is:
+
+> **After any legal load/unload/replacement history reaches quiescence, the observable runtime is equivalent to a clean construction of the final desired composition.**
+
+Example:
+
+```text
+load source A
+insert EQ
+switch output
+remove EQ
+replace decoder
+settle
+```
+
+If the final desired graph is:
+
+```text
+source A + decoder B + output C
+```
+
+then the settled runtime should be observationally equivalent to a clean root directly composed as that final graph.
+
+This tests far more than “did not crash”: it detects ghost bindings, stale lifecycle state, leaked contributions and history-dependent composition.
+
 ## Composition Kernel
 
-The generic kernel is centered on five concepts:
+After boundary design passes, the generic kernel is expected to remain centered on:
 
 ```text
 Context
@@ -90,12 +243,11 @@ Effect
 Reconcile
 ```
 
-It must remain domain-agnostic. It does not know:
+It must remain domain-agnostic and know nothing about:
 
 ```text
 Track
 PCM
-Decoder internals
 FFmpeg
 WASAPI
 PocketJS
@@ -104,260 +256,83 @@ playlist semantics
 UI payload schemas
 ```
 
-The Composition Kernel establishes:
+The exact implementation is **not yet authorized**; #53 must pass first.
 
-- capability/service visibility and binding;
-- provider/consumer dependency relationships;
-- plugin-instance lifecycle through fibers;
-- mutation/resource ownership through effects;
-- desired-vs-running composition reconciliation.
+## Everything is a Plugin
 
-See [`composition-kernel.md`](composition-kernel.md) for the detailed model and invariants.
+Every justified long-lived runtime capability should ultimately participate in the common composition/lifecycle protocol.
 
-## Everything is a plugin
-
-Every long-lived product capability should enter the runtime through the same composition/lifecycle protocol.
+This does not imply:
 
 ```text
-Plugin definition
-      |
-      v
-Fiber instance
-      |
-      +-- requires Capability A/B
-      +-- provides Capability C
-      +-- owns Effects
-      +-- activates/deactivates with dependency availability
+one feature == one plugin
+one plugin == one crate
+one plugin == one dynamic library
+everything is hot reloadable
+everything is rollbackable
 ```
 
-This does not require one crate, process, dynamic library, or downloaded package per plugin.
+Candidate boundaries such as Music, Decoder, DSP stages, AudioOutput, Presentation and UiHost remain subject to #53 granularity analysis.
 
-The runtime composition unit is the **Fiber**, not the source package.
+## Music / media / UI
 
-No product capability should become globally privileged merely because it was historically constructed directly inside `AppRuntime`.
+`MusicKernel` remains a music-domain semantic authority but is not the global composition authority.
 
-## Service definition, provider, consumer
-
-A capability/service definition is distinct from its provider.
-
-```text
-              AudioOutput definition
-                    ^
-          +---------+----------+
-          |                    |
-     Wasapi provider      PipeWire provider
-          ^                    ^
-          +---------+----------+
-                    |
-               Consumer
-```
-
-Across plugin boundaries, consumers should depend on definitions/capabilities rather than concrete providers.
-
-This preserves replaceability without requiring dynamic loading.
-
-## Domain kernels
-
-A domain kernel is the semantic authority for one domain but is an ordinary resident above the Composition Kernel.
-
-### Music Kernel
-
-`MusicKernel` owns music/player semantics as they are implemented over time:
-
-- current track and playback session;
-- play/pause/stop intent;
-- seek semantics;
-- user-visible playback state and position;
-- queue/playlist/repeat/shuffle policy;
-- track transitions;
-- buffering interpretation;
-- recovery and product-level error meaning;
-- ENDED semantics.
-
-Conceptually it is owned by a Music plugin:
-
-```text
-Music Plugin
-   |
-   +-- owns MusicKernel
-   +-- requires media/audio capabilities
-   +-- provides transport/player-state/domain services
-```
-
-It is **not** the global composition authority.
-
-Mechanism layers produce facts/evidence. Domain semantic owners decide product meaning.
-
-## Presentation and UiHost
-
-Presentation is a domain/product seam, not a generic kernel primitive.
-
-```text
-Music/domain semantics
-        |
-   Presentation
-        |
-     UiHost
-```
-
-`UiHost` is an ordinary plugin/capability for rendering/input adaptation.
-
-Current direction:
-
-```text
-Windows   -> PocketJS UiHost
-Linux     -> PocketJS UiHost
-Android   -> KuiklyUI UiHost
-iOS       -> KuiklyUI UiHost
-HarmonyOS -> KuiklyUI UiHost
-macOS     -> KuiklyUI UiHost by default, replaceable by composition/profile
-```
-
-UI frameworks do not own music semantics and do not participate in realtime audio correctness.
-
-## Media and audio data plane
-
-Decoder, Processing, and AudioOutput remain logical media capabilities:
-
-```text
-Decoder    encoded media -> canonical PCM
-Processing canonical PCM -> canonical PCM
-AudioOutput canonical PCM -> physical device + output evidence
-```
-
-But PCM is **data-plane data**.
-
-Do not design:
-
-```text
-Decoder -> Context/EventBus -> Processing -> Context/EventBus -> Output
-```
-
-The eventual audio graph should use pre-bound direct edges:
-
-```text
-MediaSource -> Decoder -> Processing -> AudioOutput
-```
-
-When FFmpeg is reintroduced, Decoder and Processing should share one FFmpeg closure authority rather than duplicate dependency closure.
-
-The canonical PCM contract must be established by media implementation work, not by the generic Composition Kernel.
-
-## Audio Runtime specialization
-
-The generic kernel should not grow audio-specific scheduling or format concepts.
-
-A future `AudioRuntime` is expected to be a normal domain/runtime plugin that may own:
+The generic Composition Kernel is not the Audio Engine. A future `AudioRuntime` may own:
 
 ```text
 AudioGraph
 clock
 buffer pool
 format negotiation
-realtime scheduling
-graph publication/swap policy
+RT scheduling
+graph publication/swap
 ```
 
-This allows different implementations—realtime desktop, offline renderer, web/AudioWorklet, etc.—without contaminating the generic Composition Kernel.
+UiHost remains a normal plugin/capability candidate. Current platform intent:
+
+```text
+Windows   -> PocketJS
+Linux     -> PocketJS
+Android   -> KuiklyUI
+iOS       -> KuiklyUI
+HarmonyOS -> KuiklyUI
+macOS     -> KuiklyUI candidate / replaceable
+```
 
 ## Realtime boundary
 
-The audio realtime path is a data-plane mechanism island.
-
-Per callback/block it must not perform:
+Realtime audio is a data-plane island. Per callback/block it must not perform:
 
 ```text
 Context lookup
 capability resolution
-fiber reconciliation
+Fiber reconciliation
 arbitrary generic event dispatch
 filesystem/network I/O
 UI/JS/managed-runtime round trips
 unbounded allocation/blocking
 ```
 
-When runtime graph mutation exists, the expected pattern is:
+Future graph changes should be prepared on the control plane and published at an RT-safe boundary.
+
+## Native media evidence
+
+#48 remains valid:
 
 ```text
-Control plane builds/prepares Graph B
-          |
-          v
-validate / acquire resources
-          |
-          v
-publish at RT-safe boundary
-          |
-          v
-Audio thread switches Graph A -> Graph B
-          |
-          v
-retire/reclaim Graph A off realtime path
+Decoder    : encoded media -> canonical PCM
+Processing : PCM -> PCM
+AudioOutput: canonical PCM -> physical device + evidence
 ```
 
-The exact mechanism is not frozen yet.
+When FFmpeg is reintroduced, Decoder/Processing must continue to share one FFmpeg closure authority rather than duplicating dependencies.
 
-## Events
+Logical component/plugin/capability boundary does not imply a separate crate/static library/shared library/dynamic library.
 
-A generic application event bus is not automatically a Composition Kernel primitive.
+## Current code and gate
 
-If a domain needs event semantics, it may provide an Event Service/plugin. Listener registrations can still be owned/unwound through Effects.
-
-Kernel-internal dependency invalidation is an implementation concern of capability/fiber lifecycle and should not be confused with a public product event bus.
-
-## Effects, independence, and restoration
-
-Effects are the kernel write/ownership boundary for reversible local runtime mutation.
-
-Typical examples:
-
-```text
-service/capability binding
-listener registration
-timer registration
-child fiber mount
-watcher/local handle registration
-```
-
-Within one Fiber, owned effects normally unwind in reverse/LIFO order.
-
-That does **not** prove cross-Fiber independent removal. When effects from multiple Fibers interleave, the shared operations must satisfy the relevant independence/commutativity contract, or the interaction must carry explicit ordering/dependency semantics.
-
-Useful interface shape:
-
-```text
-register(value) -> opaque token
-unregister(token)
-```
-
-where each caller removes only its own contribution.
-
-An ordered middleware/pipeline interaction that changes behavior under reordering is not an independent effect and must be modeled as ordered composition.
-
-Restoration is judged by **observational equivalence** through public contracts rather than bit-for-bit restoration of incidental private state.
-
-Not every external action is reversible. Transactional, compensating, or irreversible effects require explicit semantics when such behavior is introduced.
-
-## Reconciliation
-
-Profiles describe desired composition rather than hard-coding a privileged imperative boot graph.
-
-```text
-desired plugin tree
-        |
-        v
-    Reconcile
-        |
-        v
- running Fiber graph
-```
-
-The reconciler is responsible for mount/unmount/update decisions consistent with dependency/lifecycle rules.
-
-Early versions may support only a minimal subset, but the architecture should not silently regress into a monolithic `boot()` function that bypasses the plugin protocol.
-
-## Current R0 implementation and migration
-
-RUST-ARCH-R0 established three packages:
+RUST-ARCH-R0 established:
 
 ```text
 qianqian-core
@@ -365,46 +340,27 @@ qianqian-runtime
 qianqian-headless
 ```
 
-The current `qianqian-core::base` module and `qianqian-runtime::AppRuntime` constructor-only composition are bootstrap witnesses.
+Current `qianqian-core::base`, `qianqian-runtime::AppRuntime`, `AppRuntime::new()` and direct capability fields are bootstrap witnesses, not compatibility contracts.
 
-They are **not compatibility contracts**.
+But the next step is **not** to replace them immediately with a Composition Kernel implementation.
 
-The next Composition Kernel task is authorized to refactor/delete/replace those R0 shapes to establish the Context/Capability/Fiber/Effect/Reconcile model.
+Current authority is:
 
-A dedicated dependency-pure kernel crate is a likely design because it creates a strong firewall against music/media/UI concepts, but the physical split should still be justified by the implementation task rather than treated as a diagram requirement.
+```text
+#53 COMPONENT-BOUNDARY-A0
+        ↓ PASS
+future COMPOSITION-KERNEL-0
+```
+
+Until #53 passes, no new kernel implementation/API is authorized.
 
 ## Historical evidence
-
-Complete pre-Rust tree:
 
 ```text
 archive/pre-rust-v2
 pre-rust-v2
-```
-
-Frozen playback reference:
-
-```text
 research/playback-reference-v1
 playback-reference-v1
 ```
 
-The playback reference is a behavioral oracle, not a source-layout template. It proved a complete Windows playback path and important physical truths around decode/queue/submit/render, seek/flush, stale rejection, timeline, and physical drain.
-
-Architecture v2 may change language, ownership, directories, types, and composition while preserving those verified behaviors when functionality is rebuilt.
-
-## Non-goals
-
-The architecture does not require:
-
-- every plugin to be dynamically loaded;
-- one crate/binary per capability;
-- Context to transport all application data;
-- a universal global event bus;
-- audio-specific types in the generic kernel;
-- UI frameworks in the generic kernel;
-- restoring the old repository hierarchy;
-- treating a disposer as proof of cross-Fiber composability;
-- pretending irreversible external actions can always be rolled back.
-
-Implementation should grow one verified invariant at a time.
+These are opt-in evidence sources, not current source-layout templates.
