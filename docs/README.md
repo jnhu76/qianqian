@@ -11,7 +11,7 @@ Do not recursively read archived or historical material by default.
 | Repository/agent rules | `../AGENTS.md` |
 | Stable vocabulary | `../CONTEXT.md` |
 | Current architecture | `architecture/overview.md` |
-| Component boundary / plugin granularity / interaction algebra | `architecture/composition-kernel.md` boundary-design sections + issue #53 |
+| Component boundary / plugin granularity / interaction algebra | `architecture/composition-kernel.md` boundary-design sections + issue #53 + audit result `architecture/component-boundary-a0.md` |
 | Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | **Only after #53 passes**; then read `architecture/composition-kernel.md` + the implementation issue |
 | Product introduction / current repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
