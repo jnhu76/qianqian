@@ -7,9 +7,18 @@ It defines both:
 1. the **preconditions** that must hold before a kernel implementation is justified; and
 2. the invariants the eventual kernel must enforce.
 
-Current design gate: **#53 COMPONENT-BOUNDARY-A0**.
+Gate chain:
 
-No new Composition Kernel implementation/API is authorized until that gate passes.
+```text
+#53 COMPONENT-BOUNDARY-A0        PASS / CLOSED (audit: component-boundary-a0.md)
+        ↓
+#67 COMPOSITION-KERNEL-0 DESIGN  current gate (proposed semantic authority: PR #68,
+                                  composition-kernel-0-design.md)
+        ↓
+implementation issue             opens only after #67/PR #68 PASS + merge
+```
+
+No new Composition Kernel implementation/API is authorized until the #67 design gate passes and its PR merges.
 
 ## Kernel constitution
 
@@ -100,7 +109,7 @@ should trigger a mediation/integration-component audit. Bidirectional interactio
 
 However, finer decomposition is not automatically better. Component count, configuration and cognitive cost are first-class engineering costs.
 
-Current concrete audit authority: **#53**.
+Current concrete audit authority: **#53 COMPONENT-BOUNDARY-A0** (PASS/CLOSED; accepted audit `component-boundary-a0.md`). Semantic-design authority for the kernel itself: **#67 / PR #68** (`composition-kernel-0-design.md`).
 
 ## Control plane vs data plane
 
@@ -378,7 +387,7 @@ Kernel-internal dependency invalidation is not the same thing as a public produc
 
 ## Future kernel primitives
 
-Only after #53 passes may an implementation task concretize:
+Only after the #67 design gate passes and its PR merges may an implementation task concretize:
 
 ### Context
 
@@ -415,7 +424,7 @@ everything is rollbackable
 every payload goes through Context
 ```
 
-Candidate boundaries currently include Music, MediaSource, Decoder, AudioRuntime, DSP stages, AudioOutput, Presentation, UiHost, Library, Analyzer and platform capabilities, but #53 must decide their actual granularity.
+Candidate boundaries currently include Music, MediaSource, Decoder, AudioRuntime, DSP stages, AudioOutput, Presentation, UiHost, Library, Analyzer and platform capabilities; #53 (now closed) decided the MVP granularity in `component-boundary-a0.md`.
 
 ## Realtime specialization boundary
 
@@ -452,7 +461,7 @@ PCM travels through pre-bound data-plane graph edges.
 
 A future justified Music component may own it and expose domain services/capabilities.
 
-The exact Music/Transport/Presentation split is part of #53 boundary design and is not frozen here.
+The exact Music/Transport/Presentation split was audited by #53 (closed; `component-boundary-a0.md` §B.1/§I) and is not re-litigated here.
 
 ## R0 migration authority
 
@@ -470,19 +479,22 @@ They are not compatibility contracts.
 
 However:
 
-> **Do not replace them with a new Composition Kernel implementation until #53 passes.**
+> **Do not replace them with a new Composition Kernel implementation until the #67 design gate (PR #68) passes human review and merges.**
 
 ## Current gate
 
-Current authority:
+Current authority chain:
 
 ```text
 #53 COMPONENT-BOUNDARY-A0
-        ↓ PASS / human review
-future COMPOSITION-KERNEL-0
+        ↓ PASS / CLOSED (two corrective rounds; audit: component-boundary-a0.md)
+#67 COMPOSITION-KERNEL-0 DESIGN — current gate
+        ↓ proposed semantic authority: PR #68 (composition-kernel-0-design.md)
+future COMPOSITION-KERNEL-0 IMPLEMENTATION issue
+        ↓ opens only after #67/PR #68 PASS + merge
 ```
 
-#53 must first establish:
+#53 established (frozen, carried in `component-boundary-a0.md`):
 
 ```text
 component boundaries
@@ -497,7 +509,9 @@ confluence scenarios/oracle
 minimal first Windows playback decomposition
 ```
 
-Until then:
+#67 / PR #68 must establish the kernel's semantic design (primitive semantics, lifecycle, withdrawal, effect/independence model, confluence oracle, failure semantics) before any implementation.
+
+Until #67/PR #68 passes and merges:
 
 ```text
 NO qianqian-kernel implementation

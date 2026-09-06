@@ -59,9 +59,18 @@ Confluence oracle
 Context / Fiber / Effect / Reconcile implementation
 ```
 
-Current gate: **#53 COMPONENT-BOUNDARY-A0**.
+Gate chain:
 
-Until #53 passes:
+```text
+#53 COMPONENT-BOUNDARY-A0        PASS / CLOSED (audit: docs/architecture/component-boundary-a0.md)
+        ↓
+#67 COMPOSITION-KERNEL-0 DESIGN  current gate (proposed semantic authority: PR #68,
+                                  docs/architecture/composition-kernel-0-design.md)
+        ↓
+implementation issue             opens only after #67/PR #68 PASS + merge
+```
+
+Until #67/PR #68 passes and merges:
 
 ```text
 DO NOT create qianqian-kernel implementation
@@ -326,7 +335,7 @@ with_audio_output()
 
 They are not compatibility contracts.
 
-However, do **not** replace them with a new kernel implementation until #53 boundary design passes.
+However, do **not** replace them with a new kernel implementation until #67/PR #68 (COMPOSITION-KERNEL-0 design) passes human review and merges.
 
 ## Work mode
 

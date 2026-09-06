@@ -74,9 +74,9 @@ Confluence oracle
 Composition Kernel implementation
 ```
 
-Current gate: **#53 COMPONENT-BOUNDARY-A0**.
+#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). Current gate: **#67 COMPOSITION-KERNEL-0 DESIGN** (proposed semantic authority: PR #68, `composition-kernel-0-design.md`).
 
-No new generic kernel implementation/API is currently authoritative until that gate passes.
+No new generic kernel implementation/API is authoritative until #67/PR #68 passes human review and merges.
 
 ## Interaction mental model
 

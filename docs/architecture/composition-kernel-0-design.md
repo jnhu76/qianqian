@@ -4,6 +4,10 @@ Design-gate deliverable for **#67 COMPOSITION-KERNEL-0** (parent authority **#46
 
 Status: **semantic design only. Implementation NOT authorized by this document.** Nothing here freezes a Rust API, a crate layout, or an async-runtime choice. PASS (proposed, §Verdict) authorizes only opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue.
 
+Revision 1 (2026-09-06): initial semantic design (PR #68).
+
+Revision 2 (Corrective-1, 2026-09-07): applies human review round 1 on PR #68 — teardown contract-violation semantics frozen (infallible inverse contract, §G.6/§H.7; §G.2, §F.4, §L, §M, §O, §Q, §T.7); provider replacement frozen as staged orchestration preserving install-level single-source (§E.2/E.4, §G.3, §L.2, §O.1, §M.4); composition-owned Effect vs domain-resource ownership universes split, Option A frozen (§H.5/§H.5.1, §I.1, §J.4, §K.2); CLAIMED ≠ emission wording repaired (§B23, §H.5/§H.5.1); governance gate advanced to #67 in `AGENTS.md` / `composition-kernel.md` / `docs/README.md` / `CONTEXT.md` / `overview.md`; paper authority snapshot pinned (§A.4).
+
 Primary external sources:
 
 - **[PAPER]** *A Programming Paradigm for Spatiotemporal Composability*, Yifan Shi, Wei Zhang, Tianyi Cui (Peking University; DeepSeek-AI), arXiv:2608.25512v1, 92 pp. — the Cordis formal model. Section/definition/theorem numbers below cite this text directly.
@@ -28,7 +32,9 @@ docs/architecture/composition-kernel.md          generic kernel preconditions + 
 docs/architecture/component-boundary-a0.md       accepted #53 audit (Rev 3)
 #46  PLAYER-PLUGIN-ARCH-1                         parent architecture authority (open)
 #53  COMPONENT-BOUNDARY-A0                       PASS / CLOSED (two corrective rounds)
-#67  COMPOSITION-KERNEL-0                        current DESIGN gate (this document)
+#67  COMPOSITION-KERNEL-0                        current DESIGN gate
+PR #68                                            proposed semantic authority (this document, under human review)
+future COMPOSITION-KERNEL-0 IMPLEMENTATION       opens only after #67/PR #68 PASS + merge
 ```
 
 Repository reality at BASE: `qianqian-core` (empty `base.rs`, `MusicKernel` state machine, three empty port traits, presentation mapping), `qianqian-runtime` (`AppRuntime` constructor composition), `apps/headless`. All R0 shapes (`AppRuntime::new()`, `with_audio_output()`, `audio_output()`) are bootstrap witnesses, not contracts; replacing them is out of scope here.
@@ -68,6 +74,27 @@ Degraded rule          : unsatisfied dependency ⇒ dependent inactive/pending, 
 
 Not inspected (and not relied upon): Cordis/`@deepseek-ai/cordis` source code beyond the docs mirror (web quota exhausted during this task); any DeepSeek harness internals beyond what the paper and docs state. Every conclusion that would depend on uninspected internals is marked [CORDIS]-doc or [OPEN] accordingly.
 
+### A.4 Paper authority snapshot (Corrective-1)
+
+The paper repository describes the preprint as under active revision, and different drafts use different theorem numbering (public summaries of older drafts cite Thm 63/66/73 for what this snapshot numbers 70/73/80). This document therefore pins the exact snapshot all §B citations refer to:
+
+```text
+Paper authority snapshot:
+
+title:          A Programming Paradigm for Spatiotemporal Composability
+arXiv:          2608.25512v1  (v1 is the pinned version)
+retrieved:      2026-09-07
+page count:     92
+source:         https://arxiv.org/pdf/2608.25512v1
+SHA256:         390775dbc9debdcf2ed1b076eed013387ca057630be3cb594617b2b742e48cf0
+cross-check:    numbered items run to Def 81 (HMR, B29); Thm 70 (teardown-access
+                window), Thm 73 (quiescence/progress), Thm 80 (confluence) and
+                Cor 69 (departing fiber contributes nothing) verified present at
+                this snapshot with exactly the meanings cited in §B
+```
+
+> **Snapshot rule (frozen).** Theorem/definition/algorithm numbers in this document are valid **only for the pinned snapshot above**. If the paper revises, do not silently migrate theorem numbers across revisions: re-run the §B evidence-ledger mapping against the new snapshot first, update the pin block, and only then update citations. A citation whose target moved or vanished under a new snapshot is an unverified claim until re-inspected.
+
 ---
 
 ## B. Paper Evidence Ledger
@@ -87,18 +114,18 @@ Legend: Prov = provenance. "What it does NOT prove" is the adversarial column �
 | B9 | Independence of two effects = every transformation (forward **and inverse**) of one commutes with every transformation of the other, plus non-disturbance of yielded inverses/outcomes | [PAPER] | §3.4.1 Def 40–42, Lemma 41; Thm 43 | under pairwise independence, inverses may run in **any permutation** and still return to the initial state | independence itself — it is a condition on the effects, supplied by key witnesses (B10) and disjoint declarations (Thm 47) | cross-fiber independent removal is only promised where §H's contract holds |
 | B10 | A commutative key carries a witness that its operations are pairwise independent (entry-per-registration tables yes; ordered chains no; opaque-handle allocators yes, address-comparing ones no) | [PAPER] | §3.4.2 Def 44–46 + examples | same-key composability is a per-capability proof obligation owned by the **provider** | that ordered pipelines can be made commutative by clever encoding — the paper's middleware-chain example says the opposite | contribution-oriented `register → opaque token` contracts for listener-like capabilities; DSP order stays explicit (§H.4) |
 | B11 | A component = (declared deps d, provided keys p, witnessed effect function e); a fiber = one instantiation with parent pointer, own table, retirement flag, lifecycle state | [PAPER] | §4.1 Def 48–49 | plugin-definition vs live-instance separation; provision confined to p; effects witnessed at d∪p | that fibers need child-context hierarchies for K0 — parent pointers exist but MVP graph is flat | Fiber owns identity/requirements/provisions/effects/lifecycle (§D, §F) |
-| B12 | The coeffect context is **derived**: σ_γ = union of Active fibers' tables; each key has one possible provider; O-Insert refuses overlapping provisions | [PAPER] | §4.1 Def 50 + O-Insert premise (§4.2.1) | single-source resolution; a second provider of the same key is refused at insertion | what a *desired composition* containing two providers should do — that is an orchestrator/reconcile policy (§6.2 discusses brokers as one answer) | required-single cardinality: ambiguity = composition error at reconcile, never silent pick (§E.2) |
+| B12 | The coeffect context is **derived**: σ_γ = union of Active fibers' tables; each key has one possible provider; O-Insert refuses overlapping provisions | [PAPER] | §4.1 Def 50 + O-Insert premise (§4.2.1) | single-source resolution; a second provider of the same key is refused at insertion | what a *desired composition* containing two providers should do — that is an orchestrator/reconcile policy (§6.2 discusses brokers as one answer) | required-single cardinality: ambiguity = composition error at reconcile, never silent pick (§E.2). The O-Insert disjointness `∀m. pₙ ∩ pₘ = ∅` runs over **installed** fibers' declared provisions — so replacement must be staged (old removed before new inserted, §E.4) |
 | B13 | Lifecycle has four states — Inactive / Reloading / Active / Unloading — driven by comparing a committed view ω against a target view; transitions: O-Insert/O-Retire/O-Remove + L-Begin/L-Iter/L-Finish/L-Divert/L-Leave/L-Unload | [PAPER] | §4.2 Fig 1, Def 53, rules §4.2.1–4.2.2, Table 1 | a complete transition system with quiescence (`quiet`) predicate; retirement is a request, removal waits for Inactive+empty table+no children | any particular state *naming* for an implementation; failed activations (separate extension, B19) | K0 state machine adopts this shape (§F); names below are Qianqian's |
 | B14 | Committed view ω records **which fiber provided each key** (not the value); it is fixed for the whole episode; bindings stay readable through the dependent's own teardown | [PAPER] | §4.1 Def 49; Lemma 59(2); Thm 70 | teardown-access window: a consumer deactivated by a withdrawal still resolves its keys until its own unload completes | that the provider's *service* remains fully functional — only reachability/readability of the binding is claimed | teardown-time access ≠ new-resolution availability (§G.2) |
 | B15 | Provider withdrawal ordering: L-Leave marks the provider non-providing first (its table leaves σ_γ); L-Unload is guarded by `¬relied` (no installed fiber resolves a key to it); guard always releases (Theorem 73); provider activates before dependent, releases after dependent | [PAPER] | §4.2.2 L-Leave/L-Unload + Def 54; Thm 70(2); Thm 73 | dependents deactivate and finish teardown **while the provider's bindings remain in place**; deterministic, deadlock-free (under acyclic ≺) | that provider *resource* release is deferred automatically — the model only orders table withdrawal vs dependents; physical resources are §6.1 boundary questions | K0 withdrawal protocol is exactly this guard sequence (§G); Music closes its Decoder handle / tears down SinkSession inside the window |
-| B16 | Registry well-formedness is preserved by every rule; a fiber leaving an episode ends with an empty table; removal discards nothing | [PAPER] | §4.3.1 Def 63, Thm 64; Cor 69 | no-leak structural guarantee per deactivation; O-Remove safe once Inactive | absence of *external* resource leaks — outside-Γ locations are §6.1 | failed/deactivated fibers leave no ghost bindings in composition truth (§O, §M) |
+| B16 | Registry well-formedness is preserved by every rule; a fiber leaving an episode ends with an empty table; removal discards nothing | [PAPER] | §4.3.1 Def 63, Thm 64; Cor 69 | no-leak structural guarantee per deactivation; O-Remove safe once Inactive | absence of *external* resource leaks — outside-Γ locations are §6.1; the empty-table conclusion presupposes every inverse runs to completion (total-function setting — an inverse that violates its contract exits this guarantee, §G.6) | failed/deactivated fibers leave no ghost bindings in composition truth (§O, §M); K0 strengthens episode close with a discharge requirement (§G.6) |
 | B17 | Recovery exactness: an accumulator applied at a state other fibers moved still withdraws exactly that fiber's contribution, provided pairwise independence (always supplied by the paradigm) or rule-imposed ordering of entangled pairs | [PAPER] | §4.3.2 Def 65, Lemma 66–67, Thm 68 | cross-fiber interleaved removal is sound up to ≃_K | restoration of emissions crossing the system boundary (§6.1) — Thm 68 compares tables only | independent removal contract (§H.2) rests on this, not on disposers alone |
 | B18 | Progress + confluence: under acyclic dependency order ≺, bounded activation length, finite names, and components **total on their provision**, every maximal lifecycle sequence ends quiescent, and the quiescent state equals (up to ≃ and fiber renaming) a clean dependency-ordered load of the final composition; vestigial retired entries are observationally invisible | [PAPER] | §4.3.4 Thm 73; §4.3.5 Def 74–76, Lemma 75/77/78/79, Thm 80; Lemma 61/62 | history-independence of the settled composition — the paper's central oracle | (a) quiescence of *domain* state; (b) confluence of *failed* fibers (explicitly excluded, §4.4); (c) any timing/order guarantees during transitions | K0 confluence oracle (§M) inherits these exact preconditions; A0's bind-at-activation rule is what makes AudioOutput/Music total on provision |
 | B19 | Failure extension: a raising activation routes into Unloading with the partial accumulator, installs nothing, writes an error **outcome** on the fiber; L-Begin then requires an error-free fiber (no auto-retry against an unchanged environment); retry = revision (reinsertion); confluence excludes failed fibers | [PAPER] | §4.4 Failure; Cor 69 | activation failure leaves no ghost effects; FAILED is a *recorded outcome*, not a retry loop; sibling fibers keep running | that retry policy is forbidden — a host *may* reinsert; the paper only forbids invisible auto-retry | §F.4: FAILED = failed activation attempt; reactivation only via revision/generation (§L) |
 | B20 | Asynchrony/inertia: an async host takes the landing alternative of L-Divert only (an in-flight iteration completes); all metatheory still holds | [PAPER] | §4.4 Asynchrony; Alg 5 mutual chaining | K0 may serialize transitions on a single control plane without losing any guarantee | that async transitions are *required* — the synchronous schedule is one legal schedule | K0 control plane is synchronous/serialized (§N); async transport [OPEN] |
 | B21 | Isolation realms + interception are *mechanisms* (derived-context realizations), not obligations; the base calculus reads every key at one shared realm | [PAPER] | §3.2.3 Def 24–27; §4.1 disjointness discussion; §4.4 Isolation | multi-realm/intercept exist in the model and implementation, orthogonal to the core guarantees | that K0 needs them — nothing in #53 requires child realms, overrides, or interception | defer realms/interception with explicit triggers (§S) |
 | B22 | Service multiplexing (several providers of one interface): exclusive binding (orchestrator switches, consumers perturbed) or a **broker** fiber that providers register with | [PAPER] | §6.2 | broker is a *pattern on top of* single-source, not a kernel primitive | that K0 must ship a broker | broker deferred; required-single + replacement is the K0 story (§E.2, §S) |
-| B23 | System boundary: inside = exclusively modifiable + restorable location (tracked, revertible); outside = acts as identity (untracked). Outside operations decompose into **acquisition** (revertible record inside) and **emission** (crosses boundary, irreversible); recovery = withholding (output commit) or **compensation** (coarser, application-supplied equivalence; commutation must be re-proved against it) | [PAPER] | §6.1 | the paper itself legitimizes irreversible/compensatable classes and refuses to pretend `undo` exists for emissions | that compensation participates in the core metatheory — it does not (commutation vs ≃ must be re-established) | A0's Reversible/Transactional/Compensatable/Irreversible/outside classes are paper-aligned (§H.5); CLAIMED flush = emission per I4 |
+| B23 | System boundary: inside = exclusively modifiable + restorable location (tracked, revertible); outside = acts as identity (untracked). Outside operations decompose into **acquisition** (revertible record inside) and **emission** (crosses boundary, irreversible); recovery = withholding (output commit) or **compensation** (coarser, application-supplied equivalence; commutation must be re-proved against it) | [PAPER] | §6.1 | the paper itself legitimizes irreversible/compensatable classes and refuses to pretend `undo` exists for emissions | that compensation participates in the core metatheory — it does not (commutation vs ≃ must be re-established) | A0's Reversible/Transactional/Compensatable/Irreversible/outside classes are paper-aligned (§H.5); CLAIMED flush = **protocol point-of-no-return** (cancellation authority ends, I4) — **not** the external emission itself; physical render is the emission boundary (A0 corrective P1-3, §H.5.1) |
 | B24 | Dependency cycles leave components permanently inactive; the condition is detectable from declarations alone (reportable at load); apparent mutual deps should decompose into integration components, at quadratic authoring cost | [PAPER] | §6.5 | cycle detection is static; mediation components are the sanctioned fix; granularity cost is real engineering, not theorem | that every cycle *must* be decomposed — cost/benefit judgment stays with the designer | A0 §D cycle audit is already this analysis; K0 keeps acyclicity as a reconcile-time check (§L.4) |
 | B25 | Nominal key linking alone admits interface drift and key collision; versioned/structural linking is an open problem; Cordis currently uses host package-manager peer dependencies | [PAPER]+[CORDIS] | §6.6 | semver/solver/structural compatibility machinery is explicitly *not* solved by the paradigm | that K0 should defer it — confirmed: single compilation unit in K0 makes 𝒱_k typing sufficient | no semver/no solver/no marketplace (§R, §S); TypeId-era identity is intra-crate [QIANQIAN] |
 | B26 | `ctx.effect` registers an effect whose disposers run LIFO on unload or on manual dispose (idempotent); double-dispose is a no-op; effects on a disposed fiber raise `INACTIVE_EFFECT`; disposal can be awaited | [CORDIS] | docs `cordis-api/fiber.md` (effect/disposer semantics); paper Alg 1 matches | the implementation really is the paper's accumulator discipline | any Rust-shaped API — TypeScript closures do not translate directly | Effect ownership semantics carried into K0; representation deferred (§P) |
@@ -217,7 +244,7 @@ MVP capability set (from #53): `Decoder`, `PcmSink`, `OutputDeviceDiscovery` (pr
 | Observable facts | existence/count/kind per fiber (composition truth); **not** payload |
 | Lifecycle | born at registration inside an episode; dies at dispose or episode close |
 | Relationships | owned by exactly one fiber; provision effects create capability bindings; data-edge bindings are effects owned by the consumer |
-| Proof obligations | the inverse actually reverts at the state of application (author obligation, paper §5.1.1); same-key independence per D.2 witness |
+| Proof obligations | the inverse is a **total semantic obligation** (§H.7): it actually reverts at the state of application and has no failure outcome — an author obligation the runtime does not verify (paper §5.1.1); violation latches §G.6. Same-key independence per D.2 witness |
 | Must not know | other fibers; domain semantics of the mutated state |
 
 ### D.5 Reconcile
@@ -255,7 +282,7 @@ MVP capability set (from #53): `Decoder`, `PcmSink`, `OutputDeviceDiscovery` (pr
 | 0 | consumers declaring it have target = ⊥ → they are Pending, never ACTIVE; the root never crashes (A0 §K.5; #53 frozen) |
 | 1 | canonical case; consumers commit to that provider fiber |
 | ≥2 simultaneously | **composition error** at reconcile/planning (B12's insertion disjointness, surfaced as an explicit plan failure), never a silent pick; the desired composition itself is illegal |
-| provider replaced | withdraw-then-provide; consumers see provider-identity change and reactivate against the new provider (B30) |
+| provider replaced | staged replacement (§E.4): the old provider's episode fully closes and its entry is removed **before** the replacement is mounted; consumers reactivate against the new provider identity (B30); the running registry never holds two providers of one capability |
 
 Optional-requirement mode, many-provider mode, broker mode: deferred (§S) — no MVP component needs them.
 
@@ -271,9 +298,44 @@ readable-through-committed-view(k) ⇔  consumer's committed view binds k  (epis
 - **Teardown access**: during the consumer's own Unloading, the committed view stays readable — this is the window in which Music closes its Decoder handle and tears down its SinkSession (§G).
 - **Withdrawing provider**: once a provider enters Unloading it stops satisfying new resolution (`σ_γ` excludes it, B15) — new consumers cannot commit to it even though old ones still hold readable views.
 
-### E.4 Replacement vs coexistence
+### E.4 Replacement vs coexistence (frozen: staged orchestration)
 
-Replacement = withdraw (old provider leaves ACTIVE; dependents invalidate, tear down, become Pending) → provide (new provider ACTIVE; dependents reactivate against new identity). Coexistence of two providers of one capability is illegal in K0 (E.2). A provider mutating its own service value in place is **not** a replacement and is not observed as one (B30) — but the *service contract* may publish its own change events on its data plane; that is the service's business, not the kernel's.
+K0 freezes two distinct notions:
+
+```text
+desired graph     MAY express replacement intent as a single logical edit
+                  (entry A1's component becomes A2) — the desired tree is not
+                  the running registry and carries no per-step lifecycle truth
+
+running registry  NEVER simultaneously holds two installed providers of one
+                  capability — not transitively, not transiently, not
+                  "Pending-but-declared"
+```
+
+Replacement intent is realized as an explicitly **staged** orchestration, issued only by Reconcile on the serialized control plane:
+
+```text
+desired replacement A1 → A2
+
+1. retire A1                    target(A1) → ⊥
+2. A1 leaves new resolution     L-Leave: A1's provisions leave σ_γ
+3. dependents invalidate        their target views recompute; L-Leave cascades
+4. dependents teardown          each unwinds its obligations inside the
+                                teardown-access window (B14); each reaches a
+                                closed episode or latches §G.6
+5. A1 completes unload          guard (¬relied) releases; L-Unload applies;
+                                table provably empty (Cor 69 + §G.6 discharge)
+6. A1 is removed                O-Remove: entry gone from the registry
+7. mount A2                     O-Insert: now, and only now, is A2 inserted
+8. A2 activates                 provisions enter σ_γ
+9. dependents reactivate        against the new provider identity (B30)
+```
+
+**Invariant (frozen; demanded by the paper's own registry well-formedness):** at every step of the sequence — hence at every point of any legal K0 history — the set of installed fibers declaring provision for capability k has **at most one** member. This is not an extra K0 restriction: the paper's O-Insert premise `∀m. pₙ ∩ pₘ = ∅` (B12) quantifies over the **declared provision sets of all installed fibers**, not merely over the derived active context σ_γ. An Unloading old fiber is still installed, so inserting an overlapping new provider before the old is removed would violate the registry invariant outright — the review's reading is the correct one, and the simple staged sequence above is the only replacement shape the formal model licenses. K0 adopts it verbatim and gains a practical bonus: required-single becomes decidable by inspection at every step (not only at quiescence), and no question of which record owns the binding mid-flight can arise. The cost is one drain delay on the serialized control plane — and the honest Pending gap it produces is the same degraded state consumers sit in whenever a dependency is absent (A0 §K.5). A dual-provider intermediate state is therefore not an optimization available to K0; it is forbidden by the formal registry invariant, and frozen out.
+
+Because the control plane is synchronous and serialized (§N), a mount request targeting a capability whose previous provider has not completed removal is simply **not issued early**: Reconcile stages it after the removal. Step 7 never races step 6.
+
+Coexistence of two providers of one capability remains illegal in K0 (E.2). A provider mutating its own service value in place is **not** a replacement and is not observed as one (B30) — but the *service contract* may publish its own change events on its data plane; that is the service's business, not the kernel's.
 
 ### E.5 Capability binding table (artifact 2)
 
@@ -352,7 +414,7 @@ K0 observable lifecycle vocabulary (7): `Absent, Pending, Activating, Active, Un
 | Activating | e raises | Failed | partial accumulator unwinds; nothing installed (Cor 69); error outcome recorded; no auto retry (B19) |
 | Activating | target ≠ ω at completion (divert) | Unloading | unwind accumulated effects immediately; land-in-flight alternative is the only one in K0 (inertia, B20) |
 | Active | target ≠ ω (provider withdrawal / retire / replacement) | Unloading | L-Leave: provisions leave σ_γ **first** (dependents invalidate against this), then unwind |
-| Unloading | guard released (no relied-upon bindings) | Pending (target ≠ ⊥) or Absent-track (retired) | L-Unload: accumulator applied; table provably empty (Cor 69); committed view discarded last |
+| Unloading | guard released (no relied-upon bindings) **and** teardown obligations discharged (§G.6) | Pending (target ≠ ⊥) or Absent-track (retired) | L-Unload: accumulator applied; table provably empty (Cor 69); committed view discarded last. If obligations cannot be discharged, the guard stays latched and this transition is withheld (§G.6) |
 | Failed | revision (reconcile replaces entry) | Absent-track → fresh fiber | retry = new generation, never in-place (B19) |
 | any | retire request (τ=⊤) | (flag only) | lifecycle rules carry it out; removal only from Inactive-family state with empty table and no children |
 
@@ -365,6 +427,9 @@ Unloading       → Active          (guard must release; no resurrection mid-unl
 Failed          → Activating      (no silent retry against unchanged environment)
 any             → ABSENT with non-empty table or live dependents   (Thm 64 / Cor 69)
 provider final release before all dependents finished             (B15 — kernel invariant)
+Unloading → episode close while a teardown obligation is undischarged
+                  (the episode may not close over a violated teardown contract;
+                  §G.6 latches TEARDOWN_VIOLATED and withholds the transition)
 ```
 
 ### F.5 FAILED semantics (mandatory question answered)
@@ -376,6 +441,7 @@ provider final release before all dependents finished             (B15 — kerne
 - It does not propagate: siblings keep running (B19).
 - A dependency that later becomes resolvable again does **not** clear FAILED by itself — retry is a revision decision owned by reconcile/policy, visible as history. (Confluence consequently excludes failed fibers — §M.3.)
 - Domain "retry" policies (e.g., device retry inside AudioOutput) live **inside** the component behind an ACTIVE facade; they are invisible to lifecycle (A0 §G.2 bounded-retry degradation is intra-provider).
+- FAILED (an activation outcome) is a **different class** from a teardown contract violation (§G.6): FAILED is a legal, recordable, revision-recoverable result of an episode that never installed; a violation means an episode that *did* install could not prove it gave everything back — it is a latched condition, not a lifecycle state, and no revision silently clears it.
 
 ---
 
@@ -395,8 +461,12 @@ The frozen #53/#46 sequence, with the paper mechanism that realizes each step:
 5. dependents unwind owned bindings    LIFO accumulator; committed views remain READABLE
                                        (teardown access, B14) — Music closes its Decoder
                                        handle, quiesces + tears down its SinkSession here
-6. dependents finish teardown          each reaches empty table (Cor 69); guard on the
-                                       provider (¬relied) releases fiber by fiber (Thm 73)
+6. dependents finish teardown          each reaches a **discharged** episode close
+                                       (empty table per Cor 69 + all teardown
+                                       obligations discharged, §G.6); the guard on
+                                       the provider (¬relied) releases fiber by
+                                       fiber (Thm 73) — and stays latched against
+                                       any dependent that cannot discharge (§G.6)
 7. provider final release              only now the provider's L-Unload applies its own
                                        accumulator; entry removable
 ```
@@ -408,12 +478,12 @@ The frozen #53/#46 sequence, with the paper mechanism that realizes each step:
 | What remains reachable during teardown? | the withdrawing provider's capability bindings **as values** — readable through dependents' committed views until each dependent's own unload completes. Nothing else changes: no *new* resolution sees the provider (step 2). |
 | Who may access it? | exactly the fibers whose committed views bind the provider (`relied` set); they are by construction all in Unloading/Pending themselves |
 | Can new calls occur? | new *kernel* commitments: no. New *service calls on an existing handle*: the service contract decides — K0 requires contracts to define teardown-time behavior; the Decoder contract keeps `close` valid (A0 §G.1), other calls may fail-closed. This is service-contract semantics, not kernel policy. |
-| How are existing service handles treated? | handles are domain resources owned by the consumer (Music owns its open Decoder handle as an effect with a teardown-access window). The kernel never revokes them; it only guarantees the **window** in which the consumer must dispose of them. |
-| What prevents use-after-provider-destroy? | the guard: the provider's final release physically cannot run while any installed fiber resolves a key to it (L-Unload premise); plus removal requires an empty table and no children (Thm 64). |
+| How are existing service handles treated? | handles are domain resources owned by the consumer (Music owns its open Decoder handle; §J.4 ownership universes). The kernel never revokes them and never tracks them as kernel Effects; it guarantees the **window** in which the consumer must discharge its domain teardown obligations, and the consumer's episode may not close until discharge is complete (§G.6). |
+| What prevents use-after-provider-destroy? | the guard: the provider's final release physically cannot run while any installed fiber resolves a key to it (L-Unload premise); plus removal requires an empty table and no children (Thm 64). A dependent whose teardown violated its contract keeps its committed view open, keeps `relied` true, and keeps this guard latched (§G.6) — the guarantee survives disposer failure instead of assuming it away. |
 | What prevents a withdrawing provider from accepting new dependents? | σ_γ is the union over **ACTIVE** fibers only; an Unloading provider is invisible to target-view computation (B15). |
-| What if dependent teardown fails (disposer errors)? | the effect's inverse has no error channel in K0 semantics — a failing disposer is a defect of the effect owner; the kernel records the failure as a diagnostic (composition truth: teardown anomaly), does not fabricate rollback, and must not wedge: the guard releases on the dependent leaving its episode, and the anomaly is surfaced, not swallowed. [QIANQIAN] on [PAPER]'s total-function setting |
-| What if provider destruction fails? | same class: provider stays observable as teardown-anomalous; nothing below it in the ordering is affected (its dependents are already gone). Root disposal reports the anomaly. |
-| Chain A ← B ← C (C provides to B provides to A)? | invalidation cascades transitively (step 3); unwind orders *against* the dependency edges (A out, then B, then C); termination follows Thm 73 under the acyclic check of §L.4. K0 enforces acyclicity at reconcile, so the cascade always drains. |
+| What if dependent teardown fails (disposer errors)? | **not an ordinary lifecycle result.** A legal K0 inverse is a total semantic obligation (§H.7): failure to discharge it is a teardown contract violation. The dependent's episode does **not** close; a `TEARDOWN_VIOLATED` condition latches (composition truth); every provider whose safety depends on the undischarged obligations keeps its final-release guard **latched**; the run forfeits quiescence, confluence, and independent-removal claims; the violation is surfaced explicitly. Recovery is operator/revision business — "best-effort cleanup, then destroy the provider anyway" is rejected as a correctness model (§G.6). [QIANQIAN] on [PAPER]'s total-function setting |
+| What if provider destruction fails? | same class (§G.6): the provider's episode does not close; its own providers' guards latch if it still relies on them; its (already drained) dependents are unaffected. Root disposal reports the violation and does not claim completion. |
+| Chain A ← B ← C (C provides to B provides to A)? | invalidation cascades transitively (step 3); unwind orders *against* the dependency edges (A out, then B, then C); termination follows Thm 73 under the acyclic check of §L.4 — **provided every disposer discharges**; a violated teardown latches §G.6 and deliberately withholds further progress on that edge. K0 enforces acyclicity at reconcile, so a clean cascade always drains. |
 
 ### G.3 Withdrawal trace — Decoder replacement mid-playback (artifact 3)
 
@@ -426,18 +496,25 @@ t3  Music target view recomputes (push) ≠ its ω(D1) → Music L-Leave:
     their *registrants*; the contribution registry vanishes with the capability, and
     foreign tokens dispose as idempotent no-ops — H.4)
 t4  Music Unloading (teardown access to D1's binding still valid):
-      a. decode worker quiesce/join                                [Music effect]
-      b. song_close(open handle) — still valid, D1 not yet released [Music effect]
-      c. SinkSession binding quiesce/teardown (commit/flush)        [Music effect]
+      a. decode worker quiesce/join                                [Music composition effect]
+      b. song_close(open handle) — still valid, D1 not yet released
+                                                                   [Music domain teardown
+                                                                    obligation, §J.4 — must
+                                                                    discharge before episode
+                                                                    close, §G.6]
+      c. SinkSession binding quiesce/teardown (commit/flush)        [Music composition effect]
       d. remaining owned effects LIFO
-t5  Music reaches empty table → Pending (deps currently unsatisfied)
+t5  Music reaches a discharged episode close → Pending (deps currently unsatisfied)
 t6  guard on D1 released (no committed view names D1) → D1 L-Unload:
-      FFmpeg closure resources released  — use-after-unload impossible by construction
-t7  D2 mounts → ACTIVE → `Decoder` in σ_γ → Music target ≠ ⊥ → Music activates:
+      FFmpeg closure resources released — use-after-unload impossible by construction
+t7  D1 entry removed (O-Remove) — **only now** D2 mounts (staged replacement, §E.4):
+      D2 → ACTIVE → `Decoder` in σ_γ → Music target ≠ ⊥ → Music activates:
       fresh episode, commits ω(D2); binds PcmSink at ACTIVATION (A0 frozen rule);
       domain recovery (reopen same source, park-at-CONFIRMED policy) is Music's
       §H.b business, invisible here
 ```
+
+At every step t0–t7 exactly one installed fiber declares provision for `Decoder` (D1 until t7's insert replaces the removed entry, D2 after) — the E.4 invariant holds pointwise, not only at quiescence.
 
 ### G.4 Withdrawal trace — AudioOutput / device switch
 
@@ -459,6 +536,100 @@ t4  Music resumes per policy; if no replacement exists, Y never appears and
 
 No music-specific step, device policy, or track semantics may enter this protocol — G.3/G.4 are *instances*; the mechanism (steps 1–7) is fully generic. The two traces differ only in what the dependent's owned effects are.
 
+### G.6 Teardown contract violations (frozen in Corrective-1)
+
+The paper works in a total-function setting: every inverse, once invoked, completes (B16). K0 keeps that setting **as a contract on components**, not as an assumption about defective implementations:
+
+```text
+FROZEN — the infallible-inverse contract:
+A legal K0 Effect inverse is a total semantic obligation. Once the owning
+fiber's teardown (or explicit dispose) invokes it, the inverse must complete
+its semantic teardown obligation. The inverse has no failure outcome in the
+kernel's semantic model.
+
+An implementation in which an inverse fails to discharge its obligation has
+violated the component contract. This is NOT an ordinary recoverable
+lifecycle result:
+
+    ordinary activation failure   ≠   teardown invariant violation
+    (B19: FAILED outcome,              (contract violated; see below)
+     revision-owned retry)
+```
+
+An activation failure is a legal outcome a component may produce (§F.5): the environment was unsatisfiable, the component says no, the accumulator unwinds, nothing installs. A teardown violation is different in kind: the component already said yes, acquired state, and now cannot prove it gave the state back. Proceeding as if cleanup succeeded is exactly the use-after-provider-destroy the withdrawal window exists to prevent.
+
+**K0 semantics on violation:**
+
+```text
+teardown contract violation (any disposer fails to discharge)
+        ↓
+the fiber's episode does NOT close        (F.4: no close over undischarged
+                                           obligations; committed view stays open)
+        ↓
+TEARDOWN_VIOLATED latches                 (composition-truth condition on the
+                                           fiber — a diagnostic flag, NOT a new
+                                           lifecycle state and NOT a sixth primitive;
+                                           final name is an implementation-issue choice)
+        ↓
+providers whose safety depends on the undischarged obligations
+MUST NOT final-release                    (their ¬relied guard stays latched: the
+                                           open committed view keeps `relied` true —
+                                           B14's window mechanism reused verbatim)
+        ↓
+the violation is surfaced explicitly      (composition-truth diagnostic; the kernel
+                                           knows "teardown contract violated", never
+                                           the domain why — §J.3)
+```
+
+**What a latched run may no longer claim:**
+
+```text
+clean quiescence               the quiet predicate requires no open episode and
+                               no latched violation (§L.1)
+successful independent removal any removal claim involving the violated fiber is void
+composition confluence         §M excludes violation histories — Thm 80's
+                               total-function precondition is what failed
+safe provider final release    the guard stays latched; the provider stays alive
+```
+
+**What is deliberately traded:** progress. Thm 73's deadlock-freedom presupposes inverses complete; by violating that hypothesis the defective component forfeits automated progress on its dependency edges. K0 accepts this: liveness is never bought with a use-after-provider-destroy hazard. The kernel does not "wedge silently" — the violation is loud, diagnosable composition truth — but it also does not pretend the episode closed.
+
+**Recovery** is not automatic and not fabricated:
+
+```text
+no invisible retry of the failed disposer          (same discipline as B19)
+no automatic provider destruction past the latch   (rejected correctness model:
+                                                    "best-effort cleanup, then
+                                                    destroy anyway")
+operator/revision options — full process restart, or a future explicit policy —
+are [OPEN] at the implementation issue; the frozen part is: latch + surface +
+block final release + forfeit quiescence/confluence claims
+```
+
+The violation class covers **both** failure sites: a disposer failing during ordinary Unloading, and a disposer failing while the partial accumulator of a failed activation unwinds (Cor 69's "installs nothing" also presupposes its inverses complete — §G.6 latches identically there).
+
+**Scenario A — failed consumer teardown (required adversarial case):**
+
+```text
+Decoder D1 ACTIVE; Music ACTIVE, requires D1;
+Music owns a domain Decoder handle (a track was opened — §J.4 domain universe)
+
+D1 withdraws (retire or replacement)
+  → D1 leaves σ_γ; Music invalidated; Music enters Unloading
+  → Music runs its teardown inside the window (§G.3 t4):
+      song_close(handle) FAILS
+  → Music's teardown obligations are undischarged
+  → Music's episode does NOT close; TEARDOWN_VIOLATED latches on Music
+```
+
+Answers required by review:
+
+- **Can D1 final-release?** No. Music's committed view still names D1 (the episode never closed), so `relied` stays true and D1's L-Unload guard stays latched. The remaining domain resource can never reference dead provider state through this edge.
+- **Can the system claim quiescence?** No. Music sits in an open Unloading episode with a latched violation — the quiet predicate (§L.1) is false, and stays false until an operator/revision resolution (e.g., process restart) clears the fiber.
+- **What state is observable?** Composition truth: Music Unloading + `TEARDOWN_VIOLATED`; D1 still installed but non-providing (σ_γ excludes it — no new consumer can bind); siblings unaffected and still runnable; diagnostic surface shows the violation without domain detail (§J.3).
+- **What must operator/revision do?** Treat it as a component-contract defect, not a runtime glitch: capture the diagnostic, restart or otherwise externally resolve the run, fix the defective disposer. The kernel offers no automatic "continue anyway" path — that path is frozen out.
+- **Which theorem assumptions no longer apply?** Cor 69/Thm 64 (empty table, clean removal — the conclusion is withheld), Thm 73 (progress/deadlock-freedom — presupposed total inverses), Thm 80 (confluence — §M excludes the history), and the §6.1-style treatment of teardown as complete. The paper never models disposer failure (total-function setting), so none of its theorems licenses proceeding past a violated inverse; §G.6 is the [QIANQIAN] semantics for that case.
+
 ---
 
 ## H. Effect / Independence / Commutativity Model
@@ -468,7 +639,7 @@ No music-specific step, device policy, or track semantics may enter this protoco
 One fiber's owned effects unwind strictly LIFO within its episode (B1–B3, B26). K0 obligations:
 
 - every kernel-visible mutation performed by a fiber is registered as an owned effect at the moment of mutation;
-- the inverse must actually revert at the state of application — an **author obligation** the runtime does not verify (paper §5.1.1) and review/tests must;
+- the inverse must actually revert at the state of application — an **author obligation** the runtime does not verify (paper §5.1.1) and review/tests must; it is additionally a **total semantic obligation**: failure to discharge is a teardown contract violation, not a lifecycle result (§H.7, §G.6);
 - dispose is idempotent; effects cannot fire after their episode ends;
 - activation is one bounded step: either it completes, or it raises and unwinds **everything it did** (Cor 69 — a failed/aborted activation installs nothing).
 
@@ -513,17 +684,60 @@ This is the paper's entry-per-registration commutative-key pattern. It is **not*
 
 For DSP (`EQ → Compressor ≠ Compressor → EQ`), order lives in: the **declared desired topology** (Reconcile input), the future graph-owner component (`AudioRuntime`, deferred with A0 §J triggers), or the domain kernel — never in registration timing, hash iteration, or mount order.
 
-### H.5 Effect classification and the system boundary
+### H.5 Effect classification and the system boundary (composition-owned universe)
 
-| Class | Definition | MVP examples | Paper grounding |
+**Scope (frozen in Corrective-1): this table classifies composition-owned Effects only** — kernel-visible mutations whose existence a fresh construction of the desired composition exhibits (§J.4 ownership universes). Domain-session mechanisms are a separate universe and live in §H.5.1; they never enter this table and never enter the composition-confluence oracle.
+
+| Class | Definition | MVP composition-owned examples | Paper grounding |
 |---|---|---|---|
-| Reversible | tracked effect with a true inverse | capability provision, listener registration, child mount, decoder-handle open/close, SinkSession bind/teardown, ring/worker alloc | B4, §3.1 |
-| Transactional | all-or-nothing with fail-closed outcome | seek (CONFIRMED landing or ERROR, never half-seek), track open (READY @0 or ERROR) | [QIANQIAN] semantics; consistent with B19's atomic activation |
-| Compensatable | application-supplied coarser recovery | stop-recovery reopen; device switch park-at-CONFIRMED (silence is honest for the interim) | B23 compensation (commutation must be re-proved against the coarser relation) |
-| Irreversible (protocol point-of-no-return) | rollback/cancellation authority ends; outcome must be awaited | CLAIMED flush (I4) | B23 emission + A0 corrective P1-3 |
-| Outside recoverable boundary | crosses into the external world | physically rendered audio; host-IO side effects | B23 emission |
+| Reversible | tracked effect with a true inverse | capability provision, commutative listener registration, child mount, SinkSession bind/unbind (frozen bind-at-activation rule), Music's activation-owned playback mechanisms (decode worker, ring — present in a fresh construction per A0 §B.1/§H.a) | B4, §3.1 |
+| Transactional | all-or-nothing with fail-closed outcome | none in MVP composition truth (class reserved for future composition-owned effects) | consistent with B19's atomic activation |
+| Compensatable | application-supplied coarser recovery | none in MVP composition truth | B23 compensation (commutation must be re-proved against the coarser relation) |
+| Irreversible (protocol point-of-no-return) | rollback/cancellation authority ends; outcome must be awaited | none in MVP composition truth | B23 acquisition/emission split |
+| Outside recoverable boundary | crosses into the external world | none in MVP composition truth | B23 emission |
 
 An Effect may wrap an acquisition (tracked); it must never claim to roll back an emission. `Everything is a Plugin` ≠ `Everything is rollbackable`.
+
+### H.5.1 Domain-session mechanisms are NOT K0 Effects (frozen: Option A)
+
+The classes above are also used **descriptively** at the domain layer (A0 §F froze domain-mechanism classifications), but domain-session resources are owned by domain/session semantics, not by the composition kernel. Corrective-1 freezes the ownership-universes split and, with it, the design question the review surfaced about the paper's episode-oriented effect model:
+
+```text
+DECISION (frozen) — Option A: the K0 Effect is composition-lifecycle only.
+
+Domain resources use domain ownership mechanisms outside the generic
+composition-confluence oracle. K0 does NOT track domain-time resources
+through the Effect machinery. (Option B — fibers registering ACTIVE-time
+runtime effects into the kernel accumulator — is deferred with an explicit
+trigger; it would require ACTIVE-time registration rules, episode/generation
+attachment, confluence-exclusion rules for domain-triggered effects, and
+provider-withdrawal unwinding of runtime effects, and nothing in #53 or the
+MVP requires paying that cost.)
+```
+
+| Domain-session mechanism | Descriptive class | Owner | Kernel-visible? |
+|---|---|---|---|
+| open Decoder handle after track open (open/close) | reversible at the domain layer, discharged inside the teardown-access window | Music's domain session (A0 §F) | existence/value: **no** (domain truth, §J.2); discharge completed or violated: **yes, as episode close vs §G.6 latch** |
+| seek transaction (CONFIRMED landing or ERROR, never half-seek); track open (READY@0 or ERROR) | transactional | Music's domain session | no |
+| stop-recovery reopen; device-switch park-at-CONFIRMED | compensatable | Music / provider policy | no |
+| CLAIMED flush (commit/flush handshake, I3/I4/I5) | **irreversible protocol point-of-no-return** — from CLAIMED, cancellation/rollback authority ends and control must await the outcome (I4) | RT island mechanism, *driven by* composition teardown ordering (§K.2/§G.4) | handshake state: no; binding teardown state: yes (§K.3) |
+| physically rendered audio | **outside recoverable boundary — the external emission boundary** | the physical world | no |
+
+**CLAIMED ≠ emission (frozen, A0 corrective P1-3, restated because review found a regression):**
+
+```text
+CLAIMED flush  = the protocol point-of-no-return: cancellation/rollback
+                 authority ends; the outcome must be awaited (I4);
+                 protocol-level irreversibility
+physical render = the external emission boundary: sound crossed the
+                 recoverable system boundary; concrete external emission
+```
+
+A claimed flush is classified Irreversible **because rollback authority ends at CLAIMED** (and a flush may irreversibly discard device-buffer state) — it is *not* classified as, and must never be equated with, the external emission itself. A silent/null backend can pass CLAIMED with nothing audible emitted.
+
+**Scenario D — CLAIMED without emission (required adversarial case):** a null/silent output backend performs a graph-swap flush. The handshake reaches CLAIMED: from this point the swap can no longer be cancelled, and the pipeline must await COMPLETED (I4). No sample is ever rendered; the external emission boundary is never crossed; there is nothing to compensate for in the world. Both facts hold simultaneously and neither subsumes the other — the point-of-no-return governs protocol authority, the emission boundary governs external-world effects. Any wording equating CLAIMED with emission is a defect (it was exactly the regression this corrective removed from §B23/§H.5).
+
+The bridge between the universes is **obligation discharge, not effect tracking**: a fiber's teardown procedure must discharge its declared domain obligations (e.g., close the Decoder handle) inside the §G window; the kernel observes only *completion or violation* of that discharge (§G.6), never the resources themselves (§J.3).
 
 ### H.6 Effect-independence matrix (artifact 4)
 
@@ -542,6 +756,29 @@ MVP interactions classified; "independent removal" means: remove one side at qui
 | commit/flush swaps | RT handshake state | ordered single-flight (I3/I4/I5) | no (protocol) | the handshake itself (domain mechanism island) |
 | host-IO callbacks ↔ Decoder | payload data edge | not kernel effects | n/a (host-owned) | data-edge ownership (§K) |
 
+### H.7 The inverse is a total semantic obligation (frozen in Corrective-1)
+
+H.1's "the inverse must actually revert at the state of application" is an *author obligation* — and in K0 it is also a **totality contract**, not a best-effort hope:
+
+```text
+registering an Effect asserts: its inverse, once invoked, can and will
+discharge the effect's semantic teardown obligation.
+
+A legal K0 Effect has no failure outcome. If an implementation's disposer
+fails to discharge, the component contract is violated and §G.6 applies:
+
+    episode does not close → TEARDOWN_VIOLATED latches → provider guards
+    whose safety depends on the obligation stay latched → the run forfeits
+    quiescence / independent-removal / confluence claims → surfaced loudly.
+```
+
+Consequences for effect authors and the kernel:
+
+- **Effects must wrap only obligations whose discharge is actually achievable inside the episode.** An effect whose cleanup can legitimately fail (e.g., a device close with a wedged backend) must be modeled so that the *kernel-visible* inverse still completes — recording the domain-level failure in domain truth — or the author must accept that its failure is a contract violation with §G.6 consequences. Effects are not a place to hide uncertain cleanup.
+- **No fabricated rollback**: a disposer must never *report* success for an obligation it did not discharge (§O.2). A partial discharge is a violation, not a success with notes.
+- **The kernel does not retry disposers** and does not offer "continue past violation" — the rejected correctness model is `best-effort cleanup → guard releases → provider may die`.
+- The paper grounding stays honest: B1–B3/B16's guarantees (LIFO recovery, empty-table removal) are theorems *in the total-function setting*. §G.6/§H.7 do not extend those theorems to failing inverses — they define the Qianqian behavior when the setting is violated, and name exactly which guarantees are forfeited.
+
 ---
 
 ## I. Observational Equivalence
@@ -555,7 +792,7 @@ Comparison of restored/settled state happens at exactly these surfaces (closed s
 3. **committed bindings**: which consumer binds which provider (semantic identity, not uid values);
 4. **contribution sets**: per commutative key, the set of live contributions compared by semantic identity (listener *kinds*), never token values; dispatch count == registered count where observable;
 5. **composition-owned data-edge bindings**: SinkSession/device-session existence per live Music↔PcmSink binding (idle ≠ absent — A0 frozen activation rule);
-6. **ghost absence**: no bindings, provisions, contributions, sessions, or effects beyond the desired set.
+6. **ghost absence**: no composition-owned bindings, provisions, contributions, sessions, or effects beyond the desired set. Scope (frozen in Corrective-1): the ghost oracle checks the composition-owned universe only (§J.4/§H.5) — a legitimately open Decoder handle, track session, or other domain-session resource that exists because a user/domain action occurred is **never a ghost effect**, precisely because the clean baseline is defined as *no domain session* (A0 §H.b): comparing composition truth against it is well-formed only if domain resources are outside the comparison (§J.1, §M.2).
 
 ### I.2 What is deliberately NOT compared
 
@@ -606,7 +843,48 @@ Any proposed kernel API/diagnostic needing:
 track   position   playback intent   ENDED   device retry policy   reopen checkpoint
 ```
 
-is an **architecture violation on sight** — redesign (that data lives behind `PlaybackControl`/`PlaybackSnapshot`/provider contracts; the kernel may know "Music failed activation", never "Music failed because the file was bad").
+is an **architecture violation on sight** — redesign (that data lives behind `PlaybackControl`/`PlaybackSnapshot`/provider contracts; the kernel may know "Music failed activation", never "Music failed because the file was bad"). The same firewall applies to teardown: the kernel may know "Music's teardown contract was violated" (§G.6), never "song_close failed on file X".
+
+### J.4 Ownership universes (frozen in Corrective-1)
+
+There are exactly two ownership universes, and a fact belongs to exactly one:
+
+```text
+COMPOSITION-OWNED LIFECYCLE EFFECTS
+    capability provision
+    commutative listener registration (when part of plugin activation)
+    SinkSession bind created by the frozen Music-activation rule
+    fiber-owned composition bindings/data edges
+    activation-owned component mechanisms a fresh build exhibits (worker, ring)
+
+    → participate in: Composition Kernel effect calculus (§H),
+      composition confluence (§M), ghost-effect oracle (§I.1.6)
+
+DOMAIN / RUNTIME RESOURCES
+    open Decoder handle after a user opens a track
+    track session
+    playback transaction resources (seek/flush transaction state)
+    checkpoint / recovery state
+
+    → owned and torn down under domain/session semantics (A0 §F);
+      they do NOT automatically become Composition Kernel Effects,
+      composition-confluence state, or ghosts (§I.1.6, §H.5.1, Option A)
+```
+
+The bridge between universes is **obligation discharge**: when a fiber tears down, its episode may close only after its composition effects are unwound **and** its declared domain teardown obligations are discharged (§G.6). The kernel sees completion/violation of discharge; it never sees the resources (§J.3). This keeps the Decoder handle safely torn down *inside* the provider-withdrawal window without making the handle a kernel fact.
+
+**Scenario C — user opens a track (required adversarial case):**
+
+```text
+fresh composition: Music + Decoder + AudioOutput; no track (clean baseline)
+user opens track A → a Decoder handle appears inside Music's domain session
+```
+
+The composition graph is unchanged: same fibers, same capabilities, same committed views, same SinkSession binding (which existed pre-open per the activation rule). Composition truth before == composition truth after; the handle is domain truth (§J.2). Therefore:
+
+- **composition confluence does not fail**: §M compares the settled registry against `Fresh(D_H)` *constructed with no domain session* at the §I.1 surfaces — none of which contain the handle. Domain-resource existence is structurally outside the comparison (§J.1 classifier, §M.2).
+- **the handle is not a ghost**: §I.1.6 scopes ghost absence to the composition-owned universe; a domain-session resource present because a domain action legitimately occurred is the classifier working as designed, not a leak. The ghost oracle would fire only if a composition-owned artifact (a stale binding, a second SinkSession, a provision from a dead generation) outlived its justification.
+- Symmetrically, a *composition* mutation (e.g., decoder replacement) does not have to preserve or even observe the handle's *value* — it only has to preserve the window in which Music discharges it (§G), and Music's domain continuity is §H.b policy business, not confluence.
 
 ---
 
@@ -664,7 +942,10 @@ Running graph R    the fiber registry + lifecycle states
 Difference         per-entry: absent | extra | same-component-different-generation
 Transition plan    a sequence of orchestration requests: mount / retire / revise
 Settlement         quiescence = quiet predicate (B13): every fiber sits at its target view,
-                  no transition in flight
+                  no transition in flight; K0 adds (Corrective-1): no latched
+                  TEARDOWN_VIOLATED condition (§G.6) — a run with an open
+                  teardown episode is not quiescent, and a latched run can
+                  never satisfy the predicate
 ```
 
 Reconcile is the **only** issuer of orchestration requests. It never sets lifecycle state directly; it never touches effects; it never wires data edges.
@@ -675,13 +956,14 @@ Reconcile is the **only** issuer of orchestration requests. It never sets lifecy
 |---|---|
 | mount(entry) | insert fiber (Pending); lifecycle rules do the rest (B24's loader argument: no load order needed — providers first is *emergent*, not arranged) |
 | unmount(id) | retire → wait for quiesced deactivation → remove (entry may re-mount later) |
-| replace provider | retire(old) + mount(new); consumers transition through Pending automatically; **equal-value replacements still reactivate consumers** (B30) |
+| replace provider | **staged replacement (§E.4)**: retire(old) → dependents invalidate + teardown → old completes a discharged unload → old removed → *then* mount(new) → new ACTIVE → dependents reactivate. The mount(new) request is issued only after the removal completes (serialized control plane); the running registry never holds two providers of one capability at any step. Equal-value replacements still reactivate consumers (B30) |
 | missing provider | not an error: dependants sit Pending; root never crashes (A0 §K.5) |
 | ambiguous provider | **composition error**: desired graph itself is illegal (two enabled providers of one required-single capability) — reported, plan refused, no silent pick (E.2) |
 | dependency cycle | **composition error**: detected from declarations alone (B24); refused at plan time; the runtime never sits on an undetactable deadlock |
 | activation failure | fiber records FAILED outcome; reconcile leaves it visible; no invisible retry (B19) |
+| teardown contract violation | **not an activation outcome**: the fiber's episode stays open, TEARDOWN_VIOLATED latches, dependent provider final-release guards stay latched (§G.6); reconcile surfaces it and issues no further requests through the affected edge; recovery is operator/revision business |
 | revision (config change / retry / re-enable) | retire → deactivate → remove → re-mount as a fresh fiber/generation (paper §4.4 Configuration composite); dependents follow unprompted |
-| root disposal | retire all; dependents before providers emerge from the guard ordering; quiescence = empty registry; teardown anomalies reported, not swallowed |
+| root disposal | retire all; dependents before providers emerge from the guard ordering; quiescence = empty registry; teardown contract violations latch §G.6 — root disposal reports them and does not claim completion while a violation is open |
 
 ### L.3 Incremental + eventually convergent (chosen), not globally transactional
 
@@ -708,7 +990,7 @@ totality:       providers install every declared key on a completed activation
 
 ### M.1 The property (K0 statement)
 
-> For any legal orchestration history H (mounts/retires/revisions only, no activation failures) reaching quiescence, the **composition truth** of the settled registry is observationally equivalent — at the §I.1 surfaces, up to fiber-name renaming and vestigial-entry invisibility — to `Fresh(D_H)`, a clean dependency-ordered load of the final desired composition D_H, **constructed with no domain session** (A0 §H.b clean-baseline rule).
+> For any legal orchestration history H (mounts/retires/revisions only, no activation failures, no teardown contract violations) reaching quiescence, the **composition truth** of the settled registry is observationally equivalent — at the §I.1 surfaces, up to fiber-name renaming and vestigial-entry invisibility — to `Fresh(D_H)`, a clean dependency-ordered load of the final desired composition D_H, **constructed with no domain session** (A0 §H.b clean-baseline rule).
 
 This is [PAPER] Thm 80 (with Lemma 61/62 readings) narrowed to Qianqian's composition-truth classifier (A0 §H.a). Conditions: L.4's checks (acyclicity, totality, finiteness, boundedness) hold.
 
@@ -718,7 +1000,7 @@ This is [PAPER] Thm 80 (with Lemma 61/62 readings) narrowed to Qianqian's compos
 
 ### M.3 Failure exclusion
 
-Histories containing activation failures are **excluded from confluence claims** (B19: schedule-dependent failure breaks endpoint equality). They get their own assertions via §O: no ghost effects, FAILED visible, siblings unaffected. A retry decision is a revision — itself just another history step.
+Histories containing activation failures **or teardown contract violations** are **excluded from confluence claims** (B19: schedule-dependent failure breaks endpoint equality; §G.6: a violated inverse exits the total-function setting Thm 80 presumes — the empty-table and guard-release conclusions of Cor 69/Thm 73 are exactly what failed). Activation failures get their own assertions via §O: no ghost effects, FAILED visible, siblings unaffected. Teardown violations get theirs: episode open, violation latched, provider final release blocked, quiescence forfeited (§G.6) — the assertions are about the *honest poisoned state*, never about proceeding as if clean. A retry decision is a revision — itself just another history step; there is no revision that silently clears a latched §G.6 violation (that resolution is operator/revision business, visible in history).
 
 ### M.4 Confluence history matrix (artifact 7)
 
@@ -728,7 +1010,7 @@ Composition assertions are unconditional; continuity probes are policy-condition
 |---|---|---|---|
 | M0 | root without UiHost, null output (headless) | same root | baseline itself: full capability/fiber/binding truth without UI |
 | M1 | provider X absent → present → absent → present (flap, N times) | fresh build with X present | bindings resolve to the *final* X generation; no ghost generations; dependents ACTIVE |
-| M2 | A1 → A2 → A1 provider generations (same capability) | fresh build with final A1′ generation | consumers committed to final provider; no stale views; exactly one provider of the capability |
+| M2 | A1 → A2 → A1 provider generations (same capability; each replacement staged per §E.4) | fresh build with final A1′ generation | consumers committed to final provider; no stale views; exactly one provider of the capability **at every step of the history, not only at quiescence** (E.4 invariant) |
 | M3 | consumer mounted **before** provider vs **after** provider (two runs) | fresh build of both | identical settled truth — order of mounting is not observable at quiescence (B24 loader argument) |
 | M4 | activation fails once (e.g., device init error) → revise/retry succeeds | fresh build of the succeeded generation | confluent *after* the retry revision; during failure: FAILED visible, no ghosts (§M.3) |
 | M5 | same-key contributions added/removed in opposite orders | clean set | final listener sets equal by semantic identity; dispatch count == registered count (H.4) |
@@ -739,7 +1021,7 @@ Composition assertions are unconditional; continuity probes are policy-condition
 | M10 | listeners in opposite orders (A0 H5) | clean set | M5 stated for the MVP listener set |
 | M11 | UiHost removed mid-playback (A0 H6) | root without UiHost | playback capability/fiber truth unchanged by removing a pure consumer |
 | M12 | (future DSP) insert EQ → switch output → remove EQ → replace decoder (A0 H7) | clean Music+Decoder+Output(+nodes) | node list == desired order; no ghost nodes/taps |
-| M13 | root disposal from any quiescent state (A0 H8) | n/a | empty registry; all composition-owned resources released (device session closed, SinkSession torn down); anomalies reported |
+| M13 | root disposal from any quiescent state (A0 H8) | n/a | empty registry; all composition-owned resources released (device session closed, SinkSession torn down); a teardown contract violation instead latches §G.6 and root disposal reports non-completion |
 
 M0–M3, M5–M11, M13 are expressible with the MVP decomposition; M4 needs a fail-then-revise flow; M12 needs DSP (deferred with AudioRuntime).
 
@@ -784,14 +1066,14 @@ Columns: what remains observable · what must be cleaned · what can retry · wh
 
 | Scenario | Observable remains | Must clean | Retry? | FAILED? | Blocks quiescence? | Invariants |
 |---|---|---|---|---|---|---|
-| provider activation throws | entry + outcome; dependents stay Pending | partial effects of the raising activation (Cor 69: none survive) | revision only | provider fiber | no (failed fibers are quiet-legal, B19) | no ghost provisions; siblings run |
-| consumer activation fails after 2 effects, 3rd raises | entry + outcome | effects 1–2 unwound; installs nothing | revision only | consumer fiber | no | empty table at rest (Cor 69) |
-| consumer teardown partially fails (disposer error) | teardown anomaly diagnostic; fiber still completes exit | best-effort; anomaly recorded, never swallowed | manual/revision | no (anomaly ≠ activation failure) | the anomalous fiber's own episode closes; others unaffected | guard still releases (dependent left episode); no silent wedge |
+| provider activation throws | entry + outcome; dependents stay Pending | partial effects of the raising activation (Cor 69: none survive — presupposing their inverses discharge; a failing unwind is §G.6) | revision only | provider fiber | no (failed fibers are quiet-legal, B19) | no ghost provisions; siblings run |
+| consumer activation fails after 2 effects, 3rd raises | entry + outcome | effects 1–2 unwound; installs nothing (unwind failure → §G.6) | revision only | consumer fiber | no | empty table at rest (Cor 69) |
+| consumer teardown disposer fails to discharge (§G.6) | TEARDOWN_VIOLATED latched on the fiber; its committed view stays open; **no clean-exit claim** | the fiber's episode stays open by design — nothing further may claim discharge | no invisible retry; operator/revision only | no — distinct class: violation ≠ activation-FAILED | **yes — deliberately**: quiet predicate unsatisfiable while latched; provider final release blocked | no UAF path: providers the fiber relied on keep `relied` true (B14 window); violation surfaced (§J.3); siblings unaffected |
 | provider withdrawal during consumer activation | consumer divert → Unloading (target moved) | partial activation unwound | automatic (re-activates when satisfiable) | no | no | resolution coherence (Thm 71): no effect survives against a stale view |
 | root disposal during withdrawal | registry draining | same §G order, all providers | n/a | no | until drained (finite, Thm 73) | dependents-before-providers to the end |
-| replacement appears before old provider fully drains | old: Unloading→gone; new: Pending→ACTIVE | old's release completes regardless | dependents re-activate against new | no | no | single-source never violated: old left σ_γ before new entered |
+| replacement (desired A1 → A2) | staged per §E.4: old drains fully and is removed before new mounts; intermediate state = A1 gone, A2 not yet present (consumers Pending) | old's release completes before A2 is inserted | dependents re-activate automatically against A2 at step 9 | no | until the staged sequence drains (finite, serialized) | **single-source at every step**: installed provision sets for the capability never exceed one (E.4 invariant); a mount request is never issued early |
 | same-key disposer called twice | nothing | — | — | — | — | idempotent no-op (B26) |
-| effect disposer fails | see row 3 | — | — | — | — | anomaly surfaced; no fabricated rollback |
+| effect disposer fails | see §G.6 row (TEARDOWN_VIOLATED) | — | — | — | — | violation latched; no fabricated rollback; provider guards stay latched |
 | two required-single providers appear simultaneously | plan refused before any mount | nothing mounted | fix desired graph | no (composition error, not fiber state) | plan rejected (system keeps previous composition) | ambiguity never becomes runtime state (E.2) |
 | dependency chain invalidates transitively (C←B←A withdrawal) | cascade of L-Leave | each dependent unwinds own effects | automatic on re-satisfaction | no | until chain drains (finite, acyclic) | ordering Thm 70(2) |
 | activation runs forever | fiber stuck Activating | — | — | no (it's a hang, not a failure) | **yes** — boundedness violated | L.4 boundedness is the guard; a hang is a defect of e, surfaced by diagnostics |
@@ -799,9 +1081,10 @@ Columns: what remains observable · what must be cleaned · what can retry · wh
 
 ### O.2 Reading rules
 
-- No scenario leaves unexplained ghost state: every "must clean" cell is Cor 69 (empty table at episode close) or an explicitly surfaced anomaly.
-- Retry is always either *automatic reactive re-activation* (dependency returned; the fiber was never failed) or *visible revision* (after FAILED). Never an invisible loop.
-- Quiescence blockers reduce to: in-flight transitions (finite by Thm 73 under L.4) or an unbounded activation (a component defect caught by the boundedness check).
+- No scenario leaves unexplained ghost state: every "must clean" cell is Cor 69 (empty table at episode close) or an explicitly latched/surfaced §G.6 violation — never a silent "assume it's clean".
+- Retry is always either *automatic reactive re-activation* (dependency returned; the fiber was never failed) or *visible revision* (after FAILED). Never an invisible loop. A teardown contract violation has no retry at all in K0 — it latches (§G.6).
+- Quiescence blockers reduce to: in-flight transitions (finite by Thm 73 under L.4), an unbounded activation (a component defect caught by the boundedness check), or a latched TEARDOWN_VIOLATED (§G.6 — deliberate, surfaced, operator-resolved).
+- No disposer may report success for an obligation it did not discharge; partial discharge is a violation, not a success with notes.
 
 ---
 
@@ -865,8 +1148,9 @@ Typed static capability keys + object-safe service traits + generational `FiberI
 | 13 | Can a failed activation leave ghost state? | **PASS** | raise routes into Unloading with the partial accumulator; Cor 69 empties the table; FAILED carries the outcome (B19, O.1) |
 | 14 | Can two legal histories reach visibly different settled composition? | **PASS** (conditioned) | not under L.4 checks + no-failure histories (Thm 80, §M); failure histories are excluded by definition and covered by §O assertions; the conditioning is explicit, not hand-waved |
 | 15 | Does anything require kernel work on the realtime path? | **PASS** | §N.2 table: all kernel operations forbidden per block; zero exceptions proposed |
+| 16 | Can a failing disposer hide a use-after-provider-destroy? | **PASS** (frozen in Corrective-1) | the old "anomaly + exit + guard releases" shape was a review-confirmed defect; §G.6/§H.7 freeze the infallible-inverse contract: violated teardown keeps the episode open, latches TEARDOWN_VIOLATED, blocks provider final release, and forfeits quiescence/confluence claims — liveness is traded, never safety |
 
-Score: 14 PASS, 1 DEFERRED-WITH-TRIGGER (#10, routed to §T). No DESIGN DEFECT.
+Score: 15 PASS, 1 DEFERRED-WITH-TRIGGER (#10, routed to §T). No DESIGN DEFECT remaining. (Corrective-1 converted the review-confirmed defect in the teardown-failure story into #16's frozen defense.)
 
 ---
 
@@ -904,6 +1188,7 @@ Explicitly rejected framework-growth patterns (no present requirement proves the
 | silent auto-retry of failed activations | rejected | breaks quiescence decidability and confluence accounting (B19); retry = visible revision |
 | globally transactional reconcile (all-or-nothing mount batches) | rejected | would need second-order recovery machinery; Thm 80 makes quiescent convergence sufficient (L.3) |
 | FAILED as terminal product state / as retry loop | rejected (both extremes) | F.5: outcome-record semantics; revision-owned retry |
+| "best-effort cleanup" teardown: failing disposer exits anyway, guard releases, provider may die | **rejected** (Corrective-1; review-confirmed defect of Revision 1) | the exact use-after-provider-destroy the withdrawal window exists to prevent (§G.6); teardown violations latch, block provider final release, and forfeit quiescence/confluence claims |
 | string-keyed capability registry | rejected | B25 drift/collision; typed keys preferred (P) |
 | semver/structural dependency solver | rejected for K0 | B25 open problem; single compilation unit makes key typing sufficient |
 | YAML/config-file layer | rejected for K0 | #67 G: in-memory desired tree only |
@@ -925,16 +1210,43 @@ Implementation-issue inputs, not design gaps — each has a frozen semantic answ
 4. **Capability-contract Rust shape** — typed keys + object-safe traits vs other; SongCore ABI v1 as *the* Decoder seam vs one implementation behind it (A0 §K.1; P.2 exposes the object-safety collision).
 5. **Dual-mode resolution API shape** — `resolve_now` vs `resolve_teardown` (P.2) must remain visibly distinct in any API freeze.
 6. **Activation boundedness enforcement** — how the kernel surfaces/disallows non-terminating activations (L.4) beyond review discipline.
-7. **Teardown-anomaly surface** — exact diagnostic shape for failing disposers (O.1 row 3) without turning anomalies into lifecycle states.
+7. **Teardown-violation surface** — exact diagnostic schema and operator-recovery shape for the latched `TEARDOWN_VIOLATED` condition (§G.6): frozen are the semantic requirements (latch + explicit surface + blocked provider final release + forfeited quiescence/confluence claims, no invisible retry, no "continue anyway"); open are the diagnostic schema, the flag's final name, and which operator recovery paths (process restart vs future explicit policies) the implementation offers.
 8. **Domain continuity policy (§K.3 of A0)** — pause-at-CONFIRMED default remains proposed, not frozen; it gates §H.b probes only, never §M confluence.
 9. **Device-surprise MVP policy** — fail-closed into G.2 sequence with bounded-retry degradation remains the proposal (A0 §K.4); product decision at implementation time.
-10. **Docs drift note** — `AGENTS.md` and `composition-kernel.md` still name #53 as "current gate" (pre-close text); updating governance gate lines is a human call at review time, deliberately not done in this docs-only PR.
+10. *(resolved in Corrective-1)* **Governance gate drift** — the review directed the gate advance to happen in this same docs-only PR; `AGENTS.md`, `composition-kernel.md`, `docs/README.md`, `CONTEXT.md`, and `overview.md` now name #67 as the current design gate (chain: #53 PASS/CLOSED → #67 current gate → PR #68 proposed semantic authority → implementation issue only after PASS + merge).
 
 ---
 
 ## Verdict
 
-**PASS** (proposed; subject to human review per delivery discipline).
+**PASS, re-proposed after Corrective-1** (first draft proposed PASS; human review round 1 returned **PASS_WITH_CORRECTIVES** with P0-1/P0-2/P0-3 semantic blockers plus P1-4/P1-5/P2; this revision resolves all six and re-proposes PASS — subject to second human review per delivery discipline. PASS means only: the COMPOSITION-KERNEL-0 semantic design is precise enough to open a separate implementation issue.)
+
+Corrective-1 resolution summary:
+
+```text
+P0-1 teardown failure semantics   infallible-inverse contract frozen; ordinary
+                                  activation failure ≠ teardown invariant violation;
+                                  TEARDOWN_VIOLATED latches, provider final release
+                                  blocked, quiescence/confluence forfeited; the old
+                                  "anomaly + exit + guard releases" shape withdrawn   §G.6, §H.7, §F.4, §L.1, §M.3, §O, §Q16
+P0-2 provider replacement         staged orchestration frozen (9 steps); running
+                                  registry never holds two providers of one
+                                  capability at any step; desired-graph intent vs
+                                  running-registry truth explicitly separated         §E.4, §E.2, §G.3, §L.2, §O.1, §M.4
+P0-3 Effect vs domain ownership   two ownership universes frozen; Option A (K0 Effect
+                                  is composition-lifecycle only) chosen over Option B;
+                                  ghost oracle scoped to composition-owned universe;
+                                  domain resources bridge via obligation discharge    §J.4, §H.5/§H.5.1, §I.1.6, §G.2, §K
+P1-4 CLAIMED ≠ emission           CLAIMED = protocol point-of-no-return (cancellation
+                                  authority ends); physical render = external emission
+                                  boundary; regression in §B23/§H.5 removed; null-
+                                  backend scenario frozen                             §H.5.1, §B23
+P1-5 authority drift              governance gate advanced to #67 across AGENTS.md,
+                                  composition-kernel.md, docs/README.md, CONTEXT.md,
+                                  overview.md                                         those files + §T.10
+P2 paper snapshot                 arXiv:2608.25512v1 pinned (retrieval date, page count,
+                                  SHA256, theorem cross-check); snapshot rule frozen   §A.4
+```
 
 All PASS criteria of #67 / the tasking are met within this document:
 
@@ -942,18 +1254,23 @@ All PASS criteria of #67 / the tasking are met within this document:
 five primitives: precise semantic responsibility          §D
 provider withdrawal deterministic                        §G (guard sequence, trace)
 teardown-access semantics explicit                       §E.3, §G.1–G.2
+teardown-failure semantics precise and safe              §G.6, §H.7 (Corrective-1)
+replacement preserves single-source at every step        §E.4 (Corrective-1)
+composition Effect ≠ domain resource ownership            §J.4, §H.5.1 (Corrective-1)
 local revertibility ≠ cross-fiber independence           §H.1 vs §H.2
 same-key composability contract explicit                 §H.4, E.5
 non-commutative order has an explicit home               §H.4/H.6, L.1 (desired topology)
-composition truth vs domain truth cleanly separated      §J (frozen classifier)
+composition truth vs domain truth cleanly separated      §J (frozen classifier + universes)
 confluence testable without domain leakage               §I, §M
 realtime payload bypasses the kernel                     §K, §N
-failure paths leave no unexplained ghost state           §O (Cor 69 grounding)
+failure paths leave no unexplained ghost state           §O (Cor 69 grounding; violations latch, §G.6)
+CLAIMED ≠ physical emission                              §H.5.1, §B23
+paper snapshot identity pinned                           §A.4
 Rust representation downstream of semantics              §P (survey, no freeze)
-no unsupported claim presented as paper authority        §B provenance ledger
+no unsupported claim presented as paper authority        §B provenance ledger + §A.4 pin
 ```
 
-PASS authorizes exactly one next step: **opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue.** It does not authorize implementation, Rust API freeze, FFmpeg/WASAPI/PocketJS integration, async-runtime selection, or any §S-deferred machinery. This document stops at the gate.
+PASS authorizes exactly one next step: **opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue** — and only after the second human review accepts this revision and PR #68 merges. It does not authorize implementation, Rust API freeze, FFmpeg/WASAPI/PocketJS integration, async-runtime selection, or any §S-deferred machinery. This document stops at the gate.
 
 
 
