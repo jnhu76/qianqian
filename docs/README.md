@@ -13,7 +13,7 @@ Do not recursively read archived or historical material by default.
 | Current architecture | `architecture/overview.md` |
 | Component boundary / plugin granularity / interaction algebra | `architecture/composition-kernel.md` boundary-design sections + closed audit `architecture/component-boundary-a0.md` (#53 PASS/CLOSED) |
 | Composition Kernel semantics design (#67) | `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel.md` + issue #67 |
-| Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | **Only after the pre-implementation review (Corrective-5) is accepted and an implementation issue exists**; then read `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + the implementation issue |
+| Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + the implementation issue (#70) + `architecture/composition-kernel-0-implementation-adr.md` (representation decisions) |
 | Product introduction / current repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | Rust workspace/build/test | Current `Cargo.toml` / crate manifests / CI once present; do not invent a separate manual before repeated operational complexity exists. |

@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "apps/headless",
     "crates/qianqian-core",
+    "crates/qianqian-kernel",
     "crates/qianqian-runtime",
 ]
 

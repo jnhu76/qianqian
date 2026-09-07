@@ -14,6 +14,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "qianqian-kernel"
+version = "0.1.0"
+
+[[package]]
 name = "qianqian-runtime"
 version = "0.1.0"
 dependencies = [
