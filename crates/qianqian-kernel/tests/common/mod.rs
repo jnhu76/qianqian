@@ -140,3 +140,30 @@ pub fn violating_teardown_component(name: &'static str, l: &Log) -> ComponentSpe
         Discharge::Violated
     })
 }
+
+// ---------------------------------------------------------------------------
+// Extra: a second, independent capability for unrelated-churn oracles.
+// ---------------------------------------------------------------------------
+
+pub struct Extra;
+
+impl qianqian_kernel::Capability for Extra {
+    const NAME: &'static str = "Extra";
+    type Service = dyn TagService;
+}
+
+/// Provider of the unrelated `Extra` capability.
+pub fn extra_provider(name: &'static str, tag: &'static str, l: &Log) -> ComponentSpec {
+    let log_teardown = l.clone();
+    ComponentSpec::new(name)
+        .provides::<Extra>()
+        .on_activate(move |ctx| {
+            ctx.provide::<Extra>(Rc::new(FixedTag(tag)))
+                .expect("provides declared");
+            Ok(())
+        })
+        .on_teardown(move |_ctx| {
+            log_teardown.borrow_mut().push(format!("{name}:released"));
+            Discharge::Discharged
+        })
+}

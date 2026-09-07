@@ -513,11 +513,16 @@ impl Kernel {
             if verdict == Discharge::Violated {
                 // The violated unwind never reaches FAILED: latched in
                 // Unloading with the pending activation error as episode
-                // metadata (§G.6).
+                // metadata (§G.6). The committed view stays open — the
+                // episode has not closed.
                 self.fiber_mut(fid).teardown_violated = true;
                 return;
             }
-            self.fiber_mut(fid).state = FiberState::Failed;
+            // Full discharge closes the episode: the committed view is
+            // discarded last (§F.3), the FAILED outcome is recorded.
+            let f = self.fiber_mut(fid);
+            f.committed = None;
+            f.state = FiberState::Failed;
         } else {
             self.fiber_mut(fid).state = FiberState::Active;
         }
@@ -687,8 +692,14 @@ impl Kernel {
                         return true;
                     }
                 }
-                // FAILED is quiet-legal (clause 3); nothing auto-retries (B19).
-                FiberState::Failed => {}
+                // FAILED is quiet-legal (clause 3); nothing auto-retries
+                // (B19) — but a retired FAILED generation still owes its
+                // removal before the staged replacement can continue.
+                FiberState::Failed => {
+                    if f.retired {
+                        return true;
+                    }
+                }
             }
         }
         for (id, e) in &self.desired {
