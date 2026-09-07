@@ -1,180 +1,180 @@
 ---
-title: Architecture Overview
+title: 架构总览
 status: CURRENT
 ---
 
-# Architecture Overview
+# 架构总览
 
-Qianqian Architecture v2 is a boundary-first, composition-oriented plugin architecture for a local-first music player.
+Qianqian Architecture v2 是一个面向本地优先音乐播放器的、边界优先、面向组合的插件架构。
 
-> **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
-
----
-
-## Architecture Constitution
-
-<ClaimBadge role="authority" /> These principles are frozen. They cannot be changed by Observatory prose.
-
-- **Domain kernels own domain semantics.**
-- **Capabilities expose contracts; providers own mechanisms.**
-- **Fibers own plugin-instance lifetime.**
-- **Effects own attributable mutation/recovery provenance.**
-- **Profiles declare desired composition; Reconcile determines the running graph.**
+> **内核控制可达性、所有权与生命周期;它不拥有应用载荷。**
 
 ---
 
-## Boundary-First Design
+## 架构宪章
 
-The architecture question is not "how should `ctx.effect()` look?" It is:
+<ClaimBadge role="authority" /> 这些原则已冻结。观测站的文章不能更改它们。
 
-> How should the product be decomposed so that ownership, dependencies, interactions, ordering and recovery boundaries are explicit enough for composability to mean something?
+- **领域内核拥有领域语义。**
+- **能力暴露契约;提供者拥有机制。**
+- **Fiber 拥有插件实例生命周期。**
+- **Effect 拥有可归因的变更/恢复溯源。**
+- **Profile 声明期望组合;Reconcile 决定运行中的图。**
 
-Design order:
+---
+
+## 边界优先设计
+
+架构问题不是"`ctx.effect()` 应该长什么样?"而是:
+
+> 产品应如何分解,才能让所有权、依赖、交互、排序与恢复边界足够显式,使"可组合"真正有意义?
+
+设计顺序:
 
 ```text
-Component Granularity
+组件粒度
         ↓
-Capability / dependency boundary
+能力 / 依赖边界
         ↓
-Interaction Algebra
+交互代数
         ↓
-Effect / System Boundary
+Effect / 系统边界
         ↓
-Global lifecycle ordering
+全局生命周期排序
         ↓
-Confluence oracle
+合流性 oracle
         ↓
-Composition Kernel implementation
+Composition Kernel 实现
 ```
 
 ---
 
-## System Overview
+## 系统总览
 
-<ClaimBadge role="interpretation" /> This diagram shows the intended system topology.
+<ClaimBadge role="interpretation" /> 此图展示的是目标系统拓扑。
 
 ```mermaid
 flowchart TB
-    subgraph ControlPlane["Control Plane"]
+    subgraph ControlPlane["控制平面"]
         direction TB
         CK["Composition Kernel"]
         CK -."Context / Capability / Fiber<br/>Effect / Reconcile".-> CK
     end
 
-    subgraph DataPlane["Realtime Data Plane"]
+    subgraph DataPlane["实时数据平面"]
         direction LR
-        MS["MediaSource"] -->|encoded media| DEC["Decoder<br/>ENCODED → PCM"]
+        MS["MediaSource"] -->|编码媒体| DEC["Decoder<br/>编码媒体 → PCM"]
         DEC -->|PCM| PRO["Processing<br/>PCM → PCM"]
-        PRO -->|PCM| AOUT["AudioOutput<br/>PCM → physical device"]
+        PRO -->|PCM| AOUT["AudioOutput<br/>PCM → 物理设备"]
     end
 
-    subgraph Domains["Domain Components"]
+    subgraph Domains["领域组件"]
         direction TB
-        MK["MusicKernel<br/>(Music semantics)"]
-        UH["UiHost<br/>(Presentation)"]
+        MK["MusicKernel<br/>(音乐语义)"]
+        UH["UiHost<br/>(呈现)"]
     end
 
-    MK -.->|requires| DEC
-    MK -.->|binds PcmSink| AOUT
-    UH -.->|polls snapshot| MK
+    MK -.->|依赖| DEC
+    MK -.->|绑定 PcmSink| AOUT
+    UH -.->|轮询快照| MK
 
-    CK -.->|"desire composition → reconcile"| MK
-    CK -.->|"desire composition → reconcile"| DEC
-    CK -.->|"desire composition → reconcile"| AOUT
-    CK -.->|"desire composition → reconcile"| UH
+    CK -.->|"期望组合 → reconcile"| MK
+    CK -.->|"期望组合 → reconcile"| DEC
+    CK -.->|"期望组合 → reconcile"| AOUT
+    CK -.->|"期望组合 → reconcile"| UH
 
     style ControlPlane fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
     style DataPlane fill:#0f3460,stroke:#4a4a8a,color:#e0e0e0
     style Domains fill:#16213e,stroke:#4a4a6a,color:#e0e0e0
 ```
 
-| Component | Data Transformation | Status |
-|-----------|-------------------|--------|
+| 组件 | 数据变换 | 状态 |
+|------|---------|------|
 | Base Kernel | Context / Capability / Fiber / Effect / Reconcile | <StatusBadge status="IMPLEMENTED" /> |
-| Decoder | Encoded media → PCM | <StatusBadge status="PLANNED" /> |
+| Decoder | 编码媒体 → PCM | <StatusBadge status="PLANNED" /> |
 | Processing | PCM → PCM | <StatusBadge status="PLANNED" /> |
-| AudioOutput | PCM → physical device | <StatusBadge status="PLANNED" /> |
-| Playback Kernel | Music domain semantics | <StatusBadge status="NEXT" /> |
-| UI Host | Presentation | <StatusBadge status="DEFERRED" /> |
+| AudioOutput | PCM → 物理设备 | <StatusBadge status="PLANNED" /> |
+| Playback Kernel | 音乐领域语义 | <StatusBadge status="NEXT" /> |
+| UI Host | 呈现 | <StatusBadge status="DEFERRED" /> |
 
 ---
 
-## Control Plane vs Data Plane
+## 控制平面与数据平面
 
 <ClaimBadge role="authority" />
 
-> **Capability plane != Data plane.**
+> **能力平面 != 数据平面。**
 
-Context establishes reachability. It does not carry PCM blocks or application payloads.
+Context 建立可达性。它不承载 PCM 数据块或应用载荷。
 
 ```mermaid
 flowchart TB
-    subgraph CP["Control Plane"]
-        DC["Desired Composition"]
+    subgraph CP["控制平面"]
+        DC["期望组合"]
         CK2["Composition Kernel"]
-        DC -->|"input"| CK2
+        DC -->|"输入"| CK2
     end
 
-    BIND["resolve / bind<br/>(one-time capability binding)"]
+    BIND["resolve / bind<br/>(一次性能力绑定)"]
 
-    CK2 -->|"desired → running"| BIND
+    CK2 -->|"期望 → 运行"| BIND
 
-    subgraph DP["Realtime Data Plane"]
+    subgraph DP["实时数据平面"]
         direction LR
-        MS2["MediaSource"] -->|"encoded media"| DEC2["Decoder"]
+        MS2["MediaSource"] -->|"编码媒体"| DEC2["Decoder"]
         DEC2 -->|"PCM"| PROC2["Processing"]
         PROC2 -->|"PCM"| AOUT2["AudioOutput"]
     end
 
-    BIND -->|"pre-bound, no per-block lookup"| DP
+    BIND -->|"预绑定,无逐块查找"| DP
 
     style CP fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
     style DP fill:#0f3460,stroke:#4a4a8a,color:#e0e0e0
 ```
 
-The realtime audio path is a data-plane island. Per callback/block it must not perform Context lookup, capability resolution, Fiber reconciliation, arbitrary event dispatch, filesystem/network I/O, or UI round trips.
+实时音频路径是数据平面孤岛。在每个回调/数据块内,它不得执行 Context 查找、能力解析、Fiber 调和、任意事件派发、文件系统/网络 I/O 或 UI 往返。
 
 ---
 
-## Interaction Algebra
+## 交互代数
 
 <ClaimBadge role="authority" />
 
 $$
-\text{Commutative relation} \rightarrow \text{may compose as independent effects}
+\text{可交换关系} \rightarrow \text{可作为独立 Effect 组合}
 $$
 
 $$
-\text{Non-commutative relation} \rightarrow \text{explicit dependency/order structure}
+\text{非可交换关系} \rightarrow \text{显式依赖/排序结构}
 $$
 
-DSP/pipeline ordering is the canonical example. EQ → Compressor is generally not equivalent to Compressor → EQ. Registration timing, mount timing, and iteration order must never silently become product semantics.
+DSP/流水线排序是典型例子。EQ → Compressor 一般不等价于 Compressor → EQ。注册时机、挂载时机与迭代顺序绝不能悄悄变成产品语义。
 
 ---
 
-## Confluence
+## 合流性(Confluence)
 
 <ClaimBadge role="authority" />
 
-> After any legal load/unload/replacement history reaches quiescence, the observable runtime is equivalent to a clean construction of the final desired composition.
+> 任何合法的加载/卸载/替换历史到达静息态后,可观测运行时等价于对最终期望组合的一次全新构建。
 
-This tests far more than "did not crash": it detects ghost bindings, stale lifecycle state, leaked contributions, and history-dependent composition.
+它检验的远不止"没有崩溃":它能发现幽灵绑定、过期的生命周期状态、泄漏的贡献以及依赖历史的组合。
 
 ---
 
-## Five Primitives
+## 五个原语
 
-The Composition Kernel K0 is centered on exactly five primitives:
+Composition Kernel K0 恰好以五个原语为中心:
 
-| Primitive | Role |
-|-----------|------|
-| **Context** | Capability namespace / dependency view; controls reachability |
-| **Capability** | Named/typed service contract; identity distinct from provider |
-| **Fiber** | Live plugin instance with identity, scope, requirements, lifecycle |
-| **Effect** | Owned reversible mutation with total inverse, LIFO unwind |
-| **Reconcile** | Moves running Fiber graph toward desired composition |
+| 原语 | 角色 |
+|------|------|
+| **Context** | 能力命名空间/依赖视图;控制可达性 |
+| **Capability** | 命名/类型化的服务契约;身份独立于提供者 |
+| **Fiber** | 拥有身份、作用域、需求与生命周期的存活插件实例 |
+| **Effect** | 拥有全逆算子的可逆变更,LIFO 展开 |
+| **Reconcile** | 将运行中的 Fiber 图推向期望组合 |
 
-Do not add a sixth primitive without demonstrating these five cannot express a required invariant.
+在未证明这五个原语无法表达某个必需不变量之前,不得添加第六个原语。
 
 ---
 

@@ -44,9 +44,9 @@ export const projectState: ProjectState = {
   },
 
   nextQuestions: [
-    'What is the minimum Playback Session contract?',
-    'Where is Decoder / PCM ownership frozen?',
-    'What capability must AudioOutput expose without leaking device policy?',
+    'Playback Session 的最小契约是什么?',
+    'Decoder / PCM 所有权在哪里冻结?',
+    'AudioOutput 必须暴露什么能力而不泄漏设备策略?',
   ],
 }
 

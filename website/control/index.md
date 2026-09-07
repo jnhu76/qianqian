@@ -1,5 +1,5 @@
 ---
-title: Qianqian — Project Control
+title: Qianqian — 项目控制
 status: CURRENT
 ---
 
@@ -9,15 +9,15 @@ import { projectState } from '../data/project-state.ts'
 
 # Qianqian
 
-A lightweight music player and a systems architecture laboratory.
+一个轻量级音乐播放器,也是一座系统架构实验室。
 
 ---
 
-## Current Frontier
+## 当前前沿
 
 **{{ projectState.currentFrontier }}**
 
-## Last Milestone
+## 最近里程碑
 
 **{{ projectState.lastMilestone }}**
 
@@ -25,19 +25,19 @@ A lightweight music player and a systems architecture laboratory.
 
 ---
 
-## Where We Are
+## 当前所处阶段
 
 <table class="layer-table">
   <tr>
-    <td>Playback Reference</td>
+    <td>播放参考</td>
     <td><StatusBadge status="HISTORICAL_EVIDENCE" /></td>
   </tr>
   <tr>
-    <td>FFmpeg Research</td>
+    <td>FFmpeg 研究</td>
     <td><StatusBadge status="HISTORICAL_EVIDENCE" /></td>
   </tr>
   <tr>
-    <td>Component Boundary</td>
+    <td>组件边界</td>
     <td><StatusBadge status="FROZEN" /></td>
   </tr>
   <tr>
@@ -68,28 +68,28 @@ A lightweight music player and a systems architecture laboratory.
 
 ---
 
-## System Architecture
+## 系统架构
 
-See the canonical [system diagram](/architecture/#system-overview) for how Base Kernel, Playback Kernel, Decoder, Processing, AudioOutput, and UI Host relate.
+Base Kernel、Playback Kernel、Decoder、Processing、AudioOutput 与 UI Host 之间如何关联,见权威的[系统总览图](/architecture/#系统总览)。
 
 ---
 
-## Recent Result
+## 最新成果
 
 ### Composition Kernel K0
 
 <StatusBadge status="IMPLEMENTED" />
 
-The generic Composition Kernel implements five primitives — Context, Capability, Fiber, Effect, Reconcile — with 70 kernel oracle tests (75 workspace tests) across six semantic guarantee groups. It is domain-agnostic: it knows nothing about music, PCM, FFmpeg, WASAPI, or UI payloads.
+通用 Composition Kernel 实现五个原语 —— Context、Capability、Fiber、Effect、Reconcile —— 六个语义保证组共 70 项内核 oracle 测试(75 项 workspace 测试)。它领域无关:不了解音乐、PCM、FFmpeg、WASAPI 或 UI 载荷。
 
-**Semantic guarantees validated:**
+**已验证的语义保证:**
 
-- Single-Fiber local cleanup
-- Cross-Fiber independent removal
-- Same-key contribution safety
-- Explicit ordered/non-commutative interaction handling
-- Provider-disappearance ordering
-- Confluence after mutation history
+- 单 Fiber 局部清理
+- 跨 Fiber 独立移除
+- 同键贡献安全
+- 有序/非交换交互的显式处理
+- 提供者消失排序
+- 变更历史后的合流性(Confluence)
 
 <ProvenancePanel
   :authority="['docs/architecture/composition-kernel-0-design.md', 'docs/architecture/composition-kernel-0-implementation-adr.md']"
@@ -101,19 +101,19 @@ The generic Composition Kernel implements five primitives — Context, Capabilit
 
 ---
 
-## Experiment Highlight
+## 实验亮点
 
-### FFmpeg Minimization
+### FFmpeg 最小化
 
 <StatusBadge status="HISTORICAL_EVIDENCE" />
 
-How much FFmpeg does a music player actually need? Decoder and Processing share one FFmpeg closure authority. Codec coverage is provider configuration, not a runtime layer. Two build profiles prove the closure is minimizable.
+一个音乐播放器到底需要多少 FFmpeg?Decoder 与 Processing 共享唯一的 FFmpeg 闭包权威。编解码覆盖是提供者配置,不是运行时层。两个构建 profile 证明这个闭包可以最小化。
 
-[Read the experiment →](/experiments/ffmpeg-minimization)
+[阅读实验 →](/experiments/ffmpeg-minimization)
 
 ---
 
-## Next Three Questions
+## 下一步的三个问题
 
 <template v-for="(q, i) in projectState.nextQuestions" :key="i">
 1. {{ q }}

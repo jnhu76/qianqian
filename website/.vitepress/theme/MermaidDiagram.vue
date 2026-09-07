@@ -165,7 +165,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="mermaid-diagram">
     <div v-if="error" class="mermaid-error">
-      <p><strong>Mermaid render error</strong></p>
+      <p><strong>Mermaid 图表渲染失败</strong></p>
       <pre>{{ error }}</pre>
     </div>
     <div ref="container" />

@@ -3,9 +3,9 @@ import { defineConfig } from 'vitepress'
 import { resolve } from 'path'
 
 export default defineConfig({
-  title: 'Qianqian Observatory',
+  title: 'Qianqian 工程观测站',
   description:
-    'Qianqian Engineering Observatory — project control surface, architecture registry, experiment archive',
+    'Qianqian 工程观测站 —— 项目控制台、架构登记处与实验档案',
 
   srcDir: resolve(__dirname, '..'),
   outDir: resolve(__dirname, '../dist'),
@@ -55,33 +55,33 @@ export default defineConfig({
 
   themeConfig: {
     nav: [
-      { text: 'Control', link: '/control/' },
-      { text: 'Architecture', link: '/architecture/' },
-      { text: 'Experiments', link: '/experiments/' },
-      { text: 'Research', link: '/research/' },
+      { text: '项目控制', link: '/control/' },
+      { text: '架构', link: '/architecture/' },
+      { text: '实验', link: '/experiments/' },
+      { text: '研究', link: '/research/' },
     ],
 
     sidebar: {
       '/control/': [
         {
-          text: 'Control',
+          text: '项目控制',
           items: [
-            { text: 'Project Control', link: '/control/' },
-            { text: 'Roadmap', link: '/control/roadmap' },
-            { text: 'History', link: '/control/history' },
+            { text: '项目控制', link: '/control/' },
+            { text: '路线图', link: '/control/roadmap' },
+            { text: '历史', link: '/control/history' },
           ],
         },
       ],
       '/architecture/': [
         {
-          text: 'Architecture',
+          text: '架构',
           items: [
-            { text: 'Overview', link: '/architecture/' },
+            { text: '总览', link: '/architecture/' },
             { text: 'Base Kernel K0', link: '/architecture/base-kernel' },
             { text: 'Playback Kernel', link: '/architecture/playback-kernel' },
-            { text: 'Plugin Graph', link: '/architecture/plugin-graph' },
+            { text: '插件图', link: '/architecture/plugin-graph' },
             {
-              text: 'Control vs Data Plane',
+              text: '控制平面与数据平面',
               link: '/architecture/realtime-data-plane',
             },
           ],
@@ -89,15 +89,15 @@ export default defineConfig({
       ],
       '/experiments/': [
         {
-          text: 'Experiments',
+          text: '实验',
           items: [
-            { text: 'Overview', link: '/experiments/' },
+            { text: '总览', link: '/experiments/' },
             {
-              text: 'FFmpeg Minimization',
+              text: 'FFmpeg 最小化',
               link: '/experiments/ffmpeg-minimization',
             },
             {
-              text: 'Composition Kernel Oracles',
+              text: 'Composition Kernel Oracle 测试',
               link: '/experiments/composition-kernel-oracles',
             },
           ],
@@ -105,17 +105,17 @@ export default defineConfig({
       ],
       '/research/': [
         {
-          text: 'Research',
+          text: '研究',
           items: [
-            { text: 'Overview', link: '/research/' },
+            { text: '总览', link: '/research/' },
             {
-              text: 'Spatiotemporal Composability',
+              text: '时空可组合性',
               link: '/research/spatiotemporal-composability',
             },
-            { text: 'FFmpeg Closure', link: '/research/ffmpeg-closure' },
-            { text: 'Realtime Audio', link: '/research/realtime-audio' },
+            { text: 'FFmpeg 闭包', link: '/research/ffmpeg-closure' },
+            { text: '实时音频', link: '/research/realtime-audio' },
             {
-              text: 'DSH → Composition Kernel',
+              text: 'DSH → Composition Kernel 演进',
               link: '/research/dsh-composition-lineage',
             },
           ],
