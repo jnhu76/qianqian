@@ -1,0 +1,29 @@
+flowchart TB
+    subgraph CP["Control Plane"]
+        DC["Desired Composition"]
+        CK["Composition Kernel\nContext / Capability / Fiber\nEffect / Reconcile"]
+        DC -->|"input"| CK
+    end
+
+    BIND["resolve / bind\n(one-time capability binding)"]
+
+    CK -->|"desired → running"| BIND
+
+    subgraph DP["Realtime Data Plane"]
+        direction LR
+        S["service.method(payload)"] -->|"pre-bound endpoint"| P["provider"]
+        MS["MediaSource"] -->|"encoded media"| DEC2["Decoder"]
+        DEC2 -->|"PCM"| PROC2["Processing"]
+        PROC2 -->|"PCM"| AOUT2["AudioOutput"]
+    end
+
+    BIND -->|"pre-bound, no per-block lookup"| DP
+
+    NOTEPERBLOCK["Kernel lookup must NOT\nappear in payload hot path"]
+
+    style CP fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
+    style DP fill:#0f3460,stroke:#4a4a8a,color:#e0e0e0
+    style NOTEPERBLOCK fill:#3a1a1a,stroke:#6a3a3a,color:#e0a0a0
+
+    classDef constraint fill:#3a1a1a,stroke:#6a3a3a,color:#e0a0a0
+    class NOTEPERBLOCK constraint

@@ -1,0 +1,163 @@
+architectures:
+  - id: ARCH-001
+    name: Qianqian System
+    version: 1
+    status: CURRENT
+
+    diagram:
+      source: docs/architecture/diagrams/ARCH-001-qianqian-system-v1.mmd
+      frozen: true
+
+    authority:
+      - docs/architecture/overview.md
+
+    decisions:
+      - issue: 46
+      - issue: 53
+      - pr: 66
+
+    implementation:
+      - issue: 70
+      - pr: 71
+
+    evidence:
+      - crates/qianqian-kernel/tests
+      - crates/qianqian-core/src
+      - crates/qianqian-runtime/src
+
+  - id: ARCH-002
+    name: Base Kernel K0
+    version: 1
+    status: IMPLEMENTED
+
+    diagram:
+      source: docs/architecture/diagrams/ARCH-002-base-kernel-v1.mmd
+      frozen: true
+
+    authority:
+      - docs/architecture/composition-kernel-0-design.md
+      - docs/architecture/composition-kernel-0-implementation-adr.md
+
+    decisions:
+      - issue: 67
+      - pr: 68
+      - pr: 69
+
+    implementation:
+      - issue: 70
+      - pr: 71
+
+    evidence:
+      - crates/qianqian-kernel/tests
+
+  - id: ARCH-003
+    name: Playback Kernel
+    version: 1
+    status: NEXT
+
+    diagram:
+      source: docs/architecture/diagrams/ARCH-003-playback-kernel-v1.mmd
+      frozen: true
+
+    authority:
+      - docs/architecture/component-boundary-a0.md
+      - docs/architecture/overview.md
+
+    decisions:
+      - issue: 53
+      - pr: 66
+
+    implementation: []
+
+    evidence:
+      - research/playback-reference-v1
+
+  - id: ARCH-004
+    name: Plugin Graph
+    version: 1
+    status: NEXT
+
+    diagram:
+      source: docs/architecture/diagrams/ARCH-004-plugin-graph-v1.mmd
+      frozen: true
+
+    authority:
+      - docs/architecture/component-boundary-a0.md
+      - docs/architecture/overview.md
+
+    decisions:
+      - issue: 53
+      - pr: 66
+
+    implementation: []
+
+    evidence:
+      - crates/qianqian-core/src/ports.rs
+
+  - id: ARCH-005
+    name: Control Plane vs Data Plane
+    version: 1
+    status: IMPLEMENTED
+
+    diagram:
+      source: docs/architecture/diagrams/ARCH-005-control-data-plane-v1.mmd
+      frozen: true
+
+    authority:
+      - docs/architecture/composition-kernel-0-design.md
+      - docs/architecture/overview.md
+
+    decisions:
+      - issue: 67
+      - pr: 68
+
+    implementation:
+      - pr: 71
+
+    evidence:
+      - crates/qianqian-kernel/tests
+
+  - id: ARCH-006
+    name: Provider Withdrawal
+    version: 1
+    status: IMPLEMENTED
+
+    diagram:
+      source: docs/architecture/diagrams/ARCH-006-provider-withdrawal-v1.mmd
+      frozen: true
+
+    authority:
+      - docs/architecture/composition-kernel-0-design.md
+      - docs/architecture/overview.md
+
+    decisions:
+      - issue: 67
+      - pr: 68
+
+    implementation:
+      - pr: 71
+
+    evidence:
+      - crates/qianqian-kernel/tests
+
+  - id: ARCH-007
+    name: FFmpeg Closure
+    version: 1
+    status: HISTORICAL_EVIDENCE
+
+    diagram:
+      source: docs/architecture/diagrams/ARCH-007-ffmpeg-closure-v1.mmd
+      frozen: true
+
+    authority:
+      - docs/architecture/component-boundary-a0.md
+      - docs/architecture/overview.md
+
+    decisions:
+      - issue: 48
+      - issue: 53
+
+    implementation: []
+
+    evidence:
+      - research/playback-reference-v1

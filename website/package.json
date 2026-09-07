@@ -1,0 +1,19 @@
+{
+  "name": "qianqian-observatory",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "verify": "node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.0",
+    "vitepress-plugin-mermaid": "^2.0.17",
+    "mermaid": "^11.17.0",
+    "@mdit/plugin-katex": "^1.1.0",
+    "katex": "^0.16.22",
+    "yaml": "^2.7.0"
+  }
+}

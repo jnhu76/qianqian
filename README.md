@@ -35,11 +35,8 @@ Gate status:
 ```text
 #53 COMPONENT-BOUNDARY-A0    PASS / CLOSED (PR #66 merged)
 #67 COMPOSITION-KERNEL-0     semantic design MERGED (PR #68)
-Corrective-5 review          CURRENT PRE-IMPLEMENTATION GATE
-implementation               NOT YET AUTHORIZED
+#70 COMPOSITION-KERNEL-0     IMPLEMENTED (PR #71 merged, 74 tests)
 ```
-
-Until the pre-implementation review (Corrective-5 on #67) is accepted and a separate implementation issue is opened, no new `qianqian-kernel`, Context API, Fiber lifecycle engine, or Reconcile implementation is authorized.
 
 ## Control plane and data plane
 
@@ -82,7 +79,7 @@ everything is hot-loaded
 everything is rollbackable
 ```
 
-The exact granularity of Music, Decoder, DSP, AudioOutput, Presentation, UiHost and other candidates is deliberately being audited before kernel implementation.
+The exact granularity of Music, Decoder, DSP, AudioOutput, Presentation, UiHost and other candidates was justified by the component boundary audit (#53).
 
 ## Interaction correctness
 
@@ -147,7 +144,7 @@ qianqian-headless
 
 R0 `base` and constructor-only `AppRuntime` composition are bootstrap witnesses, not compatibility contracts.
 
-The decomposition they were waiting for is done (#53, closed) and the kernel semantic design is merged (PR #68). The future implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility — but only through the separate implementation issue, after the current pre-implementation review gate is accepted.
+The decomposition was completed (#53, closed), the kernel semantic design was merged (PR #68), and the Base Kernel K0 was implemented (PR #71 merged, 74 oracle tests). The implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
 
 Build/test authority:
 

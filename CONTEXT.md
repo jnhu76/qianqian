@@ -7,7 +7,7 @@ This file carries stable vocabulary and the repository mental model. It is not a
 | Term | Meaning |
 |---|---|
 | Qianqian / 千千·现代 | A local-first, lightweight, cross-platform music player and a testbed for composable runtime architecture. |
-| Architecture v2 | Boundary-first plugin architecture: component/capability/interaction boundaries are designed first; a Rust Composition Kernel later controls reachability, ownership and lifetime. |
+| Architecture v2 | Boundary-first plugin architecture: component/capability/interaction boundaries are designed first; a Rust Composition Kernel controls reachability, ownership and lifetime. |
 | Boundary-first design | The rule that component granularity, capability dependencies, interaction algebra, effect/system boundary, lifecycle ordering, and confluence are decided before kernel API/runtime machinery. |
 | Component Granularity | The architecture decision of what deserves to be one runtime component/plugin. Feature names do not determine granularity; ownership, dependencies, interaction semantics, ordering, and cognitive cost do. |
 | Integration / Mediation Component | A component introduced to make a real ordering or cross-component relationship explicit, especially when an apparent bidirectional dependency should be decomposed into clearer one-way bindings. |
@@ -74,9 +74,7 @@ Confluence oracle
 Composition Kernel implementation
 ```
 
-#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). The #67 COMPOSITION-KERNEL-0 semantic design is MERGED (PR #68, `composition-kernel-0-design.md`). Current gate: the **pre-implementation review (Corrective-5)**.
-
-No new generic kernel implementation/API is authoritative until that review is accepted and a separate implementation issue is opened.
+#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). The #67 COMPOSITION-KERNEL-0 semantic design is MERGED (PR #68, `composition-kernel-0-design.md`). The Base Kernel K0 is IMPLEMENTED (PR #71, 74 tests, 743eb86).
 
 ## Interaction mental model
 
@@ -175,7 +173,7 @@ qianqian-headless
 
 `qianqian-core::base` and `qianqian-runtime::AppRuntime` constructor composition are bootstrap witnesses, not compatibility contracts.
 
-They may later be replaced through the future implementation issue; a generic kernel must not live inside the product core (dependency direction: generic kernel ← product semantics).
+They may be replaced as the Base Kernel K0 implementation (PR #71) evolves; a generic kernel must not live inside the product core (dependency direction: generic kernel ← product semantics).
 
 ## Historical refs
 
