@@ -246,14 +246,23 @@ MVP capability set (from #53): `Decoder`, `PcmSink`, `OutputDeviceDiscovery` (pr
 | Field | Definition |
 |---|---|
 | Purpose | kernel-visible mutation/resource provenance owned by a fiber. **Every K0 Effect is a composition-lifecycle reversible mutation with a total inverse (§H.7)** — an action that is not reversible-with-total-inverse is not a K0 Effect at all (Corrective-2: no effect-class variants) |
-| Owned state | the inverse (disposer); ordering position in the owning fiber's accumulator. **No class field**: the five A0 classes are a descriptive system-boundary/action taxonomy (§H.5), never kernel Effect variants |
+| Owned state | the inverse (disposer); ordering position in the owning fiber's accumulator; **structural composition provenance** — the capability key the effect acts on, and for a data-edge binding effect the provider fiber identity (§K.4, Corrective-4). **No class field**: the five A0 classes are a descriptive system-boundary/action taxonomy (§H.5), never kernel Effect variants |
 | Legal operations | registered by the owning fiber at composition/activation time; explicitly disposed early by the owner; unwound LIFO at deactivation; for same-key contribution effects: remove only the owner's contribution |
 | Illegal operations | being executed after the owning fiber left its episode (except teardown of the effect itself); executing twice (idempotent no-op, B26); wrapping an emission and claiming rollback (B23) |
-| Observable facts | existence/count per fiber (composition truth); **not** payload, and not a class/kind |
+| Observable facts | existence/count per fiber; the composition relation each effect contributes to (capability key; for a data-edge binding, the provider fiber — §K.4); **not** payload, and not a behavioral class/kind |
 | Lifecycle | born at registration inside an episode; dies at dispose or episode close |
 | Relationships | owned by exactly one fiber; provision effects create capability bindings; data-edge bindings are effects owned by the consumer |
 | Proof obligations | the inverse is a **total semantic obligation** (§H.7): it actually reverts at the state of application and has no failure outcome — an author obligation the runtime does not verify (paper §5.1.1); violation latches §G.6. Same-key independence per D.2 witness |
 | Must not know | other fibers; domain semantics of the mutated state |
+
+Corrective-4 note — **provenance is not a class**. "No class/kind" bans
+*behavioral* classification of Effects into reversible/transactional/domain
+variants; it does **not** make an Effect structurally anonymous. A provision
+effect cannot exist without naming its capability key (B4: provision is
+`set(k,v)` on key k); a data-edge binding effect cannot carry §K.3 teardown
+truth without naming its owner, provider, and relation. The one legal Effect
+shape therefore includes minimal **structural provenance** — identity of the
+composition relation, never payload, never behavioral taxonomy (§H.5, §K.4).
 
 ### D.5 Reconcile
 
@@ -850,7 +859,7 @@ Comparison of restored/settled state happens at exactly these surfaces (closed s
 2. **fiber lifecycle truth**: each desired fiber's observable state (§F.2 vocabulary), activation-failure outcome present/absent, and its teardown-contract-violation flag (§G.6) — Corrective-2 folds the flag into this surface; it is not a seventh diagnostic concept;
 3. **committed bindings**: which consumer binds which provider (semantic identity, not uid values);
 4. **contribution sets**: per commutative key, the set of live contributions compared by semantic identity (listener *kinds*), never token values; dispatch count == registered count where observable;
-5. **composition-owned data-edge bindings**: SinkSession/device-session existence per live Music↔PcmSink binding (idle ≠ absent — A0 frozen activation rule);
+5. **composition-owned data-edge bindings**: SinkSession/device-session existence per live Music↔PcmSink binding (idle ≠ absent — A0 frozen activation rule); read as a projection of the binding effects' structural provenance, per the §K.4 single-authority rule;
 6. **ghost absence**: no composition-owned bindings, provisions, contributions, sessions, or effects beyond the desired set. Scope (frozen in Corrective-1): the ghost oracle checks the composition-owned universe only (§J.4/§H.5) — a legitimately open Decoder handle, track session, or other domain-session resource that exists because a user/domain action occurred is **never a ghost effect**, precisely because the clean baseline is defined as *no domain session* (A0 §H.b): comparing composition truth against it is well-formed only if domain resources are outside the comparison (§J.1, §M.2).
 
 ### I.2 What is deliberately NOT compared
@@ -987,6 +996,44 @@ never: PCM format payload per block, sample values, buffer addresses, media time
 ```
 
 The RT thread pulls blocks only through the endpoint handed to the session — zero kernel operations per block (§N).
+
+### K.4 Single authority for composition-visible bindings (frozen in Corrective-4)
+
+§K.3's facts (binding exists; owner fiber; provider fiber; teardown state)
+must have exactly one mutable authority. Frozen:
+
+> **Every composition-visible binding has exactly one authoritative
+> ownership/provenance record, and its lifetime is coupled to exactly one
+> owner Fiber episode. Diagnostics are projections of that authority, not a
+> second mutable registry.**
+
+For the MVP data edge that authority is the **binding Effect owned by the
+consumer fiber** (§K.1): its structural provenance (§D.4) names the relation
+(capability key — `PcmSink`), the owner (Music's fiber episode), and the
+provider fiber identity (AudioOutput). What the kernel can prove is derived
+by reading that effect together with lifecycle truth:
+
+```text
+binding exists      ← the binding effect is live inside its owner's episode
+owner / provider    ← the effect's structural provenance
+relation remains?   ← effect live AND provider episode still consistent
+ghost session?      ← live binding effect outside any justified episode
+                      (§I.1.6 ghost oracle)
+```
+
+What the kernel still never learns: PCM, buffer addresses, sample values,
+format payload, device retry policy, track identity (§K.3, §J.3). Frozen
+anti-patterns, both directions:
+
+```text
+no EffectKind::SinkSession-style behavioral enum   (§H.5: one Effect shape,
+                                                    no domain variants)
+no standalone mutable DataEdgeRegistry             (a second authority and a
+                                                    sixth-primitive risk, §D.6)
+```
+
+A derived, read-only projection index (for diagnostics/tests) is a
+representation choice (§T), never a second truth.
 
 ---
 
@@ -1374,8 +1421,9 @@ Typed static capability keys + object-safe service traits + generational `FiberI
 | 17 | Can a domain obligation sneak back in as a sixth primitive? | **PASS** (frozen in Corrective-2) | the kernel's whole teardown knowledge is one verdict per fiber — `DISCHARGED` / `CONTRACT_VIOLATED` (§G.6); no obligation registry, list, count, or identity exists kernel-side; obligations are component-contract content (§H.5.1 fence, §J.4, §D.6) |
 | 18 | Can Reconcile confuse "unchanged desired entry" with "the operator asked for a retry"? | **PASS** (frozen in Corrective-4) | desired revision identity makes fresh-incarnation intent expressible (§L.5); an unchanged identity never retries FAILED (R1/R7, oracle D0–D4); the kernel derives revision triggers from nothing — not config content, not dependency churn (R2/R3, §S) |
 | 19 | Can a FAILED fiber hang settlement forever, or be retried by accident? | **PASS** (frozen in Corrective-4) | quiescence is transition semantics: settled FAILED (and Pending) are quiet-legal (§L.1 clauses 2–3, D1 oracle); nothing retries without a fresh desired incarnation (§L.5); staged plans still owing work and latched violations stay non-quiescent (§L.1 clauses 4–5) |
+| 20 | Does "no EffectKind" make composition bindings unprovable, or force a DataEdge sixth primitive? | **PASS** (frozen in Corrective-4) | structural provenance (capability key + provider fiber identity) is part of the one Effect shape (§D.4); the binding effect is the single authority and §K.3/§I.1.5 diagnostics are projections of it (§K.4) — no behavioral enum, no second registry, no payload exposure (A4–A6 class of attacks closed) |
 
-Score: 18 PASS, 1 DEFERRED-WITH-TRIGGER (#10, routed to §T). No DESIGN DEFECT remaining. (Corrective-1 converted the review-confirmed defect in the teardown-failure story into #16's frozen defense; Corrective-2 added #17's obligation fence and repaired the raise-path state machine underlying #13; Corrective-4 added #18–#19.)
+Score: 19 PASS, 1 DEFERRED-WITH-TRIGGER (#10, routed to §T). No DESIGN DEFECT remaining. (Corrective-1 converted the review-confirmed defect in the teardown-failure story into #16's frozen defense; Corrective-2 added #17's obligation fence and repaired the raise-path state machine underlying #13; Corrective-4 added #18–#20.)
 
 ---
 
@@ -1392,7 +1440,7 @@ Frozen upper bounds for the future implementation (any excess requires a new arc
 | capability cardinality modes | **1** (required-single; optional/many/broker deferred, §S) |
 | reconcile concepts | **≤ 6** (desired diff plan revise settle compose-error) |
 | diagnostic concepts | **≤ 6** (the §I.1 surfaces; the §G.6 violation flag lives **inside** the fiber lifecycle surface — not a seventh concept) |
-| kernel Effect shapes | **1** — reversible composition-lifecycle mutation + total inverse (§H.5 frozen block, §H.7); no effect-class enum exists |
+| kernel Effect shapes | **1** — reversible composition-lifecycle mutation + total inverse (§H.5 frozen block, §H.7); no effect-class enum exists; structural provenance (§D.4/§K.4) is part of that one shape, not a second shape |
 | system-boundary action classes (descriptive taxonomy, §H.5) | **5** — none is a kernel Effect variant |
 | desired revision identity per desired entry | **1** opaque equality token — kernel compares, never interprets, never derives (§L.5) |
 | kernel obligation concepts | **0** — no registry/list/count/identity; one teardown verdict (`DISCHARGED`/`CONTRACT_VIOLATED`) per fiber (§G.6, §H.5.1) |
