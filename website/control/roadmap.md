@@ -1,5 +1,5 @@
 ---
-title: Roadmap
+title: 路线图
 status: CURRENT
 ---
 
@@ -7,41 +7,41 @@ status: CURRENT
 import { projectState } from '../data/project-state.ts'
 </script>
 
-# Roadmap
+# 路线图
 
-The roadmap is driven by the current architecture authority chain. Status comes from a single source: `docs/site/project-state.ts`.
-
----
-
-## Progress Ladder
-
-| Layer | Status | Gate |
-|-------|--------|------|
-| Playback Reference | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Tag `playback-reference-v1` frozen |
-| FFmpeg Closure Research | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Issue #48, frozen profiles on playback-reference-v1 |
-| Component Boundary A0 | <StatusBadge status="FROZEN" /> | Issue #53 PASS/CLOSED (PR #66) |
-| Base Kernel K0 | <StatusBadge status="IMPLEMENTED" /> | Issue #70, PR #71 merged (743eb86) |
-| Playback Kernel | <StatusBadge status="NEXT" /> | Design authority: #53 component boundary |
-| Decoder | <StatusBadge status="PLANNED" /> | Capability defined in ports.rs, implementation TBD |
-| Processing | <StatusBadge status="PLANNED" /> | Capability defined in ports.rs, implementation TBD |
-| AudioOutput | <StatusBadge status="PLANNED" /> | Capability defined in ports.rs, implementation TBD |
-| UI Host | <StatusBadge status="DEFERRED" /> | Platform: PocketJS (Win/Linux), KuiklyUI (Android/iOS) |
+路线图由当前架构权威链驱动。状态来自单一来源:`docs/site/project-state.ts`。
 
 ---
 
-## Next Frontier: Playback Kernel
+## 进度阶梯
 
-The Playback Kernel (MusicKernel) is the music-domain semantic authority. It owns:
+| 层 | 状态 | 门槛 |
+|----|------|------|
+| 播放参考 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Tag `playback-reference-v1` 已冻结 |
+| FFmpeg 闭包研究 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Issue #48,冻结 profiles 于 playback-reference-v1 |
+| 组件边界 A0 | <StatusBadge status="FROZEN" /> | Issue #53 PASS/CLOSED (PR #66) |
+| Base Kernel K0 | <StatusBadge status="IMPLEMENTED" /> | Issue #70,PR #71 merged (743eb86) |
+| Playback Kernel | <StatusBadge status="NEXT" /> | 设计权威:#53 组件边界 |
+| Decoder | <StatusBadge status="PLANNED" /> | 能力定义于 ports.rs,实现待定 |
+| Processing | <StatusBadge status="PLANNED" /> | 能力定义于 ports.rs,实现待定 |
+| AudioOutput | <StatusBadge status="PLANNED" /> | 能力定义于 ports.rs,实现待定 |
+| UI Host | <StatusBadge status="DEFERRED" /> | 平台:PocketJS (Win/Linux),KuiklyUI (Android/iOS) |
 
-- Playback state machine (EMPTY/READY/PLAYING/PAUSED/ENDED/ERROR)
-- Media-timeline truth (position/duration, CONFIRMED/ESTIMATED landing)
-- Active track session, decode worker, PCM ring
-- RT-safe publication boundary (commit/flush)
-- Queue semantics (future)
+---
 
-**It is not the global composition authority.**
+## 下一个前沿:Playback Kernel
 
-The generic Composition Kernel handles reachability, ownership, and lifetime. MusicKernel owns music semantics.
+Playback Kernel(MusicKernel)是音乐领域语义权威。它拥有:
+
+- 播放状态机(EMPTY/READY/PLAYING/PAUSED/ENDED/ERROR)
+- 媒体时间线真相(position/duration、CONFIRMED/ESTIMATED 落点)
+- 活动曲目会话、解码 worker、PCM 环形缓冲
+- RT 安全发布边界(commit/flush)
+- 队列语义(未来)
+
+**它不是全局组合权威。**
+
+通用 Composition Kernel 处理可达性、所有权与生命周期。MusicKernel 拥有音乐语义。
 
 <ProvenancePanel
   :authority="['docs/architecture/component-boundary-a0.md', 'docs/architecture/overview.md']"
@@ -51,25 +51,25 @@ The generic Composition Kernel handles reachability, ownership, and lifetime. Mu
 
 ---
 
-## Architecture Change Protocol
+## 架构变更协议
 
-Changes flow through a strict protocol:
+变更经过严格的协议流转:
 
 ```mermaid
 flowchart LR
-    Q["Question"] --> I["Issue / Gate"]
-    I --> R["Research / Experiment"]
-    R --> D["Canonical Doc"]
-    D --> G["Frozen Mermaid Diagram"]
-    D --> C["Implementation"]
-    C --> T["Executable Evidence"]
-    D --> W["Observatory"]
+    Q["问题"] --> I["Issue / 门槛"]
+    I --> R["研究 / 实验"]
+    R --> D["权威文档"]
+    D --> G["冻结的 Mermaid 图"]
+    D --> C["实现"]
+    C --> T["可执行证据"]
+    D --> W["观测站"]
     G --> W
     T --> W
-    I -. provenance .-> W
+    I -. 溯源 .-> W
 ```
 
-The Observatory reflects accepted authority — it never creates architecture truth.
+观测站反映已被接受的权威 —— 它从不创造架构真理。
 
 ---
 

@@ -7,121 +7,121 @@ status: IMPLEMENTED
 
 <StatusBadge status="IMPLEMENTED" />
 
-The generic Composition Kernel implements five primitives — Context, Capability, Fiber, Effect, Reconcile — with 70 kernel oracle tests (75 workspace tests). It is domain-agnostic: it knows nothing about music, PCM, FFmpeg, WASAPI, PocketJS, KuiklyUI, or UI payload schemas.
+通用 Composition Kernel 实现五个原语 —— Context、Capability、Fiber、Effect、Reconcile —— 70 项内核 oracle 测试(75 项 workspace 测试)。它领域无关:不了解音乐、PCM、FFmpeg、WASAPI、PocketJS、KuiklyUI 或 UI 载荷 schema。
 
 ---
 
-## Five Primitives
+## 五个原语
 
 ```mermaid
 flowchart TB
-    subgraph K0["Base Kernel K0 Boundary"]
+    subgraph K0["Base Kernel K0 边界"]
         direction TB
-        C["Context<br/>reachability / dependency view"]
-        CAP["Capability<br/>named service contract"]
-        F["Fiber<br/>live plugin instance"]
-        E["Effect<br/>owned reversible mutation"]
-        R["Reconcile<br/>move graph toward desired"]
+        C["Context<br/>可达性 / 依赖视图"]
+        CAP["Capability<br/>命名服务契约"]
+        F["Fiber<br/>存活插件实例"]
+        E["Effect<br/>拥有的可逆变更"]
+        R["Reconcile<br/>推动图趋向期望"]
 
-        C ---|"resolves"| CAP
-        F ---|"owns"| E
-        R -->|"desired composition"| F
+        C ---|"解析"| CAP
+        F ---|"拥有"| E
+        R -->|"期望组合"| F
     end
 
-    Desired["Desired<br/>Composition"] -->|"input"| R
-    R -->|"output"| Running["Running<br/>Fiber Graph"]
+    Desired["期望<br/>组合"] -->|"输入"| R
+    R -->|"输出"| Running["运行中<br/>Fiber 图"]
 
     style K0 fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
 ```
 
 ---
 
-## Kernel Constitution
+## 内核宪章
 
 <ClaimBadge role="authority" />
 
-> **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
+> **内核控制可达性、所有权与生命周期;它不拥有应用载荷。**
 
-The kernel must not know:
+内核不得了解:
 
-- Track / playlist semantics
-- PCM / codec formats
+- 曲目 / 播放列表语义
+- PCM / 编解码格式
 - FFmpeg / WASAPI
 - PocketJS / KuiklyUI
-- UI payload schemas
-- Music commands
+- UI 载荷 schema
+- 音乐命令
 
 ---
 
-## What the Kernel Owns
+## 内核拥有什么
 
-| In Scope | Out of Scope |
-|----------|-------------|
-| Capability resolution | Track / session semantics |
-| Fiber lifecycle | PCM buffers |
-| Effect ownership & LIFO unwind | Audio output devices |
-| Reconcile → running graph | UI payloads |
-| Reachability / dependency validity | Codec selection |
+| 范围内 | 范围外 |
+|--------|--------|
+| 能力解析 | 曲目 / 会话语义 |
+| Fiber 生命周期 | PCM 缓冲 |
+| Effect 所有权与 LIFO 展开 | 音频输出设备 |
+| Reconcile → 运行图 | UI 载荷 |
+| 可达性 / 依赖有效性 | 编解码器选择 |
 
 ---
 
-## Formal Basis
+## 形式化基础
 
 <ClaimBadge role="authority" />
 
-The design is backed by *A Programming Paradigm for Spatiotemporal Composability* (arXiv:2608.25512v1). Key theorems instantiated:
+设计由论文 *A Programming Paradigm for Spatiotemporal Composability*(arXiv:2608.25512v1)支撑。已实例化的关键定理:
 
-- **Thm 5/7** — Effects compose in twisted (LIFO-accumulating) order
-- **Thm 15** — Local revertibility is per-application, not global
-- **Thm 70** — Teardown-access window for provider withdrawal
-- **Thm 73** — Quiescence/progress guarantee
-- **Thm 80** — Confluence after legal composition history
+- **Thm 5/7** — Effect 按 twisted(LIFO 累积)顺序组合
+- **Thm 15** — 局部可逆性是逐次应用的,而非全局
+- **Thm 70** — 提供者撤回的 teardown 访问窗口
+- **Thm 73** — 静息/推进保证
+- **Thm 80** — 合法组合历史后的合流性
 
-### Effect Composition
+### Effect 组合
 
-The K0 Effect has exactly **one shape**: composition-lifecycle mutation with a total inverse. The five-label taxonomy (Reversible / Transactional / Compensatable / Irreversible / outside boundary) is a **descriptive action taxonomy**, not a kernel Effect variant.
+K0 Effect 恰好有**一种形态**:带全逆算子的组合生命周期变更。五标签分类法(Reversible / Transactional / Compensatable / Irreversible / 边界外)是**描述性行动分类**,不是内核 Effect 变体。
 
-Within one Fiber, owned effects unwind in **LIFO order**:
+在单个 Fiber 内,拥有的 Effect 按 **LIFO 顺序**展开:
 
 $$
-g_2 \circ g_1 \circ \mathrm{id} \xrightarrow{\text{LIFO unwind}} g_1^{-1} \circ g_2^{-1}
+g_2 \circ g_1 \circ \mathrm{id} \xrightarrow{\text{LIFO 展开}} g_1^{-1} \circ g_2^{-1}
 $$
 
-### Confluence
+### 合流性
 
 <ClaimBadge role="authority" />
 
-After any legal load/unload/replacement history reaches quiescence:
+任何合法的加载/卸载/替换历史到达静息态后:
 
 $$
-\mathcal{O}(\text{history} \rightarrow \text{quiescence}) = \mathcal{O}(\text{clean build of final desired composition})
+\mathcal{O}(\text{历史} \rightarrow \text{静息态}) = \mathcal{O}(\text{最终期望组合的全新构建})
 $$
 
 ---
 
-## Semantic Guarantees (Tested)
+## 语义保证(已测试)
 
-The implementation is validated by 70 kernel oracle tests across six groups:
+实现由六组共 70 项内核 oracle 测试验证:
 
-| Guarantee | What it proves |
-|-----------|---------------|
-| Single-Fiber local cleanup | Owned effects unwind LIFO; fiber reaches terminal |
-| Cross-Fiber independent removal | Removing A preserves independent B/C |
-| Same-key contribution safety | Contributions compose without hidden cross-key mutation |
-| Ordered interaction | Non-commutative relations use explicit structure |
-| Provider-disappearance ordering | Dependents finish teardown before provider release |
-| Confluence | History → quiescence ≡ clean build |
+| 保证 | 证明内容 |
+|------|---------|
+| 单 Fiber 局部清理 | 拥有的 Effect 按 LIFO 展开;fiber 到达终态 |
+| 跨 Fiber 独立移除 | 移除 A 保留独立的 B/C |
+| 同键贡献安全 | 贡献组合无隐藏跨键变更 |
+| 有序交互 | 非可交换关系使用显式结构 |
+| 提供者消失排序 | 依赖方在提供者释放前完成 teardown |
+| 合流性 | 历史 → 静息态 ≡ 全新构建 |
 
 ---
 
-## Implementation Status
+## 实现状态
 
-| Artifact | Status |
-|----------|--------|
-| `crates/qianqian-kernel` | Implemented |
-| Test count | 70 kernel (75 workspace) |
-| Tests pass | At merge (743eb86) |
-| Adversarial oracles | A1–A21 |
+| 制品 | 状态 |
+|------|------|
+| `crates/qianqian-kernel` | 已实现 |
+| 测试数量 | 70 内核(75 workspace) |
+| 测试通过 | 合并时 (743eb86) |
+| 对抗性 oracle | A1–A21 |
 
 <ProvenancePanel
   :authority="['docs/architecture/composition-kernel-0-design.md', 'docs/architecture/composition-kernel-0-implementation-adr.md']"

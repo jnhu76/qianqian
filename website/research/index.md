@@ -1,46 +1,46 @@
 ---
-title: Research
+title: 研究
 status: CURRENT
 ---
 
-# Research
+# 研究
 
-Research sources that inform Qianqian's architecture.
+为 Qianqian 架构提供输入的研究来源。
 
 <ClaimBadge role="interpretation" />
 
-Research pages are NOT paper summaries. Each page answers:
+研究页**不是**论文摘要。每页回答:
 
-- What the source says
-- What Qianqian borrows
-- What Qianqian does **NOT** borrow
-- What Qianqian changed
-- Executable evidence
-- Open questions
-
----
-
-## Research Map
-
-| Topic | Source | Status |
-|-------|--------|--------|
-| [Spatiotemporal Composability](/research/spatiotemporal-composability) | arXiv:2608.25512v1 | <StatusBadge status="VALIDATED" /> |
-| [FFmpeg Closure](/research/ffmpeg-closure) | FFmpeg configure oracle | <StatusBadge status="HISTORICAL_EVIDENCE" /> |
-| [Realtime Audio](/research/realtime-audio) | WASAPI renderer, PlayerEngine | <StatusBadge status="HISTORICAL_EVIDENCE" /> |
-| [DSH → Composition Kernel Lineage](/research/dsh-composition-lineage) | Issue #47 comparison → #53/#67/#70 | <StatusBadge status="HISTORICAL_EVIDENCE" /> |
+- 来源说了什么
+- Qianqian 借鉴了什么
+- Qianqian **不**借鉴什么
+- Qianqian 改变了什么
+- 可执行证据
+- 开放问题
 
 ---
 
-## Provenance Discipline
+## 研究地图
+
+| 主题 | 来源 | 状态 |
+|------|------|------|
+| [时空可组合性](/research/spatiotemporal-composability) | arXiv:2608.25512v1 | <StatusBadge status="VALIDATED" /> |
+| [FFmpeg 闭包](/research/ffmpeg-closure) | FFmpeg configure oracle | <StatusBadge status="HISTORICAL_EVIDENCE" /> |
+| [实时音频](/research/realtime-audio) | WASAPI renderer、PlayerEngine | <StatusBadge status="HISTORICAL_EVIDENCE" /> |
+| [DSH → Composition Kernel 演进](/research/dsh-composition-lineage) | Issue #47 对照 → #53/#67/#70 | <StatusBadge status="HISTORICAL_EVIDENCE" /> |
+
+---
+
+## 溯源纪律
 
 <ClaimBadge role="authority" />
 
-Never upgrade:
+永不升级:
 
-- Paper theorem → Qianqian implementation fact
-- Cordis implementation choice → paper theorem
+- 论文定理 → Qianqian 实现事实
+- Cordis 实现选择 → 论文定理
 
-Each research page preserves the distinction between **[PAPER]**, **[QIANQIAN]**, and **[EVIDENCE]**.
+每个研究页保持 **[PAPER]**、**[QIANQIAN]** 与 **[EVIDENCE]** 的区分。
 
 ---
 

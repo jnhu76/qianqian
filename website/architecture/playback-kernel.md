@@ -7,104 +7,104 @@ status: NEXT
 
 <StatusBadge status="NEXT" />
 
-The Playback Kernel (MusicKernel) is the music-domain semantic authority. It is **not** the global composition authority.
+Playback Kernel(MusicKernel)是音乐领域语义权威。它**不是**全局组合权威。
 
 ---
 
-## Domain Semantics
+## 领域语义
 
 <ClaimBadge role="authority" />
 
-MusicKernel owns:
+MusicKernel 拥有:
 
-- Playback state machine (EMPTY/READY/PLAYING/PAUSED/ENDED/ERROR)
-- Media-timeline truth (position/duration μs, CONFIRMED/ESTIMATED landing, GAP = zero media time)
-- Active track session (including open Decoder handle)
-- Queue semantics (future)
-- State-machine transitions; seek-landing vs ENDED
+- 播放状态机(EMPTY/READY/PLAYING/PAUSED/ENDED/ERROR)
+- 媒体时间线真相(position/duration μs、CONFIRMED/ESTIMATED 落点、GAP = 零媒体时间)
+- 活动曲目会话(含打开的 Decoder 句柄)
+- 队列语义(未来)
+- 状态机转换;seek 落点 vs ENDED
 
 ```mermaid
 flowchart TB
     subgraph PK["Playback Kernel / MusicKernel"]
         direction TB
-        TS["Track / Session / State"]
-        PP["Play / Pause / Stop / Seek"]
-        QR["Queue / Repeat / Shuffle"]
-        BFR["Buffering / Recovery"]
-        EN["ENDED / Timeline"]
+        TS["曲目 / 会话 / 状态"]
+        PP["播放 / 暂停 / 停止 / Seek"]
+        QR["队列 / 循环 / 随机"]
+        BFR["缓冲 / 恢复"]
+        EN["ENDED / 时间线"]
 
-        subgraph Mechanisms["Cohesive MVP Mechanisms"]
-            DW["Decode Worker"]
-            PR["PCM Ring"]
-            RT["RT Publication<br/>commit / flush"]
+        subgraph Mechanisms["内聚的 MVP 机制"]
+            DW["解码 Worker"]
+            PR["PCM 环形缓冲"]
+            RT["RT 发布<br/>commit / flush"]
         end
     end
 
     DEC["Decoder"] -->|"open / probe / decode / seek"| PK
-    PK -->|"bind PcmSink"| AOUT["AudioOutput"]
-    PK -.->|"future"| PROC["Processing"]
-    UH["UiHost"] -.->|"poll snapshot"| PK
+    PK -->|"绑定 PcmSink"| AOUT["AudioOutput"]
+    PK -.->|"未来"| PROC["Processing"]
+    UH["UiHost"] -.->|"轮询快照"| PK
 
     style PK fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
 ```
 
 ---
 
-## Ownership Split
+## 所有权切分
 
-<ClaimBadge role="authority" /> **Frozen in component-boundary-a0.md §B.1.**
+<ClaimBadge role="authority" /> **冻结于 component-boundary-a0.md §B.1。**
 
-| Owned by Music *component* | Owned by MusicKernel |
-|---------------------------|---------------------|
-| Domain semantics + cohesive MVP mechanisms | Domain semantics only |
-| Session / worker / ring / timeline mechanism | State-machine meaning |
-| RT publication boundary | Track/session/ENDED meaning |
-| | Timeline interpretation |
+| Music *组件*拥有 | MusicKernel 拥有 |
+|------------------|------------------|
+| 领域语义 + 内聚 MVP 机制 | 仅领域语义 |
+| 会话/worker/环形缓冲/时间线机制 | 状态机含义 |
+| RT 发布边界 | 曲目/会话/ENDED 含义 |
+| | 时间线解释 |
 
-`MusicKernel` must **never** contain `struct MusicKernel { worker, ring, renderer_handle }` — that would contradict "domain kernels own domain semantics."
-
----
-
-## Dependencies
-
-| Requires | Cardinality | Purpose |
-|----------|------------|---------|
-| Decoder | 1 | Open / probe / decode / seek / EOF |
-| PcmSink (from AudioOutput) | 1 | Bind / negotiate, RT fill endpoint |
-
-Unsatisfied requirement → component stays inactive/degraded. It never crashes the root.
+`MusicKernel` **绝不**能包含 `struct MusicKernel { worker, ring, renderer_handle }` —— 那将违背"领域内核拥有领域语义"。
 
 ---
 
-## Activation Rule
+## 依赖
 
-<ClaimBadge role="authority" /> Frozen.
+| 依赖 | 基数 | 用途 |
+|------|------|------|
+| Decoder | 1 | 打开 / 探测 / 解码 / seek / EOF |
+| PcmSink(来自 AudioOutput) | 1 | 绑定 / 协商,RT 填充端点 |
 
-Music binds `PcmSink` at **activation** (not at track open). SinkSession existence follows solely from the live binding:
+需求未满足 → 组件保持 inactive/degraded。它绝不会让根崩溃。
+
+---
+
+## 激活规则
+
+<ClaimBadge role="authority" /> 已冻结。
+
+Music 在**激活时**绑定 `PcmSink`(不是在曲目打开时)。SinkSession 的存在仅由存活绑定决定:
 
 $$
-\text{SinkSession exists} \iff \text{live binding}
+\text{SinkSession 存在} \iff \text{存活绑定}
 $$
 
-idle ≠ absent. Track open/close changes what flows through the session, never whether it exists.
+idle ≠ 不存在。曲目打开/关闭改变流经会话的内容,从不改变它是否存在。
 
 ---
 
-## Observable Contract
+## 可观测契约
 
-State; position/duration on the MEDIA timeline; landing quality; buffered/underrun diagnostics; typed errors with Decoder verdict attribution. Frozen from `pe_snapshot`.
+状态;媒体时间线上的 position/duration;落点质量;缓冲/欠载诊断;带 Decoder 判定归因的类型化错误。自 `pe_snapshot` 冻结。
 
 ---
 
-## System Boundary
+## 系统边界
 
-Audio actually rendered by the sink is **outside rollback**:
+sink 实际渲染出的音频**在回滚之外**:
 
 $$
 \text{submitted} \neq \text{rendered}
 $$
 
-Claimed physical flush is irreversible. Host-IO side effects during decode belong to the host, not to Music.
+已提交的物理 flush 不可逆。解码期间的 Host-IO 副作用属于宿主,不属于 Music。
 
 ---
 

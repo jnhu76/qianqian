@@ -1,43 +1,43 @@
 ---
-title: Control Plane vs Data Plane
+title: 控制平面与数据平面
 status: IMPLEMENTED
 ---
 
-# Control Plane vs Data Plane
+# 控制平面与数据平面
 
 <StatusBadge status="IMPLEMENTED" />
 
-> **Capability plane != Data plane.**
+> **能力平面(Capability Plane)!= 数据平面(Data Plane)。**
 
 ---
 
-## Separation
+## 分离
 
 <ClaimBadge role="authority" />
 
-Context determines **who can reach whom**. After binding, payload flows **directly** through the resolved service/data edge.
+Context 决定**谁能到达谁**。绑定之后,载荷**直接**流经已解析的服务/数据边。
 
 ```mermaid
 flowchart TB
-    subgraph CP["Control Plane"]
-        DC["Desired Composition"]
+    subgraph CP["控制平面"]
+        DC["期望组合"]
         CK["Composition Kernel"]
-        DC -->|"input"| CK
+        DC -->|"输入"| CK
     end
 
-    BIND["resolve / bind<br/>(one-time capability binding)"]
+    BIND["resolve / bind<br/>(一次性能力绑定)"]
 
-    CK -->|"desired → running"| BIND
+    CK -->|"期望 → 运行"| BIND
 
-    subgraph DP["Realtime Data Plane"]
+    subgraph DP["实时数据平面"]
         direction LR
-        S["service.method(payload)"] -->|"pre-bound endpoint"| P["provider"]
-        MS["MediaSource"] -->|"encoded media"| DEC["Decoder"]
+        S["service.method(payload)"] -->|"预绑定端点"| P["提供者"]
+        MS["MediaSource"] -->|"编码媒体"| DEC["Decoder"]
         DEC -->|"PCM"| PROC["Processing"]
         PROC -->|"PCM"| AOUT["AudioOutput"]
     end
 
-    BIND -->|"pre-bound, no per-block lookup"| DP
+    BIND -->|"预绑定,无逐块查找"| DP
 
     style CP fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
     style DP fill:#0f3460,stroke:#4a4a8a,color:#e0e0e0
@@ -45,62 +45,62 @@ flowchart TB
 
 ---
 
-## What Must NOT Happen Per Block
+## 逐块内绝不允许的事
 
 <ClaimBadge role="authority" />
 
-The realtime audio path is a data-plane island. Per callback/block it must not perform:
+实时音频路径是数据平面孤岛。每个回调/数据块内不得执行:
 
-- Context lookup
-- Capability resolution
-- Fiber reconciliation
-- Arbitrary generic event dispatch
-- Filesystem/network I/O
-- UI/JS/managed-runtime round trips
-- Unbounded allocation/blocking
+- Context 查找
+- 能力解析
+- Fiber 调和
+- 任意通用事件派发
+- 文件系统/网络 I/O
+- UI/JS/托管运行时往返
+- 无界分配或阻塞
 
-Future graph changes should be prepared on the **control plane** and published at an **RT-safe boundary**.
+未来的图变更应在**控制平面**上准备,并在 **RT 安全边界**处发布。
 
 ---
 
-## Realtime Audio Path
+## 实时音频路径
 
-The intended data path:
+目标数据路径:
 
 ```text
 MediaSource → Decoder → DSP/Processing → AudioOutput
 ```
 
-All per-block work flows through **pre-bound endpoints** established during control-plane binding. No generic kernel operation occurs in the hot path.
+所有逐块工作都流经控制平面绑定时建立的**预绑定端点**。热路径中不发生任何通用内核操作。
 
 ---
 
-## Why This Matters
+## 为什么这很重要
 
 <ClaimBadge role="interpretation" />
 
-If Context/EventBus/Reconcile appeared in the audio callback path:
+如果 Context/EventBus/Reconcile 出现在音频回调路径中:
 
-1. **Latency** — generic resolution is unbounded
-2. **Determinism** — reordering/reconciliation mid-block corrupts audio
-3. **Complexity** — control-plane and data-plane concerns mix
+1. **延迟** — 通用解析是无界的
+2. **确定性** — 块中途的重排/调和会破坏音频
+3. **复杂度** — 控制平面与数据平面关注点混杂
 
-The separation guarantees the audio path is a **deterministic mechanism island**.
+这种分离保证音频路径是**确定性的机制孤岛**。
 
 ---
 
-## Data Edge Ownership
+## 数据边所有权
 
-<ClaimBadge role="authority" /> Frozen in component-boundary-a0.md §B.3.
+<ClaimBadge role="authority" /> 冻结于 component-boundary-a0.md §B.3。
 
-The SinkSession edge is established by the dependent's explicit `PcmSink.bind(PcmSourceEndpoint)`:
+SinkSession 边由依赖方显式的 `PcmSink.bind(PcmSourceEndpoint)` 建立:
 
-- Created at control time (Music activation)
-- Per-block pull happens only through the session endpoint
-- AudioOutput holds only the endpoint handed to that session
-- No composition-root pointer wiring exists or is permitted
+- 在控制时刻创建(Music 激活)
+- 逐块拉取只通过该会话端点发生
+- AudioOutput 只持有交给该会话的端点
+- 不存在、也不允许组合根指针接线
 
-This direction keeps the graph acyclic.
+这个方向保持图无环。
 
 ---
 

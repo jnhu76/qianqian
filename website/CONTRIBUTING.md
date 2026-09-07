@@ -1,89 +1,89 @@
-# Observatory Contribution Guide
+# 观测站贡献指南
 
-The Qianqian Engineering Observatory is a curated projection of repository truth. These rules keep it that way.
-
----
-
-## Rules
-
-### 1. Do not create architecture truth in Web-only prose.
-
-The Observatory explains accepted architecture. It does not create it.
-
-### 2. Every architecture page requires authority.
-
-Every architecture page must carry a `<ProvenancePanel>` linking to canonical authority docs.
-
-### 3. Every experiment claim requires evidence.
-
-Quantitative claims must point to test results, artifacts, or executable evidence.
-
-### 4. Formal diagrams use registered Mermaid assets.
-
-Canonical architecture diagrams are stored in `docs/architecture/diagrams/` and registered in `docs/architecture/registry.yml`.
-
-Current reality: several pages still embed inline Mermaid graphs that are simplified, canonical-equivalent copies of registered diagrams (e.g. ARCH-001/002/004/005 cores). The intended contract — pages reference registry IDs and carry no duplicated canonical source (AR7) — is documented but **not yet enforced** by `docs:verify`. Inline Mermaid remains acceptable only for explanatory diagrams that are not registered architecture assets.
-
-### 5. Frozen diagrams are versioned, not edited semantically.
-
-If architecture changes, create a new version (`ARCH-002-v2.mmd`). Do not mutate a frozen v1.
-
-### 6. GitHub state is not semantic status.
-
-Issue OPEN/CLOSED is workflow state. Observatory statuses are: FROZEN, IMPLEMENTED, VALIDATED, CURRENT, NEXT, PLANNED, DEFERRED, HISTORICAL_EVIDENCE, SUPERSEDED.
-
-### 7. Project status comes from project-state.ts.
-
-Homepage, roadmap, and architecture-status UI consume the same source. No duplicate status strings.
-
-### 8. Machine facts prefer machine artifacts.
-
-If artifact files disagree with issue text, machine artifacts win. Issue text provides interpretation/provenance.
-
-### 9. Web prose is a projection, not authority.
-
-The canonical architecture lives in `docs/architecture/`. The Observatory curates and explains it.
-
-### 10. New major architecture must pass its own design gate before Observatory status changes.
-
-Don't change a page's status badge because you implemented something. The architecture gate must pass first.
+Qianqian 工程观测站是仓库真相的受控投影。以下规则使它保持如此。
 
 ---
 
-## Adding a New Architecture Page
+## 规则
 
-1. Ensure the architecture has passed its design gate
-2. Register the diagram in `docs/architecture/registry.yml`
-3. Create the diagram in `docs/architecture/diagrams/`
-4. Create the page with `<ProvenancePanel>` linking to authority
-5. Add to sidebar in `.vitepress/config.ts`
-6. Run `pnpm docs:verify` to check invariants
+### 1. 不得在 Web 文章中创造架构真理。
+
+观测站解释已被接受的架构。它不创造架构。
+
+### 2. 每个架构页必须带权威来源。
+
+每个架构页必须携带 `<ProvenancePanel>`,链接到权威文档。
+
+### 3. 每个实验主张必须带证据。
+
+定量主张必须指向测试结果、制品或可执行证据。
+
+### 4. 正式图使用已登记的 Mermaid 资产。
+
+权威架构图保存在 `docs/architecture/diagrams/`,并登记于 `docs/architecture/registry.yml`。
+
+当前现实:若干页面仍内嵌简化版、与权威图等价的 Mermaid 图(如 ARCH-001/002/004/005 的核心)。预期契约 —— 页面引用 registry ID、不携带复制的权威源(AR7)—— 已写入文档,但 `docs:verify` **尚未强制**。内嵌 Mermaid 仅对未登记为架构资产的解释性图可接受。
+
+### 5. 冻结图按版本管理,不做语义编辑。
+
+架构变化时,创建新版本(`ARCH-002-v2.mmd`)。不要改动已冻结的 v1。
+
+### 6. GitHub 状态不是语义状态。
+
+Issue OPEN/CLOSED 是工作流状态。观测站状态是:FROZEN、IMPLEMENTED、VALIDATED、CURRENT、NEXT、PLANNED、DEFERRED、HISTORICAL_EVIDENCE、SUPERSEDED。
+
+### 7. 项目状态来自 project-state.ts。
+
+首页、路线图与架构状态 UI 消费同一来源。不允许重复的状态字符串。
+
+### 8. 机器事实优先采信机器制品。
+
+如果制品文件与 issue 文本不一致,以机器制品为准。issue 文本提供解释/溯源。
+
+### 9. Web 文章是投影,不是权威。
+
+权威架构在 `docs/architecture/`。观测站负责整理与解释。
+
+### 10. 新的重大架构必须先通过自己的设计门槛,观测站状态才能改变。
+
+不要因为你实现了某个东西就改页面上的状态徽章。架构门槛必须先通过。
 
 ---
 
-## Adding a New Experiment Page
+## 新增架构页
 
-1. Register in `docs/experiments/registry.yml`
-2. Follow the standard contract: Question → Baseline → Hypothesis → Method → Evidence → Result → Architectural Consequence
-3. Link evidence to tests/artifacts
-4. Use <ClaimBadge role="evidence" /> for measured facts
+1. 确认架构已通过设计门槛
+2. 在 `docs/architecture/registry.yml` 登记图
+3. 在 `docs/architecture/diagrams/` 创建图
+4. 创建页面,带 `<ProvenancePanel>` 链接权威来源
+5. 加入 `.vitepress/config.ts` 侧栏
+6. 运行 `pnpm docs:verify` 检查不变量
 
 ---
 
-## Status Vocabulary
+## 新增实验页
 
-Use only these status values:
+1. 在 `docs/experiments/registry.yml` 登记
+2. 遵循标准契约:问题 → 基线 → 假设 → 方法 → 证据 → 结果 → 架构后果
+3. 把证据链接到测试/制品
+4. 对已测量的事实使用 <ClaimBadge role="evidence" />
 
-| Status | Meaning |
-|--------|---------|
-| FROZEN | Architecture boundary accepted |
-| IMPLEMENTED | Code merged and evidence verified |
-| VALIDATED | Experiment result confirmed |
-| CURRENT | Active architecture boundary |
-| NEXT | Immediate frontier |
-| PLANNED | Design not yet frozen |
-| DEFERRED | Future consideration |
-| HISTORICAL_EVIDENCE | Preserved as opt-in evidence |
-| SUPERSEDED | Replaced by newer version |
+---
 
-Do not invent synonyms.
+## 状态词汇
+
+只使用以下状态值:
+
+| 状态 | 含义 |
+|------|------|
+| FROZEN | 架构边界已被接受 |
+| IMPLEMENTED | 代码已合并,证据已核验 |
+| VALIDATED | 实验结果已被证据确认 |
+| CURRENT | 活跃的架构边界 |
+| NEXT | 紧邻的前沿 |
+| PLANNED | 设计尚未冻结 |
+| DEFERRED | 留待未来考虑 |
+| HISTORICAL_EVIDENCE | 作为可选证据保存 |
+| SUPERSEDED | 已被更新版本取代 |
+
+不得发明同义词。

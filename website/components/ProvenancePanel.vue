@@ -18,10 +18,10 @@ function githubPr(n: number) {
 
 <template>
   <div class="provenance-panel">
-    <h4>Provenance</h4>
+    <h4>溯源</h4>
 
     <template v-if="authority?.length">
-      <span class="provenance-label">Authority</span>
+      <span class="provenance-label">权威来源</span>
       <ul>
         <li v-for="a in authority" :key="a">
           <code>{{ a }}</code>
@@ -30,7 +30,7 @@ function githubPr(n: number) {
     </template>
 
     <template v-if="decisions?.length">
-      <span class="provenance-label">Decision History</span>
+      <span class="provenance-label">决策记录</span>
       <ul>
         <li v-for="d in decisions" :key="JSON.stringify(d)">
           <template v-if="d.issue">
@@ -44,7 +44,7 @@ function githubPr(n: number) {
     </template>
 
     <template v-if="implementation?.length">
-      <span class="provenance-label">Implementation</span>
+      <span class="provenance-label">实现</span>
       <ul>
         <li v-for="imp in implementation" :key="JSON.stringify(imp)">
           <template v-if="imp.issue">
@@ -58,7 +58,7 @@ function githubPr(n: number) {
     </template>
 
     <template v-if="evidence?.length">
-      <span class="provenance-label">Evidence</span>
+      <span class="provenance-label">证据</span>
       <ul>
         <li v-for="e in evidence" :key="e">
           <code>{{ e }}</code>
@@ -67,7 +67,7 @@ function githubPr(n: number) {
     </template>
 
     <template v-if="lastVerified">
-      <span class="provenance-label">Last verified</span>
+      <span class="provenance-label">最近核验</span>
       <span> {{ lastVerified }}</span>
     </template>
   </div>

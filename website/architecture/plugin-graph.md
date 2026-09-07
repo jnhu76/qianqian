@@ -1,76 +1,76 @@
 ---
-title: Plugin Graph
+title: 插件图
 status: NEXT
 ---
 
-# Plugin Graph
+# 插件图
 
 <StatusBadge status="NEXT" />
 
-The plugin graph shows logical component boundaries and their capability dependencies.
+插件图展示逻辑组件边界及其能力依赖。
 
 <ClaimBadge role="interpretation" />
 
-> Logical plugin boundary **!=** crate/shared-library boundary.
+> 逻辑插件边界 **!=** crate / 动态库边界。
 
 ---
 
-## Current Intended Shape
+## 当前目标形态
 
 ```mermaid
 flowchart LR
-    DEC["Decoder<br/>(encoded media → PCM)"]
-    MUSIC["Music / Playback<br/>(domain semantics)"]
-    AOUT["AudioOutput<br/>(PCM → physical)"]
+    DEC["Decoder<br/>(编码媒体 → PCM)"]
+    MUSIC["Music / Playback<br/>(领域语义)"]
+    AOUT["AudioOutput<br/>(PCM → 物理)"]
 
-    DEC -->|"provides Decoder capability"| MUSIC
-    MUSIC -->|"requires Decoder"| DEC
-    MUSIC -->|"binds PcmSink"| AOUT
-    AOUT -->|"provides PcmSink"| MUSIC
+    DEC -->|"提供 Decoder 能力"| MUSIC
+    MUSIC -->|"依赖 Decoder"| DEC
+    MUSIC -->|"绑定 PcmSink"| AOUT
+    AOUT -->|"提供 PcmSink"| MUSIC
 ```
 
 ---
 
-## Future Components
+## 未来组件
 
 ```mermaid
 flowchart TB
-    subgraph Future["Future Components"]
+    subgraph Future["未来组件"]
         PROC["Processing<br/>(PCM → PCM)"]
-        UH["UiHost<br/>(presentation)"]
+        UH["UiHost<br/>(呈现)"]
     end
 
-    MUSIC2["Music"] -.->|"future: PCM → PCM"| PROC
-    PROC -.->|"future: PCM → physical"| AOUT2["AudioOutput"]
-    MUSIC2 -.->|"future: poll snapshot"| UH
+    MUSIC2["Music"] -.->|"未来:PCM → PCM"| PROC
+    PROC -.->|"未来:PCM → 物理"| AOUT2["AudioOutput"]
+    MUSIC2 -.->|"未来:轮询快照"| UH
 ```
 
 ---
 
-## Component Dependency Matrix
+## 组件依赖矩阵
 
-| Component | Requires | Provides |
-|-----------|----------|---------|
-| Music | Decoder, PcmSink | PlaybackControl, PlaybackSnapshot |
-| Decoder | Nothing | Decoder capability |
-| AudioOutput | Nothing | PcmSink, OutputDeviceDiscovery |
-| Processing *(future)* | PCM in | PCM out |
-| UiHost *(future)* | Snapshot | User input |
+| 组件 | 依赖 | 提供 |
+|------|------|------|
+| Music | Decoder、PcmSink | PlaybackControl、PlaybackSnapshot |
+| Decoder | 无 | Decoder 能力 |
+| AudioOutput | 无 | PcmSink、OutputDeviceDiscovery |
+| Processing *(未来)* | PCM 输入 | PCM 输出 |
+| UiHost *(未来)* | 快照 | 用户输入 |
 
 ---
 
-## Boundary Justification
+## 边界论证
 
-Every component boundary must answer:
+每个组件边界必须回答:
 
-- What state/resources does it own?
-- What capabilities does it require?
-- What capabilities does it provide?
-- What operations cross the boundary?
-- Which operations commute?
-- Where is non-commutative order explicit?
+- 它拥有什么状态/资源?
+- 它需要什么能力?
+- 它提供什么能力?
+- 哪些操作跨越边界?
+- 哪些操作可交换?
+- 非可交换顺序在哪里显式表达?
 
-A different feature name is not evidence of component independence.
+不同的特性名不是组件独立性的证据。
 
 ---
 

@@ -1,110 +1,111 @@
 ---
-title: Realtime Audio Research
+title: 实时音频研究
 status: HISTORICAL_EVIDENCE
 ---
 
-# Realtime Audio Research
+# 实时音频研究
 
 <StatusBadge status="HISTORICAL_EVIDENCE" />
 
-## What makes audio output realtime-safe?
+## 是什么让音频输出实时安全?
 
 ---
 
-## Source
+## 来源
 
 <ClaimBadge role="evidence" />
 
-Historical evidence from the playback-reference-v1 frozen experiment. WASAPI renderer and PlayerEngine architecture.
+来自 playback-reference-v1 冻结实验的历史证据。WASAPI renderer 与 PlayerEngine 架构。
 
-| Source | Evidence |
-|--------|----------|
-| `native/src/player/wasapi_renderer.hpp` | Event-driven render thread, mutex-free engine seam |
-| `native/src/player/pcm_ring.hpp` | Engine-owned ring buffer |
-| `native/src/player/playback_timeline.hpp` | Single-owner timeline accounting |
-| `native/src/player/wasapi_submit_accounting.hpp` | Submit vs render accounting |
-| `native/src/player/null_audio_backend.*` | Headless correctness mode |
-| `native/src/player/commit_flush_handshake.hpp` | Single-flight commit/flush protocol |
+| 来源 | 证据 |
+|------|------|
+| `native/src/player/wasapi_renderer.hpp` | 事件驱动渲染线程,无互斥引擎缝 |
+| `native/src/player/pcm_ring.hpp` | 引擎自有的环形缓冲 |
+| `native/src/player/playback_timeline.hpp` | 单一所有者时间线记账 |
+| `native/src/player/wasapi_submit_accounting.hpp` | 提交 vs 渲染记账 |
+| `native/src/player/null_audio_backend.*` | 无头正确性模式 |
+| `native/src/player/commit_flush_handshake.hpp` | 单航次 commit/flush 协议 |
 
 ---
 
-## What the Evidence Says
+## 证据说了什么
 
 <ClaimBadge role="evidence" />
 
-### Render Thread Architecture
+### 渲染线程架构
 
-The WASAPI renderer runs an **event-driven render thread** over a mutex-free engine seam:
+WASAPI renderer 在无互斥的引擎缝上运行**事件驱动的渲染线程**:
 
-- `fill_output` / `advance_render` with padding-proven playout
-- Renderer created **after** engine, destroyed **before** engine
-- Device failure degrades to bounded-retry with audible-position freezing
+- `fill_output` / `advance_render`,带 padding 证明的 playout
+- renderer 在引擎**之后**创建、在引擎**之前**销毁
+- 设备失败降级为有界重试 + 可听位置冻结
 
-### Timeline Ownership
+### 时间线所有权
 
-Single-owner timeline accounting — split across submit/render sides was a real bug source. The fix: timeline ownership must be clearly assigned to one side.
+单一所有者的时间线记账 —— 分散在 submit/render 两侧曾是真实的 bug 来源。修复方式:时间线所有权必须明确归属一侧。
 
-### Commit/Flush Protocol
+### Commit/Flush 协议
 
-Single-flight protocol with four states:
+单航次(single-flight)协议,四个状态:
 
 ```text
 REQUESTED → CLAIMED → COMPLETED
                   ↘ CANCELLED
 ```
 
-Key invariants:
-- **I3:** Cancel before claim = never began
-- **I4:** Claimed can never be cancelled — no faked rollback of a possibly-started physical flush
-- **I5:** No cross-request ACK/ABA
+关键不变量:
 
-### RT Data Edge
+- **I3:** claim 之前取消 = 从未开始
+- **I4:** claimed 之后再也不能取消 —— 不伪造对可能已开始的物理 flush 的回滚
+- **I5:** 无跨请求 ACK/ABA
 
-Audio data flows through pre-bound endpoints, not through Context/event dispatch per block.
+### RT 数据边
+
+音频数据流经预绑定端点,而不是逐块经过 Context/事件派发。
 
 ---
 
-## What Qianqian Borrows
+## Qianqian 借鉴了什么
 
 <ClaimBadge role="authority" />
 
-| Evidence | Qianqian Principle |
-|---------|-------------------|
-| Mutex-free render thread | Realtime path has zero mutex |
-| Single-owner timeline | One side owns timeline accounting |
-| Renderer lifecycle order | Provider lifecycle ordering matters |
-| Pre-bound data edges | No per-block Context lookup |
-| Commit/flush single-flight | Irreversible actions have explicit protocol |
+| 证据 | Qianqian 原则 |
+|------|---------------|
+| 无互斥渲染线程 | 实时路径零互斥 |
+| 单一所有者时间线 | 时间线记账归属一侧 |
+| renderer 生命周期顺序 | 提供者生命周期排序很重要 |
+| 预绑定数据边 | 无逐块 Context 查找 |
+| commit/flush 单航次 | 不可逆动作有显式协议 |
 
 ---
 
-## What Qianqian Does NOT Borrow
+## Qianqian 不借鉴什么
 
 <ClaimBadge role="interpretation" />
 
-- **WASAPI-specific implementation** — The principles are platform-agnostic
-- **Specific buffer sizes** — Tuning is implementation-specific
-- **Device enumeration details** — Platform concern, not architecture
+- **WASAPI 特定实现** — 原则是平台无关的
+- **具体缓冲尺寸** — 调优是实现相关的
+- **设备枚举细节** — 平台事务,不是架构
 
 ---
 
-## Architectural Consequence
+## 架构后果
 
 <ClaimBadge role="authority" />
 
-Frozen in overview.md and component-boundary-a0.md:
+冻结于 overview.md 与 component-boundary-a0.md:
 
-> The realtime audio path is a data-plane island. Per callback/block it must not perform Context lookup, capability resolution, Fiber reconciliation, arbitrary event dispatch, filesystem/network I/O, or UI round trips.
+> 实时音频路径是数据平面孤岛。每个回调/数据块内不得执行 Context 查找、能力解析、Fiber 调和、任意事件派发、文件系统/网络 I/O 或 UI 往返。
 
-Future graph changes must be prepared on the **control plane** and published at an **RT-safe boundary**.
+未来的图变更必须在**控制平面**上准备,并在 **RT 安全边界**处发布。
 
 ---
 
-## Open Questions
+## 开放问题
 
-- How should the AudioRuntime plugin own AudioGraph, clock, buffer pool, format negotiation, RT scheduling, and graph publication?
-- What is the correct RT-safe boundary for publishing control-plane graph changes?
-- Can the commit/flush protocol be generalized for other irreversible operations?
+- AudioRuntime 插件应如何拥有 AudioGraph、时钟、缓冲池、格式协商、RT 调度与图发布?
+- 发布控制平面图变更的正确 RT 安全边界是什么?
+- commit/flush 协议能否推广到其他不可逆操作?
 
 ---
 

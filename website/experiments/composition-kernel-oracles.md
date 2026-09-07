@@ -1,101 +1,101 @@
 ---
-title: Composition Kernel K0 Oracles
+title: Composition Kernel K0 Oracle 测试
 status: VALIDATED
 ---
 
-# Composition Kernel K0 Oracles
+# Composition Kernel K0 Oracle 测试
 
 <StatusBadge status="VALIDATED" />
 
-## Does the Base Kernel satisfy its semantic design invariants?
+## Base Kernel 是否满足其语义设计不变量?
 
 ---
 
-## 01 Question
+## 01 问题
 
-Does the implemented Base Kernel K0 satisfy its frozen semantic design across single-Fiber cleanup, cross-Fiber independent removal, same-key contribution safety, ordered interaction, provider-disappearance ordering, and confluence after mutation history?
-
----
-
-## 02 Baseline
-
-The semantic design (`composition-kernel-0-design.md`) defines precise invariants derived from the Cordis formal model. Before implementation, these were theoretical guarantees.
+已实现的 Base Kernel K0 是否满足其冻结的语义设计——覆盖单 Fiber 清理、跨 Fiber 独立移除、同键贡献安全、有序交互、提供者消失排序,以及变更历史后的合流性?
 
 ---
 
-## 03 Hypothesis
+## 02 基线
 
-An executable oracle campaign can validate all six semantic guarantee groups by constructing specific composition histories and asserting observable outcomes match the design.
-
----
-
-## 04 Method
-
-Tests are organized as **adversarial oracles** — each test constructs a specific scenario that would violate an invariant if the implementation were incorrect.
-
-| Oracle Group | What it tests |
-|-------------|--------------|
-| Single-Fiber cleanup | Owned effects unwind LIFO; fiber reaches terminal |
-| Cross-Fiber removal | Removing fiber A preserves independent fibers B/C |
-| Same-key safety | Contributions compose without hidden cross-key mutation |
-| Ordered interaction | Non-commutative relations use explicit structure |
-| Provider-disappearance | Dependents finish teardown before provider release |
-| Confluence | History → quiescence ≡ clean build |
-
-Additional oracles (A1–A21, 23 tests) cover adversarial edge cases identified during review.
+语义设计(`composition-kernel-0-design.md`)定义了源自 Cordis 形式模型的精确不变量。在实现之前,它们只是理论保证。
 
 ---
 
-## 05 Evidence
+## 03 假设
+
+一场可执行的 oracle 战役可以通过构造特定组合历史、断言可观测结果与设计相符,来验证全部六个语义保证组。
+
+---
+
+## 04 方法
+
+测试组织为**对抗性 oracle** —— 每个测试构造一个特定场景:如果实现不正确,该场景将违反某个不变量。
+
+| Oracle 组 | 测试内容 |
+|-----------|---------|
+| 单 Fiber 清理 | 拥有的 Effect 按 LIFO 展开;fiber 到达终态 |
+| 跨 Fiber 移除 | 移除 fiber A 保留独立的 fibers B/C |
+| 同键安全 | 贡献组合无隐藏跨键变更 |
+| 有序交互 | 非可交换关系使用显式结构 |
+| 提供者消失 | 依赖方在提供者释放前完成 teardown |
+| 合流性 | 历史 → 静息态 ≡ 全新构建 |
+
+附加 oracle(A1–A21,23 项测试)覆盖评审中识别的对抗性边缘情况。
+
+---
+
+## 05 证据
 
 <ClaimBadge role="evidence" />
 
-| Evidence | Detail |
-|----------|--------|
-| Test count | 70 kernel tests (75 workspace tests) |
-| All pass | At merge commit `743eb86` |
-| Test location | `crates/qianqian-kernel/tests` |
-| Adversarial oracles | A1–A21 (23 tests) |
-| Implementation corrective-1 | `de46bd1` (P0-1..P1-5 fixes + A16–A20) |
-| Implementation corrective-2 | `048ebed` (review 5128815134) |
+| 证据 | 细节 |
+|------|------|
+| 测试数量 | 70 项内核测试(75 项 workspace 测试) |
+| 全部通过 | 合并 commit `743eb86` |
+| 测试位置 | `crates/qianqian-kernel/tests` |
+| 对抗性 oracle | A1–A21(23 项测试) |
+| 实现 corrective-1 | `de46bd1`(P0-1..P1-5 修复 + A16–A20) |
+| 实现 corrective-2 | `048ebed`(review 5128815134) |
 
-**Evidence quality:** Executable Rust tests, run in CI. Each test asserts specific observable outcomes from the frozen semantic design.
+**证据质量:** 可执行的 Rust 测试,在 CI 中运行。每个测试断言冻结语义设计的特定可观测结果。
 
-**Last verified commit:** `743eb86`
+**最近核验 commit:** `743eb86`
 
 ---
 
-## 06 Result
+## 06 结果
 
 <ClaimBadge role="evidence" />
 
-All 70 kernel tests pass (75 workspace tests green). The six semantic guarantee groups are validated:
+全部 70 项内核测试通过(75 项 workspace 测试全绿)。六个语义保证组均已验证:
 
-1. **Single-Fiber local cleanup** — Effects unwind in LIFO order; fiber reaches a clean terminal state.
-2. **Cross-Fiber independent removal** — Removing a fiber preserves the observable contributions of unrelated fibers.
-3. **Same-key contribution safety** — Multiple fibers contributing to the same capability key compose without hidden cross-key mutation.
-4. **Ordered interaction** — Non-commutative operations use explicit dependency/order structure rather than implicit registration order.
-5. **Provider-disappearance ordering** — Dependents finish teardown (with committed access) before the provider's final release.
-6. **Confluence** — After any legal mutation history reaches quiescence, the observable result matches a clean construction of the final desired composition.
+1. **单 Fiber 局部清理** — Effect 按 LIFO 顺序展开;fiber 到达干净的终态。
+2. **跨 Fiber 独立移除** — 移除一个 fiber 会保留无关 fiber 的可观测贡献。
+3. **同键贡献安全** — 多个 fiber 向同一能力键贡献时,组合过程无隐藏跨键变更。
+4. **有序交互** — 非可交换操作使用显式依赖/排序结构,而不是隐式注册顺序。
+5. **提供者消失排序** — 依赖方在提供者最终释放之前完成 teardown(带已提交访问)。
+6. **合流性** — 任何合法变更历史到达静息态后,可观测结果与对最终期望组合的全新构建一致。
 
 ---
 
-## 07 Architectural Consequence
+## 07 架构后果
 
 <ClaimBadge role="authority" />
 
-The Base Kernel K0 is the first validated instance of a composition kernel implementing the Cordis-inspired five-primitive model. It proves:
+Base Kernel K0 是实现 Cordis 风格五原语模型的组合内核的首个已验证实例。它证明:
 
-- The five primitives (Context, Capability, Fiber, Effect, Reconcile) are sufficient for the K0 scope
-- Confluence is testable, not just theoretical
-- Provider withdrawal can be made safe through explicit ordering
-- Domain-agnostic composition can enforce lifecycle invariants
+- 五个原语(Context、Capability、Fiber、Effect、Reconcile)对 K0 范围是充分的
+- 合流性可测试,不只是理论
+- 提供者撤回可以通过显式排序做到安全
+- 领域无关的组合可以强制生命周期不变量
 
-This enables the next frontier: the Playback Kernel (MusicKernel) as a domain-specific component built on top of the validated composition infrastructure.
+这开启下一个前沿:Playback Kernel(MusicKernel),构建在已验证组合基础设施之上的领域特定组件。
 
 ---
 
-## Test Organization
+## 测试组织
 
 ```text
 crates/qianqian-kernel/tests/
