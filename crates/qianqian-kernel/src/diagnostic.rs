@@ -1,6 +1,6 @@
 //! The closed diagnostic surface (design §I.1, §R budget): projections of
 //! kernel truth, read-only, payload-free. Anything outside these surfaces is
-//! private; anything needing track/position/PlaybackState is an architecture
+//! private; anything needing domain session or playback intent is an architecture
 //! violation on sight (§J.3).
 //!
 //! Private fiber generations never appear here; provider identity is
