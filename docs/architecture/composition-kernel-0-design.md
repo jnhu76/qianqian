@@ -10,6 +10,8 @@ Revision 2 (Corrective-1, 2026-09-07): applies human review round 1 on PR #68 �
 
 Revision 3 (Corrective-2, 2026-09-07): applies human review round 2 on PR #68 — activation-failure state machine repaired: a raise lands the fiber in Unloading first; FAILED is recorded only by a **fully discharged** unwind of a failed activation; a violated unwind stays latched in Unloading + `TEARDOWN_VIOLATED` and may not reach FAILED; pending activation error is episode metadata, not an eighth state (§F.1–F.5, §G.6, §O.1, §Q13); `TEARDOWN_VIOLATED` folded into the §I.1 fiber lifecycle diagnostic surface (§I.1, §R); the five effect classes re-frozen as a descriptive **system-boundary/action taxonomy** — the K0 Effect has exactly one shape (reversible composition-lifecycle mutation + total inverse), no Effect-class enum, no `Option<Disposer>` (§D.4, §H.5, §H.7, §R, §Q5); domain obligations fenced as neither a sixth primitive nor kernel data — the kernel's whole teardown knowledge is one verdict per fiber, `DISCHARGED` / `CONTRACT_VIOLATED` (§D.6, §G.6, §H.5.1, §J.4, §Q17); §G.4 AudioOutput switch trace now instantiates §E.4's staged old-remove → new-mount explicitly (§G.4).
 
+Revision 4 (Corrective-3, 2026-09-07): applies human review round 3 on PR #68 (review `5127362067`, **PASS_WITH_TWO_CORRECTIVES**) — M4 reclassified from a confluence-history row to a **failure/recovery sanitation oracle**: histories containing an activation failure never widen Thm 80, even when a later revision succeeds; a theorem-backed claim is possible only for the failure-free suffix H′ cut after the failed generation fully discharges and is removed (§M.3, §M.4, §O.2, §Q14, PASS criteria); child-fiber instantiation removed from K0 scope — parent/child semantics are [PAPER] design context only, `child mount` removed from the K0 Effect examples, the no-children removal guard marked vacuous in K0, the §S trigger kept (§D.3, §F.2–F.3, §H.5, §S); verdict closure wording made review-number-neutral (§Verdict).
+
 Primary external sources:
 
 - **[PAPER]** *A Programming Paradigm for Spatiotemporal Composability*, Yifan Shi, Wei Zhang, Tianyi Cui (Peking University; DeepSeek-AI), arXiv:2608.25512v1, 92 pp. — the Cordis formal model. Section/definition/theorem numbers below cite this text directly.
@@ -228,12 +230,12 @@ MVP capability set (from #53): `Decoder`, `PcmSink`, `OutputDeviceDiscovery` (pr
 | Field | Definition |
 |---|---|
 | Purpose | one live component instance; the unit of composition, ownership and lifetime |
-| Owned state | identity (name, opaque, never reused); component definition (d, p, e) fixed at mount; parent pointer; own provision table σ (written only by its own effects); retirement flag; lifecycle state θ incl. committed view and error outcome (a raise records a *pending activation error* as episode metadata that becomes the FAILED outcome only at discharged cleanup, §F.5; a latched §G.6 violation is a diagnostic flag, not a state); owned-effect record (accumulator) |
-| Legal operations | mount/retire/remove (orchestration); activate/deactivate (lifecycle); own effects; instantiate child fibers (mechanism exists in the model; MVP uses none — flat graph) |
-| Illegal operations | writing another fiber's table or control fields (confinement, B-paper Def 55–57); surviving removal with a non-empty table; being destroyed while relied upon |
+| Owned state | identity (name, opaque, never reused); component definition (d, p, e) fixed at mount; parent pointer ([PAPER] model context only — carries no K0 semantics; child mounting deferred, §S); own provision table σ (written only by its own effects); retirement flag; lifecycle state θ incl. committed view and error outcome (a raise records a *pending activation error* as episode metadata that becomes the FAILED outcome only at discharged cleanup, §F.5; a latched §G.6 violation is a diagnostic flag, not a state); owned-effect record (accumulator) |
+| Legal operations | mount/retire/remove (orchestration); activate/deactivate (lifecycle); own effects. Child-fiber instantiation is **not** a K0 fiber operation: the paper's Def 52 mechanism is preserved as [PAPER] design context only, deferred with its §S trigger — the K0 graph is flat (Corrective-3) |
+| Illegal operations | writing another fiber's table or control fields (confinement, B-paper Def 55–57); surviving removal with a non-empty table; being destroyed while relied upon; instantiating child fibers (out of K0 scope — [PAPER] context only, deferred §S; Corrective-3) |
 | Observable facts | lifecycle state; provisions installed; committed view; activation-failure outcome if failed; teardown-contract-violation flag (§G.6 — §I.1 surface 2) |
 | Lifecycle | §F |
-| Relationships | parent/child (structural), provider/dependent (via capabilities), instantiator (for child fibers) |
+| Relationships | provider/dependent (via capabilities). Parent/child and instantiator relations are [PAPER] context only, not K0 semantics (child mounting deferred, §S — Corrective-3) |
 | Proof obligations | registry well-formedness (Thm 64); empty table at episode close (Cor 69) |
 | Must not know | other fibers' internals; domain payload; that it is "music", "decoder", or "output" |
 
@@ -423,7 +425,7 @@ A fiber may have many episodes over its life (deactivate → reactivate when tar
 
 K0 observable lifecycle vocabulary (7): `Absent, Pending, Activating, Active, Unloading, Failed, (Disposed→Absent)`. Mapping to the paper's four (B13): Pending/Failed/Disposed are observational refinements of **Inactive**; Activating = **Reloading**; the core transition system is the paper's Fig 1 with K0 collapsing L-Iter/L-Finish into one bounded activation step (legal per B3/B20: a synchronous host takes whole-episode steps).
 
-Corrective-2 note: there is **no eighth state** behind the repaired raise path. The pending activation error is episode metadata and the latched `TEARDOWN_VIOLATED` condition is a diagnostic flag (§G.6, §I.1 surface 2) — a raise first lands in Unloading, FAILED is the recorded outcome of a *fully discharged* unwind (§F.3), and a violated unwind simply never leaves Unloading.
+Corrective-2 note: there is **no eighth state** behind the repaired raise path. The pending activation error is episode metadata and the latched `TEARDOWN_VIOLATED` condition is a diagnostic flag (§G.6, §I.1 surface 2) — a raise first lands in Unloading, FAILED is the recorded outcome of a *fully discharged* unwind (§F.3), and a violated unwind simply never leaves Unloading. The diagram's `no children` removal guard is inherited from the paper's O-Remove and is **vacuous in K0**: child mounting is deferred (§S, Corrective-3), so no K0 fiber ever has children.
 
 ### F.3 Transition table
 
@@ -439,7 +441,7 @@ Corrective-2 note: there is **no eighth state** behind the repaired raise path. 
 | Unloading | teardown verdict DISCHARGED (§G.6); pending activation error present (raise-derived unload; nothing installed, so no guard applies) | Failed | FAILED is **earned only by a fully discharged unwind** of a failed activation: activation failed *and* the failure scene is provably cleaned; outcome recorded; no auto retry (B19) |
 | Unloading | any owned inverse or teardown obligation fails to discharge | Unloading (stays — no exit) | TEARDOWN_VIOLATED latches (§G.6); the episode never closes; FAILED/Pending/Absent-track are all unreachable; provider final-release guards stay latched |
 | Failed | revision (reconcile replaces entry) | Absent-track → fresh fiber | retry = new generation, never in-place (B19) |
-| any | retire request (τ=⊤) | (flag only) | lifecycle rules carry it out; removal only from Inactive-family state with empty table and no children |
+| any | retire request (τ=⊤) | (flag only) | lifecycle rules carry it out; removal only from Inactive-family state with empty table and no children (the no-children guard is vacuous in K0 — child mounting deferred, §S) |
 
 ### F.4 Illegal transitions
 
@@ -742,7 +744,7 @@ consequences (frozen in Corrective-2):
 
 | Taxonomy row | Definition | MVP composition-owned instances | Paper grounding |
 |---|---|---|---|
-| Reversible | tracked action with a true inverse — the **only** row that can ever produce K0 Effects | capability provision, commutative listener registration, child mount, SinkSession bind/unbind (frozen bind-at-activation rule), Music's activation-owned playback mechanisms (decode worker, ring — present in a fresh construction per A0 §B.1/§H.a) | B4, §3.1 |
+| Reversible | tracked action with a true inverse — the **only** row that can ever produce K0 Effects | capability provision, commutative listener registration, SinkSession bind/unbind (frozen bind-at-activation rule), Music's activation-owned playback mechanisms (decode worker, ring — present in a fresh construction per A0 §B.1/§H.a). Child mount is **not** an instance: child mounting is out of K0 scope, [PAPER] context only (§D.3, §S — Corrective-3) | B4, §3.1 |
 | Transactional | all-or-nothing with fail-closed outcome | none — **can never be a K0 Effect** (Corrective-2); K0's atomic-activation behavior (B19) is lifecycle semantics, not an effect class | consistent with B19's atomic activation |
 | Compensatable | application-supplied coarser recovery | none — **can never be a K0 Effect**; compensation lives in domain/policy layers (§H.5.1) | B23 compensation (commutation must be re-proved against the coarser relation) |
 | Irreversible (protocol point-of-no-return) | rollback/cancellation authority ends; outcome must be awaited | none — **can never be a K0 Effect** (CLAIMED flush is the RT island's protocol, §H.5.1) | B23 acquisition/emission split |
@@ -1057,9 +1059,22 @@ This is [PAPER] Thm 80 (with Lemma 61/62 readings) narrowed to Qianqian's compos
 
 Histories containing activation failures **or teardown contract violations** are **excluded from confluence claims** (B19: schedule-dependent failure breaks endpoint equality; §G.6: a violated inverse exits the total-function setting Thm 80 presumes — the empty-table and guard-release conclusions of Cor 69/Thm 73 are exactly what failed). Activation failures get their own assertions via §O: no ghost effects, FAILED visible, siblings unaffected. Teardown violations get theirs: episode open, violation latched, provider final release blocked, quiescence forfeited (§G.6) — the assertions are about the *honest poisoned state*, never about proceeding as if clean. A retry decision is a revision — itself just another history step; there is no revision that silently clears a latched §G.6 violation (that resolution is operator/revision business, visible in history).
 
+```text
+FROZEN (Corrective-3) — failure histories never widen Thm 80:
+a history that contains an activation failure stays outside the confluence
+claim even if a later revision succeeds — success does not wash the failure
+out of the history. Fail-then-revise is judged by §M.4's failure/recovery
+sanitation oracle. A theorem-backed confluence statement about the recovered
+state may only be made about the suffix history H′ whose initial state is
+taken after the failed generation has fully discharged and been removed by
+the visible revision; H′ contains no failure and is compared to Fresh(D_H′)
+(D_H′ = H′'s final desired composition) under §M.1. Nothing theorem-backed
+is claimed about the pre-H′ failed prefix.
+```
+
 ### M.4 Confluence history matrix (artifact 7)
 
-Composition assertions are unconditional; continuity probes are policy-conditional (A0 §H.b) and out of kernel scope. Baselines are clean builds with **no domain session**.
+Composition assertions are unconditional; continuity probes are policy-conditional (A0 §H.b) and out of kernel scope. Baselines are clean builds with **no domain session**. M4 is the one row that is not a confluence-history row at all: it is a **failure/recovery sanitation oracle** (Corrective-3).
 
 | # | History (→ settle) | Clean baseline | Composition assertions (§I.1) |
 |---|---|---|---|
@@ -1067,7 +1082,7 @@ Composition assertions are unconditional; continuity probes are policy-condition
 | M1 | provider X absent → present → absent → present (flap, N times) | fresh build with X present | bindings resolve to the *final* X generation; no ghost generations; dependents ACTIVE |
 | M2 | A1 → A2 → A1 provider generations (same capability; each replacement staged per §E.4) | fresh build with final A1′ generation | consumers committed to final provider; no stale views; exactly one provider of the capability **at every step of the history, not only at quiescence** (E.4 invariant) |
 | M3 | consumer mounted **before** provider vs **after** provider (two runs) | fresh build of both | identical settled truth — order of mounting is not observable at quiescence (B24 loader argument) |
-| M4 | activation fails once (e.g., device init error) → revise/retry succeeds | fresh build of the succeeded generation | confluent *after* the retry revision; during failure: FAILED visible once its unwind discharges (a violated unwind latches §G.6 instead — excluded either way), no ghosts (§M.3) |
+| M4 | activation fails once (e.g., device init error) → revise/retry succeeds — **sanitation oracle, NOT a confluence history** (Corrective-3) | fresh build of the succeeded generation — comparison target for the settlement check only; the whole history is outside Thm 80 (§M.3) | failed attempt **fully discharged** (episode closed, verdict DISCHARGED); FAILED outcome **visible** on the failed generation; failed generation **removed by an explicit, visible revision** (no silent reuse); **no ghost composition state** from the failed generation (Cor 69, §I.1.6); fresh generation **settles normally** — its settled composition truth equals a clean build of it. A violated unwind latches §G.6 instead, and the oracle asserts the honest poisoned state (§G.6). Thm 80 applies at most to the failure-free suffix H′ (§M.3) |
 | M5 | same-key contributions added/removed in opposite orders | clean set | final listener sets equal by semantic identity; dispatch count == registered count (H.4) |
 | M6 | unrelated Y-side contribution survives X-provider churn | fresh build with Y + final X | Y's contribution set untouched through all X transitions (independence, H.2) |
 | M7 | open+play → switch output X→Y → settle (A0 H1) | fresh build on Y, idle | capabilities equal; exactly one live SinkSession + device session on Y; lifecycle clean |
@@ -1078,7 +1093,9 @@ Composition assertions are unconditional; continuity probes are policy-condition
 | M12 | (future DSP) insert EQ → switch output → remove EQ → replace decoder (A0 H7) | clean Music+Decoder+Output(+nodes) | node list == desired order; no ghost nodes/taps |
 | M13 | root disposal from any quiescent state (A0 H8) | n/a | empty registry; all composition-owned resources released (device session closed, SinkSession torn down); a teardown contract violation instead latches §G.6 and root disposal reports non-completion |
 
-M0–M3, M5–M11, M13 are expressible with the MVP decomposition; M4 needs a fail-then-revise flow; M12 needs DSP (deferred with AudioRuntime).
+M0–M3, M5–M11, M13 are confluence rows expressible with the MVP decomposition; M4 is the sanitation oracle and needs a fail-then-revise flow; M12 needs DSP (deferred with AudioRuntime).
+
+**Why M4 is not a confluence row (frozen, Corrective-3).** §M.3 excludes any history containing an activation failure from Thm 80 claims, and a later successful revision does not erase the earlier failure from that history — so `fail once → revise → succeed` can never be cited as theorem-backed confluence over the whole history. What M4 asserts instead is the **failure/recovery sanitation oracle**: the failed attempt fully discharged, FAILED was visible, the failed generation was removed by an explicit visible revision, no ghost composition state survived it, and the fresh generation settles normally. If a theorem-backed confluence statement about the post-recovery state is wanted, it can only be made about the suffix H′ cut after the failed generation has fully discharged and been removed (§M.3's frozen rule); the pre-H′ failed prefix gets no Thm 80 claim. Future executable tests must not silently widen Thm 80 to failed histories — that widening is exactly what this row forbids.
 
 ---
 
@@ -1138,6 +1155,7 @@ Columns: what remains observable · what must be cleaned · what can retry · wh
 
 - No scenario leaves unexplained ghost state: every "must clean" cell is Cor 69 (empty table at episode close) or an explicitly latched/surfaced §G.6 violation — never a silent "assume it's clean".
 - Retry is always either *automatic reactive re-activation* (dependency returned; the fiber was never failed) or *visible revision* (after FAILED). Never an invisible loop. A teardown contract violation has no retry at all in K0 — it latches (§G.6).
+- A fail-then-revise history never becomes a confluence history by eventually succeeding: it is judged by §M.4's failure/recovery sanitation oracle, and Thm 80 is available at most for the failure-free suffix H′ (§M.3, Corrective-3).
 - Quiescence blockers reduce to: in-flight transitions (finite by Thm 73 under L.4), an unbounded activation (a component defect caught by the boundedness check), or a latched TEARDOWN_VIOLATED (§G.6 — deliberate, surfaced, operator-resolved).
 - No disposer may report success for an obligation it did not discharge; partial discharge is a violation, not a success with notes.
 
@@ -1201,7 +1219,7 @@ Typed static capability keys + object-safe service traits + generational `FiberI
 | 11 | Can a provider be destroyed before dependents? | **PASS** | guard (`¬relied`) + removal preconditions make it structurally impossible (G.2, Thm 64/70/73) |
 | 12 | Can foreign contributions be removed accidentally? | **PASS** | same-key removal goes through opaque tokens scoped to the registrant (H.4); independence claims require the commutativity witness (H.2) |
 | 13 | Can a failed activation leave ghost state? | **PASS** | a raise routes into Unloading with the partial accumulator (F.2/F.3); FAILED is recorded only after that unwind fully discharges — a violating unwind stays latched in Unloading instead (§G.6); Cor 69 empties the table (B19, O.1) |
-| 14 | Can two legal histories reach visibly different settled composition? | **PASS** (conditioned) | not under L.4 checks + no-failure histories (Thm 80, §M); failure histories are excluded by definition and covered by §O assertions; the conditioning is explicit, not hand-waved |
+| 14 | Can two legal histories reach visibly different settled composition? | **PASS** (conditioned) | not under L.4 checks + no-failure histories (Thm 80, §M); failure histories are excluded by definition — even fail-then-succeed ones — and are covered by §O assertions plus §M.4's sanitation oracle (Corrective-3); the conditioning is explicit, not hand-waved |
 | 15 | Does anything require kernel work on the realtime path? | **PASS** | §N.2 table: all kernel operations forbidden per block; zero exceptions proposed |
 | 16 | Can a failing disposer hide a use-after-provider-destroy? | **PASS** (frozen in Corrective-1) | the old "anomaly + exit + guard releases" shape was a review-confirmed defect; §G.6/§H.7 freeze the infallible-inverse contract: violated teardown keeps the episode open, latches TEARDOWN_VIOLATED, blocks provider final release, and forfeits quiescence/confluence claims — liveness is traded, never safety |
 | 17 | Can a domain obligation sneak back in as a sixth primitive? | **PASS** (frozen in Corrective-2) | the kernel's whole teardown knowledge is one verdict per fiber — `DISCHARGED` / `CONTRACT_VIOLATED` (§G.6); no obligation registry, list, count, or identity exists kernel-side; obligations are component-contract content (§H.5.1 fence, §J.4, §D.6) |
@@ -1239,7 +1257,7 @@ Explicitly rejected framework-growth patterns (no present requirement proves the
 | generic public EventBus as kernel primitive | rejected | paper core never requires it; Koishi's need is domain (B29); #67 non-scope |
 | service broker / multi-provider coexistence in K0 | deferred (trigger: a real second concurrent provider requirement, e.g. multiple outputs) | broker is a pattern on single-source, not core (B22); MVP has profile-level competition only (A0 §D.3) |
 | isolation realms / interception in K0 | deferred (trigger: multi-tenant/sandbox/override requirement) | B21; #67 B default bias; no #53 invariant |
-| child-context hierarchy machinery | deferred (trigger: a component that actually instantiates children) | paper Def 52 mechanism is designed-in (D.3) but MVP graph is flat |
+| child-context hierarchy machinery | deferred (trigger: a component that actually instantiates children) | paper Def 52 mechanism is [PAPER] design context only — K0 exposes no child-instantiation fiber operation and lists no child-mount Effect example (§D.3, §H.5, Corrective-3); MVP graph is flat |
 | effect-iterator / generator-style incremental activation | rejected for K0 | whole-episode steps are a legal inertial host (B3/B20); generators add machinery with no current requirement |
 | async kernel transitions (per-fiber tasks) | deferred (trigger: a blocking activation that must not stall composition) | synchronous serialized control plane suffices (B20); RT firewall favors it |
 | in-place provider value mutation as replacement | rejected | provider-identity resolution means equal values are not replacements (B30); withdraw-then-provide is the only observed replacement |
@@ -1277,7 +1295,31 @@ Implementation-issue inputs, not design gaps — each has a frozen semantic answ
 
 ## Verdict
 
-**PASS, re-proposed after Corrective-2** (initial draft proposed PASS; human review round 1 returned **PASS_WITH_CORRECTIVES** — six items, resolved by Corrective-1; human review round 2 (PR #68, review `5127266745`) returned **PASS_WITH_CORRECTIVES** — P0-1 plus P1-2/P1-3/P1-4 and P2, resolved by this Corrective-2; this revision re-proposes PASS — subject to the next human review per delivery discipline. PASS means only: the COMPOSITION-KERNEL-0 semantic design is precise enough to open a separate implementation issue.)
+**PASS, re-proposed after Corrective-3** (initial draft proposed PASS; human review round 1 returned **PASS_WITH_CORRECTIVES** — six items, resolved by Corrective-1; human review round 2 (PR #68, review `5127266745`) returned **PASS_WITH_CORRECTIVES** — P0-1 plus P1-2/P1-3/P1-4 and P2, resolved by Corrective-2; human review round 3 (PR #68, review `5127362067`) returned **PASS_WITH_TWO_CORRECTIVES** — P0-1 confluence widening in M4 and P1-2 child-mount scope, plus P2 wording, resolved by this Corrective-3; this revision re-proposes PASS — subject to the next human review per delivery discipline. PASS means only: the COMPOSITION-KERNEL-0 semantic design is precise enough to open a separate implementation issue.)
+
+Corrective-3 resolution summary (review round 3):
+
+```text
+P0-1 M4 widened Thm 80 to a    M4 is reclassified as a failure/recovery
+    failed history            sanitation oracle, not a confluence-history
+                               row: fully discharged failed attempt, FAILED
+                               visible, failed generation removed by an
+                               explicit visible revision, no ghost
+                               composition state, fresh generation settles
+                               normally. The whole history is NOT theorem-
+                               backed confluence; Thm 80 applies at most to
+                               the failure-free suffix H′ (§M.3 frozen
+                               block)                                          §M.3, §M.4, §O.2, §Q14, PASS criteria
+P1-2 child mount half in/out   parent/child semantics are [PAPER] design
+    of K0 scope                context only: child instantiation removed
+                               from Fiber legal operations and fenced as
+                               out-of-scope, `child mount` removed from
+                               K0 Effect examples, no-children removal
+                               guard marked vacuous; §S trigger kept        §D.3, §F.2–F.3, §H.5, §S
+P2 closure wording             review-number-neutral: the implementation
+                               issue opens only after final human review
+                               accepts this revision and PR #68 merges      Verdict
+```
 
 Corrective-2 resolution summary (review round 2):
 
@@ -1359,6 +1401,9 @@ same-key composability contract explicit                 §H.4, E.5
 non-commutative order has an explicit home               §H.4/H.6, L.1 (desired topology)
 composition truth vs domain truth cleanly separated      §J (frozen classifier + universes)
 confluence testable without domain leakage               §I, §M
+failure histories never widen Thm 80 — judged by the    §M.3/M.4 (Corrective-3)
+sanitation oracle; confluence claimable only for the
+failure-free suffix H′
 realtime payload bypasses the kernel                     §K, §N
 failure paths leave no unexplained ghost state           §O (Cor 69 grounding; violations latch, §G.6)
 CLAIMED ≠ physical emission                              §H.5.1, §B23
@@ -1367,7 +1412,7 @@ Rust representation downstream of semantics              §P (survey, no freeze)
 no unsupported claim presented as paper authority        §B provenance ledger + §A.4 pin
 ```
 
-PASS authorizes exactly one next step: **opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue** — and only after the second human review accepts this revision and PR #68 merges. It does not authorize implementation, Rust API freeze, FFmpeg/WASAPI/PocketJS integration, async-runtime selection, or any §S-deferred machinery. This document stops at the gate.
+PASS authorizes exactly one next step: **opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue** — and only after final human review accepts this revision and PR #68 merges. It does not authorize implementation, Rust API freeze, FFmpeg/WASAPI/PocketJS integration, async-runtime selection, or any §S-deferred machinery. This document stops at the gate.
 
 
 
