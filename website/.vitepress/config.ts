@@ -12,6 +12,24 @@ export default withMermaid(
     srcDir: resolve(__dirname, '..'),
     outDir: resolve(__dirname, '../dist'),
 
+    vite: {
+      server: {
+        host: '0.0.0.0',
+        // OneDrive holds 5173 (Bound, non-listening) on this machine, so
+        // dev always falls back to 5174; pin the port to stay deterministic.
+        port: 5174,
+        hmr: {
+          host: 'localhost',
+          protocol: 'ws',
+        },
+      },
+      optimizeDeps: {
+        // mermaid is served unbundled in dev; its CJS deps (fastdom) must be
+        // pre-bundled so `import x from 'fastdom'` gets a real `default` export.
+        include: ['fastdom', 'fastdom/extensions/fastdom-promised.js'],
+      },
+    },
+
     head: [
       ['link', { rel: 'stylesheet', href: '/katex/katex.min.css' }],
     ],
