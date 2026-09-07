@@ -344,15 +344,17 @@ Current `qianqian-core::base`, `qianqian-runtime::AppRuntime`, `AppRuntime::new(
 
 But the next step is **not** to replace them immediately with a Composition Kernel implementation.
 
-Current authority is:
+Current authority chain is:
 
 ```text
 #53 COMPONENT-BOUNDARY-A0
-        ↓ PASS
-future COMPOSITION-KERNEL-0
+        ↓ PASS / CLOSED (component-boundary-a0.md)
+#67 COMPOSITION-KERNEL-0 DESIGN — current gate
+        ↓ proposed semantic authority: PR #68 (composition-kernel-0-design.md)
+future COMPOSITION-KERNEL-0 IMPLEMENTATION (only after #67/PR #68 PASS + merge)
 ```
 
-Until #53 passes, no new kernel implementation/API is authorized.
+Until #67/PR #68 passes and merges, no new kernel implementation/API is authorized.
 
 ## Historical evidence
 
