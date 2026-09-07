@@ -31,6 +31,19 @@ export default defineConfig({
 
   head: [
     ['link', { rel: 'stylesheet', href: '/katex/katex.min.css' }],
+
+    // 霞鹜文楷(LXGW WenKai)webfont —— 引入方式 A(本站采用):
+    // jsDelivr 切片版 style.css。字体按 unicode-range 切成约百片 woff2,
+    // 浏览器只下载页面实际用到的切片,避免整包中文字体过大。
+    // preconnect 提前建立到 CDN 的连接,降低首字渲染延迟。
+    ['link', { rel: 'preconnect', href: 'https://cdn.jsdelivr.net' }],
+    [
+      'link',
+      {
+        rel: 'stylesheet',
+        href: 'https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css',
+      },
+    ],
   ],
 
   markdown: {

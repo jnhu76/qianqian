@@ -1,3 +1,58 @@
+/* ============================================================
+   霞鹜文楷(LXGW WenKai)webfont —— jsDelivr 切片版
+   ============================================================
+   引入方式 A(本站采用):在 .vitepress/config.ts 的 head 中
+   以 <link> 引入切片版样式表(浏览器并行加载,性能更好):
+     https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css
+
+   引入方式 B(备选):取消下一行 @import 的注释,并删除 config.ts
+   head 中对应 <link>。注意:@import 必须位于本文件所有规则之前,
+   且串行加载,性能略差于方式 A,故默认不启用。
+   ============================================================ */
+/* @import url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css'); */
+
+/* ---------- 1) 全站正文字体 ---------- */
+/* 覆盖 VitePress 基础字体变量(驱动正文、导航、侧栏等)。
+   'LXGW WenKai' 是 CDN style.css 中的注册字体族名,
+   含 300/400/700 三个字重,按 unicode-range 切片按需加载。 */
+:root {
+  --vp-font-family-base:
+    'LXGW WenKai',      /* 首选:霞鹜文楷(CDN webfont) */
+    'Klee One',         /* 降级 1:文楷的上游原型字体(本地已装时) */
+    'Noto Serif SC',    /* 降级 2:常见中文衬线 */
+    'PingFang SC',      /* 降级 3:macOS 系统中文 */
+    'Microsoft YaHei',  /* 降级 4:Windows 系统中文 */
+    serif;              /* 最终兜底 */
+}
+
+/* body 直接声明:不经过 VitePress 变量的元素也能命中同一字体栈。
+   字号 17px:比默认 16px 大一档,楷体视觉上偏小偏轻,适当放大;
+   字重显式 400:webfont 只有 300/400/700 三档,正文绝不用 300(light)。 */
+body {
+  font-family: var(--vp-font-family-base);
+  font-size: 17px;
+  font-weight: 400;
+}
+
+/* VitePress 对文档正文 .vp-doc 固定了 16px,不随 body 字号级联,
+   需单独提升;重复类选择器(.vp-doc.vp-doc)提高特异性以稳定压过
+   默认主题。行高 1.75 更适合中文楷体长文阅读(p 有自己的 28px
+   固定行高规则,同样需要覆盖)。 */
+.vp-doc.vp-doc,
+.vp-doc.vp-doc p {
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+/* ---------- 2) 特定类名示例 ---------- */
+/* 工具类:任意元素加 .font-lxgw 即强制使用文楷及其降级栈 */
+.font-lxgw {
+  font-family: 'LXGW WenKai', 'Klee One', 'Noto Serif SC', serif;
+}
+
+/* 注:代码块/行内代码走 --vp-font-family-mono(未覆盖),
+   保持 VitePress 默认等宽栈,不随正文字体漂移。 */
+
 :root {
   /* Observatory palette — quiet, technical, editorial */
   --vp-c-brand-1: #2d6a4f;
