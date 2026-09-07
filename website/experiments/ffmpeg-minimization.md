@@ -127,7 +127,7 @@ All samples stay above 400× realtime (heaviest: flac-24-96 ≈ 410×). N0/N3 fl
 
 **Partially bypassable — narrow scope.** For the Stage-A contract (source-rate / source-layout Float32 interleaved output), libswresample only performed format + planar→interleaved conversion (no resampling, no rematrix), and the SongCore-owned conversion path was **byte-identical (14/14)** while saving 192 KiB static libs / 131 KiB linked.
 
-This proved **only** that swresample is bypassable for that contract. It did **not** prove that resampling or rematrixing will never be needed — if device-rate adaptation is ever required, swresample remains the necessary last mile.
+This proved **only** that libswresample is bypassable for that narrow Stage-A contract (N3-noswr above). It did **not** prove that resampling or rematrixing will never be needed, and it did **not** determine what implementation such a stage must use: if device-rate adaptation or rematrixing becomes required, Qianqian will need to introduce and validate an appropriate resampling/rematrix stage at that point — the experiment says nothing about libswresample being the only valid choice.
 
 ---
 

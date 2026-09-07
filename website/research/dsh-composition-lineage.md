@@ -22,7 +22,7 @@ status: HISTORICAL_EVIDENCE
 **Evidence gap.** The exact external source of "DSH" is not recoverable from this repository:
 
 - `git log --all` and every tag (`pre-rust-v2`, `playback-reference-v1`, `songcore-v0.1.0`) contain no `coreDsh` / `CoreDsh` / `startCoreDsh` symbols;
-- no GitHub issue other than #47 uses "DSH" as a concept, and #47 does not define or link the acronym;
+- searching the GitHub issue history that predates this WEB-EVIDENCE-1 task (issue #74 itself now carries extensive DSH context): issue #47 uses "DSH" as an architectural comparison, and one 2026-09-06 review comment on issue #46 also uses DSH as Base-Kernel design vocabulary — neither defines or links the acronym (issue #73 mentions DSH only to exclude it from that task's scope);
 - GitHub code search finds nothing.
 
 We therefore do **not** expand the acronym, cite a paper, or attribute a project identity. What is provable is how #47 used the model.
