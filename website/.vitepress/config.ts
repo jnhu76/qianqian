@@ -114,6 +114,10 @@ export default defineConfig({
             },
             { text: 'FFmpeg Closure', link: '/research/ffmpeg-closure' },
             { text: 'Realtime Audio', link: '/research/realtime-audio' },
+            {
+              text: 'DSH → Composition Kernel',
+              link: '/research/dsh-composition-lineage',
+            },
           ],
         },
       ],
