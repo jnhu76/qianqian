@@ -67,12 +67,14 @@ Gate chain:
 #67 COMPOSITION-KERNEL-0 DESIGN  semantic design MERGED via PR #68
                                   (docs/architecture/composition-kernel-0-design.md)
         ↓
-Corrective-4                     CURRENT PRE-IMPLEMENTATION REVIEW GATE
+Corrective-4                     human-reviewed: PASS_WITH_ONE_CORRECTIVE (review 5127750303)
         ↓
-implementation issue             opens only after Corrective-4 is accepted by human review
+Corrective-5                     CURRENT PRE-IMPLEMENTATION REVIEW GATE
+        ↓
+implementation issue             opens only after Corrective-5 is accepted by human review
 ```
 
-Until Corrective-4 passes human review and a separate implementation issue is opened:
+Until Corrective-5 passes human review and a separate implementation issue is opened:
 
 ```text
 DO NOT create qianqian-kernel implementation
@@ -233,7 +235,7 @@ buffer/resource allocation owned inside the system boundary
 
 Within one Fiber, owned effects normally unwind in reverse/LIFO order.
 
-Do not pretend every action is reversible. Classify effects as needed:
+Do not pretend every action is reversible. Classify actions as needed:
 
 ```text
 Reversible
@@ -340,7 +342,7 @@ with_audio_output()
 
 They are not compatibility contracts.
 
-However, do **not** replace them with a new kernel implementation until the Corrective-4 pre-implementation review is accepted and a separate implementation issue is opened. That future implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
+However, do **not** replace them with a new kernel implementation until the Corrective-5 pre-implementation review is accepted and a separate implementation issue is opened. That future implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
 
 ## Work mode
 

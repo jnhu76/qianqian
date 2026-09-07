@@ -35,11 +35,11 @@ Gate status:
 ```text
 #53 COMPONENT-BOUNDARY-A0    PASS / CLOSED (PR #66 merged)
 #67 COMPOSITION-KERNEL-0     semantic design MERGED (PR #68)
-Corrective-4 review          CURRENT PRE-IMPLEMENTATION GATE
+Corrective-5 review          CURRENT PRE-IMPLEMENTATION GATE
 implementation               NOT YET AUTHORIZED
 ```
 
-Until the pre-implementation review (Corrective-4 on #67) is accepted and a separate implementation issue is opened, no new `qianqian-kernel`, Context API, Fiber lifecycle engine, or Reconcile implementation is authorized.
+Until the pre-implementation review (Corrective-5 on #67) is accepted and a separate implementation issue is opened, no new `qianqian-kernel`, Context API, Fiber lifecycle engine, or Reconcile implementation is authorized.
 
 ## Control plane and data plane
 

@@ -15,12 +15,14 @@ Gate chain:
 #67 COMPOSITION-KERNEL-0 DESIGN  semantic design MERGED via PR #68
                                   (composition-kernel-0-design.md)
         ↓
-Corrective-4                     CURRENT PRE-IMPLEMENTATION REVIEW GATE
+Corrective-4                     human-reviewed: PASS_WITH_ONE_CORRECTIVE (review 5127750303)
         ↓
-implementation issue             opens only after Corrective-4 is accepted by human review
+Corrective-5                     CURRENT PRE-IMPLEMENTATION REVIEW GATE
+        ↓
+implementation issue             opens only after Corrective-5 is accepted by human review
 ```
 
-No new Composition Kernel implementation/API is authorized until the Corrective-4 pre-implementation review is accepted and a separate implementation issue is opened.
+No new Composition Kernel implementation/API is authorized until the Corrective-5 pre-implementation review is accepted and a separate implementation issue is opened.
 
 ## Kernel constitution
 
@@ -288,7 +290,7 @@ Within one Fiber, deterministic reverse/LIFO unwind is the default local rule un
 
 But not every action is reversible.
 
-Classify effects when relevant as:
+Classify actions when relevant as:
 
 ```text
 Reversible
@@ -484,7 +486,7 @@ They are not compatibility contracts.
 
 However:
 
-> **Do not replace them with a new Composition Kernel implementation until the Corrective-4 pre-implementation review is accepted and a separate implementation issue is opened.**
+> **Do not replace them with a new Composition Kernel implementation until the Corrective-5 pre-implementation review is accepted and a separate implementation issue is opened.**
 
 The future implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
 
@@ -497,7 +499,9 @@ Current authority chain:
         ↓ PASS / CLOSED (two corrective rounds; audit: component-boundary-a0.md)
 #67 COMPOSITION-KERNEL-0 DESIGN — semantic design MERGED via PR #68
         ↓ (composition-kernel-0-design.md; Revisions 1–4)
-Corrective-4 pre-implementation review — CURRENT GATE
+Corrective-4 pre-implementation review
+        ↓ human-reviewed: PASS_WITH_ONE_CORRECTIVE (review 5127750303)
+Corrective-5 pre-implementation review — CURRENT GATE
         ↓ accepted by human review
 future COMPOSITION-KERNEL-0 IMPLEMENTATION issue
         ↓ opens only then
@@ -518,9 +522,9 @@ confluence scenarios/oracle
 minimal first Windows playback decomposition
 ```
 
-#67 / PR #68 established the kernel's semantic design (primitive semantics, lifecycle, withdrawal, effect/independence model, confluence oracle, failure semantics) — it is merged authority. The post-merge pre-implementation review (Corrective-4) added the desired-revision-identity, effect-provenance and quiescence semantics on top; it is the current gate.
+#67 / PR #68 established the kernel's semantic design (primitive semantics, lifecycle, withdrawal, effect/independence model, confluence oracle, failure semantics) — it is merged authority. The post-merge pre-implementation review (Corrective-4, its provenance scope refined by Corrective-5) added the desired-revision-identity, effect-provenance and quiescence semantics on top; Corrective-5 is the current gate.
 
-Until the Corrective-4 review is accepted and the implementation issue is opened:
+Until the Corrective-5 review is accepted and the implementation issue is opened:
 
 ```text
 NO qianqian-kernel implementation

@@ -13,7 +13,7 @@ Read:
 
 For plugin/composition work, read `docs/architecture/composition-kernel.md`.
 
-Gate status: #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (PR #66 merged); the #67 COMPOSITION-KERNEL-0 semantic design is merged (PR #68, `docs/architecture/composition-kernel-0-design.md`). Current gate: the pre-implementation review (Corrective-4). Implementation is not yet authorized.
+Gate status: #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (PR #66 merged); the #67 COMPOSITION-KERNEL-0 semantic design is merged (PR #68, `docs/architecture/composition-kernel-0-design.md`). Current gate: the pre-implementation review (Corrective-5). Implementation is not yet authorized.
 
 Do not recursively preload historical docs or use `archive/pre-rust-v2` as current architecture authority.
 
@@ -208,7 +208,7 @@ They may later be redesigned, but current authority is:
 ```text
 #53 boundary design         PASS / CLOSED (PR #66 merged)
 #67 kernel semantic design  MERGED (PR #68)
-Corrective-4 review         current pre-implementation gate
+Corrective-5 review         current pre-implementation gate
 implementation issue        opens only after that review is accepted
 ```
 

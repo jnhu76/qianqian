@@ -74,7 +74,7 @@ Confluence oracle
 Composition Kernel implementation
 ```
 
-#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). The #67 COMPOSITION-KERNEL-0 semantic design is MERGED (PR #68, `composition-kernel-0-design.md`). Current gate: the **pre-implementation review (Corrective-4)**.
+#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). The #67 COMPOSITION-KERNEL-0 semantic design is MERGED (PR #68, `composition-kernel-0-design.md`). Current gate: the **pre-implementation review (Corrective-5)**.
 
 No new generic kernel implementation/API is authoritative until that review is accepted and a separate implementation issue is opened.
 
