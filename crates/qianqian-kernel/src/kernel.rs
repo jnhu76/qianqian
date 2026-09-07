@@ -587,6 +587,17 @@ impl Kernel {
             let f = self.fiber_mut(fid);
             f.committed = None;
             f.state = FiberState::Failed;
+        } else if self.fiber(fid).teardown_violated {
+            // §G.6 priority: TEARDOWN_VIOLATED ⇒ NEVER ACTIVE. A dispose
+            // violation latched during activation (an explicit
+            // `ctx.dispose()` whose inverse returned Violated) keeps the
+            // episode open in Unloading even though activation itself
+            // returned Ok: no unwind, no close, no Active landing. Not
+            // ACTIVE means the fiber never joins NEW resolution
+            // (`active_providers_of` gates on Active), so no later consumer
+            // can commit to it, and the run stays loudly Blocked
+            // (Corrective-1 review A21).
+            self.fiber_mut(fid).state = FiberState::Unloading;
         } else {
             self.fiber_mut(fid).state = FiberState::Active;
         }

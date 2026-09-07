@@ -1,7 +1,8 @@
-//! Mandatory adversarial review A1–A20 (#70 §21 + implementation
-//! Corrective-1, review 5128371083), executed against the implementation.
-//! A16–A20 are the five corrective oracles (P0-1…P1-5); each test attacks
-//! one review question; any wrong result is a STOP, not a test exception.
+//! Mandatory adversarial review A1–A21 (#70 §21 + implementation
+//! Corrective-1, review 5128371083; A21 = review 5128815134), executed
+//! against the implementation. A16–A21 are the corrective oracles
+//! (P0-1…P1-5 + the A21 landing-rule oracle); each test attacks one review
+//! question; any wrong result is a STOP, not a test exception.
 
 mod common;
 
@@ -769,6 +770,118 @@ fn a20_capability_diagnostic_names_are_unique_per_kernel() {
         err,
         qianqian_kernel::ComponentRegistrationError::DuplicateName { name: "a" }
     ));
+}
+
+/// A21 (review 5128815134, P0): Can an explicit dispose-violation during
+/// activation still land the fiber in ACTIVE? Expected: NO — a latched §G.6
+/// violation outranks activation success. TEARDOWN_VIOLATED ⇒ NEVER ACTIVE:
+/// the episode stays open in Unloading, the violated tombstone and the
+/// provision record remain, the provided key never enters NEW resolution, a
+/// later consumer requiring it can neither activate nor commit, quiet stays
+/// false, and the run ends loudly Blocked.
+#[test]
+fn a21_explicit_dispose_violation_never_lands_active() {
+    let mut k = Kernel::new();
+    let l = log();
+    k.register_component(listeners_provider("registry"))
+        .expect("component registered");
+    k.register_component(dispose_violating_provider("p", "P", &l))
+        .expect("component registered");
+    k.register_component(tag_consumer("c", &l))
+        .expect("component registered");
+    k.set_desired(vec![
+        DesiredEntry::enabled("registry", "registry", Revision::fresh()),
+        DesiredEntry::enabled("p", "p", Revision::fresh()),
+        DesiredEntry::enabled("c", "c", Revision::fresh()),
+    ])
+    .expect("legal");
+    k.settle();
+
+    let snap = k.snapshot();
+    let p = snap.fibers.get("p").expect("the provider stays installed");
+    assert_eq!(
+        p.state,
+        qianqian_kernel::FiberState::Unloading,
+        "TEARDOWN_VIOLATED ⇒ NEVER ACTIVE, even though activation returned Ok"
+    );
+    assert!(p.teardown_violated, "the dispose violation is latched");
+
+    // The provided key never enters NEW resolution: the fiber is not ACTIVE,
+    // so the key is unresolvable despite the provision record being present.
+    assert_eq!(
+        snap.capabilities.get("Tag"),
+        Some(&None),
+        "a poisoned provider must leave its key OUT of new resolution"
+    );
+    assert_eq!(
+        snap.provisions.get("Tag").map(|v| v.len()),
+        Some(1),
+        "the installed provision record survives (installed-record may remain)"
+    );
+
+    // A new consumer requiring the key can neither activate nor commit.
+    assert_eq!(
+        snap.fibers.get("c").map(|f| f.state),
+        Some(qianqian_kernel::FiberState::Pending),
+        "no consumer may activate or commit against the poisoned provider"
+    );
+    assert!(
+        !entries(&l).iter().any(|e| e.starts_with("c:bound-to-")),
+        "no consumer ever resolved the poisoned provider"
+    );
+
+    // The violated relation's provenance stays authoritative (§K.4): the
+    // binding the violated inverse carried must not vanish from diagnostics.
+    assert!(
+        snap.relations
+            .iter()
+            .any(|r| { r.owner == "p" && r.provider == "registry" && r.capability == "Listeners" }),
+        "the violated effect's provenance record must remain observable"
+    );
+
+    // A latched violation never settles and the run ends loudly Blocked.
+    assert!(!snap.quiet, "TEARDOWN_VIOLATED never settles");
+    assert_eq!(k.step(), StepOutcome::Blocked);
+
+    // The episode never closes: withdrawing the provider from desired cannot
+    // retire or remove the fiber; the name stays held, still latched.
+    k.set_desired(vec![DesiredEntry::enabled(
+        "registry",
+        "registry",
+        Revision::fresh(),
+    )])
+    .expect("legal");
+    k.settle();
+    assert!(k.snapshot().fibers.contains_key("p"));
+    assert!(k.snapshot().fibers.get("p").unwrap().teardown_violated);
+}
+
+/// A provider whose activation explicitly disposes one of its own effects
+/// whose inverse violates, then still provides its declared key and returns
+/// Ok — the A21 attack shape. The correct landing is Unloading +
+/// TEARDOWN_VIOLATED with the episode left open, never ACTIVE.
+fn dispose_violating_provider(name: &'static str, tag: &'static str, l: &Log) -> ComponentSpec {
+    let log = l.clone();
+    ComponentSpec::new(name)
+        .requires::<Listeners>()
+        .provides::<Tag>()
+        .on_activate(move |ctx| {
+            let binding = ctx
+                .resolve::<Listeners>()
+                .map_err(|e| qianqian_kernel::ActivationError::new(format!("{e:?}")))?;
+            let lg = log.clone();
+            let handle = ctx.register_relation(&binding, move || {
+                lg.borrow_mut()
+                    .push(format!("{name}:relation-inverse-violated"));
+                Discharge::Violated
+            });
+            log.borrow_mut().push(format!("{name}:dispose-own-effect"));
+            ctx.dispose(handle);
+            ctx.provide::<Tag>(Rc::new(FixedTag(tag)))
+                .expect("provides declared");
+            log.borrow_mut().push(format!("{name}:activation-ok"));
+            Ok(())
+        })
 }
 
 // --- Minimal local sink fixture for A15 (endpoint with no kernel handle) ---
