@@ -2,7 +2,7 @@
 
 Design-gate deliverable for **#67 COMPOSITION-KERNEL-0** (parent authority **#46**, boundary prerequisite **#53 / PR #66**, accepted audit `component-boundary-a0.md`).
 
-Status: **merged semantic authority (PR #68); semantic design only — implementation NOT authorized.** Nothing here freezes a Rust API, a crate layout, or an async-runtime choice. Acceptance of the current pre-implementation review (Corrective-4, §Verdict) authorizes only opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue.
+Status: **merged semantic authority (PR #68); semantic design only — implementation NOT authorized.** Nothing here freezes a Rust API, a crate layout, or an async-runtime choice. Acceptance of the current pre-implementation review (Corrective-5, §Verdict) authorizes only opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue.
 
 Revision 1 (2026-09-06): initial semantic design (PR #68).
 
@@ -13,6 +13,7 @@ Revision 3 (Corrective-2, 2026-09-07): applies human review round 2 on PR #68 �
 Revision 4 (Corrective-3, 2026-09-07): applies human review round 3 on PR #68 (review `5127362067`, **PASS_WITH_TWO_CORRECTIVES**) — M4 reclassified from a confluence-history row to a **failure/recovery sanitation oracle**: histories containing an activation failure never widen Thm 80, even when a later revision succeeds; a theorem-backed claim is possible only for the failure-free suffix H′ cut after the failed generation fully discharges and is removed (§M.3, §M.4, §O.2, §Q14, PASS criteria); child-fiber instantiation removed from K0 scope — parent/child semantics are [PAPER] design context only, `child mount` removed from the K0 Effect examples, the no-children removal guard marked vacuous in K0, the §S trigger kept (§D.3, §F.2–F.3, §H.5, §S); verdict closure wording made review-number-neutral (§Verdict).
 
 Revision 5 (Corrective-4, 2026-09-07): applied on `main` after PR #68 merged — the post-merge, pre-implementation adversarial review round. Three semantic repairs: (1) **desired revision identity** frozen — a desired entry conceptually carries an opaque revision-identity token (desired incarnation intent), so explicit fresh-generation intent is representable even when component identity, configuration semantics and enabled-state are unchanged; an unchanged desired incarnation can never retry FAILED, and nothing in the kernel may derive a revision trigger (R1–R8, §L.5, oracle D0–D4); (2) **Effect structural provenance** frozen — "one shape, no class" bans behavioral classification, not structural composition identity; every composition-visible binding has exactly one authoritative ownership/provenance record coupled to one owner fiber episode, and diagnostics are projections of it (§D.4, §K.4); (3) **quiescence** frozen in transition semantics rather than target-view equality — settled FAILED and Pending are quiet-legal, in-flight/staged orchestration and latched violations are not (§L.1). Governance: PR #68 is merged semantic authority; implementation remains blocked pending human acceptance of this corrective (§Verdict).
+Revision 6 (Corrective-5, 2026-09-07): applies human review of Corrective-4 (review `5127750303`, **PASS_WITH_ONE_CORRECTIVE**) — **Effect structural provenance made conditional**: every K0 Effect carries the base triple (owner fiber episode, total inverse, LIFO position); structural composition provenance exists only on a **relation-bearing effect** (capability provision/binding, data-edge binding, cross-fiber keyed contribution — capability key, provider/peer fiber identity where applicable), so owner-local reversible effects (timer, watcher, local handle, buffer allocation) fabricate no capability key and no optional field; §D.4 "must not know other fibers" narrowed to "other fibers' internals/domain payload" so §K.4 provenance naming the provider fiber identity is contradiction-free (§D.4, §Q20, §R); the five-label taxonomy now classifies **actions** in every authority wording (§H.5 unchanged; `AGENTS.md`, `composition-kernel.md`, #46). Desired revision identity, quiescence, confluence and the Fiber state machine are untouched by this corrective.
 
 Primary external sources:
 
@@ -40,8 +41,9 @@ docs/architecture/component-boundary-a0.md       accepted #53 audit (Rev 3)
 #53  COMPONENT-BOUNDARY-A0                       PASS / CLOSED (two corrective rounds; PR #66 merged)
 #67  COMPOSITION-KERNEL-0                        semantic design MERGED via PR #68
 PR #68                                            merged semantic authority (this document, Revisions 1–4)
-Corrective-4                                      current PRE-IMPLEMENTATION review gate (Revision 5)
-future COMPOSITION-KERNEL-0 IMPLEMENTATION       opens only after Corrective-4 is accepted by human review
+Corrective-4                                      reviewed by human review `5127750303`: PASS_WITH_ONE_CORRECTIVE
+Corrective-5                                      current PRE-IMPLEMENTATION review gate (Revision 6)
+future COMPOSITION-KERNEL-0 IMPLEMENTATION       opens only after Corrective-5 is accepted by human review
 ```
 
 Repository reality at BASE: `qianqian-core` (empty `base.rs`, `MusicKernel` state machine, three empty port traits, presentation mapping), `qianqian-runtime` (`AppRuntime` constructor composition), `apps/headless`. All R0 shapes (`AppRuntime::new()`, `with_audio_output()`, `audio_output()`) are bootstrap witnesses, not contracts; replacing them is out of scope here.
@@ -247,14 +249,14 @@ MVP capability set (from #53): `Decoder`, `PcmSink`, `OutputDeviceDiscovery` (pr
 | Field | Definition |
 |---|---|
 | Purpose | kernel-visible mutation/resource provenance owned by a fiber. **Every K0 Effect is a composition-lifecycle reversible mutation with a total inverse (§H.7)** — an action that is not reversible-with-total-inverse is not a K0 Effect at all (Corrective-2: no effect-class variants) |
-| Owned state | the inverse (disposer); ordering position in the owning fiber's accumulator; **structural composition provenance** — the capability key the effect acts on, and for a data-edge binding effect the provider fiber identity (§K.4, Corrective-4). **No class field**: the five A0 classes are a descriptive system-boundary/action taxonomy (§H.5), never kernel Effect variants |
+| Owned state | the **base triple** every K0 Effect carries: its owner fiber episode; the total inverse (disposer, §H.7); its ordering position in the owning fiber's accumulator. **Structural composition provenance is conditional** (Corrective-5; Corrective-4 over-froze it as unconditional): it exists only on a **relation-bearing effect** — one that contributes to a composition-visible relation — and then records the capability key the effect acts on, plus the provider fiber identity when that relation is a data-edge binding (§K.4). An **owner-local effect** (timer registration, watcher, local handle, buffer/resource allocation inside the system boundary) contributes to no composition relation and carries no provenance beyond the base triple — no fabricated capability key, no silently-optional field. **No class field**: the five A0 classes are a descriptive system-boundary/action taxonomy (§H.5), never kernel Effect variants |
 | Legal operations | registered by the owning fiber at composition/activation time; explicitly disposed early by the owner; unwound LIFO at deactivation; for same-key contribution effects: remove only the owner's contribution |
 | Illegal operations | being executed after the owning fiber left its episode (except teardown of the effect itself); executing twice (idempotent no-op, B26); wrapping an emission and claiming rollback (B23) |
-| Observable facts | existence/count per fiber; the composition relation each effect contributes to (capability key; for a data-edge binding, the provider fiber — §K.4); **not** payload, and not a behavioral class/kind |
+| Observable facts | existence/count per fiber; for a relation-bearing effect, the composition relation it contributes to (capability key; for a data-edge binding, the provider fiber — §K.4); an owner-local effect exposes no relation to observe. **Not** payload, and not a behavioral class/kind |
 | Lifecycle | born at registration inside an episode; dies at dispose or episode close |
 | Relationships | owned by exactly one fiber; provision effects create capability bindings; data-edge bindings are effects owned by the consumer |
 | Proof obligations | the inverse is a **total semantic obligation** (§H.7): it actually reverts at the state of application and has no failure outcome — an author obligation the runtime does not verify (paper §5.1.1); violation latches §G.6. Same-key independence per D.2 witness |
-| Must not know | other fibers; domain semantics of the mutated state |
+| Must not know | other fibers' internals/domain payload (Corrective-5, aligning with D.3 — naming a peer/provider fiber *identity* in structural provenance is not knowledge of that fiber's internals); domain semantics of the mutated state |
 
 Corrective-4 note — **provenance is not a class**. "No class/kind" bans
 *behavioral* classification of Effects into reversible/transactional/domain
@@ -264,6 +266,36 @@ effect cannot exist without naming its capability key (B4: provision is
 truth without naming its owner, provider, and relation. The one legal Effect
 shape therefore includes minimal **structural provenance** — identity of the
 composition relation, never payload, never behavioral taxonomy (§H.5, §K.4).
+
+Corrective-5 note — **provenance is conditional on bearing a relation** (the
+Corrective-4 note above, and the Owned-state row it froze, over-reached: they
+read as if every Effect must name a capability key). Two distinctions, both
+frozen:
+
+```text
+behavioral class       never exists on Effect (§H.5) — no enum, no kind
+structural provenance  exists only on a relation-bearing Effect
+
+relation-bearing Effect             owner-local reversible Effect
+  capability provision                timer registration
+  capability binding                  watcher
+  data-edge binding (§K)              local handle
+  cross-fiber keyed contribution      buffer/resource allocation inside
+                                        the system boundary
+```
+
+The test is whether the effect contributes to a composition-visible relation
+that must survive independent removal, provider withdrawal and ghost audits
+(§G, §H.4, §I.1.6) — not the effect's mechanism. An owner-local effect that
+fabricated a capability key would pollute same-key independence reasoning
+(§H.4) with a key that denotes nothing; a silently-optional provenance field
+would be the `Option<Disposer>` mistake (§H.5) in structural clothing. Two
+non-implications close the loop: structural provenance does not imply
+crossing fibers (the owner's own capability provision is relation-bearing
+and intra-fiber), and carrying provenance does not imply a behavioral kind —
+**behavioral class ≠ structural provenance** remains the one-shape rule
+(§H.5, §H.7): no `EffectKind`, no `DataEdgeRegistry`, no sixth primitive
+(§D.6).
 
 ### D.5 Reconcile
 
@@ -1423,7 +1455,7 @@ Typed static capability keys + object-safe service traits + generational `FiberI
 | 17 | Can a domain obligation sneak back in as a sixth primitive? | **PASS** (frozen in Corrective-2) | the kernel's whole teardown knowledge is one verdict per fiber — `DISCHARGED` / `CONTRACT_VIOLATED` (§G.6); no obligation registry, list, count, or identity exists kernel-side; obligations are component-contract content (§H.5.1 fence, §J.4, §D.6) |
 | 18 | Can Reconcile confuse "unchanged desired entry" with "the operator asked for a retry"? | **PASS** (frozen in Corrective-4) | desired revision identity makes fresh-incarnation intent expressible (§L.5); an unchanged identity never retries FAILED (R1/R7, oracle D0–D4); the kernel derives revision triggers from nothing — not config content, not dependency churn (R2/R3, §S) |
 | 19 | Can a FAILED fiber hang settlement forever, or be retried by accident? | **PASS** (frozen in Corrective-4) | quiescence is transition semantics: settled FAILED (and Pending) are quiet-legal (§L.1 clauses 2–3, D1 oracle); nothing retries without a fresh desired incarnation (§L.5); staged plans still owing work and latched violations stay non-quiescent (§L.1 clauses 4–5) |
-| 20 | Does "no EffectKind" make composition bindings unprovable, or force a DataEdge sixth primitive? | **PASS** (frozen in Corrective-4) | structural provenance (capability key + provider fiber identity) is part of the one Effect shape (§D.4); the binding effect is the single authority and §K.3/§I.1.5 diagnostics are projections of it (§K.4) — no behavioral enum, no second registry, no payload exposure (A4–A6 class of attacks closed) |
+| 20 | Does "no EffectKind" make composition bindings unprovable, or force a DataEdge sixth primitive? | **PASS** (frozen in Corrective-4; provenance scope corrected in Corrective-5) | structural provenance (capability key + provider fiber identity) is part of the one Effect shape **for relation-bearing effects only** (§D.4): the binding effect is the single authority and §K.3/§I.1.5 diagnostics are projections of it (§K.4); owner-local effects carry only the base triple (owner episode + total inverse + LIFO position) and fabricate no key — no behavioral enum, no second registry, no payload exposure (A4–A6 class of attacks closed) |
 
 Score: 19 PASS, 1 DEFERRED-WITH-TRIGGER (#10, routed to §T). No DESIGN DEFECT remaining. (Corrective-1 converted the review-confirmed defect in the teardown-failure story into #16's frozen defense; Corrective-2 added #17's obligation fence and repaired the raise-path state machine underlying #13; Corrective-4 added #18–#20.)
 
@@ -1442,7 +1474,7 @@ Frozen upper bounds for the future implementation (any excess requires a new arc
 | capability cardinality modes | **1** (required-single; optional/many/broker deferred, §S) |
 | reconcile concepts | **≤ 6** (desired diff plan revise settle compose-error) |
 | diagnostic concepts | **≤ 6** (the §I.1 surfaces; the §G.6 violation flag lives **inside** the fiber lifecycle surface — not a seventh concept) |
-| kernel Effect shapes | **1** — reversible composition-lifecycle mutation + total inverse (§H.5 frozen block, §H.7); no effect-class enum exists; structural provenance (§D.4/§K.4) is part of that one shape, not a second shape |
+| kernel Effect shapes | **1** — reversible composition-lifecycle mutation + total inverse (§H.5 frozen block, §H.7); no effect-class enum exists; structural provenance (§D.4/§K.4) is a conditional field of that one shape — present only on relation-bearing effects — not a second shape |
 | system-boundary action classes (descriptive taxonomy, §H.5) | **5** — none is a kernel Effect variant |
 | desired revision identity per desired entry | **1** opaque equality token — kernel compares, never interprets, never derives (§L.5) |
 | kernel obligation concepts | **0** — no registry/list/count/identity; one teardown verdict (`DISCHARGED`/`CONTRACT_VIOLATED`) per fiber (§G.6, §H.5.1) |
@@ -1499,7 +1531,36 @@ Implementation-issue inputs, not design gaps — each has a frozen semantic answ
 
 ## Verdict
 
-**Status: merged semantic authority (PR #68, Revisions 1–4); Revision 5 / Corrective-4 is the current pre-implementation review gate.** (Initial draft proposed PASS; human review round 1 returned **PASS_WITH_CORRECTIVES** — six items, resolved by Corrective-1; human review round 2 (PR #68, review `5127266745`) returned **PASS_WITH_CORRECTIVES** — P0-1 plus P1-2/P1-3/P1-4 and P2, resolved by Corrective-2; human review round 3 (PR #68, review `5127362067`) returned **PASS_WITH_TWO_CORRECTIVES** — P0-1 confluence widening in M4 and P1-2 child-mount scope, plus P2 wording, resolved by Corrective-3. PR #68 then **merged**: Revisions 1–4 are the merged semantic authority for #67. The post-merge pre-implementation adversarial review produced Corrective-4 (Revision 5, this revision), which is now subject to the next human review per delivery discipline.)
+**Status: merged semantic authority (PR #68, Revisions 1–4); Revision 6 / Corrective-5 is the current pre-implementation review gate.** (Initial draft proposed PASS; human review round 1 returned **PASS_WITH_CORRECTIVES** — six items, resolved by Corrective-1; human review round 2 (PR #68, review `5127266745`) returned **PASS_WITH_CORRECTIVES** — P0-1 plus P1-2/P1-3/P1-4 and P2, resolved by Corrective-2; human review round 3 (PR #68, review `5127362067`) returned **PASS_WITH_TWO_CORRECTIVES** — P0-1 confluence widening in M4 and P1-2 child-mount scope, plus P2 wording, resolved by Corrective-3. PR #68 then **merged**: Revisions 1–4 are the merged semantic authority for #67. The post-merge pre-implementation adversarial review produced Corrective-4 (Revision 5); human review of Corrective-4 (review `5127750303`) returned **PASS_WITH_ONE_CORRECTIVE** — P0 Effect structural provenance over-frozen plus P1 taxonomy wording residue, resolved by Corrective-5 (Revision 6, this revision), which is now subject to the next human review per delivery discipline.)
+
+Corrective-5 resolution summary (human review of Corrective-4, `5127750303`):
+
+```text
+P0  Effect structural           Corrective-4 froze provenance as if every
+    provenance over-frozen;      Effect owned a capability key, while D.4
+    D.4 self-contradiction       also said Effect "must not know other
+                                 fibers" yet required data-edge provenance
+                                 to name the provider fiber. Frozen: every
+                                 K0 Effect carries the base triple — owner
+                                 fiber episode, total inverse, LIFO
+                                 position; structural composition provenance
+                                 exists only on a relation-bearing effect
+                                 (capability key; provider/peer fiber
+                                 identity for a data edge, §K.4); owner-local
+                                 reversible effects (timer, watcher, local
+                                 handle, buffer allocation) fabricate no
+                                 key and no optional field; "must not know"
+                                 narrowed to other fibers' internals/domain
+                                 payload — naming a peer identity is not
+                                 reading its internals. One behavioral shape
+                                 unchanged; no EffectKind, no
+                                 DataEdgeRegistry                  §D.4, §K.4, §H.5, §Q20, §R
+P1  "Effects may be" wording     the five labels classify actions, not
+    residue                      Effects: "Classify effects" → "Classify
+                                 actions" in AGENTS.md/composition-kernel.md;
+                                 #46 "Effects may be" → "Actions may be
+                                 classified as"          AGENTS.md, composition-kernel.md, #46
+```
 
 Corrective-3 resolution summary (review round 3):
 
@@ -1616,7 +1677,7 @@ Rust representation downstream of semantics              §P (survey, no freeze)
 no unsupported claim presented as paper authority        §B provenance ledger + §A.4 pin
 ```
 
-PR #68 merged on 2026-09-07: Revisions 1–4 are the merged semantic authority for #67. Revision 5 (Corrective-4) is applied on `main` and is the **current pre-implementation review gate**; implementation remains unauthorized until a further human review accepts it. Acceptance authorizes exactly one next step: **opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue**. It does not authorize implementation itself, a Rust API freeze, FFmpeg/WASAPI/PocketJS integration, async-runtime selection, or any §S-deferred machinery. This document stops at the gate.
+PR #68 merged on 2026-09-07: Revisions 1–4 are the merged semantic authority for #67. Revision 5 (Corrective-4) was reviewed by human review `5127750303` (**PASS_WITH_ONE_CORRECTIVE**); Revision 6 (Corrective-5) resolves its findings and is the **current pre-implementation review gate**; implementation remains unauthorized until a further human review accepts it. Acceptance authorizes exactly one next step: **opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue**. It does not authorize implementation itself, a Rust API freeze, FFmpeg/WASAPI/PocketJS integration, async-runtime selection, or any §S-deferred machinery. This document stops at the gate.
 
 
 
