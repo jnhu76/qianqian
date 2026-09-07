@@ -31,7 +31,7 @@ mod fiber;
 mod kernel;
 
 pub use capability::{Capability, CapabilityKey};
-pub use component::{ActivationError, ComponentSpec, Discharge};
+pub use component::{ActivationError, ComponentRegistrationError, ComponentSpec, Discharge};
 pub use context::{ActivationCtx, Binding, ResolveError, TeardownCtx};
 pub use desired::{CompositionError, CompositionErrors, DesiredEntry, Revision};
 pub use diagnostic::{CompositionSnapshot, FiberDiagnostic, RelationDiagnostic};

@@ -44,8 +44,10 @@ fn undeclared_provider(name: &'static str) -> ComponentSpec {
 fn consumer_before_provider_is_pending_then_activates() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_consumer("c", &l));
-    k.register_component(tag_provider("p", "p1", &l));
+    k.register_component(tag_consumer("c", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p", "p1", &l))
+        .expect("component registered");
     // Only the consumer is desired at first.
     k.set_desired(vec![DesiredEntry::enabled("c", "c", Revision::fresh())])
         .expect("legal");
@@ -81,8 +83,10 @@ fn consumer_before_provider_is_pending_then_activates() {
 fn provider_before_consumer_activates() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_consumer("c", &l));
-    k.register_component(tag_provider("p", "p1", &l));
+    k.register_component(tag_consumer("c", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p", "p1", &l))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("p", "p", Revision::fresh()),
         DesiredEntry::enabled("c", "c", Revision::fresh()),
@@ -105,8 +109,10 @@ fn provider_before_consumer_activates() {
 fn provider_flap_n_times_settles_on_final_generation() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_consumer("c", &l));
-    k.register_component(tag_provider("p", "final", &l));
+    k.register_component(tag_consumer("c", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p", "final", &l))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("p", "p", Revision::fresh()),
         DesiredEntry::enabled("c", "c", Revision::fresh()),
@@ -157,7 +163,8 @@ fn provider_flap_n_times_settles_on_final_generation() {
 fn missing_dependency_settles_pending_without_crash() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_consumer("c", &l));
+    k.register_component(tag_consumer("c", &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("c", "c", Revision::fresh())])
         .expect("legal: a missing provider is a degraded state, not an error");
     k.settle();
@@ -176,9 +183,12 @@ fn missing_dependency_settles_pending_without_crash() {
 fn ambiguous_providers_refused_at_plan_time() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_consumer("c", &l));
-    k.register_component(tag_provider("p1", "p1", &l));
-    k.register_component(tag_provider("p2", "p2", &l));
+    k.register_component(tag_consumer("c", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p1", "p1", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p2", "p2", &l))
+        .expect("component registered");
     let err = k
         .set_desired(vec![
             DesiredEntry::enabled("p1", "p1", Revision::fresh()),
@@ -219,9 +229,11 @@ fn undeclared_access_is_rejected() {
                 Err(ActivationError::new("stop after probe"))
             })
     };
-    k.register_component(probe);
-    k.register_component(undeclared_provider("up"));
-    k.register_component(tag_provider("tp", "tp", &l));
+    k.register_component(probe).expect("component registered");
+    k.register_component(undeclared_provider("up"))
+        .expect("component registered");
+    k.register_component(tag_provider("tp", "tp", &l))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("up", "up", Revision::fresh()),
         DesiredEntry::enabled("tp", "tp", Revision::fresh()),
@@ -252,7 +264,8 @@ fn inactive_access_is_unrepresentable_outside_episodes() {
     // consumer stays Pending forever and performs zero resolutions.
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_consumer("c", &l));
+    k.register_component(tag_consumer("c", &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("c", "c", Revision::fresh())])
         .expect("legal");
     k.settle();
@@ -269,8 +282,10 @@ fn inactive_access_is_unrepresentable_outside_episodes() {
 fn capability_identity_survives_provider_replacement() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_consumer("c", &l));
-    k.register_component(tag_provider("p", "tag", &l));
+    k.register_component(tag_consumer("c", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p", "tag", &l))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("p", "p", Revision::new(1)),
         DesiredEntry::enabled("c", "c", Revision::fresh()),

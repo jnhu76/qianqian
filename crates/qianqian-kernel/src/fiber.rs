@@ -58,6 +58,16 @@ pub(crate) enum EffectPayload {
     /// A total semantic obligation (design §H.7): once invoked it either
     /// discharges or latches §G.6 — there is no partial-success outcome.
     Inverse(Box<dyn FnOnce() -> Discharge>),
+    /// Discharge-state tombstone: the inverse was consumed and returned
+    /// `Violated` (§G.6). The record stays in the accumulator because its
+    /// structural provenance is the single authority for the composition
+    /// relation it bears (§K.4) — the obligation is NOT discharged, so the
+    /// binding must remain observable instead of vanishing. Never invoked
+    /// again (the FnOnce is gone), never unwound further, never cleared by
+    /// any revision; only the §G.6 latch may sit on top of it. This is a
+    /// discharge state of the one Effect shape, not a behavioral class
+    /// (§H.5 — no EffectKind, no Option<Disposer>).
+    Violated,
 }
 
 /// One Effect record: base triple (owner episode = the accumulator it lives

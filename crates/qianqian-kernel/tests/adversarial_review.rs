@@ -1,6 +1,7 @@
-//! Mandatory adversarial review A1–A15 (#70 §21), executed against the
-//! implementation. Each test attacks one review question; any wrong result
-//! is a STOP, not a test exception.
+//! Mandatory adversarial review A1–A20 (#70 §21 + implementation
+//! Corrective-1, review 5128371083), executed against the implementation.
+//! A16–A20 are the five corrective oracles (P0-1…P1-5); each test attacks
+//! one review question; any wrong result is a STOP, not a test exception.
 
 mod common;
 
@@ -16,7 +17,8 @@ use qianqian_kernel::{ComponentSpec, DesiredEntry, Discharge, Kernel, Revision, 
 fn a1_identical_revision_never_retries_failed() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("d", 1, &l));
+    k.register_component(flaky_provider("d", 1, &l))
+        .expect("component registered");
     let entry = || vec![DesiredEntry::enabled("d", "d", Revision::new(7))];
     k.set_desired(entry()).expect("legal");
     k.settle();
@@ -41,7 +43,8 @@ fn a1_identical_revision_never_retries_failed() {
 fn a2_fresh_revision_creates_fresh_generation() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("d", 1, &l));
+    k.register_component(flaky_provider("d", 1, &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("d", "d", Revision::new(7))])
         .expect("legal");
     k.settle();
@@ -64,8 +67,10 @@ fn a2_fresh_revision_creates_fresh_generation() {
 fn a3_dependency_churn_fabricates_no_retry() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("d", 1, &l));
-    k.register_component(extra_provider("u", "u", &l));
+    k.register_component(flaky_provider("d", 1, &l))
+        .expect("component registered");
+    k.register_component(extra_provider("u", "u", &l))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("d", "d", Revision::new(7)),
         DesiredEntry::enabled("u", "u", Revision::new(1)),
@@ -97,8 +102,10 @@ fn a3_dependency_churn_fabricates_no_retry() {
 fn a4_no_two_providers_during_replacement() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p1", "one", &l));
-    k.register_component(tag_provider("p2", "two", &l));
+    k.register_component(tag_provider("p1", "one", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p2", "two", &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("svc", "p1", Revision::new(1))])
         .expect("legal");
     k.settle();
@@ -136,7 +143,8 @@ fn a4_no_two_providers_during_replacement() {
 fn a5_provider_release_waits_for_dependents() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p", "P", &l));
+    k.register_component(tag_provider("p", "P", &l))
+        .expect("component registered");
     let consumer = {
         let lg = l.clone();
         ComponentSpec::new("c")
@@ -146,7 +154,8 @@ fn a5_provider_release_waits_for_dependents() {
                 Discharge::Discharged
             })
     };
-    k.register_component(consumer);
+    k.register_component(consumer)
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("p", "p", Revision::fresh()),
         DesiredEntry::enabled("c", "c", Revision::fresh()),
@@ -174,7 +183,7 @@ fn a6_violated_unwind_never_reaches_failed() {
             Err(qianqian_kernel::ActivationError::new("fixture"))
         })
     };
-    k.register_component(spec);
+    k.register_component(spec).expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("v", "v", Revision::fresh())])
         .expect("legal");
     k.settle();
@@ -203,7 +212,7 @@ fn a7_owner_local_effect_has_no_key() {
             Ok(())
         })
     };
-    k.register_component(spec);
+    k.register_component(spec).expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("w", "w", Revision::fresh())])
         .expect("legal");
     k.settle();
@@ -224,8 +233,10 @@ fn a7_owner_local_effect_has_no_key() {
 #[test]
 fn a8_binding_diagnosed_without_effect_kind() {
     let mut k = Kernel::new();
-    k.register_component(listeners_provider("registry"));
-    k.register_component(listener_consumer("lx"));
+    k.register_component(listeners_provider("registry"))
+        .expect("component registered");
+    k.register_component(listener_consumer("lx"))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("registry", "registry", Revision::fresh()),
         DesiredEntry::enabled("lx", "lx", Revision::fresh()),
@@ -251,8 +262,10 @@ fn a8_binding_diagnosed_without_effect_kind() {
 #[test]
 fn a9_no_second_mutable_truth() {
     let mut k = Kernel::new();
-    k.register_component(listeners_provider("registry"));
-    k.register_component(listener_consumer("lx"));
+    k.register_component(listeners_provider("registry"))
+        .expect("component registered");
+    k.register_component(listener_consumer("lx"))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("registry", "registry", Revision::fresh()),
         DesiredEntry::enabled("lx", "lx", Revision::fresh()),
@@ -280,7 +293,8 @@ fn a9_no_second_mutable_truth() {
 fn a10_failed_settles() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("d", 1, &l));
+    k.register_component(flaky_provider("d", 1, &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("d", "d", Revision::new(1))])
         .expect("legal");
     k.settle();
@@ -292,7 +306,8 @@ fn a10_failed_settles() {
 fn a11_violation_never_settles() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(violating_teardown_component("v", &l));
+    k.register_component(violating_teardown_component("v", &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("v", "v", Revision::fresh())])
         .expect("legal");
     k.settle();
@@ -307,8 +322,10 @@ fn a11_violation_never_settles() {
 fn a12_half_staged_replacement_never_settles() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p1", "one", &l));
-    k.register_component(tag_provider("p2", "two", &l));
+    k.register_component(tag_provider("p1", "one", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p2", "two", &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("svc", "p1", Revision::new(1))])
         .expect("legal");
     k.settle();
@@ -393,7 +410,8 @@ fn a15_payload_traffic_does_zero_kernel_operations() {
     let mut k = Kernel::new();
     let _ = log();
     let endpoint_cell: Rc<RefCell<Option<Rc<EndpointHandle>>>> = Rc::new(RefCell::new(None));
-    k.register_component(sink_fixture(&endpoint_cell));
+    k.register_component(sink_fixture(&endpoint_cell))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled(
         "sink",
         "sink",
@@ -407,6 +425,350 @@ fn a15_payload_traffic_does_zero_kernel_operations() {
         endpoint.send(i);
     }
     assert_eq!(k.debug_op_count(), before);
+}
+
+// ---------------------------------------------------------------------------
+// Implementation Corrective-1 (review 5128371083): A16–A20
+// ---------------------------------------------------------------------------
+
+/// A fixture component whose activation and teardown both log a version tag.
+fn logging_component(name: &'static str, version: &'static str, l: &Log) -> ComponentSpec {
+    let log_a = l.clone();
+    let log_t = l.clone();
+    ComponentSpec::new(name)
+        .on_activate(move |_| {
+            log_a
+                .borrow_mut()
+                .push(format!("{name}:v{version}:activated"));
+            Ok(())
+        })
+        .on_teardown(move |_| {
+            log_t
+                .borrow_mut()
+                .push(format!("{name}:v{version}:teardown"));
+            Discharge::Discharged
+        })
+}
+
+/// A consumer whose relation-bearing binding effect's inverse violates:
+/// the binding's provenance must stay authoritative even though the inverse
+/// could not discharge (§K.4 — diagnostics are projections of the one
+/// mutable authority, and a violated teardown must not pretend the binding
+/// was cleaned).
+fn violating_binding_consumer(name: &'static str) -> ComponentSpec {
+    ComponentSpec::new(name)
+        .requires::<Tag>()
+        .on_activate(move |ctx| {
+            let binding = ctx
+                .resolve::<Tag>()
+                .map_err(|e| qianqian_kernel::ActivationError::new(format!("{e:?}")))?;
+            ctx.register_relation(&binding, || Discharge::Violated);
+            Ok(())
+        })
+}
+
+/// Two distinct capability types sharing one diagnostic NAME — the P1-5
+/// collision shape. Capability identity is the TypeId (§E.1); the snapshot
+/// keys capability maps by NAME, so a shared name in one kernel would merge
+/// distinct contracts in the §I.1 surface and let single-source oracles lie.
+struct OutputA;
+impl qianqian_kernel::Capability for OutputA {
+    const NAME: &'static str = "Output";
+    type Service = dyn TagService;
+}
+
+struct OutputB;
+impl qianqian_kernel::Capability for OutputB {
+    const NAME: &'static str = "Output";
+    type Service = dyn TagService;
+}
+
+/// A16 (P0-1): Can a component definition be re-registered while an
+/// instance of it is mounted (silent HMR)? Expected: NO — component
+/// definitions are the static `(d, p, e)` (design §F.1), immutable for the
+/// kernel's lifetime. The review's attack: `X-v1 ACTIVE → register X-v2 →
+/// v1 卸载时跑 teardown-v2`. Registration of the same name is refused, so
+/// teardown always runs the definition the fiber was mounted from.
+#[test]
+fn a16_component_definitions_are_immutable() {
+    let mut k = Kernel::new();
+    let l = log();
+    k.register_component(logging_component("x", "1", &l))
+        .expect("first registration is legal");
+    k.set_desired(vec![DesiredEntry::enabled("x", "x", Revision::fresh())])
+        .expect("legal");
+    k.settle();
+    assert_eq!(entries(&l), vec!["x:v1:activated"]);
+
+    // The HMR attack: register X-v2 over the same name while X-v1 is ACTIVE.
+    let err = k
+        .register_component(logging_component("x", "2", &l))
+        .expect_err("same-name re-registration is refused — no hot replacement");
+    assert!(matches!(
+        err,
+        qianqian_kernel::ComponentRegistrationError::DuplicateName { name: "x" }
+    ));
+
+    // Unload: the teardown that runs belongs to the ORIGINAL definition.
+    k.set_desired(Vec::new()).expect("legal");
+    k.settle();
+    assert_eq!(
+        entries(&l),
+        vec!["x:v1:activated", "x:v1:teardown"],
+        "the mounted fiber's (d, p, e) never silently changed"
+    );
+    assert!(k.snapshot().quiet);
+}
+
+/// A17 (P0-2): Does a violated inverse erase the binding's authoritative
+/// provenance record? Expected: NO. The inverse is consumed (never
+/// retried), but the record stays as a discharge-state tombstone: the
+/// composition relation remains observable (§K.4 single authority), the
+/// fiber stays installed, removal stays blocked, and the run is loudly
+/// Blocked — the snapshot never shows "relation gone" next to a latched
+/// TEARDOWN_VIOLATED.
+#[test]
+fn a17_violated_inverse_keeps_provenance_authority() {
+    let mut k = Kernel::new();
+    let l = log();
+    k.register_component(tag_provider("p", "P", &l))
+        .expect("component registered");
+    k.register_component(violating_binding_consumer("c"))
+        .expect("component registered");
+    k.set_desired(vec![
+        DesiredEntry::enabled("p", "p", Revision::fresh()),
+        DesiredEntry::enabled("c", "c", Revision::fresh()),
+    ])
+    .expect("legal");
+    k.settle();
+    assert_eq!(
+        k.snapshot().relations.iter().cloned().collect::<Vec<_>>(),
+        vec![qianqian_kernel::RelationDiagnostic {
+            owner: "c".to_owned(),
+            provider: "p".to_owned(),
+            capability: "Tag",
+        }]
+    );
+
+    // Withdraw the consumer: its binding inverse violates.
+    k.set_desired(vec![DesiredEntry::enabled("p", "p", Revision::fresh())])
+        .expect("legal");
+    k.settle();
+    let snap = k.snapshot();
+    let c = snap.fibers.get("c").expect("the fiber stays installed");
+    assert_eq!(c.state, qianqian_kernel::FiberState::Unloading);
+    assert!(c.teardown_violated, "TEARDOWN_VIOLATED latched");
+    assert_eq!(
+        snap.relations.iter().cloned().collect::<Vec<_>>(),
+        vec![qianqian_kernel::RelationDiagnostic {
+            owner: "c".to_owned(),
+            provider: "p".to_owned(),
+            capability: "Tag",
+        }],
+        "the violated binding's provenance must NOT vanish from the snapshot"
+    );
+    assert!(!snap.quiet);
+    assert_eq!(k.step(), StepOutcome::Blocked);
+    // The tombstone blocks removal: no revision can silently clear it.
+    k.set_desired(vec![DesiredEntry::enabled("c", "c", Revision::fresh())])
+        .expect("legal");
+    k.settle();
+    assert!(k.snapshot().fibers.contains_key("c"));
+    assert!(k.snapshot().fibers.get("c").unwrap().teardown_violated);
+}
+
+/// A18 (P0-3): Does the closed §I.1 surface prove the teardown-window
+/// committed-binding facts? Expected: YES — the new `committed` projection
+/// (consumer -> capability -> provider) makes the review's trace provable:
+///
+/// ```text
+/// new resolution      -> old provider 已不可用  (capabilities = None)
+/// consumer Unloading  -> committed binding 仍指向 old provider
+/// reactivation        -> committed binding 改指 new provider
+/// ```
+///
+/// A plain resolve with no relation Effect still appears here — `relations`
+/// alone could not witness this window.
+#[test]
+fn a18_committed_bindings_trace_the_teardown_window() {
+    let mut k = Kernel::new();
+    let l = log();
+    k.register_component(tag_provider("p1", "one", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p2", "two", &l))
+        .expect("component registered");
+    k.register_component(tag_consumer("consumer", &l))
+        .expect("component registered");
+    // The consumer's desired incarnation is captured once and reused: only
+    // the provider entry is revised by the replacement, so the step trace
+    // is driven by the provider, not by consumer revision churn.
+    let r_consumer = Revision::fresh();
+    k.set_desired(vec![
+        DesiredEntry::enabled("svc", "p1", Revision::new(1)),
+        DesiredEntry::enabled("consumer", "consumer", r_consumer),
+    ])
+    .expect("legal");
+    k.settle();
+    let bound = |k: &Kernel| {
+        k.snapshot()
+            .committed
+            .get("consumer")
+            .and_then(|m| m.get("Tag"))
+            .cloned()
+    };
+    assert_eq!(
+        bound(&k).as_deref(),
+        Some("svc"),
+        "an Active consumer's committed binding names its provider fiber"
+    );
+    // The plain-resolve consumer registers no relation Effect: `relations`
+    // is empty while the committed binding exists (the P0-3 gap).
+    assert!(k.snapshot().relations.is_empty());
+
+    // Staged replacement svc@p1@R1 -> svc@p2@R2, one step at a time.
+    k.set_desired(vec![
+        DesiredEntry::enabled("svc", "p2", Revision::new(2)),
+        DesiredEntry::enabled("consumer", "consumer", r_consumer),
+    ])
+    .expect("legal");
+    assert_eq!(k.step(), StepOutcome::Transitioned); // 1. retire flag
+    assert_eq!(k.step(), StepOutcome::Transitioned); // 2. L-Leave: svc -> Unloading
+    let snap = k.snapshot();
+    assert_eq!(
+        snap.capabilities.get("Tag"),
+        Some(&None),
+        "the withdrawing provider is gone from NEW resolution"
+    );
+    assert_eq!(
+        bound(&k).as_deref(),
+        Some("svc"),
+        "the committed binding still names the OLD provider while it withdraws"
+    );
+    assert_eq!(k.step(), StepOutcome::Transitioned); // 3. consumer -> Unloading
+    let snap = k.snapshot();
+    assert_eq!(
+        snap.fibers.get("consumer").map(|f| f.state),
+        Some(qianqian_kernel::FiberState::Unloading)
+    );
+    assert_eq!(
+        bound(&k).as_deref(),
+        Some("svc"),
+        "an Unloading consumer keeps its episode-fixed committed binding (B14 window)"
+    );
+    assert_eq!(k.step(), StepOutcome::Transitioned); // 4. consumer unloads (view closed)
+    assert_eq!(
+        bound(&k),
+        None,
+        "episode close discards the committed view last (§F.3)"
+    );
+    k.settle();
+    assert!(k.snapshot().quiet);
+    assert_eq!(
+        bound(&k).as_deref(),
+        Some("svc"),
+        "reactivation commits the consumer to the NEW provider generation"
+    );
+    assert_eq!(
+        entries(&l)
+            .iter()
+            .filter(|e| e.starts_with("consumer:bound-to-"))
+            .collect::<Vec<_>>(),
+        vec!["consumer:bound-to-one", "consumer:bound-to-two"],
+        "the reactivated binding is against the new provider, not the old one (B30)"
+    );
+}
+
+/// A19 (P1-4): Can `Revision::fresh()` collide with `Revision::new()`?
+/// Expected: NO — raw operator tokens live strictly below the `fresh()`
+/// domain, so a fresh incarnation can never be mistaken for an unchanged
+/// raw one (R3/D3).
+#[test]
+fn a19_revision_tokens_never_collide() {
+    let raw = [
+        Revision::new(0),
+        Revision::new(1),
+        Revision::new(7),
+        Revision::new((1 << 63) - 1),
+    ];
+    let fresh: Vec<Revision> = (0..64).map(|_| Revision::fresh()).collect();
+    for a in &raw {
+        for b in &fresh {
+            assert_ne!(a, b, "raw and fresh token domains must be disjoint");
+        }
+    }
+    for (i, a) in fresh.iter().enumerate() {
+        for b in fresh.iter().skip(i + 1) {
+            assert_ne!(a, b, "every fresh() call yields a distinct incarnation");
+        }
+    }
+}
+
+/// The disjoint-domain invariant is enforced, not documented: a raw token
+/// inside the fresh() domain is a programmer error and panics loudly rather
+/// than silently colliding with a future fresh incarnation.
+#[test]
+#[should_panic(expected = "Revision::fresh() token domain")]
+fn a19b_raw_revision_cannot_enter_the_fresh_domain() {
+    let _ = Revision::new(1 << 63);
+}
+
+/// Behavioral regression for the collision: presenting a fresh() token
+/// right after a raw token MUST stage a visible revision (a new generation
+/// mounts and activates). Under the old representation the process's first
+/// fresh() token equaled Revision::new(1) and the revision silently became
+/// a no-op (D3 violated).
+#[test]
+fn a19c_fresh_revision_after_raw_token_is_a_real_revision() {
+    let mut k = Kernel::new();
+    let l = log();
+    k.register_component(tag_provider("p", "p1", &l))
+        .expect("component registered");
+    k.set_desired(vec![DesiredEntry::enabled("svc", "p", Revision::new(1))])
+        .expect("legal");
+    k.settle();
+    let activations = || entries(&l).iter().filter(|e| *e == "p:activated").count();
+    assert_eq!(activations(), 1);
+
+    k.set_desired(vec![DesiredEntry::enabled("svc", "p", Revision::fresh())])
+        .expect("legal");
+    k.settle();
+    assert_eq!(
+        activations(),
+        2,
+        "a fresh() token must never equal the preceding raw token (R3/D3)"
+    );
+    assert!(k.snapshot().quiet);
+}
+
+/// A20 (P1-5): Can two distinct capability types share a diagnostic NAME in
+/// one kernel? Expected: NO — refused at the registration door. Identity is
+/// the TypeId; NAME is the vocabulary the §I.1 surfaces key by, so a
+/// collision would merge distinct contracts and let single-source oracles
+/// lie. The same TYPE under another component name stays legal.
+#[test]
+fn a20_capability_diagnostic_names_are_unique_per_kernel() {
+    let mut k = Kernel::new();
+    let _ = log();
+    k.register_component(ComponentSpec::new("a").provides::<OutputA>())
+        .expect("first registration is legal");
+    let err = k
+        .register_component(ComponentSpec::new("b").provides::<OutputB>())
+        .expect_err("a distinct capability type reusing the diagnostic NAME is refused");
+    assert!(matches!(
+        err,
+        qianqian_kernel::ComponentRegistrationError::DuplicateCapabilityName { name: "Output" }
+    ));
+    // Same contract (same TypeId) under a different component name is fine.
+    k.register_component(ComponentSpec::new("b").provides::<OutputA>())
+        .expect("the same capability type may be declared by another component");
+    // Same-name re-registration of a component definition is refused (P0-1).
+    let err = k
+        .register_component(ComponentSpec::new("a").provides::<OutputA>())
+        .expect_err("component definitions are immutable");
+    assert!(matches!(
+        err,
+        qianqian_kernel::ComponentRegistrationError::DuplicateName { name: "a" }
+    ));
 }
 
 // --- Minimal local sink fixture for A15 (endpoint with no kernel handle) ---

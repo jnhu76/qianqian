@@ -11,21 +11,44 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// the equality domain: same token = same incarnation, different token =
 /// fresh incarnation requested. `fresh()` is a caller-side convenience; the
 /// kernel performs no derivation of any kind.
+///
+/// Constructor domains are disjoint by construction: `new` (operator-authored
+/// raw tokens) lives strictly below `FRESH_BASE`; `fresh()` lives at or above
+/// it. A fresh incarnation can therefore never be mistaken for an unchanged
+/// raw incarnation (R3/D3) and no raw token can ever equal a fresh one.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Revision(u64);
 
-static REVISION_COUNTER: AtomicU64 = AtomicU64::new(1);
+/// Raw tokens from `Revision::new` live strictly below this bound; `fresh()`
+/// tokens live at or above it. The two domains can never collide.
+const FRESH_BASE: u64 = 1 << 63;
+
+static REVISION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 impl Revision {
+    /// Operator-authored raw token (the lower domain, `[0, FRESH_BASE)`).
+    /// Values inside the `fresh()` domain are a programmer error and panic
+    /// rather than silently colliding with a fresh incarnation.
     pub fn new(n: u64) -> Self {
+        assert!(
+            n < FRESH_BASE,
+            "Revision::new({n}) falls inside the Revision::fresh() token domain \
+             (fresh() owns [{FRESH_BASE}, u64::MAX]); use Revision::fresh()"
+        );
         Self(n)
     }
 
-    /// Operator-side factory for a token distinct from every previous one.
+    /// Operator-side factory for a token distinct from every previous one,
+    /// including every raw `new` token (upper domain, `>= FRESH_BASE`).
     pub fn fresh() -> Self {
-        Self(REVISION_COUNTER.fetch_add(1, Ordering::Relaxed))
+        let n = REVISION_COUNTER.fetch_add(1, Ordering::Relaxed);
+        // n < 2^63 for any reachable revision count, so no wraparound into
+        // the raw domain (the disjoint-domain invariant holds).
+        Self(FRESH_BASE.wrapping_add(n))
     }
 
+    /// Operator-facing readback of the raw token value. Display only: the
+    /// kernel compares tokens, never interprets them (R5).
     pub fn as_u64(self) -> u64 {
         self.0
     }

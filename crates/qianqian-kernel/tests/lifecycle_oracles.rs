@@ -20,7 +20,8 @@ fn mount_all(k: &mut Kernel, entries: Vec<DesiredEntry>) {
 fn raise_with_zero_effects_lands_failed() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(failing_after_effects("f", 0, &l));
+    k.register_component(failing_after_effects("f", 0, &l))
+        .expect("component registered");
     mount_all(
         &mut k,
         vec![DesiredEntry::enabled("f", "f", Revision::fresh())],
@@ -40,7 +41,8 @@ fn raise_after_n_effects_unwinds_lifo_then_fails() {
     for n in [1usize, 3] {
         let mut k = Kernel::new();
         let l = log();
-        k.register_component(failing_after_effects("f", n, &l));
+        k.register_component(failing_after_effects("f", n, &l))
+            .expect("component registered");
         mount_all(
             &mut k,
             vec![DesiredEntry::enabled("f", "f", Revision::fresh())],
@@ -75,7 +77,7 @@ fn violated_raise_unwind_latches_and_never_reaches_failed() {
             Err(qianqian_kernel::ActivationError::new("fixture failure"))
         })
     };
-    k.register_component(spec);
+    k.register_component(spec).expect("component registered");
     mount_all(
         &mut k,
         vec![DesiredEntry::enabled("f", "f", Revision::fresh())],
@@ -103,8 +105,10 @@ fn violated_raise_unwind_latches_and_never_reaches_failed() {
 fn violated_dependent_teardown_blocks_provider_final_release() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p", "p1", &l));
-    k.register_component(violating_teardown_consumer("c", &l));
+    k.register_component(tag_provider("p", "p1", &l))
+        .expect("component registered");
+    k.register_component(violating_teardown_consumer("c", &l))
+        .expect("component registered");
     mount_all(
         &mut k,
         vec![
@@ -160,8 +164,10 @@ fn violating_teardown_consumer(name: &'static str, l: &Log) -> ComponentSpec {
 fn failed_fiber_does_not_disturb_siblings() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(failing_after_effects("f", 0, &l));
-    k.register_component(tag_provider("p", "p1", &l));
+    k.register_component(failing_after_effects("f", 0, &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p", "p1", &l))
+        .expect("component registered");
     mount_all(
         &mut k,
         vec![

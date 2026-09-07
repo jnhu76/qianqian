@@ -10,7 +10,7 @@ use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use crate::capability::CapabilityKey;
-use crate::component::{ActivationError, ComponentSpec, Discharge};
+use crate::component::{ActivationError, ComponentRegistrationError, ComponentSpec, Discharge};
 use crate::context::{ActivationCtx, TeardownCtx};
 use crate::desired::{CompositionError, CompositionErrors, DesiredEntry, DesiredMap};
 use crate::diagnostic::{CompositionSnapshot, FiberDiagnostic, RelationDiagnostic};
@@ -69,10 +69,46 @@ impl Kernel {
         }
     }
 
-    /// Register a component definition (the paper's static `(d, p, e)`).
-    pub fn register_component(&mut self, spec: ComponentSpec) {
+    /// Register a component definition — the paper's static `(d, p, e)`
+    /// (design §F.1). Component definitions are immutable for the kernel's
+    /// lifetime: a name may be registered at most once (K0 has no component
+    /// hot replacement), and the diagnostic `NAME`s of declared capabilities
+    /// must be unique within the kernel (design §E.1: identity is the
+    /// `TypeId`, `NAME` is the vocabulary the §I.1 surfaces key by). On
+    /// refusal nothing is changed; the reason is returned.
+    pub fn register_component(
+        &mut self,
+        spec: ComponentSpec,
+    ) -> Result<(), ComponentRegistrationError> {
         self.count_op();
+        if self.catalog.contains_key(spec.name()) {
+            return Err(ComponentRegistrationError::DuplicateName { name: spec.name() });
+        }
+        // Per-kernel diagnostic-name uniqueness: two distinct capability
+        // types sharing a NAME would merge in the name-keyed snapshot maps
+        // and let the single-source oracle lie. Same TYPEID + same NAME is
+        // the same contract, always fine.
+        let new_keys: Vec<CapabilityKey> = spec
+            .requires
+            .iter()
+            .chain(spec.provides.iter())
+            .copied()
+            .collect();
+        for (i, a) in new_keys.iter().enumerate() {
+            for b in new_keys.iter().skip(i + 1).chain(
+                self.catalog
+                    .values()
+                    .flat_map(|s| s.requires.iter().chain(s.provides.iter())),
+            ) {
+                if a.id != b.id && a.name == b.name {
+                    return Err(ComponentRegistrationError::DuplicateCapabilityName {
+                        name: a.name,
+                    });
+                }
+            }
+        }
         self.catalog.insert(spec.name(), spec);
+        Ok(())
     }
 
     /// Install a desired composition. Plan-time checks (§L.4) run first: on
@@ -230,11 +266,39 @@ impl Kernel {
                 }
             }
         }
+        // Committed-binding projection (§I.1 surface 3): consumer fiber ->
+        // capability -> provider fiber, for every installed fiber with an
+        // open episode-fixed committed view. Read-only derivation from
+        // `Fiber.committed` — never a second mutable registry (§K.4). A
+        // plain resolve with no relation Effect still appears here; a
+        // §G.6-latched episode keeps its committed view open, so its
+        // binding stays visible instead of vanishing.
+        let mut committed: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+        for slot in &self.slots {
+            let Some(f) = &slot.fiber else { continue };
+            let Some(view) = &f.committed else { continue };
+            let Some(spec) = self.catalog.get(f.component) else {
+                continue;
+            };
+            let mut binds = BTreeMap::new();
+            for (cap_id, provider) in view {
+                let Some(key) = spec.requires.iter().find(|k| k.id == *cap_id) else {
+                    continue;
+                };
+                let provider_name = self
+                    .fiber_by_id(*provider)
+                    .map(|p| p.name.clone())
+                    .unwrap_or_else(|| "<removed>".to_owned());
+                binds.insert(key.name.to_owned(), provider_name);
+            }
+            committed.insert(f.name.clone(), binds);
+        }
         CompositionSnapshot {
             fibers,
             capabilities,
             provisions,
             relations,
+            committed,
             quiet: self.quiet_now(),
         }
     }
@@ -572,27 +636,48 @@ impl Kernel {
     /// inverse stops the unwind: the remaining effects stay un-discharged
     /// and unclaimed — partial discharge is a violation, never a success
     /// with notes (§O.2, §G.6).
+    ///
+    /// The violated effect's record is NOT dropped: its inverse was
+    /// consumed (it is never retried), but the record stays in the
+    /// accumulator as the authoritative provenance tombstone, so the
+    /// composition relation it bears remains observable (§K.4 single
+    /// authority — a violated teardown must not pretend the binding was
+    /// cleaned). Removal stays blocked on the non-empty accumulator.
     fn run_unwind(&mut self, fid: FiberId) -> Discharge {
         loop {
-            let record = self.fiber_mut(fid).effects.pop();
-            let Some(record) = record else {
-                return Discharge::Discharged;
+            // Take the top payload without dropping the record; the
+            // `Violated` marker is the discharge-state tombstone. A clean
+            // inverse pops the record; a violated one leaves it in place.
+            let payload = {
+                let f = self.fiber_mut(fid);
+                let Some(record) = f.effects.last_mut() else {
+                    return Discharge::Discharged;
+                };
+                std::mem::replace(&mut record.payload, EffectPayload::Violated)
             };
-            match record.payload {
+            match payload {
                 // Removal discharges a provision; the service value drops
                 // with the record (the single authority, §K.4).
-                EffectPayload::Provision { .. } => {}
+                EffectPayload::Provision { .. } => {
+                    self.fiber_mut(fid).effects.pop();
+                }
                 EffectPayload::Inverse(inverse) => {
                     if inverse() == Discharge::Violated {
                         return Discharge::Violated;
                     }
+                    self.fiber_mut(fid).effects.pop();
+                }
+                EffectPayload::Violated => {
+                    unreachable!("a violated tombstone is never unwound again")
                 }
             }
         }
     }
 
     /// Explicit dispose of an owned effect (B26: idempotent no-op for
-    /// unknown handles). A violated inverse latches §G.6 immediately.
+    /// unknown handles). A violated inverse latches §G.6 immediately and
+    /// keeps the authoritative provenance record in place — the binding it
+    /// bears is not discharged and must not vanish from diagnostics (§K.4).
     pub(crate) fn dispose_effect(&mut self, fid: FiberId, handle: EffectHandle) {
         let position = self
             .fiber(fid)
@@ -600,11 +685,26 @@ impl Kernel {
             .iter()
             .position(|e| e.handle == handle);
         let Some(position) = position else { return };
-        let record = self.fiber_mut(fid).effects.remove(position);
-        if let EffectPayload::Inverse(inverse) = record.payload
-            && inverse() == Discharge::Violated
-        {
-            self.fiber_mut(fid).teardown_violated = true;
+        let payload = std::mem::replace(
+            &mut self.fiber_mut(fid).effects[position].payload,
+            EffectPayload::Violated,
+        );
+        match payload {
+            EffectPayload::Provision { .. } => {
+                self.fiber_mut(fid).effects.remove(position);
+            }
+            EffectPayload::Inverse(inverse) => {
+                if inverse() == Discharge::Violated {
+                    self.fiber_mut(fid).teardown_violated = true;
+                    // The record stays as the tombstone; a second dispose of
+                    // the same handle is an idempotent no-op on it (B26).
+                } else {
+                    self.fiber_mut(fid).effects.remove(position);
+                }
+            }
+            EffectPayload::Violated => {
+                // Already consumed: idempotent no-op (B26).
+            }
         }
     }
 

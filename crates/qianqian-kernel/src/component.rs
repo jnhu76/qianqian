@@ -3,10 +3,52 @@
 //! keys, one bounded activation step, and one teardown closure whose verdict
 //! is the kernel's entire teardown knowledge (design §F.1, §G.6, §D.6).
 
+use std::fmt;
+
 use std::rc::Rc;
 
 use crate::capability::CapabilityKey;
 use crate::context::{ActivationCtx, TeardownCtx};
+
+/// Why `Kernel::register_component` refused a component definition. A
+/// refusal never mutates the catalog: the previous definition (or the
+/// previous diagnostic-name universe) is kept exactly as it was.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ComponentRegistrationError {
+    /// A component definition with this name is already registered.
+    /// Component definitions are the paper's static `(d, p, e)` (design
+    /// §F.1), fixed for the kernel's lifetime: re-registration would let
+    /// mounted fibers silently run a different definition at unload time —
+    /// component hot replacement, which K0 does not have.
+    DuplicateName { name: &'static str },
+    /// Two distinct capability types in this kernel declare the same
+    /// diagnostic `NAME`. Diagnostic identity is the `TypeId` (design §E.1);
+    /// `NAME` is vocabulary, but the §I.1 surfaces key capability maps by
+    /// it — a collision would merge distinct capabilities there and let
+    /// single-source oracles lie. Rename one of the capabilities.
+    DuplicateCapabilityName { name: &'static str },
+}
+
+impl fmt::Display for ComponentRegistrationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::DuplicateName { name } => write!(
+                f,
+                "component definition '{name}' is already registered; definitions are \
+                 static for the kernel's lifetime (design §F.1) — re-registration would \
+                 silently mutate mounted fibers (no component hot replacement in K0)"
+            ),
+            Self::DuplicateCapabilityName { name } => write!(
+                f,
+                "capability diagnostic name '{name}' is already declared by a distinct \
+                 capability type in this kernel; §I.1 surfaces key by NAME (design §E.1) \
+                 — rename one of the capabilities"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ComponentRegistrationError {}
 
 /// The frozen one-verdict teardown truth (design §G.6). There is no partial
 /// outcome: a `Violated` verdict is the §G.6 latch, never a result the

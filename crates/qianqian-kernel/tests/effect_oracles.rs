@@ -75,7 +75,7 @@ fn owner_local_effects_unwind_lifo() {
             Ok(())
         })
     };
-    k.register_component(spec);
+    k.register_component(spec).expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("w", "w", Revision::fresh())])
         .expect("legal");
     k.settle();
@@ -103,9 +103,12 @@ fn owner_local_effects_unwind_lifo() {
 #[test]
 fn same_key_contribution_removal_leaves_foreign_contribution() {
     let mut k = Kernel::new();
-    k.register_component(listeners_provider("registry"));
-    k.register_component(listener_consumer("a"));
-    k.register_component(listener_consumer("b"));
+    k.register_component(listeners_provider("registry"))
+        .expect("component registered");
+    k.register_component(listener_consumer("a"))
+        .expect("component registered");
+    k.register_component(listener_consumer("b"))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("registry", "registry", Revision::fresh()),
         DesiredEntry::enabled("a", "a", Revision::fresh()),
@@ -146,7 +149,7 @@ fn owner_local_effect_carries_no_relation() {
             Ok(())
         })
     };
-    k.register_component(spec);
+    k.register_component(spec).expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled(
         "local",
         "local",
@@ -191,7 +194,7 @@ fn double_dispose_is_idempotent() {
             Ok(())
         })
     };
-    k.register_component(spec);
+    k.register_component(spec).expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("d", "d", Revision::fresh())])
         .expect("legal");
     k.settle();
@@ -211,9 +214,12 @@ fn double_dispose_is_idempotent() {
 fn y_contribution_survives_x_provider_churn() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("x", "x1", &l));
-    k.register_component(listeners_provider("registry"));
-    k.register_component(listener_consumer_with_tag("y", &l));
+    k.register_component(tag_provider("x", "x1", &l))
+        .expect("component registered");
+    k.register_component(listeners_provider("registry"))
+        .expect("component registered");
+    k.register_component(listener_consumer_with_tag("y", &l))
+        .expect("component registered");
     let desired = |rev: Revision| {
         vec![
             DesiredEntry::enabled("registry", "registry", Revision::fresh()),
@@ -245,9 +251,12 @@ fn y_contribution_survives_x_provider_churn() {
 fn removal_of_unrelated_x_leaves_y_untouched() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("x", "x1", &l));
-    k.register_component(listeners_provider("registry"));
-    k.register_component(listener_consumer("y"));
+    k.register_component(tag_provider("x", "x1", &l))
+        .expect("component registered");
+    k.register_component(listeners_provider("registry"))
+        .expect("component registered");
+    k.register_component(listener_consumer("y"))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("registry", "registry", Revision::fresh()),
         DesiredEntry::enabled("x", "x", Revision::fresh()),

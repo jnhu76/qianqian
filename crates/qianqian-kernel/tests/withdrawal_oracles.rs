@@ -52,8 +52,10 @@ fn teardown_access_consumer(name: &'static str, l: &Log) -> ComponentSpec {
 fn withdrawal_sequence_is_ordered_and_observable() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p", "p1", &l));
-    k.register_component(teardown_access_consumer("c", &l));
+    k.register_component(tag_provider("p", "p1", &l))
+        .expect("component registered");
+    k.register_component(teardown_access_consumer("c", &l))
+        .expect("component registered");
     let r_c = Revision::fresh();
     k.set_desired(vec![
         DesiredEntry::enabled("p", "p", Revision::fresh()),
@@ -135,11 +137,14 @@ fn withdrawal_sequence_is_ordered_and_observable() {
 fn dependent_teardown_needing_provider_completes_before_final_release() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("a", "A", &l));
-    k.register_component(teardown_access_consumer("b", &l));
+    k.register_component(tag_provider("a", "A", &l))
+        .expect("component registered");
+    k.register_component(teardown_access_consumer("b", &l))
+        .expect("component registered");
     // A deeper chain: c requires b's capability too — invalidation cascades
     // transitively (§G.2 chain row).
-    k.register_component(tag_consumer("grand", &l));
+    k.register_component(tag_consumer("grand", &l))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("a", "a", Revision::fresh()),
         DesiredEntry::enabled("b", "b", Revision::fresh()),
@@ -183,8 +188,10 @@ fn dependent_teardown_needing_provider_completes_before_final_release() {
 fn withdrawing_provider_service_readable_until_dependents_close() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p", "val", &l));
-    k.register_component(teardown_access_consumer("c", &l));
+    k.register_component(tag_provider("p", "val", &l))
+        .expect("component registered");
+    k.register_component(teardown_access_consumer("c", &l))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("p", "p", Revision::fresh()),
         DesiredEntry::enabled("c", "c", Revision::fresh()),

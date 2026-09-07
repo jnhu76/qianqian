@@ -57,7 +57,9 @@ impl AppRuntime {
     pub fn new() -> Self {
         let audio_output: Rc<RefCell<Option<Rc<dyn AudioOutput>>>> = Rc::new(RefCell::new(None));
         let mut composition = Kernel::new();
-        composition.register_component(music_component(audio_output.clone()));
+        composition
+            .register_component(music_component(audio_output.clone()))
+            .expect("R0 music component registration is legal");
         composition
             .set_desired(vec![DesiredEntry::enabled(
                 "music",
@@ -78,15 +80,17 @@ impl AppRuntime {
     pub fn with_audio_output(self, audio_output: Box<dyn AudioOutput>) -> Self {
         let service: Rc<dyn AudioOutput> = Rc::from(audio_output);
         let mut composition = self.composition;
-        composition.register_component(
-            ComponentSpec::new("audio_output")
-                .provides::<AudioOutputCapability>()
-                .on_activate(move |ctx| {
-                    ctx.provide::<AudioOutputCapability>(service.clone())
-                        .expect("provides declared");
-                    Ok(())
-                }),
-        );
+        composition
+            .register_component(
+                ComponentSpec::new("audio_output")
+                    .provides::<AudioOutputCapability>()
+                    .on_activate(move |ctx| {
+                        ctx.provide::<AudioOutputCapability>(service.clone())
+                            .expect("provides declared");
+                        Ok(())
+                    }),
+            )
+            .expect("R0 audio-output component registration is legal");
         composition
             .set_desired(vec![
                 DesiredEntry::enabled("audio_output", "audio_output", Revision::new(1)),

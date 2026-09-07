@@ -27,7 +27,9 @@ fn kernel_crate_has_no_product_dependencies() {
 #[test]
 fn minimal_kernel_hosts_an_anonymous_component() {
     let mut kernel = Kernel::new();
-    kernel.register_component(ComponentSpec::new("anonymous"));
+    kernel
+        .register_component(ComponentSpec::new("anonymous"))
+        .expect("component registered");
     kernel
         .set_desired(vec![DesiredEntry::enabled(
             "a",

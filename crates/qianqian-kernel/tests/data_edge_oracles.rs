@@ -131,8 +131,10 @@ fn binding_provenance_is_projected_from_the_single_effect_authority() {
     let mut k = Kernel::new();
     let _ = log();
     let endpoint_cell = Rc::new(RefCell::new(None));
-    k.register_component(sink_provider("sink"));
-    k.register_component(binding_consumer("music", endpoint_cell.clone()));
+    k.register_component(sink_provider("sink"))
+        .expect("component registered");
+    k.register_component(binding_consumer("music", endpoint_cell.clone()))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("sink", "sink", Revision::fresh()),
         DesiredEntry::enabled("music", "music", Revision::fresh()),
@@ -180,8 +182,10 @@ fn payload_traffic_performs_zero_kernel_operations() {
     let mut k = Kernel::new();
     let _ = log();
     let endpoint_cell = Rc::new(RefCell::new(None));
-    k.register_component(sink_provider("sink"));
-    k.register_component(binding_consumer("music", endpoint_cell.clone()));
+    k.register_component(sink_provider("sink"))
+        .expect("component registered");
+    k.register_component(binding_consumer("music", endpoint_cell.clone()))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("sink", "sink", Revision::fresh()),
         DesiredEntry::enabled("music", "music", Revision::fresh()),
@@ -244,8 +248,10 @@ fn binding_releases_inside_the_withdrawal_window() {
                 Ok(())
             })
     };
-    k.register_component(sink_provider("sink"));
-    k.register_component(consumer);
+    k.register_component(sink_provider("sink"))
+        .expect("component registered");
+    k.register_component(consumer)
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("sink", "sink", Revision::fresh()),
         DesiredEntry::enabled("music", "music", Revision::fresh()),

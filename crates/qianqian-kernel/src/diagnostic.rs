@@ -47,6 +47,14 @@ pub struct CompositionSnapshot {
     pub provisions: BTreeMap<String, BTreeSet<String>>,
     /// Live relation-bearing bindings (§K.4 projection).
     pub relations: BTreeSet<RelationDiagnostic>,
+    /// Committed-binding projection (§I.1 surface 3): consumer fiber name ->
+    /// capability name -> provider fiber name, for every installed fiber
+    /// with an open episode-fixed committed view (`Activating` / `Active` /
+    /// `Unloading` — including a §G.6-latched episode, whose binding must
+    /// stay visible). A plain `resolve` with no relation Effect still
+    /// appears here. Read-only derivation from `Fiber.committed`, never a
+    /// second mutable registry (§K.4).
+    pub committed: BTreeMap<String, BTreeMap<String, String>>,
     /// The frozen quiescence predicate (§L.1).
     pub quiet: bool,
 }

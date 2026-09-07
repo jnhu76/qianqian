@@ -17,12 +17,18 @@ use qianqian_kernel::{ComponentSpec, DesiredEntry, Kernel, Revision, StepOutcome
 fn standard_kernel() -> Kernel {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("svc_a", "a", &l));
-    k.register_component(tag_provider("svc_b", "b", &l));
-    k.register_component(tag_consumer("consumer", &l));
-    k.register_component(listeners_provider("registry"));
-    k.register_component(listener_consumer("listener_x"));
-    k.register_component(listener_consumer("listener_y"));
+    k.register_component(tag_provider("svc_a", "a", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("svc_b", "b", &l))
+        .expect("component registered");
+    k.register_component(tag_consumer("consumer", &l))
+        .expect("component registered");
+    k.register_component(listeners_provider("registry"))
+        .expect("component registered");
+    k.register_component(listener_consumer("listener_x"))
+        .expect("component registered");
+    k.register_component(listener_consumer("listener_y"))
+        .expect("component registered");
     k
 }
 
@@ -219,8 +225,10 @@ fn m13_root_disposal_from_quiescent_state() {
 fn m4_fail_then_revise_is_sanitary() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("flaky", 1, &l));
-    k.register_component(tag_consumer("consumer", &l));
+    k.register_component(flaky_provider("flaky", 1, &l))
+        .expect("component registered");
+    k.register_component(tag_consumer("consumer", &l))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("flaky", "flaky", Revision::new(1)),
         DesiredEntry::enabled("consumer", "consumer", Revision::fresh()),
@@ -272,8 +280,12 @@ fn m4_fail_then_revise_is_sanitary() {
     let lf = log();
     // A clean build registers an always-succeeding provider under the same
     // component name: the failure never happened in this world.
-    fresh.register_component(always_provider("flaky", &lf));
-    fresh.register_component(tag_consumer("consumer", &lf));
+    fresh
+        .register_component(always_provider("flaky", &lf))
+        .expect("component registered");
+    fresh
+        .register_component(tag_consumer("consumer", &lf))
+        .expect("component registered");
     fresh
         .set_desired(vec![
             DesiredEntry::enabled("flaky", "flaky", Revision::new(2)),
@@ -294,7 +306,8 @@ fn always_provider(name: &'static str, l: &Log) -> ComponentSpec {
 fn m4_shape_violated_teardown_is_not_sanitizable() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(violating_teardown_component("v", &l));
+    k.register_component(violating_teardown_component("v", &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("v", "v", Revision::fresh())])
         .expect("legal");
     k.settle();

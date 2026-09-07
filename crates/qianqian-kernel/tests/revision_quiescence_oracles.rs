@@ -15,7 +15,8 @@ use qianqian_kernel::{DesiredEntry, Kernel, Revision};
 fn d0_fresh_incarnation_fails_into_discharged_failed() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("decoder", 1, &l));
+    k.register_component(flaky_provider("decoder", 1, &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled(
         "decoder",
         "decoder",
@@ -39,7 +40,8 @@ fn d0_fresh_incarnation_fails_into_discharged_failed() {
 fn d1_unchanged_incarnation_never_retries() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("decoder", 1, &l));
+    k.register_component(flaky_provider("decoder", 1, &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled(
         "decoder",
         "decoder",
@@ -79,8 +81,10 @@ fn d1_unchanged_incarnation_never_retries() {
 fn d2_unrelated_dependency_churn_fabricates_no_retry() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("decoder", 1, &l));
-    k.register_component(extra_provider("unrelated", "u", &l));
+    k.register_component(flaky_provider("decoder", 1, &l))
+        .expect("component registered");
+    k.register_component(extra_provider("unrelated", "u", &l))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("decoder", "decoder", Revision::new(1)),
         DesiredEntry::enabled("unrelated", "unrelated", Revision::new(1)),
@@ -131,7 +135,8 @@ fn d2_unrelated_dependency_churn_fabricates_no_retry() {
 fn d3_fresh_incarnation_stages_visible_revision() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("decoder", 1, &l));
+    k.register_component(flaky_provider("decoder", 1, &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled(
         "decoder",
         "decoder",
@@ -184,7 +189,8 @@ fn d3_fresh_incarnation_stages_visible_revision() {
 fn d4_repeated_reconcile_at_new_incarnation_is_idempotent() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("decoder", 1, &l));
+    k.register_component(flaky_provider("decoder", 1, &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled(
         "decoder",
         "decoder",
@@ -231,7 +237,8 @@ fn d4_repeated_reconcile_at_new_incarnation_is_idempotent() {
 fn revision_staging_is_visible_in_step_boundaries() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(flaky_provider("decoder", 1, &l));
+    k.register_component(flaky_provider("decoder", 1, &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled(
         "decoder",
         "decoder",
@@ -284,7 +291,8 @@ fn revision_staging_is_visible_in_step_boundaries() {
 fn pending_settles() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_consumer("c", &l));
+    k.register_component(tag_consumer("c", &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("c", "c", Revision::fresh())])
         .expect("legal");
     k.settle();
@@ -295,7 +303,8 @@ fn pending_settles() {
 fn unloading_does_not_settle() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p", "p1", &l));
+    k.register_component(tag_provider("p", "p1", &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("p", "p", Revision::fresh())])
         .expect("legal");
     k.settle();
@@ -325,7 +334,8 @@ fn unloading_does_not_settle() {
 fn latched_violation_does_not_settle_and_step_is_blocked() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(violating_unwind_component("v", &l));
+    k.register_component(violating_unwind_component("v", &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("v", "v", Revision::fresh())])
         .expect("legal");
 
@@ -359,7 +369,8 @@ fn latched_violation_does_not_settle_and_step_is_blocked() {
 fn half_finished_staged_replacement_does_not_settle() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p", "p1", &l));
+    k.register_component(tag_provider("p", "p1", &l))
+        .expect("component registered");
     k.set_desired(vec![DesiredEntry::enabled("p", "p", Revision::new(1))])
         .expect("legal");
     k.settle();
@@ -401,8 +412,10 @@ fn half_finished_staged_replacement_does_not_settle() {
 fn quiet_is_not_healthy_nor_successful() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_consumer("c", &l));
-    k.register_component(flaky_provider("p", 1, &l));
+    k.register_component(tag_consumer("c", &l))
+        .expect("component registered");
+    k.register_component(flaky_provider("p", 1, &l))
+        .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("c", "c", Revision::fresh()),
         DesiredEntry::enabled("p", "p", Revision::fresh()),

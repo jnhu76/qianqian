@@ -47,9 +47,12 @@ fn desired_svc(component: &'static str, revision: Revision) -> Vec<DesiredEntry>
 fn replacement_a1_to_a2_is_staged_with_pointwise_single_source() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p1", "one", &l));
-    k.register_component(tag_provider("p2", "two", &l));
-    k.register_component(tag_consumer("consumer", &l));
+    k.register_component(tag_provider("p1", "one", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p2", "two", &l))
+        .expect("component registered");
+    k.register_component(tag_consumer("consumer", &l))
+        .expect("component registered");
     k.set_desired(desired_svc("p1", Revision::new(1)))
         .expect("legal");
     k.settle();
@@ -90,9 +93,12 @@ fn replacement_a1_to_a2_is_staged_with_pointwise_single_source() {
 fn replacement_a1_a2_a1_round_trip() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p1", "one", &l));
-    k.register_component(tag_provider("p2", "two", &l));
-    k.register_component(tag_consumer("consumer", &l));
+    k.register_component(tag_provider("p1", "one", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p2", "two", &l))
+        .expect("component registered");
+    k.register_component(tag_consumer("consumer", &l))
+        .expect("component registered");
 
     for (component, rev) in [("p1", 1), ("p2", 2), ("p1", 3), ("p2", 4), ("p1", 5)] {
         k.set_desired(desired_svc(component, Revision::new(rev)))
@@ -121,16 +127,20 @@ fn replacement_a1_a2_a1_round_trip() {
 fn replacement_leaves_uninvolved_fibers_untouched() {
     let mut k = Kernel::new();
     let l = log();
-    k.register_component(tag_provider("p1", "one", &l));
-    k.register_component(tag_provider("p2", "two", &l));
-    k.register_component(tag_consumer("consumer", &l));
+    k.register_component(tag_provider("p1", "one", &l))
+        .expect("component registered");
+    k.register_component(tag_provider("p2", "two", &l))
+        .expect("component registered");
+    k.register_component(tag_consumer("consumer", &l))
+        .expect("component registered");
     k.register_component(ComponentSpec::new("bystander").on_activate({
         let lg = l.clone();
         move |_ctx| {
             lg.borrow_mut().push("bystander:activated".to_owned());
             Ok(())
         }
-    }));
+    }))
+    .expect("component registered");
     k.set_desired(vec![
         DesiredEntry::enabled("svc", "p1", Revision::new(1)),
         DesiredEntry::enabled("consumer", "consumer", Revision::fresh()),

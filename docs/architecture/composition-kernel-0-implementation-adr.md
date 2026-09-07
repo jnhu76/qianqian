@@ -50,6 +50,14 @@ pub trait Capability: 'static {
 - Identity = `TypeId::of::<K>()` (`CapabilityKey { id, name }`). Identity is the
   contract definition site — never the provider, the service object address, or
   any payload (§E.1).
+- Diagnostic-name uniqueness (Corrective-1, review 5128371083): the §I.1
+  surfaces key capability maps by `NAME`, so two distinct capability types
+  sharing a `NAME` inside one kernel would merge distinct contracts in the
+  diagnostic surface and let single-source oracles lie. `register_component`
+  refuses such a collision (`DuplicateCapabilityName`). The check is
+  per-kernel (snapshots are per-kernel; a process-global registry would be a
+  hidden global), same `TypeId` + same `NAME` is the same contract and stays
+  legal, and `NAME` itself remains vocabulary, never resolution identity.
 - Service storage: the provision effect (the single authority, §K.4) owns
   `Rc<ServiceHandle<K>>` erased as `Rc<dyn Any>`; resolution downcasts
   `ServiceHandle<K>` (sized wrapper around `Rc<K::Service>`) back to
@@ -71,13 +79,20 @@ generation renaming (Lemma 61).
 
 ## D4 — Desired revision identity
 
-`Revision` — opaque, `Copy`, equality-only token (`Revision(u64)`), with a
-caller-side convenience factory. It is a field of the desired entry
-(Reconcile's input datum, §L.5 / §D.6 — not a sixth primitive). The kernel
-compares it, never interprets or derives it: no config hash, no dependency
-state, no timestamps, no reconcile counters (R1–R8). D0–D4 is the executable
-oracle. A pure-`u64` token is admissible per §T.11 (representation stays open);
-equality is the only operation the kernel performs.
+`Revision` — opaque, `Copy`, equality-only token, with a caller-side
+convenience factory. It is a field of the desired entry (Reconcile's input
+datum, §L.5 / §D.6 — not a sixth primitive). The kernel compares it, never
+interprets or derives it: no config hash, no dependency state, no timestamps,
+no reconcile counters (R1–R8). D0–D4 is the executable oracle. Equality is
+the only operation the kernel performs.
+
+Constructor domains are **disjoint by construction** (Corrective-1, review
+5128371083): raw operator tokens from `Revision::new(u64)` live strictly
+below `FRESH_BASE = 1 << 63`; `fresh()` tokens live at or above it. A fresh
+incarnation can therefore never be mistaken for an unchanged raw one (R3/D3),
+and a raw token inside the fresh domain is an enforced programmer error
+(panic), never a silent collision. `as_u64` is operator-facing readback
+(display only, R5).
 
 ## D5 — Effect representation
 
@@ -123,6 +138,19 @@ effect from the accumulator by handle; unwinding skips absent effects. Effects
 cannot fire after their episode ends: episode close empties the accumulator,
 and stale handles are no-ops.
 
+**Violated-inverse tombstone** (Corrective-1, review 5128371083): a violated
+inverse (§G.6) consumes the `FnOnce` — it is never retried — but the record is
+**not** dropped. Its payload is replaced by a `Violated` discharge-state
+marker and the record stays in the accumulator: the structural provenance of a
+relation-bearing effect is the single authority for that composition relation
+(§K.4), so a teardown that did not discharge must keep the binding observable
+instead of vanishing from diagnostics. Consequences, all exercised by oracle
+A17: the relation row remains visible next to the latched `TEARDOWN_VIOLATED`
+flag, removal stays blocked on the non-empty accumulator, no revision can
+silently clear it, and a second dispose of the same handle is an idempotent
+no-op. The marker is a discharge state of the one Effect shape — not a
+behavioral class (§H.5: still no `EffectKind`, no `Option<Disposer>`).
+
 ## D6 — Resolution modes (new vs teardown access)
 
 Two visibly distinct operations (§E.3, T.5):
@@ -157,6 +185,13 @@ Invalidation is kernel-internal — there is no public event bus (C.2).
   `¬relied` respected — a provider whose open committed views still name it
   waits), divert checks, activations (one bounded step), removals, mounts,
   revision staging (retire → drain → remove → **then** mount, §E.4).
+- `register_component` returns `Result<(), ComponentRegistrationError>`
+  (Corrective-1, review 5128371083): component definitions are the static
+  `(d, p, e)` (§F.1), immutable for the kernel's lifetime. A duplicate name
+  is refused (`DuplicateName`) rather than silently replacing the definition
+  — K0 has no component hot replacement, and a mounted fiber's teardown must
+  always run the definition it was mounted from (oracle A16). Refusals never
+  mutate the catalog.
 - `settle()` loops `step()` until quiet or blocked; `is_quiet()` is the frozen
   transition predicate (§L.1 clauses 1–5), not `committed_view == target_view`.
 - Activation raise → `Unloading` with pending activation error as episode
@@ -176,10 +211,37 @@ Invalidation is kernel-internal — there is no public event bus (C.2).
 One closed snapshot type projecting exactly the §I.1 surfaces: per-fiber
 lifecycle truth (state, failed-outcome presence, violation flag), capability
 reachability (name → provider name or absent), relation set (owner, provider,
-capability — the projection of relation-bearing provenance per §K.4), and the
+capability — the projection of relation-bearing provenance per §K.4), the
+**committed-binding projection** (consumer fiber → capability → provider
+fiber, derived read-only from `Fiber.committed` — §I.1 surface 3, added in
+Corrective-1 / review 5128371083; a plain `resolve` with no relation Effect
+appears here, and a §G.6-latched episode keeps its binding visible), and the
 quiescence flag. No track/position/PlaybackState/payload fields exist (§J.3).
-A `#[doc(hidden)]` operation counter exists solely as the executable RT-firewall
-witness (§N) and is not a diagnostic surface.
+A `#[doc(hidden)]` operation counter exists solely as the executable
+RT-firewall witness (§N) and is not a diagnostic surface.
+
+## Implementation Corrective-1 — review 5128371083
+
+Executable implementation review of HEAD `b8d043c` (PR #71), verdict
+`PASS_WITH_CORRECTIVES`. All five corrections are representation-level — no
+frozen semantic was reopened; the deltas above amend D2/D4/D5/D8/D9:
+
+```text
+P0-1  component definitions immutable  register_component -> Result;
+                                       DuplicateName refused (no HMR)
+P0-2  violated-inverse provenance      Violated discharge-state tombstone;
+                                       relation stays observable (§K.4)
+P0-3  committed-binding projection     CompositionSnapshot.committed
+                                       (§I.1 surface 3, from Fiber.committed)
+P1-4  Revision domains disjoint        new() < FRESH_BASE <= fresh()
+P1-5  capability NAME collisions       refused per kernel at registration
+```
+
+Each correction is pinned by exactly one adversarial oracle in
+`tests/adversarial_review.rs` (A16–A20, including the A19b/A19c collision
+regressions). 69 kernel oracles green; `cargo fmt --check`, `cargo test
+--workspace`, and `cargo clippy --workspace --all-targets -- -D warnings`
+all clean.
 
 ## Stage-1 stop gate
 
