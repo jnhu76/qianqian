@@ -236,6 +236,53 @@ if (existsSync(diagramDir)) {
   fail('diagrams directory not found')
 }
 
+// --- Mermaid Integration Boundary (DOCS-BUILD-STABILITY-1) ---
+
+console.log('\n=== Mermaid Integration Boundary ===')
+
+// Qianqian-owned source/config must not know Mermaid's transitive internal
+// dependency graph (fastdom) or the retired vitepress-plugin-mermaid path.
+// package-lock.json is deliberately excluded: Mermaid may legitimately
+// depend on fastdom transitively — that is Mermaid's boundary, not ours.
+const forbiddenTokens = ['fastdom', 'fastdom-promised', 'vitepress-plugin-mermaid']
+const skipDirs = new Set(['node_modules', 'dist', 'cache'])
+const skipFiles = new Set(['package-lock.json'])
+// The guard itself must be exempt: it is the enforcement point, not a
+// violation surface, and naming the tokens is its job.
+const skipRelPrefixes = ['scripts/']
+const { readdirSync: fsReaddirSync } = await import('fs')
+
+function scanDir(dir, relDir = '') {
+  const entries = fsReaddirSync(dir, { withFileTypes: true })
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (skipDirs.has(entry.name)) continue
+      scanDir(resolve(dir, entry.name), `${relDir}${entry.name}/`)
+    } else if (entry.isFile() && !skipFiles.has(entry.name)) {
+      const rel = `${relDir}${entry.name}`
+      if (skipRelPrefixes.some(prefix => rel.startsWith(prefix))) continue
+      const content = readFileSync(resolve(dir, entry.name), 'utf-8')
+      for (const token of forbiddenTokens) {
+        if (content.includes(token)) {
+          fail(`mermaid boundary: "${token}" referenced in ${rel}`)
+        }
+      }
+    }
+  }
+}
+
+scanDir(WEBSITE)
+
+// Direct dependency surface must not name the retired plugin.
+const pkg = JSON.parse(readFileSync(resolve(WEBSITE, 'package.json'), 'utf-8'))
+const directDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) }
+if ('vitepress-plugin-mermaid' in directDeps) {
+  fail('mermaid boundary: vitepress-plugin-mermaid is a direct dependency')
+} else {
+  pass('vitepress-plugin-mermaid absent from direct dependencies')
+}
+pass('no fastdom / vitepress-plugin-mermaid coupling in Qianqian-owned files')
+
 // --- Summary ---
 
 console.log('\n=== Summary ===')
