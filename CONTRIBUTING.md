@@ -13,7 +13,7 @@ Read:
 
 For plugin/composition work, read `docs/architecture/composition-kernel.md`.
 
-Current design gate: **#53 COMPONENT-BOUNDARY-A0**.
+Gate status: #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (PR #66 merged); the #67 COMPOSITION-KERNEL-0 semantic design is merged (PR #68, `docs/architecture/composition-kernel-0-design.md`). Current gate: the pre-implementation review (Corrective-5). Implementation is not yet authorized.
 
 Do not recursively preload historical docs or use `archive/pre-rust-v2` as current architecture authority.
 
@@ -39,7 +39,7 @@ Confluence oracle
 Composition Kernel implementation
 ```
 
-Until #53 passes, implementation of a new generic kernel runtime is out of scope.
+Until the pre-implementation review is accepted and a separate implementation issue is opened, implementation of a new generic kernel runtime is out of scope.
 
 ## Component entry checklist
 
@@ -152,6 +152,8 @@ Irreversible / outside system boundary
 
 Already-rendered audio, for example, cannot be undone.
 
+These labels are a system-boundary/action taxonomy for reasoning about actions — not runtime variants of a kernel Effect type. The frozen K0 Effect has exactly one shape: a reversible composition-lifecycle mutation with a total inverse (`docs/architecture/composition-kernel-0-design.md` §H.5/§H.7). Do not implement an Effect-class enum.
+
 Restoration correctness uses observational equivalence through public/relevant contracts rather than private bit identity.
 
 ## Provider disappearance
@@ -204,12 +206,13 @@ RUST-ARCH-R0 APIs are bootstrap witnesses.
 They may later be redesigned, but current authority is:
 
 ```text
-#53 boundary design
-       ↓ PASS
-future Composition Kernel implementation
+#53 boundary design         PASS / CLOSED (PR #66 merged)
+#67 kernel semantic design  MERGED (PR #68)
+Corrective-5 review         current pre-implementation gate
+implementation issue        opens only after that review is accepted
 ```
 
-Do not prematurely replace them before #53 passes.
+Do not replace them outside the future implementation issue.
 
 ## Verification
 

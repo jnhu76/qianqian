@@ -12,13 +12,17 @@ Gate chain:
 ```text
 #53 COMPONENT-BOUNDARY-A0        PASS / CLOSED (audit: component-boundary-a0.md)
         ↓
-#67 COMPOSITION-KERNEL-0 DESIGN  current gate (proposed semantic authority: PR #68,
-                                  composition-kernel-0-design.md)
+#67 COMPOSITION-KERNEL-0 DESIGN  semantic design MERGED via PR #68
+                                  (composition-kernel-0-design.md)
         ↓
-implementation issue             opens only after #67/PR #68 PASS + merge
+Corrective-4                     human-reviewed: PASS_WITH_ONE_CORRECTIVE (review 5127750303)
+        ↓
+Corrective-5                     CURRENT PRE-IMPLEMENTATION REVIEW GATE
+        ↓
+implementation issue             opens only after Corrective-5 is accepted by human review
 ```
 
-No new Composition Kernel implementation/API is authorized until the #67 design gate passes and its PR merges.
+No new Composition Kernel implementation/API is authorized until the Corrective-5 pre-implementation review is accepted and a separate implementation issue is opened.
 
 ## Kernel constitution
 
@@ -275,17 +279,18 @@ Typical locally reversible examples:
 capability binding
 listener/callback registration
 timer registration
-child Fiber mount
 watcher registration
 local handle/resource ownership
 buffer allocation owned by the runtime
 ```
 
+(Child-fiber mounting is deliberately absent: child mounting is out of K0 scope — [PAPER] design context only, deferred per `composition-kernel-0-design.md` §S.)
+
 Within one Fiber, deterministic reverse/LIFO unwind is the default local rule unless a stronger contract says otherwise.
 
 But not every action is reversible.
 
-Classify effects when relevant as:
+Classify actions when relevant as:
 
 ```text
 Reversible
@@ -293,6 +298,8 @@ Transactional
 Compensatable
 Irreversible / emitted outside system boundary
 ```
+
+These labels are a system-boundary/action taxonomy for reasoning about actions — not runtime variants of a kernel Effect type; the frozen K0 Effect has exactly one shape (reversible composition-lifecycle mutation + total inverse, `composition-kernel-0-design.md` §H.5/§H.7).
 
 For a player, already-rendered audio is outside rollback: the runtime cannot “unplay” sound already emitted to the physical world.
 
@@ -479,7 +486,9 @@ They are not compatibility contracts.
 
 However:
 
-> **Do not replace them with a new Composition Kernel implementation until the #67 design gate (PR #68) passes human review and merges.**
+> **Do not replace them with a new Composition Kernel implementation until the Corrective-5 pre-implementation review is accepted and a separate implementation issue is opened.**
+
+The future implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
 
 ## Current gate
 
@@ -488,10 +497,14 @@ Current authority chain:
 ```text
 #53 COMPONENT-BOUNDARY-A0
         ↓ PASS / CLOSED (two corrective rounds; audit: component-boundary-a0.md)
-#67 COMPOSITION-KERNEL-0 DESIGN — current gate
-        ↓ proposed semantic authority: PR #68 (composition-kernel-0-design.md)
+#67 COMPOSITION-KERNEL-0 DESIGN — semantic design MERGED via PR #68
+        ↓ (composition-kernel-0-design.md; Revisions 1–4)
+Corrective-4 pre-implementation review
+        ↓ human-reviewed: PASS_WITH_ONE_CORRECTIVE (review 5127750303)
+Corrective-5 pre-implementation review — CURRENT GATE
+        ↓ accepted by human review
 future COMPOSITION-KERNEL-0 IMPLEMENTATION issue
-        ↓ opens only after #67/PR #68 PASS + merge
+        ↓ opens only then
 ```
 
 #53 established (frozen, carried in `component-boundary-a0.md`):
@@ -509,9 +522,9 @@ confluence scenarios/oracle
 minimal first Windows playback decomposition
 ```
 
-#67 / PR #68 must establish the kernel's semantic design (primitive semantics, lifecycle, withdrawal, effect/independence model, confluence oracle, failure semantics) before any implementation.
+#67 / PR #68 established the kernel's semantic design (primitive semantics, lifecycle, withdrawal, effect/independence model, confluence oracle, failure semantics) — it is merged authority. The post-merge pre-implementation review (Corrective-4, its provenance scope refined by Corrective-5) added the desired-revision-identity, effect-provenance and quiescence semantics on top; Corrective-5 is the current gate.
 
-Until #67/PR #68 passes and merges:
+Until the Corrective-5 review is accepted and the implementation issue is opened:
 
 ```text
 NO qianqian-kernel implementation

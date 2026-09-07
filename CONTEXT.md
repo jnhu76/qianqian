@@ -74,9 +74,9 @@ Confluence oracle
 Composition Kernel implementation
 ```
 
-#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). Current gate: **#67 COMPOSITION-KERNEL-0 DESIGN** (proposed semantic authority: PR #68, `composition-kernel-0-design.md`).
+#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). The #67 COMPOSITION-KERNEL-0 semantic design is MERGED (PR #68, `composition-kernel-0-design.md`). Current gate: the **pre-implementation review (Corrective-5)**.
 
-No new generic kernel implementation/API is authoritative until #67/PR #68 passes human review and merges.
+No new generic kernel implementation/API is authoritative until that review is accepted and a separate implementation issue is opened.
 
 ## Interaction mental model
 
@@ -175,7 +175,7 @@ qianqian-headless
 
 `qianqian-core::base` and `qianqian-runtime::AppRuntime` constructor composition are bootstrap witnesses, not compatibility contracts.
 
-They may later be replaced, but **not before #53 establishes the component/dependency/interaction design that the kernel is meant to host.**
+They may later be replaced through the future implementation issue; a generic kernel must not live inside the product core (dependency direction: generic kernel ← product semantics).
 
 ## Historical refs
 
