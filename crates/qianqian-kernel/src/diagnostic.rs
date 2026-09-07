@@ -40,6 +40,11 @@ pub struct CompositionSnapshot {
     /// Known capability name -> provider fiber name, or `None` when
     /// unresolvable right now (absent / Pending-only / withdrawing).
     pub capabilities: BTreeMap<String, Option<String>>,
+    /// Provision projection: installed fibers currently holding a live
+    /// provision effect per capability name, regardless of lifecycle state.
+    /// The single-source pointwise invariant (§E.4) reads this: at most one
+    /// installed provider per capability at every observable state.
+    pub provisions: BTreeMap<String, BTreeSet<String>>,
     /// Live relation-bearing bindings (§K.4 projection).
     pub relations: BTreeSet<RelationDiagnostic>,
     /// The frozen quiescence predicate (§L.1).

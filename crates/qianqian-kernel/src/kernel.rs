@@ -216,9 +216,24 @@ impl Kernel {
             };
             capabilities.insert(key.name.to_string(), provider);
         }
+        // Provision projection over ALL installed fibers (any lifecycle
+        // state): the authority for the pointwise single-source invariant.
+        let mut provisions: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        for slot in &self.slots {
+            let Some(f) = &slot.fiber else { continue };
+            for e in &f.effects {
+                if let crate::fiber::EffectPayload::Provision { key, .. } = &e.payload {
+                    provisions
+                        .entry(key.name.to_string())
+                        .or_default()
+                        .insert(f.name.clone());
+                }
+            }
+        }
         CompositionSnapshot {
             fibers,
             capabilities,
+            provisions,
             relations,
             quiet: self.quiet_now(),
         }
@@ -478,31 +493,34 @@ impl Kernel {
             }
             Err(e) => Some(e),
         };
+        // On success the completed episode keeps its owned effects installed
+        // (§F.3: "effects owned; provisions installed"); the unwind runs only
+        // on the raise path.
         if let Some(err) = raise {
             // B19: a raise lands in Unloading first; FAILED is only recorded
             // by a fully discharged unwind (§F.3, Corrective-2).
-            let f = self.fiber_mut(fid);
-            f.state = FiberState::Unloading;
-            f.pending_error = Some(err);
-        }
-        // A dispose-violation latched earlier keeps the episode open: no
-        // unwind, no close, no outcome (§G.6 — no exit while latched).
-        if self.fiber(fid).teardown_violated {
-            return;
-        }
-        let verdict = self.run_unwind(fid);
-        if verdict == Discharge::Violated {
-            // The violated unwind never reaches FAILED: latched in Unloading
-            // with the pending activation error as episode metadata (§G.6).
-            self.fiber_mut(fid).teardown_violated = true;
-            return;
-        }
-        let f = self.fiber_mut(fid);
-        f.state = if f.pending_error.is_some() {
-            FiberState::Failed
+            {
+                let f = self.fiber_mut(fid);
+                f.state = FiberState::Unloading;
+                f.pending_error = Some(err);
+            }
+            // A dispose-violation latched earlier keeps the episode open: no
+            // unwind, no close, no outcome (§G.6 — no exit while latched).
+            if self.fiber(fid).teardown_violated {
+                return;
+            }
+            let verdict = self.run_unwind(fid);
+            if verdict == Discharge::Violated {
+                // The violated unwind never reaches FAILED: latched in
+                // Unloading with the pending activation error as episode
+                // metadata (§G.6).
+                self.fiber_mut(fid).teardown_violated = true;
+                return;
+            }
+            self.fiber_mut(fid).state = FiberState::Failed;
         } else {
-            FiberState::Active
-        };
+            self.fiber_mut(fid).state = FiberState::Active;
+        }
     }
 
     fn unload_fiber(&mut self, fid: FiberId) {
