@@ -10,10 +10,8 @@
   },
   "devDependencies": {
     "vitepress": "^1.6.0",
-    "vitepress-plugin-mermaid": "^2.0.17",
     "mermaid": "^11.17.0",
     "@mdit/plugin-katex": "^1.1.0",
-    "debug": "^4.4.1",
     "katex": "^0.16.22",
     "yaml": "^2.7.0"
   }
