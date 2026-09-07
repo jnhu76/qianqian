@@ -16,83 +16,10 @@ use std::rc::Rc;
 
 use common::*;
 use qianqian_kernel::{
-    Capability, ComponentSpec, DesiredEntry, Discharge, Kernel, RelationDiagnostic, Revision,
+    ComponentSpec, DesiredEntry, Discharge, Kernel, RelationDiagnostic, Revision,
 };
 
-// ---------------------------------------------------------------------------
-// Listeners: the commutative contribution-set contract (§H.4). Each provider
-// activation creates one registry instance; consumers register through the
-// service (data plane) and own a relation-bearing effect whose inverse
-// removes exactly their own token.
-// ---------------------------------------------------------------------------
-
-pub struct Listeners;
-
-impl Capability for Listeners {
-    const NAME: &'static str = "Listeners";
-    type Service = dyn ListenerRegistry;
-}
-
-pub trait ListenerRegistry {
-    fn register(&self, who: &'static str) -> ListenerToken;
-}
-
-#[derive(Clone)]
-pub struct ListenerToken {
-    live: Rc<RefCell<Vec<&'static str>>>,
-    name: &'static str,
-}
-
-impl ListenerToken {
-    fn unregister(self) {
-        self.live.borrow_mut().retain(|n| *n != self.name);
-    }
-}
-
-struct ListenerSet {
-    live: Rc<RefCell<Vec<&'static str>>>,
-}
-
-impl ListenerRegistry for ListenerSet {
-    fn register(&self, who: &'static str) -> ListenerToken {
-        self.live.borrow_mut().push(who);
-        ListenerToken {
-            live: self.live.clone(),
-            name: who,
-        }
-    }
-}
-
-fn listeners_provider(name: &'static str) -> ComponentSpec {
-    ComponentSpec::new(name)
-        .provides::<Listeners>()
-        .on_activate(|ctx| {
-            let set = Rc::new(ListenerSet {
-                live: Rc::new(RefCell::new(Vec::new())),
-            });
-            ctx.provide::<Listeners>(set).expect("provides declared");
-            Ok(())
-        })
-}
-
-/// A consumer registering one listener contribution named after itself.
-fn listener_consumer(name: &'static str) -> ComponentSpec {
-    ComponentSpec::new(name)
-        .requires::<Listeners>()
-        .on_activate(move |ctx| {
-            let binding = ctx
-                .resolve::<Listeners>()
-                .map_err(|e| qianqian_kernel::ActivationError::new(format!("{e:?}")))?;
-            let token = binding.service().register(name);
-            ctx.register_relation(&binding, move || {
-                token.unregister();
-                Discharge::Discharged
-            });
-            Ok(())
-        })
-}
-
-/// A consumer that contributes a listener AND consumes `Tag`: its
+// A consumer that contributes a listener AND consumes `Tag`: its
 /// contribution cycles when its Tag provider is replaced (B30).
 fn listener_consumer_with_tag(name: &'static str, l: &Log) -> ComponentSpec {
     let log = l.clone();

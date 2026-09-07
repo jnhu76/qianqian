@@ -7,7 +7,7 @@
 mod common;
 
 use common::*;
-use qianqian_kernel::{ComponentSpec, DesiredEntry, Discharge, Kernel, Revision};
+use qianqian_kernel::{DesiredEntry, Kernel, Revision};
 
 /// D0: desired Decoder@R1 enabled → mount G1 → activation fails → raise →
 /// Unloading (partial unwind) → fully discharged → G1 FAILED, outcome visible.
