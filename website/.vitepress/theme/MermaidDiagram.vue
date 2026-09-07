@@ -33,8 +33,13 @@ function siteConfig(theme: 'dark' | 'default') {
 }
 
 // Load Mermaid once per document and initialize it for the given theme.
-// Theme switches re-run initialize() with the full site config — the
-// documented site-wide mechanism (there is no per-render config on render()).
+// Mermaid's configuration is site-global: initialize() is the site-level
+// setter (documented as applied once, to all diagrams) and render() takes no
+// per-render config argument. This module therefore owns the single config
+// authority and serializes every render/config operation. A theme change
+// reapplies the full site config before the queued render — verified against
+// the pinned mermaid 11.17.2, not claimed as a documented per-render config
+// API contract.
 // Only ever called from inside the serialized render queue below.
 function acquireMermaid(theme: 'dark' | 'default'): Promise<Mermaid> {
   if (!mermaidLoad) {
@@ -123,6 +128,12 @@ async function renderDiagram() {
       )
     })
     if (!isLiveRender(myEpoch)) return
+    // Localized recovery: a successful latest-live render clears any error
+    // left by a previous render of this component before publishing. Clearing
+    // only at the success point (not at render start) keeps a pending retry's
+    // old valid error visible until success is actually known; the epoch guard
+    // above keeps stale/unmounted renders from clearing a newer error.
+    error.value = ''
     container.value!.innerHTML = svg
   } catch (e) {
     if (!isLiveRender(myEpoch)) return
