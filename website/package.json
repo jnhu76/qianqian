@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vitepress dev",
+    "dev": "vitepress dev --host 0.0.0.0",
     "build": "vitepress build",
     "preview": "vitepress preview",
     "verify": "node scripts/verify.mjs"
@@ -13,6 +13,7 @@
     "vitepress-plugin-mermaid": "^2.0.17",
     "mermaid": "^11.17.0",
     "@mdit/plugin-katex": "^1.1.0",
+    "debug": "^4.4.1",
     "katex": "^0.16.22",
     "yaml": "^2.7.0"
   }
