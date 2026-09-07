@@ -5,3 +5,4 @@ edition.workspace = true
 
 [dependencies]
 qianqian-core = { path = "../qianqian-core" }
+qianqian-kernel = { path = "../qianqian-kernel" }

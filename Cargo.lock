@@ -22,4 +22,5 @@ name = "qianqian-runtime"
 version = "0.1.0"
 dependencies = [
  "qianqian-core",
+ "qianqian-kernel",
 ]
