@@ -64,13 +64,15 @@ Gate chain:
 ```text
 #53 COMPONENT-BOUNDARY-A0        PASS / CLOSED (audit: docs/architecture/component-boundary-a0.md)
         ↓
-#67 COMPOSITION-KERNEL-0 DESIGN  current gate (proposed semantic authority: PR #68,
-                                  docs/architecture/composition-kernel-0-design.md)
+#67 COMPOSITION-KERNEL-0 DESIGN  semantic design MERGED via PR #68
+                                  (docs/architecture/composition-kernel-0-design.md)
         ↓
-implementation issue             opens only after #67/PR #68 PASS + merge
+Corrective-4                     CURRENT PRE-IMPLEMENTATION REVIEW GATE
+        ↓
+implementation issue             opens only after Corrective-4 is accepted by human review
 ```
 
-Until #67/PR #68 passes and merges:
+Until Corrective-4 passes human review and a separate implementation issue is opened:
 
 ```text
 DO NOT create qianqian-kernel implementation
@@ -223,10 +225,11 @@ Local reversible examples include:
 capability binding
 listener/callback registration
 timer registration
-child Fiber mount
 watcher/local handle
 buffer/resource allocation owned inside the system boundary
 ```
+
+(Child-fiber mounting is not an example: child mounting is out of K0 scope.)
 
 Within one Fiber, owned effects normally unwind in reverse/LIFO order.
 
@@ -238,6 +241,8 @@ Transactional
 Compensatable
 Irreversible / emitted outside system boundary
 ```
+
+These labels are a system-boundary/action taxonomy for reasoning about actions — not runtime variants of a kernel Effect type; the frozen K0 Effect has exactly one shape (`composition-kernel-0-design.md` §H.5/§H.7).
 
 Already-rendered sound cannot be “unplayed”. `Everything is Plugin` does not mean `Everything is rollbackable`.
 
@@ -335,7 +340,7 @@ with_audio_output()
 
 They are not compatibility contracts.
 
-However, do **not** replace them with a new kernel implementation until #67/PR #68 (COMPOSITION-KERNEL-0 design) passes human review and merges.
+However, do **not** replace them with a new kernel implementation until the Corrective-4 pre-implementation review is accepted and a separate implementation issue is opened. That future implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
 
 ## Work mode
 

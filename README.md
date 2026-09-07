@@ -30,9 +30,16 @@ Confluence oracle
 Composition Kernel implementation
 ```
 
-Current gate: **#53 COMPONENT-BOUNDARY-A0**.
+Gate status:
 
-Until that design gate passes, no new `qianqian-kernel`, Context API, Fiber lifecycle engine, or Reconcile implementation is authorized.
+```text
+#53 COMPONENT-BOUNDARY-A0    PASS / CLOSED (PR #66 merged)
+#67 COMPOSITION-KERNEL-0     semantic design MERGED (PR #68)
+Corrective-4 review          CURRENT PRE-IMPLEMENTATION GATE
+implementation               NOT YET AUTHORIZED
+```
+
+Until the pre-implementation review (Corrective-4 on #67) is accepted and a separate implementation issue is opened, no new `qianqian-kernel`, Context API, Fiber lifecycle engine, or Reconcile implementation is authorized.
 
 ## Control plane and data plane
 
@@ -103,7 +110,9 @@ This is stronger than “no crash” or “all disposers ran”; it should catch
 
 `Everything is Plugin` does not mean `Everything is rollbackable`.
 
-Local registrations/handles may be reversible; external emissions may not be. Already-rendered sound cannot be “unplayed”. Architecture work must distinguish reversible, transactional, compensatable and irreversible/outside-boundary effects where relevant.
+Local registrations/handles may be reversible; external emissions may not be. Already-rendered sound cannot be “unplayed”. Architecture work must distinguish reversible, transactional, compensatable and irreversible/outside-boundary actions where relevant.
+
+These labels are a system-boundary/action taxonomy for reasoning about actions — they are not runtime variants of a kernel Effect type. The Composition Kernel design freezes exactly one Effect shape: a reversible composition-lifecycle mutation with a total inverse (`docs/architecture/composition-kernel-0-design.md`).
 
 ## Domain semantics
 
@@ -138,7 +147,7 @@ qianqian-headless
 
 R0 `base` and constructor-only `AppRuntime` composition are bootstrap witnesses, not compatibility contracts.
 
-They may later be replaced, but **not before #53 establishes the decomposition that the Composition Kernel is meant to host**.
+The decomposition they were waiting for is done (#53, closed) and the kernel semantic design is merged (PR #68). The future implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility — but only through the separate implementation issue, after the current pre-implementation review gate is accepted.
 
 Build/test authority:
 
@@ -172,7 +181,8 @@ The playback reference is a behavioral oracle, not a source-layout template.
 - `docs/README.md` — task-oriented documentation router.
 - `docs/architecture/overview.md` — Architecture v2 overview.
 - `docs/architecture/composition-kernel.md` — detailed Composition Kernel/precondition authority.
-- issue **#53** — current component-boundary design gate.
+- issue **#46** — architecture authority index.
+- issue **#67** — Composition Kernel semantic design gate (merged via PR #68).
 - `CONTRIBUTING.md` — contribution entry point.
 
 ## Scope

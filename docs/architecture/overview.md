@@ -2,7 +2,7 @@
 
 This document is the repository-local semantic overview for Qianqian Architecture v2.
 
-Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). The current design gate is GitHub issue **#53 COMPONENT-BOUNDARY-A0**.
+Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). The boundary audit #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED, and the Composition Kernel semantic design (#67) is merged via PR #68; the current gate is the pre-implementation review (Corrective-4).
 
 ## Architecture constitution
 
@@ -256,7 +256,7 @@ playlist semantics
 UI payload schemas
 ```
 
-The exact implementation is **not yet authorized**; #53 must pass first.
+The exact implementation is **not yet authorized**; it must wait for the current pre-implementation review gate (Corrective-4) to be accepted and a separate implementation issue to be opened.
 
 ## Everything is a Plugin
 
@@ -318,7 +318,7 @@ Future graph changes should be prepared on the control plane and published at an
 
 ## Native media evidence
 
-#48 remains valid:
+#48 remains valid as **historical native-media evidence** (not a current composition gate):
 
 ```text
 Decoder    : encoded media -> canonical PCM
@@ -348,13 +348,15 @@ Current authority chain is:
 
 ```text
 #53 COMPONENT-BOUNDARY-A0
-        ↓ PASS / CLOSED (component-boundary-a0.md)
-#67 COMPOSITION-KERNEL-0 DESIGN — current gate
-        ↓ proposed semantic authority: PR #68 (composition-kernel-0-design.md)
-future COMPOSITION-KERNEL-0 IMPLEMENTATION (only after #67/PR #68 PASS + merge)
+        ↓ PASS / CLOSED (component-boundary-a0.md; PR #66 merged)
+#67 COMPOSITION-KERNEL-0 DESIGN — semantic design MERGED
+        ↓ (PR #68; composition-kernel-0-design.md)
+Corrective-4 pre-implementation review — CURRENT GATE
+        ↓ accepted by human review
+future COMPOSITION-KERNEL-0 IMPLEMENTATION (only then, as a separate issue)
 ```
 
-Until #67/PR #68 passes and merges, no new kernel implementation/API is authorized.
+Until the Corrective-4 review is accepted and an implementation issue is opened, no new kernel implementation/API is authorized.
 
 ## Historical evidence
 

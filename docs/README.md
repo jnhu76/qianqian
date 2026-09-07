@@ -13,7 +13,7 @@ Do not recursively read archived or historical material by default.
 | Current architecture | `architecture/overview.md` |
 | Component boundary / plugin granularity / interaction algebra | `architecture/composition-kernel.md` boundary-design sections + closed audit `architecture/component-boundary-a0.md` (#53 PASS/CLOSED) |
 | Composition Kernel semantics design (#67) | `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel.md` + issue #67 |
-| Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | **Only after #67 passes**; then read `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + the implementation issue |
+| Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | **Only after the pre-implementation review (Corrective-4) is accepted and an implementation issue exists**; then read `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + the implementation issue |
 | Product introduction / current repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | Rust workspace/build/test | Current `Cargo.toml` / crate manifests / CI once present; do not invent a separate manual before repeated operational complexity exists. |
@@ -33,7 +33,7 @@ agent work rules                 -> AGENTS.md
 stable vocabulary                -> CONTEXT.md
 current architecture             -> docs/architecture/overview.md
 component-decomposition audit     -> closed issue #53 + component-boundary-a0.md + composition-kernel boundary sections
-composition-kernel-0 semantics   -> docs/architecture/composition-kernel-0-design.md + issue #67
+composition-kernel-0 semantics   -> docs/architecture/composition-kernel-0-design.md (merged via PR #68) + issue #67
 composition-kernel invariants    -> docs/architecture/composition-kernel.md
 implemented behavior             -> code + tests + current contracts
 historical experimental fact     -> preserved reference/history
@@ -64,9 +64,9 @@ Confluence oracle
 Context / Fiber / Effect / Reconcile implementation
 ```
 
-Current gate is #67 `COMPOSITION-KERNEL-0 DESIGN` (proposed semantic authority: PR #68, `architecture/composition-kernel-0-design.md`). #53 `COMPONENT-BOUNDARY-A0` is PASS/CLOSED (`architecture/component-boundary-a0.md`).
+#53 `COMPONENT-BOUNDARY-A0` is PASS/CLOSED (`architecture/component-boundary-a0.md`); the #67 `COMPOSITION-KERNEL-0` semantic design is MERGED (PR #68, `architecture/composition-kernel-0-design.md`). Current gate: the **pre-implementation review (Corrective-4)**.
 
-Until #67/PR #68 passes and merges, implementation work on a new `qianqian-kernel`, Context API, Fiber state machine, or Reconcile engine is not authorized.
+Until that review is accepted and a separate implementation issue is opened, implementation work on a new `qianqian-kernel`, Context API, Fiber state machine, or Reconcile engine is not authorized.
 
 ## Core routing distinction
 

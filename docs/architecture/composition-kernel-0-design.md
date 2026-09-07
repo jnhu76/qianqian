@@ -2,7 +2,7 @@
 
 Design-gate deliverable for **#67 COMPOSITION-KERNEL-0** (parent authority **#46**, boundary prerequisite **#53 / PR #66**, accepted audit `component-boundary-a0.md`).
 
-Status: **semantic design only. Implementation NOT authorized by this document.** Nothing here freezes a Rust API, a crate layout, or an async-runtime choice. PASS (proposed, §Verdict) authorizes only opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue.
+Status: **merged semantic authority (PR #68); semantic design only — implementation NOT authorized.** Nothing here freezes a Rust API, a crate layout, or an async-runtime choice. Acceptance of the current pre-implementation review (Corrective-4, §Verdict) authorizes only opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue.
 
 Revision 1 (2026-09-06): initial semantic design (PR #68).
 
@@ -37,10 +37,11 @@ docs/architecture/overview.md                    architecture v2 overview
 docs/architecture/composition-kernel.md          generic kernel preconditions + invariants
 docs/architecture/component-boundary-a0.md       accepted #53 audit (Rev 3)
 #46  PLAYER-PLUGIN-ARCH-1                         parent architecture authority (open)
-#53  COMPONENT-BOUNDARY-A0                       PASS / CLOSED (two corrective rounds)
-#67  COMPOSITION-KERNEL-0                        current DESIGN gate
-PR #68                                            proposed semantic authority (this document, under human review)
-future COMPOSITION-KERNEL-0 IMPLEMENTATION       opens only after #67/PR #68 PASS + merge
+#53  COMPONENT-BOUNDARY-A0                       PASS / CLOSED (two corrective rounds; PR #66 merged)
+#67  COMPOSITION-KERNEL-0                        semantic design MERGED via PR #68
+PR #68                                            merged semantic authority (this document, Revisions 1–4)
+Corrective-4                                      current PRE-IMPLEMENTATION review gate (Revision 5)
+future COMPOSITION-KERNEL-0 IMPLEMENTATION       opens only after Corrective-4 is accepted by human review
 ```
 
 Repository reality at BASE: `qianqian-core` (empty `base.rs`, `MusicKernel` state machine, three empty port traits, presentation mapping), `qianqian-runtime` (`AppRuntime` constructor composition), `apps/headless`. All R0 shapes (`AppRuntime::new()`, `with_audio_output()`, `audio_output()`) are bootstrap witnesses, not contracts; replacing them is out of scope here.
@@ -281,7 +282,7 @@ composition relation, never payload, never behavioral taxonomy (§H.5, §K.4).
 ### D.6 Primitive-budget audit
 
 - **Removing any one?** No. Without Context, declaration discipline (undeclared/inactive access) is unenforceable (D.1). Without Capability as a first-class concept, provider/consumer topology collapses into concrete types (violates #53 topology rule). Without Fiber, effects and bindings have no owner/lifetime. Without Effect, teardown is unattributed and revertibility is folklore. Without Reconcile, desired-state changes degenerate into imperative boot scripts (explicitly rejected, B13's separation of orchestration from lifecycle).
-- **Missing a sixth?** Candidates tested: *EventBus* → rejected (kernel-internal notify suffices; product events are a service plugin — B29, C.2). *Session/DataEdge* → **not a primitive**: an owned Effect of a specific kind (§K). *Obligation* → **not a primitive** (Corrective-2): the kernel's entire teardown knowledge is one verdict per fiber — `DISCHARGED` / `CONTRACT_VIOLATED` (§G.6), which is Fiber lifecycle truth; the obligations themselves are component-contract content (§H.5.1), never kernel data. *Profile* → not a primitive: it is Reconcile's input datum. *Registry* → not a primitive: it is Fiber-set truth the kernel maintains. No requirement from #53 exceeds the budget of five.
+- **Missing a sixth?** Candidates tested: *EventBus* → rejected (kernel-internal notify suffices; product events are a service plugin — B29, C.2). *Session/DataEdge* → **not a primitive**: a composition-owned binding Effect with structural provenance, one authority per binding (§K.4). *Obligation* → **not a primitive** (Corrective-2): the kernel's entire teardown knowledge is one verdict per fiber — `DISCHARGED` / `CONTRACT_VIOLATED` (§G.6), which is Fiber lifecycle truth; the obligations themselves are component-contract content (§H.5.1), never kernel data. *Profile* → not a primitive: it is Reconcile's input datum. *Registry* → not a primitive: it is Fiber-set truth the kernel maintains. No requirement from #53 exceeds the budget of five.
 
 ---
 
@@ -1207,7 +1208,8 @@ the frozen contract above is independent of which one an implementation
 picks. No Rust representation is frozen here.
 
 **Implementation oracle — revision identity (D0–D4).** Frozen as a required
-future executable test:
+future executable test (step labels D0–D4 are local to this trace — they
+name oracle steps, not fibers; generations in the trace are G1/G2):
 
 ```text
 D0  desired: Decoder@R1 enabled
@@ -1497,7 +1499,7 @@ Implementation-issue inputs, not design gaps — each has a frozen semantic answ
 
 ## Verdict
 
-**PASS, re-proposed after Corrective-3** (initial draft proposed PASS; human review round 1 returned **PASS_WITH_CORRECTIVES** — six items, resolved by Corrective-1; human review round 2 (PR #68, review `5127266745`) returned **PASS_WITH_CORRECTIVES** — P0-1 plus P1-2/P1-3/P1-4 and P2, resolved by Corrective-2; human review round 3 (PR #68, review `5127362067`) returned **PASS_WITH_TWO_CORRECTIVES** — P0-1 confluence widening in M4 and P1-2 child-mount scope, plus P2 wording, resolved by this Corrective-3; this revision re-proposes PASS — subject to the next human review per delivery discipline. PASS means only: the COMPOSITION-KERNEL-0 semantic design is precise enough to open a separate implementation issue.)
+**Status: merged semantic authority (PR #68, Revisions 1–4); Revision 5 / Corrective-4 is the current pre-implementation review gate.** (Initial draft proposed PASS; human review round 1 returned **PASS_WITH_CORRECTIVES** — six items, resolved by Corrective-1; human review round 2 (PR #68, review `5127266745`) returned **PASS_WITH_CORRECTIVES** — P0-1 plus P1-2/P1-3/P1-4 and P2, resolved by Corrective-2; human review round 3 (PR #68, review `5127362067`) returned **PASS_WITH_TWO_CORRECTIVES** — P0-1 confluence widening in M4 and P1-2 child-mount scope, plus P2 wording, resolved by Corrective-3. PR #68 then **merged**: Revisions 1–4 are the merged semantic authority for #67. The post-merge pre-implementation adversarial review produced Corrective-4 (Revision 5, this revision), which is now subject to the next human review per delivery discipline.)
 
 Corrective-3 resolution summary (review round 3):
 
@@ -1614,7 +1616,7 @@ Rust representation downstream of semantics              §P (survey, no freeze)
 no unsupported claim presented as paper authority        §B provenance ledger + §A.4 pin
 ```
 
-PASS authorizes exactly one next step: **opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue** — and only after final human review accepts this revision and PR #68 merges. It does not authorize implementation, Rust API freeze, FFmpeg/WASAPI/PocketJS integration, async-runtime selection, or any §S-deferred machinery. This document stops at the gate.
+PR #68 merged on 2026-09-07: Revisions 1–4 are the merged semantic authority for #67. Revision 5 (Corrective-4) is applied on `main` and is the **current pre-implementation review gate**; implementation remains unauthorized until a further human review accepts it. Acceptance authorizes exactly one next step: **opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue**. It does not authorize implementation itself, a Rust API freeze, FFmpeg/WASAPI/PocketJS integration, async-runtime selection, or any §S-deferred machinery. This document stops at the gate.
 
 
 
