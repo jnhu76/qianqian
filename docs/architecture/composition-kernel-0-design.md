@@ -12,6 +12,8 @@ Revision 3 (Corrective-2, 2026-09-07): applies human review round 2 on PR #68 �
 
 Revision 4 (Corrective-3, 2026-09-07): applies human review round 3 on PR #68 (review `5127362067`, **PASS_WITH_TWO_CORRECTIVES**) — M4 reclassified from a confluence-history row to a **failure/recovery sanitation oracle**: histories containing an activation failure never widen Thm 80, even when a later revision succeeds; a theorem-backed claim is possible only for the failure-free suffix H′ cut after the failed generation fully discharges and is removed (§M.3, §M.4, §O.2, §Q14, PASS criteria); child-fiber instantiation removed from K0 scope — parent/child semantics are [PAPER] design context only, `child mount` removed from the K0 Effect examples, the no-children removal guard marked vacuous in K0, the §S trigger kept (§D.3, §F.2–F.3, §H.5, §S); verdict closure wording made review-number-neutral (§Verdict).
 
+Revision 5 (Corrective-4, 2026-09-07): applied on `main` after PR #68 merged — the post-merge, pre-implementation adversarial review round. Three semantic repairs: (1) **desired revision identity** frozen — a desired entry conceptually carries an opaque revision-identity token (desired incarnation intent), so explicit fresh-generation intent is representable even when component identity, configuration semantics and enabled-state are unchanged; an unchanged desired incarnation can never retry FAILED, and nothing in the kernel may derive a revision trigger (R1–R8, §L.5, oracle D0–D4); (2) **Effect structural provenance** frozen — "one shape, no class" bans behavioral classification, not structural composition identity; every composition-visible binding has exactly one authoritative ownership/provenance record coupled to one owner fiber episode, and diagnostics are projections of it (§D.4, §K.4); (3) **quiescence** frozen in transition semantics rather than target-view equality — settled FAILED and Pending are quiet-legal, in-flight/staged orchestration and latched violations are not (§L.1). Governance: PR #68 is merged semantic authority; implementation remains blocked pending human acceptance of this corrective (§Verdict).
+
 Primary external sources:
 
 - **[PAPER]** *A Programming Paradigm for Spatiotemporal Composability*, Yifan Shi, Wei Zhang, Tianyi Cui (Peking University; DeepSeek-AI), arXiv:2608.25512v1, 92 pp. — the Cordis formal model. Section/definition/theorem numbers below cite this text directly.
@@ -258,7 +260,7 @@ MVP capability set (from #53): `Decoder`, `PcmSink`, `OutputDeviceDiscovery` (pr
 | Field | Definition |
 |---|---|
 | Purpose | move the running fiber graph toward the desired composition without a privileged imperative `boot()` |
-| Owned state | desired composition (abstract entry tree); running registry (shared with kernel); plan-in-progress |
+| Owned state | desired composition (abstract entry tree; each entry carries an opaque desired revision identity, §L.5); running registry (shared with kernel); plan-in-progress |
 | Legal operations | diff desired vs running; emit mount/retire/revise; detect ambiguity/cycles as **composition errors**; report quiescence |
 | Illegal operations | setting a fiber's lifecycle state directly (only orchestration requests + lifecycle rules move fibers — B13); wiring data edges itself; choosing between ambiguous providers; retrying failed activations invisibly |
 | Observable facts | desired tree; running composition snapshot; pending/failed entries |
@@ -440,7 +442,7 @@ Corrective-2 note: there is **no eighth state** behind the repaired raise path. 
 | Unloading | teardown verdict DISCHARGED (§G.6) **and** guard released (no relied-upon bindings); no pending activation error | Pending (target ≠ ⊥) or Absent-track (retired) | L-Unload: accumulator applied; table provably empty (Cor 69); committed view discarded last |
 | Unloading | teardown verdict DISCHARGED (§G.6); pending activation error present (raise-derived unload; nothing installed, so no guard applies) | Failed | FAILED is **earned only by a fully discharged unwind** of a failed activation: activation failed *and* the failure scene is provably cleaned; outcome recorded; no auto retry (B19) |
 | Unloading | any owned inverse or teardown obligation fails to discharge | Unloading (stays — no exit) | TEARDOWN_VIOLATED latches (§G.6); the episode never closes; FAILED/Pending/Absent-track are all unreachable; provider final-release guards stay latched |
-| Failed | revision (reconcile replaces entry) | Absent-track → fresh fiber | retry = new generation, never in-place (B19) |
+| Failed | fresh desired incarnation (§L.5) | Absent-track → fresh fiber | retry = a new generation behind an explicitly revised desired entry, never in-place, never for an unchanged desired incarnation (B19, §L.5) |
 | any | retire request (τ=⊤) | (flag only) | lifecycle rules carry it out; removal only from Inactive-family state with empty table and no children (the no-children guard is vacuous in K0 — child mounting deferred, §S) |
 
 ### F.4 Illegal transitions
@@ -468,7 +470,7 @@ Unloading → episode close while a teardown obligation is undischarged
 - It is *not* terminal for the component: the desired composition still names it, so it stays a first-class entry that reconcile may **revise** (fresh generation).
 - It is *not* auto-retried: L-Begin requires an error-free fiber (B19); an unchanged environment cannot silently relaunch it (this is what makes quiescence decidable).
 - It does not propagate: siblings keep running (B19).
-- A dependency that later becomes resolvable again does **not** clear FAILED by itself — retry is a revision decision owned by reconcile/policy, visible as history. (Confluence consequently excludes failed fibers — §M.3.)
+- A dependency that later becomes resolvable again does **not** clear FAILED by itself — and neither does reconcile running again: retry requires an explicitly fresh desired incarnation (§L.5); an unchanged desired revision identity can never retry a FAILED generation. (Confluence consequently excludes failed fibers — §M.3.)
 - Domain "retry" policies (e.g., device retry inside AudioOutput) live **inside** the component behind an ACTIVE facade; they are invisible to lifecycle (A0 §G.2 bounded-retry degradation is intra-provider).
 - FAILED (an activation outcome) is a **different class** from a teardown contract violation (§G.6): FAILED is a legal, recordable, revision-recoverable result of an episode that never installed **and whose unwind discharged cleanly**; a violation means an episode that could not prove it gave everything back — whether it had installed (ordinary Unloading) or not (unwinding a failed activation, §G.6's second failure site) — and it is a latched condition, not a lifecycle state, that no revision silently clears. A failed activation whose own unwind violates therefore **never reaches FAILED**: the fiber stays in Unloading with TEARDOWN_VIOLATED latched, and the pending activation error stays episode metadata (§G.6).
 
@@ -993,17 +995,63 @@ The RT thread pulls blocks only through the endpoint handed to the session — z
 ### L.1 Model
 
 ```text
-Desired graph D    abstract entry tree: {id → component, desired-state (enabled/disabled)}
-                  — in-memory only; no YAML/files/config language (#67 G)
+Desired graph D    abstract entry tree: {id → component, configuration
+                   semantics, enabled-state, revision identity (§L.5)} —
+                   in-memory only; no YAML/files/config language (#67 G).
+                   The revision identity is opaque equality-domain data:
+                   its only semantic content is "same desired incarnation"
+                   vs "fresh desired incarnation".
 Running graph R    the fiber registry + lifecycle states
-Difference         per-entry: absent | extra | same-component-different-generation
+Difference         per-entry: absent | extra | same desired incarnation
+                   (no revision — dependency-driven lifecycle only) |
+                   fresh desired incarnation (revision: staged
+                   retire/remove → mount a fresh generation, §E.4/§L.5)
 Transition plan    a sequence of orchestration requests: mount / retire / revise
-Settlement         quiescence = quiet predicate (B13): every fiber sits at its target view,
-                  no transition in flight; K0 adds (Corrective-1): no latched
-                  TEARDOWN_VIOLATED condition (§G.6) — a run with an open
-                  teardown episode is not quiescent, and a latched run can
-                  never satisfy the predicate
+Settlement         quiescence — frozen in transition semantics (Corrective-4),
+                   not in target-view equality alone (predicate below)
 ```
+
+```text
+FROZEN (Corrective-4) — the quiescence predicate:
+
+A running composition is quiescent iff:
+
+1. no lifecycle/orchestration transition is currently enabled or in
+   flight (no pending orchestration request; no fiber mid-transition);
+2. every non-failed fiber has reached the stable state implied by its
+   current desired/target condition — ACTIVE where satisfied, PENDING
+   where a required provider is absent or disabled, ABSENT where
+   unmounted;
+3. FAILED activation outcomes are settled states: FAILED inhibits
+   automatic L-Begin/retry (B19), so a FAILED fiber — even with all
+   dependencies satisfied, even with a non-⊥ target view — is
+   quiet-legal and remains FAILED until an explicit fresh desired
+   incarnation (§L.5);
+4. no TEARDOWN_VIOLATED condition is latched and no teardown episode is
+   open (§G.6) — a latched run can never satisfy the predicate;
+5. Reconcile holds no outstanding staged orchestration step — a staged
+   replacement is NOT quiescent between old-removal and the still-owed
+   new-mount (§E.4).
+
+Frozen distinctions: quiet ≠ healthy; quiet ≠ successful; quiet ≠
+theorem-backed confluent (§M.1 conditions; failure histories excluded,
+§M.3).
+
+Examples (each an executable future oracle):
+
+  Pending because a required provider is absent         → may be quiet
+  FAILED waiting for an explicit fresh incarnation      → may be quiet
+  Unloading                                             → not quiet
+  Activating                                            → not quiet
+  TEARDOWN_VIOLATED latched / open teardown episode     → not quiet
+  staged replacement between old-remove and new-mount   → not quiet while
+                                                          the mount is owed
+```
+
+A naive `quiet = committed_view == target_view` reading of B13 is
+explicitly rejected: it would hang settlement forever on a legal,
+quiet-visible FAILED fiber (clause 3) and would call a half-drained
+staged replacement quiet (clause 5).
 
 Reconcile is the **only** issuer of orchestration requests. It never sets lifecycle state directly; it never touches effects; it never wires data edges.
 
@@ -1019,7 +1067,7 @@ Reconcile is the **only** issuer of orchestration requests. It never sets lifecy
 | dependency cycle | **composition error**: detected from declarations alone (B24); refused at plan time; the runtime never sits on an undetactable deadlock |
 | activation failure | raise records a pending activation error and routes the fiber into Unloading; FAILED lands only on a fully discharged unwind (§F.3); reconcile leaves it visible; no invisible retry (B19); a violating unwind instead latches §G.6 (row below) |
 | teardown contract violation | **not an activation outcome**: the fiber's episode stays open, TEARDOWN_VIOLATED latches, dependent provider final-release guards stay latched (§G.6); reconcile surfaces it and issues no further requests through the affected edge; recovery is operator/revision business |
-| revision (config change / retry / re-enable) | retire → deactivate → remove → re-mount as a fresh fiber/generation (paper §4.4 Configuration composite); dependents follow unprompted |
+| revision — triggered only by a fresh desired incarnation (config change / retry / re-enable, §L.5) | retire → deactivate → remove → re-mount as a fresh fiber/generation (paper §4.4 Configuration composite); dependents follow unprompted; an unchanged desired incarnation never reaches this row |
 | root disposal | retire all; dependents before providers emerge from the guard ordering; quiescence = empty registry; teardown contract violations latch §G.6 — root disposal reports them and does not claim completion while a violation is open |
 
 ### L.3 Incremental + eventually convergent (chosen), not globally transactional
@@ -1040,6 +1088,107 @@ boundedness:    activation must terminate (engineering obligation on e, B18)
 totality:       providers install every declared key on a completed activation
                 (MVP frozen: Decoder/PcmSink/Discovery at activation; bind-at-activation rule)
 ```
+
+### L.5 Desired revision identity (frozen in Corrective-4)
+
+**Problem this closes.** The frozen semantics make retry a *visible
+revision* (retire → deactivate → remove → mount a fresh fiber/generation)
+and forbid invisible auto-retry (B19). But a desired graph carrying only
+{component, configuration, enabled-state} cannot *express* "retry" when
+nothing else changed: a FAILED `Decoder` whose desired entry is otherwise
+unchanged produces an empty diff, so Reconcile cannot distinguish "keep
+FAILED" from "the operator explicitly asked for a fresh generation". Left
+unfrozen, an implementer must invent a trigger — imperative `revise(id)`,
+revision counters, config hashing, or (forbidden) automatic retry.
+
+**Frozen concept — desired revision identity.** Every desired entry
+conceptually includes an opaque **revision identity** (alias: *desired
+incarnation intent*). Its entire semantic content is an equality domain:
+
+```text
+same revision identity as the running generation  → same incarnation; no revision
+different revision identity                       → fresh incarnation requested;
+                                                    revision = staged retire/remove
+                                                    (§E.4), then mount a fresh
+                                                    generation
+```
+
+Invariants (frozen):
+
+```text
+R1  FAILED does not mutate the desired revision identity — automatically,
+    ever. Failure settles the generation; it never rewrites the profile.
+R2  dependency appearance/disappearance never creates or changes a desired
+    revision identity (provider flapping cannot fabricate revisions).
+R3  an explicit retry / re-enable / configuration revision requests a
+    fresh incarnation by presenting a different revision identity.
+    Authoring discipline: any semantic edit to an entry that must reach
+    the running fiber presents a fresh identity; K0 semantics define no
+    content-diff revision trigger.
+R4  a fresh desired incarnation is history-visible: the revision appears
+    as explicit orchestration (retire/remove/mount) in the reconcile
+    history — never as an invisible in-place mutation.
+R5  the revision identity itself is opaque and carries no application
+    meaning: the kernel compares it, never interprets it (no timestamps,
+    no "version N means X", no configuration semantics inside the token).
+R6  private numeric identity is NOT part of observational equivalence
+    (§I.2); confluence never compares generation counters or token values.
+R7  the same desired incarnation must not remount merely because
+    reconcile runs again (reconcile is idempotent over an unchanged
+    desired graph).
+R8  a fresh desired incarnation must not reuse the FAILED fiber's
+    episode: after the visible staged retire/remove, it mounts a fresh
+    fiber/generation (§E.4 sequence; the FAILED generation is removed,
+    not resurrected).
+```
+
+The revision identity is **supplied with the desired composition** (by the
+operator/profile layer). The kernel never derives it — not from component
+identity, configuration content, enabled-state, dependency state, prior
+failures, or the number of reconcile runs. A pure function of configuration
+content is exactly the representation that made fresh-generation intent
+unexpressible in the first place. (See also §S: content-hash revision
+triggers are rejected.)
+
+This is **not a sixth primitive**: the revision identity is a field of
+Reconcile's input datum (the desired entry), in exactly the sense §D.6
+already classifies Profile as Reconcile's input rather than a primitive.
+
+**Representation stays open (§T.11).** Monotonic per-entry counters,
+operator-supplied epoch tokens, or fresh UUIDs per edit are all admissible;
+the frozen contract above is independent of which one an implementation
+picks. No Rust representation is frozen here.
+
+**Implementation oracle — revision identity (D0–D4).** Frozen as a required
+future executable test:
+
+```text
+D0  desired: Decoder@R1 enabled
+    → mount G1 → activation fails → raise → Unloading (partial unwind)
+    → fully discharged → G1 FAILED, outcome visible (§F.3/F.5)
+
+D1  reconcile runs again with the unchanged Decoder@R1 entry
+    → diff = same desired incarnation → no orchestration request
+    → G1 remains FAILED; no new activation episode
+    → the quiescence predicate (§L.1) is TRUE with G1 FAILED visible
+      (the settled failure stays visible; silent retry is a defect)
+
+D2  a capability unrelated to Decoder disappears and reappears
+    → G1 remains FAILED; no desired revision identity changed anywhere (R2)
+
+D3  the operator presents Decoder@R2 (fresh incarnation; component and
+    configuration otherwise identical)
+    → diff = fresh desired incarnation → revision:
+      G1 retired → discharged unload → removed (staged, §E.4)
+      → fresh G2 mounts → G2 may activate
+
+D4  reconcile runs repeatedly with Decoder@R2 unchanged
+    → no further requests; no G3/G4 churn (R7)
+```
+
+D1 doubles as the **FAILED-settlement oracle**: an implementation whose
+settle/quiescence check hangs on — or silently retries — a FAILED fiber
+with a satisfied target view violates §L.1 clause 3.
 
 ---
 
@@ -1095,7 +1244,7 @@ Composition assertions are unconditional; continuity probes are policy-condition
 
 M0–M3, M5–M11, M13 are confluence rows expressible with the MVP decomposition; M4 is the sanitation oracle and needs a fail-then-revise flow; M12 needs DSP (deferred with AudioRuntime).
 
-**Why M4 is not a confluence row (frozen, Corrective-3).** §M.3 excludes any history containing an activation failure from Thm 80 claims, and a later successful revision does not erase the earlier failure from that history — so `fail once → revise → succeed` can never be cited as theorem-backed confluence over the whole history. What M4 asserts instead is the **failure/recovery sanitation oracle**: the failed attempt fully discharged, FAILED was visible, the failed generation was removed by an explicit visible revision, no ghost composition state survived it, and the fresh generation settles normally. If a theorem-backed confluence statement about the post-recovery state is wanted, it can only be made about the suffix H′ cut after the failed generation has fully discharged and been removed (§M.3's frozen rule); the pre-H′ failed prefix gets no Thm 80 claim. Future executable tests must not silently widen Thm 80 to failed histories — that widening is exactly what this row forbids.
+**Why M4 is not a confluence row (frozen, Corrective-3).** §M.3 excludes any history containing an activation failure from Thm 80 claims, and a later successful revision does not erase the earlier failure from that history — so `fail once → revise → succeed` can never be cited as theorem-backed confluence over the whole history. What M4 asserts instead is the **failure/recovery sanitation oracle**: the failed attempt fully discharged, FAILED was visible, the failed generation was removed by an explicit visible revision, no ghost composition state survived it, and the fresh generation settles normally. If a theorem-backed confluence statement about the post-recovery state is wanted, it can only be made about the suffix H′ cut after the failed generation has fully discharged and been removed (§M.3's frozen rule); the pre-H′ failed prefix gets no Thm 80 claim. Future executable tests must not silently widen Thm 80 to failed histories — that widening is exactly what this row forbids. The revision-identity oracle D0–D4 (§L.5, Corrective-4) belongs to the same sanitation family: it pins that an unchanged desired incarnation never retries FAILED and that a fresh desired incarnation is the only path to a new generation.
 
 ---
 
@@ -1154,9 +1303,9 @@ Columns: what remains observable · what must be cleaned · what can retry · wh
 ### O.2 Reading rules
 
 - No scenario leaves unexplained ghost state: every "must clean" cell is Cor 69 (empty table at episode close) or an explicitly latched/surfaced §G.6 violation — never a silent "assume it's clean".
-- Retry is always either *automatic reactive re-activation* (dependency returned; the fiber was never failed) or *visible revision* (after FAILED). Never an invisible loop. A teardown contract violation has no retry at all in K0 — it latches (§G.6).
+- Retry is always either *automatic reactive re-activation* (dependency returned; the fiber was never failed) or *visible revision behind a fresh desired incarnation* (after FAILED; an unchanged desired incarnation can never retry — §L.5). Never an invisible loop. A teardown contract violation has no retry at all in K0 — it latches (§G.6).
 - A fail-then-revise history never becomes a confluence history by eventually succeeding: it is judged by §M.4's failure/recovery sanitation oracle, and Thm 80 is available at most for the failure-free suffix H′ (§M.3, Corrective-3).
-- Quiescence blockers reduce to: in-flight transitions (finite by Thm 73 under L.4), an unbounded activation (a component defect caught by the boundedness check), or a latched TEARDOWN_VIOLATED (§G.6 — deliberate, surfaced, operator-resolved).
+- Quiescence blockers reduce to: in-flight transitions (finite by Thm 73 under L.4), an unbounded activation (a component defect caught by the boundedness check), an outstanding staged orchestration step the plan still owes (§E.4/§L.1 clause 5), or a latched TEARDOWN_VIOLATED (§G.6 — deliberate, surfaced, operator-resolved).
 - No disposer may report success for an obligation it did not discharge; partial discharge is a violation, not a success with notes.
 
 ---
@@ -1223,8 +1372,10 @@ Typed static capability keys + object-safe service traits + generational `FiberI
 | 15 | Does anything require kernel work on the realtime path? | **PASS** | §N.2 table: all kernel operations forbidden per block; zero exceptions proposed |
 | 16 | Can a failing disposer hide a use-after-provider-destroy? | **PASS** (frozen in Corrective-1) | the old "anomaly + exit + guard releases" shape was a review-confirmed defect; §G.6/§H.7 freeze the infallible-inverse contract: violated teardown keeps the episode open, latches TEARDOWN_VIOLATED, blocks provider final release, and forfeits quiescence/confluence claims — liveness is traded, never safety |
 | 17 | Can a domain obligation sneak back in as a sixth primitive? | **PASS** (frozen in Corrective-2) | the kernel's whole teardown knowledge is one verdict per fiber — `DISCHARGED` / `CONTRACT_VIOLATED` (§G.6); no obligation registry, list, count, or identity exists kernel-side; obligations are component-contract content (§H.5.1 fence, §J.4, §D.6) |
+| 18 | Can Reconcile confuse "unchanged desired entry" with "the operator asked for a retry"? | **PASS** (frozen in Corrective-4) | desired revision identity makes fresh-incarnation intent expressible (§L.5); an unchanged identity never retries FAILED (R1/R7, oracle D0–D4); the kernel derives revision triggers from nothing — not config content, not dependency churn (R2/R3, §S) |
+| 19 | Can a FAILED fiber hang settlement forever, or be retried by accident? | **PASS** (frozen in Corrective-4) | quiescence is transition semantics: settled FAILED (and Pending) are quiet-legal (§L.1 clauses 2–3, D1 oracle); nothing retries without a fresh desired incarnation (§L.5); staged plans still owing work and latched violations stay non-quiescent (§L.1 clauses 4–5) |
 
-Score: 16 PASS, 1 DEFERRED-WITH-TRIGGER (#10, routed to §T). No DESIGN DEFECT remaining. (Corrective-1 converted the review-confirmed defect in the teardown-failure story into #16's frozen defense; Corrective-2 added #17's obligation fence and repaired the raise-path state machine underlying #13.)
+Score: 18 PASS, 1 DEFERRED-WITH-TRIGGER (#10, routed to §T). No DESIGN DEFECT remaining. (Corrective-1 converted the review-confirmed defect in the teardown-failure story into #16's frozen defense; Corrective-2 added #17's obligation fence and repaired the raise-path state machine underlying #13; Corrective-4 added #18–#19.)
 
 ---
 
@@ -1243,6 +1394,7 @@ Frozen upper bounds for the future implementation (any excess requires a new arc
 | diagnostic concepts | **≤ 6** (the §I.1 surfaces; the §G.6 violation flag lives **inside** the fiber lifecycle surface — not a seventh concept) |
 | kernel Effect shapes | **1** — reversible composition-lifecycle mutation + total inverse (§H.5 frozen block, §H.7); no effect-class enum exists |
 | system-boundary action classes (descriptive taxonomy, §H.5) | **5** — none is a kernel Effect variant |
+| desired revision identity per desired entry | **1** opaque equality token — kernel compares, never interprets, never derives (§L.5) |
 | kernel obligation concepts | **0** — no registry/list/count/identity; one teardown verdict (`DISCHARGED`/`CONTRACT_VIOLATED`) per fiber (§G.6, §H.5.1) |
 | context realms | **1** (root only) |
 
@@ -1262,6 +1414,7 @@ Explicitly rejected framework-growth patterns (no present requirement proves the
 | async kernel transitions (per-fiber tasks) | deferred (trigger: a blocking activation that must not stall composition) | synchronous serialized control plane suffices (B20); RT firewall favors it |
 | in-place provider value mutation as replacement | rejected | provider-identity resolution means equal values are not replacements (B30); withdraw-then-provide is the only observed replacement |
 | silent auto-retry of failed activations | rejected | breaks quiescence decidability and confluence accounting (B19); retry = visible revision |
+| revision trigger derived by the kernel (config-content hash, implicit change detection, reconcile-run counters) | rejected (Corrective-4) | the kernel derives revision triggers from nothing (§L.5, R1–R3): content-derived triggers make fresh-generation intent unexpressible at best and fabricate retries at worst; the desired revision identity is the sole revision trigger |
 | globally transactional reconcile (all-or-nothing mount batches) | rejected | would need second-order recovery machinery; Thm 80 makes quiescent convergence sufficient (L.3) |
 | FAILED as terminal product state / as retry loop | rejected (both extremes) | F.5: outcome-record semantics; revision-owned retry |
 | "best-effort cleanup" teardown: failing disposer exits anyway, guard releases, provider may die | **rejected** (Corrective-1; review-confirmed defect of Revision 1) | the exact use-after-provider-destroy the withdrawal window exists to prevent (§G.6); teardown violations latch, block provider final release, and forfeit quiescence/confluence claims |
@@ -1290,6 +1443,7 @@ Implementation-issue inputs, not design gaps — each has a frozen semantic answ
 8. **Domain continuity policy (§K.3 of A0)** — pause-at-CONFIRMED default remains proposed, not frozen; it gates §H.b probes only, never §M confluence.
 9. **Device-surprise MVP policy** — fail-closed into G.2 sequence with bounded-retry degradation remains the proposal (A0 §K.4); product decision at implementation time.
 10. *(resolved in Corrective-1)* **Governance gate drift** — the review directed the gate advance to happen in this same docs-only PR; `AGENTS.md`, `composition-kernel.md`, `docs/README.md`, `CONTEXT.md`, and `overview.md` now name #67 as the current design gate (chain: #53 PASS/CLOSED → #67 current gate → PR #68 proposed semantic authority → implementation issue only after PASS + merge).
+11. **Desired revision identity representation** (Corrective-4) — token form (per-entry counter, operator-supplied epoch, fresh UUID per edit), the authoring convention that keeps it in sync with semantic edits, and the surface for presenting a fresh incarnation (§L.5): frozen is the equality-only semantics (R1–R8) and the D0–D4 oracle; open is the representation and API shape.
 
 ---
 
