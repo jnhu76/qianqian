@@ -147,10 +147,39 @@ for (const exp of expReg.experiments || []) {
     }
   }
 
+  // D1 (WEB-EVIDENCE-1): the FFmpeg minimization experiment is historical
+  // evidence; only an explicit future authority process may change that.
+  if (exp.id === 'EXP-FFMPEG-001' && exp.status !== 'HISTORICAL_EVIDENCE') {
+    fail(`D1: ${exp.id} status must remain HISTORICAL_EVIDENCE (got ${exp.status})`)
+  }
+
   console.log(`  ${exp.id}: ${exp.status}`)
 }
 
 pass(`${expIds.size} experiment IDs, all unique`)
+
+// D2 (WEB-EVIDENCE-1): the Web page projects the registry status for the
+// FFmpeg experiment rather than inventing a second status of its own.
+function parseFrontmatter(content) {
+  const m = content.match(/^---\n([\s\S]*?)\n---/)
+  if (!m) return {}
+  try {
+    return parseYaml(m[1])
+  } catch {
+    return {}
+  }
+}
+
+const ffmpegPagePath = resolve(WEBSITE, 'experiments/ffmpeg-minimization.md')
+const expFfmpeg = expReg.experiments?.find(e => e.id === 'EXP-FFMPEG-001')
+if (expFfmpeg && existsSync(ffmpegPagePath)) {
+  const fm = parseFrontmatter(readFileSync(ffmpegPagePath, 'utf-8'))
+  if (fm.status !== expFfmpeg.status) {
+    fail(`D2: ffmpeg-minimization.md status (${fm.status}) diverges from registry (${expFfmpeg.status})`)
+  } else {
+    pass(`D2: ffmpeg-minimization.md projects registry status ${expFfmpeg.status}`)
+  }
+}
 
 // --- Project State ---
 
@@ -196,7 +225,26 @@ const pages = [
   'website/research/spatiotemporal-composability.md',
   'website/research/ffmpeg-closure.md',
   'website/research/realtime-audio.md',
+  'website/research/dsh-composition-lineage.md',
 ]
+
+// D4 (WEB-EVIDENCE-1): provenance targets that name local repo paths must
+// exist. GitHub issues/PRs and tag references (e.g. research/playback-
+// reference-v1) are not local files and are deliberately not checked.
+function extractProvenancePaths(content) {
+  const paths = []
+  const re = /:(authority|evidence)="\[([^\]]*)\]"/g
+  let m
+  while ((m = re.exec(content))) {
+    for (const raw of m[2].split("'")) {
+      const ref = raw.trim().replace(/ §.*$/, '')
+      if (ref.startsWith('docs/') || ref.startsWith('crates/') || ref.startsWith('.')) {
+        paths.push(ref)
+      }
+    }
+  }
+  return paths
+}
 
 for (const page of pages) {
   const fullPath = resolve(WEBSITE, '..', page)
@@ -213,6 +261,26 @@ for (const page of pages) {
     pass(`${page} has provenance`)
   } else {
     pass(`${page} exists`)
+  }
+
+  // D3/D5 (WEB-EVIDENCE-1): the DSH lineage page makes architecture-history
+  // claims, so provenance is mandatory and its status must stay historical —
+  // DSH is reference/influence, never current Qianqian authority.
+  if (page.includes('dsh-composition-lineage')) {
+    const fm = parseFrontmatter(content)
+    if (!content.includes('ProvenancePanel')) {
+      fail(`D3: ${page} must declare provenance (architecture-history claims)`)
+    }
+    if (fm.status !== 'HISTORICAL_EVIDENCE') {
+      fail(`D5: ${page} must be HISTORICAL_EVIDENCE (got ${fm.status})`)
+    }
+  }
+
+  // D4: local provenance targets must exist
+  for (const ref of extractProvenancePaths(content)) {
+    if (!fileExists(ref)) {
+      fail(`D4: provenance target not found: ${ref} (in ${page})`)
+    }
   }
 }
 

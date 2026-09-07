@@ -27,6 +27,7 @@ Research pages are NOT paper summaries. Each page answers:
 | [Spatiotemporal Composability](/research/spatiotemporal-composability) | arXiv:2608.25512v1 | <StatusBadge status="VALIDATED" /> |
 | [FFmpeg Closure](/research/ffmpeg-closure) | FFmpeg configure oracle | <StatusBadge status="HISTORICAL_EVIDENCE" /> |
 | [Realtime Audio](/research/realtime-audio) | WASAPI renderer, PlayerEngine | <StatusBadge status="HISTORICAL_EVIDENCE" /> |
+| [DSH → Composition Kernel Lineage](/research/dsh-composition-lineage) | Issue #47 comparison → #53/#67/#70 | <StatusBadge status="HISTORICAL_EVIDENCE" /> |
 
 ---
 
