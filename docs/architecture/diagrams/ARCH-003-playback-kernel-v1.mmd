@@ -1,0 +1,32 @@
+flowchart TB
+    subgraph PK["Playback Kernel / MusicKernel — NEXT / PLANNED"]
+        direction TB
+        subgraph DomainSemantics["Domain Semantics"]
+            TS["Track / Session / State"]
+            PP["Play / Pause / Stop / Seek"]
+            QR["Queue / Repeat / Shuffle"]
+            BFR["Buffering / Recovery"]
+            EN["ENDED / Timeline"]
+        end
+
+        subgraph Mechanisms["Cohesive MVP Mechanisms"]
+            DW["Decode Worker"]
+            PR["PCM Ring"]
+            RT["RT Publication\ncommit / flush"]
+        end
+    end
+
+    DEC["Decoder"] -->|"open / probe / decode / seek"| PK
+    PK -->|"bind PcmSink"| AOUT["AudioOutput"]
+    PK -.->|"future"| PROC["Processing"]
+    UH["UiHost"] -.->|"poll snapshot"| PK
+
+    style PK fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
+    style DomainSemantics fill:#2d6a4f,stroke:#4a9a6f,color:#e0e0e0
+    style Mechanisms fill:#3a5a3a,stroke:#5a7a5a,color:#e0e0e0
+
+    classDef next fill:#e9c46a,stroke:#f4a261,color:#1a1a1a
+    classDef planned fill:#4a4a6a,stroke:#6a6a8a,color:#e0e0e0
+
+    class DW,PR,RT,PK next
+    class DEC,AOUT,PROC,UH planned

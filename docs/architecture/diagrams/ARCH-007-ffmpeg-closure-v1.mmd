@@ -1,0 +1,32 @@
+flowchart TB
+    subgraph FFMPEG["FFmpeg Closure Evidence — HISTORICAL"]
+        direction TB
+        CI["Capability Intent\ndecode encoded media"]
+        CF["Configure / Import Oracle\nFFmpeg build profiles"]
+        MC["Machine-Derived Closure\none FFmpeg closure authority"]
+        MF["Manifest\ncodec-base, songcore-test profiles"]
+        XR["Xmake Replay\nreproducible build"]
+        SP["Shipping / Product Probe\nbinary size, symbol audit"]
+
+        CI --> CF
+        CF --> MC
+        MC --> MF
+        MF --> XR
+        XR --> SP
+    end
+
+    subgraph Components["Shared Closure Relationship"]
+        direction LR
+        DEC["Decoder\nencoded media → PCM"]
+        PROC["Processing\nPCM → PCM"]
+
+        DEC ---|"shares one\nFFmpeg closure"| PROC
+    end
+
+    MC -.->|"authority"| Components
+
+    style FFMPEG fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
+    style Components fill:#2d4a3a,stroke:#4a7a5a,color:#e0e0e0
+
+    classDef historical fill:#4a4a6a,stroke:#6a6a8a,color:#e0e0e0
+    class CI,CF,MC,MF,XR,SP historical

@@ -64,9 +64,7 @@ Confluence oracle
 Context / Fiber / Effect / Reconcile implementation
 ```
 
-#53 `COMPONENT-BOUNDARY-A0` is PASS/CLOSED (`architecture/component-boundary-a0.md`); the #67 `COMPOSITION-KERNEL-0` semantic design is MERGED (PR #68, `architecture/composition-kernel-0-design.md`). Current gate: the **pre-implementation review (Corrective-5)**.
-
-Until that review is accepted and a separate implementation issue is opened, implementation work on a new `qianqian-kernel`, Context API, Fiber state machine, or Reconcile engine is not authorized.
+#53 `COMPONENT-BOUNDARY-A0` is PASS/CLOSED (`architecture/component-boundary-a0.md`); the #67 `COMPOSITION-KERNEL-0` semantic design is MERGED (PR #68, `architecture/composition-kernel-0-design.md`). The Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86).
 
 ## Core routing distinction
 

@@ -2,7 +2,7 @@
 
 This document is the repository-local semantic overview for Qianqian Architecture v2.
 
-Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). The boundary audit #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED, and the Composition Kernel semantic design (#67) is merged via PR #68; the current gate is the pre-implementation review (Corrective-5).
+Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). The boundary audit #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED, the Composition Kernel semantic design (#67) is merged via PR #68, and the Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86).
 
 ## Architecture constitution
 
@@ -256,7 +256,7 @@ playlist semantics
 UI payload schemas
 ```
 
-The exact implementation is **not yet authorized**; it must wait for the current pre-implementation review gate (Corrective-5) to be accepted and a separate implementation issue to be opened.
+The Base Kernel K0 implementation (PR #71) provides these primitives. The exact Rust API remains subject to evolution through the normal architecture-change protocol.
 
 ## Everything is a Plugin
 
@@ -351,14 +351,9 @@ Current authority chain is:
         ↓ PASS / CLOSED (component-boundary-a0.md; PR #66 merged)
 #67 COMPOSITION-KERNEL-0 DESIGN — semantic design MERGED
         ↓ (PR #68; composition-kernel-0-design.md)
-Corrective-4 pre-implementation review
-        ↓ human-reviewed: PASS_WITH_ONE_CORRECTIVE (review 5127750303)
-Corrective-5 pre-implementation review — CURRENT GATE
-        ↓ accepted by human review
-future COMPOSITION-KERNEL-0 IMPLEMENTATION (only then, as a separate issue)
+#70 COMPOSITION-KERNEL-0 IMPL — IMPLEMENTED
+        ↓ (PR #71; 70 kernel tests / 75 workspace tests, 743eb86)
 ```
-
-Until the Corrective-5 review is accepted and an implementation issue is opened, no new kernel implementation/API is authorized.
 
 ## Historical evidence
 

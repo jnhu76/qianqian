@@ -13,7 +13,7 @@ Read:
 
 For plugin/composition work, read `docs/architecture/composition-kernel.md`.
 
-Gate status: #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (PR #66 merged); the #67 COMPOSITION-KERNEL-0 semantic design is merged (PR #68, `docs/architecture/composition-kernel-0-design.md`). Current gate: the pre-implementation review (Corrective-5). Implementation is not yet authorized.
+Gate status: #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (PR #66 merged); the #67 COMPOSITION-KERNEL-0 semantic design is merged (PR #68). The Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86).
 
 Do not recursively preload historical docs or use `archive/pre-rust-v2` as current architecture authority.
 
@@ -203,16 +203,7 @@ RUST-ARCH-R0 APIs are bootstrap witnesses.
 
 `qianqian-core::base`, `AppRuntime::new()`, `with_audio_output()`, and similar R0 composition shapes are not compatibility contracts.
 
-They may later be redesigned, but current authority is:
-
-```text
-#53 boundary design         PASS / CLOSED (PR #66 merged)
-#67 kernel semantic design  MERGED (PR #68)
-Corrective-5 review         current pre-implementation gate
-implementation issue        opens only after that review is accepted
-```
-
-Do not replace them outside the future implementation issue.
+They may be redesigned as the Base Kernel K0 implementation (PR #71) replaces R0 bootstrap shapes.
 
 ## Verification
 

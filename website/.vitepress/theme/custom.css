@@ -1,0 +1,150 @@
+:root {
+  /* Observatory palette — quiet, technical, editorial */
+  --vp-c-brand-1: #2d6a4f;
+  --vp-c-brand-2: #40916c;
+  --vp-c-brand-3: #52b788;
+  --vp-c-brand-soft: rgba(45, 106, 79, 0.14);
+
+  /* Status badge colors */
+  --obs-implemented: #2d6a4f;
+  --obs-validated: #2d6a4f;
+  --obs-current: #264653;
+  --obs-next: #e9c46a;
+  --obs-planned: #6c757d;
+  --obs-deferred: #adb5bd;
+  --obs-historical: #6c757d;
+  --obs-frozen: #457b9d;
+  --obs-superseded: #bc4749;
+
+  /* Claim badge colors */
+  --obs-authority: #2d6a4f;
+  --obs-evidence: #264653;
+  --obs-interpretation: #6c757d;
+}
+
+.dark {
+  --obs-implemented: #52b788;
+  --obs-validated: #52b788;
+  --obs-current: #468faf;
+  --obs-next: #f4a261;
+  --obs-planned: #8d99ae;
+  --obs-deferred: #6c757d;
+  --obs-historical: #8d99ae;
+  --obs-frozen: #48bfe3;
+  --obs-superseded: #e07a7a;
+
+  --obs-authority: #52b788;
+  --obs-evidence: #48bfe3;
+  --obs-interpretation: #8d99ae;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+
+.status-badge--implemented { background: var(--obs-implemented); color: #fff; }
+.status-badge--validated { background: var(--obs-validated); color: #fff; }
+.status-badge--current { background: var(--obs-current); color: #fff; }
+.status-badge--next { background: var(--obs-next); color: #1a1a1a; }
+.status-badge--planned { background: var(--obs-planned); color: #fff; }
+.status-badge--deferred { background: var(--obs-deferred); color: #1a1a1a; }
+.status-badge--historical_evidence { background: var(--obs-historical); color: #fff; }
+.status-badge--frozen { background: var(--obs-frozen); color: #fff; }
+.status-badge--superseded { background: var(--obs-superseded); color: #fff; }
+
+/* Claim badges */
+.claim-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.claim-badge--authority { background: var(--obs-authority); color: #fff; }
+.claim-badge--evidence { background: var(--obs-evidence); color: #fff; }
+.claim-badge--interpretation { background: var(--obs-interpretation); color: #fff; }
+
+/* Provenance panel */
+.provenance-panel {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin: 24px 0;
+  background: var(--vp-c-bg-soft);
+  font-size: 0.875rem;
+}
+
+.provenance-panel h4 {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--vp-c-text-2);
+}
+
+.provenance-panel ul {
+  margin: 4px 0 12px;
+  padding-left: 16px;
+}
+
+.provenance-panel li {
+  margin: 2px 0;
+}
+
+.provenance-panel .provenance-label {
+  font-weight: 600;
+  color: var(--vp-c-text-2);
+  font-size: 0.8rem;
+}
+
+.provenance-panel a {
+  color: var(--vp-c-brand-1);
+}
+
+/* Architecture diagram container */
+.arch-diagram {
+  margin: 24px 0;
+  overflow-x: auto;
+}
+
+.arch-diagram .mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+/* Formal math blocks */
+.katex-display {
+  margin: 24px 0;
+}
+
+/* Layer status table on homepage */
+.layer-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.layer-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vp-c-divider);
+}
+
+.layer-table td:first-child {
+  font-weight: 500;
+}
+
+.layer-table td:last-child {
+  text-align: right;
+}

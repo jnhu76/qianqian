@@ -1,0 +1,60 @@
+name: Observatory CI
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'website/**'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'website/**'
+
+jobs:
+  docs-verify:
+    name: Verify & Build Observatory
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --frozen-lockfile
+
+      - name: Run docs:verify
+        run: node scripts/verify.mjs
+
+      - name: Build VitePress
+        run: npx vitepress build
+
+  rust-regression:
+    name: Rust Regression
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Workspace check
+        run: cargo check --workspace
+
+      - name: Workspace tests
+        run: cargo test --workspace
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Git diff check
+        run: git diff --check

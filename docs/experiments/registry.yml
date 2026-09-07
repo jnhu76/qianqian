@@ -1,0 +1,65 @@
+experiments:
+  - id: EXP-FFMPEG-001
+    name: FFmpeg Closure Minimization
+    status: HISTORICAL_EVIDENCE
+
+    question: >
+      What is the minimum FFmpeg closure required by Qianqian's declared capabilities?
+
+    authority:
+      - issue: 48
+      - issue: 53
+
+    evidence:
+      - docs/architecture/component-boundary-a0.md
+      - research/playback-reference-v1
+
+    result:
+      summary: >
+        Decoder and Processing share one FFmpeg closure authority. Codec coverage
+        is provider configuration, not a runtime layer. Two build profiles
+        (codec-base, songcore-test) prove the closure is minimizable. Per-codec
+        plugin splitting is rejected because it multiplies the closure authority
+        for zero composability gain.
+      frozen_facts:
+        - Decoder owns one FFmpeg closure authority
+        - Decoder and Processing share this closure
+        - Two build profiles: codec-base, songcore-test
+        - Per-codec plugins rejected (zero composability gain)
+        - No FFmpeg type crosses the component seam
+      machine_artifacts: HISTORICAL (on playback-reference-v1 tag)
+
+  - id: EXP-COMPOSITION-KERNEL-001
+    name: Composition Kernel K0 Oracles
+    status: VALIDATED
+
+    question: >
+      Does the implemented Base Kernel satisfy its semantic design invariants
+      across single-Fiber cleanup, cross-Fiber independent removal, same-key
+      contribution safety, ordered interaction, provider-disappearance ordering,
+      and confluence after mutation history?
+
+    authority:
+      - issue: 67
+      - pr: 68
+      - issue: 70
+      - pr: 71
+
+    evidence:
+      - crates/qianqian-kernel/tests
+
+    result:
+      summary: >
+        70 kernel tests (75 workspace tests) across 6 semantic guarantee groups
+        validate the Base Kernel K0 implementation against the frozen semantic
+        design. All tests pass at merge (743eb86).
+      semantic_guarantees:
+        - single-Fiber local cleanup
+        - cross-Fiber independent removal
+        - same-key contribution safety
+        - explicit handling of ordered/non-commutative interaction
+        - provider-disappearance ordering
+        - confluence after mutation history
+      kernel_test_count: 70
+      workspace_test_count: 75
+      last_verified_commit: 743eb86

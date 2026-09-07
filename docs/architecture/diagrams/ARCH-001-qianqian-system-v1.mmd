@@ -1,0 +1,40 @@
+flowchart TB
+    subgraph ControlPlane["Control Plane"]
+        direction TB
+        CK["Composition Kernel"]
+        CK -."Context / Capability / Fiber\nEffect / Reconcile".-> CK
+    end
+
+    subgraph DataPlane["Realtime Data Plane"]
+        direction LR
+        MS["MediaSource"] -->|encoded media| DEC["Decoder\nENCODED → PCM"]
+        DEC -->|PCM| PRO["Processing\nPCM → PCM"]
+        PRO -->|PCM| AOUT["AudioOutput\nPCM → physical device"]
+    end
+
+    subgraph Domains["Domain Components"]
+        direction TB
+        MK["MusicKernel\n(Music semantics)"]
+        UH["UiHost\n(Presentation)"]
+    end
+
+    MK -.->|requires| DEC
+    MK -.->|binds PcmSink| AOUT
+    UH -.->|polls snapshot| MK
+
+    CK -.->|"desire composition → reconcile"| MK
+    CK -.->|"desire composition → reconcile"| DEC
+    CK -.->|"desire composition → reconcile"| AOUT
+    CK -.->|"desire composition → reconcile"| UH
+
+    style ControlPlane fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
+    style DataPlane fill:#0f3460,stroke:#4a4a8a,color:#e0e0e0
+    style Domains fill:#16213e,stroke:#4a4a6a,color:#e0e0e0
+
+    classDef implemented fill:#2d6a4f,stroke:#4a9a6f,color:#e0e0e0
+    classDef next fill:#e9c46a,stroke:#f4a261,color:#1a1a1a
+    classDef planned fill:#4a4a6a,stroke:#6a6a8a,color:#e0e0e0
+
+    class CK implemented
+    class MK next
+    class DEC,PRO,AOUT,UH planned

@@ -1,0 +1,27 @@
+sequenceDiagram
+    participant P as Provider
+    participant K as Composition Kernel
+    participant D as Dependents
+
+    Note over P: provider begins withdrawal
+
+    P->>K: report withdrawal intent
+    K->>K: leave NEW resolution (provider hidden from new resolves)
+
+    K->>D: push invalidation signal
+
+    Note over D: dependents deactivate
+    D->>D: quiesce work (stop decode, park pipeline)
+    D->>D: tear down bindings (SinkSession etc.)
+    D->>D: discharge Effects (LIFO unwind)
+    D->>D: episode closes
+
+    D-->>K: teardown complete
+
+    Note over K: dependents finished teardown<br/>teardown access still valid
+
+    K->>P: ready for final release
+    P->>P: remove binding / release resources
+    P->>P: guard releases
+
+    Note over P: provider finally released

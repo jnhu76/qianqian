@@ -15,14 +15,8 @@ Gate chain:
 #67 COMPOSITION-KERNEL-0 DESIGN  semantic design MERGED via PR #68
                                   (composition-kernel-0-design.md)
         ↓
-Corrective-4                     human-reviewed: PASS_WITH_ONE_CORRECTIVE (review 5127750303)
-        ↓
-Corrective-5                     CURRENT PRE-IMPLEMENTATION REVIEW GATE
-        ↓
-implementation issue             opens only after Corrective-5 is accepted by human review
+#70 COMPOSITION-KERNEL-0 IMPL    IMPLEMENTED via PR #71 (70 kernel tests / 75 workspace tests, 743eb86)
 ```
-
-No new Composition Kernel implementation/API is authorized until the Corrective-5 pre-implementation review is accepted and a separate implementation issue is opened.
 
 ## Kernel constitution
 
@@ -59,7 +53,7 @@ But the primitive list is **not** the architecture starting point.
 
 ## Boundary design comes first
 
-Before implementing Context/Fiber/Effect/Reconcile, Qianqian must decide how the real product is decomposed.
+The Base Kernel K0 (PR #71) implements Context/Fiber/Effect/Reconcile. The product decomposition was decided by the component boundary audit (#53).
 
 Required design order:
 
@@ -394,8 +388,6 @@ Kernel-internal dependency invalidation is not the same thing as a public produc
 
 ## Future kernel primitives
 
-Only after the #67 design gate passes and its PR merges may an implementation task concretize:
-
 ### Context
 
 Capability/dependency view visible to a Fiber. Not a global `HashMap<TypeId, Any>` escape hatch and not a payload bus.
@@ -484,11 +476,7 @@ other direct R0 capability fields/accessors
 
 They are not compatibility contracts.
 
-However:
-
-> **Do not replace them with a new Composition Kernel implementation until the Corrective-5 pre-implementation review is accepted and a separate implementation issue is opened.**
-
-The future implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
+The Base Kernel K0 implementation (PR #71) is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
 
 ## Current gate
 
@@ -498,13 +486,9 @@ Current authority chain:
 #53 COMPONENT-BOUNDARY-A0
         ↓ PASS / CLOSED (two corrective rounds; audit: component-boundary-a0.md)
 #67 COMPOSITION-KERNEL-0 DESIGN — semantic design MERGED via PR #68
-        ↓ (composition-kernel-0-design.md; Revisions 1–4)
-Corrective-4 pre-implementation review
-        ↓ human-reviewed: PASS_WITH_ONE_CORRECTIVE (review 5127750303)
-Corrective-5 pre-implementation review — CURRENT GATE
-        ↓ accepted by human review
-future COMPOSITION-KERNEL-0 IMPLEMENTATION issue
-        ↓ opens only then
+        ↓ (composition-kernel-0-design.md; Revisions 1–6)
+#70 COMPOSITION-KERNEL-0 IMPL — IMPLEMENTED via PR #71
+        ↓ (70 kernel tests / 75 workspace tests, 743eb86)
 ```
 
 #53 established (frozen, carried in `component-boundary-a0.md`):
@@ -522,14 +506,4 @@ confluence scenarios/oracle
 minimal first Windows playback decomposition
 ```
 
-#67 / PR #68 established the kernel's semantic design (primitive semantics, lifecycle, withdrawal, effect/independence model, confluence oracle, failure semantics) — it is merged authority. The post-merge pre-implementation review (Corrective-4, its provenance scope refined by Corrective-5) added the desired-revision-identity, effect-provenance and quiescence semantics on top; Corrective-5 is the current gate.
-
-Until the Corrective-5 review is accepted and the implementation issue is opened:
-
-```text
-NO qianqian-kernel implementation
-NO Context API freeze
-NO Fiber lifecycle implementation
-NO Reconcile implementation
-NO FFmpeg/WASAPI/PocketJS integration
-```
+#67 / PR #68 established the kernel's semantic design (primitive semantics, lifecycle, withdrawal, effect/independence model, confluence oracle, failure semantics) — it is merged authority. Post-merge correctives (4, 5, 6) added desired-revision-identity, effect-provenance, and quiescence semantics. The implementation (#70, PR #71) provides these primitives with 70 kernel oracle tests (75 workspace tests).
