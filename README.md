@@ -35,7 +35,7 @@ Gate status:
 ```text
 #53 COMPONENT-BOUNDARY-A0    PASS / CLOSED (PR #66 merged)
 #67 COMPOSITION-KERNEL-0     semantic design MERGED (PR #68)
-#70 COMPOSITION-KERNEL-0     IMPLEMENTED (PR #71 merged, 74 tests)
+#70 COMPOSITION-KERNEL-0     IMPLEMENTED (PR #71 merged, 70 kernel tests / 75 workspace tests)
 ```
 
 ## Control plane and data plane
@@ -144,7 +144,7 @@ qianqian-headless
 
 R0 `base` and constructor-only `AppRuntime` composition are bootstrap witnesses, not compatibility contracts.
 
-The decomposition was completed (#53, closed), the kernel semantic design was merged (PR #68), and the Base Kernel K0 was implemented (PR #71 merged, 74 oracle tests). The implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
+The decomposition was completed (#53, closed), the kernel semantic design was merged (PR #68), and the Base Kernel K0 was implemented (PR #71 merged, 70 kernel oracle tests / 75 workspace tests). The implementation is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
 
 Build/test authority:
 

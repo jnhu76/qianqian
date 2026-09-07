@@ -20,7 +20,9 @@ Quantitative claims must point to test results, artifacts, or executable evidenc
 
 ### 4. Formal diagrams use registered Mermaid assets.
 
-Canonical architecture diagrams are stored in `docs/architecture/diagrams/` and registered in `docs/architecture/registry.yml`. Pages reference registry IDs, not duplicated graph source.
+Canonical architecture diagrams are stored in `docs/architecture/diagrams/` and registered in `docs/architecture/registry.yml`.
+
+Current reality: several pages still embed inline Mermaid graphs that are simplified, canonical-equivalent copies of registered diagrams (e.g. ARCH-001/002/004/005 cores). The intended contract — pages reference registry IDs and carry no duplicated canonical source (AR7) — is documented but **not yet enforced** by `docs:verify`. Inline Mermaid remains acceptable only for explanatory diagrams that are not registered architecture assets.
 
 ### 5. Frozen diagrams are versioned, not edited semantically.
 

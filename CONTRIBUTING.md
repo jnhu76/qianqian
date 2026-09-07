@@ -13,7 +13,7 @@ Read:
 
 For plugin/composition work, read `docs/architecture/composition-kernel.md`.
 
-Gate status: #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (PR #66 merged); the #67 COMPOSITION-KERNEL-0 semantic design is merged (PR #68). The Base Kernel K0 is IMPLEMENTED (PR #71, 74 tests, 743eb86).
+Gate status: #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (PR #66 merged); the #67 COMPOSITION-KERNEL-0 semantic design is merged (PR #68). The Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86).
 
 Do not recursively preload historical docs or use `archive/pre-rust-v2` as current architecture authority.
 

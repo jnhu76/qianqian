@@ -42,7 +42,7 @@ Tests are organized as **adversarial oracles** — each test constructs a specif
 | Provider-disappearance | Dependents finish teardown before provider release |
 | Confluence | History → quiescence ≡ clean build |
 
-Additional oracles (A1–A20) cover adversarial edge cases identified during review.
+Additional oracles (A1–A21, 23 tests) cover adversarial edge cases identified during review.
 
 ---
 
@@ -52,10 +52,10 @@ Additional oracles (A1–A20) cover adversarial edge cases identified during rev
 
 | Evidence | Detail |
 |----------|--------|
-| Test count | 74 tests |
+| Test count | 70 kernel tests (75 workspace tests) |
 | All pass | At merge commit `743eb86` |
 | Test location | `crates/qianqian-kernel/tests` |
-| Adversarial oracles | A1–A20 |
+| Adversarial oracles | A1–A21 (23 tests) |
 | Implementation corrective-1 | `de46bd1` (P0-1..P1-5 fixes + A16–A20) |
 | Implementation corrective-2 | `048ebed` (review 5128815134) |
 
@@ -69,7 +69,7 @@ Additional oracles (A1–A20) cover adversarial edge cases identified during rev
 
 <ClaimBadge role="evidence" />
 
-All 74 tests pass. The six semantic guarantee groups are validated:
+All 70 kernel tests pass (75 workspace tests green). The six semantic guarantee groups are validated:
 
 1. **Single-Fiber local cleanup** — Effects unwind in LIFO order; fiber reaches a clean terminal state.
 2. **Cross-Fiber independent removal** — Removing a fiber preserves the observable contributions of unrelated fibers.
@@ -99,14 +99,16 @@ This enables the next frontier: the Playback Kernel (MusicKernel) as a domain-sp
 
 ```text
 crates/qianqian-kernel/tests/
-├── single_fiber_cleanup.rs       — LIFO effect unwind, fiber terminal
-├── cross_fiber_removal.rs        — independent removal preserves B/C
-├── same_key_contribution.rs      — shared key composition
-├── ordered_interaction.rs        — non-commutative structure
-├── provider_disappearance.rs     — withdrawal ordering
-├── confluence.rs                 — history → quiescence ≡ clean
-├── adversarial_review.rs         — A1–A20 adversarial oracles
-└── ...
+├── capability_oracles.rs            — pending/active ordering, ambiguity, identity (8)
+├── lifecycle_oracles.rs             — raise/unwind, FAILED, sibling isolation (5)
+├── effect_oracles.rs                — LIFO, same-key removal, provenance (6)
+├── revision_quiescence_oracles.rs   — D0–D4 revisions, settle semantics (11)
+├── withdrawal_oracles.rs            — provider withdrawal ordering (3)
+├── replacement_oracles.rs           — staged replacement (3)
+├── data_edge_oracles.rs             — pre-bound endpoints, zero kernel ops (3)
+├── confluence_oracles.rs            — history → quiescence ≡ clean build (6)
+├── dependency_firewall.rs           — kernel direction/dependency firewall (2)
+└── adversarial_review.rs            — A1–A21 adversarial oracles (23)
 ```
 
 ---

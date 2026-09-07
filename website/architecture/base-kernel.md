@@ -7,7 +7,7 @@ status: IMPLEMENTED
 
 <StatusBadge status="IMPLEMENTED" />
 
-The generic Composition Kernel implements five primitives — Context, Capability, Fiber, Effect, Reconcile — with 74 oracle tests. It is domain-agnostic: it knows nothing about music, PCM, FFmpeg, WASAPI, PocketJS, KuiklyUI, or UI payload schemas.
+The generic Composition Kernel implements five primitives — Context, Capability, Fiber, Effect, Reconcile — with 70 kernel oracle tests (75 workspace tests). It is domain-agnostic: it knows nothing about music, PCM, FFmpeg, WASAPI, PocketJS, KuiklyUI, or UI payload schemas.
 
 ---
 
@@ -101,7 +101,7 @@ $$
 
 ## Semantic Guarantees (Tested)
 
-The implementation is validated by 74 oracle tests across six groups:
+The implementation is validated by 70 kernel oracle tests across six groups:
 
 | Guarantee | What it proves |
 |-----------|---------------|
@@ -119,9 +119,9 @@ The implementation is validated by 74 oracle tests across six groups:
 | Artifact | Status |
 |----------|--------|
 | `crates/qianqian-kernel` | Implemented |
-| Test count | 74 |
+| Test count | 70 kernel (75 workspace) |
 | Tests pass | At merge (743eb86) |
-| Adversarial oracles | A1–A20 |
+| Adversarial oracles | A1–A21 |
 
 <ProvenancePanel
   :authority="['docs/architecture/composition-kernel-0-design.md', 'docs/architecture/composition-kernel-0-implementation-adr.md']"

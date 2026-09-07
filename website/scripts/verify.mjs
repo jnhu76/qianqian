@@ -9,9 +9,9 @@
  * AR4  every authority doc exists
  * AR5  every CURRENT / IMPLEMENTED architecture points to one explicit diagram version
  * AR6  a SUPERSEDED diagram cannot simultaneously be current
- * AR7  Web pages reference architecture registry IDs, not duplicated canonical graph source
+ * AR7  (documented, NOT yet enforced) Web pages reference architecture registry IDs, not duplicated canonical graph source
  * AR8  architecture registry does not use GitHub open/closed state as semantic status
- * AR9  frozen diagram version may only be replaced by a new version when architecture changes
+ * AR9  (documented, NOT yet enforced) frozen diagram version may only be replaced by a new version when architecture changes
  * AR10 architecture pages must declare provenance
  * ER1  experiment ID is globally unique
  * ER2  experiment evidence files exist where local

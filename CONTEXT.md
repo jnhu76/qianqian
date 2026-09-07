@@ -74,7 +74,7 @@ Confluence oracle
 Composition Kernel implementation
 ```
 
-#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). The #67 COMPOSITION-KERNEL-0 semantic design is MERGED (PR #68, `composition-kernel-0-design.md`). The Base Kernel K0 is IMPLEMENTED (PR #71, 74 tests, 743eb86).
+#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). The #67 COMPOSITION-KERNEL-0 semantic design is MERGED (PR #68, `composition-kernel-0-design.md`). The Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86).
 
 ## Interaction mental model
 

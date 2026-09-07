@@ -54,7 +54,7 @@ Semantic design for the generic Composition Kernel: five primitives (Context, Ca
 
 **IMPLEMENTED via PR #71**
 
-74 oracle tests across six semantic guarantee groups. Domain-agnostic kernel knows nothing about music, PCM, FFmpeg, WASAPI, or UI.
+70 kernel tests (75 workspace tests) across six semantic guarantee groups. Domain-agnostic kernel knows nothing about music, PCM, FFmpeg, WASAPI, or UI.
 
 Merged at commit `743eb86`.
 

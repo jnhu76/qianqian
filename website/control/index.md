@@ -80,7 +80,7 @@ See the canonical [system diagram](/architecture/#system-overview) for how Base 
 
 <StatusBadge status="IMPLEMENTED" />
 
-The generic Composition Kernel implements five primitives — Context, Capability, Fiber, Effect, Reconcile — with 74 oracle tests across six semantic guarantee groups. It is domain-agnostic: it knows nothing about music, PCM, FFmpeg, WASAPI, or UI payloads.
+The generic Composition Kernel implements five primitives — Context, Capability, Fiber, Effect, Reconcile — with 70 kernel oracle tests (75 workspace tests) across six semantic guarantee groups. It is domain-agnostic: it knows nothing about music, PCM, FFmpeg, WASAPI, or UI payloads.
 
 **Semantic guarantees validated:**
 

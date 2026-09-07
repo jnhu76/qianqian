@@ -2,7 +2,7 @@
 
 This document is the repository-local semantic overview for Qianqian Architecture v2.
 
-Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). The boundary audit #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED, the Composition Kernel semantic design (#67) is merged via PR #68, and the Base Kernel K0 is IMPLEMENTED (PR #71, 74 tests, 743eb86).
+Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). The boundary audit #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED, the Composition Kernel semantic design (#67) is merged via PR #68, and the Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86).
 
 ## Architecture constitution
 
@@ -352,7 +352,7 @@ Current authority chain is:
 #67 COMPOSITION-KERNEL-0 DESIGN — semantic design MERGED
         ↓ (PR #68; composition-kernel-0-design.md)
 #70 COMPOSITION-KERNEL-0 IMPL — IMPLEMENTED
-        ↓ (PR #71; 74 tests, 743eb86)
+        ↓ (PR #71; 70 kernel tests / 75 workspace tests, 743eb86)
 ```
 
 ## Historical evidence

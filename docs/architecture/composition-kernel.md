@@ -15,7 +15,7 @@ Gate chain:
 #67 COMPOSITION-KERNEL-0 DESIGN  semantic design MERGED via PR #68
                                   (composition-kernel-0-design.md)
         ↓
-#70 COMPOSITION-KERNEL-0 IMPL    IMPLEMENTED via PR #71 (74 tests, 743eb86)
+#70 COMPOSITION-KERNEL-0 IMPL    IMPLEMENTED via PR #71 (70 kernel tests / 75 workspace tests, 743eb86)
 ```
 
 ## Kernel constitution
@@ -488,7 +488,7 @@ Current authority chain:
 #67 COMPOSITION-KERNEL-0 DESIGN — semantic design MERGED via PR #68
         ↓ (composition-kernel-0-design.md; Revisions 1–6)
 #70 COMPOSITION-KERNEL-0 IMPL — IMPLEMENTED via PR #71
-        ↓ (74 tests, 743eb86)
+        ↓ (70 kernel tests / 75 workspace tests, 743eb86)
 ```
 
 #53 established (frozen, carried in `component-boundary-a0.md`):
@@ -506,4 +506,4 @@ confluence scenarios/oracle
 minimal first Windows playback decomposition
 ```
 
-#67 / PR #68 established the kernel's semantic design (primitive semantics, lifecycle, withdrawal, effect/independence model, confluence oracle, failure semantics) — it is merged authority. Post-merge correctives (4, 5, 6) added desired-revision-identity, effect-provenance, and quiescence semantics. The implementation (#70, PR #71) provides these primitives with 74 oracle tests.
+#67 / PR #68 established the kernel's semantic design (primitive semantics, lifecycle, withdrawal, effect/independence model, confluence oracle, failure semantics) — it is merged authority. Post-merge correctives (4, 5, 6) added desired-revision-identity, effect-provenance, and quiescence semantics. The implementation (#70, PR #71) provides these primitives with 70 kernel oracle tests (75 workspace tests).

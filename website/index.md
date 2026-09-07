@@ -20,7 +20,7 @@ hero:
 
 features:
   - title: "Composition Kernel K0"
-    details: "Five primitives — Context, Capability, Fiber, Effect, Reconcile — with 74 validated oracle tests. Domain-agnostic control plane."
+    details: "Five primitives — Context, Capability, Fiber, Effect, Reconcile — with 70 validated kernel oracle tests (75 workspace tests). Domain-agnostic control plane."
     status: "IMPLEMENTED"
   - title: "Playback Kernel"
     details: "Music-domain semantic authority: track/session/state, play/pause/stop/seek, queue, buffering/recovery, ENDED/timeline."

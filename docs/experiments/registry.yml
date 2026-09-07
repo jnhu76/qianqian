@@ -50,9 +50,9 @@ experiments:
 
     result:
       summary: >
-        74 tests across 6 semantic guarantee groups validate the Base Kernel K0
-        implementation against the frozen semantic design. All tests pass at
-        merge (743eb86).
+        70 kernel tests (75 workspace tests) across 6 semantic guarantee groups
+        validate the Base Kernel K0 implementation against the frozen semantic
+        design. All tests pass at merge (743eb86).
       semantic_guarantees:
         - single-Fiber local cleanup
         - cross-Fiber independent removal
@@ -60,5 +60,6 @@ experiments:
         - explicit handling of ordered/non-commutative interaction
         - provider-disappearance ordering
         - confluence after mutation history
-      test_count: 74
+      kernel_test_count: 70
+      workspace_test_count: 75
       last_verified_commit: 743eb86

@@ -53,7 +53,7 @@ The paper proves:
 | Desired → running graph | **Reconcile** — moves graph toward desired composition |
 | Capability provision/consumption | **Capability** — named/typed service contract |
 | LIFO effect composition | Intra-Fiber effects unwind in LIFO order |
-| Confluence | Tested by oracle campaign (74 tests) |
+| Confluence | Tested by oracle campaign (70 kernel tests) |
 
 ---
 
@@ -88,7 +88,7 @@ The paper proves:
 
 <ClaimBadge role="evidence" />
 
-The Base Kernel K0 implements the five borrowed primitives and validates them through 74 oracle tests. The tests prove:
+The Base Kernel K0 implements the five borrowed primitives and validates them through 70 kernel oracle tests (75 workspace tests). The tests prove:
 
 - **Thm 5/7 instantiation** — LIFO effect unwind verified in single-Fiber cleanup tests
 - **Thm 15 instantiation** — Local revertibility: a disposer proves local revert, not cross-Fiber independence

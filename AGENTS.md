@@ -67,7 +67,7 @@ Gate chain:
 #67 COMPOSITION-KERNEL-0 DESIGN  semantic design MERGED via PR #68
                                   (docs/architecture/composition-kernel-0-design.md)
         ↓
-#70 COMPOSITION-KERNEL-0 IMPL    IMPLEMENTED via PR #71 (74 tests, 743eb86)
+#70 COMPOSITION-KERNEL-0 IMPL    IMPLEMENTED via PR #71 (70 kernel tests / 75 workspace tests, 743eb86)
 ```
 
 A different feature name, Rust type, crate, or file is not evidence that something deserves its own plugin.
