@@ -1,32 +1,40 @@
 flowchart TB
-    subgraph PK["Playback Kernel / MusicKernel — NEXT / PLANNED"]
+    subgraph MUSIC["MusicComponent — composition lifecycle root"]
         direction TB
-        subgraph DomainSemantics["Domain Semantics"]
-            TS["Track / Session / State"]
-            PP["Play / Pause / Stop / Seek"]
-            QR["Queue / Repeat / Shuffle"]
-            BFR["Buffering / Recovery"]
-            EN["ENDED / Timeline"]
+
+        MK["MusicKernel\nmusic/product semantic authority"]
+        TK["TransportKernel\nplayback temporal authority"]
+
+        subgraph TRACKS["Nested playback runtime"]
+            TS["TrackSession(s)\nmedia identity/source lifetime"]
+            DS["DecodeSession(s)\none independently advancing decoder cursor each"]
+            TS --> DS
         end
 
-        subgraph Mechanisms["Cohesive MVP Mechanisms"]
-            DW["Decode Worker"]
-            PR["PCM Ring"]
-            RT["RT Publication\ncommit / flush"]
-        end
+        TK --- TS
+        MK -->|"playback intent / product decisions"| TK
     end
 
-    DEC["Decoder"] -->|"open / probe / decode / seek"| PK
-    PK -->|"bind PcmSink"| AOUT["AudioOutput"]
-    PK -.->|"future"| PROC["Processing"]
-    UH["UiHost"] -.->|"poll snapshot"| PK
+    DEC["Decoder provider"] -->|"decode / seek / EOF evidence"| DS
+    DS -->|"canonical PCM + MediaSpan provenance"| PROC["Audio Processing Graph\nGain / EQ / SRC / ..."]
+    PROC -->|"canonical PCM"| AOUT["AudioOutput / PcmSink provider"]
+    AOUT -->|"submitted / rendered / fence evidence"| TK
 
-    style PK fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
-    style DomainSemantics fill:#2d6a4f,stroke:#4a9a6f,color:#e0e0e0
-    style Mechanisms fill:#3a5a3a,stroke:#5a7a5a,color:#e0e0e0
+    TK -->|"typed derived terminal/transport facts"| MK
+    UI["UI / integrations"] -->|"PlaybackIntent"| MK
 
-    classDef next fill:#e9c46a,stroke:#f4a261,color:#1a1a1a
-    classDef planned fill:#4a4a6a,stroke:#6a6a8a,color:#e0e0e0
+    TK -.-> ACTIVE["Active role\n1"]
+    TK -.-> PREP["Prepared role\n0..1"]
+    TK -.-> GEN["Generation admission\nwindow-scoped"]
+    TK -.-> FENCE["Physical Fence\nlogical invalidation != physical stop"]
 
-    class DW,PR,RT,PK next
-    class DEC,AOUT,PROC,UH planned
+    style MUSIC fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
+    style MK fill:#2d6a4f,stroke:#4a9a6f,color:#e0e0e0
+    style TK fill:#264653,stroke:#457b9d,color:#e0e0e0
+    style TRACKS fill:#3a5a3a,stroke:#5a7a5a,color:#e0e0e0
+
+    classDef provider fill:#4a4a6a,stroke:#6a6a8a,color:#e0e0e0
+    classDef temporal fill:#e9c46a,stroke:#f4a261,color:#1a1a1a
+
+    class DEC,AOUT provider
+    class ACTIVE,PREP,GEN,FENCE temporal

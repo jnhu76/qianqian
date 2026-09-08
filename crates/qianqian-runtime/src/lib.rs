@@ -1,28 +1,26 @@
 //! Qianqian composition root.
 //!
-//! R0 constructor-only composition is now hosted by the generic Composition
-//! Kernel (#70 R0 migration witness): product capability contracts are
-//! declared here, providers install them as kernel provisions, and product
-//! consumers reach them through kernel-mediated resolution. This is the
-//! smallest proof that Qianqian product components can be hosted by the
-//! generic kernel — no real FFmpeg/WASAPI/PocketJS integration happens here.
+//! Product components are hosted by the generic Composition Kernel: product
+//! capability contracts are declared here, providers install them as kernel
+//! provisions, and consumers reach them through kernel-mediated resolution.
 //!
-//! Ownership universes (design §J.4): `MusicKernel` stays product/domain
-//! state owned by this crate. The kernel controls only reachability,
-//! ownership and lifetime of the composition — never payloads.
+//! The composition kernel controls reachability/lifetime only. Playback
+//! semantic authorities remain product state: `MusicKernel` owns music/product
+//! meaning while `TransportKernel` owns playback-temporal meaning. Neither is
+//! the generic Composition Kernel, and neither makes PCM a Context payload.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use qianqian_core::music::MusicKernel;
 use qianqian_core::ports::AudioOutput;
+use qianqian_core::transport::TransportKernel;
 use qianqian_kernel::{Capability, ComponentSpec, DesiredEntry, Kernel, Revision};
 
-/// The R0 audio-output port hosted as a kernel capability contract.
+/// The current audio-output port hosted as a kernel capability contract.
 /// Capability identity is this contract definition site — not any concrete
 /// output implementation. Consumers depend on the definition across the
-/// plugin seam (architecture: capabilities expose contracts; providers own
-/// mechanisms).
+/// plugin seam; providers own mechanisms.
 pub struct AudioOutputCapability;
 
 impl Capability for AudioOutputCapability {
@@ -30,17 +28,18 @@ impl Capability for AudioOutputCapability {
     type Service = dyn AudioOutput;
 }
 
-/// The running application assembled through the generic kernel.
+/// The running application assembled through the generic Composition Kernel.
 pub struct AppRuntime {
-    /// Generic composition kernel: reachability, ownership, lifetime.
+    /// Generic composition truth: reachability, binding ownership and Fiber
+    /// lifetime. It never owns playback cursor/window/product state.
     composition: Kernel,
-    /// Product/domain state: the Music Kernel. Outside the kernel by the
-    /// composition/domain firewall (design §J).
-    kernel: MusicKernel,
+    /// Music-domain/product semantic authority.
+    music_kernel: MusicKernel,
+    /// Playback-temporal semantic authority.
+    transport_kernel: TransportKernel,
     /// Pre-bound data-plane handle to the resolved audio output service.
-    /// A cached projection for ergonomic access — the composition authority
-    /// is the kernel's provision effect; this cell holds the service object
-    /// for direct payload use after binding (capability plane != data plane).
+    /// The composition authority is still the kernel's binding; this cached
+    /// service is for direct payload/mechanism use after binding.
     audio_output: Rc<RefCell<Option<Rc<dyn AudioOutput>>>>,
 }
 
@@ -51,32 +50,32 @@ impl Default for AppRuntime {
 }
 
 impl AppRuntime {
-    /// Empty runtime: the music fiber is desired but sits Pending over its
-    /// unsatisfied dependency — the honest degraded state, never a crash
-    /// (#53 §K.5).
+    /// Empty runtime: the music Fiber is desired but stays Pending over its
+    /// unsatisfied output dependency rather than crashing the root.
     pub fn new() -> Self {
         let audio_output: Rc<RefCell<Option<Rc<dyn AudioOutput>>>> = Rc::new(RefCell::new(None));
         let mut composition = Kernel::new();
         composition
             .register_component(music_component(audio_output.clone()))
-            .expect("R0 music component registration is legal");
+            .expect("music component registration is legal");
         composition
             .set_desired(vec![DesiredEntry::enabled(
                 "music",
                 "music",
                 Revision::new(1),
             )])
-            .expect("the R0 desired composition is legal");
+            .expect("the desired composition is legal");
         composition.settle();
         Self {
             composition,
-            kernel: MusicKernel::new(),
+            music_kernel: MusicKernel::new(),
+            transport_kernel: TransportKernel::new(),
             audio_output,
         }
     }
 
-    /// Static profile composition: present the audio output implementation
-    /// as a kernel-hosted provider fiber.
+    /// Static profile composition: present an audio-output implementation as
+    /// a kernel-hosted provider Fiber.
     pub fn with_audio_output(self, audio_output: Box<dyn AudioOutput>) -> Self {
         let service: Rc<dyn AudioOutput> = Rc::from(audio_output);
         let mut composition = self.composition;
@@ -90,13 +89,13 @@ impl AppRuntime {
                         Ok(())
                     }),
             )
-            .expect("R0 audio-output component registration is legal");
+            .expect("audio-output component registration is legal");
         composition
             .set_desired(vec![
                 DesiredEntry::enabled("audio_output", "audio_output", Revision::new(1)),
                 DesiredEntry::enabled("music", "music", Revision::new(1)),
             ])
-            .expect("the R0 desired composition is legal");
+            .expect("the desired composition is legal");
         composition.settle();
         Self {
             composition,
@@ -104,19 +103,26 @@ impl AppRuntime {
         }
     }
 
-    /// Product/domain semantics: untouched by composition (design §J.3 —
-    /// the kernel may never know playback state).
-    pub fn kernel(&self) -> &MusicKernel {
-        &self.kernel
+    /// Music/product semantic authority.
+    pub fn music_kernel(&self) -> &MusicKernel {
+        &self.music_kernel
     }
 
-    /// The resolved audio output service handle, present iff the kernel
-    /// mediates an active AudioOutput binding for the music fiber.
+    /// Playback-temporal semantic authority.
+    ///
+    /// This shell does not yet expose Window/Generation/Fence APIs; it only
+    /// makes the frozen authority split explicit in production Rust topology.
+    pub fn transport_kernel(&self) -> &TransportKernel {
+        &self.transport_kernel
+    }
+
+    /// The resolved audio output service handle, present iff the Composition
+    /// Kernel mediates an active AudioOutput binding for the music Fiber.
     pub fn audio_output(&self) -> Option<Rc<dyn AudioOutput>> {
         self.audio_output.borrow().clone()
     }
 
-    /// Composition truth for diagnostics/tests (closed §I.1 surface).
+    /// Composition truth for diagnostics/tests.
     pub fn composition_snapshot(&self) -> qianqian_kernel::CompositionSnapshot {
         self.composition.snapshot()
     }
@@ -132,9 +138,9 @@ impl AppRuntime {
     }
 }
 
-/// The music fiber: requires the audio output capability at activation and
-/// owns its binding as an effect whose inverse releases the pre-bound
-/// handle on teardown (kernel-mediated reachability, §K).
+/// The Music Fiber requires the audio-output capability at activation and
+/// owns the binding effect whose inverse releases the pre-bound handle on
+/// teardown. Domain/temporal state remains outside generic kernel storage.
 fn music_component(audio_output: Rc<RefCell<Option<Rc<dyn AudioOutput>>>>) -> ComponentSpec {
     let handle_on_activate = audio_output.clone();
     ComponentSpec::new("music")
@@ -147,7 +153,6 @@ fn music_component(audio_output: Rc<RefCell<Option<Rc<dyn AudioOutput>>>>) -> Co
             Ok(())
         })
         .on_teardown(move |_| {
-            // The binding's teardown releases the pre-bound handle.
             *audio_output.borrow_mut() = None;
             qianqian_kernel::Discharge::Discharged
         })
@@ -167,13 +172,14 @@ mod tests {
     #[test]
     fn kernel_hosted_profile_composes_music_with_audio_output() {
         let runtime = AppRuntime::new().with_audio_output(Box::new(FakeAudioOutput));
-        assert_eq!(runtime.kernel().state(), PlaybackState::Idle);
+        assert_eq!(runtime.music_kernel().state(), PlaybackState::Idle);
+        let _transport = runtime.transport_kernel();
         assert!(runtime.audio_output().is_some());
         let snap = runtime.composition_snapshot();
         assert_eq!(
             snap.fibers.get("music").map(|f| f.state),
             Some(FiberState::Active),
-            "the music fiber is hosted and active"
+            "the music Fiber is hosted and active"
         );
         assert_eq!(
             snap.capabilities.get("AudioOutput"),
@@ -185,13 +191,14 @@ mod tests {
     #[test]
     fn empty_runtime_degrades_to_pending_without_audio_output() {
         let runtime = AppRuntime::new();
-        assert_eq!(runtime.kernel().state(), PlaybackState::Idle);
+        assert_eq!(runtime.music_kernel().state(), PlaybackState::Idle);
+        let _transport = runtime.transport_kernel();
         assert!(runtime.audio_output().is_none());
         let snap = runtime.composition_snapshot();
         assert_eq!(
             snap.fibers.get("music").map(|f| f.state),
             Some(FiberState::Pending),
-            "unsatisfied dependency => Pending, never a root crash (#53 §K.5)"
+            "unsatisfied dependency => Pending, never a root crash"
         );
         assert!(snap.quiet);
     }
@@ -212,7 +219,7 @@ mod tests {
 
         assert!(
             runtime.audio_output().is_none(),
-            "the music fiber's teardown must release the pre-bound handle"
+            "the music Fiber's teardown must release the pre-bound handle"
         );
         let snap = runtime.composition_snapshot();
         assert_eq!(

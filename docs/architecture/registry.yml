@@ -51,26 +51,32 @@ architectures:
       - crates/qianqian-kernel/tests
 
   - id: ARCH-003
-    name: Playback Kernel
+    name: Playback Architecture
     version: 1
-    status: NEXT
+    status: PROPOSED
 
     diagram:
       source: docs/architecture/diagrams/ARCH-003-playback-kernel-v1.mmd
       frozen: true
 
     authority:
-      - docs/architecture/component-boundary-a0.md
+      - docs/adr/ADR-PBK-001.md
       - docs/architecture/overview.md
 
     decisions:
       - issue: 53
       - pr: 66
+      - pr: 78
+      - pr: 79
 
     implementation: []
 
     evidence:
       - research/playback-reference-v1
+      - specs/playback/PlaybackTemporal.tla
+      - specs/playback/README.md
+      - crates/qianqian-core/src/music.rs
+      - crates/qianqian-core/src/transport.rs
 
   - id: ARCH-004
     name: Plugin Graph
@@ -82,7 +88,7 @@ architectures:
       frozen: true
 
     authority:
-      - docs/architecture/component-boundary-a0.md
+      - docs/architecture/composition-kernel.md
       - docs/architecture/overview.md
 
     decisions:

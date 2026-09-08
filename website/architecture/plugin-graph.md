@@ -7,27 +7,47 @@ status: NEXT
 
 <StatusBadge status="NEXT" />
 
-插件图展示逻辑组件边界及其能力依赖。
+插件图描述 **Composition topology**：哪些长期能力真的通过 Capability/Fiber 参与组合。它不是 PCM Processing Graph。
 
-<ClaimBadge role="interpretation" />
-
-> 逻辑插件边界 **!=** crate / 动态库边界。
+> **逻辑插件边界 != crate / 动态库边界。**
 
 ---
 
-## 当前目标形态
+## 当前组合边界
 
 ```mermaid
 flowchart LR
-    DEC["Decoder<br/>(编码媒体 → PCM)"]
-    MUSIC["Music / Playback<br/>(领域语义)"]
-    AOUT["AudioOutput<br/>(PCM → 物理)"]
+    MUSIC["MusicComponent<br/>composition lifecycle root"]
+    DEC["Decoder provider<br/>encoded media → canonical PCM"]
+    AOUT["AudioOutput / PcmSink provider<br/>PCM → physical + evidence"]
 
-    DEC -->|"提供 Decoder 能力"| MUSIC
-    MUSIC -->|"依赖 Decoder"| DEC
-    MUSIC -->|"绑定 PcmSink"| AOUT
-    AOUT -->|"提供 PcmSink"| MUSIC
+    MUSIC -->|"requires Decoder"| DEC
+    MUSIC -->|"requires AudioOutput / PcmSink"| AOUT
 ```
+
+`MusicComponent` 内部包含：
+
+```text
+MusicKernel      music/product semantic authority
+TransportKernel  playback temporal authority
+TrackSession(s)
+DecodeSession(s)
+```
+
+这些内部对象不因为有状态就自动成为独立 Fiber。
+
+---
+
+## Processing Graph 不是 Plugin Graph
+
+```mermaid
+flowchart LR
+    GAIN["Gain"] --> EQ["EQ"] --> SRC["SRC"] --> LIM["Limiter"]
+```
+
+Gain / EQ / SRC / Limiter 是有顺序的 PCM transform。它们的普通插入、移除和参数更新属于 processing topology，不自动触发 Composition Reconcile。
+
+只有当一个 Processing provider 真正获得独立组合身份、对外 Capability、replace/withdraw boundary 时，它才进入 Composition graph。
 
 ---
 
@@ -35,47 +55,44 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    subgraph Future["未来组件"]
-        PROC["Processing<br/>(PCM → PCM)"]
-        UH["UiHost<br/>(呈现)"]
-    end
+    MUSIC2["MusicComponent"]
+    PROC["independent Processing provider<br/>仅在边界被证明后"]
+    UH["UiHost<br/>presentation mechanism"]
 
-    MUSIC2["Music"] -.->|"未来:PCM → PCM"| PROC
-    PROC -.->|"未来:PCM → 物理"| AOUT2["AudioOutput"]
-    MUSIC2 -.->|"未来:轮询快照"| UH
+    MUSIC2 -.->|"future, if earned"| PROC
+    UH -.->|"consumes domain contracts"| MUSIC2
 ```
 
 ---
 
 ## 组件依赖矩阵
 
-| 组件 | 依赖 | 提供 |
-|------|------|------|
-| Music | Decoder、PcmSink | PlaybackControl、PlaybackSnapshot |
-| Decoder | 无 | Decoder 能力 |
-| AudioOutput | 无 | PcmSink、OutputDeviceDiscovery |
-| Processing *(未来)* | PCM 输入 | PCM 输出 |
-| UiHost *(未来)* | 快照 | 用户输入 |
+| 组件 | 依赖 | 提供 / 角色 |
+|---|---|---|
+| MusicComponent | Decoder、AudioOutput/PcmSink | Playback/domain contracts；内部 lifecycle root |
+| Decoder | 无 | Decoder capability |
+| AudioOutput | 无 | PcmSink / output evidence / optional device control |
+| independent Processing provider *(未来，若挣得边界)* | 由未来 contract 决定 | ordered PCM graph service |
+| UiHost *(未来)* | domain/presentation contracts | UI mechanism |
 
 ---
 
-## 边界论证
+## 边界判断
 
-每个组件边界必须回答:
+一个候选成为 plugin/capability 前，要回答：
 
-- 它拥有什么状态/资源?
-- 它需要什么能力?
-- 它提供什么能力?
-- 哪些操作跨越边界?
-- 哪些操作可交换?
-- 非可交换顺序在哪里显式表达?
+- 是否具有独立组合身份？
+- 外部 component 是否通过 Capability 绑定它？
+- 是否可以独立 replace / withdraw？
+- 是否存在 composition-level teardown boundary？
+- 更细的拆分是否真的换来 composability，而不是只增加命名与配置成本？
 
-不同的特性名不是组件独立性的证据。
+不同特性名、不同 Rust struct、甚至独立线程，都不是独立 plugin 的充分证据。
 
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/component-boundary-a0.md', 'docs/architecture/overview.md']"
-  :decisions="[{ issue: 53 }, { pr: 66 }]"
-  :evidence="['crates/qianqian-core/src/ports.rs']"
+  :authority="['docs/architecture/composition-kernel.md', 'docs/architecture/overview.md', 'docs/adr/ADR-PBK-001.md']"
+  :decisions="[{ pr: 66 }, { pr: 78 }, { pr: 79 }]"
+  :evidence="['crates/qianqian-core/src/ports.rs', 'crates/qianqian-core/src/transport.rs']"
 />

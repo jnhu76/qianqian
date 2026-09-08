@@ -2,6 +2,8 @@
 
 This document is the canonical Architecture v2 authority for Qianqian's generic composition/control-plane kernel.
 
+Playback-specific semantic authority lives in `docs/adr/ADR-PBK-001.md`. The historical #53 audit remains decomposition evidence, but where playback-specific ownership/authority statements differ, ADR-PBK-001 is the current authority.
+
 It defines both:
 
 1. the **preconditions** that must hold before a kernel implementation is justified; and
@@ -16,6 +18,8 @@ Gate chain:
                                   (composition-kernel-0-design.md)
         ↓
 #70 COMPOSITION-KERNEL-0 IMPL    IMPLEMENTED via PR #71 (70 kernel tests / 75 workspace tests, 743eb86)
+        ↓
+ADR-PBK-001 PLAYBACK ARCH        PROPOSED / FORMAL CORE PASS (PR #78 + #79)
 ```
 
 ## Kernel constitution
@@ -37,8 +41,10 @@ Reconcile
 It must not know:
 
 ```text
-Track
-PCM
+TrackSession / DecodeSession
+playback cursor / Active / Prepared
+Generation admission / Physical Fence
+PCM / MediaSpan
 codec formats
 FFmpeg
 WASAPI
@@ -53,7 +59,7 @@ But the primitive list is **not** the architecture starting point.
 
 ## Boundary design comes first
 
-The Base Kernel K0 (PR #71) implements Context/Fiber/Effect/Reconcile. The product decomposition was decided by the component boundary audit (#53).
+The Base Kernel K0 (PR #71) implements Context/Fiber/Effect/Reconcile. The product decomposition was decided by the component boundary audit (#53), with later playback-specific authority corrections captured by ADR-PBK-001.
 
 Required design order:
 
@@ -107,7 +113,7 @@ should trigger a mediation/integration-component audit. Bidirectional interactio
 
 However, finer decomposition is not automatically better. Component count, configuration and cognitive cost are first-class engineering costs.
 
-Current concrete audit authority: **#53 COMPONENT-BOUNDARY-A0** (PASS/CLOSED; accepted audit `component-boundary-a0.md`). Semantic-design authority for the kernel itself: **#67 / PR #68** (`composition-kernel-0-design.md`).
+Current generic composition authority: **#67 / PR #68** (`composition-kernel-0-design.md`) plus the implementation ADR. Historical decomposition evidence: **#53 COMPONENT-BOUNDARY-A0**. Current playback-specific authority: **ADR-PBK-001**.
 
 ## Control plane vs data plane
 
@@ -141,7 +147,7 @@ The Composition Kernel belongs to the control plane.
                           v
                        provider
 
-      MediaSource -> Decoder -> Processing -> AudioOutput
+      Encoded Media -> Decoder -> Processing -> AudioOutput
 ```
 
 The kernel decides:
@@ -378,6 +384,8 @@ zero leaked handles
 
 because it also detects history-dependent topology, stale bindings and ghost contributions.
 
+Playback position/state continuity is **not** automatically composition-confluence truth; that belongs to playback/domain policy and ADR-PBK-001.
+
 ## Event semantics
 
 A generic public EventBus is not automatically a Composition Kernel primitive.
@@ -404,7 +412,7 @@ Owned kernel-visible mutation/recovery provenance.
 
 Moves a running Fiber graph toward desired composition without collapsing the architecture into a privileged imperative `boot()` function.
 
-Exact Rust APIs/state enum names remain unfrozen until the implementation task is authorized.
+Exact Rust APIs/state enum names remain free to evolve subject to the already-implemented K0 semantics.
 
 ## Everything is a Plugin
 
@@ -423,13 +431,13 @@ everything is rollbackable
 every payload goes through Context
 ```
 
-Candidate boundaries currently include Music, MediaSource, Decoder, AudioRuntime, DSP stages, AudioOutput, Presentation, UiHost, Library, Analyzer and platform capabilities; #53 (now closed) decided the MVP granularity in `component-boundary-a0.md`.
+The historical #53 audit proposed the MVP composition boundaries. ADR-PBK-001 later refined the internal playback authority/lifetime model without turning MusicKernel, TransportKernel, TrackSession, DecodeSession, Active, Prepared, or ordinary DSP nodes into independent Composition plugins.
 
 ## Realtime specialization boundary
 
 The generic Composition Kernel is not the audio engine.
 
-A future AudioRuntime component may own:
+A future specialized audio graph/runtime may own:
 
 ```text
 AudioGraph
@@ -439,6 +447,8 @@ format negotiation
 RT scheduling
 graph publication/swap
 ```
+
+if that boundary is later earned.
 
 Realtime callback/block execution must not perform:
 
@@ -454,13 +464,21 @@ unbounded allocation/blocking
 
 PCM travels through pre-bound data-plane graph edges.
 
-## Relationship to MusicKernel
+## Relationship to playback authorities
 
-`MusicKernel` remains a music-domain semantic authority, not the application composition authority.
+`ADR-PBK-001` supersedes the old shorthand “Playback Kernel = MusicKernel”. Current playback structure is:
 
-A future justified Music component may own it and expose domain services/capabilities.
+```text
+MusicComponent   = composition lifecycle root
+MusicKernel      = music/product semantic authority
+TransportKernel  = playback temporal authority
+```
 
-The exact Music/Transport/Presentation split was audited by #53 (closed; `component-boundary-a0.md` §B.1/§I) and is not re-litigated here.
+Nested runtime includes `TrackSession(s)` and `DecodeSession(s)`. Active/Prepared are temporal roles inside TransportKernel.
+
+The generic Composition Kernel sees the `MusicComponent` and its capability/provider relationships; it does not own or interpret playback cursor, Window roles, Generation admission, Physical Fence state, or raw playback evidence.
+
+After binding, PCM flows on direct/pre-bound data edges. Raw playback evidence is interpreted by TransportKernel; MusicKernel receives typed derived facts for product decisions.
 
 ## R0 migration authority
 
@@ -476,7 +494,7 @@ other direct R0 capability fields/accessors
 
 They are not compatibility contracts.
 
-The Base Kernel K0 implementation (PR #71) is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
+The Base Kernel K0 implementation (PR #71) may replace R0 bootstrap shapes rather than preserve them for compatibility.
 
 ## Current gate
 
@@ -484,26 +502,13 @@ Current authority chain:
 
 ```text
 #53 COMPONENT-BOUNDARY-A0
-        ↓ PASS / CLOSED (two corrective rounds; audit: component-boundary-a0.md)
+        ↓ PASS / CLOSED (historical decomposition audit: component-boundary-a0.md)
 #67 COMPOSITION-KERNEL-0 DESIGN — semantic design MERGED via PR #68
         ↓ (composition-kernel-0-design.md; Revisions 1–6)
 #70 COMPOSITION-KERNEL-0 IMPL — IMPLEMENTED via PR #71
         ↓ (70 kernel tests / 75 workspace tests, 743eb86)
+ADR-PBK-001 PLAYBACK ARCH — PROPOSED / FORMAL CORE PASS
+        ↓ (PR #78 + #79; implementation authorization remains separate)
 ```
 
-#53 established (frozen, carried in `component-boundary-a0.md`):
-
-```text
-component boundaries
-ownership
-requires/provides graph
-cycle/integration-component decisions
-interaction algebra
-explicit ordering
-recoverable system boundary
-provider-disappearance ordering
-confluence scenarios/oracle
-minimal first Windows playback decomposition
-```
-
-#67 / PR #68 established the kernel's semantic design (primitive semantics, lifecycle, withdrawal, effect/independence model, confluence oracle, failure semantics) — it is merged authority. Post-merge correctives (4, 5, 6) added desired-revision-identity, effect-provenance, and quiescence semantics. The implementation (#70, PR #71) provides these primitives with 70 kernel oracle tests (75 workspace tests).
+#53 remains evidence for the original component-decomposition audit. Playback-specific ownership/semantic authority is current in ADR-PBK-001. Generic K0 semantics remain current in the K0 design/implementation ADRs and code/tests.

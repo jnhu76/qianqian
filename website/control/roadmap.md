@@ -9,71 +9,96 @@ import { projectState } from '../data/project-state.ts'
 
 # 路线图
 
-路线图由当前架构权威链驱动。状态来自单一来源:`docs/site/project-state.ts`。
+路线图只展示当前工程状态；架构语义以仓库 ADR / architecture docs 为准。
 
 ---
 
 ## 进度阶梯
 
-| 层 | 状态 | 门槛 |
-|----|------|------|
-| 播放参考 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Tag `playback-reference-v1` 已冻结 |
-| FFmpeg 闭包研究 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Issue #48,冻结 profiles 于 playback-reference-v1 |
-| 组件边界 A0 | <StatusBadge status="FROZEN" /> | Issue #53 PASS/CLOSED (PR #66) |
-| Base Kernel K0 | <StatusBadge status="IMPLEMENTED" /> | Issue #70,PR #71 merged (743eb86) |
-| Playback Kernel | <StatusBadge status="NEXT" /> | 设计权威:#53 组件边界 |
-| Decoder | <StatusBadge status="PLANNED" /> | 能力定义于 ports.rs,实现待定 |
-| Processing | <StatusBadge status="PLANNED" /> | 能力定义于 ports.rs,实现待定 |
-| AudioOutput | <StatusBadge status="PLANNED" /> | 能力定义于 ports.rs,实现待定 |
-| UI Host | <StatusBadge status="DEFERRED" /> | 平台:PocketJS (Win/Linux),KuiklyUI (Android/iOS) |
+| 层 | 状态 | 当前事实 |
+|---|---|---|
+| 播放参考 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | `playback-reference-v1` 是行为证据，不是未来 source-layout 模板 |
+| FFmpeg 闭包研究 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Decoder/Processing 共用单一 closure authority 的历史证据 |
+| 组件边界 A0 | <StatusBadge status="FROZEN" /> | #53 历史审计保留；playback-specific 结论由 ADR-PBK-001 supersede |
+| Base / Composition Kernel K0 | <StatusBadge status="IMPLEMENTED" /> | Context / Capability / Fiber / Effect / Reconcile 已实现 |
+| Playback Architecture | <StatusBadge status="CURRENT" /> | ADR-PBK-001：PROPOSED / FORMAL CORE PASS；当前做全仓 authority alignment / acceptance review |
+| Decoder provider | <StatusBadge status="PLANNED" /> | capability seam 已有；真实 provider 实现未授权于本轮 |
+| Audio Processing | <StatusBadge status="PLANNED" /> | ordered PCM graph；普通 DSP node 不自动成为 plugin |
+| AudioOutput provider | <StatusBadge status="PLANNED" /> | capability seam 已有；真实设备实现未授权于本轮 |
+| UI Host | <StatusBadge status="DEFERRED" /> | UI 不参与 realtime correctness |
 
 ---
 
-## 下一个前沿:Playback Kernel
+## 当前前沿：统一 Playback authority，再决定是否 ACCEPT
 
-Playback Kernel(MusicKernel)是音乐领域语义权威。它拥有:
+**{{ projectState.currentFrontier }}**
 
-- 播放状态机(EMPTY/READY/PLAYING/PAUSED/ENDED/ERROR)
-- 媒体时间线真相(position/duration、CONFIRMED/ESTIMATED 落点)
-- 活动曲目会话、解码 worker、PCM 环形缓冲
-- RT 安全发布边界(commit/flush)
-- 队列语义(未来)
+这一阶段的目标不是实现 PlayerEngine，而是确认仓库的当前入口只讲一套事实：
 
-**它不是全局组合权威。**
+```text
+MusicComponent
+├── MusicKernel       music/product semantic authority
+├── TransportKernel   playback temporal authority
+└── TrackSession(s)
+    └── DecodeSession(s)
+```
 
-通用 Composition Kernel 处理可达性、所有权与生命周期。MusicKernel 拥有音乐语义。
+本轮允许最小 code shell 对齐 vocabulary，但不把 ADR 的未来 representation 提前变成生产实现。
 
-<ProvenancePanel
-  :authority="['docs/architecture/component-boundary-a0.md', 'docs/architecture/overview.md']"
-  :decisions="[{ issue: 53 }, { pr: 66 }]"
-  :evidence="['research/playback-reference-v1']"
-/>
+只有 ADR 经过人工 ACCEPTED 之后，下一阶段才进入 executable playback model，并由实现压力逐步挣得：
+
+- TrackSession / DecodeSession representation；
+- Active / Prepared role representation；
+- Generation admission executable contract；
+- Physical Fence 与真实 AudioOutput provider 的接口；
+- fence 在途时后续 intent 的 defer/coalesce/latest-wins 等 policy。
 
 ---
 
-## 架构变更协议
+## 已经不再是开放问题的边界
 
-变更经过严格的协议流转:
+```text
+MusicKernel != playback timeline authority
+TransportKernel = playback temporal authority
+TrackSession may own multiple DecodeSessions
+Active + Prepared may coexist
+stale is admission-based, not global-current equality
+logical invalidation != physical stop
+Composition Graph != Audio Processing Graph
+```
+
+这些不是实现者可随意重新选择的风格偏好。
+
+---
+
+## 下一步问题
+
+<template v-for="(q, i) in projectState.nextQuestions" :key="i">
+1. {{ q }}
+</template>
+
+---
+
+## 验证升级原则
 
 ```mermaid
 flowchart LR
-    Q["问题"] --> I["Issue / 门槛"]
-    I --> R["研究 / 实验"]
-    R --> D["权威文档"]
-    D --> G["冻结的 Mermaid 图"]
-    D --> C["实现"]
-    C --> T["可执行证据"]
-    D --> W["观测站"]
-    G --> W
-    T --> W
-    I -. 溯源 .-> W
+    Q["真实问题 / 风险"] --> D["设计 authority"]
+    D --> E["必要证据"]
+    E --> C["最小实现"]
+    C --> T["可执行测试"]
+    T --> R["回写当前事实"]
+
+    D -.->|"只有高风险状态交错"| F["Formal exploration"]
+    F --> E
 ```
 
-观测站反映已被接受的权威 —— 它从不创造架构真理。
+> **TLA+ 用来找撞车，不用来证明整个架构。**
 
 ---
 
 <ProvenancePanel
-  :authority="['docs/site/project-state.ts', 'AGENTS.md §21']"
-  lastVerified="743eb86"
+  :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/overview.md', 'docs/site/project-state.ts']"
+  :decisions="[{ pr: 78 }, { pr: 79 }]"
+  :evidence="['specs/playback/PlaybackTemporal.tla', 'crates/qianqian-core/src/transport.rs']"
 />

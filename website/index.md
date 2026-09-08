@@ -3,7 +3,7 @@ layout: home
 hero:
   name: "Qianqian 工程观测站"
   text: "工程控制台"
-  tagline: 一个轻量级音乐播放器,也是一座系统架构实验室。
+  tagline: 一个轻量级音乐播放器，也是一座系统架构实验室。
   actions:
     - theme: brand
       text: 项目控制
@@ -20,15 +20,15 @@ hero:
 
 features:
   - title: "Composition Kernel K0"
-    details: "五个原语 —— Context、Capability、Fiber、Effect、Reconcile —— 70 项内核 oracle 测试(75 项 workspace 测试)全部通过。与领域无关的控制平面。"
+    details: "Context、Capability、Fiber、Effect、Reconcile 五个原语已实现。它只拥有 composition truth，不拥有音乐/PCM/playback timeline。"
     status: "IMPLEMENTED"
-  - title: "Playback Kernel"
-    details: "音乐领域语义权威:曲目/会话/状态、播放/暂停/停止/seek、队列、缓冲/恢复、ENDED/时间线。"
-    status: "NEXT"
+  - title: "Playback Architecture"
+    details: "ADR-PBK-001 formal core PASS：MusicComponent 是 lifecycle root，MusicKernel 管产品语义，TransportKernel 管时间语义；当前进行全仓 authority alignment 与 acceptance review。"
+    status: "CURRENT"
   - title: "Decoder"
-    details: "编码媒体 → 规范化 PCM。唯一共享的 FFmpeg 闭包权威。"
+    details: "编码媒体 → Canonical PCM。真实 provider contract/实现仍待 Playback ADR 获得后续实现授权。"
     status: "PLANNED"
   - title: "AudioOutput"
-    details: "规范化 PCM → 物理设备。预绑定的实时数据边。"
+    details: "Canonical PCM → 物理设备 + submitted/rendered/fence evidence。真实 backend 尚未获得本轮实现授权。"
     status: "PLANNED"
 ---

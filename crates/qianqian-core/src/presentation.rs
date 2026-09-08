@@ -1,8 +1,9 @@
-//! Presentation: stable UI-facing state and actions.
+//! Presentation: UI-facing state and actions.
 //!
-//! UI hosts consume this seam; they must not inspect Music Kernel
-//! internals. R0 proves only that UI-facing state is distinct from
-//! Music Kernel internal state.
+//! UI hosts consume product/domain projections; they do not inspect
+//! `MusicKernel` or `TransportKernel` internals and never interpret raw
+//! playback-temporal evidence. `PlaybackState` is already product meaning,
+//! so mapping it to a UI view remains a Music-domain concern.
 
 use crate::music::PlaybackState;
 
