@@ -73,15 +73,13 @@ For ARCH-003 playback work, `ADR-PBK-001` adds a separate acceptance fence after
 ```text
 Corrective-2 design review PASS
         ↓
-PlaybackTemporal formal model
+Core PlaybackTemporal formal model (five high-risk temporal semantic groups)
         ↓
-PlaybackOwnership formal model
-        ↓
-negative controls
-        ↓
-deterministic executable oracle
+Core negative controls (4)
         ↓
 ADR ACCEPTED / ARCH-003 authority corrective
+        ↓
+deterministic executable oracle (implementation entry)
 ```
 
 Do not treat design-review PASS as production implementation authorization.

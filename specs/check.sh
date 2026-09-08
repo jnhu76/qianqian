@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# specs/check.sh — 运行 specs/ 下全部形式化模型
+# specs/check.sh — 运行 specs/ 下形式化模型
+#
+# 用法：specs/check.sh [core|all]（缺省 all）
+#   core — core acceptance 集：PlaybackTemporal 正常模型 + 4 个 core mutation
+#          （ADR ACCEPTED blocking 集）
+#   all  — 全部：另含 PlaybackOwnership 与 extended mutation（supporting evidence）
 #
 # 规则：
 #   正常模型（无 mutation）必须 TLC 探索完成且全部 invariant PASS；
@@ -10,6 +15,12 @@
 #   tla2tools v1.7.4 (Xenophanes)，sha256 见下；缺失时自动下载
 #   （需要代理时请先 export http_proxy/https_proxy）。
 set -uo pipefail
+
+mode="${1:-all}"
+case "$mode" in
+  core|all) ;;
+  *) echo "usage: specs/check.sh [core|all]" >&2; exit 2 ;;
+esac
 
 SPEC_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLAYBACK="$SPEC_ROOT/playback"
@@ -69,18 +80,24 @@ run_tlc() {
 
 echo "== 正常模型（必须全部 PASS）"
 run_tlc PlaybackTemporal "$PLAYBACK/PlaybackTemporal.cfg" pass "PlaybackTemporal"
-run_tlc PlaybackOwnership "$PLAYBACK/PlaybackOwnership.cfg" pass "PlaybackOwnership"
+if [[ "$mode" == "all" ]]; then
+  run_tlc PlaybackOwnership "$PLAYBACK/PlaybackOwnership.cfg" pass "PlaybackOwnership"
+fi
 
 echo "== 负控制（必须产生 counterexample）"
 run_tlc PlaybackTemporal "$PLAYBACK/mutations/PromoteWithoutFence.cfg"      fail:PromotionRequiresSuccessfulFence    "Temporal / PromoteWithoutFence"
 run_tlc PlaybackTemporal "$PLAYBACK/mutations/AcceptUnadmittedDecode.cfg"  fail:DecodeResultRequiresAdmission       "Temporal / AcceptUnadmittedDecode"
 run_tlc PlaybackTemporal "$PLAYBACK/mutations/SingleGlobalGenerationCheck.cfg" fail:DecodeResultRequiresAdmission  "Temporal / SingleGlobalGenerationCheck" -continue
-run_tlc PlaybackTemporal "$PLAYBACK/mutations/RetiredGenerationStillAdmitted.cfg" fail:RetiredGenerationCannotReenter "Temporal / RetiredGenerationStillAdmitted"
+if [[ "$mode" == "all" ]]; then
+  run_tlc PlaybackTemporal "$PLAYBACK/mutations/RetiredGenerationStillAdmitted.cfg" fail:RetiredGenerationCannotReenter "Temporal / RetiredGenerationStillAdmitted（extended）"
+fi
 run_tlc PlaybackTemporal "$PLAYBACK/mutations/EndBeforeRenderDrain.cfg"    fail:TransportDrainRequiresRenderedDrain "Temporal / EndBeforeRenderDrain"
-run_tlc PlaybackOwnership "$PLAYBACK/mutations/ReleaseProviderEarly.cfg"   fail:ProviderFinalReleaseRequiresDependentExit "Ownership / ReleaseProviderEarly"
-run_tlc PlaybackOwnership "$PLAYBACK/mutations/MultipleImmediateOwners.cfg" fail:UniqueImmediateLifetimeOwner      "Ownership / MultipleImmediateOwners"
-run_tlc PlaybackOwnership "$PLAYBACK/mutations/OwnershipCycle.cfg"         fail:OwnershipReachesLifecycleRoot       "Ownership / OwnershipCycle"
-run_tlc PlaybackOwnership "$PLAYBACK/mutations/KernelAdoptsLifetimeOwnership.cfg" fail:SemanticAuthoritiesHoldNoLifetimeOwnership "Ownership / KernelAdoptsLifetimeOwnership"
+if [[ "$mode" == "all" ]]; then
+  run_tlc PlaybackOwnership "$PLAYBACK/mutations/ReleaseProviderEarly.cfg"   fail:ProviderFinalReleaseRequiresDependentExit "Ownership / ReleaseProviderEarly（extended）"
+  run_tlc PlaybackOwnership "$PLAYBACK/mutations/MultipleImmediateOwners.cfg" fail:UniqueImmediateLifetimeOwner      "Ownership / MultipleImmediateOwners（extended）"
+  run_tlc PlaybackOwnership "$PLAYBACK/mutations/OwnershipCycle.cfg"         fail:OwnershipReachesLifecycleRoot       "Ownership / OwnershipCycle（extended）"
+  run_tlc PlaybackOwnership "$PLAYBACK/mutations/KernelAdoptsLifetimeOwnership.cfg" fail:SemanticAuthoritiesHoldNoLifetimeOwnership "Ownership / KernelAdoptsLifetimeOwnership（extended）"
+fi
 
 if [[ "$fail" -eq 0 ]]; then
   echo "== 全部门通过"

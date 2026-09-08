@@ -1,6 +1,6 @@
 # ADR-PBK-001：播放时间轴、媒体会话、PCM 数据面与共享状态边界
 
-- **状态**：PROPOSED / Corrective-2 / Formal Gate Pending
+- **状态**：PROPOSED / FORMAL CORE PASS
 - **日期**：2026-09-08
 - **作用域**：Qianqian Playback Architecture / ARCH-003
 - **不重开**：Base / Composition Kernel K0
@@ -26,11 +26,13 @@ Immediate Lifetime Owner
 Semantic Authority
 ```
 
-Corrective-1 的 G1-G8 设计审计全部 PASS；但 ADR 尚不 ACCEPTED。剩余门槛改为 formal model + executable oracle：
+Corrective-1 的 G1-G8 设计审计全部 PASS。Formal Acceptance 已收缩为一个**小型 blocking temporal core**：只有 `PlaybackTemporal` 模型（五组高风险 temporal 语义）+ 4 个 core negative controls 阻塞 ACCEPTED。`PlaybackOwnership` 与其余 mutation 保留为 supporting evidence，不阻塞 ACCEPTED。deterministic executable oracle 移到 ACCEPTED 之后，作为 implementation entry，不是 architecture decision 成立的前置条件。
 
 ```text
-STATUS = PROPOSED / CORRECTIVE-2 / FORMAL GATE PENDING
+STATUS = PROPOSED / FORMAL CORE PASS
 DESIGN REVIEW = PASS
+CORE TEMPORAL CHECKS = PASS
+SUPPORTING FORMAL EVIDENCE = RETAINED / NON-BLOCKING
 IMPLEMENTATION AUTHORIZATION = NO
 ARCH-003 AUTHORITY REVISION = NO
 ```
@@ -141,7 +143,6 @@ Nested Runtime Resource
     ├── TransportKernel
     ├── TrackSession
     ├── DecodeSession
-    ├── ActiveWindow / PreparedWindow
     ├── ring/window bookkeeping
     └── component-local processing graph/node when not independently composed
 
@@ -150,6 +151,12 @@ Data Item
     ├── MediaSpan / provenance
     └── typed evidence record
 ```
+
+冻结：
+
+> **Active / Prepared 是 TransportKernel 内的 temporal role / slot，不是具有独立 lifecycle 的 Nested Runtime Resource。**
+
+ActiveWindow / PreparedWindow 描述 slot 上的 temporal role。不为了满足「every nested resource has an immediate owner」而把 Window 实体化为拥有独立生命周期的资源；Window 因此不引入额外的 immediate lifetime owner 问题。
 
 成为 plugin 的判据不是“有没有状态/析构/replace”，而是：
 
@@ -472,6 +479,12 @@ Generation 不能替代 Physical Fence。
 
 > **fence 成功后，被截断 generation 不得继续产生新的可听输出。**
 
+冻结（claim 后不可逆）：
+
+> **Physical Fence 一旦进入不可逆 / claimed 阶段，后续 intent 不得取消或改写已经 claim 的 physical transaction。**
+
+fence 在途期间新命令如何排队（reject / defer / coalesce / latest-wins）不在本文冻结，留给 executable implementation 验证。
+
 ---
 
 # 9. Canonical Audio Data Plane
@@ -787,6 +800,14 @@ close admission
     -> publish stopped semantic state
 ```
 
+冻结（stop × 自然 ENDED 竞态）：
+
+> **当 hard stop / discontinuity 的 Physical Fence 在途时，自然 EOF / drain 证据不得提前终态化（ENDED / final terminalization）而销毁完成该 fence 所需的 active temporal state。**
+
+EOF evidence 可以记录，producer terminal 可以记录；但 ENDED / final terminalization 不得抢在在途 Physical Fence 之前销毁必要状态。该不变量由形式化 counterexample 挣得：无此裁决时存在「ENDED 抢先移除 ActiveWindow → fence 永久无法完成 → 命令路径锁死」的可达坏状态。
+
+fence 在途期间是否接受新 seek/next（reject / defer / coalesce / latest-wins）是模型/实现决策，不在本文冻结；本文只冻结上一条 claimed-transaction 不可逆规则（§8）。
+
 ## ENDED
 
 禁止：
@@ -805,6 +826,15 @@ AND no submitted-but-unrendered media
 ```
 
 TransportKernel 从 raw evidence 得出 transport-drained truth；MusicKernel 再解释产品语义。
+
+## Prepared EOF
+
+冻结：
+
+> **EOF evidence does not imply PreparedWindow readiness.**
+> **Prepared contribution 在正常 readiness 前 terminal，必须得到显式 outcome，不得 silently become Ready。**
+
+具体 terminal 分类（prepare failed / empty media / seek-to-EOF 等）与处理策略留给实现与 executable oracle，不在本文设计完整状态机。
 
 ---
 
@@ -866,128 +896,98 @@ PROSE OPEN QUESTIONS = CLOSED
 
 ---
 
-# 21. Formal Gate — ACCEPTED 前必须通过
+# 21. Formal Acceptance — ACCEPTED 前必须通过
 
 剩余风险已经从“边界是否清楚”变为“合法状态组合是否会撞车”。
 
-## F1 — PlaybackTemporal model
+形式化验证在这里的职责是**攻击高风险状态组合**：多个本来都合法的状态/事件组合之后，是否产生反直觉的非法状态。它不为 Playback Architecture 建立第二份完整实现；结构性架构边界由本文冻结语义、类型系统、模块边界与普通工程测试约束，只有存在复杂状态交错风险时才升级为形式化模型。
 
-使用 TLA+/TLC 或等价显式状态模型，至少覆盖：
+## 必须项（blocking）
 
-```text
-ActiveWindow
-PreparedWindow
-Generation admission
-DecodeSession
-seek / next / stop
-PhysicalFence
-submitted / rendered
-EOF / ENDED
-late decode
-rapid superseding discontinuity
-provider-withdrawal interaction
-```
+### PlaybackTemporal model
 
-至少检查：
+一个 TLA+/TLC（或等价显式状态模型），只需覆盖以下五组高风险 temporal 语义：
 
-```text
-AtMostOneActiveWindow
-AtMostOnePreparedWindow
-ActiveAndPreparedMayHaveDifferentGenerations
-AcceptedDecodeResult => generation admitted for its window role
-RetiredGeneration => no longer admitted
-HardPromotion => successful PhysicalFence
-FenceFailure => no fake promotion success
-rendered cannot exceed submitted
-ENDED => producer terminal + pipeline drained + no submitted-unrendered media
-old generation cannot submit after successful promotion
-superseded Prepared generation cannot re-enter
-```
+1. **Dual Window**：1 ActiveWindow + 0..1 PreparedWindow；两者同时存在且 generation 不同是合法状态。
+2. **Generation Admission**：stale = 不再被 owning temporal role 的 admission 接纳，而不是“与某个全局 current generation 不等”。至少保护：prepared generation 可以 prime；retired generation 不能 re-enter；来自未接纳 generation 的 late decode 被拒绝。
+3. **Physical Fence**：hard discontinuity promotion 要求成功的 Physical Fence；fence 失败不构成成功 promotion；generation invalidation 不能替代物理切断。
+4. **submitted != rendered**：rendered <= submitted 恒成立；submit 本身不得推进 physical completion truth。
+5. **EOF / drained / ENDED terminalization**：EOF != TransportDrained != ENDED；且 Physical Fence 在途时，自然 EOF / drain 不得提前发布会销毁完成该 fence 所需的 active temporal state（§18 冻结，由 counterexample 挣得）。
 
-必须覆盖 rapid command trace：
+rapid seek / next / stop 与 decode/fence/render 证据的交错是攻击这些语义组的主要向量，模型 trace 应包含此类序列。
+
+### Core negative controls
+
+模型必须抓住以下四个故意注入的 mutation，每个保护一组上述语义：
+
+| Mutation | 保护对象 |
+|---|---|
+| PromoteWithoutFence | Physical Fence |
+| AcceptUnadmittedDecode | Generation admission |
+| SingleGlobalGenerationCheck | Dual Window / 禁止全局 current generation |
+| EndBeforeRenderDrain | EOF / physical drain |
+
+retired-generation re-enter 的保护属于语义组 2，由 PlaybackTemporal 正常模型不变量承担；对应 mutation 属于 extended evidence。
+
+## 支持证据（non-blocking）
+
+以下继续保留在 `specs/` 并继续运行，但不作为 ACCEPTED 前置条件：
 
 ```text
-seek(100)
-seek(200)
-next(B)
-stop
+PlaybackOwnership model        resource-lifecycle 假设的 supporting formal exploration
+RetiredGenerationStillAdmitted extended admission mutation 证据
+ReleaseProviderEarly           provider ordering
+MultipleImmediateOwners        ownership sanity
+OwnershipCycle                 ownership sanity
+KernelAdoptsLifetimeOwnership  historical exploratory mutation
 ```
 
-并明确 pending discontinuity 的 supersede/cancel/replace authority。
+`PlaybackOwnership` FAIL 不自动推出本文不能 ACCEPTED，除非它发现本文本身存在明确语义矛盾。不为让它完美映射未来 production ownership 而扩大模型。
 
-## F2 — PlaybackOwnership model
+## 明确不在形式化范围内
 
-独立验证：
+以下问题不进入 Formal Acceptance；若未来成为真实风险，再单独验证：
 
 ```text
-MusicComponent
-├── MusicKernel
-├── TransportKernel
-└── TrackSession
-    └── DecodeSession
+Window 的最终 immediate lifetime owner
+semantic authority holder 是否可以同时 lifetime-own 某个资源
+完整 provider dependency graph
+任意 N generation 的参数化证明 / TLAPS theorem proof
+Temporal × Ownership 联合模型
+liveness / fairness
+crossfade / gapless
+完整 command supersede algebra
+RT scheduling / 真实 memory ordering
 ```
 
-至少检查：
+## Implementation entry（ACCEPTED 之后）
 
 ```text
-exactly one immediate lifetime owner
-all nested ownership paths terminate at one composed lifecycle root
-no ownership cycles
-provider final release cannot precede dependent teardown access
-TrackSession teardown implies owned DecodeSession resources discharged
+ADR ACCEPTED
+    ↓
+deterministic executable oracle
+    ↓
+implementation authorization
 ```
 
-## F3 — Negative Controls
-
-模型必须抓到故意植入的错误：
-
-```text
-BUG-A  去掉 Promote 前 fence-completed 条件 -> 必须 counterexample
-BUG-B  恢复 generation != currentGeneration -> Dual Window 必须失败
-BUG-C  允许 retired generation 继续 admitted -> late decode invariant 必须失败
-BUG-D  provider 先 final release 再 teardown DecodeSession -> lifetime invariant 必须失败
-BUG-E  EOF 直接导致 ENDED -> submitted-not-rendered trace 必须失败
-```
-
-## F4 — Deterministic Executable Oracle
-
-形式模型通过后，再建立无真实线程/无 FFmpeg/WASAPI 的 deterministic playback simulator，至少覆盖：
-
-```text
-normal playback
-dual-window same-track seek
-rapid seek supersede
-hard next
-late decode
-wrong-window result
-physical fence failure
-submitted != rendered
-provider withdrawal
-snapshot provenance
-```
-
-生产实现必须对齐该 executable oracle。
+Executable oracle 验证 implementation vocabulary 能否承载本文语义；它不是 architecture decision 成立的前置条件。
 
 ---
 
 # 22. ADR 状态机
 
 ```text
-ADR-PBK-001 Corrective-2
+Design Review（G1-G8 PASS）
         ↓
-DESIGN REVIEW PASS
+Core PlaybackTemporal（五组高风险 temporal 语义）
         ↓
-PlaybackTemporal formal model
-        ↓
-PlaybackOwnership formal model
-        ↓
-negative controls PASS
-        ↓
-deterministic executable oracle
+Core negative controls（4）
         ↓
 ADR-PBK-001 = ACCEPTED
         ↓
 corrective refinement of ARCH-003 authority
+        ↓
+deterministic executable oracle
         ↓
 implementation issue separately authorizes production work
 ```
@@ -995,9 +995,12 @@ implementation issue separately authorizes production work
 当前：
 
 ```text
-STATUS = PROPOSED / CORRECTIVE-2 / FORMAL GATE PENDING
+STATUS = PROPOSED / FORMAL CORE PASS
 DESIGN REVIEW = PASS
+CORE TEMPORAL CHECKS = PASS
+SUPPORTING FORMAL EVIDENCE = RETAINED / NON-BLOCKING
 IMPLEMENTATION AUTHORIZATION = NO
+EXECUTABLE ORACLE = NOT STARTED
 ARCH-003 AUTHORITY REVISION = NO
 ```
 
@@ -1035,7 +1038,7 @@ WASAPI/CoreAudio/AAudio 具体 fence mechanism
 
 当前 ADR 仍为 PROPOSED，因此现在不修改 `registry.yml` 的 ARCH-003 authority。
 
-Formal Gate 全部通过并改为 ACCEPTED 后，再把当前较宽泛的 Playback authority corrective-refine 为：
+Formal Acceptance 必须项通过、ADR 改为 ACCEPTED 后，再把当前较宽泛的 Playback authority corrective-refine 为：
 
 ```text
 MusicComponent

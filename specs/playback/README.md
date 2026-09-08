@@ -1,7 +1,10 @@
 # specs/playback — 播放架构形式化验证
 
-被审计对象：`docs/adr/ADR-PBK-001.md`（PROPOSED / Corrective-2 / Formal Gate Pending）。
-本目录用 TLA+/TLC 对该 ADR 冻结的播放时间轴与资源 ownership 语义做**显式状态空间探索**：正常模型穷举命令与证据的交错，负控制注入故意错误证明 checker 不是 vacuous。
+被审计对象：`docs/adr/ADR-PBK-001.md`（PROPOSED / FORMAL CORE PASS）。
+
+定位：**Playback architecture formal exploration with a small blocking temporal core and additional supporting lifecycle evidence.** 本目录不声称整个 Playback Architecture 已被形式化证明——一个小的 blocking temporal core（`PlaybackTemporal` + 4 个 core negative controls）负责攻击高风险状态交错；其余模型与 mutation 是 supporting evidence，不阻塞 ADR ACCEPTED。
+
+本目录用 TLA+/TLC 做显式状态空间探索：正常模型穷举命令与证据的交错，负控制注入故意错误证明 checker 不是 vacuous。
 
 专业名词保留英文，含义以模型为准：
 
@@ -18,7 +21,40 @@
 
 ---
 
-## 一、Semantic Claims（从 ADR 提取的验证目标）
+## 一、Core acceptance / Extended exploration
+
+### Core acceptance checks（ADR ACCEPTED blocking）
+
+| Semantic risk | Check | Blocking |
+| --- | --- | --- |
+| Dual Window | PlaybackTemporal | Yes |
+| Generation admission | PlaybackTemporal | Yes |
+| Physical Fence | PlaybackTemporal | Yes |
+| submitted / rendered | PlaybackTemporal | Yes |
+| EOF / drained / ENDED | PlaybackTemporal | Yes |
+| PromoteWithoutFence | mutation | Yes |
+| AcceptUnadmittedDecode | mutation | Yes |
+| SingleGlobalGenerationCheck | mutation | Yes |
+| EndBeforeRenderDrain | mutation | Yes |
+
+core mutation 与 semantic risk 的对应：`PromoteWithoutFence` → Physical Fence；`AcceptUnadmittedDecode` → Generation admission；`SingleGlobalGenerationCheck` → Dual Window / no-global-current；`EndBeforeRenderDrain` → EOF / physical drain。retired-generation re-enter 的保护处于 core 集——它由 `PlaybackTemporal` 正常模型的不变量 `RetiredGenerationCannotReenter` 承担；对应 mutation 是 extended 证据。
+
+### Extended exploration（supporting / non-blocking）
+
+| Check | Purpose | Blocking |
+| --- | --- | --- |
+| PlaybackOwnership | resource-lifecycle exploration | No |
+| RetiredGenerationStillAdmitted | admission 语义的扩展 mutation 证据 | No |
+| ReleaseProviderEarly | provider ordering | No |
+| MultipleImmediateOwners | ownership sanity | No |
+| OwnershipCycle | ownership sanity | No |
+| KernelAdoptsLifetimeOwnership | historical exploratory mutation | No |
+
+Extended 项继续保留并继续运行，其历史结果不删除。若某个 extended mutation 被判断为过度约束 ADR，在本 README 记录 **supporting model assumption, not production architecture authority** 即可，不急着重构模型。
+
+---
+
+## 二、Semantic Claims（从 ADR 提取的验证目标）
 
 ### Temporal claims
 
@@ -47,7 +83,7 @@
 
 ---
 
-## 二、PlaybackTemporal 模型
+## 三、PlaybackTemporal 模型
 
 ### 变量（TransportKernel 的 temporal truth + MusicKernel 产品状态 + 环境机制）
 
@@ -69,7 +105,7 @@
 ### 关键抽象决策（故意省略的现实细节）
 
 - **不模拟 PCM / buffer / 设备**：媒体流动抽象为提交/渲染计数（上限 `MaxMedia=1`，同一 generation 多块在途与 flush 的次级交错被折叠为 0/1 计数）。
-- **不模拟 track 身份与位置**：seek 与 next 共用同一 `PrepareDiscontinuity` 骨架（ADR 冻结两者同 skeleton）；next 特有的 TrackSession 子树释放竞态属 Ownership 模型（两模型不合并——F1/F2 的拆分来自 ADR 本身，组合盲区已知）。
+- **不模拟 track 身份与位置**：seek 与 next 共用同一 `PrepareDiscontinuity` 骨架（ADR 冻结两者同 skeleton）；next 特有的 TrackSession 子树释放竞态属 Ownership 模型（两模型不合并——temporal 与 ownership 的拆分来自 ADR 本身，组合盲区已知）。
 - **不模拟 pause/resume**：transport 级暂停不承载任何被验证的 temporal 安全属性（产品语义），省去后状态空间减半。
 - **supersede 原子化**："取消旧 prepared"与"创建新 prepared"折叠为一步（TransportKernel 是唯一 supersede authority）。
 - **decode session 关闭后不再产生结果**：`LateDecodeResult` guard 要求 session 存活；"decoder worker 的 in-flight result 晚于 session close 到达"的现实竞态被排除（由于所有关闭都发生在 admission 已关之后，该竞态即使探索也只会落入纯拒绝动作）。
@@ -103,11 +139,13 @@
 | `EndedRequiresTransportDrain` | constructive | ENDED 绕过 transport drained 事实 |
 | `StopFenceRequiresActiveWindow` | state | stop-fence 在途时 ActiveWindow 被移除（drained/ENDED 抢先导致命令永久锁死——见模型决策 2） |
 
-ADR F1 中"old generation cannot submit after successful promotion"与"fence failure ⇒ no fake promotion"由动作 guard（`SubmitMedia` 的 admission 条件、`PromoteFenceCondition` 只认 succeeded）构造性成立，分别由 `FenceFlushedGenerationsAreSilent` / `PromotionRequiresSuccessfulFence` 从旁佐证。
+ADR 冻结语义中「old generation cannot submit after successful promotion」与「fence failure ⇒ no fake promotion」由动作 guard（`SubmitMedia` 的 admission 条件、`PromoteFenceCondition` 只认 succeeded）构造性成立，分别由 `FenceFlushedGenerationsAreSilent` / `PromotionRequiresSuccessfulFence` 从旁佐证。
 
 ---
 
-## 三、PlaybackOwnership 模型
+## 四、PlaybackOwnership 模型（supporting / non-blocking）
+
+> **定位：resource-lifecycle 假设的 supporting formal exploration。** 本模型不作为 ADR-PBK-001 ACCEPTED 的 blocking 前置条件：`PlaybackOwnership` FAIL 不自动推出 ADR 不能 ACCEPTED，除非它发现 ADR 本身存在明确语义矛盾。不为让它完美映射未来 production ownership 而扩大模型。
 
 ### 有限实例宇宙
 
@@ -137,7 +175,7 @@ ADR F1 中"old generation cannot submit after successful promotion"与"fence fai
 
 ### 抽象决策与已知边界
 
-- **Window / Generation 不进入 ownership 树**：ADR 未冻结 Window 的 immediate lifetime owner（§3.2 树未列 window；为 implementation design 留白）。因此 I3 对 ADR §2 资源清单中 window 项**未验证**——已列为 ADR 观察项。"TransportKernel 拥有 Window semantic authority 但非 lifetime owner"的完整表述需要 window 同时出现在两个模型中，当前两模型不合并，该组合盲区已知。
+- **Window / Generation 不进入 ownership 树**：ADR §2 已纠正——Active / Prepared 是 TransportKernel 内的 temporal role / slot，不是 Nested Runtime Resource，因此不产生 immediate lifetime owner 问题（原「window immediate owner 未冻结」观察项由此关闭）。"TransportKernel 拥有 Window semantic authority 但非 lifetime owner"的张力随之消解；两模型不合并的组合盲区对 window 项不再存在。
 - **ProviderDependents(AudioOutputProvider) = {TransportKernel}** 是模型决策（ADR 未定义此依赖关系，ADR §4 绑定 AudioOutput 的是 MusicComponent；模型假设 TransportKernel 的物理输出路径使其成为 dependent）。
 - **withdrawal 五段顺序的覆盖**：阶段 3-4（全部 dependent 退出 → final release）有 guard + 不变量 + 专属负控制三层验证；阶段 1（不再接受新 commitment）仅由 `CreateDecodeSession` guard 表达（transition 级）；阶段 2（teardown 访问保持合法）由 `FinishDecodeSession` 无 provider guard 的"许可"表达，无专门交错覆盖证据。
 - **Up1..Up3 有界深度**：对当前动作集（最长链 2 跳、可能最长环 2）充分；扩展模型时必须同步加深，否则环/根检测静默漏检。
@@ -145,10 +183,13 @@ ADR F1 中"old generation cannot submit after successful promotion"与"fence fai
 
 ---
 
-## 四、如何验证
+## 五、如何验证
 
 ```bash
-# 全量（正常模型 + 全部负控制）
+# 仅 core acceptance 集（PlaybackTemporal 正常模型 + 4 个 core mutation；ADR ACCEPTED blocking 集）
+specs/check.sh core
+
+# 全量（正常模型 + 全部负控制；缺省模式）
 specs/check.sh
 
 # 需要代理下载工具链时
@@ -172,7 +213,9 @@ java -jar specs/tools/tla2tools.jar -workers 4 -config PromoteWithoutFence.cfg P
 
 ---
 
-## 五、运行结果（真实运行数据，2026-09-08，4 workers，含 review 修复后模型）
+## 六、运行结果（真实运行数据，2026-09-08，4 workers，含 review 修复后模型）
+
+core acceptance 集 = `PlaybackTemporal` 正常模型 + 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）；下表其余行为 extended exploration 证据，全部保留。
 
 ### 正常模型
 
@@ -204,20 +247,21 @@ java -jar specs/tools/tla2tools.jar -workers 4 -config PromoteWithoutFence.cfg P
 
 ---
 
-## 六、模型决策记录（ADR 未明确定义处的建模选择）
+## 七、模型决策记录（ADR 未明确定义处的建模选择）
 
-以下决策是模型为封闭探索所做的选择，**不是**对 ADR 的改写；若实现期发现不同选择，应先更新本记录并重跑验证。决策 1/2/3 同时作为 ADR 观察项上报（见任务最终报告）：
+以下决策是模型为封闭探索所做的选择，**不是**对 ADR 的改写；若实现期发现不同选择，应先更新本记录并重跑验证。决策 2 / 4 的最小 invariant 已反哺 ADR（§18）；决策 3 对应的 ADR 冻结只有 claimed-transaction 不可逆一条（§8）：
 
 1. **stop 可以 supersede 在途 promote-fence**：用户在 seek fence 未落定时按 stop 是真实竞态。模型把同一次物理冲刷重解释为终局 cut（保留握手阶段、清空 promotion 目标——设备不关心 promotion 计划）。ADR §8/§18 未定义此交错。
-2. **stop-fence 在途时不发布 drained/ENDED**：stop 与自然 ENDED 的竞态（EOF 排干 vs stop 物理切断）ADR 未定义。模型裁决：fence 握手在途 ⇒ 物理状态未定 ⇒ TransportKernel 不解释 drained（`PublishTransportDrained` 要求 fence idle；`RequestStop` 重置陈旧 drained 事实；`StopFenceRequiresActiveWindow` 不变量守护）。对抗 review 曾证明无此裁决时存在"ENDED 抢先移除 ActiveWindow → fence 永久卡死 → 命令锁死"的可达坏状态。
-3. **stop-fence 期间不接受新 seek/next**：stop 是终局性 cut，等 fence verdict 落定后才能开新 episode（`stop → seek 重开` 交错未探索——ADR 未定义，已上报）。
-4. **prepared 在 prime 完成前 decoder EOF**（如 seek 到文件尾）：`DropUnprimablePrepared` 取消该 discontinuity。ADR §18 骨架未写此失败路径——已上报。
+2. **stop-fence 在途时不发布 drained/ENDED**：stop 与自然 ENDED 的竞态（EOF 排干 vs stop 物理切断）ADR 未定义。模型裁决：fence 握手在途 ⇒ 物理状态未定 ⇒ TransportKernel 不解释 drained（`PublishTransportDrained` 要求 fence idle；`RequestStop` 重置陈旧 drained 事实；`StopFenceRequiresActiveWindow` 不变量守护）。对抗 review 曾证明无此裁决时存在"ENDED 抢先移除 ActiveWindow → fence 永久卡死 → 命令锁死"的可达坏状态。**该裁决的最小 invariant 已反哺 ADR §18**（stop × 自然 ENDED 竞态冻结：Physical Fence 在途时，自然 EOF/drain 不得提前终态化并销毁 fence 所需 active temporal state）。
+3. **stop-fence 期间不接受新 seek/next**：stop 是终局性 cut，等 fence verdict 落定后才能开新 episode（`stop → seek 重开` 交错未探索）。**这是模型为闭合探索所做的决策，不是产品语义冻结**；ADR 只冻结「fence 进入 claimed（不可逆）阶段后，后续 intent 不得取消或改写已 claim 的 physical transaction」（§8）。reject / defer / coalesce / latest-wins 留给 executable implementation/oracle。
+4. **prepared 在 prime 完成前 decoder EOF**（如 seek 到文件尾）：`DropUnprimablePrepared` 取消该 discontinuity。**ADR 已收编最小冻结**（§18 Prepared EOF）：EOF evidence does not imply PreparedWindow readiness；prepared contribution 在 readiness 前 terminal 必须得到显式 outcome。具体分类（prepare failed / empty media / seek-to-EOF 等）留给实现与后续 oracle。
 5. **fence 失败的出路**：`RetryFence`（重试）或 `AbandonFence`（fail closed：不 promote，active 保持 admission-closed 自然排干）。
 6. **fence 成功但 promotion 目标已被 supersede**：verdict 被消费（物理冲刷确实发生），不 promotion；新 prepared 走自己的 episode（同一 cut gen 可再次 fence——设备已静默，幂等）。
 7. **EOF 后、drained 前的已接受未提交结果**：drained predicate 要求 `decodeAcceptedInAdmission = submittedEver`（ADR "software media pipeline drained" 的模型化）。
 
-## 七、TLC 没有证明什么
+## 八、TLC 没有证明什么
 
+- **整个 Playback Architecture**：本目录只攻击五组高风险 temporal 语义与 resource-lifecycle 假设，**不构成对整个架构的形式化证明**（formal exploration，非完整架构证明）。
 - 真实 WASAPI/CoreAudio/AAudio 的 flush 正确性（fence 是抽象握手，不模拟设备）。
 - 真实 Rust 实现：memory ordering、锁、ring buffer、lock-free 结构。
 - 真实 decoder 行为（EOF 语义、坏帧、seek landing 精度）。
@@ -227,12 +271,13 @@ java -jar specs/tools/tla2tools.jar -workers 4 -config PromoteWithoutFence.cfg P
 - crossfade / gapless（ADR 明确 Dual Window 不自动授权）。
 - 两模型的组合性质（temporal 竞态 × ownership 释放竞态无单一模型同时可见）。
 
-## 八、Traceability
+## 九、Traceability
 
-- ADR-PBK-001 §21 F1（PlaybackTemporal 覆盖项一一对应上文 temporal claims 与 properties 表）。
-- ADR-PBK-001 §21 F2（PlaybackOwnership 覆盖 ownership claims）。
-- ADR-PBK-001 §21 F3 BUG-A..E 与本目录 mutation 的对应：BUG-A = `PromoteWithoutFence`；BUG-B = `SingleGlobalGenerationCheck`（安全性半：stop 窗口期误接收；功能性半：症状属性）；BUG-C = `RetiredGenerationStillAdmitted`（状态面：retired 重新 admitted）+ `AcceptUnadmittedDecode`（症状面：迟到结果被接收）配对覆盖；BUG-D = `ReleaseProviderEarly`；BUG-E = `EndBeforeRenderDrain`（注入点在 TransportKernel 的 drained 发布层——EOF 证据的误解释发生在该层，ENDED 经 `EndedRequiresTransportDrain` 间接被保护）。
+- **Core acceptance（blocking）**：`PlaybackTemporal` 覆盖 ADR-PBK-001 §21 **Formal Acceptance** 的五组高风险 temporal 语义，与上文 temporal claims 及 properties 表一一对应。core mutation 对应：`PromoteWithoutFence` → Physical Fence；`AcceptUnadmittedDecode` → Generation admission；`SingleGlobalGenerationCheck` → Dual Window / no-global-current（安全性半：stop 窗口期误接收；功能性半：症状属性）；`EndBeforeRenderDrain` → EOF / physical drain（注入点在 TransportKernel 的 drained 发布层——EOF 证据的误解释发生在该层，ENDED 经 `EndedRequiresTransportDrain` 间接被保护）。
+- **Extended exploration（non-blocking）**：`PlaybackOwnership` 覆盖上文 ownership claims；`RetiredGenerationStillAdmitted`（状态面：retired 重新 admitted）与 `AcceptUnadmittedDecode`（症状面：迟到结果被接收）配对覆盖 retired/late-decode admission 语义；`ReleaseProviderEarly` / `MultipleImmediateOwners` / `OwnershipCycle` / `KernelAdoptsLifetimeOwnership` 为 ownership / provider-ordering 探索证据。
+- 历史标签对照（早期 ADR 修订曾用 BUG-A..E 命名同类注入，仅作研究历史保留）：BUG-A = `PromoteWithoutFence`；BUG-B = `SingleGlobalGenerationCheck`；BUG-C = `RetiredGenerationStillAdmitted` + `AcceptUnadmittedDecode`；BUG-D = `ReleaseProviderEarly`；BUG-E = `EndBeforeRenderDrain`。
+- ADR 观察项闭环：模型决策 2（stop × 自然 ENDED）与决策 4（Prepared EOF）的最小 invariant 已反哺 ADR §18；window immediate-owner 观察项由 ADR §2 纠正关闭（Active / Prepared 是 temporal role / slot，非 Nested Runtime Resource）。
 
-## 九、对抗 review 记录
+## 十、对抗 review 记录
 
-本目录的模型经过三轮 fresh-context 对抗 review（temporal 抽象 / ownership 三分 / 负控制有效性），修复了：stop×ENDED 竞态导致的命令永久锁死（补 fence-idle guard + `StopFenceRequiresActiveWindow`）、stop×promote-fence 交错被排除（`RequestStop` 放宽）、semantic authority 缺正结构（authority 事实表 + `KernelAdoptsLifetimeOwnership` 负控制）、provider final release 把从未创建的 Absent dependent 当阻塞条件、BUG-B 症状属性未接入 gate（`-continue` + PROPERTY 机器检查）、mutation cfg 目标不变量排序（TLC 只报第一个违反）。
+本目录的模型经过三轮 fresh-context 对抗 review（temporal 抽象 / ownership 三分 / 负控制有效性），修复了：stop×ENDED 竞态导致的命令永久锁死（补 fence-idle guard + `StopFenceRequiresActiveWindow`）、stop×promote-fence 交错被排除（`RequestStop` 放宽）、semantic authority 缺正结构（authority 事实表 + `KernelAdoptsLifetimeOwnership` 负控制）、provider final release 把从未创建的 Absent dependent 当阻塞条件、`SingleGlobalGenerationCheck` 症状属性未接入 gate（`-continue` + PROPERTY 机器检查）、mutation cfg 目标不变量排序（TLC 只报第一个违反）。
