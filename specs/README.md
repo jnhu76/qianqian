@@ -1,0 +1,99 @@
+# specs/ — 形式化模型注册表
+
+`specs/` 保存 Qianqian 中值得进行状态空间验证的形式化模型。这里描述的是**长期系统语义**，不是开发阶段历史。
+
+## 验证哲学
+
+> **形式化验证优先用于发现高风险状态组合产生的反直觉错误，不用于为整个架构建立第二份完整实现。**
+
+> **结构性架构边界优先通过类型系统、ownership、模块边界和普通测试约束；只有存在复杂状态交错风险时才升级为形式化模型。**
+
+> **TLA+ 用来找撞车，不用来证明整个架构。**
+
+### 什么时候值得形式化
+
+优先把形式化验证用于**多个单独合法的状态、事件或所有权变化组合后，可能到达非法状态**的地方。典型信号包括：
+
+- **状态交错**：同一事实会被多个异步事件推进，例如 `seek / stop / EOF / render evidence` 的交错；
+- **并发 ownership / lifecycle**：资源退出、provider withdrawal、dependent teardown 之间存在先后约束，而且错误顺序可能产生悬挂资源或失效访问；
+- **不可逆边界**：软件状态变化与外部世界之间存在 point-of-no-return，例如 Physical Fence、提交到设备、持久化提交；
+- **合法事件组合可能产生非法结果**：每个动作单独看都正确，但组合后可能出现 stale re-entry、双 authority、提前终态化、死锁或不可恢复状态；
+- **普通测试难覆盖所有排列**：问题的风险主要来自 action ordering / interleaving，而不是某个单一函数的输入输出。
+
+这类问题适合使用 TLA+/TLC、针对性的并发模型检查或其他状态空间工具主动寻找 counterexample。
+
+### 什么时候不应该形式化
+
+以下问题默认**不升级为形式化模型**，除非后来出现了真实的状态交错风险：
+
+- 命名与 vocabulary 选择；
+- 普通模块、crate、component 边界；
+- 可以直接由 Rust ownership / borrowing / 类型系统约束的简单所有权关系；
+- 数据结构 representation，例如 `Box` / `Arc` / handle / token 的具体选择；
+- 可以由普通单元测试、属性测试或静态检查充分覆盖的局部逻辑；
+- 单纯为了让 ADR、Issue 或阶段 gate 获得“形式化证明”标签而建立的模型。
+
+**不要采用“架构里有一个概念，就为它建立一个模型”的做法。**
+
+### 风险驱动原则
+
+形式化验证的入口应当是一个明确的问题：
+
+> **这里有哪些独立合法的状态或事件，可能因为交错而撞出一个非法状态？**
+
+如果回答不出这个问题，优先使用更便宜、更直接的约束手段。
+
+推荐顺序：
+
+```text
+类型系统 / ownership / 模块边界
+        ↓
+普通测试 / 属性测试 / 静态检查
+        ↓
+确认存在高风险状态交错
+        ↓
+形式化模型 / 状态空间探索
+```
+
+模型得到的结论是**在其显式 abstraction 与 assumptions 下的证据**，不是架构本身的第二份 authority。模型为了闭合状态空间所做的选择，不得未经 ADR/设计 review 就自动升级为生产语义。
+
+## 命名规则
+
+- spec 文件、TLA+ module、operator、invariant、mutation 与长期注释必须使用**稳定领域 vocabulary**（如 `PlaybackTemporal`、`PromotionRequiresSuccessfulFence`、`PromoteWithoutFence`）。
+- ADR 编号 / Issue 编号 / PR 编号 / Corrective / Phase / milestone / gate 编号只作为 README 中的 **traceability 信息**，不进入模型 vocabulary 与文件名。
+
+## 当前模型
+
+| 模型 | 定位 | 负责验证 | 方法 |
+| --- | --- | --- | --- |
+| `playback/PlaybackTemporal` | **Core acceptance（blocking）** | 五组高风险 temporal 语义：Dual Window、Generation admission、Physical Fence、submitted/rendered 记账、EOF/drained/ENDED terminalization | TLA+ / TLC |
+| `playback/PlaybackOwnership` | Extended exploration（supporting / non-blocking） | resource-lifecycle 假设：composition lifecycle root、TrackSession/DecodeSession immediate lifetime ownership、semantic authority 与 lifetime ownership 的区分、provider withdrawal 顺序 | TLA+ / TLC |
+
+每个模型配备**负控制（negative controls）**：故意注入错误，TLC 必须抓到（counterexample 才算通过），以证明模型不是 vacuous。其中 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）属于 ADR ACCEPTED blocking 集；其余 mutation 属于 extended exploration / supporting evidence，不阻塞 ACCEPTED。
+
+## 运行入口
+
+```bash
+# 全量（正常模型 + 全部负控制；缺省模式）
+specs/check.sh
+
+# 仅 core acceptance 集（PlaybackTemporal 正常模型 + 4 个 core mutation）
+specs/check.sh core
+
+# 显式全量
+specs/check.sh all
+
+# 需要代理下载工具链时：
+export https_proxy=http://127.0.0.1:7897
+specs/check.sh
+```
+
+工具链固定为 `tla2tools v1.7.4 (Xenophanes)`，`check.sh` 按内嵌 sha256 校验、fail closed。jar 不入库（见 `.gitignore`），由脚本自动下载。
+
+各模型的语义说明、状态空间数据与负控制结果见 `playback/README.md`。
+
+## Traceability
+
+- `PlaybackTemporal` 五组语义 + 4 个 core mutation 对应 `docs/adr/ADR-PBK-001.md` §21 **Formal Acceptance** 必须项（blocking）；当前 core temporal checks = PASS。
+- `PlaybackOwnership` 与其余 mutation 对应同节**支持证据**（non-blocking）：它们继续保留、继续运行，其 FAIL 不自动推出该 ADR 不能 ACCEPTED（除非发现 ADR 本身明确语义矛盾）。
+- 模型 vocabulary 不使用 ADR/Issue/PR 编号；ADR 与模型的对应关系只在 README 层维护。
