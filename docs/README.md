@@ -14,6 +14,7 @@ Do not recursively read archived or historical material by default.
 | Component boundary / plugin granularity / interaction algebra | `architecture/composition-kernel.md` boundary-design sections + closed audit `architecture/component-boundary-a0.md` (#53 PASS/CLOSED) |
 | Composition Kernel semantics design (#67) | `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel.md` + issue #67 |
 | Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + the implementation issue (#70) + `architecture/composition-kernel-0-implementation-adr.md` (representation decisions) |
+| Playback timeline / media session / PCM data-plane boundaries (ARCH-003) | `adr/ADR-PBK-001.md` (**PROPOSED / Corrective-2 / Formal Gate Pending**; design review PASS, implementation not authorized) |
 | Product introduction / current repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | Rust workspace/build/test | Current `Cargo.toml` / crate manifests / CI once present; do not invent a separate manual before repeated operational complexity exists. |
@@ -32,9 +33,10 @@ Use the authority closest to the fact:
 agent work rules                 -> AGENTS.md
 stable vocabulary                -> CONTEXT.md
 current architecture             -> docs/architecture/overview.md
-component-decomposition audit     -> closed issue #53 + component-boundary-a0.md + composition-kernel boundary sections
+component-decomposition audit    -> closed issue #53 + component-boundary-a0.md + composition-kernel boundary sections
 composition-kernel-0 semantics   -> docs/architecture/composition-kernel-0-design.md (merged via PR #68) + issue #67
 composition-kernel invariants    -> docs/architecture/composition-kernel.md
+playback-architecture decisions  -> docs/adr/ADR-PBK-001.md (PROPOSED / Corrective-2; Formal Gate Pending; not frozen ARCH-003 authority until accepted)
 implemented behavior             -> code + tests + current contracts
 historical experimental fact     -> preserved reference/history
 current task scope               -> current issue/task
@@ -65,6 +67,24 @@ Context / Fiber / Effect / Reconcile implementation
 ```
 
 #53 `COMPONENT-BOUNDARY-A0` is PASS/CLOSED (`architecture/component-boundary-a0.md`); the #67 `COMPOSITION-KERNEL-0` semantic design is MERGED (PR #68, `architecture/composition-kernel-0-design.md`). The Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86).
+
+For ARCH-003 playback work, `ADR-PBK-001` adds a separate acceptance fence after prose/design review:
+
+```text
+Corrective-2 design review PASS
+        ↓
+PlaybackTemporal formal model
+        ↓
+PlaybackOwnership formal model
+        ↓
+negative controls
+        ↓
+deterministic executable oracle
+        ↓
+ADR ACCEPTED / ARCH-003 authority corrective
+```
+
+Do not treat design-review PASS as production implementation authorization.
 
 ## Core routing distinction
 
@@ -118,6 +138,16 @@ does finer granularity justify its cognitive/configuration cost?
 ```
 
 A different feature name is not evidence of component independence.
+
+For playback work, also distinguish explicitly:
+
+```text
+composition lifecycle root
+immediate lifetime owner
+semantic authority
+```
+
+Do not use one bare `owns` relation to collapse these meanings.
 
 ## Documentation growth rule
 
