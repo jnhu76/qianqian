@@ -4,40 +4,21 @@
 - **日期**：2026-09-08
 - **作用域**：Qianqian Playback Architecture / ARCH-003
 - **不重开**：Base / Composition Kernel K0
-- **关联权威**：
-  - `docs/architecture/component-boundary-a0.md`
-  - `docs/architecture/composition-kernel.md`
-  - `docs/architecture/composition-kernel-0-design.md`
-  - `docs/architecture/composition-kernel-0-implementation-adr.md`
-  - Issue #46 / #53 / #67 / #70
-  - PR #66 / #68 / #69 / #71
-- **历史行为 Oracle**：
-  - `research/playback-reference-v1`
-  - Issue #49
-  - 已验证的 seek / physical flush / stale-generation rejection / render accounting / ENDED 行为
 
----
+## 0. Corrective-2 冻结摘要
 
-# 0. Corrective-2 摘要
-
-Corrective-1 已经关闭首轮对抗审计中的三个模型级 P0：
+Corrective-2 关闭此前三个开放项，并收紧 ownership 术语：
 
 ```text
-P0-1  Plugin / Component 与 Nested Runtime Resource 边界不清
-P0-2  Dual Window 与“一 TrackSession 一个 decoder cursor”不能同时成立
-P0-3  Dual Window 与 global current-generation 判 stale 不能同时成立
+TransportKernel = 最终名称
+MusicKernel     = 最终名称
+TrackSession    = media identity / source lifetime root
+DecodeSession   = one independently advancing decoder cursor/handle
 ```
 
-Corrective-2 不再留下 Q1/Q2/Q3 三个开放命名/ownership 问题，直接冻结：
+本文中的 `Kernel` 表示 **semantic authority role**，不表示 Composition plugin boundary。
 
-```text
-TransportKernel      = 最终名称
-MusicKernel          = 最终名称
-TrackSession         = media identity / source lifetime root
-DecodeSession        = one independently advancing decoder cursor/handle
-```
-
-并正式拆分三个此前都被写成 `owns` 的不同关系：
+同时正式区分：
 
 ```text
 Composition Lifecycle Root
@@ -45,81 +26,33 @@ Immediate Lifetime Owner
 Semantic Authority
 ```
 
-Corrective-2 同时确认 Corrective-1 的 G1-G8 设计审计全部 PASS，但 ADR 尚不进入 ACCEPTED；新增 Formal Gate，在状态模型通过之前：
+Corrective-1 的 G1-G8 设计审计全部 PASS；但 ADR 尚不 ACCEPTED。剩余门槛改为 formal model + executable oracle：
 
 ```text
-STATUS = PROPOSED
+STATUS = PROPOSED / CORRECTIVE-2 / FORMAL GATE PENDING
+DESIGN REVIEW = PASS
 IMPLEMENTATION AUTHORIZATION = NO
 ARCH-003 AUTHORITY REVISION = NO
 ```
 
 ---
 
-# 1. 架构总原则
+# 1. 总体架构原则
 
-## C1 — Composition 是空间组合
+## 1.1 Composition Kernel
 
-> **Composition Kernel 管运行时组件的空间组合、capability reachability、Composition lifecycle 与 provider withdrawal。**
-
-它不拥有播放时间，也不搬运媒体 payload。
-
-## C2 — Transport 是时间 Authority
-
-> **TransportKernel is the playback temporal authority.**
-
-TransportKernel 是播放器唯一的 playback timeline / temporal semantic authority。
-
-## C3 — Music 是产品语义 Authority
-
-> **MusicKernel 是音乐播放器的产品/领域 semantic authority。**
-
-它不是 stateless helper，也不是每首媒体一个实例。
-
-## C4 — Kernel 表示 Authority Role，不表示 Plugin Boundary
-
-> **本文中的 `Kernel` 表示 semantic authority role，不表示 Composition plugin boundary。**
-
-因此：
+Composition Kernel 管：
 
 ```text
-MusicComponent   = composed lifecycle root
-MusicKernel      = music-domain semantic authority
-TransportKernel  = playback temporal authority
-```
-
-## C5 — 独立可组合能力进入 Plugin；内部资源进入 ownership tree
-
-> **Every independently composable runtime capability enters through the plugin/component model.**
-
-> **Every non-plugin runtime resource belongs to exactly one ownership tree rooted at a composed component, and has exactly one immediate lifetime owner.**
-
-内部 resource 有 lifecycle、state、teardown，并不自动意味着它应该成为 Fiber/plugin。
-
-## C6 — PCM 是 canonical audio data plane，不是全局消息总线
-
-> **连续 decoded-audio payload 收敛到 canonical PCM；control、evidence、metadata 等继续使用独立 typed contracts。**
-
-## C7 — 全局可见不等于全局拥有
-
-> **Global visibility does not imply global ownership. One fact, one semantic authority, one writer.**
-
----
-
-# 2. D1 — Composition Kernel K0 不重开
-
-Composition Kernel K0 继续只负责：
-
-```text
-plugin/component topology
+component/plugin topology
 capability reachability
 binding lifecycle
-Fiber lifetime
-Effect lifetime
+Fiber / Effect lifetime
 Reconcile
 provider withdrawal
 ```
 
-它明确不得拥有：
+它不拥有：
 
 ```text
 PCM
@@ -133,13 +66,66 @@ PlayerGain
 ENDED
 ```
 
+> **Composition Kernel owns spatial composition and lifecycle, not playback time or media payload.**
+
+## 1.2 MusicKernel
+
+最终名称：`MusicKernel`。
+
+它是 music-domain semantic authority，负责：
+
+```text
+play / pause semantic meaning
+seek intent meaning
+next / previous
+repeat / shuffle
+playlist policy
+selection semantics
+user-visible playback-state meaning
+Transport terminal 后 next/repeat/stop 的产品决策
+```
+
+它不是每首媒体一个实例，也不是 stateless policy helper。
+
+> **MusicKernel is the music-domain semantic authority.**
+
+## 1.3 TransportKernel
+
+最终名称：`TransportKernel`。
+
+它是 playback temporal authority，负责：
+
+```text
+playback cursor semantics
+MediaSpan timeline authority
+ActiveWindow / PreparedWindow
+window roles/frontiers
+GenerationId / admission
+window promotion/invalidation
+discontinuity execution
+physical-cut coordination
+raw playback evidence interpretation
+```
+
+> **TransportKernel is the playback temporal authority.**
+
+## 1.4 Kernel != Plugin
+
 冻结：
 
-> **Composition Kernel owns runtime composition topology and lifecycle, not playback time or media payload.**
+> **本文中的 Kernel 表示 semantic authority role，不表示 Composition plugin boundary。**
+
+因此：
+
+```text
+MusicComponent   = composed lifecycle root
+MusicKernel      = music-domain semantic authority
+TransportKernel  = playback temporal authority
+```
 
 ---
 
-# 3. D2 — Plugin / Nested Runtime Resource / Data Item 三层模型
+# 2. Plugin / Nested Runtime Resource / Data Item
 
 运行时对象分三层：
 
@@ -156,7 +142,7 @@ Nested Runtime Resource
     ├── TrackSession
     ├── DecodeSession
     ├── ActiveWindow / PreparedWindow
-    ├── buffer/ring bookkeeping
+    ├── ring/window bookkeeping
     └── component-local processing graph/node when not independently composed
 
 Data Item
@@ -165,7 +151,7 @@ Data Item
     └── typed evidence record
 ```
 
-是否成为 plugin 的核心判据不是“有没有状态/析构/replace”，而是：
+成为 plugin 的判据不是“有没有状态/析构/replace”，而是：
 
 ```text
 是否具有独立组合身份？
@@ -174,7 +160,7 @@ Data Item
 withdrawal 是否需要 Composition Kernel 主导 dependent-before-provider-release？
 ```
 
-因此：
+所以：
 
 ```text
 TrackSession != plugin
@@ -184,32 +170,26 @@ PcmBlock != plugin
 普通 Gain/EQ/SRC node != 自动成为 plugin
 ```
 
-冻结：
-
-> **Everything is Plugin 不等于 everything is individually a plugin。独立可组合能力通过 plugin boundary 进入；其余 runtime resource 必须进入一个明确的 component-rooted ownership tree。**
+> **Everything is Plugin 不等于 everything is individually a plugin。独立可组合能力通过 plugin boundary 进入；其余 runtime resource 进入明确的 component-rooted ownership tree。**
 
 ---
 
-# 4. D3 — Ownership 术语冻结
+# 3. Ownership 术语冻结
 
-本文禁止再用一个模糊的 `owns` 同时描述跨层关系。
+本文禁止裸用一个 `owns` 同时描述跨层关系。
 
-以后必须区分：
+## 3.1 Composition Lifecycle Root
 
-## 4.1 Composition Lifecycle Root
-
-`MusicComponent` 是其 subordinate playback runtime 的 **composition lifecycle root**。
-
-含义：
+`MusicComponent` 是 subordinate playback runtime 的 composition lifecycle root。
 
 ```text
 MusicComponent episode ends
-    -> 所有 subordinate runtime resource 必须退出
+    -> subordinate playback runtime 必须全部退出
 ```
 
-它不意味着 MusicComponent 是所有内部对象的 immediate parent，也不意味着 MusicComponent 对所有事实具有 semantic authority。
+这不意味着 MusicComponent 是所有内部对象的 immediate parent，也不意味着它对所有事实拥有 semantic authority。
 
-## 4.2 Immediate Lifetime Owner
+## 3.2 Immediate Lifetime Owner
 
 Nested Runtime Resource 形成严格树状 ownership：
 
@@ -226,21 +206,11 @@ MusicComponent
 
 > **Every non-plugin runtime resource has exactly one immediate lifetime owner.**
 
-不得存在：
+且所有 ownership path 必须最终到达一个 composed lifecycle root；不得有多 owner 或 cycle。
 
-```text
-DecodeSession X
-    -> owner A
-    -> owner B
-```
+## 3.3 Semantic Authority
 
-也不得存在 lifetime ownership cycle。
-
-## 4.3 Semantic Authority
-
-Semantic authority 与 lifetime ownership 正交。
-
-例如：
+Semantic authority 与 lifetime ownership 正交：
 
 ```text
 TransportKernel
@@ -263,19 +233,15 @@ MusicKernel
 
 > **lifetime ownership != semantic authority**
 
-以及：
-
-> **本文禁止裸用 `owns` 描述跨层关系；必须明确是 lifecycle root、immediate lifetime owner 还是 semantic authority。**
+> **跨层文档必须明确 lifecycle root、immediate lifetime owner 或 semantic authority，不得只写裸 `owns`。**
 
 ---
 
-# 5. D4 — MusicComponent 边界
+# 4. MusicComponent 边界
 
 MVP 保留 `Music` 作为 composed component / Fiber。
 
-它是 subordinate playback runtime 的 lifecycle root，但不得重新长成 PlayerEngine 巨石。
-
-概念：
+它作为 playback domain 的 lifecycle root，可以包含 subordinate runtime：
 
 ```text
 MusicComponent
@@ -285,16 +251,16 @@ MusicComponent
     └── DecodeSession(s)
 ```
 
-MusicComponent 绑定外部 provider capability：
+但它只绑定独立 provider：
 
 ```text
 Decoder
 PcmSink / AudioOutput
-future Processing provider when justified
-future Metadata capability when justified
+future independent Processing provider
+future Metadata capability
 ```
 
-明确禁止：
+禁止：
 
 ```text
 MusicComponent internally new FFmpegDecoder()
@@ -303,96 +269,15 @@ MusicComponent absorbs provider-global FFmpeg closure
 MusicComponent owns platform output implementation
 ```
 
-冻结：
-
 > **MusicComponent roots subordinate playback lifecycle; it binds but does not absorb independently composed providers.**
 
 ---
 
-# 6. D5 — MusicKernel 名称与职责冻结
+# 5. TrackSession / DecodeSession
 
-最终名称：
+## 5.1 TrackSession
 
-```text
-MusicKernel
-```
-
-不再保留 `MusicPolicy` / `MusicDomainKernel` 开放项。
-
-MusicKernel 负责：
-
-```text
-play / pause semantic meaning
-seek intent meaning
-next / previous
-repeat / shuffle
-playlist policy
-selection semantics
-user-visible playback-state meaning
-Transport terminal 后 next/repeat/stop 的产品决策
-```
-
-MusicKernel 不直接拥有/管理：
-
-```text
-decoder cursor
-PCM block
-ring
-physical device handle
-raw rendered counter
-```
-
-冻结：
-
-> **MusicKernel is the music-domain semantic authority.**
-
----
-
-# 7. D6 — TransportKernel 名称与职责冻结
-
-最终名称：
-
-```text
-TransportKernel
-```
-
-不再保留 `TrackKernel` / `PlaybackTimelineKernel` 开放项。
-
-原因：
-
-- `TrackKernel` 与 `TrackSession` 混淆，而且范围过窄；
-- `PlaybackTimelineKernel` 无法覆盖 generation admission、window promotion、discontinuity、physical-cut coordination 与 raw playback evidence；
-- `TransportKernel` 正好表达完整职责。
-
-TransportKernel 是唯一 playback temporal authority，负责：
-
-```text
-playback cursor semantics
-MediaSpan timeline authority
-ActiveWindow
-PreparedWindow
-window roles/frontiers
-GenerationId / admission
-window promotion
-window invalidation
-discontinuity execution
-physical-cut coordination state
-raw playback evidence interpretation
-```
-
-冻结：
-
-> **TransportKernel is the playback temporal authority.**
-
-MusicKernel 不与 TransportKernel 共同解释 raw cursor/render/EOF 事实。
-
----
-
-# 8. D7 — TrackSession 与 DecodeSession 的 lifetime 关系冻结
-
-## 8.1 TrackSession
-
-TrackSession 是：
+TrackSession 表示：
 
 ```text
 media identity / source lifetime root
@@ -409,13 +294,11 @@ TrackSession
 └── 0..N DecodeSession
 ```
 
-TrackSession 不持有“唯一 decoder cursor”这个语义。
+TrackSession 不承担“唯一 decoder cursor”语义，也不具有互斥的 active/prepared 状态。
 
-TrackSession 也不具有 `active / prepared / retiring` 这种互斥状态；同 Track seek 时它可以同时贡献 Active 与 Prepared。
+## 5.2 DecodeSession
 
-## 8.2 DecodeSession
-
-DecodeSession 是：
+DecodeSession 表示：
 
 ```text
 one independently advancing decoder cursor/handle
@@ -432,21 +315,16 @@ DecodeSession
 └── target-window contribution
 ```
 
-冻结 lifetime 关系：
+冻结：
 
 > **TrackSession is the immediate lifetime owner of its DecodeSession(s).**
 
-> **Each DecodeSession owns exactly one independently advancing decoder cursor/handle semantic slot.**
+> **decoder cursor belongs to DecodeSession rather than TrackSession.**
 
-具体 Rust representation 仍不冻结：
+具体 Rust representation 不冻结：
 
 ```text
-Box<>
-Arc<>
-lease
-provider-issued token
-opaque handle
-...
+Box / Arc / lease / provider-issued token / opaque handle / ...
 ```
 
 同 Track seek：
@@ -467,13 +345,9 @@ TrackSession B
 └── DecodeSession B18        -> PreparedWindow
 ```
 
-冻结：
-
-> **decoder cursor belongs to DecodeSession rather than TrackSession.**
-
 ---
 
-# 9. D8 — 双 Window 模型
+# 6. Dual Window 与 Generation Admission
 
 MVP temporal model：
 
@@ -482,58 +356,7 @@ MVP temporal model：
 0..1 PreparedWindow
 ```
 
-正常播放：
-
-```text
-ActiveWindow
-[A@72s ...]
-
-PreparedWindow
-empty
-```
-
-同 Track seek：
-
-```text
-TrackSession A
-
-ActiveWindow
-    gen17 / DecodeSession A17 @72s
-
-PreparedWindow
-    gen18 / DecodeSession A18 @100s
-```
-
-下一曲：
-
-```text
-ActiveWindow
-    TrackSession A / gen17
-
-PreparedWindow
-    TrackSession B / gen18
-```
-
-seek 与 next 共用 execution skeleton：
-
-```text
-prepare
-    -> prime
-    -> close old admission
-    -> physical fence
-    -> promote
-    -> retire old
-```
-
-但其 Music-domain meaning 不同。
-
-MVP 不授权第三个 simultaneously prepared playback window。
-
----
-
-# 10. D9 — Generation Admission 模型
-
-Dual Window 下合法状态包括：
+合法状态：
 
 ```text
 active_generation   = gen17
@@ -551,24 +374,15 @@ result.generation != current_generation
 
 > **Generation is a window-scoped temporal identity. Stale means “no longer admitted by the owning temporal role”, not “not equal to one global current generation”.**
 
-prepare 阶段可存在：
+prepare 阶段：
 
 ```text
-admitted_generations = {
-    active_generation,
-    prepared_generation
-}
-```
+Active(gen17)
+    -> 可继续满足当前 render path
 
-但角色权限不同：
-
-```text
-Active
-    -> 可满足当前 render path
-
-Preparing
-    -> 可接受 PreparedWindow 的 decode/prime result
-    -> 不得冒充 current physical-output authority
+Preparing(gen18)
+    -> 可接受 PreparedWindow decode/prime result
+    -> 不得冒充当前 physical-output authority
 ```
 
 promotion 后：
@@ -581,87 +395,49 @@ prepared slot cleared
 
 晚到结果只有同时满足 generation + window role + admission contract 才能被接收。
 
----
-
-# 11. D10 — 切换分类
-
-## Continuous Update
+seek 与 next 共用 execution skeleton：
 
 ```text
-PlayerGain
-EQ parameter
-balance
-DSP parameter
-```
-
-性质：
-
-```text
-no timeline generation change
-no TrackSession replacement
-```
-
-## Intra-Track Discontinuity
-
-```text
-seek
-loop jump
-chapter jump
-```
-
-性质：
-
-```text
-same TrackSession
-new DecodeSession / generation / PreparedWindow
-```
-
-## Track Replacement
-
-```text
-next
-previous
-open another media
-```
-
-性质：
-
-```text
-new TrackSession
-new DecodeSession
-generation/window replacement
-```
-
-## Topology Handoff
-
-```text
-Decoder provider replacement
-AudioOutput provider replacement
-future independent Processing provider replacement
-```
-
-属于 Composition topology；不天然意味着 media timeline 改变。
-
----
-
-# 12. D11 — MVP 不采用 seek fade / old-tail masking
-
-MVP 不允许为了掩盖 seek latency 而继续播放旧位置并淡出。
-
-冻结：
-
-```text
-prepare new window
+prepare
     -> prime
-    -> physical cut old
-    -> promote new
+    -> close old admission
+    -> physical fence
+    -> promote
+    -> retire old
 ```
 
-未来 crossfade / fade 如有真实需求，独立 ADR 讨论 simultaneous renderable contributions；双 Window 本身不自动授权 crossfade。
+MVP 不授权第三个 simultaneously prepared playback window。
 
 ---
 
-# 13. D12 — Physical Fence / Flush 是硬正确性边界
+# 7. 切换分类
+
+```text
+Continuous Update
+    PlayerGain / EQ / balance / DSP parameter
+    -> no timeline generation change
+
+Intra-Track Discontinuity
+    seek / loop jump / chapter jump
+    -> same TrackSession
+    -> new DecodeSession / generation / PreparedWindow
+
+Track Replacement
+    next / previous / open media
+    -> new TrackSession / DecodeSession / generation/window
+
+Topology Handoff
+    Decoder / AudioOutput / independent Processing provider replacement
+    -> Composition topology
+```
+
+MVP 不采用 seek fade / old-tail masking。
+
+未来 crossfade 如有真实需求，需要独立 ADR 讨论 simultaneous renderable contributions；Dual Window 本身不自动授权 crossfade。
+
+---
+
+# 8. Physical Fence / Flush
 
 历史事实继续成立：
 
@@ -694,15 +470,11 @@ close old admission
 
 Generation 不能替代 Physical Fence。
 
-冻结：
-
 > **fence 成功后，被截断 generation 不得继续产生新的可听输出。**
-
-平台 mechanism 可以不同，但跨平台语义必须一致。
 
 ---
 
-# 14. D13 — Canonical Audio Data Plane
+# 9. Canonical Audio Data Plane
 
 采用：
 
@@ -735,7 +507,7 @@ UI state
 
 ---
 
-# 15. D14 — Composition Topology != Audio Processing Graph Topology
+# 10. Composition Topology != Audio Processing Graph
 
 ## Composition Topology
 
@@ -749,16 +521,7 @@ future independent Processing provider
 Recorder / Analyzer provider when justified
 ```
 
-关注：
-
-```text
-capability
-binding
-lifecycle
-provider replacement
-withdrawal
-reconcile
-```
+关注 capability / binding / lifecycle / withdrawal / reconcile。
 
 ## Audio Processing Graph
 
@@ -773,33 +536,15 @@ Mixer
 future DSP nodes
 ```
 
-关注：
+关注 ordered PCM transforms / format / RT publication / parameter update / graph swap。
 
-```text
-ordered PCM transforms
-format contract
-RT publication
-parameter updates
-graph swap
-```
-
-普通：
-
-```text
-insert EQ node
-change limiter
-replace Gain node
-```
-
-不自动触发 Composition Reconcile。
-
-冻结：
+普通 insert/remove/update DSP node 不自动触发 Composition Reconcile。
 
 > **Composition topology composes providers; Audio Processing Graph orders PCM-processing nodes.**
 
 ---
 
-# 16. D15 — MediaSpan 与 PCM Block 分离
+# 11. MediaSpan != PCM Block
 
 冻结：
 
@@ -828,13 +573,11 @@ PcmBlock {
 }
 ```
 
-Processing 可以改变 frame count / layout / sample rate / block boundaries，但不能偷偷改变 MediaSpan 的领域意义。
+Processing 可以改变 frame count/layout/sample rate/block boundaries，但不能偷偷改变 MediaSpan 的领域意义。
 
 ---
 
-# 17. D16 — Command 按 Authority / Capability 路由
-
-禁止所有 command 都经过 MusicKernel。
+# 12. Command / Evidence Routing
 
 冻结：
 
@@ -848,26 +591,7 @@ UI / Integrations
     └── CompositionIntent  -> CompositionKernel
 ```
 
-例如：
-
-```text
-seek / next
-    -> Music semantic intent
-    -> Transport execution
-
-PlayerGain / EQ parameter
-    -> processing authority
-    -> no Transport hop unless timeline semantics change
-
-output provider replacement
-    -> Composition/provider-control path
-```
-
 MusicKernel 不是 God Router。
-
----
-
-# 18. D17 — Evidence 单向解释
 
 Raw playback evidence：
 
@@ -880,62 +604,31 @@ rendered evidence
 physical fence verdict
 ```
 
-先进入 TransportKernel。
-
-TransportKernel 形成 typed derived domain facts：
-
-```text
-LandingCommitted(...)
-TransportDrained(...)
-TransportDiscontinuityFailed(...)
-TransportOutputUnavailable(...)
-```
-
-MusicKernel 只解释这些派生事实并决定：
-
-```text
-ENDED
-repeat
-next
-stop
-user-visible product state
-```
-
-冻结：
+先进入 TransportKernel；TransportKernel 再产生 typed derived domain facts 给 MusicKernel。
 
 > **Raw evidence is interpreted once by the semantic authority that owns the affected fact. Other authorities receive derived typed facts.**
 
 ---
 
-# 19. D18 — PlayerGain 与 DeviceVolume 分离
+# 13. PlayerGain / DeviceVolume
 
-## PlayerGain
-
-Qianqian 主播放器音量默认表示 PCM processing gain：
+PlayerGain 是 PCM processing：
 
 ```text
 PCM -> Gain -> PCM
 ```
 
-参数变化可以做短 ramp 防 click/pop；这属于 DSP parameter smoothing，不是 seek fade。
+主播放器 UI 的普通 volume 默认表示 PlayerGain。
 
-## DeviceVolume
+短 ramp 用于防 click/pop，是 DSP parameter smoothing，不是 seek fade。
 
-属于 AudioOutput/platform 的可选 device-control capability：
-
-```text
-system endpoint volume
-hardware volume
-OS mixer volume
-```
-
-冻结：
+DeviceVolume 属于 AudioOutput/platform 的可选 device-control capability。
 
 > **PlayerGain is audio processing; DeviceVolume is platform/device control.**
 
 ---
 
-# 20. D19 — Data Plane Taxonomy 保留，但不是 Plugin Taxonomy
+# 14. Data Plane Taxonomy
 
 保留：
 
@@ -945,15 +638,7 @@ Transformer
 Consumer
 ```
 
-示例：
-
-```text
-Producer     -> Decoder output / Synth
-Transformer  -> Gain / EQ / SRC / Limiter / Mixer
-Consumer     -> AudioOutput / Recorder / Analyzer tap
-```
-
-但这只是 data-plane taxonomy。
+但它只是 data-plane taxonomy，不是 Plugin taxonomy。
 
 不得推出：
 
@@ -966,9 +651,9 @@ Consumer     -> AudioOutput / Recorder / Analyzer tap
 
 ---
 
-# 21. D20 — 全局共享状态
+# 15. 全局共享状态
 
-Qianqian 不建立：
+禁止：
 
 ```text
 GlobalPlayerState
@@ -1007,9 +692,9 @@ Processing Authority
 
 ---
 
-# 22. D21 — PlayerSnapshot 只是只读投影
+# 16. PlayerSnapshot
 
-可以暴露统一：
+可以暴露统一只读 projection：
 
 ```text
 PlayerSnapshot
@@ -1021,22 +706,11 @@ PlayerSnapshot
 │   ├── duration
 │   └── buffering
 ├── track
-│   ├── identity
-│   ├── title
-│   ├── artist
-│   └── artwork
 ├── audio
-│   ├── player_gain
-│   ├── output_device
-│   └── format
 └── diagnostics
 ```
 
-但 Snapshot 是 materialized read model，不是 authority。
-
-禁止通过修改 Snapshot 改变 runtime。
-
-冻结：
+Snapshot 不是 authority，不能通过修改 Snapshot 改 runtime。
 
 ```text
 Command
@@ -1048,35 +722,11 @@ Command
 
 每个 Snapshot 字段必须能追溯到唯一 authority/provenance。
 
----
-
-# 23. D22 — Desired State != Runtime Truth
-
-例如：
-
-```text
-desired_output = Bluetooth Headset
-actual_output  = Speakers
-```
-
-或者：
-
-```text
-desired_player_gain = 0.5
-actual ramp         = 0.62 -> 0.58 -> ... -> 0.50
-```
-
-必须允许：
-
-```text
-desired != actual
-```
-
-不得用一个字段同时表示用户 intent 与 runtime fact。
+Desired 与 actual/runtime truth 必须分离。
 
 ---
 
-# 24. D23 — RT Firewall
+# 17. RT Firewall
 
 Realtime path 只消费 pre-bound / published RT-safe state。
 
@@ -1094,11 +744,11 @@ UI/runtime round trip
 unbounded allocation/blocking
 ```
 
-Control thread 可以 build / validate 新 RT view 或 processing graph，再通过 bounded RT-safe publication 切换。
+Control thread 可 build/validate 新 RT view 或 processing graph，再做 bounded RT-safe publication。
 
 ---
 
-# 25. Seek / Next / Stop 冻结形状
+# 18. Seek / Next / Stop / ENDED
 
 ## Seek
 
@@ -1124,7 +774,7 @@ prepare new TrackSession
     -> Physical Fence
     -> promote
     -> retire old DecodeSession(s)
-    -> release old TrackSession when ownership tree drains
+    -> release old TrackSession when ownership subtree drains
 ```
 
 ## Stop
@@ -1137,9 +787,7 @@ close admission
     -> publish stopped semantic state
 ```
 
----
-
-# 26. ENDED 原则
+## ENDED
 
 禁止：
 
@@ -1156,39 +804,14 @@ AND no relevant in-flight media
 AND no submitted-but-unrendered media
 ```
 
-TransportKernel 从 raw EOF/render/submission evidence 得出 transport-drained truth；MusicKernel 再解释其产品语义。
+TransportKernel 从 raw evidence 得出 transport-drained truth；MusicKernel 再解释产品语义。
 
 ---
 
-# 27. 明确拒绝的方案
+# 19. 架构不变量
 
 ```text
-R1   Composition Kernel 管 PCM / Track
-R2   MusicKernel 与 TransportKernel 同时拥有 timeline truth
-R3   每首 MP3 一个 MusicKernel
-R4   TrackSession 持有唯一 decoder cursor
-R5   generation != current_generation 作为 stale 通用定义
-R6   Mutable GlobalPlayerState
-R7   PCM 是通用消息总线
-R8   BufferId 是媒体时间 identity
-R9   generation 代替 physical flush
-R10  MVP seek fade / old-tail masking
-R11  主播放器 volume 直接修改系统音量
-R12  每个 DSP node / parameter 都是 plugin/Fiber
-R13  DSP graph mutation 必然触发 Composition Reconcile
-R14  所有 UI command 都经过 MusicKernel
-R15  Decoder/AudioOutput mechanism 被 MusicComponent 吞入
-R16  Raw playback evidence 被 MusicKernel / TransportKernel 各解释一次
-R17  PlayerSnapshot 成为可写状态库
-R18  裸用 owns 混淆 lifecycle root / immediate owner / semantic authority
-```
-
----
-
-# 28. 架构不变量
-
-```text
-I1   Generic Composition Kernel 不得依赖 Music/Transport/PCM/TrackSession 等领域概念
+I1   Generic Composition Kernel 不依赖 Music/Transport/PCM/TrackSession 等领域概念
 I2   Plugin boundary 必须由 independent composability 挣得
 I3   每个 Nested Runtime Resource 恰有一个 immediate lifetime owner
 I4   所有 nested ownership path 最终到达一个 composed lifecycle root
@@ -1199,7 +822,7 @@ I8   MVP 最多 1 ActiveWindow + 0..1 PreparedWindow
 I9   同 Track Active + Prepared 可拥有不同 DecodeSession
 I10  Generation validity 由 admission/window role 决定
 I11  每 PCM block/callback 不经过 Context/resolve/Reconcile/Fiber/Effect
-I12  stop/seek/hard replacement 必须保留 Physical Fence correctness
+I12  stop/seek/hard replacement 保留 Physical Fence correctness
 I13  Buffer != MediaSpan
 I14  submitted != rendered
 I15  Composition topology != Processing topology
@@ -1210,14 +833,12 @@ I18  RT hot path 不访问 mutable global bag
 
 ---
 
-# 29. Corrective-2 Design Review 结论
-
-Corrective-1 的 G1-G8 现判定：
+# 20. Corrective-2 Design Review 结论
 
 | Gate | Verdict |
 |---|---|
 | G1 Nested Runtime Resource | **PASS** |
-| G2 Dual Window + provider withdrawal | **PASS，ownership terminology 已 Corrective-2 收紧** |
+| G2 Dual Window + provider withdrawal | **PASS；ownership terminology 已 Corrective-2 收紧** |
 | G3 Generation admission | **PASS** |
 | G4 Composition graph != Processing graph | **PASS** |
 | G5 Command / Evidence authority routing | **PASS** |
@@ -1225,12 +846,13 @@ Corrective-1 的 G1-G8 现判定：
 | G7 Physical Fence | **PASS** |
 | G8 Snapshot / global-state | **PASS** |
 
-Q1/Q2/Q3 已全部关闭：
+三个开放项全部关闭：
 
 ```text
 Q1 -> TransportKernel final
 Q2 -> MusicKernel final
-Q3 -> decoder cursor belongs to DecodeSession; TrackSession owns DecodeSession lifetime subtree
+Q3 -> decoder cursor belongs to DecodeSession;
+      TrackSession is the immediate lifetime owner of DecodeSession(s)
 ```
 
 因此：
@@ -1244,15 +866,13 @@ PROSE OPEN QUESTIONS = CLOSED
 
 ---
 
-# 30. Formal Gate — ACCEPTED 前必须通过
+# 21. Formal Gate — ACCEPTED 前必须通过
 
-我们担心的主要剩余风险已经从“边界不清”转为“合法状态组合是否会撞车”。
+剩余风险已经从“边界是否清楚”变为“合法状态组合是否会撞车”。
 
-因此 ADR 从 Corrective-2 起增加 Formal Gate。
+## F1 — PlaybackTemporal model
 
-## F1 — PlaybackTemporal 模型
-
-建议使用 TLA+/TLC 建立最小 temporal model，至少覆盖：
+使用 TLA+/TLC 或等价显式状态模型，至少覆盖：
 
 ```text
 ActiveWindow
@@ -1265,7 +885,7 @@ submitted / rendered
 EOF / ENDED
 late decode
 rapid superseding discontinuity
-provider withdrawal interaction
+provider-withdrawal interaction
 ```
 
 至少检查：
@@ -1274,17 +894,17 @@ provider withdrawal interaction
 AtMostOneActiveWindow
 AtMostOnePreparedWindow
 ActiveAndPreparedMayHaveDifferentGenerations
-AcceptedDecodeResult => generation is admitted for its window role
+AcceptedDecodeResult => generation admitted for its window role
 RetiredGeneration => no longer admitted
 HardPromotion => successful PhysicalFence
 FenceFailure => no fake promotion success
-rendered <= submitted
+rendered cannot exceed submitted
 ENDED => producer terminal + pipeline drained + no submitted-unrendered media
 old generation cannot submit after successful promotion
 superseded Prepared generation cannot re-enter
 ```
 
-必须包含 rapid-command traces，例如：
+必须覆盖 rapid command trace：
 
 ```text
 seek(100)
@@ -1293,11 +913,11 @@ next(B)
 stop
 ```
 
-并明确谁拥有 supersede/cancel/replace authority。
+并明确 pending discontinuity 的 supersede/cancel/replace authority。
 
-## F2 — PlaybackOwnership 模型
+## F2 — PlaybackOwnership model
 
-独立验证 lifetime ownership：
+独立验证：
 
 ```text
 MusicComponent
@@ -1314,17 +934,15 @@ exactly one immediate lifetime owner
 all nested ownership paths terminate at one composed lifecycle root
 no ownership cycles
 provider final release cannot precede dependent teardown access
-TrackSession teardown implies all owned DecodeSession resources are discharged
+TrackSession teardown implies owned DecodeSession resources discharged
 ```
 
 ## F3 — Negative Controls
 
-模型必须能抓到故意植入的错误，否则不得把 TLC PASS 当作有效证据。
-
-至少做：
+模型必须抓到故意植入的错误：
 
 ```text
-BUG-A  去掉 Promote 前 fence-completed 条件 -> 必须出现 counterexample
+BUG-A  去掉 Promote 前 fence-completed 条件 -> 必须 counterexample
 BUG-B  恢复 generation != currentGeneration -> Dual Window 必须失败
 BUG-C  允许 retired generation 继续 admitted -> late decode invariant 必须失败
 BUG-D  provider 先 final release 再 teardown DecodeSession -> lifetime invariant 必须失败
@@ -1333,7 +951,7 @@ BUG-E  EOF 直接导致 ENDED -> submitted-not-rendered trace 必须失败
 
 ## F4 — Deterministic Executable Oracle
 
-TLA+ 通过后，再建立无真实线程/无 FFmpeg/WASAPI 的 deterministic playback simulator，至少覆盖：
+形式模型通过后，再建立无真实线程/无 FFmpeg/WASAPI 的 deterministic playback simulator，至少覆盖：
 
 ```text
 normal playback
@@ -1348,13 +966,11 @@ provider withdrawal
 snapshot provenance
 ```
 
-生产实现必须对齐该 executable oracle，而不是直接从 prose 自由发挥。
+生产实现必须对齐该 executable oracle。
 
 ---
 
-# 31. ADR 状态机
-
-Corrective-2 之后的 gate：
+# 22. ADR 状态机
 
 ```text
 ADR-PBK-001 Corrective-2
@@ -1373,10 +989,10 @@ ADR-PBK-001 = ACCEPTED
         ↓
 corrective refinement of ARCH-003 authority
         ↓
-implementation issue may separately authorize production work
+implementation issue separately authorizes production work
 ```
 
-当前冻结：
+当前：
 
 ```text
 STATUS = PROPOSED / CORRECTIVE-2 / FORMAL GATE PENDING
@@ -1387,12 +1003,12 @@ ARCH-003 AUTHORITY REVISION = NO
 
 ---
 
-# 32. 本 ADR 不冻结的 representation
+# 23. 不冻结的 Representation
 
 以下留给后续 implementation design：
 
 ```text
-MusicKernel / TransportKernel 最终 Rust API
+MusicKernel / TransportKernel Rust API
 TrackSession / DecodeSession crate/module 布局
 Decoder handle 的 Box/Arc/lease/token/opaque representation
 ring buffer
@@ -1404,22 +1020,22 @@ PCM quantum
 lookahead/window size
 SRC placement
 EQ graph API
-PlayerGain 最终 component-local 或 Processing-provider placement
+PlayerGain 最终 placement
 future crossfade/gapless
 ReplayGain
 device-handoff policy
 WASAPI/CoreAudio/AAudio 具体 fence mechanism
 ```
 
-这些 representation 不得反过来改变本文已冻结的 authority / lifetime / data-plane semantics。
+这些 representation 不得反过来改变本文已冻结的 authority/lifetime/data-plane semantics。
 
 ---
 
-# 33. 对 ARCH-003 的影响
+# 24. 对 ARCH-003 的影响
 
-ADR 仍为 PROPOSED，因此现在不修改 `registry.yml` 的 ARCH-003 authority。
+当前 ADR 仍为 PROPOSED，因此现在不修改 `registry.yml` 的 ARCH-003 authority。
 
-Formal Gate 全部通过并将本文改为 ACCEPTED 后，再把现有较宽泛的 Playback authority 拆成：
+Formal Gate 全部通过并改为 ACCEPTED 后，再把当前较宽泛的 Playback authority corrective-refine 为：
 
 ```text
 MusicComponent
@@ -1441,40 +1057,4 @@ Window / Generation
     -> subordinate temporal runtime resources
 ```
 
-这不是重开 Base Kernel K0，而是在 ARCH-003 尚未实现前完成 Playback authority refinement。
-
----
-
-# 34. Final Freeze Candidate
-
-> **Composition Kernel 管 provider/component 的空间组合与生命周期。**
-
-> **MusicComponent 是 playback domain 的 composed lifecycle root，但不能吞并独立 provider。**
-
-> **MusicKernel is the music-domain semantic authority.**
-
-> **TransportKernel is the playback temporal authority.**
-
-> **Kernel 表示 semantic authority role，不表示 Composition plugin boundary。**
-
-> **TrackSession 表示 media identity / source lifetime；DecodeSession 表示一个 independently advancing decoder cursor/handle。**
-
-> **Every non-plugin runtime resource belongs to exactly one ownership tree rooted at a composed component and has exactly one immediate lifetime owner.**
-
-> **lifetime ownership != semantic authority。**
-
-> **ActiveWindow 与 PreparedWindow 可以同时存在；Generation validity 使用 admission/window-role，而不是 global-current equality。**
-
-> **PCM 是 canonical decoded-audio data plane，而不是全局消息总线。**
-
-> **Composition topology 与 Audio Processing Graph topology 是两套不同 topology。**
-
-> **Buffer 是存储单位；MediaSpan 是时间单位。**
-
-> **Generation 管软件时代边界；Physical Fence 管真实声音边界。**
-
-> **PlayerGain 属于 PCM processing；DeviceVolume 属于平台/device control。**
-
-> **Command goes to its authority；raw evidence is interpreted once by the authority that owns the affected fact.**
-
-> **Global visibility does not imply global ownership；全局可共享只读 Snapshot，但每个 mutable fact 只能有一个 semantic authority/writer。**
+这不是重开 Base Kernel K0。
