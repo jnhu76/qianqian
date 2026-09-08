@@ -1,31 +1,29 @@
 flowchart LR
-    subgraph Composition["Composition Topology"]
-        MUSIC["MusicComponent\ncontains MusicKernel + TransportKernel"]
-        DEC["Decoder provider\nencoded media → canonical PCM"]
-        AOUT["AudioOutput / PcmSink provider\nPCM → physical output + evidence"]
-        PROC["future independent Processing provider\nonly if boundary is earned"]
-        UH["UiHost\npresentation mechanism"]
+    subgraph Current["Current Intended Shape"]
+        DEC["Decoder\n(encoded media → PCM)"]
+        MUSIC["Music / Playback\n(domain semantics)"]
+        AOUT["AudioOutput\n(PCM → physical)"]
 
+        DEC -->|"provides Decoder capability"| MUSIC
         MUSIC -->|"requires Decoder"| DEC
-        MUSIC -->|"requires AudioOutput / PcmSink"| AOUT
-        MUSIC -.->|"future, if independently composable"| PROC
-        UH -.->|"consumes playback/domain contracts"| MUSIC
+        MUSIC -->|"binds PcmSink"| AOUT
+        AOUT -->|"provides PcmSink"| MUSIC
     end
 
-    subgraph ProcessingGraph["Audio Processing Graph — not the plugin graph"]
-        GAIN["Gain"] --> EQ["EQ"] --> SRC["SRC"] --> LIM["Limiter"]
+    subgraph Future["Future Components"]
+        PROC["Processing\n(PCM → PCM)"]
+        UH["UiHost\n(presentation)"]
     end
 
-    DEC -.->|"canonical PCM"| GAIN
-    LIM -.->|"canonical PCM"| AOUT
+    MUSIC -.->|"future: PCM → PCM"| PROC
+    PROC -.->|"future: PCM → physical"| AOUT
+    MUSIC -.->|"future: poll snapshot"| UH
 
-    style Composition fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
-    style ProcessingGraph fill:#0f3460,stroke:#4a4a8a,color:#e0e0e0
+    style Current fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
+    style Future fill:#2a2a2a,stroke:#5a5a5a,color:#a0a0a0
 
     classDef current fill:#4a4a6a,stroke:#6a6a8a,color:#e0e0e0
     classDef future fill:#3a3a3a,stroke:#5a5a5a,color:#a0a0a0
-    classDef node fill:#264653,stroke:#457b9d,color:#e0e0e0
 
-    class MUSIC,DEC,AOUT current
+    class DEC,MUSIC,AOUT current
     class PROC,UH future
-    class GAIN,EQ,SRC,LIM node

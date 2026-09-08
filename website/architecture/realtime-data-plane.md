@@ -1,13 +1,15 @@
 ---
 title: 控制平面与数据平面
-status: IMPLEMENTED
+status: CURRENT
 ---
 
 # 控制平面与数据平面
 
-<StatusBadge status="IMPLEMENTED" />
+<StatusBadge status="CURRENT" />
 
 > **Capability Plane != Data Plane。**
+
+本页分两层：**已实现**的 generic control/data-plane 防火墙（Base Kernel K0，PR #71），以及 ADR-PBK-001（**PROPOSED / FORMAL CORE PASS**）的 **playback mapping**（TransportKernel / Physical Fence / evidence routing）。后者是拟议模型，不代表真实 PCM playback pipeline 已经实现。
 
 ---
 
@@ -16,6 +18,8 @@ status: IMPLEMENTED
 <ClaimBadge role="authority" />
 
 Context 决定**谁能到达谁**。绑定之后，载荷通过已解析服务或预绑定数据边直接流动。
+
+**已实现层**：generic Composition Kernel 的 control/data-plane 防火墙（K0 oracle 测试，PR #71）保证控制面不逐块接触载荷。
 
 ```mermaid
 flowchart TB
@@ -33,7 +37,7 @@ flowchart TB
     BIND -.->|"建立长期/预绑定边，不逐块查找"| DP
 ```
 
-Composition Kernel 不拥有 PCM、MediaSpan、playback cursor、Window、Generation 或 rendered position。
+Composition Kernel 不拥有 PCM、MediaSpan、playback cursor、Window、Generation 或 rendered position。图中 Decoder / Processing / AudioOutput 是 capability seam；真实 provider 实现尚未获得授权。
 
 ---
 
@@ -57,7 +61,7 @@ Composition Kernel 不拥有 PCM、MediaSpan、playback cursor、Window、Genera
 
 ## 播放证据不是通用事件
 
-AudioOutput 产生的：
+**当前 Proposed Playback mapping（ADR-PBK-001，PROPOSED）**：AudioOutput 产生的：
 
 ```text
 submitted evidence
@@ -66,7 +70,7 @@ Physical Fence verdict
 device/output evidence
 ```
 
-属于 playback temporal evidence。
+属于 playback temporal evidence。拟议的证据路由：
 
 ```mermaid
 flowchart LR
@@ -74,11 +78,13 @@ flowchart LR
     TK -->|"typed derived fact"| MK["MusicKernel"]
 ```
 
-TransportKernel 是 raw playback evidence 的语义解释者。MusicKernel 不独立重算 rendered cursor 或 EOF/fence 结果。
+在拟议模型中，TransportKernel 是 raw playback evidence 的语义解释者；MusicKernel 不独立重算 rendered cursor 或 EOF/fence 结果。此映射尚未有可执行实现。
 
 ---
 
 ## Physical truth
+
+**Proposed playback semantics（ADR-PBK-001，PROPOSED）**：
 
 ```text
 decoded != queued != submitted != rendered
@@ -100,7 +106,7 @@ MusicComponent 通过 Composition Kernel 获得 AudioOutput/PcmSink capability�
 1. data edge 有明确生命周期与 teardown；
 2. provider final release 之前 dependent 完成必要 teardown；
 3. RT thread 只触碰预先准备好的 bounded state；
-4. raw physical evidence 进入 TransportKernel，而不是全局可写状态袋。
+4. raw physical evidence 进入 TransportKernel（拟议映射），而不是全局可写状态袋。
 
 ---
 

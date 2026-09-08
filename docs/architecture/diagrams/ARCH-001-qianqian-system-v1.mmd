@@ -1,50 +1,40 @@
 flowchart TB
-    subgraph ControlPlane["Composition / Control Plane"]
+    subgraph ControlPlane["Control Plane"]
         direction TB
-        CK["Composition Kernel\nContext / Capability / Fiber\nEffect / Reconcile"]
-        MC["MusicComponent\ncomposition lifecycle root"]
-        DEC["Decoder provider"]
-        AOUT["AudioOutput / PcmSink provider"]
-        UH["UiHost provider / consumer"]
-
-        CK -.->|"reconcile Fiber"| MC
-        CK -.->|"reconcile Fiber"| DEC
-        CK -.->|"reconcile Fiber"| AOUT
-        CK -.->|"reconcile Fiber"| UH
-        MC -.->|"requires Decoder"| DEC
-        MC -.->|"requires AudioOutput/PcmSink"| AOUT
+        CK["Composition Kernel"]
+        CK -."Context / Capability / Fiber\nEffect / Reconcile".-> CK
     end
 
-    subgraph PlaybackDomain["Playback Domain inside MusicComponent"]
-        direction TB
-        MK["MusicKernel\nmusic/product semantics"]
-        TK["TransportKernel\nplayback temporal semantics"]
-        TS["TrackSession(s)"] --> DS["DecodeSession(s)"]
-        MK -->|"intent / product decision"| TK
-        TK --- TS
-    end
-
-    MC --- PlaybackDomain
-
-    subgraph DataPlane["Canonical Audio Data Plane"]
+    subgraph DataPlane["Realtime Data Plane"]
         direction LR
-        DS2["DecodeSession"] -->|"canonical PCM + MediaSpan"| PRO["Audio Processing Graph\nGain / EQ / SRC / ..."]
-        PRO -->|"canonical PCM"| AO2["AudioOutput"]
+        MS["MediaSource"] -->|encoded media| DEC["Decoder\nENCODED → PCM"]
+        DEC -->|PCM| PRO["Processing\nPCM → PCM"]
+        PRO -->|PCM| AOUT["AudioOutput\nPCM → physical device"]
     end
 
-    DEC -->|"decoder handle / EOF evidence"| DS2
-    AO2 -->|"submitted / rendered / fence evidence"| TK
-    TK -->|"derived domain facts"| MK
-    UH -.->|"PlaybackIntent / snapshot consumption"| MK
+    subgraph Domains["Domain Components"]
+        direction TB
+        MK["MusicKernel\n(Music semantics)"]
+        UH["UiHost\n(Presentation)"]
+    end
+
+    MK -.->|requires| DEC
+    MK -.->|binds PcmSink| AOUT
+    UH -.->|polls snapshot| MK
+
+    CK -.->|"desire composition → reconcile"| MK
+    CK -.->|"desire composition → reconcile"| DEC
+    CK -.->|"desire composition → reconcile"| AOUT
+    CK -.->|"desire composition → reconcile"| UH
 
     style ControlPlane fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
-    style PlaybackDomain fill:#16213e,stroke:#4a4a6a,color:#e0e0e0
     style DataPlane fill:#0f3460,stroke:#4a4a8a,color:#e0e0e0
+    style Domains fill:#16213e,stroke:#4a4a6a,color:#e0e0e0
 
     classDef implemented fill:#2d6a4f,stroke:#4a9a6f,color:#e0e0e0
-    classDef designed fill:#e9c46a,stroke:#f4a261,color:#1a1a1a
+    classDef next fill:#e9c46a,stroke:#f4a261,color:#1a1a1a
     classDef planned fill:#4a4a6a,stroke:#6a6a8a,color:#e0e0e0
 
     class CK implemented
-    class MC,MK,TK,TS,DS designed
-    class DEC,AOUT,UH,PRO planned
+    class MK next
+    class DEC,PRO,AOUT,UH planned

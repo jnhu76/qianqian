@@ -138,9 +138,13 @@ impl AppRuntime {
     }
 }
 
-/// The Music Fiber requires the audio-output capability at activation and
-/// owns the binding effect whose inverse releases the pre-bound handle on
-/// teardown. Domain/temporal state remains outside generic kernel storage.
+/// The Music Fiber requires the audio-output capability at activation. On
+/// activation the fiber resolves the service and stores it outside kernel
+/// storage as a pre-bound data edge; on teardown the `on_teardown` closure —
+/// a domain teardown obligation whose verdict (`Discharge::Discharged` /
+/// `Discharge::Violated`) is all the kernel observes, not a kernel Effect
+/// inverse — releases that handle. Domain/temporal state remains outside
+/// generic kernel storage.
 fn music_component(audio_output: Rc<RefCell<Option<Rc<dyn AudioOutput>>>>) -> ComponentSpec {
     let handle_on_activate = audio_output.clone();
     ComponentSpec::new("music")

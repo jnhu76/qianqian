@@ -19,7 +19,7 @@ import { projectState } from '../data/project-state.ts'
 |---|---|---|
 | 播放参考 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | `playback-reference-v1` 是行为证据，不是未来 source-layout 模板 |
 | FFmpeg 闭包研究 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Decoder/Processing 共用单一 closure authority 的历史证据 |
-| 组件边界 A0 | <StatusBadge status="FROZEN" /> | #53 历史审计保留；playback-specific 结论由 ADR-PBK-001 supersede |
+| 组件边界 A0 | <StatusBadge status="FROZEN" /> | #53 历史审计保留；其 playback-specific 结论是历史输入，正由 ADR-PBK-001（PROPOSED）拟议替代，待 ACCEPTED 后才迁移 registry authority |
 | Base / Composition Kernel K0 | <StatusBadge status="IMPLEMENTED" /> | Context / Capability / Fiber / Effect / Reconcile 已实现 |
 | Playback Architecture | <StatusBadge status="CURRENT" /> | ADR-PBK-001：PROPOSED / FORMAL CORE PASS；当前做全仓 authority alignment / acceptance review |
 | Decoder provider | <StatusBadge status="PLANNED" /> | capability seam 已有；真实 provider 实现未授权于本轮 |
@@ -33,7 +33,7 @@ import { projectState } from '../data/project-state.ts'
 
 **{{ projectState.currentFrontier }}**
 
-这一阶段的目标不是实现 PlayerEngine，而是确认仓库的当前入口只讲一套事实：
+这一阶段的目标不是实现 PlayerEngine，而是让仓库的当前 surface 诚实表达同一组事实：registered ARCH-003 authority 尚未迁移，ADR-PBK-001 是 PROPOSED / FORMAL CORE PASS 的拟议替代候选：
 
 ```text
 MusicComponent
@@ -67,7 +67,7 @@ logical invalidation != physical stop
 Composition Graph != Audio Processing Graph
 ```
 
-这些不是实现者可随意重新选择的风格偏好。
+在 ADR-PBK-001 拟议模型内部，这些不是实现者可随意重新选择的风格偏好；模型整体仍处于 PROPOSED，待人工 ACCEPTED。
 
 ---
 

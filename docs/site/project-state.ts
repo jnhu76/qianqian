@@ -41,7 +41,7 @@ export const projectState: ProjectState = {
   },
 
   nextQuestions: [
-    '当前 README / architecture / website / code shell 是否已全部与 ADR-PBK-001 authority split 对齐?',
+    '当前 current surfaces 是否准确表达 ADR-PBK-001 为 PROPOSED replacement candidate，而 registry 的 ARCH-003 authority 尚未迁移？',
     'ADR-PBK-001 是否具备进入 ACCEPTED 的人工审查条件?',
     '只有在 ACCEPTED 之后：最小 executable playback model 应先挣得哪些 Rust representation?',
   ],

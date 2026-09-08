@@ -41,7 +41,9 @@ import { projectState } from '../data/project-state.ts'
 
 ---
 
-## 当前 Playback 结构
+## Playback 拟议结构
+
+ADR-PBK-001（**PROPOSED / FORMAL CORE PASS**）的拟议结构：
 
 ```text
 MusicComponent
@@ -51,7 +53,7 @@ MusicComponent
     └── DecodeSession(s)
 ```
 
-`MusicKernel` 不再同时承担 timeline/window/generation/fence。`TransportKernel` 是 raw playback evidence 的唯一 temporal interpreter。
+在拟议模型中，`MusicKernel` 不承担 timeline/window/generation/fence；`TransportKernel` 是 raw playback evidence 的唯一 temporal interpreter。该模型待人工 ACCEPTED 后才迁移 registry authority。
 
 当前代码已经建立两个 authority shell，但尚未实现完整 playback state machine、FFmpeg Decoder 或真实 AudioOutput backend。
 

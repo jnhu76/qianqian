@@ -2,7 +2,7 @@
 
 This document is the repository-local semantic overview for Qianqian Architecture v2.
 
-Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). Playback-specific authority lives in [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md). The closed `component-boundary-a0.md` audit remains historical decomposition evidence; where its playback-specific ownership statements differ from ADR-PBK-001, the ADR wins.
+Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). Playback-specific semantics have a **proposed replacement** in [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md) (PROPOSED / FORMAL CORE PASS). The registered ARCH-003 authority is still the closed `component-boundary-a0.md` audit; it remains historical decomposition evidence, and its playback-specific ownership conclusions are historical inputs under proposed replacement — until the ADR is ACCEPTED and the registry is updated, do not combine the two playback models in one implementation.
 
 ## Architecture constitution
 
@@ -350,21 +350,24 @@ Generic composition
     docs/architecture/composition-kernel.md
 
 Playback architecture
-    docs/adr/ADR-PBK-001.md
-    specs/playback/* as evidence
+    registered ARCH-003 authority: docs/architecture/component-boundary-a0.md
+        (NOT yet migrated; migration happens only after human ACCEPTED)
+    proposed replacement: docs/adr/ADR-PBK-001.md (PROPOSED / FORMAL CORE PASS)
+        specs/playback/* as formal evidence
 
 Historical decomposition evidence
     docs/architecture/component-boundary-a0.md
-    playback-specific statements superseded where ADR-PBK-001 differs
+    playback-specific ownership/granularity conclusions are historical inputs
+    under proposed replacement by ADR-PBK-001 (pending acceptance)
 ```
 
 ## Historical evidence
 
+Historical evidence is preserved as **git refs, not working-tree directories**:
+
 ```text
-archive/pre-rust-v2
-pre-rust-v2
-research/playback-reference-v1
-playback-reference-v1
+pre-rust-v2              git tag (branch: archive/pre-rust-v2)
+playback-reference-v1    git tag (branch: research/playback-reference-v1)
 ```
 
-These are opt-in evidence sources, not current source-layout or ownership templates.
+Inspect via `git show <tag>:<path>`. These are opt-in evidence sources, not current source-layout or ownership templates.

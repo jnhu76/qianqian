@@ -11,7 +11,7 @@ Before changing code or long-lived documentation:
 3. Use `docs/README.md` to load only the minimum relevant documentation.
 4. Read `docs/architecture/overview.md` before changing architecture boundaries.
 5. For component/plugin/composition work, read `docs/architecture/composition-kernel.md` and the current boundary/design issue.
-6. For playback work, read `docs/adr/ADR-PBK-001.md`; use `specs/playback/*` only when the task actually needs state-collision evidence.
+6. For playback work, read `docs/adr/ADR-PBK-001.md` (PROPOSED / FORMAL CORE PASS — proposed replacement candidate; registered ARCH-003 authority not yet migrated); use `specs/playback/*` only when the task actually needs state-collision evidence.
 7. Audit current repository reality before assuming a path, API, module, crate, build rule, or prior design is still authoritative.
 
 Do not recursively preload archived source/docs.
@@ -278,9 +278,9 @@ Confluence tests should compare relevant public truth such as reachable capabili
 
 ## Playback authority discipline
 
-For ARCH-003, `docs/adr/ADR-PBK-001.md` is the current playback design authority. The historical `component-boundary-a0.md` remains evidence, but it does not override the ADR where playback-specific ownership changed.
+For ARCH-003, `docs/adr/ADR-PBK-001.md` is the current **proposed replacement** for playback-specific semantics: PROPOSED / FORMAL CORE PASS, not yet ACCEPTED. The registered ARCH-003 authority remains `component-boundary-a0.md` until human acceptance updates the registry. Do not treat the ADR as already-migrated authority, and do not combine the two playback models when implementing new code.
 
-Do **not** collapse playback into one giant `MusicKernel`.
+The ADR's proposed model does **not** collapse playback into one giant `MusicKernel`.
 
 ```text
 MusicComponent   = composition lifecycle root
@@ -399,21 +399,21 @@ If current reality contradicts the task premise, surface the conflict rather tha
 
 ## Historical evidence
 
+Historical evidence is preserved as **git refs, not working-tree directories**:
+
 Pre-Rust repository:
 
 ```text
-archive/pre-rust-v2
-pre-rust-v2
+git tag pre-rust-v2          (branch: archive/pre-rust-v2)
 ```
 
 Frozen playback reference:
 
 ```text
-research/playback-reference-v1
-playback-reference-v1
+git tag playback-reference-v1    (branch: research/playback-reference-v1)
 ```
 
-These are evidence sources, not current architecture/source-layout authority.
+Neither tag is present in the current working tree; inspect via `git show <tag>:<path>`. These are evidence sources, not current architecture/source-layout authority.
 
 ## Verification
 

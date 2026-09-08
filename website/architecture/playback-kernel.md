@@ -7,7 +7,7 @@ status: PROPOSED
 
 <StatusBadge status="PROPOSED" />
 
-当前 ARCH-003 的设计权威是 `docs/adr/ADR-PBK-001.md`。这里是面向阅读的解释层，不另造一套架构。
+ADR-PBK-001 是当前 Playback 架构的**拟议替代方案**（PROPOSED / FORMAL CORE PASS）；在人工 ACCEPTED 并更新 registry 前，它尚未正式替代 ARCH-003 的登记 authority。本页是该拟议模型面向阅读的解释层，不另造一套架构。
 
 > **Playback 不是一个巨型 MusicKernel。**
 

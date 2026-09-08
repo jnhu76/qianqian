@@ -59,8 +59,8 @@ This file carries stable vocabulary and the repository mental model. It is not a
 | Realtime island | Bounded audio hot path using pre-bound data edges; no per-block generic Context resolution/reconcile. |
 | Event Service | Product/domain event semantics, if needed, should begin as a normal service/plugin rather than an automatic generic-kernel primitive. |
 | Everything is a Plugin | All justified long-lived runtime capabilities ultimately obey a common composition/lifecycle protocol; it does not mean every feature name, DSP node, or payload is exactly one plugin. |
-| Reference Playback v1 | Frozen playback experiment proving a local-file -> decode -> PCM -> physical output path and important playback truths. |
-| Pre-Rust archive | Complete repository state before Architecture v2 reset: `archive/pre-rust-v2` / `pre-rust-v2`. |
+| Reference Playback v1 | Frozen playback experiment proving a local-file -> decode -> PCM -> physical output path and important playback truths. Preserved as git tag `playback-reference-v1` (branch `research/playback-reference-v1`); not present in the working tree. |
+| Pre-Rust archive | Complete repository state before Architecture v2 reset: git tag `pre-rust-v2` (branch `archive/pre-rust-v2`); not present in the working tree. |
 | Behavioral oracle | Historical verified behavior used to preserve playback correctness while architecture changes. |
 | Formal exploration | Risk-driven state-space evidence for interactions where individually legal states/events can collide. It is not a second architecture authority. |
 
@@ -138,6 +138,8 @@ Do not use registration timing, container iteration, or mount order as hidden pr
 Context establishes reachability. It does not carry PCM blocks or playback temporal truth.
 
 ## Playback mental model
+
+The model below is ADR-PBK-001's (**PROPOSED / FORMAL CORE PASS**) proposed playback structure — the registered ARCH-003 authority has not yet migrated to it.
 
 ```text
 MusicComponent
@@ -258,12 +260,11 @@ The generic Base Kernel K0 is implemented. Product code carries separate `MusicK
 
 ## Historical refs
 
-```text
-archive/pre-rust-v2
-pre-rust-v2
+Historical evidence is preserved as **git refs, not working-tree directories**:
 
-research/playback-reference-v1
-playback-reference-v1
+```text
+pre-rust-v2              git tag (branch: archive/pre-rust-v2)
+playback-reference-v1    git tag (branch: research/playback-reference-v1)
 ```
 
-Use these as opt-in evidence, never as automatic source-layout/ownership authority.
+Inspect via `git show <tag>:<path>`. Use these as opt-in evidence, never as automatic source-layout/ownership authority.

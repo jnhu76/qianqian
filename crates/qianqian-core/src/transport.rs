@@ -8,6 +8,10 @@
 //! representation or media APIs. Those shapes must emerge under executable
 //! implementation pressure. `TransportKernel` is a semantic authority role,
 //! not a Composition plugin boundary.
+//!
+//! This shell aligns code vocabulary with the proposed Playback architecture
+//! (ADR-PBK-001, PROPOSED / FORMAL CORE PASS). It does not constitute
+//! production Playback implementation authorization.
 
 /// Authority for playback-temporal semantics.
 ///

@@ -74,6 +74,8 @@ MusicKernel      = music/product semantic authority
 TransportKernel  = playback temporal authority
 ```
 
+> 这一 playback 拆分来自 ADR-PBK-001（**PROPOSED / FORMAL CORE PASS**）；在人工 ACCEPTED 并更新 registry 前，它是 ARCH-003 的拟议替代模型，而非已迁移的登记 authority。
+
 `Kernel` 在后两个名字里表示 semantic authority role，不代表两个新的 Composition plugin。
 
 Nested playback lifetime：
