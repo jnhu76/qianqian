@@ -14,7 +14,7 @@ Do not recursively read archived or historical material by default.
 | Component boundary / plugin granularity / interaction algebra | `architecture/composition-kernel.md` boundary-design sections + closed audit `architecture/component-boundary-a0.md` (#53 PASS/CLOSED) |
 | Composition Kernel semantics design (#67) | `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel.md` + issue #67 |
 | Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + the implementation issue (#70) + `architecture/composition-kernel-0-implementation-adr.md` (representation decisions) |
-| Playback timeline / media session / PCM data-plane boundaries (ARCH-003) | `adr/ADR-PBK-001.md` (PROPOSED — pending joint review; Q1–Q3 open, not yet frozen) |
+| Playback timeline / media session / PCM data-plane boundaries (ARCH-003) | `adr/ADR-PBK-001.md` (PROPOSED / Corrective-1 — pending joint review; §40 G1–G8 are the current review gate, not implementation authorization) |
 | Product introduction / current repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | Rust workspace/build/test | Current `Cargo.toml` / crate manifests / CI once present; do not invent a separate manual before repeated operational complexity exists. |
@@ -33,10 +33,10 @@ Use the authority closest to the fact:
 agent work rules                 -> AGENTS.md
 stable vocabulary                -> CONTEXT.md
 current architecture             -> docs/architecture/overview.md
-component-decomposition audit     -> closed issue #53 + component-boundary-a0.md + composition-kernel boundary sections
+component-decomposition audit    -> closed issue #53 + component-boundary-a0.md + composition-kernel boundary sections
 composition-kernel-0 semantics   -> docs/architecture/composition-kernel-0-design.md (merged via PR #68) + issue #67
 composition-kernel invariants    -> docs/architecture/composition-kernel.md
-playback-architecture decisions  -> docs/adr/ADR-PBK-001.md (PROPOSED, ARCH-003)
+playback-architecture decisions  -> docs/adr/ADR-PBK-001.md (PROPOSED / Corrective-1, ARCH-003; not current frozen authority until accepted)
 implemented behavior             -> code + tests + current contracts
 historical experimental fact     -> preserved reference/history
 current task scope               -> current issue/task
