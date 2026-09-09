@@ -91,7 +91,7 @@ architectures:
       frozen: true
 
     authority:
-      - docs/architecture/composition-kernel.md
+      - docs/architecture/component-boundary-a0.md
       - docs/architecture/overview.md
 
     decisions:
