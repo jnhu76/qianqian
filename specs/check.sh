@@ -10,6 +10,13 @@
 #   正常模型（无 mutation）必须 TLC 探索完成且全部 invariant PASS；
 #   每个 mutation 必须违反其目标 invariant（counterexample 才算通过——
 #   mutation 的目的就是证明 checker 抓得住错误）。
+#   任何 TLC run 输出 Warning 即 FAIL（fail closed，无 whitelist）：TLC 对
+#   非法/冲突的 next-state specification 可能只发 Warning 并静默削掉相关
+#   transition，此时"探索完成 + 无违反"不是可信 evidence。
+#   mutation 的 counterexample 另要求 TLC 自行收尾（log 含 "Finished in"）：
+#   被杀/崩溃进程产出的部分输出（如 TLC 内部错误、timeout、JVM crash）
+#   不得作为 MUST-FAIL 证据（正常模型由 "Model checking completed" 同样
+#   只可能出自自行收尾的 run）。
 #
 # 工具链固定版本（fail closed）：
 #   tla2tools v1.7.4 (Xenophanes)，sha256 见下；缺失时自动下载
@@ -60,6 +67,19 @@ run_tlc() {
   completed="$(grep -c 'Model checking completed' "$log" || true)"
   viol="$(grep -oE 'Invariant [A-Za-z0-9]+ is violated' "$log" | sed 's/Invariant \(.*\) is violated/\1/' | sort -u | tr '\n' ',' | sed 's/,$//')"
   local stats; stats="$(grep -E '[0-9]+ states generated, [0-9]+ distinct states found' "$log" | tail -1)"
+  # TLC Warning 检测必须先于 normal/mutation 判定（fail closed）：有 warning
+  # 的 run 不是有效 evidence，无论它同时满足哪边的通过条件。pattern 匹配
+  # 行首/空白后的 "Warning:"（TLC 稳定 marker，大写；不匹配 JVM 小写
+  # "warning:" 或 README/路径等偶然字符串）。命中时保留 log 供诊断。
+  local warnings
+  warnings="$(grep -E -A1 '(^|[[:space:]])Warning:' "$log" || true)"
+  if [[ -n "$warnings" ]]; then
+    printf '%-42s FAIL（TLC warning：evidence invalid）\n' "$label"
+    printf '%s\n' "$warnings" | head -12 | sed 's/^/    /'
+    printf '    完整 log（保留供诊断）：%s\n' "$log"
+    fail=1
+    return
+  fi
   if [[ "$expect" == pass ]]; then
     if [[ "$completed" -ge 1 && -z "$viol" ]]; then
       printf '%-42s PASS  %s\n' "$label" "$stats"
@@ -69,10 +89,13 @@ run_tlc() {
   else
     local target; target="${expect#fail:}"
     local propviol; propviol="$(grep -c 'Temporal properties were violated' "$log" || true)"
-    if [[ ",$viol," == *",$target,"* && "$propviol" -eq 0 ]]; then
+    # "Finished in" 是 TLC 自行收尾的 footer（violation 早停与 -continue
+    # run 都会打印）；缺失说明进程被杀/崩溃，counterexample 证据不完整
+    local finished; finished="$(grep -c 'Finished in' "$log" || true)"
+    if [[ ",$viol," == *",$target,"* && "$propviol" -eq 0 && "$finished" -ge 1 ]]; then
       printf '%-42s MUST-FAIL-OK（违反 %s）\n' "$label" "$viol"
     else
-      printf '%-42s FAIL（期望违反 %s 且症状属性成立；实际 violated=%s propviol=%s）\n' "$label" "$target" "${viol:-none}" "$propviol"; fail=1
+      printf '%-42s FAIL（期望违反 %s 且症状属性成立；实际 violated=%s propviol=%s finished=%s）\n' "$label" "$target" "${viol:-none}" "$propviol" "$finished"; fail=1
     fi
   fi
   rm -rf "$tmp"

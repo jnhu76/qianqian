@@ -9,6 +9,8 @@
  *   - seek / next / stop 的 prepare -> prime -> close admission -> fence -> promote -> retire 骨架
  *   - Physical Fence（close admission 之后的物理冲刷握手，带成功/失败 verdict）
  *   - submitted / queued / rendered 记账（submitted != rendered）
+ *   - admission 关闭时 decoded-but-never-submitted backlog 的显式 discard
+ *     （discardBacklog 记账：否则 fail/abandon 后 drain predicate 永久悬空）
  *   - Decoder EOF / transport drained / ENDED 的层次
  *   - 迟到 decode result 的拒绝
  *   - rapid command supersede（seek/seek/next/stop 与 decode/fence/render 的交错）
@@ -71,6 +73,10 @@ VARIABLES
   queued,           (* [GenId -> 0..MaxMedia] 已提交未渲染（设备侧排队中） *)
   submittedEver,    (* [GenId -> 0..MaxMedia] 历史提交数 *)
   rendered,         (* [GenId -> 0..MaxMedia] 历史渲染数（物理证据） *)
+  discardedBacklog, (* [GenId -> 0..MaxMedia] admission 关闭转移显式 discard 的
+                       decoded-but-never-submitted 媒体计数（决策 8）：提交要求
+                       admission 开放且关闭单向，故该 backlog 在关闭时刻已不可
+                       能变得可听；显式移入本记账使 drain predicate 保持可达 *)
   decodeAcceptedInAdmission,   (* admission 开放期间接受的 decode result 计数 *)
   decodeAcceptedOutOfAdmission,(* admission 关闭后接受的计数（正常模型恒 0，>0 即违规） *)
   producerTerminal, (* decoder EOF（或 provider withdrawal 后终止）的 generation 集合 *)
@@ -82,9 +88,10 @@ VARIABLES
   decoderWithdrawn  (* Decoder provider 已 withdraw（一次性全局事件） *)
 
 vars == <<windows, admitted, retired, nextGen, fence, fenceSuccessFor, promotions,
-          queued, submittedEver, rendered, decodeAcceptedInAdmission,
-          decodeAcceptedOutOfAdmission, producerTerminal,
-          sessionClosed, transportDrained, ended, decoderWithdrawn>>
+          queued, submittedEver, rendered, discardedBacklog,
+          decodeAcceptedInAdmission, decodeAcceptedOutOfAdmission,
+          producerTerminal, sessionClosed, transportDrained, ended,
+          decoderWithdrawn>>
 
 (* ---------- 窗口辅助算子 ---------- *)
 
@@ -137,10 +144,13 @@ AcceptCondition(g) ==
 
 (* transport drained 的媒体清空条件（ADR ENDED 等价 predicate 的 transport 部分：
  * producer terminal 且无 submitted-but-unrendered 媒体且 active pipeline 内
- * 无已接受未提交的 decode result） *)
+ * 无"未 discard 的已接受未提交" decode result——admission 关闭转移已把不可
+ * 再提交的 backlog 显式移入 discardedBacklog（决策 8），故该等式对关闭了
+ * admission 的 pending-cut active 同样可达） *)
 DrainMediaClear ==
   /\ queued[ActiveGen] = 0
-  /\ decodeAcceptedInAdmission[ActiveGen] = submittedEver[ActiveGen]
+  /\ decodeAcceptedInAdmission[ActiveGen]
+       = submittedEver[ActiveGen] + discardedBacklog[ActiveGen]
   /\ \A g \in GenId : queued[g] = 0
 
 (* ---------- Init ---------- *)
@@ -156,6 +166,7 @@ Init ==
   /\ queued = [g \in GenId |-> 0]
   /\ submittedEver = [g \in GenId |-> 0]
   /\ rendered = [g \in GenId |-> 0]
+  /\ discardedBacklog = [g \in GenId |-> 0]
   /\ decodeAcceptedInAdmission = [g \in GenId |-> 0]
   /\ decodeAcceptedOutOfAdmission = [g \in GenId |-> 0]
   /\ producerTerminal = {}
@@ -180,7 +191,8 @@ Play ==
   /\ transportDrained' = FALSE
   /\ ended' = FALSE
   /\ UNCHANGED <<retired, fence, fenceSuccessFor, promotions, queued,
-                   submittedEver, rendered, decodeAcceptedInAdmission,
+                   submittedEver, rendered, discardedBacklog,
+                   decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, decoderWithdrawn>>
 
@@ -212,7 +224,7 @@ PrepareDiscontinuity ==
   /\ retired' = (IF HasPrepared THEN retired \cup {PreparedGen} ELSE retired)
   /\ nextGen' = nextGen + 1
   /\ UNCHANGED <<fence, fenceSuccessFor, promotions, queued, submittedEver,
-                   rendered, decodeAcceptedInAdmission,
+                   rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
@@ -238,6 +250,12 @@ RequestStop ==
   /\ fence' = [cut |-> ActiveGen, target |-> NoTarget,
                phase |-> IF fence.phase = "idle" THEN "requested" ELSE fence.phase]
   /\ transportDrained' = FALSE
+  (* admission 关闭转移同步 discard 未提交 backlog（决策 8，与 CloseOldAdmission
+   * 同一规则；对已关闭的 active 重解释 stop 时为幂等重写） *)
+  /\ discardedBacklog' =
+       [discardedBacklog EXCEPT
+          ![ActiveGen] = decodeAcceptedInAdmission[ActiveGen]
+                           - submittedEver[ActiveGen]]
   /\ UNCHANGED <<nextGen, fenceSuccessFor, promotions, queued, submittedEver,
                    rendered, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
@@ -269,7 +287,7 @@ AcceptDecodeResult(g) ==
               [decodeAcceptedOutOfAdmission EXCEPT ![g] = decodeAcceptedOutOfAdmission[g] + 1]
          /\ decodeAcceptedInAdmission' = decodeAcceptedInAdmission )
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fence, fenceSuccessFor,
-                   promotions, queued, submittedEver, rendered,
+                   promotions, queued, submittedEver, rendered, discardedBacklog,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
 
@@ -289,7 +307,7 @@ MarkPreparedReady ==
   /\ decodeAcceptedInAdmission[PreparedGen] \geq 1
   /\ windows' = (windows \ {PreparedW}) \cup {[PreparedW EXCEPT !.ready = TRUE]}
   /\ UNCHANGED <<admitted, retired, nextGen, fence, fenceSuccessFor, promotions,
-                   queued, submittedEver, rendered, decodeAcceptedInAdmission,
+                   queued, submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
@@ -300,7 +318,7 @@ DecoderEof(g) ==
   /\ producerTerminal' = producerTerminal \cup {g}
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fence, fenceSuccessFor,
                    promotions, queued, submittedEver, rendered,
-                   decodeAcceptedInAdmission, decodeAcceptedOutOfAdmission, sessionClosed, transportDrained,
+                   discardedBacklog, decodeAcceptedInAdmission, decodeAcceptedOutOfAdmission, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
 
 (* prepared decode 在 prime 完成前 EOF（如 seek 到文件尾附近）：
@@ -314,7 +332,7 @@ DropUnprimablePrepared ==
   /\ admitted' = admitted \ {PreparedGen}
   /\ retired' = retired \cup {PreparedGen}
   /\ UNCHANGED <<nextGen, fence, fenceSuccessFor, promotions, queued,
-                   submittedEver, rendered, decodeAcceptedInAdmission,
+                   submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
@@ -334,6 +352,13 @@ CloseOldAdmission ==
   /\ HasPrepared
   /\ PreparedW.ready
   /\ admitted' = admitted \ {ActiveGen}
+  (* 决策 8：提交要求 admission 开放且关闭单向，故关闭时刻的
+   * decoded-but-never-submitted backlog 永不可能变得可听——在关闭转移
+   * 显式移入 discard 记账，而不是留给一个永远无法满足的 drain predicate *)
+  /\ discardedBacklog' =
+       [discardedBacklog EXCEPT
+          ![ActiveGen] = decodeAcceptedInAdmission[ActiveGen]
+                           - submittedEver[ActiveGen]]
   /\ UNCHANGED <<windows, retired, nextGen, fence, fenceSuccessFor, promotions,
                    queued, submittedEver, rendered, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
@@ -348,7 +373,7 @@ RequestFence ==
   /\ fence.phase = "idle"
   /\ fence' = [cut |-> ActiveGen, target |-> PreparedGen, phase |-> "requested"]
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fenceSuccessFor, promotions,
-                   queued, submittedEver, rendered, decodeAcceptedInAdmission,
+                   queued, submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
@@ -358,7 +383,7 @@ ClaimFence ==
   /\ fence.phase = "requested"
   /\ fence' = [fence EXCEPT !.phase = "claimed"]
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fenceSuccessFor, promotions,
-                   queued, submittedEver, rendered, decodeAcceptedInAdmission,
+                   queued, submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
@@ -372,7 +397,7 @@ CompleteFence ==
   /\ fenceSuccessFor' = fenceSuccessFor \cup {fence.cut}
   /\ queued' = [queued EXCEPT ![fence.cut] = 0]
   /\ UNCHANGED <<windows, admitted, retired, nextGen, promotions,
-                   submittedEver, rendered, decodeAcceptedInAdmission,
+                   submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
@@ -382,7 +407,7 @@ FailFence ==
   /\ fence.phase = "claimed"
   /\ fence' = [fence EXCEPT !.phase = "failed"]
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fenceSuccessFor, promotions,
-                   queued, submittedEver, rendered, decodeAcceptedInAdmission,
+                   queued, submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
@@ -392,19 +417,21 @@ RetryFence ==
   /\ fence.phase = "failed"
   /\ fence' = [fence EXCEPT !.phase = "requested"]
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fenceSuccessFor, promotions,
-                   queued, submittedEver, rendered, decodeAcceptedInAdmission,
+                   queued, submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
 
 (* 放弃失败的 discontinuity（fail closed）：不 promote；active 保持
- * admission-closed 自然排干；prepared 留待后续 intent supersede 或重新 fence。 *)
+ * admission-closed 自然排干——该排干之所以可达，是因为 admission 关闭转移
+ * 已经把 decoded-but-never-submitted backlog 显式 discard（决策 8）；prepared
+ * 留待后续 intent supersede 或重新 fence。 *)
 AbandonFence ==
   /\ fence.phase # "idle"
   /\ fence.phase = "failed"
   /\ fence' = FenceIdle
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fenceSuccessFor, promotions,
-                   queued, submittedEver, rendered, decodeAcceptedInAdmission,
+                   queued, submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
@@ -418,7 +445,7 @@ ConsumeFenceVerdict ==
   /\ \neg HasPrepared \/ PreparedGen # fence.target
   /\ fence' = FenceIdle
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fenceSuccessFor, promotions,
-                   queued, submittedEver, rendered, decodeAcceptedInAdmission,
+                   queued, submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
@@ -438,7 +465,7 @@ PromotePrepared ==
   /\ promotions' = promotions \cup {[new |-> PreparedGen, cut |-> ActiveGen]}
   /\ transportDrained' = FALSE
   /\ UNCHANGED <<admitted, nextGen, fenceSuccessFor, queued, submittedEver,
-                   rendered, decodeAcceptedInAdmission,
+                   rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, ended,
                    decoderWithdrawn>>
@@ -456,7 +483,7 @@ StopComplete ==
   /\ retired' = retired \cup {ActiveGen}
   /\ transportDrained' = TRUE
   /\ UNCHANGED <<admitted, nextGen, fenceSuccessFor, promotions, queued,
-                   submittedEver, rendered, decodeAcceptedInAdmission,
+                   submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, ended, decoderWithdrawn>>
 
@@ -464,10 +491,10 @@ StopComplete ==
  * DecodeSession 回收
  *
  * retired 或被 supersede（无窗口且无 admission）的 generation 关闭 decode
- * session。同时折叠历史记账（submittedEver/queued/decodeAcceptedInAdmission
- * 收敛为 rendered 值）——这是刻意的状态空间抽象：retired generation 的历史
- * 细节不参与任何活跃 invariant；violation 检测器 decodeAcceptedOutOfAdmission
- * 不折叠，保证 mutation counterexample 可见。
+ * session。同时折叠历史记账（submittedEver/queued/decodeAcceptedInAdmission/
+ * discardedBacklog 收敛为 rendered 值）——这是刻意的状态空间抽象：retired
+ * generation 的历史细节不参与任何活跃 invariant；violation 检测器
+ * decodeAcceptedOutOfAdmission 不折叠，保证 mutation counterexample 可见。
  * ===================================================================== *)
 
 CloseRetiredDecodeSession(g) ==
@@ -478,6 +505,7 @@ CloseRetiredDecodeSession(g) ==
   /\ queued' = [queued EXCEPT ![g] = 0]
   /\ decodeAcceptedInAdmission' =
        [decodeAcceptedInAdmission EXCEPT ![g] = rendered[g]]
+  /\ discardedBacklog' = [discardedBacklog EXCEPT ![g] = 0]
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fence, fenceSuccessFor,
                    promotions, rendered, decodeAcceptedOutOfAdmission,
                    producerTerminal, transportDrained,
@@ -501,7 +529,7 @@ SubmitMedia(g) ==
   /\ queued' = [queued EXCEPT ![g] = queued[g] + 1]
   /\ transportDrained' = FALSE
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fence, fenceSuccessFor,
-                   promotions, rendered, decodeAcceptedInAdmission,
+                   promotions, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, ended,
                    decoderWithdrawn>>
@@ -512,7 +540,7 @@ RenderMedia(g) ==
   /\ rendered' = [rendered EXCEPT ![g] = rendered[g] + 1]
   /\ queued' = [queued EXCEPT ![g] = queued[g] - 1]
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fence, fenceSuccessFor,
-                   promotions, submittedEver, decodeAcceptedInAdmission,
+                   promotions, submittedEver, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    ended, decoderWithdrawn>>
@@ -530,7 +558,7 @@ WithdrawDecoderProvider ==
        producerTerminal \cup {g \in GenId : SessionAlive(g)}
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fence, fenceSuccessFor,
                    promotions, queued, submittedEver, rendered,
-                   decodeAcceptedInAdmission, decodeAcceptedOutOfAdmission, sessionClosed, transportDrained,
+                   discardedBacklog, decodeAcceptedInAdmission, decodeAcceptedOutOfAdmission, sessionClosed, transportDrained,
                    ended>>
 
 (* =====================================================================
@@ -548,7 +576,7 @@ PublishTransportDrained ==
   /\ transportDrained' = TRUE
   /\ UNCHANGED <<windows, admitted, retired, nextGen, fence, fenceSuccessFor,
                    promotions, queued, submittedEver, rendered,
-                   decodeAcceptedInAdmission, decodeAcceptedOutOfAdmission, producerTerminal, sessionClosed,
+                   discardedBacklog, decodeAcceptedInAdmission, decodeAcceptedOutOfAdmission, producerTerminal, sessionClosed,
                    ended, decoderWithdrawn>>
 
 PublishEnded ==
@@ -560,7 +588,7 @@ PublishEnded ==
   /\ admitted' = admitted \ {ActiveGen}
   /\ retired' = retired \cup {ActiveGen}
   /\ UNCHANGED <<nextGen, fence, fenceSuccessFor, promotions, queued,
-                   submittedEver, rendered, decodeAcceptedInAdmission,
+                   submittedEver, rendered, discardedBacklog, decodeAcceptedInAdmission,
                    decodeAcceptedOutOfAdmission,
                    producerTerminal, sessionClosed, transportDrained,
                    decoderWithdrawn>>
@@ -573,7 +601,7 @@ ReopenRetiredAdmission ==
        /\ admitted' = admitted \cup {g}
   /\ UNCHANGED <<windows, retired, nextGen, fence, fenceSuccessFor, promotions,
                    queued, submittedEver, rendered,
-                   decodeAcceptedInAdmission, decodeAcceptedOutOfAdmission, producerTerminal, sessionClosed,
+                   discardedBacklog, decodeAcceptedInAdmission, decodeAcceptedOutOfAdmission, producerTerminal, sessionClosed,
                    transportDrained, ended, decoderWithdrawn>>
 
 (* 等待环境（用户命令 / decoder / 设备）：合法等待状态不是 deadlock *)
@@ -616,6 +644,7 @@ TypeOK ==
   /\ queued \in [GenId -> 0..MaxMedia]
   /\ submittedEver \in [GenId -> 0..MaxMedia]
   /\ rendered \in [GenId -> 0..MaxMedia]
+  /\ discardedBacklog \in [GenId -> 0..MaxMedia]
   /\ decodeAcceptedInAdmission \in [GenId -> 0..MaxMedia]
   /\ decodeAcceptedOutOfAdmission \in [GenId -> 0..MaxMedia]
   /\ producerTerminal \subseteq GenId
@@ -679,12 +708,24 @@ FenceFlushedGenerationsAreSilent ==
 
 (* --- drained / ENDED 层次 --- *)
 (* transport drained 蕴含：无任何 submitted-but-unrendered 媒体，
- * 且 active pipeline 内无已接受未提交的 decode result *)
+ * 且 active pipeline 内无未 discard 的已接受未提交 decode result *)
 TransportDrainRequiresRenderedDrain ==
   transportDrained =>
     /\ \A g \in GenId : queued[g] = 0
     /\ \A w \in ActiveWindowSet :
-         decodeAcceptedInAdmission[w.gen] = submittedEver[w.gen]
+         decodeAcceptedInAdmission[w.gen]
+           = submittedEver[w.gen] + discardedBacklog[w.gen]
+
+(* admission 已关闭的窗口不得有未申报的 stranded backlog：关闭转移必须
+ * 把 decoded-but-never-submitted 媒体显式移入 discard 记账（决策 8）。
+ * 否则 fail/abandon 或 verdict-consumed 之后 accepted > submitted 的
+ * admission-closed active 永远无法满足自然 drain predicate（executable
+ * core 对抗 review 发现的真实悬挂状态）。 *)
+NoStrandedDecodeAfterAdmissionClose ==
+  \A w \in windows :
+    w.gen \notin admitted =>
+      decodeAcceptedInAdmission[w.gen]
+        = submittedEver[w.gen] + discardedBacklog[w.gen]
 
 (* ENDED 只能建立在 TransportKernel 的 drained truth 之上 *)
 EndedRequiresTransportDrain == ended => transportDrained
