@@ -495,3 +495,220 @@ fn promote(transport: &mut TransportKernel) {
         "helper expects a promotion, got {verdict:?}"
     );
 }
+
+#[test]
+fn submitted_media_outruns_rendered_without_draining_or_ending() {
+    let mut transport = TransportKernel::new();
+    let mut music = MusicKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    transport
+        .decode_result(
+            started.decode_session,
+            MediaSpan {
+                generation: started.generation,
+                start: 0,
+                end: 10,
+            },
+        )
+        .expect("decode ten frames");
+    transport
+        .media_submitted(started.generation, 10)
+        .expect("submit ten frames");
+    transport
+        .media_rendered(started.generation, 7)
+        .expect("render seven frames");
+
+    // submitted != rendered: three frames are still in flight, so the
+    // transport is not drained and the product has not ENDED even though
+    // the decoder already produced everything.
+    transport
+        .decoder_eof(started.decode_session)
+        .expect("producer terminal recorded");
+    let snapshot = transport.snapshot();
+    let active = snapshot.active.expect("active window");
+    assert_eq!(active.submitted_frames, 10);
+    assert_eq!(active.rendered_frames, 7);
+    assert_eq!(active.queued_frames, 3);
+    assert!(
+        !snapshot.transport_drained,
+        "submitted-but-unrendered media blocks drain"
+    );
+
+    music.observe_all(transport.take_derived_facts());
+    assert_ne!(
+        music.state(),
+        PlaybackState::Ended,
+        "no ENDED before render drain"
+    );
+}
+
+#[test]
+fn decoder_eof_alone_never_ends_and_full_drain_then_ends() {
+    let mut transport = TransportKernel::new();
+    let mut music = MusicKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    transport
+        .decode_result(
+            started.decode_session,
+            MediaSpan {
+                generation: started.generation,
+                start: 0,
+                end: 10,
+            },
+        )
+        .expect("decode ten frames");
+    transport
+        .media_submitted(started.generation, 10)
+        .expect("submit ten frames");
+
+    // Producer terminal with media still queued: decoder EOF is not
+    // transport drained and not ENDED.
+    transport
+        .decoder_eof(started.decode_session)
+        .expect("producer terminal");
+    music.observe_all(transport.take_derived_facts());
+    assert!(!transport.transport_drained());
+    assert_ne!(music.state(), PlaybackState::Ended);
+
+    // Rendering the remainder drains the transport; MusicKernel interprets
+    // the derived drained fact as ENDED; the episode then completes and a
+    // new episode can start.
+    transport
+        .media_rendered(started.generation, 10)
+        .expect("render the remainder");
+    assert!(
+        transport.transport_drained(),
+        "no in-flight media and producer terminal"
+    );
+
+    music.observe_all(transport.take_derived_facts());
+    assert_eq!(music.state(), PlaybackState::Ended);
+
+    transport
+        .complete_ended_episode()
+        .expect("episode completes after ENDED");
+    let snapshot = transport.snapshot();
+    assert_eq!(snapshot.active, None, "ended episode retires its window");
+    assert!(snapshot.track_sessions.is_empty(), "drained track released");
+
+    transport
+        .play(media.open())
+        .expect("new episode after ENDED");
+}
+
+#[test]
+fn natural_drain_during_stop_fence_does_not_ended_or_destroy_the_cut() {
+    let mut transport = TransportKernel::new();
+    let mut music = MusicKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    transport
+        .decode_result(
+            started.decode_session,
+            MediaSpan {
+                generation: started.generation,
+                start: 0,
+                end: 10,
+            },
+        )
+        .expect("decode ten frames");
+    transport
+        .media_submitted(started.generation, 10)
+        .expect("submit ten frames");
+    transport
+        .media_rendered(started.generation, 7)
+        .expect("render seven frames");
+
+    // Stop races natural end: the fence goes in flight while EOF/drain
+    // evidence is arriving.
+    let cut = transport.stop().expect("stop requests the terminal fence");
+    assert_eq!(cut, started.generation);
+    transport
+        .claim_fence()
+        .expect("device claims the stop transaction");
+
+    transport
+        .decoder_eof(started.decode_session)
+        .expect("EOF recorded during fence");
+    transport
+        .media_rendered(started.generation, 3)
+        .expect("final renders land during fence");
+
+    // The in-flight fence keeps the physical state undecided: no drained
+    // truth, no ENDED, and the active temporal state the fence still
+    // needs survives until the verdict.
+    assert!(!transport.transport_drained());
+    music.observe_all(transport.take_derived_facts());
+    assert_ne!(music.state(), PlaybackState::Ended);
+    let snapshot = transport.snapshot();
+    assert_eq!(
+        snapshot
+            .active
+            .expect("active window survives for the fence")
+            .generation,
+        started.generation
+    );
+
+    let verdict = transport.fence_succeeded().expect("verdict completes");
+    assert_eq!(
+        verdict,
+        FenceVerdictOutcome::StopCompleted {
+            cut: started.generation
+        }
+    );
+
+    music.observe_all(transport.take_derived_facts());
+    // Stopped is a product interpretation distinct from ENDED.
+    assert_eq!(music.state(), PlaybackState::Idle);
+    assert_ne!(music.state(), PlaybackState::Ended);
+    assert!(transport.transport_drained());
+    assert_eq!(transport.snapshot().active, None);
+}
+
+#[test]
+fn stop_after_drained_withdraws_the_pending_drained_fact() {
+    let mut transport = TransportKernel::new();
+    let mut music = MusicKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    transport
+        .decode_result(
+            started.decode_session,
+            MediaSpan {
+                generation: started.generation,
+                start: 0,
+                end: 10,
+            },
+        )
+        .expect("decode");
+    transport
+        .media_submitted(started.generation, 10)
+        .expect("submit");
+    transport
+        .media_rendered(started.generation, 10)
+        .expect("render");
+    transport.decoder_eof(started.decode_session).expect("EOF");
+    assert!(transport.transport_drained(), "naturally drained");
+
+    // Stop arrives after the transport published drain but before
+    // MusicKernel consumed the fact: the stop negates the stale drained
+    // truth and withdraws the pending fact — stop, not ENDED, wins.
+    transport.stop().expect("stop after drain");
+    assert!(
+        !transport.transport_drained(),
+        "stop negates stale drained truth"
+    );
+
+    transport.claim_fence().expect("claim");
+    transport.fence_succeeded().expect("verdict");
+
+    music.observe_all(transport.take_derived_facts());
+    assert_eq!(music.state(), PlaybackState::Idle);
+    assert_ne!(music.state(), PlaybackState::Ended);
+}

@@ -98,6 +98,16 @@ pub struct PreparedForCut {
     pub superseded: Option<SupersededPrepared>,
 }
 
+/// Outcome of producer-terminal (decoder EOF) evidence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EofOutcome {
+    /// The producer for a live window reached terminal state.
+    ProducerTerminal { generation: GenerationId },
+    /// A prepared contribution terminated before priming and was dropped
+    /// with an explicit outcome.
+    PreparedAbandonedBeforeReadiness { generation: GenerationId },
+}
+
 /// Outcome of accepting decode evidence.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DecodeAdmitted {
@@ -223,6 +233,7 @@ struct DecodeSession {
     role: Option<WindowRole>,
     position: u64,
     closed: bool,
+    producer_terminal: bool,
     accepted_frames: u64,
     submitted_frames: u64,
     rendered_frames: u64,
@@ -545,6 +556,9 @@ impl TransportKernel {
         if session.closed {
             return Err("decode session closed");
         }
+        if session.producer_terminal {
+            return Err("producer already terminal");
+        }
         session.position = session.position.max(span.end);
         session.accepted_frames += frames;
         let advanced_to = session.position;
@@ -590,7 +604,122 @@ impl TransportKernel {
         }
         session.queued_frames -= frames;
         session.rendered_frames += frames;
+        self.publish_drained_if_reached();
         Ok(())
+    }
+
+    /// Ingest producer-terminal (decoder EOF) evidence. EOF is raw
+    /// evidence: it never directly means ENDED, and it does not imply a
+    /// prepared window's readiness.
+    pub fn decoder_eof(&mut self, session: DecodeSessionId) -> Result<EofOutcome, &'static str> {
+        let session = self
+            .decode_session_mut(session)
+            .ok_or("unknown decode session")?;
+        if session.closed {
+            return Err("decode session closed");
+        }
+        if session.producer_terminal {
+            return Err("producer already terminal");
+        }
+        session.producer_terminal = true;
+        let generation = session.generation;
+
+        // A prepared contribution that terminates before priming gets an
+        // explicit outcome: the discontinuity is abandoned; it never
+        // silently becomes ready.
+        if let Some(prepared) = &self.prepared {
+            if prepared.generation == generation && !prepared.ready {
+                self.supersede_prepared();
+                self.derived_facts
+                    .push(TransportFact::PreparedAbandonedBeforeReadiness);
+                return Ok(EofOutcome::PreparedAbandonedBeforeReadiness { generation });
+            }
+        }
+        self.publish_drained_if_reached();
+        Ok(EofOutcome::ProducerTerminal { generation })
+    }
+
+    /// Stop: supersede any pending prepared contribution, close the active
+    /// admission, and request (or reinterpret) the terminal physical fence.
+    /// An in-flight promote fence is reinterpreted as the same terminal
+    /// cut — the claimed physical flush itself is never rewritten.
+    pub fn stop(&mut self) -> Result<GenerationId, &'static str> {
+        let active = self.active.as_ref().ok_or("no active episode")?;
+        let cut = active.generation;
+        self.supersede_prepared();
+        if let Some(active) = self.active.as_mut() {
+            active.admission_open = false;
+        }
+        // The stop negates stale drained truth and withdraws any drained
+        // fact MusicKernel has not consumed yet: stop, not ENDED, wins.
+        self.transport_drained = false;
+        self.derived_facts
+            .retain(|f| !matches!(f, TransportFact::NaturallyDrained));
+        match &mut self.fence {
+            None => {
+                self.fence = Some(FenceTransaction {
+                    cut,
+                    target: None,
+                    claimed: false,
+                    failed: false,
+                });
+            }
+            Some(fence) => {
+                // Promote-fence in flight: keep the handshake phase and the
+                // claimed transaction, clear only the promotion target.
+                fence.target = None;
+            }
+        }
+        Ok(cut)
+    }
+
+    /// Complete a naturally ended episode after MusicKernel interpreted
+    /// the drained fact as ENDED: retire the active window, close its
+    /// decode session, release the drained track.
+    pub fn complete_ended_episode(&mut self) -> Result<(), &'static str> {
+        if !self.transport_drained {
+            return Err("transport not drained");
+        }
+        if self.prepared.is_some() {
+            return Err("pending prepared contribution must be resolved first");
+        }
+        if let Some(active) = self.active.take() {
+            self.close_admission_of(&active);
+        }
+        self.release_drained_tracks();
+        Ok(())
+    }
+
+    /// Publish transport-drained truth when the natural-drain predicate is
+    /// newly reached with no fence in flight. The predicate: the active
+    /// producer is terminal, no generation holds queued media, and every
+    /// admitted decode result has been submitted.
+    fn publish_drained_if_reached(&mut self) {
+        if self.transport_drained || self.fence.is_some() {
+            return;
+        }
+        let Some(active) = self.active.as_ref() else {
+            return;
+        };
+        let Some(session) = self
+            .track_sessions
+            .iter()
+            .flat_map(|t| t.decode_sessions.iter())
+            .find(|d| d.id == active.decode_session)
+        else {
+            return;
+        };
+        let media_clear = session.producer_terminal
+            && session.accepted_frames == session.submitted_frames
+            && self
+                .track_sessions
+                .iter()
+                .flat_map(|t| t.decode_sessions.iter())
+                .all(|d| d.queued_frames == 0);
+        if media_clear {
+            self.transport_drained = true;
+            self.derived_facts.push(TransportFact::NaturallyDrained);
+        }
     }
 
     /// Transport-drained truth: the transport holds no media that could
@@ -676,6 +805,7 @@ impl TransportKernel {
             role: Some(role),
             position: start_position,
             closed: false,
+            producer_terminal: false,
             accepted_frames: 0,
             submitted_frames: 0,
             rendered_frames: 0,

@@ -56,6 +56,28 @@ impl MusicKernel {
     pub fn state(&self) -> PlaybackState {
         self.state
     }
+
+    /// Interpret one derived transport fact. Raw playback evidence never
+    /// reaches this kernel; each fact is interpreted exactly once, here.
+    ///
+    /// Stage-1 product policy: a natural drain means the media ENDED; a
+    /// completed stop fence means stopped (a distinct interpretation,
+    /// expressed as Idle rather than Ended); an abandoned pre-ready
+    /// prepared contribution leaves product state untouched.
+    pub fn observe(&mut self, fact: TransportFact) {
+        match fact {
+            TransportFact::NaturallyDrained => self.state = PlaybackState::Ended,
+            TransportFact::Stopped => self.state = PlaybackState::Idle,
+            TransportFact::PreparedAbandonedBeforeReadiness => {}
+        }
+    }
+
+    /// Interpret a batch of derived facts in arrival order.
+    pub fn observe_all(&mut self, facts: impl IntoIterator<Item = TransportFact>) {
+        for fact in facts {
+            self.observe(fact);
+        }
+    }
 }
 
 #[cfg(test)]
