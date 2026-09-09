@@ -96,13 +96,25 @@ jobs:
           head_sha: ${{ steps.pr-context.outputs.head_sha }}
           background: >-
             Qianqian is a Rust local-first music player and architecture testbed.
-            Review changes against explicit semantic-authority boundaries: the
-            Composition Kernel owns reachability/ownership/lifetime rather than
-            application payloads; capability/control plane must remain distinct
-            from the audio data plane; MusicKernel and TransportKernel have
-            separate authorities; TrackSession/DecodeSession lifetime and
-            playback generation/fence semantics must not be blurred. Prioritize
-            correctness, lifetime/ownership, concurrency, state-machine errors,
-            accidental architectural authority expansion, code/docs/ADR drift,
-            and missing executable evidence. Prefer minimal fixes over framework
-            growth, and do not treat historical documents as current authority.
+            The generic Composition Kernel owns reachability/lifecycle rather
+            than application payloads; its primitive budget
+            (Context/Capability/Fiber/Effect/Reconcile) is frozen. Playback
+            Foundations are currently PROPOSED / REOPENED: the reset proposal
+            (ADR-PBK-001) separates four reasoning lenses (Composition,
+            Execution/Control, Fact, Realtime Data) and deliberately does not
+            freeze playback state-machine nouns. Legacy
+            MusicKernel/TransportKernel/TrackSession/DecodeSession/Generation/
+            Fence code and specs are experimental evidence, not authority, and
+            neither the legacy model nor any new noun may be treated as
+            accepted architecture. Review work against the current PROPOSED
+            foundations: does it violate them, does it accidentally re-promote
+            legacy evidence into authority, does it confuse command vs fact vs
+            projection vs hot data, does it forge a semantic fact from
+            mechanism evidence without a designated fact-type authority, does
+            it use a projection as a control-correctness authority, does it
+            treat "commit" as implying durability/ACID, does it violate K0
+            isolation, does it release resources while realtime readers can
+            still dereference them, or does it break lifetime/concurrency
+            correctness or code/docs/ADR consistency? Prefer minimal fixes; do
+            not preserve legacy playback nouns merely because old code/specs
+            contain them.
