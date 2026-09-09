@@ -14,6 +14,34 @@
 //! `TransportKernel` is a semantic authority role, not a Composition plugin
 //! boundary. This module does not constitute production Playback
 //! implementation authorization.
+//!
+//! # Implementation policy choices (ADR-open space)
+//!
+//! The ADR leaves some interaction policies open; this core selects the
+//! same choices the temporal spec model closed its state space with
+//! (`specs/playback` model decisions), so spec and executable oracle stay
+//! in one alignment:
+//!
+//! * While a terminal stop fence is in flight, new seek/next intents are
+//!   refused until the verdict lands (model decision 3).
+//! * A stop arriving while a promote fence is in flight reinterprets the
+//!   same physical flush as the terminal cut — the claimed transaction is
+//!   never rewritten, only the promotion target is cleared (decision 1).
+//! * A successful verdict whose promotion target was superseded is
+//!   consumed without promotion; the superseding window runs its own
+//!   episode and may fence the same already-silent cut generation again
+//!   (decision 6).
+//! * A prepared contribution that reaches producer EOF before priming is
+//!   abandoned with an explicit outcome (decision 4; ADR §18 Prepared EOF).
+//! * A failed fence exposes retry and fail-closed abandon as control-plane
+//!   decisions (decision 5).
+//! * `stopped` and natural `ENDED` are distinct product interpretations of
+//!   transport truth: a completed stop publishes `Stopped`, never ENDED.
+//!
+//! If a future implementation pressure moves any of these choices, the
+//! temporal spec must move with it (boundary change = ADR + specs + tests
+//! as one synchronized transaction; policy-only drift still updates
+//! `specs/playback` and reruns its core checks).
 
 use crate::music::TransportFact;
 
@@ -322,10 +350,10 @@ impl TransportKernel {
         track: TrackSessionId,
         start_position: u64,
     ) -> Result<PreparedForCut, &'static str> {
-        if let Some(fence) = &self.fence {
-            if fence.target.is_none() {
-                return Err("stop fence in flight; intents wait for the verdict");
-            }
+        if let Some(fence) = &self.fence
+            && fence.target.is_none()
+        {
+            return Err("stop fence in flight; intents wait for the verdict");
         }
         let superseded = self.supersede_prepared();
         let generation = self.fresh_generation();
@@ -573,10 +601,10 @@ impl TransportKernel {
         session.accepted_frames += frames;
         let advanced_to = session.position;
         // First admitted decode evidence completes prepared-window priming.
-        if let Some(prepared) = self.prepared.as_mut() {
-            if prepared.generation == generation {
-                prepared.ready = true;
-            }
+        if let Some(prepared) = self.prepared.as_mut()
+            && prepared.generation == generation
+        {
+            prepared.ready = true;
         }
         Ok(DecodeAdmitted { advanced_to })
     }
@@ -637,13 +665,14 @@ impl TransportKernel {
         // A prepared contribution that terminates before priming gets an
         // explicit outcome: the discontinuity is abandoned; it never
         // silently becomes ready.
-        if let Some(prepared) = &self.prepared {
-            if prepared.generation == generation && !prepared.ready {
-                self.supersede_prepared();
-                self.derived_facts
-                    .push(TransportFact::PreparedAbandonedBeforeReadiness);
-                return Ok(EofOutcome::PreparedAbandonedBeforeReadiness { generation });
-            }
+        if let Some(prepared) = &self.prepared
+            && prepared.generation == generation
+            && !prepared.ready
+        {
+            self.supersede_prepared();
+            self.derived_facts
+                .push(TransportFact::PreparedAbandonedBeforeReadiness);
+            return Ok(EofOutcome::PreparedAbandonedBeforeReadiness { generation });
         }
         self.publish_drained_if_reached();
         Ok(EofOutcome::ProducerTerminal { generation })
