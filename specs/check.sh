@@ -5,6 +5,8 @@
 #   core — core evidence 集：PlaybackTemporal 正常模型 + 4 个 core mutation
 #          （历史 ADR ACCEPTED blocking 定位已退役；现为 experimental evidence）
 #   all  — 全部：另含 PlaybackOwnership 与 extended mutation（supporting evidence）
+#          以及 realtime-publication 套件（当前挣得的 publication lifetime 证据，
+#          core/all 两种模式都会运行）
 #
 # 规则：
 #   正常模型（无 mutation）必须 TLC 探索完成且全部 invariant PASS；
@@ -105,6 +107,11 @@ echo "== 正常模型（必须全部 PASS）"
 run_tlc PlaybackTemporal "$PLAYBACK/PlaybackTemporal.cfg" pass "PlaybackTemporal"
 if [[ "$mode" == "all" ]]; then
   run_tlc PlaybackOwnership "$PLAYBACK/PlaybackOwnership.cfg" pass "PlaybackOwnership"
+fi
+
+echo "== realtime publication lifetime（正常模型 + mutation + 探针，见 realtime-publication/README.md）"
+if ! "$SPEC_ROOT/realtime-publication/check.sh"; then
+  fail=1
 fi
 
 echo "== 负控制（必须产生 counterexample）"
