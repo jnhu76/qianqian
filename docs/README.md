@@ -89,7 +89,7 @@ If generic K0 semantics and the reset ADR appear to conflict, identify the exact
 
 # Fact/Event policy
 
-Normative authority: `adr/ADR-PBK-001.md` §2.3 — semantic commit precedes Fact publication; one designated semantic authority per fact type; projections are read-only visibility; Event Sourcing, durability, replay and a generic Event primitive are **not yet architecture decisions**.
+Normative authority: `adr/ADR-PBK-001.md` §2.3 — semantic commit precedes Fact publication; one designated semantic authority per (fact kind, subject scope); projections are read-only visibility; Event Sourcing, durability, replay and a generic Event primitive are **not yet architecture decisions**.
 
 ---
 

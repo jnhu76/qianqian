@@ -110,7 +110,11 @@ jobs:
             foundations: does it violate them, does it accidentally re-promote
             legacy evidence into authority, does it confuse command vs fact vs
             projection vs hot data, does it forge a semantic fact from
-            mechanism evidence without a designated fact-type authority, does
+            mechanism evidence without the designated authority for that
+            fact's kind and subject scope (fact-authority identity follows
+            ADR-PBK-001 §2.3), or manufacture a second writer of the same
+            semantic truth about the same subject by renaming or splitting
+            fact kinds/scopes, does
             it use a projection as a control-correctness authority, does it
             treat "commit" as implying durability/ACID, does it violate K0
             isolation, does it release resources while realtime readers can

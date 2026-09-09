@@ -303,7 +303,7 @@ A generic EventBus is not automatically a Composition Kernel primitive.
 
 If product/domain code needs committed Fact/Event semantics, begin with a normal capability/service/plugin.
 
-The K0-scoped rule is only that these are **not** kernel primitives. The normative Fact contracts — semantic-commit definition, one designated authority per fact type, projection read-side firewall, Fact publication vs Realtime-view publication — live in the reset proposal `../adr/ADR-PBK-001.md` §2.3; this document summarizes and does not carry a second normative copy.
+The K0-scoped rule is only that these are **not** kernel primitives. The normative Fact contracts — semantic-commit definition, one designated authority per (fact kind, subject scope), projection read-side firewall, Fact publication vs Realtime-view publication — live in the reset proposal `../adr/ADR-PBK-001.md` §2.3; this document summarizes and does not carry a second normative copy.
 
 Repository-wide Event Sourcing, append-only persistence and waterfall/middleware remain unfrozen as K0 primitives.
 

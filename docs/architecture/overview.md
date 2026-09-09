@@ -129,7 +129,7 @@ A future extension may use middleware/waterfall-like interception for execution 
 
 A Fact is published only after its truth has been established by its designated semantic authority.
 
-Frozen contracts (names only — normative text in `../adr/ADR-PBK-001.md` §2.3): semantic-commit definition; commit-first; one designated authority per fact type; mechanism-evidence firewall; projection read-side firewall.
+Frozen contracts (names only — normative text in `../adr/ADR-PBK-001.md` §2.3): semantic-commit definition; commit-first; one designated authority per (fact kind, subject scope); mechanism-evidence firewall; projection read-side firewall.
 
 Event Sourcing/CQRS, durability, replay authority and append-only logging remain open research questions.
 

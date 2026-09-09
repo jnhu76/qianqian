@@ -43,7 +43,7 @@ Physical Fence
 
 1. **Base Kernel K0 owns composition existence/reachability/lifecycle and remains domain-agnostic.**
 2. **Context/Capability/Plugin/Fiber mechanisms are not payload-routing mechanisms; no hidden global mutable state may become a shared writer.**
-3. **Command is intent. A Fact is truth established by its designated semantic authority. Each semantic fact type has exactly one designated authority at a time.**
+3. **Command is intent. A Fact is truth established by its designated semantic authority. For each semantic fact kind and its semantic subject scope, exactly one designated semantic authority may establish that truth at a time.**
 4. **Projection is derived visibility. It cannot write authority state, and a control decision must not use a Projection as its correctness authority.**
 5. **Realtime audio payload flows through pre-bound realtime execution state. Per-quantum PCM must not re-enter Context resolution, generic events, plugin dispatch, Reconcile, or filesystem/network/control machinery.**
 6. **Any resource that realtime execution may still dereference must remain valid until no realtime execution or queued reference can dereference it.**
@@ -206,15 +206,50 @@ listener C
 finally decide what happened
 ```
 
-一个已提交 Fact 的 observer 失败，不得偷偷改变“这个事实是否已经发生”。如果某个 observer 需要触发新的动作，它必须发起新的 command，或使相应 fact type 的 designated authority 确立新事实，而不是回写旧 fact，也不能自行另立名目发布与既有 fact type 语义重复的“新事实”。
+一个已提交 Fact 的 observer 失败，不得偷偷改变“这个事实是否已经发生”。如果某个 observer 需要触发新的动作，它必须发起新的 command，或使相应事实的 designated authority 确立新事实，而不是回写旧 fact，也不能自行另立名目发布与既有事实语义重复的“新事实”（何谓语义重复由下方 authority identity contract 裁决）。
 
-### Fact type-level authority
+### Fact authority identity（fact kind + subject scope）
 
-> **For each semantic fact type, there is exactly one designated semantic authority at a time.**
+> **A semantic fact's authority identity is determined by both its fact kind and its semantic subject scope.**
 
-> **Mechanism observations/evidence must not publish another authority's semantic fact — there is no route by which a mechanism publishes a fact type on its authority's behalf without the authority's own semantic decision.**
+> **For each (fact kind, semantic subject scope), there is exactly one designated semantic authority at a time.**
 
-Designation 是显式的 architecture-level contract，按 fact type 记录：任何 component 都不因观察了 evidence、发布了该 fact type、或在运行时自封而成为该 fact type 的 designated authority；re-designation 必须是一次显式的完整交接，不得出现双 authority 窗口。语义上重复另一 authority 既有 fact type 的“新类型”视为同一 fact type，改名不产生新 authority。
+> **Mechanism observations/evidence must not publish another authority's semantic fact — there is no route by which a mechanism publishes a fact on its authority's behalf without the authority's own semantic decision.**
+
+三个语义概念（architecture semantics，不是 runtime representation——本 ADR 不因此引入 scope 对象、namespace、key、registry 或任何新机制）：
+
+```text
+fact kind               事实的种类，如 DeviceLost；kind 本身不携带它描述的对象
+semantic subject scope  一条断言所描述的语义对象/范围——可能是 device、
+                        decoder instance、media/session、graph publication
+                        domain、playback domain、resource 或 global singleton，
+                        由对应 fact contract 定义
+authority identity      由 (fact kind, subject scope) 共同决定
+```
+
+> **Each semantic fact contract must define what subject scope makes two assertions refer to the same authoritative truth.**
+
+subject scope 的具体表示（UUID / integer key / provider id / Fiber id / generation / namespace string / hierarchical path 等）全部不冻结，由未来实验挣得。
+
+由此产生两个方向相反的约束：
+
+- 同一个 fact kind 可以在不重叠的 subject scope 上拥有各自独立的 designated authority。“每个 fact kind 一个全局 authority”是误读：本 contract 不要求、不暗示 `GlobalDeviceAuthority` / `FactAuthority` / `FactKernel` / `CentralEventRouter` 这类全局单 writer。
+- 同一个 (fact kind, subject scope) 在同一时刻只能有一个 designated semantic authority。Designation 是显式的 architecture-level contract，按 (fact kind, subject scope) 记录：任何 component 都不因观察了 evidence、发布了该 fact、或在运行时自封而成为 designated authority；re-designation 必须是一次显式的完整交接，不得出现双 authority 窗口，且交接的范围就是该 (fact kind, subject scope) 本身——不影响其它 scope 上独立 authority 的合法性。
+
+权威唯一性不得通过改名或切分绕过：
+
+> **Renaming, wrapping, or arbitrarily subdividing a fact kind or subject scope does not create a new authority identity when the assertions can establish the same semantic truth about the same semantic subject.**
+
+> **Two fact definitions must not be used to evade authority uniqueness when they overlap on, or independently establish, the same authoritative proposition for the same subject scope.**
+
+最小示例（illustrative only——具体 Playback fact authorities 仍 OPEN，以下名字都不是本文冻结的 production authority）：
+
+```text
+DeviceLost(device A) 的 authority = output authority A
+DeviceLost(device B) 的 authority = output authority B
+```
+
+两个 device 是不同 subject scope，允许两个独立 designated authority 并存。但 `DeviceLost(device A)` 同一时刻只能有一个 writer：authority A 与 authority B 不得同时确立它；未经该 scope 的显式完整交接，authority B 也不得发布 `DeviceLost(device A)`。
 
 两层区分（方向冻结，具体类型不冻结）：
 
@@ -238,7 +273,7 @@ designated authority
 semantic Fact publication
 ```
 
-一个 mechanism provider 观察到 raw evidence，不等于它可以因为该观察就直接发布 semantic fact；除非它本身就是该 fact type 的 designated authority。本文**不**现在命名任何 playback fact type 的 authority（Playback semantic authorities 仍 OPEN），只冻结上述 authority contract。也不冻结 `EvidenceEvent` / `FactEvent` / `TransportEvidence` 等具体类型。
+一个 mechanism provider 观察到 raw evidence，不等于它可以因为该观察就直接发布 semantic fact；除非它本身就是该 (fact kind, subject scope) 的 designated authority。本文**不**现在命名任何 playback fact 的 authority（Playback semantic authorities 仍 OPEN），只冻结上述 authority contract。也不冻结 `EvidenceEvent` / `FactEvent` / `TransportEvidence` 等具体类型。
 
 ### Fact 不是必然持久化事件
 
@@ -325,7 +360,7 @@ snapshot + events 还是 state + events
 ```text
 command != fact
 commit precedes fact publication
-per-fact-type single designated authority
+single designated authority per (fact kind, subject scope)
 projection != authority（含 read-side firewall）
 fact publication 与 realtime-view publication 是不同机制
 ```
@@ -634,7 +669,7 @@ DecodeFailed
 OutputStopped
 ```
 
-这些首先是 **Mechanism Evidence 候选**（§2.3）；它们是否、由谁、以何种 fact type 成为 Semantic Fact，受 §2.3 的 fact type-level authority contract 约束，由真实实验挣得。
+这些首先是 **Mechanism Evidence 候选**（§2.3）；它们是否、由谁、以何种 fact kind 成为 Semantic Fact，受 §2.3 的 fact authority identity contract 约束，由真实实验挣得。
 
 但 PCM 本身不是“因为它经过 runtime，所以也顺便做成 event”。
 
@@ -651,7 +686,7 @@ submitted/rendered counters
 physical flush verdict
 ```
 
-以及谁解释它们、谁是哪个 fact type 的 designated authority，全部由真实 decoder/output 实验重新挣得。
+以及谁解释它们、谁是哪个事实的 designated authority，全部由真实 decoder/output 实验重新挣得。
 
 ---
 
@@ -667,11 +702,7 @@ MutableAppState
 
 作为 Composition、Control、Fact、Realtime 四个平面的共同 writer。
 
-冻结：
-
-> **Each semantic fact type has exactly one designated semantic authority at a time, even if many projections can see the fact.**
-
-（这是 per-fact-type contract，不是要求一个全局 `FactAuthority` / `FactKernel` / `CentralEventRouter`。）
+Fact 一侧的全局状态规则不再在此复述第二份定义，遵循 §2.3 的 fact-authority identity contract：authority identity 由 fact kind 与 semantic subject scope 共同决定；同一 (fact kind, subject scope) 同一时刻至多一个 designated semantic authority——即使多个 projection 都能看到该事实；同一 fact kind 的不同 subject scope 可以拥有独立 authority，这不构成全局共享 writer，也不要求一个全局 `FactAuthority` / `FactKernel` / `CentralEventRouter`。
 
 但本 ADR 不提前命名具体 playback authorities。
 

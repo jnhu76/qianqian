@@ -148,7 +148,8 @@ These are one-line summaries; the normative contracts live in `ADR-PBK-001.md`:
 ```text
 Execution / Control   Command is intent, not fact                -> ADR §2.2
 Fact                  semantic commit -> Fact publication;        -> ADR §2.3
-                      one designated authority per fact type;
+                      one designated authority per
+                      (fact kind, subject scope);
                       projection is read-only visibility;
                       Event Sourcing/durability/replay remain OPEN
 Realtime Data         PCM flows through pre-bound realtime        -> ADR §2.4, §6
