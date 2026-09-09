@@ -59,6 +59,7 @@ TrackSession
 DecodeSession
 Generation
 Active / Prepared
+Dual Window
 Physical Fence
 ```
 
@@ -106,15 +107,11 @@ The boundary-first design order is normative in `../AGENTS.md` ("Boundary-first 
 
 # Formal verification policy
 
-Formalization is risk-driven.
+Formalization is risk-driven (normative policy: `adr/ADR-PBK-001.md` §13).
 
 > **TLA+ finds concrete state/interleaving collisions; it is not a second architecture authority.**
 
-The old PlaybackTemporal/PlaybackOwnership suite remains evidence only during the reset.
-
-Do not expand or preserve it merely to keep old nouns alive.
-
-A new formal model requires a concrete newly earned collision risk.
+The old PlaybackTemporal/PlaybackOwnership suite remains evidence only during the reset; do not expand or preserve it merely to keep old nouns alive. A new formal model requires a concrete newly earned collision risk.
 
 ---
 

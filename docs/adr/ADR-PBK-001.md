@@ -206,13 +206,15 @@ listener C
 finally decide what happened
 ```
 
-一个已提交 Fact 的 observer 失败，不得偷偷改变“这个事实是否已经发生”。如果某个 observer 需要触发新的动作，它必须发起新的 command 或产生新的事实，而不是回写旧 fact。
+一个已提交 Fact 的 observer 失败，不得偷偷改变“这个事实是否已经发生”。如果某个 observer 需要触发新的动作，它必须发起新的 command，或使相应 fact type 的 designated authority 确立新事实，而不是回写旧 fact，也不能自行另立名目发布与既有 fact type 语义重复的“新事实”。
 
 ### Fact type-level authority
 
 > **For each semantic fact type, there is exactly one designated semantic authority at a time.**
 
-> **Mechanism observations/evidence must not directly publish another authority's semantic fact.**
+> **Mechanism observations/evidence must not publish another authority's semantic fact — there is no route by which a mechanism publishes a fact type on its authority's behalf without the authority's own semantic decision.**
+
+Designation 是显式的 architecture-level contract，按 fact type 记录：任何 component 都不因观察了 evidence、发布了该 fact type、或在运行时自封而成为该 fact type 的 designated authority；re-designation 必须是一次显式的完整交接，不得出现双 authority 窗口。语义上重复另一 authority 既有 fact type 的“新类型”视为同一 fact type，改名不产生新 authority。
 
 两层区分（方向冻结，具体类型不冻结）：
 
@@ -256,6 +258,8 @@ Fact publication           事实发布（Fact Plane）
 Realtime-view publication  实时图/视图发布（Realtime Data Plane，§6）
 ```
 
+（Graph publication 即“对 graph 的 Realtime-view publication”；未来任何其它 publication-like 机制同样必须命名对象与所属 lens，不得共享裸动词。）
+
 这是两个不同机制，不得共用一个不带宾语的动词让 reader 猜。
 
 ### Projection
@@ -274,7 +278,7 @@ next view
 
 > **Projection is derived visibility, not authority.**
 >
-> **A control decision must not use a Projection as its correctness authority.**
+> **A control decision must not use a Projection as its correctness authority (its correctness basis).**
 
 Projection 可以用于：
 
@@ -287,13 +291,15 @@ display
 non-authoritative convenience
 ```
 
-但以下决策必须基于 authority state、authoritative capability result 或 validated fact/evidence，而不是一个可能 stale 的 projection：
+但以下决策必须基于 authority state、authoritative capability result 或 validated fact/evidence（validated 指按该 fact/evidence 的 contract 校验，即由其 designated authority 校验，而不是 controller 自行任意解释），而不是一个可能 stale 的 projection：
 
 ```text
 control transition
 resource lifecycle correctness
 semantic decision
 ```
+
+决定“是否需要”某个 control action/transition（skip / 幂等检查）本身也属于上述决策，必须查询 authority state，不得以 projection 为依据。
 
 本文不禁止 control code 读取 projection；禁止的是 **projection 成为 correctness basis**。
 
@@ -450,7 +456,7 @@ MediaOpen
 Decode
 AudioDevice
 PlaybackControl
-FactStore
+FactStore        (illustrative only; any persistence role remains OPEN per §2.3)
 Presentation
 ```
 
@@ -548,9 +554,9 @@ hazard
 
 ### Lifetime safety
 
-> **Any resource that realtime execution may still dereference must remain valid until no realtime execution or queued reference can dereference it.**
+> **§1 宪法第 6 条适用：Any resource that realtime execution may still dereference must remain valid until no realtime execution or queued reference can dereference it.**
 
-（这是资源层面的 invariant；它**不**冻结 “Provider Fiber lifetime == RT resource lifetime”。）
+（资源层面的 invariant；**不**冻结 “Provider Fiber lifetime == RT resource lifetime”。）
 
 最小顺序：
 

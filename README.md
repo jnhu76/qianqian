@@ -73,7 +73,7 @@ Names still present in old code/specs, such as:
 ```text
 MusicKernel / TransportKernel
 TrackSession / DecodeSession
-Generation / Dual Window / Physical Fence
+Generation / Active-Prepared / Dual Window / Physical Fence
 ```
 
 are **experimental evidence**: they preserve real failure witnesses (for example the formal exploration of the `stop × natural ENDED` race) and test techniques, but they are not current architecture and must not be preserved for compatibility unless a future accepted authority re-earns them.

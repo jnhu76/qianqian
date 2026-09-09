@@ -30,7 +30,7 @@ import { projectState } from '../data/project-state.ts'
 <table class="layer-table">
   <tr><td>播放参考</td><td><StatusBadge status="HISTORICAL_EVIDENCE" /></td></tr>
   <tr><td>FFmpeg 研究</td><td><StatusBadge status="HISTORICAL_EVIDENCE" /></td></tr>
-  <tr><td>组件边界 A0</td><td><StatusBadge status="FROZEN" /></td></tr>
+  <tr><td>组件边界 A0</td><td><StatusBadge status="HISTORICAL_EVIDENCE" /></td></tr>
   <tr><td>Base / Composition Kernel K0</td><td><StatusBadge status="IMPLEMENTED" /></td></tr>
   <tr><td>Playback Foundations（重置提案）</td><td><StatusBadge status="NEXT" /></td></tr>
   <tr><td>Decoder provider</td><td><StatusBadge status="PLANNED" /></td></tr>

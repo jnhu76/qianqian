@@ -31,7 +31,7 @@ export const projectState: ProjectState = {
   layers: {
     playbackReference: 'HISTORICAL_EVIDENCE',
     ffmpegResearch: 'HISTORICAL_EVIDENCE',
-    componentBoundary: 'FROZEN',
+    componentBoundary: 'HISTORICAL_EVIDENCE',
     baseKernel: 'IMPLEMENTED',
     playbackArchitecture: 'NEXT',
     decoder: 'PLANNED',

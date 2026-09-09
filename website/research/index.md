@@ -45,6 +45,6 @@ status: CURRENT
 ---
 
 <ProvenancePanel
-  :authority="['AGENTS.md §29']"
+  :authority="['AGENTS.md']"
   lastVerified="743eb86"
 />

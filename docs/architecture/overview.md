@@ -121,7 +121,7 @@ mechanism / authority
 
 A future extension may use middleware/waterfall-like interception for execution seams, but that is different from committed Fact delivery and is not yet a generic primitive.
 
-> **Command != Fact.**
+> **Command != Fact** — frozen in `../adr/ADR-PBK-001.md` §2.2.
 
 ---
 
@@ -129,17 +129,7 @@ A future extension may use middleware/waterfall-like interception for execution 
 
 A Fact is published only after its truth has been established by its designated semantic authority.
 
-Key frozen points (normative text in `../adr/ADR-PBK-001.md` §2.3):
-
-```text
-semantic commit = the producing authority considers the fact established
-                  (not ACID/durability/fsync/device completion by default)
-commit first -> Fact publication
-one designated semantic authority per semantic fact type
-mechanism evidence does not directly publish another authority's fact
-Projection is derived visibility; a control decision must not use a
-Projection as its correctness authority
-```
+Frozen contracts (names only — normative text in `../adr/ADR-PBK-001.md` §2.3): semantic-commit definition; commit-first; one designated authority per fact type; mechanism-evidence firewall; projection read-side firewall.
 
 Event Sourcing/CQRS, durability, replay authority and append-only logging remain open research questions.
 
@@ -157,9 +147,9 @@ processing graph
 output/device
 ```
 
-Per quantum, the realtime path must not re-enter Context resolution, generic Fact/Event fan-out, plugin dispatch, Reconcile, or filesystem/network/UI machinery; it operates on already-bound/published state. The normative forbidden list lives in `../adr/ADR-PBK-001.md` §2.4.
+The ADR forbids per-quantum re-entry of the realtime path into Context resolution, generic Fact/Event fan-out, plugin dispatch, Reconcile, or filesystem/network/UI machinery (normative list in `../adr/ADR-PBK-001.md` §2.4); it operates on already-bound/published state.
 
-> **Fact != hot data.**
+> **Fact != hot data** — frozen in `../adr/ADR-PBK-001.md` §8.
 
 ---
 
@@ -185,9 +175,7 @@ which concrete pre-bound object/function handles the quantum
 
 The same resource may participate in both, but edge semantics differ.
 
-> **Dependency topology != realtime processing topology.**
-
-Never derive DSP/realtime order from Fiber mount order, registration order, HashMap iteration or capability discovery order.
+Frozen in `../adr/ADR-PBK-001.md` §5: dependency topology != realtime processing topology; realtime/DSP order is never derived from mount/registration/iteration order.
 
 ---
 
@@ -195,14 +183,7 @@ Never derive DSP/realtime order from Fiber mount order, registration order, Hash
 
 Control side builds and validates the next realtime graph/view; realtime execution loads the currently published view and processes the audio quantum directly.
 
-Normative contracts (in `../adr/ADR-PBK-001.md` §6):
-
-```text
-A realtime reader observes one coherent published realtime view
-(N or N+1, never half of each).
-Any resource that realtime execution may still dereference must remain
-valid until no realtime execution or queued reference can dereference it.
-```
+Both §6 invariants — coherent publication (reader sees N or N+1) and RT-referenced resources valid until readers quiesce — are normative in `../adr/ADR-PBK-001.md` §6 only.
 
 The publication mechanism (RCU / epoch / double buffering / Arc snapshot / lease / hazard / other) is intentionally unfrozen.
 
@@ -218,25 +199,7 @@ The withdrawal ordering, reader-quiescence steps and the exact resource/fiber li
 
 Do not force every cheap runtime parameter update through full Plugin Reconcile.
 
-Examples likely to be parameter/control updates:
-
-```text
-volume
-filter coefficient
-threshold
-balance
-```
-
-Examples that may require topology/provider rebuild/publication:
-
-```text
-insert/remove processing stage
-replace decoder mechanism
-replace output mechanism
-change branch/merge structure
-```
-
-The exact boundary remains an Audio Runtime research result.
+Cheap parameter updates (volume, filter coefficients, ...) are likely control-path updates; inserting/removing stages or replacing decoder/output mechanisms may require topology/provider rebuild/publication. The exact boundary is research-open; see `../adr/ADR-PBK-001.md` §7.
 
 ---
 
@@ -244,7 +207,7 @@ The exact boundary remains an Audio Runtime research result.
 
 Playback-specific state-machine authority has been deliberately reopened.
 
-The repository still contains prior experimental concepts such as:
+The repository still contains prior experimental concepts such as (full reopened list: `../adr/ADR-PBK-001.md` §0/§10):
 
 ```text
 MusicKernel
@@ -253,6 +216,7 @@ TrackSession
 DecodeSession
 Generation
 Active / Prepared
+Dual Window
 Physical Fence
 ```
 
@@ -278,17 +242,7 @@ Do not model every architectural noun.
 
 The old PlaybackTemporal/PlaybackOwnership models are no longer blocking architecture authority.
 
-The first likely new candidate is a narrow publication/release interleaving if executable evidence demonstrates it:
-
-```text
-old graph references A
-A withdrawal begins
-new graph excludes A
-old reader still uses A
-A final release
-```
-
-A model is justified only after the collision is concrete.
+The first likely new candidate is the narrow publication/release interleaving of `../adr/ADR-PBK-001.md` §13 — justified only after the collision is concrete.
 
 ---
 

@@ -124,7 +124,7 @@ Decoder → Gain / EQ / SRC / ... → AudioOutput
 
 <ProvenancePanel
   :authority="['docs/architecture/composition-kernel-0-design.md', 'docs/architecture/overview.md', 'docs/adr/ADR-PBK-001.md']"
-  :decisions="[{ pr: 68 }, { pr: 78 }, { pr: 79 }]"
+  :decisions="[{ pr: 68 }]"
   :implementation="[{ pr: 71 }]"
   :evidence="['crates/qianqian-kernel/tests', 'specs/playback/PlaybackTemporal.tla']"
 />

@@ -361,7 +361,7 @@ filesystem/network/UI round trips
 unbounded allocation/blocking
 ```
 
-Hot data travels through pre-bound realtime edges.
+Hot data travels through pre-bound realtime edges. (Playback-side normative form of the forbidden list: `../adr/ADR-PBK-001.md` §2.4.)
 
 ---
 
@@ -371,7 +371,7 @@ ARCH-003 is currently reopened.
 
 The generic Composition Kernel currently promises only that playback/audio capabilities can participate in normal Plugin/Fiber lifecycle and dependency management without polluting K0 with music/audio concepts.
 
-It does **not** currently promise that these legacy playback nouns are correct:
+It does **not** currently promise that these legacy playback nouns are correct (full reopened list: ADR-PBK-001 §0/§10):
 
 ```text
 MusicKernel
@@ -380,6 +380,7 @@ TrackSession
 DecodeSession
 Generation
 Active / Prepared
+Dual Window
 Physical Fence
 ```
 

@@ -29,11 +29,11 @@ Playback architecture is currently **reopened**. Stable vocabulary must therefor
 | Composition Plane | Who exists, who requires/provides what, who owns Effects, and how providers/dependents enter/withdraw. |
 | Execution / Control Plane | Commands, workflows and Capability/Service calls that ask the system to perform work or mutate authoritative state. |
 | Command | Intent/request to do something. A Command is not proof that the requested outcome happened. |
-| Fact | A typed observation/truth that has already been committed by its owning authority/mechanism. |
+| Fact | A typed observation/truth established by its designated semantic authority (normative contract: ADR-PBK-001 §2.3). |
 | Fact Event | Publication of a committed Fact to observers. Fan-out semantics do not make the Fact a mutable middleware object. |
 | Fact Plane | Committed facts plus their observation, projection, persistence and presentation paths. |
 | Projection | Derived read model/materialized view built from committed facts and/or authoritative snapshots. Projection is not an authority/writer. |
-| Commit-first publication | Authoritative commit occurs before publishing the corresponding Fact; observer failure does not retroactively make the committed fact unhappen. |
+| Commit-first publication | Semantic commit occurs before Fact publication (ADR-PBK-001 §2.3). |
 | Realtime Data Plane | High-frequency bounded data flow such as PCM, executed through pre-bound realtime-safe graph edges rather than generic Context/Event dispatch. |
 | PCM | Canonical family of decoded audio payloads for realtime processing. Exact Qianqian `PcmBlock` representation is currently unfrozen. |
 | Realtime Graph/View | Pre-built/pre-bound processing view consumed directly by the realtime path. Exact representation is unfrozen. |

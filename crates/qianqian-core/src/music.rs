@@ -1,4 +1,5 @@
-//! Music Kernel: authority for music-domain and product semantics.
+//! Music Kernel (experimental evidence): music-domain/product semantics of
+//! an earlier Playback architecture experiment.
 //!
 //! `MusicKernel` decides user/product meaning such as playback-state meaning,
 //! selection, playlist/repeat/shuffle policy, and what a terminal transport

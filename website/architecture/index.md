@@ -171,13 +171,13 @@ Gain → EQ → SRC → Limiter → ...
 
 > **TLA+ 用来找撞车，不用来证明整个架构。**
 
-Blocking core 只覆盖真正高风险的 temporal collisions：Dual Window、Generation admission、Physical Fence、submitted/rendered、EOF/drained/ENDED。
+旧 playback formal core（历史 blocking 定位已退役）覆盖过这些 temporal collisions：Dual Window、Generation admission、Physical Fence、submitted/rendered、EOF/drained/ENDED；现为 experimental evidence。
 
 ---
 
 <ProvenancePanel
   :authority="['docs/architecture/overview.md', 'docs/adr/ADR-PBK-001.md', 'docs/architecture/composition-kernel.md']"
-  :decisions="[{ issue: 67 }, { pr: 68 }, { pr: 78 }, { pr: 79 }]"
+  :decisions="[{ issue: 67 }, { pr: 68 }]"
   :implementation="[{ issue: 70 }, { pr: 71 }]"
   :evidence="['crates/qianqian-kernel/tests', 'specs/playback/PlaybackTemporal.tla']"
 />
