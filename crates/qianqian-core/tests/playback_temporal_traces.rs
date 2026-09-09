@@ -14,7 +14,7 @@
 
 use qianqian_core::music::{MusicKernel, PlaybackState};
 use qianqian_core::transport::{
-    DecodeSessionId, FenceState, FenceVerdictOutcome, GenerationId, MediaId, MediaSpan,
+    DecodeSessionId, EofOutcome, FenceState, FenceVerdictOutcome, GenerationId, MediaId, MediaSpan,
     TransportKernel, WindowRole,
 };
 
@@ -711,4 +711,289 @@ fn stop_after_drained_withdraws_the_pending_drained_fact() {
     music.observe_all(transport.take_derived_facts());
     assert_eq!(music.state(), PlaybackState::Idle);
     assert_ne!(music.state(), PlaybackState::Ended);
+}
+
+#[test]
+fn rapid_seek_seek_next_stop_supersede_chain_completes() {
+    let mut transport = TransportKernel::new();
+    let mut music = MusicKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let first_seek = transport.seek(500).expect("first seek prepares");
+    assert_eq!(first_seek.superseded, None);
+
+    let second_seek = transport.seek(900).expect("second seek supersedes");
+    assert_eq!(
+        second_seek.superseded.map(|s| s.generation),
+        Some(first_seek.generation),
+        "pending prepared contribution atomically superseded"
+    );
+
+    let replacement = transport
+        .next_track(media.open())
+        .expect("next supersedes the pending seek");
+    assert_eq!(
+        replacement.superseded.map(|s| s.generation),
+        Some(second_seek.generation)
+    );
+    assert_ne!(replacement.track, started.track);
+
+    let cut = transport.stop().expect("stop wins the chain");
+    assert_eq!(cut, started.generation);
+    transport.claim_fence().expect("claim");
+    let verdict = transport.fence_succeeded().expect("verdict");
+    assert_eq!(
+        verdict,
+        FenceVerdictOutcome::StopCompleted {
+            cut: started.generation
+        }
+    );
+
+    music.observe_all(transport.take_derived_facts());
+    assert_eq!(music.state(), PlaybackState::Idle);
+    let snapshot = transport.snapshot();
+    assert_eq!(snapshot.active, None);
+    assert_eq!(snapshot.prepared, None);
+    assert_eq!(snapshot.fence, FenceState::Idle);
+    assert!(
+        snapshot.track_sessions.is_empty(),
+        "both tracks fully retired after stop"
+    );
+}
+
+#[test]
+fn next_intent_during_claimed_promote_fence_consumes_verdict_without_fake_promotion() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+    transport.begin_hard_cut().expect("cut begins");
+    transport.claim_fence().expect("device claims the flush");
+
+    // A later intent during the claimed promote-fence cannot rewrite the
+    // claimed physical transaction, but it may supersede the promotion
+    // target: the pending prepared window is replaced.
+    let replacement = transport
+        .next_track(media.open())
+        .expect("new intent allowed while promote fence is in flight");
+    assert_eq!(
+        replacement.superseded.map(|s| s.generation),
+        Some(sought.generation)
+    );
+
+    // The claimed flush completes for the same cut generation; its verdict
+    // is consumed without promoting the superseded target.
+    let verdict = transport
+        .fence_succeeded()
+        .expect("claimed flush completes");
+    assert_eq!(
+        verdict,
+        FenceVerdictOutcome::VerdictConsumed {
+            cut: started.generation
+        }
+    );
+    let snapshot = transport.snapshot();
+    assert_eq!(snapshot.fence, FenceState::Idle);
+    assert_eq!(
+        snapshot.active.expect("old active unchanged").generation,
+        started.generation
+    );
+    assert_eq!(
+        snapshot
+            .prepared
+            .expect("replacement prepared intact")
+            .generation,
+        replacement.generation
+    );
+
+    // The replacement runs its own episode and promotes through its own
+    // fence (cutting the same already-silent generation again is legal).
+    prime(
+        &mut transport,
+        replacement.decode_session,
+        replacement.generation,
+        0,
+    );
+    let cut = transport.begin_hard_cut().expect("second cut begins");
+    assert_eq!(cut.cut, started.generation);
+    transport.claim_fence().expect("claim");
+    let verdict = transport.fence_succeeded().expect("verdict");
+    assert_eq!(
+        verdict,
+        FenceVerdictOutcome::Promoted {
+            promoted: replacement.generation,
+            cut: started.generation,
+        }
+    );
+}
+
+#[test]
+fn stop_during_claimed_promote_fence_reinterprets_the_same_flush_as_terminal() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+    transport.begin_hard_cut().expect("cut begins");
+    transport.claim_fence().expect("device claims");
+
+    let cut = transport
+        .stop()
+        .expect("stop reinterprets the claimed flush");
+    assert_eq!(cut, started.generation);
+
+    let verdict = transport
+        .fence_succeeded()
+        .expect("same flush completes terminally");
+    assert_eq!(
+        verdict,
+        FenceVerdictOutcome::StopCompleted {
+            cut: started.generation
+        }
+    );
+    let snapshot = transport.snapshot();
+    assert_eq!(snapshot.active, None, "no promotion happened");
+    assert_eq!(
+        snapshot.prepared, None,
+        "stop superseded the prepared window"
+    );
+}
+
+#[test]
+fn seek_and_next_are_refused_while_a_stop_fence_is_in_flight() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    transport.stop().expect("stop requested");
+    transport.claim_fence().expect("claim");
+
+    // A stop fence is a terminal cut: new seek/next intents wait for the
+    // verdict instead of queueing onto an undecided physical state.
+    assert!(
+        transport.seek(100).is_err(),
+        "seek refused during stop fence"
+    );
+    assert!(
+        transport.next_track(media.open()).is_err(),
+        "next refused during stop fence"
+    );
+    let snapshot = transport.snapshot();
+    assert_eq!(
+        snapshot.prepared, None,
+        "refused intents leave no window behind"
+    );
+    assert_eq!(
+        snapshot
+            .active
+            .expect("active still exists for the fence")
+            .generation,
+        started.generation
+    );
+
+    // After the verdict lands, a new episode may start.
+    transport.fence_succeeded().expect("verdict");
+    transport
+        .play(media.open())
+        .expect("new episode after stop");
+}
+
+#[test]
+fn prepared_eof_before_readiness_abandons_the_discontinuity_explicitly() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let sought = transport
+        .seek(10_000)
+        .expect("seek to the file tail prepares");
+
+    // Seek lands exactly at EOF: the producer terminals before priming.
+    // EOF evidence does not imply prepared readiness; the contribution is
+    // dropped with an explicit outcome, never silently promoted.
+    let outcome = transport
+        .decoder_eof(sought.decode_session)
+        .expect("EOF handled");
+    assert_eq!(
+        outcome,
+        EofOutcome::PreparedAbandonedBeforeReadiness {
+            generation: sought.generation,
+        }
+    );
+
+    let snapshot = transport.snapshot();
+    assert_eq!(snapshot.prepared, None, "unprimable prepared dropped");
+    assert_eq!(
+        snapshot.active.expect("active unaffected").generation,
+        started.generation
+    );
+    assert!(snapshot.active.expect("active").admission_open);
+
+    // A later seek still works and fresh generations are issued.
+    let retry = transport.seek(500).expect("later seek after abandonment");
+    assert_ne!(retry.generation, sought.generation);
+}
+
+#[test]
+fn retired_generation_can_never_re_enter() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+    promote(&mut transport);
+
+    // After promotion the old generation holds no window role and its
+    // admission never reopens: no decode evidence, no submissions.
+    assert!(
+        transport
+            .decode_result(
+                started.decode_session,
+                MediaSpan {
+                    generation: started.generation,
+                    start: 720,
+                    end: 780,
+                }
+            )
+            .is_err()
+    );
+    assert!(transport.media_submitted(started.generation, 10).is_err());
+
+    // Superseded prepared generations are equally unreachable.
+    let first = transport.seek(2000).expect("first seek");
+    let second = transport.seek(3000).expect("second seek supersedes first");
+    assert!(
+        transport
+            .decode_result(
+                first.decode_session,
+                MediaSpan {
+                    generation: first.generation,
+                    start: 2000,
+                    end: 2080,
+                }
+            )
+            .is_err()
+    );
+    assert!(transport.media_submitted(first.generation, 10).is_err());
+    let _ = second;
 }

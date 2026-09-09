@@ -312,11 +312,21 @@ impl TransportKernel {
     /// Shared execution skeleton for seek and next (ADR freezes one
     /// skeleton): create the prepared window/generation, superseding any
     /// previous prepared contribution.
+    ///
+    /// A stop fence in flight is a terminal cut with the physical state
+    /// undecided: new seek/next intents are refused until its verdict
+    /// lands (implementation choice inside the ADR's open policy space,
+    /// matching the temporal spec's model decision).
     fn prepare_discontinuity(
         &mut self,
         track: TrackSessionId,
         start_position: u64,
     ) -> Result<PreparedForCut, &'static str> {
+        if let Some(fence) = &self.fence {
+            if fence.target.is_none() {
+                return Err("stop fence in flight; intents wait for the verdict");
+            }
+        }
         let superseded = self.supersede_prepared();
         let generation = self.fresh_generation();
         let decode_session =
