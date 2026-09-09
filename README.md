@@ -2,7 +2,7 @@
 
 Qianqian is a local-first, lightweight, cross-platform music player and a testbed for Rust composability/runtime architecture.
 
-The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the implementation is being rebuilt boundary-first on a small generic Composition Kernel; the playback-specific foundation is currently reopened and re-proposed in `ADR-PBK-001`.
+The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the implementation is being rebuilt boundary-first on a small generic Composition Kernel; the playback-specific foundation is **accepted** in `ADR-PBK-001` (plane-boundary constitution — production playback semantics remain open until real Audio Runtime experiments earn them).
 
 ## Architecture in 30 seconds
 
@@ -78,7 +78,7 @@ Generation / Active-Prepared / Dual Window / Physical Fence
 
 are **experimental evidence**: they preserve real failure witnesses (for example the formal exploration of the `stop × natural ENDED` race) and test techniques, but they are not current architecture and must not be preserved for compatibility unless a future accepted authority re-earns them.
 
-See `docs/adr/ADR-PBK-001.md` for the proposed foundation and `specs/playback/README.md` for the evidence status.
+See `docs/adr/ADR-PBK-001.md` for the accepted foundation and `specs/playback/README.md` for the evidence status.
 
 ## Everything is a Plugin
 

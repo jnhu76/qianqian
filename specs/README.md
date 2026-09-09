@@ -1,11 +1,16 @@
 # specs/ — 形式化模型注册表
 
-> **STATUS: EXPERIMENTAL EVIDENCE**
+> **STATUS: EXPERIMENTAL EVIDENCE（playback/ 历史套件）+ FORMAL EVIDENCE（realtime-publication/ 当前套件）**
 >
-> 本目录的模型保留了早期 Playback 架构实验的 failure witnesses 与验证技术。
+> `specs/playback/` 的模型保留了早期 Playback 架构实验的 failure witnesses 与验证技术。
 > 它们**不是当前 Playback architecture authority**，也**不是新 Playback 设计的 acceptance gate**。
-> 当前播放架构 authority 只有一个候选来源：`docs/adr/ADR-PBK-001.md`（PROPOSED / REOPENED）。
+> 当前播放架构 authority：`docs/adr/ADR-PBK-001.md`（**ACCEPTED**）。
 > 可复用：mutation 技术、具体 counterexample、verifier runner；不得要求新架构镜像旧变量/状态/名词。
+> `specs/realtime-publication/` 是重置后新建的 publication lifetime 语义级
+> 证据：其针对的交错正是 ADR §13 点名的头号候选（旧视图引用 provider → 新
+> 视图排除 → 旧 reader 仍在 → final release），TLC 穷举证明该 collision 在
+> 模型空间真实可达（风险驱动成立）；实现层碰撞确认仍随 §12 Phase D 展开。
+> 语义范围来自 ACCEPTED ADR §6；机制 representation 仍 OPEN。
 
 `specs/` 保存 Qianqian 中值得进行状态空间验证的形式化模型。这里描述的是**长期系统语义**，不是开发阶段历史。
 
@@ -75,16 +80,17 @@
 | --- | --- | --- | --- |
 | `playback/PlaybackTemporal` | Core evidence set（历史 blocking 定位已退役） | 五组高风险 temporal 语义：Dual Window、Generation admission、Physical Fence、submitted/rendered 记账、EOF/drained/ENDED terminalization | TLA+ / TLC |
 | `playback/PlaybackOwnership` | Extended exploration（supporting / non-blocking） | resource-lifecycle 假设：composition lifecycle root、TrackSession/DecodeSession immediate lifetime ownership、semantic authority 与 lifetime ownership 的区分、provider withdrawal 顺序 | TLA+ / TLC |
+| `realtime-publication/RealtimePublication` | 当前挣得的 formal evidence（语义来源：ACCEPTED ADR-PBK-001 §6） | realtime view publication / reader quiescence / resource reclamation：coherent publication、retired 视图闭门、quiescence 先于释放、多代退休记账、回收可达性 | TLA+ / TLC（含 liveness 性质与可达性探针） |
 
-每个模型配备**负控制（negative controls）**：故意注入错误，TLC 必须抓到（counterexample 才算通过），以证明模型不是 vacuous。其中 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）曾是 ADR ACCEPTED 的 blocking 集；播放架构重置后该 blocking 定位已退役，全部模型现在统一是 experimental evidence，不是新 Playback 设计的 acceptance gate。
+每个模型配备**负控制（negative controls）**：故意注入错误，TLC 必须抓到（counterexample 才算通过），以证明模型不是 vacuous。其中 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）曾是 ADR ACCEPTED 的 blocking 集；播放架构重置后该 blocking 定位已退役，`playback/` 两模型现在统一是 experimental evidence，不是新 Playback 设计的 acceptance gate（`realtime-publication/` 套件定位见上文，不属于本段历史）。
 
 ## 运行入口
 
 ```bash
-# 全量（正常模型 + 全部负控制；缺省模式）
+# 全量（playback 历史套件 + realtime-publication 当前套件；缺省模式）
 specs/check.sh
 
-# 仅 core acceptance 集（PlaybackTemporal 正常模型 + 4 个 core mutation）
+# core 集（PlaybackTemporal 正常模型 + 4 个 core mutation + realtime-publication 套件）
 specs/check.sh core
 
 # 显式全量
@@ -97,7 +103,7 @@ specs/check.sh
 
 工具链固定为 `tla2tools v1.7.4 (Xenophanes)`，`check.sh` 按内嵌 sha256 校验、fail closed。jar 不入库（见 `.gitignore`），由脚本自动下载。
 
-各模型的语义说明、状态空间数据与负控制结果见 `playback/README.md`。
+`playback/` 各模型的语义说明、状态空间数据与负控制结果见 `playback/README.md`；`realtime-publication/` 套件的对应信息见 `realtime-publication/README.md`。
 
 ## Traceability
 

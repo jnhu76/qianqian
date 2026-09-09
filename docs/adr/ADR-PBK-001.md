@@ -625,6 +625,8 @@ Arc / epoch / RCU / hazard pointer / refcount / callback fence
 reader-quiescence 的具体机制
 ```
 
+Publication/reclamation evidence: `docs/architecture/realtime-publication-lifetime-decision.md`（语义协议 P1–P5 的形式化推导与机制比较；representation 仍全部 OPEN）。
+
 ---
 
 # 7. Parameter update != topology update
@@ -905,19 +907,30 @@ ReleaseBeforeReadersQuiesce
 
 # 14. Acceptance gates
 
-本 ADR 从 PROPOSED 变成 ACCEPTED 前至少需要：
+本 ADR 于 2026-09-09 经 fresh-context adversarial review（含 corrective）后
+ACCEPTED（PR #87）。gate 语义按实际接受依据与现状如实记录：
 
 ```text
+Review gates（接受时已满足，依据 = PR #87 多轮 fresh-context adversarial review）：
 G1  四关注面（reasoning lenses）边界 adversarial review PASS
 G2  K0 domain firewall review PASS
 G3  command vs fact vs hot-data distinction review PASS
-G4  direct realtime data-flow executable experiment PASS
-G5  graph publication / lifetime overlap executable evidence PASS
-G6  若 G5 暴露真实 state collision，则对应最小 formal negative control PASS
 G7  fresh-context architecture review PASS
+
+Executable evidence gates（post-acceptance research ladder 项，对应 §12 Phase C/D）：
+G4  direct realtime data-flow executable experiment        OPEN（Phase C 前置）
+G5  graph publication / lifetime overlap executable evidence OPEN（Phase D 前置）
+G6  若 G5 暴露真实 state collision，则对应最小 formal negative control
+    —— 本 gate 的触发条件（G5 实现层碰撞）仍 OPEN；独立于本 gate，
+    §13 点名候选交错的语义级模型与 negative control（M1 ReleaseBeforeQuiesce
+    等）已由 specs/realtime-publication/ 提供（见 §6 evidence 引用），
+    其实现层（Rust / Loom / stress）取证仍随 G5 展开
 ```
 
-不要求在 ACCEPTED 前先设计完整播放器语义。
+接受依据是 review gates；executable evidence gates 不是追溯性接受前提，而是
+§12 ladder 相应步骤与任何 realtime 机制冻结决策的推进 gate——它们约束"后续
+冻结机制需要什么证据"，不改变本 ADR 的 ACCEPTED 状态。不要求在设计完整播放器
+语义之后才能接受本 ADR。
 
 ---
 

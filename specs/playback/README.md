@@ -4,8 +4,8 @@
 >
 > These models preserve earlier failure witnesses and verification techniques.
 > They are **not current Playback architecture authority** and are **not acceptance
-> gates** for new Playback design. The current Playback Foundations proposal is
-> `docs/adr/ADR-PBK-001.md` (PROPOSED / REOPENED).
+> gates** for new Playback design. The current Playback Foundations authority is
+> `docs/adr/ADR-PBK-001.md` (ACCEPTED).
 >
 > 允许复用：mutation 技术、具体 counterexample、verifier runner、负控制方法。
 > 禁止：要求新架构镜像本目录的 variables / states / nouns。

@@ -9,8 +9,8 @@
  *   证据与 verification techniques。其 MusicComponent / MusicKernel /
  *   TransportKernel / TrackSession / DecodeSession 词汇不是当前 Playback
  *   architecture authority，不约束新的 production 设计，除非该语义被
- *   独立重新挣得。当前 Playback Foundations 提案：
- *   docs/adr/ADR-PBK-001.md（PROPOSED / REOPENED）。
+ *   独立重新挣得。当前 Playback Foundations authority：
+ *   docs/adr/ADR-PBK-001.md（ACCEPTED）。
  *
  * 被审计对象（历史）：旧版 docs/adr/ADR-PBK-001.md（v1）的 ownership 语义
  * （Composition Lifecycle Root / Immediate Lifetime Owner / Semantic Authority

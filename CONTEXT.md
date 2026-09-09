@@ -199,7 +199,7 @@ No concrete collision -> prefer types/ownership/tests/static checks.
 
 The old PlaybackTemporal/PlaybackOwnership models are not current architecture acceptance gates.
 
-The likely first new formal target is realtime graph publication vs provider/resource release, but only after executable evidence earns it.
+The first new formal target was realtime graph publication vs reader quiescence / resource release. `specs/realtime-publication/` models the exact interleaving named in `ADR-PBK-001.md` §13 and demonstrates the collision exhaustively at model level (TLC + negative controls); implementation-level confirmation still follows the §12 research ladder (Phase D). Evidence and mechanism comparison: `docs/architecture/realtime-publication-lifetime-decision.md`.
 
 ---
 
