@@ -213,6 +213,8 @@ java -jar specs/tools/tla2tools.jar -workers 4 -config PromoteWithoutFence.cfg P
 
 注：TLC 每次 run 只报告 cfg 顺序中**第一个**被违反的不变量——负控制 cfg 已把目标不变量排在首位；counterexample 规模数字随 worker 数/终止时点浮动，仅作量级参考。`SingleGlobalGenerationCheck` 由 runner 以 `-continue` 运行：安全性违反与症状属性（`PROPERTY DualWindowNeverPrimesUnderGlobalCheck` 必须成立）在同一次运行中机器检查。
 
+**Verifier evidence 规则（长期）**：一次 TLC run 是有效 evidence，当且仅当（1）满足期望的完成/counterexample 条件，且（2）TLC 不发出任何 Warning。`specs/check.sh` 对 TLC Warning fail closed：任何 Warning（如"variable changed while it is specified as UNCHANGED"——TLC 只发 Warning 并静默削掉相关 transition）直接判 FAIL，无 whitelist；当前正常模型与全部 mutation 均为 0 warning，若未来遇到不可避免的无害 warning，须先单独论证再考虑例外。mutation 的 counterexample 证据另要求 TLC 自行收尾（log 含 `Finished in`）——被杀/崩溃进程（TLC 内部错误、timeout、JVM crash）产出的部分输出不作 MUST-FAIL 证据；正常模型的 `Model checking completed` 同样只可能出自自行收尾的 run。
+
 ---
 
 ## 六、运行结果（真实运行数据，2026-09-09，4 workers，含 executable-core corrective 后模型）
@@ -236,7 +238,7 @@ core acceptance 集 = `PlaybackTemporal` 正常模型 + 4 个 core mutation（`P
 | --- | --- | --- | --- |
 | PromoteWithoutFence | `PromotionRequiresSuccessfulFence` | **MUST FAIL / 已失败** ✓ | 782 distinct |
 | AcceptUnadmittedDecode | `DecodeResultRequiresAdmission` | **MUST FAIL / 已失败** ✓ | 28 distinct |
-| SingleGlobalGenerationCheck | `DecodeResultRequiresAdmission`（stop 窗口期）+ 症状属性成立 | **MUST FAIL / 已失败** ✓ | 完整探索 ~51.6k（`-continue`） |
+| SingleGlobalGenerationCheck | `DecodeResultRequiresAdmission`（stop 窗口期）+ 症状属性成立 | **MUST FAIL / 已失败** ✓ | ~7.9k 条 CE；`-continue` run 提前停止于 ~30k distinct（见下） |
 | RetiredGenerationStillAdmitted | `RetiredGenerationCannotReenter` | **MUST FAIL / 已失败** ✓ | 59 distinct |
 | EndBeforeRenderDrain | `TransportDrainRequiresRenderedDrain` | **MUST FAIL / 已失败** ✓ | 186 distinct |
 | ReleaseProviderEarly | `ProviderFinalReleaseRequiresDependentExit` | **MUST FAIL / 已失败** ✓ | 169 distinct |
@@ -249,7 +251,9 @@ Ownership 模型未随本次 corrective 变更（运行数据与 2026-09-08 一�
 `SingleGlobalGenerationCheck` 的双证据（均由 runner 机器检查）：
 
 1. **安全性失败**：恢复 `result.generation != current_generation => stale` 后，stop 窗口期（active admission 已关、fence verdict 未落、无 promotion 改变全局代）old active gen 的 decode result 被错误接收，TLC 给出 counterexample。
-2. **功能性破坏**：全局相等检查使 prepared gen（≠ current）永远无法被喂送——症状属性 `DualWindowNeverPrimesUnderGlobalCheck` 在完整探索中成立（`MarkPreparedReady` / `PromotePrepared` coverage 为 `0:0`，从未启用；正常模型中两者分别有 2,181 / 15,091 次触发）。Dual Window 在该检查下不成立。
+2. **功能性破坏**：全局相等检查使 prepared gen（≠ current）永远无法被喂送——症状属性 `DualWindowNeverPrimesUnderGlobalCheck` 成立（`MarkPreparedReady` / `PromotePrepared` 从未启用；正常模型中两者分别有 2,181 / 15,091 次触发）。Dual Window 在该检查下不成立。
+
+取证备注（2026-09-09 复核修正）：`-continue` 模式下 TLC 打印出海量 counterexample（~7.9k 条）后**提前停止探索**——两次实测分别停止于 29,508 / 30,429 distinct、队列非空（随 seed 浮动；此前记录的 ~51.6k 同为此现象），但 TLC 仍打印 `complete state graph` 措辞，不可作为完整探索证据。症状属性在全空间的成立由一次独立完整探索证实：临时移除被违反的不变量后重跑（其余 cfg 不变），`Model checking completed. No error has been found.`，21,085,867 states generated / 1,988,245 distinct / 0 left on queue / depth 41。已知 runner 局限（开放项）：TLC 对 `[]P` 形状的 PROPERTY 按 invariant 逐状态检查、违反时打印 `Invariant ... is violated`，而 runner 的症状属性半只 grep `Temporal properties were violated`——若未来模型改动意外使该 mutation 下 prepared 重新可 prime，当前 verdict 不会翻转；收紧该判定需要逐 mutation 核实单违反性，留待独立 corrective。
 
 ---
 
@@ -290,3 +294,5 @@ Ownership 模型未随本次 corrective 变更（运行数据与 2026-09-08 一�
 本目录的模型经过三轮 fresh-context 对抗 review（temporal 抽象 / ownership 三分 / 负控制有效性），修复了：stop×ENDED 竞态导致的命令永久锁死（补 fence-idle guard + `StopFenceRequiresActiveWindow`）、stop×promote-fence 交错被排除（`RequestStop` 放宽）、semantic authority 缺正结构（authority 事实表 + `KernelAdoptsLifetimeOwnership` 负控制）、provider final release 把从未创建的 Absent dependent 当阻塞条件、`SingleGlobalGenerationCheck` 症状属性未接入 gate（`-continue` + PROPERTY 机器检查）、mutation cfg 目标不变量排序（TLC 只报第一个违反）。
 
 第四轮（2026-09-09，executable core 对抗 review）首次由 Rust executable oracle 反向发现模型欠定义：admission 关闭后 decoded-but-never-submitted backlog 使 drain predicate 在 fail/abandon 与 verdict-consumed 路径下永久悬空。同步修复 = 决策 8 + `discardedBacklog` 变量 + `NoStrandedDecodeAfterAdmissionClose` 不变量 + Rust `TransportKernel::discard_stranded_backlog` 与回归测试（Rust/模型/spec 三方同步）。本轮还暴露一个取证陷阱并已修正：`RequestStop` 的 UNCHANGED 列表误含 `discardedBacklog` 时 TLC 仅发 Warning（"variable changed while UNCHANGED"）并静默丢弃相关转移，`check.sh` 的 grep 不检查 warning——首轮"PASS"数据（21.5M states）由此作废，修复后重跑（36.0M states，0 warning）。
+
+verifier 同步 corrective（同日）：`check.sh` 现对任何 TLC Warning fail closed（见"Verifier evidence 规则"），并以负反证验证——向工作区临时重新注入同一 UNCHANGED 冲突后 `check.sh core` 全项 FAIL（exit 1），而保留的 TLC log 同时含有 `Model checking completed`、0 违反与 21,553,651 states generated，即旧 runner 会误判 PASS 的同型 evidence；恢复模型后 `check.sh all` 全绿（36,016,926 / 3,213,723，0 warning）。同日另要求 MUST-FAIL 证据出自 TLC 自行收尾的 run（`Finished in`）：一次真实的 `-continue` run 因 TLC 内部错误（"Failed to recover the initial state from its fingerprint... TLC bug(4)"）中途崩溃时，旧逻辑仍会凭部分输出判 MUST-FAIL-OK。
