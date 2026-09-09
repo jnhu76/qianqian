@@ -34,10 +34,10 @@ Current architecture milestones:
 Component boundary audit          PASS / CLOSED              (PR #66)
 Composition Kernel semantic design MERGED                   (PR #68)
 Base Kernel K0                     IMPLEMENTED              (PR #71)
-Playback Foundations reset         PROPOSED / REOPENED      (ADR-PBK-001, PR #87)
+Playback Foundations reset         ACCEPTED                 (ADR-PBK-001, PR #87)
 ```
 
-The previously accepted playback architecture (`ADR-PBK-001` as registered ARCH-003 authority) has been **deliberately reopened from first principles**. Old playback implementation, specs and formal models remain in the repository as **experimental evidence only** — they preserve failure witnesses and test techniques, not current authority. The new playback foundation is proposed in `docs/adr/ADR-PBK-001.md`; production playback semantics are not authorized until its acceptance gates pass.
+The previously accepted playback architecture (`ADR-PBK-001` as registered ARCH-003 authority) has been **deliberately reopened from first principles**. Old playback implementation, specs and formal models remain in the repository as **experimental evidence only** — they preserve failure witnesses and test techniques, not current authority. The reset foundation is accepted in `docs/adr/ADR-PBK-001.md`; production playback semantics remain unauthorized until real Audio Runtime experiments earn them (ADR §10 remains OPEN).
 
 ## Control plane and data plane
 
@@ -64,9 +64,9 @@ The previously accepted playback architecture (`ADR-PBK-001` as registered ARCH-
 
 Context controls reachability/dependency truth. It does not carry PCM blocks or become a universal product message bus.
 
-## Playback status: reopened
+## Playback status: foundations accepted
 
-There is currently **no accepted playback state-machine vocabulary**. The reset proposal (`docs/adr/ADR-PBK-001.md`, PROPOSED) freezes only foundational boundaries — composition vs execution/control vs facts vs realtime data — and deliberately reopens all playback-specific nouns.
+There is still **no accepted playback state-machine vocabulary**. The accepted foundations (`docs/adr/ADR-PBK-001.md`) freeze only foundational boundaries — composition vs execution/control vs facts vs realtime data — and deliberately keep all playback-specific nouns unfrozen.
 
 Names still present in old code/specs, such as:
 
@@ -200,7 +200,7 @@ The playback reference is a behavioral oracle, not a source-layout template.
 - `CONTEXT.md` — stable vocabulary and mental model.
 - `docs/README.md` — task-oriented documentation router.
 - `docs/architecture/overview.md` — current Architecture v2 overview.
-- `docs/adr/ADR-PBK-001.md` — Playback Foundations proposal (PROPOSED / REOPENED).
+- `docs/adr/ADR-PBK-001.md` — Playback Foundations constitution (ACCEPTED).
 - `docs/architecture/composition-kernel.md` — generic Composition Kernel authority.
 - `specs/README.md` — risk-driven formalization policy and model registry.
 - `CONTRIBUTING.md` — contribution entry point.

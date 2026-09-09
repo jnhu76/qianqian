@@ -1,6 +1,7 @@
 # ADR-PBK-001：播放基础重置——组合、执行、事实与实时数据平面
 
-- **状态**：PROPOSED
+- **状态**：ACCEPTED
+- **接受说明**：Accepted after fresh-context adversarial review and fact-authority-scope corrective.
 - **日期**：2026-09-09
 - **作用域**：Qianqian Playback Foundations / ARCH-003
 - **保持不变**：Base / Composition Kernel K0
@@ -924,11 +925,11 @@ G7  fresh-context architecture review PASS
 
 ```text
 Base Kernel K0                      IMPLEMENTED / CURRENT
-ADR-PBK-001 playback foundations    PROPOSED / REOPENED
+ADR-PBK-001 playback foundations    ACCEPTED
 old playback executable core        EVIDENCE ONLY
 old playback formal models          EVIDENCE ONLY
-production playback semantics       NOT AUTHORIZED
-real Audio Runtime experiments      NEXT, after this reset is reviewed
+production playback semantics       NOT AUTHORIZED (§10 remains OPEN)
+real Audio Runtime experiments      NEXT — minimal PCM contract first
 ```
 
 当前最重要的纪律：

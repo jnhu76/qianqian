@@ -11,7 +11,7 @@ Before changing code or long-lived documentation:
 3. Use `docs/README.md` to load only the minimum relevant authority.
 4. Read `docs/architecture/overview.md` before changing architecture boundaries.
 5. For generic composition work, read `docs/architecture/composition-kernel.md` and the K0 design/implementation authority.
-6. For playback/audio work, read `docs/adr/ADR-PBK-001.md` — the **only normative Playback Foundations constitution**, currently **PROPOSED / REOPENED**.
+6. For playback/audio work, read `docs/adr/ADR-PBK-001.md` — the **only normative Playback Foundations constitution**, now **ACCEPTED**.
 7. Inspect current repository reality before assuming a path, type, crate, test, TLA variable, or prior design is still authoritative.
 
 Do not recursively preload historical refs or external failure evidence.
@@ -22,7 +22,7 @@ Do not recursively preload historical refs or external failure evidence.
 
 ```text
 Normative Playback Foundations constitution:
-    docs/adr/ADR-PBK-001.md        (PROPOSED / REOPENED — not a production contract)
+    docs/adr/ADR-PBK-001.md        (ACCEPTED Playback Foundations authority)
 
 Do not treat as current architecture unless a new experiment re-earns them:
     MusicKernel

@@ -32,7 +32,7 @@ import { projectState } from '../data/project-state.ts'
   <tr><td>FFmpeg 研究</td><td><StatusBadge status="HISTORICAL_EVIDENCE" /></td></tr>
   <tr><td>组件边界 A0</td><td><StatusBadge status="HISTORICAL_EVIDENCE" /></td></tr>
   <tr><td>Base / Composition Kernel K0</td><td><StatusBadge status="IMPLEMENTED" /></td></tr>
-  <tr><td>Playback Foundations（重置提案）</td><td><StatusBadge status="NEXT" /></td></tr>
+  <tr><td>Playback Foundations</td><td><StatusBadge status="CURRENT" /></td></tr>
   <tr><td>Decoder provider</td><td><StatusBadge status="PLANNED" /></td></tr>
   <tr><td>Audio Processing</td><td><StatusBadge status="PLANNED" /></td></tr>
   <tr><td>AudioOutput provider</td><td><StatusBadge status="PLANNED" /></td></tr>
@@ -41,9 +41,9 @@ import { projectState } from '../data/project-state.ts'
 
 ---
 
-## Playback Foundations（重置提案）
+## Playback Foundations
 
-> 以下结构是旧 Playback 架构实验的 **experimental evidence**（含其短暂 ACCEPTED 的旧版 ADR 修订）；2026-09 重置后不是 current authority。当前提案：ADR-PBK-001（**PROPOSED / REOPENED**）。
+> 以下结构是旧 Playback 架构实验的 **experimental evidence**（含其短暂 ACCEPTED 的旧版 ADR 修订）；2026-09 重置后不是 current authority。当前 authority：ADR-PBK-001（**ACCEPTED**，不冻结播放状态机名词）。
 
 ```text
 MusicComponent
@@ -77,7 +77,7 @@ Playback 的 formal core 已验证 Dual Window、Generation admission、Physical
 
 > **TLA+ 用来找撞车，不用来证明整个架构。**
 
-旧 playback formal core 的验证结果是 experimental evidence。播放架构重置后，下一步由 ADR-PBK-001（PROPOSED）的 acceptance gates 与最小实验驱动，而不是继续扩张形式化模型数量。
+旧 playback formal core 的验证结果是 experimental evidence。播放基础已接受（ADR-PBK-001 ACCEPTED）后，下一步由最小实验（minimal PCM contract 起）驱动，而不是继续扩张形式化模型数量。
 
 ---
 

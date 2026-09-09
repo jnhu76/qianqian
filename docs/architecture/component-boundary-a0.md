@@ -2,7 +2,7 @@
 
 > **STATUS: HISTORICAL / EXPERIMENTAL EVIDENCE**
 >
-> This document describes an earlier concrete Playback decomposition. It is **no longer current ARCH-004 authority**. Current Playback Foundations authority is `docs/adr/ADR-PBK-001.md` (PROPOSED / REOPENED). Generic composition provenance and behavioral evidence remain usable; playback-specific ownership/granularity conclusions below are historical.
+> This document describes an earlier concrete Playback decomposition. It is **no longer current ARCH-004 authority**. Current Playback Foundations authority is `docs/adr/ADR-PBK-001.md` (ACCEPTED). Generic composition provenance and behavioral evidence remain usable; playback-specific ownership/granularity conclusions below are historical.
 
 Design-gate evidence for **#53 COMPONENT-BOUNDARY-A0** (parent authority **#46 PLAYER-PLUGIN-ARCH-1**).
 
@@ -18,7 +18,7 @@ Revision 3 (Corrective-2, 2026-09-07): purifies §H.a per human review round 2 �
 
 ## Playback authority transition note (2026-09)
 
-> **This document is historical evidence only. Its playback-specific ownership/granularity conclusions are not fresh implementation guidance, and no playback model described here — this document's #53 position or any successor — is current authority. Playback architecture has since been reopened from first principles; `ADR-PBK-001` is PROPOSED and deliberately does not freeze either playback model.**
+> **This document is historical evidence only. Its playback-specific ownership/granularity conclusions are not fresh implementation guidance, and no playback model described here — this document's #53 position or any successor — is current authority. Playback architecture has since been reopened from first principles; `ADR-PBK-001` is ACCEPTED and deliberately does not freeze either playback model.**
 
 Still valid here (generic + behavioral evidence):
 

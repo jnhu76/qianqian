@@ -9,7 +9,7 @@ status: CURRENT
 
 > **Capability Plane != Data Plane。**
 
-本页分两层：**已实现**的 generic control/data-plane 防火墙（Base Kernel K0，PR #71），以及 ADR-PBK-001（**PROPOSED / REOPENED**）的 playback 基础提案。后者尚未接受、尚无可执行实现，不代表真实 PCM playback pipeline 已经实现；文中出现的 TransportKernel / Physical Fence 等名词是旧实验证据，不是 current authority。
+本页分两层：**已实现**的 generic control/data-plane 防火墙（Base Kernel K0，PR #71），以及 ADR-PBK-001（**ACCEPTED**）的 Playback Foundations。后者已接受但尚无可执行实现，不代表真实 PCM playback pipeline 已经实现；文中出现的 TransportKernel / Physical Fence 等名词是旧实验证据，不是 current authority。
 
 ---
 

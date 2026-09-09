@@ -2,13 +2,13 @@
 
 This file carries stable vocabulary and the current repository mental model. It is not a substitute for current code, contracts, ADRs, or task-specific evidence.
 
-Playback architecture is currently **reopened**. Stable vocabulary must therefore describe the new foundations, not legacy playback nouns that happen to remain in code.
+Playback Foundations are **ACCEPTED** (`ADR-PBK-001`). Stable vocabulary still describes the new foundations, not legacy playback nouns that happen to remain in code.
 
 ---
 
 # Current vocabulary
 
-> **Status caveat: Playback-foundation vocabulary remains PROPOSED until the `ADR-PBK-001` acceptance gates pass.** Normative definitions live in `docs/adr/ADR-PBK-001.md`; this table is a short-status index, not a second authority.
+> **Status: Playback Foundations are ACCEPTED (`ADR-PBK-001`); legacy playback nouns remain experimental evidence.** Normative definitions live in `docs/adr/ADR-PBK-001.md`; this table is a short-status index, not a second authority.
 
 | Term | Meaning |
 |---|---|
@@ -65,7 +65,7 @@ Playback architecture is currently **reopened**. Stable vocabulary must therefor
 
 # Core mental model
 
-The current proposal separates four reasoning lenses (not four mandatory runtime subsystems):
+The accepted foundations separate four reasoning lenses (not four mandatory runtime subsystems):
 
 ```text
 Composition Plane

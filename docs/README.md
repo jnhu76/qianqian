@@ -10,7 +10,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Stable vocabulary / current mental model | `../CONTEXT.md` |
 | Current architecture overview | `architecture/overview.md` |
 | Generic Composition Kernel semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel-0-implementation-adr.md` |
-| Playback/audio foundations | `adr/ADR-PBK-001.md` — **PROPOSED / REOPENED** |
+| Playback/audio foundations | `adr/ADR-PBK-001.md` — **ACCEPTED** |
 | Current Rust behavior | current code + tests |
 | Playback experimental evidence | `../specs/playback/*` + `qianqian-core` playback code/tests — evidence only, not authority |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
@@ -29,14 +29,14 @@ agent work rules              -> AGENTS.md
 stable vocabulary             -> CONTEXT.md
 generic composition semantics -> composition-kernel*.md
 current architecture overview -> architecture/overview.md
-playback foundation proposal  -> adr/ADR-PBK-001.md (PROPOSED / REOPENED)
+playback foundations          -> adr/ADR-PBK-001.md (ACCEPTED)
 implemented behavior          -> code + tests
 experimental playback evidence-> specs/playback/* + prior executable core
 historical evidence           -> git refs / explicitly historical docs
 current task scope            -> current issue/task
 ```
 
-Playback currently has **no accepted production state-machine authority**. The old accepted playback model was reopened and rewritten; current `ADR-PBK-001` only proposes foundational plane separation.
+Playback currently has **no accepted production state-machine authority**. The old accepted playback model was reopened and rewritten; the accepted `ADR-PBK-001` freezes foundational plane separation, not a production playback state machine.
 
 Do not use old type names or formal variables to close new architecture questions automatically.
 
@@ -44,7 +44,7 @@ Do not use old type names or formal variables to close new architecture question
 
 # Current playback foundation
 
-The current proposal separates four reasoning lenses — Composition, Execution/Control, Fact, Realtime Data — summarized in `architecture/overview.md` and frozen normatively in `adr/ADR-PBK-001.md` §1–§2. Do not restate the constitution normatively here.
+The accepted foundations separate four reasoning lenses — Composition, Execution/Control, Fact, Realtime Data — summarized in `architecture/overview.md` and frozen normatively in `adr/ADR-PBK-001.md` §1–§2. Do not restate the constitution normatively here.
 
 ---
 
@@ -81,7 +81,7 @@ Do not make an ordinary architecture reviewer preload them as if they were curre
 
 K0 remains implemented/current and domain-agnostic.
 
-When reading `architecture/composition-kernel.md`, generic K0 semantics remain authoritative. Any old playback-specific examples or references to the previously accepted playback state model are illustrative/history only while ARCH-003 is reopened.
+When reading `architecture/composition-kernel.md`, generic K0 semantics remain authoritative. Any old playback-specific examples or references to the previously accepted playback state model are illustrative/history only; the accepted ARCH-003 foundations do not re-freeze them.
 
 If generic K0 semantics and the reset ADR appear to conflict, identify the exact generic invariant first; do not silently import an old playback-specific conclusion from a K0 document.
 

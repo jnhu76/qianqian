@@ -53,13 +53,15 @@ architectures:
   - id: ARCH-003
     name: Playback Foundations
     version: 2
-    status: NEXT
+    status: CURRENT
 
-    # Playback authority has been reopened. The v2 diagram and ADR are proposed,
-    # not yet frozen/accepted production authority. ADR status: PROPOSED / REOPENED.
+    # Playback Foundations accepted via ADR-PBK-001 (PR #87). The accepted
+    # foundations fix plane boundaries and contracts only; they deliberately
+    # do not re-freeze legacy playback state-model nouns, and old playback
+    # code/specs remain experimental evidence only.
     diagram:
       source: docs/architecture/diagrams/ARCH-003-playback-foundations-v2.mmd
-      frozen: false
+      frozen: true
 
     authority:
       - docs/adr/ADR-PBK-001.md
@@ -68,6 +70,7 @@ architectures:
     decisions:
       - issue: 53
       - pr: 66
+      - pr: 87
 
     implementation: []
 

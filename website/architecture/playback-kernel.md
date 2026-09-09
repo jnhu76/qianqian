@@ -9,7 +9,7 @@ status: HISTORICAL_EVIDENCE
 
 > **STATUS: HISTORICAL / EXPERIMENTAL EVIDENCE**
 >
-> 本页描述的 `MusicComponent` / `MusicKernel` / `TransportKernel` / `TrackSession` / `DecodeSession` / Generation / Dual Window / Physical Fence 模型来自旧 Playback 架构实验（含其短暂 ACCEPTED 的旧版 ADR 修订）。2026-09 播放架构从第一性原理重置后，这些内容**不再是 current authority**，也不是新 Playback 设计的 acceptance gate。当前 Playback Foundations 提案：`docs/adr/ADR-PBK-001.md`（**PROPOSED / REOPENED**）。本页保留作为面向阅读的历史解释层与 failure-witness 索引。
+> 本页描述的 `MusicComponent` / `MusicKernel` / `TransportKernel` / `TrackSession` / `DecodeSession` / Generation / Dual Window / Physical Fence 模型来自旧 Playback 架构实验（含其短暂 ACCEPTED 的旧版 ADR 修订）。2026-09 播放架构从第一性原理重置后，这些内容**不再是 current authority**，也不是新 Playback 设计的 acceptance gate。当前 Playback Foundations authority：`docs/adr/ADR-PBK-001.md`（**ACCEPTED**，不冻结播放状态机名词）。本页保留作为面向阅读的历史解释层与 failure-witness 索引。
 
 以下为历史内容（原样保留，仅状态降级）：
 

@@ -2,7 +2,7 @@
 
 This document is the repository-local semantic overview for Qianqian Architecture v2.
 
-Generic composition semantics live in `composition-kernel.md` and the K0 design/implementation authorities. Playback architecture is currently **reopened**; `../adr/ADR-PBK-001.md` is a new PROPOSED foundation, not an accepted production state machine.
+Generic composition semantics live in `composition-kernel.md` and the K0 design/implementation authorities. Playback Foundations are **accepted** (`../adr/ADR-PBK-001.md`); they fix plane boundaries and contracts, not a production playback state machine or its vocabulary.
 
 The current architecture intentionally separates composition, execution/control, committed facts, and realtime data flow.
 
@@ -257,7 +257,7 @@ qianqian-headless
 
 The Base Kernel K0 is current.
 
-Playback-specific code is research evidence and may be changed/removed without compatibility obligation while the reset ADR remains PROPOSED.
+Playback-specific code is research evidence and may be changed/removed without compatibility obligation; the accepted foundations deliberately do not re-freeze legacy playback nouns.
 
 ---
 
@@ -270,7 +270,7 @@ Generic composition
     docs/architecture/composition-kernel.md
 
 Playback foundations
-    docs/adr/ADR-PBK-001.md — PROPOSED / REOPENED
+    docs/adr/ADR-PBK-001.md — ACCEPTED
     docs/architecture/overview.md
 
 Experimental playback evidence

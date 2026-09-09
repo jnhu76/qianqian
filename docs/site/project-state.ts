@@ -25,15 +25,15 @@ export interface ProjectState {
 }
 
 export const projectState: ProjectState = {
-  currentFrontier: 'Playback Foundations reset — ADR-PBK-001 PROPOSED / REOPENED, awaiting fresh-context review and acceptance gates',
-  lastMilestone: 'Playback foundations reset proposed; old playback authority demoted to experimental evidence',
+  currentFrontier: 'Playback Foundations accepted (ADR-PBK-001); next: minimal PCM contract experiments under the accepted foundations',
+  lastMilestone: 'Playback Foundations accepted after fresh-context adversarial review; legacy playback authority stays experimental evidence',
 
   layers: {
     playbackReference: 'HISTORICAL_EVIDENCE',
     ffmpegResearch: 'HISTORICAL_EVIDENCE',
     componentBoundary: 'HISTORICAL_EVIDENCE',
     baseKernel: 'IMPLEMENTED',
-    playbackArchitecture: 'NEXT',
+    playbackArchitecture: 'CURRENT',
     decoder: 'PLANNED',
     processing: 'PLANNED',
     audioOutput: 'PLANNED',
@@ -41,8 +41,8 @@ export const projectState: ProjectState = {
   },
 
   nextQuestions: [
-    'ADR-PBK-001（PROPOSED）何时、以哪些 executable evidence 通过 §14 acceptance gates G1–G7？',
-    'reset 之后哪些 minimal PCM / direct-flow / graph-publication 实验先挣得第一批边界？',
+    'minimal PCM contract 实验最少需要哪些字段/语义边界（PcmBlock format/frames/time/provenance）？',
+    '哪些 direct-flow / graph-publication 实验先挣得第一批 realtime 边界？',
     'tree-wide surfaces 是否仍把旧 playback 模型当 current authority（应为 experimental evidence only）？',
   ],
 }

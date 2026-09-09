@@ -21,7 +21,7 @@ import { projectState } from '../data/project-state.ts'
 | FFmpeg 闭包研究 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Decoder/Processing 共用单一 closure authority 的历史证据 |
 | 组件边界 A0 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | #53 历史审计保留；其 playback-specific 结论是历史证据，不是 current authority |
 | Base / Composition Kernel K0 | <StatusBadge status="IMPLEMENTED" /> | Context / Capability / Fiber / Effect / Reconcile 已实现 |
-| Playback Foundations | <StatusBadge status="NEXT" /> | 播放架构已重开：ADR-PBK-001 为 PROPOSED / REOPENED；旧 playback 模型是 experimental evidence；等待 fresh-context review 与 acceptance gates |
+| Playback Foundations | <StatusBadge status="CURRENT" /> | 播放基础已接受（ADR-PBK-001 ACCEPTED）；旧 playback 模型仍是 experimental evidence；production 播放语义仍需实验挣得 |
 | Decoder provider | <StatusBadge status="PLANNED" /> | capability seam 已有；真实 provider 实现未授权于本轮 |
 | Audio Processing | <StatusBadge status="PLANNED" /> | ordered PCM graph；普通 DSP node 不自动成为 plugin |
 | AudioOutput provider | <StatusBadge status="PLANNED" /> | capability seam 已有；真实设备实现未授权于本轮 |
@@ -33,7 +33,7 @@ import { projectState } from '../data/project-state.ts'
 
 **{{ projectState.currentFrontier }}**
 
-旧版 ADR-PBK-001（MusicComponent / MusicKernel / TransportKernel 模型）及其 deterministic executable temporal core 已随 2026-09 架构重置降级为 experimental evidence。当前目标是让重置后的 Playback Foundations 提案（PROPOSED）通过 fresh-context review，再用最小实验挣得新基础：
+旧版 ADR-PBK-001（MusicComponent / MusicKernel / TransportKernel 模型）及其 deterministic executable temporal core 已随 2026-09 架构重置降级为 experimental evidence。重置后的 Playback Foundations 提案已通过 fresh-context review 并被接受（ACCEPTED）；当前目标是用最小实验挣得新基础：
 
 - composition reality 之上的 minimal PCM contract；
 - direct Source → processing → Sink 数据流；
@@ -56,7 +56,7 @@ logical invalidation != physical stop
 Composition Graph != Audio Processing Graph
 ```
 
-这些是旧实验的可复用 failure witnesses / 测试技术；重置后它们**不是**实现者必须遵守的已冻结边界，也不得仅因旧代码存在而自动成为新设计前提。是否重新挣得其中某条边界，由 `docs/adr/ADR-PBK-001.md`（PROPOSED）之后的真实实验决定。
+这些是旧实验的可复用 failure witnesses / 测试技术；重置后它们**不是**实现者必须遵守的已冻结边界，也不得仅因旧代码存在而自动成为新设计前提。是否重新挣得其中某条边界，由 `docs/adr/ADR-PBK-001.md`（ACCEPTED）之下的真实实验决定。
 
 ---
 
