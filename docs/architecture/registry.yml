@@ -51,19 +51,19 @@ architectures:
       - crates/qianqian-kernel/tests
 
   - id: ARCH-003
-    name: Playback Kernel
+    name: Playback Architecture
     version: 1
-    status: NEXT
+    status: CURRENT
 
     diagram:
       source: docs/architecture/diagrams/ARCH-003-playback-kernel-v1.mmd
       frozen: true
 
     authority:
-      # Registered ARCH-003 authority is NOT yet migrated. ADR-PBK-001 is the
-      # PROPOSED / FORMAL CORE PASS replacement candidate; registry authority
-      # moves only after human ACCEPTED. Transition explained in docs/README.md.
-      - docs/architecture/component-boundary-a0.md
+      # ADR-PBK-001 passed its blocking formal core and was accepted on
+      # 2026-09-09. It is now the registered playback-specific authority;
+      # component-boundary-a0.md remains historical #53 evidence.
+      - docs/adr/ADR-PBK-001.md
       - docs/architecture/overview.md
 
     decisions:
