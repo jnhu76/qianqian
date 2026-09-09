@@ -625,7 +625,10 @@ impl TransportKernel {
             return Err("producer already terminal");
         }
         session.position = session.position.max(span.end);
-        session.accepted_frames += frames;
+        session.accepted_frames = session
+            .accepted_frames
+            .checked_add(frames)
+            .ok_or("decode accounting overflow")?;
         let advanced_to = session.position;
         // First admitted decode evidence completes prepared-window priming.
         if let Some(prepared) = self.prepared.as_mut()
@@ -657,12 +660,18 @@ impl TransportKernel {
         }
         let session = self
             .find_session_mut(generation)
-            .ok_or("generation with a window role has a decode session")?;
+            .ok_or("admitted active generation lost its decode session")?;
         if session.accepted_frames < session.submitted_frames.saturating_add(frames) {
             return Err("submission exceeds its admitted decode backing");
         }
-        session.submitted_frames += frames;
-        session.queued_frames += frames;
+        session.submitted_frames = session
+            .submitted_frames
+            .checked_add(frames)
+            .ok_or("submission accounting overflow")?;
+        session.queued_frames = session
+            .queued_frames
+            .checked_add(frames)
+            .ok_or("submission accounting overflow")?;
         self.invalidate_drained_truth();
         Ok(())
     }
@@ -684,7 +693,10 @@ impl TransportKernel {
             return Err("cannot render media that was never submitted");
         }
         session.queued_frames -= frames;
-        session.rendered_frames += frames;
+        session.rendered_frames = session
+            .rendered_frames
+            .checked_add(frames)
+            .ok_or("render accounting overflow")?;
         self.publish_drained_if_reached();
         Ok(())
     }
