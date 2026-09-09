@@ -12,15 +12,16 @@ Load only the documentation needed for the current task. Historical material is 
 | Generic component/plugin/composition semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — closed #53 evidence; its playback-specific ownership conclusions are historical inputs superseded by accepted `adr/ADR-PBK-001` semantics (see the transition note inside that file) |
 | Composition Kernel representation decisions | `architecture/composition-kernel-0-implementation-adr.md` |
-| Playback authority / timeline / media session / PCM boundaries (ARCH-003) | `adr/ADR-PBK-001.md` (**ACCEPTED**; registered playback-specific ARCH-003 authority; no FFmpeg/WASAPI production implementation implied) |
+| Playback authority / timeline / media session / PCM boundaries (ARCH-003) | `adr/ADR-PBK-001.md` (**ACCEPTED**; registered playback-specific ARCH-003 authority) |
+| Proposed plugin-composed audio data-plane corrective | `adr/ADR-PBK-002.md` (**PROPOSED**) + `architecture/plugin-composed-audio-data-plane.md`; read only when reviewing/implementing this corrective — it does not become registered authority until acceptance |
 | Playback formal evidence | `../specs/README.md` + `../specs/playback/README.md` |
 | Product introduction / repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | Rust workspace/build/test | Current `Cargo.toml` / crate manifests / CI |
 | Music/product semantics | `adr/ADR-PBK-001.md` + current `qianqian-core::music` code/tests |
 | Playback temporal semantics | `adr/ADR-PBK-001.md` + current `qianqian-core::transport` code/tests + playback specs when state-collision evidence is needed |
-| Decoder / Processing / AudioOutput | `adr/ADR-PBK-001.md` + `architecture/overview.md`; generic Composition Kernel never owns media payload contracts |
-| Realtime audio path | `adr/ADR-PBK-001.md` + `architecture/overview.md`; PCM stays off Context/event routing |
+| Decoder / Processing / AudioOutput current authority | `adr/ADR-PBK-001.md` + `architecture/overview.md`; if the task explicitly reviews the proposed plugin-composed corrective, also load `adr/ADR-PBK-002.md` + `architecture/plugin-composed-audio-data-plane.md` |
+| Realtime audio path current authority | `adr/ADR-PBK-001.md` + `architecture/overview.md`; PCM stays off Context/event routing. Proposed plugin-composed direct-flow semantics are opt-in via `ADR-PBK-002` until accepted |
 | UiHost / presentation | `architecture/overview.md` + current presentation contract |
 | Historical playback evidence | git tag `playback-reference-v1` (also branch `research/playback-reference-v1`); not present in the working tree — inspect via `git show playback-reference-v1:<path>` |
 | Pre-Rust repository history | git tag `pre-rust-v2` (also branch `archive/pre-rust-v2`); not present in the working tree — inspect via `git show pre-rust-v2:<path>` |
@@ -36,13 +37,16 @@ current architecture             -> docs/architecture/overview.md
 generic composition semantics    -> docs/architecture/composition-kernel*.md
 historical boundary evidence     -> docs/architecture/component-boundary-a0.md
 registered ARCH-003 authority    -> docs/adr/ADR-PBK-001.md (ACCEPTED)
+proposed data-plane corrective   -> docs/adr/ADR-PBK-002.md (PROPOSED; not registered authority)
 playback formal evidence         -> specs/playback/*
 implemented behavior             -> code + tests + current contracts
 historical experimental fact     -> preserved reference/history
 current task scope               -> current issue/task
 ```
 
-`ADR-PBK-001` is the registered playback-specific ARCH-003 authority after passing the blocking formal core and receiving human acceptance on 2026-09-09. `component-boundary-a0.md` remains historical #53 evidence; its conflicting playback-specific ownership/granularity conclusions must not be combined with the accepted ADR in new implementation. The accepted transition covers MusicKernel vs TransportKernel authority, TrackSession/DecodeSession structure, Dual Window, Generation admission, and Physical Fence semantics.
+`ADR-PBK-001` remains the registered playback-specific ARCH-003 authority after passing the blocking formal core and receiving human acceptance on 2026-09-09. `ADR-PBK-002` is a proposed amendment that would change only the Audio Data Plane plugin/composition granularity if accepted; while it is PROPOSED, ordinary implementation/review must not silently treat it as current authority.
+
+`component-boundary-a0.md` remains historical #53 evidence; its conflicting playback-specific ownership/granularity conclusions must not be combined with the accepted ADR in new implementation. The accepted transition covers MusicKernel vs TransportKernel authority, TrackSession/DecodeSession structure, Dual Window, Generation admission, and Physical Fence semantics.
 
 When documentation and implementation disagree, do not silently choose one. Identify the drift source and correct only the authority that is stale.
 
@@ -69,6 +73,35 @@ MusicComponent
 Active/Prepared are temporal roles inside `TransportKernel`, not independent plugins or standalone lifetime resources.
 
 Raw playback evidence such as Decoder EOF, late decode, submitted/rendered evidence, seek landing, and Physical Fence verdict is interpreted by `TransportKernel`; `MusicKernel` receives derived domain facts and decides product behavior.
+
+## Proposed plugin-composed audio data plane
+
+When — and only when — the task explicitly reviews `ADR-PBK-002`, use this target model:
+
+```text
+Composition Kernel
+    -> creates/binds/withdraws durable Audio Data Plane Plugin/Fiber participants
+
+ProcessingTopologyAuthority
+    -> defines ordered PCM edges and publishes a pre-bound RT graph
+
+PCM
+    -> flows directly between those already-bound plugin instances
+    -> never re-enters Context/Reconcile/generic dispatch per block
+```
+
+The proposal keeps `PcmBlock`, `MediaSpan`, `TrackSession`, `DecodeSession`, Generation/Window/Fence state as data/nested runtime resources rather than Plugins.
+
+The proposal also adds a new lifecycle requirement for RT data-plane participants:
+
+```text
+provider withdrawal
+    -> publish graph without provider
+    -> wait old graph readers/references quiesce
+    -> only then final-release provider
+```
+
+This is a **PROPOSED** corrective until its boundary/formal gates pass.
 
 ## Architecture design order
 
@@ -130,7 +163,9 @@ Formalization is risk-driven.
 
 > **TLA+ is used to find state collisions, not to model every architectural noun.**
 
-For Playback, the blocking core is deliberately small: Dual Window, Generation admission, Physical Fence, submitted/rendered accounting, and EOF/drained/ENDED terminalization. Ownership models and additional mutations are supporting evidence unless they expose a real architecture contradiction.
+For Playback, the blocking temporal core is deliberately small: Dual Window, Generation admission, Physical Fence, submitted/rendered accounting, and EOF/drained/ENDED terminalization. Ownership models and additional mutations are supporting evidence unless they expose a real architecture contradiction.
+
+`ADR-PBK-002` proposes one new formal escalation only for a confirmed high-risk lifecycle interleaving: **data-plane plugin final release vs still-published RT graph readers/references**. It does not authorize a complete formal model of DSP ordering.
 
 ## Documentation growth rule
 
