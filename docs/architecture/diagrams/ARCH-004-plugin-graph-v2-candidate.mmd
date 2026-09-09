@@ -1,0 +1,54 @@
+flowchart LR
+  subgraph CP[Control / Composition Plane]
+    CK[Composition Kernel]
+    MC[MusicComponent\nPlugin/Fiber]
+    DP[Decoder Plugin]
+    SP[SRC Plugin]
+    GP[Gain Plugin]
+    EP[EQ Plugin]
+    AP[Analyzer Plugin]
+    OP[AudioOutput Plugin]
+    PTA[Processing Topology Authority]
+
+    CK --> MC
+    CK --> DP
+    CK --> SP
+    CK --> GP
+    CK --> EP
+    CK --> AP
+    CK --> OP
+
+    MC -. product/temporal control .-> DP
+    MC -. product/temporal control .-> OP
+    PTA -. builds/publishes direct PCM graph .-> DP
+    PTA -. builds/publishes direct PCM graph .-> SP
+    PTA -. builds/publishes direct PCM graph .-> GP
+    PTA -. builds/publishes direct PCM graph .-> EP
+    PTA -. builds/publishes direct PCM graph .-> AP
+    PTA -. builds/publishes direct PCM graph .-> OP
+  end
+
+  subgraph DPTH[Direct-flow PCM Data Plane]
+    DPE[Decoder endpoint]
+    SPE[SRC endpoint]
+    GPE[Gain endpoint]
+    EPE[EQ endpoint]
+    APE[Analyzer endpoint]
+    OPE[AudioOutput endpoint]
+
+    DPE -->|PCM + MediaSpan + provenance| SPE
+    SPE -->|PCM| GPE
+    GPE -->|PCM| EPE
+    EPE -->|PCM| OPE
+    EPE -->|PCM tap| APE
+  end
+
+  DP -. pre-bound endpoint .-> DPE
+  SP -. pre-bound endpoint .-> SPE
+  GP -. pre-bound endpoint .-> GPE
+  EP -. pre-bound endpoint .-> EPE
+  AP -. pre-bound endpoint .-> APE
+  OP -. pre-bound endpoint .-> OPE
+
+  NOTE1[Composition builds/lifetimes participants\nRealtime executes pre-bound graph]
+  CK --- NOTE1
