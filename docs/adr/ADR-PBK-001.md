@@ -558,30 +558,33 @@ hazard
 
 （资源层面的 invariant；**不**冻结 “Provider Fiber lifetime == RT resource lifetime”。）
 
-最小顺序：
+最小顺序（resource 级语义；不包含 Provider Fiber 自身的退出时机）：
 
 ```text
-provider/node withdrawal requested
+withdrawal / replacement requested
         ↓
-exclude from future graph construction
+exclude old participant/resource from future published realtime views
         ↓
-Realtime-view publication of replacement graph/view
+Realtime-view publication of replacement view
         ↓
-old realtime readers/quanta stop entering old graph
+old realtime executions stop newly entering the retired view
         ↓
-old readers/queued references quiesce
+old realtime executions / queued references quiesce
         ↓
-release old graph references
+release old realtime-view references
         ↓
-provider/resource final release
+resources no longer dereferenceable by realtime execution
+become eligible for release
 ```
+
+（顺序终点是 resource 相对 realtime 执行获得 release 资格；**不是** "provider final release"。Provider Fiber 何时退出、是否与 resource release 同步，不由本 invariant 决定。）
 
 继续 OPEN（不由本 invariant 决定）：
 
 ```text
-Provider Fiber 本身是否保持 alive
-RT view 是否持有 lease
-state slab 是否 outlive provider
+Provider Fiber completion 相对 resource release 的时机
+RT view / resource 是否需要 lease（lease 语义本身 OPEN，不在此设计）
+state slab 的 lifetime
 Arc / epoch / RCU / hazard pointer / refcount / callback fence
 reader-quiescence 的具体机制
 ```

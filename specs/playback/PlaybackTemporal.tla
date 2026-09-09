@@ -1,7 +1,18 @@
 (*
- * PlaybackTemporal — 播放时间轴语义的形式化模型
+ * PlaybackTemporal — historical experimental playback model
+ *                     （播放时间轴语义的形式化模型）
  *
- * 被审计对象：docs/adr/ADR-PBK-001.md（Playback Architecture）中的 temporal 语义。
+ * STATUS:
+ *   EXPERIMENTAL / FORMAL EVIDENCE ONLY
+ *
+ *   本模型保存早期 Playback architecture 实验的 failure witnesses 与
+ *   verification techniques。其 MusicKernel / TransportKernel / Window /
+ *   Generation / Fence 词汇不是当前 Playback architecture authority，
+ *   不约束新的 production 设计，除非该语义被独立重新挣得。
+ *   当前 Playback Foundations 提案：docs/adr/ADR-PBK-001.md（PROPOSED / REOPENED）。
+ *
+ * 被审计对象（历史）：旧版 docs/adr/ADR-PBK-001.md（Playback Architecture v1）
+ * 中的 temporal 语义。
  *
  * 本模型只描述 temporal truth，不模拟 PCM sample、ring buffer、WASAPI 细节：
  *   - Window（ActiveWindow / PreparedWindow）
@@ -16,7 +27,7 @@
  *   - rapid command supersede（seek/seek/next/stop 与 decode/fence/render 的交错）
  *   - Decoder provider withdrawal 的轻量交互（完整 withdrawal 顺序在 PlaybackOwnership 模型）
  *
- * 角色（ADR 冻结）：
+ * 角色（旧版 ADR v1 的模型内分工；本模型整体为 experimental evidence）：
  *   MusicKernel     = music-domain semantic authority（intent 解释、ENDED 产品语义）
  *   TransportKernel = playback temporal authority（cursor、window role、admission、
  *                     fence、raw playback evidence 解释）
@@ -199,7 +210,7 @@ Play ==
 (* =====================================================================
  * TransportKernel：discontinuity prepare 与 supersede authority
  *
- * seek 与 next 共用同一 execution skeleton（ADR 冻结）：
+ * seek 与 next 共用同一 execution skeleton（旧版 ADR 冻结）：
  * 若已有 PreparedWindow，新 intent 原子 supersede 它（关闭 admission、retire、
  * 由 CloseRetiredDecodeSession 回收 session），再创建新 PreparedWindow。
  * TransportKernel 是 pending discontinuity 的唯一 supersede/cancel/replace authority。
@@ -230,7 +241,7 @@ PrepareDiscontinuity ==
                    ended, decoderWithdrawn>>
 
 (* intent 两种形态：同 TrackSession seek 与 Track Replacement next。
- * 在本抽象层两者共享同一 execution skeleton（ADR 冻结），TrackSession 维度的
+ * 在本抽象层两者共享同一 execution skeleton（旧版 ADR 冻结），TrackSession 维度的
  * 区分由 PlaybackOwnership 模型覆盖，这里保留两个入口动作以区分 intent 语义。 *)
 RequestSeek == PrepareDiscontinuity
 RequestNext == PrepareDiscontinuity
@@ -340,7 +351,7 @@ DropUnprimablePrepared ==
 (* =====================================================================
  * TransportKernel：admission 关闭与 Physical Fence
  *
- * 骨架（ADR 冻结）：prime -> close old admission -> physical fence -> promote -> retire。
+ * 骨架（旧版 ADR 冻结）：prime -> close old admission -> physical fence -> promote -> retire。
  * close old admission 后，old generation 的新 decode result 被 LateDecodeResult 拒绝；
  * 已提交媒体留在设备队列中，直到 fence 成功 verdict 原子冲刷（CompleteFence）。
  * Generation 不能替代 Physical Fence；fence 失败不得伪装成功 promotion。

@@ -78,10 +78,10 @@ impl MusicKernel {
     /// product meaning of the superseded state is carried by whatever
     /// superseded it (new episode, promotion, stop).
     ///
-    /// Stage-1 product policy: a natural drain means the media ENDED; a
-    /// completed stop fence means stopped (a distinct interpretation,
-    /// expressed as Idle rather than Ended); an abandoned pre-ready
-    /// prepared contribution leaves product state untouched.
+    /// Terminal-state interpretation policy: a natural drain means the
+    /// media ENDED; a completed stop fence means stopped (a distinct
+    /// interpretation, expressed as Idle rather than Ended); an abandoned
+    /// pre-ready prepared contribution leaves product state untouched.
     pub fn observe(&mut self, fact: StampedFact, current: FactRevision) {
         if fact.revision != current {
             self.stale_facts_dropped += 1;

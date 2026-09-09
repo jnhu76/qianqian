@@ -1262,15 +1262,15 @@ fn consumed_verdict_can_complete_natural_drain() {
     assert_eq!(music.state(), PlaybackState::Ended);
 }
 
-// --- Stage-1 review corrective regressions ---
+// --- Stranded-decode-backlog regressions (fail/abandon drain reachability) ---
 
 #[test]
 fn abandoned_fence_with_decode_backlog_still_reaches_natural_drain() {
     // The blocking shape: decode 10, submit 5, then a hard cut closes the
     // old admission. The five decoded-but-unsubmitted frames can never be
-    // submitted, and before the corrective the drain predicate
-    // (accepted == submitted) could never hold again — a permanently
-    // undrainable pipeline after fail/abandon.
+    // submitted, and without the discard-on-admission-close rule the drain
+    // predicate (accepted == submitted) could never hold again — a
+    // permanently undrainable pipeline after fail/abandon.
     let mut transport = TransportKernel::new();
     let mut music = MusicKernel::new();
     let mut media = Media::new();
