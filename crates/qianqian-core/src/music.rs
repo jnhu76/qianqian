@@ -20,6 +20,26 @@ pub enum PlaybackState {
     Ended,
 }
 
+/// Typed derived facts TransportKernel hands to MusicKernel.
+///
+/// Raw playback evidence (decode results, EOF, submitted/rendered media,
+/// fence verdicts) is interpreted exactly once by TransportKernel;
+/// MusicKernel only ever sees these derived facts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TransportFact {
+    /// The transport reached natural drain: producer terminal, no
+    /// in-flight media, no submitted-but-unrendered media, no fence in
+    /// flight. Product meaning (ENDED/repeat/next) is MusicKernel's call.
+    NaturallyDrained,
+    /// A terminal stop fence completed: the transport holds no active
+    /// window. Stopped is a different product interpretation than ENDED.
+    Stopped,
+    /// A prepared contribution terminated before readiness (for example
+    /// a decoder EOF before priming) and was dropped with this explicit
+    /// outcome; it never silently became ready.
+    PreparedAbandonedBeforeReadiness,
+}
+
 /// Authority for music-domain and product semantics.
 #[derive(Debug, Default)]
 pub struct MusicKernel {
