@@ -1,0 +1,160 @@
+schema_version: 1
+
+checkpoint:
+  seeded_at: 2026-09-09
+  last_incremental_scan: 2026-09-09
+  default_overlap_days: 7
+
+source_status:
+  - NEW
+  - TRIAGED
+  - ABSORBED
+  - DUPLICATE_EVIDENCE
+  - WATCH
+  - REJECTED
+  - SUPERSEDED
+
+sources:
+  - key: deepseek-ai/deepseek-harness/discussion#3400
+    source_date: 2026-08-19
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: ABSORBED
+    families: [EF-01]
+    note: cancel accepted does not prove tool/child/process quiescence
+
+  - key: deepseek-ai/deepseek-harness/discussion#3033
+    source_date: 2026-08-18
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: ABSORBED
+    families: [EF-02, EF-04]
+    note: duplicate core-module identity breaks dispatch and can leave a dangling protocol obligation
+
+  - key: deepseek-ai/deepseek-harness/discussion#2078
+    source_date: 2026-08-15
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: DUPLICATE_EVIDENCE
+    families: [EF-04]
+    note: independent duplicate module-local identity report
+
+  - key: deepseek-ai/deepseek-harness/discussion#4640
+    source_date: 2026-08-26
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: DUPLICATE_EVIDENCE
+    families: [EF-02, EF-04]
+    note: duplicate-package identity failure plus session poisoning
+
+  - key: deepseek-ai/deepseek-harness/discussion#3708
+    source_date: 2026-08-20
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: ABSORBED
+    families: [EF-02]
+    note: persisted tool/call without terminal tool/result poisons later turns
+
+  - key: deepseek-ai/deepseek-harness/discussion#3524
+    source_date: 2026-08-20
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: DUPLICATE_EVIDENCE
+    families: [EF-02]
+    note: prepare failure leaves unmatched tool calls
+
+  - key: deepseek-ai/deepseek-harness/discussion#5164
+    source_date: 2026-08-31
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: ABSORBED
+    families: [EF-02, EF-06, EF-08]
+    note: dead child leaks orphan protocol state across parent/provider boundary
+
+  - key: deepseek-ai/deepseek-harness/discussion#5182
+    source_date: 2026-08-31
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: ABSORBED
+    families: [EF-07]
+    note: malformed empty-id tool call becomes durable poison on replay
+
+  - key: deepseek-ai/deepseek-harness/discussion#466
+    source_date: 2026-08-13
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: ABSORBED
+    families: [EF-03]
+    note: clean durable EOF after crash disagrees with live-agent reality
+
+  - key: deepseek-ai/deepseek-harness/discussion#478
+    source_date: 2026-08-13
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: ABSORBED
+    families: [EF-03, EF-06]
+    note: force-killed child sessions become orphaned yet can appear completed
+
+  - key: deepseek-ai/deepseek-harness/discussion#1610
+    source_date: 2026-08-14
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: ABSORBED
+    families: [EF-04]
+    note: hot replacement activates while old registration/module cache remains live
+
+  - key: deepseek-ai/deepseek-harness/discussion#5106
+    source_date: 2026-08-30
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: ABSORBED
+    families: [EF-05]
+    note: one plugin activation failure takes down unrelated plugin loading
+
+  - key: deepseek-ai/deepseek-harness/discussion#2603
+    source_date: 2026-08-17
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: DUPLICATE_EVIDENCE
+    families: [EF-05]
+    note: independent plugin-load blast-radius report
+
+  - key: deepseek-ai/deepseek-harness/discussion#840
+    source_date: 2026-08-14
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: DUPLICATE_EVIDENCE
+    families: [EF-05]
+    note: broken install accepted and later kills host boot
+
+  - key: deepseek-ai/deepseek-harness/discussion#3154
+    source_date: 2026-08-18
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: DUPLICATE_EVIDENCE
+    families: [EF-05, EF-07]
+    note: unbuilt plugin accepted into configuration then fails plugin-tree boot
+
+  - key: deepseek-ai/deepseek-harness/discussion#2229
+    source_date: 2026-08-16
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: DUPLICATE_EVIDENCE
+    families: [EF-05]
+    note: fatal plugin state has no safe in-product recovery path
+
+  - key: deepseek-ai/deepseek-harness/discussion#4125
+    source_date: 2026-08-23
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: WATCH
+    families: [EF-08]
+    note: stale inherited route is a useful freshness analogue but has no direct Qianqian action yet
+
+  - key: deepseek-ai/deepseek-harness/discussion#5322
+    source_date: 2026-09-01
+    first_seen: 2026-09-09
+    last_reviewed: 2026-09-09
+    status: REJECTED
+    families: []
+    note: maintainers state the reported package/tool is not part of this repository; retained as a source-validation counterexample
