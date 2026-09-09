@@ -37,6 +37,18 @@
 //!   decisions (decision 5).
 //! * `stopped` and natural `ENDED` are distinct product interpretations of
 //!   transport truth: a completed stop publishes `Stopped`, never ENDED.
+//! * Evidence integrity: decode evidence must carry its own session's
+//!   generation; submissions must be backed by admitted decode evidence;
+//!   empty decode/submit/render evidence is rejected (the frame-count
+//!   translation of the model's block-count guards).
+//! * A consumed verdict flushes queued media and derives drained truth at
+//!   the verdict itself — the predicate is re-checked after every fence
+//!   resolution, not only after decode/render evidence.
+//! * Episode completion during an in-flight promote fence is permitted,
+//!   mirroring the temporal spec (its `PublishEnded` has no fence-idle
+//!   guard; only the stop fence is guarded, via ADR §18). The stale-drain
+//!   exposure of that interleaving is closed by draining-truth
+//!   invalidation, not by blocking the completion.
 //!
 //! If a future implementation pressure moves any of these choices, the
 //! temporal spec must move with it (boundary change = ADR + specs + tests
@@ -310,7 +322,7 @@ impl TransportKernel {
             admission_open: true,
             ready: false,
         });
-        self.transport_drained = false;
+        self.invalidate_drained_truth();
         Ok(EpisodeStarted {
             generation,
             track,
@@ -323,38 +335,42 @@ impl TransportKernel {
     /// generation. A pending prepared contribution is superseded
     /// atomically: TransportKernel is the only supersede authority.
     pub fn seek(&mut self, target: u64) -> Result<PreparedForCut, &'static str> {
-        let active = self.active.as_ref().ok_or("no active episode")?;
-        let track = active.track;
-        let from_position = target;
-        self.prepare_discontinuity(track, from_position)
+        self.ensure_intent_admissible()?;
+        let track = self.active.as_ref().ok_or("no active episode")?.track;
+        self.prepare_discontinuity(track, target)
     }
 
     /// Prepare a track replacement (next): a new TrackSession opens a
     /// decode cursor under a fresh prepared generation.
     pub fn next_track(&mut self, media: MediaId) -> Result<PreparedForCut, &'static str> {
+        self.ensure_intent_admissible()?;
         self.active.as_ref().ok_or("no active episode")?;
         let track = self.open_track(media);
         self.prepare_discontinuity(track, 0)
     }
 
-    /// Shared execution skeleton for seek and next (ADR freezes one
-    /// skeleton): create the prepared window/generation, superseding any
-    /// previous prepared contribution.
-    ///
     /// A stop fence in flight is a terminal cut with the physical state
     /// undecided: new seek/next intents are refused until its verdict
     /// lands (implementation choice inside the ADR's open policy space,
-    /// matching the temporal spec's model decision).
-    fn prepare_discontinuity(
-        &mut self,
-        track: TrackSessionId,
-        start_position: u64,
-    ) -> Result<PreparedForCut, &'static str> {
+    /// matching the temporal spec's model decision). Checked before any
+    /// mutation so a refused intent leaves nothing behind.
+    fn ensure_intent_admissible(&self) -> Result<(), &'static str> {
         if let Some(fence) = &self.fence
             && fence.target.is_none()
         {
             return Err("stop fence in flight; intents wait for the verdict");
         }
+        Ok(())
+    }
+
+    /// Shared execution skeleton for seek and next (ADR freezes one
+    /// skeleton): create the prepared window/generation, superseding any
+    /// previous prepared contribution.
+    fn prepare_discontinuity(
+        &mut self,
+        track: TrackSessionId,
+        start_position: u64,
+    ) -> Result<PreparedForCut, &'static str> {
         let superseded = self.supersede_prepared();
         let generation = self.fresh_generation();
         let decode_session =
@@ -445,7 +461,7 @@ impl TransportKernel {
         }
         let fence = self.fence.take().expect("fence in flight checked above");
         self.flush_queued_media(fence.cut);
-        match fence.target {
+        let outcome = match fence.target {
             Some(target) => {
                 let promotable = self
                     .active
@@ -457,21 +473,26 @@ impl TransportKernel {
                         .is_some_and(|p| p.generation == target);
                 if promotable {
                     self.promote_prepared();
-                    Ok(FenceVerdictOutcome::Promoted {
+                    FenceVerdictOutcome::Promoted {
                         promoted: target,
                         cut: fence.cut,
-                    })
+                    }
                 } else {
                     // The flush physically happened; its promotion target
                     // was superseded. Consume the verdict without promotion.
-                    Ok(FenceVerdictOutcome::VerdictConsumed { cut: fence.cut })
+                    FenceVerdictOutcome::VerdictConsumed { cut: fence.cut }
                 }
             }
             None => {
                 let cut = fence.cut;
-                Ok(self.complete_stop(cut))
+                self.complete_stop(cut)
             }
-        }
+        };
+        // The flush can complete the natural-drain predicate (queued media
+        // of the cut generation is gone); derive drained truth now instead
+        // of waiting for further evidence that may never arrive.
+        self.publish_drained_if_reached();
+        Ok(outcome)
     }
 
     /// Failed fence verdict: the physical flush did not complete. Nothing
@@ -524,7 +545,7 @@ impl TransportKernel {
         // is simply the output authority.
         promoted.ready = false;
         self.active = Some(promoted);
-        self.transport_drained = false;
+        self.invalidate_drained_truth();
         self.release_drained_tracks();
     }
 
@@ -581,6 +602,9 @@ impl TransportKernel {
     ) -> Result<DecodeAdmitted, &'static str> {
         let generation = span.generation;
         let frames = span.frames();
+        if frames == 0 {
+            return Err("empty decode span carries no media");
+        }
         let admitted = self
             .window_of(generation)
             .map(|w| w.admission_open)
@@ -591,6 +615,9 @@ impl TransportKernel {
         let session = self
             .decode_session_mut(session)
             .ok_or("unknown decode session")?;
+        if session.generation != generation {
+            return Err("decode evidence generation does not match its session");
+        }
         if session.closed {
             return Err("decode session closed");
         }
@@ -610,12 +637,17 @@ impl TransportKernel {
     }
 
     /// Ingest submitted-media evidence from the output path. Only the
-    /// active generation with open admission may submit.
+    /// active generation with open admission may submit, and every
+    /// submission must be backed by decode evidence accepted under that
+    /// admission.
     pub fn media_submitted(
         &mut self,
         generation: GenerationId,
         frames: u64,
     ) -> Result<(), &'static str> {
+        if frames == 0 {
+            return Err("empty submission carries no media");
+        }
         let is_admitted_active = self
             .active
             .as_ref()
@@ -623,20 +655,31 @@ impl TransportKernel {
         if !is_admitted_active {
             return Err("only the admitted active generation may submit media");
         }
-        let session = self.session_of_mut(generation);
+        let session = self
+            .find_session_mut(generation)
+            .ok_or("generation with a window role has a decode session")?;
+        if session.accepted_frames < session.submitted_frames.saturating_add(frames) {
+            return Err("submission exceeds its admitted decode backing");
+        }
         session.submitted_frames += frames;
         session.queued_frames += frames;
-        self.transport_drained = false;
+        self.invalidate_drained_truth();
         Ok(())
     }
 
-    /// Ingest rendered-media evidence from the device.
+    /// Ingest rendered-media evidence from the device. Rendering media of a
+    /// released or unknown generation is rejected evidence, not a panic.
     pub fn media_rendered(
         &mut self,
         generation: GenerationId,
         frames: u64,
     ) -> Result<(), &'static str> {
-        let session = self.session_of_mut(generation);
+        if frames == 0 {
+            return Err("empty render carries no evidence");
+        }
+        let Some(session) = self.find_session_mut(generation) else {
+            return Err("render evidence for a generation without a session");
+        };
         if session.queued_frames < frames {
             return Err("cannot render media that was never submitted");
         }
@@ -691,9 +734,7 @@ impl TransportKernel {
         }
         // The stop negates stale drained truth and withdraws any drained
         // fact MusicKernel has not consumed yet: stop, not ENDED, wins.
-        self.transport_drained = false;
-        self.derived_facts
-            .retain(|f| !matches!(f, TransportFact::NaturallyDrained));
+        self.invalidate_drained_truth();
         match &mut self.fence {
             None => {
                 self.fence = Some(FenceTransaction {
@@ -727,6 +768,16 @@ impl TransportKernel {
         }
         self.release_drained_tracks();
         Ok(())
+    }
+
+    /// Negate the drained truth and withdraw any unconsumed drained fact.
+    /// Every mutation that invalidates drain (new episode, new submission,
+    /// promotion, stop) must call this: a delivered-but-stale drained fact
+    /// would let MusicKernel END an episode that is actually playing.
+    fn invalidate_drained_truth(&mut self) {
+        self.transport_drained = false;
+        self.derived_facts
+            .retain(|f| !matches!(f, TransportFact::NaturallyDrained));
     }
 
     /// Publish transport-drained truth when the natural-drain predicate is
@@ -872,14 +923,6 @@ impl TransportKernel {
             .iter_mut()
             .flat_map(|t| t.decode_sessions.iter_mut())
             .find(|d| d.id == session)
-    }
-
-    fn session_of_mut(&mut self, generation: GenerationId) -> &mut DecodeSession {
-        self.track_sessions
-            .iter_mut()
-            .flat_map(|t| t.decode_sessions.iter_mut())
-            .find(|d| d.generation == generation)
-            .expect("generation with a window role has a decode session")
     }
 
     fn window_state(&self, window: &Window, role: WindowRole) -> WindowState {

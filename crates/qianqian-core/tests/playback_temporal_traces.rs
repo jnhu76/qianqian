@@ -267,6 +267,16 @@ fn prepared_generation_primes_while_active_remains_output_authority() {
 
     let started = transport.play(media.open()).expect("play starts");
     transport
+        .decode_result(
+            started.decode_session,
+            MediaSpan {
+                generation: started.generation,
+                start: 0,
+                end: 100,
+            },
+        )
+        .expect("decode evidence backs the submission");
+    transport
         .media_submitted(started.generation, 100)
         .expect("active generation submits");
 
@@ -996,4 +1006,273 @@ fn retired_generation_can_never_re_enter() {
     );
     assert!(transport.media_submitted(first.generation, 10).is_err());
     let _ = second;
+}
+
+// --- Adversarial-review regressions (Reviewer B blocking findings) ---
+
+#[test]
+fn decode_evidence_must_carry_its_own_session_generation() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let sought = transport.seek(1000).expect("seek prepares");
+
+    // Fake priming: the active session's id with a span claiming the
+    // prepared generation. The admission contract binds evidence to the
+    // generation of the session that produced it — this must be rejected
+    // without priming the prepared window or moving the active cursor.
+    let forged = transport.decode_result(
+        started.decode_session,
+        MediaSpan {
+            generation: sought.generation,
+            start: 1000,
+            end: 1480,
+        },
+    );
+    assert!(
+        forged.is_err(),
+        "evidence generation must match its session"
+    );
+
+    let snapshot = transport.snapshot();
+    assert!(
+        !snapshot.prepared.expect("prepared kept").ready,
+        "no fake priming"
+    );
+    let active = snapshot.active.expect("active kept");
+    assert_eq!(
+        active.decode_position, 0,
+        "active cursor unmoved by forged span"
+    );
+    assert_eq!(active.accepted_frames, 0);
+
+    // The reverse direction (prepared session id, active-generation span)
+    // is equally rejected.
+    let laundered = transport.decode_result(
+        sought.decode_session,
+        MediaSpan {
+            generation: started.generation,
+            start: 0,
+            end: 100,
+        },
+    );
+    assert!(laundered.is_err());
+
+    // Empty spans carry no media and must not prime anything.
+    assert!(
+        transport
+            .decode_result(
+                sought.decode_session,
+                MediaSpan {
+                    generation: sought.generation,
+                    start: 1000,
+                    end: 1000,
+                }
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn stale_drained_facts_are_withdrawn_by_promotion_and_new_episode() {
+    // Promotion invalidates a published drained truth; the unconsumed
+    // drained fact must be withdrawn so ENDED cannot fire while the
+    // promoted generation is playing.
+    let mut transport = TransportKernel::new();
+    let mut music = MusicKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    drain_naturally(&mut transport, started.decode_session, started.generation);
+    assert!(transport.transport_drained());
+
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+    promote(&mut transport);
+    assert!(
+        !transport.transport_drained(),
+        "promotion resets drained truth"
+    );
+
+    music.observe_all(transport.take_derived_facts());
+    assert_ne!(
+        music.state(),
+        PlaybackState::Ended,
+        "withdrawn drained fact must not END the promoted episode"
+    );
+
+    // The replay flow on a fresh transport: natural end completes, a new
+    // episode opens, and no stale drained fact leaks into it either.
+    let mut transport = TransportKernel::new();
+    let mut music = MusicKernel::new();
+    let second = transport.play(media.open()).expect("new episode");
+    drain_naturally(&mut transport, second.decode_session, second.generation);
+    transport
+        .complete_ended_episode()
+        .expect("episode completes");
+    transport.play(media.open()).expect("replay");
+    music.observe_all(transport.take_derived_facts());
+    assert_ne!(
+        music.state(),
+        PlaybackState::Ended,
+        "new episode is not ENDED"
+    );
+}
+
+#[test]
+fn submissions_must_be_backed_by_admitted_decode_evidence() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+
+    // Media cannot appear on the output path without decode evidence
+    // backing it.
+    assert!(
+        transport.media_submitted(started.generation, 10).is_err(),
+        "submission without decode backing is rejected"
+    );
+
+    transport
+        .decode_result(
+            started.decode_session,
+            MediaSpan {
+                generation: started.generation,
+                start: 0,
+                end: 10,
+            },
+        )
+        .expect("decode ten frames");
+    transport
+        .media_submitted(started.generation, 10)
+        .expect("backed submission accepted");
+    assert!(
+        transport.media_submitted(started.generation, 1).is_err(),
+        "submission beyond the decoded backing is rejected"
+    );
+}
+
+#[test]
+fn late_render_evidence_for_released_generation_is_rejected_not_panicking() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    // After a completed stop the old generation's subtree is released; a
+    // trailing device render must be rejected, not panic.
+    let started = transport.play(media.open()).expect("play starts");
+    transport.stop().expect("stop");
+    transport.claim_fence().expect("claim");
+    transport.fence_succeeded().expect("verdict");
+    assert!(transport.media_rendered(started.generation, 1).is_err());
+
+    // Same after a naturally completed episode; empty renders are not
+    // evidence at all.
+    let second = transport.play(media.open()).expect("second episode");
+    drain_naturally(&mut transport, second.decode_session, second.generation);
+    transport.complete_ended_episode().expect("completes");
+    assert!(transport.media_rendered(second.generation, 0).is_err());
+}
+
+#[test]
+fn refused_next_intent_leaves_no_phantom_track_session() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    transport.stop().expect("stop");
+    transport.claim_fence().expect("claim");
+
+    assert!(transport.next_track(media.open()).is_err());
+    let snapshot = transport.snapshot();
+    assert_eq!(
+        snapshot.track_sessions.len(),
+        1,
+        "refused intent must not leave an empty track session behind"
+    );
+    assert_eq!(snapshot.track_sessions[0].id, started.track);
+}
+
+#[test]
+fn consumed_verdict_can_complete_natural_drain() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    // Active media terminal with frames still queued; a cut begins, its
+    // target is superseded mid-flight, and the consumed verdict flushes
+    // the queued remainder — the natural-drain predicate then holds and
+    // must be derived without waiting for further evidence.
+    let started = transport.play(media.open()).expect("play starts");
+    transport
+        .decode_result(
+            started.decode_session,
+            MediaSpan {
+                generation: started.generation,
+                start: 0,
+                end: 10,
+            },
+        )
+        .expect("decode");
+    transport
+        .media_submitted(started.generation, 10)
+        .expect("submit");
+    transport
+        .media_rendered(started.generation, 5)
+        .expect("render half");
+    transport.decoder_eof(started.decode_session).expect("EOF");
+
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+    transport.begin_hard_cut().expect("cut begins");
+    transport.claim_fence().expect("claim");
+    let replacement = transport
+        .next_track(media.open())
+        .expect("supersede target");
+    let _ = replacement;
+
+    let verdict = transport.fence_succeeded().expect("verdict");
+    assert!(matches!(
+        verdict,
+        FenceVerdictOutcome::VerdictConsumed { .. }
+    ));
+    assert!(
+        transport.transport_drained(),
+        "flush-completed drain predicate must be derived at the verdict"
+    );
+
+    let mut music = MusicKernel::new();
+    music.observe_all(transport.take_derived_facts());
+    assert_eq!(music.state(), PlaybackState::Ended);
+}
+
+/// Drive an active session to natural drain: decode, submit, render all
+/// frames, then producer EOF.
+fn drain_naturally(
+    transport: &mut TransportKernel,
+    session: DecodeSessionId,
+    generation: GenerationId,
+) {
+    transport
+        .decode_result(
+            session,
+            MediaSpan {
+                generation,
+                start: 0,
+                end: 10,
+            },
+        )
+        .expect("decode");
+    transport.media_submitted(generation, 10).expect("submit");
+    transport.media_rendered(generation, 10).expect("render");
+    transport.decoder_eof(session).expect("EOF");
 }
