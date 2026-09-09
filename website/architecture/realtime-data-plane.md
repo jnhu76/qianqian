@@ -9,7 +9,7 @@ status: CURRENT
 
 > **Capability Plane != Data Plane。**
 
-本页分两层：**已实现**的 generic control/data-plane 防火墙（Base Kernel K0，PR #71），以及 ADR-PBK-001（**ACCEPTED**）的 **playback mapping**（TransportKernel / Physical Fence / evidence routing）。后者是已接受的架构语义，但尚无可执行实现，不代表真实 PCM playback pipeline 已经实现。
+本页分两层：**已实现**的 generic control/data-plane 防火墙（Base Kernel K0，PR #71），以及 ADR-PBK-001（**PROPOSED / REOPENED**）的 playback 基础提案。后者尚未接受、尚无可执行实现，不代表真实 PCM playback pipeline 已经实现；文中出现的 TransportKernel / Physical Fence 等名词是旧实验证据，不是 current authority。
 
 ---
 
@@ -61,7 +61,7 @@ Composition Kernel 不拥有 PCM、MediaSpan、playback cursor、Window、Genera
 
 ## 播放证据不是通用事件
 
-**Playback mapping（ADR-PBK-001，ACCEPTED）**：AudioOutput 产生的：
+**Playback mapping（历史实验证据；旧版 ADR 修订曾 ACCEPTED，重置后已降级）**：AudioOutput 产生的：
 
 ```text
 submitted evidence
@@ -70,7 +70,7 @@ Physical Fence verdict
 device/output evidence
 ```
 
-属于 playback temporal evidence。已接受的证据路由：
+属于 playback temporal evidence。历史实验中的证据路由：
 
 ```mermaid
 flowchart LR
@@ -78,13 +78,13 @@ flowchart LR
     TK -->|"typed derived fact"| MK["MusicKernel"]
 ```
 
-在该已接受模型中，TransportKernel 是 raw playback evidence 的语义解释者；MusicKernel 不独立重算 rendered cursor 或 EOF/fence 结果。此映射尚未有可执行实现。
+在该历史实验模型中，TransportKernel 是 raw playback evidence 的语义解释者；MusicKernel 不独立重算 rendered cursor 或 EOF/fence 结果。重置后此映射只是 experimental evidence，不是 current authority。
 
 ---
 
 ## Physical truth
 
-**Playback semantics（ADR-PBK-001，ACCEPTED）**：
+**Playback semantics（历史实验证据）**：
 
 ```text
 decoded != queued != submitted != rendered
@@ -106,7 +106,7 @@ MusicComponent 通过 Composition Kernel 获得 AudioOutput/PcmSink capability�
 1. data edge 有明确生命周期与 teardown；
 2. provider final release 之前 dependent 完成必要 teardown；
 3. RT thread 只触碰预先准备好的 bounded state；
-4. raw physical evidence 进入 TransportKernel（已接受映射），而不是全局可写状态袋。
+4. raw physical evidence 进入语义解释者（旧实验映射为 TransportKernel；重置后该映射本身是 OPEN 问题），而不是全局可写状态袋。
 
 ---
 

@@ -1,15 +1,20 @@
-//! Transport Kernel: playback temporal authority.
+//! Transport Kernel: playback temporal authority (experimental evidence).
 //!
 //! `TransportKernel` owns the meaning of playback time: active/prepared
 //! temporal roles, generation admission, discontinuity execution, physical
 //! fence coordination, and interpretation of raw playback evidence
 //! (decode results, decoder EOF, submitted/rendered media, fence verdicts).
 //!
-//! This is the deterministic, mechanism-independent temporal core of the
-//! accepted Playback architecture (ADR-PBK-001): pure state plus
+//! This is a deterministic, mechanism-independent temporal core from an
+//! earlier Playback architecture experiment: pure state plus
 //! evidence-ingestion methods, no threads, no devices, no PCM. Mechanisms
 //! produce evidence; this kernel is the single interpreter of raw playback
 //! evidence. `MusicKernel` receives derived typed facts, never raw evidence.
+//!
+//! **Experimental Playback evidence:** this module originates from an earlier
+//! Playback architecture experiment. Its presence does not establish current
+//! architecture authority or compatibility requirements; Playback
+//! architecture is currently reopened (`docs/adr/ADR-PBK-001.md`, PROPOSED).
 //!
 //! `TransportKernel` is a semantic authority role, not a Composition plugin
 //! boundary. This module does not constitute production Playback

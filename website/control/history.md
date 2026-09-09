@@ -33,7 +33,7 @@ Qianqian Architecture v2 的关键里程碑。
 - 撤回排序:依赖方在提供者最终释放之前完成 teardown
 - FFmpeg 闭包权威:单一共享权威,Decoder/Processing
 
-> #53 中 playback-specific 的 ownership/granularity 结论(如 Music 同时拥有 worker/ring/timeline、拒绝 Transport 拆分)是**历史输入**;`ADR-PBK-001` 现已 ACCEPTED 并完成 registry authority 迁移,本文档中与之冲突的 playback 专属结论对新 Playback 实现已被取代。Generic Composition Kernel 历史结论仍然有效。
+> #53 中 playback-specific 的 ownership/granularity 结论(如 Music 同时拥有 worker/ring/timeline、拒绝 Transport 拆分)是**历史输入**;播放架构已于 2026-09 从第一性原理重开,旧 playback 模型(包括其后短暂 ACCEPTED 的 MusicKernel/TransportKernel 拆分)统一降级为 experimental evidence,均非 current authority。当前提案见 ADR-PBK-001(PROPOSED)。Generic Composition Kernel 历史结论仍然有效。
 
 [阅读审计 →](https://github.com/jnhu76/qianqian/issues/53)
 [PR #66 已合并](https://github.com/jnhu76/qianqian/pull/66)

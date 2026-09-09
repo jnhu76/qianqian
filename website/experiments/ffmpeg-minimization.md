@@ -152,7 +152,7 @@ Decoder 与 Processing 共享**唯一的 FFmpeg 闭包权威**。关键发现:
 
 <ClaimBadge role="authority" />
 
-冻结于 component-boundary-a0.md:
+证据来源：`component-boundary-a0.md`（历史 #53 审计证据；其中 #48 FFmpeg 闭包行为事实仍然有效）：
 
 > 当 FFmpeg 重新引入时,Decoder/Processing 必须继续共享唯一的 FFmpeg 闭包权威,而不是复制依赖。
 
@@ -169,8 +169,8 @@ Decoder 与 Processing 共享**唯一的 FFmpeg 闭包权威**。关键发现:
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/component-boundary-a0.md', 'docs/architecture/overview.md']"
+  :authority="['docs/architecture/overview.md']"
+  :evidence="['docs/architecture/component-boundary-a0.md', 'research/playback-reference-v1']"
   :decisions="[{ issue: 2 }, { issue: 3 }, { issue: 48 }, { issue: 53 }]"
-  :evidence="['research/playback-reference-v1']"
   last-verified="issue #2 + playback-reference-v1 tag, 2026-09-07"
 />

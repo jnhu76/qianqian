@@ -93,7 +93,7 @@ REQUESTED → CLAIMED → COMPLETED
 
 <ClaimBadge role="authority" />
 
-冻结于 overview.md 与 component-boundary-a0.md:
+normative 见 `docs/adr/ADR-PBK-001.md` §2.4；行为证据来源：overview.md 与 component-boundary-a0.md（历史证据，其 RT 行为事实仍有效）：
 
 > 实时音频路径是数据平面孤岛。每个回调/数据块内不得执行 Context 查找、能力解析、Fiber 调和、任意事件派发、文件系统/网络 I/O 或 UI 往返。
 
@@ -110,7 +110,7 @@ REQUESTED → CLAIMED → COMPLETED
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/component-boundary-a0.md §A.2', 'docs/architecture/overview.md']"
+  :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/overview.md']"
+  :evidence="['docs/architecture/component-boundary-a0.md §A.2', 'research/playback-reference-v1']"
   :decisions="[{ issue: 53 }, { pr: 66 }]"
-  :evidence="['research/playback-reference-v1']"
 />

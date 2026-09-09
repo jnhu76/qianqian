@@ -1,6 +1,16 @@
 # specs/playback — 播放架构形式化验证
 
-被审计对象：`docs/adr/ADR-PBK-001.md`（PROPOSED / FORMAL CORE PASS）。
+> **STATUS: EXPERIMENTAL EVIDENCE**
+>
+> These models preserve earlier failure witnesses and verification techniques.
+> They are **not current Playback architecture authority** and are **not acceptance
+> gates** for new Playback design. The current Playback Foundations proposal is
+> `docs/adr/ADR-PBK-001.md` (PROPOSED / REOPENED).
+>
+> 允许复用：mutation 技术、具体 counterexample、verifier runner、负控制方法。
+> 禁止：要求新架构镜像本目录的 variables / states / nouns。
+
+原始定位（历史）：曾被用作旧版 `docs/adr/ADR-PBK-001.md` 修订的形式化审计证据（当时的定位标注 PROPOSED / FORMAL CORE PASS）。播放架构重置后，本目录整体降级为 experimental evidence。
 
 定位：**Playback architecture formal exploration with a small blocking temporal core and additional supporting lifecycle evidence.** 本目录不声称整个 Playback Architecture 已被形式化证明——一个小的 blocking temporal core（`PlaybackTemporal` + 4 个 core negative controls）负责攻击高风险状态交错；其余模型与 mutation 是 supporting evidence，不阻塞 ADR ACCEPTED。
 
@@ -21,9 +31,9 @@
 
 ---
 
-## 一、Core acceptance / Extended exploration
+## 一、Core evidence set / Extended exploration
 
-### Core acceptance checks（ADR ACCEPTED blocking）
+### Core evidence checks（历史 ADR-ACCEPTED-blocking 定位已退役）
 
 | Semantic risk | Check | Blocking |
 | --- | --- | --- |
@@ -39,7 +49,7 @@
 
 core mutation 与 semantic risk 的对应：`PromoteWithoutFence` → Physical Fence；`AcceptUnadmittedDecode` → Generation admission；`SingleGlobalGenerationCheck` → Dual Window / no-global-current；`EndBeforeRenderDrain` → EOF / physical drain。retired-generation re-enter 的保护处于 core 集——它由 `PlaybackTemporal` 正常模型的不变量 `RetiredGenerationCannotReenter` 承担；对应 mutation 是 extended 证据。
 
-### Extended exploration（supporting / non-blocking）
+### Extended exploration（supporting evidence）
 
 | Check | Purpose | Blocking |
 | --- | --- | --- |
@@ -188,7 +198,7 @@ ADR 冻结语义中「old generation cannot submit after successful promotion」
 ## 五、如何验证
 
 ```bash
-# 仅 core acceptance 集（PlaybackTemporal 正常模型 + 4 个 core mutation；ADR ACCEPTED blocking 集）
+# 仅 core evidence 集（PlaybackTemporal 正常模型 + 4 个 core mutation；历史 blocking 定位已退役）
 specs/check.sh core
 
 # 全量（正常模型 + 全部负控制；缺省模式）
@@ -284,7 +294,7 @@ Ownership 模型未随本次 corrective 变更（运行数据与 2026-09-08 一�
 
 ## 九、Traceability
 
-- **Core acceptance（blocking）**：`PlaybackTemporal` 覆盖 ADR-PBK-001 §21 **Formal Acceptance** 的五组高风险 temporal 语义，与上文 temporal claims 及 properties 表一一对应。core mutation 对应：`PromoteWithoutFence` → Physical Fence；`AcceptUnadmittedDecode` → Generation admission；`SingleGlobalGenerationCheck` → Dual Window / no-global-current（安全性半：stop 窗口期误接收；功能性半：症状属性）；`EndBeforeRenderDrain` → EOF / physical drain（注入点在 TransportKernel 的 drained 发布层——EOF 证据的误解释发生在该层，ENDED 经 `EndedRequiresTransportDrain` 间接被保护）。
+- **Core evidence set（历史 blocking 定位已退役）**：`PlaybackTemporal` 覆盖 旧版 ADR-PBK-001（重置前）「Formal Acceptance」章节（已随重置移除）的五组高风险 temporal 语义，与上文 temporal claims 及 properties 表一一对应。core mutation 对应：`PromoteWithoutFence` → Physical Fence；`AcceptUnadmittedDecode` → Generation admission；`SingleGlobalGenerationCheck` → Dual Window / no-global-current（安全性半：stop 窗口期误接收；功能性半：症状属性）；`EndBeforeRenderDrain` → EOF / physical drain（注入点在 TransportKernel 的 drained 发布层——EOF 证据的误解释发生在该层，ENDED 经 `EndedRequiresTransportDrain` 间接被保护）。
 - **Extended exploration（non-blocking）**：`PlaybackOwnership` 覆盖上文 ownership claims；`RetiredGenerationStillAdmitted`（状态面：retired 重新 admitted）与 `AcceptUnadmittedDecode`（症状面：迟到结果被接收）配对覆盖 retired/late-decode admission 语义；`ReleaseProviderEarly` / `MultipleImmediateOwners` / `OwnershipCycle` / `KernelAdoptsLifetimeOwnership` 为 ownership / provider-ordering 探索证据。
 - 历史标签对照（早期 ADR 修订曾用 BUG-A..E 命名同类注入，仅作研究历史保留）：BUG-A = `PromoteWithoutFence`；BUG-B = `SingleGlobalGenerationCheck`；BUG-C = `RetiredGenerationStillAdmitted` + `AcceptUnadmittedDecode`；BUG-D = `ReleaseProviderEarly`；BUG-E = `EndBeforeRenderDrain`。
 - ADR 观察项闭环：模型决策 2（stop × 自然 ENDED）与决策 4（Prepared EOF）的最小 invariant 已反哺 ADR §18；window immediate-owner 观察项由 ADR §2 纠正关闭（Active / Prepared 是 temporal role / slot，非 Nested Runtime Resource）。

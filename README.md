@@ -2,7 +2,7 @@
 
 Qianqian is a local-first, lightweight, cross-platform music player and a testbed for Rust composability/runtime architecture.
 
-The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the new implementation is being rebuilt as a boundary-first plugin graph with a small generic Composition Kernel and explicit playback semantic authorities.
+The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the implementation is being rebuilt boundary-first on a small generic Composition Kernel; the playback-specific foundation is currently reopened and re-proposed in `ADR-PBK-001`.
 
 ## Architecture in 30 seconds
 
@@ -34,10 +34,10 @@ Current architecture milestones:
 Component boundary audit          PASS / CLOSED              (PR #66)
 Composition Kernel semantic design MERGED                   (PR #68)
 Base Kernel K0                     IMPLEMENTED              (PR #71)
-Playback ADR-PBK-001               ACCEPTED (PR #78 + #79; accepted via #81)
+Playback Foundations reset         PROPOSED / REOPENED      (ADR-PBK-001, PR #87)
 ```
 
-ADR-PBK-001 is ACCEPTED and is the registered playback-specific ARCH-003 authority (together with `docs/architecture/overview.md`); `docs/architecture/component-boundary-a0.md` remains closed #53 historical evidence whose conflicting playback-specific conclusions are superseded for new playback implementation. Architecture acceptance is not implementation completion: the deterministic executable oracle is the implementation entry, and production FFmpeg/WASAPI integration is still a separate implementation task.
+The previously accepted playback architecture (`ADR-PBK-001` as registered ARCH-003 authority) has been **deliberately reopened from first principles**. Old playback implementation, specs and formal models remain in the repository as **experimental evidence only** — they preserve failure witnesses and test techniques, not current authority. The new playback foundation is proposed in `docs/adr/ADR-PBK-001.md`; production playback semantics are not authorized until its acceptance gates pass.
 
 ## Control plane and data plane
 
@@ -64,93 +64,21 @@ ADR-PBK-001 is ACCEPTED and is the registered playback-specific ARCH-003 authori
 
 Context controls reachability/dependency truth. It does not carry PCM blocks or become a universal product message bus.
 
-## Playback authority split
+## Playback status: reopened
 
-Playback is not one giant `MusicKernel`.
+There is currently **no accepted playback state-machine vocabulary**. The reset proposal (`docs/adr/ADR-PBK-001.md`, PROPOSED) freezes only foundational boundaries — composition vs execution/control vs facts vs realtime data — and deliberately reopens all playback-specific nouns.
 
-```text
-MusicComponent                  one composed lifecycle root
-├── MusicKernel                 music/product semantic authority
-├── TransportKernel             playback temporal authority
-└── TrackSession(s)
-    └── DecodeSession(s)
-```
-
-### MusicKernel
-
-Owns product/music meaning such as:
+Names still present in old code/specs, such as:
 
 ```text
-play / pause meaning
-seek intent meaning
-next / previous
-repeat / shuffle
-playlist policy
-selection semantics
-user-visible PlaybackState meaning
-what to do after a terminal transport outcome
+MusicKernel / TransportKernel
+TrackSession / DecodeSession
+Generation / Dual Window / Physical Fence
 ```
 
-### TransportKernel
+are **experimental evidence**: they preserve real failure witnesses (for example the formal exploration of the `stop × natural ENDED` race) and test techniques, but they are not current architecture and must not be preserved for compatibility unless a future accepted authority re-earns them.
 
-Owns playback-temporal meaning such as:
-
-```text
-playback cursor semantics
-Active / Prepared temporal roles
-Generation admission
-MediaSpan timeline authority
-window promotion / invalidation
-discontinuity execution
-Physical Fence coordination
-raw playback evidence interpretation
-```
-
-`Kernel` here means **semantic authority role**, not an independent Composition plugin.
-
-Raw playback evidence is interpreted once by `TransportKernel`; `MusicKernel` receives derived domain facts rather than independently reinterpreting cursor/render/EOF truth.
-
-## TrackSession / DecodeSession
-
-`TrackSession` is the media identity/source lifetime root. It may contain multiple `DecodeSession`s at once.
-
-A `DecodeSession` owns one independently advancing decoder cursor/handle. This is required for same-track seek preparation:
-
-```text
-TrackSession A
-├── DecodeSession gen17 @72s   -> Active role
-└── DecodeSession gen18 @100s  -> Prepared role
-```
-
-Active/Prepared are temporal roles inside `TransportKernel`; they are not independent plugins or standalone lifetime resources.
-
-## Dual Window, Generation and Physical Fence
-
-The MVP temporal shape is:
-
-```text
-1 Active
-0..1 Prepared
-```
-
-Therefore this classic check is forbidden:
-
-```text
-result.generation != global_current_generation => stale
-```
-
-A generation is valid when its temporal role still admits that operation.
-
-Hard seek/stop/replacement also requires a real physical boundary:
-
-```text
-decoded != queued != submitted != rendered
-logical invalidation != physical stop
-```
-
-Generation invalidation cannot replace a successful Physical Fence/flush verdict.
-
-Formal exploration found a real `stop × natural ENDED` race: terminalization must not destroy the active temporal state required by an in-flight Physical Fence.
+See `docs/adr/ADR-PBK-001.md` for the proposed foundation and `specs/playback/README.md` for the evidence status.
 
 ## Everything is a Plugin
 
@@ -209,7 +137,7 @@ Formal models are **risk-driven evidence**, not a second implementation of the w
 
 > **TLA+ is used to find state collisions, not to formally model every architectural noun.**
 
-The blocking playback core checks only the high-risk temporal interactions: Dual Window, Generation admission, Physical Fence, submitted/rendered accounting, and EOF/drained/ENDED terminalization. Additional ownership models remain supporting evidence.
+The old playback formal models (Dual Window, Generation admission, Physical Fence, submitted/rendered accounting, EOF/drained/ENDED terminalization) are **experimental evidence** under explicit assumptions during the reset — not a blocking acceptance gate for new playback design.
 
 See `specs/README.md` and `specs/playback/README.md`.
 
@@ -239,7 +167,7 @@ qianqian-runtime
 qianqian-headless
 ```
 
-The generic Base Kernel K0 is implemented. Product code now carries separate `MusicKernel` and `TransportKernel` authority shells without prematurely implementing the full playback state machine.
+The generic Base Kernel K0 is implemented. The playback code currently in the product crates (`qianqian-core::music`, `qianqian-core::transport`) is **experimental evidence** from the earlier architecture experiment — not current authority and not a compatibility contract.
 
 Build/test authority:
 
@@ -272,7 +200,7 @@ The playback reference is a behavioral oracle, not a source-layout template.
 - `CONTEXT.md` — stable vocabulary and mental model.
 - `docs/README.md` — task-oriented documentation router.
 - `docs/architecture/overview.md` — current Architecture v2 overview.
-- `docs/adr/ADR-PBK-001.md` — playback authority/session/timeline/data-plane decisions.
+- `docs/adr/ADR-PBK-001.md` — Playback Foundations proposal (PROPOSED / REOPENED).
 - `docs/architecture/composition-kernel.md` — generic Composition Kernel authority.
 - `specs/README.md` — risk-driven formalization policy and model registry.
 - `CONTRIBUTING.md` — contribution entry point.

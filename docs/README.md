@@ -44,31 +44,7 @@ Do not use old type names or formal variables to close new architecture question
 
 # Current playback foundation
 
-The current proposal separates four concerns:
-
-```text
-Composition Plane
-    Context / Capability / Fiber / Effect / Reconcile
-
-Execution / Control Plane
-    Command / workflow / Capability-Service call
-
-Fact Plane
-    authoritative commit -> Fact -> observers/projections/persistence
-
-Realtime Data Plane
-    pre-bound realtime graph/view -> PCM -> device
-```
-
-Key distinctions:
-
-```text
-Command != Fact
-Fact != hot PCM data
-Projection != authority
-Plugin/Fiber identity != per-block dispatch
-Dependency topology != realtime processing topology
-```
+The current proposal separates four reasoning lenses — Composition, Execution/Control, Fact, Realtime Data — summarized in `architecture/overview.md` and frozen normatively in `adr/ADR-PBK-001.md` §1–§2. Do not restate the constitution normatively here.
 
 ---
 
@@ -112,57 +88,19 @@ If generic K0 semantics and the reset ADR appear to conflict, identify the exact
 
 # Fact/Event policy
 
-Qianqian currently freezes only:
-
-```text
-commit authoritative truth
-    before
-publish corresponding Fact
-```
-
-and:
-
-```text
-Projection = derived read model, not writer
-```
-
-Complete Event Sourcing, append-only durable logs, replay authority and a generic Event primitive are **not yet architecture decisions**.
+Normative authority: `adr/ADR-PBK-001.md` §2.3 — semantic commit precedes Fact publication; one designated semantic authority per fact type; projections are read-only visibility; Event Sourcing, durability, replay and a generic Event primitive are **not yet architecture decisions**.
 
 ---
 
 # Realtime policy
 
-Realtime PCM never travels through generic Context/Event/Plugin dispatch per block.
-
-Control-side graph changes are built/validated before publication; realtime consumes a pre-bound graph/view directly.
-
-Resource/provider final release must not race a realtime reader that can still dereference the old graph/view.
-
-Exact graph/lifetime mechanism remains unfrozen.
+Normative authority: `adr/ADR-PBK-001.md` §2.4 and §6 — realtime PCM never travels through generic Context/Event/Plugin dispatch per quantum; realtime readers observe one coherent published view; RT-referenced resources stay valid until readers quiesce. The exact graph/lifetime mechanism remains unfrozen.
 
 ---
 
 # Architecture design order
 
-For new composition/playback work, do not start from API shape or legacy type names.
-
-```text
-Component Granularity
-        ↓
-Capability / dependency boundary
-        ↓
-Execution / control semantics
-        ↓
-Fact / state authority
-        ↓
-Lifetime / withdrawal ordering
-        ↓
-Realtime boundary where relevant
-        ↓
-Executable evidence
-        ↓
-API / representation
-```
+The boundary-first design order is normative in `../AGENTS.md` ("Boundary-first design"). Do not start from API shape or legacy type names.
 
 ---
 

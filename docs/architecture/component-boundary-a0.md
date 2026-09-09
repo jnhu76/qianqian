@@ -1,5 +1,9 @@
 # Component Boundary Audit A0
 
+> **STATUS: HISTORICAL / EXPERIMENTAL EVIDENCE**
+>
+> This document describes an earlier concrete Playback decomposition. It is **no longer current ARCH-004 authority**. Current Playback Foundations authority is `docs/adr/ADR-PBK-001.md` (PROPOSED / REOPENED). Generic composition provenance and behavioral evidence remain usable; playback-specific ownership/granularity conclusions below are historical.
+
 Design-gate evidence for **#53 COMPONENT-BOUNDARY-A0** (parent authority **#46 PLAYER-PLUGIN-ARCH-1**).
 
 Status: **design audit, not implementation authorization.** Nothing here freezes a Rust API, a crate layout, or a dynamic-loading mechanism. Logical component boundaries are not crate/shared-lib/dynamic-lib boundaries.
@@ -14,7 +18,7 @@ Revision 3 (Corrective-2, 2026-09-07): purifies §H.a per human review round 2 �
 
 ## Playback authority transition note (2026-09)
 
-> **This document remains the accepted historical #53 boundary audit and a provenance source for Composition Kernel design. Its playback-specific ownership/granularity conclusions are historical design evidence under replacement — not fresh implementation guidance.**
+> **This document is historical evidence only. Its playback-specific ownership/granularity conclusions are not fresh implementation guidance, and no playback model described here — this document's #53 position or any successor — is current authority. Playback architecture has since been reopened from first principles; `ADR-PBK-001` is PROPOSED and deliberately does not freeze either playback model.**
 
 Still valid here (generic + behavioral evidence):
 
@@ -26,19 +30,7 @@ system-boundary / effect-classification reasoning
 composition-kernel design provenance (#53 -> #67 -> #71 chain)
 ```
 
-`ADR-PBK-001` is now ACCEPTED (2026-09-09) and is the registered playback-specific ARCH-003 authority.
-
-Conflicting playback-specific ownership/granularity conclusions in this historical document — the #53 position below — are superseded for new Playback implementation:
-
-```text
-Music component owns the whole cohesive playback mechanism
-  (worker / PCM ring / timeline / the active open Decoder handle)
-MusicKernel owns timeline / session / ENDED interpretation
-one active track session with a single Decoder handle
-Transport / Timeline / Session split rejected
-```
-
-The accepted model instead separates `MusicKernel` (music/product semantics) from `TransportKernel` (playback temporal authority) with nested `TrackSession(s) -> DecodeSession(s)` and dual-window / generation-admission / Physical Fence semantics. Generic composition and historical behavioral evidence in this document remain valid; do **not** combine the two playback models when implementing new code.
+Playback architecture has since been reopened (2026-09 reset): neither the #53 position below nor the formerly accepted `MusicKernel`/`TransportKernel` split is current authority. Old playback conclusions — including this document's historical statement that a later accepted model superseded the #53 position — are historical records only; do **not** combine or extend either playback model when implementing new code.
 
 ---
 

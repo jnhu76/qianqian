@@ -4,10 +4,12 @@
 //! capability contracts are declared here, providers install them as kernel
 //! provisions, and consumers reach them through kernel-mediated resolution.
 //!
-//! The composition kernel controls reachability/lifetime only. Playback
-//! semantic authorities remain product state: `MusicKernel` owns music/product
-//! meaning while `TransportKernel` owns playback-temporal meaning. Neither is
-//! the generic Composition Kernel, and neither makes PCM a Context payload.
+//! The composition kernel controls reachability/lifetime only. The playback
+//! types hosted here (`MusicKernel`, `TransportKernel`) are **experimental
+//! Playback evidence** from an earlier architecture experiment; their presence
+//! does not establish current architecture authority or compatibility
+//! requirements. Neither is the generic Composition Kernel, and neither makes
+//! PCM a Context payload.
 
 use std::cell::RefCell;
 use std::rc::Rc;

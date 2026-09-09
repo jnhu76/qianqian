@@ -2,8 +2,8 @@
 # specs/check.sh — 运行 specs/ 下形式化模型
 #
 # 用法：specs/check.sh [core|all]（缺省 all）
-#   core — core acceptance 集：PlaybackTemporal 正常模型 + 4 个 core mutation
-#          （ADR ACCEPTED blocking 集）
+#   core — core evidence 集：PlaybackTemporal 正常模型 + 4 个 core mutation
+#          （历史 ADR ACCEPTED blocking 定位已退役；现为 experimental evidence）
 #   all  — 全部：另含 PlaybackOwnership 与 extended mutation（supporting evidence）
 #
 # 规则：

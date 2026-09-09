@@ -15,7 +15,7 @@ status: HISTORICAL_EVIDENCE
 
 <ClaimBadge role="evidence" />
 
-playback-reference-v1 实验期间建立的 FFmpeg 构建 profiles 与能力。作为架构决策冻结于 component-boundary-a0.md。
+playback-reference-v1 实验期间建立的 FFmpeg 构建 profiles 与能力。相关行为事实记录于 component-boundary-a0.md（历史证据）。
 
 | 来源 | 类型 |
 |------|------|
@@ -23,7 +23,7 @@ playback-reference-v1 实验期间建立的 FFmpeg 构建 profiles 与能力。�
 | `native/ffmpeg/capabilities/*.json` | 机器制品(`playback-reference-v1` tag 上) |
 | `tools/ffmpeg_import.py` + Xmake 重放 | Qianqian 自有的导入/重放工具(tag 上) |
 | `bench/results/common-formats/ladder.md` | 后续能力阶梯延续(tag 上) |
-| `component-boundary-a0.md §B.2` | 冻结的架构决策 |
+| `component-boundary-a0.md §B.2` | 历史证据（#48 行为事实仍有效） |
 | Issue #2 / #3 / #48 / #49 | 实验记录与边界审计 |
 
 ---
@@ -89,11 +89,9 @@ Qianqian 自有的正常构建重放
 
 ---
 
-## 当前仍成立的部分
+## 仍然有效的证据约束
 
-<ClaimBadge role="authority" />
-
-这些是**当前 Architecture v2 约束** —— 即使当前 main 上不存在任何 FFmpeg 代码,它们仍存续于 `docs/architecture/component-boundary-a0.md` §B.2:
+这些是 #48 实验挣得的**行为证据约束** —— 即使当前 main 上不存在任何 FFmpeg 代码,它们仍作为可复用证据存续于 `docs/architecture/component-boundary-a0.md` §B.2（历史文档;未来 Decoder 设计须重新引用并挣得其 normative 形式）:
 
 ```text
 唯一闭包权威(Decoder + 未来 Processing 共享)
@@ -127,8 +125,8 @@ FFmpeg 类型不跨组件缝
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/component-boundary-a0.md', 'docs/architecture/overview.md']"
+  :authority="['docs/architecture/overview.md']"
+  :evidence="['docs/architecture/component-boundary-a0.md §B.2', 'research/playback-reference-v1']"
   :decisions="[{ issue: 2 }, { issue: 3 }, { issue: 48 }, { issue: 53 }]"
-  :evidence="['research/playback-reference-v1']"
   last-verified="issue #2/#3/#48/#49 + playback-reference-v1 tag + current main scan, 2026-09-07"
 />

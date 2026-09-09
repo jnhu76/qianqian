@@ -5,6 +5,8 @@ status: CURRENT
 
 # 架构总览
 
+> **Playback Foundations reset（2026-09）：** 本页 mermaid 图与下文中的 `MusicComponent` / `MusicKernel` / `TransportKernel` / `TrackSession` / `DecodeSession` 内容是**历史实验证据**，不再是 current authority。当前 Playback Foundations 提案是 `docs/adr/ADR-PBK-001.md`（**PROPOSED / REOPENED**）。
+
 Qianqian Architecture v2 是一个面向本地优先音乐播放器的、边界优先、面向组合的运行时架构。
 
 > **Composition Kernel 控制可达性、组合所有权与生命周期；它不拥有应用载荷。**
@@ -66,17 +68,17 @@ flowchart TB
 
 ---
 
-## 三种不要混淆的关系
+## 历史实验中的 playback 拆分（非 current authority）
 
 ```text
-MusicComponent   = composition lifecycle root
-MusicKernel      = music/product semantic authority
-TransportKernel  = playback temporal authority
+MusicComponent   = composition lifecycle root        （历史实验）
+MusicKernel      = music/product semantic authority  （历史实验）
+TransportKernel  = playback temporal authority       （历史实验）
 ```
 
-> 这一 playback 拆分来自 ADR-PBK-001（**ACCEPTED**）；它现在是已登记的 ARCH-003 playback 专属 authority（与 `overview.md` 共同）。架构接受不等于实现完成：deterministic executable oracle 是 implementation entry，production FFmpeg/WASAPI 集成仍是后续任务。
+> 这一 playback 拆分来自旧版 ADR-PBK-001 修订；2026-09 架构重置后，它与本页其余 playback-specific 名词一样只是 **experimental evidence**。当前 Playback Foundations 提案（PROPOSED / REOPENED）不冻结任何 playback 状态机名词。
 
-`Kernel` 在后两个名字里表示 semantic authority role，不代表两个新的 Composition plugin。
+`Kernel` 在后两个名字里表示 semantic authority role，不代表两个新的 Composition plugin；这一命名习惯本身也只是历史证据。
 
 Nested playback lifetime：
 
@@ -155,13 +157,13 @@ Gain → EQ → SRC → Limiter → ...
 | 架构块 | 状态 |
 |---|---|
 | Base / Composition Kernel K0 | <StatusBadge status="IMPLEMENTED" /> |
-| Playback Architecture / ADR-PBK-001 | <StatusBadge status="CURRENT" /> `ACCEPTED` — 实现未开始 |
+| Playback Foundations / ADR-PBK-001 | <StatusBadge status="NEXT" /> `PROPOSED / REOPENED` — 等待 review 与 acceptance gates |
 | Decoder provider | <StatusBadge status="PLANNED" /> |
 | AudioOutput provider | <StatusBadge status="PLANNED" /> |
 | Audio Processing implementation | <StatusBadge status="PLANNED" /> |
 | UiHost | <StatusBadge status="DEFERRED" /> |
 
-Playback 代码目前只建立 `MusicKernel` / `TransportKernel` 的 authority shell；FFmpeg/WASAPI 和完整 playback state machine 尚未因此获得实现事实。
+当前 playback 代码（`qianqian-core::music` / `::transport`）是旧架构实验留下的 **experimental evidence**，不是 current authority；FFmpeg/WASAPI 和完整 playback state machine 未获得实现授权。
 
 ---
 

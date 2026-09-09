@@ -25,15 +25,15 @@ export interface ProjectState {
 }
 
 export const projectState: ProjectState = {
-  currentFrontier: 'Playback Architecture — deterministic executable temporal core (implementation entry)',
-  lastMilestone: 'ADR-PBK-001 ACCEPTED; ARCH-003 authority migrated',
+  currentFrontier: 'Playback Foundations reset — ADR-PBK-001 PROPOSED / REOPENED, awaiting fresh-context review and acceptance gates',
+  lastMilestone: 'Playback foundations reset proposed; old playback authority demoted to experimental evidence',
 
   layers: {
     playbackReference: 'HISTORICAL_EVIDENCE',
     ffmpegResearch: 'HISTORICAL_EVIDENCE',
     componentBoundary: 'FROZEN',
     baseKernel: 'IMPLEMENTED',
-    playbackArchitecture: 'CURRENT',
+    playbackArchitecture: 'NEXT',
     decoder: 'PLANNED',
     processing: 'PLANNED',
     audioOutput: 'PLANNED',
@@ -41,9 +41,9 @@ export const projectState: ProjectState = {
   },
 
   nextQuestions: [
-    '当前 current surfaces 是否准确表达 ADR-PBK-001 为 ACCEPTED 且为已登记的 ARCH-003 authority（同时不把架构接受误写成实现完成）？',
-    'deterministic executable temporal core 应先挣得哪些 Rust representation（不预先冻结 struct/module layout）？',
-    '施工发现协议：哪些实现压力属于 Class A/B，哪些必须走 Class C 的 ADR+specs+tests 同步事务？',
+    'ADR-PBK-001（PROPOSED）何时、以哪些 executable evidence 通过 §14 acceptance gates G1–G7？',
+    'reset 之后哪些 minimal PCM / direct-flow / graph-publication 实验先挣得第一批边界？',
+    'tree-wide surfaces 是否仍把旧 playback 模型当 current authority（应为 experimental evidence only）？',
   ],
 }
 

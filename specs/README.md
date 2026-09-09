@@ -1,5 +1,12 @@
 # specs/ — 形式化模型注册表
 
+> **STATUS: EXPERIMENTAL EVIDENCE**
+>
+> 本目录的模型保留了早期 Playback 架构实验的 failure witnesses 与验证技术。
+> 它们**不是当前 Playback architecture authority**，也**不是新 Playback 设计的 acceptance gate**。
+> 当前播放架构 authority 只有一个候选来源：`docs/adr/ADR-PBK-001.md`（PROPOSED / REOPENED）。
+> 可复用：mutation 技术、具体 counterexample、verifier runner；不得要求新架构镜像旧变量/状态/名词。
+
 `specs/` 保存 Qianqian 中值得进行状态空间验证的形式化模型。这里描述的是**长期系统语义**，不是开发阶段历史。
 
 ## 验证哲学
@@ -66,10 +73,10 @@
 
 | 模型 | 定位 | 负责验证 | 方法 |
 | --- | --- | --- | --- |
-| `playback/PlaybackTemporal` | **Core acceptance（blocking）** | 五组高风险 temporal 语义：Dual Window、Generation admission、Physical Fence、submitted/rendered 记账、EOF/drained/ENDED terminalization | TLA+ / TLC |
+| `playback/PlaybackTemporal` | Core evidence set（历史 blocking 定位已退役） | 五组高风险 temporal 语义：Dual Window、Generation admission、Physical Fence、submitted/rendered 记账、EOF/drained/ENDED terminalization | TLA+ / TLC |
 | `playback/PlaybackOwnership` | Extended exploration（supporting / non-blocking） | resource-lifecycle 假设：composition lifecycle root、TrackSession/DecodeSession immediate lifetime ownership、semantic authority 与 lifetime ownership 的区分、provider withdrawal 顺序 | TLA+ / TLC |
 
-每个模型配备**负控制（negative controls）**：故意注入错误，TLC 必须抓到（counterexample 才算通过），以证明模型不是 vacuous。其中 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）属于 ADR ACCEPTED blocking 集；其余 mutation 属于 extended exploration / supporting evidence，不阻塞 ACCEPTED。
+每个模型配备**负控制（negative controls）**：故意注入错误，TLC 必须抓到（counterexample 才算通过），以证明模型不是 vacuous。其中 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）曾是 ADR ACCEPTED 的 blocking 集；播放架构重置后该 blocking 定位已退役，全部模型现在统一是 experimental evidence，不是新 Playback 设计的 acceptance gate。
 
 ## 运行入口
 
@@ -94,6 +101,6 @@ specs/check.sh
 
 ## Traceability
 
-- `PlaybackTemporal` 五组语义 + 4 个 core mutation 对应 `docs/adr/ADR-PBK-001.md` §21 **Formal Acceptance** 必须项（blocking）；当前 core temporal checks = PASS。
-- `PlaybackOwnership` 与其余 mutation 对应同节**支持证据**（non-blocking）：它们继续保留、继续运行，其 FAIL 不自动推出该 ADR 不能 ACCEPTED（除非发现 ADR 本身明确语义矛盾）。
+- `PlaybackTemporal` 五组语义 + 4 个 core mutation 曾对应旧版 ADR 的 **Formal Acceptance** 章节（该章节已随重置移除）；当前 core temporal checks = PASS 只作为历史证据记录，不是当前 ADR 的 acceptance 项。
+- `PlaybackOwnership` 与其余 mutation 对应同节**支持证据**：它们继续保留、继续运行，作为 experimental evidence；其结论不构成当前 ADR 的 acceptance 项。
 - 模型 vocabulary 不使用 ADR/Issue/PR 编号；ADR 与模型的对应关系只在 README 层维护。

@@ -32,7 +32,7 @@ import { projectState } from '../data/project-state.ts'
   <tr><td>FFmpeg 研究</td><td><StatusBadge status="HISTORICAL_EVIDENCE" /></td></tr>
   <tr><td>组件边界 A0</td><td><StatusBadge status="FROZEN" /></td></tr>
   <tr><td>Base / Composition Kernel K0</td><td><StatusBadge status="IMPLEMENTED" /></td></tr>
-  <tr><td>Playback Architecture</td><td><StatusBadge status="CURRENT" /></td></tr>
+  <tr><td>Playback Foundations（重置提案）</td><td><StatusBadge status="NEXT" /></td></tr>
   <tr><td>Decoder provider</td><td><StatusBadge status="PLANNED" /></td></tr>
   <tr><td>Audio Processing</td><td><StatusBadge status="PLANNED" /></td></tr>
   <tr><td>AudioOutput provider</td><td><StatusBadge status="PLANNED" /></td></tr>
@@ -41,23 +41,21 @@ import { projectState } from '../data/project-state.ts'
 
 ---
 
-## Playback 已接受结构
+## Playback Foundations（重置提案）
 
-ADR-PBK-001（**ACCEPTED**，已登记 ARCH-003 authority）的结构：
+> 以下结构是旧 Playback 架构实验的 **experimental evidence**（含其短暂 ACCEPTED 的旧版 ADR 修订）；2026-09 重置后不是 current authority。当前提案：ADR-PBK-001（**PROPOSED / REOPENED**）。
 
 ```text
 MusicComponent
-├── MusicKernel       music/product semantic authority
-├── TransportKernel   playback temporal authority
+├── MusicKernel       music/product semantic authority      （历史实验）
+├── TransportKernel   playback temporal authority           （历史实验）
 └── TrackSession(s)
     └── DecodeSession(s)
 ```
 
-在该已接受模型中，`MusicKernel` 不承担 timeline/window/generation/fence；`TransportKernel` 是 raw playback evidence 的唯一 temporal interpreter。
+当前代码中的 `music` / `transport` 模块即该旧实验留下的 evidence，尚未实现完整 playback state machine、FFmpeg Decoder 或真实 AudioOutput backend。
 
-当前代码已经建立两个 authority shell，但尚未实现完整 playback state machine、FFmpeg Decoder 或真实 AudioOutput backend。
-
-[阅读 Playback Architecture →](/architecture/playback-kernel)
+[阅读 Playback Architecture（历史）→](/architecture/playback-kernel)
 
 ---
 
@@ -79,7 +77,7 @@ Playback 的 formal core 已验证 Dual Window、Generation admission、Physical
 
 > **TLA+ 用来找撞车，不用来证明整个架构。**
 
-ADR-PBK-001 已 ACCEPTED。下一阶段进入 deterministic executable Rust model（implementation entry），优先依靠类型/ownership 与普通测试推动 representation，而不是继续扩张形式化模型数量。
+旧 playback formal core 的验证结果是 experimental evidence。播放架构重置后，下一步由 ADR-PBK-001（PROPOSED）的 acceptance gates 与最小实验驱动，而不是继续扩张形式化模型数量。
 
 ---
 
@@ -93,6 +91,6 @@ ADR-PBK-001 已 ACCEPTED。下一阶段进入 deterministic executable Rust mode
 
 <ProvenancePanel
   :authority="['docs/architecture/overview.md', 'docs/adr/ADR-PBK-001.md', 'docs/site/project-state.ts']"
-  :decisions="[{ pr: 68 }, { pr: 71 }, { pr: 78 }, { pr: 79 }]"
+  :decisions="[{ pr: 68 }, { pr: 71 }]"
   :evidence="['crates/qianqian-kernel/tests', 'specs/playback/PlaybackTemporal.tla']"
 />
