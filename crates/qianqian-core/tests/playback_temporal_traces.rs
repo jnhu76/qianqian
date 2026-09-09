@@ -12,7 +12,7 @@
 //! (decoder/device) by feeding raw evidence, and interpretation stays in the
 //! kernels.
 
-use qianqian_core::music::{MusicKernel, PlaybackState};
+use qianqian_core::music::{MusicKernel, PlaybackState, TransportFact};
 use qianqian_core::transport::{
     DecodeSessionId, EofOutcome, FenceState, FenceVerdictOutcome, GenerationId, MediaId, MediaSpan,
     TransportKernel, WindowRole,
@@ -546,7 +546,7 @@ fn submitted_media_outruns_rendered_without_draining_or_ending() {
         "submitted-but-unrendered media blocks drain"
     );
 
-    music.observe_all(transport.take_derived_facts());
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
     assert_ne!(
         music.state(),
         PlaybackState::Ended,
@@ -580,7 +580,7 @@ fn decoder_eof_alone_never_ends_and_full_drain_then_ends() {
     transport
         .decoder_eof(started.decode_session)
         .expect("producer terminal");
-    music.observe_all(transport.take_derived_facts());
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
     assert!(!transport.transport_drained());
     assert_ne!(music.state(), PlaybackState::Ended);
 
@@ -595,7 +595,7 @@ fn decoder_eof_alone_never_ends_and_full_drain_then_ends() {
         "no in-flight media and producer terminal"
     );
 
-    music.observe_all(transport.take_derived_facts());
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
     assert_eq!(music.state(), PlaybackState::Ended);
 
     transport
@@ -653,7 +653,7 @@ fn natural_drain_during_stop_fence_does_not_ended_or_destroy_the_cut() {
     // truth, no ENDED, and the active temporal state the fence still
     // needs survives until the verdict.
     assert!(!transport.transport_drained());
-    music.observe_all(transport.take_derived_facts());
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
     assert_ne!(music.state(), PlaybackState::Ended);
     let snapshot = transport.snapshot();
     assert_eq!(
@@ -672,7 +672,7 @@ fn natural_drain_during_stop_fence_does_not_ended_or_destroy_the_cut() {
         }
     );
 
-    music.observe_all(transport.take_derived_facts());
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
     // Stopped is a product interpretation distinct from ENDED.
     assert_eq!(music.state(), PlaybackState::Idle);
     assert_ne!(music.state(), PlaybackState::Ended);
@@ -718,7 +718,7 @@ fn stop_after_drained_withdraws_the_pending_drained_fact() {
     transport.claim_fence().expect("claim");
     transport.fence_succeeded().expect("verdict");
 
-    music.observe_all(transport.take_derived_facts());
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
     assert_eq!(music.state(), PlaybackState::Idle);
     assert_ne!(music.state(), PlaybackState::Ended);
 }
@@ -760,7 +760,7 @@ fn rapid_seek_seek_next_stop_supersede_chain_completes() {
         }
     );
 
-    music.observe_all(transport.take_derived_facts());
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
     assert_eq!(music.state(), PlaybackState::Idle);
     let snapshot = transport.snapshot();
     assert_eq!(snapshot.active, None);
@@ -1100,7 +1100,7 @@ fn stale_drained_facts_are_withdrawn_by_promotion_and_new_episode() {
         "promotion resets drained truth"
     );
 
-    music.observe_all(transport.take_derived_facts());
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
     assert_ne!(
         music.state(),
         PlaybackState::Ended,
@@ -1117,7 +1117,7 @@ fn stale_drained_facts_are_withdrawn_by_promotion_and_new_episode() {
         .complete_ended_episode()
         .expect("episode completes");
     transport.play(media.open()).expect("replay");
-    music.observe_all(transport.take_derived_facts());
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
     assert_ne!(
         music.state(),
         PlaybackState::Ended,
@@ -1251,8 +1251,305 @@ fn consumed_verdict_can_complete_natural_drain() {
     );
 
     let mut music = MusicKernel::new();
-    music.observe_all(transport.take_derived_facts());
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
     assert_eq!(music.state(), PlaybackState::Ended);
+}
+
+// --- Stage-1 review corrective regressions ---
+
+#[test]
+fn abandoned_fence_with_decode_backlog_still_reaches_natural_drain() {
+    // The blocking shape: decode 10, submit 5, then a hard cut closes the
+    // old admission. The five decoded-but-unsubmitted frames can never be
+    // submitted, and before the corrective the drain predicate
+    // (accepted == submitted) could never hold again — a permanently
+    // undrainable pipeline after fail/abandon.
+    let mut transport = TransportKernel::new();
+    let mut music = MusicKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    transport
+        .decode_result(
+            started.decode_session,
+            MediaSpan {
+                generation: started.generation,
+                start: 0,
+                end: 10,
+            },
+        )
+        .expect("decode ten frames");
+    transport
+        .media_submitted(started.generation, 5)
+        .expect("submit five frames");
+
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+    transport.begin_hard_cut().expect("cut begins");
+
+    // Admission close owns the discard: the five stranded frames leave
+    // drain-relevant accounting at this transition, explicitly.
+    let snapshot = transport.snapshot();
+    let active = snapshot.active.expect("active kept, admission closed");
+    assert!(!active.admission_open);
+    assert_eq!(active.accepted_frames, 10);
+    assert_eq!(active.submitted_frames, 5);
+    assert_eq!(active.discarded_frames, 5);
+    assert!(
+        transport.media_submitted(started.generation, 5).is_err(),
+        "the stranded backlog can never be submitted"
+    );
+
+    // The fence fails and is abandoned fail-closed.
+    transport.claim_fence().expect("claim");
+    transport.fence_failed().expect("failure recorded");
+    transport.abandon_fence().expect("fail closed");
+
+    // The submitted tail still renders out; EOF then satisfies the drain
+    // predicate (accepted == submitted + discarded) — no permanent hang.
+    transport
+        .media_rendered(started.generation, 5)
+        .expect("queued tail renders after abandon");
+    assert!(!transport.transport_drained(), "producer not terminal yet");
+    transport
+        .decoder_eof(started.decode_session)
+        .expect("producer terminal");
+    assert!(
+        transport.transport_drained(),
+        "drain predicate reachable after an abandoned cut"
+    );
+
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
+    assert_eq!(music.state(), PlaybackState::Ended);
+}
+
+#[test]
+fn abandoned_stop_fence_with_decode_backlog_still_reaches_natural_drain() {
+    // The same stranding class through the stop path: stop closes
+    // admission (discarding the backlog); the terminal fence fails and is
+    // abandoned — the episode never stopped, and its natural end stays
+    // reachable.
+    let mut transport = TransportKernel::new();
+    let mut music = MusicKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    transport
+        .decode_result(
+            started.decode_session,
+            MediaSpan {
+                generation: started.generation,
+                start: 0,
+                end: 10,
+            },
+        )
+        .expect("decode ten frames");
+    transport
+        .media_submitted(started.generation, 5)
+        .expect("submit five frames");
+    transport.stop().expect("stop closes admission");
+    let snapshot = transport.snapshot();
+    let active = snapshot.active.expect("active kept for the fence");
+    assert!(!active.admission_open);
+    assert_eq!(active.discarded_frames, 5);
+
+    transport.claim_fence().expect("claim");
+    transport.fence_failed().expect("failure recorded");
+    transport.abandon_fence().expect("fail closed");
+
+    transport
+        .media_rendered(started.generation, 5)
+        .expect("tail renders");
+    transport
+        .decoder_eof(started.decode_session)
+        .expect("producer terminal");
+    assert!(
+        transport.transport_drained(),
+        "natural drain reachable after an abandoned stop"
+    );
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
+    assert_eq!(music.state(), PlaybackState::Ended);
+}
+
+#[test]
+fn consumed_verdict_with_decode_backlog_still_drains() {
+    // The verdict-consumed path (target superseded mid-flight, no
+    // promotion) leaves the cut generation active with closed admission:
+    // its stranded backlog must not block natural drain either.
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    transport
+        .decode_result(
+            started.decode_session,
+            MediaSpan {
+                generation: started.generation,
+                start: 0,
+                end: 10,
+            },
+        )
+        .expect("decode ten frames");
+    transport
+        .media_submitted(started.generation, 5)
+        .expect("submit five frames");
+    transport
+        .decoder_eof(started.decode_session)
+        .expect("producer terminal");
+
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+    transport.begin_hard_cut().expect("cut begins");
+    transport.claim_fence().expect("claim");
+    let replacement = transport
+        .next_track(media.open())
+        .expect("supersede the promotion target");
+    let _ = replacement;
+
+    let verdict = transport.fence_succeeded().expect("verdict");
+    assert!(matches!(
+        verdict,
+        FenceVerdictOutcome::VerdictConsumed { .. }
+    ));
+
+    // The flush emptied the queue; the discarded backlog keeps the drain
+    // predicate satisfiable with the already-terminal producer.
+    assert!(
+        transport.transport_drained(),
+        "consumed verdict with decode backlog must still reach drain"
+    );
+
+    let mut music = MusicKernel::new();
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
+    assert_eq!(music.state(), PlaybackState::Ended);
+}
+
+#[test]
+fn drained_fact_taken_before_a_superseding_episode_is_dropped_as_stale() {
+    // take_derived_facts hands fact ownership out of the kernel; delivery
+    // may be delayed past a temporal mutation that invalidates the fact.
+    // The revision stamp must drop it at the observation seam — ENDED may
+    // not fire for an episode that has already been superseded.
+    let mut transport = TransportKernel::new();
+    let mut music = MusicKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    drain_naturally(&mut transport, started.decode_session, started.generation);
+    assert!(transport.transport_drained());
+
+    let facts = transport.take_derived_facts();
+    assert_eq!(facts.len(), 1);
+    assert!(matches!(facts[0].fact, TransportFact::NaturallyDrained));
+    assert!(
+        transport.fact_is_current(&facts[0]),
+        "fresh while its temporal state holds"
+    );
+
+    // Temporal mutations land between take and delivery: the episode
+    // completes and a new one opens, superseding the drained state the
+    // fact describes.
+    transport
+        .complete_ended_episode()
+        .expect("episode completes");
+    let second = transport.play(media.open()).expect("new episode");
+    assert!(
+        !transport.fact_is_current(&facts[0]),
+        "the fact now describes a superseded temporal state"
+    );
+
+    // Delayed delivery: dropped as stale, never interpreted.
+    music.observe_all(facts, transport.fact_revision());
+    assert_ne!(music.state(), PlaybackState::Ended);
+    assert_eq!(music.stale_facts_dropped(), 1);
+
+    // The fresh episode's facts flow normally under a matching revision.
+    drain_naturally(&mut transport, second.decode_session, second.generation);
+    music.observe_all(transport.take_derived_facts(), transport.fact_revision());
+    assert_eq!(music.state(), PlaybackState::Ended);
+    assert_eq!(music.stale_facts_dropped(), 1);
+}
+
+#[test]
+fn superseded_prepared_track_session_releases_immediately() {
+    // next B then next C: supersede closes B's decode session, and B's
+    // TrackSession — now roleless with a fully retired subtree — must be
+    // released at the supersede, not retained until promotion or stop.
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let second = transport.next_track(media.open()).expect("next B prepares");
+    let third = transport
+        .next_track(media.open())
+        .expect("next C supersedes B");
+    assert_eq!(
+        third.superseded.map(|s| s.generation),
+        Some(second.generation)
+    );
+
+    let snapshot = transport.snapshot();
+    assert_eq!(
+        snapshot.track_sessions.len(),
+        2,
+        "active A + prepared C remain; B is gone now"
+    );
+    assert!(
+        snapshot
+            .track_sessions
+            .iter()
+            .any(|t| t.id == started.track),
+        "active track retained"
+    );
+    assert!(
+        snapshot.track_sessions.iter().any(|t| t.id == third.track),
+        "new prepared track retained"
+    );
+    assert!(
+        !snapshot.track_sessions.iter().any(|t| t.id == second.track),
+        "superseded prepared track released immediately"
+    );
+}
+
+#[test]
+fn unprimable_prepared_replacement_track_releases_on_eof_abandon() {
+    // Prepared-EOF abandonment drops the contribution; when it was a
+    // replacement track's only session, that TrackSession releases now.
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let replacement = transport
+        .next_track(media.open())
+        .expect("replacement track prepares");
+    let outcome = transport
+        .decoder_eof(replacement.decode_session)
+        .expect("EOF before priming");
+    assert_eq!(
+        outcome,
+        EofOutcome::PreparedAbandonedBeforeReadiness {
+            generation: replacement.generation,
+        }
+    );
+
+    let snapshot = transport.snapshot();
+    assert_eq!(snapshot.prepared, None);
+    assert_eq!(
+        snapshot.track_sessions.len(),
+        1,
+        "replacement track released at the abandonment"
+    );
+    assert_eq!(snapshot.track_sessions[0].id, started.track);
 }
 
 /// Drive an active session to natural drain: decode, submit, render all

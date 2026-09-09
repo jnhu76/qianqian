@@ -41,6 +41,18 @@
 //!   generation; submissions must be backed by admitted decode evidence;
 //!   empty decode/submit/render evidence is rejected (the frame-count
 //!   translation of the model's block-count guards).
+//! * Closing a window's admission is one-way and submission requires open
+//!   admission: the decoded-but-unsubmitted backlog can never become
+//!   audible, so the closing transition (hard cut, stop, supersede)
+//!   explicitly discards it into `discarded_frames` accounting. The
+//!   natural-drain predicate reads `accepted == submitted + discarded`,
+//!   which keeps it reachable after a failed/abandoned fence instead of
+//!   stranding an undrainable pipeline forever (model decision 8).
+//! * Derived facts carry the causal-freshness revision they were derived
+//!   under; every invalidating temporal mutation advances it. MusicKernel
+//!   observes a fact only under a revision supplied in the same
+//!   synchronous delivery transaction — a delayed delivery that crosses
+//!   an invalidating mutation is dropped as stale, never interpreted.
 //! * A consumed verdict flushes queued media and derives drained truth at
 //!   the verdict itself — the predicate is re-checked after every fence
 //!   resolution, not only after decode/render evidence.
@@ -65,6 +77,31 @@ impl GenerationId {
     pub fn as_u64(self) -> u64 {
         self.0
     }
+}
+
+/// Causal-freshness revision of derived-fact truth. Advanced by every
+/// transport mutation that invalidates pending derived facts (episode
+/// start, new submission, promotion, stop). A derived fact stamped with a
+/// superseded revision describes a temporal state that no longer exists.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FactRevision(u64);
+
+impl FactRevision {
+    fn advance(self) -> Self {
+        FactRevision(self.0 + 1)
+    }
+}
+
+/// A derived fact stamped with the temporal revision it was derived
+/// under. `take_derived_facts` hands fact ownership out of the kernel;
+/// the stamp is what keeps such a fact honest across a delayed delivery:
+/// freshness must be validated at the observation seam (see
+/// `fact_is_current` and `MusicKernel::observe`) before interpretation,
+/// so delivery cannot cross a temporal mutation that invalidates it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StampedFact {
+    pub fact: TransportFact,
+    pub revision: FactRevision,
 }
 
 /// Identity of a `TrackSession` (media identity / source lifetime root).
@@ -172,6 +209,10 @@ pub struct WindowState {
     pub submitted_frames: u64,
     pub rendered_frames: u64,
     pub queued_frames: u64,
+    /// Decoded media explicitly discarded when this window's admission
+    /// closed (it could never be submitted afterwards). Drain-relevant
+    /// accounting reads `accepted == submitted + discarded`.
+    pub discarded_frames: u64,
 }
 
 /// One decode session inside the ownership tree of a track session.
@@ -278,6 +319,7 @@ struct DecodeSession {
     submitted_frames: u64,
     rendered_frames: u64,
     queued_frames: u64,
+    discarded_frames: u64,
 }
 
 #[derive(Debug)]
@@ -297,7 +339,8 @@ pub struct TransportKernel {
     next_track: u64,
     next_decode_session: u64,
     transport_drained: bool,
-    derived_facts: Vec<TransportFact>,
+    fact_revision: FactRevision,
+    derived_facts: Vec<StampedFact>,
     fence: Option<FenceTransaction>,
 }
 
@@ -382,6 +425,11 @@ impl TransportKernel {
             admission_open: true,
             ready: false,
         });
+        // A superseded contribution may have been the last live member of
+        // its TrackSession (for example a superseded prepared replacement
+        // track): release the fully-retired subtree now instead of
+        // retaining it until the next promotion or stop.
+        self.release_drained_tracks();
         Ok(PreparedForCut {
             generation,
             track,
@@ -400,17 +448,21 @@ impl TransportKernel {
         })
     }
 
-    /// Close a window's admission and detach its decode session.
+    /// Close a window's admission and detach its decode session. The
+    /// decoded-but-unsubmitted backlog leaves drain-relevant accounting
+    /// here as an explicit discard (see `discard_stranded_backlog`).
     fn close_admission_of(&mut self, window: &Window) {
         if let Some(session) = self.decode_session_mut(window.decode_session) {
             session.role = None;
             session.closed = true;
+            discard_stranded_backlog(session);
         }
     }
 
     /// Begin the hard-cut handshake over a primed prepared window: close
-    /// the old admission (no new old-generation submission), then request
-    /// the physical fence. Promotion happens only on a successful verdict.
+    /// the old admission (no new old-generation submission) — which also
+    /// discards its decoded-but-unsubmitted backlog — then request the
+    /// physical fence. Promotion happens only on a successful verdict.
     pub fn begin_hard_cut(&mut self) -> Result<HardCutStarted, &'static str> {
         if self.fence.is_some() {
             return Err("fence already in flight");
@@ -419,10 +471,15 @@ impl TransportKernel {
         if !prepared.ready {
             return Err("prepared window not ready");
         }
-        let cut = self.active.as_ref().ok_or("no active episode")?.generation;
+        let active = self.active.as_ref().ok_or("no active episode")?;
+        let cut = active.generation;
+        let cut_session = active.decode_session;
         let target = prepared.generation;
         if let Some(active) = self.active.as_mut() {
             active.admission_open = false;
+        }
+        if let Some(session) = self.decode_session_mut(cut_session) {
+            discard_stranded_backlog(session);
         }
         self.fence = Some(FenceTransaction {
             cut,
@@ -520,6 +577,9 @@ impl TransportKernel {
     /// Abandon the failed transaction and fail closed: no promotion, fence
     /// returns to idle, the admission-closed active window keeps draining
     /// naturally, and the prepared window stays for a later episode.
+    /// Natural drain stays reachable because the admission-close
+    /// transition already discarded the cut generation's decoded-but-
+    /// unsubmitted backlog: what is left can still render out.
     pub fn abandon_fence(&mut self) -> Result<GenerationId, &'static str> {
         let fence = self.fence.as_ref().ok_or("no fence in flight")?;
         if !fence.failed {
@@ -556,7 +616,10 @@ impl TransportKernel {
             Some(active) if active.generation == cut => {
                 self.close_admission_of(&active);
                 self.transport_drained = true;
-                self.derived_facts.push(TransportFact::Stopped);
+                self.derived_facts.push(StampedFact {
+                    fact: TransportFact::Stopped,
+                    revision: self.fact_revision,
+                });
                 self.release_drained_tracks();
                 FenceVerdictOutcome::StopCompleted { cut }
             }
@@ -725,8 +788,13 @@ impl TransportKernel {
             && !prepared.ready
         {
             self.supersede_prepared();
-            self.derived_facts
-                .push(TransportFact::PreparedAbandonedBeforeReadiness);
+            // The abandoned contribution may have been the last live
+            // member of its TrackSession: release it now.
+            self.release_drained_tracks();
+            self.derived_facts.push(StampedFact {
+                fact: TransportFact::PreparedAbandonedBeforeReadiness,
+                revision: self.fact_revision,
+            });
             return Ok(EofOutcome::PreparedAbandonedBeforeReadiness { generation });
         }
         self.publish_drained_if_reached();
@@ -734,15 +802,20 @@ impl TransportKernel {
     }
 
     /// Stop: supersede any pending prepared contribution, close the active
-    /// admission, and request (or reinterpret) the terminal physical fence.
-    /// An in-flight promote fence is reinterpreted as the same terminal
-    /// cut — the claimed physical flush itself is never rewritten.
+    /// admission — discarding its decoded-but-unsubmitted backlog — and
+    /// request (or reinterpret) the terminal physical fence. An in-flight
+    /// promote fence is reinterpreted as the same terminal cut — the
+    /// claimed physical flush itself is never rewritten.
     pub fn stop(&mut self) -> Result<GenerationId, &'static str> {
         let active = self.active.as_ref().ok_or("no active episode")?;
         let cut = active.generation;
+        let cut_session = active.decode_session;
         self.supersede_prepared();
         if let Some(active) = self.active.as_mut() {
             active.admission_open = false;
+        }
+        if let Some(session) = self.decode_session_mut(cut_session) {
+            discard_stranded_backlog(session);
         }
         // The stop negates stale drained truth and withdraws any drained
         // fact MusicKernel has not consumed yet: stop, not ENDED, wins.
@@ -784,18 +857,23 @@ impl TransportKernel {
 
     /// Negate the drained truth and withdraw any unconsumed drained fact.
     /// Every mutation that invalidates drain (new episode, new submission,
-    /// promotion, stop) must call this: a delivered-but-stale drained fact
-    /// would let MusicKernel END an episode that is actually playing.
+    /// promotion, stop) must call this: it also advances the fact revision,
+    /// so a fact already taken out of the kernel but not yet delivered is
+    /// dropped as stale at the observation seam instead of ENDing an
+    /// episode that is actually playing.
     fn invalidate_drained_truth(&mut self) {
         self.transport_drained = false;
+        self.fact_revision = self.fact_revision.advance();
         self.derived_facts
-            .retain(|f| !matches!(f, TransportFact::NaturallyDrained));
+            .retain(|f| !matches!(f.fact, TransportFact::NaturallyDrained));
     }
 
     /// Publish transport-drained truth when the natural-drain predicate is
     /// newly reached with no fence in flight. The predicate: the active
     /// producer is terminal, no generation holds queued media, and every
-    /// admitted decode result has been submitted.
+    /// admitted decode result has been submitted or explicitly discarded
+    /// (admission-close discard keeps the predicate reachable after an
+    /// abandoned cut instead of stranding it forever).
     fn publish_drained_if_reached(&mut self) {
         if self.transport_drained || self.fence.is_some() {
             return;
@@ -812,7 +890,7 @@ impl TransportKernel {
             return;
         };
         let media_clear = session.producer_terminal
-            && session.accepted_frames == session.submitted_frames
+            && session.accepted_frames == session.submitted_frames + session.discarded_frames
             && self
                 .track_sessions
                 .iter()
@@ -820,7 +898,10 @@ impl TransportKernel {
                 .all(|d| d.queued_frames == 0);
         if media_clear {
             self.transport_drained = true;
-            self.derived_facts.push(TransportFact::NaturallyDrained);
+            self.derived_facts.push(StampedFact {
+                fact: TransportFact::NaturallyDrained,
+                revision: self.fact_revision,
+            });
         }
     }
 
@@ -830,8 +911,24 @@ impl TransportKernel {
         self.transport_drained
     }
 
-    /// Take derived typed facts destined for `MusicKernel`.
-    pub fn take_derived_facts(&mut self) -> Vec<TransportFact> {
+    /// Current causal-freshness revision of derived-fact truth. Delivery
+    /// pumps read this in the same synchronous transaction that observes
+    /// the taken facts.
+    pub fn fact_revision(&self) -> FactRevision {
+        self.fact_revision
+    }
+
+    /// Causal-freshness validation for a fact that has left the kernel:
+    /// true iff no invalidating temporal mutation happened after the fact
+    /// was derived.
+    pub fn fact_is_current(&self, fact: &StampedFact) -> bool {
+        fact.revision == self.fact_revision
+    }
+
+    /// Take derived typed facts destined for `MusicKernel`. Each fact is
+    /// stamped with the revision it was derived under; see
+    /// `fact_is_current` for the delivery contract.
+    pub fn take_derived_facts(&mut self) -> Vec<StampedFact> {
         std::mem::take(&mut self.derived_facts)
     }
 
@@ -912,6 +1009,7 @@ impl TransportKernel {
             submitted_frames: 0,
             rendered_frames: 0,
             queued_frames: 0,
+            discarded_frames: 0,
         });
         id
     }
@@ -956,8 +1054,23 @@ impl TransportKernel {
             submitted_frames: session.submitted_frames,
             rendered_frames: session.rendered_frames,
             queued_frames: session.queued_frames,
+            discarded_frames: session.discarded_frames,
         }
     }
+}
+
+/// Absorb a session's decoded-but-unsubmitted remainder into explicit
+/// discard accounting. Submission requires open admission and admission
+/// closing is one-way, so that media can never become audible; absorbing
+/// it at the admission-close transition keeps the natural-drain predicate
+/// (`accepted == submitted + discarded`) reachable after a failed or
+/// abandoned fence instead of stranding an undrainable pipeline forever.
+/// Idempotent: the not-yet-discarded remainder is zero once absorbed.
+fn discard_stranded_backlog(session: &mut DecodeSession) {
+    let pending = session
+        .accepted_frames
+        .saturating_sub(session.submitted_frames + session.discarded_frames);
+    session.discarded_frames += pending;
 }
 
 #[cfg(test)]

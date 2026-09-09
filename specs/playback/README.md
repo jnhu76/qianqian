@@ -66,7 +66,7 @@ Extended 项继续保留并继续运行，其历史结果不删除。若某个 e
 6. 要求 hard cut 的 promotion 必须等待成功的 Physical Fence verdict；fence 失败不得伪装成功 promotion。
 7. fence 成功冲刷后，被截断 generation 不得再有在途可渲染媒体。
 8. rendered 媒体必须曾被 submitted；每次提交必须由 admitted 期间接受的 decode result 支撑。
-9. Decoder EOF ≠ transport drained ≠ ENDED：drained 要求无任何 submitted-but-unrendered 媒体且 active pipeline 内无已接受未提交结果。
+9. Decoder EOF ≠ transport drained ≠ ENDED：drained 要求无任何 submitted-but-unrendered 媒体且 active pipeline 内无"未 discard 的已接受未提交结果"（admission 关闭转移把不可再提交的 backlog 显式移入 discard 记账，见模型决策 8）。
 10. retired generation 不得重新获得 admission / 窗口 / 在途媒体。
 11. pending discontinuity 被新 intent supersede 时，由 TransportKernel 原子取消/替换 prepared 窗口。
 12. rapid 命令序列 `seek(100) → seek(200) → next → stop` 与 decode / fence / render 证据的全部交错。
@@ -95,7 +95,7 @@ Extended 项继续保留并继续运行，其历史结果不删除。若某个 e
 | `fence` | 恒为 record `[cut, target, phase]`；`phase="idle"` 表示无进行中 fence |
 | `fenceSuccessFor` | 成功完成 fence 的 cut generation 历史 |
 | `promotions` | `[new, cut]` 记录集合（谁经 promotion 成为 Active、切的是谁） |
-| `queued` / `submittedEver` / `rendered` | 每 generation 的设备队列 / 历史提交 / 历史渲染计数（submitted != rendered 的记账） |
+| `queued` / `submittedEver` / `rendered` / `discardedBacklog` | 每 generation 的设备队列 / 历史提交 / 历史渲染 / admission 关闭时显式 discard 的 decoded-but-never-submitted 计数（drain predicate 读 `accepted = submitted + discarded`，见模型决策 8） |
 | `decodeAcceptedInAdmission` / `decodeAcceptedOutOfAdmission` | decode result 按接收时**真实 admission 状态**分流计数；后者是 violation 检测器，正常模型恒 0 |
 | `producerTerminal` | decoder EOF（或随 provider withdrawal 终止）的 generation 集合 |
 | `sessionClosed` | DecodeSession 已关闭集合 |
@@ -110,13 +110,14 @@ Extended 项继续保留并继续运行，其历史结果不删除。若某个 e
 - **supersede 原子化**："取消旧 prepared"与"创建新 prepared"折叠为一步（TransportKernel 是唯一 supersede authority）。
 - **decode session 关闭后不再产生结果**：`LateDecodeResult` guard 要求 session 存活；"decoder worker 的 in-flight result 晚于 session close 到达"的现实竞态被排除（由于所有关闭都发生在 admission 已关之后，该竞态即使探索也只会落入纯拒绝动作）。
 - **单 fence 槽**：同一时刻最多一次在途物理冲刷（现实设备通常一次一个 flush）；fence verdict 不会晚于下一次 fence 乱序到达。
-- **retired generation 的记账折叠**：DecodeSession 关闭时把该 generation 的 submitted/queued/accepted 计数收敛为 rendered 值——retired 历史不参与任何活跃不变量，这是状态空间抽象；violation 检测器 `decodeAcceptedOutOfAdmission` 不折叠，保证 counterexample 可见。
+- **retired generation 的记账折叠**：DecodeSession 关闭时把该 generation 的 submitted/queued/accepted/discard 计数收敛为 rendered 值（discardedBacklog 归零）——retired 历史不参与任何活跃不变量，这是状态空间抽象；violation 检测器 `decodeAcceptedOutOfAdmission` 不折叠，保证 counterexample 可见。
+- **admission 关闭即 discard 未提交 backlog**：提交要求 admission 开放且关闭单向，因此 admission 关闭转移（`CloseOldAdmission` / `RequestStop`）当場把 decoded-but-never-submitted backlog 写入 `discardedBacklog`（模型决策 8）；不做这一步，fail/abandon 或 verdict-consumed 之后的 admission-closed active 会让 drain predicate 永久悬空。
 - **fence 成功 = 设备冲刷完成**：`CompleteFence` 原子丢弃 cut generation 的排队媒体（flush 语义），此后该 generation 静默。
 - **有限边界**：`MaxGen=4`（覆盖 `seek/seek/next/stop` 完整 rapid trace），`MaxMedia=1`。
 
 ### 动作
 
-`Play`；`RequestSeek` / `RequestNext`（共用 `PrepareDiscontinuity`：原子 supersede 旧 prepared + 创建新 prepared generation）；`RequestStop`（supersede prepared + 关 active admission + 发起/重解释终局 fence）；`AcceptDecodeResult(g)` / `LateDecodeResult(g)`；`MarkPreparedReady`；`DecoderEof(g)`；`DropUnprimablePrepared`；`CloseOldAdmission`；`RequestFence` / `ClaimFence` / `CompleteFence` / `FailFence` / `RetryFence` / `AbandonFence` / `ConsumeFenceVerdict`；`PromotePrepared`；`StopComplete`；`CloseRetiredDecodeSession(g)`；`SubmitMedia(g)` / `RenderMedia(g)`；`WithdrawDecoderProvider`；`PublishTransportDrained` / `PublishEnded`；`Stall`（合法等待，非 deadlock）。
+`Play`；`RequestSeek` / `RequestNext`（共用 `PrepareDiscontinuity`：原子 supersede 旧 prepared + 创建新 prepared generation）；`RequestStop`（supersede prepared + 关 active admission + discard 未提交 backlog + 发起/重解释终局 fence）；`AcceptDecodeResult(g)` / `LateDecodeResult(g)`；`MarkPreparedReady`；`DecoderEof(g)`；`DropUnprimablePrepared`；`CloseOldAdmission`（关 active admission + discard 未提交 backlog）；`RequestFence` / `ClaimFence` / `CompleteFence` / `FailFence` / `RetryFence` / `AbandonFence` / `ConsumeFenceVerdict`；`PromotePrepared`；`StopComplete`；`CloseRetiredDecodeSession(g)`；`SubmitMedia(g)` / `RenderMedia(g)`；`WithdrawDecoderProvider`；`PublishTransportDrained` / `PublishEnded`；`Stall`（合法等待，非 deadlock）。
 
 ### Safety properties 与防御的 bug
 
@@ -136,6 +137,7 @@ Extended 项继续保留并继续运行，其历史结果不删除。若某个 e
 | `PromotionRequiresSuccessfulFence` | state | 未经成功 fence 的 hard-cut promotion（旧尾未死即切换） |
 | `FenceFlushedGenerationsAreSilent` | constructive | fence 成功后被截断 generation 仍可发声 |
 | `TransportDrainRequiresRenderedDrain` | state | 有 submitted-but-unrendered 媒体时宣布 drained |
+| `NoStrandedDecodeAfterAdmissionClose` | constructive | admission 已关闭的窗口仍有未申报的 decoded-but-unsubmitted backlog（fail/abandon 或 verdict-consumed 后 drain predicate 永久悬空——决策 8 关闭的洞） |
 | `EndedRequiresTransportDrain` | constructive | ENDED 绕过 transport drained 事实 |
 | `StopFenceRequiresActiveWindow` | state | stop-fence 在途时 ActiveWindow 被移除（drained/ENDED 抢先导致命令永久锁死——见模型决策 2） |
 
@@ -213,37 +215,41 @@ java -jar specs/tools/tla2tools.jar -workers 4 -config PromoteWithoutFence.cfg P
 
 ---
 
-## 六、运行结果（真实运行数据，2026-09-08，4 workers，含 review 修复后模型）
+## 六、运行结果（真实运行数据，2026-09-09，4 workers，含 executable-core corrective 后模型）
 
 core acceptance 集 = `PlaybackTemporal` 正常模型 + 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）；下表其余行为 extended exploration 证据，全部保留。
+
+本列数据对应 decision 8（admission 关闭 discard 记账 + `NoStrandedDecodeAfterAdmissionClose` 不变量）合入后的模型；与 2026-09-08 数据不可直接对比（新增变量与新不变量改变了可达状态空间与 drain 发布条件）。
 
 ### 正常模型
 
 | 模型 | 结果 | states generated | distinct states | depth | runtime |
 | --- | --- | --- | --- | --- | --- |
-| PlaybackTemporal | **PASS**（16 个 invariant 全部成立） | 30,171,228 | 2,698,368 | 44 | ~50s |
+| PlaybackTemporal | **PASS**（17 个 invariant 全部成立，0 TLC warning） | 36,016,926 | 3,213,723 | 47 | ~105s |
 | PlaybackOwnership | **PASS**（10 个 invariant 全部成立） | 99,061 | 14,528 | 19 | <1s |
 
-正常模型非空洞（coverage 证据，PlaybackTemporal 关键动作触发数 / 启用状态数）：`PrepareDiscontinuity` 8,376 / 53,020、`CloseOldAdmission` 10,974 / 21,754、`RequestFence` 18,094 / 25,220、`CompleteFence` 221,606 / 329,593、`FailFence` 191,370 / 329,593、`PromotePrepared` 14,117 / 22,128、`StopComplete` 181,466 / 275,468、`RequestStop` 120,515 / 2,103,990、`PublishEnded` 65,719 / 141,582、`WithdrawDecoderProvider` 128,770 / 2,243,215、`ConsumeFenceVerdict` 6,588 / 27,801、`DropUnprimablePrepared` 10,352 / 70,360；`LateDecodeResult` 在 6,795,847 个状态上启用（纯拒绝动作不改变状态，触发数按启用计）。Ownership 模型 `FinalReleaseProvider` 与 `FinishMusicComponent` 均有非平凡触发。
+正常模型非空洞（coverage 证据，PlaybackTemporal 关键动作触发数 / 启用状态数）：`PrepareDiscontinuity` 9,270 / 60,190、`CloseOldAdmission` 10,977 / 23,602、`RequestFence` 22,231 / 30,497、`CompleteFence` 252,909 / 377,957、`FailFence` 220,298 / 377,957、`AbandonFence` 173,628 / 377,957、`PromotePrepared` 15,091 / 26,922、`StopComplete` 205,432 / 314,448、`RequestStop` 137,471 / 2,462,900、`PublishTransportDrained` 231,874 / 500,530、`PublishEnded` 115,457 / 218,531、`WithdrawDecoderProvider` 160,328 / 2,638,555、`ConsumeFenceVerdict` 6,553 / 33,417、`DropUnprimablePrepared` 11,792 / 81,506；`LateDecodeResult` 在 8,179,286 个状态上启用（纯拒绝动作不改变状态，触发数按启用计）；`RetryFence` 触发数为 0 属 TLC coverage 归因（其 failed→requested 后继总是先由 `RequestFence`/`RequestStop` 等动作生成；与 2026-09-08 模型行为一致），探索完整性不受影响。Ownership 模型 `FinalReleaseProvider` 与 `FinishMusicComponent` 均有非平凡触发。
 
 ### 负控制（mutation 必须 FAIL 才算通过）
 
 | Mutation | 目标 property（必须被违反） | 结果 | CE 规模（近似） |
 | --- | --- | --- | --- |
-| PromoteWithoutFence | `PromotionRequiresSuccessfulFence` | **MUST FAIL / 已失败** ✓ | 866 distinct |
+| PromoteWithoutFence | `PromotionRequiresSuccessfulFence` | **MUST FAIL / 已失败** ✓ | 782 distinct |
 | AcceptUnadmittedDecode | `DecodeResultRequiresAdmission` | **MUST FAIL / 已失败** ✓ | 28 distinct |
-| SingleGlobalGenerationCheck | `DecodeResultRequiresAdmission`（stop 窗口期）+ 症状属性成立 | **MUST FAIL / 已失败** ✓ | 30 distinct（首个 CE）；完整探索 ~54.9k |
-| RetiredGenerationStillAdmitted | `RetiredGenerationCannotReenter` | **MUST FAIL / 已失败** ✓ | 67 distinct |
-| EndBeforeRenderDrain | `TransportDrainRequiresRenderedDrain` | **MUST FAIL / 已失败** ✓ | 121 distinct |
+| SingleGlobalGenerationCheck | `DecodeResultRequiresAdmission`（stop 窗口期）+ 症状属性成立 | **MUST FAIL / 已失败** ✓ | 完整探索 ~51.6k（`-continue`） |
+| RetiredGenerationStillAdmitted | `RetiredGenerationCannotReenter` | **MUST FAIL / 已失败** ✓ | 59 distinct |
+| EndBeforeRenderDrain | `TransportDrainRequiresRenderedDrain` | **MUST FAIL / 已失败** ✓ | 186 distinct |
 | ReleaseProviderEarly | `ProviderFinalReleaseRequiresDependentExit` | **MUST FAIL / 已失败** ✓ | 169 distinct |
 | MultipleImmediateOwners | `UniqueImmediateLifetimeOwner` | **MUST FAIL / 已失败** ✓ | 18 distinct |
 | OwnershipCycle | `OwnershipReachesLifecycleRoot` | **MUST FAIL / 已失败** ✓ | 103 distinct |
 | KernelAdoptsLifetimeOwnership | `SemanticAuthoritiesHoldNoLifetimeOwnership` | **MUST FAIL / 已失败** ✓ | 109 distinct |
 
+Ownership 模型未随本次 corrective 变更（运行数据与 2026-09-08 一致）。
+
 `SingleGlobalGenerationCheck` 的双证据（均由 runner 机器检查）：
 
 1. **安全性失败**：恢复 `result.generation != current_generation => stale` 后，stop 窗口期（active admission 已关、fence verdict 未落、无 promotion 改变全局代）old active gen 的 decode result 被错误接收，TLC 给出 counterexample。
-2. **功能性破坏**：全局相等检查使 prepared gen（≠ current）永远无法被喂送——症状属性 `DualWindowNeverPrimesUnderGlobalCheck` 在完整探索中成立（`MarkPreparedReady` / `PromotePrepared` coverage 为 `0:0`，从未启用；正常模型中两者分别有 1,949 / 14,117 次触发）。Dual Window 在该检查下不成立。
+2. **功能性破坏**：全局相等检查使 prepared gen（≠ current）永远无法被喂送——症状属性 `DualWindowNeverPrimesUnderGlobalCheck` 在完整探索中成立（`MarkPreparedReady` / `PromotePrepared` coverage 为 `0:0`，从未启用；正常模型中两者分别有 2,181 / 15,091 次触发）。Dual Window 在该检查下不成立。
 
 ---
 
@@ -255,9 +261,10 @@ core acceptance 集 = `PlaybackTemporal` 正常模型 + 4 个 core mutation（`P
 2. **stop-fence 在途时不发布 drained/ENDED**：stop 与自然 ENDED 的竞态（EOF 排干 vs stop 物理切断）ADR 未定义。模型裁决：fence 握手在途 ⇒ 物理状态未定 ⇒ TransportKernel 不解释 drained（`PublishTransportDrained` 要求 fence idle；`RequestStop` 重置陈旧 drained 事实；`StopFenceRequiresActiveWindow` 不变量守护）。对抗 review 曾证明无此裁决时存在"ENDED 抢先移除 ActiveWindow → fence 永久卡死 → 命令锁死"的可达坏状态。**该裁决的最小 invariant 已反哺 ADR §18**（stop × 自然 ENDED 竞态冻结：Physical Fence 在途时，自然 EOF/drain 不得提前终态化并销毁 fence 所需 active temporal state）。
 3. **stop-fence 期间不接受新 seek/next**：stop 是终局性 cut，等 fence verdict 落定后才能开新 episode（`stop → seek 重开` 交错未探索）。**这是模型为闭合探索所做的决策，不是产品语义冻结**；ADR 只冻结「fence 进入 claimed（不可逆）阶段后，后续 intent 不得取消或改写已 claim 的 physical transaction」（§8）。reject / defer / coalesce / latest-wins 留给 executable implementation/oracle。
 4. **prepared 在 prime 完成前 decoder EOF**（如 seek 到文件尾）：`DropUnprimablePrepared` 取消该 discontinuity。**ADR 已收编最小冻结**（§18 Prepared EOF）：EOF evidence does not imply PreparedWindow readiness；prepared contribution 在 readiness 前 terminal 必须得到显式 outcome。具体分类（prepare failed / empty media / seek-to-EOF 等）留给实现与后续 oracle。
-5. **fence 失败的出路**：`RetryFence`（重试）或 `AbandonFence`（fail closed：不 promote，active 保持 admission-closed 自然排干）。
+5. **fence 失败的出路**：`RetryFence`（重试）或 `AbandonFence`（fail closed：不 promote，active 保持 admission-closed 自然排干）。自然排干之所以在 abandon 后仍然可达，是因为 admission 关闭转移已经把未提交 backlog 显式 discard（决策 8）。
 6. **fence 成功但 promotion 目标已被 supersede**：verdict 被消费（物理冲刷确实发生），不 promotion；新 prepared 走自己的 episode（同一 cut gen 可再次 fence——设备已静默，幂等）。
-7. **EOF 后、drained 前的已接受未提交结果**：drained predicate 要求 `decodeAcceptedInAdmission = submittedEver`（ADR "software media pipeline drained" 的模型化）。
+7. **EOF 后、drained 前的已接受未提交结果**：drained predicate 要求 `decodeAcceptedInAdmission = submittedEver + discardedBacklog`（ADR "software media pipeline drained" 的模型化；discard 项见决策 8）。
+8. **admission 关闭即 discard 未提交 backlog**：提交要求 admission 开放且关闭单向，因此 decoded-but-never-submitted 媒体在 admission 关闭转移（`CloseOldAdmission` / `RequestStop`）当場显式移入 `discardedBacklog` 记账。没有这一步，fail/abandon（以及 verdict-consumed 后 admission 保持关闭的 active）在 `accepted > submitted` 时会落入 drain predicate 永远无法满足的悬挂状态——executable core 的对抗 review 首先发现了这个洞（Rust `TransportKernel::discard_stranded_backlog` 与本模型同步修复）。这是 fail-closed 语义的记账补全，不改写 ADR 的 fence failure ⇒ no fake promotion / retry or fail closed 冻结。
 
 ## 八、TLC 没有证明什么
 
@@ -281,3 +288,5 @@ core acceptance 集 = `PlaybackTemporal` 正常模型 + 4 个 core mutation（`P
 ## 十、对抗 review 记录
 
 本目录的模型经过三轮 fresh-context 对抗 review（temporal 抽象 / ownership 三分 / 负控制有效性），修复了：stop×ENDED 竞态导致的命令永久锁死（补 fence-idle guard + `StopFenceRequiresActiveWindow`）、stop×promote-fence 交错被排除（`RequestStop` 放宽）、semantic authority 缺正结构（authority 事实表 + `KernelAdoptsLifetimeOwnership` 负控制）、provider final release 把从未创建的 Absent dependent 当阻塞条件、`SingleGlobalGenerationCheck` 症状属性未接入 gate（`-continue` + PROPERTY 机器检查）、mutation cfg 目标不变量排序（TLC 只报第一个违反）。
+
+第四轮（2026-09-09，executable core 对抗 review）首次由 Rust executable oracle 反向发现模型欠定义：admission 关闭后 decoded-but-never-submitted backlog 使 drain predicate 在 fail/abandon 与 verdict-consumed 路径下永久悬空。同步修复 = 决策 8 + `discardedBacklog` 变量 + `NoStrandedDecodeAfterAdmissionClose` 不变量 + Rust `TransportKernel::discard_stranded_backlog` 与回归测试（Rust/模型/spec 三方同步）。本轮还暴露一个取证陷阱并已修正：`RequestStop` 的 UNCHANGED 列表误含 `discardedBacklog` 时 TLC 仅发 Warning（"variable changed while UNCHANGED"）并静默丢弃相关转移，`check.sh` 的 grep 不检查 warning——首轮"PASS"数据（21.5M states）由此作废，修复后重跑（36.0M states，0 warning）。
