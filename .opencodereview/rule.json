@@ -1,0 +1,17 @@
+{
+  "include": [
+    "**/*.md",
+    "**/*.mmd",
+    "**/*_test.rs"
+  ],
+  "rules": [
+    {
+      "path": "**/*.{md,mmd}",
+      "rule": "Treat architecture, ADR, specification, governance, project-state, and website documentation as reviewable repository authority rather than prose noise. Check for contradictions, stale authority, duplicated normative text, accidental promotion of historical/experimental evidence, terminology drift, broken cross-file references, and claims that are not supported by code or executable evidence. For Qianqian playback work, preserve the explicit separation between Composition, Execution/Control, Fact, and Realtime Data planes; do not silently re-freeze reopened playback nouns or let projections/mechanism evidence become semantic authority. Prefer the smallest correction that restores one coherent source of truth."
+    },
+    {
+      "path": "**/*_test.rs",
+      "rule": "Review Rust tests as executable semantic evidence. Check whether the test really proves the claimed invariant, whether it can pass vacuously, whether timing/concurrency assumptions are stable, and whether the test accidentally turns experimental playback behavior into architecture authority."
+    }
+  ]
+}
