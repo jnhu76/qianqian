@@ -161,3 +161,13 @@ playback-reference-v1    git tag (branch: research/playback-reference-v1)
 ```
 
 Neither tag is present in the current working tree; inspect via `git show <tag>:<path>`. These are opt-in evidence sources, not current source-layout or ownership authorities.
+
+## External evidence isolation
+
+External issue/discussion mining lives outside the documentation authority tree under `../evidence/`.
+
+> **Do not load `evidence/` during ordinary ADR, architecture, formal-spec, implementation, or PR review.**
+
+Only opt in when the current task explicitly asks for external failure evidence, failure-corpus maintenance, upstream issue/discussion mining, or adversarial inspiration from other systems. This keeps fresh-context authority reviews grounded in Qianqian's own ADR/spec/code evidence instead of biasing them with outside incidents.
+
+When explicitly opted in, start at `../evidence/README.md`; for incremental external-system scans, read `../evidence/external-systems/source-ledger.yml` before the failure corpus so already-reviewed unchanged sources can be skipped without rereading history.
