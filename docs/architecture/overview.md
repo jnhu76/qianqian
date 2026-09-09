@@ -8,23 +8,15 @@ The current architecture intentionally separates composition, execution/control,
 
 ---
 
-# Architecture constitution
+# Normative constitution
 
-> **Base Kernel is domain-agnostic.**
->
-> **Plugin/Fiber identity belongs to composition/lifecycle, not per-payload routing.**
->
-> **Commands ask; Facts report committed truth.**
->
-> **Committed Facts may fan out; hot PCM does not use generic Fact/Event dispatch.**
->
-> **Realtime processing consumes pre-bound published graph/view state.**
->
-> **Projection is derived visibility, not authority.**
+> The normative Playback Foundations constitution lives in [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md) §1–§2. This overview explains; it does not carry a second normative copy.
 
 ---
 
 # Four-plane model
+
+The following are **reasoning lenses / concern boundaries**, not a claim that the runtime consists of exactly four concrete subsystems:
 
 ```text
 ┌────────────────────────────────────────────┐
@@ -39,18 +31,18 @@ The current architecture intentionally separates composition, execution/control,
 │ Command / workflow / Capability-Service    │
 │ parameter/control operations               │
 └────────────────────┬───────────────────────┘
-                     │ authoritative commit / graph build
+                     │ semantic commit / graph build
           ┌──────────┴──────────┐
           ▼                     ▼
 ┌──────────────────────┐  ┌──────────────────────────┐
 │      Fact Plane      │  │   Realtime Data Plane   │
 │ committed Fact       │  │ published graph/view    │
 │ projections          │  │ PCM direct flow         │
-│ persistence/UI       │  │ callbacks/device        │
+│ persistence/UI       │  │ execution/device        │
 └──────────────────────┘  └──────────────────────────┘
 ```
 
-These are cooperating mechanisms, not one universal bus.
+These are cooperating concerns, not one universal bus.
 
 ---
 
@@ -113,7 +105,7 @@ The granularity of Decoder, DSP stages and AudioOutput will be earned experiment
 
 # Execution / Control Plane
 
-Execution begins with intent.
+Execution begins with intent. This is currently a constraint-oriented lens, not a new K0 subsystem.
 
 ```text
 User / UI / automation
@@ -135,36 +127,21 @@ A future extension may use middleware/waterfall-like interception for execution 
 
 # Fact Plane
 
-A Fact is published only after its truth has been committed by the responsible authority/mechanism.
+A Fact is published only after its truth has been established by its designated semantic authority.
+
+Key frozen points (normative text in `../adr/ADR-PBK-001.md` §2.3):
 
 ```text
-validate / decide
-      ↓
-authoritative commit
-      ↓
-committed Fact
-      ↓
-fan-out
-  ├─ projection
-  ├─ persistence
-  ├─ UI
-  ├─ telemetry
-  └─ reactions / new commands
+semantic commit = the producing authority considers the fact established
+                  (not ACID/durability/fsync/device completion by default)
+commit first -> Fact publication
+one designated semantic authority per semantic fact type
+mechanism evidence does not directly publish another authority's fact
+Projection is derived visibility; a control decision must not use a
+Projection as its correctness authority
 ```
 
-Observers see the committed fact; they do not serially mutate one event until it becomes truth.
-
-> **commit first -> publish fact**
-
-### Projection
-
-Projection folds committed facts and/or authoritative snapshots into a read model.
-
-It is useful for UI, diagnostics, history and telemetry, but it is not a writer.
-
-> **Projection != authority.**
-
-Qianqian has not yet chosen repository-wide Event Sourcing/CQRS. Durability, replay authority and append-only logging remain open research questions.
+Event Sourcing/CQRS, durability, replay authority and append-only logging remain open research questions.
 
 ---
 
@@ -180,20 +157,7 @@ processing graph
 output/device
 ```
 
-Per block/callback, the realtime path must not perform:
-
-```text
-Context lookup
-Capability resolution
-Fiber Reconcile
-generic Fact/Event fan-out
-plugin registry traversal
-filesystem/network I/O
-UI/JS/managed-runtime round trip
-unbounded allocation/blocking
-```
-
-The realtime path operates on already-bound/published state.
+Per quantum, the realtime path must not re-enter Context resolution, generic Fact/Event fan-out, plugin dispatch, Reconcile, or filesystem/network/UI machinery; it operates on already-bound/published state. The normative forbidden list lives in `../adr/ADR-PBK-001.md` §2.4.
 
 > **Fact != hot data.**
 
@@ -229,60 +193,24 @@ Never derive DSP/realtime order from Fiber mount order, registration order, Hash
 
 # Graph publication boundary
 
-Control side:
+Control side builds and validates the next realtime graph/view; realtime execution loads the currently published view and processes the audio quantum directly.
+
+Normative contracts (in `../adr/ADR-PBK-001.md` §6):
 
 ```text
-composition/configuration/parameter decision
-        ↓
-build + validate next realtime graph/view
-        ↓
-publish at an RT-safe boundary
+A realtime reader observes one coherent published realtime view
+(N or N+1, never half of each).
+Any resource that realtime execution may still dereference must remain
+valid until no realtime execution or queued reference can dereference it.
 ```
 
-Realtime side:
-
-```text
-load current published graph/view
-        ↓
-process audio quantum directly
-```
-
-The publication mechanism is intentionally unfrozen.
-
-Candidates may include:
-
-```text
-RCU
-epoch
-double buffering
-Arc snapshot
-lease/hazard-style schemes
-other bounded handoff
-```
+The publication mechanism (RCU / epoch / double buffering / Arc snapshot / lease / hazard / other) is intentionally unfrozen.
 
 ---
 
 # Realtime lifetime safety
 
-A resource/provider referenced by a published realtime graph/view must remain alive while any old reader can still dereference it.
-
-```text
-withdraw/replace A
-      ↓
-A excluded from future graph build
-      ↓
-publish graph/view without A
-      ↓
-stop new readers entering old view
-      ↓
-old readers/queued refs quiesce
-      ↓
-release old graph refs
-      ↓
-final release A
-```
-
-This is the first clearly identified cross-plane lifetime invariant of the reset architecture.
+The withdrawal ordering, reader-quiescence steps and the exact resource/fiber lifetime binding are normative in `../adr/ADR-PBK-001.md` §6. This is the first clearly identified cross-plane lifetime invariant of the reset architecture.
 
 ---
 
@@ -338,17 +266,7 @@ Similarly, `specs/playback/*` is a valuable source of bug reproducers and formal
 
 # New research order
 
-```text
-1. K0 composition reality
-2. minimal PCM contract
-3. direct Source -> processing -> Sink data flow
-4. realtime graph publication / replacement / reader overlap
-5. real decoder mechanism
-6. real output mechanism
-7. only then playback semantics such as seek/stop/track/session
-```
-
-This order is intentionally mechanism-first at the foundation and semantics-later at the player level.
+The one normative research/implementation ladder lives in `../adr/ADR-PBK-001.md` §12: mechanism-first at the foundation, semantics-later at the player level.
 
 ---
 

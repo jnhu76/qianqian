@@ -39,26 +39,27 @@ Physical Fence
 
 # 1. 最小宪法
 
-本次只冻结以下原则：
+本次只冻结以下原则（本节是唯一 normative 宪法；`AGENTS.md` / `CONTEXT.md` / `overview.md` 只做路由、解释与状态记录，不持有第二份 normative 宪法）：
 
-1. **Base Kernel is domain-agnostic.**
-2. **Plugin/Fiber identity belongs to composition/lifecycle, not per-payload routing.**
-3. **Commands/capability calls ask the system to do something; facts describe what has already been committed.**
-4. **Committed facts may fan out to observers/projections, but observers do not rewrite the committed fact.**
-5. **Realtime PCM is a direct typed data flow, not a generic Event/Context/Plugin dispatch stream.**
-6. **Control-side graph construction/publication and realtime graph execution are separate responsibilities.**
-7. **A projection/read model is derived visibility, not semantic authority.**
-8. **No hidden global mutable bag may become the common owner of composition, facts, control state and PCM.**
+1. **Base Kernel K0 owns composition existence/reachability/lifecycle and remains domain-agnostic.**
+2. **Context/Capability/Plugin/Fiber mechanisms are not payload-routing mechanisms; no hidden global mutable state may become a shared writer.**
+3. **Command is intent. A Fact is truth established by its designated semantic authority. Each semantic fact type has exactly one designated authority at a time.**
+4. **Projection is derived visibility. It cannot write authority state, and a control decision must not use a Projection as its correctness authority.**
+5. **Realtime audio payload flows through pre-bound realtime execution state. Per-quantum PCM must not re-enter Context resolution, generic events, plugin dispatch, Reconcile, or filesystem/network/control machinery.**
+6. **Any resource that realtime execution may still dereference must remain valid until no realtime execution or queued reference can dereference it.**
+7. **Previous Playback implementation/spec/model artifacts are evidence only. Failure witnesses may be reused; representations and nouns are not inherited.**
 
 一句话：
 
-> **Kernel 管“谁存在”；Capability/Service 管“怎么执行”；Fact/Event 管“发生了什么”；Realtime Data Plane 管“PCM 怎么流”。**
+> **Kernel 管“谁存在”；Capability/Service 管“怎么执行”；Fact 管“发生了什么”；Realtime Data Plane 管“PCM 怎么流”。**
 
 这四件事禁止再次揉成一套万能机制。
 
 ---
 
-# 2. 四个平面
+# 2. 四个关注面（reasoning lenses）
+
+以下四分法是四个 **reasoning lenses / concern boundaries**，用于区分问题归属。它**不**宣称运行时由恰好四个具体子系统组成；某个 lens 是否挣得独立 runtime mechanism，由真实实验决定。
 
 ## 2.1 Composition Plane
 
@@ -109,6 +110,8 @@ K0 目前没有因为本次重置而新增 `Event`、`AudioGraph`、`Session`、
 
 这是“要求系统做事”的路径。
 
+> 当前它是一个 **constraint-oriented lens**，不是一个新的 K0 subsystem：本文不因此引入 command processor / workflow runtime 等新 generic primitive。
+
 典型形状：
 
 ```text
@@ -154,21 +157,38 @@ PCM block
 
 ## 2.3 Fact Plane
 
-Fact 表示已经由其 owning authority / mechanism **提交成立**的事实。
+Fact 表示已经由其 designated semantic authority **确立成立**的事实。
 
 最小语义：
 
 ```text
 validate / decide
       ↓
-authoritative commit
+semantic commit（由 designated authority 确立）
       ↓
 Fact
       ↓
-publish / fan-out
+Fact publication / fan-out
       ↓
 projection / persistence / UI / telemetry / reactions
 ```
+
+### commit 的精确定义
+
+> **Semantic commit = the producing semantic authority considers the fact established, according to that fact's contract.**
+
+Commit 是**语义确立**，不是 persistence 术语。semantic commit **不**天然意味着：
+
+```text
+ACID
+durable write
+fsync
+database transaction
+device completion
+process-crash durability
+```
+
+除非某个具体 fact 的 contract 未来另外要求。
 
 冻结：
 
@@ -188,6 +208,56 @@ finally decide what happened
 
 一个已提交 Fact 的 observer 失败，不得偷偷改变“这个事实是否已经发生”。如果某个 observer 需要触发新的动作，它必须发起新的 command 或产生新的事实，而不是回写旧 fact。
 
+### Fact type-level authority
+
+> **For each semantic fact type, there is exactly one designated semantic authority at a time.**
+
+> **Mechanism observations/evidence must not directly publish another authority's semantic fact.**
+
+两层区分（方向冻结，具体类型不冻结）：
+
+```text
+Mechanism Evidence
+    raw / observer-level evidence，例如未来可能的
+    DeviceObservedSilence / DecoderObservedEof / RenderPositionObserved
+
+Semantic Fact
+    由 designated authority 确立的事实，例如未来可能的
+    PlaybackStopped / PlaybackEnded / TrackCompleted
+```
+
+方向：
+
+```text
+mechanism observation
+    ↓ validation / semantic decision
+designated authority
+    ↓
+semantic Fact publication
+```
+
+一个 mechanism provider 观察到 raw evidence，不等于它可以因为该观察就直接发布 semantic fact；除非它本身就是该 fact type 的 designated authority。本文**不**现在命名任何 playback fact type 的 authority（Playback semantic authorities 仍 OPEN），只冻结上述 authority contract。也不冻结 `EvidenceEvent` / `FactEvent` / `TransportEvidence` 等具体类型。
+
+### Fact 不是必然持久化事件
+
+```text
+Fact != necessarily persisted event
+Fact != necessarily append-only log entry
+Fact != necessarily replayable
+Fact != necessarily durable
+```
+
+### publish 的两种含义
+
+`publish` 一词必须带对象使用，禁止裸用：
+
+```text
+Fact publication           事实发布（Fact Plane）
+Realtime-view publication  实时图/视图发布（Realtime Data Plane，§6）
+```
+
+这是两个不同机制，不得共用一个不带宾语的动词让 reader 猜。
+
 ### Projection
 
 Projection / materialized read model 的语义是：
@@ -203,29 +273,55 @@ next view
 冻结：
 
 > **Projection is derived visibility, not authority.**
+>
+> **A control decision must not use a Projection as its correctness authority.**
 
-UI、telemetry、history view、diagnostics 可以使用 projection，但不能通过修改 projection 改 runtime truth。
+Projection 可以用于：
+
+```text
+UI
+telemetry
+diagnostics
+history
+display
+non-authoritative convenience
+```
+
+但以下决策必须基于 authority state、authoritative capability result 或 validated fact/evidence，而不是一个可能 stale 的 projection：
+
+```text
+control transition
+resource lifecycle correctness
+semantic decision
+```
+
+本文不禁止 control code 读取 projection；禁止的是 **projection 成为 correctness basis**。
 
 ### 本 ADR 不冻结 Event Sourcing
 
 Qianqian 当前**不因为外部系统采用 append-only event log，就自动选择完整 Event Sourcing**。
 
-尚未决定：
+尚未决定（全部 OPEN）：
 
 ```text
+完整 Event Sourcing / CQRS
 事实是否全部 durable
-是否存在唯一 append-only log
+是否存在唯一 append-only global fact log
 内存 commit 与磁盘 durability 的关系
 replay 是否成为恢复权威
 snapshot + events 还是 state + events
 ```
+
+不新增 `EventStore` / `FactStore` / `SessionEvent` / `FactLog` 作为 K0 或 global primitive。
 
 本阶段只冻结：
 
 ```text
 command != fact
 commit precedes fact publication
-projection != authority
+per-fact-type single designated authority
+projection != authority（含 read-side firewall）
+fact publication 与 realtime-view publication 是不同机制
 ```
 
 ---
@@ -415,7 +511,7 @@ composition / config / parameters
         ↓
 build + validate next realtime graph/view
         ↓
-publish at an RT-safe boundary
+Realtime-view publication at an RT-safe boundary
 
 REALTIME SIDE
 
@@ -426,11 +522,35 @@ process audio quantum directly
 
 冻结：
 
-> **Realtime callback consumes a pre-bound published graph/view; it does not construct or reconcile one.**
+> **Realtime execution consumes a pre-bound published graph/view; it does not construct or reconcile one.**
+
+（措辞刻意使用 realtime execution / quantum / task / reader，不预设执行模型必须是 callback。callback / blocking push / pull / worker / hybrid 全部继续 OPEN。）
+
+### 最小 publication correctness contract
+
+实现机制不选，但以下最低语义已 earned：
+
+> **A realtime reader observes one coherent published realtime view.**
+
+publication 从 N 到 N+1 时，reader 看到的是 N 或 N+1，不得是 “half N + half N+1”。
+
+representation 继续 OPEN，全部不选：
+
+```text
+ArcSwap
+RCU
+epoch
+double-buffer
+atomic pointer
+lease
+hazard
+```
 
 ### Lifetime safety
 
-如果 published realtime graph/view 仍引用某个 provider/resource，那么该对象不能提前 final release。
+> **Any resource that realtime execution may still dereference must remain valid until no realtime execution or queued reference can dereference it.**
+
+（这是资源层面的 invariant；它**不**冻结 “Provider Fiber lifetime == RT resource lifetime”。）
 
 最小顺序：
 
@@ -439,7 +559,7 @@ provider/node withdrawal requested
         ↓
 exclude from future graph construction
         ↓
-publish replacement graph/view
+Realtime-view publication of replacement graph/view
         ↓
 old realtime readers/quanta stop entering old graph
         ↓
@@ -450,22 +570,15 @@ release old graph references
 provider/resource final release
 ```
 
-冻结：
-
-> **Published realtime references must outlive every reader that can still dereference them.**
-
-具体采用：
+继续 OPEN（不由本 invariant 决定）：
 
 ```text
-RCU
-epoch
-double buffer
-Arc snapshot
-hazard/lease
-stop-the-world handoff
+Provider Fiber 本身是否保持 alive
+RT view 是否持有 lease
+state slab 是否 outlive provider
+Arc / epoch / RCU / hazard pointer / refcount / callback fence
+reader-quiescence 的具体机制
 ```
-
-不冻结。
 
 ---
 
@@ -512,13 +625,13 @@ DecodeFailed
 OutputStopped
 ```
 
-这些是 Fact Plane 候选。
+这些首先是 **Mechanism Evidence 候选**（§2.3）；它们是否、由谁、以何种 fact type 成为 Semantic Fact，受 §2.3 的 fact type-level authority contract 约束，由真实实验挣得。
 
 但 PCM 本身不是“因为它经过 runtime，所以也顺便做成 event”。
 
 冻结：
 
-> **Facts describe meaningful committed observations; hot data remains on the realtime data plane.**
+> **Facts describe meaningful established observations; hot data remains on the realtime data plane.**
 
 是否存在：
 
@@ -529,7 +642,7 @@ submitted/rendered counters
 physical flush verdict
 ```
 
-以及谁解释它们，全部由真实 decoder/output 实验重新挣得。
+以及谁解释它们、谁是哪个 fact type 的 designated authority，全部由真实 decoder/output 实验重新挣得。
 
 ---
 
@@ -547,7 +660,9 @@ MutableAppState
 
 冻结：
 
-> **One semantic fact must have an explicit writer/authority, even if many projections can see it.**
+> **Each semantic fact type has exactly one designated semantic authority at a time, even if many projections can see the fact.**
+
+（这是 per-fact-type contract，不是要求一个全局 `FactAuthority` / `FactKernel` / `CentralEventRouter`。）
 
 但本 ADR 不提前命名具体 playback authorities。
 
@@ -580,8 +695,13 @@ Decoder provider granularity
 Processing-node Plugin granularity
 AudioOutput capability shape
 完整 Event Sourcing 与否
+Fact persistence / durability / replay
+Fact publication 的 fan-out 传输机制
+Realtime-view publication 的 representation（ArcSwap / RCU / epoch / double-buffer / atomic pointer / lease / hazard）
+reader-quiescence 的具体机制
+Provider Fiber lifetime 与 RT resource lifetime 的绑定关系
+realtime 执行模型细节（callback / blocking push / pull / worker / hybrid 的选择）
 ```
-
 这些问题不得通过引用旧代码、旧 TLA、旧 ADR 文案直接关闭。
 
 它们必须由当前实验、真实机制和新的 adversarial evidence 重新挣得。
@@ -607,21 +727,29 @@ NOT ARCHITECTURE AUTHORITY
 NOT COMPATIBILITY CONTRACT
 ```
 
-允许：
+允许（可以继承）：
 
 ```text
-复用已经证明有价值的 bug reproducer
-复用测试技术
+复用已经证明有价值的 bug reproducer / failure witness
+复用测试技术 / negative-control 方法 / verifier runner
+复用具体 counterexample
+复用已观察到的 hardware/mechanism 事实
 比较新实验是否重新撞到旧 failure
 ```
 
-禁止：
+禁止（不自动继承）：
 
 ```text
 为了兼容旧类型而保留新架构不需要的概念
 因为旧 TLA 有某个变量就要求 production 也必须有
 把旧 executable core 当作实现授权
+type name / state name / authority split / module boundary 自动延续
+generation / window / fence 的旧 representation 自动延续
 ```
+
+一句话原则：
+
+> **Preserve the bug, not necessarily the old solution.**（保留 bug witness，不必然保留旧解法。）
 
 如果新实验再次独立挣得某个旧概念，可以重新引入；名字也不必相同。
 
@@ -739,7 +867,7 @@ ReleaseBeforeReadersQuiesce
 本 ADR 从 PROPOSED 变成 ACCEPTED 前至少需要：
 
 ```text
-G1  四平面边界 adversarial review PASS
+G1  四关注面（reasoning lenses）边界 adversarial review PASS
 G2  K0 domain firewall review PASS
 G3  command vs fact vs hot-data distinction review PASS
 G4  direct realtime data-flow executable experiment PASS

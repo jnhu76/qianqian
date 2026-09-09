@@ -6,7 +6,9 @@ Playback architecture is currently **reopened**. Stable vocabulary must therefor
 
 ---
 
-# Stable vocabulary
+# Current vocabulary
+
+> **Status caveat: Playback-foundation vocabulary remains PROPOSED until the `ADR-PBK-001` acceptance gates pass.** Normative definitions live in `docs/adr/ADR-PBK-001.md`; this table is a short-status index, not a second authority.
 
 | Term | Meaning |
 |---|---|
@@ -63,7 +65,7 @@ Playback architecture is currently **reopened**. Stable vocabulary must therefor
 
 # Core mental model
 
-The current constitution is:
+The current proposal separates four reasoning lenses (not four mandatory runtime subsystems):
 
 ```text
 Composition Plane
@@ -75,15 +77,15 @@ Execution / Control Plane
     -> asks the system to do work
 
 Fact Plane
-    authoritative commit -> Fact -> observers/projections/persistence/UI
+    semantic commit -> Fact -> observers/projections/persistence/UI
     -> describes what has happened
 
 Realtime Data Plane
-    pre-bound graph/view -> PCM -> PCM -> device
+    pre-bound graph/view -> PCM -> device
     -> moves hot data under timing constraints
 ```
 
-The four planes cooperate but are not one mechanism.
+The normative constitution and all frozen distinctions live in `ADR-PBK-001.md` §1–§2.
 
 ---
 
@@ -139,131 +141,21 @@ Whether an audio processing stage deserves its own Plugin identity is a granular
 
 ---
 
-# Execution mental model
+# Execution / Fact / Realtime mental models
+
+These are one-line summaries; the normative contracts live in `ADR-PBK-001.md`:
 
 ```text
-Command
-   ↓
-domain/controller/workflow
-   ↓
-Capability / Service
-   ↓
-mechanism / authority
+Execution / Control   Command is intent, not fact                -> ADR §2.2
+Fact                  semantic commit -> Fact publication;        -> ADR §2.3
+                      one designated authority per fact type;
+                      projection is read-only visibility;
+                      Event Sourcing/durability/replay remain OPEN
+Realtime Data         PCM flows through pre-bound realtime        -> ADR §2.4, §6
+                      execution state; a realtime reader observes
+                      one coherent published view; RT-referenced
+                      resources stay valid until readers quiesce
 ```
-
-Execution may eventually need middleware/waterfall-like interception, but that is currently an unfrozen extension mechanism.
-
-A hook that can modify/reject/wrap execution belongs to control semantics, not post-commit Fact observation.
-
----
-
-# Fact mental model
-
-Minimum ordering:
-
-```text
-validate / decide
-      ↓
-commit truth
-      ↓
-publish Fact
-      ↓
-fan-out
-  ├─ projection
-  ├─ persistence
-  ├─ UI
-  ├─ telemetry
-  └─ reactions/new commands
-```
-
-The same committed Fact is observed; it is not passed through a mutable plugin pipeline.
-
-Projection folds facts into useful read state but is not a writer.
-
-Qianqian has **not** yet chosen complete Event Sourcing/CQRS as a repository-wide architecture.
-
-Open questions include:
-
-```text
-which facts are durable
-append-only log or not
-replay authority
-snapshotting
-memory commit vs disk durability
-```
-
----
-
-# Realtime mental model
-
-PCM is not an Event.
-
-```text
-CONTROL SIDE
-
-config/composition/parameters
-        ↓
-build + validate realtime graph/view
-        ↓
-publish
-
-REALTIME SIDE
-
-load current view
-        ↓
-process hot PCM directly
-        ↓
-device/output
-```
-
-Per block/callback:
-
-```text
-no Context lookup
-no Capability resolution
-no Reconcile
-no generic EventBus fan-out
-no plugin registry traversal
-no filesystem/network/UI
-no unbounded allocation/blocking
-```
-
----
-
-# Graph lifetime mental model
-
-Published realtime references cannot outlive their backing resources incorrectly.
-
-```text
-withdraw/replace A
-      ↓
-A excluded from future graph build
-      ↓
-publish graph without A
-      ↓
-old readers stop entering old graph
-      ↓
-old readers/queued refs quiesce
-      ↓
-release old graph refs
-      ↓
-final release A
-```
-
-Exact mechanism (`RCU`, epoch, snapshot, Arc, lease, double-buffer, etc.) is intentionally unfrozen.
-
----
-
-# Parameter mental model
-
-```text
-parameter update
-    ≠ automatically composition mutation
-```
-
-Changing volume/filter coefficients should be able to use a cheap RT-safe control path if the eventual architecture permits it.
-
-Topology/provider changes may require composition/graph rebuild/publication.
 
 ---
 
@@ -292,17 +184,7 @@ Do not infer current design from them.
 
 # Current research order
 
-```text
-1. confirm K0 composition reality
-2. earn minimal PCM contract
-3. direct-flow Source -> processing -> Sink experiment
-4. graph publication / replacement / reader overlap
-5. real decoder experiment
-6. real output experiment
-7. only then re-earn playback semantics
-```
-
-Real mechanism pressure, not historical nouns, decides whether concepts such as cursor/session/generation/fence are needed.
+The one normative research/implementation ladder lives in `ADR-PBK-001.md` §12 (composition reality → minimal PCM contract → direct data flow → publication/reader overlap → real decoder → real output → only then playback semantics). Other documents link it; they do not carry a second copy.
 
 ---
 

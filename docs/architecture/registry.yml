@@ -56,7 +56,7 @@ architectures:
     status: NEXT
 
     # Playback authority has been reopened. The v2 diagram and ADR are proposed,
-    # not yet frozen/accepted production authority.
+    # not yet frozen/accepted production authority. ADR status: PROPOSED / REOPENED.
     diagram:
       source: docs/architecture/diagrams/ARCH-003-playback-foundations-v2.mmd
       frozen: false
@@ -68,16 +68,15 @@ architectures:
     decisions:
       - issue: 53
       - pr: 66
-      - pr: 78
-      - pr: 79
-      - pr: 81
-      - pr: 82
 
     implementation: []
 
     evidence:
       # Prior playback code/specs are retained as experimental evidence only
       # while ARCH-003 is reopened. They do not close current design questions.
+      # PRs #78/#79/#81 (former ADR acceptance chain) and PR #82 (former
+      # executable core) are experimental/historical evidence, NOT current
+      # architecture decisions.
       - git tag playback-reference-v1
       - specs/playback/PlaybackTemporal.tla
       - specs/playback/PlaybackOwnership.tla
@@ -85,6 +84,9 @@ architectures:
       - crates/qianqian-core/src/music.rs
       - crates/qianqian-core/src/transport.rs
       - crates/qianqian-core/tests/playback_temporal_traces.rs
+      # Historical v1 diagram of the superseded playback-kernel model; kept as
+      # historical artifact, referenced by no current authority.
+      - docs/architecture/diagrams/ARCH-003-playback-kernel-v1.mmd
 
   - id: ARCH-004
     name: Plugin Graph
@@ -95,8 +97,9 @@ architectures:
       source: docs/architecture/diagrams/ARCH-004-plugin-graph-v1.mmd
       frozen: true
 
+    # component-boundary-a0.md is historical #53 audit evidence, not current
+    # authority (see docs/README.md router).
     authority:
-      - docs/architecture/component-boundary-a0.md
       - docs/architecture/overview.md
 
     decisions:
@@ -106,6 +109,7 @@ architectures:
     implementation: []
 
     evidence:
+      - docs/architecture/component-boundary-a0.md
       - crates/qianqian-core/src/ports.rs
 
   - id: ARCH-005
@@ -163,9 +167,10 @@ architectures:
       source: docs/architecture/diagrams/ARCH-007-ffmpeg-closure-v1.mmd
       frozen: true
 
-    authority:
-      - docs/architecture/component-boundary-a0.md
-      - docs/architecture/overview.md
+    # Historical entry: no current authority. Historical provenance is the #53
+    # audit (component-boundary-a0.md, itself historical) and the frozen
+    # playback-reference tag.
+    authority: []
 
     decisions:
       - issue: 48
@@ -174,4 +179,5 @@ architectures:
     implementation: []
 
     evidence:
+      - docs/architecture/component-boundary-a0.md
       - git tag playback-reference-v1

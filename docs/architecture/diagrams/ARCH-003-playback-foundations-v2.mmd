@@ -3,7 +3,7 @@ flowchart TB
         CK[Composition Kernel\nContext / Capability / Fiber / Effect / Reconcile]
     end
 
-    subgraph XP[Execution / Control Plane]
+    subgraph XP[Execution / Control Plane\nconstraint-oriented lens, not a K0 subsystem]
         CMD[Command / Intent]
         SVC[Capability / Service]
         CTRL[Domain / Workflow / Control]
@@ -11,27 +11,30 @@ flowchart TB
     end
 
     subgraph FP[Fact Plane]
-        COMMIT[Authoritative Commit]
-        FACT[Committed Fact]
+        EVID[Mechanism Evidence\nlow-rate typed observations]
+        INTAKE[Evidence Intake / Validation]
+        AUTH[Semantic Authority Decision\none designated authority per fact type]
+        FACT[Fact Establishment\nsemantic commit]
+        PUB[Fact Publication]
         PROJ[Projection / Persistence / UI / Telemetry]
-        COMMIT --> FACT --> PROJ
+        EVID --> INTAKE --> AUTH --> FACT --> PUB --> PROJ
     end
 
     subgraph RP[Realtime Data Plane]
         BUILD[Build + Validate Graph/View]
-        PUB[RT-safe Publication]
+        RTPUB[Realtime-view Publication\nreader observes one coherent view]
         SRC[Source / Decoder]
         PROC[Realtime Processing]
         OUT[Audio Output]
-        BUILD --> PUB
-        PUB -. pre-bound view .-> PROC
+        BUILD --> RTPUB
+        RTPUB -. pre-bound view .-> PROC
         SRC -->|PCM| PROC -->|PCM| OUT
     end
 
     CK -->|reachability / lifecycle| SVC
-    CTRL -->|commit semantic/mechanism truth| COMMIT
+    CTRL -->|establish semantic facts| AUTH
     CTRL -->|build/configure| BUILD
-    OUT -->|low-rate evidence candidate| COMMIT
+    OUT -->|low-rate mechanism evidence| EVID
 
     classDef boundary fill:#fff,stroke:#333,stroke-width:1px;
-    class CK,CMD,SVC,CTRL,COMMIT,FACT,PROJ,BUILD,PUB,SRC,PROC,OUT boundary;
+    class CK,CMD,SVC,CTRL,EVID,INTAKE,AUTH,FACT,PUB,PROJ,BUILD,RTPUB,SRC,PROC,OUT boundary;
