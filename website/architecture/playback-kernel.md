@@ -1,115 +1,217 @@
 ---
-title: Playback Kernel
-status: NEXT
+title: Playback Architecture
+status: PROPOSED
 ---
 
-# Playback Kernel
+# Playback Architecture
 
-<StatusBadge status="NEXT" />
+<StatusBadge status="PROPOSED" />
 
-Playback Kernel(MusicKernel)是音乐领域语义权威。它**不是**全局组合权威。
+ADR-PBK-001 是当前 Playback 架构的**拟议替代方案**（PROPOSED / FORMAL CORE PASS）；在人工 ACCEPTED 并更新 registry 前，它尚未正式替代 ARCH-003 的登记 authority。本页是该拟议模型面向阅读的解释层，不另造一套架构。
+
+> **Playback 不是一个巨型 MusicKernel。**
 
 ---
 
-## 领域语义
+## 三个不同的角色
 
 <ClaimBadge role="authority" />
 
-MusicKernel 拥有:
-
-- 播放状态机(EMPTY/READY/PLAYING/PAUSED/ENDED/ERROR)
-- 媒体时间线真相(position/duration μs、CONFIRMED/ESTIMATED 落点、GAP = 零媒体时间)
-- 活动曲目会话(含打开的 Decoder 句柄)
-- 队列语义(未来)
-- 状态机转换;seek 落点 vs ENDED
+```text
+MusicComponent   = 组合生命周期根
+MusicKernel      = 音乐 / 产品语义权威
+TransportKernel  = 播放时间语义权威
+```
 
 ```mermaid
 flowchart TB
-    subgraph PK["Playback Kernel / MusicKernel"]
+    subgraph MUSIC["MusicComponent — 组合生命周期根"]
         direction TB
-        TS["曲目 / 会话 / 状态"]
-        PP["播放 / 暂停 / 停止 / Seek"]
-        QR["队列 / 循环 / 随机"]
-        BFR["缓冲 / 恢复"]
-        EN["ENDED / 时间线"]
+        MK["MusicKernel<br/>音乐 / 产品语义"]
+        TK["TransportKernel<br/>播放时间语义"]
+        TS["TrackSession(s)<br/>媒体身份 / source lifetime"]
+        DS["DecodeSession(s)<br/>每个拥有一个独立 decoder cursor"]
 
-        subgraph Mechanisms["内聚的 MVP 机制"]
-            DW["解码 Worker"]
-            PR["PCM 环形缓冲"]
-            RT["RT 发布<br/>commit / flush"]
-        end
+        TS --> DS
+        MK -->|"播放意图 / 产品决策"| TK
+        TK --- TS
     end
 
-    DEC["Decoder"] -->|"open / probe / decode / seek"| PK
-    PK -->|"绑定 PcmSink"| AOUT["AudioOutput"]
-    PK -.->|"未来"| PROC["Processing"]
-    UH["UiHost"] -.->|"轮询快照"| PK
+    DEC["Decoder provider"] -->|"decode / seek / EOF evidence"| DS
+    DS -->|"Canonical PCM + MediaSpan"| PROC["Audio Processing Graph"]
+    PROC -->|"Canonical PCM"| AOUT["AudioOutput / PcmSink"]
+    AOUT -->|"submitted / rendered / fence evidence"| TK
+    TK -->|"类型化派生事实"| MK
+```
 
-    style PK fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
+`Kernel` 在 `MusicKernel` / `TransportKernel` 中表示 **semantic authority role**，不表示它们各自是 Composition plugin。
+
+---
+
+## MusicKernel 管什么
+
+MusicKernel 负责**产品意义**：
+
+- play / pause 的产品语义
+- seek intent 的产品意义
+- next / previous
+- repeat / shuffle
+- playlist policy
+- 当前选择语义
+- 用户可见 `PlaybackState` 的意义
+- Transport 给出 terminal outcome 后，是 next / repeat / stop
+
+MusicKernel **不拥有**：
+
+```text
+playback cursor
+Active / Prepared role
+Generation admission
+Physical Fence state
+raw submitted / rendered / EOF evidence
 ```
 
 ---
 
-## 所有权切分
+## TransportKernel 管什么
 
-<ClaimBadge role="authority" /> **冻结于 component-boundary-a0.md §B.1。**
+TransportKernel 是唯一 playback temporal authority：
 
-| Music *组件*拥有 | MusicKernel 拥有 |
-|------------------|------------------|
-| 领域语义 + 内聚 MVP 机制 | 仅领域语义 |
-| 会话/worker/环形缓冲/时间线机制 | 状态机含义 |
-| RT 发布边界 | 曲目/会话/ENDED 含义 |
-| | 时间线解释 |
+- playback cursor / MediaSpan timeline
+- `Active` / `Prepared` temporal roles
+- Generation admission
+- window promotion / invalidation
+- discontinuity execution
+- Physical Fence 协调
+- raw playback evidence 的解释
 
-`MusicKernel` **绝不**能包含 `struct MusicKernel { worker, ring, renderer_handle }` —— 那将违背"领域内核拥有领域语义"。
-
----
-
-## 依赖
-
-| 依赖 | 基数 | 用途 |
-|------|------|------|
-| Decoder | 1 | 打开 / 探测 / 解码 / seek / EOF |
-| PcmSink(来自 AudioOutput) | 1 | 绑定 / 协商,RT 填充端点 |
-
-需求未满足 → 组件保持 inactive/degraded。它绝不会让根崩溃。
+Decoder EOF、seek landing、late decode result、submitted/rendered evidence、Physical Fence verdict 都先进入 TransportKernel；其他 authority 只接收派生后的类型化事实。
 
 ---
 
-## 激活规则
+## TrackSession 与 DecodeSession
 
-<ClaimBadge role="authority" /> 已冻结。
+`TrackSession` 是媒体身份/source lifetime root，不等于一个唯一 decoder cursor。
 
-Music 在**激活时**绑定 `PcmSink`(不是在曲目打开时)。SinkSession 的存在仅由存活绑定决定:
+一个 TrackSession 可以同时拥有多个 DecodeSession：
 
-$$
-\text{SinkSession 存在} \iff \text{存活绑定}
-$$
+```text
+TrackSession A
+├── DecodeSession gen17 @72s   -> Active
+└── DecodeSession gen18 @100s  -> Prepared
+```
 
-idle ≠ 不存在。曲目打开/关闭改变流经会话的内容,从不改变它是否存在。
+每个 DecodeSession 拥有一个独立推进的 decoder cursor/handle。
 
----
-
-## 可观测契约
-
-状态;媒体时间线上的 position/duration;落点质量;缓冲/欠载诊断;带 Decoder 判定归因的类型化错误。自 `pe_snapshot` 冻结。
+这使 same-track seek 可以一边维持当前 Active，一边准备新的 Prepared，而不是先摧毁旧时间轴再赌博式 seek。
 
 ---
 
-## 系统边界
+## Dual Window 与 Generation Admission
 
-sink 实际渲染出的音频**在回滚之外**:
+MVP 固定：
 
-$$
-\text{submitted} \neq \text{rendered}
-$$
+```text
+1 Active
+0..1 Prepared
+```
 
-已提交的物理 flush 不可逆。解码期间的 Host-IO 副作用属于宿主,不属于 Music。
+因此下面的经典写法是错误的：
+
+```text
+result.generation != global_current_generation => stale
+```
+
+Prepared generation 与 Active generation 同时存在是合法状态。
+
+Generation 是否 stale 取决于：
+
+> **该 temporal role 是否仍然 admission 这个操作。**
+
+而不是是否等于一个全局 current generation。
+
+---
+
+## Physical Fence
+
+<ClaimBadge role="authority" />
+
+```text
+decoded != queued != submitted != rendered
+logical invalidation != physical stop
+```
+
+hard stop / seek commit / hard replacement 在必须杀死旧 submitted audio 时，要经过 Physical Fence：
+
+```text
+关闭旧 admission
+        ↓
+阻止旧 generation 新提交
+        ↓
+Physical Fence / flush handshake
+        ↓
+definitive verdict
+        ↓
+promote / stop / fail closed
+```
+
+Generation retirement 不能替代物理切断。
+
+Fence 一旦进入 claimed / 不可逆阶段，后来的 intent 不得取消或改写已经 claim 的 physical transaction。
+
+形式化探索还抓到过一个真实竞态：stop fence 在途时，自然 EOF/drain 如果抢先 ENDED 并销毁 Active temporal state，会让 fence 永久无法完成。因此：
+
+> **在途 Physical Fence 所需的 active temporal state 不得被自然终态化提前销毁。**
+
+---
+
+## PCM 数据面
+
+Canonical audio data plane：
+
+```text
+Encoded Media
+    → Decoder
+    → Canonical PCM
+    → Audio Processing Graph
+    → AudioOutput
+```
+
+Composition topology 与 Audio Processing Graph 是两张不同的图。Gain / EQ / SRC / Limiter 节点不会仅因为有状态就自动成为 Fiber/plugin。
+
+---
+
+## 当前实现边界
+
+当前 Rust 代码只放入了两个**最小 authority shell**：
+
+```text
+qianqian-core::music::MusicKernel
+qianqian-core::transport::TransportKernel
+```
+
+这只是让代码 vocabulary 与 ADR 一致；并没有提前冻结 Window / Generation / Fence / TrackSession / DecodeSession 的最终 Rust representation，也没有实现 FFmpeg/WASAPI playback engine。
+
+---
+
+## 形式化证据
+
+Core temporal checks 已 PASS，覆盖：
+
+- Dual Window
+- Generation admission
+- Physical Fence
+- submitted vs rendered
+- EOF / drained / ENDED terminalization
+
+形式化验证是风险驱动证据，不是整个架构的第二份实现。
+
+> **TLA+ 用来找撞车，不用来证明整个架构。**
 
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/component-boundary-a0.md §B.1', 'docs/architecture/overview.md']"
-  :decisions="[{ issue: 53 }, { pr: 66 }]"
-  :evidence="['research/playback-reference-v1']"
+  :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/overview.md']"
+  :decisions="[{ pr: 78 }, { pr: 79 }]"
+  :evidence="['specs/playback/PlaybackTemporal.tla', 'specs/playback/README.md', 'research/playback-reference-v1']"
 />

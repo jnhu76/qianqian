@@ -1,12 +1,9 @@
 /**
  * Single presentation-state authority for the Qianqian Engineering Observatory.
  *
- * PS1–PS7 rules:
- * - Homepage, roadmap and architecture-status UI consume this source.
- * - No duplicate "current frontier" strings across Markdown.
- * - Contains presentation status only; no architecture semantics.
- * - GitHub issue OPEN/CLOSED must not automatically mutate this.
- * - State changes are reviewed repository changes.
+ * This file contains presentation state only; architecture semantics remain in
+ * the relevant docs/ADR. GitHub issue state must not mutate these values
+ * automatically. State changes are reviewed repository changes.
  */
 
 export type Status =
@@ -28,15 +25,15 @@ export interface ProjectState {
 }
 
 export const projectState: ProjectState = {
-  currentFrontier: 'Playback Kernel',
-  lastMilestone: 'Composition Kernel K0',
+  currentFrontier: 'Playback Architecture — repository authority alignment / acceptance review',
+  lastMilestone: 'Playback Architecture formal core PASS',
 
   layers: {
     playbackReference: 'HISTORICAL_EVIDENCE',
     ffmpegResearch: 'HISTORICAL_EVIDENCE',
     componentBoundary: 'FROZEN',
     baseKernel: 'IMPLEMENTED',
-    playbackKernel: 'NEXT',
+    playbackArchitecture: 'CURRENT',
     decoder: 'PLANNED',
     processing: 'PLANNED',
     audioOutput: 'PLANNED',
@@ -44,20 +41,20 @@ export const projectState: ProjectState = {
   },
 
   nextQuestions: [
-    'Playback Session 的最小契约是什么?',
-    'Decoder / PCM 所有权在哪里冻结?',
-    'AudioOutput 必须暴露什么能力而不泄漏设备策略?',
+    '当前 current surfaces 是否准确表达 ADR-PBK-001 为 PROPOSED replacement candidate，而 registry 的 ARCH-003 authority 尚未迁移？',
+    'ADR-PBK-001 是否具备进入 ACCEPTED 的人工审查条件?',
+    '只有在 ACCEPTED 之后：最小 executable playback model 应先挣得哪些 Rust representation?',
   ],
 }
 
 export const statusVocabulary: Record<Status, string> = {
   FROZEN: 'Frozen — architecture boundary accepted, no semantic changes allowed',
   IMPLEMENTED: 'Implemented — code merged and evidence verified',
-  VALIDATED: 'Validated — experiment result confirmed by evidence',
-  CURRENT: 'Current — active architecture boundary',
-  NEXT: 'Next — immediate frontier',
-  PLANNED: 'Planned — design not yet frozen',
+  VALIDATED: 'Validated — experiment/result confirmed by evidence',
+  CURRENT: 'Current — active design/reconciliation frontier',
+  NEXT: 'Next — immediate future frontier',
+  PLANNED: 'Planned — design/implementation not yet established',
   DEFERRED: 'Deferred — future consideration',
   HISTORICAL_EVIDENCE: 'Historical Evidence — preserved as opt-in evidence',
-  SUPERSEDED: 'Superseded — replaced by a newer version',
+  SUPERSEDED: 'Superseded — replaced by a newer authority',
 }

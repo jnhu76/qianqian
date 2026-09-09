@@ -1,7 +1,13 @@
-//! Music Kernel: authority for player and music-domain semantics.
+//! Music Kernel: authority for music-domain and product semantics.
 //!
-//! Mechanism layers produce evidence; the Music Kernel decides
-//! product meaning. R0 freezes ownership only, not final playback APIs.
+//! `MusicKernel` decides user/product meaning such as playback-state meaning,
+//! selection, playlist/repeat/shuffle policy, and what a terminal transport
+//! outcome means for the product. Playback-temporal truth is deliberately not
+//! owned here: cursor/window/generation/fence/raw playback evidence belongs to
+//! `crate::transport::TransportKernel`.
+//!
+//! Mechanisms produce evidence; the owning semantic authority interprets it.
+//! This shell freezes authority boundaries only, not final playback APIs.
 
 /// User-visible playback state.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -14,7 +20,7 @@ pub enum PlaybackState {
     Ended,
 }
 
-/// Authority for player and music-domain semantics.
+/// Authority for music-domain and product semantics.
 #[derive(Debug, Default)]
 pub struct MusicKernel {
     state: PlaybackState,

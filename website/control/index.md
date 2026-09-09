@@ -9,7 +9,7 @@ import { projectState } from '../data/project-state.ts'
 
 # Qianqian
 
-一个轻量级音乐播放器,也是一座系统架构实验室。
+一个轻量级音乐播放器，也是一座系统架构实验室。
 
 ---
 
@@ -21,95 +21,65 @@ import { projectState } from '../data/project-state.ts'
 
 **{{ projectState.lastMilestone }}**
 
-<StatusBadge status="IMPLEMENTED" />
+<StatusBadge status="VALIDATED" />
 
 ---
 
 ## 当前所处阶段
 
 <table class="layer-table">
-  <tr>
-    <td>播放参考</td>
-    <td><StatusBadge status="HISTORICAL_EVIDENCE" /></td>
-  </tr>
-  <tr>
-    <td>FFmpeg 研究</td>
-    <td><StatusBadge status="HISTORICAL_EVIDENCE" /></td>
-  </tr>
-  <tr>
-    <td>组件边界</td>
-    <td><StatusBadge status="FROZEN" /></td>
-  </tr>
-  <tr>
-    <td>Base Kernel</td>
-    <td><StatusBadge status="IMPLEMENTED" /></td>
-  </tr>
-  <tr>
-    <td>Playback Kernel</td>
-    <td><StatusBadge status="NEXT" /></td>
-  </tr>
-  <tr>
-    <td>Decoder</td>
-    <td><StatusBadge status="PLANNED" /></td>
-  </tr>
-  <tr>
-    <td>Processing</td>
-    <td><StatusBadge status="PLANNED" /></td>
-  </tr>
-  <tr>
-    <td>AudioOutput</td>
-    <td><StatusBadge status="PLANNED" /></td>
-  </tr>
-  <tr>
-    <td>UI Host</td>
-    <td><StatusBadge status="DEFERRED" /></td>
-  </tr>
+  <tr><td>播放参考</td><td><StatusBadge status="HISTORICAL_EVIDENCE" /></td></tr>
+  <tr><td>FFmpeg 研究</td><td><StatusBadge status="HISTORICAL_EVIDENCE" /></td></tr>
+  <tr><td>组件边界 A0</td><td><StatusBadge status="FROZEN" /></td></tr>
+  <tr><td>Base / Composition Kernel K0</td><td><StatusBadge status="IMPLEMENTED" /></td></tr>
+  <tr><td>Playback Architecture</td><td><StatusBadge status="CURRENT" /></td></tr>
+  <tr><td>Decoder provider</td><td><StatusBadge status="PLANNED" /></td></tr>
+  <tr><td>Audio Processing</td><td><StatusBadge status="PLANNED" /></td></tr>
+  <tr><td>AudioOutput provider</td><td><StatusBadge status="PLANNED" /></td></tr>
+  <tr><td>UI Host</td><td><StatusBadge status="DEFERRED" /></td></tr>
 </table>
 
 ---
 
-## 系统架构
+## Playback 拟议结构
 
-Base Kernel、Playback Kernel、Decoder、Processing、AudioOutput 与 UI Host 之间如何关联,见权威的[系统总览图](/architecture/#系统总览)。
+ADR-PBK-001（**PROPOSED / FORMAL CORE PASS**）的拟议结构：
+
+```text
+MusicComponent
+├── MusicKernel       music/product semantic authority
+├── TransportKernel   playback temporal authority
+└── TrackSession(s)
+    └── DecodeSession(s)
+```
+
+在拟议模型中，`MusicKernel` 不承担 timeline/window/generation/fence；`TransportKernel` 是 raw playback evidence 的唯一 temporal interpreter。该模型待人工 ACCEPTED 后才迁移 registry authority。
+
+当前代码已经建立两个 authority shell，但尚未实现完整 playback state machine、FFmpeg Decoder 或真实 AudioOutput backend。
+
+[阅读 Playback Architecture →](/architecture/playback-kernel)
 
 ---
 
-## 最新成果
-
-### Composition Kernel K0
+## Base Kernel K0
 
 <StatusBadge status="IMPLEMENTED" />
 
-通用 Composition Kernel 实现五个原语 —— Context、Capability、Fiber、Effect、Reconcile —— 六个语义保证组共 70 项内核 oracle 测试(75 项 workspace 测试)。它领域无关:不了解音乐、PCM、FFmpeg、WASAPI 或 UI 载荷。
+通用 Composition Kernel 实现五个原语：Context、Capability、Fiber、Effect、Reconcile。它只处理 composition truth，不理解音乐、PCM、TrackSession、Generation、WASAPI 或 UI payload。
 
-**已验证的语义保证:**
-
-- 单 Fiber 局部清理
-- 跨 Fiber 独立移除
-- 同键贡献安全
-- 有序/非交换交互的显式处理
-- 提供者消失排序
-- 变更历史后的合流性(Confluence)
-
-<ProvenancePanel
-  :authority="['docs/architecture/composition-kernel-0-design.md', 'docs/architecture/composition-kernel-0-implementation-adr.md']"
-  :decisions="[{ issue: 67 }, { pr: 68 }, { pr: 69 }]"
-  :implementation="[{ issue: 70 }, { pr: 71 }]"
-  :evidence="['crates/qianqian-kernel/tests']"
-  lastVerified="743eb86"
-/>
+Playback 不通过给 generic kernel 增加更多产品概念来实现。
 
 ---
 
-## 实验亮点
+## 形式化验证的角色
 
-### FFmpeg 最小化
+<StatusBadge status="VALIDATED" />
 
-<StatusBadge status="HISTORICAL_EVIDENCE" />
+Playback 的 formal core 已验证 Dual Window、Generation admission、Physical Fence、submitted/rendered 和 EOF/drained/ENDED 的高风险交错，并真实抓到过 stop × natural ENDED 竞态。
 
-一个音乐播放器到底需要多少 FFmpeg?Decoder 与 Processing 共享唯一的 FFmpeg 闭包权威。编解码覆盖是提供者配置,不是运行时层。两个构建 profile 证明这个闭包可以最小化。
+> **TLA+ 用来找撞车，不用来证明整个架构。**
 
-[阅读实验 →](/experiments/ffmpeg-minimization)
+当前先完成 repo authority alignment 与人工 acceptance review。只有 ADR-PBK-001 被 ACCEPTED 之后，才进入 executable Rust model，并优先依靠类型/ownership 与普通测试推动 representation，而不是继续扩张形式化模型数量。
 
 ---
 
@@ -122,7 +92,7 @@ Base Kernel、Playback Kernel、Decoder、Processing、AudioOutput 与 UI Host �
 ---
 
 <ProvenancePanel
-  :authority="['AGENTS.md', 'CONTEXT.md', 'docs/architecture/overview.md']"
-  :decisions="[{ issue: 46 }, { issue: 53 }, { issue: 67 }, { issue: 70 }]"
-  lastVerified="743eb86"
+  :authority="['docs/architecture/overview.md', 'docs/adr/ADR-PBK-001.md', 'docs/site/project-state.ts']"
+  :decisions="[{ pr: 68 }, { pr: 71 }, { pr: 78 }, { pr: 79 }]"
+  :evidence="['crates/qianqian-kernel/tests', 'specs/playback/PlaybackTemporal.tla']"
 />

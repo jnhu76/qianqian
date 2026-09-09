@@ -1,13 +1,15 @@
 ---
 title: 控制平面与数据平面
-status: IMPLEMENTED
+status: CURRENT
 ---
 
 # 控制平面与数据平面
 
-<StatusBadge status="IMPLEMENTED" />
+<StatusBadge status="CURRENT" />
 
-> **能力平面(Capability Plane)!= 数据平面(Data Plane)。**
+> **Capability Plane != Data Plane。**
+
+本页分两层：**已实现**的 generic control/data-plane 防火墙（Base Kernel K0，PR #71），以及 ADR-PBK-001（**PROPOSED / FORMAL CORE PASS**）的 **playback mapping**（TransportKernel / Physical Fence / evidence routing）。后者是拟议模型，不代表真实 PCM playback pipeline 已经实现。
 
 ---
 
@@ -15,99 +17,114 @@ status: IMPLEMENTED
 
 <ClaimBadge role="authority" />
 
-Context 决定**谁能到达谁**。绑定之后,载荷**直接**流经已解析的服务/数据边。
+Context 决定**谁能到达谁**。绑定之后，载荷通过已解析服务或预绑定数据边直接流动。
+
+**已实现层**：generic Composition Kernel 的 control/data-plane 防火墙（K0 oracle 测试，PR #71）保证控制面不逐块接触载荷。
 
 ```mermaid
 flowchart TB
-    subgraph CP["控制平面"]
-        DC["期望组合"]
-        CK["Composition Kernel"]
-        DC -->|"输入"| CK
+    subgraph CP["Composition / 控制平面"]
+        DC["期望组合"] --> CK["Composition Kernel"]
+        CK --> BIND["resolve / bind"]
     end
 
-    BIND["resolve / bind<br/>(一次性能力绑定)"]
-
-    CK -->|"期望 → 运行"| BIND
-
-    subgraph DP["实时数据平面"]
+    subgraph DP["Canonical Audio Data Plane"]
         direction LR
-        S["service.method(payload)"] -->|"预绑定端点"| P["提供者"]
-        MS["MediaSource"] -->|"编码媒体"| DEC["Decoder"]
-        DEC -->|"PCM"| PROC["Processing"]
-        PROC -->|"PCM"| AOUT["AudioOutput"]
+        DEC["Decoder"] -->|"Canonical PCM + MediaSpan"| PROC["Audio Processing Graph"]
+        PROC -->|"Canonical PCM"| AOUT["AudioOutput"]
     end
 
-    BIND -->|"预绑定,无逐块查找"| DP
-
-    style CP fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
-    style DP fill:#0f3460,stroke:#4a4a8a,color:#e0e0e0
+    BIND -.->|"建立长期/预绑定边，不逐块查找"| DP
 ```
+
+Composition Kernel 不拥有 PCM、MediaSpan、playback cursor、Window、Generation 或 rendered position。图中 Decoder / Processing / AudioOutput 是 capability seam；真实 provider 实现尚未获得授权。
 
 ---
 
-## 逐块内绝不允许的事
+## Realtime 热路径绝不允许
 
 <ClaimBadge role="authority" />
 
-实时音频路径是数据平面孤岛。每个回调/数据块内不得执行:
+每个 callback/block 内不得执行：
 
-- Context 查找
-- 能力解析
-- Fiber 调和
-- 任意通用事件派发
-- 文件系统/网络 I/O
-- UI/JS/托管运行时往返
-- 无界分配或阻塞
+- Context lookup
+- Capability resolution
+- Fiber Reconcile
+- 通用 EventBus 派发
+- 文件系统 / 网络 I/O
+- UI / JS / 托管运行时往返
+- 无界分配、锁等待或阻塞
 
-未来的图变更应在**控制平面**上准备,并在 **RT 安全边界**处发布。
+图的变更在 control side 准备，再在 RT-safe boundary 发布。
 
 ---
 
-## 实时音频路径
+## 播放证据不是通用事件
 
-目标数据路径:
+**当前 Proposed Playback mapping（ADR-PBK-001，PROPOSED）**：AudioOutput 产生的：
 
 ```text
-MediaSource → Decoder → DSP/Processing → AudioOutput
+submitted evidence
+rendered evidence
+Physical Fence verdict
+device/output evidence
 ```
 
-所有逐块工作都流经控制平面绑定时建立的**预绑定端点**。热路径中不发生任何通用内核操作。
+属于 playback temporal evidence。拟议的证据路由：
+
+```mermaid
+flowchart LR
+    AO["AudioOutput"] -->|"raw evidence"| TK["TransportKernel"]
+    TK -->|"typed derived fact"| MK["MusicKernel"]
+```
+
+在拟议模型中，TransportKernel 是 raw playback evidence 的语义解释者；MusicKernel 不独立重算 rendered cursor 或 EOF/fence 结果。此映射尚未有可执行实现。
 
 ---
 
-## 为什么这很重要
+## Physical truth
 
-<ClaimBadge role="interpretation" />
+**Proposed playback semantics（ADR-PBK-001，PROPOSED）**：
 
-如果 Context/EventBus/Reconcile 出现在音频回调路径中:
+```text
+decoded != queued != submitted != rendered
+logical invalidation != physical stop
+```
 
-1. **延迟** — 通用解析是无界的
-2. **确定性** — 块中途的重排/调和会破坏音频
-3. **复杂度** — 控制平面与数据平面关注点混杂
+Generation admission 只能阻止新的旧-generation 工作，不能撤回已经提交给设备的旧尾巴。需要 hard cut 时必须得到 Physical Fence 的 definitive verdict。
 
-这种分离保证音频路径是**确定性的机制孤岛**。
+Fence 进入 claimed 阶段后，后来的 intent 不得假装它没有发生或改写已经开始的 physical transaction。
 
 ---
 
-## 数据边所有权
+## 数据边生命周期
 
-<ClaimBadge role="authority" /> 冻结于 component-boundary-a0.md §B.3。
+MusicComponent 通过 Composition Kernel 获得 AudioOutput/PcmSink capability。具体 PCM 边在绑定后成为直接/预绑定 data edge；不能由 composition root 偷偷塞一个反向 Music 指针，也不能让 AudioOutput 通过 Context 在每个 block 反查 Music。
 
-SinkSession 边由依赖方显式的 `PcmSink.bind(PcmSourceEndpoint)` 建立:
+具体 `SinkSession` API/representation 可以随实现演进；长期不变量是：
 
-- 在控制时刻创建(Music 激活)
-- 逐块拉取只通过该会话端点发生
-- AudioOutput 只持有交给该会话的端点
-- 不存在、也不允许组合根指针接线
+1. data edge 有明确生命周期与 teardown；
+2. provider final release 之前 dependent 完成必要 teardown；
+3. RT thread 只触碰预先准备好的 bounded state；
+4. raw physical evidence 进入 TransportKernel（拟议映射），而不是全局可写状态袋。
 
-这个方向保持图无环。
+---
+
+## Processing Graph
+
+目标 PCM 路径：
+
+```text
+Decoder → Gain / EQ / SRC / ... → AudioOutput
+```
+
+这里的 Gain/EQ/SRC 是 Processing Graph node，不等于 Composition plugin。普通参数更新或 node topology change 不自动触发 Fiber Reconcile。
 
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/composition-kernel-0-design.md', 'docs/architecture/overview.md', 'docs/architecture/component-boundary-a0.md §B.3']"
-  :decisions="[{ issue: 67 }, { pr: 68 }]"
+  :authority="['docs/architecture/composition-kernel-0-design.md', 'docs/architecture/overview.md', 'docs/adr/ADR-PBK-001.md']"
+  :decisions="[{ pr: 68 }, { pr: 78 }, { pr: 79 }]"
   :implementation="[{ pr: 71 }]"
-  :evidence="['crates/qianqian-kernel/tests']"
-  lastVerified="743eb86"
+  :evidence="['crates/qianqian-kernel/tests', 'specs/playback/PlaybackTemporal.tla']"
 />

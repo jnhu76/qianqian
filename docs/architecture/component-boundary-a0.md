@@ -12,6 +12,34 @@ Revision 3 (Corrective-2, 2026-09-07): purifies §H.a per human review round 2 �
 
 ---
 
+## Playback authority transition note (2026-09)
+
+> **This document remains the accepted historical #53 boundary audit and a provenance source for Composition Kernel design. Its playback-specific ownership/granularity conclusions are historical design evidence under replacement — not fresh implementation guidance.**
+
+Still valid here (generic + behavioral evidence):
+
+```text
+FFmpeg dependency-closure evidence (#48)
+PCM / realtime-path behavior evidence (submitted != rendered, RT island,
+  commit/flush protocol, provider withdrawal ordering)
+system-boundary / effect-classification reasoning
+composition-kernel design provenance (#53 -> #67 -> #71 chain)
+```
+
+Under proposed replacement by `ADR-PBK-001` (**PROPOSED / FORMAL CORE PASS**, not yet ACCEPTED) — the playback-specific conclusions below are the historical #53 position, superseded only after human acceptance updates the registry:
+
+```text
+Music component owns the whole cohesive playback mechanism
+  (worker / PCM ring / timeline / the active open Decoder handle)
+MusicKernel owns timeline / session / ENDED interpretation
+one active track session with a single Decoder handle
+Transport / Timeline / Session split rejected
+```
+
+The proposed replacement model instead separates `MusicKernel` (music/product semantics) from `TransportKernel` (playback temporal authority) with nested `TrackSession(s) -> DecodeSession(s)` and dual-window / generation-admission / Physical Fence semantics. Until `ADR-PBK-001` is ACCEPTED and the registered ARCH-003 authority is updated, do **not** combine the two playback models when implementing new code.
+
+---
+
 ## A. Reality audit
 
 ### A.1 Current repository facts

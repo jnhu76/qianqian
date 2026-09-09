@@ -1,17 +1,20 @@
-//! Capability ports: mechanism seams consumed by the core.
+//! Capability/data-plane mechanism seams consumed by product code.
 //!
-//! These traits are intentionally incomplete in R0. They freeze the
-//! authorized capability names and dependency direction only; the
-//! final media APIs must emerge under real implementation pressure.
+//! These traits are intentionally incomplete. `Decoder` and `AudioOutput`
+//! represent independently composed provider seams already used by the Music
+//! component boundary. `Processing` names the canonical PCM-transform seam,
+//! but does not by itself imply that every processing node—or even the whole
+//! processing graph—must be an independent Composition plugin.
 //!
-//! Logical boundary != crate boundary: these are not plugin loading
-//! points and imply nothing about physical packaging.
+//! Final media APIs must emerge under real implementation pressure.
+//! Logical boundary != crate boundary: these traits imply nothing about
+//! physical packaging or dynamic loading.
 
-/// Encoded media -> canonical PCM.
+/// Encoded media -> canonical PCM provider seam.
 pub trait Decoder {}
 
-/// Canonical PCM -> canonical PCM.
+/// Canonical PCM -> canonical PCM processing seam.
 pub trait Processing {}
 
-/// Canonical PCM -> physical device, plus output evidence.
+/// Canonical PCM -> physical device, plus physical/output evidence.
 pub trait AudioOutput {}

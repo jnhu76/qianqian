@@ -91,7 +91,7 @@ export default defineConfig({
           items: [
             { text: '总览', link: '/architecture/' },
             { text: 'Base Kernel K0', link: '/architecture/base-kernel' },
-            { text: 'Playback Kernel', link: '/architecture/playback-kernel' },
+            { text: 'Playback Architecture', link: '/architecture/playback-kernel' },
             { text: '插件图', link: '/architecture/plugin-graph' },
             {
               text: '控制平面与数据平面',

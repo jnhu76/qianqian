@@ -60,17 +60,26 @@ architectures:
       frozen: true
 
     authority:
+      # Registered ARCH-003 authority is NOT yet migrated. ADR-PBK-001 is the
+      # PROPOSED / FORMAL CORE PASS replacement candidate; registry authority
+      # moves only after human ACCEPTED. Transition explained in docs/README.md.
       - docs/architecture/component-boundary-a0.md
       - docs/architecture/overview.md
 
     decisions:
       - issue: 53
       - pr: 66
+      - pr: 78
+      - pr: 79
 
     implementation: []
 
     evidence:
-      - research/playback-reference-v1
+      - git tag playback-reference-v1
+      - specs/playback/PlaybackTemporal.tla
+      - specs/playback/README.md
+      - crates/qianqian-core/src/music.rs
+      - crates/qianqian-core/src/transport.rs
 
   - id: ARCH-004
     name: Plugin Graph
@@ -160,4 +169,4 @@ architectures:
     implementation: []
 
     evidence:
-      - research/playback-reference-v1
+      - git tag playback-reference-v1

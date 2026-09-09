@@ -5,183 +5,177 @@ status: CURRENT
 
 # 架构总览
 
-Qianqian Architecture v2 是一个面向本地优先音乐播放器的、边界优先、面向组合的插件架构。
+Qianqian Architecture v2 是一个面向本地优先音乐播放器的、边界优先、面向组合的运行时架构。
 
-> **内核控制可达性、所有权与生命周期;它不拥有应用载荷。**
+> **Composition Kernel 控制可达性、组合所有权与生命周期；它不拥有应用载荷。**
+
+同时：
+
+> **每个语义事实只有一个 semantic authority。**
 
 ---
 
 ## 架构宪章
 
-<ClaimBadge role="authority" /> 这些原则已冻结。观测站的文章不能更改它们。
+<ClaimBadge role="authority" />
 
-- **领域内核拥有领域语义。**
-- **能力暴露契约;提供者拥有机制。**
-- **Fiber 拥有插件实例生命周期。**
-- **Effect 拥有可归因的变更/恢复溯源。**
-- **Profile 声明期望组合;Reconcile 决定运行中的图。**
-
----
-
-## 边界优先设计
-
-架构问题不是"`ctx.effect()` 应该长什么样?"而是:
-
-> 产品应如何分解,才能让所有权、依赖、交互、排序与恢复边界足够显式,使"可组合"真正有意义?
-
-设计顺序:
-
-```text
-组件粒度
-        ↓
-能力 / 依赖边界
-        ↓
-交互代数
-        ↓
-Effect / 系统边界
-        ↓
-全局生命周期排序
-        ↓
-合流性 oracle
-        ↓
-Composition Kernel 实现
-```
+- **Capabilities 暴露契约；providers 拥有机制。**
+- **Fibers 拥有插件实例生命周期。**
+- **Effects 记录可归因的组合变更/恢复溯源。**
+- **Profile 声明期望组合；Reconcile 决定运行中的 Fiber 图。**
+- **Playback 的产品语义与时间语义不属于 generic Composition Kernel。**
 
 ---
 
 ## 系统总览
 
-<ClaimBadge role="interpretation" /> 此图展示的是目标系统拓扑。
-
 ```mermaid
 flowchart TB
-    subgraph ControlPlane["控制平面"]
-        direction TB
-        CK["Composition Kernel"]
-        CK -."Context / Capability / Fiber<br/>Effect / Reconcile".-> CK
+    subgraph CP["Composition / Control Plane"]
+        CK["Composition Kernel<br/>Context / Capability / Fiber<br/>Effect / Reconcile"]
+        MC["MusicComponent<br/>composition lifecycle root"]
+        DEC["Decoder provider"]
+        AO["AudioOutput / PcmSink provider"]
+
+        CK -.->|"reconcile"| MC
+        CK -.->|"reconcile"| DEC
+        CK -.->|"reconcile"| AO
+        MC -.->|"requires"| DEC
+        MC -.->|"requires"| AO
     end
 
-    subgraph DataPlane["实时数据平面"]
-        direction LR
-        MS["MediaSource"] -->|编码媒体| DEC["Decoder<br/>编码媒体 → PCM"]
-        DEC -->|PCM| PRO["Processing<br/>PCM → PCM"]
-        PRO -->|PCM| AOUT["AudioOutput<br/>PCM → 物理设备"]
+    subgraph PD["Playback Domain"]
+        MK["MusicKernel<br/>音乐 / 产品语义"]
+        TK["TransportKernel<br/>播放时间语义"]
+        TS["TrackSession(s)"] --> DS["DecodeSession(s)"]
+        MK -->|"intent / 产品决策"| TK
+        TK --- TS
     end
 
-    subgraph Domains["领域组件"]
-        direction TB
-        MK["MusicKernel<br/>(音乐语义)"]
-        UH["UiHost<br/>(呈现)"]
+    MC --- PD
+
+    subgraph DP["Canonical Audio Data Plane"]
+        D2["DecodeSession"] -->|"PCM + MediaSpan"| PROC["Audio Processing Graph"]
+        PROC -->|"PCM"| A2["AudioOutput"]
     end
 
-    MK -.->|依赖| DEC
-    MK -.->|绑定 PcmSink| AOUT
-    UH -.->|轮询快照| MK
-
-    CK -.->|"期望组合 → reconcile"| MK
-    CK -.->|"期望组合 → reconcile"| DEC
-    CK -.->|"期望组合 → reconcile"| AOUT
-    CK -.->|"期望组合 → reconcile"| UH
-
-    style ControlPlane fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
-    style DataPlane fill:#0f3460,stroke:#4a4a8a,color:#e0e0e0
-    style Domains fill:#16213e,stroke:#4a4a6a,color:#e0e0e0
+    DEC -->|"decoder handle / EOF evidence"| D2
+    A2 -->|"submitted / rendered / fence evidence"| TK
+    TK -->|"typed derived facts"| MK
 ```
 
-| 组件 | 数据变换 | 状态 |
-|------|---------|------|
-| Base Kernel | Context / Capability / Fiber / Effect / Reconcile | <StatusBadge status="IMPLEMENTED" /> |
-| Decoder | 编码媒体 → PCM | <StatusBadge status="PLANNED" /> |
-| Processing | PCM → PCM | <StatusBadge status="PLANNED" /> |
-| AudioOutput | PCM → 物理设备 | <StatusBadge status="PLANNED" /> |
-| Playback Kernel | 音乐领域语义 | <StatusBadge status="NEXT" /> |
-| UI Host | 呈现 | <StatusBadge status="DEFERRED" /> |
-
 ---
 
-## 控制平面与数据平面
+## 三种不要混淆的关系
 
-<ClaimBadge role="authority" />
-
-> **能力平面 != 数据平面。**
-
-Context 建立可达性。它不承载 PCM 数据块或应用载荷。
-
-```mermaid
-flowchart TB
-    subgraph CP["控制平面"]
-        DC["期望组合"]
-        CK2["Composition Kernel"]
-        DC -->|"输入"| CK2
-    end
-
-    BIND["resolve / bind<br/>(一次性能力绑定)"]
-
-    CK2 -->|"期望 → 运行"| BIND
-
-    subgraph DP["实时数据平面"]
-        direction LR
-        MS2["MediaSource"] -->|"编码媒体"| DEC2["Decoder"]
-        DEC2 -->|"PCM"| PROC2["Processing"]
-        PROC2 -->|"PCM"| AOUT2["AudioOutput"]
-    end
-
-    BIND -->|"预绑定,无逐块查找"| DP
-
-    style CP fill:#1a1a2e,stroke:#4a4a6a,color:#e0e0e0
-    style DP fill:#0f3460,stroke:#4a4a8a,color:#e0e0e0
+```text
+MusicComponent   = composition lifecycle root
+MusicKernel      = music/product semantic authority
+TransportKernel  = playback temporal authority
 ```
 
-实时音频路径是数据平面孤岛。在每个回调/数据块内,它不得执行 Context 查找、能力解析、Fiber 调和、任意事件派发、文件系统/网络 I/O 或 UI 往返。
+> 这一 playback 拆分来自 ADR-PBK-001（**PROPOSED / FORMAL CORE PASS**）；在人工 ACCEPTED 并更新 registry 前，它是 ARCH-003 的拟议替代模型，而非已迁移的登记 authority。
+
+`Kernel` 在后两个名字里表示 semantic authority role，不代表两个新的 Composition plugin。
+
+Nested playback lifetime：
+
+```text
+MusicComponent
+├── MusicKernel
+├── TransportKernel
+└── TrackSession(s)
+    └── DecodeSession(s)
+```
 
 ---
 
-## 交互代数
+## 控制平面 != 数据平面
 
 <ClaimBadge role="authority" />
 
-$$
-\text{可交换关系} \rightarrow \text{可作为独立 Effect 组合}
-$$
+> **Capability Plane != Data Plane。**
 
-$$
-\text{非可交换关系} \rightarrow \text{显式依赖/排序结构}
-$$
+Context 建立可达性与依赖真相；绑定后，载荷通过服务或预绑定数据边直接流动。
 
-DSP/流水线排序是典型例子。EQ → Compressor 一般不等价于 Compressor → EQ。注册时机、挂载时机与迭代顺序绝不能悄悄变成产品语义。
+```text
+Encoded Media → Decoder → Canonical PCM → Audio Processing Graph → AudioOutput
+```
 
----
-
-## 合流性(Confluence)
-
-<ClaimBadge role="authority" />
-
-> 任何合法的加载/卸载/替换历史到达静息态后,可观测运行时等价于对最终期望组合的一次全新构建。
-
-它检验的远不止"没有崩溃":它能发现幽灵绑定、过期的生命周期状态、泄漏的贡献以及依赖历史的组合。
+Realtime callback 内不允许 Context 查找、能力解析、Fiber Reconcile、通用事件派发、文件/网络 I/O、UI 往返或无界阻塞/分配。
 
 ---
 
-## 五个原语
+## Playback 时间正确性
 
-Composition Kernel K0 恰好以五个原语为中心:
+MVP temporal shape：
 
-| 原语 | 角色 |
-|------|------|
-| **Context** | 能力命名空间/依赖视图;控制可达性 |
-| **Capability** | 命名/类型化的服务契约;身份独立于提供者 |
-| **Fiber** | 拥有身份、作用域、需求与生命周期的存活插件实例 |
-| **Effect** | 拥有全逆算子的可逆变更,LIFO 展开 |
-| **Reconcile** | 将运行中的 Fiber 图推向期望组合 |
+```text
+1 Active
+0..1 Prepared
+```
 
-在未证明这五个原语无法表达某个必需不变量之前,不得添加第六个原语。
+Active 与 Prepared 可以属于不同 Generation。因此：
+
+```text
+result.generation != global_current_generation => stale
+```
+
+是错误模型。
+
+Generation 是否有效取决于对应 temporal role 的 admission。
+
+同时保留：
+
+```text
+decoded != queued != submitted != rendered
+logical invalidation != physical stop
+```
+
+需要杀死旧 submitted audio 的 hard discontinuity 必须经过 Physical Fence。
+
+---
+
+## Composition Graph != Processing Graph
+
+Composition graph 管 provider / capability / Fiber / lifecycle。
+
+Audio Processing Graph 管有顺序的 PCM transform：
+
+```text
+Gain → EQ → SRC → Limiter → ...
+```
+
+普通 DSP node 不会因为“有状态”就自动成为 Composition plugin。
+
+---
+
+## 当前状态
+
+| 架构块 | 状态 |
+|---|---|
+| Base / Composition Kernel K0 | <StatusBadge status="IMPLEMENTED" /> |
+| Playback Architecture / ADR-PBK-001 | <StatusBadge status="PROPOSED" /> `FORMAL CORE PASS` |
+| Decoder provider | <StatusBadge status="PLANNED" /> |
+| AudioOutput provider | <StatusBadge status="PLANNED" /> |
+| Audio Processing implementation | <StatusBadge status="PLANNED" /> |
+| UiHost | <StatusBadge status="DEFERRED" /> |
+
+Playback 代码目前只建立 `MusicKernel` / `TransportKernel` 的 authority shell；FFmpeg/WASAPI 和完整 playback state machine 尚未因此获得实现事实。
+
+---
+
+## 形式化验证边界
+
+> **TLA+ 用来找撞车，不用来证明整个架构。**
+
+Blocking core 只覆盖真正高风险的 temporal collisions：Dual Window、Generation admission、Physical Fence、submitted/rendered、EOF/drained/ENDED。
 
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/overview.md', 'docs/architecture/composition-kernel.md']"
-  :decisions="[{ issue: 46 }, { issue: 53 }, { issue: 67 }]"
+  :authority="['docs/architecture/overview.md', 'docs/adr/ADR-PBK-001.md', 'docs/architecture/composition-kernel.md']"
+  :decisions="[{ issue: 67 }, { pr: 68 }, { pr: 78 }, { pr: 79 }]"
   :implementation="[{ issue: 70 }, { pr: 71 }]"
-  :evidence="['crates/qianqian-kernel/tests']"
-  lastVerified="743eb86"
+  :evidence="['crates/qianqian-kernel/tests', 'specs/playback/PlaybackTemporal.tla']"
 />

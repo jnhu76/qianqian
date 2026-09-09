@@ -1,8 +1,6 @@
 # Documentation router
 
-This directory is intentionally small. Load only the documentation needed for the current task.
-
-Do not recursively read archived or historical material by default.
+Load only the documentation needed for the current task. Historical material is evidence, not current authority unless explicitly routed here.
 
 ## Read by task
 
@@ -11,19 +9,21 @@ Do not recursively read archived or historical material by default.
 | Repository/agent rules | `../AGENTS.md` |
 | Stable vocabulary | `../CONTEXT.md` |
 | Current architecture | `architecture/overview.md` |
-| Component boundary / plugin granularity / interaction algebra | `architecture/composition-kernel.md` boundary-design sections + closed audit `architecture/component-boundary-a0.md` (#53 PASS/CLOSED) |
-| Composition Kernel semantics design (#67) | `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel.md` + issue #67 |
-| Composition Kernel / Context / Capability / Fiber / Effect / Reconcile implementation | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + the implementation issue (#70) + `architecture/composition-kernel-0-implementation-adr.md` (representation decisions) |
-| Playback timeline / media session / PCM data-plane boundaries (ARCH-003) | `adr/ADR-PBK-001.md` (**PROPOSED / Corrective-2 / Formal Gate Pending**; design review PASS, implementation not authorized) |
-| Product introduction / current repository entry | `../README.md` |
+| Generic component/plugin/composition semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` |
+| Historical component-boundary audit | `architecture/component-boundary-a0.md` — closed #53 evidence; its playback-specific ownership conclusions are historical inputs under proposed replacement by `adr/ADR-PBK-001` (see the transition note inside that file) |
+| Composition Kernel representation decisions | `architecture/composition-kernel-0-implementation-adr.md` |
+| Playback authority / timeline / media session / PCM boundaries (ARCH-003) | `adr/ADR-PBK-001.md` (**PROPOSED / FORMAL CORE PASS**; the proposed replacement for playback-specific ARCH-003 semantics — the registered ARCH-003 authority has **not** migrated until human ACCEPTED; no FFmpeg/WASAPI implementation implied) |
+| Playback formal evidence | `../specs/README.md` + `../specs/playback/README.md` |
+| Product introduction / repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
-| Rust workspace/build/test | Current `Cargo.toml` / crate manifests / CI once present; do not invent a separate manual before repeated operational complexity exists. |
-| Music/domain semantics | Current issue + `architecture/overview.md` + implemented Music plugin/kernel tests/contracts. |
-| Decoder / Processing / AudioOutput | Current issue + `architecture/overview.md`; generic Composition Kernel does not own media payload contracts. |
-| Realtime audio graph/runtime | Current issue + `architecture/overview.md`; realtime data must stay off Context/event routing. |
-| UiHost / presentation | Current issue + `architecture/overview.md` + implementation-local presentation/UiHost contract when established. |
-| Historical playback evidence | Inspect `research/playback-reference-v1` / `playback-reference-v1` only when the task needs behavioral evidence. |
-| Pre-Rust repository history | Inspect `archive/pre-rust-v2` / `pre-rust-v2` only when the task explicitly needs historical source/docs. |
+| Rust workspace/build/test | Current `Cargo.toml` / crate manifests / CI |
+| Music/product semantics | `adr/ADR-PBK-001.md` (proposed model) + current `qianqian-core::music` code/tests |
+| Playback temporal semantics | `adr/ADR-PBK-001.md` (proposed model) + current `qianqian-core::transport` code/tests + playback specs when state-collision evidence is needed |
+| Decoder / Processing / AudioOutput | `adr/ADR-PBK-001.md` (proposed model) + `architecture/overview.md`; generic Composition Kernel never owns media payload contracts |
+| Realtime audio path | `adr/ADR-PBK-001.md` (proposed model) + `architecture/overview.md`; PCM stays off Context/event routing |
+| UiHost / presentation | `architecture/overview.md` + current presentation contract |
+| Historical playback evidence | git tag `playback-reference-v1` (also branch `research/playback-reference-v1`); not present in the working tree — inspect via `git show playback-reference-v1:<path>` |
+| Pre-Rust repository history | git tag `pre-rust-v2` (also branch `archive/pre-rust-v2`); not present in the working tree — inspect via `git show pre-rust-v2:<path>` |
 
 ## Authority model
 
@@ -33,22 +33,47 @@ Use the authority closest to the fact:
 agent work rules                 -> AGENTS.md
 stable vocabulary                -> CONTEXT.md
 current architecture             -> docs/architecture/overview.md
-component-decomposition audit    -> closed issue #53 + component-boundary-a0.md + composition-kernel boundary sections
-composition-kernel-0 semantics   -> docs/architecture/composition-kernel-0-design.md (merged via PR #68) + issue #67
-composition-kernel invariants    -> docs/architecture/composition-kernel.md
-playback-architecture decisions  -> docs/adr/ADR-PBK-001.md (PROPOSED / Corrective-2; Formal Gate Pending; not frozen ARCH-003 authority until accepted)
+generic composition semantics    -> docs/architecture/composition-kernel*.md
+historical boundary evidence     -> docs/architecture/component-boundary-a0.md
+registered ARCH-003 authority    -> docs/architecture/component-boundary-a0.md (until ADR-PBK-001 is ACCEPTED)
+proposed playback replacement    -> docs/adr/ADR-PBK-001.md (PROPOSED / FORMAL CORE PASS)
+playback formal evidence         -> specs/playback/*
 implemented behavior             -> code + tests + current contracts
 historical experimental fact     -> preserved reference/history
 current task scope               -> current issue/task
 ```
 
-When documentation and implementation disagree, do not silently choose one. Audit the repository, identify whether drift is in code, docs, or the task premise, and make only the authorized correction.
+`ADR-PBK-001` is the current **proposed replacement** for playback-specific ARCH-003 semantics. It has passed the formal core but remains PROPOSED until human acceptance updates the registered authority. Until then, `component-boundary-a0.md` remains the registered ARCH-003 authority; for new playback design work treat the ADR as the reviewed replacement candidate and do not combine the two playback models in one implementation. Playback-specific facts the transition touches: MusicKernel vs TransportKernel authority, TrackSession/DecodeSession structure, Dual Window, Generation admission, and Physical Fence semantics.
+
+When documentation and implementation disagree, do not silently choose one. Identify the drift source and correct only the authority that is stale.
+
+## Playback authority split
+
+ADR-PBK-001 (**PROPOSED / FORMAL CORE PASS**, the acceptance candidate for ARCH-003) uses three distinct concepts:
+
+```text
+MusicComponent   = composition lifecycle root
+MusicKernel      = music/product semantic authority
+TransportKernel  = playback temporal authority
+```
+
+Nested playback lifetime:
+
+```text
+MusicComponent
+├── MusicKernel
+├── TransportKernel
+└── TrackSession(s)
+    └── DecodeSession(s)
+```
+
+Active/Prepared are temporal roles inside `TransportKernel`, not independent plugins or standalone lifetime resources.
+
+Raw playback evidence such as Decoder EOF, late decode, submitted/rendered evidence, seek landing, and Physical Fence verdict is interpreted by `TransportKernel`; `MusicKernel` receives derived domain facts and decides product behavior.
 
 ## Architecture design order
 
 For plugin/composition work, do **not** start from API shape.
-
-Use this order:
 
 ```text
 Component Granularity
@@ -66,98 +91,57 @@ Confluence oracle
 Context / Fiber / Effect / Reconcile implementation
 ```
 
-#53 `COMPONENT-BOUNDARY-A0` is PASS/CLOSED (`architecture/component-boundary-a0.md`); the #67 `COMPOSITION-KERNEL-0` semantic design is MERGED (PR #68, `architecture/composition-kernel-0-design.md`). The Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86).
+The Base Kernel K0 is already implemented. Playback architecture adds a separate temporal correctness boundary rather than expanding the generic kernel.
 
-For ARCH-003 playback work, `ADR-PBK-001` adds a separate acceptance fence after prose/design review:
-
-```text
-Corrective-2 design review PASS
-        ↓
-Core PlaybackTemporal formal model (five high-risk temporal semantic groups)
-        ↓
-Core negative controls (4)
-        ↓
-ADR ACCEPTED / ARCH-003 authority corrective
-        ↓
-deterministic executable oracle (implementation entry)
-```
-
-Do not treat design-review PASS as production implementation authorization.
-
-## Core routing distinction
+## Control plane vs data plane
 
 ### Composition/control plane
-
-Questions about:
 
 ```text
 reachability
 capability resolution
 plugin-instance lifecycle
 effect ownership
-provider disappearance
-dependency activation/deactivation
-desired plugin tree / reconciliation
+provider withdrawal
+desired graph / reconcile
 ```
 
-belong to the generic Composition Kernel authority.
+belong to the generic Composition Kernel.
 
-### Domain/data plane
-
-Questions about:
+### Playback/product/data plane
 
 ```text
-music/player semantics
+music/product meaning
+playback cursor / windows / generations
 PCM/audio formats
-realtime audio blocks
-UI payloads
-library models
-service method payloads
-domain events
+realtime blocks
+EOF/render/fence evidence
+UI/domain payloads
 ```
 
-belong to the relevant domain/plugin contract, not Context.
+belong to the relevant domain/data-plane authority, not Context.
 
-Do not solve a data-plane problem by expanding Context into a universal bus.
+> **Capability plane != Data plane.**
 
-## Boundary-design questions
+Do not solve a playback problem by turning Context into a global state bag or message bus.
 
-Before a candidate becomes a plugin/capability, ask:
+## Formal verification policy
 
-```text
-who owns its state/resources?
-what does it require/provide?
-what operations cross the boundary?
-which operations commute?
-where is non-commutative order explicit?
-what is reversible vs outside the system boundary?
-which dependents must exit before provider teardown?
-does finer granularity justify its cognitive/configuration cost?
-```
+Formalization is risk-driven.
 
-A different feature name is not evidence of component independence.
+> **TLA+ is used to find state collisions, not to model every architectural noun.**
 
-For playback work, also distinguish explicitly:
-
-```text
-composition lifecycle root
-immediate lifetime owner
-semantic authority
-```
-
-Do not use one bare `owns` relation to collapse these meanings.
+For Playback, the blocking core is deliberately small: Dual Window, Generation admission, Physical Fence, submitted/rendered accounting, and EOF/drained/ENDED terminalization. Ownership models and additional mutations are supporting evidence unless they expose a real architecture contradiction.
 
 ## Documentation growth rule
 
-Do not recreate the old documentation hierarchy wholesale.
-
-Create a new long-lived document only when a real implementation or engineering policy creates a durable fact that needs an authority.
+Create a new long-lived document only when a durable fact needs its own authority. Prefer linking to the existing authority over copying specifications into multiple files.
 
 Good reasons include:
 
 - a stable kernel or cross-layer contract exists;
 - a platform build/run procedure exists;
-- a testing policy is repeatedly needed;
+- a testing/formalization policy is repeatedly needed;
 - a research result must remain reproducible;
 - an architectural decision needs durable rationale.
 
@@ -165,25 +149,16 @@ Bad reasons include:
 
 - filling a planned directory tree;
 - mirroring archived docs;
-- documenting APIs that have not been implemented or seriously designed;
-- creating placeholder manuals for future platforms.
+- documenting APIs that do not exist;
+- creating a second authority for a fact already owned by an ADR.
 
 ## Historical material
 
-Architecture v2 begins from the post-reset `main`.
-
-The old repository is preserved at:
+Architecture v2 begins from the post-reset `main`. The historical evidence below is preserved as **git refs, not working-tree directories**:
 
 ```text
-archive/pre-rust-v2
-pre-rust-v2
+pre-rust-v2              git tag (branch: archive/pre-rust-v2)
+playback-reference-v1    git tag (branch: research/playback-reference-v1)
 ```
 
-The validated playback experiment remains independently frozen:
-
-```text
-research/playback-reference-v1
-playback-reference-v1
-```
-
-These are opt-in evidence sources, not default reading lists or current composition authorities.
+Neither tag is present in the current working tree; inspect via `git show <tag>:<path>`. These are opt-in evidence sources, not current source-layout or ownership authorities.

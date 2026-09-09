@@ -11,7 +11,8 @@ Before changing code or long-lived documentation:
 3. Use `docs/README.md` to load only the minimum relevant documentation.
 4. Read `docs/architecture/overview.md` before changing architecture boundaries.
 5. For component/plugin/composition work, read `docs/architecture/composition-kernel.md` and the current boundary/design issue.
-6. Audit current repository reality before assuming a path, API, module, crate, build rule, or prior design is still authoritative.
+6. For playback work, read `docs/adr/ADR-PBK-001.md` (PROPOSED / FORMAL CORE PASS — proposed replacement candidate; registered ARCH-003 authority not yet migrated); use `specs/playback/*` only when the task actually needs state-collision evidence.
+7. Audit current repository reality before assuming a path, API, module, crate, build rule, or prior design is still authoritative.
 
 Do not recursively preload archived source/docs.
 
@@ -19,7 +20,7 @@ Do not recursively preload archived source/docs.
 
 > **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
 >
-> **Domain kernels own domain semantics.**
+> **Semantic authorities own the meaning of their facts.**
 >
 > **Capabilities expose contracts; providers own mechanisms.**
 >
@@ -35,7 +36,7 @@ And:
 
 Rust is the product architecture language.
 
-The generic Composition Kernel must not know music, PCM, FFmpeg, WASAPI, PocketJS, KuiklyUI, track/playlist semantics, or UI payload schemas.
+The generic Composition Kernel must not know music, PCM, FFmpeg, WASAPI, PocketJS, KuiklyUI, track/playlist semantics, playback cursor/window/generation/fence state, or UI payload schemas.
 
 ## Boundary-first design rule
 
@@ -68,6 +69,8 @@ Gate chain:
                                   (docs/architecture/composition-kernel-0-design.md)
         ↓
 #70 COMPOSITION-KERNEL-0 IMPL    IMPLEMENTED via PR #71 (70 kernel tests / 75 workspace tests, 743eb86)
+        ↓
+ADR-PBK-001 PLAYBACK ARCH        PROPOSED / FORMAL CORE PASS (PR #78 + #79)
 ```
 
 A different feature name, Rust type, crate, or file is not evidence that something deserves its own plugin.
@@ -139,7 +142,7 @@ Once a capability is resolved/bound, ordinary business payload should flow throu
 Realtime audio data must flow directly, for example:
 
 ```text
-MediaSource -> Decoder -> DSP/Processing -> AudioOutput
+Encoded Media -> Decoder -> DSP/Processing -> AudioOutput
 ```
 
 not through Context/event dispatch per block.
@@ -273,13 +276,50 @@ This is stronger than “no crash” and stronger than “all disposers ran”.
 
 Confluence tests should compare relevant public truth such as reachable capabilities, Fiber lifecycle, service behavior, and absence of ghost contributions.
 
-## Domain kernels and product semantics
+## Playback authority discipline
 
-A domain kernel such as `MusicKernel` may own track/session/playback/queue/buffering/recovery/ENDED semantics.
+For ARCH-003, `docs/adr/ADR-PBK-001.md` is the current **proposed replacement** for playback-specific semantics: PROPOSED / FORMAL CORE PASS, not yet ACCEPTED. The registered ARCH-003 authority remains `component-boundary-a0.md` until human acceptance updates the registry. Do not treat the ADR as already-migrated authority, and do not combine the two playback models when implementing new code.
 
-It is not the application's global composition authority. It should live inside/behind a normal Music plugin once that component boundary is justified.
+The ADR's proposed model does **not** collapse playback into one giant `MusicKernel`.
 
-Mechanisms produce facts/evidence; domain semantic owners interpret them.
+```text
+MusicComponent   = composition lifecycle root
+MusicKernel      = music/product semantic authority
+TransportKernel  = playback temporal authority
+```
+
+Nested runtime:
+
+```text
+MusicComponent
+├── MusicKernel
+├── TransportKernel
+└── TrackSession(s)
+    └── DecodeSession(s)
+```
+
+`TrackSession` is media identity/source lifetime. Each `DecodeSession` owns one independently advancing decoder cursor/handle. Same-track seek may therefore have multiple DecodeSessions under one TrackSession.
+
+Active/Prepared are temporal roles inside TransportKernel, not independent plugins or standalone lifetime resources.
+
+Raw playback evidence (Decoder EOF/seek landing/late decode and AudioOutput submitted/rendered/fence evidence) is interpreted by TransportKernel. MusicKernel receives typed derived facts and owns product decisions.
+
+Never use:
+
+```text
+result.generation != global_current_generation => stale
+```
+
+Staleness is admission/role based.
+
+Keep:
+
+```text
+decoded != queued != submitted != rendered
+logical invalidation != physical stop
+```
+
+A hard discontinuity that must kill old submitted audio requires a definitive Physical Fence/flush outcome. A claimed fence cannot be rewritten by later intent. Natural EOF/drain must not terminalize away active temporal state needed by an in-flight fence.
 
 ## Realtime boundary
 
@@ -331,14 +371,25 @@ They are not compatibility contracts.
 
 The Base Kernel K0 implementation (PR #71) is authorized to replace R0 bootstrap shapes rather than preserve them for compatibility.
 
+## Formalization policy
+
+Formal verification is risk-driven. Ask:
+
+> **Which independently legal states/events can interleave and collide into an illegal state?**
+
+If that question has no concrete answer, prefer type/ownership/module constraints, unit/property tests, or static checks. Do not build a formal model merely because another architectural noun exists.
+
+Playback's blocking formal core is intentionally limited to Dual Window, Generation admission, Physical Fence, submitted/rendered accounting, and EOF/drained/ENDED terminalization. Models are evidence under explicit assumptions, not a second architecture authority.
+
 ## Work mode
 
 Use reality-first development:
 
 - inspect before assuming;
 - distinguish design gate from implementation gate;
+- distinguish composition lifecycle root, immediate lifetime owner, and semantic authority;
 - make assumptions explicit;
-- use adversarial cases, especially cycles, shared-state mutation, ordered DSP/pipelines, provider disappearance, and history-vs-clean-build confluence;
+- use adversarial cases, especially cycles, shared-state mutation, ordered DSP/pipelines, provider disappearance, temporal interleavings, and history-vs-clean-build confluence;
 - do not create hidden globals, parallel registries, or service-locator escape hatches;
 - do not move application payloads into Context;
 - do not treat a disposer as proof of independent removal;
@@ -348,21 +399,21 @@ If current reality contradicts the task premise, surface the conflict rather tha
 
 ## Historical evidence
 
+Historical evidence is preserved as **git refs, not working-tree directories**:
+
 Pre-Rust repository:
 
 ```text
-archive/pre-rust-v2
-pre-rust-v2
+git tag pre-rust-v2          (branch: archive/pre-rust-v2)
 ```
 
 Frozen playback reference:
 
 ```text
-research/playback-reference-v1
-playback-reference-v1
+git tag playback-reference-v1    (branch: research/playback-reference-v1)
 ```
 
-These are evidence sources, not current architecture/source-layout authority.
+Neither tag is present in the current working tree; inspect via `git show <tag>:<path>`. These are evidence sources, not current architecture/source-layout authority.
 
 ## Verification
 
@@ -380,6 +431,8 @@ explicit handling of ordered/non-commutative interaction
 provider-disappearance ordering
 confluence after mutation history
 ```
+
+For playback temporal work, use the existing core formal checks when a change touches those high-risk state interactions; do not automatically expand the model set.
 
 Never mark an unrun platform/device check PASS.
 
