@@ -174,6 +174,39 @@ pub struct TransportSnapshot {
     pub track_sessions: Vec<TrackSessionState>,
 }
 
+/// A physical fence transaction in flight.
+#[derive(Debug)]
+struct FenceTransaction {
+    /// Generation whose queued media the flush cuts.
+    cut: GenerationId,
+    /// Promotion target (`None` for a terminal stop fence).
+    target: Option<GenerationId>,
+    claimed: bool,
+    failed: bool,
+}
+
+/// Outcome of starting the hard-cut handshake.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HardCutStarted {
+    pub cut: GenerationId,
+    pub target: GenerationId,
+}
+
+/// Outcome of a fence verdict.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FenceVerdictOutcome {
+    /// The flush succeeded and the prepared window was promoted to active.
+    Promoted {
+        promoted: GenerationId,
+        cut: GenerationId,
+    },
+    /// The flush physically happened, but its promotion target had been
+    /// superseded: the verdict is consumed without promotion.
+    VerdictConsumed { cut: GenerationId },
+    /// A terminal stop fence completed; the transport holds no window.
+    StopCompleted { cut: GenerationId },
+}
+
 #[derive(Debug)]
 struct Window {
     generation: GenerationId,
@@ -214,6 +247,7 @@ pub struct TransportKernel {
     next_decode_session: u64,
     transport_drained: bool,
     derived_facts: Vec<TransportFact>,
+    fence: Option<FenceTransaction>,
 }
 
 impl TransportKernel {
@@ -309,6 +343,186 @@ impl TransportKernel {
         }
     }
 
+    /// Begin the hard-cut handshake over a primed prepared window: close
+    /// the old admission (no new old-generation submission), then request
+    /// the physical fence. Promotion happens only on a successful verdict.
+    pub fn begin_hard_cut(&mut self) -> Result<HardCutStarted, &'static str> {
+        if self.fence.is_some() {
+            return Err("fence already in flight");
+        }
+        let prepared = self.prepared.as_ref().ok_or("no prepared window")?;
+        if !prepared.ready {
+            return Err("prepared window not ready");
+        }
+        let cut = self.active.as_ref().ok_or("no active episode")?.generation;
+        let target = prepared.generation;
+        if let Some(active) = self.active.as_mut() {
+            active.admission_open = false;
+        }
+        self.fence = Some(FenceTransaction {
+            cut,
+            target: Some(target),
+            claimed: false,
+            failed: false,
+        });
+        Ok(HardCutStarted { cut, target })
+    }
+
+    /// Device claims the requested physical transaction. Claiming is the
+    /// point of no return: later intents cannot cancel or rewrite the
+    /// claimed flush.
+    pub fn claim_fence(&mut self) -> Result<GenerationId, &'static str> {
+        let fence = self.fence.as_mut().ok_or("no fence in flight")?;
+        if fence.failed {
+            return Err("fence failed; retry or abandon");
+        }
+        if fence.claimed {
+            return Err("fence already claimed");
+        }
+        fence.claimed = true;
+        Ok(fence.cut)
+    }
+
+    /// Successful fence verdict: the device completed the physical flush.
+    /// The queued media of the cut generation is discarded (unrendered),
+    /// and the definitive verdict resolves promotion / stop / consumption.
+    pub fn fence_succeeded(&mut self) -> Result<FenceVerdictOutcome, &'static str> {
+        let fence = self.fence.as_ref().ok_or("no fence in flight")?;
+        if fence.failed {
+            return Err("fence failed; retry or abandon");
+        }
+        if !fence.claimed {
+            return Err("fence not claimed");
+        }
+        let fence = self.fence.take().expect("fence in flight checked above");
+        self.flush_queued_media(fence.cut);
+        match fence.target {
+            Some(target) => {
+                let promotable = self
+                    .active
+                    .as_ref()
+                    .is_some_and(|a| a.generation == fence.cut)
+                    && self
+                        .prepared
+                        .as_ref()
+                        .is_some_and(|p| p.generation == target);
+                if promotable {
+                    self.promote_prepared();
+                    Ok(FenceVerdictOutcome::Promoted {
+                        promoted: target,
+                        cut: fence.cut,
+                    })
+                } else {
+                    // The flush physically happened; its promotion target
+                    // was superseded. Consume the verdict without promotion.
+                    Ok(FenceVerdictOutcome::VerdictConsumed { cut: fence.cut })
+                }
+            }
+            None => {
+                let cut = fence.cut;
+                Ok(self.complete_stop(cut))
+            }
+        }
+    }
+
+    /// Failed fence verdict: the physical flush did not complete. Nothing
+    /// promotes; the transaction waits for retry or fail-closed abandon.
+    pub fn fence_failed(&mut self) -> Result<GenerationId, &'static str> {
+        let fence = self.fence.as_mut().ok_or("no fence in flight")?;
+        if !fence.claimed || fence.failed {
+            return Err("fence not in claimed phase");
+        }
+        fence.failed = true;
+        fence.claimed = false;
+        Ok(fence.cut)
+    }
+
+    /// Retry the failed physical transaction (same cut generation).
+    pub fn retry_fence(&mut self) -> Result<GenerationId, &'static str> {
+        let fence = self.fence.as_mut().ok_or("no fence in flight")?;
+        if !fence.failed {
+            return Err("fence has not failed");
+        }
+        fence.failed = false;
+        Ok(fence.cut)
+    }
+
+    /// Abandon the failed transaction and fail closed: no promotion, fence
+    /// returns to idle, the admission-closed active window keeps draining
+    /// naturally, and the prepared window stays for a later episode.
+    pub fn abandon_fence(&mut self) -> Result<GenerationId, &'static str> {
+        let fence = self.fence.as_ref().ok_or("no fence in flight")?;
+        if !fence.failed {
+            return Err("fence has not failed");
+        }
+        let cut = fence.cut;
+        self.fence = None;
+        Ok(cut)
+    }
+
+    /// Promote the prepared window to active over the retired old active.
+    fn promote_prepared(&mut self) {
+        let old_active = self.active.take().expect("promotable checked active");
+        let mut promoted = self.prepared.take().expect("promotable checked prepared");
+        if let Some(session) = self.decode_session_mut(old_active.decode_session) {
+            session.role = None;
+            session.closed = true;
+        }
+        if let Some(session) = self.decode_session_mut(promoted.decode_session) {
+            session.role = Some(WindowRole::Active);
+        }
+        // Readiness is a prepared-role concept; the promoted active window
+        // is simply the output authority.
+        promoted.ready = false;
+        self.active = Some(promoted);
+        self.transport_drained = false;
+        self.release_drained_tracks();
+    }
+
+    /// Terminal stop completion: retire the cut active window, publish
+    /// drained truth and the `Stopped` derived fact.
+    fn complete_stop(&mut self, cut: GenerationId) -> FenceVerdictOutcome {
+        match self.active.take() {
+            Some(active) if active.generation == cut => {
+                self.close_admission_of(&active);
+                self.transport_drained = true;
+                self.derived_facts.push(TransportFact::Stopped);
+                self.release_drained_tracks();
+                FenceVerdictOutcome::StopCompleted { cut }
+            }
+            other => {
+                self.active = other;
+                FenceVerdictOutcome::VerdictConsumed { cut }
+            }
+        }
+    }
+
+    /// Discard the cut generation's queued-but-unrendered media: after a
+    /// successful flush the truncated generation stays silent.
+    fn flush_queued_media(&mut self, cut: GenerationId) {
+        if let Some(session) = self.find_session_mut(cut) {
+            session.queued_frames = 0;
+        }
+    }
+
+    /// Release track sessions whose decode sessions have all retired.
+    fn release_drained_tracks(&mut self) {
+        let active_track = self.active.as_ref().map(|w| w.track);
+        let prepared_track = self.prepared.as_ref().map(|w| w.track);
+        self.track_sessions.retain(|t| {
+            Some(t.id) == active_track
+                || Some(t.id) == prepared_track
+                || t.decode_sessions.iter().any(|d| !d.closed)
+        });
+    }
+
+    fn find_session_mut(&mut self, generation: GenerationId) -> Option<&mut DecodeSession> {
+        self.track_sessions
+            .iter_mut()
+            .flat_map(|t| t.decode_sessions.iter_mut())
+            .find(|d| d.generation == generation)
+    }
+
     /// Ingest decode evidence. Admission contract: the evidence's
     /// generation must hold a window role whose admission is still open.
     pub fn decode_result(
@@ -333,9 +547,14 @@ impl TransportKernel {
         }
         session.position = session.position.max(span.end);
         session.accepted_frames += frames;
-        Ok(DecodeAdmitted {
-            advanced_to: session.position,
-        })
+        let advanced_to = session.position;
+        // First admitted decode evidence completes prepared-window priming.
+        if let Some(prepared) = self.prepared.as_mut() {
+            if prepared.generation == generation {
+                prepared.ready = true;
+            }
+        }
+        Ok(DecodeAdmitted { advanced_to })
     }
 
     /// Ingest submitted-media evidence from the output path. Only the
@@ -396,7 +615,12 @@ impl TransportKernel {
                 .prepared
                 .as_ref()
                 .map(|w| self.window_state(w, WindowRole::Prepared)),
-            fence: FenceState::Idle,
+            fence: match &self.fence {
+                None => FenceState::Idle,
+                Some(f) if f.failed => FenceState::Failed { cut: f.cut },
+                Some(f) if f.claimed => FenceState::Claimed { cut: f.cut },
+                Some(f) => FenceState::Requested { cut: f.cut },
+            },
             transport_drained: self.transport_drained,
             track_sessions: self
                 .track_sessions

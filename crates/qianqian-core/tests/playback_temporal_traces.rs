@@ -13,7 +13,10 @@
 //! kernels.
 
 use qianqian_core::music::{MusicKernel, PlaybackState};
-use qianqian_core::transport::{MediaId, MediaSpan, TransportKernel, WindowRole};
+use qianqian_core::transport::{
+    DecodeSessionId, FenceState, FenceVerdictOutcome, GenerationId, MediaId, MediaSpan,
+    TransportKernel, WindowRole,
+};
 
 /// A track counter giving each opened media a distinct identity.
 struct Media {
@@ -198,5 +201,297 @@ fn next_track_prepares_under_a_second_track_session() {
     assert_eq!(
         prepared.decode_position, 0,
         "new track cursor starts at zero"
+    );
+}
+
+#[test]
+fn late_old_generation_decode_rejected_after_promotion() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+    promote(&mut transport);
+
+    // The old generation no longer holds a window role: its late decode
+    // result is stale ("not admitted by the owning temporal role"), not
+    // merely unequal to some global current generation.
+    let late = transport.decode_result(
+        started.decode_session,
+        MediaSpan {
+            generation: started.generation,
+            start: 720,
+            end: 780,
+        },
+    );
+    assert!(
+        late.is_err(),
+        "retired generation decode evidence must be rejected"
+    );
+
+    // The promoted generation is now the output authority and may submit.
+    transport
+        .media_submitted(sought.generation, 480)
+        .expect("promoted generation may submit");
+}
+
+#[test]
+fn retired_track_session_releases_after_track_replacement_promotion() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let first = transport.play(media.open()).expect("play starts");
+    let second = transport.next_track(media.open()).expect("next prepares");
+    prime(&mut transport, second.decode_session, second.generation, 0);
+    promote(&mut transport);
+
+    // Old TrackSession released once its ownership subtree fully drained;
+    // the replacement track session remains with its promoted session.
+    let snapshot = transport.snapshot();
+    assert_eq!(snapshot.track_sessions.len(), 1);
+    let remaining = &snapshot.track_sessions[0];
+    assert_eq!(remaining.id, second.track);
+    assert_ne!(remaining.id, first.track);
+}
+
+#[test]
+fn prepared_generation_primes_while_active_remains_output_authority() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    transport
+        .media_submitted(started.generation, 100)
+        .expect("active generation submits");
+
+    let prepared = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        prepared.decode_session,
+        prepared.generation,
+        1000,
+    );
+
+    let snapshot = transport.snapshot();
+    assert!(
+        snapshot.prepared.expect("prepared").ready,
+        "primed prepared window"
+    );
+    assert!(
+        snapshot.active.expect("active kept").admission_open,
+        "active admission still open while prepared primes"
+    );
+
+    // Prepared is not the physical-output authority: it cannot submit or
+    // render media before promotion.
+    assert!(
+        transport.media_submitted(prepared.generation, 10).is_err(),
+        "prepared generation must not submit media"
+    );
+    assert!(
+        transport.media_rendered(prepared.generation, 10).is_err(),
+        "prepared generation has nothing renderable"
+    );
+    transport
+        .media_rendered(started.generation, 100)
+        .expect("only the active generation's media renders");
+}
+
+#[test]
+fn promotion_requires_a_successful_fence_verdict() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+
+    let cut = transport
+        .begin_hard_cut()
+        .expect("cut begins after priming");
+    assert_eq!(cut.cut, started.generation);
+    assert_eq!(cut.target, sought.generation);
+
+    // Between cut begin and verdict nothing promotes: logical
+    // invalidation alone is not physical stop and not promotion.
+    let mid = transport.snapshot();
+    assert_eq!(
+        mid.active
+            .expect("old active survives until verdict")
+            .generation,
+        started.generation
+    );
+    assert!(
+        !mid.active.expect("active").admission_open,
+        "cut closed old admission"
+    );
+    assert_eq!(
+        mid.prepared
+            .expect("prepared survives until verdict")
+            .generation,
+        sought.generation
+    );
+    assert_eq!(
+        mid.fence,
+        FenceState::Requested {
+            cut: started.generation
+        },
+        "physical fence handshake requested"
+    );
+
+    transport
+        .claim_fence()
+        .expect("device claims the transaction");
+    let snapshot = transport.snapshot();
+    assert_eq!(
+        snapshot.fence,
+        FenceState::Claimed {
+            cut: started.generation
+        }
+    );
+
+    let verdict = transport.fence_succeeded().expect("successful verdict");
+    assert_eq!(
+        verdict,
+        FenceVerdictOutcome::Promoted {
+            promoted: sought.generation,
+            cut: started.generation,
+        }
+    );
+
+    let snapshot = transport.snapshot();
+    assert_eq!(snapshot.fence, FenceState::Idle);
+    let active = snapshot.active.expect("promoted window becomes active");
+    assert_eq!(active.generation, sought.generation);
+    assert!(active.admission_open, "promoted generation admitted");
+    assert_eq!(
+        snapshot.prepared, None,
+        "prepared slot cleared on promotion"
+    );
+}
+
+#[test]
+fn fence_failure_cannot_fake_promotion_and_can_retry() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+    transport.begin_hard_cut().expect("cut begins");
+    transport.claim_fence().expect("device claims");
+
+    transport.fence_failed().expect("failure recorded");
+    let failed = transport.snapshot();
+    assert_eq!(
+        failed.active.expect("no promotion on failure").generation,
+        started.generation
+    );
+    assert_eq!(
+        failed.prepared.expect("prepared kept").generation,
+        sought.generation
+    );
+    assert_eq!(
+        failed.fence,
+        FenceState::Failed {
+            cut: started.generation
+        }
+    );
+
+    // Retry the same physical transaction; success then promotes.
+    transport
+        .retry_fence()
+        .expect("retry re-requests the flush");
+    transport.claim_fence().expect("device claims again");
+    let verdict = transport.fence_succeeded().expect("retry succeeds");
+    assert_eq!(
+        verdict,
+        FenceVerdictOutcome::Promoted {
+            promoted: sought.generation,
+            cut: started.generation,
+        }
+    );
+}
+
+#[test]
+fn abandoned_fence_fails_closed_without_promotion() {
+    let mut transport = TransportKernel::new();
+    let mut media = Media::new();
+
+    let started = transport.play(media.open()).expect("play starts");
+    let sought = transport.seek(1000).expect("seek prepares");
+    prime(
+        &mut transport,
+        sought.decode_session,
+        sought.generation,
+        1000,
+    );
+    transport.begin_hard_cut().expect("cut begins");
+    transport.claim_fence().expect("device claims");
+    transport.fence_failed().expect("failure recorded");
+
+    transport.abandon_fence().expect("fail closed");
+    let snapshot = transport.snapshot();
+    assert_eq!(snapshot.fence, FenceState::Idle);
+    assert_eq!(
+        snapshot
+            .active
+            .expect("active kept, admission closed")
+            .generation,
+        started.generation
+    );
+    assert!(!snapshot.active.expect("active").admission_open);
+    assert_eq!(
+        snapshot
+            .prepared
+            .expect("prepared kept for a later episode")
+            .generation,
+        sought.generation
+    );
+}
+
+/// Prime a prepared window: one admitted decode result marks readiness.
+fn prime(
+    transport: &mut TransportKernel,
+    session: DecodeSessionId,
+    generation: GenerationId,
+    from: u64,
+) {
+    transport
+        .decode_result(
+            session,
+            MediaSpan {
+                generation,
+                start: from,
+                end: from + 480,
+            },
+        )
+        .expect("priming decode admitted");
+}
+
+/// Drive one full promotion episode: cut, claim, successful verdict.
+fn promote(transport: &mut TransportKernel) {
+    transport.begin_hard_cut().expect("cut begins");
+    transport.claim_fence().expect("device claims");
+    let verdict = transport.fence_succeeded().expect("verdict succeeds");
+    assert!(
+        matches!(verdict, FenceVerdictOutcome::Promoted { .. }),
+        "helper expects a promotion, got {verdict:?}"
     );
 }
