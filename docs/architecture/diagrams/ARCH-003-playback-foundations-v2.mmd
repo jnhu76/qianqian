@@ -1,0 +1,37 @@
+flowchart TB
+    subgraph CP[Composition Plane]
+        CK[Composition Kernel\nContext / Capability / Fiber / Effect / Reconcile]
+    end
+
+    subgraph XP[Execution / Control Plane]
+        CMD[Command / Intent]
+        SVC[Capability / Service]
+        CTRL[Domain / Workflow / Control]
+        CMD --> CTRL --> SVC
+    end
+
+    subgraph FP[Fact Plane]
+        COMMIT[Authoritative Commit]
+        FACT[Committed Fact]
+        PROJ[Projection / Persistence / UI / Telemetry]
+        COMMIT --> FACT --> PROJ
+    end
+
+    subgraph RP[Realtime Data Plane]
+        BUILD[Build + Validate Graph/View]
+        PUB[RT-safe Publication]
+        SRC[Source / Decoder]
+        PROC[Realtime Processing]
+        OUT[Audio Output]
+        BUILD --> PUB
+        PUB -. pre-bound view .-> PROC
+        SRC -->|PCM| PROC -->|PCM| OUT
+    end
+
+    CK -->|reachability / lifecycle| SVC
+    CTRL -->|commit semantic/mechanism truth| COMMIT
+    CTRL -->|build/configure| BUILD
+    OUT -->|low-rate evidence candidate| COMMIT
+
+    classDef boundary fill:#fff,stroke:#333,stroke-width:1px;
+    class CK,CMD,SVC,CTRL,COMMIT,FACT,PROJ,BUILD,PUB,SRC,PROC,OUT boundary;

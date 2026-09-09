@@ -97,24 +97,16 @@ jobs:
           background: >-
             Qianqian is a Rust local-first music player and architecture testbed.
             The generic Composition Kernel owns reachability/lifecycle rather
-            than application payloads; its primitive budget
-            (Context/Capability/Fiber/Effect/Reconcile) is frozen. Playback
-            Foundations are currently PROPOSED / REOPENED: the reset proposal
-            (ADR-PBK-001) separates four reasoning lenses (Composition,
-            Execution/Control, Fact, Realtime Data) and deliberately does not
-            freeze playback state-machine nouns. Legacy
-            MusicKernel/TransportKernel/TrackSession/DecodeSession/Generation/
-            Fence code and specs are experimental evidence, not authority, and
-            neither the legacy model nor any new noun may be treated as
-            accepted architecture. Review work against the current PROPOSED
-            foundations: does it violate them, does it accidentally re-promote
-            legacy evidence into authority, does it confuse command vs fact vs
-            projection vs hot data, does it forge a semantic fact from
-            mechanism evidence without a designated fact-type authority, does
-            it use a projection as a control-correctness authority, does it
-            treat "commit" as implying durability/ACID, does it violate K0
-            isolation, does it release resources while realtime readers can
-            still dereference them, or does it break lifetime/concurrency
-            correctness or code/docs/ADR consistency? Prefer minimal fixes; do
-            not preserve legacy playback nouns merely because old code/specs
-            contain them.
+            than application payloads. Playback architecture is currently
+            REOPENED: legacy MusicKernel/TransportKernel/TrackSession/
+            DecodeSession/Generation/Fence semantics are experimental evidence,
+            not current authority. Review new work against the reset foundation:
+            Composition Plane (Context/Capability/Fiber/Effect/Reconcile),
+            Execution/Control Plane (commands and capability/service calls), Fact
+            Plane (commit-first facts and read-only projections), and Realtime
+            Data Plane (pre-bound direct PCM flow). Prioritize plane confusion,
+            Context/event/PCM misuse, projection-as-writer bugs, hidden global
+            authority, provider/resource release before realtime readers quiesce,
+            lifetime/concurrency bugs, code/docs/ADR drift, and missing executable
+            evidence. Prefer minimal fixes and do not preserve legacy playback
+            nouns merely because old code/specs contain them.

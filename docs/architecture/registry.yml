@@ -51,18 +51,17 @@ architectures:
       - crates/qianqian-kernel/tests
 
   - id: ARCH-003
-    name: Playback Architecture
-    version: 1
-    status: CURRENT
+    name: Playback Foundations
+    version: 2
+    status: NEXT
 
+    # Playback authority has been reopened. The v2 diagram and ADR are proposed,
+    # not yet frozen/accepted production authority.
     diagram:
-      source: docs/architecture/diagrams/ARCH-003-playback-kernel-v1.mmd
-      frozen: true
+      source: docs/architecture/diagrams/ARCH-003-playback-foundations-v2.mmd
+      frozen: false
 
     authority:
-      # ADR-PBK-001 passed its blocking formal core and was accepted on
-      # 2026-09-09. It is now the registered playback-specific authority;
-      # component-boundary-a0.md remains historical #53 evidence.
       - docs/adr/ADR-PBK-001.md
       - docs/architecture/overview.md
 
@@ -71,15 +70,21 @@ architectures:
       - pr: 66
       - pr: 78
       - pr: 79
+      - pr: 81
+      - pr: 82
 
     implementation: []
 
     evidence:
+      # Prior playback code/specs are retained as experimental evidence only
+      # while ARCH-003 is reopened. They do not close current design questions.
       - git tag playback-reference-v1
       - specs/playback/PlaybackTemporal.tla
+      - specs/playback/PlaybackOwnership.tla
       - specs/playback/README.md
       - crates/qianqian-core/src/music.rs
       - crates/qianqian-core/src/transport.rs
+      - crates/qianqian-core/tests/playback_temporal_traces.rs
 
   - id: ARCH-004
     name: Plugin Graph
