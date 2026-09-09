@@ -2,7 +2,7 @@
 
 This document is the repository-local semantic overview for Qianqian Architecture v2.
 
-Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). Playback-specific semantics have a **proposed replacement** in [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md) (PROPOSED / FORMAL CORE PASS). The registered ARCH-003 authority is still the closed `component-boundary-a0.md` audit; it remains historical decomposition evidence, and its playback-specific ownership conclusions are historical inputs under proposed replacement — until the ADR is ACCEPTED and the registry is updated, do not combine the two playback models in one implementation.
+Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). Playback-specific semantics are frozen by [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md) (**ACCEPTED**, registered ARCH-003 authority). The closed `component-boundary-a0.md` audit remains historical decomposition evidence; its conflicting playback-specific ownership conclusions are superseded for new playback implementation — do not combine the two playback models in one implementation. Architecture acceptance is not implementation completion: the ADR still gates production implementation behind the deterministic executable oracle.
 
 ## Architecture constitution
 
@@ -350,15 +350,15 @@ Generic composition
     docs/architecture/composition-kernel.md
 
 Playback architecture
-    registered ARCH-003 authority: docs/architecture/component-boundary-a0.md
-        (NOT yet migrated; migration happens only after human ACCEPTED)
-    proposed replacement: docs/adr/ADR-PBK-001.md (PROPOSED / FORMAL CORE PASS)
+    registered ARCH-003 authority: docs/adr/ADR-PBK-001.md (ACCEPTED)
+        + docs/architecture/overview.md
         specs/playback/* as formal evidence
+        (production implementation gated behind the deterministic executable oracle)
 
 Historical decomposition evidence
     docs/architecture/component-boundary-a0.md
     playback-specific ownership/granularity conclusions are historical inputs
-    under proposed replacement by ADR-PBK-001 (pending acceptance)
+    superseded by accepted ADR-PBK-001 for new playback implementation
 ```
 
 ## Historical evidence

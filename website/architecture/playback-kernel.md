@@ -1,13 +1,13 @@
 ---
 title: Playback Architecture
-status: PROPOSED
+status: CURRENT
 ---
 
 # Playback Architecture
 
-<StatusBadge status="PROPOSED" />
+<StatusBadge status="CURRENT" />
 
-ADR-PBK-001 是当前 Playback 架构的**拟议替代方案**（PROPOSED / FORMAL CORE PASS）；在人工 ACCEPTED 并更新 registry 前，它尚未正式替代 ARCH-003 的登记 authority。本页是该拟议模型面向阅读的解释层，不另造一套架构。
+ADR-PBK-001 已 **ACCEPTED**，是已登记的 ARCH-003 playback 专属 authority（与 `overview.md` 共同）；`component-boundary-a0.md` 的冲突性 playback 结论对新实现已被取代。本页是该已接受模型面向阅读的解释层，不另造一套架构。架构接受不等于实现完成：deterministic executable temporal core 是 implementation entry，真实 Decoder/AudioOutput 机制是后续任务。
 
 > **Playback 不是一个巨型 MusicKernel。**
 

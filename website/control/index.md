@@ -41,9 +41,9 @@ import { projectState } from '../data/project-state.ts'
 
 ---
 
-## Playback 拟议结构
+## Playback 已接受结构
 
-ADR-PBK-001（**PROPOSED / FORMAL CORE PASS**）的拟议结构：
+ADR-PBK-001（**ACCEPTED**，已登记 ARCH-003 authority）的结构：
 
 ```text
 MusicComponent
@@ -53,7 +53,7 @@ MusicComponent
     └── DecodeSession(s)
 ```
 
-在拟议模型中，`MusicKernel` 不承担 timeline/window/generation/fence；`TransportKernel` 是 raw playback evidence 的唯一 temporal interpreter。该模型待人工 ACCEPTED 后才迁移 registry authority。
+在该已接受模型中，`MusicKernel` 不承担 timeline/window/generation/fence；`TransportKernel` 是 raw playback evidence 的唯一 temporal interpreter。
 
 当前代码已经建立两个 authority shell，但尚未实现完整 playback state machine、FFmpeg Decoder 或真实 AudioOutput backend。
 
@@ -79,7 +79,7 @@ Playback 的 formal core 已验证 Dual Window、Generation admission、Physical
 
 > **TLA+ 用来找撞车，不用来证明整个架构。**
 
-当前先完成 repo authority alignment 与人工 acceptance review。只有 ADR-PBK-001 被 ACCEPTED 之后，才进入 executable Rust model，并优先依靠类型/ownership 与普通测试推动 representation，而不是继续扩张形式化模型数量。
+ADR-PBK-001 已 ACCEPTED。下一阶段进入 deterministic executable Rust model（implementation entry），优先依靠类型/ownership 与普通测试推动 representation，而不是继续扩张形式化模型数量。
 
 ---
 

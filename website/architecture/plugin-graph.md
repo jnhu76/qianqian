@@ -25,7 +25,7 @@ flowchart LR
     MUSIC -->|"requires AudioOutput / PcmSink"| AOUT
 ```
 
-`MusicComponent` 拟议内部结构（ADR-PBK-001，**PROPOSED / FORMAL CORE PASS**；当前代码只建立了 `MusicKernel` / `TransportKernel` 两个 authority shell）：
+`MusicComponent` 内部结构（ADR-PBK-001，**ACCEPTED**；当前代码只建立了 `MusicKernel` / `TransportKernel` 两个 authority shell）：
 
 ```text
 MusicKernel      music/product semantic authority

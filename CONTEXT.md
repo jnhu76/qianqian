@@ -88,7 +88,7 @@ Confluence oracle
 Composition Kernel implementation
 ```
 
-#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). The #67 COMPOSITION-KERNEL-0 semantic design is MERGED (PR #68, `composition-kernel-0-design.md`). The Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86). Playback ADR-PBK-001 is `PROPOSED / FORMAL CORE PASS` (PR #78 + #79).
+#53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (`component-boundary-a0.md`). The #67 COMPOSITION-KERNEL-0 semantic design is MERGED (PR #68, `composition-kernel-0-design.md`). The Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86). Playback ADR-PBK-001 is `ACCEPTED` (PR #78 + #79; accepted via #81) and is the registered playback-specific ARCH-003 authority; implementation has not started.
 
 ## Interaction mental model
 
@@ -139,7 +139,7 @@ Context establishes reachability. It does not carry PCM blocks or playback tempo
 
 ## Playback mental model
 
-The model below is ADR-PBK-001's (**PROPOSED / FORMAL CORE PASS**) proposed playback structure — the registered ARCH-003 authority has not yet migrated to it.
+The model below is ADR-PBK-001's (**ACCEPTED**) playback structure — the registered playback-specific ARCH-003 authority.
 
 ```text
 MusicComponent
