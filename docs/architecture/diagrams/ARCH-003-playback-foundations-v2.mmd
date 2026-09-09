@@ -1,0 +1,40 @@
+flowchart TB
+    subgraph CP[Composition Plane]
+        CK[Composition Kernel\nContext / Capability / Fiber / Effect / Reconcile]
+    end
+
+    subgraph XP[Execution / Control Plane\nconstraint-oriented lens, not a K0 subsystem]
+        CMD[Command / Intent]
+        SVC[Capability / Service]
+        CTRL[Domain / Workflow / Control]
+        CMD --> CTRL --> SVC
+    end
+
+    subgraph FP[Fact Plane]
+        EVID[Mechanism Evidence\nlow-rate typed observations]
+        INTAKE[Evidence Intake / Validation]
+        AUTH[Semantic Authority Decision\none designated authority per\n(fact kind, subject scope)]
+        FACT[Fact Establishment\nsemantic commit]
+        PUB[Fact Publication]
+        PROJ[Projection / Persistence / UI / Telemetry]
+        EVID --> INTAKE --> AUTH --> FACT --> PUB --> PROJ
+    end
+
+    subgraph RP[Realtime Data Plane]
+        BUILD[Build + Validate Graph/View]
+        RTPUB[Realtime-view Publication\nreader observes one coherent view]
+        SRC[Source / Decoder]
+        PROC[Realtime Processing]
+        OUT[Audio Output]
+        BUILD --> RTPUB
+        RTPUB -. pre-bound view .-> PROC
+        SRC -->|PCM| PROC -->|PCM| OUT
+    end
+
+    CK -->|reachability / lifecycle| SVC
+    CTRL -->|establish semantic facts| AUTH
+    CTRL -->|build/configure| BUILD
+    OUT -->|low-rate mechanism evidence| EVID
+
+    classDef boundary fill:#fff,stroke:#333,stroke-width:1px;
+    class CK,CMD,SVC,CTRL,EVID,INTAKE,AUTH,FACT,PUB,PROJ,BUILD,RTPUB,SRC,PROC,OUT boundary;

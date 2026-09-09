@@ -2,335 +2,251 @@
 
 This document is the repository-local semantic overview for Qianqian Architecture v2.
 
-Detailed generic composition semantics live in [`composition-kernel.md`](composition-kernel.md). Playback-specific semantics are frozen by [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md) (**ACCEPTED**, registered ARCH-003 authority). The closed `component-boundary-a0.md` audit remains historical decomposition evidence; its conflicting playback-specific ownership conclusions are superseded for new playback implementation — do not combine the two playback models in one implementation. Architecture acceptance is not implementation completion: the ADR still gates production implementation behind the deterministic executable oracle.
+Generic composition semantics live in `composition-kernel.md` and the K0 design/implementation authorities. Playback Foundations are **accepted** (`../adr/ADR-PBK-001.md`); they fix plane boundaries and contracts, not a production playback state machine or its vocabulary.
 
-## Architecture constitution
+The current architecture intentionally separates composition, execution/control, committed facts, and realtime data flow.
 
-> **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
->
-> **Semantic authorities own the meaning of their facts.**
->
-> **Capabilities expose contracts; providers own mechanisms.**
->
-> **Fibers own plugin-instance lifetime.**
->
-> **Effects own attributable composition mutation/recovery provenance.**
->
-> **Profiles declare desired composition; Reconcile determines the running graph.**
+---
 
-Architecture v2 is boundary-first. A feature name or Rust type is not proof of component independence.
+# Normative constitution
 
-## Design order
+> The normative Playback Foundations constitution lives in [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md) §1–§2. This overview explains; it does not carry a second normative copy.
+
+---
+
+# Four-plane model
+
+The following are **reasoning lenses / concern boundaries**, not a claim that the runtime consists of exactly four concrete subsystems:
 
 ```text
-Component Granularity
+┌────────────────────────────────────────────┐
+│              Composition Plane             │
+│ Context / Capability / Fiber / Effect      │
+│ Reconcile / dependency / withdrawal        │
+└────────────────────┬───────────────────────┘
+                     │ establishes reachability/lifetime
+                     ▼
+┌────────────────────────────────────────────┐
+│          Execution / Control Plane         │
+│ Command / workflow / Capability-Service    │
+│ parameter/control operations               │
+└────────────────────┬───────────────────────┘
+                     │ semantic commit / graph build
+          ┌──────────┴──────────┐
+          ▼                     ▼
+┌──────────────────────┐  ┌──────────────────────────┐
+│      Fact Plane      │  │   Realtime Data Plane   │
+│ committed Fact       │  │ published graph/view    │
+│ projections          │  │ PCM direct flow         │
+│ persistence/UI       │  │ execution/device        │
+└──────────────────────┘  └──────────────────────────┘
+```
+
+These are cooperating concerns, not one universal bus.
+
+---
+
+# Composition Plane
+
+The generic Base Kernel K0 is implemented/current.
+
+```text
+Context
+Capability
+Fiber
+Effect
+Reconcile
+```
+
+It decides:
+
+```text
+who exists
+who may reach whom
+which provider satisfies a requirement
+who owns composition-visible resources/effects
+how providers/dependents withdraw
+```
+
+It must not know:
+
+```text
+PCM
+AudioGraph
+FFmpeg
+WASAPI
+seek
+track/playlist semantics
+player UI state
+```
+
+Context is a capability/dependency view, not a payload bus or global state bag.
+
+---
+
+# Plugin / Fiber
+
+A Plugin is a long-lived component definition participating in the common composition/lifecycle protocol after its boundary has been justified.
+
+A Fiber is its live runtime instance.
+
+A Plugin may provide services, register hooks, observe facts, own resources or provide realtime graph participants. It is **not** automatically one step in a payload pipeline.
+
+Therefore neither of these implications is valid without evidence:
+
+```text
+AudioNode => Plugin
+Plugin => AudioNode
+```
+
+The granularity of Decoder, DSP stages and AudioOutput will be earned experimentally.
+
+---
+
+# Execution / Control Plane
+
+Execution begins with intent. This is currently a constraint-oriented lens, not a new K0 subsystem.
+
+```text
+User / UI / automation
         ↓
-Capability / dependency boundary
+      Command
         ↓
-Interaction Algebra
+domain/controller/workflow
         ↓
-Effect / System Boundary
+Capability / Service
         ↓
-Global lifecycle ordering
-        ↓
-Confluence oracle
-        ↓
-Composition Kernel implementation
+mechanism / authority
 ```
 
-The generic Base Kernel K0 is already implemented. Playback correctness is not solved by adding more generic kernel primitives; it has its own domain/temporal authority boundaries.
+A future extension may use middleware/waterfall-like interception for execution seams, but that is different from committed Fact delivery and is not yet a generic primitive.
 
-## Control plane and data plane
+> **Command != Fact** — frozen in `../adr/ADR-PBK-001.md` §2.2.
+
+---
+
+# Fact Plane
+
+A Fact is published only after its truth has been established by its designated semantic authority.
+
+Frozen contracts (names only — normative text in `../adr/ADR-PBK-001.md` §2.3): semantic-commit definition; commit-first; one designated authority per (fact kind, subject scope); mechanism-evidence firewall; projection read-side firewall.
+
+Event Sourcing/CQRS, durability, replay authority and append-only logging remain open research questions.
+
+---
+
+# Realtime Data Plane
+
+PCM is high-frequency hot data and follows a direct typed path.
 
 ```text
-                         CONTROL PLANE
-
-                 desired composition
-                          |
-                          v
-                  Composition Kernel
-             Context / Capability / Fiber
-                  Effect / Reconcile
-
--------------------------------------------------------------
-                          |
-                    resolve / bind
-                          v
-                         DATA PLANE
-
-      Encoded Media -> Decoder -> Processing -> AudioOutput
+source/decoder
+      ↓ PCM
+processing graph
+      ↓ PCM
+output/device
 ```
 
-> **Capability plane != Data plane.**
+The ADR forbids per-quantum re-entry of the realtime path into Context resolution, generic Fact/Event fan-out, plugin dispatch, Reconcile, or filesystem/network/UI machinery (normative list in `../adr/ADR-PBK-001.md` §2.4); it operates on already-bound/published state.
 
-Context establishes reachability and dependency validity. It does not carry PCM blocks, playback position, Window state, UI payloads, or arbitrary domain events.
+> **Fact != hot data** — frozen in `../adr/ADR-PBK-001.md` §8.
 
-## Playback composition boundary
+---
 
-The first playback slice has one composed `Music` component that binds replaceable providers such as Decoder and AudioOutput/PcmSink.
+# Dependency graph vs realtime graph
+
+The Composition dependency graph and realtime processing graph answer different questions.
+
+## Dependency graph
 
 ```text
-Composition topology
-
-MusicComponent  ---> Decoder provider
-      |
-      +---------> AudioOutput / PcmSink provider
-      |
-      `---------> future independent Processing provider, only if earned
+who requires whom
+who provides what
+who must withdraw before whom
 ```
 
-`MusicComponent` is the **composition lifecycle root** for subordinate playback runtime state. It may contain semantic authorities and nested runtime resources without turning each one into a Composition plugin.
+## Realtime graph
 
 ```text
-MusicComponent
-├── MusicKernel
-├── TransportKernel
-└── TrackSession(s)
-    └── DecodeSession(s)
+which processing step executes next
+where PCM branches/merges
+which concrete pre-bound object/function handles the quantum
 ```
 
-The terms below must remain distinct:
+The same resource may participate in both, but edge semantics differ.
+
+Frozen in `../adr/ADR-PBK-001.md` §5: dependency topology != realtime processing topology; realtime/DSP order is never derived from mount/registration/iteration order.
+
+---
+
+# Graph publication boundary
+
+Control side builds and validates the next realtime graph/view; realtime execution loads the currently published view and processes the audio quantum directly.
+
+Both §6 invariants — coherent publication (reader sees N or N+1) and RT-referenced resources valid until readers quiesce — are normative in `../adr/ADR-PBK-001.md` §6 only.
+
+The publication mechanism (RCU / epoch / double buffering / Arc snapshot / lease / hazard / other) is intentionally unfrozen.
+
+---
+
+# Realtime lifetime safety
+
+The withdrawal ordering, reader-quiescence steps and the exact resource/fiber lifetime binding are normative in `../adr/ADR-PBK-001.md` §6. This is the first clearly identified cross-plane lifetime invariant of the reset architecture.
+
+---
+
+# Parameter vs topology changes
+
+Do not force every cheap runtime parameter update through full Plugin Reconcile.
+
+Cheap parameter updates (volume, filter coefficients, ...) are likely control-path updates; inserting/removing stages or replacing decoder/output mechanisms may require topology/provider rebuild/publication. The exact boundary is research-open; see `../adr/ADR-PBK-001.md` §7.
+
+---
+
+# Current playback status
+
+Playback-specific state-machine authority has been deliberately reopened.
+
+The repository still contains prior experimental concepts such as (full reopened list: `../adr/ADR-PBK-001.md` §0/§10):
 
 ```text
-composition lifecycle root
-immediate lifetime owner
-semantic authority
-```
-
-Do not collapse them into one ambiguous `owns` relation.
-
-## MusicKernel
-
-`MusicKernel` is the **music/product semantic authority**.
-
-It owns the meaning of:
-
-```text
-play / pause product semantics
-seek intent meaning
-next / previous
-repeat / shuffle
-playlist policy
-selection semantics
-user-visible PlaybackState meaning
-what to do after a terminal transport outcome
-```
-
-It is not the playback timeline authority and must not independently reinterpret raw cursor/render/EOF/fence facts.
-
-## TransportKernel
-
-`TransportKernel` is the **playback temporal authority**.
-
-It owns the meaning of:
-
-```text
-playback cursor
-MediaSpan timeline
-Active / Prepared temporal roles
-Generation admission
-window promotion / invalidation
-discontinuity execution
-Physical Fence coordination
-raw playback evidence interpretation
-```
-
-`Kernel` in `MusicKernel` / `TransportKernel` means semantic authority role, not Composition plugin boundary.
-
-Raw playback evidence such as:
-
-```text
-Decoder EOF
-seek landing
-late decode result
-submitted evidence
-rendered evidence
-Physical Fence verdict
-```
-
-is interpreted once by `TransportKernel`. Other authorities receive typed derived facts.
-
-## TrackSession / DecodeSession
-
-`TrackSession` is the media identity/source lifetime root.
-
-```text
+MusicKernel
+TransportKernel
 TrackSession
-├── source identity
-├── media descriptor
-├── duration / probe truth
-└── 0..N DecodeSession
-```
-
-Each `DecodeSession` owns one independently advancing decoder cursor/handle plus its generation-local decode/EOF/seek state.
-
-Same-track seek can therefore legally have two decoder cursors at once:
-
-```text
-TrackSession A
-├── DecodeSession gen17 @72s   -> Active role
-└── DecodeSession gen18 @100s  -> Prepared role
-```
-
-Active/Prepared are temporal roles/slots inside `TransportKernel`. They are not independent plugins and are not standalone lifetime resources.
-
-## Dual Window and Generation admission
-
-The MVP temporal shape is:
-
-```text
-1 Active
-0..1 Prepared
-```
-
-Therefore this check is forbidden:
-
-```text
-result.generation != global_current_generation => stale
-```
-
-A generation is stale when the owning temporal role no longer admits that operation.
-
-During preparation, the Prepared generation may accept decode/prime results but cannot become output authority before promotion.
-
-After retirement, a generation cannot re-enter admission or submit new audible media.
-
-## Physical Fence and physical truth
-
-Playback keeps these facts distinct:
-
-```text
-decoded != queued != submitted != rendered
-logical invalidation != physical stop
-```
-
-Hard stop/seek/replacement must cross a real Physical Fence when old submitted audio must cease.
-
-```text
-close old admission
-    -> prevent new old-generation submission
-    -> physical fence / flush handshake
-    -> definitive verdict
-    -> promote / stop / fail closed
-```
-
-A claimed Physical Fence is past the cancellation point; already rendered sound is outside the recoverable system boundary. These are related but different truths.
-
-Formal exploration found a real `stop × natural ENDED` race. While a hard-stop/discontinuity fence is in flight, natural EOF/drain evidence must not prematurely terminalize the active temporal state needed to finish that fence.
-
-## PCM and processing topology
-
-PCM is Qianqian's canonical decoded-audio data plane:
-
-```text
-Encoded Media
-    -> Decoder
-    -> Canonical PCM
-    -> Audio Processing Graph
-    -> AudioOutput
-```
-
-Metadata, commands, EOF evidence, render evidence, device status and UI state are not PCM payloads.
-
-The **Composition topology** and the **Audio Processing Graph** are different structures.
-
-Composition topology manages independently composed providers and lifecycle. Processing topology manages ordered PCM transforms such as:
-
-```text
-Gain
-EQ
-SRC
-Limiter
-Mixer
-```
-
-Normal DSP node insertion/removal/parameter updates do not automatically become Fiber reconciliation.
-
-Player volume defaults to `PlayerGain` in the processing graph. Optional device/system volume belongs to AudioOutput/platform control.
-
-## Interaction algebra
-
-A disposer/inverse is not sufficient evidence of independent composition.
-
-> **Commutative relation -> may compose as independent effects.**
->
-> **Non-commutative relation -> explicit dependency/order/integration structure.**
-
-DSP ordering is canonical:
-
-```text
-EQ -> Compressor
-```
-
-is generally not equivalent to:
-
-```text
-Compressor -> EQ
-```
-
-Semantic order must never come from registration time, mount order, hash iteration or discovery order.
-
-## Provider withdrawal
-
-Provider disappearance is dependency-ordered:
-
-```text
-provider begins withdrawal
-        ↓
-no new resolution sees it as available
-        ↓
-dependents invalidate / deactivate
-        ↓
-dependents finish teardown while teardown access is valid
-        ↓
-provider releases final bindings/resources
-```
-
-For playback this means DecodeSession/RT-edge teardown must complete before the corresponding provider mechanism disappears. The exact nested implementation is not a reason to move playback payloads into Context.
-
-## Confluence
-
-At the composition level:
-
-> **After any legal composition history reaches quiescence, observable composition truth should match a clean construction of the same final desired graph.**
-
-Composition confluence does not imply historical playback position/state magically survives. Domain/temporal continuity is a separate policy and must use explicit checkpoints or behavioral probes where required.
-
-## Realtime boundary
-
-Realtime audio is a bounded data-plane island. Per callback/block do not perform:
-
-```text
-Context lookup
-capability resolution
-Fiber reconciliation
-generic event dispatch
-filesystem/network I/O
-UI/JS/managed-runtime round trips
-unbounded allocation/blocking
-```
-
-Graph changes are prepared on the control side and published at an RT-safe boundary.
-
-## Formal verification boundary
-
-Playback formalization is intentionally risk-driven.
-
-Blocking temporal evidence covers only state combinations with real collision risk:
-
-```text
+DecodeSession
+Generation
+Active / Prepared
 Dual Window
-Generation admission
 Physical Fence
-submitted vs rendered
-EOF / drained / ENDED terminalization
 ```
 
-Additional ownership models remain supporting evidence. Formal models are not a second architecture authority and must not silently promote modeling assumptions into production semantics.
+They are currently **experimental evidence only**.
 
-## Current code status
+They are not stable architecture vocabulary and must not be preserved for compatibility unless a future accepted ADR re-earns them.
 
-Current Rust workspace:
+Similarly, `specs/playback/*` is a valuable source of bug reproducers and formal/testing techniques, but is not a current acceptance gate.
+
+---
+
+# New research order
+
+The one normative research/implementation ladder lives in `../adr/ADR-PBK-001.md` §12: mechanism-first at the foundation, semantics-later at the player level.
+
+---
+
+# Formal verification boundary
+
+Formal verification remains risk-driven.
+
+Do not model every architectural noun.
+
+The old PlaybackTemporal/PlaybackOwnership models are no longer blocking architecture authority.
+
+The first likely new candidate is the narrow publication/release interleaving of `../adr/ADR-PBK-001.md` §13 — justified only after the collision is concrete.
+
+---
+
+# Current workspace
 
 ```text
 qianqian-core
@@ -339,9 +255,13 @@ qianqian-runtime
 qianqian-headless
 ```
 
-The generic Composition Kernel is implemented. Product code now has separate `MusicKernel` and `TransportKernel` semantic-authority shells; final Window/Generation/Fence/TrackSession/DecodeSession representations remain deliberately unfrozen until executable implementation work earns them.
+The Base Kernel K0 is current.
 
-## Authority chain
+Playback-specific code is research evidence and may be changed/removed without compatibility obligation; the accepted foundations deliberately do not re-freeze legacy playback nouns.
+
+---
+
+# Authority chain
 
 ```text
 Generic composition
@@ -349,25 +269,16 @@ Generic composition
     docs/architecture/composition-kernel-0-implementation-adr.md
     docs/architecture/composition-kernel.md
 
-Playback architecture
-    registered ARCH-003 authority: docs/adr/ADR-PBK-001.md (ACCEPTED)
-        + docs/architecture/overview.md
-        specs/playback/* as formal evidence
-        (production implementation gated behind the deterministic executable oracle)
+Playback foundations
+    docs/adr/ADR-PBK-001.md — ACCEPTED
+    docs/architecture/overview.md
 
-Historical decomposition evidence
-    docs/architecture/component-boundary-a0.md
-    playback-specific ownership/granularity conclusions are historical inputs
-    superseded by accepted ADR-PBK-001 for new playback implementation
+Experimental playback evidence
+    qianqian-core playback code/tests
+    specs/playback/*
+
+Historical evidence
+    git history / explicit historical refs
 ```
 
-## Historical evidence
-
-Historical evidence is preserved as **git refs, not working-tree directories**:
-
-```text
-pre-rust-v2              git tag (branch: archive/pre-rust-v2)
-playback-reference-v1    git tag (branch: research/playback-reference-v1)
-```
-
-Inspect via `git show <tag>:<path>`. These are opt-in evidence sources, not current source-layout or ownership templates.
+Current architecture work must not silently upgrade experimental playback evidence back into authority.

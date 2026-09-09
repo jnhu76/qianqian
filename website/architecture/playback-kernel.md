@@ -1,13 +1,17 @@
 ---
-title: Playback Architecture
-status: CURRENT
+title: Playback Architecture（历史实验证据）
+status: HISTORICAL_EVIDENCE
 ---
 
 # Playback Architecture
 
-<StatusBadge status="CURRENT" />
+<StatusBadge status="HISTORICAL_EVIDENCE" />
 
-ADR-PBK-001 已 **ACCEPTED**，是已登记的 ARCH-003 playback 专属 authority（与 `overview.md` 共同）；`component-boundary-a0.md` 的冲突性 playback 结论对新实现已被取代。本页是该已接受模型面向阅读的解释层，不另造一套架构。架构接受不等于实现完成：deterministic executable temporal core 是 implementation entry，真实 Decoder/AudioOutput 机制是后续任务。
+> **STATUS: HISTORICAL / EXPERIMENTAL EVIDENCE**
+>
+> 本页描述的 `MusicComponent` / `MusicKernel` / `TransportKernel` / `TrackSession` / `DecodeSession` / Generation / Dual Window / Physical Fence 模型来自旧 Playback 架构实验（含其短暂 ACCEPTED 的旧版 ADR 修订）。2026-09 播放架构从第一性原理重置后，这些内容**不再是 current authority**，也不是新 Playback 设计的 acceptance gate。当前 Playback Foundations authority：`docs/adr/ADR-PBK-001.md`（**ACCEPTED**，不冻结播放状态机名词）。本页保留作为面向阅读的历史解释层与 failure-witness 索引。
+
+以下为历史内容（原样保留，仅状态降级）：
 
 > **Playback 不是一个巨型 MusicKernel。**
 
@@ -183,7 +187,7 @@ Composition topology 与 Audio Processing Graph 是两张不同的图。Gain / E
 
 ## 当前实现边界
 
-当前 Rust 代码只放入了两个**最小 authority shell**：
+当前 Rust 代码中的 `qianqian-core::music::MusicKernel` / `qianqian-core::transport::TransportKernel` 即该旧实验留下的 **experimental evidence**（非 current authority）：
 
 ```text
 qianqian-core::music::MusicKernel
@@ -211,7 +215,7 @@ Core temporal checks 已 PASS，覆盖：
 ---
 
 <ProvenancePanel
-  :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/overview.md']"
-  :decisions="[{ pr: 78 }, { pr: 79 }]"
+  :authority="[]"
+  :decisions="[]"
   :evidence="['specs/playback/PlaybackTemporal.tla', 'specs/playback/README.md', 'research/playback-reference-v1']"
 />

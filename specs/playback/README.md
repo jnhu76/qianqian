@@ -1,8 +1,18 @@
 # specs/playback — 播放架构形式化验证
 
-被审计对象：`docs/adr/ADR-PBK-001.md`（PROPOSED / FORMAL CORE PASS）。
+> **STATUS: EXPERIMENTAL EVIDENCE**
+>
+> These models preserve earlier failure witnesses and verification techniques.
+> They are **not current Playback architecture authority** and are **not acceptance
+> gates** for new Playback design. The current Playback Foundations proposal is
+> `docs/adr/ADR-PBK-001.md` (PROPOSED / REOPENED).
+>
+> 允许复用：mutation 技术、具体 counterexample、verifier runner、负控制方法。
+> 禁止：要求新架构镜像本目录的 variables / states / nouns。
 
-定位：**Playback architecture formal exploration with a small blocking temporal core and additional supporting lifecycle evidence.** 本目录不声称整个 Playback Architecture 已被形式化证明——一个小的 blocking temporal core（`PlaybackTemporal` + 4 个 core negative controls）负责攻击高风险状态交错；其余模型与 mutation 是 supporting evidence，不阻塞 ADR ACCEPTED。
+原始定位（历史）：曾被用作旧版 `docs/adr/ADR-PBK-001.md` 修订的形式化审计证据（当时的定位标注 PROPOSED / FORMAL CORE PASS）。播放架构重置后，本目录整体降级为 experimental evidence。
+
+定位：**Playback architecture formal exploration（historical evidence）。** 本目录不声称整个 Playback Architecture 已被形式化证明——一个小的 temporal core（`PlaybackTemporal` + 4 个 core negative controls）覆盖高风险状态交错的失败证人；其余模型与 mutation 是 supporting evidence。这些模型不阻塞 ADR 验收，也不再是新 Playback 设计的 acceptance gate（历史上的 "blocking temporal core" 定位已随架构重置退役）。
 
 本目录用 TLA+/TLC 做显式状态空间探索：正常模型穷举命令与证据的交错，负控制注入故意错误证明 checker 不是 vacuous。
 
@@ -21,9 +31,9 @@
 
 ---
 
-## 一、Core acceptance / Extended exploration
+## 一、Core evidence set / Extended exploration
 
-### Core acceptance checks（ADR ACCEPTED blocking）
+### Core evidence checks（历史 ADR-ACCEPTED-blocking 定位已退役）
 
 | Semantic risk | Check | Blocking |
 | --- | --- | --- |
@@ -39,7 +49,7 @@
 
 core mutation 与 semantic risk 的对应：`PromoteWithoutFence` → Physical Fence；`AcceptUnadmittedDecode` → Generation admission；`SingleGlobalGenerationCheck` → Dual Window / no-global-current；`EndBeforeRenderDrain` → EOF / physical drain。retired-generation re-enter 的保护处于 core 集——它由 `PlaybackTemporal` 正常模型的不变量 `RetiredGenerationCannotReenter` 承担；对应 mutation 是 extended 证据。
 
-### Extended exploration（supporting / non-blocking）
+### Extended exploration（supporting evidence）
 
 | Check | Purpose | Blocking |
 | --- | --- | --- |
@@ -105,7 +115,7 @@ Extended 项继续保留并继续运行，其历史结果不删除。若某个 e
 ### 关键抽象决策（故意省略的现实细节）
 
 - **不模拟 PCM / buffer / 设备**：媒体流动抽象为提交/渲染计数（上限 `MaxMedia=1`，同一 generation 多块在途与 flush 的次级交错被折叠为 0/1 计数）。
-- **不模拟 track 身份与位置**：seek 与 next 共用同一 `PrepareDiscontinuity` 骨架（ADR 冻结两者同 skeleton）；next 特有的 TrackSession 子树释放竞态属 Ownership 模型（两模型不合并——temporal 与 ownership 的拆分来自 ADR 本身，组合盲区已知）。
+- **不模拟 track 身份与位置**：seek 与 next 共用同一 `PrepareDiscontinuity` 骨架（旧版 ADR 冻结两者同 skeleton）；next 特有的 TrackSession 子树释放竞态属 Ownership 模型（两模型不合并——temporal 与 ownership 的拆分来自旧版 ADR 本身，组合盲区已知）。
 - **不模拟 pause/resume**：transport 级暂停不承载任何被验证的 temporal 安全属性（产品语义），省去后状态空间减半。
 - **supersede 原子化**："取消旧 prepared"与"创建新 prepared"折叠为一步（TransportKernel 是唯一 supersede authority）。
 - **decode session 关闭后不再产生结果**：`LateDecodeResult` guard 要求 session 存活；"decoder worker 的 in-flight result 晚于 session close 到达"的现实竞态被排除（由于所有关闭都发生在 admission 已关之后，该竞态即使探索也只会落入纯拒绝动作）。
@@ -141,7 +151,7 @@ Extended 项继续保留并继续运行，其历史结果不删除。若某个 e
 | `EndedRequiresTransportDrain` | constructive | ENDED 绕过 transport drained 事实 |
 | `StopFenceRequiresActiveWindow` | state | stop-fence 在途时 ActiveWindow 被移除（drained/ENDED 抢先导致命令永久锁死——见模型决策 2） |
 
-ADR 冻结语义中「old generation cannot submit after successful promotion」与「fence failure ⇒ no fake promotion」由动作 guard（`SubmitMedia` 的 admission 条件、`PromoteFenceCondition` 只认 succeeded）构造性成立，分别由 `FenceFlushedGenerationsAreSilent` / `PromotionRequiresSuccessfulFence` 从旁佐证。
+旧版 ADR 冻结语义中「old generation cannot submit after successful promotion」与「fence failure ⇒ no fake promotion」由动作 guard（`SubmitMedia` 的 admission 条件、`PromoteFenceCondition` 只认 succeeded）构造性成立，分别由 `FenceFlushedGenerationsAreSilent` / `PromotionRequiresSuccessfulFence` 从旁佐证。
 
 ---
 
@@ -188,7 +198,7 @@ ADR 冻结语义中「old generation cannot submit after successful promotion」
 ## 五、如何验证
 
 ```bash
-# 仅 core acceptance 集（PlaybackTemporal 正常模型 + 4 个 core mutation；ADR ACCEPTED blocking 集）
+# 仅 core evidence 集（PlaybackTemporal 正常模型 + 4 个 core mutation；历史 blocking 定位已退役）
 specs/check.sh core
 
 # 全量（正常模型 + 全部负控制；缺省模式）
@@ -219,7 +229,7 @@ java -jar specs/tools/tla2tools.jar -workers 4 -config PromoteWithoutFence.cfg P
 
 ## 六、运行结果（真实运行数据，2026-09-09，4 workers，含 executable-core corrective 后模型）
 
-core acceptance 集 = `PlaybackTemporal` 正常模型 + 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）；下表其余行为 extended exploration 证据，全部保留。
+core evidence 集 = `PlaybackTemporal` 正常模型 + 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）；下表其余行为 extended exploration 证据，全部保留。
 
 本列数据对应 decision 8（admission 关闭 discard 记账 + `NoStrandedDecodeAfterAdmissionClose` 不变量）合入后的模型；与 2026-09-08 数据不可直接对比（新增变量与新不变量改变了可达状态空间与 drain 发布条件）。
 
@@ -259,16 +269,16 @@ Ownership 模型未随本次 corrective 变更（运行数据与 2026-09-08 一�
 
 ## 七、模型决策记录（ADR 未明确定义处的建模选择）
 
-以下决策是模型为封闭探索所做的选择，**不是**对 ADR 的改写；若实现期发现不同选择，应先更新本记录并重跑验证。决策 2 / 4 的最小 invariant 已反哺 ADR（§18）；决策 3 对应的 ADR 冻结只有 claimed-transaction 不可逆一条（§8）：
+以下决策是模型为封闭探索所做的选择，**不是**对 ADR 的改写；若实现期发现不同选择，应先更新本记录并重跑验证。决策 2 / 4 的最小 invariant 曾反哺旧版 ADR 修订（当时的 §18，已随重置移除）；决策 3 对应的旧版 ADR 冻结只有 claimed-transaction 不可逆一条（当时的 §8）：
 
 1. **stop 可以 supersede 在途 promote-fence**：用户在 seek fence 未落定时按 stop 是真实竞态。模型把同一次物理冲刷重解释为终局 cut（保留握手阶段、清空 promotion 目标——设备不关心 promotion 计划）。ADR §8/§18 未定义此交错。
-2. **stop-fence 在途时不发布 drained/ENDED**：stop 与自然 ENDED 的竞态（EOF 排干 vs stop 物理切断）ADR 未定义。模型裁决：fence 握手在途 ⇒ 物理状态未定 ⇒ TransportKernel 不解释 drained（`PublishTransportDrained` 要求 fence idle；`RequestStop` 重置陈旧 drained 事实；`StopFenceRequiresActiveWindow` 不变量守护）。对抗 review 曾证明无此裁决时存在"ENDED 抢先移除 ActiveWindow → fence 永久卡死 → 命令锁死"的可达坏状态。**该裁决的最小 invariant 已反哺 ADR §18**（stop × 自然 ENDED 竞态冻结：Physical Fence 在途时，自然 EOF/drain 不得提前终态化并销毁 fence 所需 active temporal state）。
-3. **stop-fence 期间不接受新 seek/next**：stop 是终局性 cut，等 fence verdict 落定后才能开新 episode（`stop → seek 重开` 交错未探索）。**这是模型为闭合探索所做的决策，不是产品语义冻结**；ADR 只冻结「fence 进入 claimed（不可逆）阶段后，后续 intent 不得取消或改写已 claim 的 physical transaction」（§8）。reject / defer / coalesce / latest-wins 留给 executable implementation/oracle。
-4. **prepared 在 prime 完成前 decoder EOF**（如 seek 到文件尾）：`DropUnprimablePrepared` 取消该 discontinuity。**ADR 已收编最小冻结**（§18 Prepared EOF）：EOF evidence does not imply PreparedWindow readiness；prepared contribution 在 readiness 前 terminal 必须得到显式 outcome。具体分类（prepare failed / empty media / seek-to-EOF 等）留给实现与后续 oracle。
+2. **stop-fence 在途时不发布 drained/ENDED**：stop 与自然 ENDED 的竞态（EOF 排干 vs stop 物理切断）ADR 未定义。模型裁决：fence 握手在途 ⇒ 物理状态未定 ⇒ TransportKernel 不解释 drained（`PublishTransportDrained` 要求 fence idle；`RequestStop` 重置陈旧 drained 事实；`StopFenceRequiresActiveWindow` 不变量守护）。对抗 review 曾证明无此裁决时存在"ENDED 抢先移除 ActiveWindow → fence 永久卡死 → 命令锁死"的可达坏状态。**该裁决的最小 invariant 曾反哺旧版 ADR §18**（stop × 自然 ENDED 竞态冻结；该冻结已随重置移除，仅为历史记录：Physical Fence 在途时，自然 EOF/drain 不得提前终态化并销毁 fence 所需 active temporal state）。
+3. **stop-fence 期间不接受新 seek/next**：stop 是终局性 cut，等 fence verdict 落定后才能开新 episode（`stop → seek 重开` 交错未探索）。**这是模型为闭合探索所做的决策，不是产品语义冻结**；旧版 ADR 只冻结「fence 进入 claimed（不可逆）阶段后，后续 intent 不得取消或改写已 claim 的 physical transaction」（当时的 §8）。reject / defer / coalesce / latest-wins 留给 executable implementation/oracle。
+4. **prepared 在 prime 完成前 decoder EOF**（如 seek 到文件尾）：`DropUnprimablePrepared` 取消该 discontinuity。**旧版 ADR 已收编最小冻结**（当时的 §18 Prepared EOF，已随重置移除）：EOF evidence does not imply PreparedWindow readiness；prepared contribution 在 readiness 前 terminal 必须得到显式 outcome。具体分类（prepare failed / empty media / seek-to-EOF 等）留给实现与后续 oracle。
 5. **fence 失败的出路**：`RetryFence`（重试）或 `AbandonFence`（fail closed：不 promote，active 保持 admission-closed 自然排干）。自然排干之所以在 abandon 后仍然可达，是因为 admission 关闭转移已经把未提交 backlog 显式 discard（决策 8）。
 6. **fence 成功但 promotion 目标已被 supersede**：verdict 被消费（物理冲刷确实发生），不 promotion；新 prepared 走自己的 episode（同一 cut gen 可再次 fence——设备已静默，幂等）。
 7. **EOF 后、drained 前的已接受未提交结果**：drained predicate 要求 `decodeAcceptedInAdmission = submittedEver + discardedBacklog`（ADR "software media pipeline drained" 的模型化；discard 项见决策 8）。
-8. **admission 关闭即 discard 未提交 backlog**：提交要求 admission 开放且关闭单向，因此 decoded-but-never-submitted 媒体在 admission 关闭转移（`CloseOldAdmission` / `RequestStop`）当場显式移入 `discardedBacklog` 记账。没有这一步，fail/abandon（以及 verdict-consumed 后 admission 保持关闭的 active）在 `accepted > submitted` 时会落入 drain predicate 永远无法满足的悬挂状态——executable core 的对抗 review 首先发现了这个洞（Rust `TransportKernel::discard_stranded_backlog` 与本模型同步修复）。这是 fail-closed 语义的记账补全，不改写 ADR 的 fence failure ⇒ no fake promotion / retry or fail closed 冻结。
+8. **admission 关闭即 discard 未提交 backlog**：提交要求 admission 开放且关闭单向，因此 decoded-but-never-submitted 媒体在 admission 关闭转移（`CloseOldAdmission` / `RequestStop`）当場显式移入 `discardedBacklog` 记账。没有这一步，fail/abandon（以及 verdict-consumed 后 admission 保持关闭的 active）在 `accepted > submitted` 时会落入 drain predicate 永远无法满足的悬挂状态——executable core 的对抗 review 首先发现了这个洞（Rust `TransportKernel::discard_stranded_backlog` 与本模型同步修复）。这是 fail-closed 语义的记账补全，不改写旧版 ADR 的 fence failure ⇒ no fake promotion / retry or fail closed 冻结。
 
 ## 八、TLC 没有证明什么
 
@@ -284,10 +294,10 @@ Ownership 模型未随本次 corrective 变更（运行数据与 2026-09-08 一�
 
 ## 九、Traceability
 
-- **Core acceptance（blocking）**：`PlaybackTemporal` 覆盖 ADR-PBK-001 §21 **Formal Acceptance** 的五组高风险 temporal 语义，与上文 temporal claims 及 properties 表一一对应。core mutation 对应：`PromoteWithoutFence` → Physical Fence；`AcceptUnadmittedDecode` → Generation admission；`SingleGlobalGenerationCheck` → Dual Window / no-global-current（安全性半：stop 窗口期误接收；功能性半：症状属性）；`EndBeforeRenderDrain` → EOF / physical drain（注入点在 TransportKernel 的 drained 发布层——EOF 证据的误解释发生在该层，ENDED 经 `EndedRequiresTransportDrain` 间接被保护）。
+- **Core evidence set（历史 blocking 定位已退役）**：`PlaybackTemporal` 覆盖 旧版 ADR-PBK-001（重置前）「Formal Acceptance」章节（已随重置移除）的五组高风险 temporal 语义，与上文 temporal claims 及 properties 表一一对应。core mutation 对应：`PromoteWithoutFence` → Physical Fence；`AcceptUnadmittedDecode` → Generation admission；`SingleGlobalGenerationCheck` → Dual Window / no-global-current（安全性半：stop 窗口期误接收；功能性半：症状属性）；`EndBeforeRenderDrain` → EOF / physical drain（注入点在 TransportKernel 的 drained 发布层——EOF 证据的误解释发生在该层，ENDED 经 `EndedRequiresTransportDrain` 间接被保护）。
 - **Extended exploration（non-blocking）**：`PlaybackOwnership` 覆盖上文 ownership claims；`RetiredGenerationStillAdmitted`（状态面：retired 重新 admitted）与 `AcceptUnadmittedDecode`（症状面：迟到结果被接收）配对覆盖 retired/late-decode admission 语义；`ReleaseProviderEarly` / `MultipleImmediateOwners` / `OwnershipCycle` / `KernelAdoptsLifetimeOwnership` 为 ownership / provider-ordering 探索证据。
 - 历史标签对照（早期 ADR 修订曾用 BUG-A..E 命名同类注入，仅作研究历史保留）：BUG-A = `PromoteWithoutFence`；BUG-B = `SingleGlobalGenerationCheck`；BUG-C = `RetiredGenerationStillAdmitted` + `AcceptUnadmittedDecode`；BUG-D = `ReleaseProviderEarly`；BUG-E = `EndBeforeRenderDrain`。
-- ADR 观察项闭环：模型决策 2（stop × 自然 ENDED）与决策 4（Prepared EOF）的最小 invariant 已反哺 ADR §18；window immediate-owner 观察项由 ADR §2 纠正关闭（Active / Prepared 是 temporal role / slot，非 Nested Runtime Resource）。
+- ADR 观察项闭环（历史）：模型决策 2（stop × 自然 ENDED）与决策 4（Prepared EOF）的最小 invariant 曾反哺旧版 ADR §18；window immediate-owner 观察项曾由旧版 ADR §2 纠正关闭（Active / Prepared 是 temporal role / slot，非 Nested Runtime Resource）。上述旧版章节均已随重置移除。
 
 ## 十、对抗 review 记录
 

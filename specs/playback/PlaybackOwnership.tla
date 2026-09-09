@@ -1,9 +1,20 @@
 (*
- * PlaybackOwnership — 播放运行时资源 ownership 的形式化模型
+ * PlaybackOwnership — historical experimental playback model
+ *                      （播放运行时资源 ownership 的形式化模型）
  *
- * 被审计对象：docs/adr/ADR-PBK-001.md 的 ownership 语义（Composition Lifecycle
- * Root / Immediate Lifetime Owner / Semantic Authority 三分，以及 provider
- * withdrawal 的 dependent-before-final-release 顺序）。
+ * STATUS:
+ *   EXPERIMENTAL / FORMAL EVIDENCE ONLY
+ *
+ *   本模型保存早期 Playback architecture 实验的 ownership/lifecycle 假设
+ *   证据与 verification techniques。其 MusicComponent / MusicKernel /
+ *   TransportKernel / TrackSession / DecodeSession 词汇不是当前 Playback
+ *   architecture authority，不约束新的 production 设计，除非该语义被
+ *   独立重新挣得。当前 Playback Foundations 提案：
+ *   docs/adr/ADR-PBK-001.md（PROPOSED / REOPENED）。
+ *
+ * 被审计对象（历史）：旧版 docs/adr/ADR-PBK-001.md（v1）的 ownership 语义
+ * （Composition Lifecycle Root / Immediate Lifetime Owner / Semantic Authority
+ * 三分，以及 provider withdrawal 的 dependent-before-final-release 顺序）。
  *
  * 本模型与 PlaybackTemporal 互补，不重复其 temporal 语义：
  *   - MusicComponent 是 composition lifecycle root（episode 结束时 subordinate
@@ -25,8 +36,8 @@
  *   1 MusicComponent + 1 MusicKernel + 1 TransportKernel
  *   2 TrackSession、3 DecodeSession、2 Provider
  *
- * 注意：ActiveWindow / PreparedWindow 的 immediate lifetime owner 未被 ADR
- * 冻结（ADR 留给 implementation design），故不进入本 ownership 树；window 的
+ * 注意：ActiveWindow / PreparedWindow 的 immediate lifetime owner 未被旧版 ADR
+ * 冻结（旧版 ADR 留给 implementation design），故不进入本 ownership 树；window 的
  * temporal 语义由 PlaybackTemporal 模型覆盖。
  *
  * 负控制（negative controls）通过 CONSTANT Mutation 注入（model value 实例化），
@@ -76,13 +87,14 @@ Providers         == {DecoderProvider, AudioOutputProvider}
 (* DecodeSession 的机制依赖：decoder provider。
  * TransportKernel 的机制依赖：audio output provider（物理输出路径）。 *)
 DependsOnDecoder(d) == d \in DecodeSessions
-(* 模型决策（ADR 未定义此关系）：TransportKernel 的物理输出路径依赖
+(* 模型决策（旧版 ADR 未定义此关系）：TransportKernel 的物理输出路径依赖
  * AudioOutput provider，故它是 output provider 的 dependent。 *)
 ProviderDependents(p) ==
   IF p = DecoderProvider THEN DecodeSessions
   ELSE {TransportKernel}
 
-(* Semantic authority 事实表（ADR §1.3/§3.3 冻结的正结构）：
+(* Semantic authority 事实表（旧版 ADR §1.3/§3.3 冻结的正结构；本模型整体为
+ * experimental evidence）：
  * 每个 playback 事实有唯一 semantic authority holder。
  * lifetime ownership 与 semantic authority 是两种正交关系——
  * authority 关系在事实维度上，ownership 关系在资源维度上，二者不相交。 *)

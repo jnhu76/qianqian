@@ -19,9 +19,9 @@ import { projectState } from '../data/project-state.ts'
 |---|---|---|
 | 播放参考 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | `playback-reference-v1` 是行为证据，不是未来 source-layout 模板 |
 | FFmpeg 闭包研究 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Decoder/Processing 共用单一 closure authority 的历史证据 |
-| 组件边界 A0 | <StatusBadge status="FROZEN" /> | #53 历史审计保留；其 playback-specific 结论是历史输入，已被 ACCEPTED 的 ADR-PBK-001 取代（对新 playback 实现） |
+| 组件边界 A0 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | #53 历史审计保留；其 playback-specific 结论是历史证据，不是 current authority |
 | Base / Composition Kernel K0 | <StatusBadge status="IMPLEMENTED" /> | Context / Capability / Fiber / Effect / Reconcile 已实现 |
-| Playback Architecture | <StatusBadge status="CURRENT" /> | ADR-PBK-001：ACCEPTED，已登记 ARCH-003 authority；当前前沿是 deterministic executable temporal core（implementation entry） |
+| Playback Foundations | <StatusBadge status="CURRENT" /> | 播放基础已接受（ADR-PBK-001 ACCEPTED）；旧 playback 模型仍是 experimental evidence；production 播放语义仍需实验挣得 |
 | Decoder provider | <StatusBadge status="PLANNED" /> | capability seam 已有；真实 provider 实现未授权于本轮 |
 | Audio Processing | <StatusBadge status="PLANNED" /> | ordered PCM graph；普通 DSP node 不自动成为 plugin |
 | AudioOutput provider | <StatusBadge status="PLANNED" /> | capability seam 已有；真实设备实现未授权于本轮 |
@@ -29,35 +29,26 @@ import { projectState } from '../data/project-state.ts'
 
 ---
 
-## 当前前沿：deterministic executable temporal core
+## 当前前沿：Playback Foundations reset
 
 **{{ projectState.currentFrontier }}**
 
-ADR-PBK-001 已 **ACCEPTED** 并完成 registry authority 迁移。这一阶段的目标不是实现 FFmpeg/WASAPI 生产机制，而是构建 pure / deterministic / mechanism-independent 的 playback temporal core，作为 implementation entry：
+旧版 ADR-PBK-001（MusicComponent / MusicKernel / TransportKernel 模型）及其 deterministic executable temporal core 已随 2026-09 架构重置降级为 experimental evidence。重置后的 Playback Foundations 提案已通过 fresh-context review 并被接受（ACCEPTED）；当前目标是用最小实验挣得新基础：
 
-```text
-MusicComponent
-├── MusicKernel       music/product semantic authority
-├── TransportKernel   playback temporal authority
-└── TrackSession(s)
-    └── DecodeSession(s)
-```
+- composition reality 之上的 minimal PCM contract；
+- direct Source → processing → Sink 数据流；
+- realtime graph publication / replacement / reader overlap；
+- 真实 decoder / output 机制；
+- 只有到那时才重新挣得 seek / stop / track / session 等播放语义。
 
-本轮由 deterministic trace 测试的实现压力逐步挣得（不预先冻结 struct/module layout）：
-
-- TrackSession / DecodeSession representation；
-- Active / Prepared role representation；
-- Generation admission executable contract；
-- Physical Fence 的 deterministic protocol seam（真实 AudioOutput provider 是后续任务）；
-- fence 在途时后续 intent 的 defer/coalesce/latest-wins 等 policy。
+（one normative ladder 见 `docs/adr/ADR-PBK-001.md` §12。）
 
 ---
 
-## 已经不再是开放问题的边界
+## 实验证据中的历史边界（非 current authority）
 
 ```text
-MusicKernel != playback timeline authority
-TransportKernel = playback temporal authority
+MusicKernel / TransportKernel authority split
 TrackSession may own multiple DecodeSessions
 Active + Prepared may coexist
 stale is admission-based, not global-current equality
@@ -65,7 +56,7 @@ logical invalidation != physical stop
 Composition Graph != Audio Processing Graph
 ```
 
-在 ADR-PBK-001 已接受模型内部，这些不是实现者可随意重新选择的风格偏好；若施工发现需要改变其中任何一条已冻结边界，必须走 ADR + specs + tests 的同步 corrective 事务。
+这些是旧实验的可复用 failure witnesses / 测试技术；重置后它们**不是**实现者必须遵守的已冻结边界，也不得仅因旧代码存在而自动成为新设计前提。是否重新挣得其中某条边界，由 `docs/adr/ADR-PBK-001.md`（ACCEPTED）之下的真实实验决定。
 
 ---
 
@@ -95,8 +86,10 @@ flowchart LR
 
 ---
 
+PR #78 / #79 属于旧 ADR 修订历史（experimental evidence），不再列为当前决策记录。
+
 <ProvenancePanel
   :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/overview.md', 'docs/site/project-state.ts']"
-  :decisions="[{ pr: 78 }, { pr: 79 }]"
+  :decisions="[]"
   :evidence="['specs/playback/PlaybackTemporal.tla', 'crates/qianqian-core/src/transport.rs']"
 />

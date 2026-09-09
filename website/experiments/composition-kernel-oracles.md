@@ -91,7 +91,7 @@ Base Kernel K0 是实现 Cordis 风格五原语模型的组合内核的首个已
 - 提供者撤回可以通过显式排序做到安全
 - 领域无关的组合可以强制生命周期不变量
 
-这开启下一个前沿:Playback Architecture,构建在已验证组合基础设施之上的领域特定组件。(写作时点的历史表述是 "Playback Kernel(MusicKernel)";随后 ADR-PBK-001(现已 ACCEPTED)把 playback 拆分为 MusicKernel + TransportKernel authority,替代了该早期说法。)
+这开启下一个前沿:Playback Architecture,构建在已验证组合基础设施之上的领域特定组件。(写作时点的历史表述是 "Playback Kernel(MusicKernel)";其后 ADR-PBK-001 曾把 playback 拆分为 MusicKernel + TransportKernel authority;2026-09 播放架构重置后,该拆分与该早期说法一样都只是历史/实验证据,不是 current authority。当前 Playback Foundations 已被接受(ACCEPTED)。)
 
 ---
 

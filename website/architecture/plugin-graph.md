@@ -25,7 +25,7 @@ flowchart LR
     MUSIC -->|"requires AudioOutput / PcmSink"| AOUT
 ```
 
-`MusicComponent` 内部结构（ADR-PBK-001，**ACCEPTED**；当前代码只建立了 `MusicKernel` / `TransportKernel` 两个 authority shell）：
+> **Historical / experimental evidence:** 下述 `MusicKernel` / `TransportKernel` / `TrackSession` / `DecodeSession` 结构来自旧 Playback 架构实验，重置后不再是 current authority（ADR-PBK-001 现为 ACCEPTED，不冻结这些名词）。旧代码中只保留为 experimental evidence：
 
 ```text
 MusicKernel      music/product semantic authority

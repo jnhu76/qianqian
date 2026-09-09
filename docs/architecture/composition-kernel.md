@@ -1,34 +1,18 @@
 # Composition Kernel
 
-This document is the canonical Architecture v2 authority for Qianqian's generic composition/control-plane kernel.
+This document is the canonical Architecture v2 authority for Qianqian's generic composition/lifecycle kernel.
 
-Playback-specific semantics are frozen by `docs/adr/ADR-PBK-001.md` (**ACCEPTED**, registered ARCH-003 authority). The historical #53 audit remains evidence for the original component decomposition; its conflicting playback-specific ownership conclusions are superseded for new playback implementation. Do not combine the two playback models in one implementation.
+Playback Foundations are **accepted** (`docs/adr/ADR-PBK-001.md`) and deliberately do not freeze the previous MusicKernel/TransportKernel/TrackSession/Generation model. Old playback code/specs are experimental evidence only.
 
-It defines both:
+The Base Kernel K0 itself remains implemented/current.
 
-1. the **preconditions** that must hold before a kernel implementation is justified; and
-2. the invariants the eventual kernel must enforce.
+---
 
-Gate chain:
+# Kernel constitution
 
-```text
-#53 COMPONENT-BOUNDARY-A0        PASS / CLOSED (audit: component-boundary-a0.md)
-        ↓
-#67 COMPOSITION-KERNEL-0 DESIGN  semantic design MERGED via PR #68
-                                  (composition-kernel-0-design.md)
-        ↓
-#70 COMPOSITION-KERNEL-0 IMPL    IMPLEMENTED via PR #71 (70 kernel tests / 75 workspace tests, 743eb86)
-        ↓
-ADR-PBK-001 PLAYBACK ARCH        ACCEPTED (PR #78 + #79; accepted via #81)
-```
+> **Kernel controls reachability, composition-visible ownership and lifecycle; it does not own application payloads.**
 
-## Kernel constitution
-
-> **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
-
-The generic kernel maintains composition rules. It does not implement the product.
-
-Its expected primitive budget remains:
+Expected primitive budget:
 
 ```text
 Context
@@ -38,170 +22,155 @@ Effect
 Reconcile
 ```
 
-It must not know:
+The generic kernel must not know:
 
 ```text
-TrackSession / DecodeSession
-playback cursor / Active / Prepared
-Generation admission / Physical Fence
-PCM / MediaSpan
-codec formats
+PCM
+AudioGraph
 FFmpeg
 WASAPI
-PocketJS
-KuiklyUI
-playlist policy
-music commands
-UI payload schemas
+track/playlist semantics
+seek/playback state
+UI product payloads
 ```
 
-But the primitive list is **not** the architecture starting point.
+The primitive list is not the design starting point.
 
-## Boundary design comes first
+---
 
-The Base Kernel K0 (PR #71) implements Context/Fiber/Effect/Reconcile. The product decomposition was decided by the component boundary audit (#53), with playback-specific corrections frozen by ADR-PBK-001 (ACCEPTED).
+# Boundary-first design
 
-Required design order:
+Required order:
 
 ```text
 Component Granularity
         ↓
 Capability / dependency boundary
         ↓
-Interaction Algebra
+Interaction / execution semantics
         ↓
-Effect / System Boundary
+Effect / system boundary
         ↓
 Global lifecycle ordering
         ↓
 Confluence oracle
         ↓
-Composition Kernel implementation
+Context / Fiber / Effect / Reconcile representation
 ```
 
-The calculus gives strong properties only after component/key/operation boundaries are good enough.
+A feature name, Rust type, file, crate or UI panel is not proof that something deserves its own Plugin.
 
-It does not provide a unique automatic decomposition.
-
-### Component granularity
-
-A component is not independent because it has a different feature name.
-
-For every candidate boundary, review:
+For every candidate Plugin/component boundary, review:
 
 ```text
-state/resource ownership
+state/resource lifetime
 required capabilities
 provided capabilities
-cross-boundary operations/data edges
+cross-boundary execution/data edges
 observable contract
 operation locality
 commutativity / explicit ordering
-recoverable system boundary
 provider/consumer lifecycle dependency
 configuration/naming/cognitive cost
 ```
 
-Apparent cycles such as:
+Apparent bidirectional dependency should trigger a mediation/integration audit, but finer splitting is not automatically better.
+
+---
+
+# Context / Capability / Service
+
+`Context` is the capability namespace/dependency view visible to a Fiber.
+
+It controls:
 
 ```text
-A requires B
-B requires A
+which provider is reachable
+whether a requirement is satisfied
+which dependency is valid now
 ```
 
-should trigger a mediation/integration-component audit. Bidirectional interaction may sometimes be decomposed into clearer one-way bindings.
-
-However, finer decomposition is not automatically better. Component count, configuration and cognitive cost are first-class engineering costs.
-
-Current generic composition authority: **#67 / PR #68** (`composition-kernel-0-design.md`) plus the implementation ADR. Historical decomposition evidence: **#53 COMPONENT-BOUNDARY-A0**. Registered playback-specific ARCH-003 authority: **ADR-PBK-001** (ACCEPTED) + `overview.md`.
-
-## Control plane vs data plane
-
-The Composition Kernel belongs to the control plane.
+It must not become:
 
 ```text
-                         CONTROL PLANE
-
-                 desired composition
-                          |
-                          v
-                      Reconcile
-                          |
-                          v
-                     Fiber Graph
-                          |
-                 provide / require
-                    owned effects
-                          |
-                          v
-                 Context / Capability
-
--------------------------------------------------------------
-                          |
-                     bind/connect
-                          v
-                         DATA PLANE
-
-              service.method(application_payload)
-                          |
-                          v
-                       provider
-
-      Encoded Media -> Decoder -> Processing -> AudioOutput
+global product state
+universal event bus
+message broker
+PCM transport
+UI payload store
+undeclared get-anything service locator
 ```
 
-The kernel decides:
-
-```text
-who may reach whom
-which dependency is satisfied
-who owns a mutation/resource
-which component should be alive
-```
-
-It does not own the application payload after the relationship is established.
-
-> **Capability plane != Data plane.**
-
-PCM/data blocks must not travel through Context or a generic event bus per callback/block.
-
-## Capability / service definition
-
-A Capability identifies a contract that can be required and provided.
+Across Plugin seams, consumers depend on capability/service definitions rather than concrete provider classes.
 
 ```text
 Capability / Service Definition
-             ^
-        +----+----+
-        |         |
-    Provider   Consumer
+              ^
+         +----+----+
+         |         |
+      Provider   Consumer
 ```
 
-Across plugin seams, consumers depend on the definition rather than a concrete provider implementation.
+> **Capability plane != payload transport.**
 
-The public operations of that capability are part of its composability contract.
+Once a capability is bound, ordinary execution uses that service contract or a pre-bound data edge.
 
-For each shared mutable capability, boundary design must make clear:
+---
+
+# Fiber
+
+A Fiber is the live runtime instance of a Plugin definition.
+
+It owns:
 
 ```text
-what state each operation may read/write
-what result is intentionally observable
-which contributions can coexist independently
-how a caller removes only its own contribution
-which operations are order-sensitive
+runtime identity
+scope/dependency view
+provided capability bindings
+requirements
+composition-visible Effects/resources
+lifecycle state
 ```
 
-An operation on one key/capability must not secretly read/write unrelated shared keys or hidden global state. Cross-key dependency must be explicit.
+The runtime composition unit is the Fiber, not the source package or dynamic library.
 
-Type-safe identities/contracts are preferred over unstructured string-only keys when practical, but version/schema/marketplace machinery is not currently authorized.
+---
 
-## Interaction algebra
+# Effect and system boundary
 
-### Revertibility is not independence
+An Effect records composition-visible mutation/resource provenance owned by a Fiber.
 
-Within one component/Fiber, an effect may produce an inverse and later unwind in LIFO order.
+Typical locally reversible examples:
 
-That only proves local revertibility.
+```text
+capability binding
+listener/callback registration
+timer/watcher registration
+local handle/resource ownership
+```
+
+Within one Fiber, deterministic reverse/LIFO unwind is the default local rule unless a stronger contract says otherwise.
+
+But not every real-world action is reversible.
+
+Reason about actions when relevant as:
+
+```text
+Reversible
+Transactional
+Compensatable
+Irreversible / emitted outside the recoverable system boundary
+```
+
+These are reasoning categories, not new K0 Effect variants.
+
+Already emitted physical sound, network transmission or external side effect cannot be made correct merely by wrapping it in an Effect closure.
+
+---
+
+# Interaction algebra
+
+## Revertibility is not independence
 
 If:
 
@@ -209,47 +178,24 @@ If:
 S0 --A--> S1 --B--> S2
 ```
 
-and:
+and `A` has an inverse, that only proves local rollback from the state where the inverse contract applies. It does not prove removing A after B preserves B.
 
-```text
-A^-1(S1) = S0
-```
+For independent composition, cross-component interaction must preserve the other component's observable contribution.
 
-this does **not** prove that applying `A^-1` in `S2` preserves B.
+## Same/different capability keys
 
-For cross-component independent removal, design/review must account for the relevant forward/inverse interactions, conceptually including:
+Operations on genuinely independent capability/state keys should stay key-local.
 
-```text
-A    with B
-A    with B^-1
-A^-1 with B
-A^-1 with B^-1
-```
+Same-key multi-contributor semantics must be explicit; do not assume commutativity.
 
-Foreign transformations also must not alter another component's intended inverse/continuation/public behavior in a way that breaks its contract.
-
-### Different keys
-
-Operations on genuinely distinct keys should be key-local and independent by construction.
-
-This property is lost if implementation escapes into hidden globals or undeclared cross-key state.
-
-### Same key
-
-Multiple contributions to one shared interface are not automatically commutative.
-
-When the semantics fit, contribution-oriented operations may help:
+Contribution-oriented shapes may be useful where semantically correct:
 
 ```text
 register(value) -> opaque token
 unregister(token)
 ```
 
-where removing A's token cannot damage B's contribution.
-
-Opaque identity is useful when exposing incidental sequence/position information would create needless observable non-commutativity.
-
-### Non-commutative relationships
+## Ordered relationships
 
 If:
 
@@ -257,258 +203,208 @@ If:
 A -> B != B -> A
 ```
 
-then the interaction is ordered.
+then the relationship is ordered.
 
 Freeze:
 
-> **Commutative relation -> may compose as independent effects.**
+> **Commutative relation -> may compose independently.**
 >
 > **Non-commutative relation -> explicit dependency/order/integration structure.**
 
-DSP/pipeline ordering is a canonical example. Semantic topology must never depend on registration timing, hash iteration, or incidental mount order.
+Never derive semantic order from registration time, mount order or hash iteration.
 
-The architecture does not eliminate order; it makes order explicit.
+Realtime/DSP ordering is an important example, but the Composition Kernel does not itself become the audio processing graph.
 
-## Effect and system boundary
+---
 
-An Effect records kernel-visible mutation/resource provenance owned by a component/Fiber.
+# Provider withdrawal
 
-Typical locally reversible examples:
+Provider disappearance is dependency-ordered.
 
-```text
-capability binding
-listener/callback registration
-timer registration
-watcher registration
-local handle/resource ownership
-buffer allocation owned by the runtime
-```
-
-(Child-fiber mounting is deliberately absent: child mounting is out of K0 scope — [PAPER] design context only, deferred per `composition-kernel-0-design.md` §S.)
-
-Within one Fiber, deterministic reverse/LIFO unwind is the default local rule unless a stronger contract says otherwise.
-
-But not every action is reversible.
-
-Classify actions when relevant as:
-
-```text
-Reversible
-Transactional
-Compensatable
-Irreversible / emitted outside system boundary
-```
-
-These labels are a system-boundary/action taxonomy for reasoning about actions — not runtime variants of a kernel Effect type; the frozen K0 Effect has exactly one shape (reversible composition-lifecycle mutation + total inverse, `composition-kernel-0-design.md` §H.5/§H.7).
-
-For a player, already-rendered audio is outside rollback: the runtime cannot “unplay” sound already emitted to the physical world.
-
-Do not wrap an irreversible action in an Effect closure and call that rollback correctness.
-
-## Observational equivalence
-
-Recovery/removal correctness does not require private implementation state to become bit-for-bit identical.
-
-The relevant oracle is public/architecturally observable behavior.
-
-After removing A:
-
-> the system should be observationally equivalent to a world where A never contributed, while independent B/C contributions remain.
-
-Useful observable facts include:
-
-```text
-reachable capabilities
-active/pending/disposed lifecycle truth
-public service behavior
-remaining contributions/bindings
-absence of ghost effects/resources
-```
-
-Opaque IDs, allocator layout, private generations and incidental token values need not match.
-
-## Global lifecycle ordering
-
-Provider disappearance is a dependency-order problem.
-
-Required semantic shape:
+Minimum semantic shape:
 
 ```text
 provider begins withdrawal
         ↓
-provider stops satisfying new dependency resolution
+provider stops satisfying new resolution
         ↓
-dependents detect invalidation and deactivate
+dependents are invalidated/deactivate
         ↓
-dependents complete teardown while required teardown access is valid
+dependents finish teardown while required teardown access is still valid
         ↓
-provider finally removes/reclaims binding/resources
+provider removes final composition bindings/resources
 ```
 
-Do not physically destroy the provider first and let dependents fail later.
+Do not destroy a provider first and let consumers discover the failure on a later call.
 
-The eventual Fiber lifecycle must enforce this invariant even if the internal state-machine names differ.
+For realtime consumers, generic provider withdrawal may need an additional domain-specific quiescence condition before the underlying resource can actually be freed. The generic kernel does not invent that realtime mechanism; the owning domain runtime must expose/prove the safe release condition.
 
-## Confluence
+---
 
-A major correctness target is **confluence at quiescence**:
+# Observational equivalence
 
-> **After any legal load/unload/replacement history reaches quiescence, the observable runtime is equivalent to a clean construction of the final desired composition.**
+Recovery/removal correctness is judged through public/architecturally relevant behavior rather than private bit identity.
 
-Example history:
+After removing A:
 
-```text
-load source A
-insert EQ
-switch output
-remove EQ
-replace decoder
-settle
-```
+> the observable system should match a world where A never contributed, while independent B/C contributions remain.
 
-If the final desired composition is:
+Opaque IDs, allocator layout and private generations need not match.
 
-```text
-source A + decoder B + output C
-```
+---
 
-then the settled runtime should match a clean root directly composed as that final graph in all relevant observable respects.
+# Confluence
+
+A core correctness target is **confluence at quiescence**:
+
+> **After any legal composition history settles, observable composition truth is equivalent to a clean construction of the same final desired composition.**
 
 This is stronger than:
 
 ```text
 no crash
 all disposers ran
-zero leaked handles
+no obvious leaked handles
 ```
 
-because it also detects history-dependent topology, stale bindings and ghost contributions.
+because it also detects stale bindings, ghost contributions and history-dependent topology.
 
-Playback position/state continuity is **not** automatically composition-confluence truth; that belongs to playback/domain policy and ADR-PBK-001.
+Domain continuity (for example playback position) is not automatically composition-confluence truth.
 
-## Event semantics
+---
 
-A generic public EventBus is not automatically a Composition Kernel primitive.
+# Composition Plane vs other planes
 
-If a product/domain needs event semantics, model that initially as a normal Event Service/plugin. Listener ownership may still be tracked as Effects.
+The current architecture reset distinguishes:
 
-Kernel-internal dependency invalidation is not the same thing as a public product event bus.
+```text
+Composition Plane
+    Context / Capability / Fiber / Effect / Reconcile
 
-## Future kernel primitives
+Execution / Control Plane
+    Commands / workflow / Capability-Service calls
 
-### Context
+Fact Plane
+    committed facts / projections / persistence / observers
 
-Capability/dependency view visible to a Fiber. Not a global `HashMap<TypeId, Any>` escape hatch and not a payload bus.
+Realtime Data Plane
+    pre-bound hot data such as PCM
+```
 
-### Fiber
+The generic Composition Kernel owns only the first plane.
 
-Live plugin instance owning identity, scope/parent, requirements, provided bindings, effects and lifecycle state.
+It establishes the lifetime/reachability conditions that the other planes may depend on, but it does not become their universal router.
 
-### Effect
+---
 
-Owned kernel-visible mutation/recovery provenance.
+# Event / Fact semantics
 
-### Reconcile
+A generic EventBus is not automatically a Composition Kernel primitive.
 
-Moves a running Fiber graph toward desired composition without collapsing the architecture into a privileged imperative `boot()` function.
+If product/domain code needs committed Fact/Event semantics, begin with a normal capability/service/plugin.
 
-Exact Rust APIs/state enum names remain free to evolve subject to the already-implemented K0 semantics.
+The K0-scoped rule is only that these are **not** kernel primitives. The normative Fact contracts — semantic-commit definition, one designated authority per (fact kind, subject scope), projection read-side firewall, Fact publication vs Realtime-view publication — live in the reset proposal `../adr/ADR-PBK-001.md` §2.3; this document summarizes and does not carry a second normative copy.
 
-## Everything is a Plugin
+Repository-wide Event Sourcing, append-only persistence and waterfall/middleware remain unfrozen as K0 primitives.
+
+---
+
+# Everything is a Plugin
 
 In Qianqian this means:
 
-> Every **justified** long-lived runtime capability eventually participates in the common composition/lifecycle protocol.
+> **Every justified long-lived runtime capability ultimately participates in the common composition/lifecycle protocol.**
 
 It does not mean:
 
 ```text
-one feature name == one plugin
-one plugin == one crate
-one plugin == one dynamic library
+one feature name = one plugin
+one plugin = one crate
+one plugin = one dynamic library
 everything is hot-loaded
 everything is rollbackable
 every payload goes through Context
+every AudioNode is automatically a Fiber
 ```
 
-The historical #53 audit proposed the MVP composition boundaries. ADR-PBK-001 (ACCEPTED) refines the internal playback authority/lifetime model without turning MusicKernel, TransportKernel, TrackSession, DecodeSession, Active, Prepared, or ordinary DSP nodes into independent Composition plugins.
+A Plugin can provide factories/resources that participate in another specialized runtime without turning every produced object into another Plugin.
 
-## Realtime specialization boundary
+---
+
+# Realtime specialization boundary
 
 The generic Composition Kernel is not the audio engine.
 
-A future specialized audio graph/runtime may own:
+A specialized Audio Runtime may later own:
 
 ```text
-AudioGraph
-clock
-buffer pool
+PCM contract
+realtime graph/view
+clock/buffers
 format negotiation
 RT scheduling
 graph publication/swap
+reader quiescence
+parameter publication
 ```
 
-if that boundary is later earned.
+if those boundaries are earned.
 
 Realtime callback/block execution must not perform:
 
 ```text
 Context lookup
-capability resolution
-Fiber reconciliation
-arbitrary generic event dispatch
-filesystem/network I/O
-UI/runtime round trips
+Capability resolution
+Fiber Reconcile
+generic Fact/Event fan-out
+filesystem/network/UI round trips
 unbounded allocation/blocking
 ```
 
-PCM travels through pre-bound data-plane graph edges.
+Hot data travels through pre-bound realtime edges. (Playback-side normative form of the forbidden list: `../adr/ADR-PBK-001.md` §2.4.)
 
-## Relationship to playback authorities
+---
 
-`ADR-PBK-001` (ACCEPTED) replaces the old shorthand “Playback Kernel = MusicKernel”. The accepted playback structure is:
+# Relationship to playback reset
 
-```text
-MusicComponent   = composition lifecycle root
-MusicKernel      = music/product semantic authority
-TransportKernel  = playback temporal authority
-```
+ARCH-003 is currently reopened.
 
-Nested runtime includes `TrackSession(s)` and `DecodeSession(s)`. Active/Prepared are temporal roles inside TransportKernel.
+The generic Composition Kernel currently promises only that playback/audio capabilities can participate in normal Plugin/Fiber lifecycle and dependency management without polluting K0 with music/audio concepts.
 
-The generic Composition Kernel sees the `MusicComponent` and its capability/provider relationships; it does not own or interpret playback cursor, Window roles, Generation admission, Physical Fence state, or raw playback evidence.
-
-After binding, PCM flows on direct/pre-bound data edges. Raw playback evidence is interpreted by TransportKernel; MusicKernel receives typed derived facts for product decisions.
-
-## R0 migration authority
-
-RUST-ARCH-R0 created provisional bootstrap shapes:
+It does **not** currently promise that these legacy playback nouns are correct (full reopened list: ADR-PBK-001 §0/§10):
 
 ```text
-qianqian-core::base
-qianqian-runtime::AppRuntime
-AppRuntime::new()
-with_audio_output()
-other direct R0 capability fields/accessors
+MusicKernel
+TransportKernel
+TrackSession
+DecodeSession
+Generation
+Active / Prepared
+Dual Window
+Physical Fence
 ```
 
-They are not compatibility contracts.
+Those names may remain in experimental code/specs, but they are not generic K0 requirements and not current playback authority.
 
-The Base Kernel K0 implementation (PR #71) may replace R0 bootstrap shapes rather than preserve them for compatibility.
+The reset Playback ADR will re-earn whatever domain/control/realtime abstractions real experiments require.
 
-## Current gate
+---
 
-Current authority chain:
+# R0/bootstrap compatibility
+
+Older bootstrap shapes such as `AppRuntime` convenience fields/accessors are not compatibility contracts unless an accepted authority explicitly says so.
+
+Do not preserve a direct field/service-locator escape hatch merely because it existed before K0 composition.
+
+---
+
+# Current gate
 
 ```text
-#53 COMPONENT-BOUNDARY-A0
-        ↓ PASS / CLOSED (historical decomposition audit: component-boundary-a0.md)
-#67 COMPOSITION-KERNEL-0 DESIGN — semantic design MERGED via PR #68
-        ↓ (composition-kernel-0-design.md; Revisions 1–6)
-#70 COMPOSITION-KERNEL-0 IMPL — IMPLEMENTED via PR #71
-        ↓ (70 kernel tests / 75 workspace tests, 743eb86)
-ADR-PBK-001 PLAYBACK ARCH — ACCEPTED
-        ↓ (PR #78 + #79; accepted via #81; implementation authorization remains separate)
+Base Kernel K0                         IMPLEMENTED / CURRENT
+Playback Foundations / ARCH-003        CURRENT
+ADR-PBK-001                             ACCEPTED
+old playback code/specs                 EXPERIMENTAL EVIDENCE ONLY
 ```
 
-#53 remains evidence for the original component-decomposition audit; its playback-specific conclusions are historical inputs superseded by accepted ADR-PBK-001 for new playback implementation. Generic K0 semantics remain current in the K0 design/implementation ADRs and code/tests.
+Generic K0 design/implementation authority remains current. Playback-specific conclusions must come from the reset ADR and new executable evidence, not from stale examples in historical documents.

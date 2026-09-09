@@ -1,14 +1,21 @@
-//! Deterministic playback temporal traces (executable oracle for ADR-PBK-001).
+//! Deterministic playback temporal traces.
+//!
+//! **Experimental Playback evidence:** these traces were the executable
+//! oracle of an earlier Playback architecture experiment (and of the
+//! pre-reset ADR-PBK-001 revision). Playback architecture has since been
+//! reopened; these tests are failure witnesses / techniques, not a current
+//! acceptance gate (`docs/adr/ADR-PBK-001.md` is PROPOSED).
 //!
 //! These tests drive the pure, mechanism-independent temporal core through
-//! the trace families the accepted ADR and `specs/playback` identify as
-//! high-risk. They use stable semantic names; internal representation may
-//! change freely as long as these public-interface traces keep passing.
+//! the trace families the pre-reset ADR revision and `specs/playback`
+//! identify as high-risk. They use stable semantic names; internal
+//! representation may change freely as long as these public-interface
+//! traces keep passing.
 //!
-//! Test vocabulary comes from ADR-PBK-001: TransportKernel is the playback
-//! temporal authority (windows, generations, admission, fence, raw evidence
-//! interpretation); MusicKernel interprets derived facts into product
-//! semantics. Fakes do not exist here: the test itself plays the mechanism
+//! Test vocabulary comes from that experiment: TransportKernel is the
+//! playback temporal authority (windows, generations, admission, fence,
+//! raw evidence interpretation); MusicKernel interprets derived facts into
+//! product semantics. Fakes do not exist here: the test itself plays the mechanism
 //! (decoder/device) by feeding raw evidence, and interpretation stays in the
 //! kernels.
 
@@ -1255,15 +1262,15 @@ fn consumed_verdict_can_complete_natural_drain() {
     assert_eq!(music.state(), PlaybackState::Ended);
 }
 
-// --- Stage-1 review corrective regressions ---
+// --- Stranded-decode-backlog regressions (fail/abandon drain reachability) ---
 
 #[test]
 fn abandoned_fence_with_decode_backlog_still_reaches_natural_drain() {
     // The blocking shape: decode 10, submit 5, then a hard cut closes the
     // old admission. The five decoded-but-unsubmitted frames can never be
-    // submitted, and before the corrective the drain predicate
-    // (accepted == submitted) could never hold again — a permanently
-    // undrainable pipeline after fail/abandon.
+    // submitted, and without the discard-on-admission-close rule the drain
+    // predicate (accepted == submitted) could never hold again — a
+    // permanently undrainable pipeline after fail/abandon.
     let mut transport = TransportKernel::new();
     let mut music = MusicKernel::new();
     let mut media = Media::new();
