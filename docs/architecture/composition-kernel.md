@@ -2,7 +2,7 @@
 
 This document is the canonical Architecture v2 authority for Qianqian's generic composition/control-plane kernel.
 
-Playback-specific semantics have a **proposed replacement** in `docs/adr/ADR-PBK-001.md` (PROPOSED / FORMAL CORE PASS). The historical #53 audit remains the registered ARCH-003 authority until the ADR is ACCEPTED and the registry is updated; its playback-specific ownership conclusions are historical inputs under that proposed replacement. Do not combine the two playback models in one implementation.
+Playback-specific semantics are frozen by `docs/adr/ADR-PBK-001.md` (**ACCEPTED**, registered ARCH-003 authority). The historical #53 audit remains evidence for the original component decomposition; its conflicting playback-specific ownership conclusions are superseded for new playback implementation. Do not combine the two playback models in one implementation.
 
 It defines both:
 
@@ -19,7 +19,7 @@ Gate chain:
         ↓
 #70 COMPOSITION-KERNEL-0 IMPL    IMPLEMENTED via PR #71 (70 kernel tests / 75 workspace tests, 743eb86)
         ↓
-ADR-PBK-001 PLAYBACK ARCH        PROPOSED / FORMAL CORE PASS (PR #78 + #79)
+ADR-PBK-001 PLAYBACK ARCH        ACCEPTED (PR #78 + #79; accepted via #81)
 ```
 
 ## Kernel constitution
@@ -59,7 +59,7 @@ But the primitive list is **not** the architecture starting point.
 
 ## Boundary design comes first
 
-The Base Kernel K0 (PR #71) implements Context/Fiber/Effect/Reconcile. The product decomposition was decided by the component boundary audit (#53), with playback-specific corrections proposed by ADR-PBK-001 (PROPOSED, pending acceptance).
+The Base Kernel K0 (PR #71) implements Context/Fiber/Effect/Reconcile. The product decomposition was decided by the component boundary audit (#53), with playback-specific corrections frozen by ADR-PBK-001 (ACCEPTED).
 
 Required design order:
 
@@ -113,7 +113,7 @@ should trigger a mediation/integration-component audit. Bidirectional interactio
 
 However, finer decomposition is not automatically better. Component count, configuration and cognitive cost are first-class engineering costs.
 
-Current generic composition authority: **#67 / PR #68** (`composition-kernel-0-design.md`) plus the implementation ADR. Historical decomposition evidence and registered ARCH-003 authority: **#53 COMPONENT-BOUNDARY-A0**. Proposed playback-specific replacement: **ADR-PBK-001** (PROPOSED / FORMAL CORE PASS, pending acceptance).
+Current generic composition authority: **#67 / PR #68** (`composition-kernel-0-design.md`) plus the implementation ADR. Historical decomposition evidence: **#53 COMPONENT-BOUNDARY-A0**. Registered playback-specific ARCH-003 authority: **ADR-PBK-001** (ACCEPTED) + `overview.md`.
 
 ## Control plane vs data plane
 
@@ -431,7 +431,7 @@ everything is rollbackable
 every payload goes through Context
 ```
 
-The historical #53 audit proposed the MVP composition boundaries. ADR-PBK-001 (PROPOSED) proposes a refined internal playback authority/lifetime model without turning MusicKernel, TransportKernel, TrackSession, DecodeSession, Active, Prepared, or ordinary DSP nodes into independent Composition plugins.
+The historical #53 audit proposed the MVP composition boundaries. ADR-PBK-001 (ACCEPTED) refines the internal playback authority/lifetime model without turning MusicKernel, TransportKernel, TrackSession, DecodeSession, Active, Prepared, or ordinary DSP nodes into independent Composition plugins.
 
 ## Realtime specialization boundary
 
@@ -466,7 +466,7 @@ PCM travels through pre-bound data-plane graph edges.
 
 ## Relationship to playback authorities
 
-`ADR-PBK-001` (PROPOSED) replaces the old shorthand “Playback Kernel = MusicKernel” in its proposed model. That proposed playback structure is:
+`ADR-PBK-001` (ACCEPTED) replaces the old shorthand “Playback Kernel = MusicKernel”. The accepted playback structure is:
 
 ```text
 MusicComponent   = composition lifecycle root
@@ -507,8 +507,8 @@ Current authority chain:
         ↓ (composition-kernel-0-design.md; Revisions 1–6)
 #70 COMPOSITION-KERNEL-0 IMPL — IMPLEMENTED via PR #71
         ↓ (70 kernel tests / 75 workspace tests, 743eb86)
-ADR-PBK-001 PLAYBACK ARCH — PROPOSED / FORMAL CORE PASS
-        ↓ (PR #78 + #79; implementation authorization remains separate)
+ADR-PBK-001 PLAYBACK ARCH — ACCEPTED
+        ↓ (PR #78 + #79; accepted via #81; implementation authorization remains separate)
 ```
 
-#53 remains evidence for the original component-decomposition audit and the registered ARCH-003 authority until ADR-PBK-001 is ACCEPTED. Playback-specific semantics have a PROPOSED replacement in ADR-PBK-001. Generic K0 semantics remain current in the K0 design/implementation ADRs and code/tests.
+#53 remains evidence for the original component-decomposition audit; its playback-specific conclusions are historical inputs superseded by accepted ADR-PBK-001 for new playback implementation. Generic K0 semantics remain current in the K0 design/implementation ADRs and code/tests.

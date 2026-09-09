@@ -34,10 +34,10 @@ Current architecture milestones:
 Component boundary audit          PASS / CLOSED              (PR #66)
 Composition Kernel semantic design MERGED                   (PR #68)
 Base Kernel K0                     IMPLEMENTED              (PR #71)
-Playback ADR-PBK-001               PROPOSED / FORMAL CORE PASS (PR #78 + #79)
+Playback ADR-PBK-001               ACCEPTED (PR #78 + #79; accepted via #81)
 ```
 
-The playback ADR (PROPOSED / FORMAL CORE PASS) is the proposed replacement for playback-specific ARCH-003 semantics; the registered ARCH-003 authority remains `docs/architecture/component-boundary-a0.md` until human acceptance updates the registry. Production FFmpeg/WASAPI integration is still a separate implementation task.
+ADR-PBK-001 is ACCEPTED and is the registered playback-specific ARCH-003 authority (together with `docs/architecture/overview.md`); `docs/architecture/component-boundary-a0.md` remains closed #53 historical evidence whose conflicting playback-specific conclusions are superseded for new playback implementation. Architecture acceptance is not implementation completion: the deterministic executable oracle is the implementation entry, and production FFmpeg/WASAPI integration is still a separate implementation task.
 
 ## Control plane and data plane
 

@@ -11,7 +11,7 @@ Before changing code or long-lived documentation:
 3. Use `docs/README.md` to load only the minimum relevant documentation.
 4. Read `docs/architecture/overview.md` before changing architecture boundaries.
 5. For component/plugin/composition work, read `docs/architecture/composition-kernel.md` and the current boundary/design issue.
-6. For playback work, read `docs/adr/ADR-PBK-001.md` (PROPOSED / FORMAL CORE PASS — proposed replacement candidate; registered ARCH-003 authority not yet migrated); use `specs/playback/*` only when the task actually needs state-collision evidence.
+6. For playback work, read `docs/adr/ADR-PBK-001.md` (ACCEPTED — registered playback-specific ARCH-003 authority; architecture acceptance is not implementation completion); use `specs/playback/*` only when the task actually needs state-collision evidence.
 7. Audit current repository reality before assuming a path, API, module, crate, build rule, or prior design is still authoritative.
 
 Do not recursively preload archived source/docs.
@@ -70,7 +70,7 @@ Gate chain:
         ↓
 #70 COMPOSITION-KERNEL-0 IMPL    IMPLEMENTED via PR #71 (70 kernel tests / 75 workspace tests, 743eb86)
         ↓
-ADR-PBK-001 PLAYBACK ARCH        PROPOSED / FORMAL CORE PASS (PR #78 + #79)
+ADR-PBK-001 PLAYBACK ARCH        ACCEPTED (PR #78 + #79; accepted via #81)
 ```
 
 A different feature name, Rust type, crate, or file is not evidence that something deserves its own plugin.
@@ -278,9 +278,9 @@ Confluence tests should compare relevant public truth such as reachable capabili
 
 ## Playback authority discipline
 
-For ARCH-003, `docs/adr/ADR-PBK-001.md` is the current **proposed replacement** for playback-specific semantics: PROPOSED / FORMAL CORE PASS, not yet ACCEPTED. The registered ARCH-003 authority remains `component-boundary-a0.md` until human acceptance updates the registry. Do not treat the ADR as already-migrated authority, and do not combine the two playback models when implementing new code.
+For ARCH-003, `docs/adr/ADR-PBK-001.md` is ACCEPTED and is the registered playback-specific authority (together with `docs/architecture/overview.md`). `component-boundary-a0.md` remains closed #53 historical evidence; its conflicting playback-specific ownership/granularity conclusions are superseded for new playback implementation. Do not combine the two playback models when implementing new code. Architecture acceptance is not implementation authorization: the ADR still gates production implementation behind the deterministic executable oracle.
 
-The ADR's proposed model does **not** collapse playback into one giant `MusicKernel`.
+The accepted model does **not** collapse playback into one giant `MusicKernel`.
 
 ```text
 MusicComponent   = composition lifecycle root

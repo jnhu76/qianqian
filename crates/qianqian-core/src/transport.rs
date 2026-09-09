@@ -9,9 +9,9 @@
 //! implementation pressure. `TransportKernel` is a semantic authority role,
 //! not a Composition plugin boundary.
 //!
-//! This shell aligns code vocabulary with the proposed Playback architecture
-//! (ADR-PBK-001, PROPOSED / FORMAL CORE PASS). It does not constitute
-//! production Playback implementation authorization.
+//! This shell aligns code vocabulary with the accepted Playback architecture
+//! (ADR-PBK-001, ACCEPTED). It does not constitute production Playback
+//! implementation authorization.
 
 /// Authority for playback-temporal semantics.
 ///

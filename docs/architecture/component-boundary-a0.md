@@ -26,7 +26,9 @@ system-boundary / effect-classification reasoning
 composition-kernel design provenance (#53 -> #67 -> #71 chain)
 ```
 
-Under proposed replacement by `ADR-PBK-001` (**PROPOSED / FORMAL CORE PASS**, not yet ACCEPTED) — the playback-specific conclusions below are the historical #53 position, superseded only after human acceptance updates the registry:
+`ADR-PBK-001` is now ACCEPTED (2026-09-09) and is the registered playback-specific ARCH-003 authority.
+
+Conflicting playback-specific ownership/granularity conclusions in this historical document — the #53 position below — are superseded for new Playback implementation:
 
 ```text
 Music component owns the whole cohesive playback mechanism
@@ -36,7 +38,7 @@ one active track session with a single Decoder handle
 Transport / Timeline / Session split rejected
 ```
 
-The proposed replacement model instead separates `MusicKernel` (music/product semantics) from `TransportKernel` (playback temporal authority) with nested `TrackSession(s) -> DecodeSession(s)` and dual-window / generation-admission / Physical Fence semantics. Until `ADR-PBK-001` is ACCEPTED and the registered ARCH-003 authority is updated, do **not** combine the two playback models when implementing new code.
+The accepted model instead separates `MusicKernel` (music/product semantics) from `TransportKernel` (playback temporal authority) with nested `TrackSession(s) -> DecodeSession(s)` and dual-window / generation-admission / Physical Fence semantics. Generic composition and historical behavioral evidence in this document remain valid; do **not** combine the two playback models when implementing new code.
 
 ---
 

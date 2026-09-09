@@ -74,7 +74,7 @@ MusicKernel      = music/product semantic authority
 TransportKernel  = playback temporal authority
 ```
 
-> 这一 playback 拆分来自 ADR-PBK-001（**PROPOSED / FORMAL CORE PASS**）；在人工 ACCEPTED 并更新 registry 前，它是 ARCH-003 的拟议替代模型，而非已迁移的登记 authority。
+> 这一 playback 拆分来自 ADR-PBK-001（**ACCEPTED**）；它现在是已登记的 ARCH-003 playback 专属 authority（与 `overview.md` 共同）。架构接受不等于实现完成：deterministic executable oracle 是 implementation entry，production FFmpeg/WASAPI 集成仍是后续任务。
 
 `Kernel` 在后两个名字里表示 semantic authority role，不代表两个新的 Composition plugin。
 
@@ -155,7 +155,7 @@ Gain → EQ → SRC → Limiter → ...
 | 架构块 | 状态 |
 |---|---|
 | Base / Composition Kernel K0 | <StatusBadge status="IMPLEMENTED" /> |
-| Playback Architecture / ADR-PBK-001 | <StatusBadge status="PROPOSED" /> `FORMAL CORE PASS` |
+| Playback Architecture / ADR-PBK-001 | <StatusBadge status="CURRENT" /> `ACCEPTED` — 实现未开始 |
 | Decoder provider | <StatusBadge status="PLANNED" /> |
 | AudioOutput provider | <StatusBadge status="PLANNED" /> |
 | Audio Processing implementation | <StatusBadge status="PLANNED" /> |

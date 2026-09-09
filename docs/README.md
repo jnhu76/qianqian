@@ -10,17 +10,17 @@ Load only the documentation needed for the current task. Historical material is 
 | Stable vocabulary | `../CONTEXT.md` |
 | Current architecture | `architecture/overview.md` |
 | Generic component/plugin/composition semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` |
-| Historical component-boundary audit | `architecture/component-boundary-a0.md` — closed #53 evidence; its playback-specific ownership conclusions are historical inputs under proposed replacement by `adr/ADR-PBK-001` (see the transition note inside that file) |
+| Historical component-boundary audit | `architecture/component-boundary-a0.md` — closed #53 evidence; its playback-specific ownership conclusions are historical inputs superseded by accepted `adr/ADR-PBK-001` semantics (see the transition note inside that file) |
 | Composition Kernel representation decisions | `architecture/composition-kernel-0-implementation-adr.md` |
-| Playback authority / timeline / media session / PCM boundaries (ARCH-003) | `adr/ADR-PBK-001.md` (**PROPOSED / FORMAL CORE PASS**; the proposed replacement for playback-specific ARCH-003 semantics — the registered ARCH-003 authority has **not** migrated until human ACCEPTED; no FFmpeg/WASAPI implementation implied) |
+| Playback authority / timeline / media session / PCM boundaries (ARCH-003) | `adr/ADR-PBK-001.md` (**ACCEPTED**; registered playback-specific ARCH-003 authority; no FFmpeg/WASAPI production implementation implied) |
 | Playback formal evidence | `../specs/README.md` + `../specs/playback/README.md` |
 | Product introduction / repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | Rust workspace/build/test | Current `Cargo.toml` / crate manifests / CI |
-| Music/product semantics | `adr/ADR-PBK-001.md` (proposed model) + current `qianqian-core::music` code/tests |
-| Playback temporal semantics | `adr/ADR-PBK-001.md` (proposed model) + current `qianqian-core::transport` code/tests + playback specs when state-collision evidence is needed |
-| Decoder / Processing / AudioOutput | `adr/ADR-PBK-001.md` (proposed model) + `architecture/overview.md`; generic Composition Kernel never owns media payload contracts |
-| Realtime audio path | `adr/ADR-PBK-001.md` (proposed model) + `architecture/overview.md`; PCM stays off Context/event routing |
+| Music/product semantics | `adr/ADR-PBK-001.md` + current `qianqian-core::music` code/tests |
+| Playback temporal semantics | `adr/ADR-PBK-001.md` + current `qianqian-core::transport` code/tests + playback specs when state-collision evidence is needed |
+| Decoder / Processing / AudioOutput | `adr/ADR-PBK-001.md` + `architecture/overview.md`; generic Composition Kernel never owns media payload contracts |
+| Realtime audio path | `adr/ADR-PBK-001.md` + `architecture/overview.md`; PCM stays off Context/event routing |
 | UiHost / presentation | `architecture/overview.md` + current presentation contract |
 | Historical playback evidence | git tag `playback-reference-v1` (also branch `research/playback-reference-v1`); not present in the working tree — inspect via `git show playback-reference-v1:<path>` |
 | Pre-Rust repository history | git tag `pre-rust-v2` (also branch `archive/pre-rust-v2`); not present in the working tree — inspect via `git show pre-rust-v2:<path>` |
@@ -35,21 +35,20 @@ stable vocabulary                -> CONTEXT.md
 current architecture             -> docs/architecture/overview.md
 generic composition semantics    -> docs/architecture/composition-kernel*.md
 historical boundary evidence     -> docs/architecture/component-boundary-a0.md
-registered ARCH-003 authority    -> docs/architecture/component-boundary-a0.md (until ADR-PBK-001 is ACCEPTED)
-proposed playback replacement    -> docs/adr/ADR-PBK-001.md (PROPOSED / FORMAL CORE PASS)
+registered ARCH-003 authority    -> docs/adr/ADR-PBK-001.md (ACCEPTED)
 playback formal evidence         -> specs/playback/*
 implemented behavior             -> code + tests + current contracts
 historical experimental fact     -> preserved reference/history
 current task scope               -> current issue/task
 ```
 
-`ADR-PBK-001` is the current **proposed replacement** for playback-specific ARCH-003 semantics. It has passed the formal core but remains PROPOSED until human acceptance updates the registered authority. Until then, `component-boundary-a0.md` remains the registered ARCH-003 authority; for new playback design work treat the ADR as the reviewed replacement candidate and do not combine the two playback models in one implementation. Playback-specific facts the transition touches: MusicKernel vs TransportKernel authority, TrackSession/DecodeSession structure, Dual Window, Generation admission, and Physical Fence semantics.
+`ADR-PBK-001` is the registered playback-specific ARCH-003 authority after passing the blocking formal core and receiving human acceptance on 2026-09-09. `component-boundary-a0.md` remains historical #53 evidence; its conflicting playback-specific ownership/granularity conclusions must not be combined with the accepted ADR in new implementation. The accepted transition covers MusicKernel vs TransportKernel authority, TrackSession/DecodeSession structure, Dual Window, Generation admission, and Physical Fence semantics.
 
 When documentation and implementation disagree, do not silently choose one. Identify the drift source and correct only the authority that is stale.
 
 ## Playback authority split
 
-ADR-PBK-001 (**PROPOSED / FORMAL CORE PASS**, the acceptance candidate for ARCH-003) uses three distinct concepts:
+ADR-PBK-001 (**ACCEPTED**) freezes three distinct concepts:
 
 ```text
 MusicComponent   = composition lifecycle root

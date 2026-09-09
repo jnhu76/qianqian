@@ -23,7 +23,7 @@ features:
     details: "Context、Capability、Fiber、Effect、Reconcile 五个原语已实现。它只拥有 composition truth，不拥有音乐/PCM/playback timeline。"
     status: "IMPLEMENTED"
   - title: "Playback Architecture"
-    details: "ADR-PBK-001 formal core PASS：MusicComponent 是 lifecycle root，MusicKernel 管产品语义，TransportKernel 管时间语义；当前进行全仓 authority alignment 与 acceptance review。"
+    details: "ADR-PBK-001 已 ACCEPTED 并登记为 ARCH-003 authority：MusicComponent 是 lifecycle root，MusicKernel 管产品语义，TransportKernel 管时间语义；当前前沿是 deterministic executable temporal core。"
     status: "CURRENT"
   - title: "Decoder"
     details: "编码媒体 → Canonical PCM。真实 provider contract/实现仍待 Playback ADR 获得后续实现授权。"

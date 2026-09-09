@@ -25,8 +25,8 @@ export interface ProjectState {
 }
 
 export const projectState: ProjectState = {
-  currentFrontier: 'Playback Architecture — repository authority alignment / acceptance review',
-  lastMilestone: 'Playback Architecture formal core PASS',
+  currentFrontier: 'Playback Architecture — deterministic executable temporal core (implementation entry)',
+  lastMilestone: 'ADR-PBK-001 ACCEPTED; ARCH-003 authority migrated',
 
   layers: {
     playbackReference: 'HISTORICAL_EVIDENCE',
@@ -41,9 +41,9 @@ export const projectState: ProjectState = {
   },
 
   nextQuestions: [
-    '当前 current surfaces 是否准确表达 ADR-PBK-001 为 PROPOSED replacement candidate，而 registry 的 ARCH-003 authority 尚未迁移？',
-    'ADR-PBK-001 是否具备进入 ACCEPTED 的人工审查条件?',
-    '只有在 ACCEPTED 之后：最小 executable playback model 应先挣得哪些 Rust representation?',
+    '当前 current surfaces 是否准确表达 ADR-PBK-001 为 ACCEPTED 且为已登记的 ARCH-003 authority（同时不把架构接受误写成实现完成）？',
+    'deterministic executable temporal core 应先挣得哪些 Rust representation（不预先冻结 struct/module layout）？',
+    '施工发现协议：哪些实现压力属于 Class A/B，哪些必须走 Class C 的 ADR+specs+tests 同步事务？',
   ],
 }
 

@@ -1,7 +1,8 @@
 # ADR-PBK-001：播放时间轴、媒体会话、PCM 数据面与共享状态边界
 
-- **状态**：PROPOSED / FORMAL CORE PASS
+- **状态**：ACCEPTED
 - **日期**：2026-09-08
+- **接受日期**：2026-09-09
 - **作用域**：Qianqian Playback Architecture / ARCH-003
 - **不重开**：Base / Composition Kernel K0
 
@@ -26,15 +27,15 @@ Immediate Lifetime Owner
 Semantic Authority
 ```
 
-Corrective-1 的 G1-G8 设计审计全部 PASS。Formal Acceptance 已收缩为一个**小型 blocking temporal core**：只有 `PlaybackTemporal` 模型（五组高风险 temporal 语义）+ 4 个 core negative controls 阻塞 ACCEPTED。`PlaybackOwnership` 与其余 mutation 保留为 supporting evidence，不阻塞 ACCEPTED。deterministic executable oracle 移到 ACCEPTED 之后，作为 implementation entry，不是 architecture decision 成立的前置条件。
+Corrective-1 的 G1-G8 设计审计全部 PASS。Formal Acceptance 已收缩为一个**小型 blocking temporal core**：只有 `PlaybackTemporal` 模型（五组高风险 temporal 语义）+ 4 个 core negative controls 阻塞 ACCEPTED。`PlaybackOwnership` 与其余 mutation 保留为 supporting evidence，不阻塞 ACCEPTED。deterministic executable oracle 移到 ACCEPTED 之后，作为 implementation entry，不是 architecture decision 成立的前置条件。Formal core 已通过，本文现为 ACCEPTED；production implementation 仍需先经过 deterministic executable oracle。
 
 ```text
-STATUS = PROPOSED / FORMAL CORE PASS
+STATUS = ACCEPTED
 DESIGN REVIEW = PASS
 CORE TEMPORAL CHECKS = PASS
 SUPPORTING FORMAL EVIDENCE = RETAINED / NON-BLOCKING
 IMPLEMENTATION AUTHORIZATION = NO
-ARCH-003 AUTHORITY REVISION = NO
+ARCH-003 AUTHORITY REVISION = YES
 ```
 
 ---
@@ -892,11 +893,11 @@ DESIGN REVIEW = PASS
 PROSE OPEN QUESTIONS = CLOSED
 ```
 
-但这还不是 ACCEPTED。
+Design Review 本身不是 ACCEPTED；Acceptance 由 §21 formal core 决定。§21 已通过后，本文现为 ACCEPTED。
 
 ---
 
-# 21. Formal Acceptance — ACCEPTED 前必须通过
+# 21. Formal Acceptance — 已通过
 
 剩余风险已经从“边界是否清楚”变为“合法状态组合是否会撞车”。
 
@@ -995,13 +996,13 @@ implementation issue separately authorizes production work
 当前：
 
 ```text
-STATUS = PROPOSED / FORMAL CORE PASS
+STATUS = ACCEPTED
 DESIGN REVIEW = PASS
 CORE TEMPORAL CHECKS = PASS
 SUPPORTING FORMAL EVIDENCE = RETAINED / NON-BLOCKING
 IMPLEMENTATION AUTHORIZATION = NO
 EXECUTABLE ORACLE = NOT STARTED
-ARCH-003 AUTHORITY REVISION = NO
+ARCH-003 AUTHORITY REVISION = YES
 ```
 
 ---
@@ -1036,9 +1037,9 @@ WASAPI/CoreAudio/AAudio 具体 fence mechanism
 
 # 24. 对 ARCH-003 的影响
 
-当前 ADR 仍为 PROPOSED，因此现在不修改 `registry.yml` 的 ARCH-003 authority。
+本文现已 ACCEPTED。依据 §22，本次 authority transition 将 `registry.yml` 的 ARCH-003 authority corrective-refine 为本文 + `docs/architecture/overview.md`；`component-boundary-a0.md` 继续作为 #53 历史设计与证据来源，但其与本文冲突的 playback-specific ownership / granularity 结论不再是新实现 authority。
 
-Formal Acceptance 必须项通过、ADR 改为 ACCEPTED 后，再把当前较宽泛的 Playback authority corrective-refine 为：
+Formal Acceptance 后注册的 Playback authority 为：
 
 ```text
 MusicComponent
