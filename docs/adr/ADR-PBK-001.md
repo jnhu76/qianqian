@@ -1164,7 +1164,7 @@ Fact
 
 **Service** — 通过 Capability 到达的可执行对象/interface；真正做工作的是 service/mechanism。
 
-**Host**（Composition Host / Application Host）— 选择/安装 desired components、创建 Base Kernel、驱动 composition lifecycle、拥有 application 级 bootstrap/shutdown policy 的 architecture role。Host 不因方便而自动拥有 playback semantics、PCM graph、decoder/output 实现、realtime lifetime authority。crate 名当前不冻结。
+**Host**（Composition Host / Application Host）— 选择/安装 desired components、创建 Base Kernel、驱动 composition lifecycle、拥有 application 级 bootstrap 与 shutdown 的发起/编排（initiation/orchestration）的 architecture role。发起/编排 shutdown 不等于跨域 shutdown 协议已被冻结：composition teardown、realtime-view retirement、reclamation（含 release）之间的 shutdown ordering 仍 OPEN（§17）。Host 不因方便而自动拥有 playback semantics、PCM graph、decoder/output 实现、realtime lifetime authority。crate 名当前不冻结。
 
 ## 16.2 Runtime 侧
 
@@ -1240,21 +1240,36 @@ command
 
 ## 16.5 Reclamation 词汇链
 
-短定义；normative 协议本体在 §6 P1–P5：
+短定义；normative 协议本体在 §6 P1–P5。按语义时刻排列：
 
 ```text
-Retirement      某个 published view 因后续 publication 被 closed to new acquisition，
-                但既存合法持有者仍可继续使用（P2）
-Quiescence      不存在任何 active realtime execution 或 queued reference 仍可能
-                通过任何 generation 的 published/retired view 解引用相关资源（P3）
-Reclamation     确认上述谓词成立、从而授予资源回收资格的过程；
-                Reclamation != physical destruction
-Release         disposal 之后的物理释放状态
+Retirement
+    published view 因后续 publication 被 closed to new acquisition；
+    既存合法持有者仍可继续使用（P2）
+
+Quiescence
+    不存在任何 active realtime execution 或 queued reference 仍可能
+    通过任何 generation 的 published/retired view 解引用相关资源（P3）
+
+Reclamation eligibility
+    回收的语义资格；当且仅当 Quiescence 谓词成立时成立（P3 的 iff）。
+    eligibility 是语义事实：它何时首次为真由该谓词定义，
+    不依赖任何机制动作。
+
+Reclamation recognition / certification
+    控制侧机制发现并认证 eligibility 已成立的过程；
+    recognition 可以滞后于 semantic eligibility 本身（P3/P5）。
+
+Release
+    reclamation eligibility 成立之后的物理处置/释放状态（P4）
 ```
+
+**Reclamation**（总称）— 控制侧识别/认证 reclamation eligibility 并协调安全 release 的过程。它不定义 semantic eligibility 首次为真的时刻（由 P3 谓词决定），也不是物理销毁本身。
 
 保持区分：
 
 ```text
+eligibility != recognition != release   （P3/P4/P5）
 Retired != Reclaimable != Released      （P4）
 publication != reclamation certificate  （P4）
 ```
