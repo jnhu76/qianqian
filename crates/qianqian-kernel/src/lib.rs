@@ -14,9 +14,8 @@
 //! qianqian-* crate (see `tests/dependency_firewall.rs` and the
 //! implementation ADR, D1).
 //!
-//! Semantic authority: `docs/architecture/composition-kernel-0-design.md`
-//! (PR #68 + Corrective-4/5), realized per
-//! `docs/architecture/composition-kernel-0-implementation-adr.md`.
+//! Semantic authority: `docs/architecture/composition-kernel-0-design.md`,
+//! realized per `docs/architecture/composition-kernel-0-implementation-adr.md`.
 //!
 //! Control plane is synchronous and serialized; the realtime firewall (§N)
 //! forbids every kernel operation on the realtime hot path. Payload flows

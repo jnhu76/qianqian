@@ -1,8 +1,10 @@
 # Architecture overview
 
+> **This document is a derived architecture overview/router. It does not define normative architecture semantics.** Normative Playback Foundations live only in [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md); K0 semantic authority is [`composition-kernel-0-design.md`](composition-kernel-0-design.md) (representation decisions: [`composition-kernel-0-implementation-adr.md`](composition-kernel-0-implementation-adr.md)). This page summarizes and routes; on any divergence the authorities win.
+
 This document is the repository-local semantic overview for Qianqian Architecture v2.
 
-Generic composition semantics live in `composition-kernel.md` and the K0 design/implementation authorities. Playback Foundations are **accepted** (`../adr/ADR-PBK-001.md`); they fix plane boundaries and contracts, not a production playback state machine or its vocabulary.
+Generic composition semantics live in `composition-kernel.md` and the K0 design/implementation authorities. Playback Foundations are **accepted** (`../adr/ADR-PBK-001.md`); they fix plane boundaries and contracts, not a production playback state machine or its vocabulary. Term definitions (Kernel / Plugin / Fiber / Capability / Runtime / Realtime Runtime / Fact / Reclamation, …) are normative in `../adr/ADR-PBK-001.md` §16 (Vocabulary / Role Definitions).
 
 The current architecture intentionally separates composition, execution/control, committed facts, and realtime data flow.
 
@@ -261,24 +263,29 @@ Playback-specific code is research evidence and may be changed/removed without c
 
 ---
 
-# Authority chain
+# Document classes (router)
 
 ```text
-Generic composition
-    docs/architecture/composition-kernel-0-design.md
-    docs/architecture/composition-kernel-0-implementation-adr.md
-    docs/architecture/composition-kernel.md
+Normative authority
+    Generic composition (K0 semantics)
+        docs/architecture/composition-kernel-0-design.md
+        docs/architecture/composition-kernel-0-implementation-adr.md
+            (representation decisions)
+    Playback foundations
+        docs/adr/ADR-PBK-001.md — ACCEPTED (incl. §16 vocabulary, §6 P1–P5)
 
-Playback foundations
-    docs/adr/ADR-PBK-001.md — ACCEPTED
-    docs/architecture/overview.md
+Production reality
+    main-branch source, Cargo dependency graph, actual public APIs
 
-Experimental playback evidence
-    qianqian-core playback code/tests
-    specs/playback/*
+Evidence (never authority)
+    qianqian-core playback code/tests, specs/playback/*,
+    specs/realtime-publication/, architecture evidence records
+    (pcm-contract-a0.md, direct-pcm-flow.md, realtime-view-publication.md,
+    realtime-publication-lifetime-decision.md, component-boundary-a0.md)
 
-Historical evidence
-    git history / explicit historical refs
+Derived projections (summarize/route/visualize; define nothing)
+    README.md / CONTEXT.md / AGENTS.md summaries / docs/README.md /
+    this overview / registry.yml / website / diagrams
 ```
 
-Current architecture work must not silently upgrade experimental playback evidence back into authority.
+Current architecture work must not silently upgrade experimental playback evidence back into authority. If production code and a normative authority differ, follow the authority resolution rule in `../../AGENTS.md` ("Authority resolution").

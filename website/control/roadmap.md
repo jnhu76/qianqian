@@ -33,11 +33,11 @@ import { projectState } from '../data/project-state.ts'
 
 **{{ projectState.currentFrontier }}**
 
-旧版 ADR-PBK-001（MusicComponent / MusicKernel / TransportKernel 模型）及其 deterministic executable temporal core 已随 2026-09 架构重置降级为 experimental evidence。重置后的 Playback Foundations 已 ACCEPTED；realtime publication/lifetime 的语义碰撞已在模型层证明（`specs/realtime-publication/`），其语义协议 **P1–P5 已 normative 冻结于 ADR §6**——**实现机制仍 DEFERRED**。当前 ladder：
+旧版 ADR-PBK-001（MusicComponent / MusicKernel / TransportKernel 模型）及其 deterministic executable temporal core 已随 2026-09 架构重置降级为 experimental evidence。重置后的 Playback Foundations 已 ACCEPTED；realtime publication/lifetime 的语义碰撞已在模型层证明（`specs/realtime-publication/`），其语义协议 **P1–P5 已 normative 冻结于 ADR §6**；Realtime Runtime 责任已由机制证据挣得（`docs/architecture/realtime-view-publication.md`，Issue #94 closed）。当前 ladder：
 
-- composition reality 之上的 minimal PCM contract（Phase B）；
-- direct Source → processing → Sink 数据流（Phase C）；
-- publication/reclamation **机制验证**：候选机制在真实 Audio Runtime 下满足已冻结的 P1–P5（Phase D 验证机制，不再裁决 P1–P5 是否正确）；
+- composition reality 之上的 minimal PCM contract（Phase B）——**已交付**（PR #93）；
+- direct Source → processing → Sink 数据流（Phase C）——**已交付**（PR #96）；
+- publication/reclamation **机制验证**：候选机制在真实 Audio Runtime 下满足已冻结的 P1–P5（Phase D 验证机制，不再裁决 P1–P5 是否正确）——首轮机制证据已交付（PR #97），机制最终裁决仍 OPEN；
 - 真实 decoder / output 机制（Phase E）；
 - 只有到那时才重新挣得 seek / stop / track / session 等播放语义（Phase F）。
 
@@ -89,7 +89,7 @@ flowchart LR
 PR #78 / #79 属于旧 ADR 修订历史（experimental evidence），不再列为当前决策记录。
 
 <ProvenancePanel
-  :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/overview.md', 'docs/site/project-state.ts']"
+  :authority="['docs/adr/ADR-PBK-001.md', 'docs/site/project-state.ts']"
   :decisions="[]"
   :evidence="['specs/playback/PlaybackTemporal.tla', 'crates/qianqian-core/src/transport.rs']"
 />

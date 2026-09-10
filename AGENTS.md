@@ -52,6 +52,8 @@ The full normative contracts — minimal constitution, command/fact authority, f
 
 # Base Kernel K0
 
+(K0 semantic authority: `docs/architecture/composition-kernel-0-design.md`; representation decisions: `docs/architecture/composition-kernel-0-implementation-adr.md`. The lines below are guardrails, not a second definition.)
+
 The generic Composition Kernel is implemented and current.
 
 Primitive budget (no sixth primitive without a dedicated architecture issue demonstrating K0 cannot express the invariant cleanly):
@@ -173,9 +175,26 @@ For architecture reset work, green Cargo tests are regression evidence, not arch
 
 # Documentation
 
-`docs/README.md` is the documentation router.
+`docs/README.md` is the documentation router and carries the authoritative truth-class taxonomy (normative authority / production reality / evidence / derived projection). Read it before promoting any document to authority.
 
-Keep one current authority per durable fact. `ADR-PBK-001.md` is the single normative Playback Foundations constitution; every other document links or summarizes it and carries no second normative copy. Git history stores the old architecture; do not grow amendment/supersession chains in the working tree when a clean rewrite is possible.
+Keep one current authority per durable fact. `ADR-PBK-001.md` is the single normative Playback Foundations constitution (vocabulary/role definitions: its §16); every other document links or summarizes it and carries no second normative copy. Git history stores the old architecture; do not grow amendment/supersession chains in the working tree when a clean rewrite is possible.
+
+`README.md`, `CONTEXT.md`, `docs/architecture/overview.md`, `docs/architecture/registry.yml`, `website/**` and diagrams are derived projections/routers: they may summarize, route and show status, but must not define or extend architecture semantics.
+
+---
+
+# Authority resolution
+
+If production code and a normative authority differ:
+
+```text
+1. record the differential explicitly
+2. determine whether the code is wrong or the authority should change
+3. if the code is better, amend/replace the authority explicitly (reviewed change)
+4. only then is the new shape current architecture
+```
+
+Forbidden: "code is newer, therefore code wins"; "the ADR is older, therefore the implementation must mechanically copy it"; letting crate docs, tests, or issue comments silently supersede an authority.
 
 ---
 

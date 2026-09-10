@@ -77,7 +77,7 @@ Playback 不通过给 generic kernel 增加更多产品概念来实现。
 
 > **TLA+ 用来找撞车，不用来证明整个架构。**
 
-旧 playback formal core 的验证结果是 experimental evidence。播放基础已接受（ADR-PBK-001 ACCEPTED）后，下一步由最小实验（minimal PCM contract 起）驱动，而不是继续扩张形式化模型数量。
+旧 playback formal core 的验证结果是 experimental evidence。播放基础已接受（ADR-PBK-001 ACCEPTED）后，已由最小实验驱动挣得 PCM contract（Phase B）、direct flow（Phase C）与 realtime-view publication/reclamation 机制证据（Issue #94 closed）；下一步由真实机制裁决与 decoder/output 实验驱动，而不是继续扩张形式化模型数量。
 
 ---
 
@@ -90,7 +90,7 @@ Playback 不通过给 generic kernel 增加更多产品概念来实现。
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/overview.md', 'docs/adr/ADR-PBK-001.md', 'docs/site/project-state.ts']"
+  :authority="['docs/adr/ADR-PBK-001.md', 'docs/site/project-state.ts']"
   :decisions="[{ pr: 68 }, { pr: 71 }]"
   :evidence="['crates/qianqian-kernel/tests', 'specs/playback/PlaybackTemporal.tla']"
 />

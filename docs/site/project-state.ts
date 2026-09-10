@@ -25,8 +25,8 @@ export interface ProjectState {
 }
 
 export const projectState: ProjectState = {
-  currentFrontier: 'Realtime publication semantics frozen as ADR-PBK-001 §6 P1–P5 (mechanism DEFERRED); next: minimal PCM contract experiments (Phase B)',
-  lastMilestone: 'P1–P5 formally established (specs/realtime-publication) and frozen into ADR-PBK-001 §6; tree-wide authority surfaces reconciled in PR #91',
+  currentFrontier: 'Ladder evidence delivered through Phase C (PCM contract PR #93, direct flow PR #96) and realtime-view publication/reclamation mechanism evidence (PR #97, Issue #94 closed); next: re-audit the production realtime-runtime seam against the reconciled authority (PR #98), then mechanism adjudication (Phase D) and real decoder/output (Phase E)',
+  lastMilestone: 'Realtime-view publication/reclamation mechanism evidence validated ADR §6 P1–P5 on a real Rust mechanism (PR #97); Realtime Runtime responsibility earned (Issue #94 closed)',
 
   layers: {
     playbackReference: 'HISTORICAL_EVIDENCE',
@@ -41,9 +41,9 @@ export const projectState: ProjectState = {
   },
 
   nextQuestions: [
-    'minimal PCM contract 实验最少需要冻结哪些字段/语义边界（PcmBlock format/frames/time/provenance）？',
-    'direct data-flow 实验（Phase C）需要挣得哪些执行事实？',
-    '哪类 publication/reclamation mechanism 能在真实 Audio Runtime 下满足已冻结的 P1–P5（Phase D 验证）？',
+    'production realtime-runtime seam（PR #98）如何按收口后的 authority/vocabulary（ADR-PBK-001 §16）重新审判：KEEP / SHRINK / REWORK / CLOSE？',
+    '哪类 publication/reclamation mechanism 最终胜出（Phase D 机制裁决：RT acquire/release、queued-reference lifetime、final-drop、deferred disposal）？',
+    '真实 decoder / output（Phase E）会挣得哪些 playback nouns？',
   ],
 }
 

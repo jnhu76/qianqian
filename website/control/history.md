@@ -96,7 +96,7 @@ Corrective-5                     PRE-IMPLEMENTATION REVIEW
 ```
 
 <ProvenancePanel
-  :authority="['docs/architecture/overview.md', 'docs/architecture/composition-kernel.md', 'docs/adr/ADR-PBK-001.md']"
+  :authority="['docs/adr/ADR-PBK-001.md']"
   :decisions="[{ issue: 46 }, { issue: 53 }, { issue: 67 }, { issue: 70 }, { pr: 66 }, { pr: 68 }, { pr: 69 }, { pr: 71 }, { pr: 87 }, { pr: 91 }]"
   lastVerified="PR #91"
 />

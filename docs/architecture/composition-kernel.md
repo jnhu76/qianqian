@@ -1,6 +1,6 @@
 # Composition Kernel
 
-This document is the canonical Architecture v2 authority for Qianqian's generic composition/lifecycle kernel.
+This document summarizes the generic composition/lifecycle kernel preconditions and invariants for Architecture v2. It is a **derived summary/router, not the normative K0 semantic authority**: K0 semantics are defined in `composition-kernel-0-design.md`, and K0 representation decisions in `composition-kernel-0-implementation-adr.md`. Where this summary and those authorities differ, the authorities win.
 
 Playback Foundations are **accepted** (`docs/adr/ADR-PBK-001.md`) and deliberately do not freeze the previous MusicKernel/TransportKernel/TrackSession/Generation model. Old playback code/specs are experimental evidence only.
 
@@ -8,7 +8,7 @@ The Base Kernel K0 itself remains implemented/current.
 
 ---
 
-# Kernel constitution
+# Kernel guardrails (summary)
 
 > **Kernel controls reachability, composition-visible ownership and lifecycle; it does not own application payloads.**
 

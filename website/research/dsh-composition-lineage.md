@@ -126,7 +126,7 @@ flowchart TD
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/component-boundary-a0.md', 'docs/architecture/composition-kernel-0-design.md', 'docs/architecture/composition-kernel.md', 'docs/architecture/overview.md']"
+  :authority="['docs/architecture/composition-kernel-0-design.md']"
   :decisions="[{ issue: 47 }, { issue: 53 }, { issue: 67 }, { pr: 68 }]"
   :implementation="[{ issue: 70 }, { pr: 71 }]"
   :evidence="['crates/qianqian-kernel/tests']"

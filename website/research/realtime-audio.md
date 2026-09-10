@@ -112,7 +112,7 @@ normative 见 `docs/adr/ADR-PBK-001.md` §2.4；行为证据来源：overview.md
 ---
 
 <ProvenancePanel
-  :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/overview.md']"
+  :authority="['docs/adr/ADR-PBK-001.md']"
   :evidence="['docs/architecture/component-boundary-a0.md §A.2', 'research/playback-reference-v1']"
   :decisions="[{ issue: 53 }, { pr: 66 }]"
 />
