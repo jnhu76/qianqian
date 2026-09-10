@@ -6,6 +6,10 @@ The repository is in **Architecture v2**. The first verified playback experiment
 
 ## Architecture in 30 seconds
 
+这是当前 Playback Foundations（ARCH-003）的架构图；规范语义以 [`ADR-PBK-001`](docs/adr/ADR-PBK-001.md) 为准。
+
+[![ARCH-003 Playback Foundations](docs/architecture/diagrams/ARCH-003-playback-foundations-v2-poster-original.png)](docs/adr/ADR-PBK-001.md)
+
 The central rule is:
 
 > **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
