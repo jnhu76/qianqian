@@ -27,13 +27,14 @@
 //!   drop the clone                       release; deferred if it may be last
 //! ```
 //!
-//! The realtime side holds a pre-bound [`Arc`] clone for the whole flow
-//! lifetime (the direct-flow execution model), so per-quantum execution
-//! touches no mechanism state at all. Reclamation is per-resource through
-//! the resource's own reference count: a resource is destroyed only when no
-//! view that references it is still held anywhere (current, retired,
-//! reclaimable, or by any reader) — which is exactly the P3 predicate for
-//! the tested representation.
+//! The tested reader model holds one pre-bound [`Arc`] clone for a
+//! long-lived execution interval, so per-quantum execution touches no
+//! mechanism state at all. This acquisition granularity is specific to
+//! this test representation and remains architecturally open. Reclamation
+//! is per-resource through the resource's own reference count: a resource
+//! is destroyed only when no view that references it is still held anywhere
+//! (current, retired, reclaimable, or by any reader) — which is exactly the
+//! P3 predicate for the tested representation.
 //!
 //! [`ViewState`] is the test-side readout of the P4 semantic lifecycle
 //! (live / retired / reclaimable / released); it is a classification the
