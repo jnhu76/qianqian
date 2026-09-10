@@ -158,7 +158,7 @@ fn provider_flap_n_times_settles_on_final_generation() {
     assert!(k.snapshot().quiet);
 }
 
-/// Missing dependency settles Pending; the root never crashes (A0 §K.5).
+/// Missing dependency settles Pending; the root never crashes.
 #[test]
 fn missing_dependency_settles_pending_without_crash() {
     let mut k = Kernel::new();

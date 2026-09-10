@@ -8,9 +8,8 @@
 //!    comes from the twin's real execution state, not from an error the test
 //!    constructed by hand.
 //!
-//! The legacy provenance labels for these mutations and the full kill matrix
-//! live in `docs/architecture/pcm-contract-a0.md`; the code uses semantic
-//! names only.
+//! Mutation names here are semantic; provenance labels live only in the
+//! experiment's evidence document.
 
 use super::candidates::BorrowedReadOnlyFlow;
 use super::harness::{

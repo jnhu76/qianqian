@@ -1,9 +1,6 @@
-//! Minimal PCM data-edge experiment — test-only harness.
+//! Test-only executable evidence for PCM data-edge semantics.
 //!
-//! Evidence collection for the experiment recorded in
-//! `docs/architecture/pcm-contract-a0.md` (evidence, not normative
-//! authority). Nothing in this file tree is part of the `qianqian-core`
-//! library API.
+//! Nothing in this file tree is part of the `qianqian-core` library API.
 //!
 //! Layout:
 //!
@@ -181,7 +178,11 @@ fn borrowed_shapes_hand_over_producer_storage_without_intermediates() {
     assert_eq!(
         read_only.report().producer_storage_addr,
         read_only.report().consumer_observed_storage_addr,
-        "read-only lend must not insert storage"
+        "read-only lend must be observed directly in producer-owned storage"
+    );
+    assert!(
+        read_only.report().consumer_destination_addr.is_none(),
+        "a borrowed lend has no consumer-owned destination"
     );
 
     let mut in_place = BorrowedInPlaceFlow::new(stereo(), 4);
@@ -189,15 +190,26 @@ fn borrowed_shapes_hand_over_producer_storage_without_intermediates() {
     assert_eq!(
         in_place.report().producer_storage_addr,
         in_place.report().consumer_observed_storage_addr,
-        "in-place lend must not insert storage"
+        "in-place lend must be observed directly in producer-owned storage"
     );
+    assert!(
+        in_place.report().consumer_destination_addr.is_none(),
+        "a borrowed lend has no consumer-owned destination"
+    );
+}
 
+#[test]
+fn pull_fill_is_observed_directly_in_the_consumer_owned_destination() {
     let mut pulled = ConsumerFilledFlow::new(stereo(), 4);
     pulled.run(16).expect("flow is valid");
     assert_eq!(
-        pulled.report().producer_storage_addr,
+        pulled.report().consumer_destination_addr,
         pulled.report().consumer_observed_storage_addr,
-        "pull fill must not insert storage"
+        "pull fill must be observed directly in the consumer-owned destination"
+    );
+    assert!(
+        pulled.report().producer_storage_addr.is_none(),
+        "pull owns no producer-side storage; the report must not fake one"
     );
 }
 
@@ -205,11 +217,14 @@ fn borrowed_shapes_hand_over_producer_storage_without_intermediates() {
 fn owned_shape_reports_consumer_observed_storage() {
     let mut owned = OwnedTransferFlow::new(stereo(), 4);
     owned.run(16).expect("flow is valid");
-    // There is no single producer storage to compare against: each block is a
-    // fresh allocation. The per-block cost evidence is the *measured*
-    // allocation count in the mutations module; this test only pins that the
-    // report carries the observed storage address.
+    // There is no fixed storage address on either side: each block is a fresh
+    // allocation whose ownership moves. The per-block cost evidence is the
+    // *measured* allocation count in the mutations module; this test only
+    // pins that the report carries the observed storage address and pretends
+    // to no borrowed-side address.
     assert!(owned.report().consumer_observed_storage_addr.is_some());
+    assert!(owned.report().producer_storage_addr.is_none());
+    assert!(owned.report().consumer_destination_addr.is_none());
 }
 
 // ---------------------------------------------------------------------------

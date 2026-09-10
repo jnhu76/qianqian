@@ -11,9 +11,8 @@
 //! | `OwnedTransferFlow`          | ownership of the block moves to the consumer |
 //! | `ConsumerFilledFlow`         | consumer owns the destination (pull)         |
 //!
-//! The comparison record (trade-offs, provenance labels) lives in
-//! `docs/architecture/pcm-contract-a0.md`; no shape here is a production
-//! commitment.
+//! These shapes are experiment comparisons only; no shape here is a
+//! production commitment.
 //!
 //! There are deliberately no cooperative copy/allocation counters: copies are
 //! observed by storage pointer identity (see `FlowReport`) and allocations by
@@ -26,15 +25,24 @@ use super::harness::{
 /// Structural observations about one flow run.
 ///
 /// All fields are derived from execution, not self-reported by the code under
-/// observation.
+/// observation. Storage ownership is recorded per shape, never flattened: the
+/// borrowed shapes have producer-owned reusable storage, the pull shape has a
+/// consumer-owned destination, and the owned shape has no fixed storage
+/// address on either side.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FlowReport {
     /// Transfer blocks handed across the edge.
     pub blocks: usize,
     /// Frames delivered across the edge.
     pub frames_delivered: usize,
-    /// Address of the producer-side storage handed to the edge.
+    /// Address of the producer-owned reusable storage handed across the edge.
+    /// Set only by the borrowed shapes; the pull shape has no producer-side
+    /// storage and the owned shape has no fixed storage address at all.
     pub producer_storage_addr: Option<usize>,
+    /// Address of the consumer-owned destination storage. Set only by the
+    /// pull shape, where the destination is consumer property the producer
+    /// fills in place.
+    pub consumer_destination_addr: Option<usize>,
     /// Storage address the consumer observed through the most recent payload.
     pub consumer_observed_storage_addr: Option<usize>,
 }
@@ -242,7 +250,7 @@ impl ConsumerFilledFlow {
             capacity_frames,
             report,
         } = self;
-        report.producer_storage_addr = Some(dest.as_ptr() as usize);
+        report.consumer_destination_addr = Some(dest.as_ptr() as usize);
         let mut delivered = 0;
         while delivered < total_frames {
             let this_capacity = (*capacity_frames).min(total_frames - delivered);

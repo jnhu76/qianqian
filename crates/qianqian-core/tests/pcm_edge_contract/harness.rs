@@ -1,9 +1,9 @@
 //! Shared types and the deterministic sample oracle for the PCM edge
 //! experiment.
 //!
-//! Test-only harness for the minimal PCM data-edge experiment recorded in
-//! `docs/architecture/pcm-contract-a0.md` (evidence, not normative authority).
-//! Nothing here is part of the `qianqian-core` library API.
+//! Test-only harness for the minimal PCM data-edge experiment (evidence, not
+//! normative authority). Nothing here is part of the `qianqian-core` library
+//! API.
 //!
 //! Every payload construction is fail-closed: a shape that cannot be
 //! interpreted as whole frames is rejected with [`PcmShapeError`] instead of

@@ -133,7 +133,18 @@ Sensitivity check (one-off manual verification, recorded not committed): with a 
 
 ## 5. Copy and allocation evidence — what each number actually is
 
-**Copy (rows 6–8):** storage pointer identity (`producer storage address == consumer-observed address`) is STRUCTURAL CODE EVIDENCE that the reference borrowed/in-place/pull paths insert no intermediate storage buffer. Scope limits, stated plainly: it says nothing about CPU/cache-level data movement, and a faithful copy with matching values is invisible to the value oracle — only pointer identity (and, for copies that allocate, the allocator) can see it.
+**Copy (rows 6–8):** storage pointer identity is STRUCTURAL CODE EVIDENCE that the reference paths insert no intermediate storage buffer, with the ownership stated per shape:
+
+```text
+borrowed / in-place:  producer-owned reusable storage is directly observed
+                      (producer storage address == consumer-observed address)
+pull:                 consumer-owned destination is directly observed
+                      (destination address == consumer-observed address)
+owned:                fresh owned storage crosses the boundary; no fixed
+                      address exists on either side to compare
+```
+
+Scope limits, stated plainly: it says nothing about CPU/cache-level data movement, and a faithful copy with matching values is invisible to the value oracle — only pointer identity (and, for copies that allocate, the allocator) can see it.
 
 **Allocation (row 9):** steady-state loop allocation counts are MEASURED by the thread-scoped counting allocator:
 
