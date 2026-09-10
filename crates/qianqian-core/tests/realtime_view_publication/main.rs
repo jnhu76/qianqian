@@ -3,7 +3,7 @@
 //!
 //! Nothing in this file tree is part of the `qianqian-core` library API.
 //!
-//! The mechanism under test: atomic immutable-view publication with
+//! The mechanism under test: coherent immutable-view publication with
 //! per-resource refcounted reclamation (safe Rust, std only). The realtime
 //! side acquires one pre-bound view at bind time and executes quanta
 //! through already-held handles; the control side publishes, retires,
@@ -44,7 +44,7 @@ use mutations::{
     SplitPublication, StaleAcquisition, WeakHandlesReader,
 };
 use publication::{PublishedViews, Reader, ViewState};
-use resources::{EventLog, ResourceEvent, TrackedResource, new_event_log};
+use resources::{DestructorGate, EventLog, ResourceEvent, TrackedResource, new_event_log};
 use view::RealtimeView;
 
 /// Builds one immutable view with freshly tracked resources.
@@ -843,6 +843,92 @@ fn final_drop_on_the_reader_thread_destroys_there_hazard_witness() {
             .iter()
             .all(|(_, context)| context.starts_with("rt-reader")),
         "with no ledger, physical destruction runs on the realtime reader thread: {destroyed:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Physical destruction outside the publication lock
+// ---------------------------------------------------------------------------
+
+#[test]
+fn blocking_destruction_does_not_hold_the_publication_lock() {
+    let log = new_event_log();
+    let destructor_gate = DestructorGate::new();
+    let (acquire_done_tx, acquire_done_rx) = mpsc::channel();
+
+    // View 0 carries one resource whose destructor blocks until the test
+    // releases the gate; view 1 is the successor.
+    let view0 = make_view(
+        0,
+        0,
+        FLOW_PARTICIPANTS,
+        vec![TrackedResource::new_blocking(
+            10,
+            log.clone(),
+            destructor_gate.clone(),
+        )],
+        log.clone(),
+    );
+    let view1 = make_view(
+        1,
+        1,
+        FLOW_PARTICIPANTS,
+        tracked_resources(&[20, 21], &log),
+        log.clone(),
+    );
+    let publication = Arc::new(PublishedViews::new(view0));
+    publication.publish(view1);
+    assert!(
+        publication.certify_reclaimable(0),
+        "view 0 has no reader and is certified reclaimable"
+    );
+
+    // Control thread: physical release must detach the view under the lock
+    // and drop it only after unlocking, so the blocking destructor runs
+    // outside the publication critical section.
+    let control_publication = publication.clone();
+    let control = std::thread::spawn(move || {
+        assert!(
+            control_publication.release_reclaimable(0),
+            "the reclaimable view is physically released"
+        );
+    });
+
+    // Deterministic: wait until the resource destructor has entered and is
+    // blocked inside `Drop` before allowing any acquire probe.
+    destructor_gate.wait_entered();
+
+    // While the destructor remains blocked, another reader must be able to
+    // acquire the current view: physical destruction must not hold the
+    // publication lock.
+    let probe_publication = publication.clone();
+    let probe = std::thread::spawn(move || {
+        let view = probe_publication.acquire();
+        let identity = view.identity();
+        drop(view);
+        acquire_done_tx.send(identity).expect("the probe acquired");
+    });
+
+    // If release_reclaimable dropped the view inside the lock, the probe
+    // would be stuck on the mutex and this receive would time out.
+    let identity = acquire_done_rx
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .expect("acquire must progress while the destructor is blocked");
+    assert_eq!(
+        identity, 1,
+        "the probe acquires the current view while destruction is in progress"
+    );
+
+    // Only now release the destructor so the control thread can finish.
+    destructor_gate.release();
+    control.join().expect("the control thread joins");
+    probe.join().expect("the probe thread joins");
+
+    let destroyed = destroyed_events(&log);
+    assert_eq!(
+        destroyed.len(),
+        1,
+        "the blocking resource is destroyed exactly once"
     );
 }
 

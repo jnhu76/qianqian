@@ -1,4 +1,4 @@
-//! The mechanism under test: atomic immutable-view publication with
+//! The mechanism under test: coherent immutable-view publication with
 //! per-resource refcounted reclamation.
 //!
 //! Test-only harness (evidence, not normative authority). Nothing here is
@@ -10,11 +10,15 @@
 //! ```text
 //! CONTROL SIDE
 //!   build next immutable view            (control code, may allocate)
-//!   publish(next)                        atomic swap of the current slot
+//!   publish(next)                        mutex-serialized whole-view
+//!                                        replacement of the current slot
 //!   certify_reclaimable(identity)        move a quiescent retired view
 //!                                        from retired to reclaimable
-//!   release_reclaimable(identity)        drop the ledger's last reference
-//!                                        -> physical release on control side
+//!   release_reclaimable(identity)        detach the ledger's last reference
+//!                                        under the lock, drop it after
+//!                                        unlocking -> physical release on
+//!                                        the control side, outside the
+//!                                        publication critical section
 //!
 //! REALTIME SIDE
 //!   acquire()                            one clone of the current view
@@ -76,8 +80,9 @@ impl PublishedViews {
     }
 
     /// Realtime-view publication: retires the old view (moves it into the
-    /// retirement ledger) and atomically swaps in the new one. Publication
-    /// itself never touches resources and never waits for readers.
+    /// retirement ledger) and replaces the whole immutable view as one
+    /// mutex-guarded operation. Publication itself never touches resources
+    /// and never waits for readers.
     pub fn publish(&self, next: Arc<RealtimeView>) {
         let mut inner = self.inner.lock().expect("publication lock");
         let old = std::mem::replace(&mut inner.current, next);
@@ -193,19 +198,24 @@ impl PublishedViews {
         true
     }
 
-    /// Physical release of a reclaimable view: drops the ledger's last
-    /// reference, so the view (and any resource no longer referenced by any
-    /// other view or reader) is destroyed here, on the caller's thread.
+    /// Physical release of a reclaimable view: detaches the ledger's last
+    /// reference under the publication lock and drops it only after the lock
+    /// is released, so the view (and any resource no longer referenced by any
+    /// other view or reader) is destroyed here, on the caller's thread, but
+    /// **outside the publication critical section**.
     pub fn release_reclaimable(&self, identity: u64) -> bool {
-        let mut inner = self.inner.lock().expect("publication lock");
-        let position = inner
-            .reclaimable
-            .iter()
-            .position(|v| v.identity() == identity);
-        let Some(position) = position else {
-            return false;
+        let released = {
+            let mut inner = self.inner.lock().expect("publication lock");
+            let position = inner
+                .reclaimable
+                .iter()
+                .position(|v| v.identity() == identity);
+            let Some(position) = position else {
+                return false;
+            };
+            inner.reclaimable.remove(position)
         };
-        inner.reclaimable.remove(position);
+        drop(released);
         true
     }
 }

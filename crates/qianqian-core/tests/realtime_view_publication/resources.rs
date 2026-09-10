@@ -17,7 +17,7 @@
 //! constructing actual memory unsafety.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 /// The execution context (thread label) that performed an observed action.
 pub type ExecutionContext = String;
@@ -66,6 +66,57 @@ struct ResourceObserver {
     alive: AtomicBool,
 }
 
+/// Shared gate state for the blocking-destructor oracle.
+#[derive(Debug, Default)]
+struct GateState {
+    entered: bool,
+    release: bool,
+}
+
+/// Execution-level gate used only by the blocking-destructor oracle: the
+/// resource's destructor records `entered` and then waits on the condvar
+/// until the test signals `release`. Real synchronization (no self-report),
+/// and `Send + Sync` so a resource carrying a gate can be shared across
+/// threads.
+#[derive(Debug, Default)]
+pub struct DestructorGate {
+    state: Mutex<GateState>,
+    changed: Condvar,
+}
+
+impl DestructorGate {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self::default())
+    }
+
+    /// Called from inside the resource's `Drop`: record that destruction is
+    /// in progress and block until the test releases the destructor.
+    pub fn enter_and_wait(&self) {
+        let mut state = self.state.lock().expect("destructor gate lock");
+        state.entered = true;
+        self.changed.notify_all();
+        while !state.release {
+            state = self.changed.wait(state).expect("destructor gate wait");
+        }
+    }
+
+    /// Called by the test: block until the destructor has entered and is
+    /// waiting inside `Drop`.
+    pub fn wait_entered(&self) {
+        let mut state = self.state.lock().expect("destructor gate lock");
+        while !state.entered {
+            state = self.changed.wait(state).expect("destructor gate wait");
+        }
+    }
+
+    /// Called by the test: release a blocked destructor.
+    pub fn release(&self) {
+        let mut state = self.state.lock().expect("destructor gate lock");
+        state.release = true;
+        self.changed.notify_all();
+    }
+}
+
 /// A synthetic resource whose whole lifetime is externally observed.
 ///
 /// Safe Rust guarantees the object is not destroyed while any strong
@@ -76,6 +127,7 @@ struct ResourceObserver {
 pub struct TrackedResource {
     id: u64,
     observer: Arc<ResourceObserver>,
+    drop_gate: Option<Arc<DestructorGate>>,
 }
 
 impl TrackedResource {
@@ -84,7 +136,32 @@ impl TrackedResource {
             log: log.clone(),
             alive: AtomicBool::new(true),
         });
-        let resource = Arc::new(Self { id, observer });
+        let resource = Arc::new(Self {
+            id,
+            observer,
+            drop_gate: None,
+        });
+        log.lock()
+            .expect("observer log lock")
+            .push(ResourceEvent::Created {
+                id,
+                context: current_context(),
+            });
+        resource
+    }
+
+    /// Variant for the blocking-destructor oracle: the destructor signals
+    /// entry and then blocks until the test releases the gate.
+    pub fn new_blocking(id: u64, log: EventLog, gate: Arc<DestructorGate>) -> Arc<Self> {
+        let observer = Arc::new(ResourceObserver {
+            log: log.clone(),
+            alive: AtomicBool::new(true),
+        });
+        let resource = Arc::new(Self {
+            id,
+            observer,
+            drop_gate: Some(gate),
+        });
         log.lock()
             .expect("observer log lock")
             .push(ResourceEvent::Created {
@@ -131,5 +208,8 @@ impl Drop for TrackedResource {
                 id: self.id,
                 context: current_context(),
             });
+        if let Some(gate) = self.drop_gate.take() {
+            gate.enter_and_wait();
+        }
     }
 }

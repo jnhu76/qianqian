@@ -16,7 +16,7 @@ Base of this experiment is main at `4423762` (merge of the direct-flow evidence 
 
 - `ADR-PBK-001.md` is **ACCEPTED** and is the sole normative playback constitution; `docs/architecture/pcm-contract-a0.md` (PCM edge) and `docs/architecture/direct-pcm-flow.md` (direct flow) are evidence records (EVIDENCE, NOT NORMATIVE AUTHORITY), each with its executable test harness on main.
 - The formal model `specs/realtime-publication/` has already closed the semantic question (publication/reader-overlap collision is real; P1–P5 are the normative conclusions). The mechanism comparison record `docs/architecture/realtime-publication-lifetime-decision.md` records the concept-level candidate matrix and the engineering leaning; its §12 declared two flip risks: (a) queued-reference dominance collapsing the fast read path, (b) final-drop destructor authority (dimension O).
-- The direct-flow evidence established the execution model prior: the realtime side holds a **pre-bound flow acquired once at activation and executed across many quanta** (`PreboundPcmFlow` in `crates/qianqian-core/tests/direct_pcm_flow/`), and its hazard witness H1 is precisely the seam this experiment must answer: composition withdrawal alone does not revoke an already-extracted flow.
+- The direct-flow evidence established the execution model prior: the realtime side holds a flow whose **participant/data-path bindings were established once at activation and executed across many quanta** (`PreboundPcmFlow` in `crates/qianqian-core/tests/direct_pcm_flow/`), and its hazard witness H1 is precisely the seam this experiment must answer: composition withdrawal alone does not revoke an already-extracted flow. This experiment maintains a strict distinction between two lifetimes (see §4): **participant binding lifetime** (how long source/stage/sink references remain pre-bound — what direct-flow earned) versus **realtime-view acquisition lifetime** (how long one published-view handle is held before observing publication again — the tested model here, and OPEN for production).
 - Issue #94 (independent realtime runtime/kernel question) remains OPEN; Issue #12 (SRC/DSP/device) remains a downstream firewall.
 - Working tree differs from main only in `crates/qianqian-core/tests/realtime_view_publication/` (new test-only harness). **Production `src/` delta is zero** (§18).
 
@@ -34,7 +34,7 @@ The normative definitions live in ADR-PBK-001 §6 (P1 coherent publication, P2 r
 
 ## 3. Baseline: the direct-flow view
 
-The direct-flow evidence's `PreboundPcmFlow` is the static graph/view baseline: three pre-bound participant references plus one reusable block-storage arena, acquired once at activation, executed per quantum with zero composition-plane operations. This experiment reuses that shape as the view payload model:
+The direct-flow evidence's `PreboundPcmFlow` is the static graph/view baseline: three pre-bound participant references plus one reusable block-storage arena, bound once at activation, executed per quantum with zero composition-plane operations. This experiment reuses that shape as the view payload model:
 
 ```text
 RealtimeView
@@ -47,19 +47,40 @@ RealtimeView
 
 A reader acquires one pre-bound `Arc<RealtimeView>` at bind time and executes quanta through already-held handles; per-quantum execution never touches the publication mechanism. The view's dereferenceable surface is modeled by tracked resources so every dereference is externally observable. No PCM, decoder, device, SRC/DSP, or playback semantics are introduced (cage, §5).
 
-## 4. Candidate mechanisms and early rejection
+## 4. Candidate mechanisms and scoped dispositions
 
-The decision record's concept-level matrix (§11–§12) already compared five mechanism families. This experiment re-derives the comparison for the **pre-bound execution model** (acquisition once per flow, long-held queued reference, publication rare):
+The decision record's concept-level matrix (§11–§12) already compared five mechanism families. This experiment re-derives the comparison for the **pre-bound execution model under the tested long-held-view acquisition model** (participant bindings per flow; one view handle acquired at bind time and held across the test lifetime; long-held queued reference; publication rare).
 
-| # | Candidate | Disposition for this execution model |
+Two lifetimes must stay separate:
+
+```text
+Participant binding lifetime
+----------------------------
+How long source/stage/sink references remain pre-bound.
+Established by the direct-flow evidence: bind once, execute many quanta,
+no per-quantum composition-plane lookup.
+
+Realtime-view acquisition lifetime
+----------------------------------
+How long one published-view handle is held before observing publication again.
+Tested here as one handle per flow (long-held). NOT a necessary consequence
+of participant pre-binding: participants can remain pre-bound while a view is
+re-acquired at a task/block/epoch boundary, with no Context / Capability /
+Reconcile / generic composition lookup occurring. View reacquisition does not
+automatically equal composition lookup.
+```
+
+The candidate dispositions below are scoped to the tested long-held acquisition model; a different acquisition granularity could re-rank them and was not validated in this experiment (OPEN, §16).
+
+| # | Candidate | Disposition for the tested acquisition model |
 | --- | --- | --- |
-| A | refcounted immutable view (Arc-like) | **SELECTED and validated** (§15). Acquisition = one `Arc::clone` at bind time (an atomic RMW on the strong count); the clone *is* the lifetime, so release-before-quiescence is structurally excluded in safe Rust; per-resource reclamation via resource reference counts. |
-| B | epoch / RCU-like | **Early rejected.** Batch-level reclamation latency (a stalled reader delays the whole batch, not just its resource); `pin` cannot express a pre-bound queued reference held across a queue (long-pin anti-pattern — it would have to re-acquire per quantum, which is the lookup anti-shape the direct-flow evidence killed); unsafe surface (crossbeam-epoch). The pre-bound model gets none of epoch's scale benefits. |
-| C | explicit reader-count / lease | **Subsumed by A in the pre-bound model.** A reader count and an `Arc` strong count cost the same RMW per acquisition; the difference is that a hand-rolled count is *decoupled* from the view lifetime (enabling release-with-holder bugs — the M1 twin demonstrates the class), while `Arc` couples them by construction. C's explicit count adds a control-side polling/等待 surface without adding safety. Answers to the candidate-C questions (§30) are recorded in §14. |
-| D | hazard-pointer-like | **Early rejected.** Hazard slots are published at dereference time; they cannot express a pre-bound queued reference (the dominant shape here). Protocol complexity and unsafe surface are the decision record's stated costs, and the reader scale (1–2) does not justify them. |
-| E | double-buffer / bounded slot | **Early rejected.** A fixed slot count cannot express N → N+1 → N+2 overlap while a reader still holds the first slot (the third publication must wait, block, or overwrite). The P3 multi-generation requirement (formal M4 class) is structurally at odds with bounded slots. |
+| A | refcounted immutable view (Arc-like) | **VALIDATED REFERENCE MECHANISM under the tested long-held-view acquisition model** (§15). Acquisition = one `Arc::clone` at bind time (an atomic RMW on the strong count); the clone *is* the lifetime, so release-before-quiescence is structurally excluded in safe Rust; per-resource reclamation via resource reference counts. |
+| B | epoch / RCU-like | **NOT VALIDATED HERE / LESS ATTRACTIVE under long-held acquisition.** Batch-level reclamation latency (a stalled reader delays the whole batch, not just its resource); under the tested long-held-view model, an epoch guard held across a long queued/execution lifetime is unattractive because reclamation progress becomes coarser and long pins amplify retention. The unsafe surface (crossbeam-epoch) is an engineering cost / implementation surface, not by itself a correctness rejection. A shorter acquisition model was not evaluated here and remains OPEN. |
+| C | explicit reader-count / lease | **SUBSUMED / NOT SEPARATELY VALIDATED (representation-scoped).** In the tested strong-reference model, `Arc` couples ownership and reader count, so a separate reader counter adds no demonstrated benefit and introduces a decoupling surface (the M1 twin demonstrates the class: an explicit count decoupled from lifetime enables release-with-holder bugs). Other lease/count designs were not exhaustively disproven. |
+| D | hazard-pointer-like | **NOT VALIDATED HERE / LESS ATTRACTIVE under long-held acquisition.** Canonical hazard-pointer protocols protect dereference windows rather than naturally representing the long-held queued-view shape tested here; a different acquisition granularity could change this trade-off and was not validated in this experiment. Protocol complexity and unsafe surface are engineering costs. |
+| E | double-buffer / bounded slot | **REJECTED FOR BOUNDED-SLOT MULTI-GENERATION LIMIT.** A fixed slot count cannot express N → N+1 → N+2 overlap while a reader still holds the first slot (the third publication must wait, block, or overwrite). The P3 multi-generation requirement (formal M4 class) is structurally at odds with bounded slots — this limit is independent of acquisition granularity. |
 
-Early rejection is grounded in the execution model, not in preference; the decision record's §12 flip-risk analysis is the source for B/D/E costs and is re-derived here for the pre-bound shape.
+Dispositions are scoped to the tested acquisition model, not a global ranking; the decision record's §12 flip-risk analysis is the source for B/D/E costs and is re-derived here for the pre-bound shape.
 
 ## 5. Evaluation cage
 
@@ -84,15 +105,19 @@ The validated mechanism, in `crates/qianqian-core/tests/realtime_view_publicatio
 ```text
 CONTROL SIDE
   build next immutable view                (control code; may allocate)
-  publish(next)                            atomic swap of the current slot;
+  publish(next)                            mutex-serialized whole-view
+                                           replacement of the current slot;
                                            old view moves into the retirement
                                            ledger; publication never touches
                                            resources and never waits for readers
   certify_reclaimable(identity)            moves a retired view to the
                                            reclaimable ledger iff its reader
                                            count is zero (quiescence certification)
-  release_reclaimable(identity)            drops the ledger's last reference ->
-                                           physical release on the control thread
+  release_reclaimable(identity)            detaches the ledger's last reference
+                                           under the lock and drops it after
+                                           unlocking -> physical release on the
+                                           control thread, outside the
+                                           publication critical section
 
 REALTIME SIDE
   acquire()                                one clone of the current view (bind time)
@@ -104,14 +129,14 @@ REALTIME SIDE
 
 Representation details, all test-only and unfrozen:
 
-- publication slot: `Mutex<Arc<RealtimeView>>` — safe-Rust lock-free reads would need `unsafe` (as ArcSwap does); the std-safe form takes one lock per bind-time acquisition. Per-quantum execution takes no lock (it never touches the mechanism).
+- publication slot: `Mutex<Arc<RealtimeView>>` — a **guarded (mutex-serialized) whole-view replacement**, not a lock-free atomic pointer swap; safe-Rust lock-free reads would need `unsafe` (as ArcSwap does); the std-safe form takes one lock per bind-time acquisition. Per-quantum execution takes no lock (it never touches the mechanism).
 - views: immutable `Arc<RealtimeView>`; resources are `Arc<TrackedResource>` shared across views by clone, so reclamation is **per-resource**: a resource dies only when the last view referencing it dies.
 - quiescence predicate: `Arc::strong_count(view) == 1` (only the ledger's own reference) — per-`Arc`, so it inherently covers every holder of every generation; there is no per-generation accounting that could forget an older one.
 - certification/retirement/release: control-side operations on a single guarded ledger; the semantic states (live / retired / reclaimable / released) are observed externally by the tests, not stored as a production enum.
 
 ## 7. Executable scenarios and results
 
-All 22 tests pass (`cargo test -p qianqian-core --test realtime_view_publication`; 5 consecutive runs green). Scenario-to-test mapping and evidence classes:
+All 23 tests pass (`cargo test -p qianqian-core --test realtime_view_publication`; 5 consecutive runs green). Scenario-to-test mapping and evidence classes:
 
 | Scenario | What it shows | Test | Class |
 | --- | --- | --- | --- |
@@ -131,6 +156,7 @@ All 22 tests pass (`cargo test -p qianqian-core --test realtime_view_publication
 | S13 control waits don't block RT | publish does not wait for readers; waiting twin blocks RT | `publication_does_not_wait_for_readers`, `publisher_waiting_for_reader_blocks_reader_acquisition` | EXECUTABLE ORACLE (both) |
 | S14 publication atomicity | failed validation leaves the current view untouched | `failed_publication_leaves_the_current_view_untouched` | EXECUTABLE ORACLE |
 | S15 release order | resources destroyed only after the last referencing view is released | `resources_are_destroyed_only_after_all_referencing_views_are_released` | EXECUTABLE ORACLE |
+| S16 destruction outside lock | physical destruction does not hold the publication lock; a bind-time acquire progresses while a resource destructor is blocked | `blocking_destruction_does_not_hold_the_publication_lock` | EXECUTABLE ORACLE (blocking-destructor gate) |
 | stress | real thread interleavings; whole views only; no released dereference | `concurrent_publication_and_readers_observe_only_whole_views` | EXECUTABLE ORACLE (stress) |
 
 ## 8. Formal → Rust mutation mapping
@@ -146,7 +172,7 @@ The formal model's mutation classes are mapped to real Rust twins; the model fil
 | queued reference forgotten | `CertificationTwin` (active-executions-only predicate) certifies a view with a queued reference | reclaimable-with-queued-holder detected; honest certification refuses | YES |
 | publisher waits on reader | `PublisherWaitsForReader` waits for the reader while holding the shared slot lock | realtime reader's acquisition is observably blocked | YES |
 
-The honest mechanism passes every corresponding positive scenario (S1–S15); every twin is executed and killed by its oracle. Notably, the release-before-quiescence class is **structurally excluded** for strong pre-bound readers in the tested mechanism (the reader's clone *is* the lifetime — physical release with a holder is impossible in safe Rust); the twin demonstrates the class via the decoupled weak-handle shape, which is exactly the shape the direct-flow evidence's anti-lookup control warned about.
+The honest mechanism passes every corresponding positive scenario (S1–S16); every twin is executed and killed by its oracle. Notably, the release-before-quiescence class is **structurally excluded** for strong pre-bound readers in the tested mechanism (the reader's clone *is* the lifetime — physical release with a holder is impossible in safe Rust); the twin demonstrates the class via the decoupled weak-handle shape, which is exactly the shape the direct-flow evidence's anti-lookup control warned about.
 
 ## 9. Realtime acquire/release evidence
 
@@ -158,21 +184,33 @@ The honest mechanism passes every corresponding positive scenario (S1–S15); ev
 bind-time acquisition    Mutex lock on the publication slot — BLOCKING POSSIBILITY
                          under contention; happens once per flow at bind time
 per-quantum execution    no lock, no mechanism access — NON-BLOCKING by construction
-reader release          Arc drop — no blocking
+reader release          refcount decrement itself is non-waiting; final
+                         destruction can be expensive/blocking if this were
+                         the last strong ref. In the validated ledger shape
+                         the reader is not the last owner of a retired view,
+                         so physical destruction is deferred away from the
+                         reader (§10)
 control publish          one lock — no waiting on readers
 control certification   one lock — no waiting on readers
-control release         one lock — physical drop on the control thread
+control release         detach under the lock, drop after unlocking — the
+                         publication mutex is not held during destruction;
+                         the physical destructor itself may still block the
+                         control caller
 ```
+
+The blocking claim here is deliberately narrow: the mechanism **isolates** blocking (off the reader path by the ledger; outside the publication critical section by detach-before-drop), it does not **eliminate** blocking — a real destructor may still block whoever performs the physical release.
 
 The quantum path is lock-free not by tuning but by shape: `execute_quantum` is a method on the view and has no mechanism parameter (§12 test drops the mechanism entirely and the reader still executes).
 
 ## 10. Destructor / final-release evidence
 
-The task's central destructor question — *which thread performs final destruction, and can it be the realtime path* — is answered with measured thread identity:
+The task's central destructor question — *which thread performs final destruction, and can it be the realtime path, and can it hold the publication lock* — is answered with measured thread identity and a blocking-destructor oracle:
 
 - **Control-side release (deferred disposal):** when a reader releases its clone on its own thread while the ledger still holds the view, no resource is destroyed there; the destruction happens on the control thread when `release_reclaimable` drops the ledger's last reference (`final_destruction_runs_on_the_control_thread_when_reader_releases_first`).
+- **Detach-before-drop (outside the lock):** `release_reclaimable` removes the reclaimable view's last ledger reference under the publication lock and drops it only after the lock is released, so physical destruction never executes inside the publication critical section — proven by a blocking-destructor oracle (`blocking_destruction_does_not_hold_the_publication_lock`): a resource destructor that blocks inside `Drop` does not stall a concurrent bind-time acquisition. This is the second half of the destructor-authority answer: destruction occurs on the control caller's thread **AND** outside the publication mutex critical section. Moving destruction off the realtime thread is not enough; it must also not execute while holding the publication authority's critical lock.
 - **Hazard witness:** in the extracted shape — the pre-bound flow handed to the realtime side as its *only* strong reference, with no control-side ledger (the direct-flow H1 shape) — the final drop runs wherever the flow dies; the test moves the only strong reference to a named reader thread and observes destruction with the reader thread's identity (`final_drop_on_the_reader_thread_destroys_there_hazard_witness`). This is a HAZARD WITNESS: the mechanism's ledger is what keeps destruction off the RT path; the extracted shape without a ledger retains the hazard. **Memory safety is not realtime safety**: the resources stay memory-safe in both cases (safe Rust), but the destructor cascade (and any blocking/allocation inside it) runs on the reader thread in the second case.
 - Deferred disposal is therefore a property of the tested mechanism (the ledger's reference), not an added `DisposalThread`: physical release is simply not reachable from the reader path while the ledger exists. This is the mechanism's answer to the decision record's dimension O.
+- Reentrancy scope: detaching destruction from the mutex prevents a destructor from holding the publication critical section; this does **not** claim that all destructor reentrancy is solved — real FFI/device destructors remain downstream pressure (Issue #12).
 
 ## 11. Multi-generation / resource-sharing evidence
 
@@ -197,10 +235,12 @@ H3  control-side wait for readers while holding the shared lock blocks the
 
 None of these are correctness claims about the honest mechanism; they are the pressure witnesses the mechanism must answer, each answered by an executable positive scenario.
 
-## 14. Candidate comparison (for the pre-bound execution model)
+## 14. Candidate comparison (for the tested long-held-view acquisition model)
 
-| Property | A: refcounted immutable view (VALIDATED) | B: epoch/RCU | C: reader-count | D: hazard | E: double-buffer |
+| Property | A: refcounted immutable view (VALIDATED REFERENCE MECHANISM under tested long-held acquisition) | B: epoch/RCU | C: reader-count | D: hazard | E: double-buffer |
 | --- | --- | --- | --- | --- | --- |
+| tested acquisition model | long-held view (test cage) | not validated | not separately validated | not validated | bounded-slot model |
+| acquisition granularity flexibility | OPEN | could differ | could differ | could differ | constrained |
 | P1 coherent acquisition | single immutable view (whole) | whole view via epoch read | needs a single-handle view | needs a single-handle view | fixed-slot + slot tags |
 | P2 closure to new readers | swap closes; per-Arc identity | closure by epoch check | closure by current-slot check | closure by slot publication | slot overwrite semantics |
 | P3 all-generation quiescence | per-Arc count (no generation bookkeeping) | batch epoch advance | per-view count | per-object scan | slot turnover (bounded) |
@@ -209,9 +249,9 @@ None of these are correctness claims about the honest mechanism; they are the pr
 | RT acquire allocation | 0 (MEASURED) | 0 | 0 | 0 | 0 |
 | RT acquire blocking | bind-time Mutex (once per flow) | none (pin) | RMW only | TLS slot | none |
 | RT release allocation | 0 (MEASURED) | 0 | 0 | 0 | 0 |
-| RT release blocking | none | epoch read | RMW | TLS clear | slot clear |
-| final destruction on RT possible | no (ledger defers; hazard only in no-ledger extracted shape) | no (collector) | no (control after count==0) | no (control retire) | no (control slot reuse) |
-| queued pre-bound refs | native (clone) | long-pin anti-pattern | native (counted) | not expressible | not expressible |
+| RT release blocking | refcount decrement non-waiting; final drop deferred by ledger | epoch read | RMW | TLS clear | slot clear |
+| final destruction on RT possible | no (ledger defers; hazard only in no-ledger extracted shape); destruction also outside the publication lock (tested) | no (collector) | no (control after count==0) | no (control retire) | no (control slot reuse) |
+| queued pre-bound refs | native (clone) | long-pin anti-pattern under tested long-held model; shorter acquisition not evaluated | native (counted) | not naturally represented by deref-window slots | not expressible |
 | N/N+1/N+2 | native | native | native | native | slot bound |
 | stalled reader | delays only its own resource | delays whole batch | delays that view | delays that object | blocks slot chain |
 | shared resources | per-resource refcount | batch-level | per-view count (resource sharing needs per-resource) | per-object | per-slot |
@@ -223,12 +263,22 @@ For candidate C's own questions (§30): counter increment/decrement = `Arc::clon
 
 ## 15. Mechanism recommendation
 
-**The refcounted immutable view (candidate A) with per-resource reference counting and control-side certification/release is the validated mechanism** for the pre-bound execution model, satisfying P1–P5 under the test cage with the following boundaries:
+**Candidate A (refcounted immutable view with per-resource reference counting and control-side certification/release) is a validated reference mechanism under the tested long-held-view acquisition model**, satisfying P1–P5 under the test cage with the following boundaries:
 
 - what authority it would own: published realtime-view identity, publication (retirement) ordering, reader acquisition legality, quiescence certification, reclamation eligibility, resource-release coordination;
 - what API seam is unavoidable: a control-side publication point (build → publish) and a bind-time acquisition point (acquire → pre-bound clone); per-quantum execution needs neither;
 - what remains representation-specific: the `Mutex` slot, the `Arc`/per-resource layout, certification latency, memory-ordering details (see OPEN);
 - why K0 cannot own it: K0 is the domain-agnostic composition kernel (existence/reachability/lifecycle) and must not know realtime views or PCM; the publication contract is a realtime-plane responsibility, and the direct-flow H1 witness shows composition withdrawal alone does not provide retirement/revocation semantics.
+
+Candidate A proves feasibility of the independent runtime responsibility and provides a concrete safe-Rust mechanism witness. It does **NOT** freeze:
+
+```text
+- the production mechanism (other candidates remain viable at other acquisition granularities)
+- the acquisition granularity (one handle per flow / per batch / per task / per quantum — all OPEN)
+- the Mutex slot
+- the Arc layout
+- the certification schedule
+```
 
 The recommendation is an evidence-based engineering finding, **not a production freeze**. Production adoption requires the human gate and must re-derive representation under real decoder/device pressure (Issue #12 firewall).
 
@@ -246,18 +296,19 @@ The recommendation is an evidence-based engineering finding, **not a production 
 - E8 — Per-quantum execution carries no mechanism lock: after acquisition the mechanism can be dropped entirely and the reader still executes (STRUCTURAL CODE EVIDENCE).
 - E9 — Publication does not wait for readers; a control-side wait for readers blocks the realtime reader and is killed as a twin (EXECUTABLE ORACLE).
 - E10 — Failed publication validation leaves the current view untouched (EXECUTABLE ORACLE).
-- E11 — Final destruction runs on the control thread under the ledger shape; the no-ledger extracted shape permits destruction on the reader thread — the destructor-authority fact the decision record's dimension O required (MEASURED, thread identity).
+- E11 — Final destruction runs on the control thread under the ledger shape, and the detach-before-drop release keeps physical destruction outside the publication mutex critical section; the no-ledger extracted shape permits destruction on the reader thread — the destructor-authority fact the decision record's dimension O required (MEASURED, thread identity + blocking-destructor oracle).
 - E12 — The release-before-quiescence bug class is structurally excluded for strong pre-bound readers (a clone is the lifetime) and demonstrated as observable on the decoupled weak-handle shape (TYPE-SYSTEM / STRUCTURAL + EXECUTABLE ORACLE).
+- E13 — Physical destruction does not execute while the publication lock is held: a resource destructor that blocks inside `Drop` does not stall a concurrent bind-time acquisition (EXECUTABLE ORACLE, S16).
 
 **HAZARD / PRESSURE WITNESSES** (inputs for the mechanism decision, not correctness claims): H1 final-drop context; H2 decoupled-lifetime use-after-release; H3 publisher-reader coupling (§13).
 
 **OBSERVED FOR TESTED REPRESENTATION** (facts about these test shapes, not general claims): views/resources are `Arc`-based safe-Rust test objects; the publication slot is a `Mutex` (bind-time); certification uses `Arc::strong_count`; threads are test threads, not a threading model.
 
-**OPEN** (untouched by design): memory-ordering details (SeqCst used; minimal required ordering unexamined), certification recognition latency, publication slot lock-free variants (require unsafe), parameter updates vs topology updates (ADR §7), production view layout, real decoder/device pressure (Issue #12), and every production naming question.
+**OPEN** (untouched by design): memory-ordering details (SeqCst used; minimal required ordering unexamined), certification recognition latency, publication slot lock-free variants (require unsafe), parameter updates vs topology updates (ADR §7), production view layout, real decoder/device pressure (Issue #12), every production naming question, and **realtime-view acquisition granularity** (one handle per flow / per execution batch / per task / per quantum — all OPEN). Any future granularity choice must still preserve the direct-flow firewall: no Context / Capability / Reconcile / generic composition lookup per quantum; view reacquisition does not inherently mean re-entering composition.
 
 ## 17. Representation-specific observations
 
-- The `Mutex` on bind-time acquisition is a safe-Rust consequence: a lock-free read path (ArcSwap-style) requires `unsafe` internally. In the pre-bound model this matters little (one lock per flow lifetime); it would matter in a per-quantum-acquire execution model, which the direct-flow evidence does not support.
+- The `Mutex` on bind-time acquisition is a safe-Rust consequence: a lock-free read path (ArcSwap-style) requires `unsafe` internally. In the tested long-held model this matters little (one lock per flow lifetime); it would matter in a per-quantum-acquire execution model, which was not the tested model here. A shorter acquisition granularity remains OPEN rather than excluded by the direct-flow evidence: re-acquiring a published view is not a composition lookup.
 - `Arc::strong_count` as the quiescence predicate is exact in these deterministic tests; production certification would need to decide recognition semantics (poll/collect) and ordering under real concurrency.
 - The `Mutex<Vec<...>>` observer log allocates on the destruction path; the measured 0-allocation claims are scoped to acquire/release, and per-quantum allocation is covered by the direct-flow evidence instead.
 - The `ViewState` readout is a test-side classification of the P4 semantics, not a production requirement (consistent with ADR §6: P4 is semantic, not representation).
@@ -281,20 +332,20 @@ Gate 3 — Independent runtime responsibility (a real
          satisfying P1–P5 with a stable responsibility)   THIS EXPERIMENT
 ```
 
-This experiment validates a mechanism satisfying P1–P5 on the pre-bound execution model, and shows the responsibility is a coherent unit: published realtime-view identity, publication/retirement ordering, reader acquisition legality, quiescence certification and resource-release coordination are all maintained by one mechanism, and the certification twins demonstrate that shortcutting or fragmenting that logic reproduces the formal bug classes. K0 does not own it (domain-agnostic composition), and the direct-flow H1 witness shows a plain service convention does not provide it.
+This experiment validates a mechanism satisfying P1–P5 on the pre-bound execution model under the tested long-held-view acquisition model, and shows the responsibility is a coherent unit: published realtime-view identity, publication/retirement ordering, reader acquisition legality, quiescence certification and resource-release coordination are all maintained by one mechanism, and the certification twins demonstrate that shortcutting or fragmenting that logic reproduces the formal bug classes. K0 does not own it (domain-agnostic composition), and the direct-flow H1 witness shows a plain service convention does not provide it.
 
-On the strength of this evidence: **INDEPENDENT RUNTIME RESPONSIBILITY EARNED** (mechanism evidence). Whether that responsibility deserves a stable runtime/kernel name (and which) remains a human decision; no production runtime, kernel, or new API is created here, and Issue #94 is deliberately left OPEN.
+On the strength of this evidence: **INDEPENDENT RUNTIME RESPONSIBILITY EARNED** (mechanism evidence). The mechanistic conclusion is deliberately bounded: **at least one viable reference mechanism has been validated; the final production mechanism and the acquisition granularity remain open.** Whether that responsibility deserves a stable runtime/kernel name (and which) remains a human decision; no production runtime, kernel, or new API is created here, and Issue #94 is deliberately left OPEN.
 
 ## 20. Gates
 
 ```text
 cargo fmt --check                                                PASS
 cargo check --workspace                                          PASS
-cargo test --workspace                                           PASS (22 new tests; full workspace green)
+cargo test --workspace                                           PASS (23 new tests; full workspace green)
 cargo clippy --workspace --all-targets --all-features -D warnings PASS
 git diff --check                                                 PASS
 production src delta                                             ZERO
 campaign naming gate (crates apps)                               ZERO new hits
 ```
 
-The new suite: 22 tests (16 scenarios/stress + 6 mutation kills), including the concurrent stress test and thread-identity destructor oracles.
+The new suite: 23 tests (17 scenarios/stress + 6 mutation kills), including the concurrent stress test, the thread-identity destructor oracles, and the blocking-destructor lock-oracle (S16).
