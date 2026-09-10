@@ -25,13 +25,36 @@ Load only the documentation needed for the current task. Git history and externa
 
 # Authority model
 
-Use the authority closest to the fact:
+Every document belongs to exactly one truth class. Only files explicitly listed as normative authority below may define architecture semantics; everything else summarizes, routes, realizes or proves.
+
+```text
+NORMATIVE AUTHORITY (defines what the architecture means)
+  Playback Foundations constitution -> adr/ADR-PBK-001.md (ACCEPTED;
+                                      incl. §16 vocabulary, §6 P1–P5)
+  K0 semantic design                -> architecture/composition-kernel-0-design.md
+  K0 implementation decisions       -> architecture/composition-kernel-0-implementation-adr.md
+
+PRODUCTION REALITY (what the program does today)
+  -> main-branch source + Cargo dependency graph + actual public APIs
+
+EVIDENCE (why we believe a mechanism/property; never authority)
+  -> tests / specs / TLA+ / experiment harnesses / specs/playback/* /
+     architecture evidence records (pcm-contract-a0.md, direct-pcm-flow.md,
+     realtime-view-publication.md, realtime-publication-lifetime-decision.md,
+     component-boundary-a0.md)
+
+DERIVED PROJECTION (how humans discover/understand; define nothing)
+  -> README.md, CONTEXT.md, AGENTS.md summaries, this router,
+     architecture/overview.md, architecture/registry.yml,
+     architecture/composition-kernel.md (summary), website/**, diagrams
+```
+
+Routing entry points by task remain:
 
 ```text
 agent work rules              -> AGENTS.md
-stable vocabulary             -> CONTEXT.md
-generic composition semantics -> composition-kernel*.md
-current architecture overview -> architecture/overview.md
+stable vocabulary index       -> CONTEXT.md (summaries; definitions: ADR §16)
+current architecture overview -> architecture/overview.md (projection)
 playback foundations          -> adr/ADR-PBK-001.md (ACCEPTED)
 implemented behavior          -> code + tests
 experimental playback evidence-> specs/playback/* + prior executable core
@@ -84,7 +107,7 @@ Do not make an ordinary architecture reviewer preload them as if they were curre
 
 K0 remains implemented/current and domain-agnostic.
 
-When reading `architecture/composition-kernel.md`, generic K0 semantics remain authoritative. Any old playback-specific examples or references to the previously accepted playback state model are illustrative/history only; the accepted ARCH-003 foundations do not re-freeze them.
+When reading `architecture/composition-kernel.md`, treat it as a derived summary: generic K0 semantics are authoritative only in `architecture/composition-kernel-0-design.md` (representation decisions: `architecture/composition-kernel-0-implementation-adr.md`). Any old playback-specific examples or references to the previously accepted playback state model are illustrative/history only; the accepted ARCH-003 foundations do not re-freeze them.
 
 If generic K0 semantics and the reset ADR appear to conflict, identify the exact generic invariant first; do not silently import an old playback-specific conclusion from a K0 document.
 
@@ -153,4 +176,4 @@ Create a new long-lived document only when a durable fact needs its own authorit
 
 Prefer rewriting one current authority cleanly over building amendment/supersession chains while the architecture is still young.
 
-When documentation and implementation disagree, identify whether the code is experimental evidence or whether the current authority is stale; do not silently choose one.
+When documentation and implementation disagree, apply the authority resolution rule in `../AGENTS.md` ("Authority resolution"): record the differential, decide which side is wrong, amend the authority explicitly if the code is better — never let "code is newer" silently win, and never force the implementation to mechanically copy a stale authority.

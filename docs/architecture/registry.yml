@@ -1,3 +1,14 @@
+# Registry conventions (governance note, not a second authority):
+#
+# `authority` lists ONLY files designated as normative authority for the
+# entry's semantic class (see docs/README.md "Authority model"):
+#   - Playback Foundations normative authority  -> docs/adr/ADR-PBK-001.md
+#   - K0 semantic design authority              -> composition-kernel-0-design.md
+#   - K0 implementation decisions               -> composition-kernel-0-implementation-adr.md
+# `docs/architecture/overview.md` is a derived architecture summary/router —
+# it is NEVER listed as authority; it is referenced in comments as the summary
+# surface. Diagrams under docs/architecture/diagrams/ are visual projections.
+
 architectures:
   - id: ARCH-001
     name: Qianqian System
@@ -8,8 +19,13 @@ architectures:
       source: docs/architecture/diagrams/ARCH-001-qianqian-system-v1.mmd
       frozen: true
 
+    # The v1 system diagram's plane separation / data-plane rules are
+    # normative only via ADR-PBK-001 §1–§2/§2.4. Component naming inside the
+    # diagram (MusicKernel/UiHost classes) is pre-reset illustration; the
+    # playback reset (ADR-PBK-001 §0/§10) reopened those nouns.
+    # Derived summary: docs/architecture/overview.md
     authority:
-      - docs/architecture/overview.md
+      - docs/adr/ADR-PBK-001.md
 
     decisions:
       - issue: 46
@@ -55,17 +71,18 @@ architectures:
     version: 2
     status: CURRENT
 
-    # Playback Foundations accepted via ADR-PBK-001 (PR #87). The accepted
-    # foundations fix plane boundaries and contracts only; they deliberately
-    # do not re-freeze legacy playback state-model nouns, and old playback
-    # code/specs remain experimental evidence only.
+    # ARCH-003 normative authority is ONLY the accepted constitution
+    # (docs/adr/ADR-PBK-001.md, PR #87). The accepted foundations fix plane
+    # boundaries and contracts only; they deliberately do not re-freeze
+    # legacy playback state-model nouns, and old playback code/specs remain
+    # experimental evidence only.
+    # Derived summary (NOT authority): docs/architecture/overview.md
     diagram:
       source: docs/architecture/diagrams/ARCH-003-playback-foundations-v2.mmd
       frozen: true
 
     authority:
       - docs/adr/ADR-PBK-001.md
-      - docs/architecture/overview.md
 
     decisions:
       - issue: 53
@@ -107,10 +124,13 @@ architectures:
       source: docs/architecture/diagrams/ARCH-004-plugin-graph-v1.mmd
       frozen: true
 
-    # component-boundary-a0.md is historical #53 audit evidence, not current
-    # authority (see docs/README.md router).
+    # status NEXT: the Plugin Graph is not yet earned. Plugin semantics are
+    # normative only via ADR-PBK-001 §3 (vocabulary: ADR §16); generic kernel
+    # semantics come from the K0 design authority. component-boundary-a0.md
+    # is historical #53 audit evidence, not current authority (see
+    # docs/README.md router). Derived summary: docs/architecture/overview.md
     authority:
-      - docs/architecture/overview.md
+      - docs/adr/ADR-PBK-001.md
 
     decisions:
       - issue: 53
@@ -131,9 +151,11 @@ architectures:
       source: docs/architecture/diagrams/ARCH-005-control-data-plane-v1.mmd
       frozen: true
 
+    # Control plane vs data plane separation: normative in the K0 design
+    # authority (composition-kernel-0-design.md); the playback-side realtime
+    # firewall is ADR-PBK-001 §2.4. Derived summary: docs/architecture/overview.md
     authority:
       - docs/architecture/composition-kernel-0-design.md
-      - docs/architecture/overview.md
 
     decisions:
       - issue: 67
@@ -154,9 +176,11 @@ architectures:
       source: docs/architecture/diagrams/ARCH-006-provider-withdrawal-v1.mmd
       frozen: true
 
+    # Provider withdrawal semantics: normative in the K0 design authority
+    # (composition-kernel-0-design.md). Derived summary:
+    # docs/architecture/overview.md
     authority:
       - docs/architecture/composition-kernel-0-design.md
-      - docs/architecture/overview.md
 
     decisions:
       - issue: 67

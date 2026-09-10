@@ -236,7 +236,7 @@ Never report an unrun platform/device check as PASS.
 
 Keep durable documentation small and authoritative.
 
-Use `docs/README.md` as the router and `docs/architecture/composition-kernel.md` as the detailed composition authority. Current boundary decisions/results belong in the current design issue until they become durable architecture facts.
+Use `docs/README.md` as the router. Composition guardrails: `docs/architecture/composition-kernel.md` (derived summary); the K0 semantic authority is `docs/architecture/composition-kernel-0-design.md`. Current boundary decisions/results belong in the current design issue until they become durable architecture facts.
 
 ## Historical code reuse
 
