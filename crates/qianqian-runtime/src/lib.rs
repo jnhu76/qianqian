@@ -3,20 +3,11 @@
 //! Product components are hosted by the generic Composition Kernel: product
 //! capability contracts are declared here, providers install them as kernel
 //! provisions, and consumers reach them through kernel-mediated resolution.
-//!
-//! The composition kernel controls reachability/lifetime only. The playback
-//! types hosted here (`MusicKernel`, `TransportKernel`) are **experimental
-//! Playback evidence** from an earlier architecture experiment; their presence
-//! does not establish current architecture authority or compatibility
-//! requirements. Neither is the generic Composition Kernel, and neither makes
-//! PCM a Context payload.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use qianqian_core::music::MusicKernel;
 use qianqian_core::ports::AudioOutput;
-use qianqian_core::transport::TransportKernel;
 use qianqian_kernel::{Capability, ComponentSpec, DesiredEntry, Kernel, Revision};
 
 /// The current audio-output port hosted as a kernel capability contract.
@@ -35,10 +26,6 @@ pub struct AppRuntime {
     /// Generic composition truth: reachability, binding ownership and Fiber
     /// lifetime. It never owns playback cursor/window/product state.
     composition: Kernel,
-    /// Music-domain/product semantic authority.
-    music_kernel: MusicKernel,
-    /// Playback-temporal semantic authority.
-    transport_kernel: TransportKernel,
     /// Pre-bound data-plane handle to the resolved audio output service.
     /// The composition authority is still the kernel's binding; this cached
     /// service is for direct payload/mechanism use after binding.
@@ -70,8 +57,6 @@ impl AppRuntime {
         composition.settle();
         Self {
             composition,
-            music_kernel: MusicKernel::new(),
-            transport_kernel: TransportKernel::new(),
             audio_output,
         }
     }
@@ -103,19 +88,6 @@ impl AppRuntime {
             composition,
             ..self
         }
-    }
-
-    /// Music/product semantic authority.
-    pub fn music_kernel(&self) -> &MusicKernel {
-        &self.music_kernel
-    }
-
-    /// Playback-temporal semantic authority.
-    ///
-    /// This shell does not yet expose Window/Generation/Fence APIs; it only
-    /// makes the frozen authority split explicit in production Rust topology.
-    pub fn transport_kernel(&self) -> &TransportKernel {
-        &self.transport_kernel
     }
 
     /// The resolved audio output service handle, present iff the Composition
@@ -167,7 +139,6 @@ fn music_component(audio_output: Rc<RefCell<Option<Rc<dyn AudioOutput>>>>) -> Co
 #[cfg(test)]
 mod tests {
     use super::*;
-    use qianqian_core::music::PlaybackState;
     use qianqian_core::ports::AudioOutput;
     use qianqian_kernel::FiberState;
 
@@ -178,8 +149,6 @@ mod tests {
     #[test]
     fn kernel_hosted_profile_composes_music_with_audio_output() {
         let runtime = AppRuntime::new().with_audio_output(Box::new(FakeAudioOutput));
-        assert_eq!(runtime.music_kernel().state(), PlaybackState::Idle);
-        let _transport = runtime.transport_kernel();
         assert!(runtime.audio_output().is_some());
         let snap = runtime.composition_snapshot();
         assert_eq!(
@@ -197,8 +166,6 @@ mod tests {
     #[test]
     fn empty_runtime_degrades_to_pending_without_audio_output() {
         let runtime = AppRuntime::new();
-        assert_eq!(runtime.music_kernel().state(), PlaybackState::Idle);
-        let _transport = runtime.transport_kernel();
         assert!(runtime.audio_output().is_none());
         let snap = runtime.composition_snapshot();
         assert_eq!(
