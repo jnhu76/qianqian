@@ -1058,14 +1058,18 @@ G2  K0 domain firewall review PASS
 G3  command vs fact vs hot-data distinction review PASS
 G7  fresh-context architecture review PASS
 
-Executable evidence gates（post-acceptance research ladder 项，对应 §12 Phase C/D）：
-G4  direct realtime data-flow executable experiment        OPEN（Phase C 前置）
-G5  graph publication / lifetime overlap executable evidence OPEN（Phase D 前置）
+Executable evidence gates（post-acceptance research ladder 项，对应 §12 Phase C/D；
+状态随证据交付如实更新——evidence 状态不是对本文语义的修订）：
+G4  direct realtime data-flow executable experiment        DELIVERED
+    （Phase C evidence：docs/architecture/direct-pcm-flow.md，PR #96）
+G5  graph publication / lifetime overlap executable evidence DELIVERED
+    （mechanism evidence：docs/architecture/realtime-view-publication.md，PR #97，
+    在真实 Rust 机制上验证 §6 P1–P5）
 G6  若 G5 暴露真实 state collision，则对应最小 formal negative control
-    —— 本 gate 的触发条件（G5 实现层碰撞）仍 OPEN；独立于本 gate，
+    —— 本 gate 的触发条件（G5 实现层碰撞）的最终人工裁决仍 OPEN；独立于本 gate，
     §13 点名候选交错的语义级模型与 negative control（M1 ReleaseBeforeQuiesce
-    等）已由 specs/realtime-publication/ 提供（见 §6 evidence 引用），
-    其实现层（Rust / Loom / stress）取证仍随 G5 展开
+    等）已由 specs/realtime-publication/ 提供（见 §6 evidence 引用）；
+    G5 机制证据中的负控制（twin kill 等）记录于 realtime-view-publication.md
 ```
 
 接受依据是 review gates；executable evidence gates 不是追溯性接受前提，而是
@@ -1080,12 +1084,195 @@ G6  若 G5 暴露真实 state collision，则对应最小 formal negative contro
 ```text
 Base Kernel K0                      IMPLEMENTED / CURRENT
 ADR-PBK-001 playback foundations    ACCEPTED
+P1–P5 formal evidence               DELIVERED (specs/realtime-publication/)
+minimal PCM contract evidence       DELIVERED (Phase B, pcm-contract-a0.md)
+direct-flow evidence                DELIVERED (Phase C, direct-pcm-flow.md)
+realtime-view publication/reclamation
+mechanism evidence                  DELIVERED (validates §6 P1–P5 on a real
+                                    mechanism; realtime-view-publication.md)
+Realtime Runtime responsibility     EARNED (Issue #94 closed; semantic roles
+                                    defined in §16; production seam 待审)
 old playback executable core        EVIDENCE ONLY
 old playback formal models          EVIDENCE ONLY
 production playback semantics       NOT AUTHORIZED (§10 remains OPEN)
-real Audio Runtime experiments      NEXT — minimal PCM contract first
+next                                依 §12 ladder 继续:机制裁决 / 真实
+                                    decoder / output;Playback 语义最后
 ```
 
 当前最重要的纪律：
 
 > **先把 composition、execution、fact、realtime data flow 四个世界分清，再让真实音频机制决定播放器应该长什么样。**
+
+---
+
+# 16. Vocabulary / Role Definitions（vocabulary 收口）
+
+本节只收口 vocabulary 与 architecture role 定义。它**不新增 invariant、不重写宪法、不冻结 representation**：与 §1–§2、§6 的 normative 契约冲突时，以其为准；本节不冻结任何 crate 映射、Plugin 粒度或机制表示。其它文档只引用本节定义，不得另立第二份 normative 词汇表。
+
+> **Architecture role != crate name.** 本节定义的都是语义角色；任何 crate 名（如 `qianqian-runtime`、`qianqian-realtime`）都不是某角色已被正确物理实现的证据，crate 物理归属另行审计。
+
+## 16.1 Composition 侧
+
+**Base Composition Kernel (K0)** — canonical noun。domain-agnostic 的 composition/lifecycle kernel。别名 `Base Kernel` / `Composition Kernel` / `K0` 指同一 referent，行文首选全称。它拥有：
+
+```text
+existence / reachability
+capability dependency
+Fiber lifecycle
+Effect ownership
+desired → running composition
+```
+
+它不拥有：
+
+```text
+PCM payload
+realtime processing order
+playback semantics
+Fact semantic authority
+UI state
+decoder/device mechanism
+```
+
+（K0 语义权威：`docs/architecture/composition-kernel-0-design.md`。）
+
+**Component** — 拥有某个 responsibility/resource 边界的有界架构单元。是一个中性粒度概念，不是协议成员资格。
+
+**Plugin** — **经过边界论证、以 Component 身份参与 Base Composition Kernel 统一 composition/lifecycle protocol 的长期 capability/lifecycle participant**（语义见 §3）。一个 Plugin 可以 provide/require capability、own resources/effects、register control participation、provide realtime participant/factory、observe Facts。Plugin 不等于：
+
+```text
+crate / DLL
+feature
+thread
+Fact / Command / buffer
+```
+
+且 `AudioNode != automatically Plugin`、`PCM stage != Plugin`（§3；AudioNode 仍可通过边界论证挣得 Plugin 身份）。
+
+当前实现中的 `ComponentSpec` 是 K0 的 representation/substrate，**不**因此被冻结为最终 Plugin API。
+
+**Fiber** — 一个 composed component/plugin 的 live runtime instance / episode（K0 语义：design authority §F）。
+
+**Capability** — composition-visible 的 typed contract / reachability identity。它建立跨 composition 边界的 typed execution reachability。Capability 不是：
+
+```text
+payload bus
+provider 实现
+Fact
+每个 PCM block 上的 registry 查询
+```
+
+**Service** — 通过 Capability 到达的可执行对象/interface；真正做工作的是 service/mechanism。
+
+**Host**（Composition Host / Application Host）— 选择/安装 desired components、创建 Base Kernel、驱动 composition lifecycle、拥有 application 级 bootstrap/shutdown policy 的 architecture role。Host 不因方便而自动拥有 playback semantics、PCM graph、decoder/output 实现、realtime lifetime authority。crate 名当前不冻结。
+
+## 16.2 Runtime 侧
+
+**Runtime** — 抽象类别：**拥有持续运行状态、执行规则或 lifecycle authority 的 active mechanism/system**。它不是“任何叫 runtime 的 crate”。裸词 `runtime` 禁止在 architecture 行文中同时指 AppRuntime / process lifetime / Audio Runtime / Realtime Runtime / mechanism library / composition root——必须带限定语使用。
+
+**Realtime Runtime** — **负责 realtime execution-view legality 与 realtime-visible lifetime safety 的 specialised runtime responsibility**（由 §6 P1–P5 机制验证证据挣得，Issue #94 Gate 3）。已挣得的最小 authority 范围：
+
+```text
+published realtime-view identity
+coherent whole-view replacement
+new-entry legality
+existing/queued holder legality
+retirement
+quiescence recognition
+reclamation eligibility
+deferred release coordination
+```
+
+（§5–§7 行文中的 "Audio Runtime / realtime graph mechanism" 是整体机制的描述性占位，尚未作为整体挣得；其**已挣得**的责任子集即上文的 Realtime Runtime，其余部分仍 OPEN。）
+
+Realtime Runtime 不等于：
+
+```text
+Base Kernel
+Playback Domain
+PCM participant 实现
+qianqian-realtime crate（必然地）
+```
+
+> **An earned runtime responsibility does not freeze one crate boundary or one concrete mechanism representation.**
+
+**Realtime mechanism** — 用于实现某条 Realtime Runtime invariant 的具体实现机制（refcount/Arc ledger、epoch/RCU、hazard pointer 或其它）。它们仍是 representation（§6 的 mechanism 清单继续 OPEN）。`PublishedViews<V>` 是一个 candidate/concrete mechanism realization，不与 responsibility 本身互换称呼。
+
+**Realtime Execution View** — 由 control side build/validate 并发布、供 realtime execution 直接消费的 coherent pre-bound execution state。它可能包含 participants、resources/references、processing topology、parameter snapshot 及其它 RT-safe 绑定；具体 layout OPEN。**Execution View != Projection**——两个 "view" 是完全不同的概念（后者见 §2.3，是 derived visibility）。
+
+## 16.3 Plane / 数据侧
+
+**Realtime Data Plane** — hot、typed、pre-bound payload 的执行路径（§2.4）。对 audio 当前核心 payload 是 PCM。逐 quantum 禁止：
+
+```text
+Context lookup
+Capability resolve
+Reconcile
+generic Plugin dispatch
+generic Fact/Event fanout（PCM）
+```
+
+**Dependency topology != realtime processing topology**（§5 已冻结）。
+
+**Execution / Control Plane** — 保持 §2.2 的 reasoning-lens 属性，不因此物化为 `CommandKernel` / `ControlRuntime` / `WorkflowKernel`。典型路径：Command（intent）→ domain/controller/workflow → Capability/Service → mechanism。
+
+## 16.4 Fact / Evidence / Projection 侧
+
+**Command** — intent（§2.2）。Command 不是 fact，不是它所请求结果的证明。
+
+**Mechanism Evidence** — 由 mechanism/provider 产生的、可能参与后续 semantic decision 的 observation（例如未来的 `DecoderObservedEof` / `DeviceLost` observation / `Underrun`）。**Evidence != Fact**，除非产生它的 mechanism 本身就是该 (fact kind, subject scope) 的 designated semantic authority 并完成对应 semantic decision。
+
+**Fact** — **某 designated semantic authority 按该 fact contract 已经确立成立的语义真相**（normative contract：§2.3）。Fact 不是：
+
+```text
+raw observation
+event callback
+log line
+database row
+projection state
+PCM packet
+command
+```
+
+**Designated Semantic Authority** — 对某个 authority identity（= (fact kind, semantic subject scope)，§2.3）在同一时刻恰好唯一的语义权威；其职责是 validate / decide / semantic commit；Fact publication 发生在 commit 之后。observer != authority；publication transport != authority；mechanism evidence 的产生者 != 自动 authority；controller != 自动 authority。不引入 `GlobalFactAuthority` / `FactKernel` / `CentralEventRouter`。
+
+**Projection** — derived visibility（§2.3）。不得成为 control-correctness authority、resource-lifetime authority 或 semantic truth writer。README/UI/diagnostics 可以消费 Projection。
+
+## 16.5 Reclamation 词汇链
+
+短定义；normative 协议本体在 §6 P1–P5：
+
+```text
+Retirement      某个 published view 因后续 publication 被 closed to new acquisition，
+                但既存合法持有者仍可继续使用（P2）
+Quiescence      不存在任何 active realtime execution 或 queued reference 仍可能
+                通过任何 generation 的 published/retired view 解引用相关资源（P3）
+Reclamation     确认上述谓词成立、从而授予资源回收资格的过程；
+                Reclamation != physical destruction
+Release         disposal 之后的物理释放状态
+```
+
+保持区分：
+
+```text
+Retired != Reclaimable != Released      （P4）
+publication != reclamation certificate  （P4）
+```
+
+---
+
+# 17. Known normative gaps（OPEN / UNDEFINED）
+
+以下语义当前**没有** normative 定义；在它们被显式挣得并写入本文之前，任何 crate docs、tests、实现行为都不得被当作这些问题的 normative truth（Issue #99 已识别前三项）：
+
+```text
+1. application/runtime container shutdown semantics
+   —— Host 关停时的 composition teardown / realtime-view retirement /
+      reclamation 排序未定义
+2. panic/unwind failure model
+   —— panic/unwind 与 composition truth、reclamation 状态的交互
+      （K0 §G.6 teardown-verdict latch 之外的层面）未定义
+3. terminal realtime-view retirement without replacement
+   —— P2 只定义“publish N+1 退役 N”；最后一个 view 无后继退役的语义未定义
+4. Production playback semantics 整体（§10 清单继续 OPEN）
+```
