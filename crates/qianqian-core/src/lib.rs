@@ -7,8 +7,8 @@
 //! **Experimental Playback evidence:** the `music` / `transport` types
 //! (e.g. `MusicKernel`, `TransportKernel`) originate from an earlier Playback
 //! architecture experiment. Their presence does not establish current
-//! architecture authority or compatibility requirements; the current Playback
-//! Foundations proposal is `docs/adr/ADR-PBK-001.md` (PROPOSED / REOPENED).
+//! architecture authority or compatibility requirements; the Playback
+//! Foundations authority is `docs/adr/ADR-PBK-001.md`.
 //!
 //! The generic Composition Kernel lives outside this crate: a generic kernel
 //! must not depend on product semantics. `base` is an R0 bootstrap witness,

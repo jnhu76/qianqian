@@ -13,8 +13,8 @@
 //!
 //! **Experimental Playback evidence:** this module originates from an earlier
 //! Playback architecture experiment. Its presence does not establish current
-//! architecture authority or compatibility requirements; Playback
-//! architecture is currently reopened (`docs/adr/ADR-PBK-001.md`, PROPOSED).
+//! architecture authority or compatibility requirements; the Playback
+//! Foundations authority is `docs/adr/ADR-PBK-001.md`.
 //!
 //! `TransportKernel` is a semantic authority role, not a Composition plugin
 //! boundary. This module does not constitute production Playback
