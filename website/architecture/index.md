@@ -178,7 +178,7 @@ Gain → EQ → SRC → Limiter → ...
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/overview.md', 'docs/adr/ADR-PBK-001.md', 'docs/architecture/composition-kernel.md']"
+  :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/composition-kernel-0-design.md']"
   :decisions="[{ issue: 67 }, { pr: 68 }]"
   :implementation="[{ issue: 70 }, { pr: 71 }]"
   :evidence="['crates/qianqian-kernel/tests', 'specs/playback/PlaybackTemporal.tla']"

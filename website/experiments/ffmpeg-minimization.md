@@ -169,7 +169,7 @@ Decoder 与 Processing 共享**唯一的 FFmpeg 闭包权威**。关键发现:
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/overview.md']"
+  :authority="[]"
   :evidence="['docs/architecture/component-boundary-a0.md', 'research/playback-reference-v1']"
   :decisions="[{ issue: 2 }, { issue: 3 }, { issue: 48 }, { issue: 53 }]"
   last-verified="issue #2 + playback-reference-v1 tag, 2026-09-07"

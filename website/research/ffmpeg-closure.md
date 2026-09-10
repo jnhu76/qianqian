@@ -125,7 +125,7 @@ FFmpeg 类型不跨组件缝
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/overview.md']"
+  :authority="[]"
   :evidence="['docs/architecture/component-boundary-a0.md §B.2', 'research/playback-reference-v1']"
   :decisions="[{ issue: 2 }, { issue: 3 }, { issue: 48 }, { issue: 53 }]"
   last-verified="issue #2/#3/#48/#49 + playback-reference-v1 tag + current main scan, 2026-09-07"

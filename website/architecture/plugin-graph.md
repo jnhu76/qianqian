@@ -94,7 +94,7 @@ flowchart TB
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/composition-kernel.md', 'docs/architecture/overview.md', 'docs/adr/ADR-PBK-001.md']"
+  :authority="['docs/adr/ADR-PBK-001.md']"
   :decisions="[{ pr: 66 }, { pr: 78 }, { pr: 79 }]"
   :evidence="['crates/qianqian-core/src/ports.rs', 'crates/qianqian-core/src/transport.rs']"
 />

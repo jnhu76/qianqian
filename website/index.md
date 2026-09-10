@@ -23,7 +23,7 @@ features:
     details: "Context、Capability、Fiber、Effect、Reconcile 五个原语已实现。它只拥有 composition truth，不拥有音乐/PCM/playback timeline。"
     status: "IMPLEMENTED"
   - title: "Playback Foundations"
-    details: "播放基础已被接受（ADR-PBK-001 ACCEPTED）：平面边界与契约已冻结，publication/reclamation 语义协议 P1–P5 已 normative（ADR §6），实现机制仍 DEFERRED；旧 MusicKernel / TransportKernel 等模型仍只是 experimental evidence。下一步是最小 PCM contract 实验。"
+    details: "播放基础已被接受（ADR-PBK-001 ACCEPTED）：平面边界与契约已冻结，publication/reclamation 语义协议 P1–P5 已 normative（ADR §6），Realtime Runtime 责任已由机制证据挣得（Issue #94 closed）；旧 MusicKernel / TransportKernel 等模型仍只是 experimental evidence。下一步：按收口后的 authority 重审 production realtime seam（PR #98），随后 Phase D 机制裁决。"
     status: "CURRENT"
   - title: "Decoder"
     details: "编码媒体 → Canonical PCM。真实 provider contract/实现仍待 Playback ADR 获得后续实现授权。"

@@ -8,7 +8,7 @@ Playback Foundations are **ACCEPTED** (`ADR-PBK-001`). Stable vocabulary still d
 
 # Current vocabulary
 
-> **Status: Playback Foundations are ACCEPTED (`ADR-PBK-001`); legacy playback nouns remain experimental evidence.** Normative definitions live in `docs/adr/ADR-PBK-001.md`; this table is a short-status index, not a second authority.
+> **Status: Playback Foundations are ACCEPTED (`ADR-PBK-001`); legacy playback nouns remain experimental evidence.** Normative definitions live in `docs/adr/ADR-PBK-001.md` (constitution §1–§2; role/vocabulary definitions §16); this table is a short-status index, not a second authority.
 
 | Term | Meaning |
 |---|---|
@@ -34,11 +34,18 @@ Playback Foundations are **ACCEPTED** (`ADR-PBK-001`). Stable vocabulary still d
 | Fact Plane | Committed facts plus their observation, projection, persistence and presentation paths. |
 | Projection | Derived read model/materialized view built from committed facts and/or authoritative snapshots. Projection is not an authority/writer. |
 | Commit-first publication | Semantic commit occurs before Fact publication (ADR-PBK-001 §2.3). |
+| Mechanism Evidence | Observation produced by a mechanism/provider that may feed a later semantic decision. Evidence != Fact unless the producer is that fact identity's designated authority (ADR-PBK-001 §16.4). |
+| Runtime | Abstract category: an active mechanism/system owning continuously-running state, execution rules or lifecycle authority — not "any crate named runtime"; always use with a qualifier (ADR-PBK-001 §16.2). |
+| Host | Architecture role that selects/installs desired components, creates the Base Kernel, drives composition lifecycle and owns application bootstrap/shutdown policy. Does not automatically own playback/realtime authority. Architecture role != crate name. |
+| Realtime Runtime | Specialised runtime responsibility for realtime execution-view legality and realtime-visible lifetime safety (earned per ADR §6 P1–P5 evidence). Not a crate name; does not freeze a mechanism representation. |
+| Realtime mechanism | Concrete mechanism realizing a Realtime Runtime invariant (refcount ledger / epoch / hazard pointer / …); representation, not responsibility. |
+| Realtime Execution View | Coherent pre-bound execution state published by the control side for direct realtime consumption. Execution View != Projection. |
 | Realtime Data Plane | High-frequency bounded data flow such as PCM, executed through pre-bound realtime-safe graph edges rather than generic Context/Event dispatch. |
 | PCM | Canonical family of decoded audio payloads for realtime processing. Exact Qianqian `PcmBlock` representation is currently unfrozen. |
-| Realtime Graph/View | Pre-built/pre-bound processing view consumed directly by the realtime path. Exact representation is unfrozen. |
+| Realtime Graph/View | Pre-built/pre-bound processing view consumed directly by the realtime path. Exact representation is unfrozen. (Same artifact family as the Realtime Execution View, ADR-PBK-001 §16.2.) |
 | Graph Publication | Control-side act of validating/building a new realtime graph/view and making it visible at an RT-safe boundary. |
 | Reader Quiescence | State where no active or queued realtime reader can still dereference the relevant resource through any still-reachable generation (ADR-PBK-001 §6 P3 summary). |
+| Reclamation chain | Retirement (closed to new acquisition) != Reclaimable (quiescence certified) != Released (physically disposed); publication is not a reclamation certificate (ADR-PBK-001 §6 P2–P4, §16.5). |
 | Capability plane != Data plane | Context/Capability establishes reachability and execution contracts; hot payloads normally flow through already-bound service/data edges. |
 | Command != Fact | Intent and committed truth use separate semantics; one generic `emit()` must not blur them. |
 | Fact != Hot Data | Meaningful committed observations may fan out; PCM blocks stay on the realtime data plane. |
@@ -91,7 +98,7 @@ Normative definitions live in `ADR-PBK-001.md` (constitution and four lenses §1
 
 # Base Kernel mental model
 
-K0 remains implemented/current.
+K0 remains implemented/current. (K0 semantic authority: `docs/architecture/composition-kernel-0-design.md`; representation decisions: `docs/architecture/composition-kernel-0-implementation-adr.md`.)
 
 ```text
 Context
