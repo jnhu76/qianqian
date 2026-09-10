@@ -4,9 +4,10 @@
 # 用法：specs/check.sh [core|all]（缺省 all）
 #   core — core evidence 集：PlaybackTemporal 正常模型 + 4 个 core mutation
 #          （历史 ADR ACCEPTED blocking 定位已退役；现为 experimental evidence）
-#   all  — 全部：另含 PlaybackOwnership 与 extended mutation（supporting evidence）
-#          以及 realtime-publication 套件（当前挣得的 publication lifetime 证据，
-#          core/all 两种模式都会运行）
+#   all  — core + PlaybackOwnership 与 extended mutation（supporting evidence）
+#
+# realtime-publication 套件（当前挣得的 publication lifetime 证据）在 core/all
+# 两种模式下都会运行。
 #
 # 规则：
 #   正常模型（无 mutation）必须 TLC 探索完成且全部 invariant PASS；
@@ -114,7 +115,7 @@ if ! "$SPEC_ROOT/realtime-publication/check.sh"; then
   fail=1
 fi
 
-echo "== 负控制（必须产生 counterexample）"
+echo "== playback 负控制（必须产生 counterexample）"
 run_tlc PlaybackTemporal "$PLAYBACK/mutations/PromoteWithoutFence.cfg"      fail:PromotionRequiresSuccessfulFence    "Temporal / PromoteWithoutFence"
 run_tlc PlaybackTemporal "$PLAYBACK/mutations/AcceptUnadmittedDecode.cfg"  fail:DecodeResultRequiresAdmission       "Temporal / AcceptUnadmittedDecode"
 run_tlc PlaybackTemporal "$PLAYBACK/mutations/SingleGlobalGenerationCheck.cfg" fail:DecodeResultRequiresAdmission  "Temporal / SingleGlobalGenerationCheck" -continue
