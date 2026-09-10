@@ -58,9 +58,9 @@ Qianqian 自有的正常构建重放
 
 ## Qianqian 借鉴了什么
 
-<ClaimBadge role="authority" />
+<ClaimBadge role="interpretation" />
 
-- **唯一闭包权威** — Decoder 与 Processing 共享单一 FFmpeg 构建,不各自持有一份
+- **唯一闭包权威** — Decoder 与 Processing 共享单一 FFmpeg 构建,不各自持有一份（#53 历史边界约束；Decoder provider granularity 当前仍 OPEN，见 ADR-PBK-001 §10）
 - **configure 即 oracle** — 机器推导闭包,不手改构建文件
 - **manifest 重放** — 闭包组成被记录且可复现
 - **闭包最小化** — 只构建需要的组件

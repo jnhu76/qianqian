@@ -55,7 +55,7 @@ Composition Kernel 不拥有 PCM、MediaSpan、playback cursor、Window、Genera
 - UI / JS / 托管运行时往返
 - 无界分配、锁等待或阻塞
 
-图的变更在 control side 准备，再在 RT-safe boundary 发布。
+图的变更在 control side 准备，再在 RT-safe boundary 发布。当前 publication/reclamation 的 normative contract 是 `docs/adr/ADR-PBK-001.md` §6 **P1–P5**（本页不复制其正文；具体机制仍 OPEN，由 §12 Phase D 验证）。
 
 ---
 
@@ -99,7 +99,7 @@ Fence 进入 claimed 阶段后，后来的 intent 不得假装它没有发生或
 
 ## 数据边生命周期
 
-MusicComponent 通过 Composition Kernel 获得 AudioOutput/PcmSink capability。具体 PCM 边在绑定后成为直接/预绑定 data edge；不能由 composition root 偷偷塞一个反向 Music 指针，也不能让 AudioOutput 通过 Context 在每个 block 反查 Music。
+**历史实验映射（illustrative，非 current architecture 必须形状）**：旧实验中 MusicComponent 通过 Composition Kernel 获得 AudioOutput/PcmSink capability。具体 PCM 边在绑定后成为直接/预绑定 data edge；不能由 composition root 偷偷塞一个反向 Music 指针，也不能让 AudioOutput 通过 Context 在每个 block 反查 Music。当前 contract 只依赖 ADR-PBK-001 §2.4（realtime data plane）与 §6 P1–P5（publication/reclamation）。
 
 具体 `SinkSession` API/representation 可以随实现演进；长期不变量是：
 

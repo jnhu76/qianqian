@@ -11,6 +11,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Current architecture overview | `architecture/overview.md` |
 | Generic Composition Kernel semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel-0-implementation-adr.md` |
 | Playback/audio foundations | `adr/ADR-PBK-001.md` — **ACCEPTED** |
+| Realtime publication lifetime evidence + mechanism comparison | `architecture/realtime-publication-lifetime-decision.md`（evidence/decision record，非第二 authority）+ `../specs/realtime-publication/` |
 | Current Rust behavior | current code + tests |
 | Playback experimental evidence | `../specs/playback/*` + `qianqian-core` playback code/tests — evidence only, not authority |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
@@ -95,7 +96,7 @@ Normative authority: `adr/ADR-PBK-001.md` §2.3 — semantic commit precedes Fac
 
 # Realtime policy
 
-Normative authority: `adr/ADR-PBK-001.md` §2.4 and §6 — realtime PCM never travels through generic Context/Event/Plugin dispatch per quantum; realtime readers observe one coherent published view; RT-referenced resources stay valid until readers quiesce. The exact graph/lifetime mechanism remains unfrozen.
+Normative authority: `adr/ADR-PBK-001.md` §2.4 and §6 — realtime PCM never travels through generic Context/Event/Plugin dispatch per quantum; publication/reclamation follows the normative P1–P5 semantic contract (P1 is coherent publication; the full set is not restated here). The exact graph/lifetime mechanism remains unfrozen.
 
 ---
 

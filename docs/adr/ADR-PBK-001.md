@@ -50,6 +50,8 @@ Physical Fence
 6. **Any resource that realtime execution may still dereference must remain valid until no realtime execution or queued reference can dereference it.**
 7. **Previous Playback implementation/spec/model artifacts are evidence only. Failure witnesses may be reused; representations and nouns are not inherited.**
 
+（第 6 条的 normative publication/reclamation 语义由 §6 P1–P5 展开；本节保持极简宪法，不复制协议本体。）
+
 一句话：
 
 > **Kernel 管“谁存在”；Capability/Service 管“怎么执行”；Fact 管“发生了什么”；Realtime Data Plane 管“PCM 怎么流”。**
@@ -568,25 +570,148 @@ process audio quantum directly
 
 （措辞刻意使用 realtime execution / quantum / task / reader，不预设执行模型必须是 callback。callback / blocking push / pull / worker / hybrid 全部继续 OPEN。）
 
-### 最小 publication correctness contract
+### Publication / Reclamation 语义协议（P1–P5，normative）
 
-实现机制不选，但以下最低语义已 earned：
+`specs/realtime-publication/` 的形式化证据（TLC 穷举 + M1–M4 mutation 反证 + 可达性探针）已在该模型的显式抽象下证明：publication / reader quiescence / resource reclamation 的交错碰撞真实存在。由此挣得的语义协议在此冻结为 normative contract；其形式化推导与机制比较见本节末尾的 evidence 分层，语义定义只存在于本文。
 
-> **A realtime reader observes one coherent published realtime view.**
+**P1 — Coherent Publication**
 
-publication 从 N 到 N+1 时，reader 看到的是 N 或 N+1，不得是 “half N + half N+1”。
+> **一次 realtime-view acquisition 必须观察一个整体一致的 published realtime view。**
 
-representation 继续 OPEN，全部不选：
+（即本 ADR 原冻结的 “A realtime reader observes one coherent published realtime view”。）
+
+publication 从 N → N+1 时：
 
 ```text
-ArcSwap
-RCU
-epoch
-double-buffer
-atomic pointer
-lease
-hazard
+reader may observe:
+    N
+or
+    N+1
+
+reader must never observe:
+    topology(N) + resources(N+1)
+    identity(N+1) + resources(N)
+    any other logically split publication
 ```
+
+（即原 “reader 看到的是 N 或 N+1，不得是 half N + half N+1” 的精确形式。）
+
+冻结的是 **coherent acquisition / publication 语义**，不是表示：单一原子不可变 view 只是可能的实现之一；版本校验式整体一致获取等其它实现同样允许，只要满足 P1。被禁止的是无协调的逐分量独立发布。
+
+**P2 — Retired-view Closure**
+
+> **Realtime-view publication of N+1 retires N and closes N to future acquisition, but retirement must not invalidate active executions or queued references that already legitimately hold N.**
+
+```text
+publish N+1
+    ↓
+N becomes retired
+    ↓
+new acquisition of N forbidden
+
+BUT
+
+existing active holder of N
+existing queued holder of N
+    ↓
+may still legally finish using N
+```
+
+`current == N+1` 不意味着 `N has no readers`：仍持有 retired view 的旧读者（active 执行或 queued reference）是合法状态，不是缺陷。
+
+**P3 — Quiescence Before Reclamation Across All Generations**
+
+> **一个资源获得 reclamation eligibility，当且仅当不存在任何 active realtime execution 或 queued reference 仍可能通过任何 generation 的 published / retired realtime view 解引用它。**
+
+（“当且仅当” 定义的是 eligibility 的**语义谓词**，不是 recognition 时限：控制侧何时完成认证由机制与 P5 的 progress 前提决定，允许批量/延迟式认证。）
+
+认证范围必须是 **ANY generation**——不得只检查：
+
+```text
+current view
+latest retired view
+latest generation
+```
+
+必须覆盖所有仍可被合法 reader 持有的 generation：
+
+```text
+N
+N+1
+N+2
+...
+```
+
+并且：
+
+> **Publication itself does not grant reclamation permission.**
+
+**P4 — Retirement != Reclaimability != Release**
+
+```text
+Live
+  ↓ replacement publication
+Retired
+  ↓ quiescence satisfied / certified
+Reclaimable
+  ↓ disposal
+Released
+```
+
+冻结：
+
+> **Retirement does not imply reclaimability.**
+
+> **Reclaimability does not imply that physical release has already occurred.**
+
+> **Publication is an ordering event, not a reclamation certificate.**
+
+这是**语义状态区分**，不是 representation requirement：生产代码不因此必须实现 `enum ResourceState { Live, Retired, Reclaimable, Released }`，也不因此必须维护任何对应状态字段。形式模型中的 `certified` 同理——它只是 proof/model abstraction，不要求真实实现维护一个 `certified` boolean 或任何对应 runtime 机制。
+
+**P5 — Conditional Reclamation Progress**
+
+> **在 realtime readers 最终离开其持有 view，且 reclamation mechanism 在 quiescence 成立后最终推进 reclamation 的前提下，retired resource 最终应能获得 reclamation eligibility。**
+
+显式前提（与形式模型的 fairness 假设一一对应）：
+
+```text
+WF(ReaderExit)        realtime reader 不会永远停留在同一视图内
+WF(MarkReclaimable)   控制侧在 quiescence 成立后最终推进 reclamation
+```
+
+本条不扩大为：
+
+```text
+all retired resources are eventually physically destroyed
+all memory is eventually freed
+release always happens
+```
+
+形式化证明的是 **eventually reclaimable**，不是 **eventually physically released**。
+
+### Semantic contract != representation contract
+
+**P1–P5 are semantic requirements, not representation requirements.**
+
+以下全部继续 OPEN（不因 P1–P5 而冻结）：
+
+```text
+ArcSwap / atomic immutable view / atomic pointer
+epoch / RCU
+hazard pointer
+reader count / lease
+double-buffer
+其它 publication mechanism
+
+queued-reference concrete representation
+memory-order details
+exact view layout
+final-disposal executor
+deferred-disposal mechanism
+provider Fiber lifetime 与 RT resource lifetime 的具体绑定
+```
+
+当前工程倾向记录在 decision record（`docs/architecture/realtime-publication-lifetime-decision.md` §14）中，是 Phase D 可执行实验的默认起点；它不是 architecture decision，也不是本 ADR 的冻结内容。
 
 ### Lifetime safety
 
@@ -613,7 +738,7 @@ resources no longer dereferenceable by realtime execution
 become eligible for release
 ```
 
-（顺序终点是 resource 相对 realtime 执行获得 release 资格；**不是** "provider final release"。Provider Fiber 何时退出、是否与 resource release 同步，不由本 invariant 决定。）
+（顺序终点是 resource 相对 realtime 执行获得 release 资格；**不是** "provider final release"。Provider Fiber 何时退出、是否与 resource release 同步，不由本 invariant 决定。顺序中每一步的语义由 P1–P5 精确约束：闭门 = P2，quiescence 认证范围 = P3，状态与资格区分 = P4。）
 
 继续 OPEN（不由本 invariant 决定）：
 
@@ -624,6 +749,8 @@ state slab 的 lifetime
 Arc / epoch / RCU / hazard pointer / refcount / callback fence
 reader-quiescence 的具体机制
 ```
+
+Publication/reclamation 证据分层：`specs/realtime-publication/` 是可执行形式化证据（模型、mutation 负控制、可达性探针、运行数据）；`docs/architecture/realtime-publication-lifetime-decision.md` 是 P1–P5 的形式化推导、候选机制比较与工程倾向（evidence / engineering record，非 normative authority）。representation 仍全部 OPEN。
 
 ---
 
@@ -830,21 +957,29 @@ Source -> one processing stage -> Sink
 
 运行时 hot path 不进入 Context/Reconcile/EventBus。
 
-## Phase D — Graph publication / replacement
+## Phase D — Graph publication / replacement（mechanism validation）
 
-证明：
+语义层的 collision 问题已经关闭：`specs/realtime-publication/` 证明 publication 与旧 reader overlap 的交错真实存在，其语义结论已冻结为 §6 P1–P5。Phase D 不再回答 “publication/lifetime collision 是否存在”，而是回答：
+
+> **在真实 Audio Runtime 执行模型中，验证候选 implementation mechanisms 是否满足已冻结的 P1–P5，并取得足够的 realtime / lifetime / disposal 工程事实，以裁决具体机制。**
+
+必须取得的 evidence 至少包括：
 
 ```text
-Graph N
-    ↓
-publish Graph N+1
-    ↓
-old reader overlaps
-    ↓
-no use-after-release
+1.  RT acquire/release worst-case cost
+2.  queued reference 的真实生命周期
+3.  final ownership/drop 发生在哪个线程
+4.  final drop 是否触发 destructor cascade
+5.  是否需要 deferred disposal
+6.  N -> N+1 -> N+2 连续 publication / multi-generation overlap
+7.  stalled reader 行为
+8.  control-side reclamation waiting / polling
+9.  是否存在 RT/control coupling
 ```
 
-这是目前最明确值得形式化/并发压力测试的边界。
+（原 Phase D 的可执行目标——Graph N → publish Graph N+1 → old reader overlaps → no use-after-release——保留为机制验证的基础场景，其语义由 P1/P3 表达。）
+
+Phase D validates mechanisms against P1–P5；Phase D does not re-litigate whether P1–P5 are required.
 
 ## Phase E — Real decoder / real output
 
@@ -881,7 +1016,7 @@ Formalization 仍遵循：
 
 > **先发现具体 state/interleaving collision，再建立最小模型攻击它。**
 
-目前最明确的新候选是：
+Post-reset precedent：**realtime publication/lifetime 成为重置后第一个 formal target**。本节此前点名的候选交错——
 
 ```text
 old realtime graph references provider A
@@ -891,13 +1026,21 @@ old RT reader still uses A
 A final release
 ```
 
-如果实现/测试证明这个风险真实存在，再建立窄模型和类似：
+——已由 `specs/realtime-publication/` 在模型显式抽象下证实为真实 collision（TLC 穷举 + mutation 反证；实现层确认仍随 §12 Phase D / §14 G5），其语义结论已冻结为 §6 P1–P5。该次形式化挣得：
 
 ```text
-ReleaseBeforeReadersQuiesce
+publication != reclamation permission
+coherent acquisition is required
+retired-view closure is required
+quiescence must cover all reachable generations
+reclamation progress depends on explicit progress assumptions
 ```
 
-的 negative control。
+同一 precedent 也确立了形式化证据的边界：
+
+> **Formal evidence constrains semantics; it does not select a concrete Rust/C++ implementation mechanism.**
+
+机制裁决属于 §12 Phase D 的可执行实验，不属于形式化模型。
 
 不要建一个包含完整播放器、所有 Plugin、所有 PCM node 的“大一统 TLA 模型”。
 
@@ -905,19 +1048,30 @@ ReleaseBeforeReadersQuiesce
 
 # 14. Acceptance gates
 
-本 ADR 从 PROPOSED 变成 ACCEPTED 前至少需要：
+本 ADR 于 2026-09-09 经 fresh-context adversarial review（含 corrective）后
+ACCEPTED（PR #87）。gate 语义按实际接受依据与现状如实记录：
 
 ```text
+Review gates（接受时已满足，依据 = PR #87 多轮 fresh-context adversarial review）：
 G1  四关注面（reasoning lenses）边界 adversarial review PASS
 G2  K0 domain firewall review PASS
 G3  command vs fact vs hot-data distinction review PASS
-G4  direct realtime data-flow executable experiment PASS
-G5  graph publication / lifetime overlap executable evidence PASS
-G6  若 G5 暴露真实 state collision，则对应最小 formal negative control PASS
 G7  fresh-context architecture review PASS
+
+Executable evidence gates（post-acceptance research ladder 项，对应 §12 Phase C/D）：
+G4  direct realtime data-flow executable experiment        OPEN（Phase C 前置）
+G5  graph publication / lifetime overlap executable evidence OPEN（Phase D 前置）
+G6  若 G5 暴露真实 state collision，则对应最小 formal negative control
+    —— 本 gate 的触发条件（G5 实现层碰撞）仍 OPEN；独立于本 gate，
+    §13 点名候选交错的语义级模型与 negative control（M1 ReleaseBeforeQuiesce
+    等）已由 specs/realtime-publication/ 提供（见 §6 evidence 引用），
+    其实现层（Rust / Loom / stress）取证仍随 G5 展开
 ```
 
-不要求在 ACCEPTED 前先设计完整播放器语义。
+接受依据是 review gates；executable evidence gates 不是追溯性接受前提，而是
+§12 ladder 相应步骤与任何 realtime 机制冻结决策的推进 gate——它们约束"后续
+冻结机制需要什么证据"，不改变本 ADR 的 ACCEPTED 状态。不要求在设计完整播放器
+语义之后才能接受本 ADR。
 
 ---
 

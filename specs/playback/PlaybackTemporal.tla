@@ -9,7 +9,7 @@
  *   verification techniques。其 MusicKernel / TransportKernel / Window /
  *   Generation / Fence 词汇不是当前 Playback architecture authority，
  *   不约束新的 production 设计，除非该语义被独立重新挣得。
- *   当前 Playback Foundations 提案：docs/adr/ADR-PBK-001.md（PROPOSED / REOPENED）。
+ *   当前 Playback Foundations authority：docs/adr/ADR-PBK-001.md（ACCEPTED）。
  *
  * 被审计对象（历史）：旧版 docs/adr/ADR-PBK-001.md（Playback Architecture v1）
  * 中的 temporal 语义。

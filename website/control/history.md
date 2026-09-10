@@ -60,6 +60,21 @@ Qianqian Architecture v2 的关键里程碑。
 
 合并于 commit `743eb86`。
 
+### Playback Foundations reset — PR #87
+
+**MERGED via PR #87**
+
+播放基础从第一性原理重置:ADR-PBK-001(**ACCEPTED**)冻结四平面宪法、command/fact authority、fact-authority identity(每个 (fact kind, subject scope) 一个 designated authority)、projection read-side firewall 与 realtime 数据面边界;旧 playback 状态机名词(MusicKernel / TransportKernel / Active-Prepared / Generation / Physical Fence 等)全部重新开放,统一降级为 experimental evidence。
+
+[ADR-PBK-001 →](https://github.com/jnhu76/qianqian/blob/main/docs/adr/ADR-PBK-001.md)
+[PR #87 已合并](https://github.com/jnhu76/qianqian/pull/87)
+
+### Realtime publication formal evidence — PR #91
+
+`specs/realtime-publication/` 以 TLC 穷举 + mutation 负控制证明 publication/reclamation collision,其语义协议 P1–P5 冻结为 ADR §6 normative contract(机制仍 DEFERRED,由 §12 Phase D 验证候选机制);同轮完成 tree-wide authority surfaces 对齐。
+
+[PR #91 — realtime publication formal evidence + ADR §6 P1–P5 semantic clarification](https://github.com/jnhu76/qianqian/pull/91)
+
 ---
 
 ## 权威链
@@ -74,11 +89,14 @@ Corrective-4                     PASS_WITH_ONE_CORRECTIVE
 Corrective-5                     PRE-IMPLEMENTATION REVIEW
         ↓
 #70 COMPOSITION-KERNEL-0 IMPL   MERGED via PR #71
+        ↓
+#87 PLAYBACK FOUNDATIONS RESET  MERGED (ADR-PBK-001 ACCEPTED)
+        ↓
+#91 REALTIME PUBLICATION        FORMAL EVIDENCE + ADR §6 P1–P5
 ```
 
 <ProvenancePanel
-  :authority="['docs/architecture/overview.md', 'docs/architecture/composition-kernel.md']"
-  :decisions="[{ issue: 46 }, { issue: 53 }, { issue: 67 }, { issue: 70 }]"
-  :pr="[{ pr: 66 }, { pr: 68 }, { pr: 69 }, { pr: 71 }]"
-  lastVerified="743eb86"
+  :authority="['docs/architecture/overview.md', 'docs/architecture/composition-kernel.md', 'docs/adr/ADR-PBK-001.md']"
+  :decisions="[{ issue: 46 }, { issue: 53 }, { issue: 67 }, { issue: 70 }, { pr: 66 }, { pr: 68 }, { pr: 69 }, { pr: 71 }, { pr: 87 }, { pr: 91 }]"
+  lastVerified="PR #91"
 />

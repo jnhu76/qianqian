@@ -33,13 +33,13 @@ import { projectState } from '../data/project-state.ts'
 
 **{{ projectState.currentFrontier }}**
 
-旧版 ADR-PBK-001（MusicComponent / MusicKernel / TransportKernel 模型）及其 deterministic executable temporal core 已随 2026-09 架构重置降级为 experimental evidence。重置后的 Playback Foundations 提案已通过 fresh-context review 并被接受（ACCEPTED）；当前目标是用最小实验挣得新基础：
+旧版 ADR-PBK-001（MusicComponent / MusicKernel / TransportKernel 模型）及其 deterministic executable temporal core 已随 2026-09 架构重置降级为 experimental evidence。重置后的 Playback Foundations 已 ACCEPTED；realtime publication/lifetime 的语义碰撞已在模型层证明（`specs/realtime-publication/`），其语义协议 **P1–P5 已 normative 冻结于 ADR §6**——**实现机制仍 DEFERRED**。当前 ladder：
 
-- composition reality 之上的 minimal PCM contract；
-- direct Source → processing → Sink 数据流；
-- realtime graph publication / replacement / reader overlap；
-- 真实 decoder / output 机制；
-- 只有到那时才重新挣得 seek / stop / track / session 等播放语义。
+- composition reality 之上的 minimal PCM contract（Phase B）；
+- direct Source → processing → Sink 数据流（Phase C）；
+- publication/reclamation **机制验证**：候选机制在真实 Audio Runtime 下满足已冻结的 P1–P5（Phase D 验证机制，不再裁决 P1–P5 是否正确）；
+- 真实 decoder / output 机制（Phase E）；
+- 只有到那时才重新挣得 seek / stop / track / session 等播放语义（Phase F）。
 
 （one normative ladder 见 `docs/adr/ADR-PBK-001.md` §12。）
 

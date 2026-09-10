@@ -25,8 +25,8 @@ export interface ProjectState {
 }
 
 export const projectState: ProjectState = {
-  currentFrontier: 'Playback Foundations accepted (ADR-PBK-001); next: minimal PCM contract experiments under the accepted foundations',
-  lastMilestone: 'Playback Foundations accepted after fresh-context adversarial review; legacy playback authority stays experimental evidence',
+  currentFrontier: 'Realtime publication semantics frozen as ADR-PBK-001 §6 P1–P5 (mechanism DEFERRED); next: minimal PCM contract experiments (Phase B)',
+  lastMilestone: 'P1–P5 formally established (specs/realtime-publication) and frozen into ADR-PBK-001 §6; tree-wide authority surfaces reconciled in PR #91',
 
   layers: {
     playbackReference: 'HISTORICAL_EVIDENCE',
@@ -41,9 +41,9 @@ export const projectState: ProjectState = {
   },
 
   nextQuestions: [
-    'minimal PCM contract 实验最少需要哪些字段/语义边界（PcmBlock format/frames/time/provenance）？',
-    '哪些 direct-flow / graph-publication 实验先挣得第一批 realtime 边界？',
-    'tree-wide surfaces 是否仍把旧 playback 模型当 current authority（应为 experimental evidence only）？',
+    'minimal PCM contract 实验最少需要冻结哪些字段/语义边界（PcmBlock format/frames/time/provenance）？',
+    'direct data-flow 实验（Phase C）需要挣得哪些执行事实？',
+    '哪类 publication/reclamation mechanism 能在真实 Audio Runtime 下满足已冻结的 P1–P5（Phase D 验证）？',
   ],
 }
 

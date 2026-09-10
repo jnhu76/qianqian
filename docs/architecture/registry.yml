@@ -71,12 +71,19 @@ architectures:
       - issue: 53
       - pr: 66
       - pr: 87
+      - pr: 91
 
     implementation: []
 
     evidence:
+      # Current formal evidence for the ADR §6 P1–P5 publication/reclamation
+      # semantic contract (mechanism/representation remain OPEN; Phase D
+      # validates candidate mechanisms against P1–P5).
+      - specs/realtime-publication/RealtimePublication.tla
+      - specs/realtime-publication/README.md
       # Prior playback code/specs are retained as experimental evidence only
-      # while ARCH-003 is reopened. They do not close current design questions.
+      # under accepted/current ARCH-003 foundations, while production playback
+      # semantics remain open. They do not close current design questions.
       # PRs #78/#79/#81 (former ADR acceptance chain) and PR #82 (former
       # executable core) are experimental/historical evidence, NOT current
       # architecture decisions.

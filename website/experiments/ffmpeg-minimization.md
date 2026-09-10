@@ -150,7 +150,7 @@ Decoder 与 Processing 共享**唯一的 FFmpeg 闭包权威**。关键发现:
 
 ## 07 架构后果
 
-<ClaimBadge role="authority" />
+<ClaimBadge role="evidence" />
 
 证据来源：`component-boundary-a0.md`（历史 #53 审计证据；其中 #48 FFmpeg 闭包行为事实仍然有效）：
 

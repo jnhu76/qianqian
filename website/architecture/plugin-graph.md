@@ -13,7 +13,7 @@ status: NEXT
 
 ---
 
-## 当前组合边界
+## 组合边界示例（历史实验映射）
 
 ```mermaid
 flowchart LR
@@ -25,7 +25,7 @@ flowchart LR
     MUSIC -->|"requires AudioOutput / PcmSink"| AOUT
 ```
 
-> **Historical / experimental evidence:** 下述 `MusicKernel` / `TransportKernel` / `TrackSession` / `DecodeSession` 结构来自旧 Playback 架构实验，重置后不再是 current authority（ADR-PBK-001 现为 ACCEPTED，不冻结这些名词）。旧代码中只保留为 experimental evidence：
+> **Historical / experimental evidence:** 上图 `MusicComponent` 与下述 `MusicKernel` / `TransportKernel` / `TrackSession` / `DecodeSession` 结构来自旧 Playback 架构实验（#53 分解），重置后不再是 current authority（ADR-PBK-001 现为 ACCEPTED，不冻结这些名词；playback-specific component granularity 需由未来实验重新挣得）。旧代码中只保留为 experimental evidence：
 
 ```text
 MusicKernel      music/product semantic authority
@@ -55,7 +55,7 @@ Gain / EQ / SRC / Limiter 是有顺序的 PCM transform。它们的普通插入�
 
 ```mermaid
 flowchart TB
-    MUSIC2["MusicComponent"]
+    MUSIC2["MusicComponent（历史示例锚点）"]
     PROC["independent Processing provider<br/>仅在边界被证明后"]
     UH["UiHost<br/>presentation mechanism"]
 
@@ -63,13 +63,15 @@ flowchart TB
     UH -.->|"consumes domain contracts"| MUSIC2
 ```
 
+> 图中的 `MusicComponent` 锚点只是历史示例；未来组合边界由实验挣得，不由本页决定。
+
 ---
 
 ## 组件依赖矩阵
 
 | 组件 | 依赖 | 提供 / 角色 |
 |---|---|---|
-| MusicComponent | Decoder、AudioOutput/PcmSink | Playback/domain contracts；内部 lifecycle root |
+| MusicComponent *（历史示例，非 current authority）* | Decoder、AudioOutput/PcmSink | Playback/domain contracts；内部 lifecycle root |
 | Decoder | 无 | Decoder capability |
 | AudioOutput | 无 | PcmSink / output evidence / optional device control |
 | independent Processing provider *(未来，若挣得边界)* | 由未来 contract 决定 | ordered PCM graph service |

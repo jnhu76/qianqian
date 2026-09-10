@@ -2,7 +2,7 @@
 
 Qianqian is a local-first, lightweight, cross-platform music player and a testbed for Rust composability/runtime architecture.
 
-The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the implementation is being rebuilt boundary-first on a small generic Composition Kernel; the playback-specific foundation is currently reopened and re-proposed in `ADR-PBK-001`.
+The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the implementation is being rebuilt boundary-first on a small generic Composition Kernel; the playback-specific foundation is **accepted** in `ADR-PBK-001` (plane-boundary constitution — production playback semantics remain open until real Audio Runtime experiments earn them).
 
 ## Architecture in 30 seconds
 
@@ -37,7 +37,7 @@ Base Kernel K0                     IMPLEMENTED              (PR #71)
 Playback Foundations reset         ACCEPTED                 (ADR-PBK-001, PR #87)
 ```
 
-The previously accepted playback architecture (`ADR-PBK-001` as registered ARCH-003 authority) has been **deliberately reopened from first principles**. Old playback implementation, specs and formal models remain in the repository as **experimental evidence only** — they preserve failure witnesses and test techniques, not current authority. The reset foundation is accepted in `docs/adr/ADR-PBK-001.md`; production playback semantics remain unauthorized until real Audio Runtime experiments earn them (ADR §10 remains OPEN).
+The previous playback architecture (the pre-reset ARCH-003 experiment, briefly accepted in former ADR revisions) was **deliberately reopened from first principles**; the reset foundation itself is accepted in `docs/adr/ADR-PBK-001.md` (**ACCEPTED**). Old playback implementation, specs and formal models remain in the repository as **experimental evidence only** — they preserve failure witnesses and test techniques, not current authority. Production playback semantics remain unauthorized until real Audio Runtime experiments earn them (ADR §10 remains OPEN).
 
 ## Control plane and data plane
 
@@ -78,7 +78,7 @@ Generation / Active-Prepared / Dual Window / Physical Fence
 
 are **experimental evidence**: they preserve real failure witnesses (for example the formal exploration of the `stop × natural ENDED` race) and test techniques, but they are not current architecture and must not be preserved for compatibility unless a future accepted authority re-earns them.
 
-See `docs/adr/ADR-PBK-001.md` for the proposed foundation and `specs/playback/README.md` for the evidence status.
+See `docs/adr/ADR-PBK-001.md` for the accepted foundation and `specs/playback/README.md` for the evidence status.
 
 ## Everything is a Plugin
 
@@ -113,7 +113,7 @@ Restoration is judged by **observational equivalence**, not private bit-for-bit 
 
 `Everything is Plugin` does not mean `Everything is rollbackable`.
 
-Already-rendered sound cannot be “unplayed”. Claimed Physical Fence and physical emission are also different facts: a claimed fence is past the cancellation point; rendered audio is outside the recoverable system boundary.
+Already-rendered sound cannot be “unplayed”. A claimed fence and physical emission are also different facts: a claimed fence is past the cancellation point; rendered audio is outside the recoverable system boundary.
 
 ## Realtime boundary
 
@@ -139,7 +139,9 @@ Formal models are **risk-driven evidence**, not a second implementation of the w
 
 The old playback formal models (Dual Window, Generation admission, Physical Fence, submitted/rendered accounting, EOF/drained/ENDED terminalization) are **experimental evidence** under explicit assumptions during the reset — not a blocking acceptance gate for new playback design.
 
-See `specs/README.md` and `specs/playback/README.md`.
+The current formal target earned by the reset is realtime publication/lifetime: `specs/realtime-publication/` proves the publication/reclamation collision at model level (TLC + mutation negative controls), and its semantic conclusions are frozen as the normative P1–P5 contract in ADR-PBK-001 §6; the implementation mechanism remains deferred (ADR §12 Phase D validates candidate mechanisms against P1–P5).
+
+See `specs/README.md`, `specs/realtime-publication/README.md` and `specs/playback/README.md`.
 
 ## UI strategy
 

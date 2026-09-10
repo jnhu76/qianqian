@@ -19,7 +19,7 @@ status: HISTORICAL_EVIDENCE
 
 ## 三个不同的角色
 
-<ClaimBadge role="authority" />
+<ClaimBadge role="evidence" />
 
 ```text
 MusicComponent   = 组合生命周期根
@@ -138,7 +138,7 @@ Generation 是否 stale 取决于：
 
 ## Physical Fence
 
-<ClaimBadge role="authority" />
+<ClaimBadge role="evidence" />
 
 ```text
 decoded != queued != submitted != rendered
@@ -194,7 +194,7 @@ qianqian-core::music::MusicKernel
 qianqian-core::transport::TransportKernel
 ```
 
-这只是让代码 vocabulary 与 ADR 一致；并没有提前冻结 Window / Generation / Fence / TrackSession / DecodeSession 的最终 Rust representation，也没有实现 FFmpeg/WASAPI playback engine。
+这只是让代码 vocabulary 与当时历史实验模型一致，不代表当前 ADR-PBK-001 vocabulary；也没有提前冻结 Window / Generation / Fence / TrackSession / DecodeSession 的最终 Rust representation，更没有实现 FFmpeg/WASAPI playback engine。
 
 ---
 
