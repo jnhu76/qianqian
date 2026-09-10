@@ -2,9 +2,9 @@
 
 > **STATUS: FORMAL EVIDENCE（当前挣得）**
 >
-> 语义来源：`docs/adr/ADR-PBK-001.md` §6（ACCEPTED 的最小 publication correctness
-> contract 与 lifetime safety）、§12 Phase D、§13 Formalization policy。
-> 本目录不是第二份 Playback Foundations authority；ADR-PBK-001 仍是唯一
+> 语义来源：`docs/adr/ADR-PBK-001.md` §6（ACCEPTED 的 publication correctness
+> contract、P1–P5 语义协议与 lifetime safety）、§12 Phase D、§13 Formalization
+> policy。本目录不是第二份 Playback Foundations authority；ADR-PBK-001 仍是唯一
 > normative constitution。模型结论只在其显式抽象与假设下成立。
 >
 > 决策记录（候选机制比较）不在本文件，见
@@ -160,8 +160,8 @@ FAIL。证据判定逻辑全部在 `check.sh`，无人工 grep。
 
 ## Traceability
 
-- 语义范围对应 `docs/adr/ADR-PBK-001.md` §6（最小 publication correctness
-  contract / lifetime safety 最小顺序）与 §13 点名的头号候选交错。
+- 语义范围对应 `docs/adr/ADR-PBK-001.md` §6（publication correctness
+  contract / P1–P5 语义协议 / lifetime safety 最小顺序）与 §13 点名的头号候选交错。
 - 与 §13 时序的关系（显式声明）：§13 要求“先有具体 collision，再建最小模型”。
   本模型针对的正是 §13 自己点名的候选交错（old view 引用 provider → 新视图
   排除 → 旧 reader 仍在 → final release）；TLC 穷举 + M1 反例证明该交错在
@@ -171,5 +171,6 @@ FAIL。证据判定逻辑全部在 `check.sh`，无人工 grep。
 - 本模型证明的是：**在上述抽象与假设下**，对 publication/reclamation safety 的
   穷举状态探索 + mutation 反证。不声称“形式化证明整个 audio runtime”。
 - 机制（ArcSwap / epoch / RCU / hazard / refcount / lease 等 representation）
-  保持 OPEN；任何正确机制必须实现的语义协议由决策记录
-  `docs/architecture/realtime-publication-lifetime-decision.md` 归纳。
+  保持 OPEN；任何正确机制必须满足的语义协议 P1–P5 已 normative 冻结于
+  `docs/adr/ADR-PBK-001.md` §6（其形式化推导与机制比较见决策记录
+  `docs/architecture/realtime-publication-lifetime-decision.md`）。

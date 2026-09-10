@@ -5,8 +5,8 @@
 > 这不是第二份 Playback Foundations constitution。normative foundation authority
 > 仍然是 `docs/adr/ADR-PBK-001.md`（ACCEPTED）；本文只记录：
 > 1. 一个已被 TLA+ 穷举证明的真实并发风险（formal evidence）；
-> 2. 任何正确实现机制都必须满足的语义协议（对 ADR §6 已冻结语义的推导，不新增
->    normative 内容）；
+> 2. 语义协议 P1–P5 的形式化推导与模型对应（其 normative 定义已吸收进
+>    ADR §6；本文不是第二份 normative 定义，措辞与 ADR 分歧时以 ADR 为准）；
 > 3. 候选机制的工程比较与当前倾向（工程判断，representation 保持 OPEN）。
 >
 > 形式化证据本体：`specs/realtime-publication/`（模型、mutation、探针、运行数据）。
@@ -17,28 +17,35 @@
 
 ```text
 形式化证据        COMPLETE（TLC 穷举 + M1–M4 反证 + 4 个可达性探针，全部门通过）
-语义协议结论      SELECTED（P1–P5，见 §13；为 ADR §6 已冻结语义的推导）
+语义协议          FROZEN AS NORMATIVE（P1–P5 已吸收进 ADR-PBK-001 §6；本记录 §13
+                  保留其形式化推导与模型对应，ADR 是唯一 normative 定义处）
 实现机制          DEFERRED（不冻结；当前工程倾向见 §14，Phase D 可执行实验裁决）
-ADR 影响          REFERENCE ONLY（ADR §6 增加一行证据引用；representation 保持 OPEN）
+ADR 影响          SEMANTIC CLARIFICATION / CORRECTIVE——P1–P5 把 ADR §1/§6 已接受
+                  的 lifetime contract 用新挣得的形式化证据明文化为 normative 协议；
+                  无新 architecture plane、无新 runtime primitive、无 representation
+                  决策、未选具体回收机制
 ```
 
 ## 2. 问题定义
 
-ADR-PBK-001 §6 已冻结最小 publication correctness contract 与 lifetime safety，
-并把 representation（ArcSwap / RCU / epoch / double-buffer / atomic pointer /
+ADR-PBK-001 §6 冻结 publication correctness contract、lifetime safety 与语义协议
+P1–P5（由本记录的形式化证据挣得、经 semantic corrective 吸收），并把
+representation（ArcSwap / RCU / epoch / double-buffer / atomic pointer /
 lease / hazard）与 reader-quiescence 具体机制留为 OPEN。本记录回答两个问题：
 
 1. **问题是否真实**：realtime view N → N+1 发布与旧 reader overlap 时，
    "发布即可释放"是否真的能撞出非法状态？（是，见 §5/§9 的 M1 反例。）
-2. **语义上必须成立什么**：任何候选机制必须实现哪些性质？（P1–P5，§13。）
+2. **语义上必须成立什么**：任何候选机制必须实现哪些性质？（P1–P5——
+   normative 定义在 ADR §6，形式化推导见本文 §13。）
 
 不回答：哪个 crate 最好（§14 只记录工程倾向，不做 normative 选择）。
 
 ## 3. 已有 authority
 
 - `docs/adr/ADR-PBK-001.md` §1（宪法第 5/6 条：pre-bound view；RT 可解引用资源
-  在读者 quiesce 前保持有效）、§2.4、§6（publication contract + lifetime 最小
-  顺序）、§7（parameter vs topology）、§12 Phase D、§13（formalization policy）。
+  在读者 quiesce 前保持有效）、§2.4、§6（publication correctness contract +
+  P1–P5 协议 + lifetime 最小顺序）、§7（parameter vs topology）、§12 Phase D
+  （mechanism validation）、§13（formalization policy）。
 - 旧 `specs/playback/*` 只被复用了 verifier 纪律（TLC warning fail-closed、
   负控制必须出反例、`Finished in`/`Model checking completed` 判据），没有继承
   任何旧 playback 状态词汇。
@@ -198,7 +205,7 @@ API 常见的 pre-bound next-callback 形态），行 A 的排名可能整体塌
 的读路径优势缩到接近候选 3，候选 2/5 失去原生读路径。**这是 §14 倾向最可能
 被 Phase B/C 证据推翻的路径。**
 
-## 13. Selected semantic protocol（任何正确机制必须满足）
+## 13. Semantic protocol P1–P5（形式化推导；normative 定义在 ADR-PBK-001 §6）
 
 ```text
 P1  Coherent publication      Realtime-view publication 对 reader acquisition
@@ -224,16 +231,17 @@ P5  Progress under reader     在 §8 两条假设下，retired 资源最终获�
     progress                  （I6；M3 liveness 反证其必要性）。
 ```
 
-定位声明：**P1–P4 是 ADR §6 已冻结语义（coherent publication、§1 第 6 条、
-lifetime 最小顺序）在该模型下的推导结果；P5 是模型内新增的、显式假设门控的
-liveness 证据**（ADR §6 冻结的是 safety 顺序，未冻结 temporal 进度义务）。
-两者都不是新的 normative 层。
+定位声明：**P1–P5 的 normative 定义已由 semantic corrective 吸收进
+ADR-PBK-001 §6（P5 以显式 progress 前提下的 conditional liveness 形式冻结）。
+本节保留的是各条性质的形式化出处（invariant + mutation 反证），回答"为什么
+知道这些条件必须成立"；本文不是第二份 normative 定义，措辞与 ADR 分歧时以
+ADR 为准。**
 
-## 14. Selected implementation mechanism — **DEFERRED**
+## 14. Implementation mechanism — **DEFERRED**
 
 ```text
-SELECT: semantic protocol only（P1–P5）
-MECHANISM: DEFERRED
+SEMANTIC PROTOCOL: ADR-PBK-001 §6 P1–P5（normative 冻结；非本记录的选择对象）
+MECHANISM: DEFERRED（未选择任何机制）
 当前工程倾向（非冻结，Phase D 可执行实验的默认起点）：
     原子不可变视图快照 + 引用计数式回收（ArcSwap 风格）
 ```
@@ -264,9 +272,9 @@ flow → publication 实验。执行模型（callback / blocking push / pull / h
    裸 AtomicPtr（无生命周期追踪）被 RT 约束与 M1 反例直接否决。
 4. **为什么淘汰？** 见上；hazard/epoch/double-buffer 是"降优先级"而非淘汰——
    它们各自在别的负载形态下合理。
-5. **winner 为什么适合 Qianqian？** 见 §14：读者少、发布稀疏、逐资源回收、
+5. **倾向候选为什么适合 Qianqian？** 见 §14：读者少、发布稀疏、逐资源回收、
    多代 overlap、safe-Rust、与形式模型语义一一对应。
-6. **winner 的代价是什么？** 借用槽/debt 机制带来最坏情形 Guard drop 的 1 次
+6. **倾向候选的代价是什么？** 借用槽/debt 机制带来最坏情形 Guard drop 的 1 次
    RMW；`load_full` 路径有 refcount 争用（长持有/预绑定场景需评估，见 §12
    翻转风险）；视图整体重建成本（每次 publication 都要构造新不可变快照——
    低频，可接受）；**最后引用 drop 触发整棵析构级联**——必须叠加 §18.5 的
