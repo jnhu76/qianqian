@@ -252,32 +252,32 @@ impl PcmSink for ReplayingSink {
     }
 }
 
-/// A processing twin that inserts its own scratch storage: the block's
-/// samples are copied into storage the stage owns before the sink observes
-/// them. The tested stage trait cannot express this shape (the block
-/// lifetime is handed through by value), so this twin uses its own inherent
-/// method — what insertion looks like wherever a shape permits it. Values
-/// stay oracle-correct; only storage identity and the allocator can see it.
-pub struct ScratchCopyingStage {
+/// A same-interface adversarial twin: implements the exact [`PcmStage`]
+/// trait yet substitutes its own storage — the block payload is copied into
+/// freshly leaked storage and handed onward. Values stay oracle-correct and
+/// the trait shape compiles, so the method-level lifetime demonstrably does
+/// not constrain what the returned view points at: it only prevents
+/// retaining the *input* block in `self`. Storage provenance is a separate
+/// property, caught here only by the storage-identity and allocation
+/// oracles.
+///
+/// The leak is intentional and test-only; this twin runs a handful of
+/// quanta and never becomes a production helper.
+pub struct LeakingCopyStage {
     format: PcmFormat,
-    scratch: Vec<Sample>,
 }
 
-impl ScratchCopyingStage {
+impl LeakingCopyStage {
     pub fn new(format: PcmFormat) -> Self {
-        Self {
-            format,
-            scratch: Vec::new(),
-        }
+        Self { format }
     }
+}
 
-    pub fn process<'stage>(&'stage mut self, block: &PcmView<'_>) -> PcmView<'stage> {
-        self.scratch = block.payload().to_vec();
-        PcmView::new(self.format, &self.scratch).expect("the copied payload is whole frames")
-    }
-
-    pub fn scratch_addr(&self) -> usize {
-        self.scratch.as_ptr() as usize
+impl PcmStage for LeakingCopyStage {
+    fn process<'block>(&mut self, block: PcmViewMut<'block>) -> PcmView<'block> {
+        let frozen = block.freeze();
+        let copied: &'static [Sample] = Box::leak(frozen.payload().to_vec().into_boxed_slice());
+        PcmView::new(self.format, copied).expect("the copied payload is whole frames")
     }
 }
 
@@ -354,7 +354,7 @@ mod kill_tests {
 
     use super::{
         DirectoryLookupFlow, FormatSwappingSource, FrameDroppingStage, FramePermutingStage,
-        HiddenLookupStage, ParticipantDirectory, ReplayingSink, ScratchCopyingStage,
+        HiddenLookupStage, LeakingCopyStage, ParticipantDirectory, ReplayingSink,
     };
     use crate::composition::{
         CompositionFixture, compose_prebound_flow, directory_lookup_assembler_component,
@@ -588,81 +588,58 @@ mod kill_tests {
         );
     }
 
-    /// Inserting intermediate storage leaves every value correct — and is
-    /// still caught: the sink observes the scratch storage, not the source
-    /// storage. The honest path's identity is pinned in main.rs.
+    /// Storage substitution through the real stage interface: the twin
+    /// implements [`PcmStage`] and its values verify in order, but the
+    /// returned view aliases substituted (leaked) storage, so the
+    /// storage-identity oracle catches it. Lifetime safety and storage
+    /// provenance are different properties with different oracles; the
+    /// honest path's identity is pinned in main.rs. Intentional test-only
+    /// leak — a handful of quanta only.
     #[test]
-    fn intermediate_storage_insertion_is_detected_by_storage_identity() {
+    fn same_interface_storage_substitution_is_killed_by_storage_identity() {
         let format = stereo();
-        let source = Rc::new(RefCell::new(StreamingSource::new(format)));
-        let mut copying_stage = ScratchCopyingStage::new(format);
-        let sink = Rc::new(RefCell::new(VerifyingSink::new(format)));
-        let mut storage = vec![0.0; format.scalar_count(4)];
-
-        for _ in 0..5 {
-            let block = source
-                .borrow_mut()
-                .lend_next_block(&mut storage, 4)
-                .expect("the source lend is valid");
-            let frozen = block.freeze();
-            let copied = copying_stage.process(&frozen);
-            sink.borrow_mut()
-                .consume(&copied)
-                .expect("copied values are still oracle-correct");
-        }
-        assert_eq!(source.borrow().frames_produced(), 20);
-        assert_eq!(sink.borrow().frames_consumed(), 20);
-
-        let observed = sink
+        let mut fixture = compose_prebound_flow(
+            Rc::new(RefCell::new(StreamingSource::new(format))),
+            Rc::new(RefCell::new(LeakingCopyStage::new(format))),
+            Rc::new(RefCell::new(VerifyingSink::new(format))),
+            format,
+            4,
+        );
+        run_stream(&mut fixture, 12, 4)
+            .expect("substituted values are still oracle-correct in stream order");
+        let observed = fixture
+            .sink
             .borrow()
             .observed_storage_addr()
             .expect("the sink observed storage");
         assert_ne!(
             observed,
-            storage.as_ptr() as usize,
-            "the source storage never reached the sink: insertion detected"
-        );
-        assert_eq!(
-            observed,
-            copying_stage.scratch_addr(),
-            "the sink observed the stage's inserted scratch storage"
+            fixture.flow.block_storage_addr(),
+            "the returned view aliases substituted storage, not the flow's reusable block storage"
         );
     }
 
-    /// The same copying twin, measured: insertion costs a heap allocation
-    /// per quantum (the honest flow's measured zero is pinned in main.rs).
+    /// The same same-interface twin, measured: storage substitution
+    /// allocates (and leaks) per quantum — the honest flow's measured zero
+    /// is pinned in main.rs. A few quanta only, by the twin's design.
     #[test]
-    fn per_quantum_allocation_is_measured_in_the_copying_twin() {
+    fn same_interface_storage_substitution_allocates_per_quantum() {
         let format = stereo();
-        let source = Rc::new(RefCell::new(StreamingSource::new(format)));
-        let mut copying_stage = ScratchCopyingStage::new(format);
-        let sink = Rc::new(RefCell::new(VerifyingSink::new(format)));
-        let mut storage = vec![0.0; format.scalar_count(4)];
-
-        let block = source
-            .borrow_mut()
-            .lend_next_block(&mut storage, 4)
-            .expect("the source lend is valid");
-        let frozen = block.freeze();
-        let copied = copying_stage.process(&frozen);
-        sink.borrow_mut().consume(&copied).expect("warmup is valid");
-
+        let mut fixture = compose_prebound_flow(
+            Rc::new(RefCell::new(StreamingSource::new(format))),
+            Rc::new(RefCell::new(LeakingCopyStage::new(format))),
+            Rc::new(RefCell::new(VerifyingSink::new(format))),
+            format,
+            4,
+        );
         let (_, allocated) = run_counting_allocations(|| {
-            for _ in 0..16 {
-                let block = source
-                    .borrow_mut()
-                    .lend_next_block(&mut storage, 4)
-                    .expect("the source lend is valid");
-                let frozen = block.freeze();
-                let copied = copying_stage.process(&frozen);
-                sink.borrow_mut()
-                    .consume(&copied)
-                    .expect("copied values are oracle-correct");
+            for _ in 0..4 {
+                fixture.flow.run_quantum(4).expect("the quantum is valid");
             }
         });
         assert!(
-            allocated >= 16,
-            "a per-quantum copy is measurable: {allocated} allocations for 16 quanta"
+            allocated >= 4,
+            "storage substitution allocates per quantum: {allocated} allocations for 4 quanta"
         );
     }
 

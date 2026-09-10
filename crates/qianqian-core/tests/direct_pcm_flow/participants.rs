@@ -40,9 +40,14 @@ pub trait PcmSource {
 /// hands the processed block onward through the return value.
 ///
 /// The handed-through block lifetime is method-level (`for<'block>`), so a
-/// compliant impl cannot retain the block past the call or substitute its
-/// own storage for it — retention and insertion are unrepresentable in this
-/// trait shape (type-system evidence for the tested representation).
+/// compliant impl cannot retain the borrowed input block in `self` past the
+/// call (type-system evidence for the tested representation).
+///
+/// This does NOT prove that the returned view aliases the input storage: a
+/// compliant impl may legally construct new storage and return a view over
+/// it. Storage provenance is a separate property from lifetime safety and
+/// is checked by executable storage-identity and allocation oracles, not by
+/// this signature.
 pub trait PcmStage {
     fn process<'block>(&mut self, block: PcmViewMut<'block>) -> PcmView<'block>;
 }

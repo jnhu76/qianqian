@@ -283,11 +283,17 @@ fn each_participant_is_visited_exactly_once_per_quantum_in_stream_order() {
 }
 
 // ---------------------------------------------------------------------------
-// Scenarios: the bound path outlives composition changes without re-resolution
+// Hazard witness: composition withdrawal does not revoke an already-extracted flow
 // ---------------------------------------------------------------------------
+//
+// Removing a provider from K0 composition makes the capability unreachable,
+// but the already-extracted pre-bound flow stays callable. This is recorded
+// as a hazard witness — not a correctness requirement — because this
+// experiment has no publication/retirement mechanism: nothing here claims
+// that new realtime entries after withdrawal are legal.
 
 #[test]
-fn bound_flow_continues_without_re_resolution_after_composition_withdrawal() {
+fn composition_withdrawal_does_not_revoke_an_already_extracted_flow() {
     let mut fixture = identity_fixture_with_block(8);
     run_stream(&mut fixture, 32, 8).expect("the stream is valid before the composition change");
 
@@ -309,9 +315,13 @@ fn bound_flow_continues_without_re_resolution_after_composition_withdrawal() {
         "the source capability is no longer provided by the composition"
     );
 
+    // The witness: the stale extracted flow remains invocable, and its
+    // quanta still perform zero kernel operations. This is an observation
+    // about the absence of a retirement mechanism in this experiment, not
+    // an endorsement of running new realtime entries after withdrawal.
     let ops_after_change = fixture.kernel.debug_op_count();
     run_stream(&mut fixture, 64, 8)
-        .expect("the bound flow continues on its pre-bound participant references");
+        .expect("the already-extracted flow remains callable on its pre-bound references");
     assert_eq!(
         fixture.kernel.debug_op_count(),
         ops_after_change,
