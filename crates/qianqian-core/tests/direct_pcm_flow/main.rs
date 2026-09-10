@@ -5,8 +5,10 @@
 //! The boundary under test: after composition resolves the three realtime
 //! participants once, the pre-bound executable path runs Source →
 //! ProcessingStage → Sink per PCM quantum with no composition-plane work —
-//! no Context lookup, no capability resolution, no Reconcile, no generic
-//! dispatch, no per-quantum allocation.
+//! no Context lookup, no capability resolution, no Reconcile, no
+//! composition-plane generic dispatch (the per-quantum participant calls
+//! themselves are pre-bound direct trait invocations), no per-quantum
+//! allocation.
 //!
 //! Layout:
 //!
