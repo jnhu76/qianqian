@@ -19,6 +19,8 @@
 
 pub mod base;
 pub mod music;
+/// PCM-CONTRACT-A0 experimental harness (evidence only, not stable API).
+pub mod pcm_contract_a0;
 pub mod ports;
 pub mod presentation;
 pub mod transport;
