@@ -5,6 +5,9 @@ version = 4
 [[package]]
 name = "qianqian-core"
 version = "0.1.0"
+dependencies = [
+ "qianqian-kernel",
+]
 
 [[package]]
 name = "qianqian-headless"
