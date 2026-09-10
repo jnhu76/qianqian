@@ -73,7 +73,7 @@ Playback 不通过给 generic kernel 增加更多产品概念来实现。
 
 <StatusBadge status="VALIDATED" />
 
-Playback 的 formal core 已验证 Dual Window、Generation admission、Physical Fence、submitted/rendered 和 EOF/drained/ENDED 的高风险交错，并真实抓到过 stop × natural ENDED 竞态。
+旧实验的 playback formal core 曾验证 Dual Window、Generation admission、Physical Fence、submitted/rendered 和 EOF/drained/ENDED 的高风险交错，并真实抓到过 stop × natural ENDED 竞态。
 
 > **TLA+ 用来找撞车，不用来证明整个架构。**
 

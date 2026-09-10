@@ -217,11 +217,13 @@ P1  Coherent publication      Realtime-view publication 对 reader acquisition
 P2  Retired-view closure      新视图发布后，新 acquisition 不得进入 retired
                               视图；旧读者可继续完成（I3；M3 safety 反证）。
 
-P3  Quiescence precedes       资源只有在对"没有任何读者（active 执行或 queued
-    reclamation               reference）仍可能通过【任何一代】视图解引用它"
-                              认证之后才获得释放资格（I1/I4；M1 反证）。
-                              认证范围必须是资源可达的全代视图，不得只查最新
-                              退休代（M4 反证）。
+P3  Quiescence precedes       资源的释放资格由语义谓词决定：当且仅当没有任何
+    reclamation               读者（active 执行或 queued reference）仍可能通过
+                              【任何一代】视图解引用它（I1/I4；M1 反证）。
+                              quiescence 决定资格；认证/识别可由机制按 P5 前提
+                              稍后完成（ADR §6 P3：iff 是 eligibility 谓词，
+                              不是 recognition 时限）。认证范围必须是资源可达
+                              的全代视图，不得只查最新退休代（M4 反证）。
 
 P4  Retirement != reclamation retired + 旧读者仍在 是合法状态；发布、闭门、
                               quiescence、物理释放是四个不同事件（I5 探针 +

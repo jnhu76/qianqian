@@ -303,7 +303,7 @@ A generic EventBus is not automatically a Composition Kernel primitive.
 
 If product/domain code needs committed Fact/Event semantics, begin with a normal capability/service/plugin.
 
-The K0-scoped rule is only that these are **not** kernel primitives. The normative Fact contracts — semantic-commit definition, one designated authority per (fact kind, subject scope), projection read-side firewall, Fact publication vs Realtime-view publication — live in the reset proposal `../adr/ADR-PBK-001.md` §2.3; this document summarizes and does not carry a second normative copy.
+The K0-scoped rule is only that these are **not** kernel primitives. The normative Fact contracts — semantic-commit definition, one designated authority per (fact kind, subject scope), projection read-side firewall, Fact publication vs Realtime-view publication — live in the accepted Playback Foundations ADR `../adr/ADR-PBK-001.md` §2.3; this document summarizes and does not carry a second normative copy.
 
 Repository-wide Event Sourcing, append-only persistence and waterfall/middleware remain unfrozen as K0 primitives.
 
@@ -367,7 +367,7 @@ Hot data travels through pre-bound realtime edges. (Playback-side normative form
 
 # Relationship to playback reset
 
-ARCH-003 is currently reopened.
+ARCH-003 / Playback Foundations are CURRENT; `ADR-PBK-001` is ACCEPTED. Production playback semantics remain OPEN (ADR §10).
 
 The generic Composition Kernel currently promises only that playback/audio capabilities can participate in normal Plugin/Fiber lifecycle and dependency management without polluting K0 with music/audio concepts.
 
@@ -386,7 +386,7 @@ Physical Fence
 
 Those names may remain in experimental code/specs, but they are not generic K0 requirements and not current playback authority.
 
-The reset Playback ADR will re-earn whatever domain/control/realtime abstractions real experiments require.
+Subsequent experiments under the accepted ADR will earn whatever additional domain/control/realtime abstractions real experiments require.
 
 ---
 

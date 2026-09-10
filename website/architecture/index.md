@@ -13,7 +13,7 @@ Qianqian Architecture v2 是一个面向本地优先音乐播放器的、边界�
 
 同时：
 
-> **每个语义事实只有一个 semantic authority。**
+> **同一 (fact kind, semantic subject scope) 在同一时刻只有一个 designated semantic authority。**（ADR-PBK-001 §2.3 摘要；不是"每个事实一个全局 authority"。）
 
 ---
 
@@ -46,7 +46,7 @@ flowchart TB
         MC -.->|"requires"| AO
     end
 
-    subgraph PD["Playback Domain"]
+    subgraph PD["Playback Domain（历史实验）"]
         MK["MusicKernel<br/>音乐 / 产品语义"]
         TK["TransportKernel<br/>播放时间语义"]
         TS["TrackSession(s)"] --> DS["DecodeSession(s)"]
@@ -108,9 +108,11 @@ Realtime callback 内不允许 Context 查找、能力解析、Fiber Reconcile�
 
 ---
 
-## Playback 时间正确性
+## 历史 Playback temporal evidence（非 current authority）
 
-MVP temporal shape：
+以下 `Active` / `Prepared` / `Generation` / `Physical Fence` 等 temporal 词汇全部来自旧实验模型，属于 **experimental evidence**。当前 ADR-PBK-001（ACCEPTED）未冻结任何 playback 状态机名词——这些旧实验暴露过有价值的 failure witnesses，但具体 temporal vocabulary / mechanism 均需未来实验重新挣得：
+
+旧实验的 MVP temporal shape：
 
 ```text
 1 Active

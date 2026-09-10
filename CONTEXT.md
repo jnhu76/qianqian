@@ -38,7 +38,7 @@ Playback Foundations are **ACCEPTED** (`ADR-PBK-001`). Stable vocabulary still d
 | PCM | Canonical family of decoded audio payloads for realtime processing. Exact Qianqian `PcmBlock` representation is currently unfrozen. |
 | Realtime Graph/View | Pre-built/pre-bound processing view consumed directly by the realtime path. Exact representation is unfrozen. |
 | Graph Publication | Control-side act of validating/building a new realtime graph/view and making it visible at an RT-safe boundary. |
-| Reader Quiescence | State where no old realtime reader/queued reference can still dereference an old published graph/resource. |
+| Reader Quiescence | State where no active or queued realtime reader can still dereference the relevant resource through any still-reachable generation (ADR-PBK-001 §6 P3 summary). |
 | Capability plane != Data plane | Context/Capability establishes reachability and execution contracts; hot payloads normally flow through already-bound service/data edges. |
 | Command != Fact | Intent and committed truth use separate semantics; one generic `emit()` must not blur them. |
 | Fact != Hot Data | Meaningful committed observations may fan out; PCM blocks stay on the realtime data plane. |
@@ -85,7 +85,7 @@ Realtime Data Plane
     -> moves hot data under timing constraints
 ```
 
-The normative constitution and all frozen distinctions live in `ADR-PBK-001.md` §1–§2.
+Normative definitions live in `ADR-PBK-001.md` (constitution and four lenses §1–§2; publication/reclamation contract P1–P5 §6; research ladder §12; formalization policy §13). This file is a vocabulary/status index only, not a second authority.
 
 ---
 
@@ -153,9 +153,10 @@ Fact                  semantic commit -> Fact publication;        -> ADR §2.3
                       projection is read-only visibility;
                       Event Sourcing/durability/replay remain OPEN
 Realtime Data         PCM flows through pre-bound realtime        -> ADR §2.4, §6
-                      execution state; a realtime reader observes
-                      one coherent published view; RT-referenced
-                      resources stay valid until readers quiesce
+                      execution state; publication/reclamation
+                      follows the normative P1–P5 contract
+                      (this line is a summary; ADR §6 is the
+                      authority)
 ```
 
 ---
@@ -199,7 +200,7 @@ No concrete collision -> prefer types/ownership/tests/static checks.
 
 The old PlaybackTemporal/PlaybackOwnership models are not current architecture acceptance gates.
 
-The first new formal target was realtime graph publication vs reader quiescence / resource release. `specs/realtime-publication/` models the exact interleaving named in `ADR-PBK-001.md` §13 and demonstrates the collision exhaustively at model level (TLC + negative controls); implementation-level confirmation still follows the §12 research ladder (Phase D). Evidence and mechanism comparison: `docs/architecture/realtime-publication-lifetime-decision.md`.
+The first post-reset formal target was realtime graph publication vs reader quiescence / resource release — delivered. `specs/realtime-publication/` proved the collision exhaustively at model level (TLC + negative controls); its semantic conclusions are frozen normatively as P1–P5 in `ADR-PBK-001.md` §6; the implementation mechanism remains DEFERRED; §12 Phase D validates candidate mechanisms against P1–P5 (it does not re-litigate whether P1–P5 are required). Evidence and mechanism comparison: `docs/architecture/realtime-publication-lifetime-decision.md`.
 
 ---
 

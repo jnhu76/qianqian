@@ -96,7 +96,7 @@ Normative authority: `adr/ADR-PBK-001.md` §2.3 — semantic commit precedes Fac
 
 # Realtime policy
 
-Normative authority: `adr/ADR-PBK-001.md` §2.4 and §6 — realtime PCM never travels through generic Context/Event/Plugin dispatch per quantum; realtime readers observe one coherent published view; RT-referenced resources stay valid until readers quiesce. The exact graph/lifetime mechanism remains unfrozen.
+Normative authority: `adr/ADR-PBK-001.md` §2.4 and §6 — realtime PCM never travels through generic Context/Event/Plugin dispatch per quantum; publication/reclamation follows the normative P1–P5 semantic contract (P1 is coherent publication; the full set is not restated here). The exact graph/lifetime mechanism remains unfrozen.
 
 ---
 

@@ -1358,7 +1358,7 @@ RT PATH (per callback/block/sample — kernel machinery FORBIDDEN):
 
 **No exceptions are proposed for K0.** If one is ever proposed, it must come with a proof-sized justification against this table (issue #67 J wording). Enforcement mechanism (types vs ownership shape vs audit vs tests) is an implementation question (§T); the semantic firewall is frozen here.
 
-The pattern that makes this possible is §K: bind at activation → RT thread pulls through the pre-bound endpoint → graph changes prepared on the control plane, published at an RT-safe boundary (commit/flush single-flight, I3/I4/I5).
+Historically, the pre-reset playback experiment (§K) instantiated this firewall as follows: bind at activation → RT thread pulls through the pre-bound endpoint → graph changes prepared on the control plane, published at an RT-safe boundary (commit/flush single-flight, I3/I4/I5). That is one previously observed mechanism — a historical example, not current Playback representation authority; the current normative publication/reclamation contract is `ADR-PBK-001` §6 (P1–P5), and the concrete mechanism remains unfrozen.
 
 ---
 

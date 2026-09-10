@@ -67,7 +67,7 @@ REQUESTED → CLAIMED → COMPLETED
 
 ## Qianqian 借鉴了什么
 
-<ClaimBadge role="authority" />
+<ClaimBadge role="interpretation" />
 
 | 证据 | Qianqian 原则 |
 |------|---------------|
@@ -76,6 +76,8 @@ REQUESTED → CLAIMED → COMPLETED
 | renderer 生命周期顺序 | 提供者生命周期排序很重要 |
 | 预绑定数据边 | 无逐块 Context 查找 |
 | commit/flush 单航次 | 不可逆动作有显式协议 |
+
+上表是对历史证据的解读。这些原则的当前 normative 形式以 `docs/adr/ADR-PBK-001.md` 为准（§2.4 realtime data plane、§6 P1–P5 publication/reclamation contract）；commit/flush 单航次是历史实验机制，**不是** P1–P5 的当前 implementation（机制 DEFERRED，Phase D 验证）。
 
 ---
 

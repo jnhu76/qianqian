@@ -46,7 +46,7 @@ forbidden: claiming current authority from old type names, preserving old APIs f
 
 > **Preserve the bug, not necessarily the old solution.** (Full inherit/forbid lists: `ADR-PBK-001.md` §11.)
 
-The full normative contracts — minimal constitution, command/fact authority, fact-authority identity (one designated authority per fact kind + subject scope), projection read-side firewall, semantic-commit definition, Fact publication vs Realtime-view publication, realtime lifetime invariant, coherent-publication contract, and the one normative research ladder — live in `ADR-PBK-001.md` §1–§2, §6 and §12. Do not restate them normatively anywhere else; link instead.
+The full normative contracts — minimal constitution, command/fact authority, fact-authority identity (one designated authority per fact kind + subject scope), projection read-side firewall, semantic-commit definition, Fact publication vs Realtime-view publication, realtime lifetime invariant, publication/reclamation contract (P1–P5), and the one normative research ladder — live in `ADR-PBK-001.md` §1–§2, §6 and §12. Do not restate them normatively anywhere else; link instead.
 
 ---
 

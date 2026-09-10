@@ -10,7 +10,7 @@ The current architecture intentionally separates composition, execution/control,
 
 # Normative constitution
 
-> The normative Playback Foundations constitution lives in [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md) §1–§2. This overview explains; it does not carry a second normative copy.
+> The normative Playback Foundations live in [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md). This overview only summarizes them; it does not carry a second normative copy.
 
 ---
 
@@ -183,7 +183,7 @@ Frozen in `../adr/ADR-PBK-001.md` §5: dependency topology != realtime processin
 
 Control side builds and validates the next realtime graph/view; realtime execution loads the currently published view and processes the audio quantum directly.
 
-Both §6 invariants — coherent publication (reader sees N or N+1) and RT-referenced resources valid until readers quiesce — are normative in `../adr/ADR-PBK-001.md` §6 only.
+ADR §6 freezes the normative P1–P5 publication/reclamation semantic contract — coherent publication (P1), retired-view closure (P2), all-generation quiescence before reclamation (P3), retirement != reclaimability != release (P4), and conditional reclamation progress (P5). The normative text lives in `../adr/ADR-PBK-001.md` §6 only; this section summarizes it.
 
 The publication mechanism (RCU / epoch / double buffering / Arc snapshot / lease / hazard / other) is intentionally unfrozen.
 
@@ -191,7 +191,7 @@ The publication mechanism (RCU / epoch / double buffering / Arc snapshot / lease
 
 # Realtime lifetime safety
 
-The withdrawal ordering, reader-quiescence steps and the exact resource/fiber lifetime binding are normative in `../adr/ADR-PBK-001.md` §6. This is the first clearly identified cross-plane lifetime invariant of the reset architecture.
+The withdrawal ordering and reader-quiescence semantics are normative in `../adr/ADR-PBK-001.md` §6. The ADR freezes the safe resource-release condition relative to realtime readers; it does **not** freeze the concrete Provider Fiber ↔ RT resource lifetime binding (that binding remains OPEN). This is the first cross-plane lifetime invariant earned by the reset architecture.
 
 ---
 
@@ -242,7 +242,7 @@ Do not model every architectural noun.
 
 The old PlaybackTemporal/PlaybackOwnership models are no longer blocking architecture authority.
 
-The first likely new candidate is the narrow publication/release interleaving of `../adr/ADR-PBK-001.md` §13 — justified only after the collision is concrete.
+Realtime publication/lifetime was the first post-reset formal target and is delivered: `specs/realtime-publication/` proved the publication/reclamation collision at model level (TLC exhaustive check + mutation negative controls), and its semantic conclusions are frozen as the normative P1–P5 contract in ADR §6. Implementation-level evidence remains OPEN — §12 Phase D validates candidate mechanisms against P1–P5.
 
 ---
 

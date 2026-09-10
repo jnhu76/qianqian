@@ -28,7 +28,7 @@
 
 - **状态交错**：同一事实会被多个异步事件推进，例如 `seek / stop / EOF / render evidence` 的交错；
 - **并发 ownership / lifecycle**：资源退出、provider withdrawal、dependent teardown 之间存在先后约束，而且错误顺序可能产生悬挂资源或失效访问；
-- **不可逆边界**：软件状态变化与外部世界之间存在 point-of-no-return，例如 Physical Fence、提交到设备、持久化提交；
+- **不可逆边界**：软件状态变化与外部世界之间存在 point-of-no-return，例如历史实验中的 Physical Fence、提交到设备、持久化提交；
 - **合法事件组合可能产生非法结果**：每个动作单独看都正确，但组合后可能出现 stale re-entry、双 authority、提前终态化、死锁或不可恢复状态；
 - **普通测试难覆盖所有排列**：问题的风险主要来自 action ordering / interleaving，而不是某个单一函数的输入输出。
 
