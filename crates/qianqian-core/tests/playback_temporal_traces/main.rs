@@ -19,8 +19,19 @@
 //! (decoder/device) by feeding raw evidence, and interpretation stays in the
 //! kernels.
 
-use qianqian_core::music::{MusicKernel, PlaybackState, TransportFact};
-use qianqian_core::transport::{
+// The kernels under test moved out of the production library into this
+// test-local module tree: they are historical executable evidence and no
+// longer carry production API identity (see ADR-PBK-001 evidence policy).
+// `allow(dead_code)` keeps the historical API surface byte-preserved; the
+// traces exercise what they exercised then, nothing is pruned to satisfy
+// lints.
+#[allow(dead_code)]
+mod music;
+#[allow(dead_code)]
+mod transport;
+
+use crate::music::{MusicKernel, PlaybackState, TransportFact};
+use crate::transport::{
     DecodeSessionId, EofOutcome, FenceState, FenceVerdictOutcome, GenerationId, MediaId, MediaSpan,
     TransportKernel, WindowRole,
 };
