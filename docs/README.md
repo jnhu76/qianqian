@@ -12,6 +12,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Generic Composition Kernel semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel-0-implementation-adr.md` |
 | Playback/audio foundations | `adr/ADR-PBK-001.md` — **ACCEPTED** |
 | Realtime publication lifetime evidence + mechanism comparison | `architecture/realtime-publication-lifetime-decision.md`（evidence/decision record，非第二 authority）+ `../specs/realtime-publication/` |
+| Minimal PCM edge experiment (ADR §12 Phase B evidence) | `architecture/pcm-contract-a0.md` + `../crates/qianqian-core/tests/pcm_edge_contract/`（test-only harness）— evidence only, not authority |
 | Current Rust behavior | current code + tests |
 | Playback experimental evidence | `../specs/playback/*` + `qianqian-core` playback code/tests — evidence only, not authority |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
