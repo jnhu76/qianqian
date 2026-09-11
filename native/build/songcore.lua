@@ -205,6 +205,16 @@ target("dsp_cap_probe")
             target:add("cflags", "-flto")
             target:add("ldflags", "-flto=auto")
         end
+        -- Optional link map for the DSP live-bytes ledger; opt-in via env so
+        -- normal builds are untouched. (Restored: the productize/rename
+        -- commit 1b4d539 dropped this block from the old xmake.lua probe
+        -- target while keeping its QN_PROBE_NO_AVFILTER sibling, which left
+        -- tools/dsp_closure.py's QN_LINK_MAP producer without a consumer and
+        -- the live-bytes ledger unreproducible.)
+        local link_map = os.getenv("QN_LINK_MAP")
+        if link_map and #link_map > 0 then
+            target:add("ldflags", "-Wl,-Map=" .. link_map)
+        end
         -- A codec-only closure (no libavfilter) has nothing to link: the
         -- probe compiles its fail-closed stub backend instead.
         if os.getenv("QN_PROBE_NO_AVFILTER") then
