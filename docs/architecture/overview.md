@@ -278,7 +278,8 @@ Production reality
     main-branch source, Cargo dependency graph, actual public APIs
 
 Evidence (never authority)
-    qianqian-core playback code/tests, specs/playback/*,
+    qianqian-core playback test-local evidence (tests/playback_temporal_traces/,
+    no longer in production src/), specs/playback/*,
     specs/realtime-publication/, architecture evidence records
     (pcm-contract-a0.md, direct-pcm-flow.md, realtime-view-publication.md,
     realtime-publication-lifetime-decision.md, component-boundary-a0.md)

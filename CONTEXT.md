@@ -224,7 +224,7 @@ qianqian-headless
 
 The Base Kernel K0 is current.
 
-Playback-specific core code/tests/specs from the prior design remain in the repository as experimental evidence and may be changed or removed by later research without compatibility obligation.
+Playback-specific code from the prior design (`MusicKernel` / `TransportKernel`) no longer lives in production `src/`; it survives as test-local executable evidence in `qianqian-core` `tests/playback_temporal_traces/` and may be changed or removed by later research without compatibility obligation.
 
 Bootstrap APIs are not compatibility contracts unless a later accepted authority explicitly says so.
 

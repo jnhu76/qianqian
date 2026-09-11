@@ -1,24 +1,17 @@
 //! Qianqian product core.
 //!
-//! Owns portable product semantics for Architecture v2: capability ports and
-//! the Presentation seam, plus the `music` / `transport` modules carried over
-//! from an earlier Playback architecture experiment.
+//! Owns the portable product capability seam currently required by
+//! production composition: the `AudioOutput` port consumed by
+//! `qianqian-runtime`. The historical playback experiment code
+//! (`MusicKernel` / `TransportKernel`) no longer lives here; it survives
+//! as test-local executable evidence under
+//! `tests/playback_temporal_traces/` and carries no production API
+//! identity (Playback Foundations authority: `docs/adr/ADR-PBK-001.md`).
 //!
-//! **Experimental Playback evidence:** the `music` / `transport` types
-//! (e.g. `MusicKernel`, `TransportKernel`) originate from an earlier Playback
-//! architecture experiment. Their presence does not establish current
-//! architecture authority or compatibility requirements; the Playback
-//! Foundations authority is `docs/adr/ADR-PBK-001.md`.
-//!
-//! The generic Composition Kernel lives outside this crate: a generic kernel
-//! must not depend on product semantics. `base` is an R0 bootstrap witness,
-//! not the kernel's mandated home.
+//! The generic Composition Kernel lives outside this crate: a generic
+//! kernel must not depend on product semantics.
 //!
 //! This crate must stay portable product semantics: no platform,
 //! native-media, or UI implementation dependency.
 
-pub mod base;
-pub mod music;
 pub mod ports;
-pub mod presentation;
-pub mod transport;

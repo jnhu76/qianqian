@@ -108,9 +108,9 @@ architectures:
       - specs/playback/PlaybackTemporal.tla
       - specs/playback/PlaybackOwnership.tla
       - specs/playback/README.md
-      - crates/qianqian-core/src/music.rs
-      - crates/qianqian-core/src/transport.rs
-      - crates/qianqian-core/tests/playback_temporal_traces.rs
+      - crates/qianqian-core/tests/playback_temporal_traces/main.rs
+      - crates/qianqian-core/tests/playback_temporal_traces/music.rs
+      - crates/qianqian-core/tests/playback_temporal_traces/transport.rs
       # Historical v1 diagram of the superseded playback-kernel model; kept as
       # historical artifact, referenced by no current authority.
       - docs/architecture/diagrams/ARCH-003-playback-kernel-v1.mmd
