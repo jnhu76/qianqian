@@ -4,7 +4,6 @@
 //! capability contracts are declared here, providers install them as kernel
 //! provisions, and consumers reach them through kernel-mediated resolution.
 
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use qianqian_core::ports::AudioOutput;
@@ -24,12 +23,9 @@ impl Capability for AudioOutputCapability {
 /// The running application assembled through the generic Composition Kernel.
 pub struct AppRuntime {
     /// Generic composition truth: reachability, binding ownership and Fiber
-    /// lifetime. It never owns playback cursor/window/product state.
+    /// lifetime, held entirely by the kernel. The root keeps no parallel
+    /// service-handle state.
     composition: Kernel,
-    /// Pre-bound data-plane handle to the resolved audio output service.
-    /// The composition authority is still the kernel's binding; this cached
-    /// service is for direct payload/mechanism use after binding.
-    audio_output: Rc<RefCell<Option<Rc<dyn AudioOutput>>>>,
 }
 
 impl Default for AppRuntime {
@@ -39,26 +35,23 @@ impl Default for AppRuntime {
 }
 
 impl AppRuntime {
-    /// Empty runtime: the music Fiber is desired but stays Pending over its
-    /// unsatisfied output dependency rather than crashing the root.
+    /// Empty runtime: the audio-output consumer fiber is desired but stays
+    /// Pending over its unsatisfied output dependency rather than crashing
+    /// the root.
     pub fn new() -> Self {
-        let audio_output: Rc<RefCell<Option<Rc<dyn AudioOutput>>>> = Rc::new(RefCell::new(None));
         let mut composition = Kernel::new();
         composition
-            .register_component(music_component(audio_output.clone()))
-            .expect("music component registration is legal");
+            .register_component(audio_output_consumer_component())
+            .expect("audio-output consumer component registration is legal");
         composition
             .set_desired(vec![DesiredEntry::enabled(
-                "music",
-                "music",
+                "audio_output_consumer",
+                "audio_output_consumer",
                 Revision::new(1),
             )])
             .expect("the desired composition is legal");
         composition.settle();
-        Self {
-            composition,
-            audio_output,
-        }
+        Self { composition }
     }
 
     /// Static profile composition: present an audio-output implementation as
@@ -80,23 +73,20 @@ impl AppRuntime {
         composition
             .set_desired(vec![
                 DesiredEntry::enabled("audio_output", "audio_output", Revision::new(1)),
-                DesiredEntry::enabled("music", "music", Revision::new(1)),
+                DesiredEntry::enabled(
+                    "audio_output_consumer",
+                    "audio_output_consumer",
+                    Revision::new(1),
+                ),
             ])
             .expect("the desired composition is legal");
         composition.settle();
-        Self {
-            composition,
-            ..self
-        }
+        Self { composition }
     }
 
-    /// The resolved audio output service handle, present iff the Composition
-    /// Kernel mediates an active AudioOutput binding for the music Fiber.
-    pub fn audio_output(&self) -> Option<Rc<dyn AudioOutput>> {
-        self.audio_output.borrow().clone()
-    }
-
-    /// Composition truth for diagnostics/tests.
+    /// Kernel-derived composition snapshot for diagnostics/tests. The
+    /// kernel's internal committed state is the authority; this snapshot is
+    /// only its read-side projection.
     pub fn composition_snapshot(&self) -> qianqian_kernel::CompositionSnapshot {
         self.composition.snapshot()
     }
@@ -112,28 +102,14 @@ impl AppRuntime {
     }
 }
 
-/// The Music Fiber requires the audio-output capability at activation. On
-/// activation the fiber resolves the service and stores it outside kernel
-/// storage as a pre-bound data edge; on teardown the `on_teardown` closure —
-/// a domain teardown obligation whose verdict (`Discharge::Discharged` /
-/// `Discharge::Violated`) is all the kernel observes, not a kernel Effect
-/// inverse — releases that handle. Domain/temporal state remains outside
-/// generic kernel storage.
-fn music_component(audio_output: Rc<RefCell<Option<Rc<dyn AudioOutput>>>>) -> ComponentSpec {
-    let handle_on_activate = audio_output.clone();
-    ComponentSpec::new("music")
-        .requires::<AudioOutputCapability>()
-        .on_activate(move |ctx| {
-            let binding = ctx
-                .resolve::<AudioOutputCapability>()
-                .map_err(|e| qianqian_kernel::ActivationError::new(format!("{e:?}")))?;
-            *handle_on_activate.borrow_mut() = Some(binding.service());
-            Ok(())
-        })
-        .on_teardown(move |_| {
-            *audio_output.borrow_mut() = None;
-            qianqian_kernel::Discharge::Discharged
-        })
+/// The audio-output consumer witness: a component whose entire earned
+/// responsibility is requiring [`AudioOutputCapability`]. The kernel keeps
+/// it Pending while no single legal provider exists, activates it when one
+/// does, and records the capability binding itself — the root holds no
+/// service-handle state beside that. It carries no music/playback
+/// semantics; the name records only which capability it consumes.
+fn audio_output_consumer_component() -> ComponentSpec {
+    ComponentSpec::new("audio_output_consumer").requires::<AudioOutputCapability>()
 }
 
 #[cfg(test)]
@@ -147,14 +123,26 @@ mod tests {
     impl AudioOutput for FakeAudioOutput {}
 
     #[test]
-    fn kernel_hosted_profile_composes_music_with_audio_output() {
-        let runtime = AppRuntime::new().with_audio_output(Box::new(FakeAudioOutput));
-        assert!(runtime.audio_output().is_some());
+    fn without_provider_the_consumer_stays_pending() {
+        let runtime = AppRuntime::new();
         let snap = runtime.composition_snapshot();
         assert_eq!(
-            snap.fibers.get("music").map(|f| f.state),
+            snap.fibers.get("audio_output_consumer").map(|f| f.state),
+            Some(FiberState::Pending),
+            "unsatisfied dependency => Pending, never a root crash"
+        );
+        assert_eq!(snap.capabilities.get("AudioOutput"), Some(&None));
+        assert!(snap.quiet);
+    }
+
+    #[test]
+    fn with_provider_the_consumer_activates_and_the_kernel_binds() {
+        let runtime = AppRuntime::new().with_audio_output(Box::new(FakeAudioOutput));
+        let snap = runtime.composition_snapshot();
+        assert_eq!(
+            snap.fibers.get("audio_output_consumer").map(|f| f.state),
             Some(FiberState::Active),
-            "the music Fiber is hosted and active"
+            "the audio-output consumer fiber is hosted and active"
         );
         assert_eq!(
             snap.capabilities.get("AudioOutput"),
@@ -164,41 +152,83 @@ mod tests {
     }
 
     #[test]
-    fn empty_runtime_degrades_to_pending_without_audio_output() {
-        let runtime = AppRuntime::new();
-        assert!(runtime.audio_output().is_none());
-        let snap = runtime.composition_snapshot();
-        assert_eq!(
-            snap.fibers.get("music").map(|f| f.state),
-            Some(FiberState::Pending),
-            "unsatisfied dependency => Pending, never a root crash"
-        );
-        assert!(snap.quiet);
-    }
-
-    #[test]
-    fn withdrawing_the_output_releases_the_binding_through_the_kernel() {
+    fn withdrawing_the_provider_degrades_the_consumer_to_pending() {
         let runtime = AppRuntime::new().with_audio_output(Box::new(FakeAudioOutput));
-        assert!(runtime.audio_output().is_some());
-
         let mut runtime = runtime;
         runtime
             .revise_desired(vec![DesiredEntry::enabled(
-                "music",
-                "music",
+                "audio_output_consumer",
+                "audio_output_consumer",
                 Revision::new(1),
             )])
             .expect("legal");
 
-        assert!(
-            runtime.audio_output().is_none(),
-            "the music Fiber's teardown must release the pre-bound handle"
-        );
         let snap = runtime.composition_snapshot();
         assert_eq!(
-            snap.fibers.get("music").map(|f| f.state),
-            Some(FiberState::Pending)
+            snap.fibers.get("audio_output_consumer").map(|f| f.state),
+            Some(FiberState::Pending),
+            "the consumer remains desired and degrades over its vanished dependency"
         );
         assert_eq!(snap.capabilities.get("AudioOutput"), Some(&None));
+    }
+
+    /// Composition regression at the root: K0 legally instantiates several
+    /// desired entries of one component, and withdrawing one instance must
+    /// leave the surviving sibling's kernel-mediated binding untouched.
+    #[test]
+    fn sibling_consumer_instances_withdraw_independently_in_kernel_truth() {
+        let runtime = AppRuntime::new().with_audio_output(Box::new(FakeAudioOutput));
+        let mut runtime = runtime;
+        runtime
+            .revise_desired(vec![
+                DesiredEntry::enabled("audio_output", "audio_output", Revision::new(1)),
+                DesiredEntry::enabled(
+                    "audio_output_consumer",
+                    "audio_output_consumer",
+                    Revision::new(1),
+                ),
+                DesiredEntry::enabled("dup", "audio_output_consumer", Revision::new(1)),
+            ])
+            .expect("multi-instance desired composition is kernel-legal");
+        {
+            let snap = runtime.composition_snapshot();
+            assert_eq!(
+                snap.fibers.get("audio_output_consumer").map(|f| f.state),
+                Some(FiberState::Active)
+            );
+            assert_eq!(
+                snap.fibers.get("dup").map(|f| f.state),
+                Some(FiberState::Active)
+            );
+        }
+
+        // Withdraw only the duplicate instance; the survivor must keep its
+        // kernel-mediated binding.
+        runtime
+            .revise_desired(vec![
+                DesiredEntry::enabled("audio_output", "audio_output", Revision::new(1)),
+                DesiredEntry::enabled(
+                    "audio_output_consumer",
+                    "audio_output_consumer",
+                    Revision::new(1),
+                ),
+            ])
+            .expect("legal");
+
+        let snap = runtime.composition_snapshot();
+        assert_eq!(
+            snap.fibers.get("audio_output_consumer").map(|f| f.state),
+            Some(FiberState::Active),
+            "the surviving sibling instance must stay Active"
+        );
+        assert!(
+            !snap.fibers.contains_key("dup"),
+            "the withdrawn instance is gone"
+        );
+        assert_eq!(
+            snap.capabilities.get("AudioOutput"),
+            Some(&Some("audio_output".to_owned()))
+        );
+        assert!(snap.quiet);
     }
 }
