@@ -22,7 +22,11 @@ architectures:
     # The v1 system diagram's plane separation / data-plane rules are
     # normative only via ADR-PBK-001 §1–§2/§2.4. Component naming inside the
     # diagram (MusicKernel/UiHost classes) is pre-reset illustration; the
-    # playback reset (ADR-PBK-001 §0/§10) reopened those nouns.
+    # playback reset (ADR-PBK-001 §0/§10) reopened those nouns. In particular
+    # the diagram's `next` styling on MusicKernel is a stale pre-reset
+    # leftover: MusicKernel survives only as experimental evidence, it is not
+    # the next component to build, and no playback domain component currently
+    # holds NEXT status.
     # Derived summary: docs/architecture/overview.md
     authority:
       - docs/adr/ADR-PBK-001.md

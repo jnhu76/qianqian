@@ -133,7 +133,7 @@ qianqian-runtime
 qianqian-headless
 ```
 
-The generic Base Kernel K0 is implemented. The playback code currently in the product crates (`qianqian-core::music`, `qianqian-core::transport`) is **experimental evidence** from the earlier architecture experiment — not current authority and not a compatibility contract.
+The generic Base Kernel K0 is implemented. Production `qianqian-core` carries no playback modules; the earlier experiment code (`MusicKernel` / `TransportKernel`) survives only as test-local executable evidence under `crates/qianqian-core/tests/playback_temporal_traces/` — not current authority and not a compatibility contract.
 
 Build/test authority:
 

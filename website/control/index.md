@@ -53,7 +53,7 @@ MusicComponent
     └── DecodeSession(s)
 ```
 
-当前代码中的 `music` / `transport` 模块即该旧实验留下的 evidence，尚未实现完整 playback state machine、FFmpeg Decoder 或真实 AudioOutput backend。
+该旧实验的可执行证据以 test-local 模块保留在 `crates/qianqian-core/tests/playback_temporal_traces/`；尚未实现完整 playback state machine、FFmpeg Decoder 或真实 AudioOutput backend。
 
 [阅读 Playback Architecture（历史）→](/architecture/playback-kernel)
 
