@@ -25,8 +25,8 @@ export interface ProjectState {
 }
 
 export const projectState: ProjectState = {
-  currentFrontier: 'Ladder evidence delivered through Phase C (PCM contract PR #93, direct flow PR #96) and realtime-view publication/reclamation mechanism evidence (PR #97, Issue #94 closed); next: re-audit the production realtime-runtime seam against the reconciled authority (PR #98), then mechanism adjudication (Phase D) and real decoder/output (Phase E)',
-  lastMilestone: 'Realtime-view publication/reclamation mechanism evidence validated ADR §6 P1–P5 on a real Rust mechanism (PR #97); Realtime Runtime responsibility earned (Issue #94 closed)',
+  currentFrontier: 'Ladder evidence delivered through Phase C (PCM contract PR #93, direct flow PR #96) and realtime-view publication/reclamation mechanism evidence (PR #97, Issue #94 closed); production realtime seam re-audited and shrunk against the reconciled authority (PR #98, PRs #101–#103); next: mechanism adjudication (Phase D) and the first real decoder/output plugin work (Phase E)',
+  lastMilestone: 'Production composition-root shrink completed: non-production playback baggage and the unearned pre-bound audio-output cache removed, runtime binding truth cleaned (PRs #101–#103)',
 
   layers: {
     playbackReference: 'HISTORICAL_EVIDENCE',
@@ -41,9 +41,9 @@ export const projectState: ProjectState = {
   },
 
   nextQuestions: [
-    'production realtime-runtime seam（PR #98）如何按收口后的 authority/vocabulary（ADR-PBK-001 §16）重新审判：KEEP / SHRINK / REWORK / CLOSE？',
     '哪类 publication/reclamation mechanism 最终胜出（Phase D 机制裁决：RT acquire/release、queued-reference lifetime、final-drop、deferred disposal）？',
-    '真实 decoder / output（Phase E）会挣得哪些 playback nouns？',
+    '第一个真实 decoder/output 插件 vertical slice（Phase E）会挣得哪些合同与 playback nouns？',
+    '第一个运行时图变更（换曲/换设备/seek 重开）何时触发 P1–P5 生产机制实现？',
   ],
 }
 

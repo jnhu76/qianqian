@@ -187,11 +187,11 @@ Composition topology 与 Audio Processing Graph 是两张不同的图。Gain / E
 
 ## 当前实现边界
 
-当前 Rust 代码中的 `qianqian-core::music::MusicKernel` / `qianqian-core::transport::TransportKernel` 即该旧实验留下的 **experimental evidence**（非 current authority）：
+该旧实验的 Rust 可执行证据已迁出生产 crate，现以 test-local 模块形式保留（非 current authority）：
 
 ```text
-qianqian-core::music::MusicKernel
-qianqian-core::transport::TransportKernel
+crates/qianqian-core/tests/playback_temporal_traces/music.rs
+crates/qianqian-core/tests/playback_temporal_traces/transport.rs
 ```
 
 这只是让代码 vocabulary 与当时历史实验模型一致，不代表当前 ADR-PBK-001 vocabulary；也没有提前冻结 Window / Generation / Fence / TrackSession / DecodeSession 的最终 Rust representation，更没有实现 FFmpeg/WASAPI playback engine。

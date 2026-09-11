@@ -40,10 +40,10 @@ The one normative ladder is ADR-PBK-001 §12:
 
 ```text
 Phase A  composition runtime reality                 (done: K0)
-Phase B  minimal PCM contract                        (this experiment)
-Phase C  direct-flow graph                           (next)
-Phase D  graph publication/replacement mechanism     (validation against §6 P1–P5)
-Phase E  real decoder / real output
+Phase B  minimal PCM contract                        (this experiment; DELIVERED, PR #93)
+Phase C  direct-flow graph                           (DELIVERED, PR #96)
+Phase D  graph publication/replacement mechanism     (first-round mechanism evidence DELIVERED, PR #97; final mechanism adjudication OPEN)
+Phase E  real decoder / real output                  (next authorized rung)
 Phase F  playback semantics
 ```
 

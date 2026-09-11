@@ -1,7 +1,7 @@
 # DIRECT-PCM-FLOW — Direct-flow Graph Executable Evidence
 
 **Status:** EVIDENCE / ENGINEERING RECORD — **NOT NORMATIVE AUTHORITY**
-**Scope:** Issue #95 / ADR-PBK-001 §12 evidence ladder Phase C (direct-flow graph); targets ADR §14 gate G4 (direct realtime data-flow executable experiment, OPEN)
+**Scope:** Issue #95 / ADR-PBK-001 §12 evidence ladder Phase C (direct-flow graph); targets ADR §14 gate G4 (direct realtime data-flow executable experiment — DELIVERED by this evidence, PR #96)
 **Authority gate:** This document is *not* an ADR and adds no normative fact beyond [`ADR-PBK-001.md`](../adr/ADR-PBK-001.md). It records executable evidence and representation-specific observations. If any conclusion here ever earns normative status, it must go through human-reviewed ADR clarification, not this file.
 **ADR impact: NONE.** ADR-PBK-001 already carries the plane separation (§1–§2), the realtime firewall (§2.4), P1–P5 (§6), and the ladder (§12). This experiment adds executable evidence only.
 
@@ -13,8 +13,8 @@ Base of this experiment is main at `686abf7` (merge of PR #93, the corrective th
 
 - `ADR-PBK-001.md` is **ACCEPTED** and is the sole normative playback constitution; `docs/architecture/pcm-contract-a0.md` is PCM edge evidence (EVIDENCE, NOT NORMATIVE AUTHORITY), and its `tests/pcm_edge_contract/` harness is executable PCM edge evidence on main.
 - The generic Composition Kernel (K0) is implemented and current: `Context / Capability / Fiber / Effect / Reconcile`, with synchronous control-plane `&mut Kernel`, activation-only `ActivationCtx::resolve`, and `Kernel::debug_op_count()` — a `#[doc(hidden)]` witness counting every public kernel operation (implementation ADR D9).
-- The architectural precedent for resolve-once/bind-outside lives in production: `crates/qianqian-runtime/src/lib.rs` `AppRuntime` resolves `AudioOutputCapability` once during `on_activate` and caches the `Rc` service outside kernel storage.
-- Issue #92 (PCM edge contract) remains **OPEN**; PR #93 merged with commit `686abf7`. Issue #12 (SRC/DSP research) and Issue #90 (OCR) are separate downstream tracks and were not touched.
+- The architectural precedent for resolve-once/bind-outside is two-layered. **At this experiment's base**, the production `AppRuntime` carried that witness: it resolved `AudioOutputCapability` once during `on_activate` and cached the `Rc` service outside kernel storage. **On current main**, that hardcoded witness has been removed from the composition root (PR #103); the root keeps no parallel service-handle state outside the kernel. The pattern survives as executable evidence in this harness's `flow_assembler` composition (§3) — test instrumentation, not a normative production authority.
+- Issue #92 (PCM edge contract) was OPEN at this experiment's base and has since been closed; PR #93 merged with commit `686abf7`. Issue #12 (SRC/DSP research) and Issue #90 (OCR) are separate downstream tracks and were not touched.
 - Working tree: only `tests/`, one test-shared instrumentation file, `crates/qianqian-core/Cargo.toml` (dev-dependency on `qianqian-kernel`), and `crates/qianqian-core/tests/pcm_edge_contract/main.rs` (allocator extraction) differ from main. **Production `src/` delta is zero** (§13). Local untracked `.gitignore` modification from the user's machine was preserved untouched.
 
 ---
@@ -39,7 +39,7 @@ Not in scope (firewall): SRC / DSP / gain / EQ / limiter, WASAPI or any device r
 
 ## 3. Setup path vs hot path
 
-**Setup (composition plane, runs exactly once per flow):** a real K0 kernel hosts four components — `stream_source`, `processing_stage`, `stream_sink`, `flow_assembler`. Each participant component provides a capability whose service is `RefCell<dyn PcmSource | PcmStage | PcmSink>`; the assembler component requires all three and, during its activation, calls `ctx.resolve` exactly once per capability, then constructs `PreboundPcmFlow` and stores it in a `FlowSlot` (`Rc<RefCell<Option<PreboundPcmFlow>>>`) outside kernel storage. This mirrors the `AppRuntime` precedent: resolution is an activation-episode act, and the result outlives the episode as plain data.
+**Setup (composition plane, runs exactly once per flow):** a real K0 kernel hosts four components — `stream_source`, `processing_stage`, `stream_sink`, `flow_assembler`. Each participant component provides a capability whose service is `RefCell<dyn PcmSource | PcmStage | PcmSink>`; the assembler component requires all three and, during its activation, calls `ctx.resolve` exactly once per capability, then constructs `PreboundPcmFlow` and stores it in a `FlowSlot` (`Rc<RefCell<Option<PreboundPcmFlow>>>`) outside kernel storage. This mirrors the resolve-once/bind-outside witness the production `AppRuntime` carried at this experiment's base (§1): resolution is an activation-episode act, and the result outlives the episode as plain data.
 
 **Hot path (realtime data plane, per quantum):** `PreboundPcmFlow` holds only three `Rc<RefCell<dyn …>>` participant references plus one `Vec<Sample>` block buffer. It has no kernel handle, no registry, no capability table — re-entry into the composition plane is structurally impossible, not merely unexercised. `run_quantum(frames)` performs exactly:
 
@@ -208,7 +208,7 @@ All 19 tests green (`cargo test --workspace`: `direct_pcm_flow` 19 passed, `pcm_
 
 ## 11. Open questions
 
-- What exactly G4 (ADR §14) requires as acceptance beyond this experiment's evidence — whether G4 is satisfied by this rung's executable record or expects more (e.g., a real-shaped consumer) is a human gate disposition, not something this document decides.
+- What exactly G4 (ADR §14) requires as acceptance beyond this experiment's evidence — whether G4 is satisfied by this rung's executable record or expects more (e.g., a real-shaped consumer) is a human gate disposition, not something this document decides. (Post-authoring: ADR §14 records G4 as DELIVERED with this record, PR #96.)
 - Whether the participant references should be monomorphized for the eventual realtime path — out of scope here (Issue #12 territory), but the boundary claims do not depend on it.
 - Where block storage should live in a production-shaped flow (source-owned vs flow-owned) — deferred to publication/replacement and real-device pressure.
 
@@ -218,7 +218,7 @@ All 19 tests green (`cargo test --workspace`: `direct_pcm_flow` 19 passed, `pcm_
 
 - **Publication/replacement mechanism validation** (the ADR §12 ladder's Phase D) — validate graph publication/replacement mechanisms against P1–P5 with the RT/control evidence list; the single static flow here is the baseline graph that a mechanism would publish, and H1 is the pressure input it must answer.
 - **Issue #12** — real decoder / real device pressure may reject representation choices (sample type, layout, shape); conversely it must not retro-design the earned boundary semantics (PCM edge §11 firewall applies unchanged).
-- **G4** — this document is the executable evidence targeting the OPEN gate; the gate's disposition is a human decision.
+- **G4** — this document is the delivered G4 executable evidence (ADR §14, PR #96); the gate's final disposition is a human decision.
 
 ---
 

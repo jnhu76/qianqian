@@ -2,7 +2,7 @@
 
 Design-gate deliverable for **#67 COMPOSITION-KERNEL-0** (parent authority **#46**, boundary prerequisite **#53 / PR #66**, accepted audit `component-boundary-a0.md`).
 
-Status: **merged semantic authority (PR #68); semantic design only — implementation NOT authorized.** Nothing here freezes a Rust API, a crate layout, or an async-runtime choice. Acceptance of the current pre-implementation review (Corrective-5, §Verdict) authorizes only opening a separate `COMPOSITION-KERNEL-0 IMPLEMENTATION` issue.
+Status: **merged semantic authority (PR #68); implemented as `qianqian-kernel` (PR #71); representation decisions live in `composition-kernel-0-implementation-adr.md`.** Nothing here freezes a Rust API, a crate layout, or an async-runtime choice; implementation did not change the semantic content below.
 
 Revision 1 (2026-09-06): initial semantic design (PR #68).
 

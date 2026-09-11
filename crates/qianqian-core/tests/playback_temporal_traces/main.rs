@@ -4,7 +4,8 @@
 //! oracle of an earlier Playback architecture experiment (and of the
 //! pre-reset ADR-PBK-001 revision). Playback architecture has since been
 //! reopened; these tests are failure witnesses / techniques, not a current
-//! acceptance gate (`docs/adr/ADR-PBK-001.md` is PROPOSED).
+//! acceptance gate (`docs/adr/ADR-PBK-001.md` was PROPOSED at authoring
+//! time and has since been ACCEPTED).
 //!
 //! These tests drive the pure, mechanism-independent temporal core through
 //! the trace families the pre-reset ADR revision and `specs/playback`

@@ -165,7 +165,7 @@ Gain → EQ → SRC → Limiter → ...
 | Audio Processing implementation | <StatusBadge status="PLANNED" /> |
 | UiHost | <StatusBadge status="DEFERRED" /> |
 
-当前 playback 代码（`qianqian-core::music` / `::transport`）是旧架构实验留下的 **experimental evidence**，不是 current authority；FFmpeg/WASAPI 和完整 playback state machine 未获得实现授权。
+旧 playback 实验代码已移出生产 crate，仅以 test-local executable evidence 保留（`crates/qianqian-core/tests/playback_temporal_traces/`），不是 current authority；FFmpeg/WASAPI 和完整 playback state machine 未获得实现授权。
 
 ---
 

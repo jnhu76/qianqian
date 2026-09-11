@@ -244,7 +244,7 @@ Do not model every architectural noun.
 
 The old PlaybackTemporal/PlaybackOwnership models are no longer blocking architecture authority.
 
-Realtime publication/lifetime was the first post-reset formal target and is delivered: `specs/realtime-publication/` proved the publication/reclamation collision at model level (TLC exhaustive check + mutation negative controls), and its semantic conclusions are frozen as the normative P1–P5 contract in ADR §6. Implementation-level evidence remains OPEN — §12 Phase D validates candidate mechanisms against P1–P5.
+Realtime publication/lifetime was the first post-reset formal target and is delivered: `specs/realtime-publication/` proved the publication/reclamation collision at model level (TLC exhaustive check + mutation negative controls), and its semantic conclusions are frozen as the normative P1–P5 contract in ADR §6. Implementation-level mechanism evidence has been delivered (`docs/architecture/realtime-view-publication.md`, PR #97); the final production mechanism remains open — §12 Phase D validates candidate mechanisms against P1–P5.
 
 ---
 
