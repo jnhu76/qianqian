@@ -9,6 +9,11 @@ bench/
   results/          tracked durable evidence (see bench/results/README.md)
   native/qn_bench.c benchmark binary used by tools/verify_xmake_core.py
                     (Xmake replay vs upstream-oracle equivalence)
+  native/pcm_perf_probe.c
+                    benchmark instrument used by
+                    tools/measure_decode_baseline.py (decode core vs SongCore
+                    ABI: throughput, startup, per-read latency, block sweep;
+                    one JSON per run, raw dumps to untracked runs/)
 ```
 
 ## qn_bench.c
