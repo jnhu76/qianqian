@@ -1,0 +1,125 @@
+{
+  "schema": "songcore-equivalence-reference/1",
+  "provenance": {
+    "mechanism_source_commit": "fb3a3bac0e2f139b51e0241a11a5e173bbeff859",
+    "mechanism_source_branch": "evidence/native-repro-corrective-1 (#111)",
+    "performance_baseline_commit": "f3ca50a3ea6cbef9287615fe1f3cf70ec9f18d42",
+    "performance_baseline_branch": "bench/native-decode-performance (#112)",
+    "performance_baseline_json": "bench/results/decode-baseline/native-decode-performance.json",
+    "ffmpeg_pin_tag": "n9.0.1",
+    "ffmpeg_pin_commit_sha": "bf1b838f2ab88b4f8fd83443325c782ea0e0f7fa",
+    "closure_profile": "codec-base",
+    "closure_profile_sha256": "57fb70ed2c29a8464d939c611b3c5ed1bc99879438eb7f159530dfa52de554fa",
+    "closure_translation_units": 279,
+    "baseline_host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "kernel": "6.18.33.2-microsoft-standard-WSL2",
+      "os": "Ubuntu 26.04.1 LTS",
+      "logical_cpus": 8,
+      "affinity_cpu": 2,
+      "affinity_tool": "taskset -c",
+      "compiler": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+      "bench_driver_opt": "-O2"
+    },
+    "baseline_protocol": {
+      "throughput": {"block_frames": 4096, "warmup": 3, "iterations": 20, "runs": 3, "timed_window": "read loop only (B1 ABI layer), canonical conversion included, output into caller buffer, no accumulation store", "statistic": "median wall per run, median across runs"},
+      "startup": {"iterations": 50, "first_read_capacity_frames": 4096, "statistic": "median us"},
+      "read_latency": {"block_frames": 1024, "warmup": 2, "passes": 3, "statistic": "nearest-rank percentiles on pooled per-call microseconds"}
+    },
+    "reference_observation": "correctness values were re-observed from the historical mechanism build (fb3a3ba artifacts, qn_bench correct/bench modes) and cross-checked against the #112 recorded pcm_sha256 values; all match"
+  },
+  "perf_regression_threshold": 0.10,
+  "fixtures": [
+    {
+      "id": "mp3-cbr-id3v23",
+      "file": "mp3-cbr-id3v23.mp3",
+      "fixture_sha256": "feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058",
+      "fixture_bytes": 65323,
+      "codec": "mp3",
+      "sample_rate": 44100,
+      "channels": 2,
+      "pcm_frames": 176400,
+      "pcm_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+      "terminal": "clean EOF (SONG_EOF, zero frames)"
+    },
+    {
+      "id": "flac-16-44-stereo",
+      "file": "flac-16-44-stereo.flac",
+      "fixture_sha256": "d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2",
+      "fixture_bytes": 146237,
+      "codec": "flac",
+      "sample_rate": 44100,
+      "channels": 2,
+      "pcm_frames": 176400,
+      "pcm_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+      "terminal": "clean EOF (SONG_EOF, zero frames)"
+    },
+    {
+      "id": "alac-16-44-stereo",
+      "file": "alac-16-44-stereo.m4a",
+      "fixture_sha256": "0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3",
+      "fixture_bytes": 594196,
+      "codec": "alac",
+      "sample_rate": 44100,
+      "channels": 2,
+      "pcm_frames": 176400,
+      "pcm_sha256": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+      "terminal": "clean EOF (SONG_EOF, zero frames)"
+    },
+    {
+      "id": "alac-long",
+      "file": "alac-long.m4a",
+      "fixture_sha256": "2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c",
+      "fixture_bytes": 890903,
+      "codec": "alac",
+      "sample_rate": 44100,
+      "channels": 2,
+      "pcm_frames": 264600,
+      "pcm_sha256": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+      "terminal": "clean EOF (SONG_EOF, zero frames)"
+    }
+  ],
+  "corpus_note": "committed fixtures are small, distinctive MP3 / FLAC / ALAC samples only; the 224 s real-world MP3 from the #112 evidence corpus is intentionally not a repository fixture (local/optional corpus; its cross-day numbers remain available in the #112 evidence)",
+  "historical_performance": {
+    "mp3-cbr-id3v23": {
+      "x_realtime": 2044.0,
+      "wall_ms_median": 1.957,
+      "open_median_us": 28.92,
+      "probe_median_us": 71.06,
+      "first_read_median_us": 62.49,
+      "read_p50_us": 11.864,
+      "read_p99_us": 28.055,
+      "read_max_us": 61.102
+    },
+    "flac-16-44-stereo": {
+      "x_realtime": 1145.4,
+      "wall_ms_median": 3.492,
+      "open_median_us": 20.45,
+      "probe_median_us": 162.46,
+      "first_read_median_us": 105.2,
+      "read_p50_us": 0.101,
+      "read_p99_us": 107.282,
+      "read_max_us": 147.122
+    },
+    "alac-16-44-stereo": {
+      "x_realtime": 526.1,
+      "wall_ms_median": 7.603,
+      "open_median_us": 40.39,
+      "probe_median_us": 183.84,
+      "first_read_median_us": 171.6,
+      "read_p50_us": 0.1,
+      "read_p99_us": 199.916,
+      "read_max_us": 239.374
+    },
+    "alac-long": {
+      "x_realtime": 528.3,
+      "wall_ms_median": 11.357,
+      "open_median_us": 42.03,
+      "probe_median_us": 187.69,
+      "first_read_median_us": 160.85,
+      "read_p50_us": 0.1,
+      "read_p99_us": 211.81,
+      "read_max_us": 264.856
+    }
+  }
+}

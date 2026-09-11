@@ -1,0 +1,19 @@
+{
+  "schema": "songcore-equivalence-same-day-ab/1",
+  "generated_utc": "2026-09-12",
+  "protocol": {
+    "driver": "historical qn_bench.c (f3ca50a, bench/native/qn_bench.c) compiled identically twice at -O2",
+    "hist_binary_links": "libsongcore.a built from evidence/native-repro-corrective-1 (fb3a3ba)",
+    "ported_binary_links": "libsongcore.a built from this branch (current main + selective port)",
+    "runs": "3 interleaved runs per (binary, fixture); taskset -c 2; iterations 10, warmup 3",
+    "note": "the bench-mode timed window includes the driver's sample-store copy, so absolute x_realtime here is not comparable to the no-store B1 numbers in songcore-equivalence.json (it is lower for the long-MP3/ALAC fixtures, higher for others); the comparison is same-window apples-to-apples"
+  },
+  "results": [
+    {"fixture": "mp3-cbr-id3v23.mp3",  "hist_median_xrt": 2051.3, "ported_median_xrt": 2052.9, "delta_percent": 0.08,  "canonical_sha_match": true},
+    {"fixture": "flac-16-44-stereo.flac", "hist_median_xrt": 1200.6, "ported_median_xrt": 1200.1, "delta_percent": -0.04, "canonical_sha_match": true},
+    {"fixture": "alac-16-44-stereo.m4a", "hist_median_xrt": 499.4,  "ported_median_xrt": 506.7,  "delta_percent": 1.46, "canonical_sha_match": true},
+    {"fixture": "alac-long.m4a",        "hist_median_xrt": 529.2,  "ported_median_xrt": 540.5,  "delta_percent": 2.14, "canonical_sha_match": true},
+    {"fixture": "mp3-cbr-128.mp3",      "hist_median_xrt": 1188.5, "ported_median_xrt": 1198.9, "delta_percent": 0.88, "canonical_sha_match": true}
+  ],
+  "verdict": "PERFORMANCE_EQUIVALENT: max |delta| 2.14% (same-driver, same-host, same-affinity); canonical Float32 PCM sha256 identical on every fixture"
+}

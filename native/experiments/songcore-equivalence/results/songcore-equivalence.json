@@ -1,0 +1,324 @@
+{
+  "abi_gate": {
+    "actual_count": 15,
+    "expected_count": 15,
+    "exports": [
+      "song_audio_stream_count",
+      "song_audio_stream_info",
+      "song_close",
+      "song_get_artwork_count",
+      "song_get_artwork_item",
+      "song_get_metadata",
+      "song_get_metadata_count",
+      "song_get_metadata_entry",
+      "song_last_error",
+      "song_open",
+      "song_probe",
+      "song_read_pcm",
+      "song_seek",
+      "song_select_stream",
+      "songcore_abi_version"
+    ],
+    "extras": [],
+    "ffmpeg_symbol_leaks": [],
+    "header_ffmpeg_type_leaks": [],
+    "missing": [],
+    "pass": true,
+    "shared_dependency_gate": {
+      "pass": true,
+      "shared_dependency_leaks": [],
+      "shared_needed": [
+        "libc.so.6",
+        "libm.so.6"
+      ]
+    },
+    "shared_needed": [
+      "libc.so.6",
+      "libm.so.6"
+    ]
+  },
+  "artifact_gate": {
+    "pass": true,
+    "shared_bytes": 2288536,
+    "static_bytes": 4067068,
+    "static_members": 280,
+    "undefined_symbol_kinds": [
+      "_GLOBAL_OFFSET_TABLE_",
+      "aacdec.c.o:",
+      "aacdec_ac.c.o:",
+      "aacdec_float.c.o:",
+      "aacdec_lpd.c.o:",
+      "aacdec_tab.c.o:",
+      "aacdec_usac.c.o:",
+      "aacdec_usac_mps212.c.o:",
+      "aacps_common.c.o:",
+      "aacps_float.c.o:",
+      "aacpsdsp_float.c.o:",
+      "aacsbr.c.o:",
+      "aactab.c.o:",
+      "abort",
+      "ac3_channel_layout_tab.c.o:",
+      "ac3_parser.c.o:",
+      "acos",
+      "adler32.c.o:",
+      "adts_header.c.o:",
+      "adts_parser.c.o:",
+      "aes.c.o:",
+      "aes_ctr.c.o:",
+      "alac.c.o:",
+      "alac_data.c.o:",
+      "alacdsp.c.o:",
+      "allcodecs.c.o:",
+      "allformats.c.o:",
+      "ambient_viewing_environment.c.o:",
+      "apetag.c.o:",
+      "asin",
+      "atan",
+      "atan2",
+      "atan2f",
+      "atanf",
+      "audio_fifo.c.o:",
+      "audioconvert.c.o:",
+      "av1.c.o:",
+      "av_add_index_entry",
+      "av_add_q",
+      "av_add_stable"
+    ]
+  },
+  "compiler": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "correctness": {
+    "alac-16-44-stereo": {
+      "fixture_sha_ok": true,
+      "frames_match": true,
+      "observed": {
+        "channels": 2,
+        "codec": "alac",
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "duration_us": 4000000,
+        "file": "/home/hoo/Source/qianqian/native/experiments/songcore-equivalence/fixtures/alac-16-44-stereo.m4a",
+        "frames": 176400,
+        "mode": "correct",
+        "pcm_sha256": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+        "sample_rate": 44100,
+        "status": "ok",
+        "terminal": "SONG_EOF"
+      },
+      "pass": true,
+      "pcm_sha256_match": true,
+      "terminal_match": true
+    },
+    "alac-long": {
+      "fixture_sha_ok": true,
+      "frames_match": true,
+      "observed": {
+        "channels": 2,
+        "codec": "alac",
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "duration_us": 6000000,
+        "file": "/home/hoo/Source/qianqian/native/experiments/songcore-equivalence/fixtures/alac-long.m4a",
+        "frames": 264600,
+        "mode": "correct",
+        "pcm_sha256": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+        "sample_rate": 44100,
+        "status": "ok",
+        "terminal": "SONG_EOF"
+      },
+      "pass": true,
+      "pcm_sha256_match": true,
+      "terminal_match": true
+    },
+    "flac-16-44-stereo": {
+      "fixture_sha_ok": true,
+      "frames_match": true,
+      "observed": {
+        "channels": 2,
+        "codec": "flac",
+        "container": "flac",
+        "duration_us": 4000000,
+        "file": "/home/hoo/Source/qianqian/native/experiments/songcore-equivalence/fixtures/flac-16-44-stereo.flac",
+        "frames": 176400,
+        "mode": "correct",
+        "pcm_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+        "sample_rate": 44100,
+        "status": "ok",
+        "terminal": "SONG_EOF"
+      },
+      "pass": true,
+      "pcm_sha256_match": true,
+      "terminal_match": true
+    },
+    "mp3-cbr-id3v23": {
+      "fixture_sha_ok": true,
+      "frames_match": true,
+      "observed": {
+        "channels": 2,
+        "codec": "mp3",
+        "container": "mp3",
+        "duration_us": 4000000,
+        "file": "/home/hoo/Source/qianqian/native/experiments/songcore-equivalence/fixtures/mp3-cbr-id3v23.mp3",
+        "frames": 176400,
+        "mode": "correct",
+        "pcm_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+        "sample_rate": 44100,
+        "status": "ok",
+        "terminal": "SONG_EOF"
+      },
+      "pass": true,
+      "pcm_sha256_match": true,
+      "terminal_match": true
+    }
+  },
+  "correctness_verdict": "PASS",
+  "generated_utc": "2026-09-12T00:06:07Z",
+  "harness_opt": "-O2",
+  "loadavg_at_start": [
+    "1.43",
+    "3.92",
+    "3.96"
+  ],
+  "performance": {
+    "fixtures": {
+      "alac-16-44-stereo": {
+        "delta_read_p99_percent": 1.71,
+        "delta_ttfp_percent": 7.51,
+        "delta_x_realtime_percent": -2.94,
+        "first_read_us_median": 165.759,
+        "historical": {
+          "first_read_median_us": 171.6,
+          "open_median_us": 40.39,
+          "probe_median_us": 183.84,
+          "read_max_us": 239.374,
+          "read_p50_us": 0.1,
+          "read_p99_us": 199.916,
+          "wall_ms_median": 7.603,
+          "x_realtime": 526.1
+        },
+        "open_us_median": 59.628,
+        "probe_us_median": 200.789,
+        "read_max_us_median": 242.442,
+        "read_p50_us_median": 0.13,
+        "read_p99_us_median": 203.334,
+        "ttfp_us_median": 425.555,
+        "wall_us_median_of_run_medians": 7833.425,
+        "x_realtime_median": 510.63,
+        "x_realtime_per_run": [
+          498.24,
+          510.63,
+          511.66
+        ]
+      },
+      "alac-long": {
+        "delta_read_p99_percent": -6.66,
+        "delta_ttfp_percent": 7.58,
+        "delta_x_realtime_percent": -4.86,
+        "first_read_us_median": 155.849,
+        "historical": {
+          "first_read_median_us": 160.85,
+          "open_median_us": 42.03,
+          "probe_median_us": 187.69,
+          "read_max_us": 264.856,
+          "read_p50_us": 0.1,
+          "read_p99_us": 211.81,
+          "wall_ms_median": 11.357,
+          "x_realtime": 528.3
+        },
+        "open_us_median": 60.23,
+        "probe_us_median": 204.085,
+        "read_max_us_median": 262.763,
+        "read_p50_us_median": 0.13,
+        "read_p99_us_median": 197.693,
+        "ttfp_us_median": 420.164,
+        "wall_us_median_of_run_medians": 11937.249,
+        "x_realtime_median": 502.63,
+        "x_realtime_per_run": [
+          469.19,
+          502.63,
+          513.93
+        ]
+      },
+      "flac-16-44-stereo": {
+        "delta_read_p99_percent": 5.02,
+        "delta_ttfp_percent": -2.83,
+        "delta_x_realtime_percent": -0.08,
+        "first_read_us_median": 98.165,
+        "historical": {
+          "first_read_median_us": 105.2,
+          "open_median_us": 20.45,
+          "probe_median_us": 162.46,
+          "read_max_us": 147.122,
+          "read_p50_us": 0.101,
+          "read_p99_us": 107.282,
+          "wall_ms_median": 3.492,
+          "x_realtime": 1145.4
+        },
+        "open_us_median": 16.302,
+        "probe_us_median": 165.489,
+        "read_max_us_median": 133.365,
+        "read_p50_us_median": 0.111,
+        "read_p99_us_median": 112.664,
+        "ttfp_us_median": 279.956,
+        "wall_us_median_of_run_medians": 3494.845,
+        "x_realtime_median": 1144.54,
+        "x_realtime_per_run": [
+          1144.54,
+          1133.72,
+          1150.43
+        ]
+      },
+      "mp3-cbr-id3v23": {
+        "delta_read_p99_percent": 41.22,
+        "delta_ttfp_percent": 9.2,
+        "delta_x_realtime_percent": -5.64,
+        "first_read_us_median": 81.782,
+        "historical": {
+          "first_read_median_us": 62.49,
+          "open_median_us": 28.92,
+          "probe_median_us": 71.06,
+          "read_max_us": 61.102,
+          "read_p50_us": 11.864,
+          "read_p99_us": 28.055,
+          "wall_ms_median": 1.957,
+          "x_realtime": 2044.0
+        },
+        "open_us_median": 27.274,
+        "probe_us_median": 68.366,
+        "read_max_us_median": 57.985,
+        "read_p50_us_median": 12.555,
+        "read_p99_us_median": 39.619,
+        "ttfp_us_median": 177.422,
+        "wall_us_median_of_run_medians": 2074.014,
+        "x_realtime_median": 1928.63,
+        "x_realtime_per_run": [
+          1857.66,
+          1937.33,
+          1928.63
+        ]
+      }
+    },
+    "protocol": {
+      "affinity_cpu": 2,
+      "load_gate_1min": 2.0,
+      "read_latency": {
+        "block_frames": 1024,
+        "passes": 3,
+        "warmup": 2
+      },
+      "run_order": "fixtures shuffled per run (recorded seed)",
+      "runs": 3,
+      "shuffle_seed": 20260912,
+      "startup": {
+        "first_read_capacity_frames": 4096,
+        "iterations": 50
+      },
+      "throughput": {
+        "block_frames": 4096,
+        "iterations": 20,
+        "warmup": 3
+      }
+    },
+    "timer_baseline_us": 0.03
+  },
+  "performance_verdict": "EQUIVALENT_WITHIN_THRESHOLD",
+  "schema": "songcore-equivalence/1",
+  "source_commit": "fcf7ad32d17ddb1dbf6a45efb7463370e900bc03"
+}
