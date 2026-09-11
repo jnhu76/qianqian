@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """DSP/SRC integration smoke (test-only, never ships).
 
-Runs the capability probe (tests/songcore/dsp_cap_probe)
+Runs the capability probe (native/tests/songcore/dsp_cap_probe)
 against the trimmed libavfilter closure (build/minimize/avf-c2) with the
-DSP/SRC scenario (tests/songcore/dsp-src-smoke.kv) and records the evidence
+DSP/SRC scenario (native/tests/songcore/dsp-src-smoke.kv) and records the evidence
 in bench/results/songcore-v1/dsp-src-integration.json.
 
 What this proves (machine-gated):
@@ -30,7 +30,8 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 OUT_DIR = os.path.join(ROOT, "bench", "results", "songcore-v1")
 PROBE = os.path.join(ROOT, "build", "artifacts", "dsp_cap_probe")
-SCENARIO = os.path.join(ROOT, "tests", "songcore", "dsp-src-smoke.kv")
+SCENARIO = os.path.join(ROOT, "native", "tests", "songcore",
+                        "dsp-src-smoke.kv")
 CLOSURE_MANIFEST = os.path.join(ROOT, "build", "minimize", "avf-c2",
                                 "manifest.json")
 PRODUCTION_MANIFEST = os.path.join(ROOT, "build", "minimize",

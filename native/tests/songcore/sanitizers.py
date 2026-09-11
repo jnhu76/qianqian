@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Sanitizer density pass (test-only, never ships).
 
-Instruments exactly the code under test — SongCore (src/songcore_ffmpeg.c)
-plus the machine-test harness (tests/songcore/songcore_probe.c) — with
+Instruments exactly the code under test — SongCore
+(native/src/songcore_ffmpeg.c) plus the machine-test harness
+(native/tests/songcore/songcore_probe.c) — with
 AddressSanitizer, UndefinedBehaviorSanitizer and LeakSanitizer, links against
 the frozen uninstrumented FFmpeg closure (build/artifacts/libqianqian_av.a)
 and runs the full fixture corpus through the dense consumption modes:
@@ -16,7 +17,8 @@ Gates (fail-closed):
   - zero AddressSanitizer reports
   - zero LeakSanitizer reports at process exit
   - zero UndefinedBehavior reports attributed to Qianqian code
-    (src/, tests/songcore/, include/); reports inside the pinned upstream
+    (native/src/, native/tests/songcore/, native/include/); reports inside
+    the pinned upstream
     FFmpeg closure are counted as upstream noise, not our defect
   - every invocation exits cleanly (no ASan aborts / crashes)
 
@@ -45,8 +47,8 @@ COMMON_MANIFEST = os.path.join(ROOT, "corpus", "manifest", "common-formats.json"
 
 # Files we own; UBSan reports pointing here are defects.
 OWNED_PREFIXES = (
-    os.path.join(ROOT, "src", "songcore_ffmpeg.c"),
-    os.path.join(ROOT, "tests", "songcore", "songcore_probe.c"),
+    os.path.join(ROOT, "native", "src", "songcore_ffmpeg.c"),
+    os.path.join(ROOT, "native", "tests", "songcore", "songcore_probe.c"),
     os.path.join(ROOT, "native", "include", "songcore.h"),
 )
 UPSTREAM_PREFIX = os.path.join(ROOT, "build", "ffmpeg-src")
@@ -68,8 +70,8 @@ def build_binary():
     if not os.path.isfile(CLOSURE_LIB):
         raise SystemExit(f"closure library missing: {CLOSURE_LIB}")
     src = [
-        os.path.join(ROOT, "src", "songcore_ffmpeg.c"),
-        os.path.join(ROOT, "tests", "songcore", "songcore_probe.c"),
+        os.path.join(ROOT, "native", "src", "songcore_ffmpeg.c"),
+        os.path.join(ROOT, "native", "tests", "songcore", "songcore_probe.c"),
     ]
     r = run(["gcc", "-O1", "-g", "-fno-omit-frame-pointer",
              "-fsanitize=address,undefined",

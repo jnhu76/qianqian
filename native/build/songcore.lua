@@ -137,7 +137,8 @@ target("songcore_probe")
     end
     -- Test-closure provenance: embed the canonical identity fields of the
     -- replayed FFmpeg manifest (written by tools/ffmpeg_profile_import.py)
-    -- so tests/songcore/regression.py can verify this binary was built from
+    -- so native/tests/songcore/regression.py can verify this binary was
+    -- built from
     -- the closure it expects — a codec-base-built probe must fail closed
     -- before any corpus case. No manifest here defers to qianqian_av's
     -- before_build gate; the probe then reports "unknown" and the
@@ -182,7 +183,7 @@ target("songcore_probe")
 -- DSP capability probe (test-only): links the FFmpeg closure replayed by
 -- qianqian_av and exercises the filters that closure enables — registration
 -- presence/absence, negotiated formats, correctness smokes, graph lifecycle.
--- Used by tests/songcore/dsp_src.py and by tools/dsp_closure.py for the
+-- Used by native/tests/songcore/dsp_src.py and by tools/dsp_closure.py for the
 -- capability-driven libavfilter closure ladder.
 target("dsp_cap_probe")
     set_kind("binary")
