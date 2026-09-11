@@ -6,9 +6,11 @@ The repository is in **Architecture v2**. The first verified playback experiment
 
 ## Architecture in 30 seconds
 
-这是当前 Playback Foundations（ARCH-003）的架构图；规范语义以 [`ADR-PBK-001`](docs/adr/ADR-PBK-001.md) 为准。
+下图是 Architecture v2 reset 阶段留下的 Playback Foundations 历史 proposal 海报（图内自标 `PROPOSED / RESET`），仅为保留当时的视觉设计上下文；它不是当前架构的完整投影，也不是 normative authority。
 
 [![ARCH-003 Playback Foundations](docs/architecture/diagrams/ARCH-003-playback-foundations-v2-poster-original.png)](docs/adr/ADR-PBK-001.md)
+
+当前规范语义以 [`ADR-PBK-001`](docs/adr/ADR-PBK-001.md)（ACCEPTED）为准，K0 语义以 [`composition-kernel-0-design.md`](docs/architecture/composition-kernel-0-design.md) 为准。当前架构图应从仓库内 Mermaid 源（`docs/architecture/diagrams/`）生成，而不是手绘海报。
 
 The central rule is:
 
