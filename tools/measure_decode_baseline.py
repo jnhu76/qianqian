@@ -356,16 +356,17 @@ def startup_view(run_map):
         docs = [run_map[label]["startup_" + key] for label in labels]
         entry = {}
         for part in ("open", "probe", "first_read", "ttfp", "decoder_open", "first_frame"):
-            present = [d[part] for d in docs if part in d]
-            if not present:
+            part_docs = [d[part] for d in docs if part in d]
+            if not part_docs:
                 continue
             entry[part] = {
-                "median_us": round(median([d[part]["p50_us"] for d in present]), 2),
-                "p95_us": round(median([d[part]["p95_us"] for d in present]), 2),
-                "max_us": round(median([d[part]["max_us"] for d in present]), 2),
+                "median_us": round(median([p["p50_us"] for p in part_docs]), 2),
+                "p95_us": round(median([p["p95_us"] for p in part_docs]), 2),
+                "max_us": round(median([p["max_us"] for p in part_docs]), 2),
             }
         if key == "abi":
-            entry["first_buffer_silent_count"] = median([d.get("first_buffer_silent_count") for d in docs])
+            counts = [d["first_buffer_silent_count"] for d in docs if "first_buffer_silent_count" in d]
+            entry["first_buffer_silent_count"] = median(counts) if counts else None
         out[key] = entry
     return out
 
