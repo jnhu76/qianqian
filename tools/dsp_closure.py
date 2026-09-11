@@ -518,9 +518,15 @@ def parse_live_map(map_path: Path, members: list, manifest: dict) -> dict:
     member→unit alignment: xmake archives qianqian_av members in manifest
     order (validated 1:1 by the link audit; re-asserted here so
     a xmake ordering change fails loudly instead of mis-attributing bytes).
-    Map lines referencing the archive appear as
-    '<path>libqianqian_av.a(<member>)'.
+    Map lines reference the closure either as
+    '<path>libqianqian_av.a(<member>)' (unmerged session) or, since
+    PHYS-IA-2's build.merge_archive, as '<path>libsongcore.a(<member>)'
+    (the product-shaped probe links the merged archive; the merged archive
+    additionally carries the SongCore TU itself, which is not a closure
+    unit and is excluded from the ledger).
     """
+    archive_refs = ("libqianqian_av.a", "libsongcore.a")
+    non_closure_members = {"songcore_ffmpeg.c.o"}
     text = map_path.read_text(errors="replace")
     idx_to_unit = [u["object"] for u in manifest["units"]]
     if len(idx_to_unit) != len(members):
@@ -575,13 +581,19 @@ def parse_live_map(map_path: Path, members: list, manifest: dict) -> dict:
         size = int(size_hex, 16)
         if in_discarded:
             if (size and sec.startswith((".text", ".data", ".rodata", ".bss"))
-                    and "libqianqian_av.a(" in rest):
+                    and any(an + "(" in rest for an in archive_refs)):
                 disc_total += size
             continue
-        ma = re.search(r"libqianqian_av\.a\(([^)]+)\)", rest)
-        if not ma:
+        member = None
+        for an in archive_refs:
+            ma = re.search(re.escape(an) + r"\(([^)]+)\)", rest)
+            if ma:
+                member = ma.group(1)
+                break
+        if member is None:
             continue
-        member = ma.group(1)
+        if member in non_closure_members:
+            continue
         if member not in members:
             unrecognized.add(member)
             continue
