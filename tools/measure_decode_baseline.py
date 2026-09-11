@@ -305,33 +305,41 @@ def agg_lat(blocks_by_run):
     out["flag"] = "INSUFFICIENT_SAMPLE_COUNT" if out.get("p999_us") is None else None
     return out
 
-def throughput_view(rec):
-    tp = rec["throughput"]
-    audio_s = rec["audio_seconds"]
+def throughput_view(run_map):
+    labels = sorted(run_map)
+    first = run_map[labels[0]]
+    audio_s = median([r["audio_seconds"] for r in run_map.values()])
     view = {"audio_seconds": audio_s}
-    for layer, wall_key, count_key in (("core", "samples", "frames"), ("abi", "frames", "calls")):
-        walls = [it["wall_us"] for it in tp[layer]["iters"]]
-        cpus = [it["cpu_us"] for it in tp[layer]["iters"]]
-        wall = median(walls) / 1e3
-        cpu_med = median(cpus) / 1e3
+    for layer, count_key in (("core", "samples"), ("abi", "frames")):
+        per_run_med = {}
+        per_run_cpu = {}
+        for label in labels:
+            iters = run_map[label]["throughput"][layer]["iters"]
+            per_run_med[label] = median([it["wall_us"] for it in iters])
+            per_run_cpu[label] = median([it["cpu_us"] for it in iters])
+        wall = median(per_run_med.values()) / 1e3
+        cpu_med = median(per_run_cpu.values()) / 1e3
         entry = {
             "wall_ms_median": round(wall, 3),
             "cpu_ms_median": round(cpu_med, 3),
             "cpu_to_wall_ratio": round(cpu_med / wall, 3) if wall else None,
-            "wall_ms_min": round(min(walls) / 1e3, 3),
-            "wall_ms_max": round(max(walls) / 1e3, 3),
+            "wall_ms_min": round(min(per_run_med.values()) / 1e3, 3),
+            "wall_ms_max": round(max(per_run_med.values()) / 1e3, 3),
+            "wall_ms_median_per_run": {label: round(v / 1e3, 3) for label, v in per_run_med.items()},
         }
+        c = cv(list(per_run_med.values()))
+        entry["run_cv"] = round(c, 4) if c is not None else None
         if audio_s and wall > 0:
             entry["x_realtime"] = round(audio_s / (wall / 1e3), 1)
-        frames = rec["verify"]["abi"]["frames"]
-        channels = tp["channels"]
+        frames = first["verify"]["abi"]["frames"]
+        channels = first["throughput"]["channels"]
         if wall > 0:
             entry["pcm_mbytes_per_s"] = round(frames * channels * 4 / (wall / 1e3) / 1e6, 1)
             entry["us_per_frame"] = round(wall * 1e3 / frames, 4)
         view[layer] = entry
     cw = view["core"]["wall_ms_median"]
     aw = view["abi"]["wall_ms_median"]
-    frames = rec["verify"]["abi"]["frames"]
+    frames = first["verify"]["abi"]["frames"]
     delta_ms = aw - cw
     view["canonical_output_cost"] = {
         "wall_ms_delta": round(delta_ms, 3),
@@ -341,40 +349,54 @@ def throughput_view(rec):
     }
     return view
 
-def startup_view(rec):
+def startup_view(run_map):
+    labels = sorted(run_map)
     out = {}
-    for key, doc in (("abi", rec["startup_abi"]), ("core", rec["startup_core"])):
+    for key in ("abi", "core"):
+        docs = [run_map[label]["startup_" + key] for label in labels]
         entry = {}
         for part in ("open", "probe", "first_read", "ttfp", "decoder_open", "first_frame"):
-            if part in doc:
-                entry[part] = {"median_us": doc[part]["p50_us"], "p95_us": doc[part]["p95_us"], "max_us": doc[part]["max_us"]}
+            present = [d[part] for d in docs if part in d]
+            if not present:
+                continue
+            entry[part] = {
+                "median_us": round(median([d[part]["p50_us"] for d in present]), 2),
+                "p95_us": round(median([d[part]["p95_us"] for d in present]), 2),
+                "max_us": round(median([d[part]["max_us"] for d in present]), 2),
+            }
         if key == "abi":
-            entry["first_buffer_silent_count"] = doc.get("first_buffer_silent_count")
+            entry["first_buffer_silent_count"] = median([d.get("first_buffer_silent_count") for d in docs])
         out[key] = entry
     return out
 
-def sweep_view(rec):
-    sweep = rec.get("block_sweep")
+def sweep_view(run_map):
+    labels = sorted(run_map)
+    first = run_map[labels[0]]
+    sweep = first.get("block_sweep")
     if not sweep:
         return None
-    audio_s = rec["audio_seconds"]
+    audio_s = median([r["audio_seconds"] for r in run_map.values()])
+    docs = [run_map[label]["block_sweep"] for label in labels]
     out = []
     for blk in sweep["per_block"]:
-        stats = blk["read_call"]
+        block = blk["block_frames"]
+        runs_blk = [b for doc in docs for b in doc["per_block"] if b["block_frames"] == block]
+        if not runs_blk:
+            continue
+        read_calls = [b["read_call"] for b in runs_blk]
         entry = {
-            "block_frames": blk["block_frames"],
-            "calls_per_pass": blk["calls_per_pass"],
-            "frames_per_call": round(blk["frames_per_pass"] / blk["calls_per_pass"], 1),
-            "p50_us": stats["p50_us"],
-            "p95_us": stats["p95_us"],
-            "p99_us": stats["p99_us"],
-            "max_us": stats["max_us"],
-            "batch_wall_us": blk["batch_wall_us"],
-            "batch_mean_call_us": blk["batch_mean_call_us"],
+            "block_frames": block,
+            "calls_per_pass": median([b["calls_per_pass"] for b in runs_blk]),
+            "frames_per_call": round(median([b["frames_per_pass"] / b["calls_per_pass"] for b in runs_blk]), 1),
+            "batch_wall_us": median([b["batch_wall_us"] for b in runs_blk]),
+            "batch_mean_call_us": median([b["batch_mean_call_us"] for b in runs_blk]),
         }
-        if audio_s and blk["batch_wall_us"] > 0:
-            entry["batch_x_realtime"] = round(audio_s / (blk["batch_wall_us"] / 1e6), 1)
-            entry["batch_pcm_mbytes_per_s"] = round(blk["batch_frames"] * sweep["channels"] * 4 / (blk["batch_wall_us"] / 1e6) / 1e6, 1)
+        for key in LAT_KEYS:
+            vals = [rc[key] for rc in read_calls if rc.get(key) is not None]
+            entry[key] = median(vals)
+        if audio_s and entry["batch_wall_us"] > 0:
+            entry["batch_x_realtime"] = round(audio_s / (entry["batch_wall_us"] / 1e6), 1)
+            entry["batch_pcm_mbytes_per_s"] = round(median([b["batch_frames"] for b in runs_blk]) * sweep["channels"] * 4 / (entry["batch_wall_us"] / 1e6) / 1e6, 1)
         out.append(entry)
     return out
 
@@ -424,20 +446,13 @@ def cmd_commit(args):
         rec = bundle["record"]
         run_map = bundle["runs"]
         labels = sorted(run_map)
-        tp_view = throughput_view(rec)
-        per_run_tp = {}
+        tp_view = throughput_view(run_map)
         for layer in ("core", "abi"):
-            med_walls = []
-            for label in labels:
-                walls = [it["wall_us"] for it in run_map[label]["throughput"][layer]["iters"]]
-                med_walls.append(median(walls))
-            tp_view[layer]["wall_ms_median_per_run"] = {label: round(median([it["wall_us"] for it in run_map[label]["throughput"][layer]["iters"]]) / 1e3, 3) for label in labels}
-            c = cv(med_walls)
-            tp_view[layer]["run_cv"] = round(c, 4) if c is not None else None
+            c = tp_view[layer]["run_cv"]
             tp_cv[layer].append(c)
         throughput[fid] = tp_view
 
-        st_view = startup_view(rec)
+        st_view = startup_view(run_map)
         ttfp_vals = [run_map[label]["startup_abi"]["ttfp"]["p50_us"] for label in labels]
         st_view["abi"]["ttfp_p50_per_run_us"] = {label: round(v, 1) for label, v in zip(labels, ttfp_vals)}
         c = cv(ttfp_vals)
@@ -464,7 +479,7 @@ def cmd_commit(args):
             max_cvs.append(cmax)
         read_latency[fid] = lat_by_block
 
-        sw = sweep_view(rec)
+        sw = sweep_view(run_map)
         if sw:
             sweeps[fid] = sw
 

@@ -727,6 +727,33 @@ static int abi_run_once(abi_session *s, float *dst, size_t cap_frames,
     return 0;
 }
 
+typedef struct {
+    double wall;
+    double cpu;
+    int64_t samples;
+    int64_t frames;
+    int errors;
+    int demux_eof;
+    int decoder_eof;
+} core_iter;
+
+typedef struct {
+    double wall;
+    double cpu;
+    int64_t frames;
+    int64_t calls;
+} abi_iter;
+
+static int abi_iter_once(const char *path, float *dst, size_t block, abi_iter *out) {
+    abi_session s;
+    if (abi_open(&s, path) != 0) return -1;
+    int term;
+    abi_run_once(&s, dst, block, &out->wall, &out->cpu, &out->frames, &out->calls, &term);
+    abi_close(&s);
+    if (term != 1) return -1;
+    return 0;
+}
+
 static int mode_throughput(const char *path, int warmup, int iters, size_t block) {
     if (warmup <= 0) warmup = 3;
     if (iters <= 0) iters = 20;
@@ -773,50 +800,66 @@ static int mode_throughput(const char *path, int warmup, int iters, size_t block
             return 1;
         }
     }
+    core_iter *cit = (core_iter *)malloc(sizeof(core_iter) * iters);
+    abi_iter *ait = (abi_iter *)malloc(sizeof(abi_iter) * iters);
+    if (!cit || !ait) {
+        free(dst);
+        free(cit);
+        free(ait);
+        printf("{\"mode\":\"throughput\",\"status\":\"failed\",\"error\":\"oom\"}\n");
+        return 1;
+    }
+    for (int i = 0; i < iters; i++) {
+        int rc = 0;
+        if ((i & 1) == 0) {
+            if (core_run_once(path, &cit[i].wall, &cit[i].cpu, &cit[i].samples,
+                              &cit[i].frames, &cit[i].errors, &cit[i].demux_eof,
+                              &cit[i].decoder_eof) < 0)
+                rc = 1;
+            else if (abi_iter_once(path, dst, block, &ait[i]) < 0)
+                rc = 2;
+        } else {
+            if (abi_iter_once(path, dst, block, &ait[i]) < 0)
+                rc = 2;
+            else if (core_run_once(path, &cit[i].wall, &cit[i].cpu, &cit[i].samples,
+                                   &cit[i].frames, &cit[i].errors, &cit[i].demux_eof,
+                                   &cit[i].decoder_eof) < 0)
+                rc = 1;
+        }
+        if (rc) {
+            free(dst);
+            free(cit);
+            free(ait);
+            printf("{\"mode\":\"throughput\",\"status\":\"failed\",\"error\":\"%s\"}\n",
+                   rc == 1 ? "core iter" : "abi iter");
+            return 1;
+        }
+    }
     printf("{\"mode\":\"throughput\",\"file\":");
     print_path(path);
-    printf(",\"status\":\"ok\",\"warmup\":%d,\"iterations\":%d,\"block_frames\":%zu",
+    printf(",\"status\":\"ok\",\"warmup\":%d,\"iterations\":%d,\"block_frames\":%zu"
+           ",\"interleave\":\"abab\"",
            warmup, iters, block);
     print_info_fields(&info, -1);
     printf(",\"core\":{\"iters\":[");
     for (int i = 0; i < iters; i++) {
-        double w, c;
-        int64_t sm, fr;
-        int errs, deof, cfeof;
-        if (core_run_once(path, &w, &c, &sm, &fr, &errs, &deof, &cfeof) < 0) {
-            printf("]}\n");
-            free(dst);
-            return 1;
-        }
         printf("%s{\"wall_us\":%.3f,\"cpu_us\":%.3f,\"samples\":%" PRId64
                ",\"frames\":%" PRId64 ",\"errors\":%d,\"demux_eof\":%s,\"decoder_eof\":%s}",
-               i ? "," : "", w, c, sm, fr, errs,
-               deof ? "true" : "false", cfeof ? "true" : "false");
+               i ? "," : "", cit[i].wall, cit[i].cpu, cit[i].samples, cit[i].frames,
+               cit[i].errors, cit[i].demux_eof ? "true" : "false",
+               cit[i].decoder_eof ? "true" : "false");
     }
     printf("]},\"abi\":{\"iters\":[");
     for (int i = 0; i < iters; i++) {
-        abi_session s2;
-        if (abi_open(&s2, path) != 0) {
-            printf("]}\n");
-            free(dst);
-            return 1;
-        }
-        double w, c;
-        int64_t f, ca;
-        int term;
-        abi_run_once(&s2, dst, block, &w, &c, &f, &ca, &term);
-        abi_close(&s2);
-        if (term != 1) {
-            printf("]}\n");
-            free(dst);
-            return 1;
-        }
         printf("%s{\"wall_us\":%.3f,\"cpu_us\":%.3f,\"frames\":%" PRId64
-               ",\"calls\":%" PRId64 "}", i ? "," : "", w, c, f, ca);
+               ",\"calls\":%" PRId64 "}", i ? "," : "", ait[i].wall, ait[i].cpu,
+               ait[i].frames, ait[i].calls);
     }
     printf("]}");
     printf(",\"peak_rss_kb\":%ld}\n", peak_rss_kb());
     free(dst);
+    free(cit);
+    free(ait);
     return 0;
 }
 
