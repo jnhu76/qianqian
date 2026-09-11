@@ -24,8 +24,7 @@ impl Capability for AudioOutputCapability {
 pub struct AppRuntime {
     /// Generic composition truth: reachability, binding ownership and Fiber
     /// lifetime, held entirely by the kernel. The root keeps no parallel
-    /// service-handle state (see issue #104 for why the former pre-bound
-    /// cache was unsound and removed).
+    /// service-handle state.
     composition: Kernel,
 }
 
@@ -176,8 +175,6 @@ mod tests {
     /// Composition regression at the root: K0 legally instantiates several
     /// desired entries of one component, and withdrawing one instance must
     /// leave the surviving sibling's kernel-mediated binding untouched.
-    /// (This is the scenario that the former per-component pre-bound cache
-    /// mis-modeled — issue #104; the truth here is kernel-only.)
     #[test]
     fn sibling_consumer_instances_withdraw_independently_in_kernel_truth() {
         let runtime = AppRuntime::new().with_audio_output(Box::new(FakeAudioOutput));
