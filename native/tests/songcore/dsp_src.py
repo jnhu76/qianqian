@@ -29,7 +29,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 OUT_DIR = os.path.join(ROOT, "bench", "results", "songcore-v1")
-PROBE = os.path.join(ROOT, "build", "artifacts", "dsp_cap_probe")
+# dsp_closure replays each ladder stage into its own artifact namespace
+# (build/artifacts/<stage>/); this gate consumes the avf-c2 session.
+PROBE = os.path.join(ROOT, "build", "artifacts", "avf-c2", "dsp_cap_probe")
 SCENARIO = os.path.join(ROOT, "native", "tests", "songcore",
                         "dsp-src-smoke.kv")
 CLOSURE_MANIFEST = os.path.join(ROOT, "build", "minimize", "avf-c2",

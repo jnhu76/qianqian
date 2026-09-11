@@ -15,7 +15,10 @@ Pipeline (all machine-owned, resumable per stage):
       ↓ V=1 compile-closure manifest (build/minimize/<stage>/manifest.json)
   xmake f --av_manifest=<manifest> → qianqian_av replay
       ↓ + dsp_cap_probe (bench-only product-shaped link)
-  registration / smoke / negotiated-format / ldd / sizes / link-map live bytes
+  (each stage replays into its own artifact namespace
+   build/artifacts/<stage>/ — session isolation; the canonical
+   build/artifacts/ root is never written or cleaned by this driver)
+      ↓ registration / smoke / negotiated-format / ldd / sizes / link-map live bytes
       ↓
   bench/results/avfilter-minimize/*.json  (authority tree)
       ↓
@@ -50,9 +53,11 @@ CODEC_PROFILE = ROOT / "native" / "ffmpeg" / "profiles" / "codec-base.json"
 RESULTS = ROOT / "bench" / "results" / "avfilter-minimize"
 STAGES = ROOT / "build" / "minimize"
 BUILDIR = "build/xmake-avf"
+# Canonical artifact root: the default/canonical sessions keep the
+# historical build/artifacts/ layout. Each ladder stage session owns
+# build/artifacts/<stage>/ exclusively (session_artifacts below); the
+# driver's cleanup never touches the canonical root.
 ARTIFACTS = ROOT / "build" / "artifacts"
-ARCHIVE = ARTIFACTS / "libqianqian_av.a"
-PROBE = ARTIFACTS / "dsp_cap_probe"
 DOC = ROOT / "docs" / "research" / "ffmpeg-minimization.md"
 
 TIER_FILE = {  # tier id -> results filename (task §27 naming)
@@ -410,14 +415,36 @@ def projected_manifest(stage: str, kind: str) -> Path:
 # xmake replay + measurement
 # --------------------------------------------------------------------------
 
+def session_artifacts(name: str) -> Path:
+    """Artifact namespace of one closure session (fail-closed).
+
+    A session's regenerable artifacts live in build/artifacts/<name>/; the
+    driver may only clean up a directory it provably owns — one plain path
+    segment directly under the canonical artifact root, never the root
+    itself, so cross-session evidence cannot be clobbered by mistake."""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name) or ".." in name:
+        raise SystemExit(f"unsafe artifact namespace: {name!r}")
+    p = (ARTIFACTS / name).resolve()
+    if p.parent != ARTIFACTS.resolve():
+        raise SystemExit(f"cleanup guard: {p} is not a session subdir of "
+                         f"{ARTIFACTS}")
+    return p
+
+
 def xmake_build(manifest_rel: str, gc=False, lto=False, link_map: Path | None = None,
                 no_avfilter: bool = False) -> None:
+    # Every replay owns its stage namespace: the build dir and the stage's
+    # artifact subdir are session-local regenerable state; the canonical
+    # artifact root is never deleted here (BUG-3 corrective: the old global
+    # rmtree(build/artifacts) destroyed every other session's evidence).
+    session = session_artifacts(Path(manifest_rel).parent.name)
     shutil.rmtree(ROOT / BUILDIR, ignore_errors=True)
-    shutil.rmtree(ARTIFACTS, ignore_errors=True)
+    shutil.rmtree(session, ignore_errors=True)
     # Normal mode.release replay of the frozen manifest; the DSP probe links
     # the same product-shaped closure the shipping artifact uses.
     cfg = ["xmake", "f", "-o", BUILDIR, "-m", "release",
-           f"--av_manifest={manifest_rel}", "-y"]
+           f"--av_manifest={manifest_rel}", f"--artifact_ns={session.name}",
+           "-y"]
     if gc:
         cfg.append("--gc_sections=y")
     if lto:
@@ -431,16 +458,16 @@ def xmake_build(manifest_rel: str, gc=False, lto=False, link_map: Path | None = 
     must(["xmake", "build", "dsp_cap_probe"], env=env)
 
 
-def run_probe(scenario: Path, out: Path) -> dict:
-    p = subprocess.run([str(PROBE), str(scenario), str(out)],
+def run_probe(scenario: Path, out: Path, probe: Path) -> dict:
+    p = subprocess.run([str(probe), str(scenario), str(out)],
                        cwd=ROOT, capture_output=True, text=True)
     if not out.is_file():
         raise SystemExit(f"probe produced no JSON (rc={p.returncode}): {p.stderr[-2000:]}")
     return jload(out)
 
 
-def ldd_probe() -> list:
-    out = must(["ldd", str(PROBE)])
+def ldd_probe(probe: Path) -> list:
+    out = must(["ldd", str(probe)])
     deps = []
     for line in out.splitlines():
         m = re.match(r"\s*(\S+) => (\S+)", line)
@@ -752,6 +779,9 @@ def stage_identity(stage: str, tier_ids: list, extra_filters=()) -> str:
 
 def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
     d = stage_dir(stage)
+    s_art = session_artifacts(stage)
+    archive = s_art / "libqianqian_av.a"
+    probe = s_art / "dsp_cap_probe"
     res_file = stage_result_file(stage)
     manifest_rel = f"build/minimize/{stage}/manifest.json"
     no_avf = stage == "avf-c0"
@@ -782,7 +812,7 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
     scenario_a = write_scenario(d / "scenario.kv",
                                 scenario_checks(tier_ids, filters_a))
     xmake_build(manifest_rel, gc=False, lto=False, no_avfilter=no_avf)
-    smoke_a = run_probe(scenario_a, d / "smoke-direct.json")
+    smoke_a = run_probe(scenario_a, d / "smoke-direct.json", probe)
     failures = graph_config_failures(smoke_a)
 
     # ---- pass B (only on discovery): minimal format adaptation ----
@@ -822,9 +852,9 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
     plain_map = d / "plain.map"
     xmake_build(manifest_rel, gc=False, lto=False, link_map=plain_map,
                 no_avfilter=no_avf)
-    plain_archive_bytes = ARCHIVE.stat().st_size
-    plain_probe_sha = sha256_file(PROBE)
-    xmake_syms = ff_symbols_archive(ARCHIVE)
+    plain_archive_bytes = archive.stat().st_size
+    plain_probe_sha = sha256_file(probe)
+    xmake_syms = ff_symbols_archive(archive)
     oracle_syms = oracle_archive_set(stage)
     sym_gate = {
         "xmake_ff_symbols": len(xmake_syms),
@@ -834,19 +864,19 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
         "extra_in_xmake": sorted(xmake_syms - oracle_syms)[:20],
     }
 
-    smoke_plain = run_probe(scenario, d / "smoke-plain.json")
-    plain_ldd = ldd_probe()
+    smoke_plain = run_probe(scenario, d / "smoke-plain.json", probe)
+    plain_ldd = ldd_probe(probe)
 
     # ---- xmake replay: shipping (-Os + sections + gc) ----
     ship_manifest = projected_manifest(stage, "shipping")
     ship_map = d / "shipping.map"
     xmake_build(f"build/minimize/{stage}/manifest-shipping.json", gc=True,
                 lto=False, link_map=ship_map, no_avfilter=no_avf)
-    shipping_sizes = binary_sizes(PROBE, d, "probe")
-    shipping_archive_bytes = ARCHIVE.stat().st_size
-    smoke_ship = run_probe(scenario, d / "smoke-shipping.json")
-    shipping_ldd = ldd_probe()
-    members = archive_members(ARCHIVE)
+    shipping_sizes = binary_sizes(probe, d, "probe")
+    shipping_archive_bytes = archive.stat().st_size
+    smoke_ship = run_probe(scenario, d / "smoke-shipping.json", probe)
+    shipping_ldd = ldd_probe(probe)
+    members = archive_members(archive)
     live = parse_live_map(ship_map, members,
                           jload(d / "manifest-shipping.json"))
 
@@ -859,8 +889,8 @@ def run_stage(stage: str, tier_ids: list, force: bool = False) -> dict:
         projected_manifest(stage, "lto")
         xmake_build(f"build/minimize/{stage}/manifest-lto.json", gc=True,
                     lto=True, no_avfilter=no_avf)
-        lto_data = {"sizes": binary_sizes(PROBE, d, "probe-lto"),
-                    "archive_bytes": ARCHIVE.stat().st_size}
+        lto_data = {"sizes": binary_sizes(probe, d, "probe-lto"),
+                    "archive_bytes": archive.stat().st_size}
 
     req = profile.get("configure_required_deps", {})
     data = {
@@ -1001,17 +1031,20 @@ def run_probe_stage(flt: str, force: bool = False) -> dict:
 
     # base = codec + F0; probe filter adds ONLY its configure-required deps
     d = stage_dir(stage)
+    s_art = session_artifacts(stage)
+    archive = s_art / "libqianqian_av.a"
+    probe = s_art / "dsp_cap_probe"
 
     def build_and_smoke():
         ship_manifest = projected_manifest(stage, "shipping")
         ship_map = d / "shipping.map"
         xmake_build(f"build/minimize/{stage}/manifest-shipping.json",
                     gc=True, lto=False, link_map=ship_map)
-        sizes = binary_sizes(PROBE, d, "probe")
+        sizes = binary_sizes(probe, d, "probe")
         scenario = write_scenario(
             d / "scenario.kv",
             scenario_checks(["F0"], stage_filters_now(), extra_filter=flt))
-        smoke = run_probe(scenario, d / "smoke-shipping.json")
+        smoke = run_probe(scenario, d / "smoke-shipping.json", probe)
         return projected_manifest, sizes, smoke
 
     def stage_filters_now():
@@ -1060,7 +1093,7 @@ def run_probe_stage(flt: str, force: bool = False) -> dict:
     fft_foundation_in_direct = len(tx_direct) > len(tx_base)
     delta_eff = delta_stage(base1, {
         "manifest": {"units": manifest["closure"]["translation_units"]},
-        "shipping": {"archive_bytes": ARCHIVE.stat().st_size,
+        "shipping": {"archive_bytes": archive.stat().st_size,
                      "probe_sizes": sizes}})
     data = {
         "stage": stage,
@@ -1122,9 +1155,9 @@ def run_probe_stage(flt: str, force: bool = False) -> dict:
         "multi_input_status": mi_status,
         "manifest_units": manifest["closure"]["translation_units"],
         "manifest_per_library": per_library_units(manifest),
-        "shipping": {"archive_bytes": ARCHIVE.stat().st_size,
+        "shipping": {"archive_bytes": archive.stat().st_size,
                      "probe_sizes": sizes,
-                     "ldd": ldd_probe()},
+                     "ldd": ldd_probe(probe)},
         "smoke_verdict": smoke["summary"]["verdict"],
         "gate_verdict": probe_verdict({
             "graph_evidence": graph_evidence(smoke)}),

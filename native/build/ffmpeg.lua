@@ -11,6 +11,15 @@ local artifact_dir = path.join(os.projectdir(), "build", "artifacts")
 if is_plat("mingw", "windows") then
     artifact_dir = path.join(artifact_dir, "windows-mingw-x86_64")
 end
+-- Closure-session isolation: a session driven with an explicit artifact_ns
+-- (tools/dsp_closure.py namespaces every ladder stage) builds into its own
+-- artifact subdir, so two closure sessions can never overwrite or delete
+-- each other's evidence. The default and canonical sessions keep the
+-- historical layout; cleanup of a namespace is owned by its driver only.
+local artifact_ns = get_config("artifact_ns")
+if artifact_ns and #artifact_ns > 0 then
+    artifact_dir = path.join(artifact_dir, artifact_ns)
+end
 
 -- Which frozen compile closure qianqian_av replays. Defaults to the
 -- canonical import manifest (build/ffmpeg-xmake/manifest.json); test and
@@ -20,6 +29,14 @@ option("av_manifest")
     set_default("build/ffmpeg-xmake/manifest.json")
     set_showmenu(true)
     set_description("FFmpeg compile-closure manifest to replay")
+
+-- Artifact subdir namespace for closure evidence sessions (see artifact_ns
+-- consumption at the top of this file). Empty = the default/canonical
+-- historical artifact layout.
+option("artifact_ns")
+    set_default("")
+    set_showmenu(true)
+    set_description("Artifact subdir namespace for closure evidence sessions")
 
 local ffmpeg_manifest = function ()
     return path.join(os.projectdir(), get_config("av_manifest"))
@@ -201,6 +218,14 @@ target("qianqian_av")
         end
     end)
     before_build(function (target)
+        -- Fail-closed namespace shape (the description-scope sandbox has no
+        -- abort primitive, so the plain-name rule is enforced here where
+        -- every closure-session build passes through qianqian_av):
+        local ns = get_config("artifact_ns")
+        if ns and #ns > 0 and (ns:find("[/\\]") or ns == "." or ns == "..") then
+            raise(format("artifact_ns must be a plain directory name, got '%s'",
+                         ns))
+        end
         if not os.isfile(ffmpeg_manifest()) then
             raise("FFmpeg source closure is missing. Run `xmake ffmpeg-import` first, then rerun xmake.")
         end

@@ -11,6 +11,17 @@ local artifact_dir = path.join(os.projectdir(), "build", "artifacts")
 if is_plat("mingw", "windows") then
     artifact_dir = path.join(artifact_dir, "windows-mingw-x86_64")
 end
+-- Closure-session isolation: same rule as native/build/ffmpeg.lua — a
+-- session driven with an explicit artifact_ns (tools/dsp_closure.py
+-- namespaces every ladder stage) builds into its own artifact subdir so
+-- closure sessions cannot overwrite/delete each other's evidence; default
+-- and canonical sessions keep the historical layout. Namespace shape is
+-- enforced fail-closed by qianqian_av's before_build gate (the
+-- description-scope sandbox has no abort primitive).
+local artifact_ns = get_config("artifact_ns")
+if artifact_ns and #artifact_ns > 0 then
+    artifact_dir = path.join(artifact_dir, artifact_ns)
+end
 -- WASM sessions archive their guest closure here as well; sharing the
 -- native artifact path would let a wasm-format libsongcore.a silently
 -- overwrite the native archive (and vice versa) across sessions.
