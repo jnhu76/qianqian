@@ -7,10 +7,11 @@ Load only the documentation needed for the current task. Git history and externa
 | Task | Read first |
 |---|---|
 | Repository/agent rules | `../AGENTS.md` |
-| Stable vocabulary / current mental model | `../CONTEXT.md` |
+| Stable vocabulary / current role names | `adr/ADR-PBK-002.md` — **ACCEPTED** |
 | Current architecture overview | `architecture/overview.md` |
 | Generic Composition Kernel semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel-0-implementation-adr.md` |
 | Playback/audio foundations | `adr/ADR-PBK-001.md` — **ACCEPTED** |
+| First earned static playback composition boundaries | `adr/ADR-PBK-002.md` — **ACCEPTED** |
 | Realtime publication lifetime evidence + mechanism comparison | `architecture/realtime-publication-lifetime-decision.md`（evidence/decision record，非第二 authority）+ `../specs/realtime-publication/` |
 | Minimal PCM edge experiment (ADR §12 Phase B evidence) | `architecture/pcm-contract-a0.md` + `../crates/qianqian-audio-api/tests/pcm_edge_contract/`（test-only harness）— evidence only, not authority |
 | Direct-flow graph experiment (ADR §12 Phase C evidence) | `architecture/direct-pcm-flow.md` + `../crates/qianqian-audio-api/tests/direct_pcm_flow/`（test-only harness）— evidence only, not authority |
@@ -30,7 +31,9 @@ Every document belongs to exactly one truth class. Only files explicitly listed 
 ```text
 NORMATIVE AUTHORITY (defines what the architecture means)
   Playback Foundations constitution -> adr/ADR-PBK-001.md (ACCEPTED;
-                                      incl. §16 vocabulary, §6 P1–P5)
+                                      planes, Fact semantics, §6 P1–P5)
+  Canonical vocabulary + first earned
+  static playback composition       -> adr/ADR-PBK-002.md (ACCEPTED)
   K0 semantic design                -> architecture/composition-kernel-0-design.md
   K0 implementation decisions       -> architecture/composition-kernel-0-implementation-adr.md
 
@@ -41,7 +44,7 @@ EVIDENCE (why we believe a mechanism/property; never authority)
   -> tests / specs / TLA+ / experiment harnesses / specs/playback/* /
      architecture evidence records (pcm-contract-a0.md, direct-pcm-flow.md,
      realtime-view-publication.md, realtime-publication-lifetime-decision.md,
-     component-boundary-a0.md)
+     component-boundary-a0.md, first-audible-slice.md)
 
 DERIVED PROJECTION (how humans discover/understand; define nothing)
   -> README.md, CONTEXT.md, AGENTS.md summaries, this router,
@@ -53,16 +56,17 @@ Routing entry points by task remain:
 
 ```text
 agent work rules              -> AGENTS.md
-stable vocabulary index       -> CONTEXT.md (summaries; definitions: ADR §16)
+stable vocabulary             -> adr/ADR-PBK-002.md (ACCEPTED)
 current architecture overview -> architecture/overview.md (projection)
 playback foundations          -> adr/ADR-PBK-001.md (ACCEPTED)
+static playback composition   -> adr/ADR-PBK-002.md (ACCEPTED)
 implemented behavior          -> code + tests
 experimental playback evidence-> specs/playback/* + prior executable core
 historical evidence           -> git refs / explicitly historical docs
 current task scope            -> current issue/task
 ```
 
-Playback currently has **no accepted production state-machine authority**. The old accepted playback model was reopened and rewritten; the accepted `ADR-PBK-001` freezes foundational plane separation, not a production playback state machine.
+Playback currently has **no accepted dynamic production state-machine authority**. ADR-PBK-001 freezes foundational plane separation and P1–P5; ADR-PBK-002 freezes current vocabulary plus the first earned static playback composition. Neither freezes pause/seek/next/device-switch semantics.
 
 Do not use old type names or formal variables to close new architecture questions automatically.
 
@@ -70,7 +74,7 @@ Do not use old type names or formal variables to close new architecture question
 
 # Current playback foundation
 
-The accepted foundations separate four reasoning lenses — Composition, Execution/Control, Fact, Realtime Data — summarized in `architecture/overview.md` and frozen normatively in `adr/ADR-PBK-001.md` §1–§2. Do not restate the constitution normatively here.
+The accepted foundations separate four reasoning lenses — Composition, Execution/Control, Fact, Realtime Data — summarized in `architecture/overview.md` and frozen normatively in `adr/ADR-PBK-001.md` §1–§2. Current role names and the real static Decode Plugin + Output Plugin + Playback Session composition are frozen in `adr/ADR-PBK-002.md`. Do not restate either authority normatively here.
 
 ---
 
@@ -109,7 +113,7 @@ K0 remains implemented/current and domain-agnostic.
 
 When reading `architecture/composition-kernel.md`, treat it as a derived summary: generic K0 semantics are authoritative only in `architecture/composition-kernel-0-design.md` (representation decisions: `architecture/composition-kernel-0-implementation-adr.md`). Any old playback-specific examples or references to the previously accepted playback state model are illustrative/history only; the accepted ARCH-003 foundations do not re-freeze them.
 
-If generic K0 semantics and the reset ADR appear to conflict, identify the exact generic invariant first; do not silently import an old playback-specific conclusion from a K0 document.
+If generic K0 semantics and a playback ADR appear to conflict, identify the exact generic invariant first; do not silently import an old playback-specific conclusion from a K0 document.
 
 ---
 
@@ -121,7 +125,7 @@ Normative authority: `adr/ADR-PBK-001.md` §2.3 — semantic commit precedes Fac
 
 # Realtime policy
 
-Normative authority: `adr/ADR-PBK-001.md` §2.4 and §6 — realtime PCM never travels through generic Context/Event/Plugin dispatch per quantum; publication/reclamation follows the normative P1–P5 semantic contract (P1 is coherent publication; the full set is not restated here). The exact graph/lifetime mechanism remains unfrozen.
+Normative authority: `adr/ADR-PBK-001.md` §2.4 and §6 — realtime PCM never travels through generic Context/Event/Plugin dispatch per quantum; publication/reclamation follows the normative P1–P5 semantic contract. ADR-PBK-002 reserves the current noun `Realtime Audio Runtime` but leaves its representation OPEN.
 
 ---
 
