@@ -19,9 +19,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "qianqian-decode-songcore"
+version = "0.1.0"
+dependencies = [
+ "qianqian-core",
+ "qianqian-kernel",
+ "qianqian-songcore-sys",
+]
+
+[[package]]
 name = "qianqian-headless"
 version = "0.1.0"
 dependencies = [
+ "qianqian-core",
+ "qianqian-decode-songcore",
+ "qianqian-kernel",
+ "qianqian-output-wasapi",
+ "qianqian-playback",
  "qianqian-runtime",
 ]
 
@@ -40,12 +54,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "qianqian-playback"
+version = "0.1.0"
+dependencies = [
+ "qianqian-core",
+ "qianqian-kernel",
+ "qianqian-runtime",
+]
+
+[[package]]
 name = "qianqian-runtime"
 version = "0.1.0"
 dependencies = [
  "qianqian-core",
  "qianqian-kernel",
 ]
+
+[[package]]
+name = "qianqian-songcore-sys"
+version = "0.1.0"
 
 [[package]]
 name = "quote"

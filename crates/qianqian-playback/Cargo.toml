@@ -1,0 +1,13 @@
+[package]
+name = "qianqian-playback"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "Playback Session: composes Decode + Output capabilities into one bounded playback episode"
+
+[dependencies]
+qianqian-core = { path = "../qianqian-core" }
+qianqian-kernel = { path = "../qianqian-kernel" }
+
+[dev-dependencies]
+qianqian-runtime = { path = "../qianqian-runtime" }

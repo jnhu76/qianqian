@@ -5,6 +5,7 @@ members = [
     "crates/qianqian-core",
     "crates/qianqian-kernel",
     "crates/qianqian-output-wasapi",
+    "crates/qianqian-playback",
     "crates/qianqian-runtime",
 ]
 exclude = [

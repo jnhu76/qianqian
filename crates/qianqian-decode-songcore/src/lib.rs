@@ -93,7 +93,8 @@ pub struct SongcoreSource {
     format: PcmFormat,
     /// Kept alive for the handle's lifetime; the callbacks borrow it raw.
     /// Declared after `handle` so drop runs song_close while the file is
-    /// still alive.
+    /// still alive. Never read: its whole job is being alive, then dropped.
+    #[allow(dead_code)]
     file: Box<File>,
 }
 
