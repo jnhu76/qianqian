@@ -146,11 +146,11 @@ DECISION  Decode Plugin  = capability provider (long-lived mechanism)
           Playback Session = the one playback episode owner
 
 Decode Plugin owns:     the SongCore mechanism binding (ABI check, host-IO
-                        callback machinery); provides open_source(path)
+                        callback machinery); provides open_media(path)
 Output Plugin owns:     the WASAPI mechanism (COM call sequences,
                         negotiation, render loop code); provides
-                        open_stream(format, frame source, drain signal)
-Playback Session owns:  one PcmSource endpoint (one song_handle), the
+                        open_stream(format, render input, drain signal)
+Playback Session owns:  one DecodedPcmStream endpoint (one song_handle), the
                         bounded PCM edge, the decode worker thread, one
                         acquired render stream (including its render
                         thread), the completion signal, EOF/stop
@@ -168,8 +168,8 @@ public contract. `AudioOutputCapability` moves from `qianqian-runtime` to
 composition root.
 
 ```text
-qianqian-core::ports       PcmFormat, PcmDecode + PcmSource, AudioOutput +
-                           RenderStream + PcmFrameSource + DrainSignal,
+qianqian-core::ports       PcmFormat, PcmDecode + DecodedPcmStream, AudioOutput +
+                           RenderStream + RenderPcmInput + DrainSignal,
                            capability keys
 qianqian-playback          bounded PcmEdge, Playback Session component,
                            session completion handle   (workspace member)

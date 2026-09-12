@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use qianqian_core::ports::{PcmFrameSource, PcmPull};
+use qianqian_core::ports::{PcmPull, RenderPcmInput};
 use qianqian_playback::{PcmEdge, SessionCompletion, SessionOutcome};
 
 const CHANNELS: u16 = 2;

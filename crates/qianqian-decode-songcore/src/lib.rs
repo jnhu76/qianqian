@@ -3,8 +3,8 @@
 //! Mechanism provider only: it owns the SongCore binding (ABI identity
 //! check, host-IO callback machinery, handle RAII) and publishes the
 //! `PcmDecode` capability through a kernel `ComponentSpec`. Per-episode
-//! state — one opened media file, one `PcmSource` endpoint — belongs to
-//! the caller (the Playback Session), never to this provider
+//! state — one opened media file, one `DecodedPcmStream` endpoint —
+//! belongs to the caller (the Playback Session), never to this provider
 //! (first-audible-slice design §2).
 
 use std::fs::File;
@@ -14,8 +14,8 @@ use std::rc::Rc;
 use std::slice;
 
 use qianqian_core::ports::{
-    DecodeError, DecodeOpenError, DecodeOutcome, PcmDecode, PcmDecodeCapability, PcmFormat,
-    PcmSource,
+    DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, PcmDecode, PcmDecodeCapability,
+    PcmFormat,
 };
 use qianqian_kernel::{ActivationError, ComponentSpec};
 use qianqian_songcore_sys as sys;
@@ -45,14 +45,24 @@ impl SongcoreDecode {
 }
 
 impl PcmDecode for SongcoreDecode {
-    fn open_source(&self, path: &Path) -> Result<Box<dyn PcmSource>, DecodeOpenError> {
-        SongcoreSource::open(path)
+    fn open_media(&self, path: &Path) -> Result<Box<dyn DecodedPcmStream>, DecodeOpenError> {
+        SongcoreDecodeStream::open(path)
     }
 }
 
 // --- host-IO callbacks over std::fs::File --------------------------------
+//
+// FFI boundary discipline: every callback fails closed (-1) on a null
+// userdata pointer or a null destination, and on a negative absolute
+// offset (the ABI defines offsets as non-negative). The pointer
+// preconditions for `from_raw_parts_mut` are checked before the slice is
+// formed; the SongCore side never legitimately passes these values, so a
+// guard hit is a caller bug, not a decode result.
 
 unsafe extern "C" fn file_read(ud: *mut c_void, dst: *mut u8, size: usize) -> i64 {
+    if ud.is_null() || (size > 0 && dst.is_null()) {
+        return -1;
+    }
     use std::io::Read;
     let file = unsafe { &mut *(ud as *mut File) };
     let buf = unsafe { slice::from_raw_parts_mut(dst, size) };
@@ -63,6 +73,9 @@ unsafe extern "C" fn file_read(ud: *mut c_void, dst: *mut u8, size: usize) -> i6
 }
 
 unsafe extern "C" fn file_seek(ud: *mut c_void, offset: i64) -> i64 {
+    if ud.is_null() || offset < 0 {
+        return -1;
+    }
     use std::io::{Seek, SeekFrom};
     let file = unsafe { &mut *(ud as *mut File) };
     match file.seek(SeekFrom::Start(offset as u64)) {
@@ -72,6 +85,9 @@ unsafe extern "C" fn file_seek(ud: *mut c_void, offset: i64) -> i64 {
 }
 
 unsafe extern "C" fn file_size(ud: *mut c_void) -> i64 {
+    if ud.is_null() {
+        return -1;
+    }
     let file = unsafe { &mut *(ud as *mut File) };
     match file.metadata() {
         Ok(m) => m.len() as i64,
@@ -87,8 +103,8 @@ fn status_open_error(path: &Path, status: u32) -> DecodeOpenError {
 
 /// One playback-specific decode endpoint: owns one native song handle and
 /// the file it reads from. Released on drop (song_close), single-thread
-/// serialized by contract (`PcmSource: Send` but not `Sync`).
-pub struct SongcoreSource {
+/// serialized by contract (`DecodedPcmStream: Send` but not `Sync`).
+pub struct SongcoreDecodeStream {
     handle: *mut sys::song_handle,
     format: PcmFormat,
     /// Kept alive for the handle's lifetime; the callbacks borrow it raw.
@@ -100,10 +116,10 @@ pub struct SongcoreSource {
 
 // The native handle is externally serialized (SongCore contract): moving
 // the endpoint to another thread is safe; concurrent calls are not made.
-unsafe impl Send for SongcoreSource {}
+unsafe impl Send for SongcoreDecodeStream {}
 
-impl SongcoreSource {
-    fn open(path: &Path) -> Result<Box<dyn PcmSource>, DecodeOpenError> {
+impl SongcoreDecodeStream {
+    fn open(path: &Path) -> Result<Box<dyn DecodedPcmStream>, DecodeOpenError> {
         let file = File::open(path)
             .map_err(|e| DecodeOpenError {
                 message: format!("cannot open '{}': {e}", path.display()),
@@ -135,7 +151,7 @@ impl SongcoreSource {
                 ),
             });
         }
-        Ok(Box::new(SongcoreSource {
+        Ok(Box::new(SongcoreDecodeStream {
             handle,
             format: PcmFormat {
                 sample_rate: info.sample_rate as u32,
@@ -162,7 +178,7 @@ impl SongcoreSource {
     }
 }
 
-impl PcmSource for SongcoreSource {
+impl DecodedPcmStream for SongcoreDecodeStream {
     fn format(&self) -> PcmFormat {
         self.format
     }
@@ -191,9 +207,16 @@ impl PcmSource for SongcoreSource {
     }
 }
 
-impl Drop for SongcoreSource {
+impl Drop for SongcoreDecodeStream {
     fn drop(&mut self) {
-        unsafe { sys::song_close(self.handle) };
+        // Defensive FFI-boundary hardening: successful construction always
+        // leaves a non-null handle (checked on every open path above), so
+        // the guard below can only fire on a construction invariant
+        // violation — it exists to keep Drop itself sound, not to excuse
+        // a null handle reaching the endpoint.
+        if !self.handle.is_null() {
+            unsafe { sys::song_close(self.handle) };
+        }
     }
 }
 

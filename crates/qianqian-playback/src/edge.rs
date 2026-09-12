@@ -6,7 +6,7 @@
 
 use std::sync::{Arc, Condvar, Mutex};
 
-use qianqian_core::ports::{PcmFrameSource, PcmPull};
+use qianqian_core::ports::{PcmPull, RenderPcmInput};
 
 /// Why the producer stopped writing. Failure detail lives in the
 /// session-owned completion signal, not in the edge.
@@ -154,7 +154,7 @@ impl PcmEdge {
     }
 }
 
-impl PcmFrameSource for PcmEdge {
+impl RenderPcmInput for PcmEdge {
     fn read_frames(&self, dst: &mut [f32]) -> PcmPull {
         assert!(
             dst.len() >= self.channels,

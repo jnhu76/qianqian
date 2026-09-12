@@ -2,7 +2,7 @@
 //! (same implementation lineage as the experiment harness; no external
 //! dependency).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub struct ReferenceFixture {
     pub file: String,
@@ -51,6 +51,31 @@ impl ReferenceFixture {
             path.display()
         );
     }
+}
+
+pub fn fixtures_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../native/experiments/songcore-equivalence/fixtures")
+}
+
+pub fn load_fixture(id: &str) -> (ReferenceFixture, PathBuf) {
+    let reference_path = fixtures_dir().parent().unwrap().join("reference.json");
+    if !reference_path.exists() {
+        panic!(
+            "missing reference manifest at {}: committed corpus fixtures are required, tests fail closed",
+            reference_path.display()
+        );
+    }
+    let fx = ReferenceFixture::load(&reference_path, id);
+    let path = fixtures_dir().join(&fx.file);
+    if !path.exists() {
+        panic!(
+            "missing fixture '{id}' at {}: committed corpus fixtures are required, tests fail closed",
+            path.display()
+        );
+    }
+    fx.verify_file_identity(&path);
+    (fx, path)
 }
 
 // --- minimal SHA-256 (FIPS 180-4) ----------------------------------------

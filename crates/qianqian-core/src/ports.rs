@@ -6,6 +6,11 @@
 //! boundary: a trait implies nothing about physical packaging or dynamic
 //! loading. Contracts speak PCM, never decoder/vendor vocabulary.
 //!
+//! Two PCM endpoints sit at different points of the one data path and are
+//! named for it: [`DecodedPcmStream`] is the decode leg (encoded media in,
+//! source-format PCM out), [`RenderPcmInput`] is the render leg's already
+//! pre-bound input (the renderer knows nothing about decoders or media).
+//!
 //! Capability identity is the key-type definition site in this module —
 //! not any concrete provider implementation. Consumers depend on the
 //! definition across the plugin seam; providers own mechanisms. No
@@ -37,12 +42,13 @@ pub enum PcmPull {
 
 /// The consumer half of the bounded PCM edge, pre-bound to one render
 /// stream at open time. The steady render path touches only this trait —
-/// never the kernel, the filesystem or a decoder.
+/// never the kernel, the filesystem or a decoder. It is the renderer's
+/// PCM input: ready PCM only, no knowledge of where it came from.
 ///
 /// Terminals are reachable from both ends: `stop` unblocks a blocked
 /// reader (and, symmetrically, the producer the edge carries) so stop,
 /// failure and EOF can never wedge the data plane.
-pub trait PcmFrameSource: Send + Sync {
+pub trait RenderPcmInput: Send + Sync {
     /// Read frames into `dst` (interleaved float32), blocking until at
     /// least one frame, a terminal, or `stop`. Returns `Frames(n)` with
     /// n > 0, or the terminal outcome.
@@ -109,11 +115,11 @@ impl DrainSignal {
 }
 
 /// Request for one playback-specific render stream: the source format to
-/// negotiate, the pre-bound PCM frame source, and the session-owned drain
+/// negotiate, the pre-bound PCM input, and the session-owned drain
 /// signal. All data-plane pieces bind once, here.
 pub struct RenderRequest {
     pub format: PcmFormat,
-    pub source: Arc<dyn PcmFrameSource>,
+    pub input: Arc<dyn RenderPcmInput>,
     pub drain: DrainSignal,
 }
 
@@ -147,8 +153,10 @@ impl Capability for AudioOutputCapability {
 }
 
 /// Source PCM format truth: interleaved float32 at the source rate/layout
-/// (first-audible-slice design §1.1). `channel_mask == 0` means unknown;
-/// consumers must not guess channel order from the count alone.
+/// (first-audible-slice design §1.1). `channels` is always `> 0`;
+/// `channel_mask == 0` means the channel layout is unspecified/unknown
+/// and is never a valid "no channels selected" format — consumers must
+/// not guess channel order from the count alone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PcmFormat {
     pub sample_rate: u32,
@@ -177,13 +185,14 @@ pub struct DecodeError {
     pub message: String,
 }
 
-/// One playback-specific decode endpoint: media -> source PCM.
+/// One playback-specific decode endpoint: from encoded media to
+/// source-format decoded PCM.
 ///
 /// The endpoint owns its native decode handle for exactly one playback
 /// episode and is released on drop. It is `Send` (movable to a decode
 /// worker thread) but not `Sync`: calls on one endpoint must be
 /// externally serialized, mirroring the native mechanism contract.
-pub trait PcmSource: Send {
+pub trait DecodedPcmStream: Send {
     /// The format of every frame this endpoint will produce. Immutable
     /// for the endpoint's lifetime (the native mechanism fails closed on
     /// mid-stream format changes rather than contradicting this value).
@@ -198,7 +207,7 @@ pub trait PcmSource: Send {
 /// endpoints. Long-lived mechanism provider; per-episode state (the
 /// endpoint) belongs to the caller, not to the service.
 pub trait PcmDecode {
-    fn open_source(&self, path: &Path) -> Result<Box<dyn PcmSource>, DecodeOpenError>;
+    fn open_media(&self, path: &Path) -> Result<Box<dyn DecodedPcmStream>, DecodeOpenError>;
 }
 
 /// Capability key for the decode contract. Identity is this definition.

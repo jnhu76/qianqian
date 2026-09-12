@@ -27,10 +27,7 @@ fn fixtures_dir() -> PathBuf {
 }
 
 fn load_fixture(id: &str) -> (ReferenceFixture, PathBuf) {
-    let fx = ReferenceFixture::load(&fixtures_dir().parent().unwrap().join("reference.json"), id);
-    let path = fixtures_dir().join(&fx.file);
-    fx.verify_file_identity(&path);
-    (fx, path)
+    common::load_fixture(id)
 }
 
 /// Raw FFI caller: an open handle read directly through song_read_pcm,
@@ -83,13 +80,20 @@ impl RawFfi {
 impl Drop for RawFfi {
     fn drop(&mut self) {
         unsafe {
-            sys::song_close(self.handle);
-            drop(Box::from_raw(self.file));
+            if !self.handle.is_null() {
+                sys::song_close(self.handle);
+            }
+            if !self.file.is_null() {
+                drop(Box::from_raw(self.file));
+            }
         }
     }
 }
 
 unsafe extern "C" fn raw_read(ud: *mut std::ffi::c_void, dst: *mut u8, size: usize) -> i64 {
+    if ud.is_null() || (size > 0 && dst.is_null()) {
+        return -1;
+    }
     use std::io::Read;
     let f = unsafe { &mut *(ud as *mut std::fs::File) };
     let buf = unsafe { std::slice::from_raw_parts_mut(dst, size) };
@@ -97,12 +101,18 @@ unsafe extern "C" fn raw_read(ud: *mut std::ffi::c_void, dst: *mut u8, size: usi
 }
 
 unsafe extern "C" fn raw_seek(ud: *mut std::ffi::c_void, off: i64) -> i64 {
+    if ud.is_null() || off < 0 {
+        return -1;
+    }
     use std::io::{Seek, SeekFrom};
     let f = unsafe { &mut *(ud as *mut std::fs::File) };
     f.seek(SeekFrom::Start(off as u64)).map_or(-1, |n| n as i64)
 }
 
 unsafe extern "C" fn raw_size(ud: *mut std::ffi::c_void) -> i64 {
+    if ud.is_null() {
+        return -1;
+    }
     let f = unsafe { &mut *(ud as *mut std::fs::File) };
     f.metadata().map_or(-1, |m| m.len() as i64)
 }
@@ -111,13 +121,13 @@ unsafe extern "C" fn raw_size(ud: *mut std::ffi::c_void) -> i64 {
 /// elapsed wall time in microseconds.
 fn plugin_drain_us(path: &std::path::Path) -> usize {
     let service = SongcoreDecode::new().expect("mechanism binds");
-    let mut src = service.open_source(path).expect("opens");
-    let channels = usize::from(src.format().channels);
+    let mut decode_stream = service.open_media(path).expect("opens");
+    let channels = usize::from(decode_stream.format().channels);
     let mut staging = vec![0.0f32; BLOCK_FRAMES * channels];
     let mut frames = 0usize;
     let start = Instant::now();
     loop {
-        match src.read_frames(&mut staging).expect("read") {
+        match decode_stream.read_frames(&mut staging).expect("read") {
             DecodeOutcome::Frames(n) => frames += n,
             DecodeOutcome::Eof => break,
         }

@@ -15,12 +15,14 @@
 //! format is submitted directly; shared-mode WASAPI mixes it to the
 //! device mix format itself. A device that refuses the source format
 //! fails the open honestly (Tier-2 SRC fallback is OPEN-1, not faked).
-
-// Every function in this module is a raw COM/Win32 mechanism sequence and
-// is already marked `unsafe fn` as its safety boundary; inside those
-// bodies the whole point is unsafe Win32 calls. Signature-level marking is
-// the discipline here, not per-call wrapping noise.
-#![allow(unsafe_op_in_unsafe_fn)]
+//!
+//! Safety: all Win32/COM calls sit in explicit `unsafe` blocks at their
+//! call sites; the private functions themselves are safe. Two RAII owners
+//! guarantee release on every exit path — panic included:
+//! [`ComApartment`] balances `CoInitializeEx` on the render thread, and
+//! [`DeviceSession`]'s [`Drop`] runs the historical release order (Stop,
+//! render client, audio client, event handle) exactly once on that same
+//! thread.
 
 use std::slice;
 use std::sync::{Arc, Condvar, Mutex};
@@ -40,7 +42,7 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::GUID;
 
 use qianqian_core::ports::{
-    AudioOutput, DrainSignal, DrainVerdict, OutputError, PcmFormat, PcmFrameSource, PcmPull,
+    AudioOutput, DrainSignal, DrainVerdict, OutputError, PcmFormat, PcmPull, RenderPcmInput,
     RenderRequest, RenderStream,
 };
 
@@ -87,9 +89,9 @@ impl AudioOutput for WasapiOutput {
             .spawn({
                 let slot = slot.clone();
                 let format = request.format;
-                let source = request.source.clone();
+                let render_input = request.input.clone();
                 let drain = request.drain.clone();
-                move || run_render_thread(format, source, drain, slot)
+                move || run_render_thread(format, render_input, drain, slot)
             })
             .map_err(|e| OutputError {
                 message: format!("render thread spawn failed: {e}"),
@@ -104,16 +106,16 @@ impl AudioOutput for WasapiOutput {
         let verdict = { guard.take() };
         match verdict {
             Some(OpenVerdict::Opened { format }) => Ok(Box::new(WasapiStream {
-                source: request.source,
+                render_input: request.input,
                 thread: Some(handle),
                 negotiated: format,
             })),
             Some(OpenVerdict::Failed { message }) => {
-                abort_thread(handle, &request.source);
+                abort_thread(handle, &request.input);
                 Err(OutputError { message })
             }
             None if wait.timed_out() => {
-                abort_thread(handle, &request.source);
+                abort_thread(handle, &request.input);
                 Err(OutputError {
                     message: "WASAPI device open did not reach a verdict in time".to_owned(),
                 })
@@ -126,15 +128,15 @@ impl AudioOutput for WasapiOutput {
 /// Wake and join a render thread whose stream was never handed to the
 /// session (open failure / timeout). The thread observes the data-plane
 /// stop at its first read, or exits through its own failed verdict.
-fn abort_thread(handle: JoinHandle<()>, source: &Arc<dyn PcmFrameSource>) {
-    source.stop();
+fn abort_thread(handle: JoinHandle<()>, render_input: &Arc<dyn RenderPcmInput>) {
+    render_input.stop();
     let _ = handle.join();
 }
 
 /// One acquired render stream: owns the render thread and the device
 /// session for one playback episode.
 struct WasapiStream {
-    source: Arc<dyn PcmFrameSource>,
+    render_input: Arc<dyn RenderPcmInput>,
     thread: Option<JoinHandle<()>>,
     negotiated: PcmFormat,
 }
@@ -149,7 +151,7 @@ impl RenderStream for WasapiStream {
     /// reading an empty edge; the thread releases the device before
     /// exiting, so a completed join means the device is released.
     fn stop_and_join(mut self: Box<Self>) {
-        self.source.stop();
+        self.render_input.stop();
         if let Some(handle) = self.thread.take() {
             let _ = handle.join();
         }
@@ -184,14 +186,14 @@ enum LoopOutcome {
 
 fn run_render_thread(
     format: PcmFormat,
-    source: Arc<dyn PcmFrameSource>,
+    render_input: Arc<dyn RenderPcmInput>,
     drain: DrainSignal,
     slot: OpenSlot,
 ) {
     // A panic must not leave the completion unresolved or the producer
     // wedged: it reports like any other abort.
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        open_and_run(format, &*source, &slot)
+        open_and_run(format, &*render_input, &slot)
     }))
     .unwrap_or_else(|_| LoopOutcome::Aborted {
         message: "render thread panicked".to_owned(),
@@ -203,7 +205,7 @@ fn run_render_thread(
             // The device leg is gone: stop the data plane so the decode
             // worker cannot wedge on a full edge against a dead consumer
             // (first-wins on the edge, so it is a no-op after natural EOF).
-            source.stop();
+            render_input.stop();
         }
         LoopOutcome::Drained => {}
     }
@@ -214,20 +216,24 @@ fn run_render_thread(
 }
 
 /// COM apartment ownership lives and dies on this thread, around the
-/// whole open + loop + release sequence.
-fn open_and_run(format: PcmFormat, source: &dyn PcmFrameSource, slot: &OpenSlot) -> LoopOutcome {
+/// whole open + loop + release sequence. Both `S_OK` and `S_FALSE` are
+/// successful `CoInitializeEx` results; both require a matching
+/// `CoUninitialize` (Microsoft COM contract). The `ComApartment` guard
+/// guarantees that `CoUninitialize` runs on every exit path — success,
+/// error, panic — because it is dropped during unwind as well.
+fn open_and_run(
+    format: PcmFormat,
+    render_input: &dyn RenderPcmInput,
+    slot: &OpenSlot,
+) -> LoopOutcome {
     let coinit = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
-    let com_owner = coinit.is_ok();
-    let outcome = unsafe { open_and_run_inner(format, source, slot) };
-    if com_owner {
-        unsafe { CoUninitialize() };
-    }
-    outcome
+    let _apartment = ComApartment(coinit.is_ok());
+    open_and_run_inner(format, render_input, slot)
 }
 
-unsafe fn open_and_run_inner(
+fn open_and_run_inner(
     format: PcmFormat,
-    source: &dyn PcmFrameSource,
+    render_input: &dyn RenderPcmInput,
     slot: &OpenSlot,
 ) -> LoopOutcome {
     let Some(session) = open_session(format, slot) else {
@@ -236,42 +242,56 @@ unsafe fn open_and_run_inner(
         };
     };
     // The open verdict is published; from here every exit is reported
-    // through the loop outcome only.
-    let outcome = steady_loop(&session, &format, source);
-    release_session(session);
-    outcome
+    // through the loop outcome only. The session is released by Drop on
+    // every path — success, error, panic — before the unwind reaches
+    // this scope's boundary.
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        steady_loop(&session, &format, render_input)
+    })) {
+        Ok(outcome) => outcome,
+        Err(_) => LoopOutcome::Aborted {
+            message: "render loop panicked".to_owned(),
+        },
+    }
 }
 
-/// Everything the render thread owns on the device side. Released in
-/// `release_session`, in the historical stop order: Stop, render client,
-/// client, event handle — all on this thread.
+/// COM apartment ownership on the render thread. `CoInitializeEx` returns
+/// `Ok` for both `S_OK` and `S_FALSE`: both are successful initialization
+/// results and both require a matching `CoUninitialize` (Microsoft COM
+/// contract). This guard runs that `CoUninitialize` exactly once on every
+/// exit path — success, error, panic — because it is dropped during
+/// unwind as well.
+struct ComApartment(bool);
+
+impl Drop for ComApartment {
+    fn drop(&mut self) {
+        if self.0 {
+            unsafe { CoUninitialize() };
+        }
+    }
+}
 struct DeviceSession {
-    client: IAudioClient,
     render: IAudioRenderClient,
+    client: IAudioClient,
     event: HANDLE,
     buffer_frames: u32,
 }
 
-fn release_session(session: DeviceSession) {
-    unsafe {
-        let _ = session.client.Stop();
-    }
-    let DeviceSession {
-        client,
-        render,
-        event,
-        buffer_frames: _,
-    } = session;
-    drop(render); // render client released before the audio client
-    drop(client);
-    unsafe {
-        let _ = CloseHandle(event);
+impl Drop for DeviceSession {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = self.client.Stop();
+        }
+        // Fields drop in declaration order: render client, audio client,
+        // event handle — the required historical release order.
     }
 }
 
 /// Device open + Tier-1 negotiation. Publishes exactly one open verdict;
 /// returns the session on success.
-unsafe fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSession> {
+/// Device open + Tier-1 negotiation. Publishes exactly one open verdict;
+/// returns the session on success.
+fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSession> {
     let publish = |v: OpenVerdict| {
         let (m, cv) = &**slot;
         let mut guard = m.lock().expect("open verdict lock");
@@ -284,15 +304,15 @@ unsafe fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSessi
     };
 
     let enumerator: IMMDeviceEnumerator =
-        match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+        match unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) } {
             Ok(e) => e,
             Err(e) => return fail(format!("CoCreateInstance(MMDeviceEnumerator): {e}")),
         };
-    let device = match enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia) {
+    let device = match unsafe { enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia) } {
         Ok(d) => d,
         Err(e) => return fail(format!("no default render endpoint: {e}")),
     };
-    let client: IAudioClient = match device.Activate(CLSCTX_ALL, None) {
+    let client: IAudioClient = match unsafe { device.Activate(CLSCTX_ALL, None) } {
         Ok(c) => c,
         Err(e) => return fail(format!("device activation failed: {e}")),
     };
@@ -310,14 +330,16 @@ unsafe fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSessi
     wfx.dwChannelMask = u32::try_from(format.channel_mask).unwrap_or(0);
     wfx.SubFormat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 
-    if let Err(e) = client.Initialize(
-        AUDCLNT_SHAREMODE_SHARED,
-        AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-        0,
-        0,
-        std::ptr::addr_of!(wfx.Format),
-        None,
-    ) {
+    if let Err(e) = unsafe {
+        client.Initialize(
+            AUDCLNT_SHAREMODE_SHARED,
+            AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+            0,
+            0,
+            std::ptr::addr_of!(wfx.Format),
+            None,
+        )
+    } {
         let hint = if e.code() == AUDCLNT_E_UNSUPPORTED_FORMAT {
             " (device refused the float32 source format; Tier-2 SRC fallback is deferred)"
         } else {
@@ -326,29 +348,29 @@ unsafe fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSessi
         return fail(format!("stream initialize failed: {e}{hint}"));
     }
 
-    let event: HANDLE = match CreateEventW(None, false, false, None) {
+    let event: HANDLE = match unsafe { CreateEventW(None, false, false, None) } {
         Ok(h) => h,
         Err(e) => return fail(format!("buffer event creation failed: {e}")),
     };
-    if let Err(e) = client.SetEventHandle(event) {
-        let _ = CloseHandle(event);
+    if let Err(e) = unsafe { client.SetEventHandle(event) } {
+        let _ = unsafe { CloseHandle(event) };
         return fail(format!("SetEventHandle failed: {e}"));
     }
-    let buffer_frames = match client.GetBufferSize() {
+    let buffer_frames = match unsafe { client.GetBufferSize() } {
         Ok(f) if f > 0 => f,
         Ok(_) => {
-            let _ = CloseHandle(event);
+            let _ = unsafe { CloseHandle(event) };
             return fail("device reported a zero-frame buffer".to_owned());
         }
         Err(e) => {
-            let _ = CloseHandle(event);
+            let _ = unsafe { CloseHandle(event) };
             return fail(format!("GetBufferSize failed: {e}"));
         }
     };
-    let render: IAudioRenderClient = match client.GetService() {
+    let render: IAudioRenderClient = match unsafe { client.GetService() } {
         Ok(r) => r,
         Err(e) => {
-            let _ = CloseHandle(event);
+            let _ = unsafe { CloseHandle(event) };
             return fail(format!("render client acquire failed: {e}"));
         }
     };
@@ -361,20 +383,20 @@ unsafe fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSessi
         format.sample_rate, format.channels, format.channel_mask, buffer_frames
     );
     Some(DeviceSession {
-        client,
         render,
+        client,
         event,
         buffer_frames,
     })
 }
 
 /// The steady event-driven loop, then the EOF drain.
-unsafe fn steady_loop(
+fn steady_loop(
     session: &DeviceSession,
     format: &PcmFormat,
-    source: &dyn PcmFrameSource,
+    render_input: &dyn RenderPcmInput,
 ) -> LoopOutcome {
-    if let Err(e) = session.client.Start() {
+    if let Err(e) = unsafe { session.client.Start() } {
         return LoopOutcome::Aborted {
             message: format!("stream start failed: {e}"),
         };
@@ -382,8 +404,8 @@ unsafe fn steady_loop(
     let channels = usize::from(format.channels);
     loop {
         // Period cadence; the bounded wait is also the stop-latency bound.
-        WaitForSingleObject(session.event, EVENT_TIMEOUT_MS);
-        let padding = match session.client.GetCurrentPadding() {
+        unsafe { WaitForSingleObject(session.event, EVENT_TIMEOUT_MS) };
+        let padding = match unsafe { session.client.GetCurrentPadding() } {
             Ok(p) => p,
             Err(e) => break abort_msg(format!("GetCurrentPadding failed: {e}")),
         };
@@ -393,24 +415,24 @@ unsafe fn steady_loop(
         }
 
         // The device buffer IS the fill destination (zero-copy period).
-        let ptr = match session.render.GetBuffer(available as u32) {
+        let ptr = match unsafe { session.render.GetBuffer(available as u32) } {
             Ok(p) => p,
             Err(e) => break abort_msg(format!("GetBuffer failed: {e}")),
         };
-        let dst = slice::from_raw_parts_mut(ptr as *mut f32, available * channels);
-        match source.read_frames(dst) {
+        let dst = unsafe { slice::from_raw_parts_mut(ptr as *mut f32, available * channels) };
+        match render_input.read_frames(dst) {
             PcmPull::Frames(n) => {
-                if let Err(e) = session.render.ReleaseBuffer(n as u32, 0) {
+                if let Err(e) = unsafe { session.render.ReleaseBuffer(n as u32, 0) } {
                     break abort_msg(format!("ReleaseBuffer failed: {e}"));
                 }
             }
             PcmPull::Eof => {
                 // Edge drained: everything produced has been submitted.
-                let _ = session.render.ReleaseBuffer(0, 0);
+                let _ = unsafe { session.render.ReleaseBuffer(0, 0) };
                 break drain_to_zero(session);
             }
             PcmPull::Stopped => {
-                let _ = session.render.ReleaseBuffer(0, 0);
+                let _ = unsafe { session.render.ReleaseBuffer(0, 0) };
                 break LoopOutcome::Aborted {
                     message: "data plane stopped".to_owned(),
                 };
@@ -421,10 +443,10 @@ unsafe fn steady_loop(
 
 /// Wait until the device has played out everything submitted
 /// (padding reaches zero), bounded. EOF must be audible, not just queued.
-unsafe fn drain_to_zero(session: &DeviceSession) -> LoopOutcome {
+fn drain_to_zero(session: &DeviceSession) -> LoopOutcome {
     let deadline = Instant::now() + DRAIN_CAP;
     loop {
-        match session.client.GetCurrentPadding() {
+        match unsafe { session.client.GetCurrentPadding() } {
             Ok(0) => return LoopOutcome::Drained,
             Ok(_) => {}
             Err(e) => return abort_msg(format!("drain padding check failed: {e}")),
@@ -432,7 +454,7 @@ unsafe fn drain_to_zero(session: &DeviceSession) -> LoopOutcome {
         if Instant::now() > deadline {
             return abort_msg("drain deadline passed before the device played out".to_owned());
         }
-        WaitForSingleObject(session.event, EVENT_TIMEOUT_MS);
+        unsafe { WaitForSingleObject(session.event, EVENT_TIMEOUT_MS) };
     }
 }
 

@@ -20,3 +20,9 @@ mod session;
 pub use completion::{SessionCompletion, SessionOutcome};
 pub use edge::{EdgeTerminal, PcmEdge, SharedEdge, WriteOutcome};
 pub use session::playback_session_spec;
+
+// Re-export core port types for convenient use across the workspace.
+pub use qianqian_core::ports::{
+    AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainSignal,
+    DrainVerdict, PcmDecode, PcmFormat, RenderPcmInput, RenderRequest, RenderStream,
+};

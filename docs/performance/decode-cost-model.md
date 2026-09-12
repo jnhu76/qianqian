@@ -195,7 +195,7 @@ blocks, 15 interleaved iterations per fixture, median vs median, noise band
 (`crates/qianqian-decode-songcore/tests/plugin_tax.rs`):
 
 ```text
-raw FFI (song_read_pcm direct)  vs  real Decode Plugin endpoint (Box<dyn PcmSource>)
+raw FFI (song_read_pcm direct)  vs  real Decode Plugin endpoint (Box<dyn DecodedPcmStream>)
 
 MP3   ~1.93 ms vs ~1.90 ms   delta -1.9%   (noise band 3.6%)
 FLAC  ~3.19 ms vs ~3.19 ms   delta -0.2%   (noise band 1.8%)

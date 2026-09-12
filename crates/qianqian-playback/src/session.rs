@@ -19,7 +19,9 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use qianqian_core::ports::{AudioOutputCapability, DecodeOutcome, PcmDecodeCapability, PcmSource};
+use qianqian_core::ports::{
+    AudioOutputCapability, DecodeOutcome, DecodedPcmStream, PcmDecodeCapability,
+};
 use qianqian_kernel::{ActivationError, ComponentSpec, Discharge};
 
 use crate::completion::SessionCompletion;
@@ -66,21 +68,27 @@ fn activate_inner(
     ctx: &mut qianqian_kernel::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
     // Control plane: capability resolution happens exactly once, here.
-    let decode = ctx
-        .resolve::<PcmDecodeCapability>()
-        .map_err(|e| ActivationError::new(format!("decode capability unresolved: {e:?}")))?;
-    let output = ctx
-        .resolve::<AudioOutputCapability>()
-        .map_err(|e| ActivationError::new(format!("output capability unresolved: {e:?}")))?;
+    let decode = ctx.resolve::<PcmDecodeCapability>().map_err(|e| {
+        ActivationError::new(format!(
+            "decode capability unresolved: {}",
+            resolve_error(e)
+        ))
+    })?;
+    let output = ctx.resolve::<AudioOutputCapability>().map_err(|e| {
+        ActivationError::new(format!(
+            "output capability unresolved: {}",
+            resolve_error(e)
+        ))
+    })?;
 
     // One playback-specific decode endpoint. Its RAII rides with the
     // worker closure: released when the worker exits (joined before any
     // stream release), dropped on spawn failure, dropped on earlier raises.
-    let source = decode
+    let decode_stream = decode
         .service()
-        .open_source(file)
+        .open_media(file)
         .map_err(|e| ActivationError::new(format!("decode open failed: {}", e.message)))?;
-    let format = source.format();
+    let format = decode_stream.format();
     completion.set_source_format(format);
 
     // The one bounded PCM edge: session-owned, preallocated now.
@@ -93,7 +101,7 @@ fn activate_inner(
         .service()
         .open_stream(qianqian_core::ports::RenderRequest {
             format,
-            source: edge.clone(),
+            input: edge.clone(),
             drain: completion.drain_signal(),
         })
         .map_err(|e| ActivationError::new(format!("render stream open failed: {}", e.message)))?;
@@ -110,7 +118,14 @@ fn activate_inner(
     let worker_completion = completion.clone();
     let worker = std::thread::Builder::new()
         .name("qianqian-decode".into())
-        .spawn(move || decode_worker(source, worker_edge, worker_completion, STAGING_FRAMES))
+        .spawn(move || {
+            decode_worker(
+                decode_stream,
+                worker_edge,
+                worker_completion,
+                STAGING_FRAMES,
+            )
+        })
         .map_err(|e| ActivationError::new(format!("decode worker spawn failed: {e}")))?;
     // Registered last, so it unwinds first: stop the edge (unblocking
     // both legs), then join the producer. Relation-bearing toward the
@@ -127,17 +142,17 @@ fn activate_inner(
 /// The decode worker: SongCore/FFmpeg/filesystem work lives only here.
 /// Refills a once-allocated staging buffer and feeds the bounded edge.
 fn decode_worker(
-    mut source: Box<dyn PcmSource>,
+    mut decode_stream: Box<dyn DecodedPcmStream>,
     edge: Arc<PcmEdge>,
     completion: SessionCompletion,
     staging_frames: usize,
 ) {
-    let channels = usize::from(source.format().channels);
+    let channels = usize::from(decode_stream.format().channels);
     let catch = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         // Startup allocation only; the steady loop reuses this buffer.
         let mut staging = vec![0.0f32; staging_frames * channels];
         loop {
-            match source.read_frames(&mut staging) {
+            match decode_stream.read_frames(&mut staging) {
                 // A zero-frame response must still observe the data plane:
                 // a decoder that never progresses cannot pin the worker
                 // past a stop.
@@ -163,9 +178,31 @@ fn decode_worker(
             }
         }
     }));
-    if catch.is_err() {
-        completion.decode_failed("decode worker panicked");
-        edge.fail();
+    match catch {
+        Ok(()) => {}
+        Err(payload) => {
+            let message = if let Some(s) = payload.downcast_ref::<&str>() {
+                format!("decode worker panicked: {s}")
+            } else if let Some(s) = payload.downcast_ref::<String>() {
+                format!("decode worker panicked: {s}")
+            } else {
+                "decode worker panicked".to_owned()
+            };
+            completion.decode_failed(&message);
+            edge.fail();
+        }
     }
     completion.worker_exited(edge.terminal());
+}
+
+/// Map a kernel resolution error to a human-readable diagnostic without
+/// coupling session.rs to `ResolveError`'s Debug surface.
+fn resolve_error(e: qianqian_kernel::ResolveError) -> &'static str {
+    match e {
+        qianqian_kernel::ResolveError::Undeclared => "capability not declared",
+        qianqian_kernel::ResolveError::InactiveAccess => "activation context inactive",
+        qianqian_kernel::ResolveError::Unresolved => "no active provider",
+        qianqian_kernel::ResolveError::Ambiguous => "multiple providers",
+        qianqian_kernel::ResolveError::AlreadyProvided => "already provided",
+    }
 }

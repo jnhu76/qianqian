@@ -19,15 +19,7 @@ use qianqian_runtime::AppRuntime;
 use common::ReferenceFixture;
 
 fn fixtures_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../native/experiments/songcore-equivalence/fixtures")
-}
-
-fn load_fixture(id: &str) -> (ReferenceFixture, PathBuf) {
-    let fx = ReferenceFixture::load(&fixtures_dir().parent().unwrap().join("reference.json"), id);
-    let path = fixtures_dir().join(&fx.file);
-    fx.verify_file_identity(&path);
-    (fx, path)
+    common::fixtures_dir()
 }
 
 fn service() -> SongcoreDecode {
@@ -37,11 +29,11 @@ fn service() -> SongcoreDecode {
 #[test]
 fn opens_real_files_with_reference_format() {
     for id in ["mp3-cbr-id3v23", "flac-16-44-stereo"] {
-        let (fx, path) = load_fixture(id);
-        let mut src = service().open_source(&path).unwrap_or_else(|e| {
+        let (fx, path) = common::load_fixture(id);
+        let mut decode_stream = service().open_media(&path).unwrap_or_else(|e| {
             panic!("{id}: real file must open: {}", e.message);
         });
-        let fmt = src.format();
+        let fmt = decode_stream.format();
         assert_eq!(
             fmt.sample_rate, fx.sample_rate,
             "{id}: reference sample rate"
@@ -55,14 +47,14 @@ fn opens_real_files_with_reference_format() {
 
 #[test]
 fn drains_exact_reference_frame_count_then_stable_eof() {
-    let (fx, path) = load_fixture("mp3-cbr-id3v23");
-    let mut src = service().open_source(&path).expect("opens");
+    let (fx, path) = common::load_fixture("mp3-cbr-id3v23");
+    let mut decode_stream = service().open_media(&path).expect("opens");
 
-    let channels = src.format().channels as usize;
+    let channels = decode_stream.format().channels as usize;
     let mut block = vec![0.0f32; 1024 * channels];
     let mut total = 0usize;
     loop {
-        match src.read_frames(&mut block).expect("read succeeds") {
+        match decode_stream.read_frames(&mut block).expect("read succeeds") {
             DecodeOutcome::Frames(n) => total += n,
             DecodeOutcome::Eof => break,
         }
@@ -70,7 +62,7 @@ fn drains_exact_reference_frame_count_then_stable_eof() {
     assert_eq!(total, fx.pcm_frames, "reference frame count");
     // EOF is terminal and stable, not one-shot.
     assert_eq!(
-        src.read_frames(&mut block).expect("read after EOF"),
+        decode_stream.read_frames(&mut block).expect("read after EOF"),
         DecodeOutcome::Eof,
         "EOF stays terminal"
     );
@@ -79,15 +71,15 @@ fn drains_exact_reference_frame_count_then_stable_eof() {
 #[test]
 fn full_drain_pcm_matches_reference_sha256() {
     for id in ["mp3-cbr-id3v23", "flac-16-44-stereo", "alac-16-44-stereo"] {
-        let (fx, path) = load_fixture(id);
-        let mut src = service().open_source(&path).expect("opens");
+        let (fx, path) = common::load_fixture(id);
+        let mut decode_stream = service().open_media(&path).expect("opens");
 
-        let channels = src.format().channels as usize;
+        let channels = decode_stream.format().channels as usize;
         let mut hasher = common::Sha256::new();
         let mut block = vec![0.0f32; 1024 * channels];
         let mut total = 0usize;
         loop {
-            match src.read_frames(&mut block).expect("read succeeds") {
+            match decode_stream.read_frames(&mut block).expect("read succeeds") {
                 DecodeOutcome::Frames(n) => {
                     let samples = n * channels;
                     let bytes: Vec<u8> = block[..samples]
@@ -108,7 +100,7 @@ fn full_drain_pcm_matches_reference_sha256() {
 #[test]
 fn missing_file_is_an_open_error() {
     let err = service()
-        .open_source(Path::new("/nonexistent/qianqian-test media.mp3"))
+        .open_media(Path::new("/nonexistent/qianqian-test media.mp3"))
         .err()
         .expect("missing file must not open");
     assert!(!err.message.is_empty());
@@ -118,18 +110,18 @@ fn missing_file_is_an_open_error() {
 fn undecodable_file_is_an_open_error() {
     let path = std::env::temp_dir().join("qianqian-decode-test-garbage.bin");
     std::fs::write(&path, b"this is not a media container at all").expect("temp file");
-    let result = service().open_source(&path);
+    let result = service().open_media(&path);
     let _ = std::fs::remove_file(&path);
     assert!(result.is_err(), "garbage bytes must not open as media");
 }
 
 #[test]
 fn two_endpoints_from_one_service_are_independent() {
-    let (_, mp3) = load_fixture("mp3-cbr-id3v23");
-    let (_, flac) = load_fixture("flac-16-44-stereo");
+    let (_, mp3) = common::load_fixture("mp3-cbr-id3v23");
+    let (_, flac) = common::load_fixture("flac-16-44-stereo");
     let svc = service();
-    let mut a = svc.open_source(&mp3).expect("opens");
-    let mut b = svc.open_source(&flac).expect("opens");
+    let mut a = svc.open_media(&mp3).expect("opens");
+    let mut b = svc.open_media(&flac).expect("opens");
     let mut buf = vec![0.0f32; 1024 * 2];
     assert!(matches!(
         a.read_frames(&mut buf).expect("a reads"),
@@ -146,7 +138,7 @@ fn two_endpoints_from_one_service_are_independent() {
 /// media through the resolved service.
 #[test]
 fn plugin_publishes_capability_that_opens_real_media_through_the_kernel() {
-    let (fx, path) = load_fixture("mp3-cbr-id3v23");
+    let (fx, path) = common::load_fixture("mp3-cbr-id3v23");
     let observed: Rc<RefCell<Option<(u32, usize)>>> = Rc::new(RefCell::new(None));
     let observed_in_activate = observed.clone();
     let open_path = path.clone();
@@ -157,13 +149,13 @@ fn plugin_publishes_capability_that_opens_real_media_through_the_kernel() {
             let binding = ctx
                 .resolve::<PcmDecodeCapability>()
                 .expect("decode resolves");
-            let mut src = binding
+            let mut decode_stream = binding
                 .service()
-                .open_source(&open_path)
+                .open_media(&open_path)
                 .expect("real file opens via resolved capability");
-            let rate = src.format().sample_rate;
+            let rate = decode_stream.format().sample_rate;
             let mut buf = vec![0.0f32; 1024 * 2];
-            let n = match src.read_frames(&mut buf).expect("reads") {
+            let n = match decode_stream.read_frames(&mut buf).expect("reads") {
                 DecodeOutcome::Frames(n) => n,
                 DecodeOutcome::Eof => 0,
             };

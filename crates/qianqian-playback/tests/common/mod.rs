@@ -20,8 +20,8 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
 }
 
 use qianqian_core::ports::{
-    AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DrainVerdict, OutputError, PcmDecode,
-    PcmFormat, PcmFrameSource, PcmPull, PcmSource, RenderRequest, RenderStream,
+    AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainVerdict,
+    OutputError, PcmDecode, PcmFormat, PcmPull, RenderPcmInput, RenderRequest, RenderStream,
 };
 
 pub const TEST_FORMAT: PcmFormat = PcmFormat {
@@ -51,13 +51,16 @@ pub struct TestDecode {
 }
 
 impl PcmDecode for TestDecode {
-    fn open_source(&self, _path: &std::path::Path) -> Result<Box<dyn PcmSource>, DecodeOpenError> {
+    fn open_media(
+        &self,
+        _path: &std::path::Path,
+    ) -> Result<Box<dyn DecodedPcmStream>, DecodeOpenError> {
         let (n, fail, pace) = match self.behavior {
             SourceBehavior::EofAfter(n) => (n, false, None),
             SourceBehavior::FailAfter(n) => (n, true, None),
             SourceBehavior::Paced { after, delay } => (after, false, Some(delay)),
         };
-        Ok(Box::new(TestSource {
+        Ok(Box::new(TestDecodeStream {
             remaining: n,
             fail_after: fail,
             pace_delay: pace,
@@ -66,14 +69,14 @@ impl PcmDecode for TestDecode {
     }
 }
 
-struct TestSource {
+struct TestDecodeStream {
     remaining: usize,
     fail_after: bool,
     pace_delay: Option<Duration>,
     format: PcmFormat,
 }
 
-impl PcmSource for TestSource {
+impl DecodedPcmStream for TestDecodeStream {
     fn format(&self) -> PcmFormat {
         self.format
     }
@@ -124,20 +127,20 @@ impl AudioOutput for TestOutput {
             }),
             OutputBehavior::Consume => {
                 let RenderRequest {
-                    source,
+                    input,
                     drain,
                     format: _,
                 } = request;
                 let thread = std::thread::Builder::new()
                     .name("qianqian-test-render".into())
                     .spawn({
-                        let source = source.clone();
+                        let input = input.clone();
                         move || {
-                            let verdict = consume_loop(source.clone());
+                            let verdict = consume_loop(input.clone());
                             if verdict == DrainVerdict::Aborted {
                                 // Mirror the real mechanism: a dead render
                                 // leg stops the data plane.
-                                source.stop();
+                                input.stop();
                             }
                             drain.complete(verdict);
                         }
@@ -146,7 +149,7 @@ impl AudioOutput for TestOutput {
                         message: format!("test render spawn failed: {e}"),
                     })?;
                 Ok(Box::new(TestStream {
-                    source,
+                    input,
                     thread: Some(thread),
                 }))
             }
@@ -154,10 +157,10 @@ impl AudioOutput for TestOutput {
     }
 }
 
-fn consume_loop(source: Arc<dyn PcmFrameSource>) -> DrainVerdict {
+fn consume_loop(input: Arc<dyn RenderPcmInput>) -> DrainVerdict {
     let mut dst = vec![0.0f32; 256 * usize::from(TEST_FORMAT.channels)];
     loop {
-        match source.read_frames(&mut dst) {
+        match input.read_frames(&mut dst) {
             PcmPull::Frames(_) => {}
             PcmPull::Eof => return DrainVerdict::Drained,
             PcmPull::Stopped => return DrainVerdict::Aborted,
@@ -166,7 +169,7 @@ fn consume_loop(source: Arc<dyn PcmFrameSource>) -> DrainVerdict {
 }
 
 struct TestStream {
-    source: Arc<dyn PcmFrameSource>,
+    input: Arc<dyn RenderPcmInput>,
     thread: Option<std::thread::JoinHandle<()>>,
 }
 
@@ -176,7 +179,7 @@ impl RenderStream for TestStream {
     }
 
     fn stop_and_join(mut self: Box<Self>) {
-        self.source.stop();
+        self.input.stop();
         if let Some(handle) = self.thread.take() {
             let _ = handle.join();
         }

@@ -28,19 +28,22 @@ fn run(args: Vec<String>) -> ExitCode {
     };
 
     let mut runtime = qianqian_runtime::AppRuntime::new();
-    runtime
-        .register_component(qianqian_decode_songcore::songcore_decode_plugin())
-        .expect("decode plugin registers");
-    runtime
-        .register_component(qianqian_output_wasapi::wasapi_output_plugin())
-        .expect("output plugin registers");
+    if let Err(e) = runtime.register_component(qianqian_decode_songcore::songcore_decode_plugin()) {
+        eprintln!("decode plugin registration failed: {e:?}");
+        return ExitCode::from(1);
+    }
+    if let Err(e) = runtime.register_component(qianqian_output_wasapi::wasapi_output_plugin()) {
+        eprintln!("output plugin registration failed: {e:?}");
+        return ExitCode::from(1);
+    }
     let completion = SessionCompletion::new();
-    runtime
-        .register_component(playback_session_spec(
-            PathBuf::from(file),
-            completion.clone(),
-        ))
-        .expect("session registers");
+    if let Err(e) = runtime.register_component(playback_session_spec(
+        PathBuf::from(file),
+        completion.clone(),
+    )) {
+        eprintln!("session registration failed: {e:?}");
+        return ExitCode::from(1);
+    }
 
     if let Err(errors) = runtime.revise_desired(vec![
         desired("decode", "songcore_decode_plugin"),
@@ -64,7 +67,8 @@ fn run(args: Vec<String>) -> ExitCode {
                  failed or is missing on this platform)"
             );
         }
-        runtime.dispose();
+        let snapshot = runtime.dispose();
+        report_disposal(&snapshot);
         return ExitCode::from(1);
     }
 
@@ -89,9 +93,7 @@ fn run(args: Vec<String>) -> ExitCode {
             println!("stopped before completion");
         }
     }
-    if !snapshot.quiet {
-        eprintln!("warning: disposal reported a latched teardown violation");
-    }
+    report_disposal(&snapshot);
     match outcome {
         SessionOutcome::Completed | SessionOutcome::Stopped => {
             if snapshot.quiet {
@@ -114,12 +116,22 @@ fn run(_args: Vec<String>) -> ExitCode {
 }
 
 #[cfg(feature = "playback")]
-fn desired(id: &str, component: &'static str) -> qianqian_kernel::DesiredEntry {
-    qianqian_kernel::DesiredEntry::enabled(id, component, qianqian_kernel::Revision::new(1))
+fn report_disposal(snapshot: &qianqian_kernel::CompositionSnapshot) {
+    if snapshot.quiet {
+        return;
+    }
+    eprintln!("warning: disposal reported a latched teardown violation");
+    for (name, fiber) in &snapshot.fibers {
+        if fiber.teardown_violated {
+            eprintln!(
+                "  fiber '{name}': teardown violated (state {:?})",
+                fiber.state
+            );
+        }
+    }
 }
 
-#[cfg(not(feature = "playback"))]
-#[allow(dead_code)]
+#[cfg(feature = "playback")]
 fn desired(id: &str, component: &'static str) -> qianqian_kernel::DesiredEntry {
     qianqian_kernel::DesiredEntry::enabled(id, component, qianqian_kernel::Revision::new(1))
 }

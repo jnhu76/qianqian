@@ -14,6 +14,7 @@ qianqian-output-wasapi = { path = "../../crates/qianqian-output-wasapi", optiona
 
 [features]
 default = []
-# The real playback slice requires the native SongCore artifacts; gating
-# keeps the default workspace build clean without them.
+# Binary-local feature: gates the real playback slice (requires native SongCore
+# artifacts). Kept for the capability it enables, not the underlying crates.
+# This is NOT a library public API feature.
 playback = ["dep:qianqian-decode-songcore", "dep:qianqian-output-wasapi"]
