@@ -21,6 +21,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "build" / "ffmpeg-src"
@@ -112,6 +113,17 @@ def find_native_recipe() -> dict:
         f"add one before importing")
 
 
+def find_recipe(explicit_id: str | None) -> dict:
+    """The target recipe for this import: an explicit --recipe id (how a
+    cross target is derived from a non-matching host) or the host match."""
+    if explicit_id is None:
+        return find_native_recipe()
+    path = TARGETS / f"{explicit_id}.json"
+    if not path.is_file():
+        raise SystemExit(f"recipe '{explicit_id}' not found under ffmpeg/targets/")
+    return json.loads(path.read_text())
+
+
 def recipe_configure_args(recipe: dict) -> list[str]:
     """Deterministic configure arguments implied by the target facts."""
     ff = recipe.get("ffmpeg", {})
@@ -176,14 +188,14 @@ def configure_args(profile: dict) -> list[str]:
     return args
 
 
-def make_log() -> str:
+def make_log(recipe: dict) -> str:
     # A clean oracle tree gives generated config and the exact commands FFmpeg
     # itself considers necessary for this capability slice.
     shutil.rmtree(ORACLE, ignore_errors=True)
     ORACLE.mkdir(parents=True)
 
     profile = json.loads(PROFILE.read_text())
-    args = configure_args(profile)
+    args = configure_args(profile) + recipe_configure_args(recipe)
     run([str(SRC / "configure"), *args], cwd=ORACLE)
 
     jobs = str(max(1, os.cpu_count() or 4))
@@ -340,16 +352,26 @@ def assert_portable_manifest(manifest: dict) -> None:
 
 
 def main() -> None:
+    recipe_id = None
+    argv = sys.argv[1:]
+    if "--recipe" in argv:
+        i = argv.index("--recipe")
+        if i + 1 >= len(argv):
+            raise SystemExit("--recipe requires the target recipe id")
+        recipe_id = argv[i + 1]
+        del argv[i:i + 2]
+    if argv:
+        raise SystemExit(f"unexpected arguments: {argv}; usage: ffmpeg_import.py [--recipe ID]")
+
     pin = json.loads(PIN.read_text())
     profile = json.loads(PROFILE.read_text())
     if profile.get("profile") != "codec-base":
         raise SystemExit("import profile identity changed unexpectedly")
-    recipe = find_native_recipe()
+    recipe = find_recipe(recipe_id)
     verified_source(pin)
-
-    log = make_log()
+    log = make_log(recipe)
     units = closure_from_log(log)
-    args = configure_args(profile)
+    args = configure_args(profile) + recipe_configure_args(recipe)
     toolchain = toolchain_identity()
 
     refs = {}

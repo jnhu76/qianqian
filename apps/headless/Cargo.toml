@@ -2,6 +2,19 @@
 name = "qianqian-headless"
 version.workspace = true
 edition.workspace = true
+description = "Headless bootstrap of Architecture v2: composition-only real playback entry"
 
 [dependencies]
+qianqian-core = { path = "../../crates/qianqian-core" }
+qianqian-kernel = { path = "../../crates/qianqian-kernel" }
+qianqian-playback = { path = "../../crates/qianqian-playback" }
 qianqian-runtime = { path = "../../crates/qianqian-runtime" }
+qianqian-decode-songcore = { path = "../../crates/qianqian-decode-songcore", optional = true }
+qianqian-output-wasapi = { path = "../../crates/qianqian-output-wasapi", optional = true }
+
+[features]
+default = []
+# Binary-local feature: gates the real playback slice (requires native SongCore
+# artifacts). Kept for the capability it enables, not the underlying crates.
+# This is NOT a library public API feature.
+playback = ["dep:qianqian-decode-songcore", "dep:qianqian-output-wasapi"]

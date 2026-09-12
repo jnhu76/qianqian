@@ -4,9 +4,12 @@ members = [
     "apps/headless",
     "crates/qianqian-core",
     "crates/qianqian-kernel",
+    "crates/qianqian-output-wasapi",
+    "crates/qianqian-playback",
     "crates/qianqian-runtime",
 ]
 exclude = [
+    "crates/qianqian-decode-songcore",
     "crates/qianqian-songcore-sys",
     "experiments/songcore-call-comparison",
 ]

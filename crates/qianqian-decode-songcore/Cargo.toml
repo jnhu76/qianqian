@@ -1,0 +1,15 @@
+[package]
+name = "qianqian-decode-songcore"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Real Decode capability provider over the SongCore C ABI v1"
+
+[dependencies]
+qianqian-core = { path = "../qianqian-core" }
+qianqian-kernel = { path = "../qianqian-kernel" }
+qianqian-songcore-sys = { path = "../qianqian-songcore-sys" }
+
+[dev-dependencies]
+qianqian-runtime = { path = "../qianqian-runtime" }
+serde_json = "1"
