@@ -70,8 +70,12 @@ fn main() {
     );
     println!("cargo:rustc-link-search=native={}", artifacts_dir.display());
     println!("cargo:rustc-link-lib=static=songcore");
-    println!("cargo:rustc-link-lib=m");
-    println!("cargo:rustc-link-lib=pthread");
+    // The merged archive is self-contained; only POSIX hosts need system
+    // libs beyond it. The Windows (mingw/MSVC) artifact links none.
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
+        println!("cargo:rustc-link-lib=m");
+        println!("cargo:rustc-link-lib=pthread");
+    }
     println!("cargo:rerun-if-changed={}", header.display());
     println!("cargo:rerun-if-changed={}", archive.display());
     println!("cargo:rerun-if-changed=build.rs");

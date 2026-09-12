@@ -1,0 +1,10 @@
+# Cross-build configuration for the Windows real-sound gate: a
+# windows-gnu session links with the mingw-w64 cross toolchain (the same
+# toolchain family that builds the native SongCore artifact for that
+# target). Native builds and Linux host builds are unaffected.
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+ar = "x86_64-w64-mingw32-ar"
+# rustc's windows-gnu runtime references BCrypt* (random_seed.o); the
+# cross linker does not pick bcrypt up by default.
+rustflags = ["-C", "link-arg=-lbcrypt"]
