@@ -37,7 +37,7 @@ const EDGE_CAPACITY_FRAMES: usize = 8192;
 /// baselines were measured at.
 const STAGING_FRAMES: usize = 1024;
 
-/// The Playback Session component definition. The Host captures the file
+/// The Playback Session component definition. The App captures the file
 /// and the completion handle it will wait on; desired entries need no
 /// config payload for the first slice.
 pub fn playback_session_spec(file: PathBuf, completion: SessionCompletion) -> ComponentSpec {
