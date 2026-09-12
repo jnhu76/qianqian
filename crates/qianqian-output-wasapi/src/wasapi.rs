@@ -341,6 +341,15 @@ unsafe fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSessi
     };
 
     publish(OpenVerdict::Opened { format });
+    // One open diagnostic per episode — the real-sound gate's negotiated
+    // format evidence; never steady-state output.
+    eprintln!(
+        "[qianqian-wasapi] opened: {} Hz, {} channels, mask {:#x}, buffer {} frames (shared, event-driven)",
+        format.sample_rate,
+        format.channels,
+        format.channel_mask,
+        buffer_frames
+    );
     Some(DeviceSession {
         client,
         render,
