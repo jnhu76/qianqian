@@ -11,6 +11,17 @@ local artifact_dir = path.join(os.projectdir(), "build", "artifacts")
 if is_plat("mingw", "windows") then
     artifact_dir = path.join(artifact_dir, "windows-mingw-x86_64")
 end
+-- Closure-session isolation: same rule as native/build/ffmpeg.lua — a
+-- session driven with an explicit artifact_ns (tools/dsp_closure.py
+-- namespaces every ladder stage) builds into its own artifact subdir so
+-- closure sessions cannot overwrite/delete each other's evidence; default
+-- and canonical sessions keep the historical layout. Namespace shape is
+-- enforced fail-closed by qianqian_av's before_build gate (the
+-- description-scope sandbox has no abort primitive).
+local artifact_ns = get_config("artifact_ns")
+if artifact_ns and #artifact_ns > 0 then
+    artifact_dir = path.join(artifact_dir, artifact_ns)
+end
 -- WASM sessions archive their guest closure here as well; sharing the
 -- native artifact path would let a wasm-format libsongcore.a silently
 -- overwrite the native archive (and vice versa) across sessions.
@@ -137,7 +148,8 @@ target("songcore_probe")
     end
     -- Test-closure provenance: embed the canonical identity fields of the
     -- replayed FFmpeg manifest (written by tools/ffmpeg_profile_import.py)
-    -- so tests/songcore/regression.py can verify this binary was built from
+    -- so native/tests/songcore/regression.py can verify this binary was
+    -- built from
     -- the closure it expects — a codec-base-built probe must fail closed
     -- before any corpus case. No manifest here defers to qianqian_av's
     -- before_build gate; the probe then reports "unknown" and the
@@ -182,7 +194,7 @@ target("songcore_probe")
 -- DSP capability probe (test-only): links the FFmpeg closure replayed by
 -- qianqian_av and exercises the filters that closure enables — registration
 -- presence/absence, negotiated formats, correctness smokes, graph lifecycle.
--- Used by tests/songcore/dsp_src.py and by tools/dsp_closure.py for the
+-- Used by native/tests/songcore/dsp_src.py and by tools/dsp_closure.py for the
 -- capability-driven libavfilter closure ladder.
 target("dsp_cap_probe")
     set_kind("binary")
@@ -203,6 +215,16 @@ target("dsp_cap_probe")
         if get_config("lto") then
             target:add("cflags", "-flto")
             target:add("ldflags", "-flto=auto")
+        end
+        -- Optional link map for the DSP live-bytes ledger; opt-in via env so
+        -- normal builds are untouched. (Restored: the productize/rename
+        -- commit 1b4d539 dropped this block from the old xmake.lua probe
+        -- target while keeping its QN_PROBE_NO_AVFILTER sibling, which left
+        -- tools/dsp_closure.py's QN_LINK_MAP producer without a consumer and
+        -- the live-bytes ledger unreproducible.)
+        local link_map = os.getenv("QN_LINK_MAP")
+        if link_map and #link_map > 0 then
+            target:add("ldflags", "-Wl,-Map=" .. link_map)
         end
         -- A codec-only closure (no libavfilter) has nothing to link: the
         -- probe compiles its fail-closed stub backend instead.

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """DSP/SRC integration smoke (test-only, never ships).
 
-Runs the capability probe (tests/songcore/dsp_cap_probe)
+Runs the capability probe (native/tests/songcore/dsp_cap_probe)
 against the trimmed libavfilter closure (build/minimize/avf-c2) with the
-DSP/SRC scenario (tests/songcore/dsp-src-smoke.kv) and records the evidence
+DSP/SRC scenario (native/tests/songcore/dsp-src-smoke.kv) and records the evidence
 in bench/results/songcore-v1/dsp-src-integration.json.
 
 What this proves (machine-gated):
@@ -26,11 +26,15 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 OUT_DIR = os.path.join(ROOT, "bench", "results", "songcore-v1")
-PROBE = os.path.join(ROOT, "build", "artifacts", "dsp_cap_probe")
-SCENARIO = os.path.join(ROOT, "tests", "songcore", "dsp-src-smoke.kv")
+# dsp_closure replays each ladder stage into its own artifact namespace
+# (build/artifacts/<stage>/); this gate consumes the avf-c2 session.
+PROBE = os.path.join(ROOT, "build", "artifacts", "avf-c2", "dsp_cap_probe")
+SCENARIO = os.path.join(ROOT, "native", "tests", "songcore",
+                        "dsp-src-smoke.kv")
 CLOSURE_MANIFEST = os.path.join(ROOT, "build", "minimize", "avf-c2",
                                 "manifest.json")
 PRODUCTION_MANIFEST = os.path.join(ROOT, "build", "minimize",
@@ -57,13 +61,38 @@ def closure_evidence():
     return out
 
 
+def _reserve_output_path():
+    # mkstemp hands out a name that did not pre-exist and starts empty, so a
+    # failed or silent probe can never leave a stale PASS payload behind for
+    # json.load to consume (the pre-corrective fixed /tmp/dsp-src.json could).
+    fd, tmp = tempfile.mkstemp(prefix="dsp-src-", suffix=".json")
+    os.close(fd)
+    return tmp
+
+
 def run_probe():
-    import tempfile
-    tmp = os.path.join(tempfile.gettempdir(), "dsp-src.json")
-    r = subprocess.run([PROBE, SCENARIO, tmp], capture_output=True, text=True)
-    summary = r.stdout.strip().splitlines()[-1] if r.stdout else ""
-    d = json.load(open(tmp))
-    os.unlink(tmp)
+    tmp = _reserve_output_path()
+    try:
+        before = os.stat(tmp)
+        r = subprocess.run([PROBE, SCENARIO, tmp], capture_output=True,
+                           text=True)
+        if r.returncode != 0:
+            raise SystemExit(
+                f"dsp_cap_probe failed (rc={r.returncode}); refusing to "
+                f"parse any output.\nstdout:\n{r.stdout}\nstderr:\n{r.stderr}")
+        if not os.path.isfile(tmp):
+            raise SystemExit("dsp_cap_probe exited 0 but produced no output "
+                             f"file ({tmp})")
+        after = os.stat(tmp)
+        if after.st_size == 0 or after.st_mtime_ns == before.st_mtime_ns:
+            raise SystemExit("dsp_cap_probe exited 0 but did not freshly "
+                             f"write its output ({tmp}); refusing to parse")
+        summary = r.stdout.strip().splitlines()[-1] if r.stdout else ""
+        with open(tmp) as f:
+            d = json.load(f)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
     return d, summary
 
 

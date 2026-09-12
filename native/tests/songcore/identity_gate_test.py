@@ -26,7 +26,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-sys.path.insert(0, os.path.join(ROOT, "tests", "songcore"))
+sys.path.insert(0, os.path.join(ROOT, "native", "tests", "songcore"))
 import regression  # noqa: E402
 
 SCRATCH = os.path.join(ROOT, "build", "identity-gate-test")
@@ -57,7 +57,7 @@ def stub_identity(expected, overrides=None, omit=()):
 
 def run_regression(binary, out_dir):
     return subprocess.run(
-        [sys.executable, os.path.join(ROOT, "tests", "songcore",
+        [sys.executable, os.path.join(ROOT, "native", "tests", "songcore",
                                       "regression.py"),
          "--binary", binary, "--out", out_dir, "--no-common"],
         capture_output=True, text=True, cwd=ROOT)
