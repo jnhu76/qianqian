@@ -13,23 +13,10 @@
 //! inverses — the kernel carries no `Drop` — so a latched violation can
 //! only ever be observed through the explicit seam.
 
-use qianqian_core::ports::AudioOutput;
 use qianqian_kernel::{
-    Capability, ComponentRegistrationError, ComponentSpec, CompositionErrors, CompositionSnapshot,
+    ComponentRegistrationError, ComponentSpec, CompositionErrors, CompositionSnapshot,
     DesiredEntry, Kernel,
 };
-
-/// The current audio-output port hosted as a kernel capability contract.
-/// Capability identity is this contract definition site — not any concrete
-/// output implementation. Consumers depend on the definition across the
-/// plugin seam; providers own mechanisms. No provider or consumer is wired
-/// here: a real output plugin installs both under its own composition.
-pub struct AudioOutputCapability;
-
-impl Capability for AudioOutputCapability {
-    const NAME: &'static str = "AudioOutput";
-    type Service = dyn AudioOutput;
-}
 
 /// The running application assembled through the generic Composition Kernel.
 pub struct AppRuntime {

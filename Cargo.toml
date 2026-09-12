@@ -4,6 +4,7 @@ members = [
     "apps/headless",
     "crates/qianqian-core",
     "crates/qianqian-kernel",
+    "crates/qianqian-output-wasapi",
     "crates/qianqian-runtime",
 ]
 exclude = [
