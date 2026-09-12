@@ -19,10 +19,10 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use qianqian_core::ports::{
+use qianqian_audio_api::ports::{
     AudioOutputCapability, DecodeOutcome, DecodedPcmStream, PcmDecodeCapability,
 };
-use qianqian_kernel::{ActivationError, ComponentSpec, Discharge};
+use qianqian_composition::{ActivationError, ComponentSpec, Discharge};
 
 use crate::completion::SessionCompletion;
 use crate::edge::PcmEdge;
@@ -37,7 +37,7 @@ const EDGE_CAPACITY_FRAMES: usize = 8192;
 /// baselines were measured at.
 const STAGING_FRAMES: usize = 1024;
 
-/// The Playback Session component definition. The Host captures the file
+/// The Playback Session component definition. The App captures the file
 /// and the completion handle it will wait on; desired entries need no
 /// config payload for the first slice.
 pub fn playback_session_spec(file: PathBuf, completion: SessionCompletion) -> ComponentSpec {
@@ -50,11 +50,11 @@ pub fn playback_session_spec(file: PathBuf, completion: SessionCompletion) -> Co
 fn activate(
     file: &Path,
     completion: &SessionCompletion,
-    ctx: &mut qianqian_kernel::ActivationCtx<'_>,
+    ctx: &mut qianqian_composition::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
     // The kernel's diagnostic surface carries the FAILED verdict but not
     // the domain message; the session publishes its own activation
-    // failure so the Host can show why an episode never started.
+    // failure so the App can show why an episode never started.
     let result = activate_inner(file, completion, ctx);
     if let Err(e) = &result {
         completion.activation_failed(&e.message);
@@ -65,7 +65,7 @@ fn activate(
 fn activate_inner(
     file: &Path,
     completion: &SessionCompletion,
-    ctx: &mut qianqian_kernel::ActivationCtx<'_>,
+    ctx: &mut qianqian_composition::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
     // Control plane: capability resolution happens exactly once, here.
     let decode = ctx.resolve::<PcmDecodeCapability>().map_err(|e| {
@@ -99,7 +99,7 @@ fn activate_inner(
     // device failures inside activation.
     let stream = output
         .service()
-        .open_stream(qianqian_core::ports::RenderRequest {
+        .open_stream(qianqian_audio_api::ports::RenderRequest {
             format,
             input: edge.clone(),
             drain: completion.drain_signal(),
@@ -197,12 +197,12 @@ fn decode_worker(
 
 /// Map a kernel resolution error to a human-readable diagnostic without
 /// coupling session.rs to `ResolveError`'s Debug surface.
-fn resolve_error(e: qianqian_kernel::ResolveError) -> &'static str {
+fn resolve_error(e: qianqian_composition::ResolveError) -> &'static str {
     match e {
-        qianqian_kernel::ResolveError::Undeclared => "capability not declared",
-        qianqian_kernel::ResolveError::InactiveAccess => "activation context inactive",
-        qianqian_kernel::ResolveError::Unresolved => "no active provider",
-        qianqian_kernel::ResolveError::Ambiguous => "multiple providers",
-        qianqian_kernel::ResolveError::AlreadyProvided => "already provided",
+        qianqian_composition::ResolveError::Undeclared => "capability not declared",
+        qianqian_composition::ResolveError::InactiveAccess => "activation context inactive",
+        qianqian_composition::ResolveError::Unresolved => "no active provider",
+        qianqian_composition::ResolveError::Ambiguous => "multiple providers",
+        qianqian_composition::ResolveError::AlreadyProvided => "already provided",
     }
 }

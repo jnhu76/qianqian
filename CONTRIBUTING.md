@@ -13,7 +13,7 @@ Read:
 
 For plugin/composition work, read `docs/architecture/composition-kernel.md`.
 
-Gate status: #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (PR #66 merged); the #67 COMPOSITION-KERNEL-0 semantic design is merged (PR #68). The Base Kernel K0 is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86).
+Gate status: #53 COMPONENT-BOUNDARY-A0 is PASS/CLOSED (PR #66 merged); the #67 COMPOSITION-KERNEL-0 semantic design is merged (PR #68). The Composition Kernel (K0) is IMPLEMENTED (PR #71, 70 kernel tests / 75 workspace tests, 743eb86).
 
 Do not recursively preload historical docs or use `archive/pre-rust-v2` as current architecture authority.
 
@@ -68,7 +68,7 @@ The central rule is:
 
 > **Kernel controls reachability, ownership and lifetime; it should not own application payloads.**
 
-The future generic Composition Kernel is expected to stay centered on:
+The generic Composition Kernel stays centered on:
 
 ```text
 Context
@@ -88,7 +88,7 @@ library/product behavior
 service payload schemas
 ```
 
-The five primitive names are a mechanism budget, not permission to implement them before the decomposition is reviewed.
+The five primitive names are a mechanism budget, not permission to add new primitives without reviewed pressure.
 
 ## Service/provider separation
 
@@ -201,9 +201,17 @@ Do not create:
 
 RUST-ARCH-R0 APIs are bootstrap witnesses.
 
-`qianqian-core::base`, `AppRuntime::new()`, `with_audio_output()`, and similar R0 composition shapes are not compatibility contracts.
+Historical R0 names are intentionally preserved here as history:
 
-They may be redesigned as the Base Kernel K0 implementation (PR #71) replaces R0 bootstrap shapes.
+```text
+qianqian-core::base
+AppRuntime::new()
+with_audio_output()
+```
+
+Those historical shapes were not compatibility contracts. Their current canonical successors live under `qianqian-audio-api`, `QianqianApp`, and the current Composition Kernel vocabulary; this does not rewrite what R0 was called at the time.
+
+They could be redesigned as the Composition Kernel (K0) implementation (PR #71) replaced the R0 bootstrap shapes.
 
 ## Verification
 
@@ -236,7 +244,7 @@ Never report an unrun platform/device check as PASS.
 
 Keep durable documentation small and authoritative.
 
-Use `docs/README.md` as the router. Composition guardrails: `docs/architecture/composition-kernel.md` (derived summary); the K0 semantic authority is `docs/architecture/composition-kernel-0-design.md`. Current boundary decisions/results belong in the current design issue until they become durable architecture facts.
+Use `docs/README.md` as the router. Composition guardrails: `docs/architecture/composition-kernel.md` (derived summary); the K0 semantic authority is `docs/architecture/composition-kernel-0-design.md`. Current canonical vocabulary and first earned static playback composition are authoritative in `docs/adr/ADR-PBK-002.md`.
 
 ## Historical code reuse
 

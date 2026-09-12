@@ -1,17 +1,8 @@
 # First audible slice — static playback vertical-slice design
 
-> **Status: first static playback vertical-slice design.** This is not a new
-> overall architecture authority and carries no second normative copy of any
-> constitution: the Playback Foundations remain normative only in
-> [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md), and K0 semantics only in
-> [`composition-kernel-0-design.md`](composition-kernel-0-design.md) /
-> [`composition-kernel-0-implementation-adr.md`](composition-kernel-0-implementation-adr.md).
-> This document fixes one slice: capability boundaries, session ownership, the
-> PCM data edge, thread/resource ownership, shutdown order, the Processing
-> decision, and explicit non-scope. Facts, decisions and open questions are
-> labelled. Everything here is earned by exactly one goal: make one real local
-> file travel real capabilities under real K0 lifecycle into a real audio
-> device.
+> **Status: first static playback vertical-slice design / evidence record.** This is not a new overall architecture authority and carries no second normative copy of any constitution. Playback foundations, Fact semantics and P1–P5 remain normative in [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md); current canonical vocabulary and the static production composition earned by this slice are normative in [`../adr/ADR-PBK-002.md`](../adr/ADR-PBK-002.md); K0 semantics remain normative in [`composition-kernel-0-design.md`](composition-kernel-0-design.md) / [`composition-kernel-0-implementation-adr.md`](composition-kernel-0-implementation-adr.md).
+>
+> This document records the evidence and implementation decisions for one slice: capability boundaries, session ownership, the PCM data edge, thread/resource ownership, shutdown order, the Processing decision, and explicit non-scope. Facts, decisions and open questions are labelled. Everything here is earned by exactly one goal: make one real local file travel real capabilities under real K0 lifecycle into a real audio device.
 
 ---
 
@@ -30,13 +21,13 @@ Output capability (WASAPI mechanism)
         ↓
 real Windows audio device
         ↓
-EOF / stop → join → release → AppRuntime::dispose()
+EOF / stop → join → release → QianqianApp::dispose()
 ```
 
 Deliberate non-scope (deferred, not missing): pause, resume, seek, next track,
 playlist, multiple sessions, device switch, runtime format switch, hot plugin
 replacement, EQ, volume semantics, dynamic DSP insertion, UI, library,
-metadata UX. The first runtime graph mutation triggers the Realtime Runtime /
+metadata UX. The first runtime graph mutation triggers the Realtime Audio Runtime /
 P1–P5 production phase (`ADR-PBK-001` §6, §12) and does not enter this slice.
 
 ---
@@ -160,29 +151,29 @@ Playback Session owns:  one DecodedPcmStream endpoint (one song_handle), the
 ## 3. DECISION — capabilities and crates
 
 Capability contracts are defined once, beside their service traits, in
-`qianqian-core::ports` (the contract definition site — capability identity is
+`qianqian-audio-api::ports` (the contract definition site — capability identity is
 this definition site). Contracts speak PCM, never FFmpeg/SongCore vendor
 vocabulary; no `AV*` type, SongCore struct, or FFmpeg enum appears in a
-public contract. `AudioOutputCapability` moves from `qianqian-runtime` to
+public contract. `AudioOutputCapability` moves from `qianqian-app` to
 `ports` so both providers and consumers depend on the contract, not on the
 composition root.
 
 ```text
-qianqian-core::ports       PcmFormat, PcmDecode + DecodedPcmStream, AudioOutput +
-                           RenderStream + RenderPcmInput + DrainSignal,
-                           capability keys
-qianqian-playback          bounded PcmEdge, Playback Session component,
-                           session completion handle   (workspace member)
-qianqian-decode-songcore   Decode provider over qianqian-songcore-sys
-                           (outside the workspace, like songcore-sys:
-                           fail-closed native-artifact dependency)
-qianqian-output-wasapi     Output provider; cfg(windows) mechanism,
-                           non-Windows activation raises UnsupportedPlatform
-                           (workspace member; compiles everywhere, activates
-                           for real only on Windows)
-qianqian-headless          Host entry; `playback` feature gates the real
-                           plugins so the default workspace build keeps
-                           compiling without native artifacts
+qianqian-audio-api::ports       PcmFormat, PcmDecode + DecodedPcmStream, AudioOutput +
+                                RenderStream + RenderPcmInput + DrainSignal,
+                                capability keys
+qianqian-playback               bounded PcmEdge, Playback Session component,
+                                session completion handle   (workspace member)
+qianqian-decode-songcore        Decode provider over qianqian-songcore-sys
+                                (outside the workspace, like songcore-sys:
+                                fail-closed native-artifact dependency)
+qianqian-output-wasapi          Output provider; cfg(windows) mechanism,
+                                non-Windows activation raises UnsupportedPlatform
+                                (workspace member; compiles everywhere, activates
+                                for real only on Windows)
+qianqian-headless               App entry; `playback` feature gates the real
+                                plugins so the default workspace build keeps
+                                compiling without native artifacts
 ```
 
 No generic Plugin trait, PluginManager, PluginRegistry, PluginContext, event
@@ -283,8 +274,8 @@ worker exits) → completion = Failed; device failure stops the edge (worker
 exits) → completion = Failed. Stop: the stop inverse covers producer-blocked
 (full edge), consumer-blocked (empty edge), and already-finished legs.
 
-The session completion handle is session-owned; the Host waits on it and
-then drives `AppRuntime::dispose()` explicitly. The Host never pumps PCM,
+The session completion handle is session-owned; the App waits on it and
+then drives `QianqianApp::dispose()` explicitly. The App never pumps PCM,
 decodes, or owns a render loop.
 
 ## 7. DECISION — Processing

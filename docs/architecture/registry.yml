@@ -2,7 +2,8 @@
 #
 # `authority` lists ONLY files designated as normative authority for the
 # entry's semantic class (see docs/README.md "Authority model"):
-#   - Playback Foundations normative authority  -> docs/adr/ADR-PBK-001.md
+#   - Playback foundations / Fact / P1-P5       -> docs/adr/ADR-PBK-001.md
+#   - Current vocabulary + first static playback -> docs/adr/ADR-PBK-002.md
 #   - K0 semantic design authority              -> composition-kernel-0-design.md
 #   - K0 implementation decisions               -> composition-kernel-0-implementation-adr.md
 # `docs/architecture/overview.md` is a derived architecture summary/router —
@@ -19,37 +20,39 @@ architectures:
       source: docs/architecture/diagrams/ARCH-001-qianqian-system-v1.mmd
       frozen: true
 
-    # The v1 system diagram's plane separation / data-plane rules are
-    # normative only via ADR-PBK-001 §1–§2/§2.4. Component naming inside the
-    # diagram (MusicKernel/UiHost classes) is pre-reset illustration; the
-    # playback reset (ADR-PBK-001 §0/§10) reopened those nouns. In particular
-    # the diagram's `next` styling on MusicKernel is a stale pre-reset
-    # leftover: MusicKernel survives only as experimental evidence, it is not
-    # the next component to build, and no playback domain component currently
-    # holds NEXT status.
-    # Derived summary: docs/architecture/overview.md
+    # The v1 system diagram is a frozen historical visual projection. Plane
+    # separation remains normative via ADR-PBK-001; current role names and the
+    # first earned static playback composition are normative via ADR-PBK-002.
+    # Legacy nouns such as MusicKernel/UiHost in the frozen diagram do not
+    # override current vocabulary.
     authority:
       - docs/adr/ADR-PBK-001.md
+      - docs/adr/ADR-PBK-002.md
 
     decisions:
       - issue: 46
       - issue: 53
       - pr: 66
+      - pr: 117
+      - pr: 118
 
     implementation:
       - issue: 70
       - pr: 71
+      - pr: 117
 
     evidence:
-      - crates/qianqian-kernel/tests
-      - crates/qianqian-core/src
-      - crates/qianqian-runtime/src
+      - crates/qianqian-composition/tests
+      - crates/qianqian-audio-api/src
+      - crates/qianqian-app/src
+      - crates/qianqian-playback/src
 
   - id: ARCH-002
-    name: Base Kernel K0
+    name: Composition Kernel (K0)
     version: 1
     status: IMPLEMENTED
 
+    # Filename is historical; the current canonical noun is Composition Kernel.
     diagram:
       source: docs/architecture/diagrams/ARCH-002-base-kernel-v1.mmd
       frozen: true
@@ -62,61 +65,54 @@ architectures:
       - issue: 67
       - pr: 68
       - pr: 69
+      - pr: 118
 
     implementation:
       - issue: 70
       - pr: 71
+      - pr: 118
 
     evidence:
-      - crates/qianqian-kernel/tests
+      - crates/qianqian-composition/tests
 
   - id: ARCH-003
     name: Playback Foundations
     version: 2
     status: CURRENT
 
-    # ARCH-003 normative authority is ONLY the accepted constitution
-    # (docs/adr/ADR-PBK-001.md, PR #87). The accepted foundations fix plane
-    # boundaries and contracts only; they deliberately do not re-freeze
-    # legacy playback state-model nouns, and old playback code/specs remain
-    # experimental evidence only.
-    # Derived summary (NOT authority): docs/architecture/overview.md
+    # ADR-PBK-001 owns foundational plane separation, Fact semantics and P1-P5.
+    # ADR-PBK-002 owns current vocabulary and the first earned static playback
+    # composition. Neither freezes a dynamic pause/seek/next state machine.
     diagram:
       source: docs/architecture/diagrams/ARCH-003-playback-foundations-v2.mmd
       frozen: true
 
     authority:
       - docs/adr/ADR-PBK-001.md
+      - docs/adr/ADR-PBK-002.md
 
     decisions:
       - issue: 53
       - pr: 66
       - pr: 87
       - pr: 91
+      - pr: 117
+      - pr: 118
 
-    implementation: []
+    implementation:
+      - pr: 117
 
     evidence:
-      # Current formal evidence for the ADR §6 P1–P5 publication/reclamation
-      # semantic contract (mechanism/representation remain OPEN; Phase D
-      # validates candidate mechanisms against P1–P5).
       - specs/realtime-publication/RealtimePublication.tla
       - specs/realtime-publication/README.md
-      # Prior playback code/specs are retained as experimental evidence only
-      # under accepted/current ARCH-003 foundations, while production playback
-      # semantics remain open. They do not close current design questions.
-      # PRs #78/#79/#81 (former ADR acceptance chain) and PR #82 (former
-      # executable core) are experimental/historical evidence, NOT current
-      # architecture decisions.
       - git tag playback-reference-v1
       - specs/playback/PlaybackTemporal.tla
       - specs/playback/PlaybackOwnership.tla
       - specs/playback/README.md
-      - crates/qianqian-core/tests/playback_temporal_traces/main.rs
-      - crates/qianqian-core/tests/playback_temporal_traces/music.rs
-      - crates/qianqian-core/tests/playback_temporal_traces/transport.rs
-      # Historical v1 diagram of the superseded playback-kernel model; kept as
-      # historical artifact, referenced by no current authority.
+      - crates/qianqian-audio-api/tests/playback_temporal_traces/main.rs
+      - crates/qianqian-audio-api/tests/playback_temporal_traces/music.rs
+      - crates/qianqian-audio-api/tests/playback_temporal_traces/transport.rs
+      - docs/architecture/first-audible-slice.md
       - docs/architecture/diagrams/ARCH-003-playback-kernel-v1.mmd
 
   - id: ARCH-004
@@ -128,23 +124,25 @@ architectures:
       source: docs/architecture/diagrams/ARCH-004-plugin-graph-v1.mmd
       frozen: true
 
-    # status NEXT: the Plugin Graph is not yet earned. Plugin semantics are
-    # normative only via ADR-PBK-001 §3 (vocabulary: ADR §16); generic kernel
-    # semantics come from the K0 design authority. component-boundary-a0.md
-    # is historical #53 audit evidence, not current authority (see
-    # docs/README.md router). Derived summary: docs/architecture/overview.md
+    # A generic Plugin Graph/runtime is still not earned. ADR-PBK-002 does,
+    # however, classify the real Decode/Output providers as Plugins and keeps
+    # ComponentSpec as substrate rather than a frozen final Plugin API.
     authority:
       - docs/adr/ADR-PBK-001.md
+      - docs/adr/ADR-PBK-002.md
 
     decisions:
       - issue: 53
       - pr: 66
+      - pr: 117
+      - pr: 118
 
     implementation: []
 
     evidence:
       - docs/architecture/component-boundary-a0.md
-      - crates/qianqian-core/src/ports.rs
+      - crates/qianqian-audio-api/src/ports.rs
+      - crates/qianqian-playback/src/session.rs
 
   - id: ARCH-005
     name: Control Plane vs Data Plane
@@ -155,21 +153,27 @@ architectures:
       source: docs/architecture/diagrams/ARCH-005-control-data-plane-v1.mmd
       frozen: true
 
-    # Control plane vs data plane separation: normative in the K0 design
-    # authority (composition-kernel-0-design.md); the playback-side realtime
-    # firewall is ADR-PBK-001 §2.4. Derived summary: docs/architecture/overview.md
+    # Generic separation is normative in the K0 design; playback-side realtime
+    # constraints are ADR-PBK-001 §2.4 and the earned static firewall is
+    # restated normatively in ADR-PBK-002 D8.
     authority:
       - docs/architecture/composition-kernel-0-design.md
+      - docs/adr/ADR-PBK-001.md
+      - docs/adr/ADR-PBK-002.md
 
     decisions:
       - issue: 67
       - pr: 68
+      - pr: 117
+      - pr: 118
 
     implementation:
       - pr: 71
+      - pr: 117
 
     evidence:
-      - crates/qianqian-kernel/tests
+      - crates/qianqian-composition/tests
+      - crates/qianqian-playback/tests/k0_firewall.rs
 
   - id: ARCH-006
     name: Provider Withdrawal
@@ -180,9 +184,6 @@ architectures:
       source: docs/architecture/diagrams/ARCH-006-provider-withdrawal-v1.mmd
       frozen: true
 
-    # Provider withdrawal semantics: normative in the K0 design authority
-    # (composition-kernel-0-design.md). Derived summary:
-    # docs/architecture/overview.md
     authority:
       - docs/architecture/composition-kernel-0-design.md
 
@@ -194,7 +195,7 @@ architectures:
       - pr: 71
 
     evidence:
-      - crates/qianqian-kernel/tests
+      - crates/qianqian-composition/tests
 
   - id: ARCH-007
     name: FFmpeg Closure
@@ -205,9 +206,6 @@ architectures:
       source: docs/architecture/diagrams/ARCH-007-ffmpeg-closure-v1.mmd
       frozen: true
 
-    # Historical entry: no current authority. Historical provenance is the #53
-    # audit (component-boundary-a0.md, itself historical) and the frozen
-    # playback-reference tag.
     authority: []
 
     decisions:

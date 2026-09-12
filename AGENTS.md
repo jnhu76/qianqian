@@ -35,7 +35,7 @@ Do not treat as current architecture unless a new experiment re-earns them:
     Physical Fence
 ```
 
-Old playback code/specs — `qianqian-core::music`, `qianqian-core::transport`, `playback_temporal_traces`, `specs/playback/*` — are **experimental / executable evidence only**:
+Old playback code/specs — `qianqian-audio-api::music`, `qianqian-audio-api::transport`, `playback_temporal_traces`, `specs/playback/*` — are **experimental / executable evidence only**:
 
 ```text
 allowed:   reuse bug reproducers, test techniques, negative controls, concrete counterexamples

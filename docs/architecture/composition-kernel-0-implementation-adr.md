@@ -9,9 +9,9 @@ it represents. Rust APIs remain free to evolve; the semantics do not.
 
 Baseline facts recorded at branch point (`c0f818b`, main):
 
-- Workspace: `apps/headless`, `crates/qianqian-core`, `crates/qianqian-runtime`
+- Workspace: `apps/headless`, `crates/qianqian-audio-api`, `crates/qianqian-app`
   (dependency direction headless → runtime → core). No tests beyond 4 R0 witness tests.
-- R0 witnesses (`qianqian-core::base`, `qianqian-runtime::AppRuntime`, `AppRuntime::new()`,
+- R0 witnesses (`qianqian-audio-api::base`, `qianqian-app::AppRuntime`, `AppRuntime::new()`,
   `with_audio_output()`, empty port traits) are bootstrap witnesses, **not compatibility
   contracts**. The authorized implementation may reshape them.
 - Baseline gates green: `cargo fmt --check`, `cargo check --workspace`,
@@ -19,18 +19,18 @@ Baseline facts recorded at branch point (`c0f818b`, main):
 
 ## D1 — Kernel home
 
-`crates/qianqian-kernel/`, a new workspace member with an **empty `[dependencies]`
+`crates/qianqian-composition/`, a new workspace member with an **empty `[dependencies]`
 table** (std only). Dependency direction:
 
 ```text
-qianqian-kernel        (generic; imports no qianqian-* crate)
+qianqian-composition        (generic; imports no qianqian-* crate)
         ↑
-qianqian-runtime       (composes product components using the kernel)
+qianqian-app       (composes product components using the kernel)
         ↑
 apps/headless
 ```
 
-`qianqian-kernel` must not depend on `qianqian-core` (hard invariant, #70 §5.1).
+`qianqian-composition` must not depend on `qianqian-audio-api` (hard invariant, #70 §5.1).
 A test reads the kernel manifest and fails if any workspace dependency appears,
 so the firewall is executable, not aspirational. A separate crate is justified:
 the kernel is the one component whose *entire point* is not knowing product

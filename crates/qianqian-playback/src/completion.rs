@@ -1,11 +1,11 @@
 //! Session completion: session-owned truth about how one playback episode
-//! ended. Not K0 semantic truth, not a Fact plane object — the Host waits
+//! ended. Not K0 semantic truth, not a Fact plane object — the App waits
 //! on it and then initiates disposal.
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-use qianqian_core::ports::{DrainSignal, DrainVerdict};
+use qianqian_audio_api::ports::{DrainSignal, DrainVerdict};
 
 use crate::edge::EdgeTerminal;
 
@@ -27,8 +27,8 @@ struct CompletionState {
     worker_terminal: Option<EdgeTerminal>,
     decode_failure: Option<String>,
     /// Source PCM format, published once at session activation
-    /// (diagnostic readback for the Host).
-    source_format: Option<qianqian_core::ports::PcmFormat>,
+    /// (diagnostic readback for the App).
+    source_format: Option<qianqian_audio_api::ports::PcmFormat>,
     /// Why activation raised, published by the session itself (the
     /// kernel's diagnostic surface carries the verdict, not the message).
     activation_failure: Option<String>,
@@ -87,7 +87,7 @@ impl SessionCompletion {
     }
 
     /// The session publishes the endpoint's source format at activation.
-    pub fn set_source_format(&self, format: qianqian_core::ports::PcmFormat) {
+    pub fn set_source_format(&self, format: qianqian_audio_api::ports::PcmFormat) {
         let mut guard = self.state.state.lock().expect("completion lock");
         if guard.source_format.is_none() {
             guard.source_format = Some(format);
@@ -95,7 +95,7 @@ impl SessionCompletion {
     }
 
     /// The source format of this episode, once activation published it.
-    pub fn source_format(&self) -> Option<qianqian_core::ports::PcmFormat> {
+    pub fn source_format(&self) -> Option<qianqian_audio_api::ports::PcmFormat> {
         self.state
             .state
             .lock()

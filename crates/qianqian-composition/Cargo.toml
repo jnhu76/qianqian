@@ -1,0 +1,9 @@
+[package]
+name = "qianqian-composition"
+version.workspace = true
+edition.workspace = true
+
+# Composition Kernel firewall (implementation ADR D1): this crate is generic.
+# It must not depend on any qianqian-* crate or on product semantics.
+# A test enforces the empty dependency table.
+[dependencies]

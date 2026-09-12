@@ -6,11 +6,11 @@ publish = false
 description = "Real WASAPI Output capability provider (shared mode, event-driven)"
 
 [dependencies]
-qianqian-core = { path = "../qianqian-core" }
-qianqian-kernel = { path = "../qianqian-kernel" }
+qianqian-audio-api = { path = "../qianqian-audio-api" }
+qianqian-composition = { path = "../qianqian-composition" }
 
 [dev-dependencies]
-qianqian-runtime = { path = "../qianqian-runtime" }
+qianqian-app = { path = "../qianqian-app" }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [

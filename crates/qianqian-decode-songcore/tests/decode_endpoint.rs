@@ -11,10 +11,10 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use qianqian_core::ports::{DecodeOutcome, PcmDecode, PcmDecodeCapability};
+use qianqian_audio_api::ports::{DecodeOutcome, PcmDecode, PcmDecodeCapability};
 use qianqian_decode_songcore::{SongcoreDecode, songcore_decode_plugin};
-use qianqian_kernel::{ComponentSpec, DesiredEntry, Kernel, Revision};
-use qianqian_runtime::AppRuntime;
+use qianqian_composition::{ComponentSpec, DesiredEntry, CompositionKernel, Revision};
+use qianqian_app::QianqianApp;
 
 use common::ReferenceFixture;
 
@@ -163,7 +163,7 @@ fn plugin_publishes_capability_that_opens_real_media_through_the_kernel() {
             Ok(())
         });
 
-    let mut runtime = AppRuntime::new();
+    let mut runtime = QianqianApp::new();
     runtime
         .register_component(songcore_decode_plugin())
         .expect("legal");

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use qianqian_core::ports::{PcmPull, RenderPcmInput};
+use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
 use qianqian_playback::{PcmEdge, SessionCompletion, SessionOutcome};
 
 const CHANNELS: u16 = 2;
@@ -233,7 +233,7 @@ fn completion_resolves_completed_only_from_eof_plus_drained() {
 
     completion
         .drain_signal()
-        .complete(qianqian_core::ports::DrainVerdict::Drained);
+        .complete(qianqian_audio_api::ports::DrainVerdict::Drained);
     assert_eq!(
         completion.try_resolve_now(),
         Some(SessionOutcome::Completed)
@@ -258,7 +258,7 @@ fn completion_reports_device_abort_as_failure() {
     completion.worker_exited(qianqian_playback::EdgeTerminal::Eof);
     completion
         .drain_signal()
-        .complete(qianqian_core::ports::DrainVerdict::Aborted);
+        .complete(qianqian_audio_api::ports::DrainVerdict::Aborted);
     assert_eq!(
         completion.try_resolve_now(),
         Some(SessionOutcome::Failed {

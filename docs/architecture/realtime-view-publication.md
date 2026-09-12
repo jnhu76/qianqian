@@ -16,9 +16,9 @@ Base of this experiment is main at `4423762` (merge of the direct-flow evidence 
 
 - `ADR-PBK-001.md` is **ACCEPTED** and is the sole normative playback constitution; `docs/architecture/pcm-contract-a0.md` (PCM edge) and `docs/architecture/direct-pcm-flow.md` (direct flow) are evidence records (EVIDENCE, NOT NORMATIVE AUTHORITY), each with its executable test harness on main.
 - The formal model `specs/realtime-publication/` has already closed the semantic question (publication/reader-overlap collision is real; P1–P5 are the normative conclusions). The mechanism comparison record `docs/architecture/realtime-publication-lifetime-decision.md` records the concept-level candidate matrix and the engineering leaning; its §12 declared two flip risks: (a) queued-reference dominance collapsing the fast read path, (b) final-drop destructor authority (dimension O).
-- The direct-flow evidence established the execution model prior: the realtime side holds a flow whose **participant/data-path bindings were established once at activation and executed across many quanta** (`PreboundPcmFlow` in `crates/qianqian-core/tests/direct_pcm_flow/`), and its hazard witness H1 is precisely the seam this experiment must answer: composition withdrawal alone does not revoke an already-extracted flow. This experiment maintains a strict distinction between two lifetimes (see §4): **participant binding lifetime** (how long source/stage/sink references remain pre-bound — what direct-flow earned) versus **realtime-view acquisition lifetime** (how long one published-view handle is held before observing publication again — the tested model here, and OPEN for production).
+- The direct-flow evidence established the execution model prior: the realtime side holds a flow whose **participant/data-path bindings were established once at activation and executed across many quanta** (`PreboundPcmFlow` in `crates/qianqian-audio-api/tests/direct_pcm_flow/`), and its hazard witness H1 is precisely the seam this experiment must answer: composition withdrawal alone does not revoke an already-extracted flow. This experiment maintains a strict distinction between two lifetimes (see §4): **participant binding lifetime** (how long source/stage/sink references remain pre-bound — what direct-flow earned) versus **realtime-view acquisition lifetime** (how long one published-view handle is held before observing publication again — the tested model here, and OPEN for production).
 - Issue #94 (independent realtime runtime/kernel question) was OPEN at this experiment's base and has since been closed on the strength of this evidence; Issue #12 (SRC/DSP/device) remains a downstream firewall.
-- Working tree differs from main only in `crates/qianqian-core/tests/realtime_view_publication/` (new test-only harness). **Production `src/` delta is zero** (§18).
+- Working tree differs from main only in `crates/qianqian-audio-api/tests/realtime_view_publication/` (new test-only harness). **Production `src/` delta is zero** (§18).
 
 ## 2. Normative P1–P5 mapping
 
@@ -100,7 +100,7 @@ Threads are used only to manufacture publication/read interleavings and final-dr
 
 ## 6. Mechanism under test (test-only representation)
 
-The validated mechanism, in `crates/qianqian-core/tests/realtime_view_publication/`:
+The validated mechanism, in `crates/qianqian-audio-api/tests/realtime_view_publication/`:
 
 ```text
 CONTROL SIDE
@@ -136,7 +136,7 @@ Representation details, all test-only and unfrozen:
 
 ## 7. Executable scenarios and results
 
-All 23 tests pass (`cargo test -p qianqian-core --test realtime_view_publication`; 5 consecutive runs green). Scenario-to-test mapping and evidence classes:
+All 23 tests pass (`cargo test -p qianqian-audio-api --test realtime_view_publication`; 5 consecutive runs green). Scenario-to-test mapping and evidence classes:
 
 | Scenario | What it shows | Test | Class |
 | --- | --- | --- | --- |
@@ -315,7 +315,7 @@ The recommendation is an evidence-based engineering finding, **not a production 
 
 ## 18. Production delta and naming gates
 
-- `git diff origin/main -- 'crates/**/src/**' 'apps/**/src/**'` is **empty** — production `src/` delta is zero; the only change is the new test directory under `crates/qianqian-core/tests/`.
+- `git diff origin/main -- 'crates/**/src/**' 'apps/**/src/**'` is **empty** — production `src/` delta is zero; the only change is the new test directory under `crates/qianqian-audio-api/tests/`.
 - Campaign-name gate over `crates apps`: **zero new hits** — test names, module names, types and comments use only semantic vocabulary (`realtime_view_publication`, `PublishedViews`, `RealtimeView`, `reader`, `queued`, `retirement`, `quiescence`, `reclamation`, `release`). The existing hits in the tree are pre-dating this experiment (kernel implementation-ADR references, legacy experimental code) and are untouched.
 - Durable-doc naming gate: this document contains no stage-campaign tokens (the A–E ladder labels) in its body; roadmap and issue provenance appears only as tracking references (§1, §19), which is its permitted role.
 

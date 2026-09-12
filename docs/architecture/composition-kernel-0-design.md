@@ -2,7 +2,7 @@
 
 Design-gate deliverable for **#67 COMPOSITION-KERNEL-0** (parent authority **#46**, boundary prerequisite **#53 / PR #66**, accepted audit `component-boundary-a0.md`).
 
-Status: **merged semantic authority (PR #68); implemented as `qianqian-kernel` (PR #71); representation decisions live in `composition-kernel-0-implementation-adr.md`.** Nothing here freezes a Rust API, a crate layout, or an async-runtime choice; implementation did not change the semantic content below.
+Status: **merged semantic authority (PR #68); implemented as `qianqian-composition` (PR #71); representation decisions live in `composition-kernel-0-implementation-adr.md`.** Nothing here freezes a Rust API, a crate layout, or an async-runtime choice; implementation did not change the semantic content below.
 
 Revision 1 (2026-09-06): initial semantic design (PR #68).
 
@@ -48,7 +48,7 @@ Corrective-5                                      current PRE-IMPLEMENTATION rev
 future COMPOSITION-KERNEL-0 IMPLEMENTATION       opens only after Corrective-5 is accepted by human review
 ```
 
-Repository reality at BASE: `qianqian-core` (empty `base.rs`, `MusicKernel` state machine, three empty port traits, presentation mapping), `qianqian-runtime` (`AppRuntime` constructor composition), `apps/headless`. All R0 shapes (`AppRuntime::new()`, `with_audio_output()`, `audio_output()`) are bootstrap witnesses, not contracts; replacing them is out of scope here.
+Repository reality at BASE: `qianqian-audio-api` (empty `base.rs`, `MusicKernel` state machine, three empty port traits, presentation mapping), `qianqian-app` (`AppRuntime` constructor composition), `apps/headless`. All R0 shapes (`AppRuntime::new()`, `with_audio_output()`, `audio_output()`) are bootstrap witnesses, not contracts; replacing them is out of scope here.
 
 ### A.2 Frozen inputs from #53 this design must honor
 

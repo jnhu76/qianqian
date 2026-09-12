@@ -127,13 +127,14 @@ UiHost owns rendering/input mechanism, not music semantics or realtime correctne
 Current Rust workspace:
 
 ```text
-qianqian-core
-qianqian-kernel
-qianqian-runtime
+qianqian-composition
+qianqian-audio-api
+qianqian-app
+qianqian-playback
 qianqian-headless
 ```
 
-The generic Base Kernel K0 is implemented. Production `qianqian-core` carries no playback modules; the earlier experiment code (`MusicKernel` / `TransportKernel`) survives only as test-local executable evidence under `crates/qianqian-core/tests/playback_temporal_traces/` — not current authority and not a compatibility contract.
+The generic Composition Kernel (K0) is implemented. Current canonical vocabulary and production boundaries: ADR-PBK-002. The earlier experiment code (`MusicKernel` / `TransportKernel`) survives only as test-local executable evidence under `crates/qianqian-audio-api/tests/playback_temporal_traces/` — not current authority and not a compatibility contract.
 
 Build/test authority:
 

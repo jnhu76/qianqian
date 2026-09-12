@@ -1,0 +1,21 @@
+name: Architecture Vocabulary Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  vocabulary-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Check architecture vocabulary
+        run: python3 tools/check_architecture_vocabulary.py

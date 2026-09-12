@@ -27,7 +27,7 @@ fn run(args: Vec<String>) -> ExitCode {
         return ExitCode::from(2);
     };
 
-    let mut runtime = qianqian_runtime::AppRuntime::new();
+    let mut runtime = qianqian_app::QianqianApp::new();
     if let Err(e) = runtime.register_component(qianqian_decode_songcore::songcore_decode_plugin()) {
         eprintln!("decode plugin registration failed: {e:?}");
         return ExitCode::from(1);
@@ -57,7 +57,8 @@ fn run(args: Vec<String>) -> ExitCode {
     // revise_desired settles before returning: a failed activation is
     // visible in the snapshot, and there is no episode to wait for.
     let snapshot = runtime.composition_snapshot();
-    if snapshot.fibers.get("session").map(|f| f.state) != Some(qianqian_kernel::FiberState::Active)
+    if snapshot.fibers.get("session").map(|f| f.state)
+        != Some(qianqian_composition::FiberState::Active)
     {
         if let Some(message) = completion.activation_error() {
             eprintln!("playback session failed to activate: {message}");
@@ -116,7 +117,7 @@ fn run(_args: Vec<String>) -> ExitCode {
 }
 
 #[cfg(feature = "playback")]
-fn report_disposal(snapshot: &qianqian_kernel::CompositionSnapshot) {
+fn report_disposal(snapshot: &qianqian_composition::CompositionSnapshot) {
     if snapshot.quiet {
         return;
     }
@@ -132,6 +133,10 @@ fn report_disposal(snapshot: &qianqian_kernel::CompositionSnapshot) {
 }
 
 #[cfg(feature = "playback")]
-fn desired(id: &str, component: &'static str) -> qianqian_kernel::DesiredEntry {
-    qianqian_kernel::DesiredEntry::enabled(id, component, qianqian_kernel::Revision::new(1))
+fn desired(id: &str, component: &'static str) -> qianqian_composition::DesiredEntry {
+    qianqian_composition::DesiredEntry::enabled(
+        id,
+        component,
+        qianqian_composition::Revision::new(1),
+    )
 }

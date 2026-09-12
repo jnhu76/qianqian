@@ -216,15 +216,16 @@ The first post-reset formal target was realtime graph publication vs reader quie
 Workspace currently includes:
 
 ```text
-qianqian-core
-qianqian-kernel
-qianqian-runtime
+qianqian-composition
+qianqian-audio-api
+qianqian-app
+qianqian-playback
 qianqian-headless
 ```
 
-The Base Kernel K0 is current.
+The Composition Kernel (K0) is current. Current canonical vocabulary: ADR-PBK-002.
 
-Playback-specific code from the prior design (`MusicKernel` / `TransportKernel`) no longer lives in production `src/`; it survives as test-local executable evidence in `qianqian-core` `tests/playback_temporal_traces/` and may be changed or removed by later research without compatibility obligation.
+Playback-specific code from the prior design (`MusicKernel` / `TransportKernel`) no longer lives in production `src/`; it survives as test-local executable evidence in `qianqian-audio-api` `tests/playback_temporal_traces/` and may be changed or removed by later research without compatibility obligation.
 
 Bootstrap APIs are not compatibility contracts unless a later accepted authority explicitly says so.
 

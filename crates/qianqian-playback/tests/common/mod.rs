@@ -19,7 +19,7 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-use qianqian_core::ports::{
+use qianqian_audio_api::ports::{
     AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainVerdict,
     OutputError, PcmDecode, PcmFormat, PcmPull, RenderPcmInput, RenderRequest, RenderStream,
 };

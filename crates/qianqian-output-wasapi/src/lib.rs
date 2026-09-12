@@ -14,8 +14,8 @@
 
 use std::rc::Rc;
 
-use qianqian_core::ports::AudioOutputCapability;
-use qianqian_kernel::{ActivationError, ComponentSpec};
+use qianqian_audio_api::ports::AudioOutputCapability;
+use qianqian_composition::{ActivationError, ComponentSpec};
 
 #[cfg(windows)]
 mod wasapi;
@@ -23,12 +23,12 @@ mod wasapi;
 /// Build the platform's real output mechanism. On non-Windows this is the
 /// honest unsupported-platform report, surfaced as an activation failure.
 #[cfg(windows)]
-fn platform_provider() -> Result<Rc<dyn qianqian_core::ports::AudioOutput>, String> {
+fn platform_provider() -> Result<Rc<dyn qianqian_audio_api::ports::AudioOutput>, String> {
     Ok(Rc::new(wasapi::WasapiOutput::new()?))
 }
 
 #[cfg(not(windows))]
-fn platform_provider() -> Result<Rc<dyn qianqian_core::ports::AudioOutput>, String> {
+fn platform_provider() -> Result<Rc<dyn qianqian_audio_api::ports::AudioOutput>, String> {
     Err(
         "WASAPI output requires Windows; this platform has no real output \
          mechanism and the plugin refuses to fake one"

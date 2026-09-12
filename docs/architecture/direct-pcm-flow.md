@@ -15,7 +15,7 @@ Base of this experiment is main at `686abf7` (merge of PR #93, the corrective th
 - The generic Composition Kernel (K0) is implemented and current: `Context / Capability / Fiber / Effect / Reconcile`, with synchronous control-plane `&mut Kernel`, activation-only `ActivationCtx::resolve`, and `Kernel::debug_op_count()` — a `#[doc(hidden)]` witness counting every public kernel operation (implementation ADR D9).
 - The architectural precedent for resolve-once/bind-outside is two-layered. **At this experiment's base**, the production `AppRuntime` carried that witness: it resolved `AudioOutputCapability` once during `on_activate` and cached the `Rc` service outside kernel storage. **On current main**, that hardcoded witness has been removed from the composition root (PR #103); the root keeps no parallel service-handle state outside the kernel. The pattern survives as executable evidence in this harness's `flow_assembler` composition (§3) — test instrumentation, not a normative production authority.
 - Issue #92 (PCM edge contract) was OPEN at this experiment's base and has since been closed; PR #93 merged with commit `686abf7`. Issue #12 (SRC/DSP research) and Issue #90 (OCR) are separate downstream tracks and were not touched.
-- Working tree: only `tests/`, one test-shared instrumentation file, `crates/qianqian-core/Cargo.toml` (dev-dependency on `qianqian-kernel`), and `crates/qianqian-core/tests/pcm_edge_contract/main.rs` (allocator extraction) differ from main. **Production `src/` delta is zero** (§13). Local untracked `.gitignore` modification from the user's machine was preserved untouched.
+- Working tree: only `tests/`, one test-shared instrumentation file, `crates/qianqian-audio-api/Cargo.toml` (dev-dependency on `qianqian-composition`), and `crates/qianqian-audio-api/tests/pcm_edge_contract/main.rs` (allocator extraction) differ from main. **Production `src/` delta is zero** (§13). Local untracked `.gitignore` modification from the user's machine was preserved untouched.
 
 ---
 
@@ -56,7 +56,7 @@ The kernel's `&mut Kernel` is not borrowed on this path; the control-plane may s
 ## 4. Test topology
 
 ```text
-crates/qianqian-core/tests/
+crates/qianqian-audio-api/tests/
     common/counting_allocator.rs        thread-scoped counting allocator (shared with the PCM edge experiment)
     pcm_edge_contract/harness.rs        PCM edge harness, reused verbatim (Sample, PcmFormat,
                                         PcmView/PcmViewMut, SyntheticProducer, SyntheticConsumer,
@@ -224,5 +224,5 @@ All 19 tests green (`cargo test --workspace`: `direct_pcm_flow` 19 passed, `pcm_
 
 ## 13. Production delta and naming gate
 
-- `git diff origin/main -- 'crates/**/src/**' 'apps/**/src/**'` is **empty** — production `src/` delta is zero; the only non-test change is a `[dev-dependencies]` entry for `qianqian-kernel` in `crates/qianqian-core/Cargo.toml` (test-only, with an explicit comment that the kernel keeps its own empty `[dependencies]` firewall).
+- `git diff origin/main -- 'crates/**/src/**' 'apps/**/src/**'` is **empty** — production `src/` delta is zero; the only non-test change is a `[dev-dependencies]` entry for `qianqian-composition` in `crates/qianqian-audio-api/Cargo.toml` (test-only, with an explicit comment that the kernel keeps its own empty `[dependencies]` firewall).
 - Campaign-name gate: `rg` for the campaign identity pattern over `crates apps` shows **zero new hits** vs main — no `Phase C`/`phase_c`/`PHASE-C`/`C0`/`C1`/`A0`/`experiment-1`/issue-number/PR-number strings in filenames, modules, types, functions, test helpers, or comments anywhere in the test tree. (This document's header is the one permitted provenance mention.)

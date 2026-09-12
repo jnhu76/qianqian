@@ -165,7 +165,7 @@ Gain → EQ → SRC → Limiter → ...
 | Audio Processing implementation | <StatusBadge status="PLANNED" /> |
 | UiHost | <StatusBadge status="DEFERRED" /> |
 
-旧 playback 实验代码已移出生产 crate，仅以 test-local executable evidence 保留（`crates/qianqian-core/tests/playback_temporal_traces/`），不是 current authority；FFmpeg/WASAPI 和完整 playback state machine 未获得实现授权。
+旧 playback 实验代码已移出生产 crate，仅以 test-local executable evidence 保留（`crates/qianqian-audio-api/tests/playback_temporal_traces/`），不是 current authority；FFmpeg/WASAPI 和完整 playback state machine 未获得实现授权。
 
 ---
 
@@ -181,5 +181,5 @@ Gain → EQ → SRC → Limiter → ...
   :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/composition-kernel-0-design.md']"
   :decisions="[{ issue: 67 }, { pr: 68 }]"
   :implementation="[{ issue: 70 }, { pr: 71 }]"
-  :evidence="['crates/qianqian-kernel/tests', 'specs/playback/PlaybackTemporal.tla']"
+  :evidence="['crates/qianqian-composition/tests', 'specs/playback/PlaybackTemporal.tla']"
 />

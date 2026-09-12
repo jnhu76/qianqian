@@ -1,12 +1,12 @@
 //! K0 hot-path firewall (first-audible-slice design §5): after activation,
 //! the steady data plane must flow with zero K0 work per quantum. Uses
-//! Kernel directly (not AppRuntime) because debug_op_count is the oracle.
+//! Kernel directly (not QianqianApp) because debug_op_count is the oracle.
 
 mod common;
 
 use std::time::Duration;
 
-use qianqian_kernel::{DesiredEntry, Kernel, Revision};
+use qianqian_composition::{CompositionKernel, DesiredEntry, Revision};
 use qianqian_playback::{SessionCompletion, SessionOutcome, playback_session_spec};
 
 use common::{OutputBehavior, SourceBehavior, TestDecode, TestOutput, within};
@@ -15,18 +15,18 @@ fn desired(id: &str, component: &'static str) -> DesiredEntry {
     DesiredEntry::enabled(id, component, Revision::new(1))
 }
 
-fn kernel_with_session(completion: &SessionCompletion) -> Kernel {
-    let mut kernel = Kernel::new();
+fn kernel_with_session(completion: &SessionCompletion) -> CompositionKernel {
+    let mut kernel = CompositionKernel::new();
     kernel
         .register_component({
             let behavior = SourceBehavior::EofAfter(48_000);
-            qianqian_kernel::ComponentSpec::new("test_decode_plugin")
-                .provides::<qianqian_core::ports::PcmDecodeCapability>()
+            qianqian_composition::ComponentSpec::new("test_decode_plugin")
+                .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
                 .on_activate(move |ctx| {
-                    ctx.provide::<qianqian_core::ports::PcmDecodeCapability>(std::rc::Rc::new(
-                        TestDecode { behavior },
-                    ))
-                    .map_err(|e| qianqian_kernel::ActivationError::new(format!("{e:?}")))?;
+                    ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
+                        std::rc::Rc::new(TestDecode { behavior }),
+                    )
+                    .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
                     Ok(())
                 })
         })
@@ -34,13 +34,13 @@ fn kernel_with_session(completion: &SessionCompletion) -> Kernel {
     kernel
         .register_component({
             let behavior = OutputBehavior::Consume;
-            qianqian_kernel::ComponentSpec::new("test_output_plugin")
-                .provides::<qianqian_core::ports::AudioOutputCapability>()
+            qianqian_composition::ComponentSpec::new("test_output_plugin")
+                .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
                 .on_activate(move |ctx| {
-                    ctx.provide::<qianqian_core::ports::AudioOutputCapability>(std::rc::Rc::new(
-                        TestOutput { behavior },
-                    ))
-                    .map_err(|e| qianqian_kernel::ActivationError::new(format!("{e:?}")))?;
+                    ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
+                        std::rc::Rc::new(TestOutput { behavior }),
+                    )
+                    .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
                     Ok(())
                 })
         })

@@ -5,10 +5,10 @@ edition.workspace = true
 description = "Headless bootstrap of Architecture v2: composition-only real playback entry"
 
 [dependencies]
-qianqian-core = { path = "../../crates/qianqian-core" }
-qianqian-kernel = { path = "../../crates/qianqian-kernel" }
+qianqian-audio-api = { path = "../../crates/qianqian-audio-api" }
+qianqian-composition = { path = "../../crates/qianqian-composition" }
 qianqian-playback = { path = "../../crates/qianqian-playback" }
-qianqian-runtime = { path = "../../crates/qianqian-runtime" }
+qianqian-app = { path = "../../crates/qianqian-app" }
 qianqian-decode-songcore = { path = "../../crates/qianqian-decode-songcore", optional = true }
 qianqian-output-wasapi = { path = "../../crates/qianqian-output-wasapi", optional = true }
 
