@@ -1,0 +1,5 @@
+/build/*
+!/build/ffmpeg.lua
+!/build/songcore.lua
+.xmake/
+__pycache__/
