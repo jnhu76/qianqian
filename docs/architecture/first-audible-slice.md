@@ -239,22 +239,30 @@ Activation (control plane, one bounded step):
 ```text
 resolve Decode capability ONCE
 resolve Output capability ONCE
-open PcmSource                    -> register inverse: release source
+open decode endpoint (RAII rides with the decode worker closure)
 build bounded edge (preallocate)
 open render stream (bounded open verdict; failure = raise)
                                   -> register inverse: stop_and_join stream
-spawn decode worker               (spawn failure = raise)
+spawn decode worker               (spawn failure = raise; the moved
+                                   endpoint drops with the failed closure)
                                   -> register inverse: stop edge + join worker
 Active
 ```
 
-Effects unwind strictly LIFO (kernel §H.1), so the registered order
-`[release source, release stream, stop+join worker]` unwinds exactly as
+Note on the decode endpoint (implementation differential, resolved): the
+design first sketched a dedicated release-source effect. The implemented
+and current shape is simpler and equivalent for every path: the endpoint
+is owned by the decode worker closure, so it is released exactly when the
+worker joins (which the unwind ordering places before any stream
+release), and drops on spawn failure or earlier raises via plain RAII.
+There is no second owner and no destructor accident — the ordering is
+still registration-order discipline.
+
+Effects unwind strictly LIFO (kernel §H.1), so disposal runs exactly
 
 ```text
-stop edge signal -> decode worker joins
+stop edge signal -> decode worker joins (endpoint released with it)
                  -> render stream stops, render thread joins, device released
-                 -> PcmSource released (song_close)
                  -> providers may teardown later via their own effects
 ```
 
@@ -299,11 +307,27 @@ real-sound gate runs on Windows with a real output device.
 ```text
 OPEN-1  Tier-2 format fallback (closest float32 + SRC) — deferred until a
         real device refuses Tier 1; would be earned as minimal conversion.
-OPEN-2  Windows native artifact recipe (xmake mingw, Windows-side) needed
-        for the real-sound build; mechanism proven historically, recipe to
-        be re-run for this slice.
 OPEN-3  Mix-format-native rendering (rendering at the device mix format
         instead of the source format) — not needed while Tier 1 holds.
 ```
 
+RESOLVED at gate time: OPEN-2 (the Windows native artifact recipe) — the
+`windows-x86_64` mingw-cross target recipe was derived through the
+documented fail-closed import (`ffmpeg_import.py --recipe
+windows-x86_64`) and the real-sound gate ran on it.
+
 Everything else outside §0 is deliberate deferral, not open design debt.
+
+## 10. Real-sound gate record (2026-09-12)
+
+```text
+entry        qianqian-headless <file>   (windows x86_64, mingw-w64 closure)
+file         reference corpus fixtures (real encodings, SHA-verified)
+codec        mp3 (mp3float), flac
+source       44100 Hz, 2 ch, mask 0x3 (SongCore probe)
+negotiated   44100 Hz, 2 ch, mask 0x3 — Tier 1 direct, shared mode,
+             event-driven, 970-frame device buffer (Realtek endpoint)
+program      EOF "played out completely" (padding drained to zero),
+             exit code 0, quiet disposal          — both fixtures
+audible      program evidence complete; human confirmation requested
+```

@@ -184,10 +184,29 @@ This table is the durable comparison surface.
 | Real boundary | Representative performance | Added cost vs previous layer | Status |
 |---|---:|---:|---|
 | Native SongCore (C ABI) | long MP3 ≈ 1444× realtime | raw FFmpeg→SongCore ≈ +4–7% long-media wall cost (historical, #112) | measured |
-| Rust raw FFI (`qianqian-songcore-sys`) | steady decode ≈ C caller within noise (see below) | **C→Rust = no measurable tax** | measured (this PR) |
-| REAL Decode Plugin | TBD | Rust FFI→Plugin = TBD | not started |
+| Rust raw FFI (`qianqian-songcore-sys`) | steady decode ≈ C caller within noise (see below) | **C→Rust = no measurable tax** | measured |
+| REAL Decode Plugin (endpoint dispatch) | steady decode ≈ raw FFI within noise (see below) | **FFI→Plugin endpoint = no measurable tax** | measured (2026-09-12) |
 
-No Plugin row numbers exist yet and none should be invented.
+### Real Decode Plugin endpoint measurement (2026-09-12)
+
+Balanced ABAB steady-decode walls, same host/artifact/session, 1024-frame
+blocks, 15 interleaved iterations per fixture, median vs median, noise band
+= interquartile spread of the raw-FFI samples
+(`crates/qianqian-decode-songcore/tests/plugin_tax.rs`):
+
+```text
+raw FFI (song_read_pcm direct)  vs  real Decode Plugin endpoint (Box<dyn PcmSource>)
+
+MP3   ~1.93 ms vs ~1.90 ms   delta -1.9%   (noise band 3.6%)
+FLAC  ~3.19 ms vs ~3.19 ms   delta -0.2%   (noise band 1.8%)
+
+overall verdict: NO MEASURABLE_PLUGIN_TAX
+```
+
+There is no separate safe-adapter layer to charge: the real Decode Plugin
+owns whatever the raw binding needs directly. The bounded PCM edge and the
+WASAPI render loop are not decode-cost rows; they are charged only if a
+measured anomaly ever points at them.
 
 ### Rust raw FFI measurement (2026-09-12)
 
@@ -248,8 +267,10 @@ no measurable tax (steady decode equal to C within noise)
 Plugin tax = ...
 ```
 
-The SongCore number is measured (#112); the Rust FFI line is measured (this
-PR); the Plugin lines remain illustrative until that layer exists.
+The SongCore number is measured (#112); the Rust FFI line is measured
+(2026-09-12); the Plugin endpoint line is measured (2026-09-12). The
+bounded edge and output legs have no decode-cost row: they are transport,
+not decode, and get one only when a measured anomaly points at them.
 
 Do not hide a slow architectural layer behind the fact that native decode is hundreds of times faster than realtime. A layer that adds a few microseconds may be fine; a layer that creates millisecond-scale long-tail stalls may be unacceptable even if total xRT remains high.
 
