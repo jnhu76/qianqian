@@ -45,6 +45,12 @@ struct CompletionArc {
     drain: DrainSignal,
 }
 
+impl Default for SessionCompletion {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SessionCompletion {
     pub fn new() -> Self {
         Self {
@@ -161,13 +167,11 @@ fn resolve(state: &mut CompletionState, drain: &DrainSignal) -> Option<SessionOu
         });
         return state.outcome.clone();
     }
-    if let Some(terminal) = state.worker_terminal {
-        if terminal == EdgeTerminal::Failed {
-            state.outcome = Some(SessionOutcome::Failed {
-                stage: "decode".to_owned(),
-            });
-            return state.outcome.clone();
-        }
+    if state.worker_terminal == Some(EdgeTerminal::Failed) {
+        state.outcome = Some(SessionOutcome::Failed {
+            stage: "decode".to_owned(),
+        });
+        return state.outcome.clone();
     }
     match drain.peek() {
         Some(DrainVerdict::Drained) => {

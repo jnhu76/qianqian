@@ -20,9 +20,8 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
 }
 
 use qianqian_core::ports::{
-    AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DrainSignal, DrainVerdict,
-    OutputError, PcmDecode, PcmFormat, PcmFrameSource, PcmPull, PcmSource, RenderRequest,
-    RenderStream,
+    AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DrainVerdict, OutputError, PcmDecode,
+    PcmFormat, PcmFrameSource, PcmPull, PcmSource, RenderRequest, RenderStream,
 };
 
 pub const TEST_FORMAT: PcmFormat = PcmFormat {
@@ -31,7 +30,10 @@ pub const TEST_FORMAT: PcmFormat = PcmFormat {
     channel_mask: 0x3,
 };
 
-/// How the fake decode source behaves.
+/// How the fake decode source behaves. Which variants are live differs
+/// per test binary sharing this mod, so the enum carries a dead-code
+/// allowance for the binaries that exercise a subset.
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum SourceBehavior {
     /// Produce `n` frames of payload, then clean EOF.
@@ -100,7 +102,8 @@ impl PcmSource for TestSource {
     }
 }
 
-/// How the test render leg behaves.
+/// How the test render leg behaves. (Per-binary usage, see above.)
+#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum OutputBehavior {
     /// Consume the edge to EOF, then report Drained.
@@ -182,8 +185,10 @@ impl RenderStream for TestStream {
 
 /// Linux-only leak oracle: is any OS thread with this name still alive?
 /// Deterministic under the parallel test harness (which inflates raw
-/// thread counts with other tests' workers).
+/// thread counts with other tests' workers). Only the lifecycle test
+/// binary calls it.
 #[cfg(target_os = "linux")]
+#[allow(dead_code)]
 pub fn named_thread_alive(name: &str) -> bool {
     let tasks = std::fs::read_dir("/proc/self/task").expect("/proc/self/task available");
     for entry in tasks.flatten() {

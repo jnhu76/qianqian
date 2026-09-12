@@ -2,7 +2,6 @@
 //! Windows, and fails its activation loudly on every other platform —
 //! never a fake success, never a silent null output.
 
-use qianqian_core::ports::AudioOutputCapability;
 use qianqian_kernel::{DesiredEntry, FiberState, Revision};
 use qianqian_output_wasapi::wasapi_output_plugin;
 use qianqian_runtime::AppRuntime;

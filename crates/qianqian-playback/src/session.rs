@@ -16,7 +16,7 @@
 //! then stop-join-release the stream — the required stop -> join ->
 //! release order.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use qianqian_core::ports::{AudioOutputCapability, DecodeOutcome, PcmDecodeCapability, PcmSource};
@@ -46,7 +46,7 @@ pub fn playback_session_spec(file: PathBuf, completion: SessionCompletion) -> Co
 }
 
 fn activate(
-    file: &PathBuf,
+    file: &Path,
     completion: &SessionCompletion,
     ctx: &mut qianqian_kernel::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
@@ -61,7 +61,7 @@ fn activate(
 }
 
 fn activate_inner(
-    file: &PathBuf,
+    file: &Path,
     completion: &SessionCompletion,
     ctx: &mut qianqian_kernel::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
@@ -78,7 +78,7 @@ fn activate_inner(
     // stream release), dropped on spawn failure, dropped on earlier raises.
     let source = decode
         .service()
-        .open_source(&file)
+        .open_source(file)
         .map_err(|e| ActivationError::new(format!("decode open failed: {}", e.message)))?;
     let format = source.format();
     completion.set_source_format(format);

@@ -22,8 +22,8 @@ fn frame(channels: u16, value: f32) -> Vec<f32> {
 #[test]
 fn write_then_read_roundtrips_frames() {
     let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
-    let mut a = vec![0.25f32; 16 * usize::from(CHANNELS)];
-    assert_eq!(edge.write(&mut a), qianqian_playback::WriteOutcome::Written);
+    let a = vec![0.25f32; 16 * usize::from(CHANNELS)];
+    assert_eq!(edge.write(&a), qianqian_playback::WriteOutcome::Written);
 
     let mut dst = vec![0.0f32; 16 * usize::from(CHANNELS)];
     assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(16));
@@ -36,7 +36,7 @@ fn reader_sees_partial_frames_as_whole_frames_only() {
     // One and a half frames buffered: only the whole frame is readable.
     let mut samples = frame(CHANNELS, 0.5);
     samples.push(0.5);
-    edge.write(&mut samples);
+    edge.write(&samples);
     let mut dst = vec![0.0f32; 8 * usize::from(CHANNELS)];
     assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(1));
 }
@@ -77,7 +77,7 @@ fn producer_blocks_when_full_and_unblocks_on_consume() {
 #[test]
 fn eof_drains_before_terminating_and_stays_terminal() {
     let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
-    edge.write(&mut frame(CHANNELS, 0.1));
+    edge.write(&frame(CHANNELS, 0.1));
     edge.close_eof();
 
     let mut dst = vec![0.0f32; 8 * usize::from(CHANNELS)];
@@ -97,7 +97,7 @@ fn torn_remainder_at_eof_terminates_instead_of_wedging() {
     let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
     let mut torn = frame(CHANNELS, 0.5);
     torn.push(0.5); // one and a half frames
-    edge.write(&mut torn);
+    edge.write(&torn);
     edge.close_eof();
 
     let mut dst = vec![0.0f32; 8 * usize::from(CHANNELS)];
@@ -152,7 +152,7 @@ fn stop_unblocks_a_producer_blocked_on_a_full_edge() {
 #[test]
 fn fail_terminal_stops_the_consumer() {
     let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
-    edge.write(&mut frame(CHANNELS, 0.2));
+    edge.write(&frame(CHANNELS, 0.2));
     edge.fail();
     let mut dst = vec![0.0f32; 8 * usize::from(CHANNELS)];
     assert_eq!(

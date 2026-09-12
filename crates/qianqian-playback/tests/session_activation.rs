@@ -7,7 +7,6 @@ mod common;
 
 use std::time::Duration;
 
-use qianqian_core::ports::PcmDecode;
 use qianqian_kernel::{DesiredEntry, FiberState, Revision};
 use qianqian_playback::{SessionCompletion, SessionOutcome, playback_session_spec};
 use qianqian_runtime::AppRuntime;
