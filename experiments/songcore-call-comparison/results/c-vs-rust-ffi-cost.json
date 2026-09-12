@@ -1,0 +1,892 @@
+{
+  "artifacts": {
+    "driver_artifact_matches_build_time_sha": true,
+    "driver_measured_static_sha256": "d1710b2dd534583cc7be65a93c124b3804f243cc6b53ca6a51f0cba64e479316",
+    "link_mode": "static, C caller object and Rust sys crate linked into one binary against one archive",
+    "songcore_header_sha256": "cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536",
+    "static_libsongcore_sha256": "d1710b2dd534583cc7be65a93c124b3804f243cc6b53ca6a51f0cba64e479316"
+  },
+  "block_sweep": {
+    "256": {
+      "block_frames": 256,
+      "fixtures": {
+        "alac-16-44-stereo": {
+          "block_frames": 256,
+          "c_median_us": 7359.0,
+          "c_wall_us_all": [
+            7330.0,
+            7359.0,
+            7480.0,
+            7345.0,
+            7418.0,
+            7339.0,
+            7355.0,
+            7402.0,
+            7345.0,
+            7459.0,
+            7285.0,
+            7477.0
+          ],
+          "delta_pct": 0.510259546133988,
+          "iterations": 12,
+          "noise_band_pct": 1.2055714091588572,
+          "rust_median_us": 7396.55,
+          "rust_wall_us_all": [
+            7325.289,
+            7396.55,
+            7356.15,
+            7474.294,
+            7383.844,
+            7423.725,
+            7311.05,
+            7439.486000000001,
+            7420.017,
+            7318.455,
+            7439.626,
+            7380.959000000001
+          ],
+          "verdict": "NO_MEASURABLE_FFI_TAX",
+          "warmup": 2
+        },
+        "alac-long": {
+          "block_frames": 256,
+          "c_median_us": 11021.0,
+          "c_wall_us_all": [
+            11019.0,
+            11310.0,
+            10924.0,
+            11021.0,
+            11034.0,
+            11032.0,
+            10947.0,
+            10872.0,
+            10962.0,
+            10865.0,
+            11308.0,
+            11119.0
+          ],
+          "delta_pct": -0.6054713728336754,
+          "iterations": 12,
+          "noise_band_pct": 1.8508846747119125,
+          "rust_median_us": 10954.271,
+          "rust_wall_us_all": [
+            10954.271,
+            10904.282,
+            10993.439,
+            11046.113,
+            10971.216,
+            10972.407,
+            10941.617,
+            10991.984999999999,
+            10178.943,
+            10674.435,
+            10506.913999999999,
+            10842.659
+          ],
+          "verdict": "NO_MEASURABLE_FFI_TAX",
+          "warmup": 2
+        },
+        "flac-16-44-stereo": {
+          "block_frames": 256,
+          "c_median_us": 3347.0,
+          "c_wall_us_all": [
+            3404.0,
+            3344.0,
+            3383.0,
+            3347.0,
+            3367.0,
+            3329.0,
+            3345.0,
+            3357.0,
+            3337.0,
+            3343.0,
+            3326.0,
+            3452.0
+          ],
+          "delta_pct": 1.0637585897818886,
+          "iterations": 12,
+          "noise_band_pct": 1.3853450851508833,
+          "rust_median_us": 3382.604,
+          "rust_wall_us_all": [
+            3366.141,
+            3341.522,
+            3382.604,
+            3322.715,
+            3461.59,
+            3389.958,
+            3486.78,
+            3389.146,
+            3327.223,
+            3463.465,
+            3369.608,
+            3325.22
+          ],
+          "verdict": "NO_MEASURABLE_FFI_TAX",
+          "warmup": 2
+        },
+        "mp3-cbr-id3v23": {
+          "block_frames": 256,
+          "c_median_us": 1930.0,
+          "c_wall_us_all": [
+            1994.0,
+            1904.0,
+            1902.0,
+            1925.0,
+            2280.0,
+            1930.0,
+            1923.0,
+            1960.0,
+            1960.0,
+            1920.0,
+            1970.0,
+            1908.0
+          ],
+          "delta_pct": 0.8280829015544026,
+          "iterations": 12,
+          "noise_band_pct": 1.996373056994817,
+          "rust_median_us": 1945.982,
+          "rust_wall_us_all": [
+            1927.1850000000002,
+            1943.918,
+            1952.2450000000001,
+            1925.1299999999999,
+            2046.001,
+            1940.001,
+            1955.7009999999998,
+            1945.982,
+            1911.934,
+            1948.156,
+            1930.632,
+            1967.3239999999998
+          ],
+          "verdict": "NO_MEASURABLE_FFI_TAX",
+          "warmup": 2
+        }
+      },
+      "iterations": 12,
+      "warmup": 2
+    },
+    "4096": {
+      "block_frames": 4096,
+      "fixtures": {
+        "alac-16-44-stereo": {
+          "block_frames": 4096,
+          "c_median_us": 7593.0,
+          "c_wall_us_all": [
+            7431.0,
+            7359.0,
+            7258.0,
+            8380.0,
+            7721.0,
+            7686.0,
+            6795.0,
+            8938.0,
+            7228.0,
+            7618.0,
+            7593.0,
+            7579.0
+          ],
+          "delta_pct": 0.4346766758856856,
+          "iterations": 12,
+          "noise_band_pct": 5.4293889108389335,
+          "rust_median_us": 7626.005,
+          "rust_wall_us_all": [
+            7354.216,
+            7293.415,
+            7411.34,
+            7233.245999999999,
+            8834.704,
+            9439.655,
+            7304.1269999999995,
+            7875.271,
+            7556.578,
+            7654.262000000001,
+            7700.634,
+            7626.005
+          ],
+          "verdict": "NO_MEASURABLE_FFI_TAX",
+          "warmup": 2
+        },
+        "alac-long": {
+          "block_frames": 4096,
+          "c_median_us": 11132.0,
+          "c_wall_us_all": [
+            11201.0,
+            11164.0,
+            11064.0,
+            11054.0,
+            11084.0,
+            11126.0,
+            11087.0,
+            11176.0,
+            11115.0,
+            11145.0,
+            11172.0,
+            11132.0
+          ],
+          "delta_pct": 0.031270212001435205,
+          "iterations": 12,
+          "noise_band_pct": 0.7842166726554158,
+          "rust_median_us": 11135.481,
+          "rust_wall_us_all": [
+            11164.469,
+            11177.935,
+            11096.824,
+            11135.481,
+            11453.101999999999,
+            11254.076,
+            11063.939,
+            11122.505,
+            11113.577,
+            11050.572,
+            11071.823999999999,
+            11166.422
+          ],
+          "verdict": "NO_MEASURABLE_FFI_TAX",
+          "warmup": 2
+        },
+        "flac-16-44-stereo": {
+          "block_frames": 4096,
+          "c_median_us": 3355.0,
+          "c_wall_us_all": [
+            3366.0,
+            3316.0,
+            3325.0,
+            3377.0,
+            3346.0,
+            3365.0,
+            3328.0,
+            3327.0,
+            3355.0,
+            3290.0,
+            3363.0,
+            3366.0
+          ],
+          "delta_pct": -0.030789865871843715,
+          "iterations": 12,
+          "noise_band_pct": 1.4958420268256347,
+          "rust_median_us": 3353.9669999999996,
+          "rust_wall_us_all": [
+            3378.605,
+            3363.255,
+            3323.676,
+            3374.468,
+            3319.408,
+            3376.672,
+            3298.957,
+            3333.145,
+            3281.5029999999997,
+            3353.9669999999996,
+            3314.0969999999998,
+            3403.295
+          ],
+          "verdict": "NO_MEASURABLE_FFI_TAX",
+          "warmup": 2
+        },
+        "mp3-cbr-id3v23": {
+          "block_frames": 4096,
+          "c_median_us": 1941.0,
+          "c_wall_us_all": [
+            1891.0,
+            2022.0,
+            1909.0,
+            1910.0,
+            1896.0,
+            2316.0,
+            1941.0,
+            1957.0,
+            1927.0,
+            2006.0,
+            1958.0,
+            1926.0
+          ],
+          "delta_pct": -0.5738794435857869,
+          "iterations": 12,
+          "noise_band_pct": 2.425038639876349,
+          "rust_median_us": 1929.8609999999999,
+          "rust_wall_us_all": [
+            1929.8609999999999,
+            1978.8470000000002,
+            1915.321,
+            1913.157,
+            1947.405,
+            1978.7580000000003,
+            1958.5969999999998,
+            1915.763,
+            1913.327,
+            2051.462,
+            1913.4569999999999,
+            1918.748
+          ],
+          "verdict": "NO_MEASURABLE_FFI_TAX",
+          "warmup": 2
+        }
+      },
+      "iterations": 12,
+      "warmup": 2
+    }
+  },
+  "call_floor": {
+    "c_ns_per_call": 1.4790905,
+    "iterations": 2000000,
+    "repeats": 3,
+    "rust_ns_per_call": 1.2169955
+  },
+  "correctness_gate": {
+    "fixtures": {
+      "alac-16-44-stereo": {
+        "c": {
+          "frames": 176400,
+          "pcm_sha256": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+          "terminal": 1
+        },
+        "expected": {
+          "pcm_frames": 176400,
+          "pcm_sha256": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46"
+        },
+        "pass": true,
+        "rust": {
+          "frames": 176400,
+          "pcm_sha256": "431db36e08b3af40a397e03e8a0acf8e61c3ad166acbe8e5889984f1b2791a46",
+          "terminal": 1
+        }
+      },
+      "alac-long": {
+        "c": {
+          "frames": 264600,
+          "pcm_sha256": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+          "terminal": 1
+        },
+        "expected": {
+          "pcm_frames": 264600,
+          "pcm_sha256": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612"
+        },
+        "pass": true,
+        "rust": {
+          "frames": 264600,
+          "pcm_sha256": "e9479a0aae2d6633f1d3e22fec9452930f1a44d0999448cedaaf08fe0e45f612",
+          "terminal": 1
+        }
+      },
+      "flac-16-44-stereo": {
+        "c": {
+          "frames": 176400,
+          "pcm_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+          "terminal": 1
+        },
+        "expected": {
+          "pcm_frames": 176400,
+          "pcm_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc"
+        },
+        "pass": true,
+        "rust": {
+          "frames": 176400,
+          "pcm_sha256": "3dc4728afd48b2ae02b562c86042f0751c144910cf8230e8b1bef3b7b2dd62dc",
+          "terminal": 1
+        }
+      },
+      "mp3-cbr-id3v23": {
+        "c": {
+          "frames": 176400,
+          "pcm_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+          "terminal": 1
+        },
+        "expected": {
+          "pcm_frames": 176400,
+          "pcm_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926"
+        },
+        "pass": true,
+        "rust": {
+          "frames": 176400,
+          "pcm_sha256": "7f22037048647fa92c8461b91a8c99fede9cd047d538ea3cfc8f0933bb60e926",
+          "terminal": 1
+        }
+      }
+    },
+    "pass": true
+  },
+  "equivalent_224s_track_cost_ms_at_max_delta": 2.4001586102718977,
+  "generated_utc": "2026-09-12T01:55:12Z",
+  "host": {
+    "affinity_cpus": "2",
+    "c_compiler": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+    "c_opt": "-O2",
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "loadavg": "4.05 3.14 2.58 1/1778 2328669",
+    "logical_cpus": 1,
+    "rust_profile": "release, opt-level 3, no special LTO",
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "layout_gate": {
+    "c_probe_lines": 223,
+    "pass": true,
+    "rust_probe_lines": 223
+  },
+  "overall_verdict": "NO_MEASURABLE_FFI_TAX",
+  "protocol": {
+    "iterations": 20,
+    "ordering": "balanced interleaved, per iteration both callers run with alternating order",
+    "primary_block_frames": 1024,
+    "steady_gates": "per-iteration frames == reference pcm_frames and terminal == SONG_EOF, else sample rejected",
+    "timed_window": "song_read_pcm loop only, fresh open+probe per iteration",
+    "warmup": 3
+  },
+  "read_latency": {
+    "block_frames": 1024,
+    "fixtures": {
+      "alac-16-44-stereo": {
+        "block_frames": 1024,
+        "c": {
+          "count": 519,
+          "max_us": 213.1829833984375,
+          "p50_us": 0.110015869140625,
+          "p90_us": 170.52798461914062,
+          "p99_us": 183.62399291992188
+        },
+        "passes": 3,
+        "rust": {
+          "count": 519,
+          "max_us": 198.645,
+          "p50_us": 0.11,
+          "p90_us": 170.579,
+          "p99_us": 181.671
+        },
+        "warmup": 2
+      },
+      "alac-long": {
+        "block_frames": 1024,
+        "c": {
+          "count": 777,
+          "max_us": 2383.81201171875,
+          "p50_us": 0.110015869140625,
+          "p90_us": 170.68801879882812,
+          "p99_us": 203.56399536132812
+        },
+        "passes": 3,
+        "rust": {
+          "count": 777,
+          "max_us": 221.98000000000002,
+          "p50_us": 0.11,
+          "p90_us": 170.368,
+          "p99_us": 186.831
+        },
+        "warmup": 2
+      },
+      "flac-16-44-stereo": {
+        "block_frames": 1024,
+        "c": {
+          "count": 519,
+          "max_us": 118.59500122070312,
+          "p50_us": 0.100982666015625,
+          "p90_us": 85.92001342773438,
+          "p99_us": 95.29901123046875
+        },
+        "passes": 3,
+        "rust": {
+          "count": 519,
+          "max_us": 125.56899999999999,
+          "p50_us": 0.11,
+          "p90_us": 85.7,
+          "p99_us": 96.562
+        },
+        "warmup": 2
+      },
+      "mp3-cbr-id3v23": {
+        "block_frames": 1024,
+        "c": {
+          "count": 519,
+          "max_us": 30.6710205078125,
+          "p50_us": 12.05401611328125,
+          "p90_us": 12.894989013671875,
+          "p99_us": 22.394989013671875
+        },
+        "passes": 3,
+        "rust": {
+          "count": 519,
+          "max_us": 40.631,
+          "p50_us": 12.084,
+          "p90_us": 13.467,
+          "p99_us": 28.206
+        },
+        "warmup": 2
+      }
+    },
+    "passes": 3,
+    "warmup": 2
+  },
+  "schema": "songcore-call-comparison/1",
+  "standalone_c_cross_check": {
+    "samples_us": [
+      1942.0,
+      1921.0,
+      1896.0,
+      2226.0,
+      2032.0
+    ],
+    "standalone_c_median_us": 1942.0
+  },
+  "steady": {
+    "block_frames": 1024,
+    "fixtures": {
+      "alac-16-44-stereo": {
+        "block_frames": 1024,
+        "c_median_us": 7550.0,
+        "c_wall_us_all": [
+          7577.0,
+          7471.0,
+          7569.0,
+          7907.0,
+          8328.0,
+          7608.0,
+          7589.0,
+          7585.0,
+          7715.0,
+          7905.0,
+          7550.0,
+          7424.0,
+          7543.0,
+          7546.0,
+          7526.0,
+          7366.0,
+          7444.0,
+          7451.0,
+          7465.0,
+          7504.0
+        ],
+        "delta_pct": -0.38866225165562984,
+        "iterations": 20,
+        "noise_band_pct": 1.4937615894039795,
+        "rust_median_us": 7520.656,
+        "rust_wall_us_all": [
+          7520.656,
+          7821.153000000001,
+          7631.246,
+          7534.394,
+          7567.856000000001,
+          7513.422,
+          7993.284,
+          7567.86,
+          7466.298,
+          7735.824,
+          7471.619,
+          7505.226000000001,
+          7557.499,
+          7553.612,
+          7435.017000000001,
+          7375.138,
+          7444.526,
+          7369.807,
+          7502.32,
+          7489.465
+        ],
+        "verdict": "NO_MEASURABLE_FFI_TAX",
+        "warmup": 3
+      },
+      "alac-long": {
+        "block_frames": 1024,
+        "c_median_us": 11278.0,
+        "c_wall_us_all": [
+          11322.0,
+          11434.0,
+          11155.0,
+          11160.0,
+          11153.0,
+          11100.0,
+          11612.0,
+          11516.0,
+          11505.0,
+          11549.0,
+          11003.0,
+          11356.0,
+          11276.0,
+          11045.0,
+          11183.0,
+          11278.0,
+          11191.0,
+          11503.0,
+          12030.0,
+          11082.0
+        ],
+        "delta_pct": -0.3750665011526963,
+        "iterations": 20,
+        "noise_band_pct": 2.2272211384997314,
+        "rust_median_us": 11235.699999999999,
+        "rust_wall_us_all": [
+          11148.447,
+          11192.023000000001,
+          11133.347,
+          11156.573,
+          11293.243999999999,
+          11053.627999999999,
+          11051.303,
+          11285.719,
+          11155.621,
+          11178.175000000001,
+          11253.144,
+          11290.939999999999,
+          11345.568000000001,
+          10607.813,
+          11235.699999999999,
+          11270.798999999999,
+          11115.622000000001,
+          12661.128,
+          14090.266000000001,
+          11264.688
+        ],
+        "verdict": "NO_MEASURABLE_FFI_TAX",
+        "warmup": 3
+      },
+      "flac-16-44-stereo": {
+        "block_frames": 1024,
+        "c_median_us": 3652.0,
+        "c_wall_us_all": [
+          4032.0,
+          3904.0,
+          4071.0,
+          3530.0,
+          7936.0,
+          3542.0,
+          3587.0,
+          4079.0,
+          3729.0,
+          3648.0,
+          3589.0,
+          3724.0,
+          3656.0,
+          3652.0,
+          3547.0,
+          3544.0,
+          3500.0,
+          3532.0,
+          3454.0,
+          3701.0
+        ],
+        "delta_pct": 0.11960569550930827,
+        "iterations": 20,
+        "noise_band_pct": 6.009446878422786,
+        "rust_median_us": 3656.368,
+        "rust_wall_us_all": [
+          3929.278,
+          3847.436,
+          4211.399,
+          3935.2700000000004,
+          3617.881,
+          3488.9249999999997,
+          3693.7219999999998,
+          3920.832,
+          3734.452,
+          3819.8920000000003,
+          3623.973,
+          3619.293,
+          3601.759,
+          4021.482,
+          3512.571,
+          3656.368,
+          3480.0159999999996,
+          3595.506,
+          3518.273,
+          3599.474
+        ],
+        "verdict": "NO_MEASURABLE_FFI_TAX",
+        "warmup": 3
+      },
+      "mp3-cbr-id3v23": {
+        "block_frames": 1024,
+        "c_median_us": 1986.0,
+        "c_wall_us_all": [
+          1885.0,
+          1955.0,
+          1981.0,
+          1920.0,
+          1901.0,
+          2017.0,
+          1923.0,
+          1954.0,
+          1986.0,
+          1968.0,
+          1977.0,
+          2002.0,
+          2086.0,
+          2024.0,
+          1971.0,
+          2088.0,
+          1991.0,
+          2011.0,
+          2030.0,
+          2012.0
+        ],
+        "delta_pct": 1.5484894259818696,
+        "iterations": 20,
+        "noise_band_pct": 4.198288016112797,
+        "rust_median_us": 2016.753,
+        "rust_wall_us_all": [
+          1975.841,
+          2114.086,
+          1940.8220000000001,
+          1941.0230000000001,
+          2002.134,
+          2084.597,
+          1943.146,
+          1998.1259999999997,
+          2049.0069999999996,
+          2003.456,
+          1960.6409999999998,
+          2015.0290000000002,
+          2024.5279999999998,
+          2067.213,
+          2104.827,
+          2214.235,
+          2534.0,
+          2318.091,
+          1993.6879999999999,
+          2016.753
+        ],
+        "verdict": "NO_MEASURABLE_FFI_TAX",
+        "warmup": 3
+      }
+    },
+    "iterations": 20,
+    "warmup": 3
+  },
+  "surface_gate": {
+    "fixtures": {
+      "alac-16-44-stereo": {
+        "c": {
+          "first_frames": 1024,
+          "seek_actual_us": 464399,
+          "seek_status": 0,
+          "select_status": 0
+        },
+        "pass": true,
+        "rust": {
+          "first_frames": 1024,
+          "seek_actual_us": 464399,
+          "seek_status": 0,
+          "select_status": 0
+        }
+      },
+      "alac-long": {
+        "c": {
+          "first_frames": 1024,
+          "seek_actual_us": 464399,
+          "seek_status": 0,
+          "select_status": 0
+        },
+        "pass": true,
+        "rust": {
+          "first_frames": 1024,
+          "seek_actual_us": 464399,
+          "seek_status": 0,
+          "select_status": 0
+        }
+      },
+      "flac-16-44-stereo": {
+        "c": {
+          "first_frames": 1024,
+          "seek_actual_us": 417959,
+          "seek_status": 0,
+          "select_status": 0
+        },
+        "pass": true,
+        "rust": {
+          "first_frames": 1024,
+          "seek_actual_us": 417959,
+          "seek_status": 0,
+          "select_status": 0
+        }
+      },
+      "mp3-cbr-id3v23": {
+        "c": {
+          "first_frames": 1024,
+          "seek_actual_us": 496327,
+          "seek_status": 0,
+          "select_status": 0
+        },
+        "pass": true,
+        "rust": {
+          "first_frames": 1024,
+          "seek_actual_us": 496327,
+          "seek_status": 0,
+          "select_status": 0
+        }
+      }
+    },
+    "pass": true
+  },
+  "track_cost_basis": "SongCore 224 s real-MP3 whole-file decode ~= 155 ms (docs/performance/decode-cost-model.md)",
+  "ttfp": {
+    "fixtures": {
+      "alac-16-44-stereo": {
+        "c": {
+          "first_us": 136.0,
+          "open_us": 38.0,
+          "probe_us": 165.0,
+          "ttfp_us": 339.0
+        },
+        "first_block_frames": 1024,
+        "iterations": 20,
+        "rust": {
+          "first_us": 135.158,
+          "open_us": 33.206,
+          "probe_us": 157.071,
+          "ttfp_us": 325.43499999999995
+        },
+        "ttfp_delta_pct": -4.001474926253704
+      },
+      "alac-long": {
+        "c": {
+          "first_us": 136.0,
+          "open_us": 38.0,
+          "probe_us": 165.0,
+          "ttfp_us": 339.0
+        },
+        "first_block_frames": 1024,
+        "iterations": 20,
+        "rust": {
+          "first_us": 136.0,
+          "open_us": 33.677,
+          "probe_us": 160.389,
+          "ttfp_us": 330.06600000000003
+        },
+        "ttfp_delta_pct": -2.6353982300884864
+      },
+      "flac-16-44-stereo": {
+        "c": {
+          "first_us": 82.0,
+          "open_us": 16.0,
+          "probe_us": 139.0,
+          "ttfp_us": 237.0
+        },
+        "first_block_frames": 1024,
+        "iterations": 20,
+        "rust": {
+          "first_us": 82.113,
+          "open_us": 14.709999999999999,
+          "probe_us": 135.299,
+          "ttfp_us": 232.122
+        },
+        "ttfp_delta_pct": -2.05822784810126
+      },
+      "mp3-cbr-id3v23": {
+        "c": {
+          "first_us": 29.0,
+          "open_us": 27.0,
+          "probe_us": 71.0,
+          "ttfp_us": 127.0
+        },
+        "first_block_frames": 1024,
+        "iterations": 20,
+        "rust": {
+          "first_us": 29.488999999999997,
+          "open_us": 23.136,
+          "probe_us": 66.703,
+          "ttfp_us": 119.328
+        },
+        "ttfp_delta_pct": -6.040944881889762
+      }
+    },
+    "iterations": 20
+  }
+}
