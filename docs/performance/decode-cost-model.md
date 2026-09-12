@@ -2,7 +2,7 @@
 
 Nature: **PERFORMANCE EVIDENCE / DECISION SUPPORT — NOT ARCHITECTURE AUTHORITY**
 
-This document turns the native decode benchmark into a durable cost ledger that can be extended as the production path gains Rust FFI, a safe adapter, a real Decode Plugin, and bounded PCM transport.
+This document turns the native decode benchmark into a durable cost ledger that extends along the real production chain as it gains layers: the Rust raw FFI binding, then the real Decode Plugin. The safe-adapter layer was removed from the plan: the real Decode Plugin earns whatever ownership shape it needs directly over the raw binding, so there is no separate adapter boundary left to charge.
 
 Source evidence:
 
@@ -23,31 +23,22 @@ The useful question is:
 
 > When we add one architectural layer, how much performance does that layer cost us?
 
-We therefore keep a cumulative tax ladder:
+We therefore keep a cumulative tax ladder over the real production chain:
 
 ```text
-raw FFmpeg decode
-        │
-        │ + SongCore tax
-        ▼
-SongCore C ABI
+Native SongCore (C ABI over FFmpeg)
         │
         │ + Rust FFI tax
         ▼
-Rust raw FFI
-        │
-        │ + safe-adapter tax
-        ▼
-Rust safe adapter
+Rust raw FFI (qianqian-songcore-sys)
         │
         │ + Decode Plugin tax
         ▼
-Decode Plugin
-        │
-        │ + bounded-transport tax
-        ▼
-PCM transport
+REAL Decode Plugin
 ```
+
+The historical first rung — raw FFmpeg decode → SongCore — was measured once
+(#112) and is kept below as history; it is not a future benchmark milestone.
 
 Every future benchmark should answer the same three questions:
 
@@ -99,7 +90,7 @@ The corrected benchmark gives this rough range:
 | Opus | about +3% | small |
 | Very cheap PCM fixtures | percentage may look large | absolute cost is tiny; do not over-read the percentage |
 
-This is the first filled row of the tax ledger. Rust and Plugin rows remain intentionally unknown until those layers exist on the real path.
+This is the first filled row of the tax ledger. The Rust FFI row is now measured too (section 7); the Plugin row stays unknown until that layer exists on the real path.
 
 ---
 
@@ -188,25 +179,56 @@ Block size must still be earned by the real end-to-end path; this baseline only 
 
 ## 7. Tax ledger
 
-This table is the durable comparison surface for #110.
+This table is the durable comparison surface.
 
-| Layer | Representative performance | Added cost vs previous layer | Status |
+| Real boundary | Representative performance | Added cost vs previous layer | Status |
 |---|---:|---:|---|
-| Raw FFmpeg decode | long MP3 ≈ 1544× realtime | — | measured |
-| SongCore C ABI | long MP3 ≈ 1444× realtime | ≈ +6.9% wall time; long media typically +4%–7% | measured |
-| Rust raw FFI | TBD | TBD | measure after SongCore exists on current main |
-| Rust safe adapter | TBD | TBD | measure after adapter exists |
-| Decode Plugin | TBD | TBD | measure the real pre-bound Plugin path |
-| Bounded PCM transport | TBD | TBD | measure after the real bounded edge exists |
+| Native SongCore (C ABI) | long MP3 ≈ 1444× realtime | raw FFmpeg→SongCore ≈ +4–7% long-media wall cost (historical, #112) | measured |
+| Rust raw FFI (`qianqian-songcore-sys`) | steady decode ≈ C caller within noise (see below) | **C→Rust = no measurable tax** | measured (this PR) |
+| REAL Decode Plugin | TBD | Rust FFI→Plugin = TBD | not started |
 
-Future rows should report both:
+No Plugin row numbers exist yet and none should be invented.
+
+### Rust raw FFI measurement (2026-09-12)
+
+`experiments/songcore-call-comparison` compares, same-day/same-host/same
+static `libsongcore.a` (FFmpeg closure merged), a C caller against a Rust
+caller going through `qianqian-songcore-sys`. Protocol: balanced interleaved
+iterations (both callers every iteration, alternating order), pinned CPU,
+steady-decode wall time as the primary metric at 1024-frame blocks with a
+256/4096 sweep, per-iteration frame/terminal gates, and PCM SHA equality
+against the #114 reference enforced for both callers.
+
+Result:
 
 ```text
-absolute cost: ns / µs / ms
-relative cost: % vs previous layer
+steady decode wall, C median vs Rust median (block 1024)
+
+MP3        ~2.0 ms  vs ~2.0 ms   delta +1.6%  (noise band 4.2%)
+FLAC       ~3.7 ms  vs ~3.7 ms   delta +0.1%  (noise band 6.0%)
+ALAC       ~7.6 ms  vs ~7.6 ms   delta -0.4%  (noise band 1.5%)
+ALAC-long ~11.3 ms  vs ~11.2 ms  delta -0.4%  (noise band 2.2%)
+
+all 12 comparisons (4 fixtures x blocks 256/1024/4096): |delta| <= 1.6%,
+inside the inter-quartile noise band of the run in every case
+
+overall verdict: NO MEASURABLE FFI TAX
 ```
 
-Percentages alone are misleading when the baseline operation is extremely cheap.
+Equivalent 224 s-track cost: at the worst observed primary delta ≈ 2.4 ms of
+a ~155 ms whole-file decode — a value inside the run's own noise band, i.e.
+not a resolvable cost and not treated as a percentage.
+
+Secondary observations: read-call p99 at 1024 frames is equal within noise
+on every fixture (lossless p99 ~95–205 µs, matching the native baseline
+shape); time-to-first-PCM is a few percent *faster* on Rust, attributable to
+the host IO difference (stdio `FILE*` vs direct fd reads — see the
+experiment README for why this cannot hide a steady-decode tax) and not to
+FFI; the bare `songcore_abi_version()` call floor is ~1.2–1.5 ns on both
+sides, dominated by loop overhead.
+
+Evidence: `experiments/songcore-call-comparison/results/` (raw per-iteration
+samples, host and artifact identity, gates, verdict).
 
 ---
 
@@ -218,20 +240,16 @@ Prefer this form:
 SongCore
 1444× realtime
 
-+ Rust FFI
-1438× realtime
-FFI tax = 0.4%
++ Rust raw FFI
+no measurable tax (steady decode equal to C within noise)
 
-+ safe adapter
-1429× realtime
-adapter tax = 0.6%
-
-+ Decode Plugin
-1418× realtime
-Plugin tax = 0.8%
++ REAL Decode Plugin
+...× realtime
+Plugin tax = ...
 ```
 
-The numbers above are illustrative except for the measured SongCore baseline.
+The SongCore number is measured (#112); the Rust FFI line is measured (this
+PR); the Plugin lines remain illustrative until that layer exists.
 
 Do not hide a slow architectural layer behind the fact that native decode is hundreds of times faster than realtime. A layer that adds a few microseconds may be fine; a layer that creates millisecond-scale long-tail stalls may be unacceptable even if total xRT remains high.
 
@@ -252,7 +270,8 @@ The current baseline is intentionally bounded:
 - based on the corrected historical SongCore + trimmed FFmpeg substrate;
 - long-file coverage is strongest for MP3;
 - long lossless p99.9 remains a corpus gap;
-- it does not include Rust FFI, Plugin dispatch, bounded transport, processing or WASAPI;
+- it does not include Plugin dispatch, processing or WASAPI (the Rust raw
+  FFI boundary itself is measured — section 7);
 - it is performance evidence, not a latency SLA and not architecture authority.
 
 The local FLAC file excluded by #112 had a corrupt download tail and is not treated as a SongCore/FFmpeg defect.
@@ -266,7 +285,7 @@ This evidence supports the following engineering decisions:
 1. Preserve SongCore's Media→PCM mechanism rather than rewriting FFmpeg state machines in Rust for performance reasons.
 2. Port the smallest self-contained SongCore mechanism to current `main`, without reviving the old PlayerEngine/runtime architecture.
 3. Re-run an equivalent benchmark after that port to prove correctness and performance equivalence.
-4. Then extend the same ledger across Rust FFI, safe adapter, Decode Plugin and bounded PCM transport.
+4. Then extend the same ledger across the Rust raw FFI binding and the real Decode Plugin.
 
 The baseline does **not** authorize importing the historical player, playback state machine, WASAPI composition or other old architecture simply because they existed beside SongCore.
 

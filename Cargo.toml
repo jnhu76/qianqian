@@ -6,6 +6,10 @@ members = [
     "crates/qianqian-kernel",
     "crates/qianqian-runtime",
 ]
+exclude = [
+    "crates/qianqian-songcore-sys",
+    "experiments/songcore-call-comparison",
+]
 
 [workspace.package]
 edition = "2024"
