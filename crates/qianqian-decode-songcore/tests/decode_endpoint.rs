@@ -24,10 +24,7 @@ fn fixtures_dir() -> PathBuf {
 }
 
 fn load_fixture(id: &str) -> (ReferenceFixture, PathBuf) {
-    let fx = ReferenceFixture::load(
-        &fixtures_dir().parent().unwrap().join("reference.json"),
-        id,
-    );
+    let fx = ReferenceFixture::load(&fixtures_dir().parent().unwrap().join("reference.json"), id);
     let path = fixtures_dir().join(&fx.file);
     fx.verify_file_identity(&path);
     (fx, path)
@@ -45,8 +42,14 @@ fn opens_real_files_with_reference_format() {
             panic!("{id}: real file must open: {}", e.message);
         });
         let fmt = src.format();
-        assert_eq!(fmt.sample_rate, fx.sample_rate, "{id}: reference sample rate");
-        assert_eq!(fmt.channels as u32, fx.channels, "{id}: reference channel count");
+        assert_eq!(
+            fmt.sample_rate, fx.sample_rate,
+            "{id}: reference sample rate"
+        );
+        assert_eq!(
+            fmt.channels as u32, fx.channels,
+            "{id}: reference channel count"
+        );
     }
 }
 
@@ -151,7 +154,9 @@ fn plugin_publishes_capability_that_opens_real_media_through_the_kernel() {
     let consumer = ComponentSpec::new("decode_probe_consumer")
         .requires::<PcmDecodeCapability>()
         .on_activate(move |ctx| {
-            let binding = ctx.resolve::<PcmDecodeCapability>().expect("decode resolves");
+            let binding = ctx
+                .resolve::<PcmDecodeCapability>()
+                .expect("decode resolves");
             let mut src = binding
                 .service()
                 .open_source(&open_path)
@@ -167,7 +172,9 @@ fn plugin_publishes_capability_that_opens_real_media_through_the_kernel() {
         });
 
     let mut runtime = AppRuntime::new();
-    runtime.register_component(songcore_decode_plugin()).expect("legal");
+    runtime
+        .register_component(songcore_decode_plugin())
+        .expect("legal");
     runtime.register_component(consumer).expect("legal");
     runtime
         .revise_desired(vec![
@@ -182,7 +189,12 @@ fn plugin_publishes_capability_that_opens_real_media_through_the_kernel() {
         Some(Some("decode")),
         "the real decode capability binding is kernel truth"
     );
-    let (rate, first_frames) = observed.borrow().expect("consumer probed the real endpoint");
+    let (rate, first_frames) = observed
+        .borrow()
+        .expect("consumer probed the real endpoint");
     assert_eq!(rate, fx.sample_rate);
-    assert!(first_frames > 0, "real PCM flowed through the resolved capability");
+    assert!(
+        first_frames > 0,
+        "real PCM flowed through the resolved capability"
+    );
 }

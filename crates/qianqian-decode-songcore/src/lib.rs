@@ -152,8 +152,9 @@ impl SongcoreSource {
         if status == sys::SONG_OK && !err.is_null() {
             let e = unsafe { &*err };
             if !e.message.is_null() && e.message_len > 0 {
-                let bytes =
-                    unsafe { slice::from_raw_parts(e.message as *const u8, e.message_len as usize) };
+                let bytes = unsafe {
+                    slice::from_raw_parts(e.message as *const u8, e.message_len as usize)
+                };
                 return String::from_utf8_lossy(bytes).into_owned();
             }
         }
@@ -202,8 +203,7 @@ pub fn songcore_decode_plugin() -> ComponentSpec {
     ComponentSpec::new("songcore_decode_plugin")
         .provides::<PcmDecodeCapability>()
         .on_activate(|ctx| {
-            let service = SongcoreDecode::new()
-                .map_err(|e| ActivationError::new(e.message))?;
+            let service = SongcoreDecode::new().map_err(|e| ActivationError::new(e.message))?;
             ctx.provide::<PcmDecodeCapability>(Rc::new(service))
                 .map_err(|e| ActivationError::new(format!("provision refused: {e:?}")))?;
             Ok(())

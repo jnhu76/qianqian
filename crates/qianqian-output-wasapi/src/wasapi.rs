@@ -27,17 +27,17 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use windows::core::GUID;
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Media::Audio::{
-    eMultimedia, eRender, IAudioClient, IAudioRenderClient, IMMDeviceEnumerator,
     AUDCLNT_E_UNSUPPORTED_FORMAT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-    MMDeviceEnumerator, WAVEFORMATEXTENSIBLE,
+    IAudioClient, IAudioRenderClient, IMMDeviceEnumerator, MMDeviceEnumerator,
+    WAVEFORMATEXTENSIBLE, eMultimedia, eRender,
 };
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
+    CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize,
 };
 use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
+use windows::core::GUID;
 
 use qianqian_core::ports::{
     AudioOutput, DrainSignal, DrainVerdict, OutputError, PcmFormat, PcmFrameSource, PcmPull,
@@ -75,7 +75,10 @@ impl AudioOutput for WasapiOutput {
     fn open_stream(&self, request: RenderRequest) -> Result<Box<dyn RenderStream>, OutputError> {
         if request.format.sample_rate == 0 || request.format.channels == 0 {
             return Err(OutputError {
-                message: format!("unrenderable source format: {}", debug_format(&request.format)),
+                message: format!(
+                    "unrenderable source format: {}",
+                    debug_format(&request.format)
+                ),
             });
         }
         let slot: OpenSlot = Arc::new((Mutex::new(None), Condvar::new()));
@@ -212,11 +215,7 @@ fn run_render_thread(
 
 /// COM apartment ownership lives and dies on this thread, around the
 /// whole open + loop + release sequence.
-fn open_and_run(
-    format: PcmFormat,
-    source: &dyn PcmFrameSource,
-    slot: &OpenSlot,
-) -> LoopOutcome {
+fn open_and_run(format: PcmFormat, source: &dyn PcmFrameSource, slot: &OpenSlot) -> LoopOutcome {
     let coinit = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
     let com_owner = coinit.is_ok();
     let outcome = unsafe { open_and_run_inner(format, source, slot) };
@@ -359,10 +358,7 @@ unsafe fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSessi
     // format evidence; never steady-state output.
     eprintln!(
         "[qianqian-wasapi] opened: {} Hz, {} channels, mask {:#x}, buffer {} frames (shared, event-driven)",
-        format.sample_rate,
-        format.channels,
-        format.channel_mask,
-        buffer_frames
+        format.sample_rate, format.channels, format.channel_mask, buffer_frames
     );
     Some(DeviceSession {
         client,

@@ -15,15 +15,25 @@ fn desired_plugin(id: &str) -> DesiredEntry {
 #[test]
 fn non_windows_activation_fails_loudly_without_ghost_provisions() {
     let mut runtime = AppRuntime::new();
-    runtime.register_component(wasapi_output_plugin()).expect("legal");
-    runtime.revise_desired(vec![desired_plugin("output")]).expect("legal");
+    runtime
+        .register_component(wasapi_output_plugin())
+        .expect("legal");
+    runtime
+        .revise_desired(vec![desired_plugin("output")])
+        .expect("legal");
 
     let snap = runtime.composition_snapshot();
     let fiber = snap.fibers.get("output").expect("installed");
-    assert_eq!(fiber.state, FiberState::Failed, "activation refuses the platform");
+    assert_eq!(
+        fiber.state,
+        FiberState::Failed,
+        "activation refuses the platform"
+    );
     assert!(fiber.failed_outcome, "the refusal is recorded as FAILED");
     assert!(
-        snap.capabilities.get("AudioOutput").is_none_or(|p| p.is_none()),
+        snap.capabilities
+            .get("AudioOutput")
+            .is_none_or(|p| p.is_none()),
         "no capability binding is published for a mechanism that does not exist"
     );
     assert!(
@@ -40,8 +50,12 @@ fn non_windows_activation_fails_loudly_without_ghost_provisions() {
 #[test]
 fn windows_activation_publishes_the_capability() {
     let mut runtime = AppRuntime::new();
-    runtime.register_component(wasapi_output_plugin()).expect("legal");
-    runtime.revise_desired(vec![desired_plugin("output")]).expect("legal");
+    runtime
+        .register_component(wasapi_output_plugin())
+        .expect("legal");
+    runtime
+        .revise_desired(vec![desired_plugin("output")])
+        .expect("legal");
 
     let snap = runtime.composition_snapshot();
     let fiber = snap.fibers.get("output").expect("installed");

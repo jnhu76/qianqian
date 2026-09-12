@@ -29,9 +29,11 @@ fn platform_provider() -> Result<Rc<dyn qianqian_core::ports::AudioOutput>, Stri
 
 #[cfg(not(windows))]
 fn platform_provider() -> Result<Rc<dyn qianqian_core::ports::AudioOutput>, String> {
-    Err("WASAPI output requires Windows; this platform has no real output \
+    Err(
+        "WASAPI output requires Windows; this platform has no real output \
          mechanism and the plugin refuses to fake one"
-        .to_owned())
+            .to_owned(),
+    )
 }
 
 /// The Output Plugin component definition: provides the `AudioOutput`

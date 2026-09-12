@@ -13,8 +13,7 @@ use qianqian_playback::{SessionCompletion, SessionOutcome, playback_session_spec
 use qianqian_runtime::AppRuntime;
 
 use common::{
-    OutputBehavior, SourceBehavior, TestDecode, TestOutput, TEST_FORMAT, named_thread_alive,
-    within,
+    OutputBehavior, SourceBehavior, TEST_FORMAT, TestDecode, TestOutput, named_thread_alive, within,
 };
 
 const DUMMY_PATH: &str = "test://sine";
@@ -105,7 +104,11 @@ fn session_completes_through_eof_and_disposes_quietly() {
             .expect("composition is legal");
 
         let outcome = completion.wait();
-        assert_eq!(outcome, SessionOutcome::Completed, "EOF + drain = completion");
+        assert_eq!(
+            outcome,
+            SessionOutcome::Completed,
+            "EOF + drain = completion"
+        );
 
         let snap = runtime.dispose();
         assert!(snap.quiet, "clean shutdown");
@@ -237,7 +240,11 @@ fn withdrawing_a_provider_degrades_the_session_to_pending() {
             ])
             .expect("legal");
         assert_eq!(
-            runtime.composition_snapshot().fibers.get("session").map(|f| f.state),
+            runtime
+                .composition_snapshot()
+                .fibers
+                .get("session")
+                .map(|f| f.state),
             Some(FiberState::Active)
         );
 
@@ -266,8 +273,11 @@ fn missing_capabilities_leave_the_session_pending_not_failed() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
         let completion = SessionCompletion::new();
-        let mut runtime =
-            registered_runtime(SourceBehavior::EofAfter(1), OutputBehavior::Consume, completion);
+        let mut runtime = registered_runtime(
+            SourceBehavior::EofAfter(1),
+            OutputBehavior::Consume,
+            completion,
+        );
         runtime
             .revise_desired(vec![desired("session", "playback_session")])
             .expect("legal");

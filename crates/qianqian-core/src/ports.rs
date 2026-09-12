@@ -104,11 +104,7 @@ impl DrainSignal {
 
     /// Current verdict, if any (non-blocking observation).
     pub fn peek(&self) -> Option<DrainVerdict> {
-        *self
-            .inner
-            .verdict
-            .lock()
-            .expect("drain verdict lock")
+        *self.inner.verdict.lock().expect("drain verdict lock")
     }
 }
 

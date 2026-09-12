@@ -40,8 +40,8 @@ impl ReferenceFixture {
     /// Fail the test before any decode assertion if the corpus file itself
     /// drifted from the reference it anchors.
     pub fn verify_file_identity(&self, path: &Path) {
-        let bytes = std::fs::read(path)
-            .unwrap_or_else(|e| panic!("fixture {}: {e}", path.display()));
+        let bytes =
+            std::fs::read(path).unwrap_or_else(|e| panic!("fixture {}: {e}", path.display()));
         let mut hasher = Sha256::new();
         hasher.update(&bytes);
         assert_eq!(
@@ -185,11 +185,17 @@ mod tests {
     fn matches_known_vectors() {
         let mut h = Sha256::new();
         h.update(b"");
-        assert_eq!(h.hex(), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assert_eq!(
+            h.hex(),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
 
         let mut h = Sha256::new();
         h.update(b"abc");
-        assert_eq!(h.hex(), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        assert_eq!(
+            h.hex(),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
 
         // Multi-update with a length that crosses block boundaries.
         let mut h = Sha256::new();

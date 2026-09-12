@@ -53,7 +53,10 @@ fn producer_blocks_when_full_and_unblocks_on_consume() {
     };
     // The producer must be blocked (10 frames into a 4-frame edge).
     thread::sleep(Duration::from_millis(50));
-    assert!(!producer.is_finished(), "producer must block on a full edge");
+    assert!(
+        !producer.is_finished(),
+        "producer must block on a full edge"
+    );
 
     // The read returns what the edge holds per call; accumulate all 10.
     let mut dst = vec![0.0f32; 16 * usize::from(CHANNELS)];
@@ -65,7 +68,10 @@ fn producer_blocks_when_full_and_unblocks_on_consume() {
         }
     }
     assert_eq!(total, 10);
-    assert_eq!(producer.join().expect("producer exits"), qianqian_playback::WriteOutcome::Written);
+    assert_eq!(
+        producer.join().expect("producer exits"),
+        qianqian_playback::WriteOutcome::Written
+    );
 }
 
 #[test]
@@ -75,7 +81,11 @@ fn eof_drains_before_terminating_and_stays_terminal() {
     edge.close_eof();
 
     let mut dst = vec![0.0f32; 8 * usize::from(CHANNELS)];
-    assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(1), "EOF drains buffered frames first");
+    assert_eq!(
+        edge.read_frames(&mut dst),
+        PcmPull::Frames(1),
+        "EOF drains buffered frames first"
+    );
     assert_eq!(edge.read_frames(&mut dst), PcmPull::Eof, "then reports EOF");
     assert_eq!(edge.read_frames(&mut dst), PcmPull::Eof, "EOF is stable");
 }
@@ -170,7 +180,10 @@ fn ring_wraps_without_losing_frames() {
     for i in 0..17u32 {
         let mut dst = vec![0.0f32; usize::from(CHANNELS)];
         assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(1));
-        assert!(dst.iter().all(|s| *s == i as f32), "frame {i} came back in order");
+        assert!(
+            dst.iter().all(|s| *s == i as f32),
+            "frame {i} came back in order"
+        );
     }
     producer.join().expect("producer exits");
     let mut dst = vec![0.0f32; usize::from(CHANNELS)];
@@ -197,7 +210,10 @@ fn steady_state_read_write_performs_zero_allocations() {
             assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(1));
         }
     });
-    assert_eq!(allocations, 0, "the steady-state edge performs no allocation");
+    assert_eq!(
+        allocations, 0,
+        "the steady-state edge performs no allocation"
+    );
 }
 
 /// Completion resolution truth: the session outcome combines the worker
@@ -209,10 +225,19 @@ fn completion_resolves_completed_only_from_eof_plus_drained() {
     assert_eq!(completion.try_resolve_now(), None);
 
     completion.worker_exited(qianqian_playback::EdgeTerminal::Eof);
-    assert_eq!(completion.try_resolve_now(), None, "EOF without drain is not completion");
+    assert_eq!(
+        completion.try_resolve_now(),
+        None,
+        "EOF without drain is not completion"
+    );
 
-    completion.drain_signal().complete(qianqian_core::ports::DrainVerdict::Drained);
-    assert_eq!(completion.try_resolve_now(), Some(SessionOutcome::Completed));
+    completion
+        .drain_signal()
+        .complete(qianqian_core::ports::DrainVerdict::Drained);
+    assert_eq!(
+        completion.try_resolve_now(),
+        Some(SessionOutcome::Completed)
+    );
 }
 
 #[test]
@@ -231,10 +256,14 @@ fn completion_reports_decode_failure_before_any_drain() {
 fn completion_reports_device_abort_as_failure() {
     let completion = SessionCompletion::new();
     completion.worker_exited(qianqian_playback::EdgeTerminal::Eof);
-    completion.drain_signal().complete(qianqian_core::ports::DrainVerdict::Aborted);
+    completion
+        .drain_signal()
+        .complete(qianqian_core::ports::DrainVerdict::Aborted);
     assert_eq!(
         completion.try_resolve_now(),
-        Some(SessionOutcome::Failed { stage: "device".to_owned() }),
+        Some(SessionOutcome::Failed {
+            stage: "device".to_owned()
+        }),
         "an abort before drain is a device failure, never a fake completion"
     );
 }
@@ -247,7 +276,10 @@ fn wait_blocks_until_a_leg_publishes() {
         thread::spawn(move || completion.wait())
     };
     thread::sleep(Duration::from_millis(50));
-    assert!(!waiter.is_finished(), "wait blocks until the session resolves");
+    assert!(
+        !waiter.is_finished(),
+        "wait blocks until the session resolves"
+    );
     completion.decode_failed("test failure");
     assert!(matches!(
         waiter.join().expect("waiter exits"),

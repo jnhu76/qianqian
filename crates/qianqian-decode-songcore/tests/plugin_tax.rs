@@ -27,10 +27,7 @@ fn fixtures_dir() -> PathBuf {
 }
 
 fn load_fixture(id: &str) -> (ReferenceFixture, PathBuf) {
-    let fx = ReferenceFixture::load(
-        &fixtures_dir().parent().unwrap().join("reference.json"),
-        id,
-    );
+    let fx = ReferenceFixture::load(&fixtures_dir().parent().unwrap().join("reference.json"), id);
     let path = fixtures_dir().join(&fx.file);
     fx.verify_file_identity(&path);
     (fx, path)
@@ -72,7 +69,12 @@ impl RawFfi {
         let mut dst = vec![0.0f32; BLOCK_FRAMES * self.channels];
         let mut produced = 0u64;
         let status = unsafe {
-            sys::song_read_pcm(self.handle, dst.as_mut_ptr(), BLOCK_FRAMES as u64, &mut produced)
+            sys::song_read_pcm(
+                self.handle,
+                dst.as_mut_ptr(),
+                BLOCK_FRAMES as u64,
+                &mut produced,
+            )
         };
         (produced as usize, status == sys::SONG_EOF)
     }
@@ -186,8 +188,10 @@ fn plugin_endpoint_vs_raw_ffi_steady_decode() {
             f64::INFINITY
         };
 
-        println!("{id}: raw FFI median {raw_med} us, plugin median {plugin_med} us, \
-                  delta {delta_pct:+.1}%, noise band (IQR) {noise_band:.1}%");
+        println!(
+            "{id}: raw FFI median {raw_med} us, plugin median {plugin_med} us, \
+                  delta {delta_pct:+.1}%, noise band (IQR) {noise_band:.1}%"
+        );
 
         // The gate is informational + bounded: the endpoint must not add a
         // systematic cost far outside the run's own noise. A failure here

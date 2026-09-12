@@ -56,7 +56,10 @@ impl PcmEdge {
     /// A bounded, preallocated edge for interleaved float32 frames.
     pub fn new(channels: u16, capacity_frames: usize) -> Self {
         assert!(channels > 0, "an edge without channels cannot exist");
-        assert!(capacity_frames > 0, "an unbounded or empty edge is not an edge");
+        assert!(
+            capacity_frames > 0,
+            "an unbounded or empty edge is not an edge"
+        );
         Self {
             channels: usize::from(channels),
             capacity_samples: capacity_frames * usize::from(channels),

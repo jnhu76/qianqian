@@ -36,7 +36,10 @@ fn run(args: Vec<String>) -> ExitCode {
         .expect("output plugin registers");
     let completion = SessionCompletion::new();
     runtime
-        .register_component(playback_session_spec(PathBuf::from(file), completion.clone()))
+        .register_component(playback_session_spec(
+            PathBuf::from(file),
+            completion.clone(),
+        ))
         .expect("session registers");
 
     if let Err(errors) = runtime.revise_desired(vec![
