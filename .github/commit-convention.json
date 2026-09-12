@@ -1,0 +1,29 @@
+{
+  "types": [
+    "feat",
+    "fix",
+    "refactor",
+    "perf",
+    "test",
+    "docs",
+    "build",
+    "ci",
+    "chore",
+    "revert"
+  ],
+  "require_scope": true,
+  "scope_pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+  "forbidden_scope_patterns": [
+    "^e\\d+[a-z]*$",
+    "^b\\d+$",
+    "^phase(?:-.+)?$",
+    "^stage(?:-.+)?$",
+    "^round(?:-.+)?$"
+  ],
+  "header_max_length": 72,
+  "subject_pattern": "^[a-z0-9]",
+  "forbidden_subject_suffixes": [
+    ".",
+    "。"
+  ]
+}
