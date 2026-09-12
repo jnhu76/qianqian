@@ -31,8 +31,11 @@ mkdir -p "$DOWNLOADS"
 
 # Re-verify the pinned tag still points at the pinned commit when network allows.
 PROXY="${QIANQIAN_FETCH_PROXY:-${https_proxy:-}}"
-proxy_env="https_proxy=$PROXY http_proxy=$PROXY"
-if remote_commit=$(eval "$proxy_env git ls-remote https://github.com/FFmpeg/FFmpeg 'refs/tags/$TAG^{}'" 2>/dev/null | awk '{print $1}') && [[ -n "$remote_commit" ]]; then
+proxy_cmd=()
+if [[ -n "$PROXY" ]]; then
+  proxy_cmd=(env https_proxy="$PROXY" http_proxy="$PROXY")
+fi
+if remote_commit=$("${proxy_cmd[@]}" git ls-remote https://github.com/FFmpeg/FFmpeg "refs/tags/$TAG^{}" 2>/dev/null | awk '{print $1}') && [[ -n "$remote_commit" ]]; then
   if [[ "$remote_commit" != "$EXPECT_COMMIT" ]]; then
     echo "FATAL: upstream tag $TAG now points to $remote_commit, pin says $EXPECT_COMMIT" >&2
     exit 1
@@ -53,7 +56,7 @@ fi
 
 if [[ ! -f "$ZIP" ]]; then
   echo "downloading $URL"
-  eval "$proxy_env curl -sL --max-time 600 -o '$ZIP' '$URL'"
+  "${proxy_cmd[@]}" curl -sL --max-time 600 -o "$ZIP" "$URL"
 fi
 
 actual_sha=$(sha256sum "$ZIP" | awk '{print $1}')
