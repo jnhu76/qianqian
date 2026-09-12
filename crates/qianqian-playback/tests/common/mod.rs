@@ -38,6 +38,10 @@ pub enum SourceBehavior {
     EofAfter(usize),
     /// Produce `n` frames, then fail.
     FailAfter(usize),
+    /// Produce `n` frames fast, then pace one frame per `delay` — models
+    /// a decode side that is slower than the consumer, so the render leg
+    /// is genuinely blocked mid-playback on an empty edge.
+    Paced { after: usize, delay: Duration },
 }
 
 pub struct TestDecode {
@@ -46,13 +50,15 @@ pub struct TestDecode {
 
 impl PcmDecode for TestDecode {
     fn open_source(&self, _path: &std::path::Path) -> Result<Box<dyn PcmSource>, DecodeOpenError> {
-        let (n, fail) = match self.behavior {
-            SourceBehavior::EofAfter(n) => (n, false),
-            SourceBehavior::FailAfter(n) => (n, true),
+        let (n, fail, pace) = match self.behavior {
+            SourceBehavior::EofAfter(n) => (n, false, None),
+            SourceBehavior::FailAfter(n) => (n, true, None),
+            SourceBehavior::Paced { after, delay } => (after, false, Some(delay)),
         };
         Ok(Box::new(TestSource {
             remaining: n,
             fail_after: fail,
+            pace_delay: pace,
             format: TEST_FORMAT,
         }))
     }
@@ -61,6 +67,7 @@ impl PcmDecode for TestDecode {
 struct TestSource {
     remaining: usize,
     fail_after: bool,
+    pace_delay: Option<Duration>,
     format: PcmFormat,
 }
 
@@ -76,7 +83,12 @@ impl PcmSource for TestSource {
                     message: "test decode failure".to_owned(),
                 });
             }
-            return Ok(DecodeOutcome::Eof);
+            if let Some(delay) = self.pace_delay {
+                std::thread::sleep(delay);
+                self.remaining = 1; // one paced frame per call, forever
+            } else {
+                return Ok(DecodeOutcome::Eof);
+            }
         }
         let channels = usize::from(self.format.channels);
         let n = (dst.len() / channels).min(self.remaining).max(1);

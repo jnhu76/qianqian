@@ -189,9 +189,14 @@ fn stopping_a_playing_session_disposes_promptly_without_leaks() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
         let completion = SessionCompletion::new();
-        // Huge source: playback would run far longer than the test.
+        // Paced source: after a fast prefix the decode side produces one
+        // frame per 100 ms, so the consumer is genuinely blocked mid-play
+        // on an empty edge when stop arrives.
         let mut runtime = registered_runtime(
-            SourceBehavior::EofAfter(44100 * 3600),
+            SourceBehavior::Paced {
+                after: 4 * 1024,
+                delay: Duration::from_millis(100),
+            },
             OutputBehavior::Consume,
             completion.clone(),
         );
