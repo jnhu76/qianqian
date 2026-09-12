@@ -329,5 +329,9 @@ negotiated   44100 Hz, 2 ch, mask 0x3 — Tier 1 direct, shared mode,
              event-driven, 970-frame device buffer (Realtek endpoint)
 program      EOF "played out completely" (padding drained to zero),
              exit code 0, quiet disposal          — both fixtures
-audible      program evidence complete; human confirmation requested
+audible      YES — human-confirmed on the fixtures and re-confirmed on a
+             full-length real song (张韶涵《隐形的翅膀》mp3, complete file,
+             natural EOF, exit 0)
 ```
+
+Verdict: **FIRST_AUDIBLE_SLICE = PASS** (human-confirmed 2026-09-12).
