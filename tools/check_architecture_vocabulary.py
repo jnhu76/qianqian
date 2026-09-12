@@ -1,74 +1,35 @@
 #!/usr/bin/env python3
 """Architecture vocabulary drift gate.
 
-Scans current production code and derived documentation for stale
-architecture identifiers that were retired by ADR-PBK-002.
+Scans current production code, active automation, and derived documentation
+for high-confidence stale architecture identifiers retired by ADR-PBK-002.
+Historical evidence is intentionally excluded when rewriting it would falsify
+provenance.
 
-Usage:
-    python3 tools/check_architecture_vocabulary.py
-
-Exit 0 = PASS, Exit 1 = FAIL (stale identifiers found).
-
-Scope:
-    - .rs, .toml, .md, .yml, .yaml, .py, .sh, .ts, .js files
-    - Excludes: .git/, target/, docs/archive/, historical evidence dirs
-
-This script uses only the Python standard library.
+Exit 0 = PASS, Exit 1 = FAIL.
+Uses only the Python standard library.
 """
+
+from __future__ import annotations
 
 import os
 import re
 import sys
+import tempfile
+from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Stale identifiers: high-confidence signals of vocabulary drift
-# ---------------------------------------------------------------------------
-
-# Package names (exact match in Cargo.toml or import paths)
-STALE_PACKAGES = [
-    "qianqian-kernel",
-    "qianqian_kernel",
-    "qianqian-core",
-    "qianqian_core",
-    "qianqian-runtime",
-    "qianqian_runtime",
-]
-
-# Type identifiers (word-boundary match in Rust code)
-STALE_TYPES = [
-    r"\bAppRuntime\b",
-    # Kernel as standalone type — but NOT CompositionKernel, MusicKernel,
-    # TransportKernel, or inside comments/historical prose
-    # We match: use ... Kernel, Kernel::, : Kernel, -> Kernel
-    # But NOT: CompositionKernel, MusicKernel, TransportKernel
-]
-
-# Patterns that indicate stale type usage in Rust code (import/type contexts)
-STALE_RUST_PATTERNS = [
-    # Standalone Kernel type in use statements or type annotations
-    # Match "Kernel" not preceded by "Composition" and not followed by "s"
-    (r"(?<!Composition)(?<!Music)(?<!Transport)\bKernel\b(?!s)", "standalone Kernel type"),
-    (r"\bAppRuntime\b", "AppRuntime type"),
-]
-
-# In Cargo.toml: old package names
 STALE_CARGO_TOML = [
     (r'^name\s*=\s*"qianqian-kernel"', "old package name qianqian-kernel"),
     (r'^name\s*=\s*"qianqian-core"', "old package name qianqian-core"),
     (r'^name\s*=\s*"qianqian-runtime"', "old package name qianqian-runtime"),
 ]
 
-# In .rs files: old import paths
 STALE_RS_IMPORTS = [
     (r"\buse\s+qianqian_kernel\b", "old import path qianqian_kernel"),
     (r"\buse\s+qianqian_core\b", "old import path qianqian_core"),
     (r"\buse\s+qianqian_runtime\b", "old import path qianqian_runtime"),
 ]
 
-# Standalone Kernel type: only match in code contexts (not prose comments)
-# Match: Kernel::new, Kernel, (Kernel), : Kernel, -> Kernel
-# But NOT inside doc comments (//! or ///) where "Kernel" is part of
-# "Composition Kernel" prose
 STALE_RS_KERNEL_TYPE = [
     (r"(?<!Composition)(?<!Music)(?<!Transport)(?<!\")\bKernel::", "standalone Kernel:: call"),
     (r"= Kernel::new", "= Kernel::new constructor"),
@@ -77,18 +38,32 @@ STALE_RS_KERNEL_TYPE = [
     (r"\(Kernel\)", "(Kernel) type"),
     (r"\bKernel,\s*Revision", "Kernel in import list"),
     (r"\bKernel,\s*StepOutcome", "Kernel in import list"),
+    (r"\bAppRuntime\b", "AppRuntime type"),
 ]
 
-# In .toml files: old dependency references
 STALE_TOML_DEPS = [
     (r"qianqian-kernel\s*=", "old dependency qianqian-kernel"),
     (r"qianqian-core\s*=", "old dependency qianqian-core"),
     (r"qianqian-runtime\s*=", "old dependency qianqian-runtime"),
 ]
 
-# ---------------------------------------------------------------------------
-# Exclusions: paths where historical names are allowed
-# ---------------------------------------------------------------------------
+STALE_TEXT_REFERENCES = [
+    (r"crates/qianqian-kernel", "stale crate path"),
+    (r"crates/qianqian-core", "stale crate path"),
+    (r"crates/qianqian-runtime", "stale crate path"),
+    (r"qianqian_kernel::", "stale crate import in doc/script"),
+    (r"qianqian_core::", "stale crate import in doc/script"),
+    (r"qianqian_runtime::", "stale crate import in doc/script"),
+    (r"-p qianqian-kernel", "stale cargo -p reference"),
+    (r"-p qianqian-core", "stale cargo -p reference"),
+    (r"-p qianqian-runtime", "stale cargo -p reference"),
+    (r"qianqian-kernel\s*=", "stale dependency spec"),
+    (r"qianqian-core\s*=", "stale dependency spec"),
+    (r"qianqian-runtime\s*=", "stale dependency spec"),
+    (r"name\s*=\s*\"qianqian-kernel\"", "stale package name"),
+    (r"name\s*=\s*\"qianqian-core\"", "stale package name"),
+    (r"name\s*=\s*\"qianqian-runtime\"", "stale package name"),
+]
 
 EXCLUDE_DIRS = {
     ".git",
@@ -98,111 +73,120 @@ EXCLUDE_DIRS = {
     "dist",
 }
 
+# Narrow historical exclusions only. Active .github workflows are deliberately
+# scanned because CI/build automation is part of the current execution surface.
 EXCLUDE_PATH_SUBSTRINGS = [
     "docs/archive/",
     "playback_temporal_traces/",
     "evidence/",
-    ".github/",
 ]
 
-# Files where old names are intentional historical references
 EXCLUDE_FILES = {
-    "ADR-PBK-001.md",                      # historical authority, amended by PBK-002
-    "history.md",                           # historical record pages
-    "check_architecture_vocabulary.py",     # self (contains regex patterns for old names)
+    "ADR-PBK-001.md",
+    "history.md",
+    "check_architecture_vocabulary.py",
 }
 
+SCANNABLE_EXTENSIONS = {".rs", ".toml", ".md", ".yml", ".yaml", ".py", ".sh", ".ts", ".js"}
 
-def should_exclude(filepath):
-    """Check if this file should be excluded from scanning."""
+
+def should_exclude(filepath: str) -> bool:
     parts = filepath.split(os.sep)
-    for d in EXCLUDE_DIRS:
-        if d in parts:
-            return True
-    for sub in EXCLUDE_PATH_SUBSTRINGS:
-        if sub in filepath:
-            return True
-    basename = os.path.basename(filepath)
-    if basename in EXCLUDE_FILES:
+    if any(directory in parts for directory in EXCLUDE_DIRS):
         return True
-    return False
+    if any(fragment in filepath for fragment in EXCLUDE_PATH_SUBSTRINGS):
+        return True
+    return os.path.basename(filepath) in EXCLUDE_FILES
 
 
-def scan_file(filepath, stale_patterns):
-    """Scan a single file for stale identifiers."""
+def scan_file(filepath: str, stale_patterns: list[tuple[str, str]]):
     violations = []
     try:
-        with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-            for lineno, line in enumerate(f, 1):
+        with open(filepath, "r", encoding="utf-8", errors="replace") as handle:
+            for lineno, line in enumerate(handle, 1):
                 for pattern, description in stale_patterns:
                     if re.search(pattern, line):
                         violations.append((filepath, lineno, description, line.rstrip()))
-    except (OSError, UnicodeDecodeError):
+    except OSError:
         pass
     return violations
 
 
-def find_files(root):
-    """Find all scannable files under root."""
-    extensions = {".rs", ".toml", ".md", ".yml", ".yaml", ".py", ".sh", ".ts", ".js"}
+def find_files(root: str):
     for dirpath, dirnames, filenames in os.walk(root):
-        # Prune excluded directories in-place
         dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
-        for fname in filenames:
-            _, ext = os.path.splitext(fname)
-            if ext in extensions:
-                yield os.path.join(dirpath, fname)
+        for filename in filenames:
+            if Path(filename).suffix in SCANNABLE_EXTENSIONS:
+                yield os.path.join(dirpath, filename)
 
 
-def main():
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    all_violations = []
+def patterns_for(filepath: str):
+    ext = Path(filepath).suffix
+    if ext == ".toml":
+        return STALE_CARGO_TOML + STALE_TOML_DEPS
+    if ext == ".rs":
+        return STALE_RS_IMPORTS + STALE_RS_KERNEL_TYPE
+    return STALE_TEXT_REFERENCES
 
+
+def collect_violations(root: str):
+    violations = []
     for filepath in find_files(root):
         if should_exclude(filepath):
             continue
+        violations.extend(scan_file(filepath, patterns_for(filepath)))
+    return violations
 
-        _, ext = os.path.splitext(filepath)
 
-        if ext == ".toml":
-            all_violations.extend(scan_file(filepath, STALE_CARGO_TOML + STALE_TOML_DEPS))
-        elif ext == ".rs":
-            all_violations.extend(scan_file(filepath, STALE_RS_IMPORTS + STALE_RS_KERNEL_TYPE))
-        elif ext in {".md", ".yml", ".yaml", ".py", ".sh", ".ts", ".js"}:
-            # In docs/scripts: check for stale package names in path-like contexts
-            # (crates/ prefix, :: separators, Cargo.toml references, dependency specs)
-            # NOT bare prose mentions (which may be intentional historical references)
-            all_violations.extend(scan_file(filepath, [
-                (r"crates/qianqian-kernel", "stale crate path"),
-                (r"crates/qianqian-core", "stale crate path"),
-                (r"crates/qianqian-runtime", "stale crate path"),
-                (r"qianqian_kernel::", "stale crate import in doc/script"),
-                (r"qianqian_core::", "stale crate import in doc/script"),
-                (r"qianqian_runtime::", "stale crate import in doc/script"),
-                (r"-p qianqian-kernel", "stale cargo -p reference"),
-                (r"-p qianqian-core", "stale cargo -p reference"),
-                (r"-p qianqian-runtime", "stale cargo -p reference"),
-                (r"qianqian-kernel\s*=", "stale dependency spec"),
-                (r"qianqian-core\s*=", "stale dependency spec"),
-                (r"qianqian-runtime\s*=", "stale dependency spec"),
-                (r"name\s*=\s*\"qianqian-kernel\"", "stale package name"),
-                (r"name\s*=\s*\"qianqian-core\"", "stale package name"),
-                (r"name\s*=\s*\"qianqian-runtime\"", "stale package name"),
-            ]))
+def run_negative_control() -> None:
+    """Prove an active workflow stale-name mutation is caught, then clears."""
+    with tempfile.TemporaryDirectory() as tmp:
+        workflow_dir = Path(tmp) / ".github" / "workflows"
+        workflow_dir.mkdir(parents=True)
+        workflow = workflow_dir / "negative-control.yml"
 
-    if all_violations:
-        print(f"VOCABULARY GATE FAIL: {len(all_violations)} stale identifier(s) found\n")
-        for filepath, lineno, desc, line in all_violations:
-            # Show path relative to root
+        if should_exclude(str(workflow)):
+            raise AssertionError("active .github workflow must not be excluded")
+
+        workflow.write_text(
+            "name: negative-control\njobs:\n  test:\n    steps:\n      - run: cargo test -p qianqian-kernel\n",
+            encoding="utf-8",
+        )
+        bad = collect_violations(tmp)
+        if not any("qianqian-kernel" in line for _, _, _, line in bad):
+            raise AssertionError("negative control was not detected")
+
+        workflow.write_text(
+            "name: negative-control\njobs:\n  test:\n    steps:\n      - run: cargo test -p qianqian-composition\n",
+            encoding="utf-8",
+        )
+        good = collect_violations(tmp)
+        if good:
+            raise AssertionError(f"corrected negative control still fails: {good}")
+
+
+def main() -> int:
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    try:
+        run_negative_control()
+    except AssertionError as exc:
+        print(f"VOCABULARY GATE SELF-TEST FAIL: {exc}")
+        return 1
+
+    violations = collect_violations(root)
+    if violations:
+        print(f"VOCABULARY GATE FAIL: {len(violations)} stale identifier(s) found\n")
+        for filepath, lineno, description, line in violations:
             relpath = os.path.relpath(filepath, root)
-            print(f"  {relpath}:{lineno}: [{desc}]")
+            print(f"  {relpath}:{lineno}: [{description}]")
             print(f"    {line}")
-        print(f"\nSee ADR-PBK-002 for canonical vocabulary.")
-        sys.exit(1)
-    else:
-        print("VOCABULARY GATE PASS: no stale identifiers found")
-        sys.exit(0)
+        print("\nSee ADR-PBK-002 for canonical vocabulary.")
+        return 1
+
+    print("VOCABULARY GATE PASS: no stale identifiers found; workflow negative control FAIL→PASS verified")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
