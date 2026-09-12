@@ -1296,15 +1296,15 @@ publication != reclamation certificate  （P4）
 
 # 18. Post-acceptance Vocabulary Amendment
 
-> **Added by ADR-PBK-002 (PROPOSED).** This section records vocabulary canonicalization decisions that amend ADR-PBK-001's historical terminology without changing its semantic responsibilities.
+> **Added by ADR-PBK-002 (ACCEPTED).** This section records vocabulary canonicalization decisions that amend ADR-PBK-001's historical terminology without changing its semantic responsibilities. ADR-PBK-002 governs current vocabulary; the older nouns above remain decision history.
 
 ADR-PBK-002 canonicalizes:
 
-| ADR-PBK-001 term | Current canonical term | Scope |
+| ADR-PBK-001 / historical term | Current canonical term | Scope |
 |---|---|---|
 | Host (Composition Host / Application Host) | **Qianqian App** (`QianqianApp`, `qianqian-app`) | architecture noun, code type, crate |
 | Base Kernel / Base Composition Kernel / Composition Kernel | **Composition Kernel (K0)** (`CompositionKernel`, `qianqian-composition`) | architecture noun, code type, crate |
-| qianqian-audio-api (shared contracts crate) | **Audio API** (`qianqian-audio-api`) | crate |
+| `qianqian-core` (historical shared contracts crate) | **Audio API** (`qianqian-audio-api`) | crate |
 | `Kernel` (standalone type) | `CompositionKernel` | code type |
 | `AppRuntime` | `QianqianApp` | code type |
 
