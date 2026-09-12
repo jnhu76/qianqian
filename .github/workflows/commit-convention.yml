@@ -1,0 +1,41 @@
+name: Commit Convention
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  validate:
+    name: Validate commit messages and PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout trusted base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 1
+
+      - name: Self-test checker
+        run: python3 tools/check_commit_convention.py --self-test
+
+      - name: Validate PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: python3 tools/check_commit_convention.py --message "$PR_TITLE" --label "PR title"
+
+      - name: Fetch commit subjects
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/commits?per_page=100" \
+            --jq '.[] | [.sha, (.commit.message | split("\n")[0])] | @tsv' \
+            > "$RUNNER_TEMP/commit-subjects.tsv"
+
+      - name: Validate commit subjects
+        run: python3 tools/check_commit_convention.py --records-file "$RUNNER_TEMP/commit-subjects.tsv"
