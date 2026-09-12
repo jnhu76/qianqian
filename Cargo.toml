@@ -7,6 +7,7 @@ members = [
     "crates/qianqian-runtime",
 ]
 exclude = [
+    "crates/qianqian-decode-songcore",
     "crates/qianqian-songcore-sys",
     "experiments/songcore-call-comparison",
 ]

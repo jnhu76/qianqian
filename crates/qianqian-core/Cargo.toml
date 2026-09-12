@@ -3,8 +3,9 @@ name = "qianqian-core"
 version.workspace = true
 edition.workspace = true
 
-# Test-only: the direct PCM flow experiment composes its participants
-# through the real generic kernel. The kernel keeps its own dependency table
-# empty (its firewall test enforces that), so this direction is safe.
-[dev-dependencies]
+# The ports module hosts capability contract definition sites, which bind
+# kernel `Capability` keys to their service traits. The kernel keeps its own
+# dependency table empty (its firewall test enforces that), so this
+# direction is safe.
+[dependencies]
 qianqian-kernel = { path = "../qianqian-kernel" }
