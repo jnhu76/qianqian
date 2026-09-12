@@ -112,7 +112,7 @@ FFmpeg 类型不跨组件缝
 已发布的 FFmpeg 制品
 ```
 
-已于 2026-09-07 核验:当前 main 不含 FFmpeg crate、不含 FFmpeg 构建配方、不含解码器实现;仅有的出现是一处文档注释(`crates/qianqian-runtime/src/lib.rs:8`)和一处能力命名测试字符串(`crates/qianqian-kernel/tests/adversarial_review.rs:372`)。
+已于 2026-09-07 核验:当前 main 不含 FFmpeg crate、不含 FFmpeg 构建配方、不含解码器实现;仅有的出现是一处文档注释(`crates/qianqian-app/src/lib.rs:8`)和一处能力命名测试字符串(`crates/qianqian-composition/tests/adversarial_review.rs:372`)。
 
 ---
 

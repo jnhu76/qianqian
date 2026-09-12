@@ -53,10 +53,10 @@ Phase F  playback semantics
 
 ## 3. Harness
 
-Test-only; no `qianqian-core` library API is added or changed.
+Test-only; no `qianqian-audio-api` library API is added or changed.
 
 ```text
-crates/qianqian-core/tests/pcm_edge_contract/
+crates/qianqian-audio-api/tests/pcm_edge_contract/
     main.rs             instrumentation + scenario tests + compile-fail runner
     harness.rs          types + deterministic sample oracle (fail-closed construction)
     candidates.rs       four candidate edge shapes (semantic names)
@@ -67,7 +67,7 @@ crates/qianqian-core/tests/pcm_edge_contract/
 Run:
 
 ```bash
-cargo test -p qianqian-core --test pcm_edge_contract
+cargo test -p qianqian-audio-api --test pcm_edge_contract
 ```
 
 Key types (`harness.rs`):
@@ -258,7 +258,7 @@ Issue #12 (SRC/DSP research) consumes this evidence under real decoder/device pr
 
 The first draft of this PR was audited adversarially; this revision corrects:
 
-1. **Production API contamination:** the harness lived at `qianqian-core/src/pcm_contract_a0.rs` behind `pub mod` — a real library API surface regardless of "experimental" comments. Moved to `tests/pcm_edge_contract/` (production src delta vs `main` is zero).
+1. **Production API contamination:** the harness lived at `qianqian-audio-api/src/pcm_contract_a0.rs` behind `pub mod` — a real library API surface regardless of "experimental" comments. Moved to `tests/pcm_edge_contract/` (production src delta vs `main` is zero).
 2. **compile_fail that never ran:** a doc-comment `compile_fail` inside `#[cfg(test)]` is not collected by rustdoc (CI: "running 0 tests"). Replaced with executed `rustc`-subprocess fixtures plus positive control and a recorded sensitivity check.
 3. **Silent truncation:** `scalars / channel_count` discarded trailing partial scalars while comments claimed whole frames. Construction is now fail-closed (`TrailingScalar`), and zero-channel formats are unconstructable.
 4. **Cross-frame aliasing:** `index = frame * channels + channel` without a channel bound let stereo channel 2 read frame 1 channel 0 while docs claimed a panic. Access is now checked (`Option`), and the adversarial tests pin the boundary.

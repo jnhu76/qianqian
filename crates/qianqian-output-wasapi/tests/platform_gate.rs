@@ -2,9 +2,9 @@
 //! Windows, and fails its activation loudly on every other platform —
 //! never a fake success, never a silent null output.
 
-use qianqian_kernel::{DesiredEntry, FiberState, Revision};
+use qianqian_app::QianqianApp;
+use qianqian_composition::{DesiredEntry, FiberState, Revision};
 use qianqian_output_wasapi::wasapi_output_plugin;
-use qianqian_runtime::AppRuntime;
 
 fn desired_plugin(id: &str) -> DesiredEntry {
     DesiredEntry::enabled(id, "wasapi_output_plugin", Revision::new(1))
@@ -13,7 +13,7 @@ fn desired_plugin(id: &str) -> DesiredEntry {
 #[cfg(not(windows))]
 #[test]
 fn non_windows_activation_fails_loudly_without_ghost_provisions() {
-    let mut runtime = AppRuntime::new();
+    let mut runtime = QianqianApp::new();
     runtime
         .register_component(wasapi_output_plugin())
         .expect("legal");
@@ -48,7 +48,7 @@ fn non_windows_activation_fails_loudly_without_ghost_provisions() {
 #[cfg(windows)]
 #[test]
 fn windows_activation_publishes_the_capability() {
-    let mut runtime = AppRuntime::new();
+    let mut runtime = QianqianApp::new();
     runtime
         .register_component(wasapi_output_plugin())
         .expect("legal");

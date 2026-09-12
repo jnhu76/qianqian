@@ -41,9 +41,9 @@ architectures:
       - pr: 71
 
     evidence:
-      - crates/qianqian-kernel/tests
-      - crates/qianqian-core/src
-      - crates/qianqian-runtime/src
+      - crates/qianqian-composition/tests
+      - crates/qianqian-audio-api/src
+      - crates/qianqian-app/src
 
   - id: ARCH-002
     name: Base Kernel K0
@@ -68,7 +68,7 @@ architectures:
       - pr: 71
 
     evidence:
-      - crates/qianqian-kernel/tests
+      - crates/qianqian-composition/tests
 
   - id: ARCH-003
     name: Playback Foundations
@@ -112,9 +112,9 @@ architectures:
       - specs/playback/PlaybackTemporal.tla
       - specs/playback/PlaybackOwnership.tla
       - specs/playback/README.md
-      - crates/qianqian-core/tests/playback_temporal_traces/main.rs
-      - crates/qianqian-core/tests/playback_temporal_traces/music.rs
-      - crates/qianqian-core/tests/playback_temporal_traces/transport.rs
+      - crates/qianqian-audio-api/tests/playback_temporal_traces/main.rs
+      - crates/qianqian-audio-api/tests/playback_temporal_traces/music.rs
+      - crates/qianqian-audio-api/tests/playback_temporal_traces/transport.rs
       # Historical v1 diagram of the superseded playback-kernel model; kept as
       # historical artifact, referenced by no current authority.
       - docs/architecture/diagrams/ARCH-003-playback-kernel-v1.mmd
@@ -144,7 +144,7 @@ architectures:
 
     evidence:
       - docs/architecture/component-boundary-a0.md
-      - crates/qianqian-core/src/ports.rs
+      - crates/qianqian-audio-api/src/ports.rs
 
   - id: ARCH-005
     name: Control Plane vs Data Plane
@@ -169,7 +169,7 @@ architectures:
       - pr: 71
 
     evidence:
-      - crates/qianqian-kernel/tests
+      - crates/qianqian-composition/tests
 
   - id: ARCH-006
     name: Provider Withdrawal
@@ -194,7 +194,7 @@ architectures:
       - pr: 71
 
     evidence:
-      - crates/qianqian-kernel/tests
+      - crates/qianqian-composition/tests
 
   - id: ARCH-007
     name: FFmpeg Closure

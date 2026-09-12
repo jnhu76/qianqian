@@ -118,7 +118,7 @@ $$
 
 | 制品 | 状态 |
 |------|------|
-| `crates/qianqian-kernel` | 已实现 |
+| `crates/qianqian-composition` | 已实现 |
 | 测试数量 | 70 内核(75 workspace) |
 | 测试通过 | 合并时 (743eb86) |
 | 对抗性 oracle | A1–A21 |
@@ -127,6 +127,6 @@ $$
   :authority="['docs/architecture/composition-kernel-0-design.md', 'docs/architecture/composition-kernel-0-implementation-adr.md']"
   :decisions="[{ issue: 67 }, { pr: 68 }, { pr: 69 }]"
   :implementation="[{ issue: 70 }, { pr: 71 }]"
-  :evidence="['crates/qianqian-kernel/tests']"
+  :evidence="['crates/qianqian-composition/tests']"
   lastVerified="743eb86"
 />

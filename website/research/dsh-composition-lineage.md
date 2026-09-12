@@ -85,7 +85,7 @@ flowchart TD
     B -->|"历史 Level-0 建议"| C["#53 组件边界审计"]
     C -->|"已接受的边界权威"| D["#67 Composition Kernel 语义"]
     D -->|"实现门槛"| E["#70 / PR #71"]
-    E -->|"当前实现"| F["qianqian-kernel"]
+    E -->|"当前实现"| F["qianqian-composition"]
 ```
 
 | 步骤 | 状态(2026-09-07 核验) |
@@ -94,7 +94,7 @@ flowchart TD
 | #53 COMPONENT-BOUNDARY-A0 | CLOSED/PASS —— 已接受的审计,经 PR #66 合并(`component-boundary-a0.md`) |
 | #67 COMPOSITION-KERNEL-0 design | CLOSED —— 语义设计经 PR #68 合并(+ PR #69 Corrective-4) |
 | #70 COMPOSITION-KERNEL-0 implementation | OPEN issue;实现 PR #71 **MERGED**(`743eb862`) |
-| `crates/qianqian-kernel` | main 上的当前实现(Context / Capability / Fiber / Effect / Reconcile) |
+| `crates/qianqian-composition` | main 上的当前实现(Context / Capability / Fiber / Effect / Reconcile) |
 
 这**不**意味着 Qianqian 采纳了整个 DSH 运行时模型 —— 见下文当前边界。
 
@@ -106,12 +106,12 @@ flowchart TD
 
 | 想法 | 当前状态 | 证据 |
 |------|----------|------|
-| 显式组合权威 | 已采纳 / 演化为 Kernel | `crates/qianqian-kernel/src/kernel.rs`(`Kernel`、`set_desired`、`settle`) |
-| 能力/依赖可达性 | 已在 K0 实现 | `crates/qianqian-kernel/src/context.rs`(`ActivationCtx::resolve`)+ `capability.rs` |
-| Fiber 生命周期 | 已在 K0 实现 | `crates/qianqian-kernel/src/fiber.rs`(`FiberState`) |
-| 拥有的 Effect 生命周期 | 已在 K0 实现 | `crates/qianqian-kernel/src/kernel.rs`(`EffectHandle`、LIFO 展开) |
-| 期望 → 运行 Reconcile | 已在 K0 实现 | `crates/qianqian-kernel/src/desired.rs` + `Kernel::step/settle/is_quiet` |
-| 变更历史后的合流性 | 已实现 + 已测试 | `crates/qianqian-kernel/tests/confluence_oracles.rs`(70 内核 / 75 workspace 测试,`743eb862`) |
+| 显式组合权威 | 已采纳 / 演化为 Kernel | `crates/qianqian-composition/src/kernel.rs`(`Kernel`、`set_desired`、`settle`) |
+| 能力/依赖可达性 | 已在 K0 实现 | `crates/qianqian-composition/src/context.rs`(`ActivationCtx::resolve`)+ `capability.rs` |
+| Fiber 生命周期 | 已在 K0 实现 | `crates/qianqian-composition/src/fiber.rs`(`FiberState`) |
+| 拥有的 Effect 生命周期 | 已在 K0 实现 | `crates/qianqian-composition/src/kernel.rs`(`EffectHandle`、LIFO 展开) |
+| 期望 → 运行 Reconcile | 已在 K0 实现 | `crates/qianqian-composition/src/desired.rs` + `Kernel::step/settle/is_quiet` |
+| 变更历史后的合流性 | 已实现 + 已测试 | `crates/qianqian-composition/tests/confluence_oracles.rs`(70 内核 / 75 workspace 测试,`743eb862`) |
 | 经 Context 传领域载荷 | 已否决 | AGENTS.md "Context is not a data bus";`CONTEXT.md` "Capability plane != Data plane" |
 | 逐块 PCM Context/注册表查找 | 已否决 | AGENTS.md "Realtime boundary"(仅预绑定数据边) |
 | 注册顺序当拓扑 | 已否决 | AGENTS.md "Interaction algebra"(显式排序;非可交换关系需要显式结构) |
@@ -129,6 +129,6 @@ flowchart TD
   :authority="['docs/architecture/composition-kernel-0-design.md']"
   :decisions="[{ issue: 47 }, { issue: 53 }, { issue: 67 }, { pr: 68 }]"
   :implementation="[{ issue: 70 }, { pr: 71 }]"
-  :evidence="['crates/qianqian-kernel/tests']"
+  :evidence="['crates/qianqian-composition/tests']"
   last-verified="GitHub issue/PR states + current main scan, 2026-09-07"
 />

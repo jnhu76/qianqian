@@ -6,7 +6,7 @@
 
 use std::sync::{Arc, Condvar, Mutex};
 
-use qianqian_core::ports::{PcmPull, RenderPcmInput};
+use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
 
 /// Why the producer stopped writing. Failure detail lives in the
 /// session-owned completion signal, not in the edge.

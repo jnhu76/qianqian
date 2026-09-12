@@ -13,7 +13,7 @@ mod common;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use qianqian_core::ports::{DecodeOutcome, PcmDecode};
+use qianqian_audio_api::ports::{DecodeOutcome, PcmDecode};
 use qianqian_decode_songcore::SongcoreDecode;
 use qianqian_songcore_sys as sys;
 

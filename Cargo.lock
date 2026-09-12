@@ -12,18 +12,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "qianqian-core"
+name = "qianqian-app"
 version = "0.1.0"
 dependencies = [
- "qianqian-kernel",
+ "qianqian-audio-api",
+ "qianqian-composition",
 ]
+
+[[package]]
+name = "qianqian-audio-api"
+version = "0.1.0"
+dependencies = [
+ "qianqian-composition",
+]
+
+[[package]]
+name = "qianqian-composition"
+version = "0.1.0"
 
 [[package]]
 name = "qianqian-decode-songcore"
 version = "0.1.0"
 dependencies = [
- "qianqian-core",
- "qianqian-kernel",
+ "qianqian-audio-api",
+ "qianqian-composition",
  "qianqian-songcore-sys",
 ]
 
@@ -31,25 +43,21 @@ dependencies = [
 name = "qianqian-headless"
 version = "0.1.0"
 dependencies = [
- "qianqian-core",
+ "qianqian-app",
+ "qianqian-audio-api",
+ "qianqian-composition",
  "qianqian-decode-songcore",
- "qianqian-kernel",
  "qianqian-output-wasapi",
  "qianqian-playback",
- "qianqian-runtime",
 ]
-
-[[package]]
-name = "qianqian-kernel"
-version = "0.1.0"
 
 [[package]]
 name = "qianqian-output-wasapi"
 version = "0.1.0"
 dependencies = [
- "qianqian-core",
- "qianqian-kernel",
- "qianqian-runtime",
+ "qianqian-app",
+ "qianqian-audio-api",
+ "qianqian-composition",
  "windows",
 ]
 
@@ -57,17 +65,9 @@ dependencies = [
 name = "qianqian-playback"
 version = "0.1.0"
 dependencies = [
- "qianqian-core",
- "qianqian-kernel",
- "qianqian-runtime",
-]
-
-[[package]]
-name = "qianqian-runtime"
-version = "0.1.0"
-dependencies = [
- "qianqian-core",
- "qianqian-kernel",
+ "qianqian-app",
+ "qianqian-audio-api",
+ "qianqian-composition",
 ]
 
 [[package]]

@@ -201,7 +201,7 @@ Do not create:
 
 RUST-ARCH-R0 APIs are bootstrap witnesses.
 
-`qianqian-core::base`, `AppRuntime::new()`, `with_audio_output()`, and similar R0 composition shapes are not compatibility contracts.
+`qianqian-audio-api::base`, `QianqianApp::new()`, `with_audio_output()`, and similar R0 composition shapes are not compatibility contracts.
 
 They may be redesigned as the Base Kernel K0 implementation (PR #71) replaces R0 bootstrap shapes.
 

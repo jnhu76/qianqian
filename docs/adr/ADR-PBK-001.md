@@ -881,8 +881,8 @@ realtime 执行模型细节（callback / blocking push / pull / worker / hybrid 
 当前仓库中已经存在：
 
 ```text
-qianqian-core::music
-qianqian-core::transport
+qianqian-audio-api::music
+qianqian-audio-api::transport
 playback_temporal_traces
 specs/playback/*
 ```
@@ -1109,7 +1109,7 @@ next                                依 §12 ladder 继续:机制裁决 / 真实
 
 本节只收口 vocabulary 与 architecture role 定义。它**不新增 invariant、不重写宪法、不冻结 representation**：与 §1–§2、§6 的 normative 契约冲突时，以其为准；本节不冻结任何 crate 映射、Plugin 粒度或机制表示。其它文档只引用本节定义，不得另立第二份 normative 词汇表。
 
-> **Architecture role != crate name.** 本节定义的都是语义角色；任何 crate 名（如 `qianqian-runtime`、`qianqian-realtime`）都不是某角色已被正确物理实现的证据，crate 物理归属另行审计。
+> **Architecture role != crate name.** 本节定义的都是语义角色；任何 crate 名（如 `qianqian-app`、`qianqian-realtime`）都不是某角色已被正确物理实现的证据，crate 物理归属另行审计。
 
 ## 16.1 Composition 侧
 
@@ -1291,3 +1291,23 @@ publication != reclamation certificate  （P4）
    —— P2 只定义“publish N+1 退役 N”；最后一个 view 无后继退役的语义未定义
 4. Production playback semantics 整体（§10 清单继续 OPEN）
 ```
+
+---
+
+# 18. Post-acceptance Vocabulary Amendment
+
+> **Added by ADR-PBK-002 (PROPOSED).** This section records vocabulary canonicalization decisions that amend ADR-PBK-001's historical terminology without changing its semantic responsibilities.
+
+ADR-PBK-002 canonicalizes:
+
+| ADR-PBK-001 term | Current canonical term | Scope |
+|---|---|---|
+| Host (Composition Host / Application Host) | **Qianqian App** (`QianqianApp`, `qianqian-app`) | architecture noun, code type, crate |
+| Base Kernel / Base Composition Kernel / Composition Kernel | **Composition Kernel (K0)** (`CompositionKernel`, `qianqian-composition`) | architecture noun, code type, crate |
+| qianqian-audio-api (shared contracts crate) | **Audio API** (`qianqian-audio-api`) | crate |
+| `Kernel` (standalone type) | `CompositionKernel` | code type |
+| `AppRuntime` | `QianqianApp` | code type |
+
+The semantic responsibilities remain unchanged. ADR-PBK-002 is authoritative for current vocabulary; this section preserves the amendment trace.
+
+Historical terms (`Host`, `MusicKernel`, `TransportKernel`, `Base Kernel`) may still appear in this ADR's historical rationale sections — they are retained as decision history, not as current authority.

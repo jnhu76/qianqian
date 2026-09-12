@@ -30,7 +30,7 @@ Output capability (WASAPI mechanism)
         ↓
 real Windows audio device
         ↓
-EOF / stop → join → release → AppRuntime::dispose()
+EOF / stop → join → release → QianqianApp::dispose()
 ```
 
 Deliberate non-scope (deferred, not missing): pause, resume, seek, next track,
@@ -160,15 +160,15 @@ Playback Session owns:  one DecodedPcmStream endpoint (one song_handle), the
 ## 3. DECISION — capabilities and crates
 
 Capability contracts are defined once, beside their service traits, in
-`qianqian-core::ports` (the contract definition site — capability identity is
+`qianqian-audio-api::ports` (the contract definition site — capability identity is
 this definition site). Contracts speak PCM, never FFmpeg/SongCore vendor
 vocabulary; no `AV*` type, SongCore struct, or FFmpeg enum appears in a
-public contract. `AudioOutputCapability` moves from `qianqian-runtime` to
+public contract. `AudioOutputCapability` moves from `qianqian-app` to
 `ports` so both providers and consumers depend on the contract, not on the
 composition root.
 
 ```text
-qianqian-core::ports       PcmFormat, PcmDecode + DecodedPcmStream, AudioOutput +
+qianqian-audio-api::ports       PcmFormat, PcmDecode + DecodedPcmStream, AudioOutput +
                            RenderStream + RenderPcmInput + DrainSignal,
                            capability keys
 qianqian-playback          bounded PcmEdge, Playback Session component,
@@ -180,7 +180,7 @@ qianqian-output-wasapi     Output provider; cfg(windows) mechanism,
                            non-Windows activation raises UnsupportedPlatform
                            (workspace member; compiles everywhere, activates
                            for real only on Windows)
-qianqian-headless          Host entry; `playback` feature gates the real
+qianqian-headless          App entry; `playback` feature gates the real
                            plugins so the default workspace build keeps
                            compiling without native artifacts
 ```
@@ -283,8 +283,8 @@ worker exits) → completion = Failed; device failure stops the edge (worker
 exits) → completion = Failed. Stop: the stop inverse covers producer-blocked
 (full edge), consumer-blocked (empty edge), and already-finished legs.
 
-The session completion handle is session-owned; the Host waits on it and
-then drives `AppRuntime::dispose()` explicitly. The Host never pumps PCM,
+The session completion handle is session-owned; the App waits on it and
+then drives `QianqianApp::dispose()` explicitly. The App never pumps PCM,
 decodes, or owns a render loop.
 
 ## 7. DECISION — Processing

@@ -6,8 +6,8 @@ publish = false
 description = "Playback Session: composes Decode + Output capabilities into one bounded playback episode"
 
 [dependencies]
-qianqian-core = { path = "../qianqian-core" }
-qianqian-kernel = { path = "../qianqian-kernel" }
+qianqian-audio-api = { path = "../qianqian-audio-api" }
+qianqian-composition = { path = "../qianqian-composition" }
 
 [dev-dependencies]
-qianqian-runtime = { path = "../qianqian-runtime" }
+qianqian-app = { path = "../qianqian-app" }

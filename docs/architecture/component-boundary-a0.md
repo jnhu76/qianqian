@@ -41,13 +41,13 @@ Playback architecture has since been reopened (2026-09 reset): neither the #53 p
 ```text
 BASE: dae8dba (main, clean)
 
-crates/qianqian-core
+crates/qianqian-audio-api
   base.rs          empty placeholder (no kernel concepts yet)
   music.rs         MusicKernel with PlaybackState {Idle,Ready,Playing,Paused,Ended}; state only
   ports.rs         three EMPTY capability-port traits: Decoder, Processing, AudioOutput
                    (authorized capability names + dependency direction only)
   presentation.rs  PlayerView/PlayerAction, PlaybackState -> PlayerView mapping
-crates/qianqian-runtime
+crates/qianqian-app
   AppRuntime       constructor-only composition: MusicKernel + Option<Box<dyn AudioOutput>>
 apps/headless      prints and constructs an empty runtime
 ```

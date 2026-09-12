@@ -54,7 +54,7 @@ status: VALIDATED
 |------|------|
 | 测试数量 | 70 项内核测试(75 项 workspace 测试) |
 | 全部通过 | 合并 commit `743eb86` |
-| 测试位置 | `crates/qianqian-kernel/tests` |
+| 测试位置 | `crates/qianqian-composition/tests` |
 | 对抗性 oracle | A1–A21(23 项测试) |
 | 实现 corrective-1 | `de46bd1`(P0-1..P1-5 修复 + A16–A20) |
 | 实现 corrective-2 | `048ebed`(review 5128815134) |
@@ -98,7 +98,7 @@ Base Kernel K0 是实现 Cordis 风格五原语模型的组合内核的首个已
 ## 测试组织
 
 ```text
-crates/qianqian-kernel/tests/
+crates/qianqian-composition/tests/
 ├── capability_oracles.rs            — pending/active ordering, ambiguity, identity (8)
 ├── lifecycle_oracles.rs             — raise/unwind, FAILED, sibling isolation (5)
 ├── effect_oracles.rs                — LIFO, same-key removal, provenance (6)
@@ -117,6 +117,6 @@ crates/qianqian-kernel/tests/
   :authority="['docs/architecture/composition-kernel-0-design.md']"
   :decisions="[{ issue: 67 }, { pr: 68 }]"
   :implementation="[{ issue: 70 }, { pr: 71 }]"
-  :evidence="['crates/qianqian-kernel/tests']"
+  :evidence="['crates/qianqian-composition/tests']"
   lastVerified="743eb86"
 />

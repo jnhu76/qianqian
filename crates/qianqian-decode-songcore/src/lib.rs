@@ -13,11 +13,11 @@ use std::path::Path;
 use std::rc::Rc;
 use std::slice;
 
-use qianqian_core::ports::{
+use qianqian_audio_api::ports::{
     DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, PcmDecode, PcmDecodeCapability,
     PcmFormat,
 };
-use qianqian_kernel::{ActivationError, ComponentSpec};
+use qianqian_composition::{ActivationError, ComponentSpec};
 use qianqian_songcore_sys as sys;
 
 /// Real decode mechanism over one SongCore native library instance.

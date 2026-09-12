@@ -41,7 +41,7 @@ use windows::Win32::System::Com::{
 use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::GUID;
 
-use qianqian_core::ports::{
+use qianqian_audio_api::ports::{
     AudioOutput, DrainSignal, DrainVerdict, OutputError, PcmFormat, PcmPull, RenderPcmInput,
     RenderRequest, RenderStream,
 };

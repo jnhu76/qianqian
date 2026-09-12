@@ -108,6 +108,6 @@ Base Kernel K0 实现五个被借鉴的原语,并通过 70 项内核 oracle 测�
 <ProvenancePanel
   :authority="['docs/architecture/composition-kernel-0-design.md §A.4']"
   :decisions="[{ issue: 67 }, { pr: 68 }]"
-  :evidence="['crates/qianqian-kernel/tests']"
+  :evidence="['crates/qianqian-composition/tests']"
   lastVerified="743eb86"
 />

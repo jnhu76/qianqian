@@ -91,5 +91,5 @@ PR #78 / #79 属于旧 ADR 修订历史（experimental evidence），不再列�
 <ProvenancePanel
   :authority="['docs/adr/ADR-PBK-001.md', 'docs/site/project-state.ts']"
   :decisions="[]"
-  :evidence="['specs/playback/PlaybackTemporal.tla', 'crates/qianqian-core/tests/playback_temporal_traces/transport.rs']"
+  :evidence="['specs/playback/PlaybackTemporal.tla', 'crates/qianqian-audio-api/tests/playback_temporal_traces/transport.rs']"
 />

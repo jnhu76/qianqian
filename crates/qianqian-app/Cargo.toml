@@ -1,0 +1,8 @@
+[package]
+name = "qianqian-app"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+qianqian-audio-api = { path = "../qianqian-audio-api" }
+qianqian-composition = { path = "../qianqian-composition" }

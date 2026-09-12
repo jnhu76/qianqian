@@ -10,7 +10,7 @@
 //! decode worker -> bounded edge -> render thread, with zero K0 work per
 //! quantum.
 //!
-//! The completion signal is session truth, not K0 truth: the Host waits on
+//! The completion signal is session truth, not K0 truth: the App waits on
 //! it and then drives disposal explicitly.
 
 mod completion;
@@ -22,7 +22,7 @@ pub use edge::{EdgeTerminal, PcmEdge, SharedEdge, WriteOutcome};
 pub use session::playback_session_spec;
 
 // Re-export core port types for convenient use across the workspace.
-pub use qianqian_core::ports::{
+pub use qianqian_audio_api::ports::{
     AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainSignal,
     DrainVerdict, PcmDecode, PcmFormat, RenderPcmInput, RenderRequest, RenderStream,
 };

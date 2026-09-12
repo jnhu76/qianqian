@@ -48,7 +48,7 @@ experiments:
       - pr: 71
 
     evidence:
-      - crates/qianqian-kernel/tests
+      - crates/qianqian-composition/tests
 
     result:
       summary: >

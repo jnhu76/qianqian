@@ -5,3 +5,4 @@
 
 # 形式化验证工具链（specs/check.sh 按固定版本+sha256 自动下载）
 specs/tools/tla2tools.jar
+.zcode/plan.md

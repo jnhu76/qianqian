@@ -7,9 +7,9 @@ mod common;
 
 use std::time::Duration;
 
-use qianqian_kernel::{DesiredEntry, FiberState, Revision};
+use qianqian_app::QianqianApp;
+use qianqian_composition::{DesiredEntry, FiberState, Revision};
 use qianqian_playback::{SessionCompletion, SessionOutcome, playback_session_spec};
-use qianqian_runtime::AppRuntime;
 
 use common::{
     OutputBehavior, SourceBehavior, TEST_FORMAT, TestDecode, TestOutput, named_thread_alive, within,
@@ -38,22 +38,22 @@ fn registered_runtime(
     source: SourceBehavior,
     output: OutputBehavior,
     completion: SessionCompletion,
-) -> AppRuntime {
-    let mut runtime = AppRuntime::new();
+) -> QianqianApp {
+    let mut runtime = QianqianApp::new();
     let source_behavior = source;
     let output_behavior = output;
 
     runtime
         .register_component({
             let behavior = source_behavior;
-            qianqian_kernel::ComponentSpec::new("test_decode_plugin")
-                .provides::<qianqian_core::ports::PcmDecodeCapability>()
+            qianqian_composition::ComponentSpec::new("test_decode_plugin")
+                .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
                 .on_activate(move |ctx| {
                     let service = TestDecode { behavior };
-                    ctx.provide::<qianqian_core::ports::PcmDecodeCapability>(std::rc::Rc::new(
-                        service,
-                    ))
-                    .map_err(|e| qianqian_kernel::ActivationError::new(format!("{e:?}")))?;
+                    ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
+                        std::rc::Rc::new(service),
+                    )
+                    .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
                     Ok(())
                 })
         })
@@ -62,14 +62,14 @@ fn registered_runtime(
     runtime
         .register_component({
             let behavior = output_behavior;
-            qianqian_kernel::ComponentSpec::new("test_output_plugin")
-                .provides::<qianqian_core::ports::AudioOutputCapability>()
+            qianqian_composition::ComponentSpec::new("test_output_plugin")
+                .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
                 .on_activate(move |ctx| {
                     let service = TestOutput { behavior };
-                    ctx.provide::<qianqian_core::ports::AudioOutputCapability>(std::rc::Rc::new(
-                        service,
-                    ))
-                    .map_err(|e| qianqian_kernel::ActivationError::new(format!("{e:?}")))?;
+                    ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
+                        std::rc::Rc::new(service),
+                    )
+                    .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
                     Ok(())
                 })
         })

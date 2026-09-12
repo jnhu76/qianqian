@@ -2,11 +2,11 @@
 resolver = "3"
 members = [
     "apps/headless",
-    "crates/qianqian-core",
-    "crates/qianqian-kernel",
+    "crates/qianqian-audio-api",
+    "crates/qianqian-composition",
     "crates/qianqian-output-wasapi",
     "crates/qianqian-playback",
-    "crates/qianqian-runtime",
+    "crates/qianqian-app",
 ]
 exclude = [
     "crates/qianqian-decode-songcore",

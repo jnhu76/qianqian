@@ -251,9 +251,9 @@ Realtime publication/lifetime was the first post-reset formal target and is deli
 # Current workspace
 
 ```text
-qianqian-core
-qianqian-kernel
-qianqian-runtime
+qianqian-audio-api
+qianqian-composition
+qianqian-app
 qianqian-headless
 ```
 
@@ -278,7 +278,7 @@ Production reality
     main-branch source, Cargo dependency graph, actual public APIs
 
 Evidence (never authority)
-    qianqian-core playback test-local evidence (tests/playback_temporal_traces/,
+    qianqian-audio-api playback test-local evidence (tests/playback_temporal_traces/,
     no longer in production src/), specs/playback/*,
     specs/realtime-publication/, architecture evidence records
     (pcm-contract-a0.md, direct-pcm-flow.md, realtime-view-publication.md,
