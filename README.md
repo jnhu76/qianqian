@@ -39,7 +39,7 @@ Current architecture milestones:
 ```text
 Component boundary audit          PASS / CLOSED              (PR #66)
 Composition Kernel semantic design MERGED                   (PR #68)
-Base Kernel K0                     IMPLEMENTED              (PR #71)
+Composition Kernel K0              IMPLEMENTED              (PR #71)
 Playback Foundations reset         ACCEPTED                 (ADR-PBK-001, PR #87)
 Publication/reclamation P1–P5      NORMATIVE (formal evidence, PR #91)
 Minimal PCM contract evidence      DELIVERED (Phase B, PR #93)

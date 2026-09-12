@@ -50,7 +50,7 @@ These are cooperating concerns, not one universal bus.
 
 # Composition Plane
 
-The generic Base Kernel K0 is implemented/current.
+The generic Composition Kernel K0 is implemented/current.
 
 ```text
 Context
@@ -257,7 +257,7 @@ qianqian-app
 qianqian-headless
 ```
 
-The Base Kernel K0 is current.
+The Composition Kernel K0 is current.
 
 Playback-specific code is research evidence and may be changed/removed without compatibility obligation; the accepted foundations deliberately do not re-freeze legacy playback nouns.
 
