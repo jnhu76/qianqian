@@ -185,10 +185,24 @@ fn run_render_thread(
     drain: DrainSignal,
     slot: OpenSlot,
 ) {
-    let outcome = open_and_run(format, &*source, &slot);
+    // A panic must not leave the completion unresolved or the producer
+    // wedged: it reports like any other abort.
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        open_and_run(format, &*source, &slot)
+    }))
+    .unwrap_or_else(|_| LoopOutcome::Aborted {
+        message: "render thread panicked".to_owned(),
+    });
     // One terminal diagnostic per episode — never steady-state output.
-    if let LoopOutcome::Aborted { message } = &outcome {
-        eprintln!("[qianqian-wasapi] render aborted: {message}");
+    match &outcome {
+        LoopOutcome::Aborted { message } => {
+            eprintln!("[qianqian-wasapi] render aborted: {message}");
+            // The device leg is gone: stop the data plane so the decode
+            // worker cannot wedge on a full edge against a dead consumer
+            // (first-wins on the edge, so it is a no-op after natural EOF).
+            source.stop();
+        }
+        LoopOutcome::Drained => {}
     }
     drain.complete(match outcome {
         LoopOutcome::Drained => DrainVerdict::Drained,

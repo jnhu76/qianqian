@@ -169,7 +169,13 @@ impl PcmFrameSource for PcmEdge {
                 let want_frames = (dst.len() / self.channels).min(guard.buffered / self.channels);
                 if want_frames == 0 {
                     // Only a partial frame is buffered: wait for the rest
-                    // rather than handing the consumer a torn frame.
+                    // rather than handing the consumer a torn frame —
+                    // unless the producer is gone (EOF), in which case the
+                    // torn remainder is dropped: no terminal may wedge a
+                    // reader behind data it can never consume.
+                    if guard.terminal == TERMINAL_EOF {
+                        return PcmPull::Eof;
+                    }
                     guard = self.data_ready.wait(guard).expect("pcm edge lock");
                     continue;
                 }

@@ -53,14 +53,13 @@ fn run(args: Vec<String>) -> ExitCode {
     let snapshot = runtime.composition_snapshot();
     if snapshot.fibers.get("session").map(|f| f.state) != Some(qianqian_kernel::FiberState::Active)
     {
-        if let Some(fiber) = snapshot.fibers.get("session") {
-            if fiber.failed_outcome {
-                eprintln!("playback session failed to activate (see plugin diagnostics above)");
-            } else {
-                eprintln!("playback session did not activate: state {:?}", fiber.state);
-            }
+        if let Some(message) = completion.activation_error() {
+            eprintln!("playback session failed to activate: {message}");
         } else {
-            eprintln!("playback session was not installed");
+            eprintln!(
+                "playback session did not activate (a required capability provider \
+                 failed or is missing on this platform)"
+            );
         }
         runtime.dispose();
         return ExitCode::from(1);

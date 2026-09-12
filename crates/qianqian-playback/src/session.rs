@@ -50,6 +50,21 @@ fn activate(
     completion: &SessionCompletion,
     ctx: &mut qianqian_kernel::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
+    // The kernel's diagnostic surface carries the FAILED verdict but not
+    // the domain message; the session publishes its own activation
+    // failure so the Host can show why an episode never started.
+    let result = activate_inner(file, completion, ctx);
+    if let Err(e) = &result {
+        completion.activation_failed(&e.message);
+    }
+    result
+}
+
+fn activate_inner(
+    file: &PathBuf,
+    completion: &SessionCompletion,
+    ctx: &mut qianqian_kernel::ActivationCtx<'_>,
+) -> Result<(), ActivationError> {
     // Control plane: capability resolution happens exactly once, here.
     let decode = ctx
         .resolve::<PcmDecodeCapability>()
@@ -83,8 +98,10 @@ fn activate(
         })
         .map_err(|e| ActivationError::new(format!("render stream open failed: {}", e.message)))?;
     // Registered first, so it unwinds after the worker inverse:
-    // stop+join the producer before the device is released.
-    ctx.register_effect(move || {
+    // stop+join the producer before the device is released. It is a
+    // relation-bearing effect: the stream is a cross-fiber contribution
+    // toward the output provider.
+    ctx.register_relation::<AudioOutputCapability>(&output, move || {
         stream.stop_and_join();
         Discharge::Discharged
     });
@@ -96,8 +113,9 @@ fn activate(
         .spawn(move || decode_worker(source, worker_edge, worker_completion, STAGING_FRAMES))
         .map_err(|e| ActivationError::new(format!("decode worker spawn failed: {e}")))?;
     // Registered last, so it unwinds first: stop the edge (unblocking
-    // both legs), then join the producer.
-    ctx.register_effect(move || {
+    // both legs), then join the producer. Relation-bearing toward the
+    // decode provider (the data edge it feeds).
+    ctx.register_relation::<PcmDecodeCapability>(&decode, move || {
         edge.stop();
         let _ = worker.join();
         Discharge::Discharged
@@ -120,7 +138,14 @@ fn decode_worker(
         let mut staging = vec![0.0f32; staging_frames * channels];
         loop {
             match source.read_frames(&mut staging) {
-                Ok(DecodeOutcome::Frames(0)) => continue,
+                // A zero-frame response must still observe the data plane:
+                // a decoder that never progresses cannot pin the worker
+                // past a stop.
+                Ok(DecodeOutcome::Frames(0)) => {
+                    if edge.terminal() != crate::edge::EdgeTerminal::Open {
+                        return;
+                    }
+                }
                 Ok(DecodeOutcome::Frames(n)) => {
                     if edge.write(&staging[..n * channels]) == crate::edge::WriteOutcome::Stopped {
                         return;

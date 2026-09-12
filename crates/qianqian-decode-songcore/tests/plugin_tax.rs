@@ -80,7 +80,10 @@ impl RawFfi {
 
 impl Drop for RawFfi {
     fn drop(&mut self) {
-        unsafe { sys::song_close(self.handle) };
+        unsafe {
+            sys::song_close(self.handle);
+            drop(Box::from_raw(self.file));
+        }
     }
 }
 

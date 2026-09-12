@@ -130,7 +130,12 @@ impl AudioOutput for TestOutput {
                     .spawn({
                         let source = source.clone();
                         move || {
-                            let verdict = consume_loop(source);
+                            let verdict = consume_loop(source.clone());
+                            if verdict == DrainVerdict::Aborted {
+                                // Mirror the real mechanism: a dead render
+                                // leg stops the data plane.
+                                source.stop();
+                            }
                             drain.complete(verdict);
                         }
                     })

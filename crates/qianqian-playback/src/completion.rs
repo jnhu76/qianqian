@@ -29,6 +29,9 @@ struct CompletionState {
     /// Source PCM format, published once at session activation
     /// (diagnostic readback for the Host).
     source_format: Option<qianqian_core::ports::PcmFormat>,
+    /// Why activation raised, published by the session itself (the
+    /// kernel's diagnostic surface carries the verdict, not the message).
+    activation_failure: Option<String>,
 }
 
 #[derive(Clone)]
@@ -51,11 +54,30 @@ impl SessionCompletion {
                     worker_terminal: None,
                     decode_failure: None,
                     source_format: None,
+                    activation_failure: None,
                 }),
                 signal: Condvar::new(),
                 drain: DrainSignal::new(),
             }),
         }
+    }
+
+    /// The session publishes its activation failure (first wins).
+    pub fn activation_failed(&self, message: &str) {
+        let mut guard = self.state.state.lock().expect("completion lock");
+        if guard.activation_failure.is_none() {
+            guard.activation_failure = Some(message.to_owned());
+        }
+    }
+
+    /// Why activation raised, if it did (Host diagnostics).
+    pub fn activation_error(&self) -> Option<String> {
+        self.state
+            .state
+            .lock()
+            .expect("completion lock")
+            .activation_failure
+            .clone()
     }
 
     /// The session publishes the endpoint's source format at activation.
@@ -112,10 +134,11 @@ impl SessionCompletion {
             if let Some(outcome) = resolve(&mut guard, &self.state.drain) {
                 return outcome;
             }
-            // The drain verdict has no condvar wired into this one; a
-            // bounded poll is the control-plane bridge. The render side
-            // also always wakes us via worker_exited before exiting in
-            // practice, so the poll is a backstop, not the mechanism.
+            // The drain verdict lives on its own condvar inside
+            // DrainSignal, which this wait cannot block on; the bounded
+            // poll below is the bridge. 20 ms of Host-side latency is
+            // irrelevant on a control-plane wait, and the state the poll
+            // reads is written once per leg.
             let (next, _timeout) = self
                 .state
                 .signal

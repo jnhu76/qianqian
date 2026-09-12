@@ -81,6 +81,25 @@ fn eof_drains_before_terminating_and_stays_terminal() {
 }
 
 #[test]
+fn torn_remainder_at_eof_terminates_instead_of_wedging() {
+    // Regression (adversarial review): a torn frame buffered at close_eof
+    // used to block the reader forever behind data it can never consume.
+    let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
+    let mut torn = frame(CHANNELS, 0.5);
+    torn.push(0.5); // one and a half frames
+    edge.write(&mut torn);
+    edge.close_eof();
+
+    let mut dst = vec![0.0f32; 8 * usize::from(CHANNELS)];
+    assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(1));
+    assert_eq!(
+        edge.read_frames(&mut dst),
+        PcmPull::Eof,
+        "the torn remainder is dropped, never awaited"
+    );
+}
+
+#[test]
 fn stop_unblocks_a_reader_blocked_on_an_empty_edge() {
     let edge = Arc::new(PcmEdge::new(CHANNELS, CAPACITY_FRAMES));
     let reader = {
