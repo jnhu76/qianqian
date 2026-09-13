@@ -1,0 +1,7 @@
+--- a/crates/qianqian-playback/src/edge.rs
++++ b/crates/qianqian-playback/src/edge.rs
+@@ -142,4 +142,3 @@
+         }
+         self.space_freed.notify_all();
+-        self.data_ready.notify_all();
+     }

@@ -6,6 +6,10 @@
 //! can be exercised on any platform and under adversarial timing. The
 //! Windows real-sound gate covers the physical path.
 
+// Shared test support: each test binary uses a subset, so per-binary
+// dead-code findings on the unused remainder are expected, not defects.
+#![allow(dead_code)]
+
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -33,7 +37,6 @@ pub const TEST_FORMAT: PcmFormat = PcmFormat {
 /// How the fake decode source behaves. Which variants are live differs
 /// per test binary sharing this mod, so the enum carries a dead-code
 /// allowance for the binaries that exercise a subset.
-#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum SourceBehavior {
     /// Produce `n` frames of payload, then clean EOF.
@@ -106,7 +109,6 @@ impl DecodedPcmStream for TestDecodeStream {
 }
 
 /// How the test render leg behaves. (Per-binary usage, see above.)
-#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum OutputBehavior {
     /// Consume the edge to EOF, then report Drained.
@@ -190,28 +192,70 @@ impl RenderStream for TestStream {
 /// Deterministic under the parallel test harness (which inflates raw
 /// thread counts with other tests' workers). Only the lifecycle test
 /// binary calls it.
+///
+/// The kernel truncates thread comm names to 15 bytes (`PR_SET_NAME`),
+/// so the query is truncated the same way; comparing a longer Builder
+/// name against comm would make the check vacuously absent.
 #[cfg(target_os = "linux")]
-#[allow(dead_code)]
 pub fn named_thread_alive(name: &str) -> bool {
+    let comm_name = name.get(..15).unwrap_or(name);
     let tasks = std::fs::read_dir("/proc/self/task").expect("/proc/self/task available");
     for entry in tasks.flatten() {
         let comm = std::fs::read_to_string(entry.path().join("comm")).unwrap_or_default();
-        if comm.trim_end() == name {
+        if comm.trim_end() == comm_name {
             return true;
         }
     }
     false
 }
 
+/// Bounded-poll variant of [`named_thread_alive`] for disposal oracles.
+///
+/// A successful `join()` already means the worker has terminated — that
+/// is the Rust/POSIX lifecycle contract, which this oracle does not
+/// restate. Whether the thread's entry has vanished from
+/// `/proc/self/task` is a separate, external Linux diagnostic
+/// observation with no timing contract; empirically the listing can
+/// still show the task right after a successful join on a loaded
+/// machine (issue #121). Poll until the name disappears or `limit`
+/// elapses so the diagnostic does not report false leaks, while a
+/// genuinely running worker never leaves the window. The grace is
+/// observation tolerance for the diagnostic, not part of the join
+/// contract.
+#[cfg(target_os = "linux")]
+pub fn named_thread_gone_within(name: &str, limit: Duration) -> bool {
+    let deadline = std::time::Instant::now() + limit;
+    loop {
+        if !named_thread_alive(name) {
+            return true;
+        }
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
 /// Run `f` on a watchdog thread that fails the test if it exceeds `limit`.
+/// A panic inside `f` is re-raised here unchanged: `Disconnected` on the
+/// channel means the body died, not that the limit was exceeded (issue
+/// #121 — body panics were being misreported as "operation exceeded 10s").
 pub fn within<R>(limit: Duration, f: impl FnOnce() -> R + Send + 'static) -> R
 where
     R: Send + 'static,
 {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        let _ = tx.send(f());
+        let _ = tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)));
     });
-    rx.recv_timeout(limit)
-        .unwrap_or_else(|_| panic!("operation exceeded {:?}", limit))
+    match rx.recv_timeout(limit) {
+        Ok(Ok(value)) => value,
+        Ok(Err(payload)) => std::panic::resume_unwind(payload),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+            panic!("operation exceeded {limit:?}")
+        }
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+            panic!("watchdog body vanished without a panic payload")
+        }
+    }
 }

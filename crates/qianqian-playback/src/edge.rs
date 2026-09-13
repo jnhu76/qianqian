@@ -3,8 +3,17 @@
 //! the steady-state read/write path performs no allocation. Terminals —
 //! EOF, failure, stop — always unblock both endpoints so no lifecycle
 //! path can wedge the data plane.
+//!
+//! The synchronization primitives are selected by `cfg(loom)` (campaign
+//! FV-CONC-0): the loom types are drop-in for the std ones and preserve
+//! the synchronization semantics, so loom explores the real edge code
+//! rather than a test copy. Outside a loom build this file is unchanged.
 
-use std::sync::{Arc, Condvar, Mutex};
+#[cfg(loom)]
+use loom::sync::{Condvar, Mutex};
+use std::sync::Arc;
+#[cfg(not(loom))]
+use std::sync::{Condvar, Mutex};
 
 use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
 

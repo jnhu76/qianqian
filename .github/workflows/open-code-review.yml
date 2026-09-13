@@ -74,6 +74,10 @@ jobs:
 
       - name: Review PR with OpenCodeReview
         uses: alibaba/open-code-review@04284b5dc19e0f52528ca466a767e4a2c100e5f5
+        # The OCR action currently fails on its own installation bug
+        # (upstream fix submitted, pending). Review results are advisory:
+        # a tool-side failure must not block the other CI gates.
+        continue-on-error: true
         with:
           ocr_version: '1.11.6'
           llm_url: https://opencode.ai/zen/go/v1/chat/completions

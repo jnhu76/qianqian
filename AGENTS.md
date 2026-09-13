@@ -129,6 +129,27 @@ Formalization is risk-driven.
 
 If there is no concrete collision, prefer types, ownership, unit/property tests, static checks, or executable stress tests. The old playback formal core is evidence, not a blocking acceptance gate. See `specs/README.md`.
 
+## Verification authority boundary
+
+Verification challenges the current architecture and implementation; it does not define either one.
+
+> **Verification evidence MUST NOT silently promote a new state, primitive, lifecycle rule, vocabulary, or authority. Any such finding must first return to ADR / design-authority review.**
+
+Apply the following rules to TLA+/TLC, Kani, Loom, Miri, property tests, stress tests, mutation tests and other executable verification:
+
+```text
+Authority / ADR        defines intended semantics
+Production Rust        realizes current behavior
+Verification evidence  searches for counterexamples and regressions
+```
+
+- Build verification models from the minimum current authority plus an explicit mapping to current implementation reality. Auxiliary verifier-only variables are allowed, but remain non-normative.
+- Prefer the verification mechanism closest to the property: Rust types/ownership first; bounded state/invariant checking next; concurrency schedule exploration for implementation interleavings; TLA+/TLC for concrete temporal/state collisions that are awkward or impossible to express directly against the Rust implementation.
+- A clean bounded/model-checking run means only that no counterexample was found within the stated model, bounds, assumptions and fairness conditions. It is not architecture acceptance and must not be reported as “the architecture is proven correct.”
+- A counterexample must be classified before any production change: model/spec mismatch, production defect, authority gap, or refinement/oracle gap. Do not patch production merely to satisfy an over-strong verifier oracle.
+- If evidence suggests that the architecture needs a new semantic concept, record the differential and use the Authority resolution process below. If the authority changes, change it explicitly under review before treating the new concept as current architecture.
+- Verification harnesses may encode stronger diagnostic checks than production contracts only when those checks are named as diagnostics and are not allowed to redefine lifecycle or correctness semantics.
+
 ---
 
 # UI boundary
@@ -170,6 +191,8 @@ Do not reject a new design merely because it differs from old PlaybackTemporal o
 Report what was actually verified. Never mark an unrun device/platform/audio check PASS.
 
 For architecture reset work, green Cargo tests are regression evidence, not architecture acceptance.
+
+Verification reports must state the checked target, tool, bounds/assumptions, and whether the result is a counterexample, a bounded clean run, or a platform/runtime observation. Keep evidence claims narrower than the authority they challenge.
 
 ---
 

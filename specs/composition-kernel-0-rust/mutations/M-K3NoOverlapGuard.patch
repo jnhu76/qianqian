@@ -1,0 +1,10 @@
+--- a/crates/qianqian-composition/src/kernel.rs
++++ b/crates/qianqian-composition/src/kernel.rs
+@@ -476,6 +476,6 @@
+             // (§L.2: no further requests through the affected edge).
+             let spec = &self.catalog[e.component];
+-            let overlap = self.slots.iter().any(|slot| {
++            let overlap = false && self.slots.iter().any(|slot| {
+                 slot.fiber.as_ref().is_some_and(|f| {
+                     let installed = &self.catalog[f.component];
+                     installed

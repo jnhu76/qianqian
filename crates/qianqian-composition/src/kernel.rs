@@ -462,7 +462,29 @@ impl CompositionKernel {
 
     fn mount_candidate(&self) -> Option<DesiredEntry> {
         for e in self.desired.values() {
-            if e.enabled && self.find_by_name(&e.id).is_none() {
+            if !e.enabled || self.find_by_name(&e.id).is_some() {
+                continue;
+            }
+            // §E.4 pointwise single-source: at every point of any legal K0
+            // history at most one installed fiber declares provision for a
+            // capability, and "an Unloading old fiber is still installed".
+            // Clean replacements are already staged by the step ordering
+            // (rule 4 removal precedes rule 5 mount); this candidate check
+            // additionally withholds the mount while a §G.6-latched fiber
+            // can never reach removal — the affected edge stays frozen
+            // instead of hosting two installed providers of one capability
+            // (§L.2: no further requests through the affected edge).
+            let spec = &self.catalog[e.component];
+            let overlap = self.slots.iter().any(|slot| {
+                slot.fiber.as_ref().is_some_and(|f| {
+                    let installed = &self.catalog[f.component];
+                    installed
+                        .provides
+                        .iter()
+                        .any(|k| spec.provides.iter().any(|k2| k2.id == k.id))
+                })
+            });
+            if !overlap {
                 return Some(e.clone());
             }
         }
@@ -916,3 +938,13 @@ fn dfs_cycle(
     }
     color.insert(node.to_owned(), 2);
 }
+
+// Bounded scenario verification of the real kernel (campaign FV-RUST-0,
+// see specs/composition-kernel-0-rust/). A child module so harnesses can
+// reach private registry internals. Under the Kani toolchain the harnesses
+// are proof harnesses; under a normal test build they run as plain tests
+// (also under Miri), executing the same exhaustive concrete scenario
+// matrices with the same per-step invariant assertions.
+#[cfg(any(kani, test))]
+#[path = "kernel_verify.rs"]
+mod verify;

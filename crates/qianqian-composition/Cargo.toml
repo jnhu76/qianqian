@@ -7,3 +7,9 @@ edition.workspace = true
 # It must not depend on any qianqian-* crate or on product semantics.
 # A test enforces the empty dependency table.
 [dependencies]
+
+# The FV-RUST-0 verification harnesses (src/kernel_verify.rs) are compiled
+# under the Kani toolchain's `kani` cfg; register it so tooling treats the
+# condition name as expected. Not a dependency (D1 unaffected).
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
