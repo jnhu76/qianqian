@@ -50,7 +50,7 @@ The full normative contracts — minimal constitution, command/fact authority, f
 
 ---
 
-# Base Kernel K0
+# Composition Kernel K0
 
 (K0 semantic authority: `docs/architecture/composition-kernel-0-design.md`; representation decisions: `docs/architecture/composition-kernel-0-implementation-adr.md`. The lines below are guardrails, not a second definition.)
 
@@ -154,7 +154,7 @@ Verification evidence  searches for counterexamples and regressions
 
 # UI boundary
 
-UI is not playback authority and never participates in realtime correctness. UiHost remains an ordinary capability/plugin candidate; platform intent stays replaceable and must not leak into Base Kernel semantics.
+UI is not playback authority and never participates in realtime correctness. UiHost remains an ordinary capability/plugin candidate; platform intent stays replaceable and must not leak into Composition Kernel semantics.
 
 ---
 

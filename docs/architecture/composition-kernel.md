@@ -4,7 +4,7 @@ This document summarizes the generic composition/lifecycle kernel preconditions 
 
 Playback Foundations are **accepted** (`docs/adr/ADR-PBK-001.md`) and deliberately do not freeze the previous MusicKernel/TransportKernel/TrackSession/Generation model. Old playback code/specs are experimental evidence only.
 
-The Base Kernel K0 itself remains implemented/current.
+The Composition Kernel K0 itself remains implemented/current.
 
 ---
 
@@ -401,7 +401,7 @@ Do not preserve a direct field/service-locator escape hatch merely because it ex
 # Current gate
 
 ```text
-Base Kernel K0                         IMPLEMENTED / CURRENT
+Composition Kernel K0                  IMPLEMENTED / CURRENT
 Playback Foundations / ARCH-003        CURRENT
 ADR-PBK-001                             ACCEPTED
 old playback code/specs                 EXPERIMENTAL EVIDENCE ONLY

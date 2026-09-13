@@ -6,9 +6,9 @@
 
 mod common;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use common::{named_thread_gone_within, within};
+use common::{named_thread_alive, named_thread_gone_within, within};
 
 #[test]
 fn diagnostic_oracle_catches_a_genuine_leak() {
@@ -18,6 +18,20 @@ fn diagnostic_oracle_catches_a_genuine_leak() {
         .name("qianqian-leak-probe".into())
         .spawn(|| std::thread::sleep(Duration::from_millis(1_500)))
         .expect("leak-probe worker spawns");
+    // std applies the thread's comm name from the child after its first
+    // scheduling, so the name has its own startup observation lag — the
+    // same /proc lag class the oracle tolerates. Wait (bounded) for the
+    // leak to become observable before pinning the diagnostic window;
+    // otherwise a pre-name first poll reads as "gone" and the control
+    // tests nothing but scheduler timing.
+    let visible_by = Instant::now() + Duration::from_secs(2);
+    while !named_thread_alive("qianqian-leak-probe") {
+        assert!(
+            Instant::now() < visible_by,
+            "leak-probe name never became observable in /proc/self/task"
+        );
+        std::thread::sleep(Duration::from_millis(2));
+    }
     assert!(
         !named_thread_gone_within("qianqian-leak-probe", Duration::from_millis(300)),
         "diagnostic oracle failed to detect a genuinely leaked named thread"

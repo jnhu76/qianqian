@@ -11,10 +11,10 @@ use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-use qianqian_audio_api::ports::{DecodeOutcome, PcmDecode, PcmDecodeCapability};
-use qianqian_decode_songcore::{SongcoreDecode, songcore_decode_plugin};
-use qianqian_composition::{ComponentSpec, DesiredEntry, CompositionKernel, Revision};
 use qianqian_app::QianqianApp;
+use qianqian_audio_api::ports::{DecodeOutcome, PcmDecode, PcmDecodeCapability};
+use qianqian_composition::{ComponentSpec, CompositionKernel, DesiredEntry, Revision};
+use qianqian_decode_songcore::{SongcoreDecode, songcore_decode_plugin};
 
 use common::ReferenceFixture;
 
@@ -54,7 +54,10 @@ fn drains_exact_reference_frame_count_then_stable_eof() {
     let mut block = vec![0.0f32; 1024 * channels];
     let mut total = 0usize;
     loop {
-        match decode_stream.read_frames(&mut block).expect("read succeeds") {
+        match decode_stream
+            .read_frames(&mut block)
+            .expect("read succeeds")
+        {
             DecodeOutcome::Frames(n) => total += n,
             DecodeOutcome::Eof => break,
         }
@@ -62,7 +65,9 @@ fn drains_exact_reference_frame_count_then_stable_eof() {
     assert_eq!(total, fx.pcm_frames, "reference frame count");
     // EOF is terminal and stable, not one-shot.
     assert_eq!(
-        decode_stream.read_frames(&mut block).expect("read after EOF"),
+        decode_stream
+            .read_frames(&mut block)
+            .expect("read after EOF"),
         DecodeOutcome::Eof,
         "EOF stays terminal"
     );
@@ -79,7 +84,10 @@ fn full_drain_pcm_matches_reference_sha256() {
         let mut block = vec![0.0f32; 1024 * channels];
         let mut total = 0usize;
         loop {
-            match decode_stream.read_frames(&mut block).expect("read succeeds") {
+            match decode_stream
+                .read_frames(&mut block)
+                .expect("read succeeds")
+            {
                 DecodeOutcome::Frames(n) => {
                     let samples = n * channels;
                     let bytes: Vec<u8> = block[..samples]

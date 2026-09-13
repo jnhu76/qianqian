@@ -3,29 +3,43 @@
 //! Correctness authority must not depend on a UI framework, so the
 //! product must always be able to start without one.
 //!
-//! Host role (first-audible-slice design §6): select the file, install
-//! the desired components, wait for top-level completion, initiate
-//! explicit shutdown. The Host never pumps PCM, decodes, or owns a render
-//! loop.
+//! Qianqian App role (first-audible-slice design §6; canonical name per
+//! ADR-PBK-002 D1): select the file, install the desired components,
+//! wait for top-level completion, initiate explicit shutdown. The App
+//! never pumps PCM, decodes, or owns a render loop. Argument grammar
+//! lives in the library's [`cli`] module so parsing stays separable
+//! from this playback wiring.
 
 use std::process::ExitCode;
 
 #[cfg(feature = "playback")]
 use std::path::PathBuf;
 
+use qianqian_headless::cli::{self, Invocation};
+
 fn main() -> ExitCode {
-    let args: Vec<String> = std::env::args().collect();
-    run(args)
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match cli::parse_invocation(&args) {
+        Ok(Invocation::Help) => {
+            print!("{}", cli::usage());
+            ExitCode::SUCCESS
+        }
+        Ok(Invocation::Version) => {
+            println!("qianqian-headless {}", env!("CARGO_PKG_VERSION"));
+            ExitCode::SUCCESS
+        }
+        Ok(Invocation::Play { file }) => run_playback(file),
+        Err(error) => {
+            eprintln!("error: {error}");
+            eprint!("{}", cli::usage());
+            ExitCode::from(2)
+        }
+    }
 }
 
 #[cfg(feature = "playback")]
-fn run(args: Vec<String>) -> ExitCode {
+fn run_playback(file: PathBuf) -> ExitCode {
     use qianqian_playback::{SessionCompletion, SessionOutcome, playback_session_spec};
-
-    let Some(file) = args.get(1) else {
-        eprintln!("usage: qianqian-headless <music-file>");
-        return ExitCode::from(2);
-    };
 
     let mut runtime = qianqian_app::QianqianApp::new();
     if let Err(e) = runtime.register_component(qianqian_decode_songcore::songcore_decode_plugin()) {
@@ -37,10 +51,9 @@ fn run(args: Vec<String>) -> ExitCode {
         return ExitCode::from(1);
     }
     let completion = SessionCompletion::new();
-    if let Err(e) = runtime.register_component(playback_session_spec(
-        PathBuf::from(file),
-        completion.clone(),
-    )) {
+    if let Err(e) =
+        runtime.register_component(playback_session_spec(file.clone(), completion.clone()))
+    {
         eprintln!("session registration failed: {e:?}");
         return ExitCode::from(1);
     }
@@ -79,7 +92,7 @@ fn run(args: Vec<String>) -> ExitCode {
             format.sample_rate, format.channels, format.channel_mask
         );
     }
-    println!("playing {file} ...");
+    println!("playing {} ...", file.display());
 
     let outcome = completion.wait();
     let snapshot = runtime.dispose();
@@ -108,7 +121,8 @@ fn run(args: Vec<String>) -> ExitCode {
 }
 
 #[cfg(not(feature = "playback"))]
-fn run(_args: Vec<String>) -> ExitCode {
+fn run_playback(file: std::path::PathBuf) -> ExitCode {
+    let _ = file;
     eprintln!(
         "this binary was built without the playback slice; \
          rebuild with: cargo build --release --features playback"
