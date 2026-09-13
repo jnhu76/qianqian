@@ -10,12 +10,15 @@
 //! exhaustively* as concrete scenarios (all plan bits, violation verdicts
 //! and disposal routes iterated), with the property invariants asserted
 //! after every bounded step. All data is concrete — no symbolic Strings —
-//! which keeps each CBMC run seconds-to-minutes and makes the bounds
-//! crisp: "every scenario in the stated finite universe, drained ≤ M
-//! steps, invariant re-checked after each step". A green run is
-//! BOUNDED-CLEAN within exactly those bounds (vocabulary #124) — never a
-//! general proof. The symbolic/exhaustive protocol-level counterpart is
-//! the TLA+ model in specs/composition-kernel-0/.
+//! to keep the bounds crisp: "every scenario in the stated finite
+//! universe, drained ≤ M steps, invariant re-checked after each step".
+//! A green run is BOUNDED-CLEAN within exactly those bounds (vocabulary
+//! #124) — never a general proof. In practice even these concrete
+//! harnesses did not converge under Kani's CBMC backend (std collection
+//! expansion; recorded TOOLING-INSUFFICIENT in RESULTS.md), so the
+//! recorded evidence channel is native tests + Miri, with the
+//! symbolic/exhaustive protocol-level counterpart being the TLA+ model
+//! in specs/composition-kernel-0/.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
