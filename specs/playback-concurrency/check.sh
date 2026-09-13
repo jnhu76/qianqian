@@ -52,12 +52,17 @@ if ! git apply --whitespace=nowarn "$PATCH"; then
   echo "TOOLING-FAIL: mutation does not apply" >&2
   fail=1
 else
-  if RUSTFLAGS="--cfg loom" cargo test -p qianqian-playback --features loom --release --test loom_edge 2>&1 | grep -qE "deadlock|test result: FAILED"; then
+  # The mutated run is EXPECTED to fail (deadlock schedule). Note: pipefail
+  # would invert a grep-on-pipe here, so capture to a file first.
+  MUT_LOG="$(mktemp)"
+  RUSTFLAGS="--cfg loom" cargo test -p qianqian-playback --features loom --release --test loom_edge > "$MUT_LOG" 2>&1
+  if grep -qE "deadlock|test result: FAILED" "$MUT_LOG"; then
     echo "RESULT M-L1 COUNTEREXAMPLE-WITNESSED (lost wakeup found)"
   else
     echo "RESULT M-L1 TOOLING-FAIL (mutation NOT caught)"
     fail=1
   fi
+  rm -f "$MUT_LOG"
   git apply -R --whitespace=nowarn "$PATCH"
   if ! cmp -s "$EDGE" "$EDGE_SNAPSHOT"; then
     cp "$EDGE_SNAPSHOT" "$EDGE"
