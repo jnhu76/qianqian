@@ -12,7 +12,8 @@ use qianqian_composition::{DesiredEntry, FiberState, Revision};
 use qianqian_playback::{SessionCompletion, SessionOutcome, playback_session_spec};
 
 use common::{
-    OutputBehavior, SourceBehavior, TEST_FORMAT, TestDecode, TestOutput, named_thread_alive, within,
+    OutputBehavior, SourceBehavior, TEST_FORMAT, TestDecode, TestOutput, named_thread_gone_within,
+    within,
 };
 
 const DUMMY_PATH: &str = "test://sine";
@@ -21,15 +22,23 @@ fn desired(id: &str, component: &'static str) -> DesiredEntry {
     DesiredEntry::enabled(id, component, Revision::new(1))
 }
 
-/// No session leg thread may survive disposal.
+/// No session leg thread may still be observable after disposal.
+///
+/// A successful join already means the worker terminated (the Rust/POSIX
+/// lifecycle contract); whether its entry has left `/proc/self/task` is
+/// an external Linux diagnostic observation with no timing contract,
+/// which empirically lags the join return under load (issue #121). The
+/// bounded poll gives that diagnostic an explicit grace — see
+/// test_oracles.rs for the controls keeping it truthful both ways.
 #[cfg(target_os = "linux")]
 fn assert_no_leg_threads() {
+    const LEAK_ORACLE_GRACE: Duration = Duration::from_secs(2);
     assert!(
-        !named_thread_alive("qianqian-decode"),
+        named_thread_gone_within("qianqian-decode", LEAK_ORACLE_GRACE),
         "decode worker thread leaked"
     );
     assert!(
-        !named_thread_alive("qianqian-test-render"),
+        named_thread_gone_within("qianqian-test-render", LEAK_ORACLE_GRACE),
         "render thread leaked"
     );
 }
