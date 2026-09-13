@@ -21,7 +21,7 @@ Sources read: `crates/qianqian-composition/src/{kernel,fiber,capability,componen
 
 | # | PROPERTY | GUARANTEED BY RUST TYPE SYSTEM? | RUNTIME CHECK STILL NEEDED? | TARGET TOOL |
 |---|----------|--------------------------------|-----------------------------|-------------|
-| A1 | One `EffectPayload::Inverse` closure value is invoked at most once | **YES** — `Box<dyn FnOnce>` is consumed by the call; `run_unwind`/`dispose_effect` take the payload out via `mem::replace(.., Violated)` before invoking, so a second invocation would have to read the `Violated` tombstone, which is `unreachable!` (panic, not silent double-call) | The closure value ≠ the semantic obligation: "one EffectRecord is globally discharged exactly once across all paths (clean unload, partial unwind, dispose, retire)" is control flow, not ownership | Kani K3 |
+| A1 | One `EffectPayload::Inverse` closure value is invoked at most once | **YES, for the type-level fact only** — one particular `Box<dyn FnOnce>` value cannot be successfully called twice: the payload is consumed by the call, and `run_unwind`/`dispose_effect` take it out via `mem::replace(.., Violated)` before invoking, so a second invocation would have to read the `Violated` tombstone, which is `unreachable!` (panic, not silent double-call). `FnOnce` proves single consumption of one closure value; it does **not** prove Effect exactly-once globally | The semantic lifecycle property — one EffectRecord / lifecycle obligation is discharged exactly once across *all* kernel control-flow paths (clean unload, partial unwind, dispose, retire) — is NOT a compiler theorem; K3 challenges the kernel's global effect-discharge discipline | Kani K3 |
 | A2 | A `Violated` tombstone is never unwound or invoked again; it stays in the accumulator with its provenance observable | **PARTIAL** — representation: the FnOnce is gone once consumed; the `Violated` arm panics (`unreachable!`) | That the tombstone *stays in the accumulator* (provenance/authority visible, removal blocked) under every legal history is a kernel invariant | Matrix + Miri (K4b tombstone-retention assertion) |
 | A3 | Stale `FiberId { idx, generation }` cannot resolve to a reused slot | **PARTIAL** — representation: generation stored per slot, compared in `fiber_opt`/`fiber_mut` (`f.id == fid`); `FiberId` fields are `pub(crate)` — no external forgery | Removal bumps generation (`wrapping_add`) and resolution honors it only if every path checks; that is a runtime invariant over all interleavings of remove/reuse | Kani K1 |
 | A4 | `FiberId` generation ABA after 2^32 removals in one slot | **NO** (`wrapping_add`) | Observation recorded here: not reachable within any realistic process lifetime, and unreachable by bounded verifiers; if this limit is to be *accepted* as a representation contract, that acceptance belongs in the implementation ADR (D3), not in this evidence file | Authority routing (no tool) |
@@ -72,15 +72,21 @@ no verifier re-earns them.
 
 1. Kani (FV-RUST-0) was the intended owner of **K1 stale FiberId, K2
    relied_on guard, K3 effect discharge discipline, K4 removal
-   discipline, K5 quiet truth, K6 single-source**; the symbolic engine
+   discipline, K5 quiet truth, K6 single-source incl. the #126
+   withheld-mount latch**; the symbolic engine
    did not converge (recorded TOOLING-INSUFFICIENT in RESULTS.md), so
    the Rust-side evidence is carried by the exhaustive concrete
    scenario matrices under native tests + Miri, with the TLA+ model
    (#125) holding the symbolic layer.
-2. Loom (FV-CONC-0) owns the playback slice (B1–B4): the mutex-guarded edge
-   and completion races — the properties whose risk is interleaving, per the
-   risk-driven formalization policy.
+2. Loom (FV-CONC-0) owns the playback slice (B1–B3): the mutex-guarded
+   edge races — the properties whose risk is interleaving, per the
+   risk-driven formalization policy. B4 (`SessionCompletion`) is owned by
+   native tests + system stress instead: Loom excludes it because
+   `wait_timeout` is unmodeled (playback RESULTS B2.2).
 3. Miri (FV-UB-0) can only cover the pure-Rust crates; the FFI surface is
    C1–C3 and must be reported as NOT VERIFIED BY MIRI, not silently skipped.
-4. Nothing above re-runs what A1/A5/A8/A13/B5/B8/D already have from the
-   compiler and existing tests.
+4. Nothing above re-runs what the compiler and existing tests already
+   carry: A1's type-level closure-value single-call, A5, A13, B5, B8, D.
+   A1's semantic Effect obligation stays with K3, and A8 (mount-time
+   capability-overlap withholding) stays a runtime property owned by the
+   K6 scenario matrix — neither is compiler-discharged.
