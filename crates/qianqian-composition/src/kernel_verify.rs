@@ -346,15 +346,15 @@ fn k2_relied_provider_is_never_removed_behind_an_open_committed_view() {
 }
 
 // ---------------------------------------------------------------------
-// K3 — effect discharge discipline: 12 concrete scenarios (early top-effect
-// dispose × double-dispose × disposal route), clean verdicts only.
+// K3 — effect discharge discipline: 8 concrete scenarios (early top-effect
+// dispose × double-dispose × drain-vs-leave-live), clean verdicts only.
 // ---------------------------------------------------------------------
 
 #[cfg_attr(kani, kani::proof)]
 #[cfg_attr(not(kani), test)]
 #[cfg_attr(kani, kani::unwind(24))]
 fn k3_effect_inverses_fire_at_most_once_in_lifo_order() {
-    for case in 0..12u32 {
+    for case in 0..8u32 {
         let log = Log::new();
         let no_violation = Rc::new(Cell::new(false));
         let handle2: Rc<RefCell<Option<EffectHandle>>> = Rc::new(RefCell::new(None));
@@ -375,7 +375,9 @@ fn k3_effect_inverses_fire_at_most_once_in_lifo_order() {
 
         let do_dispose = case & 1 != 0;
         let do_double_dispose = case & 2 != 0;
-        let route = case >> 2; // 0 dispose_root, 1 desired-empty, 2 leave live
+        // Drain fully (the `dispose_root` equivalent, disclosed in
+        // RESULTS) or leave the episode live.
+        let leave_live = case & 4 != 0;
         if do_dispose {
             let fid = k.find_by_name("fx").unwrap();
             let h = handle2.borrow().expect("effect 2 registered");
@@ -384,12 +386,11 @@ fn k3_effect_inverses_fire_at_most_once_in_lifo_order() {
                 k.dispose_effect(fid, h);
             }
         }
-        match route {
-            0 | 1 => {
-                force_desired(&mut k, Vec::new());
-                drain_bounded(&mut k, 10);
-            }
-            _ => drain_bounded(&mut k, 4),
+        if !leave_live {
+            force_desired(&mut k, Vec::new());
+            drain_bounded(&mut k, 10);
+        } else {
+            drain_bounded(&mut k, 4);
         }
 
         // Discipline: each inverse fired at most once across every path
@@ -404,7 +405,7 @@ fn k3_effect_inverses_fire_at_most_once_in_lifo_order() {
             assert!(i2 < i1, "unwind violated LIFO order");
         }
         // A fully drained, non-violated run discharges both effects.
-        if route != 2 {
+        if !leave_live {
             assert_eq!(c1, 1, "inverse 1 owed after a full drain");
             assert_eq!(c2, 1, "inverse 2 owed after a full drain");
         }
@@ -413,14 +414,14 @@ fn k3_effect_inverses_fire_at_most_once_in_lifo_order() {
 
 // ---------------------------------------------------------------------
 // K4a — removal discipline with clean verdicts: activation raise or not ×
-// disposal route × early dispose. Removed fibers must owe nothing.
+// early dispose. Removed fibers must owe nothing.
 // ---------------------------------------------------------------------
 
 #[cfg_attr(kani, kani::proof)]
 #[cfg_attr(not(kani), test)]
 #[cfg_attr(kani, kani::unwind(28))]
 fn k4a_removed_fibers_leave_nothing_owed_clean() {
-    for case in 0..8u32 {
+    for case in 0..4u32 {
         let log = Log::new();
         let no_violation = Rc::new(Cell::new(false));
         let act_fails = Rc::new(Cell::new(case & 1 != 0));
@@ -442,21 +443,15 @@ fn k4a_removed_fibers_leave_nothing_owed_clean() {
         drain_bounded(&mut k, 8);
 
         let do_dispose = case & 2 != 0;
-        let route = case >> 2; // 0 dispose_root, 1 desired-empty
+        // Disposal: empty the desired composition (the `dispose_root`
+        // equivalent, disclosed in RESULTS) and drain.
         if do_dispose
             && let Some(fid) = k.find_by_name("fx")
             && let Some(h) = handle2.borrow().as_ref()
         {
             k.dispose_effect(fid, *h);
         }
-        match route {
-            0 => {
-                force_desired(&mut k, Vec::new());
-            }
-            _ => {
-                force_desired(&mut k, Vec::new());
-            }
-        }
+        force_desired(&mut k, Vec::new());
         drain_bounded(&mut k, 14);
 
         // Clean full drain: every fiber gone; each inverse fired exactly
@@ -477,15 +472,16 @@ fn k4a_removed_fibers_leave_nothing_owed_clean() {
 
 // ---------------------------------------------------------------------
 // K4b — removal discipline under violated verdicts: the full violation
-// lattice (inv1/inv2/teardown) × disposal route. A §G.6 latch must keep
-// the fiber installed, must block removal, and must preserve P_RELIED.
+// lattice (inv1/inv2/teardown). A §G.6 latch must keep the fiber
+// installed, must block removal, must preserve P_RELIED, and a violated
+// inverse must retain its provenance tombstone in the accumulator.
 // ---------------------------------------------------------------------
 
 #[cfg_attr(kani, kani::proof)]
 #[cfg_attr(not(kani), test)]
 #[cfg_attr(kani, kani::unwind(32))]
 fn k4b_removed_fibers_leave_nothing_owed_violations() {
-    for case in 0..16u32 {
+    for case in 0..8u32 {
         let log = Log::new();
         let inv1_v = Rc::new(Cell::new(case & 1 != 0));
         let inv2_v = Rc::new(Cell::new(case & 2 != 0));
@@ -508,15 +504,8 @@ fn k4b_removed_fibers_leave_nothing_owed_violations() {
         force_desired(&mut k, vec![entry("p", "p"), entry("fx", "fx")]);
         drain_bounded(&mut k, 8);
 
-        let route = case >> 3; // 0 dispose_root, 1 desired-empty
-        match route {
-            0 => {
-                force_desired(&mut k, Vec::new());
-            }
-            _ => {
-                force_desired(&mut k, Vec::new());
-            }
-        }
+        // Disposal: empty the desired composition and drain.
+        force_desired(&mut k, Vec::new());
         drain_bounded(&mut k, 14);
 
         let violated = any_violated(&k);
@@ -528,7 +517,22 @@ fn k4b_removed_fibers_leave_nothing_owed_violations() {
             "a violated verdict must latch exactly when one was configured"
         );
         if violated {
-            assert!(k.find_by_name("fx").is_some(), "latched fiber removed");
+            assert!(
+                k.find_by_name("fx").is_some(),
+                "a §G.6-latched fiber is missing from the registry"
+            );
+            // A violated *inverse* stops the unwind with its provenance
+            // tombstone retained: the record must still sit in the
+            // accumulator (§K.4 — a violated teardown must not pretend
+            // the obligation was discharged). A teardown-only violation
+            // discharges the unwind fully, so no tombstone is expected.
+            if inv1_v.get() || inv2_v.get() {
+                let fid = k.find_by_name("fx").expect("latched fiber installed");
+                assert!(
+                    !k.fiber(fid).effects.is_empty(),
+                    "a violated unwind dropped the provenance tombstone"
+                );
+            }
         } else {
             assert!(
                 k.slots.iter().all(|s| s.fiber.is_none()),
@@ -652,11 +656,14 @@ fn k5_quiet_is_the_fixed_point_of_step() {
 #[cfg_attr(not(kani), test)]
 #[cfg_attr(kani, kani::unwind(40))]
 fn k6_single_source_survives_replacement_and_violation() {
-    for case in 0..12u32 {
+    // plan2 bit encoding over the legal 6-plan universe: bit0 p1, bit1 p2,
+    // bit2 c; plan 3 (p1+p2) is the one illegal plan (required-single
+    // refuses it) and is skipped.
+    for case in 0..14u32 {
         let p1_latches = case & 1 != 0;
-        let plan2 = case >> 1; // 0: none, 1: p1, 2: p2, 3: p1+c, 4: p2+c, 5: c
+        let plan2 = case >> 1;
         if plan2 == 3 {
-            continue; // illegal: both providers enabled (plan refused)
+            continue;
         }
         let p1_violates = Rc::new(Cell::new(false));
         let mut k = CompositionKernel::new();

@@ -22,9 +22,9 @@ Sources read: `crates/qianqian-composition/src/{kernel,fiber,capability,componen
 | # | PROPERTY | GUARANTEED BY RUST TYPE SYSTEM? | RUNTIME CHECK STILL NEEDED? | TARGET TOOL |
 |---|----------|--------------------------------|-----------------------------|-------------|
 | A1 | One `EffectPayload::Inverse` closure value is invoked at most once | **YES** — `Box<dyn FnOnce>` is consumed by the call; `run_unwind`/`dispose_effect` take the payload out via `mem::replace(.., Violated)` before invoking, so a second invocation would have to read the `Violated` tombstone, which is `unreachable!` (panic, not silent double-call) | The closure value ≠ the semantic obligation: "one EffectRecord is globally discharged exactly once across all paths (clean unload, partial unwind, dispose, retire)" is control flow, not ownership | Kani K3 |
-| A2 | A `Violated` tombstone is never unwound or invoked again | **PARTIAL** — representation: the FnOnce is gone once consumed; the `Violated` arm panics (`unreachable!`) | That the tombstone *stays in the accumulator* (provenance/authority visible, removal blocked) under every legal history is a kernel invariant | Kani K3 (tombstone scenario) |
+| A2 | A `Violated` tombstone is never unwound or invoked again; it stays in the accumulator with its provenance observable | **PARTIAL** — representation: the FnOnce is gone once consumed; the `Violated` arm panics (`unreachable!`) | That the tombstone *stays in the accumulator* (provenance/authority visible, removal blocked) under every legal history is a kernel invariant | Matrix + Miri (K4b tombstone-retention assertion) |
 | A3 | Stale `FiberId { idx, generation }` cannot resolve to a reused slot | **PARTIAL** — representation: generation stored per slot, compared in `fiber_opt`/`fiber_mut` (`f.id == fid`); `FiberId` fields are `pub(crate)` — no external forgery | Removal bumps generation (`wrapping_add`) and resolution honors it only if every path checks; that is a runtime invariant over all interleavings of remove/reuse | Kani K1 |
-| A4 | `FiberId` generation ABA after 2^32 removals in one slot | **NO** (`wrapping_add`) | Accepted bounded-representation limit, documented here; not reachable within any realistic process lifetime; bounded verifiers cannot reach it either | Documented bound (no tool) |
+| A4 | `FiberId` generation ABA after 2^32 removals in one slot | **NO** (`wrapping_add`) | Observation recorded here: not reachable within any realistic process lifetime, and unreachable by bounded verifiers; if this limit is to be *accepted* as a representation contract, that acceptance belongs in the implementation ADR (D3), not in this evidence file | Authority routing (no tool) |
 | A5 | Serialized control plane (kernel operations never race) | **YES** — `CompositionKernel` contains `Cell<u64>` and `Rc<_>` ⇒ auto `!Send + !Sync`; sharing across threads does not compile and no `unsafe impl` exists in the crate | Nothing for a verifier; concurrency enters only *below* the kernel (playback legs) | None (compiler); Loom targets the playback slice instead |
 | A6 | Required-single at new resolution (`activation_ready` exactly-one) | **NO** | Pointwise single-source + exactly-one-active-provider over all legal histories | Kani K6 (+ existing TLA+); unit tests for happy path |
 | A7 | `relied_on` removal guard (committed consumer blocks provider unload) | **NO** | All legal step sequences | Kani K2 (+ existing TLA+) |
@@ -46,7 +46,7 @@ Sources read: `crates/qianqian-composition/src/{kernel,fiber,capability,componen
 | B1 | Ring-buffer indices never over/underrun; partial-frame handling | **PARTIAL** — all ring state under one `Mutex<EdgeState>` (mutual exclusion by `std`); the arithmetic invariants themselves are code | All interleavings of write/read/terminal that respect the mutex | Loom L-series + property tests |
 | B2 | Terminal monotonicity: first terminal wins (EOF not downgraded by late stop; failure not downgraded) | **NO** | Races between `close_eof` / `fail` / `stop` | Loom (stop × EOF × failure) |
 | B3 | Stop/failure/EOF unblock both endpoints (no wedged reader/writer) | **NO** | Every interleaving incl. blocked-in-`wait` at terminal-set time | Loom L4 |
-| B4 | `SessionCompletion` outcome resolved exactly once; decode failure authoritative over stop/drain | **NO** | Races between `decode_failed` / `worker_exited` / drain verdict / `stop` | Loom L2 + unit tests |
+| B4 | `SessionCompletion` outcome resolved exactly once; decode failure authoritative over stop/drain | **NO** | Races between `decode_failed` / `worker_exited` / drain verdict / `stop` | Native tests + stress (loom excluded: `wait_timeout` unmodeled — see playback RESULTS B2.2) |
 | B5 | `DrainSignal` publishes exactly one verdict, first-wins | **PARTIAL** — mutex + `Option` first-wins; semantic "exactly one mechanism fact" is runtime | Trivial; covered by unit tests | Unit tests (existing) |
 | B6 | Disposal ordering stop → join → release (session inverse registration) | **PARTIAL** — kernel LIFO (A11) guarantees the order given the registration order in `session.rs`; the *claim* that the order is correct lives in the session's activation contract | Kernel-level: Kani K3; system-level: session/edge lifecycle tests + B4 stress | Kani K3 + system stress |
 | B7 | Decode worker panics cannot escape or wedge the data plane | **NO** (`catch_unwind` + `edge.fail()` control flow) | Worker body panic path | Unit tests (existing, session_activation) |
@@ -70,10 +70,13 @@ no verifier re-earns them.
 
 ## Consequences for tool choice (B1+)
 
-1. Kani (FV-RUST-0) owns **K1 stale FiberId, K2 relied_on guard, K3 effect
-   discharge discipline (incl. violated tombstone), K4 removal discipline,
-   K5 quiet truth, K6 single-source incl. #126 overlap guard** — exactly the
-   rows with RUNTIME CHECK STILL NEEDED = YES and no concurrency.
+1. Kani (FV-RUST-0) was the intended owner of **K1 stale FiberId, K2
+   relied_on guard, K3 effect discharge discipline, K4 removal
+   discipline, K5 quiet truth, K6 single-source**; the symbolic engine
+   did not converge (recorded TOOLING-INSUFFICIENT in RESULTS.md), so
+   the Rust-side evidence is carried by the exhaustive concrete
+   scenario matrices under native tests + Miri, with the TLA+ model
+   (#125) holding the symbolic layer.
 2. Loom (FV-CONC-0) owns the playback slice (B1–B4): the mutex-guarded edge
    and completion races — the properties whose risk is interleaving, per the
    risk-driven formalization policy.

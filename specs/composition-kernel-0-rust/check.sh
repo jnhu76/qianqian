@@ -1,92 +1,99 @@
 #!/usr/bin/env bash
-# FV-RUST-0 runner: bounded model checking of the real qianqian-composition
+# FV-RUST-0 runner: scenario verification of the real qianqian-composition
 # kernel (campaign QIANQIAN-VERIFICATION-CAMPAIGN-1, Phase B1).
 #
-# Fail-closed contract:
-#   - every K harness must come back VERIFICATION SUCCESSFUL, else exit != 0;
-#   - every mutation (negative control) MUST be caught — a clean mutation
-#     run is TOOLING-FAIL and exits != 0;
-#   - mutations are applied to the working tree only briefly and restored
-#     immediately; the script refuses to run on a dirty kernel.rs and
-#     verifies restoration afterwards.
+# This runs the channel that produced the recorded evidence (see
+# RESULTS.md): the dual-gated harnesses in src/kernel_verify.rs executed
+# natively and under Miri, plus the known-bad mutation controls. The
+# harnesses ALSO compile as Kani proof harnesses (cfg(kani)), but the
+# symbolic Kani channel is recorded TOOLING-INSUFFICIENT (no convergence
+# within ~40 min CPU per harness; formulas dominated by std
+# BTreeMap/String expansion). It is not run here; see RESULTS.md for the
+# concrete bounds before attempting it.
 #
-# Result vocabulary follows issue #124. A green run states
-# BOUNDED-CLEAN under the harness bounds in specs/composition-kernel-0-rust/
-# RESULTS.md — never "the architecture is proven correct".
+# Fail-closed contract:
+#   - all 7 harness matrices must pass natively and under Miri;
+#   - each mutation MUST be caught natively — a clean mutated run is
+#     TOOLING-FAIL and exits != 0;
+#   - mutations touch the working tree only briefly and are restored to
+#     a snapshot-verified state.
+#
+# Result vocabulary follows issue #124. A green run states BOUNDED-CLEAN
+# under the harness bounds in RESULTS.md — never "the architecture is
+# proven correct".
 
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-CRATE="qianqian-composition"
 KERNEL="crates/qianqian-composition/src/kernel.rs"
 DIR="specs/composition-kernel-0-rust"
 
-HARNESS_k1="k1_stale_fiber_id_never_addresses_a_reused_slot"
-HARNESS_k2="k2_relied_provider_is_never_removed_behind_an_open_committed_view"
-HARNESS_k3="k3_effect_inverses_fire_at_most_once_in_lifo_order"
-HARNESS_k4="k4_removed_fibers_leave_nothing_owed"
-HARNESS_k5="k5_quiet_is_the_fixed_point_of_step"
-HARNESS_k6="k6_single_source_survives_replacement_and_violation"
-
-# mutation -> (patch, harness that must catch it)
-MUTATIONS=(
-  "M-K1IgnoreGeneration.patch $HARNESS_k1"
-  "M-K2DropReliedGuard.patch  $HARNESS_k2"
-  "M-K3NoOverlapGuard.patch   $HARNESS_k6"
-)
-
 fail=0
-restore_kernel() {
-  if ! git apply -R --whitespace=nowarn "$DIR/mutations/$1" 2>/dev/null; then
-    git checkout -- "$KERNEL"
-  fi
-}
-
 if [[ -n "$(git status --porcelain -- "$KERNEL")" ]]; then
   echo "TOOLING-FAIL: $KERNEL is dirty; refusing to run mutations" >&2
   exit 2
 fi
+KERNEL_SNAPSHOT="$(mktemp)"
+cp "$KERNEL" "$KERNEL_SNAPSHOT"
 
-echo "== K harness suite (real production kernel + cfg(kani) harnesses) =="
-for key in k1 k2 k3 k4 k5 k6; do
-  h="HARNESS_$key"
-  echo "--- ${!h}"
-  if cargo kani -p "$CRATE" --harness "${!h}"; then
-    echo "RESULT $key BOUNDED-CLEAN"
+echo "== harness matrices, native channel =="
+if cargo test -p qianqian-composition --lib verify:: > /dev/null 2>&1; then
+  echo "RESULT matrices(native) BOUNDED-CLEAN"
+else
+  echo "RESULT matrices(native) FAILED"
+  fail=1
+fi
+
+echo "== harness matrices, Miri channel (UB/leak/overflow) =="
+if command -v cargo +nightly miri > /dev/null 2>&1 || cargo +nightly miri --version > /dev/null 2>&1; then
+  if cargo +nightly miri test -p qianqian-composition --lib verify:: > /dev/null 2>&1; then
+    echo "RESULT matrices(miri) MIRI-CLEAN"
   else
-    echo "RESULT $key FAILED (counterexample or harness/tooling error — classify before touching production)"
+    echo "RESULT matrices(miri) FAILED"
     fail=1
   fi
-done
+else
+  echo "TOOLING-FAIL: nightly miri toolchain not available" >&2
+  fail=1
+fi
 
-echo "== Negative controls (known-bad production mutations MUST be caught) =="
-for entry in "${MUTATIONS[@]}"; do
-  patch="${entry%% *}"
-  harness="${entry##* }"
+echo "== negative controls (known-bad production mutations MUST be caught) =="
+ctl() {
+  local patch="$1" harness="$2" name log
   name="${patch%.patch}"
+  log="$(mktemp)"
   if ! git apply --whitespace=nowarn "$DIR/mutations/$patch"; then
     echo "TOOLING-FAIL: mutation $name does not apply" >&2
     fail=1
-    continue
+    return
   fi
-  if cargo kani -p "$CRATE" --harness "$harness"; then
-    echo "RESULT $name TOOLING-FAIL (mutation was NOT caught — harness has no teeth)"
+  if cargo test -p qianqian-composition --lib "verify::$harness" > "$log" 2>&1; then
+    echo "RESULT $name TOOLING-FAIL (mutation was NOT caught)"
     fail=1
-  else
+  elif grep -q "test result: FAILED" "$log"; then
     echo "RESULT $name COUNTEREXAMPLE-WITNESSED"
-  fi
-  restore_kernel "$patch"
-  if [[ -n "$(git status --porcelain -- "$KERNEL")" ]]; then
-    echo "TOOLING-FAIL: kernel.rs failed to restore" >&2
-    git checkout -- "$KERNEL"
+  else
+    echo "TOOLING-FAIL: mutation $name run errored unexpectedly" >&2
+    tail -3 "$log" >&2
     fail=1
   fi
-done
+  rm -f "$log"
+  git apply -R --whitespace=nowarn "$DIR/mutations/$patch"
+  if ! cmp -s "$KERNEL" "$KERNEL_SNAPSHOT"; then
+    cp "$KERNEL_SNAPSHOT" "$KERNEL"
+    echo "TOOLING-FAIL: kernel.rs did not restore to the expected state" >&2
+    fail=1
+  fi
+}
+ctl M-K1IgnoreGeneration.patch k1_stale_fiber_id_never_addresses_a_reused_slot
+ctl M-K2DropReliedGuard.patch k2_relied_provider_is_never_removed_behind_an_open_committed_view
+ctl M-K3NoOverlapGuard.patch k6_single_source_survives_replacement_and_violation
 
+rm -f "$KERNEL_SNAPSHOT"
 if [[ "$fail" -eq 0 ]]; then
-  echo "SUITE: BOUNDED-CLEAN (all K harnesses clean; all mutations caught)"
+  echo "SUITE: BOUNDED-CLEAN (all matrices clean natively + Miri; all mutations caught)"
 else
-  echo "SUITE: FAILED (see per-item RESULT lines above)"
+  echo "SUITE: FAILED (see RESULT lines above)"
 fi
 exit "$fail"
