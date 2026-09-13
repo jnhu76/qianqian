@@ -139,7 +139,8 @@ The generic Composition Kernel (K0) is implemented. Current canonical vocabulary
 Build/test authority:
 
 ```bash
-cargo run -p qianqian-headless
+cargo run -p qianqian-headless -- --help
+cargo run -p qianqian-headless --features playback -- play <music-file>
 cargo test --workspace
 ```
 
