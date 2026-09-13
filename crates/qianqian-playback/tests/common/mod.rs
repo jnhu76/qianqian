@@ -6,6 +6,10 @@
 //! can be exercised on any platform and under adversarial timing. The
 //! Windows real-sound gate covers the physical path.
 
+// Shared test support: each test binary uses a subset, so per-binary
+// dead-code findings on the unused remainder are expected, not defects.
+#![allow(dead_code)]
+
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -204,14 +208,25 @@ pub fn named_thread_alive(name: &str) -> bool {
 }
 
 /// Run `f` on a watchdog thread that fails the test if it exceeds `limit`.
+/// A panic inside `f` is re-raised here unchanged: `Disconnected` on the
+/// channel means the body died, not that the limit was exceeded (issue
+/// #121 — body panics were being misreported as "operation exceeded 10s").
 pub fn within<R>(limit: Duration, f: impl FnOnce() -> R + Send + 'static) -> R
 where
     R: Send + 'static,
 {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        let _ = tx.send(f());
+        let _ = tx.send(std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)));
     });
-    rx.recv_timeout(limit)
-        .unwrap_or_else(|_| panic!("operation exceeded {:?}", limit))
+    match rx.recv_timeout(limit) {
+        Ok(Ok(value)) => value,
+        Ok(Err(payload)) => std::panic::resume_unwind(payload),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+            panic!("operation exceeded {limit:?}")
+        }
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+            panic!("watchdog body vanished without a panic payload")
+        }
+    }
 }
