@@ -37,7 +37,6 @@ pub const TEST_FORMAT: PcmFormat = PcmFormat {
 /// How the fake decode source behaves. Which variants are live differs
 /// per test binary sharing this mod, so the enum carries a dead-code
 /// allowance for the binaries that exercise a subset.
-#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum SourceBehavior {
     /// Produce `n` frames of payload, then clean EOF.
@@ -110,7 +109,6 @@ impl DecodedPcmStream for TestDecodeStream {
 }
 
 /// How the test render leg behaves. (Per-binary usage, see above.)
-#[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum OutputBehavior {
     /// Consume the edge to EOF, then report Drained.
@@ -194,17 +192,45 @@ impl RenderStream for TestStream {
 /// Deterministic under the parallel test harness (which inflates raw
 /// thread counts with other tests' workers). Only the lifecycle test
 /// binary calls it.
+///
+/// The kernel truncates thread comm names to 15 bytes (`PR_SET_NAME`),
+/// so the query is truncated the same way; comparing a longer Builder
+/// name against comm would make the check vacuously absent.
 #[cfg(target_os = "linux")]
-#[allow(dead_code)]
 pub fn named_thread_alive(name: &str) -> bool {
+    let comm_name = name.get(..15).unwrap_or(name);
     let tasks = std::fs::read_dir("/proc/self/task").expect("/proc/self/task available");
     for entry in tasks.flatten() {
         let comm = std::fs::read_to_string(entry.path().join("comm")).unwrap_or_default();
-        if comm.trim_end() == name {
+        if comm.trim_end() == comm_name {
             return true;
         }
     }
     false
+}
+
+/// Bounded-poll variant of [`named_thread_alive`] for disposal oracles.
+///
+/// `join()` — the semantic contract — returns when the worker closure has
+/// finished but before the OS thread has completed its own exit, so the
+/// `/proc` entry can legitimately linger briefly after a successful join.
+/// A single-shot check therefore reports false leaks on loaded machines
+/// (issue #121). Poll until the name disappears or `limit` elapses: a
+/// just-joined worker exits within the window, a genuinely running worker
+/// never does. This is a diagnostic observation with an explicit grace
+/// period, not a restatement of the join contract.
+#[cfg(target_os = "linux")]
+pub fn named_thread_gone_within(name: &str, limit: Duration) -> bool {
+    let deadline = std::time::Instant::now() + limit;
+    loop {
+        if !named_thread_alive(name) {
+            return true;
+        }
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
 }
 
 /// Run `f` on a watchdog thread that fails the test if it exceeds `limit`.
