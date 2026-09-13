@@ -44,21 +44,31 @@ races are instead covered natively (see below) and under Miri.
 `crates/qianqian-playback/tests/loom_edge.rs` (whole file `cfg(loom)`):
 
 ```text
-loom_l1  3 threads: write([7,9]) × stop × read-to-terminal
-         ring: 1 channel × 2 samples. Asserts: FIFO ring integrity under
-         every interleaving, EOF unreachable, terminal monotone Stopped,
-         consumer exits through the terminal.
-loom_l3  2 threads: close_eof × stop. Asserts first-terminal-wins and
-         consumer outcome == final terminal.
-loom_l4a pre-filled 1-sample edge; 2 threads: blocked write([9]) × stop.
-         Asserts the producer wakes and returns Stopped under every
-         schedule (no lost wakeup, no wedge).
-loom_l4b 2 threads × 2 params: consumer blocked on empty × {close_eof,
-         stop}. Asserts the consumer wakes with the matching outcome.
+loom_l1   3 threads: write([7,9]) × stop × read-to-terminal
+          ring: 1 channel × 2 samples. Asserts: FIFO ring integrity under
+          every interleaving, EOF unreachable, terminal monotone Stopped,
+          consumer exits through the terminal.
+loom_l3a  2 threads: close_eof × stop. Asserts first-terminal-wins and
+          consumer outcome == final terminal (read distinguishes the
+          winner: Eof vs Stopped).
+loom_l3b  2 threads: fail × stop. Asserts first-terminal-wins at the
+          identity level: the winner (Failed or Stopped) is preserved in
+          edge.terminal() under every schedule — a failure is never
+          downgraded into a stop state and the two are never merged —
+          while the collapsed consumer outcome is Stopped for both.
+loom_l4a  pre-filled 1-sample edge; 2 threads × 2 params: blocked
+          write([9]) × {stop, fail}. Asserts the producer wakes and
+          returns Stopped under every schedule (no lost wakeup, no
+          wedge); after a fail the edge terminal is Failed.
+loom_l4b  2 threads × 3 params: consumer blocked on empty ×
+          {close_eof, stop, fail}. Asserts the consumer wakes with the
+          matching outcome; the fail arm reads the collapsed Stopped
+          while edge.terminal() stays Failed.
 ```
 
-Full interleaving exploration per model (loom 0.7.2, release build);
-the suite completes in ~28 s wall. Bounds: ≤ 3 threads, ≤ 2 buffered
+Five test functions, eight loom model explorations in total. Full
+interleaving exploration per model (loom 0.7.2, release build); the
+suite completes in ~27 s wall. Bounds: ≤ 3 threads, ≤ 2 buffered
 samples, ≤ 3 operations per thread. A clean run is SCHEDULE-CLEAN
 within exactly these bounds.
 
@@ -67,12 +77,20 @@ within exactly these bounds.
 | ITEM | RESULT | ENGINE |
 |------|--------|--------|
 | L1 write×read×stop: FIFO integrity, no wedge | SCHEDULE-CLEAN | loom 0.7.2 |
-| L3 first-terminal-wins (EOF × stop) | SCHEDULE-CLEAN | loom 0.7.2 |
-| L4a blocked producer × stop wakes | SCHEDULE-CLEAN | loom 0.7.2 |
-| L4b blocked consumer × {EOF, stop} wakes | SCHEDULE-CLEAN | loom 0.7.2 |
+| L3a first-terminal-wins (EOF × stop) | SCHEDULE-CLEAN | loom 0.7.2 |
+| L3b first-terminal-wins (failure × stop), Failed identity preserved | SCHEDULE-CLEAN | loom 0.7.2 |
+| L4a blocked producer × {stop, fail} wakes | SCHEDULE-CLEAN | loom 0.7.2 |
+| L4b blocked consumer × {EOF, stop, fail} wakes | SCHEDULE-CLEAN | loom 0.7.2 |
 | M-L1 (drop `data_ready.notify_all`) | COUNTEREXAMPLE-WITNESSED — loom reports the deadlocked schedule (consumer blocked forever) | mutation → loom |
 
-C4/C6 (failure × completion publication authority) and the
+Negative-control sensitivity: M-L1 removes the notify inside the shared
+`set_terminal` path, which serves EOF, failure and stop alike — the
+witnessed deadlock schedule therefore exercises the same lost-wakeup
+mechanism the new fail arms depend on. No separate failure-path mutation
+was added; one mechanism-sensitive control is the honest count, not a
+coverage number.
+
+C6 (failure × completion publication authority) and the
 `SessionCompletion` resolve decision table are exercised by the native
 `session_activation`/`edge_lifecycle` suites under CPU pressure (Phase
 B4 stress) and by the Miri pass; they are recorded there, not claimed

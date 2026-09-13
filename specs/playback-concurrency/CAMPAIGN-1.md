@@ -7,13 +7,21 @@
 
 ```text
 BASE_SHA:        44e9ed0b26d031a7985d67d179600fdce3af8117  (main after #127)
-BRANCHES:        verification/fv-rust-0 (Phase B0/B1)
+BRANCHES:        verification/fv-rust-0 (Phase B0/B1; merged via PR #129)
                  verification/fv-conc-0 (Phase B2 + this report)
 HOST:            Fedora server, 20 cores, 64 GB RAM
 TOOLCHAIN:       rustc/cargo 1.98.1 · kani-verifier 0.67.0 · miri nightly 2026-09-12 · loom 0.7.2
 TLA+/TLC:        NOT RE-RUN this round — PR #125 evidence stands
                  (baseline BOUNDED-CLEAN, 263314 states; M1–M5 counterexamples;
                   probes witnessed; production corrective #126 merged)
+
+SINGLE-WRITER DISCIPLINE: each verification layer's canonical RESULTS
+has exactly one owner. FV-RUST-0 owns
+specs/composition-kernel-0-rust/RESULTS.md (merged via #129); FV-CONC-0
+owns specs/playback-concurrency/RESULTS.md. This campaign report only
+summarizes and references them — it never carries a second copy of
+another layer's canonical numbers. If a summary here ever disagrees
+with a layer's canonical RESULTS, the campaign report is wrong.
 ```
 
 ## Phase A — #127 oracle corrective (precondition)
@@ -40,13 +48,17 @@ inverse once + LIFO +
 generation safety (K1)     partial  -     T-I        ✓             -      tests
 removal discipline (K4)        -    ✓     T-I        ✓             -      tests
 quiet truth (K5)               -    ✓     T-I        ✓             -      tests
-edge FIFO / terminal
-  monotonicity / wakeup        -    -     -          ✓ (native)    ✓      stress
+edge FIFO / ring integrity     -    -     -          ✓ (native)    ✓      stress
+EOF × stop terminal            -    -     -          ✓ (native)    ✓      stress
+failure × stop terminal        -    -     -          ✓ (native)    ✓      stress
+blocked endpoint terminal
+  wake (EOF/stop/failure)      -    -     -          ✓ (native)    ✓      stress
 completion exactly once        -    -     -          ✓ (native)    -      tests/stress
 unsafe pointer validity        -    -     -          MIRI-CLEAN
   (pure-Rust crates)                                       (scope below)  -
 procfs visibility              -    -     -          -             -      ✓
-WASAPI / native decode         -    -     -          -             -      NOT RUN
+songcore native FFI            -    -     -          -             -      NOT RUN
+WASAPI                         -    -     -          -             -      DEFERRED
 ```
 
 Legend: ✓ = executed result recorded; T-I = TOOLING-INSUFFICIENT (recorded
@@ -65,7 +77,10 @@ already proves is explicitly excluded from verifier scope.
 
 ### FV-RUST-0 (Phase B1) — kernel scenario verification
 
-Details: `specs/composition-kernel-0-rust/RESULTS.md`.
+Canonical source: `specs/composition-kernel-0-rust/RESULTS.md`,
+merged via PR #129. The block below is a summary only — the
+fine-grained property/bound record lives in the canonical file, and on
+any disagreement the canonical file wins over this report.
 
 ```text
 K1 stale FiberId / K2 relied provision / K3 inverse-once+LIFO /
@@ -87,17 +102,22 @@ HARNESS EVOLUTION: P_RELIED was strengthened after M-K2 exposed the
 
 ### FV-CONC-0 (Phase B2) — playback concurrency
 
-Details: `specs/playback-concurrency/RESULTS.md`.
+Canonical source: `specs/playback-concurrency/RESULTS.md` (this
+layer's own RESULTS; the block below is a summary).
 
 ```text
 LOOM 0.7.2 over the REAL PcmEdge (cfg(loom) drop-in sync primitives):
-    L1 write×read×stop (FIFO ring integrity, terminal monotone)
-    L3 first-terminal-wins (EOF × stop)
-    L4a blocked producer × stop wakes
-    L4b blocked consumer × {EOF, stop} wakes
-    → SCHEDULE-CLEAN (full interleaving exploration; ≤3 threads, ≤2 samples)
+    L1  write×read×stop (FIFO ring integrity, terminal monotone)
+    L3a first-terminal-wins (EOF × stop)
+    L3b first-terminal-wins (failure × stop; Failed identity preserved,
+        never merged into or downgraded to Stopped)
+    L4a blocked producer × {stop, fail} wakes
+    L4b blocked consumer × {EOF, stop, fail} wakes
+    → SCHEDULE-CLEAN (full interleaving exploration; 5 test fns =
+      8 model explorations; ≤3 threads, ≤2 samples)
 NEGATIVE CONTROL: M-L1 drop data_ready notify → COUNTEREXAMPLE-WITNESSED
-    (loom reports the deadlocked schedule).
+    (loom reports the deadlocked schedule; the mutation hits the shared
+    terminal-wakeup path, so it is failure-path sensitive too).
 SessionCompletion: explicitly NOT loomed (wait_timeout unmodeled);
     covered natively + stress + Miri-adjacent runs.
 ```
