@@ -11,8 +11,9 @@
 //! Modeled slice (campaign B2.1: where concurrency actually begins): the
 //! edge is the only genuinely interleaved shared state in the playback
 //! session. Properties: L1 write/read/stop interleaving with FIFO ring
-//! integrity; L3 first-terminal-wins; L4 blocked-endpoint wakeup. A clean
-//! run is SCHEDULE-CLEAN within the stated thread/operation bounds
+//! integrity; L3 first-terminal-wins over {EOF, failure, stop}; L4
+//! blocked-endpoint wakeup under every terminal. A clean run is
+//! SCHEDULE-CLEAN within the stated thread/operation bounds
 //! (vocabulary #124) — not a general proof.
 
 #![cfg(loom)]
@@ -91,11 +92,11 @@ fn loom_l1_write_read_stop_interleave() {
     })
 }
 
-/// L3 — first terminal wins: `close_eof` × `stop` race. The terminal is
+/// L3a — first terminal wins: `close_eof` × `stop` race. The terminal is
 /// one of the two, never downgraded or swapped, and the consumer outcome
 /// matches the final terminal exactly.
 #[test]
-fn loom_l3_first_terminal_wins() {
+fn loom_l3a_eof_stop_first_terminal_wins() {
     loom::model(|| {
         let edge = Arc::new(PcmEdge::new(1, 2));
         let eof = {
@@ -127,35 +128,94 @@ fn loom_l3_first_terminal_wins() {
     })
 }
 
-/// L4a — a producer blocked on a full edge must be woken by `stop` and
-/// return `Stopped` under every schedule (no lost wakeup, no wedge).
+/// L3b — first terminal wins: `fail` × `stop` race. Whichever terminal
+/// commits first keeps its identity internally (`Failed` is never
+/// downgraded to `Stopped` and vice versa — the edge holds a single
+/// winner, not a merged state); the consumer outcome is `Stopped` for
+/// both, which is the collapsed read-side view.
 #[test]
-fn loom_l4a_stop_unblocks_full_producer() {
+fn loom_l3b_fail_stop_first_terminal_wins() {
     loom::model(|| {
-        let edge = Arc::new(PcmEdge::new(1, 1));
-        // Fill the single-sample edge synchronously: the spawned write
-        // below is genuinely blocked on `space_freed`.
-        assert_eq!(edge.write(&[7.0]), WriteOutcome::Written);
-        let producer = {
+        let edge = Arc::new(PcmEdge::new(1, 2));
+        let fail = {
             let e = edge.clone();
-            thread::spawn(move || e.write(&[9.0]))
+            thread::spawn(move || e.fail())
         };
-        let stopper = {
+        let stop = {
             let e = edge.clone();
             thread::spawn(move || e.stop())
         };
-        let written = producer.join().unwrap();
-        stopper.join().unwrap();
-        assert_eq!(written, WriteOutcome::Stopped);
+        fail.join().unwrap();
+        stop.join().unwrap();
+
+        let term = edge.terminal();
+        match term {
+            EdgeTerminal::Failed | EdgeTerminal::Stopped => {}
+            other => panic!("terminal must be Failed or Stopped, got {other:?}"),
+        }
+        let mut dst = [0.0f32; 1];
+        assert!(
+            matches!(edge.read_frames(&mut dst), PcmPull::Stopped),
+            "fail × stop must read Stopped under every schedule"
+        );
     })
 }
 
-/// L4b — a consumer blocked on an empty edge must be woken by a terminal:
-/// once by committed EOF (reading `Eof`), once by stop (reading
-/// `Stopped`), under every schedule.
+/// L4a — a producer blocked on a full edge must be woken by a terminal
+/// and return `Stopped` under every schedule (no lost wakeup, no wedge):
+/// once by `stop`, once by `fail`. The failing edge keeps its `Failed`
+/// identity while still unblocking the writer.
+#[test]
+fn loom_l4a_terminal_unblocks_full_producer() {
+    /// Which terminal the closer commits against the blocked producer.
+    #[derive(Clone, Copy)]
+    enum Kill {
+        Stop,
+        Fail,
+    }
+    for kill in [Kill::Stop, Kill::Fail] {
+        loom::model(move || {
+            let edge = Arc::new(PcmEdge::new(1, 1));
+            // Fill the single-sample edge synchronously: the spawned write
+            // below is genuinely blocked on `space_freed`.
+            assert_eq!(edge.write(&[7.0]), WriteOutcome::Written);
+            let producer = {
+                let e = edge.clone();
+                thread::spawn(move || e.write(&[9.0]))
+            };
+            let closer = {
+                let e = edge.clone();
+                thread::spawn(move || match kill {
+                    Kill::Stop => e.stop(),
+                    Kill::Fail => e.fail(),
+                })
+            };
+            let written = producer.join().unwrap();
+            closer.join().unwrap();
+            assert_eq!(written, WriteOutcome::Stopped);
+            match kill {
+                Kill::Stop => assert_eq!(edge.terminal(), EdgeTerminal::Stopped),
+                Kill::Fail => assert_eq!(edge.terminal(), EdgeTerminal::Failed),
+            }
+        });
+    }
+}
+
+/// L4b — a consumer blocked on an empty edge must be woken by a terminal
+/// under every schedule (no lost wakeup, no wedge): by committed EOF
+/// (reading `Eof`), by stop (reading `Stopped`), and by failure
+/// (reading the collapsed `Stopped` while the edge itself keeps the
+/// `Failed` identity).
 #[test]
 fn loom_l4b_terminal_unblocks_blocked_consumer() {
-    for set_eof in [true, false] {
+    /// Which terminal the setter commits against the blocked consumer.
+    #[derive(Clone, Copy)]
+    enum Kill {
+        Eof,
+        Stop,
+        Fail,
+    }
+    for kill in [Kill::Eof, Kill::Stop, Kill::Fail] {
         loom::model(move || {
             let edge = Arc::new(PcmEdge::new(1, 2));
             let consumer = {
@@ -167,20 +227,27 @@ fn loom_l4b_terminal_unblocks_blocked_consumer() {
             };
             let setter = {
                 let e = edge.clone();
-                thread::spawn(move || {
-                    if set_eof {
-                        e.close_eof();
-                    } else {
-                        e.stop();
-                    }
+                thread::spawn(move || match kill {
+                    Kill::Eof => e.close_eof(),
+                    Kill::Stop => e.stop(),
+                    Kill::Fail => e.fail(),
                 })
             };
             setter.join().unwrap();
             let pull = consumer.join().unwrap();
-            if set_eof {
-                assert!(matches!(pull, PcmPull::Eof));
-            } else {
-                assert!(matches!(pull, PcmPull::Stopped));
+            match kill {
+                Kill::Eof => {
+                    assert!(matches!(pull, PcmPull::Eof));
+                    assert_eq!(edge.terminal(), EdgeTerminal::Eof);
+                }
+                Kill::Stop => {
+                    assert!(matches!(pull, PcmPull::Stopped));
+                    assert_eq!(edge.terminal(), EdgeTerminal::Stopped);
+                }
+                Kill::Fail => {
+                    assert!(matches!(pull, PcmPull::Stopped));
+                    assert_eq!(edge.terminal(), EdgeTerminal::Failed);
+                }
             }
         });
     }
