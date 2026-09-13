@@ -180,18 +180,26 @@ fn any_violated(k: &CompositionKernel) -> bool {
     installed_fibers(k).iter().any(|f| f.teardown_violated)
 }
 
-/// P_RELIED: every provider referenced by an open committed view is still
-/// installed. This is the semantic content of the relied_on removal guard,
-/// stated on the registry truth instead of restating the guard's code.
+/// P_RELIED: for every open committed view binding, the bound provider's
+/// provision must remain resolvable — the provider fiber is installed and
+/// still holds the Provision effect for that capability. This is the
+/// semantic content of the relied_on removal guard stated on registry
+/// truth instead of restating the guard's code: a relied provider may sit
+/// in `Unloading` while consumers close their episodes, but its provision
+/// must not be discharged (nor the fiber removed) behind an open view.
 fn assert_committed_providers_installed(k: &CompositionKernel) {
     for f in installed_fibers(k) {
-        if let Some(view) = &f.committed {
-            for p in view.values() {
-                assert!(
-                    k.fiber_opt(*p).is_some(),
-                    "an open committed view references an uninstalled provider"
-                );
-            }
+        let Some(view) = &f.committed else { continue };
+        for (cap_id, p) in view {
+            let pf = k.fiber_opt(*p).unwrap_or_else(|| {
+                panic!("an open committed view references an uninstalled provider")
+            });
+            assert!(
+                pf.effects.iter().any(
+                    |e| matches!(&e.payload, crate::fiber::EffectPayload::Provision { key, .. } if key.id == *cap_id)
+                ),
+                "a committed view binding lost its provider's provision"
+            );
         }
     }
 }
