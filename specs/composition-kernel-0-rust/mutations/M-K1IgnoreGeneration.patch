@@ -1,0 +1,12 @@
+--- a/crates/qianqian-composition/src/kernel.rs
++++ b/crates/qianqian-composition/src/kernel.rs
+@@ -885,8 +885,8 @@
+     fn fiber_opt(&self, fid: FiberId) -> Option<&Fiber> {
+         self.slots
+             .get(fid.idx as usize)
+             .and_then(|s| s.fiber.as_ref())
+-            .filter(|f| f.id == fid)
++            .filter(|f| f.id.idx == fid.idx)
+     }
+
+     fn find_by_name(&self, name: &str) -> Option<FiberId> {
