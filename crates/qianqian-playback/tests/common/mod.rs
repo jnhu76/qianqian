@@ -211,14 +211,17 @@ pub fn named_thread_alive(name: &str) -> bool {
 
 /// Bounded-poll variant of [`named_thread_alive`] for disposal oracles.
 ///
-/// `join()` — the semantic contract — returns when the worker closure has
-/// finished but before the OS thread has completed its own exit, so the
-/// `/proc` entry can legitimately linger briefly after a successful join.
-/// A single-shot check therefore reports false leaks on loaded machines
-/// (issue #121). Poll until the name disappears or `limit` elapses: a
-/// just-joined worker exits within the window, a genuinely running worker
-/// never does. This is a diagnostic observation with an explicit grace
-/// period, not a restatement of the join contract.
+/// A successful `join()` already means the worker has terminated — that
+/// is the Rust/POSIX lifecycle contract, which this oracle does not
+/// restate. Whether the thread's entry has vanished from
+/// `/proc/self/task` is a separate, external Linux diagnostic
+/// observation with no timing contract; empirically the listing can
+/// still show the task right after a successful join on a loaded
+/// machine (issue #121). Poll until the name disappears or `limit`
+/// elapses so the diagnostic does not report false leaks, while a
+/// genuinely running worker never leaves the window. The grace is
+/// observation tolerance for the diagnostic, not part of the join
+/// contract.
 #[cfg(target_os = "linux")]
 pub fn named_thread_gone_within(name: &str, limit: Duration) -> bool {
     let deadline = std::time::Instant::now() + limit;

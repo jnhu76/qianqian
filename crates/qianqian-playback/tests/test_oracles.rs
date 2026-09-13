@@ -1,7 +1,7 @@
 //! Negative + positive controls for the test-support oracles (issue #121
-//! corrective). The thread-leak diagnostic's bounded-poll tolerance for a
-//! just-joined worker's OS exit must not become blindness to a real
-//! leak; the watchdog must report a body panic as itself, not as a
+//! corrective). The thread-leak diagnostic's bounded-poll tolerance for
+//! the /proc listing's observation lag must not become blindness to a
+//! real leak; the watchdog must report a body panic as itself, not as a
 //! timeout, and must still bound genuinely slow bodies.
 
 mod common;
@@ -24,7 +24,7 @@ fn diagnostic_oracle_catches_a_genuine_leak() {
     );
     // Retire the probe so it cannot outlive this window; joining is the
     // semantic cleanup, and the oracle tolerance above covers only the
-    // post-join /proc lag.
+    // /proc listing's observation lag.
     handle.join().expect("leak-probe worker joins");
 }
 
@@ -37,7 +37,7 @@ fn diagnostic_oracle_accepts_a_joined_worker() {
     handle.join().expect("join-probe worker joins");
     assert!(
         named_thread_gone_within("qianqian-join-probe", Duration::from_secs(2)),
-        "diagnostic oracle must tolerate a joined worker's OS exit window"
+        "diagnostic oracle must tolerate the /proc listing's observation lag"
     );
 }
 
