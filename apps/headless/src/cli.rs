@@ -31,6 +31,9 @@ pub enum InvocationError {
 }
 
 /// Parse argv (excluding the program path) into one typed invocation.
+///
+/// Flags are recognized only in command position: `play --help` denotes
+/// a file literally named `--help`, not a help request.
 pub fn parse_invocation(args: &[String]) -> Result<Invocation, InvocationError> {
     let Some(command) = args.first() else {
         return Err(InvocationError::MissingCommand);
@@ -246,9 +249,16 @@ mod tests {
 
     #[test]
     fn help_or_version_with_trailing_arguments_is_an_arity_error() {
-        for tokens in [["--help", "play"], ["--version", "x"]] {
-            let err = parse_invocation(&argv(&tokens)).expect_err("flags take no arguments");
-            assert_eq!(err, InvocationError::WrongArity { command: tokens[0] });
+        // Short flags canonicalize to their long form in the error.
+        let cases = [
+            (&["--help", "play"][..], "--help"),
+            (&["-h", "x"][..], "--help"),
+            (&["--version", "x"][..], "--version"),
+            (&["-V", "x"][..], "--version"),
+        ];
+        for (tokens, command) in cases {
+            let err = parse_invocation(&argv(tokens)).expect_err("flags take no arguments");
+            assert_eq!(err, InvocationError::WrongArity { command });
         }
     }
 
