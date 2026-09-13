@@ -8,6 +8,12 @@ description = "Playback Session: composes Decode + Output capabilities into one 
 [dependencies]
 qianqian-audio-api = { path = "../qianqian-audio-api" }
 qianqian-composition = { path = "../qianqian-composition" }
+# FV-CONC-0: selected only under `--cfg loom` + `--features loom` so the
+# loom model checker explores the real PcmEdge synchronization code.
+loom = { version = "0.7", optional = true }
+
+[features]
+loom = ["dep:loom"]
 
 [dev-dependencies]
 qianqian-app = { path = "../qianqian-app" }
