@@ -1,0 +1,13 @@
+--- a/crates/qianqian-composition/src/kernel.rs
++++ b/crates/qianqian-composition/src/kernel.rs
+@@ -411,7 +411,7 @@
+     fn eligible_unload(&self) -> Option<FiberId> {
+         for slot in &self.slots {
+             let Some(f) = &slot.fiber else { continue };
+-            if f.state == FiberState::Unloading && !f.teardown_violated && !self.relied_on(f.id) {
++            if f.state == FiberState::Unloading && !f.teardown_violated {
+                 return Some(f.id);
+             }
+         }
+         None
+     }

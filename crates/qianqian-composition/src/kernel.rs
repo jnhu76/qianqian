@@ -938,3 +938,13 @@ fn dfs_cycle(
     }
     color.insert(node.to_owned(), 2);
 }
+
+// Bounded scenario verification of the real kernel (campaign FV-RUST-0,
+// see specs/composition-kernel-0-rust/). A child module so harnesses can
+// reach private registry internals. Under the Kani toolchain the harnesses
+// are proof harnesses; under a normal test build they run as plain tests
+// (also under Miri), executing the same exhaustive concrete scenario
+// matrices with the same per-step invariant assertions.
+#[cfg(any(kani, test))]
+#[path = "kernel_verify.rs"]
+mod verify;

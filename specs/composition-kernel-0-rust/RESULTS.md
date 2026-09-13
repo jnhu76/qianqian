@@ -19,26 +19,34 @@ host:                    Fedora, 20 cores, 64 GB RAM
 ## Harness shape (bounds, stated precisely)
 
 `crates/qianqian-composition/src/kernel_verify.rs` — a child module of
-`kernel` (private registry access, zero production changes; two `#[cfg]`
-lines in `kernel.rs`). The properties are evaluated over **exhaustively
-enumerated concrete scenario matrices**:
+`kernel` (private registry access, zero production changes; a `#[cfg]`
+module gate in `kernel.rs`). The properties are evaluated over
+**exhaustively enumerated concrete scenario matrices**, counted here by
+*distinct behaviors* (a bit that only selects an identical code path is
+not counted twice):
 
 ```text
 K1  stale FiberId          2 scenarios  (slot-0 reuse; slot-1 reuse behind filler)
 K2  relied_on guard        4 scenarios  (all keep/remove rewrites of {p,c})
-K3  effect discipline     12 scenarios  (dispose × double-dispose × 3 routes)
-K4a removal (clean)        8 scenarios  (activation raise × dispose × 2 routes)
-K4b removal (violations)  16 scenarios  (inv1/inv2/teardown violation lattice × 2 routes)
-K5  quiet truth           16 + 8 scenarios (all plan subsets × activation failure; sweep from maximal state)
-K6  single-source         10 scenarios (5 legal phase-2 plans × p1 §G.6 latch)
+K3  effect discipline      8 scenarios  (dispose × double-dispose × {drain, leave live})
+K4a removal (clean)        4 scenarios  (activation raise × early dispose)
+K4b removal (violations)   8 scenarios  (inv1/inv2/teardown violation lattice)
+K5  quiet truth           24 scenarios (16: all plan subsets × activation failure;
+                                          8: full phase-2 sweep from the maximal state)
+K6  single-source         12 scenarios (6 legal phase-2 plans × p1 §G.6 latch)
 ```
 
-Every scenario is drained a bounded number of `step()` transitions
-(≤ 14) and the property invariant is re-asserted **after every step**.
-Desired plans are injected directly (`force_desired`) — observationally
-equivalent to `set_desired` on a legal plan, kept out of the verified
-formula; plan-time validation itself is covered by existing unit tests.
-`dispose_root` is replaced by the equivalent (empty-desired + drain).
+Total: 62 distinct-behavior scenarios (62 loop iterations; no axis in the
+loop nests selects a duplicate code path after the reviewer-driven route
+deduplication). Every scenario is drained a bounded number of `step()`
+transitions (≤ 14). P_RELIED/P_SINGLE are re-asserted **after every
+step** in K2 and K6; the remaining harnesses assert at drain completion
+(discharge counters and end-state predicates are only meaningful once
+the drain has settled). Desired plans are injected directly
+(`force_desired`) — observationally equivalent to `set_desired` on a
+legal plan, kept out of the verified formula; plan-time validation
+itself is covered by existing unit tests. `dispose_root` is replaced by
+the equivalent (empty-desired + drain).
 
 ## Results
 
@@ -46,15 +54,15 @@ formula; plan-time validation itself is covered by existing unit tests.
 |------|--------------------------|--------|
 | K1 stale FiberId never re-addresses a reused slot | BOUNDED-CLEAN (scenario bounds above) | native test + MIRI-CLEAN |
 | K2 relied provision stays resolvable behind open views | BOUNDED-CLEAN | native test + MIRI-CLEAN |
-| K3 inverse at most once, LIFO, tombstone authority | BOUNDED-CLEAN | native test + MIRI-CLEAN |
+| K3 inverse at most once, LIFO order | BOUNDED-CLEAN | native test + MIRI-CLEAN |
 | K4a clean removal discharges everything owed | BOUNDED-CLEAN | native test + MIRI-CLEAN |
-| K4b violated verdict latches; removal blocked; P_RELIED holds | BOUNDED-CLEAN | native test + MIRI-CLEAN |
-| K5 quiet ⇔ step settles (FAILED/Pending quiet-legal covered) | BOUNDED-CLEAN | native test + MIRI-CLEAN |
+| K4b violated verdict latches; removal blocked; P_RELIED holds; **violated inverse retains its provenance tombstone in the accumulator** | BOUNDED-CLEAN | native test + MIRI-CLEAN |
+| K5 quiet ⇒ `step()` settles (FAILED/Pending quiet-legal covered) | BOUNDED-CLEAN | native test + MIRI-CLEAN |
 | K6 single-source incl. #126 withheld-mount latch | BOUNDED-CLEAN | native test + MIRI-CLEAN |
 | M-K1 (ignore FiberId generation) | COUNTEREXAMPLE-WITNESSED | mutation → native/Miri channel |
 | M-K2 (drop relied_on guard) | COUNTEREXAMPLE-WITNESSED | mutation → native/Miri channel |
 | M-K3 (drop mount overlap guard) | COUNTEREXAMPLE-WITNESSED | mutation → native/Miri channel |
-| Miri over all 7 matrices | MIRI-CLEAN (18.9 s; full UB/leak/overflow checking) | cargo +nightly miri |
+| Miri over all 7 matrices | MIRI-CLEAN (≈19 s; full UB/leak/overflow checking) | cargo +nightly miri |
 
 ## Kani engine status: TOOLING-INSUFFICIENT (symbolic), honestly recorded
 
@@ -64,7 +72,9 @@ proof harnesses. Symbolic runs did not converge to usable runtimes:
 ```text
 k1, symbolic filler bit, unwind 16:  aborted > 40 min CPU / > 15 GB, no result
 k1, fully concrete,       unwind 16:  aborted > 40 min CPU, memory still climbing
-k2, concrete,             unwind 20:  > 40 min CPU at timeout (2400 s), no result
+k2, concrete,             unwind 20:  killed at the 2400 s timeout, no result
+                                      (output still churning through std
+                                       iterator path-abortions)
 ```
 
 CBMC formula expansion over the std-collection-heavy kernel
@@ -80,7 +90,7 @@ dedicated design question, not a silent API widening.
 
 ## Classification notes (harness evolution, no production defect)
 
-1. K3 route-0 initially forgot the drain after replacing `dispose_root`
+1. K3's first draft forgot the drain after replacing `dispose_root`
    — HARNESS DEFECT, fixed before any result was recorded.
 2. The original P_RELIED ("provider still installed") was too weak: with
    the relied_on guard mutated away, the kernel kept the provider
@@ -89,3 +99,8 @@ dedicated design question, not a silent API widening.
    actually protects (provision resolvability); M-K2 then produced a
    counterexample. HARNESS ORACLE evolution; production behavior was
    identical with and without the fix, no production change was made.
+3. Review-driven deduplication: K3/K4a/K4b originally counted identical
+   disposal-route arms as separate scenarios; the loops now enumerate
+   distinct behaviors only (K3 12→8, K4a 8→4, K4b 16→8 iterations), and
+   K6 was extended to the full legal 6-plan phase-2 universe (12
+   scenarios). Recorded results were re-run green after the change.
