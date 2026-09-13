@@ -48,7 +48,9 @@ fn loom_l1_write_read_stop_interleave() {
                 let mut dst = [0.0f32; 2];
                 let mut expect = 7.0f32;
                 let mut consumed = 0usize;
-                let mut stopped = false;
+                // The only exit is the terminal: EOF is unreachable without
+                // close_eof, so reaching the join below proves the consumer
+                // left through `Stopped`.
                 loop {
                     match e.read_frames(&mut dst) {
                         PcmPull::Frames(k) => {
@@ -61,19 +63,16 @@ fn loom_l1_write_read_stop_interleave() {
                             consumed += k;
                         }
                         PcmPull::Eof => panic!("EOF is unreachable without close_eof"),
-                        PcmPull::Stopped => {
-                            stopped = true;
-                            break;
-                        }
+                        PcmPull::Stopped => break,
                     }
                 }
-                (consumed, stopped)
+                consumed
             })
         };
 
         let written = producer.join().unwrap();
         stopper.join().unwrap();
-        let (consumed, stopped) = consumer.join().unwrap();
+        let consumed = consumer.join().unwrap();
 
         // The stopper always runs and terminals are monotone, so the edge
         // must have ended Stopped. `Written` only means the whole slice
@@ -87,7 +86,6 @@ fn loom_l1_write_read_stop_interleave() {
             WriteOutcome::Written | WriteOutcome::Stopped
         ));
         assert_eq!(edge.terminal(), EdgeTerminal::Stopped);
-        assert!(stopped, "consumer must exit through the terminal");
         assert!(consumed <= 2);
     })
 }

@@ -68,9 +68,11 @@ loom_l4b  2 threads × 3 params: consumer blocked on empty ×
 
 Five test functions, eight loom model explorations in total. Full
 interleaving exploration per model (loom 0.7.2, release build); the
-suite completes in ~27 s wall. Bounds: ≤ 3 threads, ≤ 2 buffered
-samples, ≤ 3 operations per thread. A clean run is SCHEDULE-CLEAN
-within exactly these bounds.
+suite completes in ~30 s wall. Bounds: ≤ 3 threads, ≤ 2 buffered
+samples, ≤ 3 operations per thread. Scope note: the models share the
+edge through loom's own `Arc`, so std `Arc` refcount drop-orderings are
+not part of the modeled slice. A clean run is SCHEDULE-CLEAN within
+exactly these bounds.
 
 ## Results
 

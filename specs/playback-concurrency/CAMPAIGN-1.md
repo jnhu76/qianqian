@@ -119,7 +119,9 @@ NEGATIVE CONTROL: M-L1 drop data_ready notify → COUNTEREXAMPLE-WITNESSED
     (loom reports the deadlocked schedule; the mutation hits the shared
     terminal-wakeup path, so it is failure-path sensitive too).
 SessionCompletion: explicitly NOT loomed (wait_timeout unmodeled);
-    covered natively + stress + Miri-adjacent runs.
+    covered natively (session_activation + the MIRI-CLEAN edge_lifecycle
+    suite, which contains the dedicated SessionCompletion tests) and
+    under Phase-B4 stress.
 ```
 
 ### FV-UB-0 (Phase B3) — Miri per crate
@@ -217,6 +219,28 @@ Reviewer B (verification soundness):    APPROVE (with findings)
     claims, confirmed harnesses exercise production code (no copies)
     and that the Kani non-result is recorded with concrete bounds.
     Its doc-accuracy findings were applied in the same pass.
+```
+
+Corrective round (after #129 merged; this branch refreshed onto the
+merged canonical evidence, loom failure coverage added):
+
+```text
+Reviewer A (evidence / authority):      PASS (with findings applied)
+    Verified the branch no longer touches
+    specs/composition-kernel-0-rust/RESULTS.md (empty diff vs main),
+    that this report references #129's canonical evidence with the
+    summary-vs-canonical precedence rule, that no stale pre-dedup
+    scenario counts remain, that Kani stays TOOLING-INSUFFICIENT, and
+    that SessionCompletion is never claimed as Loom-verified.
+Reviewer B (concurrency soundness):     PASS (with findings applied)
+    Verified the loom suite drives the real PcmEdge with only
+    Mutex/Condvar cfg-swapped, that fail × stop, blocked producer ×
+    fail and blocked consumer × fail are genuinely explored with
+    winner-identity assertions (Failed ≠ Stopped internally; collapsed
+    Stopped at the consumer), that M-L1 remains a mechanism-sensitive
+    caught control, and re-ran the suite green (5/5 models).
+    Applied findings: removed an unused-assignment lint in L1, timed
+    the suite honestly (~30 s), and recorded the loom-Arc scope note.
 ```
 
 ## FINAL VERDICT
