@@ -15,6 +15,8 @@
 //! run is SCHEDULE-CLEAN within the stated thread/operation bounds
 //! (vocabulary #124) — not a general proof.
 
+#![cfg(loom)]
+
 use loom::sync::Arc;
 use loom::thread;
 

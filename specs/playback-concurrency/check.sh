@@ -30,10 +30,12 @@ EDGE_SNAPSHOT="$(mktemp)"
 cp "$EDGE" "$EDGE_SNAPSHOT"
 
 echo "== native regression (playback crate) =="
-if cargo test -p qianqian-playback 2>&1 | tail -1 | grep -q "test result: ok"; then
+NATIVE_LOG="$(mktemp)"
+if cargo test -p qianqian-playback > "$NATIVE_LOG" 2>&1 && ! grep -q "test result: FAILED" "$NATIVE_LOG"; then
   echo "RESULT native BOUNDED-CLEAN"
 else
   echo "RESULT native FAILED"
+  tail -5 "$NATIVE_LOG"
   fail=1
 fi
 
