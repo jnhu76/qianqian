@@ -1,6 +1,6 @@
 # specs/ — 形式化模型注册表
 
-> **STATUS: EXPERIMENTAL EVIDENCE（playback/ 历史套件）+ FORMAL EVIDENCE（realtime-publication/ 当前套件）**
+> **STATUS: EXPERIMENTAL EVIDENCE（playback/ 历史套件）+ FORMAL EVIDENCE（realtime-publication/ 与 composition-kernel-0/ 当前套件）**
 >
 > `specs/playback/` 的模型保留了早期 Playback 架构实验的 failure witnesses 与验证技术。
 > 它们**不是当前 Playback architecture authority**，也**不是新 Playback 设计的 acceptance gate**。
@@ -81,6 +81,7 @@
 | `playback/PlaybackTemporal` | Core evidence set（历史 blocking 定位已退役） | 五组高风险 temporal 语义：Dual Window、Generation admission、Physical Fence、submitted/rendered 记账、EOF/drained/ENDED terminalization | TLA+ / TLC |
 | `playback/PlaybackOwnership` | Extended exploration（supporting / non-blocking） | resource-lifecycle 假设：composition lifecycle root、TrackSession/DecodeSession immediate lifetime ownership、semantic authority 与 lifetime ownership 的区分、provider withdrawal 顺序 | TLA+ / TLC |
 | `realtime-publication/RealtimePublication` | 当前挣得的 formal evidence（语义来源：ACCEPTED ADR-PBK-001 §6） | realtime view publication / reader quiescence / resource reclamation：coherent publication、retired 视图闭门、quiescence 先于释放、多代退休记账、回收可达性 | TLA+ / TLC（含 liveness 性质与可达性探针） |
+| `composition-kernel-0/CompositionKernel0` | 当前挣得的 formal evidence（语义来源：K0 design authority `docs/architecture/composition-kernel-0-design.md`） | K0 控制面语义交错：relied_on guard、inverse 恰好一次与 tombstone 保留、移除纪律、§E.4 点单一来源、staged replacement、§G.6 违约 latch 与 guard 保持、FAILED settlement、dispose 收敛、settle 终止 | TLA+ / TLC（fail-closed runner + 5 mutation 负控制 + 6 可达性探针） |
 
 每个模型配备**负控制（negative controls）**：故意注入错误，TLC 必须抓到（counterexample 才算通过），以证明模型不是 vacuous。其中 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）曾是 ADR ACCEPTED 的 blocking 集；播放架构重置后该 blocking 定位已退役，`playback/` 两模型现在统一是 experimental evidence，不是新 Playback 设计的 acceptance gate（`realtime-publication/` 套件定位见上文，不属于本段历史）。
 
@@ -103,7 +104,7 @@ specs/check.sh
 
 工具链固定为 `tla2tools v1.7.4 (Xenophanes)`，`check.sh` 按内嵌 sha256 校验、fail closed。jar 不入库（见 `.gitignore`），由脚本自动下载。
 
-`playback/` 各模型的语义说明、状态空间数据与负控制结果见 `playback/README.md`；`realtime-publication/` 套件的对应信息见 `realtime-publication/README.md`。
+`playback/` 各模型的语义说明、状态空间数据与负控制结果见 `playback/README.md`；`realtime-publication/` 套件的对应信息见 `realtime-publication/README.md`；`composition-kernel-0/` 套件（含其 production differential 记录）见 `composition-kernel-0/RESULTS.md`，独立运行入口 `specs/composition-kernel-0/check.sh`。
 
 ## Traceability
 
