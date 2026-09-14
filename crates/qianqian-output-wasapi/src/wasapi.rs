@@ -228,7 +228,15 @@ fn open_and_run(
     slot: &OpenSlot,
 ) -> LoopOutcome {
     let coinit = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
-    let _apartment = ComApartment(coinit.is_ok());
+    // Fail closed at the boundary: without a successful CoInitializeEx
+    // (S_OK or S_FALSE) this thread has no COM apartment and the open
+    // must not proceed into COM calls. (NATIVE-BOUNDARY-AUDIT-0 A3.2.)
+    if coinit.is_err() {
+        return LoopOutcome::Aborted {
+            message: format!("CoInitializeEx failed: {coinit:?}"),
+        };
+    }
+    let _apartment = ComApartment(true);
     open_and_run_inner(format, render_input, slot)
 }
 
