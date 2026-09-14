@@ -123,6 +123,80 @@ fn undecodable_file_is_an_open_error() {
     assert!(result.is_err(), "garbage bytes must not open as media");
 }
 
+/// NATIVE-BOUNDARY-AUDIT-0 adversarial coverage: a zero-length source is
+/// not a media file and must fail at open, not produce a zombie endpoint.
+#[test]
+fn zero_length_file_is_an_open_error() {
+    let path = std::env::temp_dir().join("qianqian-decode-test-empty.mp3");
+    std::fs::write(&path, b"").expect("temp file");
+    let result = service().open_media(&path);
+    let _ = std::fs::remove_file(&path);
+    assert!(result.is_err(), "empty file must not open as media");
+}
+
+/// NATIVE-BOUNDARY-AUDIT-0 adversarial coverage: a truncated container
+/// must end deterministically — a clean EOF or a typed decode error —
+/// never a crash or a hang.
+#[test]
+fn truncated_file_drains_to_eof_or_typed_error() {
+    let (fx, real) = common::load_fixture("mp3-cbr-id3v23");
+    let bytes = std::fs::read(&real).expect("fixture readable");
+    let truncated_path = std::env::temp_dir().join("qianqian-decode-test-truncated.mp3");
+    std::fs::write(&truncated_path, &bytes[..bytes.len() / 3]).expect("temp file");
+    let opened = service().open_media(&truncated_path);
+    match opened {
+        Err(_) => {} // refusing to open a broken container is honest
+        Ok(mut decode_stream) => {
+            let channels = decode_stream.format().channels as usize;
+            let mut block = vec![0.0f32; 1024 * channels];
+            let mut total = 0usize;
+            // A typed decode error is an accepted terminal here: the
+            // assertion is that the drain *ends* — clean EOF or typed
+            // error, never a crash or a hang.
+            while let Ok(outcome) = decode_stream.read_frames(&mut block) {
+                match outcome {
+                    DecodeOutcome::Frames(n) => total += n,
+                    DecodeOutcome::Eof => break,
+                }
+            }
+            assert!(total <= fx.pcm_frames, "truncation cannot add frames");
+        }
+    }
+    let _ = std::fs::remove_file(&truncated_path);
+}
+
+/// NATIVE-BOUNDARY-AUDIT-0 adversarial coverage: dropping an endpoint
+/// mid-stream releases the native handle immediately; the same file must
+/// reopen cleanly afterwards (drop-before-EOF and repeated open/close).
+#[test]
+fn drop_before_eof_then_repeated_reopens_are_stable() {
+    let (_, path) = common::load_fixture("flac-16-44-stereo");
+    {
+        let mut decode_stream = service().open_media(&path).expect("opens");
+        let channels = decode_stream.format().channels as usize;
+        let mut block = vec![0.0f32; 1024 * channels];
+        assert!(matches!(
+            decode_stream.read_frames(&mut block).expect("first read"),
+            DecodeOutcome::Frames(_)
+        ));
+        // Drop mid-stream: the endpoint's Drop releases the native handle.
+    }
+    for cycle in 0..16 {
+        let mut decode_stream = service()
+            .open_media(&path)
+            .unwrap_or_else(|e| panic!("cycle {cycle}: reopen must succeed: {}", e.message));
+        let channels = decode_stream.format().channels as usize;
+        let mut block = vec![0.0f32; 1024 * channels];
+        assert!(
+            matches!(
+                decode_stream.read_frames(&mut block).expect("reads"),
+                DecodeOutcome::Frames(_)
+            ),
+            "cycle {cycle}: reopened endpoint produces PCM"
+        );
+    }
+}
+
 #[test]
 fn two_endpoints_from_one_service_are_independent() {
     let (_, mp3) = common::load_fixture("mp3-cbr-id3v23");
