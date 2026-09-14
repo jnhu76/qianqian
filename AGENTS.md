@@ -11,7 +11,7 @@ Before changing code or long-lived documentation:
 3. Use `docs/README.md` to load only the minimum relevant authority.
 4. Read `docs/architecture/overview.md` before changing architecture boundaries.
 5. For generic composition work, read `docs/architecture/composition-kernel.md` and the K0 design/implementation authority.
-6. For playback/audio work, read `docs/adr/ADR-PBK-001.md` — the **only normative Playback Foundations constitution**, now **ACCEPTED**.
+6. For playback/audio work, read `docs/adr/ADR-PBK-001.md` plus current vocabulary/static playback authority `docs/adr/ADR-PBK-002.md`.
 7. Inspect current repository reality before assuming a path, type, crate, test, TLA variable, or prior design is still authoritative.
 
 Do not recursively preload historical refs or external failure evidence.
@@ -22,7 +22,10 @@ Do not recursively preload historical refs or external failure evidence.
 
 ```text
 Normative Playback Foundations constitution:
-    docs/adr/ADR-PBK-001.md        (ACCEPTED Playback Foundations authority)
+    docs/adr/ADR-PBK-001.md        (ACCEPTED foundations)
+
+Current vocabulary / Plugin-Fiber taxonomy / static playback composition:
+    docs/adr/ADR-PBK-002.md        (ACCEPTED; corrective under review on Issue #138 branch)
 
 Do not treat as current architecture unless a new experiment re-earns them:
     MusicKernel
@@ -35,28 +38,17 @@ Do not treat as current architecture unless a new experiment re-earns them:
     Physical Fence
 ```
 
-Old playback code/specs — `qianqian-audio-api::music`, `qianqian-audio-api::transport`, `playback_temporal_traces`, `specs/playback/*` — are **experimental / executable evidence only**:
+Old playback code/specs are **experimental / executable evidence only**. Reuse bug reproducers and test techniques; do not inherit old nouns or force production to mirror old formal variables.
 
-```text
-allowed:   reuse bug reproducers, test techniques, negative controls, concrete counterexamples
-forbidden: claiming current authority from old type names, preserving old APIs for
-           compatibility without an explicit requirement, forcing production state
-           to mirror old TLA variables
-```
-
-> **Preserve the bug, not necessarily the old solution.** (Full inherit/forbid lists: `ADR-PBK-001.md` §11.)
-
-The full normative contracts — minimal constitution, command/fact authority, fact-authority identity (one designated authority per fact kind + subject scope), projection read-side firewall, semantic-commit definition, Fact publication vs Realtime-view publication, realtime lifetime invariant, publication/reclamation contract (P1–P5), and the one normative research ladder — live in `ADR-PBK-001.md` §1–§2, §6 and §12. Do not restate them normatively anywhere else; link instead.
+> **Preserve the bug, not necessarily the old solution.**
 
 ---
 
 # Composition Kernel K0
 
-(K0 semantic authority: `docs/architecture/composition-kernel-0-design.md`; representation decisions: `docs/architecture/composition-kernel-0-implementation-adr.md`. The lines below are guardrails, not a second definition.)
+K0 semantic authority: `docs/architecture/composition-kernel-0-design.md`; representation decisions: `docs/architecture/composition-kernel-0-implementation-adr.md`.
 
-The generic Composition Kernel is implemented and current.
-
-Primitive budget (no sixth primitive without a dedicated architecture issue demonstrating K0 cannot express the invariant cleanly):
+Primitive budget:
 
 ```text
 Context / Capability / Fiber / Effect / Reconcile
@@ -70,37 +62,100 @@ track/playlist semantics / seek / playback cursor
 platform UI payloads
 ```
 
-An Event/Fact system is **not automatically a new K0 primitive**. Start it as a normal capability/service/plugin unless evidence demonstrates that it belongs in the kernel.
+An Event/Fact system is **not automatically a new K0 primitive**. Start it as a normal Plugin-provided capability/service unless evidence demonstrates that it belongs in the kernel.
 
 `Context` is a capability namespace/dependency view. It must not become global product state, a universal event bus, a message broker, PCM transport, a UI payload store, or a get-anything service locator.
 
 ---
 
-# Plugin / Fiber discipline
+# Everything is a Plugin / Fiber discipline
 
-A Plugin is a long-lived capability/lifecycle participant whose boundary has been justified; a Fiber is its live runtime instance.
+Current canonical rule (PBK-002 D4/D12):
 
-“Everything is a Plugin” means justified long-lived runtime capabilities enter the common composition/lifecycle protocol. It does **not** mean one feature = one plugin, one AudioNode = one Fiber, or everything is hot-loaded/rollbackable.
+> **Every independently K0-composed lifecycle/behavior unit is a Plugin; one live mounted instance is a Fiber.**
 
-For every proposed Plugin boundary, answer:
+A Plugin may require or provide Capabilities/Services, but **providing a Capability is not an admission requirement**. A Plugin may be episode-scoped or long-lived; lifetime length is not Plugin identity.
+
+Current mapping:
 
 ```text
-What lifetime/resource does it own?
-What capability does it provide / require?
-Does it need independent replacement/withdrawal?
+architecture role     Plugin
+K0 representation     ComponentSpec
+live runtime instance Fiber
+```
+
+`ComponentSpec` remains a K0 formal/representation term. Do not create a second product taxonomy where some K0-composed Fibers are “Components but not Plugins”.
+
+“Everything is a Plugin” does **not** mean:
+
+```text
+one feature = one Plugin
+one command/fact/payload = one Plugin
+one buffer/endpoint/worker = one Plugin
+one AudioNode = one Plugin
+one crate/DLL/thread = one Plugin
+```
+
+Subordinate resources remain resources unless they genuinely require their own K0 composition identity/lifecycle.
+
+For every proposed new Plugin boundary, answer:
+
+```text
+Why does this unit need independent K0 composition identity?
+What lifetime/resources/behavior does it own?
+What capabilities does it require and optionally provide?
+Does it need independent activation/invalidation/withdrawal?
 What execution/data edges cross the boundary?
 What state is intentionally public?
+Why is it not just an owned resource/effect of an existing Plugin?
 What is the configuration/cognitive cost of splitting it?
 ```
+
+Current earned Plugin roles include:
+
+```text
+Decode Plugin
+Output Plugin
+Playback Session Plugin (episode-scoped)
+```
+
+Possible future `PlaylistPlugin`, `ProcessingPlugin`, UI adapter Plugins, etc. must still be earned by real composition/lifecycle pressure; feature names alone are insufficient.
+
+---
+
+# Plugin ownership vs K0 knowledge
+
+A Plugin may semantically own domain resources such as decoder endpoints, workers, PCM edges or render streams. This **does not** mean K0 stores or understands those domain objects.
+
+K0 keeps only its frozen composition knowledge:
+
+```text
+Fiber lifecycle
+Capability reachability / committed bindings
+composition Effect provenance + total inverse
+component teardown Discharge verdict
+```
+
+Domain choreography remains inside Plugin activation/teardown/effect closures.
+
+For current playback:
+
+```text
+Playback Session Plugin
+    requires Decode + Output capabilities
+    owns one episode's decoder endpoint / worker / PCM edge / render relation / completion
+```
+
+PCM payload then flows through the already-bound data plane; K0 is not in the per-block path.
 
 ---
 
 # Boundary-first design
 
-Do not begin by inventing APIs. Required order remains:
+Do not begin by inventing APIs. Required order:
 
 ```text
-Component Granularity
+Plugin granularity / ownership
         ↓
 Capability / dependency boundary
         ↓
@@ -117,7 +172,64 @@ Executable evidence
 API / representation
 ```
 
-A different Rust type, file, crate, feature name, or test helper is not proof that a new Plugin or authority is needed.
+A different Rust type, file, crate, feature name, command, or test helper is not proof that a new Plugin or authority is needed.
+
+Prefer deleting taxonomy/state over adding runtime concepts. For Phase-F playback work, first try the current Plugin/Fiber + owned-resource model; only a concrete counterexample may earn Window, Generation, a new Plugin, or a specialized Realtime Audio Runtime mechanism.
+
+---
+
+# Command / Fact / Projection discipline
+
+Normative contract: `ADR-PBK-001` §2.2–§2.3.
+
+```text
+Command    = intent
+Fact       = truth established by its designated semantic authority
+Projection = derived visibility, never authority
+Evidence   = mechanism observation unless separately designated as semantic truth
+```
+
+For each `(fact kind, subject scope)`, exactly one designated semantic authority may establish that truth at a time.
+
+Current earned playback designation (PBK-002 D11):
+
+```text
+Playback Session Plugin
+    designated authority for one episode's terminal outcome
+    Completed / Stopped / Failed
+```
+
+Do not infer Playing/Starting/Paused/Position/source truth from K0 lifecycle or mechanism evidence.
+
+---
+
+# Realtime / PCM firewall
+
+PCM is direct typed hot data, not Plugin dispatch payload.
+
+Per block/quantum, never perform:
+
+```text
+Context lookup
+Capability resolution
+Fiber Reconcile
+generic Plugin dispatch
+generic Fact/Event fan-out
+filesystem/network/UI round trip
+unbounded allocation/blocking
+```
+
+The current playback shape is:
+
+```text
+K0 composes Plugins/Fibers
+        ↓ setup / bind
+Playback Session Plugin owns episode resources
+        ↓
+decoder → PCM edge → output
+```
+
+If a later feature creates old/new realtime views that may overlap while readers can still dereference the old world, trigger PBK-001 P1–P5 and earn the minimum publication/quiescence mechanism. Do not pre-create Window/Generation because an older model had them.
 
 ---
 
@@ -127,34 +239,19 @@ Formalization is risk-driven.
 
 > **Which independently legal states/events can interleave and collide into an illegal state?**
 
-If there is no concrete collision, prefer types, ownership, unit/property tests, static checks, or executable stress tests. The old playback formal core is evidence, not a blocking acceptance gate. See `specs/README.md`.
+If there is no concrete collision, prefer types, ownership, unit/property tests, static checks, or executable stress tests. The old playback formal core is evidence, not a blocking acceptance gate.
 
-## Verification authority boundary
-
-Verification challenges the current architecture and implementation; it does not define either one.
-
-> **Verification evidence MUST NOT silently promote a new state, primitive, lifecycle rule, vocabulary, or authority. Any such finding must first return to ADR / design-authority review.**
-
-Apply the following rules to TLA+/TLC, Kani, Loom, Miri, property tests, stress tests, mutation tests and other executable verification:
-
-```text
-Authority / ADR        defines intended semantics
-Production Rust        realizes current behavior
-Verification evidence  searches for counterexamples and regressions
-```
-
-- Build verification models from the minimum current authority plus an explicit mapping to current implementation reality. Auxiliary verifier-only variables are allowed, but remain non-normative.
-- Prefer the verification mechanism closest to the property: Rust types/ownership first; bounded state/invariant checking next; concurrency schedule exploration for implementation interleavings; TLA+/TLC for concrete temporal/state collisions that are awkward or impossible to express directly against the Rust implementation.
-- A clean bounded/model-checking run means only that no counterexample was found within the stated model, bounds, assumptions and fairness conditions. It is not architecture acceptance and must not be reported as “the architecture is proven correct.”
-- A counterexample must be classified before any production change: model/spec mismatch, production defect, authority gap, or refinement/oracle gap. Do not patch production merely to satisfy an over-strong verifier oracle.
-- If evidence suggests that the architecture needs a new semantic concept, record the differential and use the Authority resolution process below. If the authority changes, change it explicitly under review before treating the new concept as current architecture.
-- Verification harnesses may encode stronger diagnostic checks than production contracts only when those checks are named as diagnostics and are not allowed to redefine lifecycle or correctness semantics.
+Verification challenges authority; it does not define authority. A counterexample must be classified before any production change: model/spec mismatch, production defect, authority gap, or refinement/oracle gap.
 
 ---
 
 # UI boundary
 
-UI is not playback authority and never participates in realtime correctness. UiHost remains an ordinary capability/plugin candidate; platform intent stays replaceable and must not leak into Composition Kernel semantics.
+UI is not playback authority and never participates in realtime correctness.
+
+A UI widget is not a Plugin merely because it invokes a command. A UI adapter/controller may earn Plugin identity only if it genuinely needs independent K0 composition/lifecycle identity.
+
+UI must consume application-facing commands and read-side facts/projections without seeing K0 internals, PcmEdge, SongCore handles or WASAPI objects.
 
 ---
 
@@ -162,27 +259,26 @@ UI is not playback authority and never participates in realtime correctness. UiH
 
 External failure mining lives under `evidence/` and is opt-in.
 
-Do not load it during ordinary architecture/ADR/implementation review unless the task explicitly asks for external failure evidence or adversarial inspiration. When external systems inspire a design distinction, re-derive and state the Qianqian invariant locally; do not turn the external project's implementation into our authority.
+Do not load it during ordinary architecture/ADR/implementation review unless the task explicitly asks for external failure evidence or adversarial inspiration. External systems can inspire distinctions; re-derive Qianqian invariants locally.
 
 ---
 
 # Review discipline
 
-Fresh-context reviewers for new playback work should prioritize:
+Fresh-context reviewers for playback/architecture work should prioritize:
 
 ```text
-lens/plane confusion
+Plugin vs owned-resource confusion
+ComponentSpec representation accidentally becoming a second taxonomy
+feature-shaped Plugin over-fragmentation
 Context/event/PCM misuse
 hidden global authority
 command/fact confusion
-fact-authority forgery (mechanism evidence posing as a semantic fact, or rename/scope-slicing manufacturing a second writer of the same truth)
-projection used as a control-correctness authority
+fact-authority forgery
+projection used as correctness authority
 provider/resource release before realtime readers quiesce
-plugin boundary over-fragmentation
-accidental preservation of old playback assumptions
+accidental preservation of old Window/Generation assumptions
 ```
-
-Do not reject a new design merely because it differs from old PlaybackTemporal or old core types.
 
 ---
 
@@ -190,34 +286,34 @@ Do not reject a new design merely because it differs from old PlaybackTemporal o
 
 Report what was actually verified. Never mark an unrun device/platform/audio check PASS.
 
-For architecture reset work, green Cargo tests are regression evidence, not architecture acceptance.
-
-Verification reports must state the checked target, tool, bounds/assumptions, and whether the result is a counterexample, a bounded clean run, or a platform/runtime observation. Keep evidence claims narrower than the authority they challenge.
+Green Cargo tests are regression evidence, not architecture acceptance. Verification reports must state target, tool, assumptions/bounds and result class.
 
 ---
 
 # Documentation
 
-`docs/README.md` is the documentation router and carries the authoritative truth-class taxonomy (normative authority / production reality / evidence / derived projection). Read it before promoting any document to authority.
+`docs/README.md` is the documentation router and truth-class index.
 
-Keep one current authority per durable fact. `ADR-PBK-001.md` is the single normative Playback Foundations constitution (vocabulary/role definitions: its §16); every other document links or summarizes it and carries no second normative copy. Git history stores the old architecture; do not grow amendment/supersession chains in the working tree when a clean rewrite is possible.
+Keep one current authority per durable fact. PBK-001 owns playback foundations; PBK-002 owns current vocabulary, Plugin/Fiber taxonomy, earned static playback composition and the D11 terminal-outcome authority designation.
 
-`README.md`, `CONTEXT.md`, `docs/architecture/overview.md`, `docs/architecture/registry.yml`, `website/**` and diagrams are derived projections/routers: they may summarize, route and show status, but must not define or extend architecture semantics.
+`README.md`, `CONTEXT.md`, `docs/architecture/overview.md`, `docs/architecture/registry.yml`, website and diagrams are derived projections/routers; they may summarize, route and show status, but must not define or extend architecture semantics.
+
+Historical evidence may retain historical terminology. Do not rewrite history for grep cleanliness.
 
 ---
 
 # Authority resolution
 
-If production code and a normative authority differ:
+If production code and normative authority differ:
 
 ```text
 1. record the differential explicitly
-2. determine whether the code is wrong or the authority should change
-3. if the code is better, amend/replace the authority explicitly (reviewed change)
+2. determine whether code is wrong or authority should change
+3. if authority changes, amend/replace it explicitly under review
 4. only then is the new shape current architecture
 ```
 
-Forbidden: "code is newer, therefore code wins"; "the ADR is older, therefore the implementation must mechanically copy it"; letting crate docs, tests, or issue comments silently supersede an authority.
+Forbidden: “code is newer, therefore code wins”; “ADR is older, therefore code must mechanically copy it”; issue comments/tests/projections silently superseding authority.
 
 ---
 
@@ -227,5 +323,5 @@ Forbidden: "code is newer, therefore code wins"; "the ADR is older, therefore th
 - keep changes narrow to the current gate;
 - distinguish evidence from authority;
 - do not perform unrelated cleanup;
-- do not silently preserve stale architecture for compatibility;
+- prefer the smallest coherent model;
 - stop after opening the requested PR unless explicitly authorized to merge.
