@@ -374,7 +374,7 @@ Re-run on the FINAL merged tip (gate/f1-integration 2a2b56b = main +
 songcore corrective + wasapi correctives + F1 + the review fixes below),
 after the review round; these are the numbers this report stands on:
 
-    cargo test --workspace (MSVC)                 275 passed, 0 failed,
+    cargo test --workspace (MSVC)                 259 passed, 0 failed,
                                                   0 warnings
       incl. stop_seam 11/11, wasapi handle suite 2/2
       (real endpoint, +0 handle growth over 30 cycles)
@@ -383,6 +383,13 @@ after the review round; these are the numbers this report stands on:
     physical binary (gnu, release)                built at 2a2b56b
     physical stop gate:  20/20 PASS
     physical EOF gate:   10/10 PASS
+
+  CORRECTION (recorded at closure): an earlier version of this section
+  reported "275 passed" for this same run. A clean single-invocation
+  recount at 2a2b56b measured 259 passed / 0 failed; 275 was an
+  aggregation artifact (the original command summed `test result` lines
+  across several cargo invocations in one shell command). 0 failed at
+  either count; no test was lost.
 
 ### Formalization triage (A3.6)
 
@@ -574,4 +581,9 @@ PASS_WITH_CORRECTIVES
   carried;
 - audit stops here by design; native scope does not grow further this
   round (A5.2).
+
+CLOSED — the round's correctives merged (1714670, ae6502c, 179cb24) and
+final GitHub main revalidated on real Windows hardware; the closure
+evidence and the full round verdict (PASS_WITH_LIMITATIONS) live in
+ROUND-REPORT.md.
 ```
