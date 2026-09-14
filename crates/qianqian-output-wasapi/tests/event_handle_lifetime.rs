@@ -35,13 +35,13 @@ mod windows {
             let event = CreateEventW(None, false, false, None).expect("CreateEventW");
             assert_eq!(
                 WaitForSingleObject(event, 0),
-                WAIT_TIMEOUT.0,
+                WAIT_TIMEOUT,
                 "a live nonsignaled event times out, it does not fail"
             );
             let _ = windows::Win32::Foundation::CloseHandle(event);
             assert_eq!(
                 WaitForSingleObject(event, 0),
-                WAIT_FAILED.0,
+                WAIT_FAILED,
                 "a closed handle must fail, not time out like a live one"
             );
         }
