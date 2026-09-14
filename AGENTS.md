@@ -323,5 +323,6 @@ Forbidden: “code is newer, therefore code wins”; “ADR is older, therefore 
 - keep changes narrow to the current gate;
 - distinguish evidence from authority;
 - do not perform unrelated cleanup;
+- **do not silently preserve stale architecture or stale APIs merely for compatibility; resolve the authority differential explicitly;**
 - prefer the smallest coherent model;
 - stop after opening the requested PR unless explicitly authorized to merge.
