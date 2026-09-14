@@ -2,9 +2,17 @@
 
 > **STATUS:** EVIDENCE / DESIGN INPUT. This report audits the current
 > static playback architecture for candidate semantic truths and their
-> designated authorities. It is not architecture authority; it promotes
+> authority candidates. It is not architecture authority; it promotes
 > nothing. Any durable decisions earn their way into ADR corrective
 > proposals only through explicit review.
+>
+> This report DOES NOT establish:
+> - new architecture authority
+> - new normative playback fact contract
+> - new durable authority designation
+>
+> unless that durable decision is separately proposed through an ADR
+> corrective.
 
 ```text
 PHASE-F2-PLAYBACK-AUTHORITY-SEMANTICS-0
@@ -32,10 +40,10 @@ current consumers.
 | Signal | Runtime source | Writer | Readers | Lifetime | Current meaning | Current consumers |
 |---|---|---|---|---|---|---|
 | `SessionOutcome` | `CompletionState.outcome` | `resolve()` in completion.rs | `wait()` / `try_resolve_now()` | Once-resolved, memoized | How the episode ended | Headless CLI (print + exit code) |
-| `SessionOutcome::Completed` | `resolve()` | designated authority (see §4) | App | session-scoped | EOF + device drained | Headless exit code |
-| `SessionOutcome::Stopped` | `resolve()` | designated authority (see §4) | App | session-scoped | Stop requested before completion | Headless exit code |
-| `SessionOutcome::Failed{stage}` | `resolve()` | designated authority (see §4) | App | session-scoped | Episode failed; stage names which leg | Headless exit code |
-| `activation_failure` | `CompletionState.activation_failure` | `SessionCompletion::activation_failed()` | `activation_error()` | session-scoped | Why activation raised | Headless error message |
+| `SessionOutcome::Completed` | `resolve()` | candidate authority (see §4) | App | session-scoped | EOF + device drained | Headless exit code |
+| `SessionOutcome::Stopped` | `resolve()` | candidate authority (see §4) | App | session-scoped | Stop intent observed before semantic resolution of aborted episode | Headless exit code |
+| `SessionOutcome::Failed{stage}` | `resolve()` | candidate authority (see §4) | App | session-scoped | Episode failed; stage identifies failure class by resolver precedence | Headless exit code |
+| `activation_failure` | `CompletionState.activation_failure` | `SessionCompletion::activation_failed()` | `activation_error()` | session-scoped | Why this activation attempt raised | Headless error message |
 | `decode_failure` | `CompletionState.decode_failure` | `decode_worker` via `decode_failed()` | `resolve()` | session-scoped | Decode mechanism failed | Internal to resolve() |
 | `worker_terminal` | `CompletionState.worker_terminal` | `worker_exited()` | `resolve()` | session-scoped | Edge terminal at worker exit | Internal to resolve() |
 | `DrainVerdict` | `DrainInner.verdict` | Output mechanism `complete()` | `peek()` / `wait()` | session-scoped | How render leg terminated | resolve() + session completion |
@@ -43,7 +51,7 @@ current consumers.
 | `DrainVerdict::Aborted` | output mechanism | output mechanism | resolve() | session-scoped | Render leg aborted (stop or failure) | resolve() |
 | `stop_requested` | `CompletionState.stop_requested` | `request_stop()` | `stop_requested()` | session-scoped, command-state | Whether stop intent was recorded | F2 status (design) |
 | `stop_target` | `CompletionState.stop_target` | `bind_stop_target()` | `request_stop()` | session-scoped | The edge to stop | session-internal |
-| `source_format` | `CompletionState.source_format` | `set_source_format()` | `source_format()` | session-scoped, write-once | PCM format of the source | Headless print |
+| `source_format` | `CompletionState.source_format` | `set_source_format()` | `source_format()` | session-scoped, write-once | PCM format of the opened decode endpoint | Headless print |
 | `EdgeTerminal` | `EdgeState.terminal` | `set_terminal()` (edge) | `terminal()` / `read_frames()` | edge-scoped | Data-plane terminal state | resolve(), worker, tests |
 | `EdgeTerminal::Open` | edge | edge | consumers | edge-scoped | No terminal yet | edge-internal |
 | `EdgeTerminal::Eof` | edge | edge | consumers | edge-scoped | Producer committed EOF | resolve() |
@@ -62,11 +70,11 @@ current consumers.
 | Absent signal | Why it matters |
 |---|---|
 | `Playing` (semantic state) | No authority commits "playing has started" |
-| `Starting` (semantic state) | No authority commits "episode is starting" |
+| `Starting` (semantic state) | No authority commits "episode is starting"; no bounded interval whose semantics mean "starting" |
 | `Paused` | Not implemented |
 | `Seeking` | Not implemented |
 | `Stopping` (semantic state) | No separate authority; stop_requested is command-state |
-| `current media path` (public) | Held by App as PathBuf, not published as fact |
+| `current media path` (public) | Held by App as PathBuf, not published as fact by any session authority |
 | `render position` / `playback position` | No render-position tracking |
 | `elapsed time` | No time tracking |
 | `buffer underrun count` | Not tracked |
@@ -102,7 +110,7 @@ Every signal classified into exactly one primary category per PBK-001 §2.
 | `worker_terminal` | MECHANISM EVIDENCE | The decode worker's exit terminal on the edge — mechanism observation. |
 | `decode_failure` | MECHANISM EVIDENCE | Decode mechanism reported failure — mechanism observation. |
 | `buffered_frames` | MECHANISM EVIDENCE | Ring occupancy diagnostic — mechanism observation. NOT semantic truth, NOT UI authority. |
-| `source_format` | MECHANISM EVIDENCE | Decode endpoint's published format — mechanism observation. |
+| `source_format` | MECHANISM EVIDENCE | Decode endpoint's published format after decode open succeeds — mechanism observation. May exist even if later activation steps (output open, worker spawn) fail. |
 | `activation_failure` | MECHANISM EVIDENCE | Kernel's diagnostic surface carried the FAILED verdict — mechanism evidence of why activation raised. |
 | `WASAPI open verdict` | MECHANISM EVIDENCE | Device-open result — mechanism. |
 | `render thread existence` | MECHANISM EVIDENCE | Whether the render thread is alive — mechanism. |
@@ -111,7 +119,7 @@ Every signal classified into exactly one primary category per PBK-001 §2.
 
 | Signal | Classification | Justification |
 |---|---|---|
-| `SessionOutcome` | AUTHORITY STATE | The resolved semantic truth of how the episode ended. Established by `resolve()` (the designated authority — see §4), consumed by the App. |
+| `SessionOutcome` | AUTHORITY STATE | The resolved semantic truth of how the episode ended. Currently established by `resolve()` (candidate authority — see §4), consumed by the App. |
 | `FiberState::Active` / `Failed` | AUTHORITY STATE | K0 kernel truth about composition lifecycle — but this is K0 authority, not playback authority. |
 | `CompositionSnapshot` | AUTHORITY STATE | K0 truth about the running composition. Projection for the App (read-only visibility). |
 
@@ -119,9 +127,9 @@ Every signal classified into exactly one primary category per PBK-001 §2.
 
 | Signal | Classification | Justification |
 |---|---|---|
-| `SessionOutcome::Completed` | SEMANTIC FACT (see §4 for authority) | "The episode completed: EOF + device drained." |
-| `SessionOutcome::Stopped` | SEMANTIC FACT (see §4 for authority) | "The episode was stopped before completion." |
-| `SessionOutcome::Failed{stage}` | SEMANTIC FACT (see §4 for authority) | "The episode failed; stage names which leg." |
+| `SessionOutcome::Completed` | SEMANTIC FACT (see §4 for authority candidate) | "The episode completed: EOF + device drained." |
+| `SessionOutcome::Stopped` | SEMANTIC FACT (see §4 for authority candidate) | "Stop intent was observed before semantic resolution of an aborted episode." |
+| `SessionOutcome::Failed{stage}` | SEMANTIC FACT (see §4 for authority candidate) | "The episode failed; stage identifies the failure class selected by resolver precedence." |
 
 ## 2.5 PROJECTION / DIAGNOSTIC
 
@@ -164,6 +172,31 @@ from the native audit).
 
 # 4. Fact Authority Cards
 
+## Vocabulary for authority status
+
+This report distinguishes three levels of authority status:
+
+```text
+CURRENT IMPLEMENTATION WRITER:
+    The code location that currently writes this fact.
+    A production property, not an architecture designation.
+
+CANDIDATE DESIGNATED AUTHORITY:
+    The semantic role that could become the architecture-level
+    designated authority, if an ADR corrective is accepted.
+
+ARCHITECTURALLY DESIGNATED AUTHORITY:
+    An explicit architecture-level designation through ADR corrective.
+    NOT YET for any playback fact — requires separate review.
+```
+
+Per PBK-001 §2.3: "For each semantic fact kind and its semantic subject
+scope, there is exactly one designated semantic authority at a time."
+Designation is explicit architecture-level contract; it cannot be
+inferred from "current code has one writer" or "tests are deterministic."
+
+---
+
 ## F2-T1 — Current Source
 
 ```text
@@ -174,57 +207,73 @@ PROPOSITION:        "The media source for the current playback episode."
 
 FACT KIND:          PlaybackSource (proposed)
 
-SEMANTIC SUBJECT:   Current playback episode
+SEMANTIC SUBJECT:   This Playback Session activation attempt / episode
 SUBJECT SCOPE:      One PlaybackSession / SessionCompletion lifetime
 
-DESIGNATED AUTHORITY:
-    The Playback Session's activation function (session.rs:activate).
-    It receives the Path, opens the decode endpoint, and publishes the
-    format. The App holds the PathBuf as a handle, but the Session's
-    activation is the semantic commit point.
+CURRENT IMPLEMENTATION WRITER:
+    Session activation (session.rs:activate_inner) receives the Path,
+    opens the decode endpoint. The App holds the PathBuf as handle
+    ownership.
 
-AUTHORITY STATE:
-    source_format (write-once at activation)
+CURRENT PRODUCTION PROPERTY:
+    PathBuf is passed into activation and used to open_media().
+    No session-owned semantic source fact is currently stored or
+    published after activation.
+
+CANDIDATE DESIGNATED AUTHORITY:
+    Playback Session activation — it receives the path and opens
+    the decode endpoint. But no authoritative source identity is
+    currently stored on the session for later read-side use.
+
+ARCHITECTURALLY DESIGNATED:
+    NOT YET — requires ADR corrective if frozen.
 
 MECHANISM EVIDENCE USED:
     decode endpoint's format() after open_media() succeeds
 
 SEMANTIC COMMIT POINT:
-    activate_inner() successfully opens the decode endpoint and calls
-    set_source_format().
+    If one existed: activate_inner() successfully opening the decode
+    endpoint. But currently no source identity fact is committed —
+    only source_format is stored.
 
 CAN IT CHANGE AFTER COMMIT?:
-    No — source_format is write-once.
+    N/A — no source identity fact currently committed.
 
 CONFLICTING EVIDENCE RULE:
-    If activation fails, no source fact is committed (activation_failure
-    is mechanism evidence, not a source fact).
+    N/A
 
 PUBLICATION / READ-SIDE SHAPE:
-    source_format() — derived read-side accessor on SessionCompletion.
+    None for source identity. source_format() exists as mechanism
+    evidence readback, but does not carry source identity.
 
 PROJECTION CONSUMERS:
-    Headless CLI (print), future UI.
+    Future UI may need "what is the player playing" — but this is
+    NOT currently earned.
 
 CONTROL MAY USE PROJECTION?:
     NO — control does not depend on knowing the source.
 
 CURRENT PRODUCTION MAPPING:
-    PathBuf held by App → passed to activation → open_media() →
-    set_source_format(). The App's PathBuf is handle ownership, not
-    semantic authority.
+    PathBuf held by App → passed to activation → open_media().
+    The App's PathBuf is handle ownership, not semantic authority.
+    No session-owned source identity fact exists after activation.
 
 CURRENT GAP:
-    "Current source" as a persistent fact across terminal is NOT earned.
-    After the episode ends, source_format remains visible on the
-    SessionCompletion, but this is a one-episode handle, not a cross-
-    episode "what is the player playing" fact.
+    "Current source" as a persistent semantic fact is NOT EARNED.
+    The App holds PathBuf as input ownership; the session uses it
+    to open the decode endpoint but stores no source identity.
+    A future session-owned source identity fact would need its own
+    authority designation.
 
 VERDICT:
-    PARTIALLY_EARNED
-    Within one episode, the source is established at activation and is
-    immutable. Cross-episode "current source" is NOT EARNED.
+    NOT EARNED
+    Source identity as a semantic fact is not currently established.
+    The App's PathBuf is input/request ownership, not playback
+    semantic authority. Do not fabricate a source fact because UI
+    will need one.
 ```
+
+---
 
 ## F2-T2 — Playing
 
@@ -238,8 +287,8 @@ FACT KIND:          PlaybackPlaying (proposed)
 
 SEMANTIC SUBJECT:   Current playback episode
 
-DESIGNATED AUTHORITY:
-    NO DESIGNATED AUTHORITY EARNED.
+CURRENT IMPLEMENTATION WRITER:
+    NO WRITER EARNED.
 
     The current architecture has NO single observation that establishes
     "audio is audible." Each candidate is mechanism evidence, not a
@@ -332,29 +381,40 @@ PROPOSITION:        "The episode is in the process of starting."
 
 FACT KIND:          PlaybackStarting (proposed)
 
+CURRENT IMPLEMENTATION WRITER:
+    NONE — no code commits this.
+
 DESIGNATED AUTHORITY:
     NO DESIGNATED AUTHORITY EARNED.
 
-    "Starting" can be fully derived from authoritative state:
+    The previous report proposed deriving "Starting" from:
     - source selected (App holds PathBuf)
     - activation succeeded (FiberState::Active in K0 snapshot)
     - no terminal committed yet (SessionOutcome is None)
-    - no Playing/Completed/Stopped/Failed fact exists
 
-    This is a projection: "selected + active + no terminal = starting."
+    This derivation is INVALID: FiberState::Active means K0
+    activation completed. With no Playing semantic fact, the
+    condition "Active + no terminal" remains true for the
+    ENTIRE active playback episode — not just the beginning.
+    It therefore labels normal ongoing playback as "Starting,"
+    which is a false projection.
 
-AUTHORITY STATE:    NONE (derivable projection)
+AUTHORITY STATE:    NONE
 
 SEMANTIC COMMIT POINT:
-    N/A — it is a derived state, not a committed fact.
+    NONE EARNED. No bounded interval exists whose semantics
+    mean "episode is starting."
 
 VERDICT:
-    NOT_A_SEMANTIC_FACT
-    "Starting" is a projection derived from (activation succeeded AND
-    no terminal committed). It should NOT be an independent semantic
-    authority. It can be derived and displayed, but control must not
-    depend on it.
+    NOT_EARNED
+    "Starting" cannot be truthfully derived from current authority
+    state. The predicate "Active + no terminal" is true for the
+    whole active episode, not just the start. There is currently
+    no authoritative transition or bounded interval whose semantics
+    mean "episode is starting." F2 must not expose this.
 ```
+
+---
 
 ## F2-T4 — Completed
 
@@ -362,15 +422,16 @@ VERDICT:
 FACT AUTHORITY CARD
 
 NAME:               Completed
-PROPOSITION:        "The episode finished: EOF was produced, the device
-                    drained, and the session resolved."
+PROPOSITION:        "The episode finished: EOF was produced, the output
+                    mechanism reported its drain contract completed, and
+                    the Playback Session resolver committed Completed."
 
 FACT KIND:          SessionOutcome::Completed
 
 SEMANTIC SUBJECT:   Current playback episode
 SUBJECT SCOPE:      One SessionCompletion lifetime
 
-DESIGNATED AUTHORITY:
+CURRENT IMPLEMENTATION WRITER:
     The resolve() function in completion.rs — it is the single writer
     of CompletionState.outcome. It observes:
     1. decode_failure (mechanism evidence)
@@ -383,11 +444,22 @@ DESIGNATED AUTHORITY:
       DrainVerdict::Aborted + stop_requested → Stopped
       DrainVerdict::Aborted + !stop_requested → Failed{device}
 
+CANDIDATE DESIGNATED AUTHORITY:
+    Playback Session episode-outcome semantic authority.
+    Current realization: SessionCompletion::resolve().
+    Mechanism evidence may inform that decision, but does not
+    itself establish playback outcome truth.
+
+ARCHITECTURALLY DESIGNATED:
+    NOT YET — requires ADR corrective if frozen.
+    PBK-002 §14 leaves PlaybackFacts OPEN.
+
 AUTHORITY STATE:
     SessionOutcome (memoized after first resolution)
 
 MECHANISM EVIDENCE USED:
-    DrainVerdict::Drained (render mechanism reports all frames played)
+    DrainVerdict::Drained (output mechanism reports all frames played
+    through its drain contract)
     + EdgeTerminal::Eof (decode worker confirms EOF on the edge)
 
 SEMANTIC COMMIT POINT:
@@ -421,27 +493,33 @@ CURRENT PRODUCTION MAPPING:
 
 CURRENT GAP:
     Completed requires BOTH legs to reach their terminal: decode EOF
-    AND device drained. This is the correct semantic: "played out
-    completely" means the device physically finished playing.
+    AND output drain contract completed. Use contract-level wording:
+    "the output mechanism reported its drain contract completed" —
+    do NOT upgrade "device buffer empty" to "listener definitely
+    heard final sample" unless actually guaranteed.
 
     The gap is that "device drained" is mechanism evidence
     (DrainVerdict::Drained) — the output mechanism publishes this
-    after the WASAPI drain loop completes. The resolve() function
+    after the drain loop completes. The resolve() function
     INTERPRETS this mechanism evidence as a semantic fact. This
-    interpretation is the semantic commit — resolve() IS the designated
-    authority.
+    interpretation is the semantic commit — resolve() is the
+    candidate authority.
 
 VERDICT:
-    EARNED
-    Completed is a semantic fact committed by resolve() (the designated
-    authority for this (fact kind, subject scope)). It requires both
-    legs to reach their terminal. It is memoized and conflict-free.
+    CANDIDATE — implementation classification sound, candidate
+    semantic fact earned by production evidence, architectural
+    designation requires ADR corrective if frozen.
+    Causal overclaim: none — Completed does not claim physical
+    audibility, only contract-level drain completion.
 
     Adversarial Q3: If decoder EOF but WASAPI still has 300ms buffered
     → Completed CANNOT成立 yet. resolve() waits for DrainVerdict::Drained
     before committing Completed. This is correct: "completed" means
-    the device finished playing, not just the decoder finished producing.
+    the output drain contract completed, not just the decoder finished
+    producing.
 ```
+
+---
 
 ## F2-T5 — Stopped
 
@@ -449,15 +527,24 @@ VERDICT:
 FACT AUTHORITY CARD
 
 NAME:               Stopped
-PROPOSITION:        "The episode was stopped before completion."
+PROPOSITION:        "At semantic resolution time, an aborted terminal
+                    episode had recorded stop intent and no
+                    higher-precedence failure was committed."
 
 FACT KIND:          SessionOutcome::Stopped
 
 SEMANTIC SUBJECT:   Current playback episode
 SUBJECT SCOPE:      One SessionCompletion lifetime
 
-DESIGNATED AUTHORITY:
-    The resolve() function in completion.rs (same authority as Completed).
+CURRENT IMPLEMENTATION WRITER:
+    The resolve() function in completion.rs (same writer as Completed).
+
+CANDIDATE DESIGNATED AUTHORITY:
+    Playback Session episode-outcome semantic authority.
+    Current realization: SessionCompletion::resolve().
+
+ARCHITECTURALLY DESIGNATED:
+    NOT YET — requires ADR corrective if frozen.
 
 AUTHORITY STATE:
     SessionOutcome (memoized after first resolution)
@@ -466,8 +553,8 @@ MECHANISM EVIDENCE USED:
     DrainVerdict::Aborted (render mechanism reports abort)
     + worker_terminal == EdgeTerminal::Stopped (decode worker observed
       edge stop)
-    + stop_requested == true (command state — discriminates user stop
-      from device abort)
+    + stop_requested == true (command state — classifies the abort as
+      having recorded stop intent)
 
 SEMANTIC COMMIT POINT:
     resolve() first produces SessionOutcome::Stopped. Memoized.
@@ -494,29 +581,32 @@ CURRENT PRODUCTION MAPPING:
     function checks stop_requested. If true → Stopped. If false →
     Failed{device}.
 
-CURRENT GAP:
-    The discriminator (stop_requested) is command state used as
-    evidence in the semantic decision. This is legal per PBK-001 §2.2:
-    command state can inform semantic decisions. The key property:
-    request_stop() publishes intent BEFORE releasing the edge, so any
-    stop-caused Stopped necessarily observes the intent.
+CURRENT GAP — CAUSE-LOSS:
+    The proposition is deliberately narrow: "stop intent was observed
+    before semantic resolution of an aborted episode." This does NOT
+    claim "the user's stop caused the termination."
 
-    Known limitation (from native audit RV-A1): a device abort that
-    races a user stop may still resolve Stopped because both paths
-    land on the identical edge terminal. The window is wider than it
-    appears: stop intent recorded AFTER the abort resolves still
+    Known limitation: a device abort that races a user stop may still
+    resolve Stopped because both paths land on the identical edge
+    terminal. Stop intent recorded AFTER the abort resolves still
     produces Stopped, because request_stop() sets stop_requested
     unconditionally and resolve() checks it later. The discriminator
     is "was stop intent recorded at the time resolve() processes the
     Aborted+Stopped state?" not "was stop intent recorded before the
-    abort?" This is the full cause-loss hole (§7).
+    abort?"
+
+    This is a LIMITATION, not an architecture defect, because the
+    narrowed proposition does not require causal truth. If a future
+    product requirement demands "the user's stop caused termination,"
+    that would require cause-carrying mechanism evidence — an
+    AUTHORITY_GAP / MECHANISM_EVIDENCE_GAP at that point.
 
 VERDICT:
-    EARNED
-    Stopped is a semantic fact committed by resolve(). It requires:
-    (1) DrainVerdict::Aborted, (2) worker_terminal == Stopped,
-    (3) stop_requested == true. The third condition is the causal
-    discriminator. Memoized and conflict-free.
+    CANDIDATE — deterministic classification, narrow (non-causal)
+    proposition, candidate semantic fact. Architectural designation
+    requires ADR corrective if frozen.
+    Cause-loss limitation: explicit, not an architecture defect for
+    the current narrowed proposition.
 
     Adversarial Q4: If user stop THEN decode error → decode failure
     wins because decode_failure is checked first in resolve(). This
@@ -529,6 +619,8 @@ VERDICT:
     Completed. The late stop is a no-op. Projection should NOT show
     "Stopping" — the outcome is already committed.
 ```
+
+---
 
 ## F2-T6 — Failed
 
@@ -543,16 +635,23 @@ FACT KIND:          SessionOutcome::Failed { stage: String }
 SEMANTIC SUBJECT:   Current playback episode
 SUBJECT SCOPE:      One SessionCompletion lifetime
 
-DESIGNATED AUTHORITY:
-    The resolve() function in completion.rs (same authority as
+CURRENT IMPLEMENTATION WRITER:
+    The resolve() function in completion.rs (same writer as
     Completed/Stopped).
+
+CANDIDATE DESIGNATED AUTHORITY:
+    Playback Session episode-outcome semantic authority.
+    Current realization: SessionCompletion::resolve().
+
+ARCHITECTURALLY DESIGNATED:
+    NOT YET — requires ADR corrective if frozen.
 
 AUTHORITY STATE:
     SessionOutcome (memoized after first resolution)
 
 MECHANISM EVIDENCE USED:
     Multiple causes, checked in precedence order:
-    1. decode_failure string (first decode mechanism failure)
+    1. decode_failure string (decode mechanism failure)
     2. worker_terminal == Failed (decode worker observed edge failure
        without a message)
     3. DrainVerdict::Aborted + worker_terminal != Stopped ||
@@ -584,9 +683,11 @@ CURRENT PRODUCTION MAPPING:
 
 CURRENT GAP:
     "Failed{stage}" is one fact kind with structured cause (the stage
-    string). This is correct: there is ONE semantic proposition
-    "the episode failed" and the stage is a structured attribute of
-    that fact, not a separate fact kind.
+    string). The stage identifies the failure class selected by the
+    resolver's semantic precedence — it does NOT imply chronological
+    first-failure. A device abort can occur first in wall-clock time,
+    yet a published decode failure can still dominate semantic
+    resolution.
 
     The stage string is mechanism-level detail ("decode: {message}" or
     "device") — it is NOT a separate (fact kind, subject scope). The
@@ -601,11 +702,13 @@ CURRENT GAP:
     (mechanism evidence), and resolve() interprets it.
 
 VERDICT:
-    EARNED
-    Failed is a semantic fact committed by resolve(). The stage is a
-    structured attribute of the same fact, not a separate authority.
-    Memoized and conflict-free.
+    CANDIDATE — implementation classification sound, candidate
+    semantic fact. Stage identifies failure class by resolver
+    precedence, not chronological first-failure.
+    Architectural designation requires ADR corrective if frozen.
 ```
+
+---
 
 ## Additional discovered facts
 
@@ -615,16 +718,25 @@ VERDICT:
 FACT AUTHORITY CARD
 
 NAME:               Source Format
-PROPOSITION:        "The PCM format of the current episode's source."
+PROPOSITION:        "The opened decode endpoint reports PCM format X."
 
 FACT KIND:          PlaybackSourceFormat (proposed)
 
-SEMANTIC SUBJECT:   Current playback episode
+SEMANTIC SUBJECT:   Current playback episode / decode endpoint
 SUBJECT SCOPE:      One SessionCompletion lifetime
 
-DESIGNATED AUTHORITY:
+CURRENT IMPLEMENTATION WRITER:
     Session activation (session.rs:activate_inner). It calls
     set_source_format() exactly once after successful decode open.
+
+CURRENT PRODUCTION PROPERTY:
+    Write-once after decode open succeeds. May exist even if later
+    activation steps (output open, worker spawn) subsequently fail.
+    This is a mechanism-derived write-once observation — not proof
+    that the playback episode successfully activated.
+
+ARCHITECTURALLY DESIGNATED:
+    NOT YET — requires ADR corrective if frozen.
 
 AUTHORITY STATE:
     source_format (write-once, memoized)
@@ -639,14 +751,18 @@ CAN IT CHANGE AFTER COMMIT?:
     No — write-once.
 
 CONFLICTING EVIDENCE RULE:
-    If activation fails, no format is published.
+    If decode open itself fails, no format is published. But if
+    decode open succeeds and later activation steps fail, the
+    format IS committed — it is not rolled back.
 
 PUBLICATION / READ-SIDE SHAPE:
     source_format() accessor on SessionCompletion.
 
 VERDICT:
-    EARNED
-    Write-once, conflict-free, within one episode scope.
+    CANDIDATE — mechanism-derived write-once observation.
+    Narrow proposition: "the opened decode endpoint reports format X."
+    NOT proof that the episode activated successfully.
+    Do NOT mix with source identity.
 ```
 
 ### activation_error
@@ -655,16 +771,22 @@ VERDICT:
 FACT AUTHORITY CARD
 
 NAME:               Activation Error
-PROPOSITION:        "Activation failed; here is why."
+PROPOSITION:        "This Playback Session activation attempt failed;
+                    here is why."
 
 FACT KIND:          PlaybackActivationFailed (proposed)
 
-SEMANTIC SUBJECT:   Current playback episode
-SUBJECT SCOPE:      One SessionCompletion lifetime
+SEMANTIC SUBJECT:   This Playback Session activation attempt
+SUBJECT SCOPE:      One activation attempt (not a successfully
+                    activated episode — activation failure occurs
+                    before any episode exists)
 
-DESIGNATED AUTHORITY:
+CURRENT IMPLEMENTATION WRITER:
     Session activation (session.rs:activate). It calls
     activation_failed() when activate_inner() returns Err.
+
+ARCHITECTURALLY DESIGNATED:
+    NOT YET — requires ADR corrective if frozen.
 
 AUTHORITY STATE:
     activation_failure (write-once, memoized)
@@ -677,15 +799,15 @@ SEMANTIC COMMIT POINT:
     activation_failed() in session.rs:59-62.
 
 VERDICT:
-    EARNED
-    Write-once, conflict-free.
+    CANDIDATE — write-once, conflict-free.
 
-    Note (Reviewer A MINOR-1): The producing mechanism (session
-    activation) IS the designated authority for this (fact kind,
-    subject scope), which is why mechanism evidence here directly
-    constitutes semantic fact per PBK-001 §2.3. This is the one
-    case where the evidence producer and the designated authority
-    coincide.
+    Subject scope note: The producing mechanism (session activation)
+    IS the current implementation writer for this (fact kind, subject
+    scope), which is why mechanism evidence here directly constitutes
+    the stored value. But the subject is "this activation attempt,"
+    NOT "current playback episode" — activation failure occurs before
+    a successfully activated playback episode exists. Activation
+    failure != episode terminal outcome.
 ```
 
 ---
@@ -694,14 +816,18 @@ VERDICT:
 
 | Candidate | Semantic ownership | Physical lifetime | Fact scope | Writers | Pause/Seek compat | UI access | Cross-episode | Stale risk | K0 leakage | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **Session (session.rs)** | One episode | Episode-scoped | episode-outcome, source, activation | resolve() is single writer | episode-scoped; pause/seek would need new authority | App reads completion | No | Low (consume-once) | No | **DESIGNATED** for episode outcome |
-| **SessionCompletion** | One episode | Episode-scoped | same as Session | same | same | App holds handle | No | Low | No | **DESIGNATED** (it IS the session's application-facing seam) |
+| **Session (session.rs)** | One episode | Episode-scoped | episode-outcome, source_format, activation | resolve() is single writer | episode-scoped; pause/seek would need new authority | App reads completion | No | Low (consume-once) | No | **CANDIDATE** for episode outcome |
+| **SessionCompletion** | One episode | Episode-scoped | same as Session | same | same | App holds handle | No | Low | No | **CANDIDATE** (it IS the session's application-facing seam) |
 | **App** | None (PBK-002 D3) | Application | N/A | N/A | N/A | IS the consumer | N/A | N/A | No | **REJECTED** — App is bootstrap/shutdown, not playback authority |
 | **K0 / Fiber state** | Composition | composition-scoped | lifecycle only | K0 kernel | No | snapshot read | No | Low | YES — would leak | **REJECTED** — K0 owns existence, not playback semantics |
 | **Decode Plugin** | decode mechanism | provider-lifetime | decode only | decode mechanism | No | No | No | Low | No | Only for decode-specific facts (e.g., decode_failed) |
 | **Output Plugin** | output mechanism | provider-lifetime | drain only | output mechanism | No | No | No | Low | No | Only for drain-specific facts (DrainVerdict) |
 
-**Decision:** `SessionCompletion` (which is `SessionCompletion` + `resolve()`) is the designated semantic authority for episode outcome. It is:
+**Decision:** For the current one-episode playback topology, the Playback
+Session is the candidate designated semantic authority for that episode's
+terminal outcome. Current realization: `SessionCompletion::resolve()`.
+
+It is:
 
 1. **Single writer:** resolve() is the only function that writes to `CompletionState.outcome`.
 2. **Episode-scoped:** one handle per episode, consume-once.
@@ -710,12 +836,12 @@ VERDICT:
 5. **No mechanism leakage:** resolve() interprets mechanism evidence but is not itself a mechanism.
 6. **Testable:** unit-testable with mock DrainVerdict/EdgeTerminal inputs.
 
-The authority chain is:
+The current authority chain is:
 
 ```text
 mechanism evidence (DrainVerdict, EdgeTerminal, decode_failure)
         ↓
-resolve() — designated semantic authority
+resolve() — current implementation writer (candidate authority)
         ↓
 semantic commit (memoized SessionOutcome)
         ↓
@@ -723,6 +849,9 @@ publication (wait() / try_resolve_now())
         ↓
 projection / headless status / future UI
 ```
+
+**This chain is production reality, not architecture designation.** To
+freeze this as architecture authority, an ADR corrective is required.
 
 ---
 
@@ -745,9 +874,9 @@ cannot truthfully commit this fact.
 ## Q3: Decoder EOF but WASAPI has 300ms buffered → Completed?
 
 **Answer:** `Completed` CANNOT be committed yet. resolve() requires
-DrainVerdict::Drained (device finished playing) AND worker_terminal ==
-Eof. The 300ms of buffered audio means the device hasn't drained yet.
-This is correct behavior.
+DrainVerdict::Drained (output drain contract completed) AND
+worker_terminal == Eof. The 300ms of buffered audio means the drain
+contract is not yet satisfied. This is correct behavior.
 
 ## Q4: User stop then decode error → final truth?
 
@@ -755,7 +884,7 @@ This is correct behavior.
 first in resolve() and is authoritative over Stopped. The decode
 failure is the more specific truth about why the episode ended.
 
-**Who decides?** resolve() — the designated authority.
+**Who decides?** resolve() — the candidate authority.
 
 ## Q5: Device dies → who owns Failed{device}?
 
@@ -777,17 +906,17 @@ after Completed would be lying.
 
 **Answer:** This exposes that "terminal outcome" and "current activity"
 are different dimensions. The terminal outcome (Completed/Stopped/Failed)
-is the authoritative fact. "Idle" would be a projection: "no active
+is the candidate authority fact. "Idle" would be a projection: "no active
 episode" — derivable from (no active PlaybackSession fiber in K0
 composition). These are orthogonal:
 
-- Terminal outcome = "how did the episode end?" (SessionCompletion authority)
+- Terminal outcome = "how did the episode end?" (SessionCompletion candidate authority)
 - Current activity = "is the player doing something?" (projection from K0 state)
 
 ## Q8: Future UI reconnect → snapshot or replay?
 
-**Answer:** Current snapshot. The authority (SessionCompletion) holds
-the memoized outcome. No event log is needed. The App reads
+**Answer:** Current snapshot. The candidate authority (SessionCompletion)
+holds the memoized outcome. No event log is needed. The App reads
 try_resolve_now() and gets the committed truth. This is sufficient
 because the current architecture is single-episode, single-outcome.
 
@@ -833,31 +962,31 @@ The current discriminator works because:
 2. Any stop-caused Stopped necessarily observes the intent.
 3. A device abort without a stop request leaves stop_requested=false.
 
-## 7.3 Does F2 need cause-carrying evidence NOW?
+But: stop intent recorded AFTER the abort resolves still produces
+Stopped, because request_stop() sets stop_requested unconditionally
+and resolve() checks it later.
 
-**Conclusion B: F2 snapshot can remain honest without exposing a state
-that requires unavailable causality.** (Reviewed: the window is wider
-than the original text suggested — stop intent after the abort still
-produces Stopped — but the semantic correctness of the precedence
-rules is not affected.)
+## 7.3 Classification of the limitation
 
-Reasoning:
-1. The current resolve() function already produces correct outcomes for
-   all observable histories in the current single-episode architecture.
-2. The cause-loss window is small: in the F1 CLI, wait() runs
-   immediately after activation, so the race between user stop and
-   device abort is narrow.
-3. A richer cause-carrying DrainVerdict (e.g., `Aborted{cause:
-   UserStop | DeviceFailure}`) would be a mechanism corrective, not a
-   semantic design requirement. The semantic truth is correctly resolved
-   by the existing discriminator.
-4. F2's job is to establish what truths exist and who decides them —
-   not to fix mechanism-level cause tracking.
+The narrowed proposition for Stopped is:
+
+> "At semantic resolution time, an aborted terminal episode had
+> recorded stop intent and no higher-precedence failure was committed."
+
+This does NOT require causal truth. Therefore the cause-loss is a
+**LIMITATION** — the semantic proposition is honest about what the
+current mechanism can determine. It is NOT an architecture defect for
+the current narrowed proposition.
+
+If a future product requirement demands "the user's stop caused
+termination," that would require cause-carrying mechanism evidence
+(e.g., `DrainVerdict::Aborted { cause: UserStop | DeviceFailure }`).
+At that point the cause-loss becomes an **AUTHORITY_GAP /
+MECHANISM_EVIDENCE_GAP**.
 
 **Deferred to later phase:** A cause-carrying drain verdict would
 improve diagnostic accuracy but is not required for F2 semantic
-correctness. The current resolve() function is honest about what it
-can and cannot determine.
+correctness under the current narrowed proposition.
 
 ---
 
@@ -890,7 +1019,7 @@ Reasoning:
    state per PBK-001 §2.2.
 2. It is NOT a semantic fact about the episode's outcome.
 3. It IS used as evidence in the semantic decision (resolve() checks
-   it to discriminate user stop from device abort).
+   it to classify an aborted episode as having recorded stop intent).
 4. "Stopping..." would be a projection derived from (stop_requested AND
    no terminal committed yet). It should NOT be an independent semantic
    authority.
@@ -911,41 +1040,44 @@ Given the authority audit, a headless status or future UI projection
 may truthfully display:
 
 ```text
-SOURCE:
-    The media source path (App handle ownership, not semantic authority).
-    source_format (mechanism evidence, within one episode).
+OUTCOME:
+    SessionOutcome (authority state from resolve()):
+    - Completed: EOF + device drain contract completed
+    - Stopped: stop intent observed before resolution of aborted episode
+    - Failed{stage}: episode failed (stage = failure class by precedence)
+
+SOURCE FORMAT:
+    source_format (mechanism evidence, write-once, within episode).
+    Not source identity — just the PCM format of the opened endpoint.
 
 ACTIVATION:
     Whether activation succeeded (FiberState::Active in K0 snapshot —
     this is K0 authority, used as read-side visibility).
-    activation_failure (mechanism evidence, within one episode).
-
-OUTCOME:
-    SessionOutcome (authority state from resolve()):
-    - Completed: EOF + device drained
-    - Stopped: stop requested before completion
-    - Failed{stage}: episode failed
+    activation_failure (mechanism evidence, within this activation
+    attempt).
 
 COMMAND STATE:
     stop_requested (command state, labeled as such).
 
 DIAGNOSTIC (not for product display):
     buffered_frames (mechanism evidence).
-    source_format (mechanism evidence).
 ```
 
 ## 9.2 What MUST NOT be shown yet
 
 ```text
 Playing          NOT EARNED — no designated authority
-Starting         NOT A SEMANTIC FACT — derivable projection
+Starting         NOT EARNED — derivation is semantically false
+                   (Active + no terminal is true for whole episode)
 Paused           NOT IMPLEMENTED
 Seeking          NOT IMPLEMENTED
 Stopping         NOT EARNED — derivable from (stop_requested + no terminal)
+                   but not independently earned
 Position         NOT TRACKED
 Elapsed time     NOT TRACKED
 Buffer health    NOT A SEMANTIC FACT
 Device status    NOT TRACKED
+Source path      NOT EARNED as semantic fact
 ```
 
 ## 9.3 Projection contract
@@ -966,6 +1098,49 @@ Forbidden:
 UI reads snapshot → decides architecture-critical teardown legality
 ```
 
+## 9.4 Snapshot composition ownership
+
+A `SessionCompletion::snapshot()` method can only honestly expose
+fields that `SessionCompletion` actually owns or stores:
+
+```text
+SessionCompletion owns/stores:
+    outcome (authority state)
+    source_format (mechanism evidence, write-once)
+    activation_failure (mechanism evidence, write-once)
+    stop_requested (command state)
+
+SessionCompletion does NOT own:
+    source path (held by App as input ownership)
+    K0 Fiber state (K0 authority)
+    K0 composition snapshot (K0 authority)
+    activation success/failure from K0 perspective
+```
+
+Therefore a `SessionCompletion::snapshot()` can only provide:
+
+```text
+outcome: Option<SessionOutcome>
+source_format: Option<PcmFormat>
+activation_error: Option<String>
+stop_requested: bool
+```
+
+It cannot synthesize `source: Option<PathBuf>` (App input ownership,
+not session-owned) or `activation: succeeded/failed` from K0 state
+(K0 authority, not session-owned).
+
+If a future UI needs a combined view that merges App input + K0 state
++ session authority, that must be assembled at the App level as a
+projection — NOT inside `SessionCompletion::snapshot()`. That
+App-level assembly is:
+
+```text
+projection assembly ownership (App)
+separate from
+semantic authority ownership (SessionCompletion)
+```
+
 ---
 
 # 10. Headless Status Design
@@ -973,9 +1148,8 @@ UI reads snapshot → decides architecture-critical teardown legality
 ## 10.1 What `status` can truthfully print today
 
 ```text
-source: {path}
-format: {sample_rate} Hz, {channels} channels, mask {channel_mask}
 outcome: Completed | Stopped | Failed{stage} | (pending)
+format: {sample_rate} Hz, {channels} channels, mask {channel_mask}
 stop_requested: true | false
 activation: succeeded | failed ({message})
 ```
@@ -986,6 +1160,7 @@ activation: succeeded | failed ({message})
 state: Playing / Paused / Stopped (as a playback state)
 position: 1:23 / 3:45
 buffered: 1234 frames
+source: {path}  (App input, not session authority)
 ```
 
 ## 10.3 Design principle
@@ -1064,13 +1239,12 @@ PROJECTION UPDATE:  headless prints error
 
 **Single writer:** resolve(). No MAJOR.
 
-**Note (Reviewer B MINOR-2):** If a device abort happens BEFORE a
+**Note (MINOR-2 corrective):** If a device abort happens BEFORE a
 decode error arrives, the outcome is still `Failed{decode}` — not
 `Failed{device}` — because decode_failure is checked first in
-resolve(), regardless of temporal ordering. This is correct per the
-precedence rules (decode failure is the more specific truth), but
-readers may expect chronological first-failure-wins. The precedence
-rule is "decode failure dominates," not "first-in-time wins."
+resolve(), regardless of temporal ordering. The stage identifies the
+failure class selected by the resolver's semantic precedence, not the
+chronological first failure.
 
 ## H6 — Play → device abort × stop collision
 
@@ -1087,8 +1261,9 @@ PROJECTION UPDATE:  headless prints "stopped before completion"
 
 **Single writer:** resolve(). No MAJOR — but this is the cause-loss
 case: if the device abort was independent of the stop, the outcome is
-still Stopped because stop_requested was true. This is a known
-limitation (§7), not an architecture defect.
+still Stopped because stop_requested was true. The narrowed proposition
+("stop intent observed before resolution") does not claim causality,
+so this is a LIMITATION, not an architecture defect.
 
 ## H7 — Play → activation failure
 
@@ -1099,6 +1274,8 @@ MECHANISM EVIDENCE: activate_inner() returns Err, activation_failed()
 SEMANTIC DECISION:  No SessionOutcome committed (activation failed
                    before any episode started)
 FACT COMMIT:        activation_failure (mechanism evidence, write-once)
+                   subject: this activation attempt, not
+                   "current playback episode" (no episode exists yet)
 PROJECTION UPDATE:  headless prints error
 ```
 
@@ -1224,23 +1401,40 @@ WHY:
 # 16. ADR Amendment
 
 ```text
-ADR AMENDMENT = NOT NEEDED (for this round)
+ADR CORRECTIVE REQUIRED
 
 Reasoning:
-    F2 has earned semantic authority designations (resolve() is the
-    designated authority for episode outcome), but these are
-    implementation-level decisions about who writes what, not new
-    architecture invariants. PBK-001's §2.3 fact-authority identity
-    contract already provides the framework; F2 applies it.
+    The report proposes that the Playback Session be the designated
+    semantic authority for episode terminal outcome (Completed/Stopped/
+    Failed). PBK-002 §14 leaves PlaybackFacts OPEN. Freezing a
+    designated authority for (episode outcome, episode scope) is a
+    durable playback authority decision that requires explicit
+    ADR-level designation.
 
-    No new primitive, no new K0 invariant, no new plane separation
-    is earned. The designations (resolve() = authority, mechanism
-    evidence = input, projection = derived visibility) are already
-    covered by existing ADR authority.
+    The candidate designation:
+    "For the current one-episode playback topology, the Playback
+    Session is the designated semantic authority for that episode's
+    terminal outcome."
 
-    If F2 implementation later needs to freeze a PlaybackSnapshot
-    type or a new read-side seam as a durable contract, that would
-    be an ADR corrective. Not yet.
+    Current realization: SessionCompletion::resolve().
+
+    Mechanism evidence may inform that decision, but does not itself
+    establish playback outcome truth.
+
+    This report does NOT directly edit any accepted ADR. It proposes
+    the minimum amendment for later review.
+
+SCOPE OF PROPOSED AMENDMENT:
+    - Playback Session designated semantic authority for episode
+      terminal outcome (one-episode topology only)
+    - Current outcomes: Completed, Stopped, Failed
+    - Explicitly OPEN: Playing, Starting, Paused, Position, Seek,
+      cross-episode source truth, playlist, multi-session,
+      EpisodeId/Generation, PlaybackControl topology, PlaybackSnapshot
+      representation
+
+If this ADR corrective is not accepted in this PR:
+    F2 implementation remains blocked on the authority designation.
 ```
 
 ---
@@ -1248,14 +1442,16 @@ Reasoning:
 # 17. Majors / Minors / FYI
 
 ```text
-MAJORS:  (none)
+MAJORS:  (none — all 4 MAJORs from reviewer are corrected in this
+          version)
 
-MINORS:  (none — all findings are correctly classified in current code)
+MINORS:  (none — all 4 MINORs from reviewer are corrected in this
+          version)
 
 FYI:
-    1. The cause-loss hole (§7) is a known limitation, not a defect.
-       Deferred to a later phase when cause-carrying evidence may be
-       needed.
+    1. The cause-loss hole (§7) is a known LIMITATION, not a defect,
+       for the current narrowed Stopped proposition. Becomes an
+       AUTHORITY_GAP only if future product requires causal truth.
     2. SessionCompletion consume-once is documented but unenforced.
        Latent for future retry/restart.
     3. The zero-frame decode branch loops hot (pre-existing; the
@@ -1268,101 +1464,162 @@ FYI:
 
 # 18. Next Implementable F2 Slice
 
-The smallest F2 implementation slice authorized after this design gate:
+After the corrected authority analysis, the next F2 slice must be
+re-derived. The previous proposal (PlaybackSnapshot on SessionCompletion
+with source field + K0 activation field) does not survive review because
+SessionCompletion cannot honestly synthesize fields it does not own.
 
-1. **PlaybackSnapshot type** (projection, not authority) containing:
-   - `source: Option<PathBuf>` (App handle, not semantic authority)
-   - `format: Option<PcmFormat>` (mechanism evidence, within episode)
-   - `outcome: Option<SessionOutcome>` (authority state from resolve())
-   - `stop_requested: bool` (command state, labeled as such)
-   - `activation_error: Option<String>` (mechanism evidence)
+**Recommended next slice:**
 
-2. **Read-side seam** on SessionCompletion:
-   - `fn snapshot(&self) -> PlaybackSnapshot` — returns derived
-     projection from current authority state + mechanism evidence.
+1. **ADR corrective proposal** — designate Playback Session as semantic
+   authority for episode terminal outcome (Completed/Stopped/Failed).
+   This is the gate that unblocks F2 implementation.
 
-3. **Headless status command** (projection display):
-   - `status` interactive command prints the projection.
-   - Explicitly labeled as derived visibility.
+2. **Terminal outcome read-side projection only** — if ADR corrective
+   is accepted, the smallest implementable slice is:
+   - `SessionOutcome` read-side accessor (already exists as
+     `try_resolve_now()` / `wait()`)
+   - Headless `status` command printing outcome + source_format +
+     stop_requested + activation_error
+   - No PlaybackSnapshot type yet (projection assembly across
+     App/K0/session boundaries needs clearer ownership)
 
-4. **No new Plugin, no new K0 primitive, no new capability.**
+3. **No Playing/Starting/current-source claims** — these are NOT EARNED
+   and must not be fabricated.
 
-This slice is implementable without changing any existing authority
-or mechanism code.
+**What is NOT authorized yet:**
+
+```text
+PlaybackSnapshot type (cross-boundary assembly unclear)
+Playing / Starting / Paused / Stopped-as-state projections
+Source path as semantic fact
+status command as control-correctness authority
+New Plugin / K0 primitive / capability
+```
 
 ---
 
 # 19. Final Verdict
 
 ```text
-F2-AUTHORITY-AUDIT-0
+F2-AUTHORITY-AUDIT-CORRECTIVE-1
 
 BASE:         8cf337e (main)
-VERDICT:      READY_FOR_SEMANTIC_REVIEW
+OLD_HEAD:     a36b9c3
+BRANCH:       specs/f2-authority-audit-0
 
-EARNED:
-    SessionOutcome (Completed/Stopped/Failed) — semantic fact,
-    designated authority = resolve() in completion.rs, episode-scoped,
-    memoized, single-writer, conflict-free.
+VERDICT:      ADR_CORRECTIVE_REQUIRED
 
-    SourceFormat — mechanism evidence, write-once, within episode.
+EARNED (as candidate authority):
+    SessionOutcome (Completed/Stopped/Failed) — candidate semantic
+    fact, current implementation writer = resolve() in completion.rs,
+    episode-scoped, memoized, single-writer, conflict-free.
+    Architecturally designated: NOT YET (ADR corrective required).
 
-    ActivationError — mechanism evidence, write-once, within episode.
+    SourceFormat — mechanism-derived write-once observation, within
+    episode. May exist even if later activation steps fail.
 
-    Source (within episode) — established at activation, immutable.
+    ActivationError — mechanism evidence, write-once. Subject: this
+    activation attempt, not "current playback episode."
 
 NOT EARNED:
     Playing — no designated authority, no mechanism publishes this.
-    Starting — not a semantic fact, derivable projection.
+    Starting — derivation is semantically false (Active + no terminal
+        is true for whole episode, not just the start).
     Paused/Seeking — not implemented.
     Stopping — not an independent fact, derivable projection.
+    Source identity — NOT EARNED; App holds PathBuf as input ownership.
     EpisodeId/Generation — not needed for single-episode architecture.
     Cross-episode "current source" — not earned.
 
-DESIGNATED AUTHORITIES:
-    Episode outcome (Completed/Stopped/Failed) → resolve()
-    Source format → session activation (write-once)
-    Activation error → session activation (write-once)
-    DrainVerdict → output mechanism (mechanism evidence)
-    EdgeTerminal → edge (mechanism evidence)
-    FiberState → K0 (composition authority)
+AUTHORITY MODEL:
+    current implementation writer:
+        resolve() in completion.rs (episode outcome)
+        session activation (source_format, activation_failure)
+    candidate designated authority:
+        Playback Session for episode terminal outcome
+    architecturally designated authority:
+        NOT YET for any playback fact
 
-PROJECTION:
-    PlaybackSnapshot (to be designed) is derived visibility, NOT
-    authority. Control must query resolve(), not the snapshot.
+SOURCE VERDICT:
+    NOT EARNED — no session-owned source identity fact exists.
+    App holds PathBuf as input/request ownership.
 
-CAUSE GAP:
-    Known limitation: device abort × user stop uses stop_requested
-    as discriminator, not cause-carrying evidence. Honest for current
-    single-episode architecture. Deferred.
+SOURCE_FORMAT VERDICT:
+    CANDIDATE — mechanism-derived write-once observation.
+    May exist even if activation later fails.
+    Do NOT conflate with source identity.
 
-BUFFERED_FRAMES:
-    RETIRED from any future PlaybackSnapshot. Remains test diagnostic
-    only. NOT product semantic truth, NOT UI authority.
+STARTING VERDICT:
+    NOT EARNED — derivation is semantically false.
+    Active + no terminal is true for the whole active episode.
 
-STOP_REQUESTED:
-    COMMAND STATE. May appear in projection labeled as command-state.
-    NOT a playback semantic fact.
+STOPPED PROPOSITION:
+    Narrow classification: "stop intent observed before semantic
+    resolution of aborted episode."
+    NOT causal: does not claim "user's stop caused termination."
 
-ADR CHANGE:
-    NOT NEEDED for this round. Existing authority (PBK-001 §2.3)
-    provides the framework; F2 applies it.
+CAUSE-LOSS STATUS:
+    LIMITATION — the narrowed proposition does not require causal
+    truth. Becomes AUTHORITY_GAP only if future product demands
+    causal semantics.
+
+FAILED PRECEDENCE:
+    Stage identifies failure class by resolver semantic precedence,
+    NOT chronological first-failure. Device abort can occur first
+    in wall-clock time, yet published decode failure still dominates.
+
+COMPLETED PROPOSITION:
+    EOF + output drain contract completed + resolver committed.
+    NOT physical audibility. Contract-level wording.
+
+ACTIVATION FAILURE SUBJECT:
+    This activation attempt (not "current playback episode").
+    Activation failure occurs before a successfully activated
+    episode exists.
+
+PROJECTION ASSEMBLY:
+    SessionCompletion can only expose fields it owns: outcome,
+    source_format, activation_failure, stop_requested.
+    Source path and K0 state must be assembled at App level.
+    Separate projection assembly ownership from authority ownership.
+
+ADR:
+    REQUIRED
+    Scope: designate Playback Session as semantic authority for
+    episode terminal outcome (one-episode topology).
+    Explicitly OPEN: Playing, Starting, Paused, Position, Seek,
+    source truth, playlist, multi-session, PlaybackSnapshot.
 
 FORMALIZATION:
-    NOT EARNED. No independently-legal interleaving produces conflicting
-    truth. resolve() is single-writer with deterministic precedence.
+    NOT EARNED — no independently-legal interleaving produces
+    conflicting truth.
 
-NEXT AUTHORIZED WORK:
-    Smallest F2 implementation slice: PlaybackSnapshot projection type
-    + read-side seam on SessionCompletion + headless status command.
+NEXT IMPLEMENTABLE F2 SLICE:
+    1. ADR corrective proposal (authority designation gate)
+    2. Terminal outcome read-side projection + headless status
+    3. No Playing/Starting/source claims
+    4. No PlaybackSnapshot cross-boundary synthesis
+
+PRODUCTION CODE CHANGED:
+    NO
+
+UNRESOLVED MAJORS:
+    (none)
+
+WORKTREE:
+    clean
 ```
 
 ---
 
-# Appendix A — resolve() Precedence Rule (Normative for F2)
+# Appendix A — Current resolve() Precedence Observed in Production
 
-The following precedence rule is the designated semantic authority's
-decision function. It is frozen as F2's core semantic commit logic:
+> This is production reality / evidence. It becomes normative only if
+> separately accepted through architecture authority.
+
+The following precedence rule is the current implementation's decision
+function, observed in `resolve()` in completion.rs:
 
 ```text
 1. if outcome already committed → return it (memoized, first-wins)
@@ -1376,9 +1633,23 @@ decision function. It is frozen as F2's core semantic commit logic:
 6. otherwise → not yet decidable (wait)
 ```
 
-This rule is the single source of truth for episode outcome. It is
-NOT an enum state machine — it is a one-shot resolution function that
-observes mechanism evidence and commits a semantic fact.
+This rule is the current implementation property. It is a one-shot
+resolution function that observes mechanism evidence and commits a
+semantic fact.
+
+Key properties (current implementation, not frozen architecture):
+- **Decode failure dominates** everything downstream (checked first).
+- **Precedence, not chronological first-failure**: a device abort can
+  occur first in wall-clock time, yet a published decode failure still
+  dominates semantic resolution.
+- **First-wins memoization**: once committed, the outcome never changes.
+- **stop_requested is command state** used as a discriminator, not
+  cause-carrying evidence.
+
+If an ADR corrective accepts the Playback Session as the designated
+semantic authority for episode outcome, this precedence rule would be
+the current realization of that authority's decision function. It
+would then become normative through the ADR, not through this report.
 
 ---
 
@@ -1389,10 +1660,34 @@ All terms below are design input, not frozen vocabulary:
 | Term | Class | Meaning |
 |---|---|---|
 | Episode | Subject scope | One playback lifetime: activation → terminal |
-| Episode outcome | Semantic fact | How the episode ended (Completed/Stopped/Failed) |
+| Episode outcome | Semantic fact (candidate) | How the episode ended (Completed/Stopped/Failed) |
 | Mechanism evidence | Input to authority | Raw observations from decode/output mechanisms |
 | Semantic commit | Authority action | Designated authority establishes truth |
 | Derived projection | Read-side visibility | Snapshot of current authority state for display |
 | Command state | Intent | Whether an intent was recorded (stop_requested) |
-| Designated authority | Architecture role | Single writer for a (fact kind, subject scope) |
-| Resolve | Authority function | The function that commits semantic truth |
+| Current implementation writer | Production property | The code that currently writes a fact |
+| Candidate designated authority | Architecture proposal | The semantic role that could become designated authority |
+| Architecturally designated authority | Architecture decision | Explicit ADR-level designation (NOT YET for any playback fact) |
+| Designated authority | Architecture role | Single writer for a (fact kind, subject scope) — requires ADR |
+| Resolve | Implementation function | The current function that commits semantic truth — candidate authority realization |
+
+---
+
+# Appendix C — Fact Authority Matrix (Corrected)
+
+Columns: PROPOSITION | SUBJECT SCOPE | CURRENT PRODUCER/WRITER | CLASS | CANDIDATE ARCHITECTURAL AUTHORITY | ARCHITECTURALLY DESIGNATED? | COMMIT POINT | POST-COMMIT MUTABILITY | KNOWN AMBIGUITY | VERDICT
+
+| Proposition | Subject scope | Current writer | Class | Candidate authority | Designated? | Commit point | Post-commit | Ambiguity | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| Episode completed (EOF + drain) | Episode | resolve() | semantic fact (candidate) | Playback Session | ADR_REQUIRED | resolve() first produces Completed | immutable (memoized) | none | CANDIDATE |
+| Episode stopped (abort + stop intent) | Episode | resolve() | semantic fact (candidate) | Playback Session | ADR_REQUIRED | resolve() first produces Stopped | immutable (memoized) | cause-loss: stop intent after abort still produces Stopped | CANDIDATE (LIMITATION) |
+| Episode failed | Episode | resolve() | semantic fact (candidate) | Playback Session | ADR_REQUIRED | resolve() first produces Failed | immutable (memoized) | stage = precedence class, not chronological first | CANDIDATE |
+| Source format of opened endpoint | Episode | set_source_format() | mechanism evidence (write-once) | session activation | ADR_REQUIRED | set_source_format() in activate_inner | immutable (write-once) | may exist if later activation fails | CANDIDATE |
+| Activation failure | Activation attempt | activation_failed() | mechanism evidence (write-once) | session activation | ADR_REQUIRED | activation_failed() | immutable (write-once) | subject = activation attempt, not episode | CANDIDATE |
+| Source identity | Episode | NONE | NOT EARNED | NONE | NOT EARNED | N/A | N/A | App holds PathBuf, not session authority | NOT EARNED |
+| Playing | Episode | NONE | NOT EARNED | NONE | NOT EARNED | N/A | N/A | no mechanism publishes this | NOT EARNED |
+| Starting | Episode | NONE | NOT EARNED | NONE | NOT EARNED | N/A | N/A | derivation is semantically false | NOT EARNED |
+| Stopping | Episode | NONE | NOT EARNED (projection) | NONE | NOT EARNED | N/A | N/A | derivable from stop_requested + no terminal | NOT EARNED |
+| Paused | Episode | NONE | NOT EARNED | NONE | NOT EARNED | N/A | N/A | not implemented | NOT EARNED |
+| Buffered frames | Edge | edge read/write | mechanism evidence (diagnostic) | NONE | NOT EARNED | N/A | mutable | ring occupancy only | RETIRED from snapshot |
+| Stop requested | Episode | request_stop() | command state | NONE | NOT EARNED | request_stop() | mutable (set once) | command, not outcome | COMMAND STATE |
