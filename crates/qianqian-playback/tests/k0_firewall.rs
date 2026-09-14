@@ -38,7 +38,7 @@ fn kernel_with_session(completion: &SessionCompletion) -> CompositionKernel {
                 .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
                 .on_activate(move |ctx| {
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
-                        std::rc::Rc::new(TestOutput { behavior }),
+                        std::rc::Rc::new(TestOutput::new(behavior)),
                     )
                     .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
                     Ok(())

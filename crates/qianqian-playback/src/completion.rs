@@ -1,13 +1,27 @@
-//! Session completion: session-owned truth about how one playback episode
-//! ended. Not K0 semantic truth, not a Fact plane object — the App waits
-//! on it and then initiates disposal.
+//! Session completion: the session-owned application-facing seam for one
+//! playback episode. Control intent enters through [`SessionCompletion::
+//! request_stop`]; resolved truth leaves through `wait` /
+//! `try_resolve_now`. It is not K0 semantic truth, not a Fact plane
+//! object — the App holds it, drives the episode with it, waits on it,
+//! and then initiates disposal.
+//!
+//! One handle serves exactly one episode: activation binds one edge and
+//! the outcome memoizes on first resolution, so do not re-use a
+//! completion across a retried or restarted episode.
+//!
+//! Outcome precedence, stated once at the seam: a published decode
+//! failure dominates everything (it is checked first and is not
+//! relabelled by stop intent); otherwise the drain verdict plus the
+//! worker's exit terminal decide, with recorded stop intent
+//! disambiguating an aborted drain between a user stop and a device
+//! failure.
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use qianqian_audio_api::ports::{DrainSignal, DrainVerdict};
 
-use crate::edge::EdgeTerminal;
+use crate::edge::{EdgeTerminal, PcmEdge};
 
 /// How one playback episode ended.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,6 +46,15 @@ struct CompletionState {
     /// Why activation raised, published by the session itself (the
     /// kernel's diagnostic surface carries the verdict, not the message).
     activation_failure: Option<String>,
+    /// Stop intent, recorded by [`SessionCompletion::request_stop`].
+    /// Command state, not outcome truth: an episode that already ended
+    /// (Completed/Failed) is not retroactively renamed by a late stop.
+    stop_requested: bool,
+    /// The session's data-plane edge, bound by activation as the stop
+    /// target. `None` until the episode binds one (or forever, if
+    /// activation failed). The edge is the session-owned stop mechanism;
+    /// this handle only routes intent to it.
+    stop_target: Option<Arc<PcmEdge>>,
 }
 
 #[derive(Clone)]
@@ -61,6 +84,8 @@ impl SessionCompletion {
                     decode_failure: None,
                     source_format: None,
                     activation_failure: None,
+                    stop_requested: false,
+                    stop_target: None,
                 }),
                 signal: Condvar::new(),
                 drain: DrainSignal::new(),
@@ -117,6 +142,82 @@ impl SessionCompletion {
         }
         drop(guard);
         self.state.signal.notify_all();
+    }
+
+    /// Request the episode to stop.
+    ///
+    /// This is a command, not a fact: it records stop intent and releases
+    /// the session's data-plane stop (which is idempotent and first-wins,
+    /// so it never overwrites a committed EOF or failure). How the episode
+    /// actually ends remains decided solely by [`Self::resolve`]. Calling
+    /// this after the outcome is resolved is a no-op with respect to that
+    /// outcome.
+    ///
+    /// Safe from any thread and any state:
+    /// - before the session bound an edge (not yet activated): intent is
+    ///   recorded and applied the moment activation binds the edge;
+    /// - while playing: both legs are woken with terminal outcomes;
+    /// - after resolution: nothing changes.
+    pub fn request_stop(&self) {
+        let target = {
+            let mut guard = self.state.state.lock().expect("completion lock");
+            guard.stop_requested = true;
+            guard.stop_target.clone()
+        };
+        if let Some(edge) = target {
+            edge.stop();
+        }
+    }
+
+    /// Whether stop intent has been recorded. Command-state visibility
+    /// (F2 status will read it); it says nothing about the outcome.
+    pub fn stop_requested(&self) -> bool {
+        self.state
+            .state
+            .lock()
+            .expect("completion lock")
+            .stop_requested
+    }
+
+    /// Frames currently buffered on the session's edge, once bound.
+    /// Diagnostic mechanism-evidence readback (same class as
+    /// [`Self::source_format`]); it is not an outcome and carries no
+    /// control authority. `None` before the session bound its edge.
+    ///
+    /// Visibility ruling (NATIVE-BOUNDARY-AUDIT-AND-F1-CLOSURE-1): this
+    /// stays public only because the integration tests that exercise it
+    /// live outside the crate. It is diagnostic mechanism evidence only —
+    /// NOT PlaybackState, NOT product semantic truth, NOT UI-facing
+    /// authority. F2 must explicitly re-admit or retire this seam; it
+    /// must not silently become a state contract by continued use.
+    pub fn buffered_frames(&self) -> Option<usize> {
+        let guard = self.state.state.lock().expect("completion lock");
+        guard
+            .stop_target
+            .as_ref()
+            .map(|edge| edge.buffered_frames())
+    }
+
+    /// The session binds its data-plane edge as the stop target at
+    /// activation. If stop intent was already recorded before the edge
+    /// existed ("stop before the episode fully opened"), it is applied
+    /// immediately, so the episode ends `Stopped` instead of playing past
+    /// a stop that arrived first.
+    ///
+    /// Session-internal binding seam: the application reaches the same
+    /// effect only through [`Self::request_stop`].
+    pub(crate) fn bind_stop_target(&self, edge: Arc<PcmEdge>) {
+        let already_requested = {
+            let mut guard = self.state.state.lock().expect("completion lock");
+            // First binding wins; activation binds exactly once.
+            if guard.stop_target.is_none() {
+                guard.stop_target = Some(edge.clone());
+            }
+            guard.stop_requested
+        };
+        if already_requested {
+            edge.stop();
+        }
     }
 
     /// The decode worker wrapper reports the edge terminal at its exit.
@@ -180,13 +281,36 @@ fn resolve(state: &mut CompletionState, drain: &DrainSignal) -> Option<SessionOu
             }
         }
         Some(DrainVerdict::Aborted) => {
-            state.outcome = Some(if state.worker_terminal == Some(EdgeTerminal::Stopped) {
-                SessionOutcome::Stopped
-            } else {
-                SessionOutcome::Failed {
-                    stage: "device".to_owned(),
+            match state.worker_terminal {
+                // Until the worker has exited, the outcome is not
+                // decidable: an aborted render alone happens on every
+                // stop (the render leg is typically the first to observe
+                // it) and on a real device failure. Keep waiting — every
+                // abort path releases the data-plane stop, and that stop
+                // wakes the worker, so this always terminates.
+                None => {}
+                Some(EdgeTerminal::Stopped) => {
+                    // The worker terminal alone cannot distinguish "the
+                    // user stopped us" from "the render leg died and
+                    // stopped the data plane on its way out": both land
+                    // here with the identical Stopped terminal. Recorded
+                    // stop intent is the discriminator — request_stop
+                    // publishes intent before it releases the edge, so
+                    // any stop-caused Stopped necessarily observes it.
+                    if state.stop_requested {
+                        state.outcome = Some(SessionOutcome::Stopped);
+                    } else {
+                        state.outcome = Some(SessionOutcome::Failed {
+                            stage: "device".to_owned(),
+                        });
+                    }
                 }
-            });
+                Some(_) => {
+                    state.outcome = Some(SessionOutcome::Failed {
+                        stage: "device".to_owned(),
+                    });
+                }
+            }
         }
         None => {}
     }

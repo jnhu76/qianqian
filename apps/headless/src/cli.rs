@@ -68,6 +68,9 @@ commands:
   play <file>      play one local media file to completion
   --help | -h      print this usage
   --version | -V   print the version
+
+while `play` runs, a `stop` line on stdin stops the episode
+(other interactive commands are recognized but not wired yet)
 "
 }
 
@@ -130,6 +133,22 @@ pub enum InteractiveParseError {
         expected: usize,
         got: usize,
     },
+}
+
+impl std::fmt::Display for InteractiveParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InteractiveParseError::EmptyLine => write!(f, "empty line"),
+            InteractiveParseError::UnknownCommand(token) => {
+                write!(f, "unknown command '{token}'")
+            }
+            InteractiveParseError::WrongArity {
+                command,
+                expected,
+                got,
+            } => write!(f, "'{command}' expects {expected} argument(s), got {got}"),
+        }
+    }
 }
 
 /// Parse one interactive shell line into a typed command.

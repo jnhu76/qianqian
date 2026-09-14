@@ -91,8 +91,12 @@ fn activate_inner(
     let format = decode_stream.format();
     completion.set_source_format(format);
 
-    // The one bounded PCM edge: session-owned, preallocated now.
+    // The one bounded PCM edge: session-owned, preallocated now. It is
+    // also the stop target: application-facing stop intent arrives here
+    // (through the session completion) and ends the episode with the
+    // same first-wins terminal the legs already understand.
     let edge = Arc::new(PcmEdge::new(format.channels, EDGE_CAPACITY_FRAMES));
+    completion.bind_stop_target(edge.clone());
 
     // Playback-specific render stream, pre-bound to the edge's consumer
     // half and the session's drain signal. A bounded open verdict keeps
