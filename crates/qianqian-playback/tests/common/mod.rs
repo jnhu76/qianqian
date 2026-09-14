@@ -118,6 +118,12 @@ pub enum OutputBehavior {
     SlowConsume { per_read: Duration },
     /// Fail at open (device open failure).
     FailOpen,
+    /// Consume `after_reads` blocks, then abort mid-stream — models a
+    /// real device failure/invalidation where the render loop exits on
+    /// its own, stops the data plane, and reports the drain aborted. No
+    /// stop was requested; this is how a genuine device abort reaches
+    /// the completion resolver.
+    AbortMidStream { after_reads: usize },
 }
 
 pub struct TestOutput {
@@ -130,10 +136,13 @@ impl AudioOutput for TestOutput {
             OutputBehavior::FailOpen => Err(OutputError {
                 message: "test device open failure".to_owned(),
             }),
-            OutputBehavior::Consume | OutputBehavior::SlowConsume { .. } => {
-                let pace = match self.behavior {
-                    OutputBehavior::SlowConsume { per_read } => Some(per_read),
-                    _ => None,
+            OutputBehavior::Consume
+            | OutputBehavior::SlowConsume { .. }
+            | OutputBehavior::AbortMidStream { .. } => {
+                let (pace, abort_after) = match self.behavior {
+                    OutputBehavior::SlowConsume { per_read } => (Some(per_read), None),
+                    OutputBehavior::AbortMidStream { after_reads } => (None, Some(after_reads)),
+                    _ => (None, None),
                 };
                 let RenderRequest {
                     input,
@@ -145,7 +154,7 @@ impl AudioOutput for TestOutput {
                     .spawn({
                         let input = input.clone();
                         move || {
-                            let verdict = consume_loop(input.clone(), pace);
+                            let verdict = consume_loop(input.clone(), pace, abort_after);
                             if verdict == DrainVerdict::Aborted {
                                 // Mirror the real mechanism: a dead render
                                 // leg stops the data plane.
@@ -166,11 +175,23 @@ impl AudioOutput for TestOutput {
     }
 }
 
-fn consume_loop(input: Arc<dyn RenderPcmInput>, pace: Option<Duration>) -> DrainVerdict {
+fn consume_loop(
+    input: Arc<dyn RenderPcmInput>,
+    pace: Option<Duration>,
+    abort_after: Option<usize>,
+) -> DrainVerdict {
     let mut dst = vec![0.0f32; 256 * usize::from(TEST_FORMAT.channels)];
+    let mut reads = 0usize;
     loop {
+        if abort_after.is_some_and(|limit| reads >= limit) {
+            // Device died mid-stream: the render loop exits on its own.
+            // The caller mirrors the real mechanism by stopping the data
+            // plane before completing the drain.
+            return DrainVerdict::Aborted;
+        }
         match input.read_frames(&mut dst) {
             PcmPull::Frames(_) => {
+                reads += 1;
                 if let Some(per_read) = pace {
                     std::thread::sleep(per_read);
                 }

@@ -394,6 +394,42 @@ fn outcome_stage(outcome: &SessionOutcome) -> String {
     }
 }
 
+/// A render leg that aborts on its own — the real device-failure shape:
+/// the render loop exits, stops the data plane, and reports the drain
+/// aborted — must resolve Failed{"device"}, never Stopped. Regression
+/// for the resolve() discriminator: the worker's Stopped terminal is
+/// identical for a user stop and a device death, so recorded stop intent
+/// is the only honest witness (a stop nobody requested is not a stop).
+#[test]
+fn a_device_abort_without_stop_request_lands_failed_device() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(10), move || {
+        let completion = SessionCompletion::new();
+        let mut runtime = registered_runtime(
+            SourceBehavior::EofAfter(4_000_000),
+            OutputBehavior::AbortMidStream { after_reads: 4 },
+            completion.clone(),
+        );
+        activate(&mut runtime);
+
+        assert_eq!(
+            completion.wait(),
+            SessionOutcome::Failed {
+                stage: "device".to_owned()
+            },
+            "an abort nobody requested is a device failure, not a stop"
+        );
+        assert!(
+            !completion.stop_requested(),
+            "no stop intent was ever recorded"
+        );
+
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet);
+        assert_no_leg_threads();
+    });
+}
+
 /// The stop seam does not disturb the normal EOF path when nobody
 /// stops: regression guard that binding a stop target alone changes no
 /// completion semantics.

@@ -185,7 +185,10 @@ impl SessionCompletion {
     /// existed ("stop before the episode fully opened"), it is applied
     /// immediately, so the episode ends `Stopped` instead of playing past
     /// a stop that arrived first.
-    pub fn bind_stop_target(&self, edge: Arc<PcmEdge>) {
+    ///
+    /// Session-internal binding seam: the application reaches the same
+    /// effect only through [`Self::request_stop`].
+    pub(crate) fn bind_stop_target(&self, edge: Arc<PcmEdge>) {
         let already_requested = {
             let mut guard = self.state.state.lock().expect("completion lock");
             // First binding wins; activation binds exactly once.
@@ -261,17 +264,28 @@ fn resolve(state: &mut CompletionState, drain: &DrainSignal) -> Option<SessionOu
         }
         Some(DrainVerdict::Aborted) => {
             match state.worker_terminal {
-                // The worker's exit terminal is the authority for "this
-                // abort was the stop, not a device failure". Until the
-                // worker has exited, the outcome is not decidable: an
-                // aborted render alone happens on every stop (the render
-                // leg is typically the first to observe it). Keep
-                // waiting — every abort path releases the data-plane
-                // stop, and that stop wakes the worker, so this always
-                // terminates.
+                // Until the worker has exited, the outcome is not
+                // decidable: an aborted render alone happens on every
+                // stop (the render leg is typically the first to observe
+                // it) and on a real device failure. Keep waiting — every
+                // abort path releases the data-plane stop, and that stop
+                // wakes the worker, so this always terminates.
                 None => {}
                 Some(EdgeTerminal::Stopped) => {
-                    state.outcome = Some(SessionOutcome::Stopped);
+                    // The worker terminal alone cannot distinguish "the
+                    // user stopped us" from "the render leg died and
+                    // stopped the data plane on its way out": both land
+                    // here with the identical Stopped terminal. Recorded
+                    // stop intent is the discriminator — request_stop
+                    // publishes intent before it releases the edge, so
+                    // any stop-caused Stopped necessarily observes it.
+                    if state.stop_requested {
+                        state.outcome = Some(SessionOutcome::Stopped);
+                    } else {
+                        state.outcome = Some(SessionOutcome::Failed {
+                            stage: "device".to_owned(),
+                        });
+                    }
                 }
                 Some(_) => {
                     state.outcome = Some(SessionOutcome::Failed {
