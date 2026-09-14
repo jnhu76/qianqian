@@ -113,6 +113,9 @@ impl DecodedPcmStream for TestDecodeStream {
 pub enum OutputBehavior {
     /// Consume the edge to EOF, then report Drained.
     Consume,
+    /// Consume with a sleep after every read: the producer genuinely
+    /// fills the bounded edge and blocks mid-write long before EOF.
+    SlowConsume { per_read: Duration },
     /// Fail at open (device open failure).
     FailOpen,
 }
@@ -127,7 +130,11 @@ impl AudioOutput for TestOutput {
             OutputBehavior::FailOpen => Err(OutputError {
                 message: "test device open failure".to_owned(),
             }),
-            OutputBehavior::Consume => {
+            OutputBehavior::Consume | OutputBehavior::SlowConsume { .. } => {
+                let pace = match self.behavior {
+                    OutputBehavior::SlowConsume { per_read } => Some(per_read),
+                    _ => None,
+                };
                 let RenderRequest {
                     input,
                     drain,
@@ -138,7 +145,7 @@ impl AudioOutput for TestOutput {
                     .spawn({
                         let input = input.clone();
                         move || {
-                            let verdict = consume_loop(input.clone());
+                            let verdict = consume_loop(input.clone(), pace);
                             if verdict == DrainVerdict::Aborted {
                                 // Mirror the real mechanism: a dead render
                                 // leg stops the data plane.
@@ -159,11 +166,15 @@ impl AudioOutput for TestOutput {
     }
 }
 
-fn consume_loop(input: Arc<dyn RenderPcmInput>) -> DrainVerdict {
+fn consume_loop(input: Arc<dyn RenderPcmInput>, pace: Option<Duration>) -> DrainVerdict {
     let mut dst = vec![0.0f32; 256 * usize::from(TEST_FORMAT.channels)];
     loop {
         match input.read_frames(&mut dst) {
-            PcmPull::Frames(_) => {}
+            PcmPull::Frames(_) => {
+                if let Some(per_read) = pace {
+                    std::thread::sleep(per_read);
+                }
+            }
             PcmPull::Eof => return DrainVerdict::Drained,
             PcmPull::Stopped => return DrainVerdict::Aborted,
         }
