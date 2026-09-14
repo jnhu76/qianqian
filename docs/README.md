@@ -14,6 +14,8 @@ Load only the documentation needed for the current task. Git history and externa
 | Plugin/Fiber taxonomy + earned static playback composition | `adr/ADR-PBK-002.md` D1/D4/D5/D6/D12 |
 | Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
 | Current architecture corrective basis | Issue #138 — design input only, **not authority** |
+| Minimal PCM contract evidence | `architecture/pcm-contract-a0.md` + `../crates/qianqian-audio-api/tests/pcm_edge_contract/` — Phase B evidence only |
+| Direct-flow graph evidence | `architecture/direct-pcm-flow.md` + `../crates/qianqian-audio-api/tests/direct_pcm_flow/` — Phase C evidence only |
 | Realtime publication lifetime evidence + mechanism comparison | `architecture/realtime-publication-lifetime-decision.md` + `../specs/realtime-publication/` — evidence only |
 | Current Rust behavior | current code + tests |
 | Playback experimental evidence | `../specs/playback/*` + explicitly historical/test-local playback artifacts — evidence only |
