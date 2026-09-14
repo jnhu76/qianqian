@@ -183,6 +183,13 @@ impl SessionCompletion {
     /// Diagnostic mechanism-evidence readback (same class as
     /// [`Self::source_format`]); it is not an outcome and carries no
     /// control authority. `None` before the session bound its edge.
+    ///
+    /// Visibility ruling (NATIVE-BOUNDARY-AUDIT-AND-F1-CLOSURE-1): this
+    /// stays public only because the integration tests that exercise it
+    /// live outside the crate. It is diagnostic mechanism evidence only —
+    /// NOT PlaybackState, NOT product semantic truth, NOT UI-facing
+    /// authority. F2 must explicitly re-admit or retire this seam; it
+    /// must not silently become a state contract by continued use.
     pub fn buffered_frames(&self) -> Option<usize> {
         let guard = self.state.state.lock().expect("completion lock");
         guard

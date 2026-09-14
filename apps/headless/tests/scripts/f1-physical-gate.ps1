@@ -21,6 +21,10 @@ function Run-Episode([string]$StdinLine, [bool]$SendStop, [string]$ExpectMatch) 
     $psi.RedirectStandardError = $true
     $psi.UseShellExecute = $false
     $p = [System.Diagnostics.Process]::Start($psi)
+    # Async drains from launch: a child blocked on a full stdout/stderr
+    # pipe can neither process 'stop' nor exit, which would surface as a
+    # fake watchdog timeout. Neither stream may be read only at the end.
+    $errTask = $p.StandardError.ReadToEndAsync()
     if ($SendStop) {
         $witness = $false
         while ($null -ne ($line = $p.StandardOutput.ReadLine())) {
@@ -30,17 +34,21 @@ function Run-Episode([string]$StdinLine, [bool]$SendStop, [string]$ExpectMatch) 
             $p.StandardInput.WriteLine('quit-never-wired')
             return @{ Ok = $false; Why = "no playing witness"; Exit = -1 }
         }
+        # Witness consumed synchronously; drain the remainder without
+        # blocking (sync reads are complete before the async begins).
+        $outTask = $p.StandardOutput.ReadToEndAsync()
         Start-Sleep -Milliseconds 400
         $p.StandardInput.WriteLine($StdinLine)
     } else {
         $p.StandardInput.Close()
+        $outTask = $p.StandardOutput.ReadToEndAsync()
     }
     if (-not $p.WaitForExit(20000)) {
         $p.Kill()
         return @{ Ok = $false; Why = "timeout"; Exit = -1 }
     }
-    $out = $p.StandardOutput.ReadToEnd()
-    $err = $p.StandardError.ReadToEnd()
+    $out = $outTask.GetAwaiter().GetResult()
+    $err = $errTask.GetAwaiter().GetResult()
     # 'render aborted: data plane stopped' is the EXPECTED one-shot stop
     # diagnostic on the stopped path; a real failure says failed/error
     # and a latched teardown violation says warning:.
