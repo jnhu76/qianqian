@@ -187,12 +187,7 @@ Composition topology 与 Audio Processing Graph 是两张不同的图。Gain / E
 
 ## 当前实现边界
 
-该旧实验的 Rust 可执行证据已迁出生产 crate，现以 test-local 模块形式保留（非 current authority）：
-
-```text
-crates/qianqian-audio-api/tests/playback_temporal_traces/music.rs
-crates/qianqian-audio-api/tests/playback_temporal_traces/transport.rs
-```
+该旧实验的 Rust 可执行证据（music/transport traces）与其 TLA+ 模型已随 post-#139 spec reset 从 main 移除；Git 历史是唯一存档（非 current authority；`playback-reference-v1` ref 存档的是 pre-Rust 参考，不含这些 Rust-era artifacts）。
 
 这只是让代码 vocabulary 与当时历史实验模型一致，不代表当前 ADR-PBK-001 vocabulary；也没有提前冻结 Window / Generation / Fence / TrackSession / DecodeSession 的最终 Rust representation，更没有实现 FFmpeg/WASAPI playback engine。
 
@@ -217,5 +212,5 @@ Core temporal checks 已 PASS，覆盖：
 <ProvenancePanel
   :authority="[]"
   :decisions="[]"
-  :evidence="['specs/playback/PlaybackTemporal.tla', 'specs/playback/README.md', 'research/playback-reference-v1']"
+  :evidence="['git history (pre-reset playback suite)', 'research/playback-reference-v1']"
 />

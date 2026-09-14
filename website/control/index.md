@@ -53,7 +53,7 @@ MusicComponent
     └── DecodeSession(s)
 ```
 
-该旧实验的可执行证据以 test-local 模块保留在 `crates/qianqian-audio-api/tests/playback_temporal_traces/`；尚未实现完整 playback state machine、FFmpeg Decoder 或真实 AudioOutput backend。
+该旧实验的可执行证据已随 post-#139 spec reset 从 main 移除（Git 历史存档）；当前 composition/control 验证证据见 `specs/README.md`。完整 playback state machine、FFmpeg Decoder 与真实 AudioOutput backend 的语义仍 OPEN。
 
 [阅读 Playback Architecture（历史）→](/architecture/playback-kernel)
 
@@ -92,5 +92,5 @@ Playback 不通过给 generic kernel 增加更多产品概念来实现。
 <ProvenancePanel
   :authority="['docs/adr/ADR-PBK-001.md', 'docs/site/project-state.ts']"
   :decisions="[{ pr: 68 }, { pr: 71 }]"
-  :evidence="['crates/qianqian-composition/tests', 'specs/playback/PlaybackTemporal.tla']"
+  :evidence="['crates/qianqian-composition/tests', 'specs/composition-kernel-0/CompositionKernel0.tla']"
 />

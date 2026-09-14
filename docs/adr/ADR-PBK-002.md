@@ -638,6 +638,9 @@ production code:  crates/qianqian-playback/src/completion.rs
                   crates/qianqian-playback/src/session.rs（episode lifecycle）
 
 resolver 精确 precedence：保留在 evidence report PR #135 Appendix A，本文不冻结。
+（Archive note 2026-09-15：该报告已随 post-#139 spec reset 从 main 移除；
+PR #135 记录仍是 archive，当前真相由 `completion.rs` 的 seam 文档与
+resolve() 实现承载。）
 若改变 precedence 会改变上述外部语义命题本身，需回到 authority review。
 ```
 

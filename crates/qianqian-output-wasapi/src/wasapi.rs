@@ -243,7 +243,7 @@ fn open_and_run(
     let coinit = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
     // Fail closed at the boundary: without a successful CoInitializeEx
     // (S_OK or S_FALSE) this thread has no COM apartment and the open
-    // must not proceed into COM calls. (NATIVE-BOUNDARY-AUDIT-0 A3.2.)
+    // must not proceed into COM calls. (NATIVE-BOUNDARY-AUDIT-0 A3.2（round record：Git 历史 / PR #134）.)
     if coinit.is_err() {
         return LoopOutcome::Aborted {
             message: format!("CoInitializeEx failed: {coinit:?}"),
@@ -296,7 +296,7 @@ impl Drop for ComApartment {
 /// wrapper without `Drop`, so a plain `HANDLE` field releases nothing —
 /// the guard's `Drop` runs `CloseHandle` exactly once on every exit path:
 /// open failure, panic, stop, and normal release
-/// (NATIVE-BOUNDARY-AUDIT-0 A3.3 corrective).
+/// (NATIVE-BOUNDARY-AUDIT-0 A3.3 corrective（round record：Git 历史 / PR #134）).
 struct EventHandle(HANDLE);
 
 impl EventHandle {

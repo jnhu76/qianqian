@@ -114,7 +114,7 @@ run_tlc "$SPEC_ROOT/mutations/M1DropReliedGuard.cfg"       fail:ReliedGuard   "M
 run_tlc "$SPEC_ROOT/mutations/M2RemoveBeforeDischarge.cfg" fail:NoRemovalOwing "Mutation / M2 RemoveBeforeDischarge" -continue
 run_tlc "$SPEC_ROOT/mutations/M3EarlyReplacement.cfg"      fail:SingleSource  "Mutation / M3 EarlyReplacement" -continue
 run_tlc "$SPEC_ROOT/mutations/M4DoubleInverse.cfg"         fail:InverseOnce   "Mutation / M4 DoubleInverse" -continue
-run_tlc "$SPEC_ROOT/mutations/M5MountOverViolation.cfg"    fail:SingleSource  "Mutation / M5 MountOverViolation（=当前Rust）" -continue
+run_tlc "$SPEC_ROOT/mutations/M5MountOverViolation.cfg"    fail:SingleSource  "Mutation / M5 MountOverViolation（pre-#126 Rust 行为；现作 overlap guard 负控制）" -continue
 
 echo "== 可达性探针（正向控制：witness 必须找到 = 断言必须被违反）"
 run_tlc "$SPEC_ROOT/probes/StagingWindow.cfg"        fail:ProbeStagingWindowUnreachable        "Probe / §E.4 staging 窗口"

@@ -159,13 +159,13 @@ Gain → EQ → SRC → Limiter → ...
 | 架构块 | 状态 |
 |---|---|
 | Base / Composition Kernel K0 | <StatusBadge status="IMPLEMENTED" /> |
-| Playback Foundations / ADR-PBK-001 | <StatusBadge status="CURRENT" /> `ACCEPTED` — 旧 playback 名词仍为 experimental evidence |
+| Playback Foundations / ADR-PBK-001 | <StatusBadge status="CURRENT" /> `ACCEPTED` — 旧 playback 名词为 historical evidence（Git 历史存档） |
 | Decoder provider | <StatusBadge status="PLANNED" /> |
 | AudioOutput provider | <StatusBadge status="PLANNED" /> |
 | Audio Processing implementation | <StatusBadge status="PLANNED" /> |
 | UiHost | <StatusBadge status="DEFERRED" /> |
 
-旧 playback 实验代码已移出生产 crate，仅以 test-local executable evidence 保留（`crates/qianqian-audio-api/tests/playback_temporal_traces/`），不是 current authority；FFmpeg/WASAPI 和完整 playback state machine 未获得实现授权。
+旧 playback 实验代码及其 test-local executable traces 已随 post-#139 spec reset 从 main 移除（Git 历史存档），不是 current authority；仍在验证的竞态由当前 specs/tests 承载（`specs/README.md`）。FFmpeg/WASAPI 和完整 playback state machine 未获得实现授权。
 
 ---
 
@@ -181,5 +181,5 @@ Gain → EQ → SRC → Limiter → ...
   :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/composition-kernel-0-design.md']"
   :decisions="[{ issue: 67 }, { pr: 68 }]"
   :implementation="[{ issue: 70 }, { pr: 71 }]"
-  :evidence="['crates/qianqian-composition/tests', 'specs/playback/PlaybackTemporal.tla']"
+  :evidence="['crates/qianqian-composition/tests', 'specs/composition-kernel-0/CompositionKernel0.tla']"
 />

@@ -77,7 +77,6 @@ EXCLUDE_DIRS = {
 # scanned because CI/build automation is part of the current execution surface.
 EXCLUDE_PATH_SUBSTRINGS = [
     "docs/archive/",
-    "playback_temporal_traces/",
     "evidence/",
 ]
 

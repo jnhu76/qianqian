@@ -248,7 +248,7 @@ pub fn songcore_decode_plugin() -> ComponentSpec {
 }
 #[cfg(test)]
 mod tests {
-    // Callback-guard regressions from NATIVE-BOUNDARY-AUDIT-0. These run
+    // Callback-guard regressions from NATIVE-BOUNDARY-AUDIT-0（round record：Git 历史 / PR #134）. These run
     // against the callback machinery only — no native library, no fixture.
     // They are the executable form of the guard contract: a host-IO
     // callback must fail closed (-1) without ever forming a Rust slice

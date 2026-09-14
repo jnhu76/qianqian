@@ -106,12 +106,9 @@ architectures:
       - specs/realtime-publication/RealtimePublication.tla
       - specs/realtime-publication/README.md
       - git tag playback-reference-v1
-      - specs/playback/PlaybackTemporal.tla
-      - specs/playback/PlaybackOwnership.tla
-      - specs/playback/README.md
-      - crates/qianqian-audio-api/tests/playback_temporal_traces/main.rs
-      - crates/qianqian-audio-api/tests/playback_temporal_traces/music.rs
-      - crates/qianqian-audio-api/tests/playback_temporal_traces/transport.rs
+      - crates/qianqian-playback/tests/loom_edge.rs
+      - crates/qianqian-playback/tests/session_activation.rs
+      - crates/qianqian-audio-api/tests/realtime_view_publication/main.rs
       - docs/architecture/first-audible-slice.md
       - docs/architecture/diagrams/ARCH-003-playback-kernel-v1.mmd
 

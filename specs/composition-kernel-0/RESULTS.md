@@ -2,7 +2,7 @@
 
 STATUS: FORMAL EVIDENCE（#124 truth class: evidence，非 authority）。
 
-> **RESULT: BOUNDED-CLEAN（safety + liveness）+ 1 个 PRODUCTION-DEFECT 候选（M5 反例，见 DIFFERENTIAL）。**
+> **RESULT: BOUNDED-CLEAN（safety + liveness）+ 1 个 PRODUCTION-DEFECT 候选（M5 反例）——该候选已由 #126 确认并修复，见 DIFFERENTIAL 的 resolution。**
 > BOUNDED-CLEAN 指在下方显式 BOUNDS/FAIRNESS 内未找到反例；它**不是**
 > "architecture proven correct"，不构成 acceptance。
 
@@ -19,7 +19,7 @@ Mutation / M1 DropReliedGuard                        MUST-FAIL-OK（违反 Relie
 Mutation / M2 RemoveBeforeDischarge                  MUST-FAIL-OK（违反 NoRemovalOwing）
 Mutation / M3 EarlyReplacement                       MUST-FAIL-OK（违反 SingleSource）
 Mutation / M4 DoubleInverse                          MUST-FAIL-OK（违反 InverseOnce）
-Mutation / M5 MountOverViolation（=当前Rust）    MUST-FAIL-OK（违反 SingleSource）
+Mutation / M5 MountOverViolation（pre-#126）    MUST-FAIL-OK（违反 SingleSource）
 == 可达性探针（正向控制：witness 必须找到）
 Probe / §E.4 staging 窗口                         MUST-FAIL-OK
 Probe / §G.6 违约 latch                           MUST-FAIL-OK
@@ -126,7 +126,8 @@ NEGATIVE CONTROL
                                 重叠守卫）
     M4 DoubleInverse          → InverseOnce 反例（违约 tombstone 二次执行）
     M5 MountOverViolation     → SingleSource 反例（只撤重叠守卫 =
-                                当前 kernel.rs 行为；见 DIFFERENTIAL）
+                                #126 修复前的 kernel.rs 行为，现作该
+                                guard 的 TLA 侧负控制；见 DIFFERENTIAL）
     全部 mutation 反例命中目标；BASELINE clean。mutation run 使用更紧
     界（MaxRevisions=2、MaxActivations=1、只查目标 invariant）——原因
     见「Runner lessons」。
@@ -153,8 +154,14 @@ fiber 声明提供同一 capability —— "An Unloading old fiber is still
 installed, so inserting an overlapping new provider before the old is
 removed would violate the registry invariant outright"；§L.2 违约行：
 reconcile "issues no further requests through the affected edge"）
-Rust violates X（mount_candidate 只查同名 fiber，不查 capability 重叠）
-=> PRODUCTION DEFECT（候选，待人工确认后进入 corrective）
+Rust violates X（当时 mount_candidate 只查同名 fiber，不查 capability 重叠）
+=> PRODUCTION DEFECT
+
+**[2026-09-15 RESOLUTION]** 已确认并修复：#126（bb7662d，2026-09-13
+merge）为 mount_candidate 增加 capability-overlap withhold；TA 反例的
+Rust 回归在 `crates/qianqian-composition/tests/staged_mount_oracles.rs`，
+Rust 侧负控制为 M-K3（specs/composition-kernel-0-rust）。M5 mutation
+的现存意义 = 该 guard 的 TLA 侧负控制（模型默认行为 = 修复后 Rust）。
 ```
 
 **反例（模型复现当前 Rust 行为，trace：`evidence/m5-counterexample-trace.md`）：**
@@ -180,8 +187,8 @@ removal 先于 rule 5 mount）使 staging 涌现成立；洞只在「latched fib
 「其 provision 集与任一 installed fiber 的 provision 集相交」的
 entry（使 §E.4 可 inspection-decidable，正是 §E.4 点名的实践收益）。
 挂载将在违约边解除前保持欠着（Blocked/owed，loud 而非 silent），与
-§G.6「进展放弃」一致。修复以独立 corrective PR 承载，含 Rust 侧
-对抗性回归测试复现本 counterexample；**不随 evidence PR 提交**。
+§G.6「进展放弃」一致。——已按此形状落地于 #126（含 Rust 侧对抗性
+回归测试复现本 counterexample）。
 
 ---
 
@@ -219,12 +226,19 @@ plan-time 校验（§L.4 的环/歧义拒绝）   （Rust 侧，非法 desired �
 步骤粒度内的 ActivationCtx 可重入行为  （activation 建模为 atomic step）
 implementation 细节（slab 复用、generation 回绕、handle 编号）
 OS / realtime / FFI 表面               （Loom/Miri/集成层领域）
+§G.6 的第二个 disposer 失败位          （component teardown closure，
+                                        kernel.rs 在空 accumulator 上 latch
+                                        TEARDOWN_VIOLATED；模型全部违约路径
+                                        effects>=1，故 P2b 的 tombstone 条款
+                                        只覆盖 effect-bearing latch——两处
+                                        latch/guard/removal-blocking 语义
+                                        相同，无已检不变式结果差异）
 ```
 
 ## 5. 建议后续
 
-1. mount_candidate overlap guard —— 独立 corrective PR（含 Rust 回归
-   测试），人工确认分类后合入。
+1. mount_candidate overlap guard —— 已完成：#126 merge（含 Rust 回归
+   staged_mount_oracles + M-K3 负控制），differential 见 §2 RESOLUTION。
 2. K0 语义无 differential：模型与 ADR 一致；无需 authority 修订。
 3. 后续 FV-RUST-0（Kani）可在 implementation 层复核 K1–K6 候选性质
    （见 #124 §3.B），与本模型的语义层结论互补。

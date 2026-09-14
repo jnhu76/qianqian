@@ -151,7 +151,7 @@ export https_proxy=http://127.0.0.1:7897
 specs/realtime-publication/check.sh
 ```
 
-工具链固定 `tla2tools v1.7.4`，与 `specs/playback` 共用 `specs/tools/tla2tools.jar`
+工具链固定 `tla2tools v1.7.4`，与 `specs/composition-kernel-0` 共用 `specs/tools/tla2tools.jar`
 （内嵌 sha256 校验，fail closed；缺失时自动下载）。
 
 规则：正常模型必须探索完成且全部不变式 + temporal property PASS；每个 mutation

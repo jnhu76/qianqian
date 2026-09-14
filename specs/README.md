@@ -1,113 +1,125 @@
-# specs/ — 形式化模型注册表
+# specs/ — 当前验证证据
 
-> **STATUS: EXPERIMENTAL EVIDENCE（playback/ 历史套件）+ FORMAL EVIDENCE（realtime-publication/ 与 composition-kernel-0/ 当前套件）**
+> **STATUS: CURRENT EVIDENCE ONLY。**
 >
-> `specs/playback/` 的模型保留了早期 Playback 架构实验的 failure witnesses 与验证技术。
-> 它们**不是当前 Playback architecture authority**，也**不是新 Playback 设计的 acceptance gate**。
-> 当前播放架构 authority：`docs/adr/ADR-PBK-001.md`（**ACCEPTED**）。
-> 可复用：mutation 技术、具体 counterexample、verifier runner；不得要求新架构镜像旧变量/状态/名词。
-> `specs/realtime-publication/` 是重置后新建的 publication lifetime 语义级
-> 证据：其针对的交错正是 ADR §13 点名的头号候选（旧视图引用 provider → 新
-> 视图排除 → 旧 reader 仍在 → final release），TLC 穷举证明该 collision 在
-> 模型空间真实可达（风险驱动成立）；实现层碰撞确认仍随 §12 Phase D 展开。
-> 语义范围来自 ACCEPTED ADR §6；机制 representation 仍 OPEN。
+> 本目录只保存**今天仍然用于验证当前 architecture / production reality 的
+> verification artifacts**。每个幸存套件都能回答：验证哪条当前不变式、
+> 权威在哪、攻击什么碰撞、对应哪段 production 代码、负控制是什么、
+> PASS 意味着什么（见下表与各套件 README/RESULTS）。
+>
+> 2026-09（PR #139 之后的 formal-spec reset）删除了 pre-reset playback
+> TLA 模型（PlaybackTemporal/PlaybackOwnership 及其 mutations）、pre-139
+> F2 design audit 报告、native-boundary audit 轮次报告、以及旧
+> executable temporal-core 测试 harness。它们的 bug witness 已由当前
+> 证据承载（见 deletion ledger，PR 描述）；Git 历史 / `playback-reference-v1`
+> ref / PR 记录是唯一存档。**本目录不是博物馆。**
 
-`specs/` 保存 Qianqian 中值得进行状态空间验证的形式化模型。这里描述的是**长期系统语义**，不是开发阶段历史。
-
-## 验证哲学
+## 验证哲学（不变）
 
 > **形式化验证优先用于发现高风险状态组合产生的反直觉错误，不用于为整个架构建立第二份完整实现。**
 
-> **结构性架构边界优先通过类型系统、ownership、模块边界和普通测试约束；只有存在复杂状态交错风险时才升级为形式化模型。**
-
 > **TLA+ 用来找撞车，不用来证明整个架构。**
 
-### 什么时候值得形式化
-
-优先把形式化验证用于**多个单独合法的状态、事件或所有权变化组合后，可能到达非法状态**的地方。典型信号包括：
-
-- **状态交错**：同一事实会被多个异步事件推进，例如 `seek / stop / EOF / render evidence` 的交错；
-- **并发 ownership / lifecycle**：资源退出、provider withdrawal、dependent teardown 之间存在先后约束，而且错误顺序可能产生悬挂资源或失效访问；
-- **不可逆边界**：软件状态变化与外部世界之间存在 point-of-no-return，例如历史实验中的 Physical Fence、提交到设备、持久化提交；
-- **合法事件组合可能产生非法结果**：每个动作单独看都正确，但组合后可能出现 stale re-entry、双 authority、提前终态化、死锁或不可恢复状态；
-- **普通测试难覆盖所有排列**：问题的风险主要来自 action ordering / interleaving，而不是某个单一函数的输入输出。
-
-这类问题适合使用 TLA+/TLC、针对性的并发模型检查或其他状态空间工具主动寻找 counterexample。
-
-### 什么时候不应该形式化
-
-以下问题默认**不升级为形式化模型**，除非后来出现了真实的状态交错风险：
-
-- 命名与 vocabulary 选择；
-- 普通模块、crate、component 边界；
-- 可以直接由 Rust ownership / borrowing / 类型系统约束的简单所有权关系；
-- 数据结构 representation，例如 `Box` / `Arc` / handle / token 的具体选择；
-- 可以由普通单元测试、属性测试或静态检查充分覆盖的局部逻辑；
-- 单纯为了让 ADR、Issue 或阶段 gate 获得“形式化证明”标签而建立的模型。
-
-**不要采用“架构里有一个概念，就为它建立一个模型”的做法。**
-
-### 风险驱动原则
-
-形式化验证的入口应当是一个明确的问题：
+入口问题（ADR-PBK-001 §13）：
 
 > **这里有哪些独立合法的状态或事件，可能因为交错而撞出一个非法状态？**
 
-如果回答不出这个问题，优先使用更便宜、更直接的约束手段。
+回答不出这个问题的问题用类型系统 / ownership / 普通测试 / Loom / Miri
+解决。模型结论只在其显式 abstraction 与 assumptions 下成立；模型不得
+静默升级为 architecture authority（AGENTS.md "Verification authority
+boundary"）。
 
-推荐顺序：
+---
 
-```text
-类型系统 / ownership / 模块边界
-        ↓
-普通测试 / 属性测试 / 静态检查
-        ↓
-确认存在高风险状态交错
-        ↓
-形式化模型 / 状态空间探索
-```
+## 当前验证覆盖矩阵
 
-模型得到的结论是**在其显式 abstraction 与 assumptions 下的证据**，不是架构本身的第二份 authority。模型为了闭合状态空间所做的选择，不得未经 ADR/设计 review 就自动升级为生产语义。
+### A. Formal semantic verification（TLA+ / TLC）
 
-## 命名规则
+| Invariant family | Authority | 攻击的碰撞 | Artifact | 负控制 | Bounds / 假设 | 结果 |
+| --- | --- | --- | --- | --- | --- | --- |
+| K0 控制面：relied_on guard、inverse 恰好一次 + 违约 tombstone、移除纪律、§E.4 点单一来源与 staged replacement、§G.6 违约 latch 与 guard 保持、FAILED settlement（raise+完全 discharge）、settle 终止 | `docs/architecture/composition-kernel-0-design.md` §E.3/E.4/F/G/G.6/L.1/L.5 | withdraw × dispose × replacement churn × activation raise × 违约注入在 settle 各 step 边界的交错 | `composition-kernel-0/`（PRODUCTION MAPPING 表映射到 `crates/qianqian-composition/src/kernel.rs`） | M1–M5 mutation（M5 = 曾检出的 mount overlap 缺陷，已由 #126 修复）+ 6 可达性探针 | 3 fibers / 单 capability 单 consumer / bounded churn window；见 RESULTS.md B1–B6 | BOUNDED-CLEAN（safety+liveness），2026-09-13 实测 |
+| Realtime view publication / reader quiescence / resource reclamation：coherent acquisition（P1）、retired 闭门（P2）、跨代 quiescence 先于回收资格（P3）、Retired≠Reclaimable≠Released（P4）、条件回收进展（P5） | `docs/adr/ADR-PBK-001.md` §6（ACCEPTED；normative 协议本体在 ADR，语义定义不在本目录） | publication N→N+1 与旧 reader overlap；多代退休记账下提前回收；split publication；stale entry liveness | `realtime-publication/` | M1 ReleaseBeforeQuiesce / M2 SplitPublication / M3 StaleEntry（safety+liveness）/ M4 ForgetsOlderRetirement + 4 可达性探针 | ≤2 readers、bounded publication 链、WF(ReaderExit)+WF(MarkReclaimable)；不建模 PCM/线程/内存序 | BOUNDED-CLEAN；M1–M4 全部 COUNTEREXAMPLE-WITNESSED |
 
-- spec 文件、TLA+ module、operator、invariant、mutation 与长期注释必须使用**稳定领域 vocabulary**（如 `PlaybackTemporal`、`PromotionRequiresSuccessfulFence`、`PromoteWithoutFence`）。
-- ADR 编号 / Issue 编号 / PR 编号 / Corrective / Phase / milestone / gate 编号只作为 README 中的 **traceability 信息**，不进入模型 vocabulary 与文件名。
+### B. Implementation / concurrency verification（Rust）
 
-## 当前模型
+| Invariant family | Authority | 攻击的碰撞 | Artifact | 负控制 | 结果 |
+| --- | --- | --- | --- | --- | --- |
+| K0 Rust refinement：stale FiberId、relied provision 可解析、inverse-once + LIFO + tombstone 保留、移除纪律（clean+violation 格）、quiet truth、single-source 含 #126 withheld-mount | K0 design + `composition-kernel-0-implementation-adr.md` | 真实 `kernel.rs` 全部合法 step 序列（62 distinct-behavior 场景矩阵，K2/K6 每 step 后断言） | `composition-kernel-0-rust/`（harness 在 `crates/qianqian-composition/src/kernel_verify.rs`，直测 production） | M-K1/M-K2/M-K3 production mutation patches | BOUNDED-CLEAN（native）+ MIRI-CLEAN；Kani symbolic = TOOLING-INSUFFICIENT（如实记录） |
+| 当前 PCM 边并发：FIFO ring 完整性、terminal 单调（EOF×stop、failure×stop 且 Failed 身份不降级）、阻塞 producer/consumer 唤醒 | PBK-002 D8 PCM data plane + `crates/qianqian-playback` 契约 | 真实 `PcmEdge`（仅 `cfg(loom)` 换 Mutex/Condvar）的全部调度 | `playback-concurrency/`（harness 在 `crates/qianqian-playback/tests/loom_edge.rs`） | M-L1 drop data_ready notify | SCHEDULE-CLEAN（≤3 threads / ≤2 samples / ≤3 ops）+ native/stress |
+| 每层结果与工具选择的 single-writer | — | — | `playback-concurrency/CAMPAIGN-1.md`（VERIFICATION-CAMPAIGN-1 轮次记录；Miri per-crate 与 integration stress 结果的唯一 canonical owner） | — | PASS_WITH_LIMITATIONS（轮次判据） |
 
-| 模型 | 定位 | 负责验证 | 方法 |
-| --- | --- | --- | --- |
-| `playback/PlaybackTemporal` | Core evidence set（历史 blocking 定位已退役） | 五组高风险 temporal 语义：Dual Window、Generation admission、Physical Fence、submitted/rendered 记账、EOF/drained/ENDED terminalization | TLA+ / TLC |
-| `playback/PlaybackOwnership` | Extended exploration（supporting / non-blocking） | resource-lifecycle 假设：composition lifecycle root、TrackSession/DecodeSession immediate lifetime ownership、semantic authority 与 lifetime ownership 的区分、provider withdrawal 顺序 | TLA+ / TLC |
-| `realtime-publication/RealtimePublication` | 当前挣得的 formal evidence（语义来源：ACCEPTED ADR-PBK-001 §6） | realtime view publication / reader quiescence / resource reclamation：coherent publication、retired 视图闭门、quiescence 先于释放、多代退休记账、回收可达性 | TLA+ / TLC（含 liveness 性质与可达性探针） |
-| `composition-kernel-0/CompositionKernel0` | 当前挣得的 formal evidence（语义来源：K0 design authority `docs/architecture/composition-kernel-0-design.md`） | K0 控制面语义交错：relied_on guard、inverse 恰好一次与 tombstone 保留、移除纪律、§E.4 点单一来源、staged replacement、§G.6 违约 latch 与 guard 保持、FAILED settlement、dispose 收敛、settle 终止 | TLA+ / TLC（fail-closed runner + 5 mutation 负控制 + 6 可达性探针） |
+### C. Ordinary regression evidence（不在 specs/，`cargo test --workspace` 承载）
 
-每个模型配备**负控制（negative controls）**：故意注入错误，TLC 必须抓到（counterexample 才算通过），以证明模型不是 vacuous。其中 4 个 core mutation（`PromoteWithoutFence` / `AcceptUnadmittedDecode` / `SingleGlobalGenerationCheck` / `EndBeforeRenderDrain`）曾是 ADR ACCEPTED 的 blocking 集；播放架构重置后该 blocking 定位已退役，`playback/` 两模型现在统一是 experimental evidence，不是新 Playback 设计的 acceptance gate（`realtime-publication/` 套件定位见上文，不属于本段历史）。
+- K0 语义 oracle（`crates/qianqian-composition/tests/*_oracles.rs`，含
+  staged-mount #126 反例回归）；
+- episode 终局语义（`crates/qianqian-playback/tests/`：
+  session_activation / edge_lifecycle / stop_seam —— SessionCompletion
+  单写者 + precedence、stop×EOF×failure、join/leak oracle）；
+- P1–P5 真实机制证据（`crates/qianqian-audio-api/tests/realtime_view_publication/`，
+  含 twin-kill 负控制）；
+- PCM 契约 / direct-flow / RT firewall（pcm_edge_contract /
+  direct_pcm_flow / k0_firewall，含 trybuild compile-fail 类型系统证据）。
+
+层间纪律：**TLA+ 持语义级交错证据，Rust matrices/Miri/loom 持
+实现/refinement 证据，普通测试持回归证据；任何一层不得声称证明了
+另一层检查的性质。**
+
+---
 
 ## 运行入口
 
 ```bash
-# 全量（playback 历史套件 + realtime-publication 当前套件；缺省模式）
+# 全部当前形式化验证（缺省 = current = K0 + realtime publication）
 specs/check.sh
 
-# core 集（PlaybackTemporal 正常模型 + 4 个 core mutation + realtime-publication 套件）
-specs/check.sh core
+# 显式当前集
+specs/check.sh current
 
-# 显式全量
-specs/check.sh all
+# 专项
+specs/check.sh k0         # K0 控制面 TLA+ 套件
+specs/check.sh realtime   # realtime publication TLA+ 套件
 
-# 需要代理下载工具链时：
-export https_proxy=http://127.0.0.1:7897
-specs/check.sh
+# Rust 侧当前验证（cargo 矩阵 + Miri + production mutation 负控制 +
+# loom；需要 nightly/miri 与 loom feature）
+specs/check.sh rust
 ```
 
-工具链固定为 `tla2tools v1.7.4 (Xenophanes)`，`check.sh` 按内嵌 sha256 校验、fail closed。jar 不入库（见 `.gitignore`），由脚本自动下载。
+工具链固定 `tla2tools v1.7.4 (Xenophanes)`，各 runner 内嵌 sha256 校验、
+fail closed；jar 缓存在 `specs/tools/`（不入库），缺失时自动下载
+（需要代理时先 `export http_proxy/https_proxy`）。
 
-`playback/` 各模型的语义说明、状态空间数据与负控制结果见 `playback/README.md`；`realtime-publication/` 套件的对应信息见 `realtime-publication/README.md`；`composition-kernel-0/` 套件（含其 production differential 记录）见 `composition-kernel-0/RESULTS.md`，独立运行入口 `specs/composition-kernel-0/check.sh`。
+Runner 纪律（所有套件继承）：baseline 必须 TLC 探索完成且全部
+invariant/temporal property PASS；每个 mutation 必须被抓住
+（counterexample 才算通过）；任何 TLC `Warning:` 行即 FAIL；
+反例 run 必须由 TLC 自行收尾（log 含 `Finished in`）。
 
-## Traceability
+## 结果词汇与声明边界
 
-- `PlaybackTemporal` 五组语义 + 4 个 core mutation 曾对应旧版 ADR 的 **Formal Acceptance** 章节（该章节已随重置移除）；当前 core temporal checks = PASS 只作为历史证据记录，不是当前 ADR 的 acceptance 项。
-- `PlaybackOwnership` 与其余 mutation 对应同节**支持证据**：它们继续保留、继续运行，作为 experimental evidence；其结论不构成当前 ADR 的 acceptance 项。
-- 模型 vocabulary 不使用 ADR/Issue/PR 编号；ADR 与模型的对应关系只在 README 层维护。
+允许的结果类（issue #124 vocabulary）：`BOUNDED-CLEAN` /
+`COUNTEREXAMPLE-WITNESSED` / `SCHEDULE-CLEAN` / `MIRI-CLEAN` /
+`TEST-PASS` / `STATIC-CHECK-PASS` / `TOOLING-INSUFFICIENT` / `NOT-RUN`。
+
+正确表述：
+
+> 当前选定的不变式已在显式记录的抽象、bounds 与假设下检查，未发现反例。
+
+禁止表述："architecture proven correct" / "race-free" / "bug-free" /
+"系统已形式化证明"。一个 clean run 只意味着**在所述模型、界、假设与
+fairness 条件内未找到反例**。
+
+## 命名规则
+
+- spec 文件、TLA+ module、operator、invariant、mutation 与长期注释使用
+  **稳定领域 vocabulary**（描述语义，不描述里程碑）。
+- ADR/Issue/PR/Corrective/Phase 编号只作 README/RESULTS 的 traceability
+  信息，不进入模型 vocabulary 与文件名。
+
+## 目录
+
+| 目录 | 为什么现在存在 |
+| --- | --- |
+| `composition-kernel-0/` | K0 控制面语义交错的唯一 TLA+ 证据（权威：K0 design） |
+| `composition-kernel-0-rust/` | K0 语义在真实 Rust kernel 上的 refinement 证据（矩阵 + Miri + mutation） |
+| `realtime-publication/` | PBK-001 §6 P1–P5 的唯一 TLA+ 语义证据 |
+| `playback-concurrency/` | 当前 PcmEdge 并发证据（loom + native + mutation）与 CAMPAIGN-1 轮次记录 |
+| `tools/` | 固定版本 TLC jar 本地缓存（gitignored） |

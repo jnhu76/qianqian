@@ -15,7 +15,7 @@
 #   MUST-FAIL 另要求 TLC 自行收尾（log 含 "Finished in"）：被杀/崩溃进程的
 #   部分输出不得作为反例证据。
 #
-# 工具链与 specs/playback 相同：tla2tools v1.7.4 (Xenophones)，sha256 校验，
+# 工具链与 specs/composition-kernel-0 相同：tla2tools v1.7.4 (Xenophanes)，sha256 校验，
 # 缺失时自动下载（需要代理请先 export http_proxy/https_proxy）。
 set -uo pipefail
 

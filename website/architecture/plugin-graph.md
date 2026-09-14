@@ -101,5 +101,5 @@ flowchart TB
 <ProvenancePanel
   :authority="['docs/adr/ADR-PBK-001.md', 'docs/adr/ADR-PBK-002.md']"
   :decisions="[{ pr: 66 }, { pr: 78 }, { pr: 79 }, { pr: 139 }]"
-  :evidence="['crates/qianqian-audio-api/src/ports.rs', 'crates/qianqian-audio-api/tests/playback_temporal_traces/transport.rs']"
+  :evidence="['crates/qianqian-audio-api/src/ports.rs', 'crates/qianqian-composition/tests']"
 />
