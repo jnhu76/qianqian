@@ -4,6 +4,17 @@
 //! `try_resolve_now`. It is not K0 semantic truth, not a Fact plane
 //! object — the App holds it, drives the episode with it, waits on it,
 //! and then initiates disposal.
+//!
+//! One handle serves exactly one episode: activation binds one edge and
+//! the outcome memoizes on first resolution, so do not re-use a
+//! completion across a retried or restarted episode.
+//!
+//! Outcome precedence, stated once at the seam: a published decode
+//! failure dominates everything (it is checked first and is not
+//! relabelled by stop intent); otherwise the drain verdict plus the
+//! worker's exit terminal decide, with recorded stop intent
+//! disambiguating an aborted drain between a user stop and a device
+//! failure.
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;

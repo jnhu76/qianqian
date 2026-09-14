@@ -44,7 +44,7 @@ fn assert_no_leg_threads() {}
 /// Poll until `pred` holds or the deadline passes (a witness, not an
 /// oracle: the stop request below does not depend on the predicate, only
 /// the adversarial shape does).
-fn wait_for_witness(pred: impl Fn() -> bool, limit: Duration, what: &str) {
+fn wait_for_witness(mut pred: impl FnMut() -> bool, limit: Duration, what: &str) {
     let deadline = std::time::Instant::now() + limit;
     while !pred() {
         assert!(
@@ -55,11 +55,56 @@ fn wait_for_witness(pred: impl Fn() -> bool, limit: Duration, what: &str) {
     }
 }
 
+/// Witness the "consumer parked on an empty edge" shape: the render leg
+/// has consumed at least one frame — exact mechanism evidence, since a
+/// fast consumer keeps the bounded edge empty and the edge alone cannot
+/// show production — and the edge has then stayed empty across a window
+/// long enough that a fast producer would have refilled it. The paced
+/// producer's next frame is a full pacing gap away, so when this returns
+/// the consumer is parked inside `read_frames` on an empty edge.
+fn wait_for_a_parked_consumer(
+    completion: &SessionCompletion,
+    consumed: &std::sync::atomic::AtomicUsize,
+    limit: Duration,
+) {
+    use std::sync::atomic::Ordering;
+    const QUIET: Duration = Duration::from_millis(80);
+    let deadline = std::time::Instant::now() + limit;
+    let mut empty_since: Option<std::time::Instant> = None;
+    loop {
+        let produced = consumed.load(Ordering::SeqCst) > 0;
+        match (produced, completion.buffered_frames()) {
+            (true, Some(0)) => match empty_since {
+                None => empty_since = Some(std::time::Instant::now()),
+                Some(since) if since.elapsed() >= QUIET => return,
+                Some(_) => {}
+            },
+            _ => empty_since = None,
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "witness never appeared: consumer parked on an empty edge"
+        );
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
 fn registered_runtime(
     source: SourceBehavior,
     output: OutputBehavior,
     completion: SessionCompletion,
 ) -> QianqianApp {
+    registered_runtime_observed(source, output, completion).0
+}
+
+/// The same runtime, with the render double's consumption counter
+/// surfaced: tests that must witness "the episode really produced audio"
+/// read it instead of guessing from an edge a fast consumer keeps empty.
+fn registered_runtime_observed(
+    source: SourceBehavior,
+    output: OutputBehavior,
+    completion: SessionCompletion,
+) -> (QianqianApp, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
     let mut runtime = QianqianApp::new();
 
     runtime
@@ -78,13 +123,15 @@ fn registered_runtime(
         })
         .expect("decode provider registers");
 
+    let consumed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     runtime
         .register_component({
             let behavior = output;
+            let consumed = consumed.clone();
             qianqian_composition::ComponentSpec::new("test_output_plugin")
                 .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
                 .on_activate(move |ctx| {
-                    let service = TestOutput { behavior };
+                    let service = TestOutput::observed(behavior, consumed.clone());
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
                         std::rc::Rc::new(service),
                     )
@@ -100,7 +147,7 @@ fn registered_runtime(
             completion,
         ))
         .expect("session registers");
-    runtime
+    (runtime, consumed)
 }
 
 fn activate(runtime: &mut QianqianApp) {
@@ -114,27 +161,29 @@ fn activate(runtime: &mut QianqianApp) {
 }
 
 /// Stop while playing: the session resolves Stopped, both legs exit,
-/// disposal is quiet, no leg thread leaks. The slow producer keeps the
-/// episode genuinely mid-flight, and the consumer is blocked on an empty
-/// edge (the trickle never lets it accumulate) when the stop lands.
+/// disposal is quiet, no leg thread leaks. The episode is genuinely
+/// mid-flight — a large burst has been produced and consumed, and the
+/// paced tail leaves the consumer parked on the empty edge — when the
+/// stop lands.
 #[test]
 fn stop_while_playing_resolves_stopped_and_disposes_quietly() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
         let completion = SessionCompletion::new();
-        let mut runtime = registered_runtime(
+        let (mut runtime, consumed) = registered_runtime_observed(
             SourceBehavior::Paced {
-                after: 0,
-                delay: Duration::from_millis(50),
+                after: 100_000,
+                delay: Duration::from_millis(250),
             },
             OutputBehavior::Consume,
             completion.clone(),
         );
         activate(&mut runtime);
 
-        // No witness is required for correctness here: the stop is valid
-        // in any episode state. The bounded `within` watchdog above is
-        // the hang oracle.
+        wait_for_a_parked_consumer(&completion, &consumed, Duration::from_secs(5));
+        // The witness guarantees the empty window is fresh; the next
+        // paced frame is still ~170 ms away, so the stop lands with the
+        // consumer parked.
         completion.request_stop();
         assert_eq!(completion.wait(), SessionOutcome::Stopped);
 
@@ -307,34 +356,26 @@ fn stop_wakes_a_producer_blocked_on_a_full_edge() {
     });
 }
 
-/// Stop while the consumer is genuinely blocked on an empty edge: the
-/// paced producer emits one frame every 50 ms and the fast consumer
-/// drains it immediately; the consumer parks in read_frames between
-/// frames. The stop must wake it and resolve Stopped.
+/// Stop while the consumer is genuinely blocked on an empty edge: after
+/// a produced burst, the paced producer's next frame is a full pacing
+/// gap away, so the consumer is parked inside `read_frames` on the empty
+/// edge when the stop lands. The stop must wake it and resolve Stopped.
 #[test]
 fn stop_wakes_a_consumer_blocked_on_an_empty_edge() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(15), move || {
         let completion = SessionCompletion::new();
-        let mut runtime = registered_runtime(
+        let (mut runtime, consumed) = registered_runtime_observed(
             SourceBehavior::Paced {
-                after: 0,
-                delay: Duration::from_millis(50),
+                after: 100_000,
+                delay: Duration::from_millis(250),
             },
             OutputBehavior::Consume,
             completion.clone(),
         );
         activate(&mut runtime);
 
-        wait_for_witness(
-            || completion.buffered_frames().is_some_and(|n| n == 0),
-            Duration::from_secs(5),
-            "edge observed empty (consumer between frames)",
-        );
-        // Give the consumer a moment to park inside read_frames on the
-        // empty edge; the stop below is valid regardless of whether it
-        // has parked yet.
-        std::thread::sleep(Duration::from_millis(60));
+        wait_for_a_parked_consumer(&completion, &consumed, Duration::from_secs(5));
 
         completion.request_stop();
         assert_eq!(completion.wait(), SessionOutcome::Stopped);
@@ -345,11 +386,54 @@ fn stop_wakes_a_consumer_blocked_on_an_empty_edge() {
     });
 }
 
-/// Stop during a decode failure: the failure committed first stays the
-/// outcome (Failed is not downgraded to Stopped); a racing or later stop
-/// cannot rewrite it.
+/// Decode failure dominates stop intent, deterministically: at the seam,
+/// a published decode failure resolves Failed{"decode: ..."} whether the
+/// stop was requested before or after it. (At the session level the two
+/// can only coexist if the failure wins the race, because a stop applied
+/// at bind time ends the episode at the producer's first write — which
+/// is why this precedence rule is pinned here, directly on the resolver's
+/// inputs, rather than through a racy episode.)
 #[test]
-fn stop_during_decode_failure_leaves_failed_in_charge() {
+fn a_stop_cannot_downgrade_a_decode_failure() {
+    // Stop first, failure second.
+    let completion = SessionCompletion::new();
+    completion.request_stop();
+    completion.decode_failed("test decode failure");
+    let outcome = completion.try_resolve_now();
+    assert_eq!(
+        outcome,
+        Some(SessionOutcome::Failed {
+            stage: "decode: test decode failure".to_owned()
+        }),
+        "a committed decode failure is not relabelled by stop intent"
+    );
+    assert!(
+        completion.stop_requested(),
+        "the command was recorded; it simply did not win"
+    );
+    assert_eq!(
+        completion.try_resolve_now(),
+        outcome,
+        "resolution is stable across reads"
+    );
+
+    // Failure first, stop second: same answer.
+    let completion = SessionCompletion::new();
+    completion.decode_failed("test decode failure");
+    completion.request_stop();
+    assert_eq!(
+        completion.try_resolve_now(),
+        Some(SessionOutcome::Failed {
+            stage: "decode: test decode failure".to_owned()
+        })
+    );
+}
+
+/// Without any stop intent, a decoder failure lands Failed{"decode: ..."}
+/// through the real session: the failure path is not disturbed by the
+/// stop seam's presence.
+#[test]
+fn a_decode_failure_without_any_stop_lands_failed_decode() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
         let completion = SessionCompletion::new();
@@ -360,38 +444,17 @@ fn stop_during_decode_failure_leaves_failed_in_charge() {
         );
         activate(&mut runtime);
 
-        // The failure fires after 48k frames of fast production — race a
-        // stop right in around the failure window. Either terminal may
-        // commit first, but Failed must win if it committed first.
         let outcome = completion.wait();
-        if matches!(outcome, SessionOutcome::Failed { .. }) {
-            completion.request_stop();
-            assert_eq!(
-                completion.try_resolve_now(),
-                Some(SessionOutcome::Failed {
-                    stage: outcome_stage(&outcome)
-                }),
-                "a late stop must not downgrade a committed failure"
-            );
-        } else {
-            assert_eq!(
-                outcome,
-                SessionOutcome::Stopped,
-                "if the stop committed first, Stopped is the honest outcome"
-            );
-        }
+        assert!(
+            matches!(&outcome, SessionOutcome::Failed { stage } if stage.starts_with("decode")),
+            "a decoder failure must land Failed{{decode}}, got {outcome:?}"
+        );
+        assert!(!completion.stop_requested(), "nobody requested a stop");
 
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
-}
-
-fn outcome_stage(outcome: &SessionOutcome) -> String {
-    match outcome {
-        SessionOutcome::Failed { stage } => stage.clone(),
-        other => panic!("expected a failure outcome, got {other:?}"),
-    }
 }
 
 /// A render leg that aborts on its own — the real device-failure shape:

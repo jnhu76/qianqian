@@ -128,6 +128,25 @@ pub enum OutputBehavior {
 
 pub struct TestOutput {
     pub behavior: OutputBehavior,
+    /// Test-local mechanism evidence: how many reads returned frames.
+    /// A fast consumer keeps the bounded edge empty almost always, so
+    /// `buffered_frames == 0` alone cannot witness that the episode
+    /// really produced audio; this counter can.
+    pub consumed: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl TestOutput {
+    pub fn new(behavior: OutputBehavior) -> TestOutput {
+        Self::observed(behavior, Arc::new(std::sync::atomic::AtomicUsize::new(0)))
+    }
+
+    /// The caller keeps the consumption counter for witness purposes.
+    pub fn observed(
+        behavior: OutputBehavior,
+        consumed: Arc<std::sync::atomic::AtomicUsize>,
+    ) -> TestOutput {
+        TestOutput { behavior, consumed }
+    }
 }
 
 impl AudioOutput for TestOutput {
@@ -149,12 +168,13 @@ impl AudioOutput for TestOutput {
                     drain,
                     format: _,
                 } = request;
+                let consumed = self.consumed.clone();
                 let thread = std::thread::Builder::new()
                     .name("qianqian-test-render".into())
                     .spawn({
                         let input = input.clone();
                         move || {
-                            let verdict = consume_loop(input.clone(), pace, abort_after);
+                            let verdict = consume_loop(input.clone(), pace, abort_after, &consumed);
                             if verdict == DrainVerdict::Aborted {
                                 // Mirror the real mechanism: a dead render
                                 // leg stops the data plane.
@@ -179,7 +199,9 @@ fn consume_loop(
     input: Arc<dyn RenderPcmInput>,
     pace: Option<Duration>,
     abort_after: Option<usize>,
+    consumed: &std::sync::atomic::AtomicUsize,
 ) -> DrainVerdict {
+    use std::sync::atomic::Ordering;
     let mut dst = vec![0.0f32; 256 * usize::from(TEST_FORMAT.channels)];
     let mut reads = 0usize;
     loop {
@@ -190,7 +212,8 @@ fn consume_loop(
             return DrainVerdict::Aborted;
         }
         match input.read_frames(&mut dst) {
-            PcmPull::Frames(_) => {
+            PcmPull::Frames(n) => {
+                consumed.fetch_add(n, Ordering::SeqCst);
                 reads += 1;
                 if let Some(per_read) = pace {
                     std::thread::sleep(per_read);

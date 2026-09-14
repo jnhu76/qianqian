@@ -74,7 +74,7 @@ fn registered_runtime(
             qianqian_composition::ComponentSpec::new("test_output_plugin")
                 .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
                 .on_activate(move |ctx| {
-                    let service = TestOutput { behavior };
+                    let service = TestOutput::new(behavior);
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
                         std::rc::Rc::new(service),
                     )
