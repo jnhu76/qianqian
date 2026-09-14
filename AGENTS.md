@@ -25,7 +25,8 @@ Normative Playback Foundations constitution:
     docs/adr/ADR-PBK-001.md        (ACCEPTED foundations)
 
 Current vocabulary / Plugin-Fiber taxonomy / static playback composition:
-    docs/adr/ADR-PBK-002.md        (ACCEPTED; corrective under review on Issue #138 branch)
+    docs/adr/ADR-PBK-002.md        (ACCEPTED; current authority.
+                                    Issue #138 records the corrective rationale/history)
 
 Do not treat as current architecture unless a new experiment re-earns them:
     MusicKernel
@@ -40,7 +41,9 @@ Do not treat as current architecture unless a new experiment re-earns them:
 
 Old playback code/specs are **experimental / executable evidence only**. Reuse bug reproducers and test techniques; do not inherit old nouns or force production to mirror old formal variables.
 
-> **Preserve the bug, not necessarily the old solution.**
+> **Preserve the bug, not necessarily the old solution.** (Full inherit/forbid lists: `ADR-PBK-001.md` §11; evidence status ladder: its §12.)
+
+The full normative contracts — minimal constitution, command/fact authority, fact-authority identity, projection read-side firewall, semantic-commit definition, Fact publication vs Realtime-view publication, realtime lifetime invariant, and the publication/reclamation contract (P1–P5) — live in `ADR-PBK-001.md` §1–§2 and §6. Do not restate them normatively anywhere else; link instead.
 
 ---
 
@@ -76,6 +79,12 @@ Current canonical rule (PBK-002 D4/D12):
 
 A Plugin may require or provide Capabilities/Services, but **providing a Capability is not an admission requirement**. A Plugin may be episode-scoped or long-lived; lifetime length is not Plugin identity.
 
+Admission invariant (normative: PBK-002 D13):
+
+> **If an existing Plugin can fully own the candidate without losing composition-level correctness or lifecycle ordering, the candidate MUST remain an owned resource/effect, not become a Plugin.**
+
+"K0 already composes it" is evidence, never the admission reason.
+
 Current mapping:
 
 ```text
@@ -98,7 +107,7 @@ one crate/DLL/thread = one Plugin
 
 Subordinate resources remain resources unless they genuinely require their own K0 composition identity/lifecycle.
 
-For every proposed new Plugin boundary, answer:
+For every proposed new Plugin boundary, answer (review prompt for the D13 invariant):
 
 ```text
 Why does this unit need independent K0 composition identity?
@@ -143,8 +152,12 @@ For current playback:
 ```text
 Playback Session Plugin
     requires Decode + Output capabilities
-    owns one episode's decoder endpoint / worker / PCM edge / render relation / completion
+    owns the episode-scoped lifetime / teardown responsibility for
+    one episode's decoder endpoint / worker / PCM edge / render
+    relation / completion
 ```
+
+"Owns" here is lifecycle/teardown ownership, not allocation/implementation ownership: the Decode/Output provider Plugins still own the allocation mechanisms and internals behind those endpoints/streams (PBK-002 D6).
 
 PCM payload then flows through the already-bound data plane; K0 is not in the per-block path.
 
@@ -180,7 +193,7 @@ Prefer deleting taxonomy/state over adding runtime concepts. For Phase-F playbac
 
 # Command / Fact / Projection discipline
 
-Normative contract: `ADR-PBK-001` §2.2–§2.3.
+Guardrail summary. Normative contracts — including fact-authority identity and the `(fact kind, subject scope)` uniqueness rule — live in `ADR-PBK-001` §2.2–§2.3 and are not redefined here.
 
 ```text
 Command    = intent
@@ -189,14 +202,14 @@ Projection = derived visibility, never authority
 Evidence   = mechanism observation unless separately designated as semantic truth
 ```
 
-For each `(fact kind, subject scope)`, exactly one designated semantic authority may establish that truth at a time.
+Current earned playback designation (PBK-002 D11): the Playback Session semantic role for one playback episode is the designated authority for that episode's terminal outcome (Completed / Stopped / Failed).
 
-Current earned playback designation (PBK-002 D11):
+Agents MUST NOT:
 
 ```text
-Playback Session Plugin
-    designated authority for one episode's terminal outcome
-    Completed / Stopped / Failed
+forge authority
+infer semantic truth from mechanism evidence
+use projection as correctness authority
 ```
 
 Do not infer Playing/Starting/Paused/Position/source truth from K0 lifecycle or mechanism evidence.
@@ -235,13 +248,32 @@ If a later feature creates old/new realtime views that may overlap while readers
 
 # Formalization policy
 
-Formalization is risk-driven.
+Formalization is risk-driven (normative policy: `ADR-PBK-001.md` §13).
 
 > **Which independently legal states/events can interleave and collide into an illegal state?**
 
-If there is no concrete collision, prefer types, ownership, unit/property tests, static checks, or executable stress tests. The old playback formal core is evidence, not a blocking acceptance gate.
+If there is no concrete collision, prefer types, ownership, unit/property tests, static checks, or executable stress tests. The old playback formal core is evidence, not a blocking acceptance gate. See `specs/README.md`.
 
-Verification challenges authority; it does not define authority. A counterexample must be classified before any production change: model/spec mismatch, production defect, authority gap, or refinement/oracle gap.
+## Verification authority boundary
+
+Verification challenges the current architecture and implementation; it does not define either one.
+
+> **Verification evidence MUST NOT silently promote a new state, primitive, lifecycle rule, vocabulary, or authority. Any such finding must first return to ADR / design-authority review.**
+
+Apply the following rules to TLA+/TLC, Kani, Loom, Miri, property tests, stress tests, mutation tests and other executable verification:
+
+```text
+Authority / ADR        defines intended semantics
+Production Rust        realizes current behavior
+Verification evidence  searches for counterexamples and regressions
+```
+
+- Build verification models from the minimum current authority plus an explicit mapping to current implementation reality. Auxiliary verifier-only variables are allowed, but remain non-normative — model variables/state are proof abstractions, not production representation requirements.
+- Prefer the verification mechanism closest to the property: Rust types/ownership first; bounded state/invariant checking next; concurrency schedule exploration for implementation interleavings; TLA+/TLC for concrete temporal/state collisions that are awkward or impossible to express directly against the Rust implementation.
+- A clean bounded/model-checking run means only that no counterexample was found within the stated model, bounds, assumptions and fairness conditions. It is not architecture acceptance and must not be reported as "the architecture is proven correct."
+- A counterexample must be classified before any production change: model/spec mismatch, production defect, authority gap, or refinement/oracle gap. Do not patch production merely to satisfy an over-strong verifier oracle.
+- Formal evidence challenges authority; it does not silently define production. If evidence suggests the architecture needs a new semantic concept, record the differential and use the Authority resolution process below.
+- Verification harnesses may encode stronger diagnostic checks than production contracts only when those checks are named as diagnostics and are not allowed to redefine lifecycle or correctness semantics.
 
 ---
 

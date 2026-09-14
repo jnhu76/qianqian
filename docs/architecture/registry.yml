@@ -124,9 +124,11 @@ architectures:
       source: docs/architecture/diagrams/ARCH-004-plugin-graph-v1.mmd
       frozen: true
 
-    # A generic Plugin Graph/runtime is still not earned. ADR-PBK-002 does,
-    # however, classify the real Decode/Output providers as Plugins and keeps
-    # ComponentSpec as substrate rather than a frozen final Plugin API.
+    # Plugin Graph = composition topology (projection of PBK-002 taxonomy).
+    # Current earned Plugin roles include Decode, Output, and the
+    # episode-scoped Playback Session (PBK-002 D1/D4/D12; admission
+    # invariant D13). ComponentSpec remains the K0 representation term,
+    # not a frozen final Plugin API.
     authority:
       - docs/adr/ADR-PBK-001.md
       - docs/adr/ADR-PBK-002.md

@@ -409,11 +409,20 @@ Plugin/Fiber 可以决定某个长期能力或 provider 是否存在；但已经
 
 ---
 
-# 3. Plugin 到底是什么
+# 3. Plugin / Fiber 的基础边界
 
-本次重置后，“Everything is a Plugin” 采用更严格的解释：
+> **Routing (2026-09-14):** 本节只冻结 Plugin/Fiber 的 **foundational plane 约束**。Current Plugin identity/admission、ComponentSpec mapping 与 Plugin/Fiber taxonomy 由 `ADR-PBK-002` D1/D4/D13 定义；本节不再回答 “which candidate earns Plugin identity”。
 
-> **Plugin 是长期能力进入统一 composition/lifecycle protocol 的方式，不是宇宙里的数据流原子。**
+Plugin/Fiber 属于 Composition Plane：它们是统一 composition/lifecycle protocol 的参与者，不是 payload 路由机制。Plugin identity 不蕴含：
+
+```text
+AudioNode
+PCM stage
+Fact
+Command
+buffer
+realtime hot-path dispatch
+```
 
 一个 Plugin/Fiber 可以：
 
@@ -432,33 +441,9 @@ provide factories or realtime graph participants
 Plugin A -> Plugin B -> Plugin C
 ```
 
-不自动等价于任何业务/PCM pipeline。
+不自动等价于任何业务/PCM pipeline（§5 冻结 dependency topology != realtime processing topology）。
 
-是否把：
-
-```text
-Decoder
-Gain
-EQ
-SRC
-Mixer
-Analyzer
-Recorder
-AudioOutput
-```
-
-分别做成独立 Plugin，**本 ADR 暂不冻结**。
-
-真正要先问：
-
-```text
-它是否有独立 lifetime？
-是否提供/要求稳定 capability？
-是否需要独立 replacement/withdrawal？
-是否拥有长期资源/状态？
-它是否只是某个 provider 内部的 realtime node？
-拆出来的配置/认知成本是否值得？
-```
+> **History:** reset-era 版本曾把 Plugin 定义为 “长期能力进入统一 composition/lifecycle protocol 的方式”，并把 “是否长期 / 是否提供稳定 capability / 是否拥有长期资源” 当作 admission 问题。那套 admission wording 已删除，仅保留为 decision history；current admission invariant 见 `ADR-PBK-002` D13。
 
 所以：
 
@@ -1107,9 +1092,14 @@ next                                依 §12 ladder 继续:机制裁决 / 真实
 
 # 16. Vocabulary / Role Definitions（vocabulary 收口）
 
-> **Current vocabulary routing (2026-09-14):** 本节保留 reset-era vocabulary / decision history；current Plugin/Fiber/ComponentSpec taxonomy 由 `ADR-PBK-002` D1/D4/D12 governs。若本节 `Component` / `Plugin` / `Fiber` 条目与 PBK-002 不一致，以 PBK-002 的 current vocabulary 为准；PBK-001 的 foundations、Fact contract、realtime firewall 与 P1–P5 authority 不变。
+> **Vocabulary ownership (2026-09-14):**
+>
+> - 本节 owns **PBK-001-defined foundational roles** 的 vocabulary：plane、Composition/Execution-Control/Fact 侧角色、Realtime Runtime / Realtime mechanism / Execution View、Reclamation 词汇链（§16.2–§16.5）。
+> - `ADR-PBK-002` owns **current Plugin/Fiber taxonomy、ComponentSpec mapping、earned static playback composition 与 D11 playback authority vocabulary**（其 D1/D4/D13/§17–§18）。本节 §16.1 的 `Component` / `Plugin` / `Fiber` 条目与 PBK-002 不一致时，以 PBK-002 为准；下述条目相应部分保留为 reset-era decision history。
+>
+> 本节不是全仓唯一 vocabulary 权威；它只对 PBK-001-owned roles 收口。
 
-本节只收口 vocabulary 与 architecture role 定义。它**不新增 invariant、不重写宪法、不冻结 representation**：与 §1–§2、§6 的 normative 契约冲突时，以其为准；本节不冻结任何 crate 映射、Plugin 粒度或机制表示。其它文档只引用本节定义，不得另立第二份 normative 词汇表。
+本节只收口 vocabulary 与 architecture role 定义。它**不新增 invariant、不重写宪法、不冻结 representation**：与 §1–§2、§6 的 normative 契约冲突时，以其为准；本节不冻结任何 crate 映射、Plugin 粒度或机制表示。对 PBK-001-owned vocabulary，其它文档只引用本节定义，不得另立第二份 normative 定义；对 PBK-002-owned vocabulary，以 PBK-002 为准。
 
 > **Architecture role != crate name.** 本节定义的都是语义角色；任何 crate 名（如 `qianqian-app`、`qianqian-realtime`）都不是某角色已被正确物理实现的证据，crate 物理归属另行审计。
 
@@ -1138,9 +1128,9 @@ decoder/device mechanism
 
 （K0 语义权威：`docs/architecture/composition-kernel-0-design.md`。）
 
-**Component** — 拥有某个 responsibility/resource 边界的有界架构单元。是一个中性粒度概念，不是协议成员资格。
+**Component** — K0 design 文档中的 formal/representation 中性词（当前实现为 `ComponentSpec`）。它不是与 Plugin 平级的 product taxonomy；current mapping（architecture role `Plugin` ↔ K0 representation `ComponentSpec`）由 `ADR-PBK-002` D1 定义。
 
-**Plugin** — **经过边界论证、以 Component 身份参与 Base Composition Kernel 统一 composition/lifecycle protocol 的长期 capability/lifecycle participant**（语义见 §3）。一个 Plugin 可以 provide/require capability、own resources/effects、register control participation、provide realtime participant/factory、observe Facts。Plugin 不等于：
+**Plugin** — 统一 composition/lifecycle protocol 的参与单元；foundational plane 边界见 §3。**Current Plugin identity/admission 与 Plugin/Fiber taxonomy 由 `ADR-PBK-002` D1/D4/D13 定义**：Plugin 不因 long-lived 或 provide Capability 才成立，也可能 episode-scoped / provide none。Plugin 不等于：
 
 ```text
 crate / DLL
@@ -1149,11 +1139,11 @@ thread
 Fact / Command / buffer
 ```
 
-且 `AudioNode != automatically Plugin`、`PCM stage != Plugin`（§3；AudioNode 仍可通过边界论证挣得 Plugin 身份）。
+且 `AudioNode != automatically Plugin`、`PCM stage != Plugin`（§3）。Reset-era 本节曾把 Plugin 描述为 “以 Component 身份参与 protocol 的长期 capability/lifecycle participant”；该 admission wording 已由 PBK-002 取代，仅保留为 decision history。
 
 当前实现中的 `ComponentSpec` 是 K0 的 representation/substrate，**不**因此被冻结为最终 Plugin API。
 
-**Fiber** — 一个 composed component/plugin 的 live runtime instance / episode（K0 语义：design authority §F）。
+**Fiber** — 一个 Plugin definition 的 live runtime instance / episode，Plugin definition → 0..N Fibers（K0 语义：design authority §F）。
 
 **Capability** — composition-visible 的 typed contract / reachability identity。它建立跨 composition 边界的 typed execution reachability。Capability 不是：
 
@@ -1166,7 +1156,7 @@ Fact
 
 **Service** — 通过 Capability 到达的可执行对象/interface；真正做工作的是 service/mechanism。
 
-**Host**（Composition Host / Application Host）— 选择/安装 desired components、创建 Base Kernel、驱动 composition lifecycle、拥有 application 级 bootstrap 与 shutdown 的发起/编排（initiation/orchestration）的 architecture role。发起/编排 shutdown 不等于跨域 shutdown 协议已被冻结：composition teardown、realtime-view retirement、reclamation（含 release）之间的 shutdown ordering 仍 OPEN（§17）。Host 不因方便而自动拥有 playback semantics、PCM graph、decoder/output 实现、realtime lifetime authority。crate 名当前不冻结。
+**Host**（Composition Host / Application Host）— 选择/安装 desired components、创建 Base Kernel、驱动 composition lifecycle、拥有 application 级 bootstrap 与 shutdown 的发起/编排（initiation/orchestration）的 architecture role。发起/编排 shutdown 不等于跨域 shutdown 协议已被冻结：composition teardown、realtime-view retirement、reclamation（含 release）之间的 shutdown ordering 仍 OPEN（§17）。Host 不因方便而自动拥有 playback semantics、PCM graph、decoder/output 实现、realtime lifetime authority。crate 名当前不冻结。（Naming note: 本角色的 current canonical 名为 `Qianqian App`，由 `ADR-PBK-002` D1/§16 mapping 收口；本条保留 foundational 职责定义。）
 
 ## 16.2 Runtime 侧
 

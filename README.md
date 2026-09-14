@@ -89,11 +89,11 @@ Generation / Active-Prepared / Dual Window / Physical Fence
 
 are **experimental evidence**: they preserve real failure witnesses (for example the formal exploration of the `stop × natural ENDED` race) and test techniques, but they are not current architecture and must not be preserved for compatibility unless a future accepted authority re-earns them.
 
-See `docs/adr/ADR-PBK-001.md` for the accepted foundation, `docs/adr/ADR-PBK-002.md` for current vocabulary/static playback composition, and `specs/playback/README.md` for the evidence status. The realtime publication/reclamation semantics (P1–P5) are normative in PBK-001 §6. Current Plugin/Fiber vocabulary is governed by PBK-002 D1/D4/D12; PBK-001 §16 retains older vocabulary as decision history where PBK-002 has superseded it.
+See `docs/adr/ADR-PBK-001.md` for the accepted foundation, `docs/adr/ADR-PBK-002.md` for current vocabulary/static playback composition, and `specs/playback/README.md` for the evidence status. The realtime publication/reclamation semantics (P1–P5) are normative in PBK-001 §6. Current Plugin/Fiber vocabulary is governed by PBK-002 D1/D4/D12, and Plugin admission by its D13 invariant; PBK-001 §16 retains older vocabulary as decision history where PBK-002 has superseded it.
 
 ## Everything is a Plugin
 
-“Everything is a Plugin” means every **independently K0-composed lifecycle/behavior unit** has Plugin identity and is mounted as a Fiber. A Plugin may be episode-scoped or long-lived and need not provide a Capability. It does **not** mean one feature == one Plugin, one Plugin == one crate/DLL, every resource/payload == Plugin, or every DSP node is a Fiber. Current taxonomy and the boundary questionnaire: `docs/adr/ADR-PBK-002.md` D4/D12 + `AGENTS.md` ("Everything is a Plugin / Fiber discipline").
+“Everything is a Plugin” means every **independently K0-composed lifecycle/behavior unit** has Plugin identity and is mounted as a Fiber. A Plugin may be episode-scoped or long-lived and need not provide a Capability. It does **not** mean one feature == one Plugin, one Plugin == one crate/DLL, every resource/payload == Plugin, or every DSP node is a Fiber. Independent composition is itself earned: if an existing Plugin can own the candidate without losing composition correctness or lifecycle ordering, it stays an owned resource/effect. Current taxonomy and the admission invariant: `docs/adr/ADR-PBK-002.md` D4/D12/D13 + `AGENTS.md` ("Everything is a Plugin / Fiber discipline").
 
 ## Interaction correctness
 

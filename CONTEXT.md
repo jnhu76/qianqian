@@ -23,7 +23,7 @@ Issue #138 records the current architecture corrective basis. It is design input
 | Qianqian / 千千·现代 | Local-first, lightweight, cross-platform music player and composable-runtime architecture testbed. |
 | Architecture v2 | Boundary-first architecture built on a generic K0 Plugin/Fiber composition runtime plus domain-specific semantics and realtime data paths. |
 | Composition Kernel (K0) | Domain-agnostic runtime that manages Plugin/Fiber existence, reachability, dependency, composition Effects and desired→running composition. It does not transport PCM or own playback semantics. |
-| Plugin | **K0-managed independently composable lifecycle/behavior unit.** It may require/provide Capabilities, may provide none, and may be episode-scoped or long-lived. |
+| Plugin | **K0-managed independently composable lifecycle/behavior unit.** It may require/provide Capabilities, may provide none, and may be episode-scoped or long-lived. Admission requires the PBK-002 D13 invariant — "K0 composes it" is evidence, not the admission reason. |
 | ComponentSpec | Current K0 Rust/formal representation of a Plugin definition: requires/provides + bounded activation + teardown verdict. It is not a second product-architecture taxonomy. |
 | Fiber | One live mounted Plugin instance/episode with identity, committed dependency view, Effects/provenance and lifecycle state. |
 | Context | Capability namespace/dependency view visible to a Fiber. Not payload bus, event store or global state bag. |
@@ -144,7 +144,7 @@ Command          != Plugin
 Fact             != Plugin
 ```
 
-Promote a thing to Plugin only when it needs independent K0 composition identity/lifecycle rather than being an owned resource of an existing Plugin.
+Promote a thing to Plugin only when it earns the PBK-002 D13 admission invariant — in particular, only when an existing Plugin **cannot** own it without losing composition correctness or lifecycle ordering.
 
 ---
 
@@ -161,7 +161,7 @@ teardown Discharge verdict
 
 It does **not** know decoder handles, PCM buffers, WASAPI objects, playback position, playlist meaning or seek semantics.
 
-When Playback Session Plugin owns a decoder endpoint, worker, edge and render stream, that ownership is domain semantics implemented inside activation/effect/teardown closures; it does not widen K0's kernel data model.
+When the Playback Session Plugin owns a decoder endpoint, worker, edge and render stream, that ownership is **lifecycle/teardown ownership** of episode-scoped handles (allocation mechanisms and implementation internals stay with the Decode/Output provider Plugins — PBK-002 D6). It is domain semantics implemented inside activation/effect/teardown closures; it does not widen K0's kernel data model.
 
 ---
 
@@ -173,10 +173,13 @@ Current production classification:
 Playback Session Plugin
     lifetime: one current playback episode
     requires: Decode + Output capabilities
-    owns: decode endpoint / worker / PCM edge / render relation / completion
+    owns lifecycle/teardown of:
+        decode endpoint / worker / PCM edge / render relation / completion
     designated semantic authority:
         one episode terminal outcome (D11)
 ```
+
+The D11 designation attaches to the Playback Session semantic role for one playback episode; the episode-scoped Plugin/Fiber is its current composition realization, not a frozen identity equation.
 
 D11 terminal variants:
 
@@ -290,7 +293,9 @@ Ask first:
 
 > Which independently legal states/events can interleave and collide into an illegal state?
 
-No concrete collision -> prefer Rust types/ownership/tests/static checks.
+No concrete collision -> prefer Rust types/ownership/tests/static checks. Normative policy: `ADR-PBK-001.md` §13; verification guardrails: `AGENTS.md` "Verification authority boundary".
+
+The one normative research/implementation ladder lives in `ADR-PBK-001.md` §12 (composition reality → minimal PCM contract → direct data flow → publication/reader overlap → real decoder → real output → only then playback semantics).
 
 Realtime publication/lifetime evidence already established PBK-001 P1–P5. Do not import old PlaybackTemporal nouns merely because a future feature resembles an old model.
 
@@ -320,7 +325,7 @@ playback_session_spec()  -> ComponentSpec
 all are mounted by K0 as Fibers
 ```
 
-This is why the old “Playback Session is Component but not Plugin” taxonomy is being corrected without a production runtime redesign.
+This is why the old “Playback Session is Component but not Plugin” taxonomy was corrected (Issue #138 basis; PBK-002 D12) without a production runtime redesign.
 
 ---
 

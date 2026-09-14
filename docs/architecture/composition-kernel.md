@@ -298,7 +298,9 @@ Output Plugin
 Playback Session Plugin
     episode-scoped Plugin
     requires Decode + Output capabilities
-    owns episode endpoint / worker / PCM edge / render relation / completion
+    owns the episode-scoped lifetime/teardown of:
+        endpoint / worker / PCM edge / render relation / completion
+        (allocation/implementation stays with the provider Plugins)
 ```
 
 All three use the same K0 `ComponentSpec → Fiber` substrate. The earlier “Playback Session is Component but not Plugin” distinction was taxonomy, not a K0 runtime constraint.
@@ -391,7 +393,9 @@ Older bootstrap shapes are not compatibility contracts unless accepted authority
 ```text
 Composition Kernel K0                          IMPLEMENTED / CURRENT
 Playback Foundations / PBK-001                 ACCEPTED
-Current Plugin/Fiber taxonomy / PBK-002        CORRECTIVE UNDER REVIEW (#138)
-Playback Session Plugin classification         proposed authority corrective; code reality already matches common K0 substrate
-Phase-F F2 implementation                      PAUSED pending #138 corrective review
+Current Plugin/Fiber taxonomy / PBK-002        ACCEPTED (D12; admission invariant D13)
+Playback Session Plugin classification         episode-scoped Plugin (PBK-002 D6);
+                                               code already runs on the common K0 substrate
+Phase-F playback semantics                     OPEN (PBK-002 §14); new implementation
+                                               paused pending authority design
 ```

@@ -11,7 +11,7 @@ status: NEXT
 
 > **逻辑插件边界 != crate / 动态库边界。**
 
-当前 Plugin taxonomy 由 `ADR-PBK-002` D4/D12 governs；PBK-001 的旧“long-lived capability”措辞只保留为 reset-era decision history。
+当前 Plugin taxonomy 由 `ADR-PBK-002` D4/D12 governs，Plugin admission invariant 由 D13 定义；PBK-001 的旧“long-lived capability”措辞只保留为 reset-era decision history。
 
 ---
 
@@ -83,14 +83,16 @@ flowchart TB
 
 ## 边界判断
 
-一个候选成为 Plugin 前，要回答：
+一个候选成为 Plugin 前，要回答（D13 的 review prompt）：
 
 - 是否需要独立 K0 composition identity？
 - 是否具有独立 activation / invalidation / withdrawal lifecycle？
-- 是否拥有不能更自然归属于现有 Plugin 的资源/行为？
+- 是否拥有现有 Plugin 无法在不损失 composition correctness / lifecycle ordering 的前提下拥有的资源/行为？（D13 判据）
 - 是否 require/provide Capability（可选，不是 admission requirement）？
 - 是否存在 composition-level teardown boundary？
 - 更细的拆分是否真的换来 composability，而不是只增加命名与配置成本？
+
+**核心不变式（D13）**：若一个现有 Plugin 可以在不损失 composition correctness 或 lifecycle ordering 的前提下完全拥有该候选，该候选必须保持为 owned resource/effect，而不是变成 Plugin。
 
 不同特性名、不同 Rust struct、独立线程，甚至“有生命周期”，都不是独立 Plugin 的充分证据；subordinate endpoint / worker / buffer / payload 默认仍是 Plugin-owned resource/data。
 

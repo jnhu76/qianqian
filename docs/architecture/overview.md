@@ -39,11 +39,11 @@ Key sentence:
 
 # Everything is a Plugin — scoped meaning
 
-Current canonical meaning (PBK-002 D4/D12):
+Current canonical meaning (PBK-002 D4/D12; admission invariant D13):
 
 > **Every independently K0-composed lifecycle/behavior unit is a Plugin; one live mounted instance is a Fiber.**
 
-This does not mean every object is a Plugin.
+This does not mean every object is a Plugin. Independent composition is itself earned: if an existing Plugin can own the candidate without losing composition correctness or lifecycle ordering, the candidate stays an owned resource/effect (D13).
 
 ```text
 Plugin
@@ -186,12 +186,15 @@ Playback Session Plugin
         open render stream
         start decode worker
 
-    lifetime ownership:
+    lifetime ownership (teardown responsibility; allocation/implementation
+    stays with the Decode/Output provider Plugins — PBK-002 D6):
         endpoint / worker / edge / render relation / completion
 
     semantic authority:
         one episode terminal outcome (D11)
 ```
+
+The D11 designation attaches to the Playback Session semantic role for one playback episode; the episode-scoped Plugin/Fiber is its current composition realization.
 
 D11 terminal outcomes:
 
@@ -255,13 +258,13 @@ where processing branches/merges
 which RT-visible resource is current
 ```
 
-Never infer realtime order from registration/mount/hash iteration order.
+Never infer realtime order from registration/mount/hash iteration order. Cheap parameter updates (volume, filter coefficients) are control-path updates, not topology updates; inserting/removing stages or replacing decoder/output mechanisms may require composition/provider changes. The exact boundary is research-open; see `../adr/ADR-PBK-001.md` §7.
 
 ---
 
 # Realtime publication/lifetime gate
 
-PBK-001 §6 P1–P5 remains unchanged.
+PBK-001 §6 P1–P5 remains unchanged. The one normative research/implementation ladder lives in `../adr/ADR-PBK-001.md` §12 (Phase D validates candidate mechanisms against P1–P5); model-level evidence and mechanism comparison: `docs/architecture/realtime-publication-lifetime-decision.md` + `specs/realtime-publication/`.
 
 Do not create Window/Generation/view-swap machinery in advance. Trigger the specialized Realtime Audio Runtime only when a real feature produces a concrete collision such as:
 
@@ -341,7 +344,7 @@ Accepted:
 
 ```text
 K0 generic composition semantics
-Plugin/Fiber taxonomy (PBK-002 corrective)
+Plugin/Fiber taxonomy (PBK-002 D1/D4/D12/D13)
 Decode Plugin / Output Plugin
 Playback Session Plugin episode ownership
 PCM composition/data-plane firewall

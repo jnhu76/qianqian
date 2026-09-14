@@ -7,11 +7,11 @@ Load only the documentation needed for the current task. Git history and externa
 | Task | Read first |
 |---|---|
 | Repository/agent rules | `../AGENTS.md` |
-| Stable vocabulary / current role names | `adr/ADR-PBK-002.md` — current authority; Everything-is-a-Plugin corrective under review on Issue #138 branch |
+| Stable vocabulary / current role names | `adr/ADR-PBK-002.md` — current authority (Issue #138 records the corrective rationale/history) |
 | Current architecture overview | `architecture/overview.md` |
 | Generic Composition Kernel semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel-0-implementation-adr.md` |
 | Playback/audio foundations | `adr/ADR-PBK-001.md` — **ACCEPTED** |
-| Plugin/Fiber taxonomy + earned static playback composition | `adr/ADR-PBK-002.md` D1/D4/D5/D6/D12 |
+| Plugin/Fiber taxonomy + admission invariant + earned static playback composition | `adr/ADR-PBK-002.md` D1/D4/D5/D6/D12/D13 |
 | Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
 | Current architecture corrective basis | Issue #138 — design input only, **not authority** |
 | Minimal PCM contract evidence | `architecture/pcm-contract-a0.md` + `../crates/qianqian-audio-api/tests/pcm_edge_contract/` — Phase B evidence only |
@@ -52,7 +52,11 @@ PRODUCTION REALITY
 
 EVIDENCE
   -> tests / specs / TLA+ / experiment harnesses /
-     architecture evidence records / historical refs
+     architecture evidence records (pcm-contract-a0.md,
+     direct-pcm-flow.md, realtime-view-publication.md,
+     realtime-publication-lifetime-decision.md,
+     component-boundary-a0.md, first-audible-slice.md) /
+     historical refs
 
 DERIVED PROJECTION
   -> README.md / CONTEXT.md / AGENTS.md summaries /
@@ -130,19 +134,19 @@ Decode Plugin + Output Plugin + Playback Session Plugin
 kernel-free PCM data plane
 ```
 
-Playback Session Plugin is also the D11 designated semantic authority for **one episode's terminal outcome**:
+Playback Session is also the D11 designated semantic authority for **one episode's terminal outcome**:
 
 ```text
 Completed / Stopped / Failed
 ```
 
-This is one fact authority, not a complete playback state machine.
+The designation attaches to the Playback Session semantic role for one playback episode; its current composition realization is the episode-scoped Playback Session Plugin/Fiber (semantic role != Fiber identity by definition). This is one fact authority, not a complete playback state machine.
 
 ---
 
 # Plugin / resource routing rule
 
-Use PBK-002 D4/D12 for current taxonomy.
+Use PBK-002 D4/D12 for current taxonomy and D13 for the admission invariant.
 
 Do not infer:
 
@@ -155,7 +159,7 @@ resource/object == Plugin
 
 A Plugin may provide no Capability and may be episode-scoped.
 
-Subordinate resources stay resources unless they need independent K0 composition identity/lifecycle. Domain resource ownership does not widen K0 kernel data: K0 still knows only its frozen Fiber/Capability/Effect/Discharge semantics.
+Subordinate resources stay resources unless they need independent K0 composition identity/lifecycle — if an existing Plugin can own the candidate without losing composition correctness or lifecycle ordering, it stays an owned resource/effect (D13). Domain resource ownership does not widen K0 kernel data: K0 still knows only its frozen Fiber/Capability/Effect/Discharge semantics.
 
 ---
 
@@ -219,7 +223,7 @@ small orthogonal fact/control state
 
 Only concrete counterexamples may earn extra Plugin boundaries, Window/Generation, or a specialized Realtime Audio Runtime mechanism.
 
-Phase-F implementation is paused while Issue #138 corrective is under review.
+Phase-F playback semantics remain OPEN (PBK-002 §14); new Phase-F implementation stays paused pending their authority design.
 
 ---
 
@@ -261,7 +265,7 @@ Plugin granularity / ownership
 
 # Formal verification policy
 
-Formalization is risk-driven.
+Formalization is risk-driven (normative policy: `adr/ADR-PBK-001.md` §13; verification guardrails: `../AGENTS.md` "Verification authority boundary").
 
 > **TLA+ finds concrete state/interleaving collisions; it is not a second architecture authority.**
 
