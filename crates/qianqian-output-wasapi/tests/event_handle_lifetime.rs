@@ -114,8 +114,7 @@ mod windows {
     fn process_handle_count() -> u32 {
         unsafe {
             let mut count = 0u32;
-            GetProcessHandleCount(GetCurrentProcess(), &mut count)
-                .expect("GetProcessHandleCount");
+            GetProcessHandleCount(GetCurrentProcess(), &mut count).expect("GetProcessHandleCount");
             count
         }
     }
