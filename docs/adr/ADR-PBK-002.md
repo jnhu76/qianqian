@@ -6,7 +6,8 @@
 | Date | 2026-09-12 |
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
-| Amends | ADR-PBK-001 (current vocabulary and first earned static playback composition only) |
+| Amends | ADR-PBK-001 (current vocabulary, first earned static playback composition, and the §17 D11 authority designation only) |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority (F2-TERMINAL-OUTCOME-AUTHORITY-ADR-1; evidence: PR #135, Issue #119) |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE |
 
 ---
@@ -58,7 +59,7 @@ composition-kernel-0-implementation-adr.md
     Composition Kernel representation / implementation decisions
 ```
 
-PBK-002 只在 **current canonical vocabulary** 与本文明确记录的 **first static playback composition decisions** 上补充 PBK-001；它不覆盖 PBK-001 的 foundations、Fact contract 或 P1–P5。
+PBK-002 只在 **current canonical vocabulary**、本文明确记录的 **first static playback composition decisions** 与 **§17 D11 的 episode terminal outcome authority designation** 上补充 PBK-001；它不覆盖 PBK-001 的 foundations、Fact contract 或 P1–P5。
 
 如果 PBK-001 的历史 noun 与本文 current vocabulary 不一致，本文 governs current vocabulary；PBK-001 的历史 rationale 保留为 decision history。
 
@@ -411,7 +412,8 @@ UniversalUiBus
 8. call UI widgets Plugins solely because they invoke playback；
 9. create a second architecture `Kernel` noun for PCM/realtime work；
 10. use `core` as a generic dumping-ground architecture layer；
-11. infer `Plugin` merely from “has ComponentSpec / Fiber / capability relation”。
+11. infer `Plugin` merely from “has ComponentSpec / Fiber / capability relation”；
+12. let any mechanism provider, the App, or K0 establish episode terminal outcome (Completed / Stopped / Failed) outside the §17 D11 authority。
 
 ---
 
@@ -431,7 +433,9 @@ Processing Plugin
 SRC fallback
 UI adapter membership
 PlaybackControl
-PlaybackFacts
+PlaybackFacts publication/topology
+    (episode terminal outcome semantic authority: DESIGNATED — §17 D11;
+     all other playback fact kinds and the publication topology remain OPEN)
 multi-session topology
 Realtime Audio Runtime representation
 P1–P5 concrete production mechanism
@@ -484,4 +488,131 @@ AppRuntime type
 
 历史文档在描述历史事实时可以保留旧 noun；current production/current derived docs 应使用 canonical noun。不要为了 grep clean 改写历史 provenance。
 
-The semantic responsibilities remain unchanged. ADR-PBK-002 is authoritative for current vocabulary and the static composition decisions explicitly enumerated above.
+The semantic responsibilities remain unchanged. ADR-PBK-002 is authoritative for current vocabulary, the static composition decisions explicitly enumerated above, and the §17 D11 episode terminal outcome authority designation.
+
+---
+
+## 17. D11 — Episode terminal outcome semantic authority
+
+> 2026-09-14 amendment (F2-TERMINAL-OUTCOME-AUTHORITY-ADR-1; evidence report: PR #135; roadmap: Issue #119)。
+>
+> 本节只关闭 PBK-001 §2.3 留 OPEN 的**一个** (fact kind, subject scope) authority designation。它不定义 playback state machine，不冻结任何 representation，不创建任何新 Plugin / Capability / K0 primitive / fact publication 机制。
+
+### Decision
+
+For the current one-Playback-Session / one-playback-episode topology:
+
+> **The Playback Session is the designated semantic authority for that episode's terminal outcome.**
+
+```text
+fact kind:            episode terminal outcome
+subject scope:        one playback episode（一个 Playback Session ownership unit，§8/D6）
+authority role:       Playback Session（semantic role）
+current variants:     Completed / Stopped / Failed
+current realization:  SessionCompletion / 其 resolver（Rust，可替换）
+```
+
+Designation 只作用于 **semantic role**。当前 Rust realization（`SessionCompletion` 及其 resolver）不是 frozen representation：它可以被替换、重命名或重构，不改变本 designation。本文**不**说 "resolve() 永久是 authority"。
+
+### Terminal outcome propositions
+
+当前 fact kind 的三个 variant，语义命题如下（contract-level wording；Rust enum/variant 名是 current realization）：
+
+```text
+Completed:
+    the episode reached decode EOF,
+    the output mechanism reported its drain contract completed,
+    and the Playback Session authority committed terminal completion.
+
+    Completed 不声称 listener 听到了最后一个 sample，不声称 physical
+    audibility 被 observed。Qianqian 无法观察物理可听性。
+
+Stopped:
+    at terminal semantic resolution, the aborted episode had recorded
+    stop intent and no higher-precedence failure classification won.
+
+    Stopped 是非因果命题：它不声称 user 的 stop 因果上导致了 abort。
+    device abort × user stop 的 cause-loss 是已知 LIMITATION；未来若
+    产品需要 causal 语义，需要 cause-carrying evidence 并回到
+    authority review。
+
+Failed:
+    the episode is classified as terminal failure according to the
+    Playback Session authority's decision contract.
+
+    失败类别由 semantic precedence 选择，不是 chronological
+    first-failure。具体诊断文本（如 stage 字符串）是 representation
+    细节，不冻结。
+```
+
+一个 playback episode 至多有一个 terminal outcome，且一旦 commit 即不可改写（后续 evidence 或 command 不得改写它）。本命题是 fact cardinality，不是 liveness 承诺：本 contract 不承诺每个 episode 都必然 commit 一个 outcome。
+
+### Mechanism evidence firewall
+
+```text
+mechanism evidence
+    ↓
+Playback Session semantic decision
+    ↓
+terminal outcome semantic commit
+```
+
+Mechanism providers 可以 publish/produce evidence——例如 `DrainVerdict`、`EdgeTerminal`、decode failure observation——但产生 evidence 不等于确立了 Completed / Stopped / Failed，除非它是该 (fact kind, subject scope) 的 designated authority 并完成对应 semantic decision（PBK-001 §2.3）。
+
+当前架构中：
+
+```text
+Decode Plugin / Output Plugin / PcmEdge / Composition Kernel (K0)
+    都不是 episode terminal outcome 的 designated authority。
+```
+
+resolver 的精确 precedence 顺序是 **current realization**，保留在 production code 与 evidence report（PR #135 Appendix A）中，本文不冻结。若未来改变 precedence 顺序会改变上述外部语义命题本身，该改变需要回到 authority review。
+
+### CURRENT REALIZATION（非 normative）
+
+```text
+SessionCompletion 保存 eventual SessionOutcome。
+其 resolver 当前观察 decode_failure / worker_terminal /
+DrainVerdict / stop_requested，并 memoize 一个 terminal outcome。
+```
+
+本块明确标注 CURRENT REALIZATION：不是 frozen representation，不代表任何永久承诺。
+
+### App / K0 firewall
+
+§3/§5 不变，对本 designation 显式重申：
+
+```text
+Qianqian App             不是 playback semantic authority。
+Composition Kernel (K0)  不是 playback semantic authority。
+```
+
+App 可以 hold handles、submit commands、read projections、initiate disposal，但 App 不确立 terminal playback truth。K0 可以确立 composition lifecycle facts（如 Fiber Active / Fiber Failed），但这些不是 Playing / Completed / Stopped / Failed(playback)。
+
+### Projection rule
+
+PBK-001 §2.3 不变：projection != authority。未来 headless status / UI / automation 可以消费 derived read-side representation，但 read-side snapshot 不得成为 terminal semantic decision、resource reclamation、control legality 或 lifecycle correctness 的 correctness authority。本文不定义 PlaybackSnapshot。
+
+### 不在本 designation 范围内
+
+`source_format` 与 `activation_failure` 仍是当前的 write-once mechanism observations / diagnostics（PR #135 evidence），**不属于**本 authority designation：writer != semantic authority，mechanism evidence 不因出现在 read-side projection 中而被提升为 semantic authority。
+
+### 仍然 OPEN
+
+本 designation 不冻结以下任何决策（各自需要独立 authority review）：
+
+```text
+Playing semantics          Starting semantics         Paused semantics
+Stopping as independent semantic state
+position authority         duration authority         seek semantics
+source identity            current-source semantic truth
+playlist / queue authority next / previous
+volume authority           device-switch semantics
+PlaybackControl topology   PlaybackSnapshot representation
+EpisodeId                  Generation
+multi-session topology     preload / gapless
+Realtime Audio Runtime representation
+PlaybackFacts publication topology
+```
+
+也不冻结 `one track == one Playback Session` 为永久 topology；§8 已把未来 topology 留 OPEN。

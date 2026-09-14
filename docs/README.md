@@ -12,6 +12,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Generic Composition Kernel semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel-0-implementation-adr.md` |
 | Playback/audio foundations | `adr/ADR-PBK-001.md` — **ACCEPTED** |
 | First earned static playback composition boundaries | `adr/ADR-PBK-002.md` — **ACCEPTED** |
+| Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 — **ACCEPTED** |
 | Realtime publication lifetime evidence + mechanism comparison | `architecture/realtime-publication-lifetime-decision.md`（evidence/decision record，非第二 authority）+ `../specs/realtime-publication/` |
 | Minimal PCM edge experiment (ADR §12 Phase B evidence) | `architecture/pcm-contract-a0.md` + `../crates/qianqian-audio-api/tests/pcm_edge_contract/`（test-only harness）— evidence only, not authority |
 | Direct-flow graph experiment (ADR §12 Phase C evidence) | `architecture/direct-pcm-flow.md` + `../crates/qianqian-audio-api/tests/direct_pcm_flow/`（test-only harness）— evidence only, not authority |
@@ -33,7 +34,8 @@ NORMATIVE AUTHORITY (defines what the architecture means)
   Playback Foundations constitution -> adr/ADR-PBK-001.md (ACCEPTED;
                                       planes, Fact semantics, §6 P1–P5)
   Canonical vocabulary + first earned
-  static playback composition       -> adr/ADR-PBK-002.md (ACCEPTED)
+  static playback composition +
+  episode terminal-outcome authority -> adr/ADR-PBK-002.md (ACCEPTED; §17/D11)
   K0 semantic design                -> architecture/composition-kernel-0-design.md
   K0 implementation decisions       -> architecture/composition-kernel-0-implementation-adr.md
 
@@ -55,18 +57,19 @@ DERIVED PROJECTION (how humans discover/understand; define nothing)
 Routing entry points by task remain:
 
 ```text
-agent work rules              -> AGENTS.md
-stable vocabulary             -> adr/ADR-PBK-002.md (ACCEPTED)
-current architecture overview -> architecture/overview.md (projection)
-playback foundations          -> adr/ADR-PBK-001.md (ACCEPTED)
-static playback composition   -> adr/ADR-PBK-002.md (ACCEPTED)
-implemented behavior          -> code + tests
-experimental playback evidence-> specs/playback/* + prior executable core
-historical evidence           -> git refs / explicitly historical docs
-current task scope            -> current issue/task
+agent work rules                 -> AGENTS.md
+stable vocabulary                -> adr/ADR-PBK-002.md (ACCEPTED)
+current architecture overview    -> architecture/overview.md (projection)
+playback foundations             -> adr/ADR-PBK-001.md (ACCEPTED)
+static playback composition      -> adr/ADR-PBK-002.md (ACCEPTED)
+episode terminal outcome authority -> adr/ADR-PBK-002.md §17 / D11 (ACCEPTED)
+implemented behavior             -> code + tests
+experimental playback evidence   -> specs/playback/* + prior executable core
+historical evidence              -> git refs / explicitly historical docs
+current task scope               -> current issue/task
 ```
 
-Playback currently has **no accepted dynamic production state-machine authority**. ADR-PBK-001 freezes foundational plane separation and P1–P5; ADR-PBK-002 freezes current vocabulary plus the first earned static playback composition. Neither freezes pause/seek/next/device-switch semantics.
+Playback currently has **no accepted dynamic production state-machine authority**. ADR-PBK-001 freezes foundational plane separation and P1–P5; ADR-PBK-002 freezes current vocabulary plus the first earned static playback composition and §17/D11's episode terminal-outcome authority designation. This D11 designation is one terminal fact authority, not a playback state machine. Neither ADR freezes pause/seek/next/device-switch semantics.
 
 Do not use old type names or formal variables to close new architecture questions automatically.
 
@@ -74,7 +77,7 @@ Do not use old type names or formal variables to close new architecture question
 
 # Current playback foundation
 
-The accepted foundations separate four reasoning lenses — Composition, Execution/Control, Fact, Realtime Data — summarized in `architecture/overview.md` and frozen normatively in `adr/ADR-PBK-001.md` §1–§2. Current role names and the real static Decode Plugin + Output Plugin + Playback Session composition are frozen in `adr/ADR-PBK-002.md`. Do not restate either authority normatively here.
+The accepted foundations separate four reasoning lenses — Composition, Execution/Control, Fact, Realtime Data — summarized in `architecture/overview.md` and frozen normatively in `adr/ADR-PBK-001.md` §1–§2. Current role names, the real static Decode Plugin + Output Plugin + Playback Session composition, and the Playback Session's episode terminal-outcome authority designation are frozen in `adr/ADR-PBK-002.md` (D11 at §17). Do not restate either authority normatively here.
 
 ---
 
@@ -119,7 +122,7 @@ If generic K0 semantics and a playback ADR appear to conflict, identify the exac
 
 # Fact/Event policy
 
-Normative authority: `adr/ADR-PBK-001.md` §2.3 — semantic commit precedes Fact publication; one designated semantic authority per (fact kind, subject scope); projections are read-only visibility; Event Sourcing, durability, replay and a generic Event primitive are **not yet architecture decisions**.
+Normative authority: `adr/ADR-PBK-001.md` §2.3 — semantic commit precedes Fact publication; one designated semantic authority per (fact kind, subject scope); projections are read-only visibility; Event Sourcing, durability, replay and a generic Event primitive are **not yet architecture decisions**. For the single fact kind already designated in production playback architecture — one episode's terminal outcome — route to `adr/ADR-PBK-002.md` §17 / D11. All other PlaybackFacts authorities and publication topology remain OPEN.
 
 ---
 
