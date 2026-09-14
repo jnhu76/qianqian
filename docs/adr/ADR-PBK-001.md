@@ -1107,6 +1107,8 @@ next                                依 §12 ladder 继续:机制裁决 / 真实
 
 # 16. Vocabulary / Role Definitions（vocabulary 收口）
 
+> **Current vocabulary routing (2026-09-14):** 本节保留 reset-era vocabulary / decision history；current Plugin/Fiber/ComponentSpec taxonomy 由 `ADR-PBK-002` D1/D4/D12 governs。若本节 `Component` / `Plugin` / `Fiber` 条目与 PBK-002 不一致，以 PBK-002 的 current vocabulary 为准；PBK-001 的 foundations、Fact contract、realtime firewall 与 P1–P5 authority 不变。
+
 本节只收口 vocabulary 与 architecture role 定义。它**不新增 invariant、不重写宪法、不冻结 representation**：与 §1–§2、§6 的 normative 契约冲突时，以其为准；本节不冻结任何 crate 映射、Plugin 粒度或机制表示。其它文档只引用本节定义，不得另立第二份 normative 词汇表。
 
 > **Architecture role != crate name.** 本节定义的都是语义角色；任何 crate 名（如 `qianqian-app`、`qianqian-realtime`）都不是某角色已被正确物理实现的证据，crate 物理归属另行审计。
