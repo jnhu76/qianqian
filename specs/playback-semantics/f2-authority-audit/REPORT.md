@@ -736,7 +736,9 @@ CURRENT PRODUCTION PROPERTY:
     that the playback episode successfully activated.
 
 ARCHITECTURALLY DESIGNATED:
-    NOT YET — requires ADR corrective if frozen.
+    NOT_APPLICABLE — mechanism evidence is not a semantic-fact
+    candidate and needs no semantic-authority designation
+    (writer != semantic authority).
 
 AUTHORITY STATE:
     source_format (write-once, memoized)
@@ -759,10 +761,11 @@ PUBLICATION / READ-SIDE SHAPE:
     source_format() accessor on SessionCompletion.
 
 VERDICT:
-    CANDIDATE — mechanism-derived write-once observation.
+    MECHANISM EVIDENCE — mechanism-derived write-once observation.
     Narrow proposition: "the opened decode endpoint reports format X."
     NOT proof that the episode activated successfully.
-    Do NOT mix with source identity.
+    Do NOT mix with source identity. Not a semantic-fact candidate;
+    no ADR authority designation required.
 ```
 
 ### activation_error
@@ -786,7 +789,9 @@ CURRENT IMPLEMENTATION WRITER:
     activation_failed() when activate_inner() returns Err.
 
 ARCHITECTURALLY DESIGNATED:
-    NOT YET — requires ADR corrective if frozen.
+    NOT_APPLICABLE — mechanism evidence / write-once diagnostic is
+    not a semantic-fact candidate and needs no semantic-authority
+    designation (writer != semantic authority).
 
 AUTHORITY STATE:
     activation_failure (write-once, memoized)
@@ -799,15 +804,17 @@ SEMANTIC COMMIT POINT:
     activation_failed() in session.rs:59-62.
 
 VERDICT:
-    CANDIDATE — write-once, conflict-free.
+    MECHANISM EVIDENCE — write-once diagnostic, conflict-free.
+    Not a semantic-fact candidate; no ADR authority designation
+    required.
 
     Subject scope note: The producing mechanism (session activation)
-    IS the current implementation writer for this (fact kind, subject
-    scope), which is why mechanism evidence here directly constitutes
-    the stored value. But the subject is "this activation attempt,"
-    NOT "current playback episode" — activation failure occurs before
-    a successfully activated playback episode exists. Activation
-    failure != episode terminal outcome.
+    is the current implementation writer of the stored value; that
+    does NOT make it a designated semantic authority. The subject is
+    "this activation attempt," NOT "current playback episode" —
+    activation failure occurs before a successfully activated
+    playback episode exists. Activation failure != episode terminal
+    outcome.
 ```
 
 ---
@@ -1510,12 +1517,14 @@ BRANCH:       specs/f2-authority-audit-0
 
 VERDICT:      ADR_CORRECTIVE_REQUIRED
 
-EARNED (as candidate authority):
+SEMANTIC FACT CANDIDATES (ADR designation required):
     SessionOutcome (Completed/Stopped/Failed) — candidate semantic
     fact, current implementation writer = resolve() in completion.rs,
     episode-scoped, memoized, single-writer, conflict-free.
     Architecturally designated: NOT YET (ADR corrective required).
 
+MECHANISM / DIAGNOSTIC EVIDENCE (not semantic-fact candidates;
+no authority designation required — writer != semantic authority):
     SourceFormat — mechanism-derived write-once observation, within
     episode. May exist even if later activation steps fail.
 
@@ -1546,9 +1555,10 @@ SOURCE VERDICT:
     App holds PathBuf as input/request ownership.
 
 SOURCE_FORMAT VERDICT:
-    CANDIDATE — mechanism-derived write-once observation.
+    MECHANISM EVIDENCE — mechanism-derived write-once observation.
     May exist even if activation later fails.
-    Do NOT conflate with source identity.
+    Do NOT conflate with source identity. NOT_APPLICABLE to ADR
+    authority designation.
 
 STARTING VERDICT:
     NOT EARNED — derivation is semantically false.
@@ -1682,8 +1692,8 @@ Columns: PROPOSITION | SUBJECT SCOPE | CURRENT PRODUCER/WRITER | CLASS | CANDIDA
 | Episode completed (EOF + drain) | Episode | resolve() | semantic fact (candidate) | Playback Session | ADR_REQUIRED | resolve() first produces Completed | immutable (memoized) | none | CANDIDATE |
 | Episode stopped (abort + stop intent) | Episode | resolve() | semantic fact (candidate) | Playback Session | ADR_REQUIRED | resolve() first produces Stopped | immutable (memoized) | cause-loss: stop intent after abort still produces Stopped | CANDIDATE (LIMITATION) |
 | Episode failed | Episode | resolve() | semantic fact (candidate) | Playback Session | ADR_REQUIRED | resolve() first produces Failed | immutable (memoized) | stage = precedence class, not chronological first | CANDIDATE |
-| Source format of opened endpoint | Episode | set_source_format() | mechanism evidence (write-once) | session activation | ADR_REQUIRED | set_source_format() in activate_inner | immutable (write-once) | may exist if later activation fails | CANDIDATE |
-| Activation failure | Activation attempt | activation_failed() | mechanism evidence (write-once) | session activation | ADR_REQUIRED | activation_failed() | immutable (write-once) | subject = activation attempt, not episode | CANDIDATE |
+| Source format of opened endpoint | Episode | set_source_format() | mechanism evidence (write-once) | N/A | NOT_APPLICABLE | set_source_format() in activate_inner | immutable (write-once) | may exist if later activation fails | MECHANISM EVIDENCE |
+| Activation failure | Activation attempt | activation_failed() | mechanism evidence (write-once) | N/A | NOT_APPLICABLE | activation_failed() | immutable (write-once) | subject = activation attempt, not episode | MECHANISM EVIDENCE |
 | Source identity | Episode | NONE | NOT EARNED | NONE | NOT EARNED | N/A | N/A | App holds PathBuf, not session authority | NOT EARNED |
 | Playing | Episode | NONE | NOT EARNED | NONE | NOT EARNED | N/A | N/A | no mechanism publishes this | NOT EARNED |
 | Starting | Episode | NONE | NOT EARNED | NONE | NOT EARNED | N/A | N/A | derivation is semantically false | NOT EARNED |
