@@ -13,8 +13,8 @@
 mod common;
 
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use qianqian_app::QianqianApp;
@@ -92,7 +92,10 @@ fn a_fresh_session_observes_pending_with_no_evidence() {
     let obs = completion.observation();
     assert!(obs.outcome.is_none(), "no terminal outcome committed yet");
     assert!(obs.source_format.is_none(), "no activation readback yet");
-    assert!(obs.activation_error.is_none(), "no activation diagnostic yet");
+    assert!(
+        obs.activation_error.is_none(),
+        "no activation diagnostic yet"
+    );
     assert!(!obs.stop_requested, "no stop intent recorded yet");
 }
 
@@ -260,8 +263,7 @@ fn an_activation_failure_stays_pending_and_reports_only_the_activation_diagnosti
 
         let obs = completion.observation();
         assert_eq!(
-            obs.outcome,
-            None,
+            obs.outcome, None,
             "activation failed before an episode existed: no terminal outcome is fabricated"
         );
         assert_eq!(
@@ -313,8 +315,7 @@ fn repeated_observations_are_side_effect_free_and_stable() {
         for _ in 0..64 {
             let obs = completion.observation();
             assert_eq!(
-                obs.outcome,
-                None,
+                obs.outcome, None,
                 "reads do not resolve the episode (pure read)"
             );
         }
@@ -331,7 +332,10 @@ fn repeated_observations_are_side_effect_free_and_stable() {
         }
 
         let snapshot = runtime.dispose();
-        assert!(snapshot.quiet, "the episode still disposed cleanly after 128+ reads");
+        assert!(
+            snapshot.quiet,
+            "the episode still disposed cleanly after 128+ reads"
+        );
     });
 }
 
@@ -369,7 +373,10 @@ fn observation_racing_stop_and_resolution_never_deadlocks_or_lies() {
                         let current = completion.observation().outcome;
                         let committed = current.is_some();
                         if Some(&current) != last.as_ref() {
-                            transitions.lock().expect("transitions lock").push(current.clone());
+                            transitions
+                                .lock()
+                                .expect("transitions lock")
+                                .push(current.clone());
                             last = Some(current);
                         }
                         // Exit only once the main side is done AND the

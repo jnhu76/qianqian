@@ -167,8 +167,7 @@ fn no_rendering_claims_an_unearned_semantic() {
 fn assert_never_claims_unearned_semantics(text: &str) {
     let lowered = text.to_lowercase();
     for forbidden in [
-        "playing", "starting", "paused", "stopping", "position", "elapsed",
-        "buffered", "duration",
+        "playing", "starting", "paused", "stopping", "position", "elapsed", "buffered", "duration",
     ] {
         assert!(
             !lowered.contains(forbidden),

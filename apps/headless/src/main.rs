@@ -110,9 +110,7 @@ fn run_playback(file: PathBuf) -> ExitCode {
                     Ok(cli::InteractiveCommand::Stop) => control_completion.request_stop(),
                     Ok(cli::InteractiveCommand::Status) => println!(
                         "{}",
-                        qianqian_headless::status::format_status(
-                            &control_completion.observation()
-                        )
+                        qianqian_headless::status::format_status(&control_completion.observation())
                     ),
                     Ok(_) => {
                         eprintln!("not wired yet: only 'stop' controls playback; 'status' reads it")
