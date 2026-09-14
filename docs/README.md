@@ -7,83 +7,229 @@ Load only the documentation needed for the current task. Git history and externa
 | Task | Read first |
 |---|---|
 | Repository/agent rules | `../AGENTS.md` |
-| Stable vocabulary / current role names | `adr/ADR-PBK-002.md` — **ACCEPTED** |
+| Stable vocabulary / current role names | `adr/ADR-PBK-002.md` — current authority (Issue #138 records the corrective rationale/history) |
 | Current architecture overview | `architecture/overview.md` |
 | Generic Composition Kernel semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel-0-implementation-adr.md` |
 | Playback/audio foundations | `adr/ADR-PBK-001.md` — **ACCEPTED** |
-| First earned static playback composition boundaries | `adr/ADR-PBK-002.md` — **ACCEPTED** |
-| Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 — **ACCEPTED** |
-| Realtime publication lifetime evidence + mechanism comparison | `architecture/realtime-publication-lifetime-decision.md`（evidence/decision record，非第二 authority）+ `../specs/realtime-publication/` |
-| Minimal PCM edge experiment (ADR §12 Phase B evidence) | `architecture/pcm-contract-a0.md` + `../crates/qianqian-audio-api/tests/pcm_edge_contract/`（test-only harness）— evidence only, not authority |
-| Direct-flow graph experiment (ADR §12 Phase C evidence) | `architecture/direct-pcm-flow.md` + `../crates/qianqian-audio-api/tests/direct_pcm_flow/`（test-only harness）— evidence only, not authority |
+| Plugin/Fiber taxonomy + admission invariant + earned static playback composition | `adr/ADR-PBK-002.md` D1/D4/D5/D6/D12/D13 |
+| Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
+| Current architecture corrective basis | Issue #138 — design input only, **not authority** |
+| Minimal PCM contract evidence | `architecture/pcm-contract-a0.md` + `../crates/qianqian-audio-api/tests/pcm_edge_contract/` — Phase B evidence only |
+| Direct-flow graph evidence | `architecture/direct-pcm-flow.md` + `../crates/qianqian-audio-api/tests/direct_pcm_flow/` — Phase C evidence only |
+| Realtime publication lifetime evidence + mechanism comparison | `architecture/realtime-publication-lifetime-decision.md` + `../specs/realtime-publication/` — evidence only |
 | Current Rust behavior | current code + tests |
-| Playback experimental evidence | `../specs/playback/*` + `qianqian-audio-api` playback code/tests — evidence only, not authority |
+| Playback experimental evidence | `../specs/playback/*` + explicitly historical/test-local playback artifacts — evidence only |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
 | Product/repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
-| External failure evidence | `../evidence/README.md` — opt-in only when explicitly requested |
+| External failure evidence | `../evidence/README.md` — opt-in only |
 
 ---
 
 # Authority model
 
-Every document belongs to exactly one truth class. Only files explicitly listed as normative authority below may define architecture semantics; everything else summarizes, routes, realizes or proves.
+Every document belongs to exactly one truth class.
 
 ```text
-NORMATIVE AUTHORITY (defines what the architecture means)
-  Playback Foundations constitution -> adr/ADR-PBK-001.md (ACCEPTED;
-                                      planes, Fact semantics, §6 P1–P5)
-  Canonical vocabulary + first earned
-  static playback composition +
-  episode terminal-outcome authority -> adr/ADR-PBK-002.md (ACCEPTED; §17/D11)
-  K0 semantic design                -> architecture/composition-kernel-0-design.md
-  K0 implementation decisions       -> architecture/composition-kernel-0-implementation-adr.md
+NORMATIVE AUTHORITY
+  Playback foundations
+      -> adr/ADR-PBK-001.md
+         plane separation, Command/Fact/Projection contracts,
+         realtime data-plane firewall, P1–P5
 
-PRODUCTION REALITY (what the program does today)
-  -> main-branch source + Cargo dependency graph + actual public APIs
+  Current vocabulary + Plugin/Fiber taxonomy +
+  earned static playback composition + D11
+      -> adr/ADR-PBK-002.md
 
-EVIDENCE (why we believe a mechanism/property; never authority)
-  -> tests / specs / TLA+ / experiment harnesses / specs/playback/* /
-     architecture evidence records (pcm-contract-a0.md, direct-pcm-flow.md,
-     realtime-view-publication.md, realtime-publication-lifetime-decision.md,
-     component-boundary-a0.md, first-audible-slice.md)
+  K0 semantic design
+      -> architecture/composition-kernel-0-design.md
 
-DERIVED PROJECTION (how humans discover/understand; define nothing)
-  -> README.md, CONTEXT.md, AGENTS.md summaries, this router,
-     architecture/overview.md, architecture/registry.yml,
-     architecture/composition-kernel.md (summary), website/**, diagrams
+  K0 representation decisions
+      -> architecture/composition-kernel-0-implementation-adr.md
+
+PRODUCTION REALITY
+  -> current main-branch source + Cargo graph + public APIs
+
+EVIDENCE
+  -> tests / specs / TLA+ / experiment harnesses /
+     architecture evidence records (pcm-contract-a0.md,
+     direct-pcm-flow.md, realtime-view-publication.md,
+     realtime-publication-lifetime-decision.md,
+     component-boundary-a0.md, first-audible-slice.md) /
+     historical refs
+
+DERIVED PROJECTION
+  -> README.md / CONTEXT.md / AGENTS.md summaries /
+     this router / architecture/overview.md /
+     architecture/composition-kernel.md / registry.yml /
+     website / diagrams
 ```
 
-Routing entry points by task remain:
+Issue #138 is an **architecture corrective basis / design-input record**. It may explain why authority is being changed but does not itself define current architecture.
+
+---
+
+# Current canonical architecture mapping
+
+Current vocabulary is routed to PBK-002:
 
 ```text
-agent work rules                 -> AGENTS.md
-stable vocabulary                -> adr/ADR-PBK-002.md (ACCEPTED)
-current architecture overview    -> architecture/overview.md (projection)
-playback foundations             -> adr/ADR-PBK-001.md (ACCEPTED)
-static playback composition      -> adr/ADR-PBK-002.md (ACCEPTED)
-episode terminal outcome authority -> adr/ADR-PBK-002.md §17 / D11 (ACCEPTED)
-implemented behavior             -> code + tests
-experimental playback evidence   -> specs/playback/* + prior executable core
-historical evidence              -> git refs / explicitly historical docs
-current task scope               -> current issue/task
+Composition Kernel (K0)
+    runtime that manages Plugin/Fiber composition
+
+Plugin
+    independently K0-composed lifecycle/behavior unit
+
+ComponentSpec
+    current K0 formal/Rust representation of a Plugin definition
+
+Fiber
+    one live Plugin instance
+
+Capability
+    typed dependency/reachability contract
+
+Service
+    executable object reached through a Capability
+
+Plugin-owned domain resource
+    subordinate endpoint/worker/edge/stream whose internals remain outside K0
+
+PCM Data Plane
+    pre-bound payload flow; not a Plugin and not routed through K0 per quantum
 ```
 
-Playback currently has **no accepted dynamic production state-machine authority**. ADR-PBK-001 freezes foundational plane separation and P1–P5; ADR-PBK-002 freezes current vocabulary plus the first earned static playback composition and §17/D11's episode terminal-outcome authority designation. This D11 designation is one terminal fact authority, not a playback state machine. Neither ADR freezes pause/seek/next/device-switch semantics.
+Current earned Plugin roles:
 
-Do not use old type names or formal variables to close new architecture questions automatically.
+```text
+Decode Plugin
+Output Plugin
+Playback Session Plugin (episode-scoped)
+```
+
+Do not use the older `Component vs Plugin` taxonomy as current architecture. K0 design documents may use `component` as their formal/paper term; PBK-002 defines the Qianqian architecture mapping.
 
 ---
 
 # Current playback foundation
 
-The accepted foundations separate four reasoning lenses — Composition, Execution/Control, Fact, Realtime Data — summarized in `architecture/overview.md` and frozen normatively in `adr/ADR-PBK-001.md` §1–§2. Current role names, the real static Decode Plugin + Output Plugin + Playback Session composition, and the Playback Session's episode terminal-outcome authority designation are frozen in `adr/ADR-PBK-002.md` (D11 at §17). Do not restate either authority normatively here.
+The accepted foundation remains the four reasoning lenses in PBK-001:
+
+```text
+Composition
+Execution / Control
+Fact
+Realtime Data
+```
+
+PBK-002 maps current production onto them:
+
+```text
+Qianqian App
+    ↓ desired composition
+K0
+    ↓ manages
+Decode Plugin + Output Plugin + Playback Session Plugin
+    ↓ Playback Session binds/owns episode resources
+kernel-free PCM data plane
+```
+
+Playback Session is also the D11 designated semantic authority for **one episode's terminal outcome**:
+
+```text
+Completed / Stopped / Failed
+```
+
+The designation attaches to the Playback Session semantic role for one playback episode; its current composition realization is the episode-scoped Playback Session Plugin/Fiber (semantic role != Fiber identity by definition). This is one fact authority, not a complete playback state machine.
+
+---
+
+# Plugin / resource routing rule
+
+Use PBK-002 D4/D12 for current taxonomy and D13 for the admission invariant.
+
+Do not infer:
+
+```text
+feature == Plugin
+Capability provider == only kind of Plugin
+long-lived == required for Plugin
+resource/object == Plugin
+```
+
+A Plugin may provide no Capability and may be episode-scoped.
+
+Subordinate resources stay resources unless they need independent K0 composition identity/lifecycle — if an existing Plugin can own the candidate without losing composition correctness or lifecycle ordering, it stays an owned resource/effect (D13). Domain resource ownership does not widen K0 kernel data: K0 still knows only its frozen Fiber/Capability/Effect/Discharge semantics.
+
+---
+
+# Generic Composition Kernel vs playback
+
+K0 remains implemented/current and domain-agnostic.
+
+When reading `architecture/composition-kernel-0-design.md`, treat `component` as the K0/paper formal unit. Current product architecture maps an independently K0-composed unit to **Plugin**, represented today by `ComponentSpec`, with each mounted instance represented by a Fiber.
+
+Do not rewrite K0 semantics merely to rename `component`; do not resurrect a peer product taxonomy from the formal term either.
+
+---
+
+# Realtime / PCM policy
+
+Normative authority: PBK-001 §2.4 and §6; current static mapping: PBK-002 D8/D9.
+
+Per quantum PCM must not perform:
+
+```text
+Context lookup
+Capability resolution
+Fiber Reconcile
+generic Plugin dispatch
+generic Fact/Event fan-out
+filesystem/network/UI round trip
+```
+
+K0 composes owners on setup/control boundaries; already-bound domain resources carry PCM directly.
+
+If a future feature creates overlapping old/new RT worlds whose release depends on reader quiescence, trigger PBK-001 P1–P5 and earn the minimum specialized mechanism. Do not pre-create Window/Generation because historical models had them.
+
+---
+
+# Fact/Event policy
+
+Normative authority: PBK-001 §2.3.
+
+```text
+Command != Fact
+Mechanism Evidence != Semantic Fact unless explicitly designated
+semantic commit precedes Fact publication
+one designated semantic authority per (fact kind, subject scope)
+Projection != Authority
+```
+
+Current designated playback fact: PBK-002 D11 episode terminal outcome. Other PlaybackFacts and publication topology remain OPEN.
+
+---
+
+# Phase-F architecture rule
+
+Future pause/seek/open/next/volume work must first attempt the simplest expression using:
+
+```text
+existing Plugin/Fiber lifecycle
+existing Capability/Service seams
+Plugin-owned domain resources
+small orthogonal fact/control state
+```
+
+Only concrete counterexamples may earn extra Plugin boundaries, Window/Generation, or a specialized Realtime Audio Runtime mechanism.
+
+Phase-F playback semantics remain OPEN (PBK-002 §14); new Phase-F implementation stays paused pending their authority design.
 
 ---
 
 # Playback experimental evidence
 
-Existing code/specs may still contain:
+Legacy nouns remain evidence only:
 
 ```text
 MusicKernel
@@ -96,84 +242,53 @@ Dual Window
 Physical Fence
 ```
 
-During the reset these are:
-
-```text
-EXPERIMENTAL EVIDENCE
-NOT STABLE VOCABULARY
-NOT CURRENT ARCHITECTURE AUTHORITY
-```
-
-Load them only when the task needs a prior bug reproducer, executable comparison, or formal/testing technique.
-
-Do not make an ordinary architecture reviewer preload them as if they were current design.
-
----
-
-# Generic Composition Kernel vs playback reset
-
-K0 remains implemented/current and domain-agnostic.
-
-When reading `architecture/composition-kernel.md`, treat it as a derived summary: generic K0 semantics are authoritative only in `architecture/composition-kernel-0-design.md` (representation decisions: `architecture/composition-kernel-0-implementation-adr.md`). Any old playback-specific examples or references to the previously accepted playback state model are illustrative/history only; the accepted ARCH-003 foundations do not re-freeze them.
-
-If generic K0 semantics and a playback ADR appear to conflict, identify the exact generic invariant first; do not silently import an old playback-specific conclusion from a K0 document.
-
----
-
-# Fact/Event policy
-
-Normative authority: `adr/ADR-PBK-001.md` §2.3 — semantic commit precedes Fact publication; one designated semantic authority per (fact kind, subject scope); projections are read-only visibility; Event Sourcing, durability, replay and a generic Event primitive are **not yet architecture decisions**. For the single fact kind already designated in production playback architecture — one episode's terminal outcome — route to `adr/ADR-PBK-002.md` §17 / D11. All other PlaybackFacts authorities and publication topology remain OPEN.
-
----
-
-# Realtime policy
-
-Normative authority: `adr/ADR-PBK-001.md` §2.4 and §6 — realtime PCM never travels through generic Context/Event/Plugin dispatch per quantum; publication/reclamation follows the normative P1–P5 semantic contract. ADR-PBK-002 reserves the current noun `Realtime Audio Runtime` but leaves its representation OPEN.
+Load them only for a prior reproducer, executable comparison, or verification technique. Do not preserve them because a new feature happens to resemble the old design.
 
 ---
 
 # Architecture design order
 
-The boundary-first design order is normative in `../AGENTS.md` ("Boundary-first design"). Do not start from API shape or legacy type names.
+Follow `../AGENTS.md`:
+
+```text
+Plugin granularity / ownership
+→ Capability / dependency
+→ execution semantics
+→ fact/state authority
+→ lifetime/withdrawal
+→ realtime boundary if earned
+→ evidence
+→ representation
+```
 
 ---
 
 # Formal verification policy
 
-Formalization is risk-driven (normative policy: `adr/ADR-PBK-001.md` §13).
+Formalization is risk-driven (normative policy: `adr/ADR-PBK-001.md` §13; verification guardrails: `../AGENTS.md` "Verification authority boundary").
 
 > **TLA+ finds concrete state/interleaving collisions; it is not a second architecture authority.**
 
-The old PlaybackTemporal/PlaybackOwnership suite remains evidence only during the reset; do not expand or preserve it merely to keep old nouns alive. A new formal model requires a concrete newly earned collision risk.
+No concrete collision -> prefer types/ownership/tests/static checks.
 
 ---
 
 # External evidence isolation
 
-External issue/discussion mining lives under `../evidence/`.
-
-> **Do not load `evidence/` during ordinary ADR, architecture, formal-spec, implementation, or PR review.**
-
-Only opt in when the current task explicitly asks for external failure evidence, upstream issue/discussion mining, failure-corpus maintenance, or adversarial inspiration.
-
-When opted in, start at `../evidence/README.md`; for incremental scans, read `../evidence/external-systems/source-ledger.yml` before the corpus.
-
-External systems can inspire tests and distinctions; they do not become Qianqian authority.
+Do not load `evidence/` during ordinary architecture/ADR/implementation work unless the task explicitly asks for external failure evidence/adversarial inspiration. External systems can inspire tests/distinctions; they never become Qianqian authority.
 
 ---
 
 # Historical material
 
-Historical evidence is preserved primarily as Git history/refs, not as a second current authority tree.
-
-Useful refs include:
+Historical evidence is preserved primarily as Git history/refs:
 
 ```text
 pre-rust-v2
 playback-reference-v1
 ```
 
-Inspect only when the task explicitly needs history.
+Inspect only when the task needs history.
 
 ---
 
@@ -181,6 +296,6 @@ Inspect only when the task explicitly needs history.
 
 Create a new long-lived document only when a durable fact needs its own authority.
 
-Prefer rewriting one current authority cleanly over building amendment/supersession chains while the architecture is still young.
+Prefer rewriting current authority cleanly over growing amendment/supersession chains while the architecture is young.
 
-When documentation and implementation disagree, apply the authority resolution rule in `../AGENTS.md` ("Authority resolution"): record the differential, decide which side is wrong, amend the authority explicitly if the code is better — never let "code is newer" silently win, and never force the implementation to mechanically copy a stale authority.
+When production and authority disagree: record the differential, decide which side is wrong, amend authority explicitly if needed, and only then treat the new shape as current architecture.

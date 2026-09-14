@@ -10,7 +10,7 @@ The repository is in **Architecture v2**. The first verified playback experiment
 
 [![ARCH-003 Playback Foundations](docs/architecture/diagrams/ARCH-003-playback-foundations-v2-poster-original.png)](docs/adr/ADR-PBK-001.md)
 
-当前规范语义以 [`ADR-PBK-001`](docs/adr/ADR-PBK-001.md)（ACCEPTED）为准，K0 语义以 [`composition-kernel-0-design.md`](docs/architecture/composition-kernel-0-design.md) 为准。当前架构图应从仓库内 Mermaid 源（`docs/architecture/diagrams/`）生成，而不是手绘海报。
+当前基础语义以 [`ADR-PBK-001`](docs/adr/ADR-PBK-001.md)（ACCEPTED）为准；当前 vocabulary、Plugin/Fiber taxonomy 与已挣得的静态 playback composition 以 [`ADR-PBK-002`](docs/adr/ADR-PBK-002.md) 为准；K0 语义以 [`composition-kernel-0-design.md`](docs/architecture/composition-kernel-0-design.md) 为准。当前架构图应从仓库内 Mermaid 源（`docs/architecture/diagrams/`）生成，而不是手绘海报。
 
 The central rule is:
 
@@ -19,7 +19,7 @@ The central rule is:
 But the project does **not** start by writing kernel APIs.
 
 ```text
-Component Granularity
+Plugin granularity / ownership
         ↓
 Capability / dependency boundary
         ↓
@@ -77,7 +77,7 @@ Context controls reachability/dependency truth. It does not carry PCM blocks or 
 
 ## Playback status: foundations accepted
 
-There is still **no accepted playback state-machine vocabulary**. The accepted foundations (`docs/adr/ADR-PBK-001.md`) freeze only foundational boundaries — composition vs execution/control vs facts vs realtime data — and deliberately keep all playback-specific nouns unfrozen.
+There is still **no accepted playback state-machine vocabulary**. The accepted foundations (`docs/adr/ADR-PBK-001.md`) freeze foundational boundaries — composition vs execution/control vs facts vs realtime data — while current role names and the earned static playback composition are governed by `docs/adr/ADR-PBK-002.md`.
 
 Names still present in old code/specs, such as:
 
@@ -89,11 +89,11 @@ Generation / Active-Prepared / Dual Window / Physical Fence
 
 are **experimental evidence**: they preserve real failure witnesses (for example the formal exploration of the `stop × natural ENDED` race) and test techniques, but they are not current architecture and must not be preserved for compatibility unless a future accepted authority re-earns them.
 
-See `docs/adr/ADR-PBK-001.md` for the accepted foundation and `specs/playback/README.md` for the evidence status. The realtime publication/reclamation semantics (P1–P5) are normative in ADR §6, and the Realtime Runtime responsibility was earned by executable mechanism evidence (`docs/architecture/realtime-view-publication.md`); production playback semantics remain open (ADR §10). Normative term definitions (Plugin, Fiber, Capability, Runtime, Realtime Runtime, Fact, Reclamation, …) live in ADR §16.
+See `docs/adr/ADR-PBK-001.md` for the accepted foundation, `docs/adr/ADR-PBK-002.md` for current vocabulary/static playback composition, and `specs/playback/README.md` for the evidence status. The realtime publication/reclamation semantics (P1–P5) are normative in PBK-001 §6. Current Plugin/Fiber vocabulary is governed by PBK-002 D1/D4/D12, and Plugin admission by its D13 invariant; PBK-001 §16 retains older vocabulary as decision history where PBK-002 has superseded it.
 
 ## Everything is a Plugin
 
-“Everything is a plugin” means every **justified** long-lived runtime capability participates in one common composition/lifecycle protocol. It does **not** mean one feature == one plugin, one plugin == one crate/DLL, or every DSP node is a Fiber. Plugin/Component granularity and the boundary questionnaire: `docs/adr/ADR-PBK-001.md` §3 + `AGENTS.md` ("Plugin / Fiber discipline").
+“Everything is a Plugin” means every **independently K0-composed lifecycle/behavior unit** has Plugin identity and is mounted as a Fiber. A Plugin may be episode-scoped or long-lived and need not provide a Capability. It does **not** mean one feature == one Plugin, one Plugin == one crate/DLL, every resource/payload == Plugin, or every DSP node is a Fiber. Independent composition is itself earned: if an existing Plugin can own the candidate without losing composition correctness or lifecycle ordering, it stays an owned resource/effect. Current taxonomy and the admission invariant: `docs/adr/ADR-PBK-002.md` D4/D12/D13 + `AGENTS.md` ("Everything is a Plugin / Fiber discipline").
 
 ## Interaction correctness
 
@@ -169,6 +169,7 @@ The playback reference is a behavioral oracle, not a source-layout template.
 - `docs/README.md` — task-oriented documentation router.
 - `docs/architecture/overview.md` — current Architecture v2 overview.
 - `docs/adr/ADR-PBK-001.md` — Playback Foundations constitution (ACCEPTED).
+- `docs/adr/ADR-PBK-002.md` — current vocabulary, Plugin/Fiber taxonomy, static playback composition and D11 terminal-outcome authority.
 - `docs/architecture/composition-kernel.md` — generic composition guardrails (derived summary; K0 authority: `composition-kernel-0-design.md`).
 - `specs/README.md` — risk-driven formalization policy and model registry.
 - `CONTRIBUTING.md` — contribution entry point.
