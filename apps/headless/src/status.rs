@@ -8,7 +8,11 @@
 use qianqian_playback::{SessionObservation, SessionOutcome};
 
 /// Render one status observation as stable, scriptable lines. The exact
-/// block is frozen by `tests/status_format.rs`:
+/// pending/completed/stopped blocks are pinned by
+/// `tests/status_format.rs`; the conditional failure/activation lines
+/// are pinned by containment there. One observation never spans
+/// multiple lines except for its own block structure, so line-based
+/// parsing stays reliable:
 ///
 /// ```text
 /// outcome: pending | completed | stopped | failed
@@ -32,7 +36,11 @@ pub fn format_status(observation: &SessionObservation) -> String {
         Some(SessionOutcome::Stopped) => lines.push("outcome: stopped".to_owned()),
         Some(SessionOutcome::Failed { stage }) => {
             lines.push("outcome: failed".to_owned());
-            lines.push(format!("failure: {stage}"));
+            // A stage diagnostic is representation, not frozen truth
+            // (ADR-PBK-002 §17/D11); flattening embedded newlines keeps
+            // the status block line-parseable.
+            let flat = stage.replace('\n', " ");
+            lines.push(format!("failure: {flat}"));
         }
     }
     match observation.source_format {

@@ -102,6 +102,30 @@ fn a_failed_outcome_renders_its_class_diagnostic() {
     );
 }
 
+/// A multi-line stage diagnostic is flattened so one status block stays
+/// line-parseable (the stage is representation, not frozen truth).
+#[test]
+fn a_multiline_stage_diagnostic_is_flattened_to_one_line() {
+    let failed = SessionObservation {
+        outcome: Some(SessionOutcome::Failed {
+            stage: "decode: broken\nheader".to_owned(),
+        }),
+        ..pending_observation()
+    };
+    let text = format_status(&failed);
+    assert_eq!(
+        text.lines()
+            .filter(|line| line.starts_with("failure:"))
+            .count(),
+        1,
+        "the diagnostic must stay on one line: {text}"
+    );
+    assert!(
+        text.contains("failure: decode: broken header"),
+        "flattened diagnostic missing: {text}"
+    );
+}
+
 /// The activation diagnostic renders only when present, and stays
 /// labeled as the activation attempt's diagnostic.
 #[test]
