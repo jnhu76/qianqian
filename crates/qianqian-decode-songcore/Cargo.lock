@@ -24,33 +24,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "qianqian-app"
+name = "qianqian-core"
 version = "0.1.0"
 dependencies = [
- "qianqian-audio-api",
- "qianqian-composition",
+ "qianqian-kernel",
 ]
-
-[[package]]
-name = "qianqian-audio-api"
-version = "0.1.0"
-dependencies = [
- "qianqian-composition",
-]
-
-[[package]]
-name = "qianqian-composition"
-version = "0.1.0"
 
 [[package]]
 name = "qianqian-decode-songcore"
 version = "0.1.0"
 dependencies = [
- "qianqian-app",
- "qianqian-audio-api",
- "qianqian-composition",
+ "qianqian-core",
+ "qianqian-kernel",
+ "qianqian-runtime",
  "qianqian-songcore-sys",
  "serde_json",
+]
+
+[[package]]
+name = "qianqian-kernel"
+version = "0.1.0"
+
+[[package]]
+name = "qianqian-runtime"
+version = "0.1.0"
+dependencies = [
+ "qianqian-core",
+ "qianqian-kernel",
 ]
 
 [[package]]
