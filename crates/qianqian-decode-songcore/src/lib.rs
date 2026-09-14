@@ -53,14 +53,16 @@ impl PcmDecode for SongcoreDecode {
 // --- host-IO callbacks over std::fs::File --------------------------------
 //
 // FFI boundary discipline: every callback fails closed (-1) on a null
-// userdata pointer or a null destination, and on a negative absolute
-// offset (the ABI defines offsets as non-negative). The pointer
-// preconditions for `from_raw_parts_mut` are checked before the slice is
-// formed; the SongCore side never legitimately passes these values, so a
-// guard hit is a caller bug, not a decode result.
+// userdata pointer, a null destination (regardless of the requested
+// length: `from_raw_parts_mut` requires a non-null data pointer even for
+// a zero-length slice), and a negative absolute offset (the ABI defines
+// offsets as non-negative). The pointer preconditions for
+// `from_raw_parts_mut` are checked before the slice is formed; the
+// SongCore side never legitimately passes these values, so a guard hit is
+// a caller bug, not a decode result.
 
 unsafe extern "C" fn file_read(ud: *mut c_void, dst: *mut u8, size: usize) -> i64 {
-    if ud.is_null() || (size > 0 && dst.is_null()) {
+    if ud.is_null() || dst.is_null() {
         return -1;
     }
     use std::io::Read;
@@ -137,6 +139,18 @@ impl SongcoreDecodeStream {
             unsafe { drop(Box::from_raw(io.userdata as *mut File)) };
             return Err(status_open_error(path, status));
         }
+        // Fail closed: the ABI does not spell out "SONG_OK implies a
+        // non-null handle", so the wrapper refuses to build on one. A null
+        // here would make every later handle call undefined behavior.
+        if handle.is_null() {
+            unsafe { drop(Box::from_raw(io.userdata as *mut File)) };
+            return Err(DecodeOpenError {
+                message: format!(
+                    "SongCore opened '{}' with SONG_OK but a null handle",
+                    path.display()
+                ),
+            });
+        }
         let mut info: sys::song_info = unsafe { std::mem::zeroed() };
         let status = unsafe { sys::song_probe(handle, &mut info) };
         if status != sys::SONG_OK {
@@ -209,8 +223,8 @@ impl DecodedPcmStream for SongcoreDecodeStream {
 
 impl Drop for SongcoreDecodeStream {
     fn drop(&mut self) {
-        // Defensive FFI-boundary hardening: successful construction always
-        // leaves a non-null handle (checked on every open path above), so
+        // Defensive FFI-boundary hardening: every open path above either
+        // leaves a non-null handle or refuses to construct the endpoint, so
         // the guard below can only fire on a construction invariant
         // violation — it exists to keep Drop itself sound, not to excuse
         // a null handle reaching the endpoint.
@@ -231,4 +245,70 @@ pub fn songcore_decode_plugin() -> ComponentSpec {
                 .map_err(|e| ActivationError::new(format!("provision refused: {e:?}")))?;
             Ok(())
         })
+}
+#[cfg(test)]
+mod tests {
+    // Callback-guard regressions from NATIVE-BOUNDARY-AUDIT-0. These run
+    // against the callback machinery only — no native library, no fixture.
+    // They are the executable form of the guard contract: a host-IO
+    // callback must fail closed (-1) without ever forming a Rust slice
+    // from a pointer the slice rules forbid.
+    use super::*;
+
+    /// Holds a `Box<File>` leaked to a raw userdata pointer for the
+    /// duration of one assertion, reclaiming it on drop.
+    struct RawFile(*mut c_void);
+    impl RawFile {
+        fn from_temp() -> Self {
+            let path = std::env::temp_dir().join("qianqian-callback-guard-test");
+            let file: Box<File> = Box::new(File::create(path).unwrap());
+            Self(Box::into_raw(file) as *mut c_void)
+        }
+        fn as_ud(&self) -> *mut c_void {
+            self.0
+        }
+    }
+    impl Drop for RawFile {
+        fn drop(&mut self) {
+            if !self.0.is_null() {
+                drop(unsafe { Box::from_raw(self.0 as *mut File) });
+            }
+        }
+    }
+
+    /// S1 regression: a null destination is rejected even for a
+    /// zero-length read. `from_raw_parts_mut` requires a non-null data
+    /// pointer for every slice, length zero included — the guard must
+    /// fire before the slice is formed, not rely on the native side
+    /// never issuing this call. (Negative control: with the guard
+    /// relaxed to `size > 0 &&`, Miri flags this call as UB at the
+    /// `from_raw_parts_mut` site.)
+    #[test]
+    fn read_fails_closed_on_null_destination_even_for_zero_length() {
+        let ud = RawFile::from_temp();
+        let dst: *mut u8 = std::ptr::null_mut();
+        unsafe {
+            assert_eq!(file_read(ud.as_ud(), dst, 0), -1);
+            assert_eq!(file_read(ud.as_ud(), dst, 16), -1);
+        }
+    }
+
+    #[test]
+    fn read_fails_closed_on_null_userdata() {
+        let mut byte = 0u8;
+        unsafe {
+            assert_eq!(file_read(std::ptr::null_mut(), &mut byte, 1), -1);
+            assert_eq!(file_seek(std::ptr::null_mut(), 0), -1);
+            assert_eq!(file_size(std::ptr::null_mut()), -1);
+        }
+    }
+
+    /// The ABI defines seek offsets as non-negative absolute positions.
+    #[test]
+    fn seek_fails_closed_on_negative_offset() {
+        let ud = RawFile::from_temp();
+        unsafe {
+            assert_eq!(file_seek(ud.as_ud(), -1), -1);
+        }
+    }
 }
