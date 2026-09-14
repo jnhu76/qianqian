@@ -69,7 +69,9 @@ commands:
   --help | -h      print this usage
   --version | -V   print the version
 
-while `play` runs, a `stop` line on stdin stops the episode
+while `play` runs:
+  stop             stop the episode
+  status           print what the session truthfully knows right now
 (other interactive commands are recognized but not wired yet)
 "
 }

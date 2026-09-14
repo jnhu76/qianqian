@@ -94,10 +94,11 @@ fn run_playback(file: PathBuf) -> ExitCode {
     }
     println!("playing {} ...", file.display());
 
-    // F1 control transport: while the episode runs, stdin lines go through
-    // the frozen interactive parser; `stop` is the one wired command and
-    // requests the stop through the session's application-facing seam. The
-    // transport never touches the edge, the stream, or any mechanism.
+    // F1 control transport + F2 read-side: while the episode runs, stdin
+    // lines go through the frozen interactive parser. `stop` requests the
+    // stop through the session's application-facing seam; `status` reads
+    // the session's truthful observation and prints it. The transport
+    // never touches the edge, the stream, or any mechanism.
     let control_completion = completion.clone();
     let _control = std::thread::Builder::new()
         .name("qianqian-stdin".into())
@@ -107,7 +108,15 @@ fn run_playback(file: PathBuf) -> ExitCode {
                 let Ok(line) = line else { break };
                 match cli::parse_interactive_line(&line) {
                     Ok(cli::InteractiveCommand::Stop) => control_completion.request_stop(),
-                    Ok(_) => eprintln!("not wired yet: only 'stop' controls playback"),
+                    Ok(cli::InteractiveCommand::Status) => println!(
+                        "{}",
+                        qianqian_headless::status::format_status(
+                            &control_completion.observation()
+                        )
+                    ),
+                    Ok(_) => {
+                        eprintln!("not wired yet: only 'stop' controls playback; 'status' reads it")
+                    }
                     Err(error) => eprintln!("ignored input: {error}"),
                 }
             }
