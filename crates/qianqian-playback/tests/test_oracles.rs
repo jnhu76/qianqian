@@ -6,10 +6,22 @@
 
 mod common;
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use common::{named_thread_alive, named_thread_gone_within, within};
+// `Instant` is used only by the /proc-based controls below, which are
+// Linux-only; importing it unconditionally would warn on the Windows gate.
+#[cfg(target_os = "linux")]
+use std::time::Instant;
 
+use common::within;
+
+// The /proc-based leak-oracle controls are Linux-only by nature (the
+// oracle reads /proc/self/task); they must not break the suite's build
+// on the Windows gate.
+#[cfg(target_os = "linux")]
+use common::{named_thread_alive, named_thread_gone_within};
+
+#[cfg(target_os = "linux")]
 #[test]
 fn diagnostic_oracle_catches_a_genuine_leak() {
     // A worker that is never signaled and never joined must keep the
@@ -42,6 +54,7 @@ fn diagnostic_oracle_catches_a_genuine_leak() {
     handle.join().expect("leak-probe worker joins");
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn diagnostic_oracle_accepts_a_joined_worker() {
     let handle = std::thread::Builder::new()
