@@ -104,24 +104,33 @@ impl AudioOutput for WasapiOutput {
             .wait_timeout_while(guard, OPEN_TIMEOUT, |v| v.is_none())
             .expect("open verdict wait poisoned");
 
+        // Every path that can join the render thread runs only after the
+        // verdict mutex is released: the render thread takes this same
+        // mutex to publish its verdict, so joining it while holding the
+        // lock deadlocks as soon as an open outlives the timeout and
+        // publishes late (a slow-but-eventually-successful device open).
         let verdict = { guard.take() };
-        match verdict {
-            Some(OpenVerdict::Opened { format }) => Ok(Box::new(WasapiStream {
+        let timed_out = wait.timed_out();
+        drop(guard);
+        match (verdict, timed_out) {
+            (Some(OpenVerdict::Opened { format }), _) => Ok(Box::new(WasapiStream {
                 render_input: request.input,
                 thread: Some(handle),
                 negotiated: format,
             })),
-            Some(OpenVerdict::Failed { message }) => {
+            (Some(OpenVerdict::Failed { message }), _) => {
                 abort_thread(handle, &request.input);
                 Err(OutputError { message })
             }
-            None if wait.timed_out() => {
+            (None, true) => {
                 abort_thread(handle, &request.input);
                 Err(OutputError {
                     message: "WASAPI device open did not reach a verdict in time".to_owned(),
                 })
             }
-            None => unreachable!("wait_timeout_while returned without a verdict or timeout"),
+            (None, false) => {
+                unreachable!("wait_timeout_while returned without a verdict or timeout")
+            }
         }
     }
 }
@@ -129,6 +138,10 @@ impl AudioOutput for WasapiOutput {
 /// Wake and join a render thread whose stream was never handed to the
 /// session (open failure / timeout). The thread observes the data-plane
 /// stop at its first read, or exits through its own failed verdict.
+///
+/// Callers must not hold the open-verdict mutex across this join: a
+/// render thread that is publishing its verdict needs that same mutex,
+/// so joining while holding it would wait forever.
 fn abort_thread(handle: JoinHandle<()>, render_input: &Arc<dyn RenderPcmInput>) {
     render_input.stop();
     let _ = handle.join();
