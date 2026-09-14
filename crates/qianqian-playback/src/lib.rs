@@ -17,7 +17,7 @@ mod completion;
 mod edge;
 mod session;
 
-pub use completion::{SessionCompletion, SessionOutcome};
+pub use completion::{SessionCompletion, SessionObservation, SessionOutcome};
 pub use edge::{EdgeTerminal, PcmEdge, SharedEdge, WriteOutcome};
 pub use session::playback_session_spec;
 

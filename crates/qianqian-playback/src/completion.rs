@@ -81,6 +81,37 @@ pub struct SessionCompletion {
     state: Arc<CompletionArc>,
 }
 
+/// One coherent read-side observation of what the session currently
+/// knows about its episode — the F2 truthful read-side projection a
+/// headless `status` (and a future UI) consumes.
+///
+/// This is a projection, not an authority: it is a single-lock copy of
+/// committed session truth, produced read-only, and it can never write
+/// back (ADR-PBK-001 §2.3 projection rule; ADR-PBK-002 §17/D11). Its
+/// fields carry deliberately different truth classes — they are NOT
+/// equivalent "player state", and consumers must not relabel them:
+///
+/// - `outcome`: SEMANTIC FACT — the episode terminal outcome committed
+///   by the Playback Session authority (current realization: the
+///   resolver). `None` means only "no terminal outcome has been
+///   committed yet" (pending). It does NOT mean Playing, Starting,
+///   healthy, or audible.
+/// - `source_format`: MECHANISM EVIDENCE — the write-once activation
+///   readback of the opened endpoint's PCM format. Not source identity,
+///   not an activation-success proof, not playback state.
+/// - `activation_error`: DIAGNOSTIC — why this activation attempt
+///   raised, if it did. Not an episode terminal outcome: activation can
+///   fail before any episode exists.
+/// - `stop_requested`: COMMAND STATE — stop intent has been recorded.
+///   It is not a Stopping fact and implies nothing about the outcome.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SessionObservation {
+    pub outcome: Option<SessionOutcome>,
+    pub source_format: Option<qianqian_audio_api::ports::PcmFormat>,
+    pub activation_error: Option<String>,
+    pub stop_requested: bool,
+}
+
 struct CompletionArc {
     state: Mutex<CompletionState>,
     signal: Condvar,
@@ -218,6 +249,27 @@ impl SessionCompletion {
             .stop_target
             .as_ref()
             .map(|edge| edge.buffered_frames())
+    }
+
+    /// A coherent read-side observation of committed session truth
+    /// (single-lock copy; field truth classes: [`SessionObservation`]).
+    ///
+    /// Read-only by contract: unlike [`Self::try_resolve_now`] and
+    /// [`Self::wait`], this never resolves or commits the outcome — an
+    /// episode whose published evidence is decidable but not yet
+    /// committed by the authority still observes `outcome: None`
+    /// (pending). The copy is taken under the state lock and the lock
+    /// is released before returning, so formatting or printing the
+    /// result never holds a session mutex (F2 status/output safety
+    /// rule). Safe from any thread, any number of times.
+    pub fn observation(&self) -> SessionObservation {
+        let guard = self.state.state.lock().expect("completion lock");
+        SessionObservation {
+            outcome: guard.outcome.clone(),
+            source_format: guard.source_format,
+            activation_error: guard.activation_failure.clone(),
+            stop_requested: guard.stop_requested,
+        }
     }
 
     /// The session binds its data-plane edge as the stop target at
