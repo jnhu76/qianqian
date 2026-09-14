@@ -342,7 +342,9 @@ fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSession> {
     };
 
     // Tier 1: float32 EXTENSIBLE at the source rate/channels/mask.
-    let mut wfx: WAVEFORMATEXTENSIBLE = std::mem::zeroed();
+    // Win32 requires the extension struct zero-initialized before the
+    // fixed fields are filled in.
+    let mut wfx: WAVEFORMATEXTENSIBLE = unsafe { std::mem::zeroed() };
     wfx.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE_TAG;
     wfx.Format.nChannels = format.channels;
     wfx.Format.nSamplesPerSec = format.sample_rate;
@@ -418,7 +420,7 @@ fn steady_loop(
     let channels = usize::from(format.channels);
     loop {
         // Period cadence; the bounded wait is also the stop-latency bound.
-        unsafe { WaitForSingleObject(session.event, EVENT_TIMEOUT_MS) };
+        unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
         let padding = match unsafe { session.client.GetCurrentPadding() } {
             Ok(p) => p,
             Err(e) => break abort_msg(format!("GetCurrentPadding failed: {e}")),
@@ -468,7 +470,7 @@ fn drain_to_zero(session: &DeviceSession) -> LoopOutcome {
         if Instant::now() > deadline {
             return abort_msg("drain deadline passed before the device played out".to_owned());
         }
-        unsafe { WaitForSingleObject(session.event, EVENT_TIMEOUT_MS) };
+        unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
     }
 }
 
