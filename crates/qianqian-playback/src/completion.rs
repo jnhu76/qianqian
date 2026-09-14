@@ -13,8 +13,14 @@
 //! failure dominates everything (it is checked first and is not
 //! relabelled by stop intent); otherwise the drain verdict plus the
 //! worker's exit terminal decide, with recorded stop intent
-//! disambiguating an aborted drain between a user stop and a device
-//! failure.
+//! distinguishing an intent-bearing abort from a device failure
+//! (non-causal: the cause-loss case is the documented LIMITATION,
+//! ADR-PBK-002 §17/D11).
+//!
+//! Architecture role (ADR-PBK-002 §17/D11): the Playback Session is the
+//! designated semantic authority for one episode's terminal outcome.
+//! This type and its resolver are the current Rust realization of that
+//! role, not a frozen representation.
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
@@ -24,14 +30,27 @@ use qianqian_audio_api::ports::{DrainSignal, DrainVerdict};
 use crate::edge::{EdgeTerminal, PcmEdge};
 
 /// How one playback episode ended.
+///
+/// Variant propositions are the contract-level ones designated in
+/// ADR-PBK-002 §17/D11; the enum names are current realization.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SessionOutcome {
-    /// EOF was produced, drained and played out.
+    /// Decode EOF was produced, the output mechanism reported its drain
+    /// contract completed, and the session committed terminal completion.
+    /// This is contract-level truth only: it does not claim physical
+    /// audibility or that a listener heard the final sample.
     Completed,
-    /// The episode failed before completion. The stage names which leg
-    /// failed first ("decode: ..." or "device").
+    /// The episode is classified as a terminal failure. The stage names
+    /// the failure class selected by the resolver's semantic precedence
+    /// ("decode: ..." or "device") — not the chronologically first
+    /// failure: a decode failure dominates a device abort regardless of
+    /// which was observed first in wall-clock time.
     Failed { stage: String },
-    /// Stop was requested before completion.
+    /// At semantic resolution, the aborted episode had recorded stop
+    /// intent and no higher-precedence failure classification won.
+    /// Non-causal: this does not claim the stop caused the termination
+    /// (a device abort racing a recorded stop still resolves here; that
+    /// cause-loss is the documented LIMITATION, ADR-PBK-002 §17/D11).
     Stopped,
 }
 
@@ -188,8 +207,11 @@ impl SessionCompletion {
     /// stays public only because the integration tests that exercise it
     /// live outside the crate. It is diagnostic mechanism evidence only —
     /// NOT PlaybackState, NOT product semantic truth, NOT UI-facing
-    /// authority. F2 must explicitly re-admit or retire this seam; it
-    /// must not silently become a state contract by continued use.
+    /// authority. F2 ruling (F2-TRUTHFUL-READ-SIDE-IMPLEMENTATION-1,
+    /// per the #135 audit §8.1): NOT re-admitted into the product
+    /// read-side — it is absent from [`SessionObservation`] and from
+    /// headless `status`; it remains a test/verifier diagnostic seam and
+    /// must not become a state contract by continued use.
     pub fn buffered_frames(&self) -> Option<usize> {
         let guard = self.state.state.lock().expect("completion lock");
         guard
@@ -260,8 +282,10 @@ fn resolve(state: &mut CompletionState, drain: &DrainSignal) -> Option<SessionOu
     if state.outcome.is_some() {
         return state.outcome.clone();
     }
-    // Decode failure is authoritative over everything downstream: the
-    // failure was published before the edge was failed.
+    // Decode failure dominates by semantic precedence, not chronology:
+    // once a decode failure is published, even a device abort that was
+    // observed first in wall-clock time resolves Failed{decode}
+    // (ADR-PBK-002 §17/D11).
     if let Some(message) = &state.decode_failure {
         state.outcome = Some(SessionOutcome::Failed {
             stage: format!("decode: {message}"),
@@ -290,13 +314,17 @@ fn resolve(state: &mut CompletionState, drain: &DrainSignal) -> Option<SessionOu
                 // wakes the worker, so this always terminates.
                 None => {}
                 Some(EdgeTerminal::Stopped) => {
-                    // The worker terminal alone cannot distinguish "the
-                    // user stopped us" from "the render leg died and
-                    // stopped the data plane on its way out": both land
-                    // here with the identical Stopped terminal. Recorded
-                    // stop intent is the discriminator — request_stop
-                    // publishes intent before it releases the edge, so
-                    // any stop-caused Stopped necessarily observes it.
+                    // The worker terminal alone cannot distinguish a
+                    // stop-intent-bearing abort from a render-leg death
+                    // that stopped the data plane on its way out: both
+                    // land here with the identical Stopped terminal.
+                    // Recorded stop intent is the discriminator —
+                    // request_stop publishes intent before it releases
+                    // the edge, so an aborted episode whose stop intent
+                    // was recorded before resolution necessarily
+                    // observes it. The discrimination is non-causal: it
+                    // classifies the resolution, it does not claim the
+                    // stop caused the abort.
                     if state.stop_requested {
                         state.outcome = Some(SessionOutcome::Stopped);
                     } else {
