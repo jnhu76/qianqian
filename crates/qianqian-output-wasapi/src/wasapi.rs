@@ -17,9 +17,10 @@
 //! fails the open honestly (Tier-2 SRC fallback is OPEN-1, not faked).
 //!
 //! Safety: all Win32/COM calls sit in explicit `unsafe` blocks at their
-//! call sites; the private functions themselves are safe. Two RAII owners
+//! call sites; the private functions themselves are safe. Three RAII owners
 //! guarantee release on every exit path — panic included:
-//! [`ComApartment`] balances `CoInitializeEx` on the render thread, and
+//! [`ComApartment`] balances `CoInitializeEx` on the render thread,
+//! [`EventHandle`] closes the buffer event exactly once, and
 //! [`DeviceSession`]'s [`Drop`] runs the historical release order (Stop,
 //! render client, audio client, event handle) exactly once on that same
 //! thread.
@@ -270,10 +271,31 @@ impl Drop for ComApartment {
         }
     }
 }
+/// RAII owner of one kernel event HANDLE. `HANDLE` itself is a raw
+/// wrapper without `Drop`, so a plain `HANDLE` field releases nothing —
+/// the guard's `Drop` runs `CloseHandle` exactly once on every exit path:
+/// open failure, panic, stop, and normal release
+/// (NATIVE-BOUNDARY-AUDIT-0 A3.3 corrective).
+struct EventHandle(HANDLE);
+
+impl EventHandle {
+    fn raw(&self) -> HANDLE {
+        self.0
+    }
+}
+
+impl Drop for EventHandle {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CloseHandle(self.0);
+        }
+    }
+}
+
 struct DeviceSession {
     render: IAudioRenderClient,
     client: IAudioClient,
-    event: HANDLE,
+    event: EventHandle,
     buffer_frames: u32,
 }
 
@@ -283,7 +305,9 @@ impl Drop for DeviceSession {
             let _ = self.client.Stop();
         }
         // Fields drop in declaration order: render client, audio client,
-        // event handle — the required historical release order.
+        // event handle — the required historical release order. The COM
+        // pointers release through their own smart-pointer Drop; the
+        // event closes through EventHandle's Drop.
     }
 }
 
@@ -348,31 +372,21 @@ fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSession> {
         return fail(format!("stream initialize failed: {e}{hint}"));
     }
 
-    let event: HANDLE = match unsafe { CreateEventW(None, false, false, None) } {
-        Ok(h) => h,
+    let event = match unsafe { CreateEventW(None, false, false, None) } {
+        Ok(h) => EventHandle(h),
         Err(e) => return fail(format!("buffer event creation failed: {e}")),
     };
-    if let Err(e) = unsafe { client.SetEventHandle(event) } {
-        let _ = unsafe { CloseHandle(event) };
+    if let Err(e) = unsafe { client.SetEventHandle(event.raw()) } {
         return fail(format!("SetEventHandle failed: {e}"));
     }
     let buffer_frames = match unsafe { client.GetBufferSize() } {
         Ok(f) if f > 0 => f,
-        Ok(_) => {
-            let _ = unsafe { CloseHandle(event) };
-            return fail("device reported a zero-frame buffer".to_owned());
-        }
-        Err(e) => {
-            let _ = unsafe { CloseHandle(event) };
-            return fail(format!("GetBufferSize failed: {e}"));
-        }
+        Ok(_) => return fail("device reported a zero-frame buffer".to_owned()),
+        Err(e) => return fail(format!("GetBufferSize failed: {e}")),
     };
     let render: IAudioRenderClient = match unsafe { client.GetService() } {
         Ok(r) => r,
-        Err(e) => {
-            let _ = unsafe { CloseHandle(event) };
-            return fail(format!("render client acquire failed: {e}"));
-        }
+        Err(e) => return fail(format!("render client acquire failed: {e}")),
     };
 
     publish(OpenVerdict::Opened { format });

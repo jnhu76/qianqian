@@ -20,6 +20,12 @@ use qianqian_composition::{ActivationError, ComponentSpec};
 #[cfg(windows)]
 mod wasapi;
 
+/// The concrete Windows mechanism, exported for direct-mechanism tests
+/// and gates the same way the decode crate exports `SongcoreDecode`.
+/// Product consumers go through the capability, not this type.
+#[cfg(windows)]
+pub use wasapi::WasapiOutput;
+
 /// Build the platform's real output mechanism. On non-Windows this is the
 /// honest unsupported-platform report, surfaced as an activation failure.
 #[cfg(windows)]
