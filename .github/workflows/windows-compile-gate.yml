@@ -1,0 +1,32 @@
+name: Windows Compile Gate
+
+# Continuous compile coverage for the Windows-only surface
+# (qianqian-output-wasapi and every cfg(windows) module no Linux runner
+# ever sees). This is prevention for the NATIVE-BOUNDARY-AUDIT-0 W1
+# class: cfg(windows) syntax/type/import drift.
+#
+# Hosted Windows CI is NOT real-device WASAPI evidence: the runner has no
+# audio endpoint, so the WASAPI crate's runtime tests (which require a
+# real render endpoint) stay in the Windows-native gate
+# (specs/native-boundary-audit-0/REPORT.md). Only the device-free
+# playback/headless suites run here.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  windows-compile:
+    name: cfg(windows) compile + device-free tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Workspace check (all targets)
+        run: cargo check --workspace --all-targets
+
+      - name: Device-free test suites
+        run: cargo test -p qianqian-playback -p qianqian-headless

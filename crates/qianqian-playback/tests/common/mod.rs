@@ -113,12 +113,40 @@ impl DecodedPcmStream for TestDecodeStream {
 pub enum OutputBehavior {
     /// Consume the edge to EOF, then report Drained.
     Consume,
+    /// Consume with a sleep after every read: the producer genuinely
+    /// fills the bounded edge and blocks mid-write long before EOF.
+    SlowConsume { per_read: Duration },
     /// Fail at open (device open failure).
     FailOpen,
+    /// Consume `after_reads` blocks, then abort mid-stream — models a
+    /// real device failure/invalidation where the render loop exits on
+    /// its own, stops the data plane, and reports the drain aborted. No
+    /// stop was requested; this is how a genuine device abort reaches
+    /// the completion resolver.
+    AbortMidStream { after_reads: usize },
 }
 
 pub struct TestOutput {
     pub behavior: OutputBehavior,
+    /// Test-local mechanism evidence: how many reads returned frames.
+    /// A fast consumer keeps the bounded edge empty almost always, so
+    /// `buffered_frames == 0` alone cannot witness that the episode
+    /// really produced audio; this counter can.
+    pub consumed: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl TestOutput {
+    pub fn new(behavior: OutputBehavior) -> TestOutput {
+        Self::observed(behavior, Arc::new(std::sync::atomic::AtomicUsize::new(0)))
+    }
+
+    /// The caller keeps the consumption counter for witness purposes.
+    pub fn observed(
+        behavior: OutputBehavior,
+        consumed: Arc<std::sync::atomic::AtomicUsize>,
+    ) -> TestOutput {
+        TestOutput { behavior, consumed }
+    }
 }
 
 impl AudioOutput for TestOutput {
@@ -127,18 +155,26 @@ impl AudioOutput for TestOutput {
             OutputBehavior::FailOpen => Err(OutputError {
                 message: "test device open failure".to_owned(),
             }),
-            OutputBehavior::Consume => {
+            OutputBehavior::Consume
+            | OutputBehavior::SlowConsume { .. }
+            | OutputBehavior::AbortMidStream { .. } => {
+                let (pace, abort_after) = match self.behavior {
+                    OutputBehavior::SlowConsume { per_read } => (Some(per_read), None),
+                    OutputBehavior::AbortMidStream { after_reads } => (None, Some(after_reads)),
+                    _ => (None, None),
+                };
                 let RenderRequest {
                     input,
                     drain,
                     format: _,
                 } = request;
+                let consumed = self.consumed.clone();
                 let thread = std::thread::Builder::new()
                     .name("qianqian-test-render".into())
                     .spawn({
                         let input = input.clone();
                         move || {
-                            let verdict = consume_loop(input.clone());
+                            let verdict = consume_loop(input.clone(), pace, abort_after, &consumed);
                             if verdict == DrainVerdict::Aborted {
                                 // Mirror the real mechanism: a dead render
                                 // leg stops the data plane.
@@ -159,11 +195,30 @@ impl AudioOutput for TestOutput {
     }
 }
 
-fn consume_loop(input: Arc<dyn RenderPcmInput>) -> DrainVerdict {
+fn consume_loop(
+    input: Arc<dyn RenderPcmInput>,
+    pace: Option<Duration>,
+    abort_after: Option<usize>,
+    consumed: &std::sync::atomic::AtomicUsize,
+) -> DrainVerdict {
+    use std::sync::atomic::Ordering;
     let mut dst = vec![0.0f32; 256 * usize::from(TEST_FORMAT.channels)];
+    let mut reads = 0usize;
     loop {
+        if abort_after.is_some_and(|limit| reads >= limit) {
+            // Device died mid-stream: the render loop exits on its own.
+            // The caller mirrors the real mechanism by stopping the data
+            // plane before completing the drain.
+            return DrainVerdict::Aborted;
+        }
         match input.read_frames(&mut dst) {
-            PcmPull::Frames(_) => {}
+            PcmPull::Frames(n) => {
+                consumed.fetch_add(n, Ordering::SeqCst);
+                reads += 1;
+                if let Some(per_read) = pace {
+                    std::thread::sleep(per_read);
+                }
+            }
             PcmPull::Eof => return DrainVerdict::Drained,
             PcmPull::Stopped => return DrainVerdict::Aborted,
         }

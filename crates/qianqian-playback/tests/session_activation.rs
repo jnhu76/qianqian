@@ -11,10 +11,11 @@ use qianqian_app::QianqianApp;
 use qianqian_composition::{DesiredEntry, FiberState, Revision};
 use qianqian_playback::{SessionCompletion, SessionOutcome, playback_session_spec};
 
-use common::{
-    OutputBehavior, SourceBehavior, TEST_FORMAT, TestDecode, TestOutput, named_thread_gone_within,
-    within,
-};
+use common::{OutputBehavior, SourceBehavior, TEST_FORMAT, TestDecode, TestOutput, within};
+
+// Linux-only /proc leak-oracle helper; kept out of the Windows build.
+#[cfg(target_os = "linux")]
+use common::named_thread_gone_within;
 
 const DUMMY_PATH: &str = "test://sine";
 
@@ -74,7 +75,7 @@ fn registered_runtime(
             qianqian_composition::ComponentSpec::new("test_output_plugin")
                 .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
                 .on_activate(move |ctx| {
-                    let service = TestOutput { behavior };
+                    let service = TestOutput::new(behavior);
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
                         std::rc::Rc::new(service),
                     )

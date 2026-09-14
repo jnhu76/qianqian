@@ -17,9 +17,10 @@
 //! fails the open honestly (Tier-2 SRC fallback is OPEN-1, not faked).
 //!
 //! Safety: all Win32/COM calls sit in explicit `unsafe` blocks at their
-//! call sites; the private functions themselves are safe. Two RAII owners
+//! call sites; the private functions themselves are safe. Three RAII owners
 //! guarantee release on every exit path — panic included:
-//! [`ComApartment`] balances `CoInitializeEx` on the render thread, and
+//! [`ComApartment`] balances `CoInitializeEx` on the render thread,
+//! [`EventHandle`] closes the buffer event exactly once, and
 //! [`DeviceSession`]'s [`Drop`] runs the historical release order (Stop,
 //! render client, audio client, event handle) exactly once on that same
 //! thread.
@@ -103,24 +104,33 @@ impl AudioOutput for WasapiOutput {
             .wait_timeout_while(guard, OPEN_TIMEOUT, |v| v.is_none())
             .expect("open verdict wait poisoned");
 
+        // Every path that can join the render thread runs only after the
+        // verdict mutex is released: the render thread takes this same
+        // mutex to publish its verdict, so joining it while holding the
+        // lock deadlocks as soon as an open outlives the timeout and
+        // publishes late (a slow-but-eventually-successful device open).
         let verdict = { guard.take() };
-        match verdict {
-            Some(OpenVerdict::Opened { format }) => Ok(Box::new(WasapiStream {
+        let timed_out = wait.timed_out();
+        drop(guard);
+        match (verdict, timed_out) {
+            (Some(OpenVerdict::Opened { format }), _) => Ok(Box::new(WasapiStream {
                 render_input: request.input,
                 thread: Some(handle),
                 negotiated: format,
             })),
-            Some(OpenVerdict::Failed { message }) => {
+            (Some(OpenVerdict::Failed { message }), _) => {
                 abort_thread(handle, &request.input);
                 Err(OutputError { message })
             }
-            None if wait.timed_out() => {
+            (None, true) => {
                 abort_thread(handle, &request.input);
                 Err(OutputError {
                     message: "WASAPI device open did not reach a verdict in time".to_owned(),
                 })
             }
-            None => unreachable!("wait_timeout_while returned without a verdict or timeout"),
+            (None, false) => {
+                unreachable!("wait_timeout_while returned without a verdict or timeout")
+            }
         }
     }
 }
@@ -128,6 +138,10 @@ impl AudioOutput for WasapiOutput {
 /// Wake and join a render thread whose stream was never handed to the
 /// session (open failure / timeout). The thread observes the data-plane
 /// stop at its first read, or exits through its own failed verdict.
+///
+/// Callers must not hold the open-verdict mutex across this join: a
+/// render thread that is publishing its verdict needs that same mutex,
+/// so joining while holding it would wait forever.
 fn abort_thread(handle: JoinHandle<()>, render_input: &Arc<dyn RenderPcmInput>) {
     render_input.stop();
     let _ = handle.join();
@@ -227,7 +241,15 @@ fn open_and_run(
     slot: &OpenSlot,
 ) -> LoopOutcome {
     let coinit = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
-    let _apartment = ComApartment(coinit.is_ok());
+    // Fail closed at the boundary: without a successful CoInitializeEx
+    // (S_OK or S_FALSE) this thread has no COM apartment and the open
+    // must not proceed into COM calls. (NATIVE-BOUNDARY-AUDIT-0 A3.2.)
+    if coinit.is_err() {
+        return LoopOutcome::Aborted {
+            message: format!("CoInitializeEx failed: {coinit:?}"),
+        };
+    }
+    let _apartment = ComApartment(true);
     open_and_run_inner(format, render_input, slot)
 }
 
@@ -270,10 +292,31 @@ impl Drop for ComApartment {
         }
     }
 }
+/// RAII owner of one kernel event HANDLE. `HANDLE` itself is a raw
+/// wrapper without `Drop`, so a plain `HANDLE` field releases nothing —
+/// the guard's `Drop` runs `CloseHandle` exactly once on every exit path:
+/// open failure, panic, stop, and normal release
+/// (NATIVE-BOUNDARY-AUDIT-0 A3.3 corrective).
+struct EventHandle(HANDLE);
+
+impl EventHandle {
+    fn raw(&self) -> HANDLE {
+        self.0
+    }
+}
+
+impl Drop for EventHandle {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = CloseHandle(self.0);
+        }
+    }
+}
+
 struct DeviceSession {
     render: IAudioRenderClient,
     client: IAudioClient,
-    event: HANDLE,
+    event: EventHandle,
     buffer_frames: u32,
 }
 
@@ -283,7 +326,9 @@ impl Drop for DeviceSession {
             let _ = self.client.Stop();
         }
         // Fields drop in declaration order: render client, audio client,
-        // event handle — the required historical release order.
+        // event handle — the required historical release order. The COM
+        // pointers release through their own smart-pointer Drop; the
+        // event closes through EventHandle's Drop.
     }
 }
 
@@ -318,7 +363,9 @@ fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSession> {
     };
 
     // Tier 1: float32 EXTENSIBLE at the source rate/channels/mask.
-    let mut wfx: WAVEFORMATEXTENSIBLE = std::mem::zeroed();
+    // Win32 requires the extension struct zero-initialized before the
+    // fixed fields are filled in.
+    let mut wfx: WAVEFORMATEXTENSIBLE = unsafe { std::mem::zeroed() };
     wfx.Format.wFormatTag = WAVE_FORMAT_EXTENSIBLE_TAG;
     wfx.Format.nChannels = format.channels;
     wfx.Format.nSamplesPerSec = format.sample_rate;
@@ -348,31 +395,21 @@ fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSession> {
         return fail(format!("stream initialize failed: {e}{hint}"));
     }
 
-    let event: HANDLE = match unsafe { CreateEventW(None, false, false, None) } {
-        Ok(h) => h,
+    let event = match unsafe { CreateEventW(None, false, false, None) } {
+        Ok(h) => EventHandle(h),
         Err(e) => return fail(format!("buffer event creation failed: {e}")),
     };
-    if let Err(e) = unsafe { client.SetEventHandle(event) } {
-        let _ = unsafe { CloseHandle(event) };
+    if let Err(e) = unsafe { client.SetEventHandle(event.raw()) } {
         return fail(format!("SetEventHandle failed: {e}"));
     }
     let buffer_frames = match unsafe { client.GetBufferSize() } {
         Ok(f) if f > 0 => f,
-        Ok(_) => {
-            let _ = unsafe { CloseHandle(event) };
-            return fail("device reported a zero-frame buffer".to_owned());
-        }
-        Err(e) => {
-            let _ = unsafe { CloseHandle(event) };
-            return fail(format!("GetBufferSize failed: {e}"));
-        }
+        Ok(_) => return fail("device reported a zero-frame buffer".to_owned()),
+        Err(e) => return fail(format!("GetBufferSize failed: {e}")),
     };
     let render: IAudioRenderClient = match unsafe { client.GetService() } {
         Ok(r) => r,
-        Err(e) => {
-            let _ = unsafe { CloseHandle(event) };
-            return fail(format!("render client acquire failed: {e}"));
-        }
+        Err(e) => return fail(format!("render client acquire failed: {e}")),
     };
 
     publish(OpenVerdict::Opened { format });
@@ -404,7 +441,7 @@ fn steady_loop(
     let channels = usize::from(format.channels);
     loop {
         // Period cadence; the bounded wait is also the stop-latency bound.
-        unsafe { WaitForSingleObject(session.event, EVENT_TIMEOUT_MS) };
+        unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
         let padding = match unsafe { session.client.GetCurrentPadding() } {
             Ok(p) => p,
             Err(e) => break abort_msg(format!("GetCurrentPadding failed: {e}")),
@@ -454,7 +491,7 @@ fn drain_to_zero(session: &DeviceSession) -> LoopOutcome {
         if Instant::now() > deadline {
             return abort_msg("drain deadline passed before the device played out".to_owned());
         }
-        unsafe { WaitForSingleObject(session.event, EVENT_TIMEOUT_MS) };
+        unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
     }
 }
 

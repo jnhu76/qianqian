@@ -2,7 +2,9 @@
 //!
 //! The library target owns the product-facing CLI grammar so that parsing
 //! stays separable from the playback mechanism code the binary wires up.
-//! In Phase F0 the grammar is parse-only: recognizing an intent here is
-//! not control, and no playback semantics are attached to any command.
+//! Since F1 the binary wires one command: a `stop` line on stdin becomes
+//! a request through the session's application-facing seam
+//! (`SessionCompletion::request_stop`). Recognizing the other intents is
+//! still not control; they wait for their Phase-F slice.
 
 pub mod cli;
