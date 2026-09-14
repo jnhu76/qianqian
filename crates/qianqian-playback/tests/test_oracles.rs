@@ -6,7 +6,12 @@
 
 mod common;
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+// `Instant` is used only by the /proc-based controls below, which are
+// Linux-only; importing it unconditionally would warn on the Windows gate.
+#[cfg(target_os = "linux")]
+use std::time::Instant;
 
 use common::within;
 
