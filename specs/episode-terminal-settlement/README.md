@@ -75,7 +75,7 @@ class 保留 failed-decode / failed-device 细分（production `Failed.stage`
 | `completion.rs` 判决分支增删/改值 | Rust gate：oracle byte-compare 失败，直到表重生成 |
 | 手改 `CurrentDecisionTable.tla`（任何字节） | Rust gate（byte-compare）；投影可见的改值另被 Formal gate TLC run 击穿 |
 | 改 TLA `CurrentDecisionDecisive`/`CurrentDecisionVerdict` | Formal gate：`TableDecisiveMatchesContract` / `TableVerdictMatchesContract` 违反 |
-| 表有缺行/重复/畸形行 | Formal gate：`TableRowsWellFormed` / `RowFor` CHOOSE 失败（fail closed） |
+| 表有缺行/重复/畸形行 | Formal gate：`TableRowsWellFormed` **显式 bijection**（行数=域大小 ∧ 每行形状合法 ∧ 每个域 key 恰好一行）直接击穿——"48 行穷举、key 无缺无重"是模块自身的 theorem；`RowFor` 的 CHOOSE 只作查找（选择集非空且唯一已由不变式保证） |
 
 trigger（两侧闭环）：`crates/qianqian-playback/src/completion.rs` 加入
 Formal Semantic Gate；`specs/episode-terminal-settlement/CurrentDecisionTable.tla`
@@ -284,7 +284,7 @@ authority 的 semantic fact）。
 | --- | --- | --- |
 | `EpisodeTerminalSettlement.cfg` | 全部安全不变式 + `SettlementProgress` + `AuthorityIsSoleWriter`，`SPECIFICATION SpecSettlementFairness`（WF_vars(AuthoritySettle)） | PASS |
 | `EpisodeTerminalSettlementSafetyOnly.cfg` | 全部安全不变式 + `AuthorityIsSoleWriter`（`SettlementProgress` 不在此 run——它是进度性质，需要 WF），`SPECIFICATION Spec`（无 fairness） | PASS（safety——含 S3——与进度假设解耦；S3 在无 fairness 的行为超集上成立，带 WF 时 a fortiori） |
-| `EpisodeTerminalSettlementTable.cfg` | refinement oracle：`DecisionDomain` 全部 48 元组为初始状态，逐行比对 `CurrentDecisionTable`（production 冻结表）↔ `CurrentDecisionDecisive`/`CurrentDecisionVerdict` + 行完整性 | PASS（CORRECTIVE-2；production 侧绑定由 Rust oracle run 承担） |
+| `EpisodeTerminalSettlementTable.cfg` | refinement oracle：`DecisionDomain` 全部 48 元组为初始状态，逐行比对 `CurrentDecisionTable`（production 冻结表）↔ `CurrentDecisionDecisive`/`CurrentDecisionVerdict` + 行完整性（含显式 key bijection） | PASS（CORRECTIVE-2；production 侧绑定由 Rust oracle run 承担） |
 
 Rust oracle run（Verification Rust Gate 内执行，不在本 check.sh）：
 `cargo test -p qianqian-playback --test completion_decision_table` ——

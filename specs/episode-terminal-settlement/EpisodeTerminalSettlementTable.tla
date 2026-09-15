@@ -59,16 +59,25 @@ OutcomeClassOf(cls) ==
     ELSE IF cls = "stopped" THEN "Stopped"
     ELSE "Failed"
 
-\* 行完整性：行数 = 域大小（重复行在 TLA 集合语义下自动去重，会表现为
-\* 行数不足而在此被抓），每行形状合法。某域元组无行则由 RowFor 的
-\* CHOOSE 失败暴露（TLC error，fail closed）。
+\* 行 key（前四元组）：DecisionDomain 的一个证据元组。
+RowKey(r) == <<r[1], r[2], r[3], r[4]>>
+
+\* 行完整性 + **显式 bijection**：行数 = 域大小、每行形状合法、且
+\* **每个域 key 恰好一行**。"48 行穷举、key 无缺无重"因此是本模块自身
+\* 的明确 theorem，不依赖 RowFor 无解 CHOOSE 的运行时行为兜底
+\* （key 重复两行不同 class、或 key 缺失而行数仍凑够，都被
+\* Cardinality 子句直接击穿）。
 TableRowsWellFormed ==
     /\ Cardinality(DecisionTableRows) = Cardinality(DecisionDomain)
     /\ \A r \in DecisionTableRows :
-        /\ <<r[1], r[2], r[3], r[4]>> \in DecisionDomain
+        /\ RowKey(r) \in DecisionDomain
         /\ r[5] \in DecisionClasses
+    /\ \A t \in DecisionDomain :
+        Cardinality({r \in DecisionTableRows : RowKey(r) = t}) = 1
 
-RowFor(t) == CHOOSE r \in DecisionTableRows : <<r[1], r[2], r[3], r[4]>> = t
+\* key → 行查找。上面的 bijection 子句保证选择集非空且唯一，
+\* CHOOSE 在此只是查找，不承担完整性检测。
+RowFor(t) == CHOOSE r \in DecisionTableRows : RowKey(r) = t
 
 \* 穷举枚举器：48 个初始状态、其后纯 stutter。不变式在每个初始状态上
 \* 逐行比对（对全部域元组完整覆盖）。EXTENDS 继承主模块声明的全部

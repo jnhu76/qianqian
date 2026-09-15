@@ -354,15 +354,17 @@ MAJOR，已修正）：
            DecisionDomain 全部 48 元组为初始状态（穷举枚举器），
            TableDecisiveMatchesContract（decisive 域逐行一致）+
            TableVerdictMatchesContract（判决值逐行一致）+
-           TableRowsWellFormed（行数=域大小、形状合法、缺行由 RowFor
-           CHOOSE 失败暴露）。Formal Semantic Gate 执行。
+           TableRowsWellFormed（行数=域大小 ∧ 每行形状合法 ∧ **每个域
+           key 恰好一行**——显式 bijection，"48 行穷举、key 无缺无重"
+           是模块自身的 theorem，不依赖无解 CHOOSE 的运行时行为兜底；
+           review follow-up MINOR 采纳）。Formal Semantic Gate 执行。
         4. trigger 闭环：crates/qianqian-playback/src/completion.rs 加入
            formal-semantic-gate；CurrentDecisionTable.tla 加入
            verification-rust-gate（手改表也会重跑 Rust oracle）。
         5. 主模型 EpisodeTerminalSettlement.tla 语义零改动（表模块仅
            EXTENDS 复用 CurrentDecisionDecisive/CurrentDecisionVerdict）。
 
-    oracle 负控制（三条漂移路径逐条实际注入验证，非声称）：
+    oracle 负控制（漂移路径逐条实际注入验证，非声称）：
         - TLA 侧漂移：删 CurrentDecisionDecisive 的
           (Aborted ∧ wt≠None) 支 → TableDecisiveMatchesContract
           立即违反（Eof+Aborted 行）。
@@ -371,6 +373,16 @@ MAJOR，已修正）：
         - 表侧漂移（TLC 投影不可见）：failed-device→failed-decode
           （两者都投影为 "Failed"）→ TLC 不响，Rust byte-compare
           FAILED（这正是 artifact 单侧绑定不够、双侧绑定必要的原因）。
+        - bijection 破坏（review follow-up 场景）：key A 两行不同
+          class + key B 缺行、总行数仍 48 → TableRowsWellFormed
+          直接 FALSE（显式 invariant 击穿，非 CHOOSE 运行时错误）。
+
+    corrective-2 follow-up（第三轮 review，对 93e9e2a）：
+        verdict: 不挡 merge，1 MINOR（oracle hygiene）——
+        "每个域 key 恰好一行"的 bijection 未写成显式 invariant，
+        完整性依赖 RowFor 无解 CHOOSE 的执行行为。已采纳收紧：
+        TableRowsWellFormed 增加 Cardinality-per-key = 1 子句
+        （负控制场景实跑验证，见上）。全套 26 条 TLC run 重跑通过。
 
     corrective rerun: 全套 26 条 TLC run（2 base + 1 table refinement +
         10 mutation + 5 overclaim + 1 fairness 承重 + 7 witness）——
