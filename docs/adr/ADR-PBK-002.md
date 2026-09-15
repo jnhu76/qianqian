@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139) |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141) |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -58,6 +58,7 @@ ADR-PBK-002
     Plugin admission invariant (D13)
     first earned static playback composition boundaries
     D11 episode terminal-outcome authority designation
+    D14 current Phase-F playback semantic execution guard
 
 composition-kernel-0-design.md
     generic K0 semantic contract
@@ -392,16 +393,16 @@ allocation / implementation ownership
 
 ```text
 track lifetime
-seek lifetime
-open/replacement mechanism
-next-track lifetime
+seek lifetime beyond D14's current same-episode contract
+advanced open/replacement mechanisms beyond D14's sequential v1 contract
+next-track overlap/preload lifetime
 preload lifetime
 gapless lifetime
 multi-session topology
-session construction/config representation
+session construction/config representation beyond D14's current Phase-F seam
 ```
 
-特别是：当前 `ComponentSpec` 捕获 file/completion 的实现不自动成为未来 `open` 的 contract；Open 需要在其 phase 重新挣得最小 replacement/config mechanism。
+特别是：当前 `ComponentSpec` 捕获 file/completion 的实现不自动成为未来 `open` 的永久 contract；D14 只冻结 Phase-F 当前最小 sequential replacement shape，任何 overlap/preload/gapless 仍需重新挣得最小 mechanism。
 
 ---
 
@@ -494,30 +495,32 @@ VolumePlugin
 9. introduce generic ToHost / FromHost / global EventBus as universal seam；
 10. infer realtime execution topology directly from composition topology；
 11. create a second architecture `Kernel` noun for PCM/realtime work；
-12. let any mechanism provider, the App, or K0 establish episode terminal outcome outside D11；
+12. let any mechanism provider, the App, K0, observer, projection, or external waiter establish episode terminal outcome outside D11；
 13. broaden K0 Effect/kernel data to encode decoder/render/PCM domain internals merely because their owner is a Plugin；
-14. admit a candidate as a Plugin when an existing Plugin can own it without losing composition correctness, lifecycle/dependency ordering, or independent replacement/withdrawal semantics（D13）。
+14. admit a candidate as a Plugin when an existing Plugin can own it without losing composition correctness, lifecycle/dependency ordering, or independent replacement/withdrawal semantics（D13）；
+15. add a second playback lifecycle (`Dead` / `Reclaimed` / `Retiring` / generation state machine, etc.) when Fiber lifecycle + D11 terminal Fact + ordinary resource ownership already express the requirement；
+16. treat an `OPEN` Phase-F semantic/mechanism decision as coding-agent freedom rather than an authority gap（D14）。
 
 ---
 
 ## 14. Open decisions
 
 ```text
-pause/resume semantics and minimal execution-control mechanism
+pause/resume semantic commit point and minimal output-control mechanism
 position / duration authority
-seek semantics and whether old/new RT worlds actually overlap
-open/session replacement/config mechanism
+seek physical-output cutover mechanism beyond D14's frozen stale-PCM invariant
+open/session replacement mechanisms beyond D14's sequential v1 contract
 playlist / queue authority and whether it earns PlaylistPlugin
-next / previous semantics
+next / previous navigation policy beyond D14's sequential replacement execution shape
 volume authority / mechanism
-device switch
+device switch authority / replacement mechanism
 format switch
 Processing Plugin
 SRC fallback
 UI adapter Plugin membership
-PlaybackControl
+PlaybackControl publication/topology beyond D14's episode handle seam
 PlaybackFacts publication/topology
-    (episode terminal outcome authority: DESIGNATED — §17 D11;
+    (episode terminal outcome authority + commit ownership: DESIGNATED — §17 D11;
      all other playback fact kinds/publication topology remain OPEN)
 multi-session topology
 preload / gapless
@@ -527,7 +530,9 @@ P1–P5 concrete production mechanism
 
 Reduction rule for all future phases:
 
-> **Try the current Plugin/Fiber + owned-resource model first. Add Window/Generation/new runtime state only after a concrete counterexample proves the simpler model cannot preserve correctness.**
+> **Try the current Plugin/Fiber + owned-resource model first. Try ordinary ownership/RAII/join and a local operation invariant before adding any architecture noun. Add Window/Generation/new runtime state only after a concrete counterexample proves the simpler model cannot preserve correctness. Explanatory vocabulary is not architecture vocabulary.**
+
+`AGENTS.md` owns the repository-wide abstraction-earning review procedure; this ADR owns only the Qianqian playback decisions below.
 
 ---
 
@@ -592,13 +597,15 @@ Playback Session component (pre-corrective prose)
 
 历史文档描述历史事实时可以保留旧 noun；current authority/current projections 使用本表。不要为了 grep-clean 改写历史 provenance。
 
-ADR-PBK-002 is authoritative for current vocabulary, Plugin/Fiber taxonomy, the Plugin admission invariant (D13), earned static playback composition, and D11 terminal-outcome authority designation.
+ADR-PBK-002 is authoritative for current vocabulary, Plugin/Fiber taxonomy, the Plugin admission invariant (D13), earned static playback composition, D11 terminal-outcome authority/settlement contract, and D14 Phase-F semantic execution guard.
 
 ---
 
 ## 17. D11 — Episode terminal outcome semantic authority
 
 > 2026-09-14 amendment (F2-TERMINAL-OUTCOME-AUTHORITY-ADR-1; evidence report: PR #135; roadmap: Issue #119)。
+>
+> 2026-09-15 settlement corrective: formal campaign PR #142 proved the previous text underspecified **who/when triggers semantic commit**. This amendment resolves that authority gap without importing the verifier's A/B/B′ representation as production taxonomy.
 >
 > D12 taxonomy corrective does not change this fact contract. It changes only the **current composition realization** of the designated semantic role.
 
@@ -611,7 +618,9 @@ fact kind:            episode terminal outcome
 subject scope:        one playback episode
 authority role:       Playback Session semantic role for one playback episode
 current variants:     Completed / Stopped / Failed
-current realization:  SessionCompletion / resolver (replaceable Rust detail)
+current realization:  SessionCompletion / resolver (replaceable Rust detail;
+                      current consumer-triggered commit path is a known
+                      production differential to be corrected by F2)
 current composition:  episode-scoped Playback Session Plugin / Fiber (D1/D6)
 ```
 
@@ -628,6 +637,52 @@ current composition realization:
 
 未来 topology 改变（如 multi-session siblings、其它 composition realization）不因此修订本 fact contract，只要每个 playback episode 在同一时刻保持恰好一个 designated terminal-outcome authority。
 
+### Terminal settlement ownership
+
+D11 现在同时冻结 **decision ownership** 与 **commit-progress ownership**：
+
+```text
+mechanism evidence arrives
+        ↓
+Playback Session semantic authority evaluates the terminal contract
+        ↓
+Playback Session semantic authority commits exactly one terminal outcome
+        ↓
+external wait/read observes the committed truth
+```
+
+对于一个已成功激活的 episode：
+
+> **Once the terminal evidence set becomes decisive under the current terminal decision contract, the Playback Session semantic role MUST settle the terminal Fact on its own execution/teardown path. No external observer, projection, status query, `wait()`, or other consumer call may be required to create that Fact.**
+
+> **Playback Session domain teardown MUST NOT report its episode work quiesced/discharged while decisive terminal evidence exists and the terminal outcome is still uncommitted.**
+
+这不是“每个 episode 最终都会结束”的一般 liveness 承诺：decoder/device 可以永久不产生 terminal evidence。它只裁决 **证据已经足够以后，Fact 由谁负责落锤**。
+
+Read-side / wait-side contract：
+
+```text
+observation/read:
+    pure visibility only
+    MUST NOT resolve or commit
+
+wait-for-terminal:
+    waits for authority-owned settlement
+    MUST NOT be the semantic writer or the trigger required for settlement
+```
+
+具体 production mechanism 仍可由同步调用、session-owned control flow、callback/notification、teardown settlement point 等最小实现实现；D11 不要求独立 resolver thread，也不要求把 commit 与 evidence publication 合并成一个通用 runtime primitive。
+
+### Decision-time stability / late command rule
+
+Terminal classification 不能由一个任意晚到的 consumer 调用时刻重解释已经决定性的 mechanism history。
+
+> **A command arriving after the terminal evidence set has already become decisive MUST NOT relabel the outcome selected from that decisive evidence.**
+
+因此 `Stopped` 的 stop intent 必须在**不晚于 terminal evidence 首次足以判决该 episode 的时刻**已经被 Playback Session authority 记录。之后才到达的 stop intent 可以作为 command history/diagnostic 存在，但不得把已经决定性的 `Failed` / `Completed` 改写成 `Stopped`。
+
+这条冻结的是 semantic classification boundary，不要求 production 新建 `Terminalization`, `Generation`, `Dead`, `Retiring` 等状态或类型；最小实现可以在最后一块决定性 evidence 到达时立即 settlement，或保存足以防止 late-command 重解释的最小 session-owned state。
+
 ### Current realization（非 normative）
 
 ```text
@@ -637,13 +692,16 @@ production code:  crates/qianqian-playback/src/completion.rs
                   stop_requested 并 memoize 一个 terminal outcome）
                   crates/qianqian-playback/src/session.rs（episode lifecycle）
 
-resolver 精确 precedence：保留在 evidence report PR #135 Appendix A，本文不冻结。
-（Archive note 2026-09-15：该报告已随 post-#139 spec reset 从 main 移除，
-仅存于 Git 历史与 originating PR 记录。D11 的语义命题仍以本 ADR 为
-normative 真相；`completion.rs` 的 seam 文档与 resolve() 实现承载的是
-当前 production realization / executable evidence，不是 architecture
-authority。）
-若改变 precedence 会改变上述外部语义命题本身，需回到 authority review。
+known differential after PR #142 formal campaign:
+    wait() / try_resolve_now() currently call resolve() and can therefore
+    be required to create terminalOutcome. That consumer-triggered settlement
+    is no longer the target contract after this amendment; F2 must move
+    commit progress back under Playback Session-owned execution/teardown.
+
+resolver 精确 precedence：保留在 production code / formal campaign evidence；
+本文只冻结对外 terminal propositions、single-writer/immutability、settlement ownership
+和 late-command stability。若改变 precedence 会改变这些外部语义命题本身，需回到
+authority review。
 ```
 
 本块明确标注 CURRENT REALIZATION：不是 frozen representation，不代表任何永久承诺。
@@ -659,10 +717,11 @@ Completed:
     No physical-audibility claim is made.
 
 Stopped:
-    at terminal semantic resolution, the aborted episode had recorded
-    stop intent and no higher-precedence failure classification won.
+    when the terminal evidence first became decisive, the episode had already
+    recorded stop intent and no higher-precedence failure classification won.
 
     This is non-causal: it does not claim the user's stop caused the abort.
+    A later stop command cannot relabel already-decisive failure/completion.
 
 Failed:
     the episode is classified as terminal failure according to the
@@ -672,7 +731,7 @@ Failed:
     first-failure; diagnostic stage text is not frozen.
 ```
 
-一个 playback episode 至多有一个 terminal outcome；一旦 commit 即不可改写。这是 cardinality/immutability contract，不是 liveness 承诺。
+一个 playback episode 至多有一个 terminal outcome；一旦 commit 即不可改写。这是 cardinality/immutability contract，不是一般 episode-liveness 承诺。
 
 ### Mechanism evidence firewall
 
@@ -686,21 +745,24 @@ Playback Session semantic decision
 terminal outcome semantic commit
 ```
 
-Decode Plugin / Output Plugin / PcmEdge / K0 都不是该 fact 的 designated authority。Exact resolver precedence remains current realization; any change that changes the external propositions returns to authority review.
+Decode Plugin / Output Plugin / PcmEdge / K0 都不是该 fact 的 designated authority。Evidence producers do not gain terminal authority merely because their publication makes the decision decisive.
 
 ### App / K0 / projection firewall
 
 Qianqian App 不是 playback semantic authority；K0 lifecycle facts 不是 playback terminal facts；projection/read-side remains non-authoritative per PBK-001 §2.3。
 
-`source_format` / `activation_failure` remain mechanism observations/diagnostics, not this fact authority。
+`source_format` / `activation_failure` remain mechanism observations/diagnostics, not this fact authority。Activation failure before a live playback episode exists does not get upgraded into D11 `Failed` merely for status convenience.
 
 ### Still OPEN
 
 ```text
 Playing / Starting / Paused / Stopping semantics
 position / duration authority
-seek / source identity / playlist / next / previous / volume / device switch
-PlaybackControl / PlaybackFacts publication topology / PlaybackSnapshot
+seek product-state vocabulary / actual-landing authority beyond D14 minimum
+source identity / playlist authority / navigation policy
+volume / device-switch authority
+PlaybackFacts publication topology beyond D14 read seam
+PlaybackSnapshot
 EpisodeId / Generation / Window
 multi-session / preload / gapless
 Realtime Audio Runtime representation
@@ -722,7 +784,7 @@ Playback Session = Component, not Plugin
 not every Fiber belongs to a Plugin
 ```
 
-Current production reality instead shows Decode, Output and Playback Session all enter K0 through the same `ComponentSpec` substrate and run as Fibers. Playback Session already has independent desired identity/lifecycle, requires capabilities, owns episode-scoped resources/relations, and supplies the D11 semantic authority role.
+Current production reality instead shows Decode, Output and Playback Session all enter K0 through the same `ComponentSpec` substrate and run as Fibers. Playback Session already has independent desired identity/lifecycle, requires capabilities, owns episode-scoped resources/relations, and supplies the D11 semantic authority role。
 
 The old distinction therefore encoded an unnecessary architecture taxonomy rather than a runtime invariant.
 
@@ -757,9 +819,11 @@ existing Plugin/Fiber lifecycle
 existing Capability/Service seams
 Plugin-owned domain resources
 small orthogonal semantic facts/control state
+ordinary Rust ownership / RAII / join
+local operation invariants
 ```
 
-Only a concrete counterexample may earn additional runtime concepts such as Window, Generation, extra Plugin boundaries, or a Realtime Audio Runtime mechanism.
+Only a concrete counterexample may earn additional runtime concepts such as Window, Generation, extra Plugin boundaries, or a Realtime Audio Runtime mechanism. Explanatory words used during analysis do not automatically become architecture nouns.
 
 ---
 
@@ -834,7 +898,9 @@ MetadataRead      NO            NO             YES               NO        provi
 Operation                                                                读操作
 TrackOpen         NO            NO             YES               NO        open 的
 Operation                                                                 representation
-                                                                          仍 OPEN（D6）
+                                                                          仍受 D14
+                                                                          sequential-v1
+                                                                          约束
 PcmEdge           NO            NO             YES               NO        payload 路径
                                                                                 资源（D8）
 worker thread     NO            NO             YES               NO        owned effect
@@ -851,3 +917,284 @@ Output Plugin     YES           YES            NO                YES       mecha
 ### Review procedure
 
 新的 Plugin boundary 提案必须按本节 invariant 逐条回答（AGENTS.md 的 questionnaire 是本节的 review prompt）；任何一条不成立即驳回为 owned resource/effect。把 operation-shaped / payload-shaped / convenience-shaped 候选注册进 K0 而不通过本节论证，构成 §13#14 的 forbidden regression。
+
+---
+
+## 20. D14 — Phase-F minimal playback semantic execution guard
+
+> 2026-09-15 amendment. Inputs: Issue #141 post-#139/post-#140 reality audit, PR #142 terminal-commit formal evidence, current production code, and D11 settlement corrective above.
+>
+> Purpose: remove coding-agent discretion from Phase-F semantic boundaries **without** inventing a second playback lifecycle or a generic playback runtime. This section freezes the smallest implementation shape that current evidence has earned and explicitly blocks everything else.
+
+### D14.1 Current model: no second playback lifecycle
+
+The current implementation model remains exactly:
+
+```text
+Qianqian App / application host
+        ↓ desired composition
+K0
+        ↓
+Playback Session Plugin / Fiber
+        ↓ owns
+session semantics + decoder endpoint + worker + PcmEdge + render relation
+```
+
+Do not add `PlaybackStateMachine`, `Dead`, `Retiring`, `Reclaimed`, `DataPlaneAuthority`, `TimelineSegment`, `Generation`, `Window`, global current-playback store, or another runtime layer merely to explain lifetime. Current responsibilities are already split by existing mechanisms:
+
+```text
+K0 Fiber lifecycle         = whether the Plugin instance exists
+D11 terminal Fact          = how the episode semantically ended
+Rust ownership/effects     = when owned resources are stopped/joined/dropped
+operation invariant        = any extra correctness rule local to Seek/Open/etc.
+```
+
+A new noun requires AGENTS.md abstraction-earning evidence.
+
+### D14.2 Episode-scoped control/read seam — current Phase-F implementation choice
+
+F2 SHALL introduce one thin, episode-scoped domain handle in `qianqian-playback`. Current Rust working names are frozen for this implementation slice unless a review shows a concrete naming/type conflict:
+
+```text
+PlaybackSessionHandle
+PlaybackSessionObservation
+EpisodeTerminalOutcome
+```
+
+This handle is:
+
+```text
+NOT a Plugin
+NOT a Capability
+NOT a K0 primitive
+NOT a global current-playback store
+NOT a second lifecycle owner
+```
+
+The application host/bootstrap may retain the handle **alongside** `QianqianApp`; `QianqianApp` itself must not become the playback semantic owner or store/derive playback truth.
+
+Required current surface:
+
+```text
+PlaybackSessionHandle::request_stop()
+    Command only; idempotent/monotone intent.
+
+PlaybackSessionHandle::observation()
+    pure read; no resolve/commit/lifecycle side effect.
+
+PlaybackSessionHandle::wait_terminal()   (exact spelling may stay `wait` if review prefers)
+    pure blocking wait for authority-owned committed terminal Fact;
+    it MUST NOT run the semantic resolver or be required for commit progress.
+```
+
+`PlaybackSessionObservation` SHALL keep truth classes explicit:
+
+```text
+terminal_outcome: Option<EpisodeTerminalOutcome>
+    Fact / pending absence only
+
+stop_requested: bool
+    Command state
+
+source_format: Option<PcmFormat>
+    mechanism evidence, explicitly labeled as such
+
+activation_error: Option<...>
+    diagnostic, not D11 Failed
+```
+
+`EpisodeTerminalOutcome` SHALL expose only the stable semantic variants:
+
+```text
+Completed
+Stopped
+Failed
+```
+
+Current resolver stage/message strings remain diagnostics and MUST NOT be frozen into the semantic terminal enum. A failure diagnostic may be exposed separately if F2 status needs it; prose/message text is not a stable semantic contract.
+
+Product status MUST NOT infer playback truth from:
+
+```text
+FiberState
+PcmEdge::buffered_frames
+logs
+WASAPI state
+Decode endpoint state
+```
+
+`None` terminal outcome means only “no terminal Fact committed yet”; it is not `Playing`, `Starting`, `Paused`, or any fourth outcome.
+
+### D14.3 Terminal settlement implementation target
+
+Current `SessionCompletion` / resolver remains a replaceable internal realization. F2 SHALL move consumer-visible access behind the handle and SHALL make publisher/resolver mutation surfaces crate-private or otherwise unreachable from ordinary application consumers.
+
+The target execution shape is **authority-owned structured settlement**:
+
+```text
+mechanism evidence producers
+    publish only their evidence
+        ↓
+Playback Session-owned execution/teardown path
+    evaluates D11 and commits exactly one terminal Fact
+        ↓
+observation / wait consume that Fact
+```
+
+Do not create an independent resolver Plugin, global fact bus, resolver thread, or K0 primitive merely to satisfy this shape. Use the smallest session-owned control flow that makes D11 true.
+
+Verification-only needs MUST NOT leak mechanism fields back into the product seam. Existing race/precedence tests may move to crate-private unit tests or an explicit test-only support seam; `buffered_frames`, fake `decode_failed`, fake `worker_exited`, etc. do not become product status because tests need them.
+
+### D14.4 Stop — frozen current semantics
+
+`request_stop()` is a Command, not a Fact.
+
+For an active episode:
+
+```text
+request_stop
+    ↓ recorded stop intent
+Playback Session-owned mechanism stops its owned work
+    ↓ worker/output evidence
+D11 settlement
+    ↓
+Stopped iff stop intent was already recorded by the decisive-evidence boundary
+and no higher-precedence failure wins
+```
+
+Rules:
+
+- late stop after a committed or already-decisive `Completed`/`Failed` cannot relabel it；
+- repeated stop is idempotent for terminal truth；
+- current F1 stop-before-full-open behavior remains supported for a live activation path；
+- activation failure remains diagnostic and is not upgraded into D11 `Failed` merely because a stop was also requested；
+- no `Stopping` Fact/state is earned yet。
+
+### D14.5 Seek — same episode, local discontinuity invariant
+
+Current Phase-F Seek MUST remain an operation owned by the existing Playback Session Plugin. It does not create a new Plugin/Fiber and does not earn `Generation`, `TimelineSegment`, `Window`, or a second lifecycle.
+
+Minimal semantic contract:
+
+> **After seek cutover commits, PCM belonging to the pre-seek timeline must not later become post-seek audible output.**
+
+Any implementation must account for every currently known stale-PCM reservoir:
+
+```text
+decode worker local staging
+PcmEdge buffered PCM
+already-submitted output/device buffer
+```
+
+The minimum protocol remains:
+
+```text
+serialize seek at the decode worker
+    ↓
+discard old worker-local staging
+    ↓
+reposition decoder
+    ↓
+invalidate/flush old PcmEdge content without violating terminal monotonicity
+    ↓
+perform/prove physical output cutover so old submitted PCM cannot reappear
+    ↓
+acknowledge actual landing / resume new PCM
+```
+
+`seek command accepted`, `decoder repositioned`, `old PCM invalidated`, `physical output cutover`, and `actual landing` are not to be collapsed into one vague success bit if the implementation exposes them internally.
+
+**The physical output cutover mechanism is still OPEN.** F5 production implementation must stop at that gap until a narrow mechanism decision proves one of the existing-output reset/reopen/minimal-cutover choices. A coding agent may not invent `Generation`, a generic cache protocol, or a new runtime to bypass this gate.
+
+### D14.6 Open / Next / Previous — sequential replacement v1
+
+The current Phase-F v1 replacement strategy is deliberately simple and gap-tolerant:
+
+```text
+old Playback Session episode
+    ↓ request intentional stop if it is still live
+    ↓ wait for D11 authority-owned settlement + episode teardown
+    ↓ remove/replace old desired Playback Session
+    ↓ create/mount a fresh Playback Session episode with new source config
+new episode
+```
+
+This freezes **sequential replacement only** for the first working Open/Next/Previous slice. It explicitly forbids introducing overlap/preload/gapless machinery in that slice.
+
+Consequences:
+
+- Open creates a new playback episode; it is not Seek。
+- Next/Previous are navigation/selection decisions followed by the same Open replacement shape; they are not new K0 primitives or new data-plane protocols。
+- A small audible gap is acceptable in v1。
+- No old/new episode realtime overlap is required, so `Generation`/`Window`/Realtime Audio Runtime is not earned by Open/Next/Previous v1。
+- The retired old episode keeps its already-committed terminal truth; replacement cannot relabel it。
+- If intentional replacement stop was recorded before that episode's terminal evidence became decisive and no higher-precedence failure wins, the existing `Stopped` terminal variant is sufficient. Do **not** invent `Superseded` / `Preempted` as a new terminal Fact for v1. Replacement cause may remain diagnostic/control context if needed。
+
+Playlist/queue selection authority remains OPEN. The first headless Open/Next/Previous slice may use only the selection source explicitly authorized by its issue/task; it must not create a global playlist authority to make the command convenient.
+
+### D14.7 Pause / Resume — semantic direction fixed, implementation still blocked
+
+Pause/Resume, when earned, is **same-episode, non-terminal control**. It must not create a new Playback Session Fiber and must not settle D11 terminal outcome merely because playback is paused.
+
+However the semantic commit point for `Paused` and the minimum output/data-plane mechanism are still OPEN. Therefore:
+
+```text
+F3 may prototype or audit the mechanism,
+but a coding agent MUST NOT publish a Paused Fact/state
+or choose a pause mechanism as architecture
+until a narrow authority decision freezes when pause is truthfully established.
+```
+
+No inference from worker blocking, PcmEdge occupancy, FiberState, or UI button state is allowed.
+
+### D14.8 Position / Duration — not yet a product Fact
+
+F4 MUST NOT infer product position/duration from buffer occupancy, K0 lifecycle, or arbitrary decoder/output counters. Mechanism counters may exist as diagnostics/evidence, but product `Position`/`Duration` authority remains OPEN until a narrow authority decision defines the proposition and writer.
+
+No `PlaybackSnapshot` or global state store may be introduced merely to make F4 convenient.
+
+### D14.9 Volume / Device switch — no generic state invention
+
+F7/F8 remain bounded by their current roadmap goals, but their authority/mechanism is not frozen here. A coding agent must not choose between session-owned control, output-provider control, episode replacement, stream replacement, or a generic control bus without a narrow authority/mechanism decision.
+
+What is already forbidden:
+
+```text
+no K0 playback state
+no global mutable control store
+no per-quantum plugin dispatch
+no generic EventBus as control plane
+no new Plugin merely named Volume/DeviceSwitch
+```
+
+### D14.10 What Flash/coding agents may and may not decide
+
+A coding agent MAY choose:
+
+```text
+private helper names
+private struct layout
+lock vs equivalent local synchronization when semantics are unchanged
+ordinary error plumbing
+test organization
+small local refactors needed to realize the frozen contract
+```
+
+A coding agent MUST STOP and report an authority gap before choosing:
+
+```text
+new semantic state or terminal variant
+new fact authority
+new Plugin / Capability / K0 primitive
+new lifetime taxonomy
+Generation / Window / epoch / global playback store
+consumer-driven vs authority-driven semantic commit
+seek physical-output cutover mechanism
+Paused semantic commit point
+Position/Duration authority
+playlist/queue authority
+volume/device-switch authority
+preload/gapless/overlap topology
+```
+
+The rule is intentional: **OPEN means “not authorized yet,” not “Flash may invent the missing architecture.”**
