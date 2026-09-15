@@ -64,7 +64,11 @@ ADR-vs-code gap audit。完整结论见 `report.md`。
 
 1. **证据组合的合法性**：`Drained ⇒ worker ∈ {None, Eof}`（render 只在 edge
    terminal = Eof 后才可能报 Drained，而 edge terminal 就是 worker 退出时读到的
-   那个 first-wins 值）；`decodeFailure ⇒ worker ∈ {None, Failed}`。
+   那个 first-wins 值）；`decodeFailure ⇒ worker ∈ {None, Failed}` —— 前半条是
+   保留的现实约束；**后半条是理想化顺序而非严格现实约束**：production 里
+   `decode_failed` 与已放开的 stop edge 竞争可产生 decode_failure ∧ worker=Stopped
+   的组合（first-wins 使 edge.fail() 成为 no-op）。无害：模型与 production 都把
+   decode failure 排在判决第一位，被排除的组合在两侧都判 Failed。
 2. **activation 失败后不存在任何 leg**：证据发布动作一律要求 `~activationFailed`。
 3. **teardown 完成 ⇔ 两个 leg 的 join 都已返回**（`FinishTeardown` 的守卫）：
    `worker.join()` 返回时 `worker_exited` 必然已执行；`stop_and_join()` 返回时
@@ -99,7 +103,7 @@ ADR-vs-code gap audit。完整结论见 `report.md`。
 | M5 `ActivationFailureIsFailed` | `mutations/ActivationFailureIsFailed.cfg` | 违反 `ActivationFailureIsNotTerminalFailed`（⇒ S4 非空洞） |
 | M6 `ResolverIgnoresEvidence` | `mutations/ResolverIgnoresEvidence.cfg` | 违反 `NoFalseCompleted`（⇒ S5 非空洞；附带击穿 2 条 Scenario，见 cfg 注释） |
 | M7 `StopDiscriminatorRemoved` | `mutations/StopDiscriminatorRemoved.cfg` | 违反 `ScenarioUserStop`（precedence 负控制；证明场景矩阵有约束力） |
-| M9 `FailureDowngraded` | `mutations/FailureDowngraded.cfg` | 违反 `ScenarioDecodeFailureNeverStopped`（+ `NoFalseStopped`） |
+| M9 `FailureDowngraded` | `mutations/FailureDowngraded.cfg` | 违反 `ScenarioDecodeFailureNeverStopped`（附带击穿 `NoFalseStopped`：解析蕴含、经独立单检查项 run 验证；TLC 每状态只报第一条，套件输出不展示附带杀伤，见 report「运行结果的读法」） |
 | M8 `TeardownBeforeLegsJoined` | `mutations/TeardownBeforeLegsJoined.cfg` | 违反 `TeardownImpliesDecisive`（join 纪律是承重的，不是假设） |
 | 反向控制 ×3 | `mutations/Overclaim_*.cfg` | `EpisodesEventuallyTerminate` 必须被违反（模型不得宣称无条件终结） |
 | fairness 承重 ×2 | `probes/NoFairnessProgressFails_*.cfg` | 去掉 fairness 后条件性进度必须被违反 |

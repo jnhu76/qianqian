@@ -4,8 +4,9 @@
 BASE_SHA:  6d7cc200e460177348be2e53e3eae8b65b53344f  (current main: post-#139/#140/#141)
 BRANCH:    formal/f2-terminal-commit-boundary-1
 HEAD_SHA:  2afdc2c3ca2732abe790485b6a3c5555efff5e15  （模型 + runner + README
-           + adversarial review 修正；本报告在其后单独提交，
-           它描述的就是 2afdc2c 这棵树）
+           + adversarial review 修正；本报告单独提交于其后，并随第二轮
+           fresh review 的 MINOR 修正更新（见文末记录）。
+           模型语义自 2afdc2c 起未变：改动仅注释与证据文档本身）
 WORKTREE:  /home/hoo/Source/qianqian，干净
 ARTIFACT:  specs/f2-terminal-commit-boundary/
 RUNNER:    specs/f2-terminal-commit-boundary/check.sh（27 条 TLC run，全绿）
@@ -269,7 +270,7 @@ plain-language meaning:
 | S3 | 晚到的 stop 不能改写已提交终局 | **PASS**（三变体） | 同 S1 的不变式；另有 3 条 witness（`probes/LateStopAfterCommitWitness_*.cfg`）证明"已提交 Fact + 晚到 stop 意图共存"可达且 Fact 未变；M2 证明检查有约束力 |
 | S4 | activation failure 不是 D11 Failed | **PASS**（三变体，含更锐的命名诊断 `activationFailed ⇒ outcome = None`） | `ActivationFailureIsNotTerminalFailed` + `DiagnosticActivationFailureLeavesOutcomeUncommitted`；M5 把它升格成 Failed → 立刻被抓住 |
 | S5 | 不虚构 Completed | **PASS**（三变体） | `NoFalseCompleted`；M6（resolver 忽略证据）→ 立刻被抓住 |
-| S6 | 不虚构 Stopped | **PASS**（三变体） | `NoFalseStopped`；M2 的附带杀伤（改写路径伪造 Stopped）证明它有约束力 |
+| S6 | 不虚构 Stopped | **PASS**（三变体） | `NoFalseStopped`；其非空洞性由 M2 的改写路径（伪造 Stopped）**解析蕴含**——该附带杀伤经独立单检查项 run 验证成立，但套件 run 的 violated 输出不展示它（每状态只报第一条，见"关于运行结果的读法"） |
 
 补充：模型还证明了 **`TeardownImpliesDecisive`**（teardown 完成 ⇒ 证据已齐备且决定性），
 不是靠假设，而是由"两个 leg 的 join 语义 + 证据组合的合法性"推出。这条是本轮
@@ -368,9 +369,9 @@ exact assumption:
 
 why needed:
     没有 fairness 时，"证据决定性后最终提交"在**所有**变体里都可被违反。
-    最干净的 counterexample 取自在 B 上做无 fairness 的实验：
-        ... → PublishDecodeFailure（已决定性）→ PublishWorkerFailed
-            → PublishDrainAborted → FinishTeardown → **Stuttering 永远**
+    最干净的 counterexample 取自在 B 上做无 fairness 的实验
+    （完整逐 action trace 见 CE-B1）：
+        ... → FinishTeardown → **Stuttering 永远**
         终点：evidence 齐备、teardown 完成、consumerAsked=TRUE，outcome 仍是 None。
     这正是 §13 CE-B1 要的行为，也说明 fairness 是**承重**的：
     A 的进度挂在外部动作上（"外面的人会一直来问"），
@@ -430,7 +431,9 @@ M1 ObserveCommits              → 违反 OutcomeWrittenOnlyByContractCommitter
            终点 terminalOutcome="Failed" ∧ committerStepped=FALSE
     意义：纯读变成 writer 会立刻暴露 ⇒ S2/B4 不是空洞约束。
 
-M2 TerminalRewritable          → 违反 TerminalOutcomeImmutable（附带 NoFalseStopped）
+M2 TerminalRewritable          → 违反 TerminalOutcomeImmutable
+                                  （附带击穿 NoFalseStopped：解析蕴含，经独立
+                                    单检查项 run 验证；套件输出不展示，见读法节）
     trace: Activate → PublishDecodeFailure → ConsumerTriggeredCommit(Failed)
            → RequestStop ⇒ terminalOutcome 被改写成 "Stopped"
     意义：S1b/S3 有约束力；也说明现实里 resolve() 的 `outcome.is_some()` 与
@@ -466,7 +469,8 @@ M7 StopDiscriminatorRemoved    → 违反 ScenarioUserStop（precedence 负控�
          同一 mutation 下全部 ownership / boundary 结论不受影响。
 
 M9 FailureDowngraded           → 违反 ScenarioDecodeFailureNeverStopped
-                                  （附带击穿 NoFalseStopped）
+                                  （附带击穿 NoFalseStopped：解析蕴含，经独立
+                                    单检查项 run 验证；套件输出不展示，见读法节）
     意义：失败被 stop 意图覆盖这一方向有明确的负控制。
 
 M8 TeardownBeforeLegsJoined    → 违反 TeardownImpliesDecisive
@@ -503,8 +507,8 @@ CE-A1  decisive evidence exists, no consumer asks, terminalOutcome remains None
 
 CE-A2  teardown completes with decisive evidence but terminalOutcome never commits
        → FOUND（A）
-       最短 trace：Init → BeginTeardown → PublishWorkerEof → PublishDrainDrained
-                 → FinishTeardown
+       最短 trace：Init → Activate → PublishWorkerEof → PublishDrainDrained
+                 → BeginTeardown → FinishTeardown
                  终点 workerTerminal=Eof, drainVerdict=Drained,
                       episodeLifecycle=TeardownDone, terminalOutcome="None"
        取证：probes/TeardownWithoutFactWitness_OwnershipConsumerTriggered.cfg
@@ -533,16 +537,17 @@ CE-A5  activation failure alone becomes Failed
        → 正常模型中 NOT FOUND（ActivationFailureIsNotTerminalFailed 全程 PASS）
        → 注入 M5 后 FOUND（违反 ActivationFailureIsNotTerminalFailed）
        附：模型中 activation 失败后证据结构上不可能产生，故还有更锐的
-       DiagnosticActivationFailureLeavesOutcomeUncommitted（同样被 M5 击穿）。
+       DiagnosticActivationFailureLeavesOutcomeUncommitted（被 M5 击穿同为
+       解析蕴含，经独立单检查项 run 验证；套件输出不展示，见读法节）。
 
 CE-B1  B without fairness still allows permanent pending
        → FOUND（这正是 §13 要求确认的自由度）
-       trace（SpecNoFairness，B，逐 action）：
-             Init → RequestStop → ConsumerWait → BeginTeardown
-             → PublishWorkerFailed → PublishDecodeFailure → PublishDrainAborted
-             → FinishTeardown → Stuttering 永远
-             终点 decodeFailure=TRUE, workerTerminal=Failed, drainVerdict=Aborted,
-                  episodeLifecycle=TeardownDone, terminalOutcome="None",
+       trace（SpecNoFairness，B，逐 action；第二轮 review 复跑取证）：
+             Init → Activate → BeginTeardown → PublishWorkerEof
+             → PublishDrainAborted → RequestStop → FinishTeardown
+             → ConsumerWait → Stuttering 永远
+             终点 workerTerminal="Eof", drainVerdict="Aborted",
+                  episodeLifecycle="TeardownDone", terminalOutcome="None",
                   consumerAsked=TRUE
        取证：probes/NoFairnessProgressFails_AuthorityOwned.cfg（必须被违反，已违反）
        意义：**没有任何变体免费获得进度**；差别只在假设落在谁身上，
@@ -585,6 +590,11 @@ CE-B2  B with chosen fairness accidentally claims too much liveness
 2. 判据强度：`pass` = 穷举完成且无违规；`fail:<Inv>` = 目标被违反且 TLC
    自行收尾；`lfail:<P>` = temporal 性质被违反。三者都不等于"性质成立"，
    只等于"在该 bounds 下未被证伪 / 已被证伪"。
+3. "附带击穿"的读法：mutation 一节里目标之外的附带杀伤（如 M2/M9 附带
+   NoFalseStopped、M5 附带 DiagnosticActivationFailure…）是**解析蕴含**，
+   并经独立单检查项 run 验证成立；但 TLC `-continue` 在同一违规状态只报
+   第一条不变式，套件 run 的 violated 输出通常**不展示**它们。引用这些
+   附带杀伤时一律按本条读法，不得当作"套件输出已展示"。
 ```
 
 ## WHAT THE MODEL DOES NOT PROVE
@@ -925,3 +935,29 @@ MAJOR-3  判决瞬间窗口一节的"模型侧证据"引用不支撑"翻转"断�
 三处 MAJOR 的处理都落在模型/配置/文档层，改动后可复跑（27 条 run 全绿）。
 其中 (a) BeginTeardown 守卫收紧与 (b) 新增 M7/M8/M9 都改变了模型文本，
 因此本报告描述的树是**处理之后的树**（见 HEAD_SHA）。
+
+### 第二轮 fresh review（merge 前复审，0 MAJOR）
+
+merge 前由另一名独立 fresh-context reviewer 复审：自行复跑全部 27 条 run
+（全绿，状态计数与本报告一致），并在 /var/tmp 副本上做探针实验。11 问判定：
+10 SOUND / 1 WEAK（Q10 陈旧 trace）。**0 MAJOR / 5 MINOR → FORMAL_EVIDENCE_PASS**。
+
+```text
+MINOR-1  CE-A2 的 COUNTEREXAMPLE-FIRST 副本仍是最初缺 Activate 的 trace
+         （守卫收紧后此处未与 MODEL A 一节同步）→ 已改为含 Activate 的
+         忠实 trace（与 MODEL A 一节一致，并经 witness 复跑取证）。
+MINOR-2  CE-B1 的 trace 从未激活前缀进入 teardown，同病 → 已替换为复跑
+         取得的真实逐 action trace（终点语义不变：evidence 齐备、teardown
+         完成、consumerAsked=TRUE、outcome 恒缺）。
+MINOR-3  "附带击穿"（M2/M9 附带 NoFalseStopped、M5 附带 Diagnostic）解析上
+         成立且经独立单检查项 run 验证，但 TLC -continue 每状态只报一条，
+         套件 run 输出不展示 → 相关表述全部标注读法，"运行结果的读法"
+         一节新增第 3 条；S6 非空洞性不再单独引用套件输出。
+MINOR-4  EvidenceConsistent 的 decodeFailure 子句强于 production（真实竞争
+         可产生 decode_failure ∧ Stopped；无害：两侧都把 decode failure
+         排在判决第一位）→ README 改标注为"理想化顺序"。
+MINOR-5  模块头负控制清单缺 StopDiscriminatorRemoved / FailureDowngraded /
+         TeardownBeforeLegsJoined 三项 → 已补齐（仅注释，无语义变化）。
+```
+
+处理后复跑 27 条 run 全绿；模型语义零变化（TLA 改动仅注释）。
