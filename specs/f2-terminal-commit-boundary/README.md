@@ -1,11 +1,20 @@
 # specs/f2-terminal-commit-boundary — terminal Fact commit ownership 边界
 
-> **CAMPAIGN ARTIFACT。** 这是 `QIANQIAN-F2-TERMINAL-COMMIT-BOUNDARY-FORMAL-1`
-> 的形式化证据，**不是第二份 authority**，也**不是** architecture acceptance。
+> **CAMPAIGN ARTIFACT — HISTORICAL / EXPLORATORY EVIDENCE（已关闭，不再演进）。**
+> 这是 `QIANQIAN-F2-TERMINAL-COMMIT-BOUNDARY-FORMAL-1` 的形式化证据，
+> **不是第二份 authority**，也**不是** architecture acceptance。
 > 语义真相仍是 `docs/adr/ADR-PBK-001.md` §2（Fact Plane / semantic commit）
 > 与 `docs/adr/ADR-PBK-002.md` §17 D11（episode terminal outcome authority）。
-> 本套件**未**接入 CI formal gate（`specs/check.sh` 的 current 集不含它）：
-> 它挑战的是一个尚未裁决的语义边界，不是一条已冻结的不变式。
+> 本套件**未**接入 CI formal gate（`specs/check.sh` 的 current 集不含它）。
+>
+> **Authority status 更新（episode-terminal-settlement 之后）**：本套件回答的
+> underspecification（CURRENT_CONTRACT_UNDERSPECIFIED）已由 ADR-PBK-002 §17
+> D11 settlement corrective 裁决：decision ownership + commit-progress
+> ownership 归 Playback Session semantic authority，late-command stability
+> 冻结。**current-spec conformance 证据是 `specs/episode-terminal-settlement/`
+> （CI formal gate）**；本套件的 A/B/B′ 变体比较不构成 current requirement
+> （B′ atomic-commit 不是 production requirement），仅作历史证据与
+> current decision table（resolver precedence）的形式转录保留。
 
 ## 本模型回答的唯一问题
 

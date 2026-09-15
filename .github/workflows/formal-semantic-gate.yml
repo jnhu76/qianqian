@@ -1,8 +1,9 @@
 name: Formal Semantic Gate
 
 # Durable gate for the CURRENT formal semantic evidence (post-139 spec
-# reset): the K0 control-plane TLA+ suite and the realtime-publication
-# TLA+ suite, via specs/check.sh current.
+# reset): the K0 control-plane TLA+ suite, the realtime-publication
+# TLA+ suite, and the episode-terminal-settlement conformance suite
+# (ADR-PBK-002 D11), via specs/check.sh current.
 #
 # Fail-closed contract (task NORTH STAR: explicit proof obligation ->
 # smallest sufficient verifier -> negative control -> durable gate):
@@ -34,10 +35,12 @@ on:
     paths:
       - "specs/composition-kernel-0/**"
       - "specs/realtime-publication/**"
+      - "specs/episode-terminal-settlement/**"
       - "specs/check.sh"
       - "docs/architecture/composition-kernel-0-design.md"
       - "docs/architecture/composition-kernel-0-implementation-adr.md"
       - "docs/adr/ADR-PBK-001.md"
+      - "docs/adr/ADR-PBK-002.md"
       - "crates/qianqian-composition/**"
       - ".github/workflows/formal-semantic-gate.yml"
   push:
@@ -45,10 +48,12 @@ on:
     paths:
       - "specs/composition-kernel-0/**"
       - "specs/realtime-publication/**"
+      - "specs/episode-terminal-settlement/**"
       - "specs/check.sh"
       - "docs/architecture/composition-kernel-0-design.md"
       - "docs/architecture/composition-kernel-0-implementation-adr.md"
       - "docs/adr/ADR-PBK-001.md"
+      - "docs/adr/ADR-PBK-002.md"
       - "crates/qianqian-composition/**"
       - ".github/workflows/formal-semantic-gate.yml"
 
@@ -58,7 +63,7 @@ concurrency:
 
 jobs:
   tla-semantic:
-    name: TLA+/TLC current suites (K0 + realtime publication)
+    name: TLA+/TLC current suites (K0 + realtime publication + episode terminal settlement)
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
