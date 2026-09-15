@@ -116,6 +116,9 @@ run_tlc "$SPEC_ROOT/mutations/WaitIsSoleResolver.cfg"       lfail:TerminalEviden
 run_tlc "$SPEC_ROOT/mutations/AuthorityResolverRemoved.cfg" lfail:TerminalEvidenceCommitsEventually  "Mutation / M4 AuthorityResolverRemoved（liveness）"
 run_tlc "$SPEC_ROOT/mutations/ActivationFailureIsFailed.cfg" fail:ActivationFailureIsNotTerminalFailed "Mutation / M5 ActivationFailureIsFailed" -continue
 run_tlc "$SPEC_ROOT/mutations/ResolverIgnoresEvidence.cfg"  fail:NoFalseCompleted                    "Mutation / M6 ResolverIgnoresEvidence" -continue
+run_tlc "$SPEC_ROOT/mutations/StopDiscriminatorRemoved.cfg"  fail:ScenarioUserStop                    "Mutation / M7 StopDiscriminatorRemoved（precedence）" -continue
+run_tlc "$SPEC_ROOT/mutations/FailureDowngraded.cfg"         fail:ScenarioDecodeFailureNeverStopped   "Mutation / M9 FailureDowngraded（precedence）" -continue
+run_tlc "$SPEC_ROOT/mutations/TeardownBeforeLegsJoined.cfg"  fail:TeardownImpliesDecisive             "Mutation / M8 TeardownBeforeLegsJoined（join 纪律）" -continue
 
 echo "== 反向控制（对模型自己结论的负控制：必须被违反）"
 run_tlc "$SPEC_ROOT/mutations/Overclaim_ConsumerTriggered.cfg"      lfail:EpisodesEventuallyTerminate      "Overclaim / unconditional termination（A）"

@@ -85,7 +85,10 @@ CONSTANTS
     MutationWaitIsSoleResolver,
     MutationAuthorityResolverRemoved,
     MutationActivationFailureIsFailed,
-    MutationResolverIgnoresEvidence
+    MutationResolverIgnoresEvidence,
+    MutationStopDiscriminatorRemoved,
+    MutationFailureDowngraded,
+    MutationTeardownBeforeLegsJoined
 
 OwnershipChoices == {OwnershipConsumerTriggered,
                      OwnershipAuthorityOwned,
@@ -99,7 +102,10 @@ MutationChoices == {MutationNone,
                     MutationWaitIsSoleResolver,
                     MutationAuthorityResolverRemoved,
                     MutationActivationFailureIsFailed,
-                    MutationResolverIgnoresEvidence}
+                    MutationResolverIgnoresEvidence,
+                    MutationStopDiscriminatorRemoved,
+                    MutationFailureDowngraded,
+                    MutationTeardownBeforeLegsJoined}
 
 ASSUME /\ Ownership \in OwnershipChoices
        /\ ConsumerEnvironment \in ConsumerChoices
@@ -163,11 +169,15 @@ Init ==
 CandidateOf(stopReq, decFail, worker, drain) ==
     IF Mutation = MutationResolverIgnoresEvidence
     THEN "Completed"                       \* 负控制：忽略证据直接判决
+    ELSE IF Mutation = MutationFailureDowngraded /\ decFail
+    THEN "Stopped"                         \* 负控制：failure 被降格成 Stopped
     ELSE IF decFail THEN "Failed"
     ELSE IF worker = "Failed" THEN "Failed"
     ELSE IF drain = "Drained" /\ worker = "Eof" THEN "Completed"
     ELSE IF drain = "Aborted" /\ worker = "Stopped"
-         THEN (IF stopReq THEN "Stopped" ELSE "Failed")
+         THEN (IF Mutation = MutationStopDiscriminatorRemoved
+               THEN "Failed"                \* 负控制：去掉 stop 意图区分器
+               ELSE IF stopReq THEN "Stopped" ELSE "Failed")
     ELSE IF drain = "Aborted" /\ worker = "Eof" THEN "Failed"
     ELSE "None"
 
@@ -330,7 +340,8 @@ PublishDrainAborted ==
 \* 两个 leg 的 inverse 顺序（stop edge + join worker → stop_and_join stream）
 \* 在本模型中折叠成 teardown 的两个阶段；中间态对 terminal commit 问题不可观测。
 BeginTeardown ==
-    /\ episodeLifecycle \in {"BeforeActivation", "Active"}
+    /\ \/ episodeLifecycle = "Active"
+       \/ (episodeLifecycle = "BeforeActivation" /\ activationFailed)
     /\ episodeLifecycle' = "TeardownStarted"
     /\ UNCHANGED <<stopRequested, decodeFailure, workerTerminal, drainVerdict,
                    activationFailed, terminalOutcome,
@@ -342,7 +353,9 @@ BeginTeardown ==
 \* 所以"证据齐备"是 teardown 完成的前置条件，而不是额外假设。
 FinishTeardown ==
     /\ episodeLifecycle = "TeardownStarted"
-    /\ (activationFailed \/ (workerTerminal # "None" /\ drainVerdict # "None"))
+    /\ (   Mutation = MutationTeardownBeforeLegsJoined
+         \/ activationFailed
+         \/ (workerTerminal # "None" /\ drainVerdict # "None"))
     /\ episodeLifecycle' = "TeardownDone"
     /\ UNCHANGED <<stopRequested, decodeFailure, workerTerminal, drainVerdict,
                    activationFailed, terminalOutcome,
@@ -548,6 +561,13 @@ NeverCommitted ==
 (************************** 场景矩阵（§12 命题） *****************************)
 
 \* 四个场景断言的是 D11 命题在**当前证据**上的判决（Candidate），不是"最终提交值"。
+\*
+\* 依赖声明（fresh adversarial review MAJOR-1）：这四条是 **current realization 的
+\* precedence 转录**，不是 D11 命题本身。D11 只写 Stopped ⇒ "had recorded stop
+\* intent"；本块断言的是更强的反向（stopRequested ∧ Aborted ∧ Stopped ⇒ Stopped）。
+\* 证据：把区分器去掉（MutationStopDiscriminatorRemoved）会立刻击穿
+\* ScenarioUserStop，而全部 ownership / boundary 结论不受影响 ⇒ 这一块的成败
+\* 只反映 decision table 的形状，不反映提交所有权。
 \*
 \* 这个区分是被 TLC 逼出来的，不是修辞：把"当前证据"直接写成对提交值的要求
 \* （例如 "worker=Stopped ∧ drain=Aborted ∧ stopRequested ⇒ outcome ∈ {None,Stopped}"）

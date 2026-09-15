@@ -74,6 +74,17 @@ ADR-vs-code gap audit。完整结论见 `report.md`。
    terminal commit 问题不可观测，故不建两条 join 的次序。
 5. `CHECK_DEADLOCK FALSE`：终局之后"环境停摆"是 `[][Next]_vars` 允许的合法
    行为，也是本模型要表达的东西（"没人做任何事"恰恰是 A 变体的失败模式）。
+6. **已知的粗粒度处（如实声明）**：`Activate` 是一个原子步骤，但现实中 render
+   侧的 drain verdict 在一个极端时序下可以在激活**期间**就发布（read_frames 因
+   设备错误直接 abort）。本模型把这类情形折叠进 Activate 之后，不区分
+   "激活中发布"与"激活后发布"——它对 terminal commit 所有权问题不可观测，
+   但不适合用来推理激活期的机制时序。
+7. **决策输入的 cause 维度不存在**（忠实转录，不是简化）：`CandidateOf` 的输入
+   只有 (stopRequested, decodeFailure, workerTerminal, drainVerdict)。production
+   里 edge 的 `Stopped` 终态不携带"用户停的还是设备死的"，`resolve()` 读的是
+   调用瞬间的 `stop_requested`。模型里因此不存在 chronology 变量，
+   "晚到 stop 改变分类"这种带时序的断言**不在**本模型范围内（见 report 的
+   "判决瞬间窗口"一节）。
 
 ## 检查清单（`check.sh`）
 
@@ -86,16 +97,31 @@ ADR-vs-code gap audit。完整结论见 `report.md`。
 | M3 `WaitIsSoleResolver` | `mutations/WaitIsSoleResolver.cfg` | liveness 反例 `TerminalEvidenceCommitsEventually` |
 | M4 `AuthorityResolverRemoved` | `mutations/AuthorityResolverRemoved.cfg` | 同上（进度确实由 authority 侧动作承载） |
 | M5 `ActivationFailureIsFailed` | `mutations/ActivationFailureIsFailed.cfg` | 违反 `ActivationFailureIsNotTerminalFailed`（⇒ S4 非空洞） |
-| M6 `ResolverIgnoresEvidence` | `mutations/ResolverIgnoresEvidence.cfg` | 违反 `NoFalseCompleted`（⇒ S5 非空洞） |
+| M6 `ResolverIgnoresEvidence` | `mutations/ResolverIgnoresEvidence.cfg` | 违反 `NoFalseCompleted`（⇒ S5 非空洞；附带击穿 2 条 Scenario，见 cfg 注释） |
+| M7 `StopDiscriminatorRemoved` | `mutations/StopDiscriminatorRemoved.cfg` | 违反 `ScenarioUserStop`（precedence 负控制；证明场景矩阵有约束力） |
+| M9 `FailureDowngraded` | `mutations/FailureDowngraded.cfg` | 违反 `ScenarioDecodeFailureNeverStopped`（+ `NoFalseStopped`） |
+| M8 `TeardownBeforeLegsJoined` | `mutations/TeardownBeforeLegsJoined.cfg` | 违反 `TeardownImpliesDecisive`（join 纪律是承重的，不是假设） |
 | 反向控制 ×3 | `mutations/Overclaim_*.cfg` | `EpisodesEventuallyTerminate` 必须被违反（模型不得宣称无条件终结） |
 | fairness 承重 ×2 | `probes/NoFairnessProgressFails_*.cfg` | 去掉 fairness 后条件性进度必须被违反 |
-| witness ×11 | `probes/*.cfg` | 断言必须被违反 = witness 找到 |
+| witness ×9 | `probes/*.cfg` | 断言必须被违反 = witness 找到 |
 | 不可达取证 ×1 | `probes/NoConsumerCommitImpossible.cfg` | 必须 PASS = 已证"无 consumer 时提交不可达" |
+
+**没有负控制的断言（如实声明，不作为"有约束力"的证据引用）**：
+`EvidenceConsistent`（守卫一致性自查）与 `ScenarioNaturalEof`（Completed 规则转录）
+没有任何 cfg 会违反它们。`Scenario*` 块整体是 **current realization 的
+decision table 转录**，不是 D11 命题本身——D11 只写 Stopped ⇒ had recorded stop
+intent，模型断言的是更强的反向；其负控制是 M7/M9/M6。
+
+**读 TLC 结果的纪律**：`-continue` 的 violated 列表**不是**穷尽清单（TLC 在同一
+违规状态通常只报一条）。mutation cfg 的 INVARIANT 列表读作"本次检查了这些"，
+runner 只要求目标出现在 violated 集合里。
 
 ## 运行
 
 ```bash
-specs/f2-terminal-commit-boundary/check.sh
+specs/f2-terminal-commit-boundary/check.sh   # 27 条 TLC run（3 正常 + 9 mutation
+                                            # + 3 over-claim + 2 fairness + 9 witness
+                                            # + 1 不可达取证）
 ```
 
 工具链与其它套件共用 `specs/tools/tla2tools.jar`（v1.7.4，sha256 校验，

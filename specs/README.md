@@ -91,6 +91,19 @@ CI 列的 **verification-rust-gate** = `.github/workflows/verification-rust-gate
 
 ---
 
+### D. Campaign artifacts（**非 CI gate**；挑战 authority 中的语义边界）
+
+这些套件产出**尚未裁决**的语义发现，按 AGENTS.md「Verification authority
+boundary」它们必须先回到 ADR / design-authority review，因此**不接入**
+`specs/check.sh` 的 current 集，也不构成 acceptance gate。它们仍是可复跑、
+fail-closed 的当前证据，只是结论用途不同。
+
+| 套件 | 问题 | 覆盖类 | 结果 | 状态 |
+| --- | --- | --- | --- | --- |
+| `f2-terminal-commit-boundary/` | 一个 episode 的 terminal Fact semantic commit 归谁所有：外部 `wait()`/`try_resolve_now()` 触发（当前实现）还是 Playback Session authority 自己推进？外部 read/wait 是在消费 truth 还是在创造 truth？ | CHECKED-IN-MODEL（TLA/TLC，A/B/B′ 三变体 + 9 mutation（含 3 条 precedence/join 纪律负控制）+ 9 witness + 3 over-claim 反向控制 + 2 fairness 承重控制 + 1 已证不可达，共 27 条 TLC run） | 3 正常模型 PASS；全部负控制按预期（含 fresh adversarial review 的两轮修正）；核心 witness：A 中"teardown 完成而 Fact 缺席"可达、无 consumer 时提交不可达（穷举证明）；B 中无 consumer 也能提交 | **READY_FOR_HUMAN_SEMANTIC_BOUNDARY_REVIEW**（verdict 为 CURRENT_CONTRACT_UNDERSPECIFIED；报告 `f2-terminal-commit-boundary/report.md`） |
+
+---
+
 ## Deletion witness ledger（post-139 reset：每个退役 witness 族的现居所）
 
 删除不消灭 witness；每个 retired major witness family 必须有精确现居所：
@@ -117,6 +130,7 @@ specs/check.sh current
 # 专项
 specs/check.sh k0         # K0 控制面 TLA+ 套件
 specs/check.sh realtime   # realtime publication TLA+ 套件
+specs/f2-terminal-commit-boundary/check.sh   # campaign artifact（见 §D，非 CI gate）
 
 # Rust 侧当前验证（cargo 矩阵 + Miri + production mutation 负控制 +
 # loom；需要 nightly/miri 与 loom feature）

@@ -13,6 +13,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Playback/audio foundations | `adr/ADR-PBK-001.md` — **ACCEPTED** |
 | Plugin/Fiber taxonomy + admission invariant + earned static playback composition | `adr/ADR-PBK-002.md` D1/D4/D5/D6/D12/D13 |
 | Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
+| Terminal Fact commit-ownership boundary evidence（F2 seam 前置 formal campaign） | `../specs/f2-terminal-commit-boundary/` — campaign evidence only，**未裁决**；结论是 CURRENT_CONTRACT_UNDERSPECIFIED，等 ADR/code gap audit |
 | Current architecture corrective basis | Issue #138 — design input only, **not authority** |
 | Minimal PCM contract evidence | `architecture/pcm-contract-a0.md` + `../crates/qianqian-audio-api/tests/pcm_edge_contract/` — Phase B evidence only |
 | Direct-flow graph evidence | `architecture/direct-pcm-flow.md` + `../crates/qianqian-audio-api/tests/direct_pcm_flow/` — Phase C evidence only |
