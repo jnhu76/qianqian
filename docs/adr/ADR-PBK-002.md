@@ -394,7 +394,7 @@ allocation / implementation ownership
 ```text
 track lifetime
 seek lifetime beyond D14's current same-episode contract
-advanced open/replacement mechanisms beyond D14's sequential v1 contract
+advanced open/replacement mechanisms beyond D14's no-overlap v1 semantic contract
 next-track overlap/preload lifetime
 preload lifetime
 gapless lifetime
@@ -402,7 +402,7 @@ multi-session topology
 session construction/config representation beyond D14's current Phase-F seam
 ```
 
-特别是：当前 `ComponentSpec` 捕获 file/completion 的实现不自动成为未来 `open` 的永久 contract；D14 只冻结 Phase-F 当前最小 sequential replacement shape，任何 overlap/preload/gapless 仍需重新挣得最小 mechanism。
+特别是：当前 `ComponentSpec` 捕获 file/completion 的实现不自动成为未来 `open` 的永久 contract；D14 只冻结 Phase-F 当前最小 **old episode fully retires before new episode becomes live** 的 v1 语义约束。怎样把新 source/config 送进 fresh Playback Session definition 仍是 F6 CONFIG-MECHANISM-OPEN，必须另行窄门裁决。
 
 ---
 
@@ -509,9 +509,9 @@ VolumePlugin
 pause/resume semantic commit point and minimal output-control mechanism
 position / duration authority
 seek physical-output cutover mechanism beyond D14's frozen stale-PCM invariant
-open/session replacement mechanisms beyond D14's sequential v1 contract
+open/session CONFIG mechanism under D14's no-overlap v1 semantic contract
 playlist / queue authority and whether it earns PlaylistPlugin
-next / previous navigation policy beyond D14's sequential replacement execution shape
+next / previous navigation policy beyond D14's no-overlap replacement semantic shape
 volume authority / mechanism
 device switch authority / replacement mechanism
 format switch
@@ -899,7 +899,7 @@ Operation                                                                读操�
 TrackOpen         NO            NO             YES               NO        open 的
 Operation                                                                 representation
                                                                           仍受 D14
-                                                                          sequential-v1
+                                                                          no-overlap-v1
                                                                           约束
 PcmEdge           NO            NO             YES               NO        payload 路径
                                                                                 资源（D8）
@@ -1106,28 +1106,34 @@ acknowledge actual landing / resume new PCM
 
 **The physical output cutover mechanism is still OPEN.** F5 production implementation must stop at that gap until a narrow mechanism decision proves one of the existing-output reset/reopen/minimal-cutover choices. A coding agent may not invent `Generation`, a generic cache protocol, or a new runtime to bypass this gate.
 
-### D14.6 Open / Next / Previous — sequential replacement v1
+### D14.6 Open / Next / Previous — no-overlap replacement v1
 
-The current Phase-F v1 replacement strategy is deliberately simple and gap-tolerant:
+The current Phase-F v1 semantic requirement is deliberately simple and gap-tolerant:
+
+> **The old playback episode must be fully retired from K0 before the new playback episode becomes live.**
+
+This is a **no-overlap semantic constraint**, not a frozen App/K0 call sequence. It deliberately avoids preload/gapless/dual-world lifetime for the first working slice.
+
+At the product level:
 
 ```text
-old Playback Session episode
-    ↓ request intentional stop if it is still live
-    ↓ wait for D11 authority-owned settlement + episode teardown
-    ↓ remove/replace old desired Playback Session
-    ↓ create/mount a fresh Playback Session episode with new source config
-new episode
+old episode, if still live
+    ↓ intentional stop command
+    ↓ D11 authority-owned settlement
+    ↓ old Playback Session Fiber withdrawn + teardown/discharge complete
+    ↓
+new Playback Session episode may become live
 ```
 
-This freezes **sequential replacement only** for the first working Open/Next/Previous slice. It explicitly forbids introducing overlap/preload/gapless machinery in that slice.
+The exact configuration/handoff mechanism that creates a fresh session definition for the new source is still **F6 CONFIG-MECHANISM-OPEN**. Current `ComponentSpec` definitions are fixed and current `playback_session_spec(file, ...)` captures source config, so a coding agent MUST NOT invent hot component replacement, a mutable global source slot, a registry, or another config channel to make Open work. F6 production code remains blocked until that narrow mechanism decision is explicitly made.
 
-Consequences:
+Consequences already frozen:
 
 - Open creates a new playback episode; it is not Seek。
-- Next/Previous are navigation/selection decisions followed by the same Open replacement shape; they are not new K0 primitives or new data-plane protocols。
-- A small audible gap is acceptable in v1。
-- No old/new episode realtime overlap is required, so `Generation`/`Window`/Realtime Audio Runtime is not earned by Open/Next/Previous v1。
-- The retired old episode keeps its already-committed terminal truth; replacement cannot relabel it。
+- Next/Previous are navigation/selection decisions followed by the same no-overlap Open semantics; they are not new K0 primitives or data-plane protocols。
+- An audible gap is acceptable in v1。
+- Because old/new playback episodes do not overlap, `Generation`/`Window`/Realtime Audio Runtime is not earned by Open/Next/Previous v1。
+- The old episode keeps any already-committed terminal truth; replacement cannot relabel it。
 - If intentional replacement stop was recorded before that episode's terminal evidence became decisive and no higher-precedence failure wins, the existing `Stopped` terminal variant is sufficient. Do **not** invent `Superseded` / `Preempted` as a new terminal Fact for v1. Replacement cause may remain diagnostic/control context if needed。
 
 Playlist/queue selection authority remains OPEN. The first headless Open/Next/Previous slice may use only the selection source explicitly authorized by its issue/task; it must not create a global playlist authority to make the command convenient.
@@ -1190,6 +1196,7 @@ new lifetime taxonomy
 Generation / Window / epoch / global playback store
 consumer-driven vs authority-driven semantic commit
 seek physical-output cutover mechanism
+F6 fresh-source/config handoff mechanism
 Paused semantic commit point
 Position/Duration authority
 playlist/queue authority
