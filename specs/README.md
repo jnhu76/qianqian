@@ -73,7 +73,8 @@ CI 列的 **verification-rust-gate** = `.github/workflows/verification-rust-gate
 ### C. Ordinary regression evidence（不在 specs/，`cargo test --workspace` 承载）
 
 - K0 语义 oracle（`crates/qianqian-composition/tests/*_oracles.rs`，含
-  staged-mount #126 反例回归、violation-latch cross-locus 等价 oracle）；
+  staged-mount #126 反例回归、violation-latch cross-locus refinement oracle
+  （dependent-consumer 拓扑，scope 见 §B §G.6 行））；
 - episode 终局语义（`crates/qianqian-playback/tests/`：
   session_activation / edge_lifecycle / stop_seam —— SessionCompletion
   单写者 + precedence、stop×EOF×failure、join/leak oracle）；

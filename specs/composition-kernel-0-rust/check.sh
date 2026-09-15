@@ -61,7 +61,7 @@ if cargo test -p qianqian-composition --test lifecycle_oracles \
   && grep -q "test result: ok" "$ORACLE_LOG"; then
   echo "RESULT §G.6 dependent-consumer oracle TEST-PASS"
 else
-  echo "RESULT §G.6 cross-locus oracle FAILED"
+  echo "RESULT §G.6 dependent-consumer oracle FAILED"
   tail -5 "$ORACLE_LOG"
   fail=1
 fi
