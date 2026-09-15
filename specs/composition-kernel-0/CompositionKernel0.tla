@@ -92,11 +92,13 @@
 (*   MutationEarlyReplacement         M3 旧代未移除即挂载新 provider        *)
 (*                                    （§E.4 staging 优先级被撤）           *)
 (*   MutationDoubleInverse            M4 违约 tombstone 被再次执行（§G.6）  *)
-(*   MutationMountOverViolation       M5 撤掉 §G.6 违约边 guard —— 这不是   *)
-(*                                    假想缺陷，而是当前 kernel.rs          *)
-(*                                    mount_candidate 的真实行为；其        *)
-(*                                    counterexample 即生产缺陷的可执行     *)
-(*                                    复现（见 RESULTS.md differential）。  *)
+(*   MutationMountOverViolation       M5 撤掉 §G.6 违约边的 mount 重叠      *)
+(*                                    guard —— 归档 #126 修复前 kernel.rs   *)
+(*                                    mount_candidate 的真实缺陷行为；       *)
+(*                                    #126 已加 overlap guard，本 mutation  *)
+(*                                    现作为该 guard 的 TLA 侧负控制        *)
+(*                                    （反例 = 当时缺陷的可执行复现，       *)
+(*                                    见 RESULTS.md differential）。        *)
 (***************************************************************************)
 
 EXTENDS Integers, FiniteSets
@@ -300,9 +302,12 @@ EnabledRemove(f) ==        \* rule 4：removal_candidate（O-Remove；Thm 64/Cor
 \* 该前提；「§G.6 违约 latch 使旧代永远无法到达移除」的路径（consumer 或
 \* provider 自身违约，两种 trace 都已找到）则必须由 mount 候选检查显式
 \* 把关，否则点不变式被打破。
-\* FV-TEMP-0 differential：当前 kernel.rs mount_candidate 只查同名 fiber，
-\* 不查 capability 重叠 —— M5 = MutationMountOverViolation 仅撤该守卫
-\* （保留 staging 优先级，= 当前 Rust 行为）复现缺陷（见 RESULTS.md）；
+\* FV-TEMP-0 differential（历史，已由 #126 解决）：当时的 kernel.rs
+\* mount_candidate 只查同名 fiber，不查 capability 重叠 —— M5 =
+\* MutationMountOverViolation 仅撤该守卫（保留 staging 优先级，= #126
+\* 修复前的 Rust 行为）复现缺陷（见 RESULTS.md）。#126 后 mount_candidate
+\* 对 overlap withhold（kernel.rs），Rust 侧负控制为 M-K3
+\* （specs/composition-kernel-0-rust），M5 现存续意义 = TLA 侧负控制；
 \* M3 = MutationEarlyReplacement 把 staging 优先级与重叠守卫一并撤掉
 \* （经典「replacement 未 staged」回归）。
 MountOverlapBlock(e) ==
@@ -415,7 +420,8 @@ Remove(f) ==
 \* ---- rule 5：挂载（O-Insert）。§E.4：旧 provider 代移除之后才允许——
 \* 该 staging 由 step 优先级（rule 1..5 次序）涌现，不是模型假设。
 \* M3 撤掉该优先级守卫；M5（MutationMountOverViolation）撤掉 §G.6 违约边
-\* 守卫（= 当前 Rust 行为，见头注 differential）。
+\* 守卫（= pre-#126 Rust 行为；baseline 守卫在位 = 当前 Rust，见头注
+\* differential 与 RESULTS.md 的 mapping）。
 Mount(e) ==
     /\ EnabledMount(e)
     /\ ~MountOverlapBlock(e)
@@ -572,7 +578,7 @@ FailedHasPendingError ==
 -----------------------------------------------------------------------------
 (***************************** Liveness 性质 ********************************)
 
-\* L1（§1.3a：settle 终止 / 不死循环）：环境停止提交事件后，控制面最终
+\* L1（§L.1/§L.2：settle 终止 / 不死循环）：环境停止提交事件后，控制面最终
 \* 到达「无 enabled transition」（Settled 或 Blocked）。
 L_STABLE == envStopped ~> SystemStable
 

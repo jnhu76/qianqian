@@ -123,7 +123,7 @@ fn undecodable_file_is_an_open_error() {
     assert!(result.is_err(), "garbage bytes must not open as media");
 }
 
-/// NATIVE-BOUNDARY-AUDIT-0 adversarial coverage: a zero-length source is
+/// NATIVE-BOUNDARY-AUDIT-0 adversarial coverage（round record：Git 历史 / PR #134）: a zero-length source is
 /// not a media file and must fail at open, not produce a zombie endpoint.
 #[test]
 fn zero_length_file_is_an_open_error() {
@@ -134,7 +134,7 @@ fn zero_length_file_is_an_open_error() {
     assert!(result.is_err(), "empty file must not open as media");
 }
 
-/// NATIVE-BOUNDARY-AUDIT-0 adversarial coverage: a truncated container
+/// NATIVE-BOUNDARY-AUDIT-0 adversarial coverage（round record：Git 历史 / PR #134）: a truncated container
 /// must end deterministically — a clean EOF or a typed decode error —
 /// never a crash or a hang.
 #[test]
@@ -165,7 +165,7 @@ fn truncated_file_drains_to_eof_or_typed_error() {
     let _ = std::fs::remove_file(&truncated_path);
 }
 
-/// NATIVE-BOUNDARY-AUDIT-0 adversarial coverage: dropping an endpoint
+/// NATIVE-BOUNDARY-AUDIT-0 adversarial coverage（round record：Git 历史 / PR #134）: dropping an endpoint
 /// mid-stream releases the native handle immediately; the same file must
 /// reopen cleanly afterwards (drop-before-EOF and repeated open/close).
 #[test]

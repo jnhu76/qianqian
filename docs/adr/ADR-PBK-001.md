@@ -12,7 +12,7 @@
 
 Qianqian 仍处在足够年轻的阶段。此时最危险的不是 breaking change，而是为了维护已经写下来的名词，继续给一个尚未被真实机制验证的播放模型追加修订层。
 
-因此本 ADR 只描述**当前我们真正愿意承诺的基础边界**。旧的播放状态机、ownership 命名和形式化模型继续保留在 Git 历史、代码和 `specs/playback/*` 中作为实验/反例证据，但它们不再自动构成架构 authority。
+因此本 ADR 只描述**当前我们真正愿意承诺的基础边界**。旧的播放状态机、ownership 命名和形式化模型作为实验/反例证据由 Git 历史（含各 PR 记录）存档（曾位于 `specs/playback/*` 等，已随 post-#139 spec reset 从 main 移除），它们不再自动构成架构 authority。
 
 冻结：
 
@@ -863,16 +863,13 @@ realtime 执行模型细节（callback / blocking push / pull / worker / hybrid 
 
 # 11. 旧 playback code/spec 的地位
 
-当前仓库中已经存在：
+> **Location note (2026-09-15, post-#139 spec reset):** 本节最初列举的
+> 旧证据位置（`qianqian-audio-api::music` / `::transport`、
+> `playback_temporal_traces`、`specs/playback/*`）已随该 reset 从 main
+> 移除；Git 历史（含各 PR 记录）是唯一存档。本节的
+> inherit/forbid 规则不变，继续适用于任何从历史取回的证据。
 
-```text
-qianqian-audio-api::music
-qianqian-audio-api::transport
-playback_temporal_traces
-specs/playback/*
-```
-
-这些现在统一定义为：
+这些历史 artifacts 现统一定义为：
 
 ```text
 EXPERIMENTAL / EXECUTABLE EVIDENCE

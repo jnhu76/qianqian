@@ -46,7 +46,7 @@ lease / hazard）与 reader-quiescence 具体机制留为 OPEN。本记录回答
   在读者 quiesce 前保持有效）、§2.4、§6（publication correctness contract +
   P1–P5 协议 + lifetime 最小顺序）、§7（parameter vs topology）、§12 Phase D
   （mechanism validation）、§13（formalization policy）。
-- 旧 `specs/playback/*` 只被复用了 verifier 纪律（TLC warning fail-closed、
+- 旧 playback TLA 套件（已从 main 删除，Git 历史存档）只被复用了 verifier 纪律（TLC warning fail-closed、
   负控制必须出反例、`Finished in`/`Model checking completed` 判据），没有继承
   任何旧 playback 状态词汇。
 

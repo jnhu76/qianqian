@@ -3,10 +3,10 @@
 //! Owns the portable product capability seam currently required by
 //! production composition: the `AudioOutput` port consumed by
 //! `qianqian-playback`. The historical playback experiment code
-//! (`MusicKernel` / `TransportKernel`) no longer lives here; it survives
-//! as test-local executable evidence under
-//! `tests/playback_temporal_traces/` and carries no production API
-//! identity (Playback Foundations authority: `docs/adr/ADR-PBK-001.md`).
+//! (`MusicKernel` / `TransportKernel`) no longer lives here; it was
+//! removed from main together with its test-local traces harness (Git
+//! history archives it) and carries no production API identity
+//! (Playback Foundations authority: `docs/adr/ADR-PBK-001.md`).
 //!
 //! The generic Composition Kernel lives outside this crate: a generic
 //! kernel must not depend on product semantics.

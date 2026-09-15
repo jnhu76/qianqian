@@ -1,5 +1,5 @@
 //! Event-handle lifetime regressions (NATIVE-BOUNDARY-AUDIT-0 A3.3
-//! corrective): the buffer event must have exactly one CloseHandle per
+//! corrective; round record: Git history / PR #134): the buffer event must have exactly one CloseHandle per
 //! successful CreateEventW, on every exit path.
 //!
 //! Windows-only by nature — the mechanism does not exist elsewhere. The

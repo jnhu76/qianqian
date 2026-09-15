@@ -79,7 +79,7 @@ Context controls reachability/dependency truth. It does not carry PCM blocks or 
 
 There is still **no accepted playback state-machine vocabulary**. The accepted foundations (`docs/adr/ADR-PBK-001.md`) freeze foundational boundaries — composition vs execution/control vs facts vs realtime data — while current role names and the earned static playback composition are governed by `docs/adr/ADR-PBK-002.md`.
 
-Names still present in old code/specs, such as:
+Names from the retired pre-reset experiments, such as:
 
 ```text
 MusicKernel / TransportKernel
@@ -87,9 +87,9 @@ TrackSession / DecodeSession
 Generation / Active-Prepared / Dual Window / Physical Fence
 ```
 
-are **experimental evidence**: they preserve real failure witnesses (for example the formal exploration of the `stop × natural ENDED` race) and test techniques, but they are not current architecture and must not be preserved for compatibility unless a future accepted authority re-earns them.
+are **historical evidence only** (Git history and the PR records preserve the artifacts and their failure witnesses; the still-current races — terminal first-wins, stop × EOF × failure — are covered by today's tests and models): they are not current architecture and must not be re-imported unless a future accepted authority re-earns them.
 
-See `docs/adr/ADR-PBK-001.md` for the accepted foundation, `docs/adr/ADR-PBK-002.md` for current vocabulary/static playback composition, and `specs/playback/README.md` for the evidence status. The realtime publication/reclamation semantics (P1–P5) are normative in PBK-001 §6. Current Plugin/Fiber vocabulary is governed by PBK-002 D1/D4/D12, and Plugin admission by its D13 invariant; PBK-001 §16 retains older vocabulary as decision history where PBK-002 has superseded it.
+See `docs/adr/ADR-PBK-001.md` for the accepted foundation, `docs/adr/ADR-PBK-002.md` for current vocabulary/static playback composition, and `specs/README.md` for what current verification exists today. The realtime publication/reclamation semantics (P1–P5) are normative in PBK-001 §6. Current Plugin/Fiber vocabulary is governed by PBK-002 D1/D4/D12, and Plugin admission by its D13 invariant; PBK-001 §16 retains older vocabulary as decision history where PBK-002 has superseded it.
 
 ## Everything is a Plugin
 
@@ -134,7 +134,7 @@ qianqian-playback
 qianqian-headless
 ```
 
-The generic Composition Kernel (K0) is implemented. Current canonical vocabulary and production boundaries: ADR-PBK-002. The earlier experiment code (`MusicKernel` / `TransportKernel`) survives only as test-local executable evidence under `crates/qianqian-audio-api/tests/playback_temporal_traces/` — not current authority and not a compatibility contract.
+The generic Composition Kernel (K0) is implemented. Current canonical vocabulary and production boundaries: ADR-PBK-002. The earlier experiment code (`MusicKernel` / `TransportKernel`) and its test-local traces harness were removed from main by the post-#139 spec reset (Git history archives them) — not current authority and not a compatibility contract.
 
 Build/test authority:
 

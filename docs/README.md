@@ -18,7 +18,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Direct-flow graph evidence | `architecture/direct-pcm-flow.md` + `../crates/qianqian-audio-api/tests/direct_pcm_flow/` — Phase C evidence only |
 | Realtime publication lifetime evidence + mechanism comparison | `architecture/realtime-publication-lifetime-decision.md` + `../specs/realtime-publication/` — evidence only |
 | Current Rust behavior | current code + tests |
-| Playback experimental evidence | `../specs/playback/*` + explicitly historical/test-local playback artifacts — evidence only |
+| Retired pre-reset playback models/harness | Git history / PR records — historical evidence only; removed from main by the post-#139 spec reset (still-current races are covered by today's specs/tests, see `../specs/README.md`) |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
 | Product/repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |

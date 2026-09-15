@@ -30,8 +30,12 @@ EDGE_SNAPSHOT="$(mktemp)"
 cp "$EDGE" "$EDGE_SNAPSHOT"
 
 echo "== native regression (playback crate) =="
+# Fail closed on ANY failure AND on an emptied suite: at least one target
+# must report a positive pass count (guards a silent no-op green).
 NATIVE_LOG="$(mktemp)"
-if cargo test -p qianqian-playback > "$NATIVE_LOG" 2>&1 && ! grep -q "test result: FAILED" "$NATIVE_LOG"; then
+if cargo test -p qianqian-playback > "$NATIVE_LOG" 2>&1 \
+  && ! grep -q "test result: FAILED" "$NATIVE_LOG" \
+  && grep -qE "test result: ok\. [1-9][0-9]* passed" "$NATIVE_LOG"; then
   echo "RESULT native BOUNDED-CLEAN"
 else
   echo "RESULT native FAILED"
