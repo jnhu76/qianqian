@@ -53,8 +53,11 @@ on:
       - "crates/qianqian-composition/**"
       # Refinement-oracle seam: the settlement suite re-validates the
       # frozen decision table (regenerated from this resolver by the
-      # Rust gate) against the formal decision functions.
+      # Rust gate) against the formal decision functions. The Rust-side
+      # oracle itself moved crate-internal in F2
+      # (src/decision_table_oracle.rs), so it is a trigger too.
       - "crates/qianqian-playback/src/completion.rs"
+      - "crates/qianqian-playback/src/decision_table_oracle.rs"
       - ".github/workflows/formal-semantic-gate.yml"
   push:
     branches: [main]
@@ -70,6 +73,7 @@ on:
       - "crates/qianqian-composition/**"
       # Refinement-oracle seam (see pull_request above).
       - "crates/qianqian-playback/src/completion.rs"
+      - "crates/qianqian-playback/src/decision_table_oracle.rs"
       - ".github/workflows/formal-semantic-gate.yml"
 
 concurrency:
