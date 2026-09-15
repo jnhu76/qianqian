@@ -2,7 +2,7 @@
 
 This file carries stable vocabulary and the current repository mental model. It is a derived status/index, not a substitute for current code, contracts, ADRs, or task-specific evidence.
 
-Current authorities:
+Current normative authorities:
 
 ```text
 Playback foundations        -> docs/adr/ADR-PBK-001.md
@@ -12,7 +12,13 @@ K0 semantics                -> docs/architecture/composition-kernel-0-design.md
 K0 representation           -> docs/architecture/composition-kernel-0-implementation-adr.md
 ```
 
-Issue #138 records the current architecture corrective basis. It is design input, not authority.
+Current execution roadmap:
+
+```text
+Phase F v2                  -> Issue #119 PHASE-F-HEADLESS-CONTROL-1
+```
+
+Issue #119 is the current **execution roadmap**, derived from the normative authorities and current production reality; it is not a replacement for the ADRs. Issue #141 is the closed post-#139/#140 Phase-F reality-audit record whose REV.3 conclusions are reflected in #119 and this file. Issue #138 records the architecture-corrective basis; it remains design input, not authority.
 
 ---
 
@@ -179,7 +185,7 @@ Playback Session Plugin
         one episode terminal outcome (D11)
 ```
 
-The D11 designation attaches to the Playback Session semantic role for one playback episode; the episode-scoped Plugin/Fiber is its current composition realization, not a frozen identity equation.
+The D11 designation attaches to the Playback Session semantic role for one playback episode; the episode-scoped Plugin/Fiber is its current composition realization, not a frozen identity equation. In particular, **Fiber Active is composition/lifecycle evidence, not automatically the semantic-authority start boundary for a future Open contract**; that boundary must be earned with the episode construction/config semantics.
 
 D11 terminal variants:
 
@@ -196,17 +202,41 @@ The following are still OPEN:
 ```text
 Playing / Starting / Paused / Stopping semantics
 position / duration authority
-seek semantics
-open/session replacement mechanism
+seek acceptance / discontinuity / commit semantics
+open/session construction + config + replacement semantics
 playlist/queue authority
 next / previous
 volume authority
-device switch
+device switch / replaceable render binding
 PlaybackControl topology
 PlaybackFacts publication topology
 multi-session / preload / gapless
 Realtime Audio Runtime representation
 ```
+
+---
+
+# Phase-F current status
+
+Issue #119 is the current Phase-F v2 execution roadmap.
+
+```text
+F0 CLI shell / grammar          DONE / CLOSED
+F1 Stop                         DONE / CLOSED
+F2 Observable read side         RESTART
+    next authorized step:
+    F2-READ-SIDE-SEAM-REALITY-GATE
+    compare A/B/C representation; do not preselect SessionCompletion
+F3 Pause / Resume               GOAL KEPT / MECHANISM OPEN
+F4 Position / Duration          GOAL KEPT / AUTHORITY + COUNTERS OPEN
+F5 Seek                         REDESIGNED AROUND DISCONTINUITY PROTOCOL
+F6 Open                         CONFIG-MECHANISM-OPEN
+Next / Previous                 AFTER OPEN; separate navigation step
+F7 Volume                       GOAL KEPT / authority mechanism to earn
+F8 Devices / Device switch      split; switch mechanism still OPEN
+```
+
+PR #137 is historical implementation/test material only. Do not rebase it or treat it as current design authority.
 
 ---
 
@@ -218,7 +248,8 @@ For every new playback feature:
 1. Can existing Playback Session Plugin semantics express it?
 2. Can existing Decode/Output capability seams realize the mechanism?
 3. Can subordinate resources be changed/quiesced/replaced without a new Plugin?
-4. Does any old/new RT resource actually overlap while readers can still dereference the old world?
+4. Is this an in-place discontinuity on the same resources, or a replacement of resources/worlds?
+5. If resources/worlds are replaced, can an old RT reader still dereference the retired world while the new one is current?
 ```
 
 Prefer the smallest model.
@@ -236,36 +267,96 @@ Buffering
 Nexting
 ```
 
-If seek/open/device-switch genuinely creates old/new RT worlds with overlapping dereferenceability, then PBK-001 P1–P5 is triggered and the minimum view/generation/quiescence mechanism may be earned.
+Two different realtime problems must not be conflated:
+
+```text
+same-resource discontinuity
+    e.g. a seek that keeps the same decoder/edge/render stream
+    may need an explicit decode/edge/output cutover protocol
+    but does not by itself earn PBK-001 P1–P5
+
+old/new RT resource overlap
+    old world still dereferenceable while new world becomes current
+    -> PBK-001 P1–P5 is triggered
+```
+
+Seek/open/device-switch do not trigger Realtime Audio Runtime merely because their names sound dangerous. The trigger is concrete overlap/reclamation pressure.
 
 ---
 
-# Likely future semantic decomposition (NOT YET AUTHORITY)
+# Current Phase-F execution hypotheses (derived projection; #119 is the roadmap)
 
-Issue #138 records the current reduction hypotheses:
+These are compact execution hypotheses, not new normative authority.
 
 ```text
-Pause/Resume
-    same Playback Session Plugin; execution behavior changes
+Pause / Resume
+    same Playback Session Plugin is still the default ownership hypothesis
+    mechanism is OPEN
+    compare at least:
+      - explicit render-loop pause gate before WASAPI GetBuffer
+      - IAudioClient::Stop / Start
+      - another smaller proven mechanism
+    backpressure is an effect of not consuming; it is not itself the pause mechanism
 
 Seek
-    first try same Session Plugin:
-    quiesce → discard stale PCM → decoder seek → resume
+    first try same Playback Session Plugin and same resource set
+    correctness requires a three-layer SEEK DISCONTINUITY PROTOCOL:
+
+      decode-side cutover
+        worker command -> serialization point -> discard OLD staging -> decoder reposition
+
+      edge-side cutover
+        invalidate/flush OLD buffered PCM without corrupting terminal monotonicity
+
+      output-side physical cutover
+        prove already-submitted OLD PCM cannot remain audible after seek commit
+        exact mechanism remains OPEN
+
+    output-side candidates remain OPEN; do not copy the historical #40 Stop()+Reset()
+    implementation as current contract
+
+    distinguish:
+      seek command accepted
+      logical decoder/edge landing
+      audible cutover committed
+
+    Loom/native tests cover worker/edge races; a Windows physical-output gate is required
+    for audible cutover because device buffering is outside Loom
+
+    if the same resources remain and no old/new resource world overlaps, P1–P5 is NOT earned
 
 Open(source B)
-    first try Session Plugin replacement through K0 lifecycle
-    exact construction/config mechanism remains OPEN
+    K0 staged teardown/mount ordering exists
+    fresh episode configuration mechanism does NOT yet exist
+    current ComponentSpec capture(file, completion) is not an Open contract
+
+    config candidates remain OPEN (per-instance config / App-owned config source /
+    multiple concrete definitions / another minimal construction mechanism)
+
+    Fiber Active is not automatically the semantic-authority start boundary
+    failure rollback, transactional preflight and zero-gap are separate product/mechanism questions
+    zero-gap is the clearest current candidate for real old/new RT overlap
 
 Next / Previous
-    playlist/queue selection + Open(selected)
-    a future PlaylistPlugin must be independently earned
+    only after Open exists
+    default minimal hypothesis is App-owned ordered selection + Open(selected)
+    PlaylistPlugin must be independently earned by D13
 
 Volume
-    parameter/control routed through an existing mechanism service
+    parameter/control routed through an existing mechanism service is the default hypothesis
+    do not conflate playback volume with PCM gain / DSP / ReplayGain
     no feature-shaped VolumePlugin
+
+Devices / Device switch
+    enumeration is an Output-side mechanism query
+    switching is not implemented by the current RenderStream ownership shape
+    first earn either:
+      - a session-owned replaceable render binding with coherent drain semantics, or
+      - whole-episode replacement
+    seamless switch may create real old/new render overlap and therefore may trigger P1–P5
 ```
 
-These are execution hypotheses for future Phase-F work, not accepted semantics yet.
+Historical Issue #40 may be used only as a **counterexample/mechanism evidence** that machine/logical seek landing can differ from audible device-buffer truth. Its historical implementation is not current architecture authority.
 
 ---
 
@@ -299,6 +390,8 @@ The one normative research/implementation ladder lives in `ADR-PBK-001.md` §12 
 
 Realtime publication/lifetime evidence already established PBK-001 P1–P5. Do not import old PlaybackTemporal nouns merely because a future feature resembles an old model.
 
+Current Phase-F review has earned **no new TLA+ obligation**. Future F5/F6/F8 designs must be re-evaluated if they introduce an independently legal temporal collision not covered by existing models/tests.
+
 ---
 
 # Current code status
@@ -315,7 +408,7 @@ qianqian-output-wasapi
 qianqian-headless
 ```
 
-Current production facts important to Issue #138:
+Current production facts important to the post-#139 architecture:
 
 ```text
 songcore_decode_plugin() -> ComponentSpec
