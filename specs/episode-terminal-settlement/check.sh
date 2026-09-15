@@ -49,7 +49,7 @@ fi
 # TLC 的磁盘状态队列可能很大：工作目录放在真实磁盘而非 tmpfs。
 WORK_BASE="${TLA_TMPDIR:-/var/tmp}"
 
-# run_tlc <cfg_path> <期望模式 pass|fail:<目标invariant>|lfail:<性质名>> <显示名> [附加TLC参数...]
+# run_tlc <cfg_path> <期望模式 pass|fail:<目标invariant>|lfail:<性质名>|tfail:<性质名>> <显示名> [附加TLC参数...]
 run_tlc() {
   local cfg="$1" expect="$2" label="$3"; shift 3
   local tmp; tmp="$(mktemp -d "$WORK_BASE/qianqian-episode-terminal.XXXXXX")"
@@ -62,10 +62,13 @@ run_tlc() {
     finished="$(grep -c 'Finished in' "$log" || true)"
     [[ "$finished" -ge 1 ]] && break
   done
-  local completed viol propviol
+  local completed viol propviol apviol
   completed="$(grep -c 'Model checking completed' "$log" || true)"
   viol="$(grep -oE 'Invariant [A-Za-z0-9_]+ is violated' "$log" | sed 's/Invariant \(.*\) is violated/\1/' | sort -u | tr '\n' ',' | sed 's/,$//')"
   propviol="$(grep -c 'Temporal properties were violated' "$log" || true)"
+  # S3 的 transition 级性质（[][A]_vars）由 TLC 以 "Action property <名>
+  # is violated" 报告，且**按名**可提取（比 liveness 的泛化标记更强）。
+  apviol="$(grep -oE 'Action property [A-Za-z0-9_]+ is violated' "$log" | sed 's/Action property \(.*\) is violated/\1/' | sort -u | tr '\n' ',' | sed 's/,$//')"
   finished="$(grep -c 'Finished in' "$log" || true)"
   local stats; stats="$(grep -E '[0-9]+ states generated, [0-9]+ distinct states found' "$log" | tail -1)"
   # TLC Warning 检测必须先于 pass/mutation 判定（fail closed）。
@@ -79,11 +82,11 @@ run_tlc() {
     return
   fi
   if [[ "$expect" == pass ]]; then
-    if [[ "$completed" -ge 1 && -z "$viol" && "$propviol" -eq 0 ]]; then
+    if [[ "$completed" -ge 1 && -z "$viol" && "$propviol" -eq 0 && -z "$apviol" ]]; then
       printf '%-64s PASS  %s\n' "$label" "$stats"
       rm -rf "$tmp"
     else
-      printf '%-64s FAIL（期望 PASS）violated=%s propviol=%s\n' "$label" "${viol:-none}" "$propviol"; fail=1
+      printf '%-64s FAIL（期望 PASS）violated=%s propviol=%s apviol=%s\n' "$label" "${viol:-none}" "$propviol" "${apviol:-none}"; fail=1
       printf '    log：%s\n' "$log"
     fi
   elif [[ "$expect" == lfail:* ]]; then
@@ -92,6 +95,18 @@ run_tlc() {
       rm -rf "$tmp"
     else
       printf '%-64s FAIL（期望 liveness 反例；实际 violated=%s propviol=%s finished=%s）\n' "$label" "${viol:-none}" "$propviol" "$finished"; fail=1
+      printf '    log：%s\n' "$log"
+    fi
+  elif [[ "$expect" == tfail:* ]]; then
+    # 纯 temporal 违反：writer identity 类约束（S3 transition 级性质）。
+    # 要求：性质**按名**被违反 + **零**状态不变式被违反（violated 为空正是
+    # "状态层与 authority 提交不可区分"这一演示成立的证据）+ TLC 自行收尾。
+    local ttarget; ttarget="${expect#tfail:}"
+    if [[ ",$apviol," == *",$ttarget,"* && -z "$viol" && "$finished" -ge 1 ]]; then
+      printf '%-64s MUST-FAIL-OK（temporal 反例：%s；状态不变式全绿）\n' "$label" "$ttarget"
+      rm -rf "$tmp"
+    else
+      printf '%-64s FAIL（期望纯 temporal 反例 %s；实际 violated=%s apviol=%s finished=%s）\n' "$label" "$ttarget" "${viol:-none}" "${apviol:-none}" "$finished"; fail=1
       printf '    log：%s\n' "$log"
     fi
   else
@@ -111,15 +126,16 @@ run_tlc "$SPEC_ROOT/EpisodeTerminalSettlement.cfg"           pass "Base / safety
 run_tlc "$SPEC_ROOT/EpisodeTerminalSettlementSafetyOnly.cfg" pass "Base / safety only（no fairness）"
 
 echo "== 负控制（每个 mutation 必须被抓住）"
-run_tlc "$SPEC_ROOT/mutations/ObserveCommits.cfg"              fail:OutcomeWrittenOnlyByAuthoritySettle "Mutation / M1 ObserveCommits（pure read commits）" -continue
-run_tlc "$SPEC_ROOT/mutations/WaitCommits.cfg"                 fail:OutcomeWrittenOnlyByAuthoritySettle "Mutation / M2 WaitCommits（wait settles）" -continue
+run_tlc "$SPEC_ROOT/mutations/ObserveCommits.cfg"              tfail:AuthorityIsSoleWriter "Mutation / M1 ObserveCommits（pure read commits）" -continue
+run_tlc "$SPEC_ROOT/mutations/WaitCommits.cfg"                 tfail:AuthorityIsSoleWriter "Mutation / M2 WaitCommits（wait settles）" -continue
 run_tlc "$SPEC_ROOT/mutations/TerminalRewritable.cfg"          fail:TerminalOutcomeImmutable            "Mutation / M3 TerminalRewritable（late stop rewrites）" -continue
 run_tlc "$SPEC_ROOT/mutations/LateStopReadsCurrentIntent.cfg"  fail:CommittedOutcomeMatchesContract     "Mutation / M4 LateStopReadsCurrentIntent（relabel）" -continue
 run_tlc "$SPEC_ROOT/mutations/TeardownBeforeSettlement.cfg"    fail:TeardownRequiresSettlement          "Mutation / M5 TeardownBeforeSettlement" -continue
 run_tlc "$SPEC_ROOT/mutations/ActivationFailureBecomesFailed.cfg" fail:ActivationFailureIsNotTerminalFailed "Mutation / M6 ActivationFailureBecomesFailed" -continue
 run_tlc "$SPEC_ROOT/mutations/FalseCompleted.cfg"              fail:NoFalseCompleted                    "Mutation / M7 FalseCompleted" -continue
 run_tlc "$SPEC_ROOT/mutations/FalseStopped.cfg"                fail:NoFalseStopped                      "Mutation / M8 FalseStopped（stopRequestedNow）" -continue
-run_tlc "$SPEC_ROOT/mutations/EvidenceProducerCommits.cfg"     fail:OutcomeWrittenOnlyByAuthoritySettle "Mutation / M9 EvidenceProducerCommits" -continue
+run_tlc "$SPEC_ROOT/mutations/EvidenceProducerSpoofsAuthority.cfg" tfail:AuthorityIsSoleWriter "Mutation / M9 EvidenceProducerSpoofsAuthority（max spoof）" -continue
+run_tlc "$SPEC_ROOT/mutations/NarrowDecisiveDomain.cfg"        fail:TeardownRequiresSettlement          "Mutation / M10 NarrowDecisiveDomain（C5 coverage）" -continue
 
 echo "== 反向控制（对模型自己结论的负控制：必须被违反；带 WF 的最强让步下）"
 run_tlc "$SPEC_ROOT/mutations/OverclaimTermination.cfg"       lfail:EveryEpisodeEventuallyTerminates      "Overclaim / unconditional termination"
@@ -138,6 +154,7 @@ run_tlc "$SPEC_ROOT/probes/WitnessDeviceAbortFailed.cfg"       fail:Unreachable_
 run_tlc "$SPEC_ROOT/probes/WitnessLateStopCannotRelabel.cfg"   fail:Unreachable_LateStopDecisiveFailedStaysFailed "Witness / W4 late stop stays Failed"
 run_tlc "$SPEC_ROOT/probes/WitnessLateStopAfterCompleted.cfg"  fail:Unreachable_CompletedWithLateStop            "Witness / W5 late stop after Completed"
 run_tlc "$SPEC_ROOT/probes/WitnessNoConsumerCommit.cfg"        fail:Unreachable_CommitWithoutConsumer            "Witness / W6 commit with no consumer at all"
+run_tlc "$SPEC_ROOT/probes/WitnessEofAbortedFailed.cfg"        fail:Unreachable_EofAbortedFailedDevice           "Witness / W7 Eof+Aborted（no stop）-> Failed"
 
 if [[ "$fail" -eq 0 ]]; then
   echo "== 全部门通过"

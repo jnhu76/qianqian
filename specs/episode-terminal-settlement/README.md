@@ -3,6 +3,18 @@
 > **STATUS: CURRENT FORMAL GATE（current-spec conformance）。**
 > 已接入 `specs/check.sh current` 与 CI `formal-semantic-gate`。
 >
+> **CORRECTIVE-1（review 响应）已合入**：fresh review 以 2 MAJOR + 1 CI
+> BLOCKER 拒绝了初版 verdict。修正：
+> ① decisive 触发域从 deliberately-minimal 判决域改为 current decision
+>    contract 的全部可判决形状（`CurrentDecisionDecisive`；初版把
+>    production 果断的 `Eof+Aborted → Failed(device)` 留在触发域外，使
+>    C5/progress/latch 成为局部证明）；
+> ② writer identity 从 ghost 布尔状态不变式改为 transition 级性质
+>    （`AuthorityIsSoleWriter`；ghost 布尔可被"顺手维护 ghost"的冒写动作
+>    骗过——M9 即该最大对手）；
+> ③ CI BLOCKER：本 suite runner 在 git 中缺可执行位（100644），CI
+>    `Permission denied`，已修。新增 W7 witness 与 M10 负控制。
+>
 > 语义真相只有一份：`docs/adr/ADR-PBK-001.md` §2（semantic commit /
 > fact authority identity / projection 非权威）与
 > `docs/adr/ADR-PBK-002.md` §17 D11（episode terminal outcome authority +
@@ -46,10 +58,10 @@ decision（分类边界）与 semantic commit 执行**可以分离**：
 | RULE | 普通话 | 类型 | 模型表达 |
 | --- | --- | --- | --- |
 | C1 单个 terminal Fact | 一个 episode 至多一个终局（None→Completed/Stopped/Failed 一次），提交后不可改写 | safety | `TerminalOutcomeImmutable`（S2）；mutation M3 |
-| C2 authority-owned settlement | 歌播完/失败后，**不需要有人来问**，authority 自己负责把终局落下来。Observe/Wait/Projection/App query 都不是 Fact 出现的必要条件 | safety + witness | writer 集合（S3）+ `WitnessNoConsumerCommit`（W6）；mutation M9 |
+| C2 authority-owned settlement | 歌播完/失败后，**不需要有人来问**，authority 自己负责把终局落下来。Observe/Wait/Projection/App query 都不是 Fact 出现的必要条件 | safety + witness | `AuthorityIsSoleWriter`（S3，transition 级）+ `WitnessNoConsumerCommit`（W6）；mutation M1/M2/M9 |
 | C3 Observe 纯读 | observe() 只能读；不能 resolve/commit/改证据/改 stop intent/改生命周期 | safety | `Observe` 只写 `observeRan`；mutation M1 |
 | C4 Wait 纯等待 | wait() 只能等 authority 已经落下的 Fact；不跑 resolver、不是 terminal writer、不是 Fact 存在的前提。TLA 不模拟 OS blocking，只需 wait 动作无 semantic writer 效果 | safety | `Wait` 只写 `waitRan`；mutation M2（今日生产 `wait()->resolve()` differential 的形状，必须被抓住） |
-| C5 teardown settlement 边界 | 如果 teardown 已经完成，那"早就足够判决"的 terminal Fact 不能还没落下来。这是 safety 边界，**不是**"每个 episode 最终都会 teardown"的进度承诺 | safety | `TeardownRequiresSettlement`（S10，条件形式）；mutation M5 |
+| C5 teardown settlement 边界 | 如果 teardown 已经完成，那"早就足够判决"的 terminal Fact 不能还没落下来。这是 safety 边界，**不是**"每个 episode 最终都会 teardown"的进度承诺 | safety | `TeardownRequiresSettlement`（S10，条件形式；判定用全形状触发域）；mutation M5 / M10 |
 | C6 late-command stability | 终局证据首次决定性**之后**才到的 stop 命令，不能改变这次 episode 应得的分类：决定性已判 Failed 时晚到 stop ≠ Stopped；边界**之前**记录的 stop intent 仍满足 Stopped | safety | `stopAtDecision` ghost + `CommittedOutcomeMatchesContract`（S9）+ `NoFalseStopped`（S7）；mutation M4/M8；正向 witness W4/W5 |
 | C7 activation failure firewall | activation failure 是 diagnostic，不是 D11 episode terminal Failed（除非 live episode 的 terminal evidence 独立满足 contract） | safety | `ActivationFailureIsNotTerminalFailed`（S8）；mutation M6 |
 | C8 无虚构 Completed | Completed 至少要求 decode/worker EOF evidence + output drain-complete evidence（不加物理可听性） | safety | `NoFalseCompleted`（S6）；mutation M7 |
@@ -70,15 +82,30 @@ decision（分类边界）与 semantic commit 执行**可以分离**：
 | `Observe` / `Wait` | D14.2 seam 语义的纯读 / 纯等待 | 当前生产 `wait()` 会顺手 resolve（known differential；M2 形式化证明当前 contract 拒绝它） |
 | `terminalOutcome` / `firstCommitted` | `CompletionState.outcome`（memoized） | `completion.rs` |
 | `decisionLatched` / `stopAtDecision` | **无 production 对应**（verifier-only ghost） | 见下节 |
-| `observeRan` / `waitRan` / `authoritySettled` | **无 production 对应**（verifier-only 见证变量） | — |
+| `observeRan` / `waitRan` / `firstCommitted` | **无 production 对应**（verifier-only 见证变量；`firstCommitted` 只服务改写检出） | — |
 
-`TerminalCandidateOf(...)` 只转录 accepted D11 命题的极小判决核心
-（failure evidence 压过一切 → `Eof∧Drained`=Completed → aborted+边界
-stop intent=Stopped、否则 Failed）。production resolver 的其余精确
-precedence（如 `Aborted+Eof → Failed`、stage 文本）是 **current
-realization**，不进本套件的 normative 不变式；current decision table 的
-形式证据保留在 `f2-terminal-commit-boundary/`（historical）与 production
-oracle tests。改变 precedence 若不改变外部命题无需回 authority review。
+判决概念分两层（review corrective 轮确立，**不得混用**）：
+
+```text
+CurrentDecisionDecisive(df, wt, dv)
+    current decision contract 在哪些证据形状上已能作出终局判决。
+    settlement obligation 的触发域（decision 边界 latch / C5 门 /
+    progress）是 normative 层：必须覆盖 current contract 能判决的
+    全部形状。逐支对应 production resolve() 的分支；不可判决形状
+    （如 Drained+worker 未退出/Stopped、Aborted+worker 未退出）在域外。
+
+CurrentDecisionVerdict(sa, df, wt, dv)
+    current contract 对可判决形状的判决值，在**边界冻结 stop intent**
+    下求值。current realization conformance oracle：精确 precedence
+    （Aborted+Eof→Failed(device)、stage 文本等）是 realization，
+    决策 contract 演进时随 authority 变更重推导；与 production 的唯一
+    刻意偏差是模型读边界 intent（D11 late-command rule），production
+    resolve() 读当前 stop_requested（known differential，F2 修正目标）。
+
+D11 的三条外部命题（Completed/Stopped 的成立条件、无虚构）由独立
+不变式（S6/S7）承载，不从判决表导出——normative 层与 realization 层
+分离。S9 用判决表做 conformance 检查，但触发域、C5、progress 的
+义务结构不依赖表中具体取值。
 
 ### verifier-only ghost/辅助变量（非 normative）
 
@@ -88,8 +115,12 @@ production architecture state**：它们只在"最后一块决定性证据落地
 检查（"未提交但已决定"的窗口里，晚到命令不得重释历史）。production 允许
 在边界瞬间立即 settlement（从而根本不需要保留这个历史），或保存足以防止
 late-command 重解释的最小 session-owned state——两条路 D11 都明示合法，
-ghost 变量不要求任何 Rust 表示。`firstCommitted` / `authoritySettled` /
-`observeRan` / `waitRan` 同类（auxiliary verifier-only）。
+ghost 变量不要求任何 Rust 表示。`firstCommitted` / `observeRan` /
+`waitRan` 同类（auxiliary verifier-only）。
+
+`authoritySettled` ghost 布尔已**退役**（CORRECTIVE-1）：它承载的
+writer 集合检查可被"顺手维护 ghost"的冒写动作骗过，writer identity
+改由 transition 级性质 `AuthorityIsSoleWriter` 承载（见下节）。
 
 ### 抽象里刻意保留的现实约束（不是额外假设）
 
@@ -122,35 +153,44 @@ ghost 变量不要求任何 Rust 表示。`firstCommitted` / `authoritySettled` 
    `stop_requested`（无边界概念）——该 differential 已由 D11 记录、F2 修正；
    模型表达的是 accepted contract，不是 differential。
 
-### 范围声明（None-region 与证据形状是 model-scoped，非 normative 边界）
+### 范围声明（触发域两层边界，CORRECTIVE-1 后）
 
-`TerminalCandidateOf` 只转录 accepted D11 命题的极小判决核心，因此：
+- **触发域（normative）**：`CurrentDecisionDecisive` 覆盖 current decision
+  contract 能判决的**全部**形状，包括 production 果断的
+  `Eof+Aborted → Failed(device)`（初版曾把它留在触发域外，使 C5/progress
+  成为局部证明——CORRECTIVE-1 修正）。域外的形状是 current contract
+  **真的不可判决**（如 `Drained` 而 worker 未退出），不是刻意收窄。
+  M10 负控制证明该覆盖是真实约束：把机制门缩回 minimal 域，C5 立即被违反。
+- **判决值（realization oracle）**：`CurrentDecisionVerdict` 的精确
+  precedence 是 current realization conformance oracle，不是 D11 冻结
+  内容；决策 contract 演进时本表随 authority 变更重推导，触发域全覆盖、
+  C5、progress 的义务结构不变。
+- D11 外部命题由独立不变式（S6/S7）承载；`CommittedOutcomeMatchesContract`
+  （S9）取单向蕴含 `Decisive ⇒ (outcome = None ∨ outcome = 判决值)`：
+  settlement 执行前 outcome 为 None 合法。M3/M4 在该形式下仍被击穿。
 
-- **未决定组合的 None-region 是本模型的抽象**，不是 normative 边界：
-  production 当前 resolver 对部分组合（如 `Aborted+Eof → Failed`）比模型
-  更"果断"。那属于 current realization（ADR-PBK-002 §17 明示 precedence
-  非冻结），本套件不做 normative 约束，也因此不把"production 会判而模型
-  未判"的组合当作缺陷。
-- `CommittedOutcomeMatchesContract`（S9）相应取**单向蕴含**
-  `Decisive ⇒ (outcome = None ∨ outcome = SettleCandidate)`：只约束
-  "决定性证据上的提交值"，不把 None-region 升格为 normative。M3/M4 在该
-  形式下仍然被击穿（runner 验证）。
-- `NoFalseStopped`（S7）的 antecedent（`worker=Stopped ∧ drain=Aborted`）
-  与 `TeardownRequiresSettlement`（S10）的 decisive 判定同样使用本模型的
-  极小证据形状；同上，是 model-scoped 转录而非 production precedence 的
-  冻结。
-
-## writer 集合（谁可以写 terminalOutcome）
+## writer identity（谁可以写 terminalOutcome）
 
 ```text
 terminal Fact 的唯一 None -> terminal writer:   AuthoritySettle
+    —— 由 transition 级性质 S3 表达：
+       OutcomeChangedOnlyByAuthority ==
+           (terminalOutcome' # terminalOutcome) => AuthoritySettle
+       （[][A]_vars 形式，TLC 以 Action property 检查、按名报告。）
 mechanism evidence writers（只写证据，从不写 outcome）:
     PublishDecodeFailure / PublishWorkerEof / PublishWorkerStopped /
     PublishWorkerFailed / PublishDrainDrained / PublishDrainAborted
-forbidden writers（被不变式排除，mutation 证明有牙齿）:
-    Observe（M1）、Wait（M2）、evidence 发布者顺手提交（M9）、
+forbidden writers（mutation 证明有牙齿）:
+    Observe（M1）、Wait（M2）、evidence 发布者冒充 authority 提交（M9）、
     late stop 改写已提交值（M3）
 ```
+
+**为什么 S3 必须是 transition 级**（CORRECTIVE-1）：初版用 ghost 布尔
+（`authoritySettled`）做状态不变式，被 review 证伪——一个"顺手把 ghost
+也维护掉"的冒写动作可以骗过全部状态检查。状态谓词原则上表达不了"是哪个
+动作写的"。M9 现在就是这个最大对手：值、边界 intent、`firstCommitted`
+全部如实维护，**全部状态不变式保持绿色**，唯一能抓住它的是 S3
+（runner 的 `tfail` 模式验证"temporal 按名违反 + 零状态违反"）。
 
 M9 的边界（重要）：它**不代表** production 永远不能在同一 Rust call
 stack 内由 authority 完成 decision+commit。它检查的是 semantic writer
@@ -159,28 +199,29 @@ stack 内由 authority 完成 decision+commit。它检查的是 semantic writer
 成为另一个 authority（PBK-001 §2.3：mechanism observation 不得发布另一
 authority 的 semantic fact）。
 
-## 检查清单（`check.sh`，23 条 TLC run）
+## 检查清单（`check.sh`，25 条 TLC run）
 
 正常模型（2）：
 
 | run | 内容 | 期望 |
 | --- | --- | --- |
-| `EpisodeTerminalSettlement.cfg` | 全部安全不变式 + `SettlementProgress`，`SPECIFICATION SpecSettlementFairness`（WF_vars(AuthoritySettle)） | PASS |
-| `EpisodeTerminalSettlementSafetyOnly.cfg` | 同一不变式集，`SPECIFICATION Spec`（无 fairness） | PASS（safety 与进度假设解耦） |
+| `EpisodeTerminalSettlement.cfg` | 全部安全不变式 + `SettlementProgress` + `AuthorityIsSoleWriter`，`SPECIFICATION SpecSettlementFairness`（WF_vars(AuthoritySettle)） | PASS |
+| `EpisodeTerminalSettlementSafetyOnly.cfg` | 同一性质集（含 S3 transition 级），`SPECIFICATION Spec`（无 fairness） | PASS（safety 与进度假设解耦） |
 
-负控制 mutation（9，全部必须产生 counterexample）：
+负控制 mutation（10，全部必须产生 counterexample）：
 
 | 文件 | 注入 | 期望击穿 |
 | --- | --- | --- |
-| `mutations/ObserveCommits.cfg` | 纯读偷偷提交（不登记 authoritySettled） | `OutcomeWrittenOnlyByAuthoritySettle`（S3/S4 非空洞） |
-| `mutations/WaitCommits.cfg` | 纯等待调用 settlement（= 今日生产 differential 的形状） | 同上（S5 非空洞；与 M1 分开成 run） |
+| `mutations/ObserveCommits.cfg` | 纯读偷偷提交（值正确，但 writer 不是 AuthoritySettle） | `AuthorityIsSoleWriter`（S3 非空洞；状态不变式全绿——writer identity 只能由 transition 级性质承载） |
+| `mutations/WaitCommits.cfg` | 纯等待调用 settlement（= 今日生产 differential 的形状） | 同上（与 M1 分开成 run） |
 | `mutations/TerminalRewritable.cfg` | late stop 改写已提交 Completed/Failed | `TerminalOutcomeImmutable`（S2 非空洞） |
-| `mutations/LateStopReadsCurrentIntent.cfg` | settlement 读当前 stopSeen（决定性已判 Failed → 晚到 stop → 提交 Stopped） | `CommittedOutcomeMatchesContract`（S9；#143 新规则约束力的核心 mutation，附带击穿 `NoFalseStopped`） |
+| `mutations/LateStopReadsCurrentIntent.cfg` | settlement 读当前 stopSeen（决定性已判 Failed → 晚到 stop → 提交 Stopped） | `CommittedOutcomeMatchesContract`（S9；late-command rule 约束力的核心 mutation，附带击穿 `NoFalseStopped`） |
 | `mutations/TeardownBeforeSettlement.cfg` | 去掉 FinishTeardown 的 settlement 守卫 | `TeardownRequiresSettlement`（S10 非空洞） |
 | `mutations/ActivationFailureBecomesFailed.cfg` | activation failure 升格 terminal Failed | `ActivationFailureIsNotTerminalFailed`（S8 非空洞） |
 | `mutations/FalseCompleted.cfg` | 无 Eof+Drained 也判 Completed | `NoFalseCompleted`（S6 非空洞） |
 | `mutations/FalseStopped.cfg` | 无边界 stop intent 也判 Stopped（stopRequestedNow 反模式） | `NoFalseStopped`（S7 非空洞） |
-| `mutations/EvidenceProducerCommits.cfg` | evidence 发布者顺手写 outcome | `OutcomeWrittenOnlyByAuthoritySettle`（writer authority 非空洞） |
+| `mutations/EvidenceProducerSpoofsAuthority.cfg` | evidence 发布者冒充 authority：值/边界 intent/`firstCommitted` 全部如实维护的最大对手 | `AuthorityIsSoleWriter`（S3 按名违反；**零**状态不变式违反——ghost 状态无法承载 writer identity 的机器证明） |
+| `mutations/NarrowDecisiveDomain.cfg` | teardown settlement 门缩回 deliberately-minimal 触发域（`Eof+Aborted` 落在门外），性质不动 | `TeardownRequiresSettlement`（S10 触发域覆盖是真实约束，非跟着定义空洞成立） |
 
 反向控制（5 + 1，必须被违反；overclaim 全部在带 WF 的最强让步下检查）：
 
@@ -193,7 +234,7 @@ authority 的 semantic fact）。
 | `mutations/OverclaimDeviceDrains.cfg` | `EveryDeviceEventuallyDrains` | liveness 反例 |
 | `probes/NoFairnessProgressFails.cfg` | 去掉 WF 后 `SettlementProgress` 必须失效 | liveness 反例（fairness 是承重的） |
 
-可达性 witness（6，断言"不可达"必须被违反 = witness 找到）：
+可达性 witness（7，断言"不可达"必须被违反 = witness 找到）：
 
 | 文件 | 合法路径 |
 | --- | --- |
@@ -201,7 +242,9 @@ authority 的 semantic fact）。
 | `probes/WitnessUserStop.cfg` | W2 边界前 stop → Stopped |
 | `probes/WitnessDeviceAbortFailed.cfg` | W3 无 stop 的设备 abort → Failed |
 | `probes/WitnessLateStopCannotRelabel.cfg` | W4 决定性 Failed 后晚到 stop，settlement **仍是 Failed**（与 M4 成对：同一调度形状，正确版/错误版） |
-| `probes/WitnessLateStopAfterCompleted.cfg` | W5 Completed 已提交 + 晚到 stop 共存（同 run `TerminalOutcomeImmutable` PASS） || `probes/WitnessNoConsumerCommit.cfg` | W6 Observe/Wait 从未运行，terminal Fact 仍建立 |
+| `probes/WitnessLateStopAfterCompleted.cfg` | W5 Completed 已提交 + 晚到 stop 共存（同 run `TerminalOutcomeImmutable` PASS） |
+| `probes/WitnessNoConsumerCommit.cfg` | W6 Observe/Wait 从未运行，terminal Fact 仍建立 |
+| `probes/WitnessEofAbortedFailed.cfg` | W7 Eof+Aborted 全程无 stop → Failed(device)（CORRECTIVE-1 收回触发域的 production-decisive 分支） |
 
 **读 TLC 结果的纪律**：`-continue` 的 violated 列表不是穷尽清单；mutation
 cfg 的 INVARIANT 列表读作"本次检查了这些"，runner 只要求目标出现在
@@ -212,7 +255,7 @@ violated 集合里。
 ```bash
 specs/check.sh current                       # 含本套件（current formal gate）
 specs/check.sh terminal                      # 仅本套件
-specs/episode-terminal-settlement/check.sh   # 直接运行（23 条 TLC run）
+specs/episode-terminal-settlement/check.sh   # 直接运行（25 条 TLC run）
 ```
 
 工具链与其它套件共用 `specs/tools/tla2tools.jar`（v1.7.4，sha256 校验，
@@ -220,7 +263,7 @@ specs/episode-terminal-settlement/check.sh   # 直接运行（23 条 TLC run）
 
 ## Bounds / 假设（结论只在这个范围内成立）
 
-- 状态空间：616 个 distinct state（穷举；无界参数，除 `Mutation` 常量外
+- 状态空间：652 个 distinct state（穷举；无界参数，除 `Mutation` 常量外
   无其它常量）。
 - 进度性质依赖其 `SPECIFICATION` 显式写出的 `WF_vars(AuthoritySettle)`；
   无 fairness 的 run 是反向控制/承重控制，不是结论。
@@ -229,5 +272,6 @@ specs/episode-terminal-settlement/check.sh   # 直接运行（23 条 TLC run）
   TimelineSegment / DataPlaneAuthority / PlaybackSessionHandle / UI /
   PlayerEngine / 线程调度 / 内存序 / 物理可听性。
 - 单 episode、单次 teardown、无 multi-session / preload / gapless。
-- 模型选择的是 **accepted contract 的极小判决核心**；production 当前
-  precedence 的其余分支不在 normative 不变式内（见上文映射表）。
+- 触发域/判决值分两层：settlement obligation 的触发域是 normative
+  （全形状覆盖）；判决值表是 current realization conformance oracle
+  （见上文"判决概念分两层"）。

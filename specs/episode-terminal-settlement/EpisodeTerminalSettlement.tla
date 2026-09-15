@@ -40,8 +40,9 @@
 (*   Aborted                   stop_and_join 返回 => verdict 已发布）        *)
 (*   BeginTeardown /           session fiber 的 effect 逆序释放（LIFO：       *)
 (*   FinishTeardown            stop edge + join worker -> stop_and_join      *)
-(*                             stream）。FinishTeardown 的两个守卫是生产      *)
-(*                             现实，不是额外假设（见动作注释）。             *)
+(*                             stream）。守卫 1（join 纪律）是生产现实；      *)
+(*                             守卫 2（settlement 边界）是 accepted D11-C5    *)
+(*                             要求（见动作注释）。                           *)
 (*   AuthoritySettle           Playback Session semantic authority 的         *)
 (*                             settlement 动作（当前 Rust 中由               *)
 (*                             consumer 调用路径代为触发——那是 D11 已记录的   *)
@@ -78,7 +79,25 @@
 (*                                     D11 Failed（M6）                      *)
 (*   MutationFalseCompleted            无 Eof+Drained 也判 Completed（M7）    *)
 (*   MutationFalseStopped              无边界 stop intent 也判 Stopped（M8）  *)
-(*   MutationEvidenceProducerCommits   evidence 发布者自己写 outcome（M9）    *)
+(*   MutationEvidenceProducerSpoofsAuthority                                           *)
+(*                                     evidence 发布者冒充 authority 提交：   *)
+(*                                     值/边界 intent/firstCommitted 全部如实 *)
+(*                                     维护，状态不变式全绿，只有 S3 的       *)
+(*                                     transition 级性质能抓住（M9）          *)
+(*   MutationNarrowDecisiveDomain      把 teardown settlement 门缩回          *)
+(*                                     deliberately-minimal 触发域：C5 必须    *)
+(*                                     抓住（证明 C5 触发域覆盖是真实的）（M10）*)
+
+(* review corrective round 记录（不改变 authority，只修正模型两处不足）：     *)
+(*   1. decisive 触发域从 deliberately-minimal 判决域改为 current decision    *)
+(*      contract 的**全部**可判决形状（CurrentDecisionDecisive）；上一轮把    *)
+(*      production 果断的 Eof+Aborted -> Failed(device) 留在触发域外，使      *)
+(*      C5 / progress / latch 成为局部证明。判决**值**表仍是 current          *)
+(*      realization conformance oracle（非 normative precedence）。           *)
+(*   2. writer identity 从 ghost 布尔状态不变式改为 transition 级性质         *)
+(*      （OutcomeChangedOnlyByAuthority）：ghost 布尔可被"顺手维护 ghost"的   *)
+(*      冒写动作骗过（M9 即该最大对手）。                                     *)
+(*   新增 W7（Eof+Aborted -> Failed witness）与 M10（触发域收窄负控制）。     *)
 (*                                                                         *)
 (* 本模型不检查 TLC deadlock：终局之后"环境停摆"是 [][Next]_vars 允许的      *)
 (* 合法行为，也是本模型要表达的东西（没有任何人是 required 的）。            *)
@@ -98,7 +117,8 @@ CONSTANTS
     MutationActivationFailureBecomesFailed,
     MutationFalseCompleted,
     MutationFalseStopped,
-    MutationEvidenceProducerCommits
+    MutationEvidenceProducerSpoofsAuthority,
+    MutationNarrowDecisiveDomain
 
 MutationChoices == {MutationNone,
                     MutationObserveCommits,
@@ -109,7 +129,8 @@ MutationChoices == {MutationNone,
                     MutationActivationFailureBecomesFailed,
                     MutationFalseCompleted,
                     MutationFalseStopped,
-                    MutationEvidenceProducerCommits}
+                    MutationEvidenceProducerSpoofsAuthority,
+                    MutationNarrowDecisiveDomain}
 
 ASSUME Mutation \in MutationChoices
 
@@ -129,14 +150,16 @@ VARIABLES
     \* —— 以下是 verifier-only 历史/见证变量（auxiliary，非 normative，        *)
     \*    不要求 production 具有任何对应表示 ——                            *)
     firstCommitted,         \* 第一次提交写入的值（write-once），用于检出改写
-    authoritySettled,       \* AuthoritySettle 是否至少执行过一次（writer 集合）
     observeRan,             \* 外部纯读是否至少发生过一次
     waitRan                 \* 外部等待是否至少发生过一次
+    \* 注：上一轮的 authoritySettled ghost 布尔已退役——它是被 review 证伪的    *)
+    \*    writer 证明形状（冒写动作顺手维护 ghost 即可骗过；M9 即该对手）。      *)
+    \*    writer identity 现由 transition 级性质 S3 承载（见安全不变式节）。     *)
 
 vars == <<stopSeen, decodeFailure, workerTerminal, drainVerdict,
           activationFailed, terminalOutcome, episodeLifecycle,
           decisionLatched, stopAtDecision,
-          firstCommitted, authoritySettled, observeRan, waitRan>>
+          firstCommitted, observeRan, waitRan>>
 
 WorkerTerminals == {"None", "Eof", "Stopped", "Failed"}
 DrainVerdicts == {"None", "Drained", "Aborted"}
@@ -157,51 +180,87 @@ Init ==
     /\ decisionLatched = FALSE
     /\ stopAtDecision = FALSE
     /\ firstCommitted = "None"
-    /\ authoritySettled = FALSE
     /\ observeRan = FALSE
     /\ waitRan = FALSE
 
 -----------------------------------------------------------------------------
 (************************ 语义判决函数（纯函数） *****************************)
 
-\* D11 accepted proposition 的极小转录：本函数**只**包含
-\* merged D11 明确冻结/要求的判决内容：
+\* —— 概念拆分（review corrective 轮确立，两层不得混用）—————
 \*
-\*   Completed（D11 命题）：decode EOF evidence + output drain-complete
-\*       evidence（不加入 physical audibility）。
-\*   Stopped（D11 命题）：aborted episode terminal evidence + 决策边界时
-\*       已记录 stop intent + 无更高优先级 failure 胜出。
-\*   Failed（D11 命题）：按 authority decision contract 判为失败；failure
-\*       class 由 semantic precedence 决定——本函数转录其最小核心：
-\*       failure evidence（decode failure / worker Failed）压过一切；
-\*       无 stop intent 的 abort 是 device failure。
-\*
-\* production resolver 的其余精确 precedence（如 Aborted+Eof -> Failed、
-\* stage 文本）是 **current realization**，不是 D11 冻结内容，本模型不转录
-\* （见 README 的 production 映射表；f2-terminal-commit-boundary 套件承载
-\* current decision table
-\* 证据）。第一分支是 M7 的负控制注入口。
-TerminalCandidateOf(sa, df, wt, dv) ==
+\* (1) CurrentDecisionDecisive —— current decision contract 在哪些证据形状上
+\*     已经能作出终局判决。settlement obligation 的触发域（decision 边界
+\*     latch / C5 teardown 门 / progress）是 normative 的：D11 冻结
+\*     "decisive evidence 出现 => authority 必须 settlement"，而 decisive
+\*     必须覆盖 current contract 能判决的**全部**形状——把 production 已
+\*     果断的分支留在触发域外会把 C5/progress 变成局部证明。
+\*     每个析取支映射 production resolver（SessionCompletion::resolve）的
+\*     一个分支，四条全覆盖：
+\*       decode failure 最先判（drain-independent）
+\*       worker terminal = Failed（drain-independent）
+\*       drain = Drained + worker = Eof  -> Completed
+\*       drain = Aborted + worker 已退出（Stopped / Eof / Failed 均可判决；
+\*       其中 Eof -> Failed(device) 是上一轮被留在触发域外的分支）
+\*     反例（不可判决，不在域内）：Drained + worker 未退出或 Stopped；
+\*     Aborted + worker 未退出。
+CurrentDecisionDecisive(df, wt, dv) ==
+    df
+    \/ wt = "Failed"
+    \/ (dv = "Drained" /\ wt = "Eof")
+    \/ (dv = "Aborted" /\ wt # "None")
+
+\* (2) CurrentDecisionVerdict —— current contract 对可判决形状的判决值，
+\*     在**决策边界冻结的 stop intent**（sa）下求值。这是 current
+\*     realization 的 conformance oracle：精确 precedence 是 realization，
+\*     决策 contract 演进时本表随 authority 变更重推导；normative 层是
+\*     (1) 的触发域全覆盖 + S6/S7 承载的 D11 外部命题，不是这张表的
+\*     具体取值。与 production 的唯一刻意偏差：production resolve() 读
+\*     **当前** stop_requested（known differential，F2 修正目标）；本模型
+\*     按 D11 late-command rule 读边界 intent。
+CurrentDecisionVerdict(sa, df, wt, dv) ==
+    IF ~CurrentDecisionDecisive(df, wt, dv) THEN "None"
+    ELSE IF df THEN "Failed"
+    ELSE IF wt = "Failed" THEN "Failed"
+    ELSE IF dv = "Drained" THEN "Completed"      \* 域内必有 wt = "Eof"
+    ELSE IF wt = "Stopped" /\ sa THEN "Stopped"  \* 此处 dv = "Aborted"
+    ELSE "Failed"                                \* Aborted + Eof；Aborted + Stopped 无边界 stop
+
+\* 上一轮 deliberately-minimal 触发域。现在只作为 M10 负控制的变异对象：
+\* 把 teardown settlement 门缩回这个域时 C5 必须被违反（证明 C5 的触发域
+\* 覆盖是真实约束，不是跟着模型定义空洞成立）。
+MinimalCandidateDomain(df, wt, dv) ==
+    df \/ wt = "Failed"
+    \/ (wt = "Eof" /\ dv = "Drained")
+    \/ (wt = "Stopped" /\ dv = "Aborted")
+
+\* M7 / M8 的注入口：劫持判决值（不动触发域）。正常模型下与
+\* CurrentDecisionVerdict 恒等。
+SettleVerdict(sa, df, wt, dv) ==
     CASE Mutation = MutationFalseCompleted /\ wt = "Eof" -> "Completed"
       [] Mutation = MutationFalseStopped /\ wt = "Stopped" /\ dv = "Aborted" -> "Stopped"
-      [] df \/ wt = "Failed" -> "Failed"
-      [] wt = "Eof" /\ dv = "Drained" -> "Completed"
-      [] wt = "Stopped" /\ dv = "Aborted" -> IF sa THEN "Stopped" ELSE "Failed"
-      [] OTHER -> "None"
+      [] OTHER -> CurrentDecisionVerdict(sa, df, wt, dv)
 
-\* 用"决策边界时刻的 stop intent"（ghost 值）算出的当前判决。
+\* 用决策边界时刻的 stop intent（ghost 值）算出的当前判决。
 \* evidence write-once => 一旦判决锁定，判决函数值不再变化。
-SettleCandidate == TerminalCandidateOf(stopAtDecision, decodeFailure, workerTerminal, drainVerdict)
+SettleCandidate == SettleVerdict(stopAtDecision, decodeFailure, workerTerminal, drainVerdict)
 
-\* 当前证据是否已足以判决。
-Decisive == SettleCandidate # "None"
+\* 当前证据是否已处于 settlement obligation 的触发域（normative 层）。
+Decisive == CurrentDecisionDecisive(decodeFailure, workerTerminal, drainVerdict)
+
+\* teardown settlement 门使用的 decisive 判定。正常模型下与 Decisive 恒等；
+\* M10 让它缩回 MinimalCandidateDomain（变异的是机制门，不是性质——性质
+\* 仍以全形状 Decisive 为准，这正是该负控制的检验点）。
+SettlementGateDecisive ==
+    IF Mutation = MutationNarrowDecisiveDomain
+    THEN MinimalCandidateDomain(decodeFailure, workerTerminal, drainVerdict)
+    ELSE Decisive
 
 \* 决定性边界是否在"这块证据落地"的瞬间首次到达。
-\* latch 判定用 stopSeen（此刻已记录的 intent）求值：最后一块决定性证据
-\* 与 stop intent 的先后关系，就是 D11 late-command rule 的判决输入。
+\* 触发域与 stop intent 无关（见 CurrentDecisionDecisive），因此 latch 判定
+\* 不读 intent；intent 的先后关系由 StopAtBoundary 在边界瞬间冻结。
 BecameDecisive(dfN, wtN, dvN) ==
     /\ ~decisionLatched
-    /\ TerminalCandidateOf(stopSeen, dfN, wtN, dvN) # "None"
+    /\ CurrentDecisionDecisive(dfN, wtN, dvN)
 
 \* 边界时刻冻结下来的 stop intent：边界刚到就用"此刻已记录的 intent"，
 \* 之前已 latch 则保持不变。
@@ -218,8 +277,7 @@ Activate ==
     /\ episodeLifecycle' = "Active"
     /\ UNCHANGED <<stopSeen, decodeFailure, workerTerminal, drainVerdict,
                    activationFailed, terminalOutcome, decisionLatched,
-                   stopAtDecision, firstCommitted, authoritySettled,
-                   observeRan, waitRan>>
+                   stopAtDecision, firstCommitted, observeRan, waitRan>>
 
 \* 激活失败：diagnostic，不是 terminal outcome 权威（D11 firewall）。
 \* 负控制 MutationActivationFailureBecomesFailed 让它把 activation failure
@@ -233,7 +291,6 @@ PublishActivationFailure ==
         /\ terminalOutcome' = IF escalated THEN "Failed" ELSE terminalOutcome
         /\ firstCommitted' = IF escalated /\ firstCommitted = "None"
                              THEN "Failed" ELSE firstCommitted
-        /\ authoritySettled' = (authoritySettled \/ escalated)
         /\ UNCHANGED <<stopSeen, decodeFailure, workerTerminal, drainVerdict,
                        episodeLifecycle, decisionLatched, stopAtDecision,
                        observeRan, waitRan>>
@@ -252,7 +309,7 @@ RequestStop ==
         /\ terminalOutcome' = IF rewritten THEN "Stopped" ELSE terminalOutcome
         /\ UNCHANGED <<decodeFailure, workerTerminal, drainVerdict, activationFailed,
                        episodeLifecycle, decisionLatched, stopAtDecision,
-                       firstCommitted, authoritySettled, observeRan, waitRan>>
+                       firstCommitted, observeRan, waitRan>>
 
 \* —— 证据发布。每个动作在"这块证据落地"的同一步执行决定性边界 latch
 \*    （decisionLatched / stopAtDecision），但**从不**写 terminalOutcome：
@@ -273,17 +330,22 @@ PublishDecodeFailure ==
     /\ stopAtDecision' = StopAtBoundary(TRUE, workerTerminal, drainVerdict)
     /\ UNCHANGED <<stopSeen, workerTerminal, drainVerdict, activationFailed,
                    terminalOutcome, episodeLifecycle, firstCommitted,
-                   authoritySettled, observeRan, waitRan>>
+                   observeRan, waitRan>>
 
+\* evidence 发布者冒充 authority 的负控制注入口（M9）：sneak 触发时，
+\* 发布动作执行 AuthoritySettle 的**全部**状态效果——判决值按边界 intent
+\* 正确计算、firstCommitted 如实维护。结果：全部状态不变式（S2/S6/S7/S9/
+\* C5……）保持绿色，唯一能抓住它的是 S3 的 transition 级性质。这正是
+\* writer identity 不能用 ghost 状态表达、必须落在"改变 outcome 的
+\* transition 必须就是 AuthoritySettle"上的机器证明。
 PublishWorkerEof ==
-    LET sneak ==
-            Mutation = MutationEvidenceProducerCommits
+    LET spoof ==
+            /\ Mutation = MutationEvidenceProducerSpoofsAuthority
             /\ terminalOutcome = "None"
-            /\ TerminalCandidateOf(StopAtBoundary(decodeFailure, "Eof", drainVerdict),
-                                   decodeFailure, "Eof", drainVerdict) # "None"
+            /\ CurrentDecisionDecisive(decodeFailure, "Eof", drainVerdict)
         cand ==
-            TerminalCandidateOf(StopAtBoundary(decodeFailure, "Eof", drainVerdict),
-                                decodeFailure, "Eof", drainVerdict)
+            SettleVerdict(StopAtBoundary(decodeFailure, "Eof", drainVerdict),
+                          decodeFailure, "Eof", drainVerdict)
     IN  /\ episodeLifecycle \in {"Active", "TeardownStarted"}
         /\ ~activationFailed
         /\ workerTerminal = "None"
@@ -291,10 +353,11 @@ PublishWorkerEof ==
         /\ workerTerminal' = "Eof"
         /\ decisionLatched' = (decisionLatched \/ BecameDecisive(decodeFailure, "Eof", drainVerdict))
         /\ stopAtDecision' = StopAtBoundary(decodeFailure, "Eof", drainVerdict)
-        /\ terminalOutcome' = IF sneak THEN cand ELSE terminalOutcome
+        /\ terminalOutcome' = IF spoof THEN cand ELSE terminalOutcome
+        /\ firstCommitted' = IF spoof /\ firstCommitted = "None"
+                             THEN cand ELSE firstCommitted
         /\ UNCHANGED <<stopSeen, decodeFailure, drainVerdict, activationFailed,
-                       episodeLifecycle, firstCommitted, authoritySettled,
-                       observeRan, waitRan>>
+                       episodeLifecycle, observeRan, waitRan>>
 
 PublishWorkerStopped ==
     /\ episodeLifecycle \in {"Active", "TeardownStarted"}
@@ -307,7 +370,7 @@ PublishWorkerStopped ==
     /\ stopAtDecision' = StopAtBoundary(decodeFailure, "Stopped", drainVerdict)
     /\ UNCHANGED <<stopSeen, decodeFailure, drainVerdict, activationFailed,
                    terminalOutcome, episodeLifecycle, firstCommitted,
-                   authoritySettled, observeRan, waitRan>>
+                   observeRan, waitRan>>
 
 PublishWorkerFailed ==
     /\ episodeLifecycle \in {"Active", "TeardownStarted"}
@@ -320,7 +383,7 @@ PublishWorkerFailed ==
     /\ stopAtDecision' = StopAtBoundary(decodeFailure, "Failed", drainVerdict)
     /\ UNCHANGED <<stopSeen, decodeFailure, drainVerdict, activationFailed,
                    terminalOutcome, episodeLifecycle, firstCommitted,
-                   authoritySettled, observeRan, waitRan>>
+                   observeRan, waitRan>>
 
 PublishDrainDrained ==
     /\ episodeLifecycle \in {"Active", "TeardownStarted"}
@@ -332,7 +395,7 @@ PublishDrainDrained ==
     /\ stopAtDecision' = StopAtBoundary(decodeFailure, workerTerminal, "Drained")
     /\ UNCHANGED <<stopSeen, decodeFailure, workerTerminal, activationFailed,
                    terminalOutcome, episodeLifecycle, firstCommitted,
-                   authoritySettled, observeRan, waitRan>>
+                   observeRan, waitRan>>
 
 PublishDrainAborted ==
     /\ episodeLifecycle \in {"Active", "TeardownStarted"}
@@ -343,7 +406,7 @@ PublishDrainAborted ==
     /\ stopAtDecision' = StopAtBoundary(decodeFailure, workerTerminal, "Aborted")
     /\ UNCHANGED <<stopSeen, decodeFailure, workerTerminal, activationFailed,
                    terminalOutcome, episodeLifecycle, firstCommitted,
-                   authoritySettled, observeRan, waitRan>>
+                   observeRan, waitRan>>
 
 -----------------------------------------------------------------------------
 (******************************** teardown 边界 ******************************)
@@ -356,8 +419,7 @@ BeginTeardown ==
     /\ episodeLifecycle' = "TeardownStarted"
     /\ UNCHANGED <<stopSeen, decodeFailure, workerTerminal, drainVerdict,
                    activationFailed, terminalOutcome, decisionLatched,
-                   stopAtDecision, firstCommitted, authoritySettled,
-                   observeRan, waitRan>>
+                   stopAtDecision, firstCommitted, observeRan, waitRan>>
 
 \* teardown 完成。两个守卫的性质不同：
 \*
@@ -374,19 +436,21 @@ BeginTeardown ==
 \*    独立动作（AuthoritySettle），可以在 Active 或 TeardownStarted 期间
 \*    发生——"settlement 挂在 teardown path 上"的最小实现即这两步的先后。
 \*    负控制 MutationTeardownBeforeSettlement 去掉守卫 2。
+\*    守卫 2 的 decisive 判定走 SettlementGateDecisive：M10 负控制把它缩回
+\*    deliberately-minimal 触发域（Eof+Aborted 落在门外），C5 不变式仍按
+\*    全形状 Decisive 检查——证明 C5 的触发域覆盖是真实约束。
 FinishTeardown ==
     /\ episodeLifecycle = "TeardownStarted"
     /\ (   activationFailed
          \/ (workerTerminal # "None" /\ drainVerdict # "None"))
     /\ (   Mutation = MutationTeardownBeforeSettlement
          \/ activationFailed
-         \/ ~Decisive
+         \/ ~SettlementGateDecisive
          \/ terminalOutcome # "None")
     /\ episodeLifecycle' = "TeardownDone"
     /\ UNCHANGED <<stopSeen, decodeFailure, workerTerminal, drainVerdict,
                    activationFailed, terminalOutcome, decisionLatched,
-                   stopAtDecision, firstCommitted, authoritySettled,
-                   observeRan, waitRan>>
+                   stopAtDecision, firstCommitted, observeRan, waitRan>>
 
 -----------------------------------------------------------------------------
 (****************************** authority / 消费侧动作 ***********************)
@@ -404,17 +468,16 @@ AuthoritySettle ==
     /\ terminalOutcome = "None"
     /\ terminalOutcome' =
            IF Mutation = MutationLateStopReadsCurrentIntent
-           THEN TerminalCandidateOf(stopSeen, decodeFailure, workerTerminal, drainVerdict)
+           THEN SettleVerdict(stopSeen, decodeFailure, workerTerminal, drainVerdict)
            ELSE SettleCandidate
     /\ firstCommitted' = terminalOutcome'
-    /\ authoritySettled' = TRUE
     /\ UNCHANGED <<stopSeen, decodeFailure, workerTerminal, drainVerdict,
                    activationFailed, episodeLifecycle, decisionLatched,
                    stopAtDecision, observeRan, waitRan>>
 
 \* 纯读（D14.2 observe 语义）：只改 observeRan，永不写任何语义状态。
-\* M1 负控制让它偷偷提交（且不登记 authoritySettled，writer 集合不变式
-\* 必须发现它）。
+\* M1 负控制让它偷偷提交——值完全正确，但写入 transition 不是
+\* AuthoritySettle，S3 的 transition 级性质必须发现它。
 Observe ==
     /\ observeRan' = TRUE
     /\ terminalOutcome' =
@@ -426,7 +489,7 @@ Observe ==
            ELSE terminalOutcome
     /\ UNCHANGED <<stopSeen, decodeFailure, workerTerminal, drainVerdict,
                    activationFailed, episodeLifecycle, decisionLatched,
-                   stopAtDecision, firstCommitted, authoritySettled, waitRan>>
+                   stopAtDecision, firstCommitted, waitRan>>
 
 \* 纯等待（D14.2 wait-for-terminal 语义）：只改 waitRan。TLA 不模拟 OS
 \* blocking；语义要求只有一条——wait 没有任何 semantic writer 效果，
@@ -444,7 +507,7 @@ Wait ==
            ELSE terminalOutcome
     /\ UNCHANGED <<stopSeen, decodeFailure, workerTerminal, drainVerdict,
                    activationFailed, episodeLifecycle, decisionLatched,
-                   stopAtDecision, firstCommitted, authoritySettled, observeRan>>
+                   stopAtDecision, firstCommitted, observeRan>>
 
 -----------------------------------------------------------------------------
 (************************** 次态关系与公平性 *********************************)
@@ -500,7 +563,6 @@ TypeOK ==
     /\ decisionLatched \in BOOLEAN
     /\ stopAtDecision \in BOOLEAN
     /\ firstCommitted \in Outcomes
-    /\ authoritySettled \in BOOLEAN
     /\ observeRan \in BOOLEAN
     /\ waitRan \in BOOLEAN
 
@@ -526,11 +588,20 @@ BoundaryLatchedWhenDecisive == Decisive => decisionLatched
 TerminalOutcomeImmutable ==
     firstCommitted = "None" \/ terminalOutcome = firstCommitted
 
-\* S3 / S4 / S5 的 writer 集合 —— terminalOutcome 的唯一 None -> terminal
-\* writer 是 AuthoritySettle。Observe（纯读）、Wait（纯等待）、证据发布
-\* 动作都不在此集合内。M1 / M2 / M9 分别证明这条约束不是空洞的。
-OutcomeWrittenOnlyByAuthoritySettle ==
-    terminalOutcome = "None" \/ authoritySettled
+\* S3 —— writer identity，**transition 级**性质（review corrective 轮重做）：
+\* terminalOutcome 的任何改变必须**就是** AuthoritySettle 这个动作。
+\* 上一轮用 ghost 布尔状态不变式表达 writer 集合，被 review 证伪：一个
+\* "顺手把 ghost 也维护掉"的冒写动作可以骗过全部状态检查。状态谓词在
+\* 原则上无法表达"是哪个动作写的"，所以这条性质必须落在 transition 上，
+\* 由 TLC 以 temporal property 检查（cfg 的 PROPERTY 节引用
+\* AuthorityIsSoleWriter）。M1 / M2 / M9 证明它不空洞；其中 M9 是最大
+\* 对手（值、边界 intent、firstCommitted 全部如实维护，状态不变式全绿）。
+OutcomeChangedOnlyByAuthority ==
+    (terminalOutcome' # terminalOutcome) => AuthoritySettle
+
+\* [][A]_vars 形式：每一步要么满足 A，要么整体 stutter（stutter 时
+\* outcome 不变，蕴含前件为假，平凡满足）。
+AuthorityIsSoleWriter == [][OutcomeChangedOnlyByAuthority]_vars
 
 \* S6 —— 不虚构 Completed（D11 命题：decode EOF + drain contract 完成；
 \* 不加入 physical audibility）。
@@ -548,16 +619,16 @@ NoFalseStopped ==
             /\ stopAtDecision
             /\ ~decodeFailure)
 
-\* S9 —— **已决定性（Decisive）时**，提交值必须是判决函数在（冻结的）边界
-\* intent 下对当前证据的判决。单向蕴含是有意的范围选择：它只约束"决定性
-\* 证据上的提交值"，不把本模型 None-region（未决定组合）的边界升格为
-\* normative——production 当前 resolver 对部分未决定组合（如
-\* Aborted+Eof -> Failed）更"果断"，那是 current realization，本模型不做
-\* normative 约束（见 README 范围声明）。evidence write-once => 提交后的
-\* 证据不再变化。它同时排除：改写已提交值（M3）、settlement 读取当前
-\* stopSeen 导致的重标签（M4）。这是 late-command stability 的机器表达，
-\* 配套正向 witness Unreachable_LateStopDecisiveFailedStaysFailed 的反证
-\* （W4）。
+\* S9 —— 已处于 settlement obligation 触发域（全形状 Decisive）时，提交值
+\* 必须是判决函数在（冻结的）边界 intent 下对当前证据的判决。单向蕴含是
+\* 有意的：只约束"可判决证据上的提交值"，未提交（None）在 settlement
+\* 执行前合法。判决**值表**（CurrentDecisionVerdict）是 current
+\* realization conformance oracle——conformance 的对象正是当前已接受的
+\* decision contract；其 precedence 演进时本不变式随 authority 变更重推导，
+\* 而触发域全覆盖、C5、progress 的义务结构不变。它同时排除：改写已提交
+\* 值（M3）、settlement 读取当前 stopSeen 导致的重标签（M4）。这是
+\* late-command stability 的机器表达，配套正向 witness
+\* Unreachable_LateStopDecisiveFailedStaysFailed 的反证（W4）。
 CommittedOutcomeMatchesContract ==
     Decisive =>
         (terminalOutcome = "None" \/ terminalOutcome = SettleCandidate)
@@ -573,6 +644,9 @@ DiagnosticActivationFailureLeavesOutcomeUncommitted ==
 
 \* S10 —— teardown settlement 边界（D11-C5 的条件形式）：decisive evidence
 \* 存在时，teardown 不允许完成成 TeardownDone ∧ outcome 未提交。
+\* 判定用**全形状** Decisive（normative 触发域）。M10 负控制证明这个覆盖
+\* 是真实的：只把机制门（SettlementGateDecisive）缩回 minimal 域、性质
+\* 不动，C5 立即被违反。
 \* 这是 safety boundary，**不是**"每个 episode 最终都会 teardown/终结"的
 \* liveness 承诺。
 TeardownRequiresSettlement ==
@@ -615,6 +689,13 @@ Unreachable_CompletedWithLateStop ==
 \* 整个执行中 Observe 从未运行、Wait 从未运行，terminal Fact 仍被建立。
 Unreachable_CommitWithoutConsumer ==
     ~(terminalOutcome # "None" /\ ~observeRan /\ ~waitRan)
+
+\* W7（review corrective 轮新增）：Eof + Aborted（全程无 stop）——上一轮
+\* 被留在触发域外、导致 C5/progress 局部化的 production-decisive 分支——
+\* 现在由 authority 判为 Failed(device) 并提交。
+Unreachable_EofAbortedFailedDevice ==
+    ~(terminalOutcome = "Failed" /\ workerTerminal = "Eof"
+      /\ drainVerdict = "Aborted" /\ ~stopAtDecision /\ ~stopSeen)
 
 -----------------------------------------------------------------------------
 (***************************** Liveness 性质 ********************************)

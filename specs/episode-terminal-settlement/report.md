@@ -10,8 +10,8 @@
 
 2. **observe() 做什么、不做什么？** 只读。它不能 resolve、不能 commit、不能改
    证据、不能改 stop intent、不能改生命周期。模型里 `Observe` 动作只写一个
-   verifier-only 见证位；mutation M1 证明"observe 顺手提交"会被 writer 集合
-   不变式当场抓住。
+   verifier-only 见证位；mutation M1 证明"observe 顺手提交"会被 transition
+   级 writer 性质（S3）当场抓住——即使提交的值完全正确。
 
 3. **wait() 做什么、不做什么？** 只等 authority 已经落下的 Fact。它不跑
    resolver、不是 terminal writer、也不是 Fact 出现的前提。模型里 `Wait` 只写
@@ -211,15 +211,71 @@ FRESH REVIEW:
                 规则）——已全部清除/改为 ADR 章节引用，grep 验证清零。
     corrective rerun: 全套 23 条 TLC run 重跑 —— 23/23 通过（与修前同结果）
 
+CORRECTIVE-1（人工 review 对上一轮的 2 MAJOR + 1 CI BLOCKER，全部修正）：
+
+    review 判定（对初版 HEAD）：REQUEST_CHANGES，
+    D11_CONFORMANCE_PASS 不成立 → D11_CONFORMANCE_NEEDS_CORRECTIVE。
+
+    MAJOR-1（None-region 收窄了 settlement obligation 的触发域）：
+        初版模型的 TerminalCandidateOf 把 production 果断的
+        Eof+Aborted → Failed(device) 留在触发域（Decisive）之外，
+        于是存在这样的可达执行：current decision contract 已能判决
+        （decisive=TRUE, verdict=Failed）、teardown 已完成、outcome
+        未提交——而 C5 不变式因 antecedent 用同一个被收窄的 Decisive
+        而不响。S9 可以收窄（已收窄），但 C5/progress/latch 不可以
+        跟着收窄：settlement obligation 的 decisive domain 不得被
+        under-approximate。
+        修正：判决概念拆成两层——
+          CurrentDecisionDecisive（触发域，normative 层）：覆盖 current
+            decision contract 能判决的全部形状（逐支对应 production
+            resolve() 分支），latch/C5/progress 全部换用它；
+          CurrentDecisionVerdict（判决值，realization conformance
+            oracle）：精确 precedence 是 current realization，演进时
+            随 authority 变更重推导；D11 三条外部命题由独立不变式
+            （S6/S7）承载，不从判决表导出。
+        新增正向 witness W7（Eof+Aborted 全程无 stop → Failed(device)
+        提交可达）与负控制 M10（把机制门缩回 minimal 域、性质不动，
+        C5 必须被违反——证明触发域覆盖是真实约束而非空洞成立）。
+
+    MAJOR-2（writer-set theorem 证明的是 ghost 被置位，不是 writer
+    identity）：
+        初版 S3 = "outcome 非空 ⇒ authoritySettled ghost 为 TRUE"，
+        M9 之所以被杀只因 mutation 忘记登记 ghost——mutation 预先配合
+        了 oracle。"foreign writer 本身会被抓"并没有被证明。
+        修正：退役 authoritySettled 布尔；S3 改为 transition 级性质
+          OutcomeChangedOnlyByAuthority ==
+              (terminalOutcome' # terminalOutcome) => AuthoritySettle
+        （[][A]_vars 形式，TLC 以 Action property 检查、按名报告）。
+        M9 重构为最大对手 EvidenceProducerSpoofsAuthority：值按边界
+        intent 正确计算、firstCommitted 如实维护——全部状态不变式保持
+        绿色，唯一能抓住它的是 S3（runner 新增 tfail 模式验证
+        "temporal 按名违反 + 零状态不变式违反"）。M1/M2 同步升级为
+        同类验证。
+
+    CI BLOCKER（Formal Semantic Gate 红）：
+        根因：本 suite 的 check.sh 在 git 中无可执行位（100644），
+        CI 报 Permission denied（本地 shell 有 +x 掩盖了它）。已以
+        git update-index --chmod=+x 修正。
+
+    corrective rerun: 全套 25 条 TLC run（2 base + 10 mutation +
+        5 overclaim + 1 fairness 承重 + 7 witness）—— 25/25 通过；
+        聚合 specs/check.sh current（K0 + realtime-publication +
+        本 suite）exit 0。状态空间 616 → 652 distinct states
+        （触发域扩大所致）。
+
+    修正后 fresh review：见下节（CORRECTIVE-1 REVIEW）。
+
 CURRENT FORMAL GATE:
-    promoted? YES（本 PR 内完成注册）
-    reason: 全部 accepted D11 properties PASS（safety 与 fairness 解耦双跑）；
-            9 mutation 全 killed；5 overclaim + fairness 承重控制全部按预期
-            反例；fresh reviewer 0 MAJOR，5 MINOR 已修并重跑。已接入
-            specs/check.sh current 与 CI formal-semantic-gate 触发路径；
-            f2-terminal-commit-boundary 标注为 HISTORICAL/EXPLORATORY。
-            最终接受仍等待本 PR 的人工 review（READY_FOR_HUMAN_FORMAL_
-            CONFORMANCE_REVIEW）。
+    promoted? YES（本 PR 内完成注册；CORRECTIVE-1 后维持）
+    reason: 全部 accepted D11 properties PASS（safety 与 fairness 解耦双跑，
+            含 S3 transition 级 writer 性质）；10 mutation 全 killed
+            （writer 类为纯 temporal 反例：状态不变式全绿）；5 overclaim +
+            fairness 承重控制全部按预期反例；触发域全覆盖由 W7（正）与
+            M10（负）证明；corrective 后 fresh review 0 MAJOR（下节）。
+            已接入 specs/check.sh current 与 CI formal-semantic-gate 触发
+            路径；f2-terminal-commit-boundary 标注为 HISTORICAL/
+            EXPLORATORY。最终接受仍等待本 PR 的人工 review
+            （READY_FOR_HUMAN_FORMAL_CONFORMANCE_REVIEW）。
 
 PRODUCTION CODE:
     CHANGED? NO
@@ -231,10 +287,11 @@ F2 REPRESENTATION:
     CHOSEN? NO
 
 FORMAL VERDICT:
-    D11_CONFORMANCE_PASS
+    D11_CONFORMANCE_PASS（CORRECTIVE-1 后）
     （当前已接受的 D11 terminal-settlement contract 可被极小、非空洞的
-     TLA+ 模型一致表达；9/9 错误变体被机器抓住；无一般 liveness 偷渡；
-     未发现 merged D11 自相矛盾或无法一致建模之处 → 无 AUTHORITY DEFECT）
+     TLA+ 模型一致表达；10/10 错误变体被机器抓住——含触发域收窄与
+     全保真冒写两个初版漏掉的最大对手；无一般 liveness 偷渡；未发现
+     merged D11 自相矛盾或无法一致建模之处 → 无 AUTHORITY DEFECT）
 
 NEXT SINGLE STEP:
     QIANQIAN-F2-READ-SIDE-SEAM-REALITY-GATE-2
@@ -246,9 +303,9 @@ DO NOT CHOOSE F2 REPRESENTATION.
 
 ## 结果词汇
 
-- 正常模型：`BOUNDED-CLEAN`（616 distinct states 穷举；safety 无 fairness
+- 正常模型：`BOUNDED-CLEAN`（652 distinct states 穷举；safety 无 fairness
   双跑 PASS；条件进度在显式 WF 下 PASS）
-- 9 mutation + 5 overclaim + 1 fairness 承重：`COUNTEREXAMPLE-WITNESSED`
-- 6 witness：可达性确认（asserted-unreachable 不变式被违反）
+- 10 mutation + 5 overclaim + 1 fairness 承重：`COUNTEREXAMPLE-WITNESSED`
+- 7 witness：可达性确认（asserted-unreachable 不变式被违反）
 - 按 specs/README 结果声明边界：以上只在所述模型、界、假设与 fairness
   条件内成立，不构成 "architecture proven correct"。
