@@ -31,7 +31,14 @@ name: Verification Rust Gate
 # test-local candidate realization — no multi-generation publication
 # mechanism exists in any production crate yet (ADR-PBK-001 §6/§12 keeps
 # the production representation OPEN; ADR-PBK-001 itself triggers the
-# Formal Semantic Gate, not this one).
+# Formal Semantic Gate, not this one). One artifact from the formal
+# side IS listed: the settlement decision table
+# (specs/episode-terminal-settlement/CurrentDecisionTable.tla) is
+# frozen from the production resolver by the exhaustive Rust oracle
+# (crates/qianqian-playback/tests/completion_decision_table.rs, run by
+# this gate's playback native regression), so hand-editing the artifact
+# re-runs the oracle here while the Formal Semantic Gate re-checks the
+# table against the TLA decision functions.
 #
 # A green run states: bounded verification (scenario matrices + Miri +
 # loom, with all mutation negative controls caught) found no violation
@@ -49,6 +56,9 @@ on:
       - "crates/qianqian-playback/**"
       - "specs/composition-kernel-0-rust/**"
       - "specs/playback-concurrency/**"
+      # Decision-table refinement-oracle artifact: frozen from
+      # completion.rs by the exhaustive oracle this gate runs.
+      - "specs/episode-terminal-settlement/CurrentDecisionTable.tla"
       - "specs/check.sh"
       - "docs/architecture/composition-kernel-0-design.md"
       - "docs/architecture/composition-kernel-0-implementation-adr.md"
@@ -61,6 +71,8 @@ on:
       - "crates/qianqian-playback/**"
       - "specs/composition-kernel-0-rust/**"
       - "specs/playback-concurrency/**"
+      # Decision-table refinement-oracle artifact (see pull_request).
+      - "specs/episode-terminal-settlement/CurrentDecisionTable.tla"
       - "specs/check.sh"
       - "docs/architecture/composition-kernel-0-design.md"
       - "docs/architecture/composition-kernel-0-implementation-adr.md"

@@ -31,6 +31,8 @@ TLA_SHA256="936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
 WORKERS="${TLA_WORKERS:-4}"
 JAVA_BIN="${TLA_JAVA:-java}"
 MODULE="EpisodeTerminalSettlement"
+# 个别 run 使用其它主模块（refinement oracle 表模块）时覆盖。
+run_module="$MODULE"
 
 fail=0
 
@@ -53,12 +55,12 @@ WORK_BASE="${TLA_TMPDIR:-/var/tmp}"
 run_tlc() {
   local cfg="$1" expect="$2" label="$3"; shift 3
   local tmp; tmp="$(mktemp -d "$WORK_BASE/qianqian-episode-terminal.XXXXXX")"
-  cp "$SPEC_ROOT/$MODULE.tla" "$cfg" "$tmp/"
+  cp "$SPEC_ROOT"/*.tla "$cfg" "$tmp/"
   local log="$tmp/out.log"
   local attempt finished
   for attempt in 1 2 3; do
     ( cd "$tmp" && timeout 3600 "$JAVA_BIN" -XX:+UseParallelGC -jar "$JAR" \
-        -workers "$WORKERS" "$@" -config "$(basename "$cfg")" "$MODULE.tla" > out.log 2>&1 )
+        -workers "$WORKERS" "$@" -config "$(basename "$cfg")" "$run_module.tla" > out.log 2>&1 )
     finished="$(grep -c 'Finished in' "$log" || true)"
     [[ "$finished" -ge 1 ]] && break
   done
@@ -124,6 +126,11 @@ run_tlc() {
 echo "== 正常模型（必须全部 PASS：invariants + temporal properties）"
 run_tlc "$SPEC_ROOT/EpisodeTerminalSettlement.cfg"           pass "Base / safety + conditional progress（WF settle）"
 run_tlc "$SPEC_ROOT/EpisodeTerminalSettlementSafetyOnly.cfg" pass "Base / safety only（no fairness）"
+
+echo "== production ↔ formal 判决合同 refinement oracle（CurrentDecisionTable ↔ CurrentDecision*，48 元组穷举）"
+run_module="EpisodeTerminalSettlementTable"
+run_tlc "$SPEC_ROOT/EpisodeTerminalSettlementTable.cfg" pass "Table / 冻结表逐行 ↔ formal 判决函数（production 绑定在 Rust gate）"
+run_module="$MODULE"
 
 echo "== 负控制（每个 mutation 必须被抓住）"
 run_tlc "$SPEC_ROOT/mutations/ObserveCommits.cfg"              tfail:AuthorityIsSoleWriter "Mutation / M1 ObserveCommits（pure read commits）" -continue

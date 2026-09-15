@@ -43,6 +43,15 @@
    立即 settlement，从而根本不需要保留它）。F2 的 Rust representation 仍由
    F2-READ-SIDE-SEAM-REALITY-GATE 决定。
 
+8. **模型里的判决函数凭什么跟着生产代码走？** CORRECTIVE-2 起，不再凭
+   人工逐支核对：production `resolve()` 的判决合同被 Rust exhaustive
+   oracle（48 元组、真实公开 seam）冻结成单一真值表 artifact
+   `CurrentDecisionTable.tla`，TLC run 逐行校验这张表与
+   `CurrentDecisionDecisive`/`CurrentDecisionVerdict` 一致。改
+   `completion.rs` 判决分支、手改表、改 TLA 判决函数，三者任何漂移都会
+   击穿对应 CI gate——W7/M10 证明"formal ground truth 内部承重"，这张表
+   机器维护"ground truth ↔ production 相等"。
+
 ---
 
 ```text
@@ -310,21 +319,88 @@ CORRECTIVE-1（人工 review 对上一轮的 2 MAJOR + 1 CI BLOCKER，全部修�
                  允许 (decodeFailure, worker=None, drain=Drained) 这一
                  production 不可达组合（保守超近似；两侧同判 Failed）。
 
+CORRECTIVE-2（人工 review 对 CORRECTIVE-1 的复核——原判修复确认 + 1 新
+MAJOR，已修正）：
+
+    review 判定（对 CORRECTIVE-1 HEAD 136f616）：CHANGES_REQUIRED ——
+        原 MAJOR-1（decisive 触发域 under-approximation）确认 FIXED；
+        原 MAJOR-2（可伪造 ghost writer 证明）确认 FIXED；
+        CI BLOCKER（可执行位）确认 FIXED；
+        corrective-1 fresh findings（stale ledger / base PROPERTY 漏接 /
+        保守超近似未声明）确认 FIXED。
+        NEW MAJOR：current decision contract（completion.rs::resolve）与
+        TLA CurrentDecisionDecisive 是两个 truth source，只有人工逐支
+        核对的快照相等，缺 durable binding——Rust gate 不比对判决域、
+        Formal gate 不触发于 completion.rs，判决分支增删后所有 formal
+        tests 可保持绿色而 ground truth 已过期（W7+M10 证明的是"给定
+        CurrentDecision* 这份 formal ground truth，C5 对完整域承重"，
+        不能机器证明这份 ground truth 永远等于 production contract）。
+
+    修正（production 源码零改动，纯 verification 侧）：
+        1. 共享真值表 artifact specs/episode-terminal-settlement/
+           CurrentDecisionTable.tla（生成文件，48 元组穷举：
+           stop_intent × decode_failure × worker_terminal × drain_verdict
+           → undecided/completed/stopped/failed-decode/failed-device；
+           failed-* 细分保留 production stage 命名，TLC 比较时投影为
+           "Failed"）。
+        2. Rust exhaustive oracle
+           crates/qianqian-playback/tests/completion_decision_table.rs：
+           每个 tuple 一个 fresh SessionCompletion，经公开 seam
+           （decode_failed/worker_exited/drain_signal().complete/
+           request_stop）发布证据后 try_resolve_now 一次；渲染完整表
+           文件并 byte-compare（QIANQIAN_UPDATE_DECISION_TABLE=1 再生成）。
+           Verification Rust Gate 经 playback native regression 执行。
+        3. TLC refinement run（EpisodeTerminalSettlementTable.tla/.cfg）：
+           DecisionDomain 全部 48 元组为初始状态（穷举枚举器），
+           TableDecisiveMatchesContract（decisive 域逐行一致）+
+           TableVerdictMatchesContract（判决值逐行一致）+
+           TableRowsWellFormed（行数=域大小、形状合法、缺行由 RowFor
+           CHOOSE 失败暴露）。Formal Semantic Gate 执行。
+        4. trigger 闭环：crates/qianqian-playback/src/completion.rs 加入
+           formal-semantic-gate；CurrentDecisionTable.tla 加入
+           verification-rust-gate（手改表也会重跑 Rust oracle）。
+        5. 主模型 EpisodeTerminalSettlement.tla 语义零改动（表模块仅
+           EXTENDS 复用 CurrentDecisionDecisive/CurrentDecisionVerdict）。
+
+    oracle 负控制（三条漂移路径逐条实际注入验证，非声称）：
+        - TLA 侧漂移：删 CurrentDecisionDecisive 的
+          (Aborted ∧ wt≠None) 支 → TableDecisiveMatchesContract
+          立即违反（Eof+Aborted 行）。
+        - 表侧漂移（投影可见）：行值 failed-device→completed →
+          TableVerdictMatchesContract 违反。
+        - 表侧漂移（TLC 投影不可见）：failed-device→failed-decode
+          （两者都投影为 "Failed"）→ TLC 不响，Rust byte-compare
+          FAILED（这正是 artifact 单侧绑定不够、双侧绑定必要的原因）。
+
+    corrective rerun: 全套 26 条 TLC run（2 base + 1 table refinement +
+        10 mutation + 5 overclaim + 1 fairness 承重 + 7 witness）——
+        26/26 通过（table run：48 初始状态穷举，96 states generated）；
+        cargo test -p qianqian-playback 全绿（含 oracle test）。
+
+    scope 检查：diff 不触 crates/qianqian-playback/src/**（生产源码
+        零改动）、不触 docs/adr/**（authority 零改动）；只新增
+        verification artifact/test/workflow trigger 与文档措辞。
+
 CURRENT FORMAL GATE:
-    promoted? YES（本 PR 内完成注册；CORRECTIVE-1 后维持）
+    promoted? YES（本 PR 内完成注册；CORRECTIVE-2 后维持）
     reason: 全部 accepted D11 properties PASS（safety 与 fairness 解耦双跑，
             含 S3 transition 级 writer 性质）；10 mutation 全 killed
             （writer 类为纯 temporal 反例：状态不变式全绿）；5 overclaim +
             fairness 承重控制全部按预期反例；触发域全覆盖由 W7（正）与
-            M10（负）证明；corrective-1 后 fresh review 的实际结果与处置
-            见上节（CHANGES_REQUIRED 的 1 MAJOR + 2 MINOR 全部修正并
-            重跑）。已接入 specs/check.sh current 与 CI formal-semantic-gate
-            触发路径；f2-terminal-commit-boundary 标注为 HISTORICAL/
-            EXPLORATORY。最终接受仍等待本 PR 的人工 review
-            （READY_FOR_HUMAN_FORMAL_CONFORMANCE_REVIEW）。
+            M10（负）证明——**在其给定 formal ground truth 的意义上**：
+            W7/M10 证明 C5 等性质对 CurrentDecisionDecisive 的完整域真实
+            承重，而该 ground truth 与 production 判决合同的相等性由
+            refinement oracle 机器维护（CORRECTIVE-2，48 元组穷举双侧
+            绑定，三条漂移路径负控制全部有牙齿），不依赖人工逐支核对；
+            corrective-1/2 review 的实际结果与处置见上两节。已接入
+            specs/check.sh current 与 CI formal-semantic-gate 触发路径
+            （含 completion.rs refinement seam）；f2-terminal-commit-boundary
+            标注为 HISTORICAL/EXPLORATORY。最终接受仍等待本 PR 的人工
+            review（READY_FOR_HUMAN_FORMAL_CONFORMANCE_REVIEW）。
 
 PRODUCTION CODE:
-    CHANGED? NO
+    CHANGED? NO（CORRECTIVE-2 亦然：oracle 测试与 artifact 属
+          verification 侧；crates/qianqian-playback/src/** 零改动）
 
 ADR:
     CHANGED? NO
@@ -333,11 +409,13 @@ F2 REPRESENTATION:
     CHOSEN? NO
 
 FORMAL VERDICT:
-    D11_CONFORMANCE_PASS（CORRECTIVE-1 后）
+    D11_CONFORMANCE_PASS（CORRECTIVE-2 后）
     （当前已接受的 D11 terminal-settlement contract 可被极小、非空洞的
      TLA+ 模型一致表达；10/10 错误变体被机器抓住——含触发域收窄与
-     全保真冒写两个初版漏掉的最大对手；无一般 liveness 偷渡；未发现
-     merged D11 自相矛盾或无法一致建模之处 → 无 AUTHORITY DEFECT）
+     全保真冒写两个初版漏掉的最大对手；无一般 liveness 偷渡；production
+     ↔ formal 判决合同由 refinement oracle 双侧机器绑定（48 元组穷举，
+     漂移即 gate 红）；未发现 merged D11 自相矛盾或无法一致建模之处 →
+     无 AUTHORITY DEFECT）
 
 NEXT SINGLE STEP:
     QIANQIAN-F2-READ-SIDE-SEAM-REALITY-GATE-2
@@ -351,6 +429,9 @@ DO NOT CHOOSE F2 REPRESENTATION.
 
 - 正常模型：`BOUNDED-CLEAN`（652 distinct states 穷举；safety 无 fairness
   双跑 PASS；条件进度在显式 WF 下 PASS）
+- refinement oracle：`EXHAUSTIVE-CLEAN`（48 元组穷举双绑定：Rust oracle
+  byte-compare PASS + TLC 逐行比对 PASS；三条漂移路径负控制
+  `COUNTEREXAMPLE-WITNESSED` / Rust `FAILED`）
 - 10 mutation + 5 overclaim + 1 fairness 承重：`COUNTEREXAMPLE-WITNESSED`
 - 7 witness：可达性确认（asserted-unreachable 不变式被违反）
 - 按 specs/README 结果声明边界：以上只在所述模型、界、假设与 fairness

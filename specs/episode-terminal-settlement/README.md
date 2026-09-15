@@ -15,6 +15,18 @@
 > ③ CI BLOCKER：本 suite runner 在 git 中缺可执行位（100644），CI
 >    `Permission denied`，已修。新增 W7 witness 与 M10 负控制。
 >
+> **CORRECTIVE-2（review 响应）已合入**：fresh review 确认 CORRECTIVE-1 的
+> 2 MAJOR + CI BLOCKER 均已修复，但提出新 MAJOR——`completion.rs::resolve()`
+> 与 `CurrentDecisionDecisive` 是两个 truth source，只有人工逐支核对的
+> 快照相等，缺 durable binding（"TLA models do not re-run on implementation
+> diffs" 使漂移可以静默通过 CI）。修正：**production ↔ formal 判决合同
+> refinement oracle**（见下节）——单一共享真值表 artifact
+> `CurrentDecisionTable.tla`（48 元组穷举、由 Rust oracle 从公开 seam 生成/
+> 比对），TLC run 逐行校验表 ↔ formal 判决函数；completion.rs 与该
+> artifact 进入两个 gate 的 trigger。W7/M10 证明的是"给定 formal ground
+> truth，C5 对完整域承重"；ground truth ↔ production 的相等性由本 oracle
+> 机器维护。
+>
 > 语义真相只有一份：`docs/adr/ADR-PBK-001.md` §2（semantic commit /
 > fact authority identity / projection 非权威）与
 > `docs/adr/ADR-PBK-002.md` §17 D11（episode terminal outcome authority +
@@ -26,6 +38,62 @@
 > 命名说明：suite/module/不变式全部使用稳定领域词汇。ADR 决策编号
 > （D11）按 `specs/README.md` 命名规则只作 traceability 信息，不进入
 > 模型文件名/词表。
+
+## production ↔ formal 判决合同 refinement oracle（CORRECTIVE-2）
+
+问题（review MAJOR）：`completion.rs::resolve()` 与
+`CurrentDecisionDecisive`/`CurrentDecisionVerdict` 是两个 truth source，
+CORRECTIVE-1 的相等性只由 fresh reviewer 人工逐支核对——它不能承担永久
+CI gate 的同步职责。production 判决分支增删后，Rust gate 仍绿、TLA 根本
+不运行，旧 formal ground truth 继续被当作 CURRENT 证据。
+
+修正：**一个共享真值表 artifact，两侧各由一个 gate 机器绑定**：
+
+```text
+production resolve()（经 SessionCompletion 公开 seam 逐元组驱动）
+        │  Rust exhaustive oracle（48 元组穷举，byte-compare）
+        │  crates/qianqian-playback/tests/completion_decision_table.rs
+        ▼  Verification Rust Gate
+specs/episode-terminal-settlement/CurrentDecisionTable.tla
+（生成文件：<<stop_intent, decode_failure, worker_terminal,
+  drain_verdict, class>> × 48 行；class ∈ undecided / completed /
+  stopped / failed-decode / failed-device）
+        │  TLC 穷举 run（48 初始状态逐行比对）
+        │  EpisodeTerminalSettlementTable.tla + .cfg
+        ▼  Formal Semantic Gate
+CurrentDecisionDecisive / CurrentDecisionVerdict（主模型，语义不变）
+```
+
+class 保留 failed-decode / failed-device 细分（production `Failed.stage`
+的 realization 命名）；TLC 侧比较时经 `OutcomeClassOf` 投影到模型 verdict
+的 "Failed"——投影只用于比较，不改变模型语义。
+
+漂移矩阵（谁改了什么、哪个 gate 拒绝）：
+
+| 漂移 | 拒绝它的 gate / 机制 |
+| --- | --- |
+| `completion.rs` 判决分支增删/改值 | Rust gate：oracle byte-compare 失败，直到表重生成 |
+| 手改 `CurrentDecisionTable.tla`（任何字节） | Rust gate（byte-compare）；投影可见的改值另被 Formal gate TLC run 击穿 |
+| 改 TLA `CurrentDecisionDecisive`/`CurrentDecisionVerdict` | Formal gate：`TableDecisiveMatchesContract` / `TableVerdictMatchesContract` 违反 |
+| 表有缺行/重复/畸形行 | Formal gate：`TableRowsWellFormed` / `RowFor` CHOOSE 失败（fail closed） |
+
+trigger（两侧闭环）：`crates/qianqian-playback/src/completion.rs` 加入
+Formal Semantic Gate；`specs/episode-terminal-settlement/CurrentDecisionTable.tla`
+加入 Verification Rust Gate。判决合同变更的合法路径只有一条：authority
+记录在案（ADR-PBK-002 §17 D11）→ `QIANQIAN_UPDATE_DECISION_TABLE=1`
+重生成表 → `specs/check.sh terminal` TLC run 必须仍 PASS（formal 判决
+函数同步重推导）。
+
+负控制（本轮实际执行过，见 report.md）：删 `CurrentDecisionDecisive`
+的 Aborted 支 → `TableDecisiveMatchesContract` 立即违反；表行改值
+（failed-device→completed）→ `TableVerdictMatchesContract` 违反；表行
+stage 级改值（failed-device→failed-decode，TLC 投影不可见）→ Rust
+byte-compare 失败。三条漂移路径全部有牙齿。
+
+边界：oracle 冻结的是**静态**判决合同（证据形状 → 判决类，intent 在
+resolve 时刻固定）。production `resolve()` 读当前 stop intent 的 known
+differential（late intent 重判）不在表域内——那是动态时序问题，由主模型
+M4/W4 机器检查、D11 记录、F2 修正；本 oracle 不是它的替代品。
 
 ## 与 `f2-terminal-commit-boundary/` 的 authority 关系
 
@@ -166,6 +234,10 @@ writer 集合检查可被"顺手维护 ghost"的冒写动作骗过，writer iden
   成为局部证明——CORRECTIVE-1 修正）。域外的形状是 current contract
   **真的不可判决**（如 `Drained` 而 worker 未退出），不是刻意收窄。
   M10 负控制证明该覆盖是真实约束：把机制门缩回 minimal 域，C5 立即被违反。
+  措辞边界：W7/M10 证明的是"**给定 `CurrentDecisionDecisive` 这份 formal
+  ground truth**，C5 等性质对完整域承重"；这份 ground truth 与 production
+  判决合同的相等性由 refinement oracle 机器维护（上一节），不靠人工逐支
+  核对。
 - **判决值（realization oracle）**：`CurrentDecisionVerdict` 的精确
   precedence 是 current realization conformance oracle，不是 D11 冻结
   内容；决策 contract 演进时本表随 authority 变更重推导，触发域全覆盖、
@@ -204,14 +276,20 @@ stack 内由 authority 完成 decision+commit。它检查的是 semantic writer
 成为另一个 authority（PBK-001 §2.3：mechanism observation 不得发布另一
 authority 的 semantic fact）。
 
-## 检查清单（`check.sh`，25 条 TLC run）
+## 检查清单（`check.sh`，26 条 TLC run + 1 条 Rust oracle run）
 
-正常模型（2）：
+正常模型（3）：
 
 | run | 内容 | 期望 |
 | --- | --- | --- |
 | `EpisodeTerminalSettlement.cfg` | 全部安全不变式 + `SettlementProgress` + `AuthorityIsSoleWriter`，`SPECIFICATION SpecSettlementFairness`（WF_vars(AuthoritySettle)） | PASS |
 | `EpisodeTerminalSettlementSafetyOnly.cfg` | 全部安全不变式 + `AuthorityIsSoleWriter`（`SettlementProgress` 不在此 run——它是进度性质，需要 WF），`SPECIFICATION Spec`（无 fairness） | PASS（safety——含 S3——与进度假设解耦；S3 在无 fairness 的行为超集上成立，带 WF 时 a fortiori） |
+| `EpisodeTerminalSettlementTable.cfg` | refinement oracle：`DecisionDomain` 全部 48 元组为初始状态，逐行比对 `CurrentDecisionTable`（production 冻结表）↔ `CurrentDecisionDecisive`/`CurrentDecisionVerdict` + 行完整性 | PASS（CORRECTIVE-2；production 侧绑定由 Rust oracle run 承担） |
+
+Rust oracle run（Verification Rust Gate 内执行，不在本 check.sh）：
+`cargo test -p qianqian-playback --test completion_decision_table` ——
+48 元组经 `SessionCompletion` 公开 seam 驱动真实 `resolve()`，byte-compare
+`CurrentDecisionTable.tla`。
 
 负控制 mutation（10，全部必须产生 counterexample）：
 
@@ -260,7 +338,10 @@ violated 集合里。
 ```bash
 specs/check.sh current                       # 含本套件（current formal gate）
 specs/check.sh terminal                      # 仅本套件
-specs/episode-terminal-settlement/check.sh   # 直接运行（25 条 TLC run）
+specs/episode-terminal-settlement/check.sh   # 直接运行（26 条 TLC run）
+cargo test -p qianqian-playback --test completion_decision_table
+                                             # production ↔ 表 refinement
+                                             # oracle（Rust gate 侧）
 ```
 
 工具链与其它套件共用 `specs/tools/tla2tools.jar`（v1.7.4，sha256 校验，
@@ -269,7 +350,8 @@ specs/episode-terminal-settlement/check.sh   # 直接运行（25 条 TLC run）
 ## Bounds / 假设（结论只在这个范围内成立）
 
 - 状态空间：652 个 distinct state（穷举；无界参数，除 `Mutation` 常量外
-  无其它常量）。
+  无其它常量）。refinement-oracle run 另有 48 个初始状态（决策元组域
+  穷举，纯枚举器、无行为深度）。
 - 进度性质依赖其 `SPECIFICATION` 显式写出的 `WF_vars(AuthoritySettle)`；
   无 fairness 的 run 是反向控制/承重控制，不是结论。
 - 不建模：K0 graph / Fiber 依赖 / Capability / ComponentSpec / PCM /
