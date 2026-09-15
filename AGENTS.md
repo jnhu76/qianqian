@@ -189,6 +189,60 @@ A different Rust type, file, crate, feature name, command, or test helper is not
 
 Prefer deleting taxonomy/state over adding runtime concepts. For Phase-F playback work, first try the current Plugin/Fiber + owned-resource model; only a concrete counterexample may earn Window, Generation, a new Plugin, or a specialized Realtime Audio Runtime mechanism.
 
+## Abstraction earning / razor rule
+
+Before introducing any new architecture noun, lifecycle state, runtime mechanism, global service, or cross-cutting abstraction, answer in this order:
+
+```text
+1. Can the existing Plugin/Fiber lifecycle express the requirement correctly?
+
+2. Can ordinary language/runtime mechanisms express it correctly?
+   Examples: Rust ownership, RAII, join, cancellation, scoped resources,
+   one existing disposer/effect, or an ordinary private field.
+
+3. Can a local operation invariant express the requirement without
+   introducing a new architecture noun/state?
+
+4. What concrete evidence proves the simpler model is insufficient?
+```
+
+Accepted evidence for #4 is narrow and falsifiable:
+
+```text
+reproducible code-level counterexample
+independently legal concurrency/temporal counterexample
+formal counterexample
+or a demonstrated ownership/lifecycle contradiction
+```
+
+If the answer to **any** of 1–3 is YES, do not introduce the new architecture concept. A future possibility, naming convenience, symmetry, diagram clarity, or “we may need it later” is not evidence.
+
+> **Explanatory vocabulary is not architecture vocabulary.**
+
+A term used to reason about a problem does not thereby earn a Rust type, enum state, ADR noun, K0 primitive, Plugin, Capability, registry, generation, epoch, store, or runtime subsystem. It earns architectural status only when correctness, ownership, implementation, or verification requires the distinction to exist explicitly.
+
+Prefer, in order:
+
+```text
+local before global
+domain-specific before generic
+operation-specific invariant before runtime-wide mechanism
+owned resource before independently composed unit
+existing state before new state
+```
+
+For current playback, words such as `Dead`, `Reclaimed`, `DataPlaneAuthority`, `TimelineSegment`, `Generation`, or `Window` may be useful explanatory language but are **not current architecture** unless separately earned under this rule (the authoritative enumeration of forbidden/current playback nouns lives in `ADR-PBK-002` §13/§20; this list is routing, not a second authority). In particular, do not encode a second playback lifecycle beside K0 Fiber lifecycle + D11 terminal Fact + ordinary resource ownership.
+
+## OPEN means un-authorized, not “agent may choose”
+
+An ADR/roadmap item marked `OPEN`, `MECHANISM OPEN`, `AUTHORITY OPEN`, or equivalent is **not** implementation freedom for a coding agent.
+
+If implementation requires choosing among materially different semantics, authority owners, lifecycle boundaries, or runtime mechanisms that current authority leaves open, the agent MUST stop and report an authority gap. It MUST NOT choose one because it is convenient, common in another project, or easy to code.
+
+A coding agent may choose ordinary local representation details only when all observable semantics/ownership/lifetime obligations are already fixed and the choice does not create a new architectural noun or authority.
+
+For Phase-F playback, `ADR-PBK-002` D11/D14 is the implementation guard. Anything still explicitly OPEN there is out of scope until a narrow authority amendment earns it.
+
 ---
 
 # Command / Fact / Projection discipline
