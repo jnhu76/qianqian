@@ -9,8 +9,9 @@
 //! diagnostic, and no observation ever creates truth.
 //!
 //! The authority-side properties (settlement autonomy, wait purity,
-//! coherence races, watcher lifecycle) need the crate-internal seam and
-//! live in `src/settlement_contract_tests.rs` (D14.3).
+//! coherence races, the decision-boundary witnesses and the
+//! no-settlement-thread rule) need the crate-internal seam and live in
+//! `src/settlement_contract_tests.rs` (D14.3).
 
 use std::time::Duration;
 

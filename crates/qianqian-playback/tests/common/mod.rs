@@ -177,8 +177,8 @@ impl AudioOutput for TestOutput {
                             // Mirror the real render leg (wasapi.rs
                             // run_render_thread): a panic still publishes
                             // a verdict and stops the data plane, so the
-                            // session's settlement watcher can never
-                            // wedge on a dead consumer.
+                            // session's synchronous drain settlement can
+                            // never wedge on a dead consumer.
                             let verdict =
                                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                                     consume_loop(input.clone(), pace, abort_after, &consumed)
