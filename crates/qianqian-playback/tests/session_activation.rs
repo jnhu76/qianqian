@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use qianqian_app::QianqianApp;
 use qianqian_composition::{DesiredEntry, FiberState, Revision};
-use qianqian_playback::{SessionCompletion, SessionOutcome, playback_session_spec};
+use qianqian_playback::{PlaybackSessionHandle, SessionOutcome, playback_session_spec};
 
 use common::{OutputBehavior, SourceBehavior, TEST_FORMAT, TestDecode, TestOutput, within};
 
@@ -47,7 +47,7 @@ fn assert_no_leg_threads() {
 fn registered_runtime(
     source: SourceBehavior,
     output: OutputBehavior,
-    completion: SessionCompletion,
+    handle: PlaybackSessionHandle,
 ) -> QianqianApp {
     let mut runtime = QianqianApp::new();
     let source_behavior = source;
@@ -88,7 +88,7 @@ fn registered_runtime(
     runtime
         .register_component(playback_session_spec(
             std::path::PathBuf::from(DUMMY_PATH),
-            completion,
+            handle,
         ))
         .expect("session registers");
     runtime
@@ -98,11 +98,11 @@ fn registered_runtime(
 fn session_completes_through_eof_and_disposes_quietly() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
-        let completion = SessionCompletion::new();
+        let handle = PlaybackSessionHandle::new();
         let mut runtime = registered_runtime(
             SourceBehavior::EofAfter(48_000),
             OutputBehavior::Consume,
-            completion.clone(),
+            handle.clone(),
         );
         runtime
             .revise_desired(vec![
@@ -112,7 +112,7 @@ fn session_completes_through_eof_and_disposes_quietly() {
             ])
             .expect("composition is legal");
 
-        let outcome = completion.wait();
+        let outcome = handle.wait_terminal();
         assert_eq!(
             outcome,
             SessionOutcome::Completed,
@@ -131,11 +131,11 @@ fn session_completes_through_eof_and_disposes_quietly() {
 fn session_reports_decode_failure_and_cleans_up() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
-        let completion = SessionCompletion::new();
+        let handle = PlaybackSessionHandle::new();
         let mut runtime = registered_runtime(
             SourceBehavior::FailAfter(1024),
             OutputBehavior::Consume,
-            completion.clone(),
+            handle.clone(),
         );
         runtime
             .revise_desired(vec![
@@ -145,7 +145,7 @@ fn session_reports_decode_failure_and_cleans_up() {
             ])
             .expect("legal");
 
-        let outcome = completion.wait();
+        let outcome = handle.wait_terminal();
         assert!(
             matches!(&outcome, SessionOutcome::Failed { stage } if stage.starts_with("decode")),
             "decode failure surfaces as the session outcome: {outcome:?}"
@@ -160,11 +160,11 @@ fn session_reports_decode_failure_and_cleans_up() {
 fn output_open_failure_fails_activation_without_leaks() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
-        let completion = SessionCompletion::new();
+        let handle = PlaybackSessionHandle::new();
         let mut runtime = registered_runtime(
             SourceBehavior::EofAfter(48_000),
             OutputBehavior::FailOpen,
-            completion.clone(),
+            handle.clone(),
         );
         runtime
             .revise_desired(vec![
@@ -181,8 +181,8 @@ fn output_open_failure_fails_activation_without_leaks() {
             "device open failure lands the session FAILED"
         );
         assert!(
-            completion.try_resolve_now().is_none(),
-            "a failed activation never started an episode: no completion to wait for"
+            handle.observe().terminal_outcome.is_none(),
+            "a failed activation never started an episode: no terminal Fact to read"
         );
 
         let snap = runtime.dispose();
@@ -200,7 +200,7 @@ fn stopping_a_playing_session_disposes_promptly_without_leaks() {
     // edge stop unblocks both legs) and leak nothing.
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
-        let completion = SessionCompletion::new();
+        let handle = PlaybackSessionHandle::new();
         // Paced source: after a fast prefix the decode side produces one
         // frame per 100 ms, so at stop time the consumer is genuinely
         // blocked mid-play on an empty edge (the producer-blocked-on-full
@@ -211,7 +211,7 @@ fn stopping_a_playing_session_disposes_promptly_without_leaks() {
                 delay: Duration::from_millis(100),
             },
             OutputBehavior::Consume,
-            completion.clone(),
+            handle.clone(),
         );
         runtime
             .revise_desired(vec![
@@ -224,7 +224,9 @@ fn stopping_a_playing_session_disposes_promptly_without_leaks() {
         // No wait: stop immediately, mid-playback.
         let snap = runtime.dispose();
         assert!(snap.quiet, "dispose settles after a mid-stream stop");
-        let _ = completion; // never resolved; that is the point of stopping
+        // F2: teardown itself completes the evidence set and the
+        // authority settles on its own path (pinned exactly in the
+        // crate-internal settlement contract tests).
 
         #[cfg(target_os = "linux")]
         assert_no_leg_threads();
@@ -235,11 +237,11 @@ fn stopping_a_playing_session_disposes_promptly_without_leaks() {
 fn withdrawing_a_provider_degrades_the_session_to_pending() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
-        let completion = SessionCompletion::new();
+        let handle = PlaybackSessionHandle::new();
         let mut runtime = registered_runtime(
             SourceBehavior::EofAfter(48_000),
             OutputBehavior::Consume,
-            completion.clone(),
+            handle.clone(),
         );
         runtime
             .revise_desired(vec![
@@ -281,12 +283,9 @@ fn withdrawing_a_provider_degrades_the_session_to_pending() {
 fn missing_capabilities_leave_the_session_pending_not_failed() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
-        let completion = SessionCompletion::new();
-        let mut runtime = registered_runtime(
-            SourceBehavior::EofAfter(1),
-            OutputBehavior::Consume,
-            completion,
-        );
+        let handle = PlaybackSessionHandle::new();
+        let mut runtime =
+            registered_runtime(SourceBehavior::EofAfter(1), OutputBehavior::Consume, handle);
         runtime
             .revise_desired(vec![desired("session", "playback_session")])
             .expect("legal");
@@ -306,11 +305,11 @@ fn missing_capabilities_leave_the_session_pending_not_failed() {
 fn session_binds_the_source_format_into_the_data_plane() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(10), move || {
-        let completion = SessionCompletion::new();
+        let handle = PlaybackSessionHandle::new();
         let mut runtime = registered_runtime(
             SourceBehavior::EofAfter(48_000),
             OutputBehavior::Consume,
-            completion.clone(),
+            handle.clone(),
         );
         runtime
             .revise_desired(vec![
@@ -319,7 +318,7 @@ fn session_binds_the_source_format_into_the_data_plane() {
                 desired("session", "playback_session"),
             ])
             .expect("legal");
-        assert_eq!(completion.wait(), SessionOutcome::Completed);
+        assert_eq!(handle.wait_terminal(), SessionOutcome::Completed);
         // TEST_FORMAT flows through the edge end to end; the decoded
         // payload was consumed to completion (asserted by Completed).
         let _ = TEST_FORMAT;

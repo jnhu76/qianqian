@@ -10,7 +10,7 @@ use std::thread;
 use std::time::Duration;
 
 use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
-use qianqian_playback::{PcmEdge, SessionCompletion, SessionOutcome};
+use qianqian_playback::PcmEdge;
 
 const CHANNELS: u16 = 2;
 const CAPACITY_FRAMES: usize = 64;
@@ -214,75 +214,4 @@ fn steady_state_read_write_performs_zero_allocations() {
         allocations, 0,
         "the steady-state edge performs no allocation"
     );
-}
-
-/// Completion resolution truth: the session outcome combines the worker
-/// terminal, the decode-failure record and the render drain verdict.
-#[test]
-fn completion_resolves_completed_only_from_eof_plus_drained() {
-    let completion = SessionCompletion::new();
-    // Neither leg has reported: no outcome.
-    assert_eq!(completion.try_resolve_now(), None);
-
-    completion.worker_exited(qianqian_playback::EdgeTerminal::Eof);
-    assert_eq!(
-        completion.try_resolve_now(),
-        None,
-        "EOF without drain is not completion"
-    );
-
-    completion
-        .drain_signal()
-        .complete(qianqian_audio_api::ports::DrainVerdict::Drained);
-    assert_eq!(
-        completion.try_resolve_now(),
-        Some(SessionOutcome::Completed)
-    );
-}
-
-#[test]
-fn completion_reports_decode_failure_before_any_drain() {
-    let completion = SessionCompletion::new();
-    completion.decode_failed("corrupt stream");
-    assert_eq!(
-        completion.try_resolve_now(),
-        Some(SessionOutcome::Failed {
-            stage: "decode: corrupt stream".to_owned()
-        })
-    );
-}
-
-#[test]
-fn completion_reports_device_abort_as_failure() {
-    let completion = SessionCompletion::new();
-    completion.worker_exited(qianqian_playback::EdgeTerminal::Eof);
-    completion
-        .drain_signal()
-        .complete(qianqian_audio_api::ports::DrainVerdict::Aborted);
-    assert_eq!(
-        completion.try_resolve_now(),
-        Some(SessionOutcome::Failed {
-            stage: "device".to_owned()
-        }),
-        "an abort before drain is a device failure, never a fake completion"
-    );
-}
-
-#[test]
-fn wait_blocks_until_a_leg_publishes() {
-    let completion = Arc::new(SessionCompletion::new());
-    let waiter = {
-        let completion = completion.clone();
-        thread::spawn(move || completion.wait())
-    };
-    thread::sleep(Duration::from_millis(50));
-    assert!(
-        !waiter.is_finished(),
-        "wait blocks until the session resolves"
-    );
-    completion.decode_failed("test failure");
-    assert!(matches!(
-        waiter.join().expect("waiter exits"),
-        SessionOutcome::Failed { .. }
-    ));
 }

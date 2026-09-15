@@ -7,7 +7,7 @@ mod common;
 use std::time::Duration;
 
 use qianqian_composition::{CompositionKernel, DesiredEntry, Revision};
-use qianqian_playback::{SessionCompletion, SessionOutcome, playback_session_spec};
+use qianqian_playback::{PlaybackSessionHandle, SessionOutcome, playback_session_spec};
 
 use common::{OutputBehavior, SourceBehavior, TestDecode, TestOutput, within};
 
@@ -15,7 +15,7 @@ fn desired(id: &str, component: &'static str) -> DesiredEntry {
     DesiredEntry::enabled(id, component, Revision::new(1))
 }
 
-fn kernel_with_session(completion: &SessionCompletion) -> CompositionKernel {
+fn kernel_with_session(handle: &PlaybackSessionHandle) -> CompositionKernel {
     let mut kernel = CompositionKernel::new();
     kernel
         .register_component({
@@ -48,7 +48,7 @@ fn kernel_with_session(completion: &SessionCompletion) -> CompositionKernel {
     kernel
         .register_component(playback_session_spec(
             std::path::PathBuf::from("test://sine"),
-            completion.clone(),
+            handle.clone(),
         ))
         .expect("legal");
     kernel
@@ -58,8 +58,8 @@ fn kernel_with_session(completion: &SessionCompletion) -> CompositionKernel {
 fn steady_data_plane_performs_zero_kernel_work() {
     within(Duration::from_secs(10), move || {
         let _lifecycle = common::lifecycle_lock();
-        let completion = SessionCompletion::new();
-        let mut kernel = kernel_with_session(&completion);
+        let handle = PlaybackSessionHandle::new();
+        let mut kernel = kernel_with_session(&handle);
 
         let ops_before = kernel.debug_op_count();
         kernel
@@ -80,7 +80,7 @@ fn steady_data_plane_performs_zero_kernel_work() {
             "debug_op_count must observe control-plane work"
         );
 
-        let outcome = completion.wait();
+        let outcome = handle.wait_terminal();
         assert_eq!(outcome, SessionOutcome::Completed);
 
         assert_eq!(
