@@ -784,7 +784,7 @@ Playback Session = Component, not Plugin
 not every Fiber belongs to a Plugin
 ```
 
-Current production reality instead shows Decode, Output and Playback Session all enter K0 through the same `ComponentSpec` substrate and run as Fibers. Playback Session already has independent desired identity/lifecycle, requires capabilities, owns episode-scoped resources/relations, and supplies the D11 semantic authority role。
+Current production reality instead shows Decode, Output and Playback Session all enter K0 through the same `ComponentSpec` substrate and run as Fibers. Playback Session already has independent desired identity/lifecycle, requires capabilities, owns episode-scoped resources/relations, and supplies the D11 semantic authority role.
 
 The old distinction therefore encoded an unnecessary architecture taxonomy rather than a runtime invariant.
 
@@ -953,7 +953,7 @@ A new noun requires AGENTS.md abstraction-earning evidence.
 
 ### D14.2 Episode-scoped control/read seam — current Phase-F implementation choice
 
-F2 SHALL introduce one thin, episode-scoped domain handle in `qianqian-playback`. Current Rust working names are frozen for this implementation slice unless a review shows a concrete naming/type conflict:
+F2 SHALL introduce one thin, episode-scoped domain handle in `qianqian-playback`. Current Rust working names are frozen for this implementation slice unless a review shows a concrete naming/type conflict; they are **replaceable representation, not semantic authority** — a semantics-preserving rename does not amend this section:
 
 ```text
 PlaybackSessionHandle
@@ -1058,8 +1058,9 @@ Playback Session-owned mechanism stops its owned work
     ↓ worker/output evidence
 D11 settlement
     ↓
-Stopped iff stop intent was already recorded by the decisive-evidence boundary
-and no higher-precedence failure wins
+an aborted episode settles `Stopped` iff stop intent was already recorded by
+the decisive-evidence boundary and no higher-precedence failure classification
+wins
 ```
 
 Rules:
@@ -1086,20 +1087,21 @@ PcmEdge buffered PCM
 already-submitted output/device buffer
 ```
 
-The minimum protocol remains:
+The implementation protocol (decode-side serialization → old-staging discard →
+decoder reposition → edge invalidate/flush → physical output cutover → landing
+acknowledgement) is roadmap execution detail owned by Issue #119 F5
+(SEEK DISCONTINUITY PROTOCOL REV.3, three-layer cutover). This ADR freezes
+only its semantic spine:
 
 ```text
-serialize seek at the decode worker
-    ↓
-discard old worker-local staging
-    ↓
-reposition decoder
-    ↓
-invalidate/flush old PcmEdge content without violating terminal monotonicity
-    ↓
-perform/prove physical output cutover so old submitted PCM cannot reappear
-    ↓
-acknowledge actual landing / resume new PCM
+same-episode ownership            no new Plugin/Fiber/lifecycle noun
+stale-PCM invariant               the proposition above
+reservoir accounting              the mechanism decision must cover every
+                                  known stale-PCM reservoir
+no single vague success bit       command accepted / decoder repositioned /
+                                  old PCM invalidated / physical output
+                                  cutover / actual landing stay separable
+physical cutover gate stays OPEN  F5 implementation STOPs here
 ```
 
 `seek command accepted`, `decoder repositioned`, `old PCM invalidated`, `physical output cutover`, and `actual landing` are not to be collapsed into one vague success bit if the implementation exposes them internally.
@@ -1112,7 +1114,7 @@ The current Phase-F v1 semantic requirement is deliberately simple and gap-toler
 
 > **The old playback episode must be fully retired from K0 before the new playback episode becomes live.**
 
-This is a **no-overlap semantic constraint**, not a frozen App/K0 call sequence. It deliberately avoids preload/gapless/dual-world lifetime for the first working slice.
+This is a **no-overlap semantic constraint**, not a frozen App/K0 call sequence. It deliberately avoids preload/gapless/dual-world lifetime for the first working slice. It is a **Phase-F v1 constraint, not a permanent playback topology**; any overlap-bearing successor topology must be earned separately under the AGENTS.md abstraction-earning rule.
 
 At the product level:
 
