@@ -152,6 +152,11 @@ writer 集合检查可被"顺手维护 ghost"的冒写动作骗过，writer iden
    边界的先后"（由 ghost 捕获）。production 的 `resolve()` 读调用瞬间的
    `stop_requested`（无边界概念）——该 differential 已由 D11 记录、F2 修正；
    模型表达的是 accepted contract，不是 differential。
+8. **一处保守超近似**：模型允许 `(decodeFailure, worker=None, drain=Drained)`
+   这一 production 不可达组合（decode failure 会 fail 掉 edge，render leg
+   只会 abort 不会 Drained）。保守方向无害：该形状在两侧都判 Failed
+   （模型经 `df` 分支，production 经 `decode_failure` 分支），不产生任何
+   可观测分类分歧。
 
 ### 范围声明（触发域两层边界，CORRECTIVE-1 后）
 
@@ -206,7 +211,7 @@ authority 的 semantic fact）。
 | run | 内容 | 期望 |
 | --- | --- | --- |
 | `EpisodeTerminalSettlement.cfg` | 全部安全不变式 + `SettlementProgress` + `AuthorityIsSoleWriter`，`SPECIFICATION SpecSettlementFairness`（WF_vars(AuthoritySettle)） | PASS |
-| `EpisodeTerminalSettlementSafetyOnly.cfg` | 同一性质集（含 S3 transition 级），`SPECIFICATION Spec`（无 fairness） | PASS（safety 与进度假设解耦） |
+| `EpisodeTerminalSettlementSafetyOnly.cfg` | 全部安全不变式 + `AuthorityIsSoleWriter`（`SettlementProgress` 不在此 run——它是进度性质，需要 WF），`SPECIFICATION Spec`（无 fairness） | PASS（safety——含 S3——与进度假设解耦；S3 在无 fairness 的行为超集上成立，带 WF 时 a fortiori） |
 
 负控制 mutation（10，全部必须产生 counterexample）：
 

@@ -93,15 +93,20 @@ NORMATIVE PROPERTIES:
 SAFETY:
     S1:  TypeOK —— PASS
     S2:  TerminalOutcomeImmutable —— PASS（M3 击穿验证非空洞）
-    S3:  OutcomeWrittenOnlyByAuthoritySettle —— PASS（M1/M2/M9 击穿验证）
+    S3:  AuthorityIsSoleWriter（transition 级：terminalOutcome 的任何改变
+         必须就是 AuthoritySettle；[][A]_vars 形式，TLC 以 Action property
+         检查、按名报告）—— PASS（M1/M2/M9 击穿验证；M9 为全保真冒写，
+         状态不变式全绿仍被按名抓住）
     S4:  Observe 纯读 —— Observe 结构上只写 observeRan；M1 证明偏离即被抓
     S5:  Wait 纯等待 —— Wait 结构上只写 waitRan；M2 独立 run 证明偏离即被抓
     S6:  NoFalseCompleted —— PASS（M7 击穿验证）
     S7:  NoFalseStopped（只用 stopAtDecision）—— PASS（M4/M8 击穿验证）
     S8:  ActivationFailureIsNotTerminalFailed —— PASS（M6 击穿验证）
-    S9:  CommittedOutcomeMatchesContract（单向：Decisive ⇒ 提交值=边界判决）
+    S9:  CommittedOutcomeMatchesContract（单向；触发域=全形状
+         CurrentDecisionDecisive，提交值=边界 intent 下的 current 判决）
          —— PASS（M3/M4 击穿验证）
-    S10: TeardownRequiresSettlement（条件形式）—— PASS（M5 击穿验证）
+    S10: TeardownRequiresSettlement（条件形式；antecedent 用全形状触发域）
+         —— PASS（M5/M10 击穿验证）
     辅助：EvidenceConsistent（守卫自查，无 mutation 负控制，如实声明）、
          BoundaryLatchedWhenDecisive（模型内部一致性）、
          DiagnosticActivationFailureLeavesOutcomeUncommitted（命名诊断）
@@ -157,10 +162,13 @@ WAIT:
     mutation: M2 WaitCommits —— 击穿 S3（独立于 M1 的单独 run）
 
 WRITER SET:
-    terminal Fact writer: 仅 AuthoritySettle（S3 + authoritySettled 见证位）
+    terminal Fact writer: 仅 AuthoritySettle —— 由 transition 级性质 S3
+                 （AuthorityIsSoleWriter）承载；初版的 authoritySettled
+                 ghost 布尔已退役（可被顺手维护 ghost 的冒写动作骗过）
     mechanism evidence writers: 6 个 Publish* 动作（只写证据与 ghost）
-    forbidden writers: Observe（M1）、Wait（M2）、evidence 发布者顺手提交
-                 （M9）、late stop 改写已提交值（M3）
+    forbidden writers: Observe（M1）、Wait（M2）、evidence 发布者全保真
+                 冒写（M9：值/边界 intent/firstCommitted 全部如实维护，
+                 状态不变式全绿，仅 S3 抓住）、late stop 改写已提交值（M3）
     边界说明：M9 不禁止 production 在同一 Rust call stack 内由 authority
                  完成 decision+commit；它禁止的是 mechanism provider 因
                  发布证据而自己成为另一个 authority
@@ -172,17 +180,23 @@ WITNESSES:
     W4: 决定性 Failed 后晚到 stop，settlement 仍 Failed —— 可达
     W5: Completed 已提交 + 晚到 stop 共存 —— 可达
     W6: Observe/Wait 从未运行，terminal Fact 仍建立 —— 可达
+    W7: Eof+Aborted 全程无 stop → Failed(device) 提交（触发域收回的
+                 production-decisive 分支）—— 可达
 
 MUTATIONS:
-    M1 ObserveCommits:                击穿 OutcomeWrittenOnlyByAuthoritySettle ✅
-    M2 WaitCommits:                   击穿 OutcomeWrittenOnlyByAuthoritySettle ✅
+    M1 ObserveCommits:                击穿 AuthorityIsSoleWriter（纯 temporal
+                                      反例；状态不变式全绿）✅
+    M2 WaitCommits:                   击穿 AuthorityIsSoleWriter（同上）✅
     M3 TerminalRewritable:            击穿 TerminalOutcomeImmutable ✅
     M4 LateStopReadsCurrentIntent:    击穿 CommittedOutcomeMatchesContract ✅
     M5 TeardownBeforeSettlement:      击穿 TeardownRequiresSettlement ✅
     M6 ActivationFailureBecomesFailed: 击穿 ActivationFailureIsNotTerminalFailed ✅
     M7 FalseCompleted:                击穿 NoFalseCompleted ✅
     M8 FalseStopped:                  击穿 NoFalseStopped ✅
-    M9 EvidenceProducerCommits:       击穿 OutcomeWrittenOnlyByAuthoritySettle ✅
+    M9 EvidenceProducerSpoofsAuthority: 击穿 AuthorityIsSoleWriter（全保真
+                                      冒写；零状态不变式违反）✅
+    M10 NarrowDecisiveDomain:         击穿 TeardownRequiresSettlement
+                                      （机制门缩回 minimal 域、性质不动）✅
 
 OVERCLAIM CONTROLS:
     EveryEpisodeEventuallyTerminates / EveryActiveEpisodeEventuallyCompletes /
@@ -191,9 +205,11 @@ OVERCLAIM CONTROLS:
     Fairness 下，最强让步）；NoFairnessProgressFails —— SettlementProgress
     被违反（fairness 承重确认）
 
-FRESH REVIEW:
+FRESH REVIEW（round 1，针对初版模型——历史记录）:
     verdict: PASS_WITH_MINOR（fresh adversarial reviewer，独立以 pinned jar
              重跑全部 23 条 run 并用 scratch 模块探查 None-region）
+    说明: 本轮 review 未发现下述两个 MAJOR（触发域收窄、ghost writer
+          证明），它们由随后的人工 review 发现——见 CORRECTIVE-1。
     MAJOR:   0
     MINOR:   5 —— 全部已修并重跑全套确认：
              1. S9 由双向形式收窄为单向蕴含（Decisive ⇒ …），None-region 不
@@ -263,7 +279,36 @@ CORRECTIVE-1（人工 review 对上一轮的 2 MAJOR + 1 CI BLOCKER，全部修�
         本 suite）exit 0。状态空间 616 → 652 distinct states
         （触发域扩大所致）。
 
-    修正后 fresh review：见下节（CORRECTIVE-1 REVIEW）。
+    corrective-1 fresh review（1582a93 后，实际结果，非预写）：
+        verdict: CHANGES_REQUIRED —— 1 MAJOR（文档完整性）+ 2 MINOR；
+                 全部由紧随的 commit 修正。模型/cfg/runner 本体被 reviewer
+                 独立复核确认 sound：
+                 - decisive 域对照 completion.rs resolve() 双向逐支核对
+                   精确一致（含"worker 退出只可能报告
+                   {Eof, Stopped, Failed}"的 reality 检查，session.rs
+                   逐返回路径核过）；唯一偏差 = 已文档化的边界 intent
+                   读取（D11 late-command rule）。
+                 - M9 全保真冒写在全部 652 states 上零状态不变式违反、
+                   Action property 按名违反（非单轨迹，穷举证明）。
+                 - M10 非循环：C5 的 antecedent 不使用被变异的门。
+                 - fairness 论证无死角：decisive ∧ 未提交 ⇒ teardown 被
+                   阻塞、AuthoritySettle 持续使能，WF 承载进度成立。
+                 - 25/25 run 与聚合 specs/check.sh current exit 0 由
+                   reviewer 独立复现；scope 检查（diff 只触 specs/）
+                   通过。
+                 MAJOR（已修）：report.md 本文件多处 ledger 仍描述修正前
+                 模型（S3 旧名 / authoritySettled / M9 旧名 / 缺 M10 与
+                 W7 行），并且预写了尚未发生的 review 结论——违反
+                 "Report what was actually verified"。已全部改为当前
+                 现实；本节即该 review 的真实产物。
+                 MINOR-1（已修）：base fairness run 的 PROPERTY 实际只含
+                 SettlementProgress（当初一次编辑失败未重试），README
+                 表格却写成双性质。已把 AuthorityIsSoleWriter 补进 base
+                 cfg（修复后全量重跑），README 如实描述两次 base run
+                 各自的 PROPERTY 集。
+                 MINOR-2（已修）：README"已知粗粒度处"补第 8 条——模型
+                 允许 (decodeFailure, worker=None, drain=Drained) 这一
+                 production 不可达组合（保守超近似；两侧同判 Failed）。
 
 CURRENT FORMAL GATE:
     promoted? YES（本 PR 内完成注册；CORRECTIVE-1 后维持）
@@ -271,9 +316,10 @@ CURRENT FORMAL GATE:
             含 S3 transition 级 writer 性质）；10 mutation 全 killed
             （writer 类为纯 temporal 反例：状态不变式全绿）；5 overclaim +
             fairness 承重控制全部按预期反例；触发域全覆盖由 W7（正）与
-            M10（负）证明；corrective 后 fresh review 0 MAJOR（下节）。
-            已接入 specs/check.sh current 与 CI formal-semantic-gate 触发
-            路径；f2-terminal-commit-boundary 标注为 HISTORICAL/
+            M10（负）证明；corrective-1 后 fresh review 的实际结果与处置
+            见上节（CHANGES_REQUIRED 的 1 MAJOR + 2 MINOR 全部修正并
+            重跑）。已接入 specs/check.sh current 与 CI formal-semantic-gate
+            触发路径；f2-terminal-commit-boundary 标注为 HISTORICAL/
             EXPLORATORY。最终接受仍等待本 PR 的人工 review
             （READY_FOR_HUMAN_FORMAL_CONFORMANCE_REVIEW）。
 
