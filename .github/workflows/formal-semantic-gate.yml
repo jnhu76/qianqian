@@ -1,8 +1,9 @@
 name: Formal Semantic Gate
 
 # Durable gate for the CURRENT formal semantic evidence (post-139 spec
-# reset): the K0 control-plane TLA+ suite and the realtime-publication
-# TLA+ suite, via specs/check.sh current.
+# reset): the K0 control-plane TLA+ suite, the realtime-publication
+# TLA+ suite, and the episode-terminal-settlement conformance suite
+# (ADR-PBK-002 D11), via specs/check.sh current.
 #
 # Fail-closed contract (task NORTH STAR: explicit proof obligation ->
 # smallest sufficient verifier -> negative control -> durable gate):
@@ -21,9 +22,18 @@ name: Formal Semantic Gate
 # the only executable mechanism evidence is the test-local candidate
 # harness under crates/qianqian-audio-api/tests/. crates/qianqian-playback
 # hosts the current episode-scoped single-generation teardown surface
-# (edge/session/completion), which the Verification Rust Gate covers;
-# the TLA models check protocol semantics and do not re-run on
-# implementation diffs.
+# (edge/session/completion), which the Verification Rust Gate covers.
+# The protocol-semantics models (K0 / realtime publication) remain
+# implementation-diff independent. ONE deliberate exception: the
+# episode-terminal-settlement suite's refinement oracle pins the
+# production resolver (completion.rs) to the generated decision table
+# (specs/episode-terminal-settlement/CurrentDecisionTable.tla) — the
+# Rust gate freezes production => table (exhaustive Rust oracle), and
+# this gate checks table => formal decision functions
+# (EpisodeTerminalSettlementTable TLC run). Hence completion.rs is a
+# trigger here: a decision-contract change cannot pass CI without
+# re-validating the terminal formal evidence against the regenerated
+# table.
 #
 # A green run states: bounded model checking found no counterexample
 # within the stated bounds (specs/*/RESULTS.md). It is NOT architecture
@@ -34,22 +44,32 @@ on:
     paths:
       - "specs/composition-kernel-0/**"
       - "specs/realtime-publication/**"
+      - "specs/episode-terminal-settlement/**"
       - "specs/check.sh"
       - "docs/architecture/composition-kernel-0-design.md"
       - "docs/architecture/composition-kernel-0-implementation-adr.md"
       - "docs/adr/ADR-PBK-001.md"
+      - "docs/adr/ADR-PBK-002.md"
       - "crates/qianqian-composition/**"
+      # Refinement-oracle seam: the settlement suite re-validates the
+      # frozen decision table (regenerated from this resolver by the
+      # Rust gate) against the formal decision functions.
+      - "crates/qianqian-playback/src/completion.rs"
       - ".github/workflows/formal-semantic-gate.yml"
   push:
     branches: [main]
     paths:
       - "specs/composition-kernel-0/**"
       - "specs/realtime-publication/**"
+      - "specs/episode-terminal-settlement/**"
       - "specs/check.sh"
       - "docs/architecture/composition-kernel-0-design.md"
       - "docs/architecture/composition-kernel-0-implementation-adr.md"
       - "docs/adr/ADR-PBK-001.md"
+      - "docs/adr/ADR-PBK-002.md"
       - "crates/qianqian-composition/**"
+      # Refinement-oracle seam (see pull_request above).
+      - "crates/qianqian-playback/src/completion.rs"
       - ".github/workflows/formal-semantic-gate.yml"
 
 concurrency:
@@ -58,7 +78,7 @@ concurrency:
 
 jobs:
   tla-semantic:
-    name: TLA+/TLC current suites (K0 + realtime publication)
+    name: TLA+/TLC current suites (K0 + realtime publication + episode terminal settlement)
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:

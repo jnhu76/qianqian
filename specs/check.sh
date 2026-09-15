@@ -6,10 +6,12 @@
 # 没有历史模式：pre-reset playback 模型已从 main 删除（Git 历史存档），
 # 见 specs/README.md。
 #
-# 用法：specs/check.sh [current|k0|realtime|rust]（缺省 current）
-#   current  — composition-kernel-0 + realtime-publication（TLA+/TLC）
+# 用法：specs/check.sh [current|k0|realtime|terminal|rust]（缺省 current）
+#   current  — composition-kernel-0 + realtime-publication +
+#              episode-terminal-settlement（TLA+/TLC）
 #   k0       — K0 控制面套件
 #   realtime — realtime publication 套件
+#   terminal — episode terminal settlement 套件（D11 current-spec conformance）
 #   rust     — Rust 侧当前验证：composition-kernel-0-rust（cargo 矩阵 +
 #              Miri + production mutation 负控制）与 playback-concurrency
 #              （native + loom + mutation）。需要 nightly miri / loom
@@ -24,8 +26,8 @@ set -uo pipefail
 
 mode="${1:-current}"
 case "$mode" in
-  current|k0|realtime|rust) ;;
-  *) echo "usage: specs/check.sh [current|k0|realtime|rust]（缺省 current）" >&2; exit 2 ;;
+  current|k0|realtime|terminal|rust) ;;
+  *) echo "usage: specs/check.sh [current|k0|realtime|terminal|rust]（缺省 current）" >&2; exit 2 ;;
 esac
 
 SPEC_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -44,12 +46,16 @@ case "$mode" in
   current)
     run_suite composition-kernel-0
     run_suite realtime-publication
+    run_suite episode-terminal-settlement
     ;;
   k0)
     run_suite composition-kernel-0
     ;;
   realtime)
     run_suite realtime-publication
+    ;;
+  terminal)
+    run_suite episode-terminal-settlement
     ;;
   rust)
     run_suite composition-kernel-0-rust
@@ -58,9 +64,10 @@ case "$mode" in
 esac
 
 case "$mode" in
-  current)    what="全部当前 TLA+ 验证（K0 + realtime publication）" ;;
+  current)    what="全部当前 TLA+ 验证（K0 + realtime publication + episode terminal settlement）" ;;
   k0)         what="K0 套件" ;;
   realtime)   what="realtime publication 套件" ;;
+  terminal)   what="episode terminal settlement 套件" ;;
   rust)       what="全部当前 Rust 侧验证（matrices + Miri + loom + 负控制）" ;;
 esac
 

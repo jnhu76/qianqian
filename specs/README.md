@@ -57,6 +57,7 @@ CI 列的 **formal-semantic-gate** = `.github/workflows/formal-semantic-gate.yml
 | K0 §G.6 violation-latch semantic family（dependent-consumer 拓扑） | §G.6 | `unload_fiber`/`run_unwind`/teardown closure latch | 违约 latch × guard 保持 × 移除/替换阻塞 | **TLA witness：effect-bearing inverse failure = CHECKED-IN-MODEL；teardown-closure empty-accumulator failure = NOT-MODELED（TLA）+ REFINEMENT-CHECKED-IN-RUST**（differential 判定 FORMALIZATION_NOT_EARNED，见 `composition-kernel-0/RESULTS.md` §4） | TLA：`composition-kernel-0/`；Rust oracle（dependent-consumer 拓扑）：`crates/qianqian-composition/tests/lifecycle_oracles.rs :: dependent_consumer_violation_loci_preserve_k0_guard_semantics` | M4 + probe GuardLatched/ViolatedLatch（TLA） | 同上 | TLA 部分 BOUNDED-CLEAN；Rust oracle TEST-PASS | TLA 未直接探索 teardown-closure 位点（如实声明）；oracle 只声明 dependent-consumer 拓扑，非普遍 locus 等价证明 | formal-semantic-gate + verification-rust-gate |
 | K0 FAILED settlement / settle 终止（L1/L2） | §F.5/§L.1/L.2 | `activate_fiber` raise 路径/`settle` | raise × 违约 × churn 交错下假收敛/死循环 | CHECKED-IN-MODEL | 同上 | probes（FailedQuiet、DisposeConvergence 等 6 项正向控制） | 同上 + WF(KernelActions) | 同上 | 强 fairness 未假设 | formal-semantic-gate |
 | Realtime publication P1–P5（coherent acquisition / retired 闭门 / quiescence 先于回收 / Retired≠Reclaimable≠Released / 条件回收进展） | `docs/adr/ADR-PBK-001.md` §6（normative 协议本体在 ADR） | **production realization 尚不存在**（多代 publication 机制未进任何 production crate；ADR §6/§12：production representation OPEN）。当前 production surface = episode-scoped 单代 teardown（`crates/qianqian-playback` edge/session/completion 的 join-quiescence），协议上不得违反 P1–P5；可执行机制证据是 **test-local candidate harness**（`realtime_view_publication/`，非 lib API） | publication N→N+1 与旧 reader overlap；多代退休记账提前回收；split publication；stale entry liveness | CHECKED-IN-MODEL（TLA）+ candidate-mechanism harness（Rust，test-local） | `realtime-publication/` | M1 ReleaseBeforeQuiesce / M2 SplitPublication / M3 StaleEntry（safety+liveness）/ M4 ForgetsOlderRetirement + 4 可达性探针 | ≤2 readers、bounded publication 链、WF(ReaderExit)+WF(MarkReclaimable)；不建模 PCM/线程/内存序 | BOUNDED-CLEAN；M1–M4 全部 COUNTEREXAMPLE-WITNESSED | production 机制 realization（OPEN，ADR Phase D）；PCM/线程/内存序 | formal-semantic-gate |
+| episode terminal settlement（D11 current-spec conformance：单次提交不可改写、writer identity=authority（transition 级性质）、Observe/Wait 纯性、late-command stability（决策边界 ghost）、teardown settlement 边界（全形状触发域）、activation failure firewall、Completed/Stopped 命题必要条件、条件性 settlement 进度） | `docs/adr/ADR-PBK-002.md` §17 D11（normative authority）+ ADR-PBK-001 §2.2–§2.3 | `crates/qianqian-playback/src/completion.rs` resolver / `session.rs`（current realization；consumer-triggered commit 是 D11 记录的 known differential，F2 修正目标——模型表达 accepted contract，不是 differential） | observe/wait/证据发布者/晚到 stop 偷偷写 terminal Fact；teardown 跑在决定性证据未提交之前；无边界 stop intent 判 Stopped；触发域收窄逃逸 C5 | CHECKED-IN-MODEL | `episode-terminal-settlement/` | M1 ObserveCommits / M2 WaitCommits / M3 TerminalRewritable / M4 LateStopReadsCurrentIntent / M5 TeardownBeforeSettlement / M6 ActivationFailureBecomesFailed / M7 FalseCompleted / M8 FalseStopped / M9 EvidenceProducerSpoofsAuthority / M10 NarrowDecisiveDomain + 5 overclaim 反向控制（带 WF 最强让步）+ fairness 承重控制 + 7 可达性 witness | 652 distinct states（穷举）；WF(AuthoritySettle) 仅承载条件性进度 | BOUNDED-CLEAN（safety 无 fairness 双跑 PASS）；10 mutation 全部 COUNTEREXAMPLE-WITNESSED（writer 类为纯 temporal 反例：状态不变式全绿）；7 witness 可达 | 判决值表 precedence（current realization，非 D11 冻结；触发域全覆盖是 normative）；Rust refinement 层（verification-rust-gate 承载） | formal-semantic-gate |
 
 ### B. Implementation / concurrency verification（Rust）
 
@@ -100,7 +101,7 @@ fail-closed 的当前证据，只是结论用途不同。
 
 | 套件 | 问题 | 覆盖类 | 结果 | 状态 |
 | --- | --- | --- | --- | --- |
-| `f2-terminal-commit-boundary/` | 一个 episode 的 terminal Fact semantic commit 归谁所有：外部 `wait()`/`try_resolve_now()` 触发（当前实现）还是 Playback Session authority 自己推进？外部 read/wait 是在消费 truth 还是在创造 truth？ | CHECKED-IN-MODEL（TLA/TLC，A/B/B′ 三变体 + 9 mutation（含 3 条 precedence/join 纪律负控制）+ 9 witness + 3 over-claim 反向控制 + 2 fairness 承重控制 + 1 已证不可达，共 27 条 TLC run） | 3 正常模型 PASS；全部负控制按预期（含 fresh adversarial review 的两轮修正）；核心 witness：A 中"teardown 完成而 Fact 缺席"可达、无 consumer 时提交不可达（穷举证明）；B 中无 consumer 也能提交 | **READY_FOR_HUMAN_SEMANTIC_BOUNDARY_REVIEW**（verdict 为 CURRENT_CONTRACT_UNDERSPECIFIED；报告 `f2-terminal-commit-boundary/report.md`） |
+| `f2-terminal-commit-boundary/` | 一个 episode 的 terminal Fact semantic commit 归谁所有：外部 `wait()`/`try_resolve_now()` 触发（当时实现）还是 Playback Session authority 自己推进？外部 read/wait 是在消费 truth 还是在创造 truth？ | CHECKED-IN-MODEL（TLA/TLC，A/B/B′ 三变体 + 9 mutation（含 3 条 precedence/join 纪律负控制）+ 9 witness + 3 over-claim 反向控制 + 2 fairness 承重控制 + 1 已证不可达，共 27 条 TLC run） | 3 正常模型 PASS；全部负控制按预期（含 fresh adversarial review 的两轮修正）；核心 witness：A 中"teardown 完成而 Fact 缺席"可达、无 consumer 时提交不可达（穷举证明）；B 中无 consumer 也能提交 | **HISTORICAL / EXPLORATORY EVIDENCE（已关闭）**。verdict 为 CURRENT_CONTRACT_UNDERSPECIFIED；该 underspecification 已由 ADR-PBK-002 §17 D11 settlement corrective 裁决（decision+commit ownership 归 Playback Session semantic authority；late-command stability 冻结）。**current-spec conformance 证据是 `episode-terminal-settlement/`（§A，CI gate）**；本套件不再演进，A/B/B′ 变体不构成 current requirement（报告 `f2-terminal-commit-boundary/report.md`） |
 
 ---
 
@@ -121,7 +122,8 @@ fail-closed 的当前证据，只是结论用途不同。
 ## 运行入口
 
 ```bash
-# 全部当前形式化验证（缺省 = current = K0 + realtime publication）
+# 全部当前形式化验证（缺省 = current = K0 + realtime publication +
+# episode terminal settlement）
 specs/check.sh
 
 # 显式当前集
@@ -130,7 +132,8 @@ specs/check.sh current
 # 专项
 specs/check.sh k0         # K0 控制面 TLA+ 套件
 specs/check.sh realtime   # realtime publication TLA+ 套件
-specs/f2-terminal-commit-boundary/check.sh   # campaign artifact（见 §D，非 CI gate）
+specs/check.sh terminal   # episode terminal settlement 套件（D11 conformance）
+specs/f2-terminal-commit-boundary/check.sh   # campaign artifact（见 §D，非 CI gate，historical）
 
 # Rust 侧当前验证（cargo 矩阵 + Miri + production mutation 负控制 +
 # loom；需要 nightly/miri 与 loom feature）
@@ -150,8 +153,10 @@ invariant/temporal property PASS；每个 mutation 必须被抓住
 
 ```text
 formal-semantic-gate     specs/check.sh current
-    触发：specs/{composition-kernel-0,realtime-publication}/**、specs/check.sh、
-          K0 design/implementation ADR、ADR-PBK-001、crates/qianqian-composition/**
+    触发：specs/{composition-kernel-0,realtime-publication,
+          episode-terminal-settlement}/**、specs/check.sh、
+          K0 design/implementation ADR、ADR-PBK-001、ADR-PBK-002、
+          crates/qianqian-composition/**
 verification-rust-gate   specs/check.sh rust
     触发：crates/qianqian-{composition,playback}/**、specs/{composition-kernel-0-rust,
           playback-concurrency}/**、specs/check.sh
@@ -205,5 +210,6 @@ fairness 条件内未找到反例**。
 | `composition-kernel-0/` | K0 控制面语义交错的唯一 TLA+ 证据（权威：K0 design） |
 | `composition-kernel-0-rust/` | K0 语义在真实 Rust kernel 上的 refinement 证据（矩阵 + Miri + mutation） |
 | `realtime-publication/` | PBK-001 §6 P1–P5 的唯一 TLA+ 语义证据 |
+| `episode-terminal-settlement/` | D11 episode terminal settlement contract 的 current-spec conformance 证据（权威：PBK-002 §17 D11） |
 | `playback-concurrency/` | 当前 PcmEdge 并发证据（loom + native + mutation）与 CAMPAIGN-1 轮次记录 |
 | `tools/` | 固定版本 TLC jar 本地缓存（gitignored） |
