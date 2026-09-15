@@ -13,9 +13,9 @@
 #
 # Fail-closed contract:
 #   - all 7 harness matrices must pass natively and under Miri;
-#   - the §G.6 cross-locus refinement oracle (lifecycle_oracles integration
-#     test; teardown-closure locus — see CompositionKernel0 RESULTS §4)
-#     must pass;
+#   - the §G.6 dependent-consumer refinement oracle (lifecycle_oracles
+#     integration test; teardown-closure locus within the dependent-consumer
+#     topology — see CompositionKernel0 RESULTS §4) must pass;
 #   - each mutation MUST be caught natively — a clean mutated run is
 #     TOOLING-FAIL and exits != 0;
 #   - mutations touch the working tree only briefly and are restored to
@@ -48,17 +48,18 @@ else
   fail=1
 fi
 
-echo "== §G.6 cross-locus refinement oracle (integration; teardown-closure locus coverage) =="
+echo "== §G.6 dependent-consumer refinement oracle (integration; teardown-closure locus coverage) =="
 # CompositionKernel0 RESULTS §4: the teardown-closure empty-accumulator
 # latch locus is NOT separately modeled in TLA; this integration oracle is
-# its production refinement witness and is therefore gate-wired here.
+# its production refinement witness (for the dependent-consumer topology —
+# not a universal locus-equivalence claim) and is therefore gate-wired here.
 # Fail closed on BOTH "no ok line" and "filter matched nothing".
 ORACLE_LOG="$(mktemp)"
 if cargo test -p qianqian-composition --test lifecycle_oracles \
-    violation_latch_semantic_family_is_locus_invariant > "$ORACLE_LOG" 2>&1 \
-  && grep -q "violation_latch_semantic_family_is_locus_invariant ... ok" "$ORACLE_LOG" \
+    dependent_consumer_violation_loci_preserve_k0_guard_semantics > "$ORACLE_LOG" 2>&1 \
+  && grep -q "dependent_consumer_violation_loci_preserve_k0_guard_semantics ... ok" "$ORACLE_LOG" \
   && grep -q "test result: ok" "$ORACLE_LOG"; then
-  echo "RESULT §G.6 cross-locus oracle TEST-PASS"
+  echo "RESULT §G.6 dependent-consumer oracle TEST-PASS"
 else
   echo "RESULT §G.6 cross-locus oracle FAILED"
   tail -5 "$ORACLE_LOG"
@@ -113,7 +114,7 @@ ctl M-K3NoOverlapGuard.patch k6_single_source_survives_replacement_and_violation
 
 rm -f "$KERNEL_SNAPSHOT"
 if [[ "$fail" -eq 0 ]]; then
-  echo "SUITE: BOUNDED-CLEAN (matrices clean natively + Miri; §G.6 cross-locus oracle green; all mutations caught)"
+  echo "SUITE: BOUNDED-CLEAN (matrices clean natively + Miri; §G.6 dependent-consumer oracle green; all mutations caught)"
 else
   echo "SUITE: FAILED (see RESULT lines above)"
 fi

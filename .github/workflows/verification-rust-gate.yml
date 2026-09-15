@@ -6,18 +6,32 @@ name: Verification Rust Gate
 # and the real-PcmEdge Loom concurrency suite with its negative control
 # (specs/playback-concurrency), via specs/check.sh rust.
 #
+# Toolchain contract (fail-closed preflight below enforces it):
+#   plain rustc/cargo   = stable  — native matrices, §G.6 dependent-consumer
+#                                   oracle, production mutations, loom
+#   cargo +nightly miri = nightly — the Miri channel only
+# The dtolnay toolchain action sets the rustup default on every install,
+# so stable MUST be the LAST toolchain installed. (Hosted-run evidence
+# before this fix: run 34913770412 installed nightly last and then ran
+# the whole "native" channel under nightly.)
+#
 # Fail-closed contract: dirty production file, missing nightly-miri
 # toolchain, a matrix failure, a Miri finding, a mutation that is no
 # longer caught, a lost loom deadlock, or any nonzero runner exit fails
 # this job. No continue-on-error, no || true, no allowed failure.
 #
 # Trigger paths are repository-reality scoped: the verified production
-# crates (kernel + playback) and the suite definitions themselves.
+# crates (kernel + playback), the suite definitions themselves, and the
+# authority documents the Rust refinement evidence is checked against
+# (K0 design/implementation ADRs — the composition refinement matrix
+# claims them; ADR-PBK-002 D8/D11 — the PCM data-plane boundary and the
+# episode terminal-outcome authority realized by qianqian-playback).
 # qianqian-audio-api is intentionally not listed: its src/ hosts only
 # portable ports, and the P1–P5 mechanism harness under its tests/ is a
 # test-local candidate realization — no multi-generation publication
 # mechanism exists in any production crate yet (ADR-PBK-001 §6/§12 keeps
-# the production representation OPEN).
+# the production representation OPEN; ADR-PBK-001 itself triggers the
+# Formal Semantic Gate, not this one).
 #
 # A green run states: bounded verification (scenario matrices + Miri +
 # loom, with all mutation negative controls caught) found no violation
@@ -36,6 +50,9 @@ on:
       - "specs/composition-kernel-0-rust/**"
       - "specs/playback-concurrency/**"
       - "specs/check.sh"
+      - "docs/architecture/composition-kernel-0-design.md"
+      - "docs/architecture/composition-kernel-0-implementation-adr.md"
+      - "docs/adr/ADR-PBK-002.md"
       - ".github/workflows/verification-rust-gate.yml"
   push:
     branches: [main]
@@ -45,6 +62,9 @@ on:
       - "specs/composition-kernel-0-rust/**"
       - "specs/playback-concurrency/**"
       - "specs/check.sh"
+      - "docs/architecture/composition-kernel-0-design.md"
+      - "docs/architecture/composition-kernel-0-implementation-adr.md"
+      - "docs/adr/ADR-PBK-002.md"
       - ".github/workflows/verification-rust-gate.yml"
 
 concurrency:
@@ -59,13 +79,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install stable Rust (workspace builds)
-        uses: dtolnay/rust-toolchain@stable
-
+      # Nightly FIRST: each dtolnay install sets the rustup default, so
+      # the LAST install (stable below) owns the plain rustc/cargo path.
       - name: Install nightly Rust with Miri (fail closed if unavailable)
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: miri
+
+      - name: Install stable Rust (default workspace toolchain)
+        uses: dtolnay/rust-toolchain@stable
+
+      # Fail-closed preflight: print the actual channels and refuse to
+      # run if plain rustc is nightly. The permanent invariant is the
+      # channel split, not any pinned version number.
+      - name: Toolchain preflight (native channel must be stable)
+        run: |
+          rustc --version
+          cargo --version
+          ACTIVE="$(rustup show active-toolchain)"
+          echo "active toolchain: $ACTIVE"
+          rustc +nightly --version
+          cargo +nightly miri --version
+          echo "NATIVE_TOOLCHAIN=$(rustc --version)"
+          echo "MIRI_TOOLCHAIN=$(cargo +nightly miri --version)"
+          if rustc --version | grep -q nightly; then
+            echo "ERROR: native verification must run on stable (active: $ACTIVE)" >&2
+            exit 1
+          fi
 
       - name: Rust-side verification (specs/check.sh rust)
         run: specs/check.sh rust

@@ -263,14 +263,18 @@ accumulator 深度）是 representation——**但它恰是 P2b tombstone 条款
 交错出 Shape A 抽象无法表达的状态」的具体碰撞 ⇒
 **FORMALIZATION_NOT_EARNED，不加新 TLA state/operator，不设 M6**。
 
-**Rust refinement/equivalence oracle**（production mapping 证据）：
+**Rust refinement oracle**（production mapping 证据，scope 刻意收窄）：
 `crates/qianqian-composition/tests/lifecycle_oracles.rs ::
-violation_latch_semantic_family_is_locus_invariant` —— 两个 locus 走同一
-场景脚本（withdraw provider → latch → 尝试同 capability replacement →
-dispose_root），断言同一语义后果集（latched+installed、episode 开放且
-committed binding 仍可见、provider guard 保持、removal 阻断、replacement
-withheld、settle Blocked、diagnostic loud），并含 locus 路径证据断言防
-vacuity。representation 差异刻意不要求一致。
+dependent_consumer_violation_loci_preserve_k0_guard_semantics` ——
+dependent-consumer 拓扑（consumer 持开放 episode 违约 + 同 capability
+replacement 待命）下两个 locus 走同一场景脚本（withdraw provider → latch →
+尝试同 capability replacement → dispose_root），断言同一语义后果集
+（latched+installed、episode 开放且 committed binding 仍可见、provider
+guard 保持、removal 阻断、replacement withheld、settle Blocked、
+diagnostic loud），并含 locus 路径证据断言防 vacuity。representation
+差异刻意不要求一致。**该 oracle 只声明其覆盖的 dependent-consumer
+拓扑，不是对所有 component role/topology 的普遍 locus 等价证明**
+（provider-self 违约不在其覆盖内）。
 
 **当前 TLA claim 精确化**：§G.6 violation-latch semantic family =
 TLA witness（effect-bearing inverse failure，直接探索）+ Rust refinement

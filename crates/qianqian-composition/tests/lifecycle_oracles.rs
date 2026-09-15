@@ -193,7 +193,16 @@ fn violating_consumer(locus: ViolationLocus, name: &'static str, l: &Log) -> Com
     }
 }
 
-/// §G.6 violation-latch semantic family — cross-locus refinement oracle.
+/// §G.6 violation-latch semantic family — dependent-consumer refinement
+/// oracle.
+///
+/// Scope claim (deliberately narrow): this oracle covers the
+/// **dependent-consumer topology** — a consumer that requires a provided
+/// Tag capability and violates §G.6 while its episode is open, with a
+/// same-capability replacement provider waiting. It does NOT claim to
+/// prove locus equivalence for every possible component role/topology;
+/// provider-self violations (a provider failing its own teardown with no
+/// dependent present) are not exercised here.
 ///
 /// The TLA model (`specs/composition-kernel-0`) directly explores only the
 /// effect-bearing witness: its `TombstoneRetained` invariant assumes every
@@ -201,10 +210,10 @@ fn violating_consumer(locus: ViolationLocus, name: &'static str, l: &Log) -> Com
 /// failure locus — a component teardown closure returning `Violated` on an
 /// EMPTY accumulator (kernel.rs `unload_fiber`, after a fully discharged
 /// unwind) — is deliberately NOT separately modeled. This oracle carries
-/// the production refinement coverage: it drives both loci through the
-/// identical scenario (withdraw provider → latch → attempt same-capability
-/// replacement → dispose_root) and asserts the same K0 semantic
-/// consequences for each:
+/// the production refinement coverage for the covered topology: it drives
+/// both loci through the identical scenario (withdraw provider → latch →
+/// attempt same-capability replacement → dispose_root) and asserts the
+/// same K0 semantic consequences for each:
 ///
 /// ```text
 /// violation latched and loud      fiber installed, Unloading, FAILED
@@ -222,7 +231,7 @@ fn violating_consumer(locus: ViolationLocus, name: &'static str, l: &Log) -> Com
 /// §4 (no independent interleaving collision was found for the teardown
 /// closure locus, so no TLA extension was added).
 #[test]
-fn violation_latch_semantic_family_is_locus_invariant() {
+fn dependent_consumer_violation_loci_preserve_k0_guard_semantics() {
     for locus in [
         ViolationLocus::EffectInverse,
         ViolationLocus::TeardownClosure,

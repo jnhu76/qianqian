@@ -9,6 +9,20 @@ Branch: `verification/fv-rust-0`.
 
 ## Toolchain
 
+The durable contract is channel-level only (enforced by the
+verification-rust-gate preflight):
+
+```text
+plain rustc/cargo    = stable   (native matrices, §G.6 dependent-consumer
+                                oracle, production mutations, loom)
+cargo +nightly miri  = nightly  (Miri channel)
+```
+
+The exact versions below are the **campaign-recorded toolchain** (kept
+for evidence reproducibility). They are NOT a permanent toolchain
+invariant; hosted CI floats to the current stable/nightly within the
+channels above.
+
 ```text
 rustc/cargo (workspace): 1.98.1
 kani-verifier:           0.67.0 (bundled nightly-2025-11-21, rustc 1.93.0-nightly)
@@ -48,15 +62,20 @@ legal plan, kept out of the verified formula; plan-time validation
 itself is covered by existing unit tests. `dispose_root` is replaced by
 the equivalent (empty-desired + drain).
 
-Post-campaign addition (2026-09-15, post-139 spec reset corrective): the
-runner now also gate-wires the **§G.6 cross-locus refinement oracle**
+Post-campaign addition (2026-09-15, post-139 spec reset corrective; claim
+scope narrowed in FINAL-CORRECTIVE-2): the runner now also gate-wires the
+**§G.6 dependent-consumer refinement oracle**
 (`tests/lifecycle_oracles.rs ::
-violation_latch_semantic_family_is_locus_invariant`) — the production
-refinement witness for the teardown-closure empty-accumulator latch
-locus that the TLA model deliberately does not separately model
+dependent_consumer_violation_loci_preserve_k0_guard_semantics`) — the
+production refinement witness, for the dependent-consumer topology, of
+the teardown-closure empty-accumulator latch locus that the TLA model
+deliberately does not separately model
 (specs/composition-kernel-0/RESULTS.md §4, FORMALIZATION_NOT_EARNED).
-Native integration channel, TEST-PASS class; not part of the 62-scenario
-count above.
+The oracle claims exactly its covered topology (committed-view /
+relied-provider / replacement-withhold scenario); it is NOT a universal
+locus-equivalence proof for every component role/topology. Native
+integration channel, TEST-PASS class; not part of the 62-scenario count
+above.
 
 ## Results
 
