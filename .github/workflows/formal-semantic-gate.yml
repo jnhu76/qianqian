@@ -1,0 +1,82 @@
+name: Formal Semantic Gate
+
+# Durable gate for the CURRENT formal semantic evidence (post-139 spec
+# reset): the K0 control-plane TLA+ suite and the realtime-publication
+# TLA+ suite, via specs/check.sh current.
+#
+# Fail-closed contract (task NORTH STAR: explicit proof obligation ->
+# smallest sufficient verifier -> negative control -> durable gate):
+#   - Java missing / tla2tools.jar download failure / sha256 mismatch /
+#     baseline failure / a mutation no longer producing a counterexample /
+#     a probe becoming unreachable / any TLC warning / per-run timeout /
+#     nonzero runner exit all fail this job (the suite runners are
+#     fail-closed by design; this workflow adds no softening).
+#   - No continue-on-error, no || true, no allowed failure.
+#
+# Trigger paths are repository-reality scoped: the modeled semantic
+# surfaces, the authority documents the models are checked against, and
+# the composition production mapping. Repository reality (verified): NO
+# multi-generation publication mechanism exists in any production crate
+# yet — ADR-PBK-001 §6/§12 keeps the production representation OPEN, and
+# the only executable mechanism evidence is the test-local candidate
+# harness under crates/qianqian-audio-api/tests/. crates/qianqian-playback
+# hosts the current episode-scoped single-generation teardown surface
+# (edge/session/completion), which the Verification Rust Gate covers;
+# the TLA models check protocol semantics and do not re-run on
+# implementation diffs.
+#
+# A green run states: bounded model checking found no counterexample
+# within the stated bounds (specs/*/RESULTS.md). It is NOT architecture
+# acceptance.
+
+on:
+  pull_request:
+    paths:
+      - "specs/composition-kernel-0/**"
+      - "specs/realtime-publication/**"
+      - "specs/check.sh"
+      - "docs/architecture/composition-kernel-0-design.md"
+      - "docs/architecture/composition-kernel-0-implementation-adr.md"
+      - "docs/adr/ADR-PBK-001.md"
+      - "crates/qianqian-composition/**"
+      - ".github/workflows/formal-semantic-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "specs/composition-kernel-0/**"
+      - "specs/realtime-publication/**"
+      - "specs/check.sh"
+      - "docs/architecture/composition-kernel-0-design.md"
+      - "docs/architecture/composition-kernel-0-implementation-adr.md"
+      - "docs/adr/ADR-PBK-001.md"
+      - "crates/qianqian-composition/**"
+      - ".github/workflows/formal-semantic-gate.yml"
+
+concurrency:
+  group: formal-semantic-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tla-semantic:
+    name: TLA+/TLC current suites (K0 + realtime publication)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Java (TLC runtime)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Preflight — TLC runtime must be present (fail closed, legibly)
+        run: |
+          java -version
+          command -v java
+
+      # Evidence is produced from the checked-out PR HEAD; the suite
+      # runners pin tla2tools v1.7.4 by sha256 and fail closed on any
+      # warning, incomplete exploration, or uncaught mutation/probe.
+      - name: Formal semantic verification (specs/check.sh current)
+        run: specs/check.sh current

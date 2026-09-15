@@ -1,0 +1,71 @@
+name: Verification Rust Gate
+
+# Durable gate for the CURRENT Rust-side verification evidence: the
+# qianqian-composition scenario matrices (native + Miri) with their
+# production mutation negative controls (specs/composition-kernel-0-rust),
+# and the real-PcmEdge Loom concurrency suite with its negative control
+# (specs/playback-concurrency), via specs/check.sh rust.
+#
+# Fail-closed contract: dirty production file, missing nightly-miri
+# toolchain, a matrix failure, a Miri finding, a mutation that is no
+# longer caught, a lost loom deadlock, or any nonzero runner exit fails
+# this job. No continue-on-error, no || true, no allowed failure.
+#
+# Trigger paths are repository-reality scoped: the verified production
+# crates (kernel + playback) and the suite definitions themselves.
+# qianqian-audio-api is intentionally not listed: its src/ hosts only
+# portable ports, and the P1–P5 mechanism harness under its tests/ is a
+# test-local candidate realization — no multi-generation publication
+# mechanism exists in any production crate yet (ADR-PBK-001 §6/§12 keeps
+# the production representation OPEN).
+#
+# A green run states: bounded verification (scenario matrices + Miri +
+# loom, with all mutation negative controls caught) found no violation
+# within the stated bounds (specs/*/RESULTS.md). It is NOT architecture
+# acceptance.
+#
+# Cost note: Miri here is the ~1-minute 7-matrix pass over
+# qianqian-composition (see specs/composition-kernel-0-rust/RESULTS.md),
+# not a cross-workspace Miri campaign.
+
+on:
+  pull_request:
+    paths:
+      - "crates/qianqian-composition/**"
+      - "crates/qianqian-playback/**"
+      - "specs/composition-kernel-0-rust/**"
+      - "specs/playback-concurrency/**"
+      - "specs/check.sh"
+      - ".github/workflows/verification-rust-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/qianqian-composition/**"
+      - "crates/qianqian-playback/**"
+      - "specs/composition-kernel-0-rust/**"
+      - "specs/playback-concurrency/**"
+      - "specs/check.sh"
+      - ".github/workflows/verification-rust-gate.yml"
+
+concurrency:
+  group: verification-rust-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-verification:
+    name: matrices + Miri + mutations + loom (specs/check.sh rust)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable Rust (workspace builds)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install nightly Rust with Miri (fail closed if unavailable)
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+
+      - name: Rust-side verification (specs/check.sh rust)
+        run: specs/check.sh rust

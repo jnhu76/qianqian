@@ -45,15 +45,26 @@ fi
 WORK_BASE="${TLA_TMPDIR:-/var/tmp}"
 
 # run_tlc <cfg_path> <期望模式 pass|fail:<目标invariant>|lfail:<性质名>> <显示名> [附加TLC参数...]
+#
+# TLC 1.7.4 已知行为（同 specs/composition-kernel-0 的 #82 学费）：-continue
+# 且有 violated invariant 时，JVM 可能在校验完成后、打印统计的收尾阶段随机
+# 崩溃，缓冲的日志尾部（含 "Finished in"）随崩溃丢失。完整探索过的 run 的
+# 日志必然含 "Finished in"；被杀/崩溃丢尾的 run 不是有效 evidence。因此对
+# 全部模式做最多 3 次重试，直到拿到含 "Finished in" 的完整日志。
 run_tlc() {
   local cfg="$1" expect="$2" label="$3"; shift 3
   local module="RealtimePublication"
   local tmp; tmp="$(mktemp -d "$WORK_BASE/qianqian-specs.XXXXXX")"
   cp "$SPEC_ROOT/$module.tla" "$cfg" "$tmp/"
   local log="$tmp/out.log"
-  ( cd "$tmp" && timeout 3600 "$JAVA_BIN" -XX:+UseParallelGC -jar "$JAR" \
-      -workers "$WORKERS" "$@" -config "$(basename "$cfg")" "$module.tla" > out.log 2>&1 )
-  local completed viol propviol finished
+  local attempt finished
+  for attempt in 1 2 3; do
+    ( cd "$tmp" && timeout 3600 "$JAVA_BIN" -XX:+UseParallelGC -jar "$JAR" \
+        -workers "$WORKERS" "$@" -config "$(basename "$cfg")" "$module.tla" > out.log 2>&1 )
+    finished="$(grep -c 'Finished in' "$log" || true)"
+    [[ "$finished" -ge 1 ]] && break
+  done
+  local completed viol propviol
   completed="$(grep -c 'Model checking completed' "$log" || true)"
   viol="$(grep -oE 'Invariant [A-Za-z0-9]+ is violated' "$log" | sed 's/Invariant \(.*\) is violated/\1/' | sort -u | tr '\n' ',' | sed 's/,$//')"
   propviol="$(grep -c 'Temporal properties were violated' "$log" || true)"

@@ -2,7 +2,8 @@
 
 STATUS: FORMAL EVIDENCE（#124 truth class: evidence，非 authority）。
 
-> **RESULT: BOUNDED-CLEAN（safety + liveness）+ 1 个 PRODUCTION-DEFECT 候选（M5 反例）——该候选已由 #126 确认并修复，见 DIFFERENTIAL 的 resolution。**
+> **RESULT: BOUNDED-CLEAN（safety + liveness）+ 1 个 RESOLVED DIFFERENTIAL
+> （M5 反例 = pre-#126 生产缺陷；已由 #126 确认并修复，见 §2 RESOLUTION）**
 > BOUNDED-CLEAN 指在下方显式 BOUNDS/FAIRNESS 内未找到反例；它**不是**
 > "architecture proven correct"，不构成 acceptance。
 
@@ -51,6 +52,9 @@ CLAIM
       P2a inverse 恰好一次 —— 每 effect 的 inverse 至多执行一次（§H.1）。
       P2b tombstone 保留 —— 违约 latch 后 fiber 保持 installed、episode
           开放、provenance tombstone 留在 accumulator（§G.6/§K.4）。
+          （精度限定：模型直接探索的是 effect-bearing witness；第二个
+          生产失败位 teardown-closure latch 未单独建模，由 Rust refinement
+          oracle 承载覆盖——见 §4。）
       P3  移除纪律 —— 不存在 accumulator 未清空 / 有未消费 inverse 的
           移除（Thm 64/Cor 69）。
       P4a 点单一来源 —— 任一时刻至多一个 installed fiber 声明提供 K
@@ -144,7 +148,7 @@ DIFFERENTIAL
 
 ---
 
-## 2. DIFFERENTIAL — PRODUCTION-DEFECT 候选：`mount_candidate` 缺 capability-overlap guard
+## 2. DIFFERENTIAL — RESOLVED：`mount_candidate` 曾缺 capability-overlap guard（pre-#126）
 
 **分类（按 #124 §9 / AGENTS.md authority resolution）：**
 
@@ -155,16 +159,24 @@ installed, so inserting an overlapping new provider before the old is
 removed would violate the registry invariant outright"；§L.2 违约行：
 reconcile "issues no further requests through the affected edge"）
 Rust violates X（当时 mount_candidate 只查同名 fiber，不查 capability 重叠）
-=> PRODUCTION DEFECT
+=> PRODUCTION DEFECT（pre-#126；RESOLVED，见下方 RESOLUTION）
+```
 
 **[2026-09-15 RESOLUTION]** 已确认并修复：#126（bb7662d，2026-09-13
 merge）为 mount_candidate 增加 capability-overlap withhold；TA 反例的
 Rust 回归在 `crates/qianqian-composition/tests/staged_mount_oracles.rs`，
-Rust 侧负控制为 M-K3（specs/composition-kernel-0-rust）。M5 mutation
-的现存意义 = 该 guard 的 TLA 侧负控制（模型默认行为 = 修复后 Rust）。
+Rust 侧负控制为 M-K3（specs/composition-kernel-0-rust）。当前 mapping：
+
+```text
+baseline 模型（MountOverlapBlock 默认生效）
+    = 当前 Rust 的 overlap-guard 行为（#126 之后）
+
+M5 mutation（MountOverViolation）
+    = 刻意撤掉该现行 guard
+    = 复现 pre-#126 Rust 的反例（归档该历史缺陷行为）
 ```
 
-**反例（模型复现当前 Rust 行为，trace：`evidence/m5-counterexample-trace.md`）：**
+**反例（模型复现 pre-#126 Rust 行为；trace：`evidence/m5-counterexample-trace.md`）：**
 
 1. P1 激活期 partial unwind 违约（defective component）→ P1 latched 在
    Unloading，provision tombstone 永不释放（§G.6 语义，设计行为）。
@@ -180,8 +192,9 @@ Rust 侧负控制为 M-K3（specs/composition-kernel-0-rust）。M5 mutation
 
 **为何 baseline 无法覆盖此缺陷**：clean 路径下 step 优先级（rule 4
 removal 先于 rule 5 mount）使 staging 涌现成立；洞只在「latched fiber
-永不可到达移除」的 §G.6 路径上。M5 正是把该守卫撤掉后的模型行为，与
-当前 Rust 一致。
+永不可到达移除」的 §G.6 路径上。M5 正是把该现行守卫撤掉后的模型行为，
+与 pre-#126 Rust 行为一致；#126 修复后 baseline（守卫在位）即当前
+Rust 行为。
 
 **拟议修复（最小、authority-faithful）**：`mount_candidate` 跳过
 「其 provision 集与任一 installed fiber 的 provision 集相交」的
@@ -216,7 +229,55 @@ deadlock                   模型显式提供 TerminalStutter（仅 envStopped �
                            缺陷，保持被 TLC 死锁检测捕获。
 ```
 
-## 4. UNVERIFIED SURFACES（明确不在本 gate 覆盖内）
+## 4. §G.6 第二失败位（teardown-closure latch）— FORMALIZATION_NOT_EARNED（2026-09-15）
+
+模型直接探索的违约路径全部是 **effect-bearing latch**（违约 inverse 停住
+unwind，violated 记录留作 tombstone，`TombstoneRetained` 因此要求
+`effects >= 1`）。生产的第二个失败位——**component teardown closure 在空
+accumulator 上返回 Violated**（kernel.rs `unload_fiber`：run_unwind 完全
+discharge 之后）——未单独建模。本轮按 differential 分析判定该位点
+**不是**独立的状态/交错家族：
+
+| 维度 | Shape A：effect-bearing inverse | Shape B：teardown closure（空 accumulator） |
+| --- | --- | --- |
+| 生产位点 | `run_unwind` inverse 返回 Violated | `unload_fiber` teardown closure 返回 Violated（unwind 已完全 discharge） |
+| fiber state | Unloading | Unloading |
+| accumulator 非空 | 是（violated 记录 = provenance tombstone，§K.4） | 否 |
+| tombstone 存在 | 是 | 否（无 effect 绑定可保留；开放 episode 本身承载「未假装清洁」） |
+| violation bit | TEARDOWN_VIOLATED latch | 同 |
+| committed view / relied_on | 开放（两路径都在 `committed = None` 之前 return） | 同 |
+| provider guard | 被 latched fiber 的开放 view 钉住（ViolatedKeepsGuard） | 同 |
+| removal eligibility | `¬teardown_violated` 阻断 | 同 |
+| mount overlap blocking | `mount_candidate` 按 installed 声明 provides withhold（#126） | 同（与 accumulator 深度无关） |
+| dispose_root | 不移除 latched fiber | 同 |
+| settle 终止 | 终止于 Blocked（loud，quiet=false） | 同 |
+| FAILED 可达 | 否 | 否 |
+
+**判定**：两形状在所有对两形状共同声明的 K0 不变式（ReliedGuard /
+InverseOnce / NoRemovalOwing / SingleSource / ViolatedKeepsGuard /
+FailedHasPendingError / L1 / L2）上取值相同；唯一差异（tombstone /
+accumulator 深度）是 representation——**但它恰是 P2b tombstone 条款的
+对象，而该条款已按 §1 的精度限定 scope 在 effect-bearing witness 上**；
+本节不得被引用为「P2b 覆盖 teardown-closure latch」。除 P2b 外，该差异
+不是任何其他已声明不变式的语义载体。未找到「独立合法事件在 Shape B
+交错出 Shape A 抽象无法表达的状态」的具体碰撞 ⇒
+**FORMALIZATION_NOT_EARNED，不加新 TLA state/operator，不设 M6**。
+
+**Rust refinement/equivalence oracle**（production mapping 证据）：
+`crates/qianqian-composition/tests/lifecycle_oracles.rs ::
+violation_latch_semantic_family_is_locus_invariant` —— 两个 locus 走同一
+场景脚本（withdraw provider → latch → 尝试同 capability replacement →
+dispose_root），断言同一语义后果集（latched+installed、episode 开放且
+committed binding 仍可见、provider guard 保持、removal 阻断、replacement
+withheld、settle Blocked、diagnostic loud），并含 locus 路径证据断言防
+vacuity。representation 差异刻意不要求一致。
+
+**当前 TLA claim 精确化**：§G.6 violation-latch semantic family =
+TLA witness（effect-bearing inverse failure，直接探索）+ Rust refinement
+witness（teardown-closure empty-accumulator failure）。TLA 并未直接探索
+Shape B——任何向该方向的转述都是 scope inflation。
+
+## 5. UNVERIFIED SURFACES（明确不在本 gate 覆盖内）
 
 ```text
 无限 churn / 无界 generation 数        （bounded churn window 截断）
@@ -226,16 +287,12 @@ plan-time 校验（§L.4 的环/歧义拒绝）   （Rust 侧，非法 desired �
 步骤粒度内的 ActivationCtx 可重入行为  （activation 建模为 atomic step）
 implementation 细节（slab 复用、generation 回绕、handle 编号）
 OS / realtime / FFI 表面               （Loom/Miri/集成层领域）
-§G.6 的第二个 disposer 失败位          （component teardown closure，
-                                        kernel.rs 在空 accumulator 上 latch
-                                        TEARDOWN_VIOLATED；模型全部违约路径
-                                        effects>=1，故 P2b 的 tombstone 条款
-                                        只覆盖 effect-bearing latch——两处
-                                        latch/guard/removal-blocking 语义
-                                        相同，无已检不变式结果差异）
+§G.6 的 teardown-closure latch 位点   （未单独建模：
+                                        FORMALIZATION_NOT_EARNED 判定 +
+                                        Rust refinement oracle 覆盖，见 §4）
 ```
 
-## 5. 建议后续
+## 6. 建议后续
 
 1. mount_candidate overlap guard —— 已完成：#126 merge（含 Rust 回归
    staged_mount_oracles + M-K3 负控制），differential 见 §2 RESOLUTION。

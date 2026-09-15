@@ -18,7 +18,7 @@
 #   MUTANT/PROBE 另要求 TLC 自行收尾（log 含 "Finished in"）：被杀/崩溃
 #   进程的部分输出不得作为反例证据。
 #
-# 工具链：tla2tools v1.7.4（Xenophones），sha256 校验，缺失时自动下载。
+# 工具链：tla2tools v1.7.4（Xenophanes），sha256 校验，缺失时自动下载。
 set -uo pipefail
 
 SPEC_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

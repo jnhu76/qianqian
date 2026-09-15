@@ -420,7 +420,8 @@ Remove(f) ==
 \* ---- rule 5：挂载（O-Insert）。§E.4：旧 provider 代移除之后才允许——
 \* 该 staging 由 step 优先级（rule 1..5 次序）涌现，不是模型假设。
 \* M3 撤掉该优先级守卫；M5（MutationMountOverViolation）撤掉 §G.6 违约边
-\* 守卫（= 当前 Rust 行为，见头注 differential）。
+\* 守卫（= pre-#126 Rust 行为；baseline 守卫在位 = 当前 Rust，见头注
+\* differential 与 RESULTS.md 的 mapping）。
 Mount(e) ==
     /\ EnabledMount(e)
     /\ ~MountOverlapBlock(e)

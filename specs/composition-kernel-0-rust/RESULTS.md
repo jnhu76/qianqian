@@ -48,6 +48,16 @@ legal plan, kept out of the verified formula; plan-time validation
 itself is covered by existing unit tests. `dispose_root` is replaced by
 the equivalent (empty-desired + drain).
 
+Post-campaign addition (2026-09-15, post-139 spec reset corrective): the
+runner now also gate-wires the **§G.6 cross-locus refinement oracle**
+(`tests/lifecycle_oracles.rs ::
+violation_latch_semantic_family_is_locus_invariant`) — the production
+refinement witness for the teardown-closure empty-accumulator latch
+locus that the TLA model deliberately does not separately model
+(specs/composition-kernel-0/RESULTS.md §4, FORMALIZATION_NOT_EARNED).
+Native integration channel, TEST-PASS class; not part of the 62-scenario
+count above.
+
 ## Results
 
 | ITEM | RESULT (vocabulary #124) | ENGINE |
