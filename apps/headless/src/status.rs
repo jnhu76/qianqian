@@ -12,24 +12,30 @@
 //! `format` is mechanism evidence; `activation_error` is a diagnostic.
 //! The forbidden-vocabulary oracle below pins that boundary.
 
-use qianqian_playback::{PlaybackSessionObservation, SessionOutcome};
+use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionObservation};
 
 /// Render one observation as the `status` output: stable,
 /// scriptable, truth-class correct.
 pub fn format_status(observation: &PlaybackSessionObservation) -> String {
     let mut out = String::new();
-    match &observation.terminal_outcome {
+    // The semantic line names ONLY the stable terminal vocabulary
+    // (D14.2): completed / stopped / failed. No diagnostic text and no
+    // failure subclass may appear here — callers cannot infer
+    // DecodeFailed/DeviceFailed from the projection's first line.
+    match observation.terminal_outcome {
         None => out.push_str("outcome: pending\n"),
-        Some(SessionOutcome::Completed) => out.push_str("outcome: completed\n"),
-        Some(SessionOutcome::Stopped) => out.push_str("outcome: stopped\n"),
-        Some(SessionOutcome::Failed { stage }) => {
-            out.push_str("outcome: failed\n");
-            // Stage text is a diagnostic (D14.2), printed as such and
-            // never frozen into the semantic outcome vocabulary.
-            out.push_str("failure: ");
-            out.push_str(stage);
-            out.push('\n');
-        }
+        Some(EpisodeTerminalOutcome::Completed) => out.push_str("outcome: completed\n"),
+        Some(EpisodeTerminalOutcome::Stopped) => out.push_str("outcome: stopped\n"),
+        Some(EpisodeTerminalOutcome::Failed) => out.push_str("outcome: failed\n"),
+    }
+    // The failure diagnostic is a separate presentation line, printed
+    // only when one was published. Its presence, absence or wording is
+    // never part of the semantic outcome: a Failed fact is Failed with
+    // or without it.
+    if let Some(failure) = &observation.failure_diagnostic {
+        out.push_str("failure: ");
+        out.push_str(failure);
+        out.push('\n');
     }
     match &observation.source_format {
         Some(format) => {

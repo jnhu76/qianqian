@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use qianqian_app::QianqianApp;
 use qianqian_composition::{DesiredEntry, FiberState, Revision};
-use qianqian_playback::{PlaybackSessionHandle, SessionOutcome, playback_session_spec};
+use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionHandle, playback_session_spec};
 
 use common::{OutputBehavior, SourceBehavior, TEST_FORMAT, TestDecode, TestOutput, within};
 
@@ -115,7 +115,7 @@ fn session_completes_through_eof_and_disposes_quietly() {
         let outcome = handle.wait_terminal();
         assert_eq!(
             outcome,
-            SessionOutcome::Completed,
+            EpisodeTerminalOutcome::Completed,
             "EOF + drain = completion"
         );
 
@@ -146,9 +146,18 @@ fn session_reports_decode_failure_and_cleans_up() {
             .expect("legal");
 
         let outcome = handle.wait_terminal();
+        assert_eq!(
+            outcome,
+            EpisodeTerminalOutcome::Failed,
+            "decode failure surfaces as the semantic outcome: {outcome:?}"
+        );
+        let observation = handle.observe();
         assert!(
-            matches!(&outcome, SessionOutcome::Failed { stage } if stage.starts_with("decode")),
-            "decode failure surfaces as the session outcome: {outcome:?}"
+            observation
+                .failure_diagnostic
+                .as_deref()
+                .is_some_and(|stage| stage.starts_with("decode")),
+            "the decode diagnostic travels separately: {observation:?}"
         );
 
         let snap = runtime.dispose();
@@ -318,7 +327,7 @@ fn session_binds_the_source_format_into_the_data_plane() {
                 desired("session", "playback_session"),
             ])
             .expect("legal");
-        assert_eq!(handle.wait_terminal(), SessionOutcome::Completed);
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         // TEST_FORMAT flows through the edge end to end; the decoded
         // payload was consumed to completion (asserted by Completed).
         let _ = TEST_FORMAT;

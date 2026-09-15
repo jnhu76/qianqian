@@ -39,7 +39,7 @@ fn main() -> ExitCode {
 
 #[cfg(feature = "playback")]
 fn run_playback(file: PathBuf) -> ExitCode {
-    use qianqian_playback::{PlaybackSessionHandle, SessionOutcome, playback_session_spec};
+    use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionHandle, playback_session_spec};
 
     let mut runtime = qianqian_app::QianqianApp::new();
     if let Err(e) = runtime.register_component(qianqian_decode_songcore::songcore_decode_plugin()) {
@@ -127,27 +127,32 @@ fn run_playback(file: PathBuf) -> ExitCode {
 
     let outcome = handle.wait_terminal();
     let snapshot = runtime.dispose();
-    match &outcome {
-        SessionOutcome::Completed => {
+    // The failure diagnostic is read separately from the settled
+    // observation: it is presentation text, not part of the semantic
+    // outcome (D14.2).
+    let observation = handle.observe();
+    match outcome {
+        EpisodeTerminalOutcome::Completed => {
             println!("EOF: played out completely");
         }
-        SessionOutcome::Failed { stage } => {
-            eprintln!("playback failed: {stage}");
-        }
-        SessionOutcome::Stopped => {
+        EpisodeTerminalOutcome::Failed => match &observation.failure_diagnostic {
+            Some(failure) => eprintln!("playback failed: {failure}"),
+            None => eprintln!("playback failed"),
+        },
+        EpisodeTerminalOutcome::Stopped => {
             println!("stopped before completion");
         }
     }
     report_disposal(&snapshot);
     match outcome {
-        SessionOutcome::Completed | SessionOutcome::Stopped => {
+        EpisodeTerminalOutcome::Completed | EpisodeTerminalOutcome::Stopped => {
             if snapshot.quiet {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::from(1)
             }
         }
-        SessionOutcome::Failed { .. } => ExitCode::from(1),
+        EpisodeTerminalOutcome::Failed => ExitCode::from(1),
     }
 }
 

@@ -22,17 +22,18 @@
 //! outcome class:
 //!   undecided | completed | stopped | failed-decode | failed-device
 //! (the failed-decode / failed-device split preserves production's
-//! `Failed.stage` naming; the TLA verdict collapses both to "Failed").
+//! internal `Failed.stage` diagnostic naming; the TLA verdict collapses
+//! both to "Failed").
 //!
 //! Publication order mirrors the production contract: stop intent is
 //! recorded FIRST (request_stop publishes intent before it releases
 //! the data plane, so any stop-caused evidence observes it — the D11
-//! decision-time stability rule), then evidence publications each end
-//! in the session-owned settlement step (`decode_failed` /
-//! `worker_exited` settle inline; the drain verdict's settlement step
-//! is invoked once after publication, standing in for the settlement
-//! watcher that owns that site in a live episode). Reading the
-//! committed outcome afterwards never creates it.
+//! decision-time stability rule), then each evidence publication runs
+//! the session-owned settlement step synchronously inside its own call
+//! (`decode_failed` / `worker_exited` on the worker call stack; the
+//! drain verdict through the session-installed one-shot DrainSignal
+//! observer, on the publishing leg's call stack). Reading the committed
+//! outcome afterwards never creates it.
 //!
 //! The committed artifact
 //!   specs/episode-terminal-settlement/CurrentDecisionTable.tla
@@ -55,11 +56,17 @@
 //!
 //! Scope boundary: the table freezes the STATIC decision contract
 //! (evidence shape ⇒ verdict class, intent fixed at the settlement
-//! boundary). The pre-F2 dynamic differential — consumer-triggered
-//! resolve reading late stop intent — is closed by the F2
-//! authority-owned settlement (evidence publication runs the settlement
-//! step; the model's boundary-intent semantics M4/W4 now match
-//! production), and the model keeps machine-checking that rule.
+//! boundary). The dynamic differential is closed — and, since
+//! CORRECTIVE-1, closed for a stateable reason: every decisive-evidence
+//! publication path runs authority settlement synchronously before it
+//! returns, `request_stop` and evidence publication serialize through
+//! the same completion lock, and there is no asynchronous settlement
+//! gap (the pre-corrective watcher let `complete()` return before
+//! settlement, so a late stop was visible to the resolver — M4-RUST-A
+//! in settlement_contract_tests.rs is the RED-on-old-shape witness).
+//! The model keeps machine-checking the boundary rule (M4/W4); the
+//! Rust M4-RUST-A/B and W4-RUST witnesses pin the same rule against
+//! production directly.
 
 use std::fmt::Write as _;
 
@@ -121,13 +128,12 @@ fn classify(outcome: Option<SessionOutcome>) -> &'static str {
 
 /// Drive one fresh `SessionCompletion` core exactly as the session legs
 /// drive it, then read the committed outcome. Stop intent is recorded
-/// first (the production order); every evidence publication ends in the
-/// session-owned settlement step — the drain verdict's step is invoked
-/// explicitly once after publication, standing in for the settlement
-/// watcher that owns that site in a live episode. No edge is ever
-/// bound, so `request_stop` only records intent. Publication order is
-/// irrelevant on a fresh core: every publisher here is a write-once
-/// state recorder and settlement reads current state.
+/// first (the production order); every evidence publication runs the
+/// session-owned settlement step synchronously inside its own call
+/// (decode/worker evidence on the worker call stack; the drain verdict
+/// through the session-installed one-shot DrainSignal observer), so no
+/// explicit settlement trigger exists or is needed. No edge is ever
+/// bound, so `request_stop` only records intent.
 fn production_class(
     stop_intent: bool,
     decode_failure: bool,
@@ -146,8 +152,6 @@ fn production_class(
     }
     if let Some(verdict) = drain_verdict {
         completion.drain_signal().complete(verdict);
-        // The settlement watcher's step for the drain-publication site.
-        completion.settle_now();
     }
     classify(completion.committed())
 }
@@ -185,10 +189,13 @@ const ARTIFACT_HEADER: &str = concat!(
     "(*                                                                        *)\n",
     "(* verifier-only evidence（AGENTS.md verification authority boundary）：   *)\n",
     "(* 本表是 refinement oracle，不是 authority；语义只在 ADR-PBK-001 §2 与    *)\n",
-    "(* ADR-PBK-002 §17 D11。表冻结的是**静态**判决合同（证据形状 → 判决类，    *)\n",
-    "(* intent 在 settlement 边界固定）。F2 已把 settlement 迁回 evidence       *)\n",
-    "(* publication 触发（authority-owned），pre-F2 的 late-intent 动态差分     *)\n",
-    "(* 已闭合；主模型 M4/W4 继续机器检查该边界规则。                           *)\n",
+    "(* ADR-PBK-002 §17 D11/D14。表冻结的是**静态**判决合同（证据形状 →         *)\n",
+    "(* 判决类，intent 在 settlement 边界固定）。动态差分闭合依据               *)\n",
+    "(* （CORRECTIVE-1）：每个 decisive evidence publication 路径在返回前同步    *)\n",
+    "(* 完成 authority settlement，request_stop 与 evidence publication 经同一  *)\n",
+    "(* completion 边界串行化，不存在异步 settlement 间隙。主模型 M4/W4 继续    *)\n",
+    "(* 机器检查该边界规则；Rust 侧 M4-RUST-A/B、W4-RUST 白盒 witness 直接      *)\n",
+    "(* 钉住同一规则。                                                          *)\n",
     "(**************************************************************************)\n",
 );
 

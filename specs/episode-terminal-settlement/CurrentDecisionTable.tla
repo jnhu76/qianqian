@@ -26,10 +26,13 @@
 (*                                                                        *)
 (* verifier-only evidence（AGENTS.md verification authority boundary）：   *)
 (* 本表是 refinement oracle，不是 authority；语义只在 ADR-PBK-001 §2 与    *)
-(* ADR-PBK-002 §17 D11。表冻结的是**静态**判决合同（证据形状 → 判决类，    *)
-(* intent 在 settlement 边界固定）。F2 已把 settlement 迁回 evidence       *)
-(* publication 触发（authority-owned），pre-F2 的 late-intent 动态差分     *)
-(* 已闭合；主模型 M4/W4 继续机器检查该边界规则。                           *)
+(* ADR-PBK-002 §17 D11/D14。表冻结的是**静态**判决合同（证据形状 →         *)
+(* 判决类，intent 在 settlement 边界固定）。动态差分闭合依据               *)
+(* （CORRECTIVE-1）：每个 decisive evidence publication 路径在返回前同步    *)
+(* 完成 authority settlement，request_stop 与 evidence publication 经同一  *)
+(* completion 边界串行化，不存在异步 settlement 间隙。主模型 M4/W4 继续    *)
+(* 机器检查该边界规则；Rust 侧 M4-RUST-A/B、W4-RUST 白盒 witness 直接      *)
+(* 钉住同一规则。                                                          *)
 (**************************************************************************)
 DecisionTableRows ==
     {

@@ -9,17 +9,17 @@
 //! open decode endpoint            (RAII: rides with the decode worker)
 //! build bounded edge
 //! open render stream              -> inverse: stop_and_join stream
-//! spawn settlement watcher        -> inverse: join watcher (owner-local;
-//!                                    registered first so it unwinds last,
-//!                                    after the stream has made the render
-//!                                    leg publish its drain verdict)
 //! spawn decode worker             -> inverse: stop edge + join worker
 //! ```
 //!
 //! Effects unwind strictly LIFO, so disposal runs stop-edge, join worker,
-//! then stop-join-release the stream, then join the settlement watcher —
-//! preserving stop -> join -> release and guaranteeing the watcher's
-//! drain wait is already satisfied when its join runs.
+//! then stop-join-release the stream — preserving stop -> join -> release.
+//! There is no settlement watcher/resolver thread (D14.3): every terminal
+//! evidence publication settles synchronously on the publishing leg's own
+//! call stack (the worker wrapper for decode/worker evidence; the
+//! session-installed one-shot DrainSignal observer for the drain verdict),
+//! so when both join inverses return, no decisive evidence can sit
+//! uncommitted.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -106,7 +106,12 @@ fn activate_inner(
 
     // Playback-specific render stream, pre-bound to the edge's consumer
     // half and the session's drain signal. A bounded open verdict keeps
-    // device failures inside activation.
+    // device failures inside activation. The drain signal already
+    // carries the session-owned one-shot observer: the render leg's
+    // first verdict publication settles the episode synchronously,
+    // before `complete` returns — which also means this stream's
+    // stop_and_join inverse below cannot return before the terminal
+    // publication path has run.
     let stream = output
         .service()
         .open_stream(qianqian_audio_api::ports::RenderRequest {
@@ -116,38 +121,10 @@ fn activate_inner(
         })
         .map_err(|e| ActivationError::new(format!("render stream open failed: {}", e.message)))?;
 
-    // The settlement watcher: the drain verdict is published inside the
-    // output provider's render thread, the one evidence site no
-    // session-owned call stack observes, so a drain-last episode (natural
-    // EOF) needs this watcher to run the settlement step without any
-    // consumer call. Owner-local effect; registered FIRST so it unwinds
-    // LAST — by then the stream inverse below has stopped and joined the
-    // render leg, which publishes exactly one verdict on every exit
-    // path, so the watcher's drain wait is satisfied and the join cannot
-    // wedge teardown.
-    //
-    // Spawn-failure window: at this point the stream is open but its
-    // inverse is not registered yet (it must unwind after this effect),
-    // so the raise below must tear the stream down itself — dropping it
-    // would detach the render thread while it holds the device.
-    let watcher = match completion.spawn_settlement_watcher() {
-        Ok(watcher) => watcher,
-        Err(e) => {
-            stream.stop_and_join();
-            return Err(ActivationError::new(format!(
-                "settlement watcher spawn failed: {e}"
-            )));
-        }
-    };
-    ctx.register_effect(move || {
-        let _ = watcher.join();
-        Discharge::Discharged
-    });
-
-    // Registered after the watcher effect, so it unwinds before the
-    // watcher join: stop+join the producer before the device is
-    // released. It is a relation-bearing effect: the stream is a
-    // cross-fiber contribution toward the output provider.
+    // Registered before the worker spawn, so it unwinds after the worker
+    // inverse: stop+join the producer before the device is released. It
+    // is a relation-bearing effect: the stream is a cross-fiber
+    // contribution toward the output provider.
     ctx.register_relation::<AudioOutputCapability>(&output, move || {
         stream.stop_and_join();
         Discharge::Discharged

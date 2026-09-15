@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use qianqian_app::QianqianApp;
 use qianqian_composition::{DesiredEntry, FiberState, Revision};
-use qianqian_playback::{PlaybackSessionHandle, SessionOutcome, playback_session_spec};
+use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionHandle, playback_session_spec};
 
 use common::{OutputBehavior, SourceBehavior, TestDecode, TestOutput, within};
 
@@ -38,9 +38,11 @@ fn assert_no_leg_threads() {
         common::named_thread_gone_within("qianqian-test-render", LEAK_ORACLE_GRACE),
         "render thread leaked"
     );
+    // No settlement/resolver thread may exist at all (D14.3): the
+    // publication paths settle synchronously on the legs' own stacks.
     assert!(
-        common::named_thread_gone_within("qianqian-settle", LEAK_ORACLE_GRACE),
-        "settlement watcher thread leaked"
+        !common::named_thread_alive("qianqian-settle"),
+        "a settlement/resolver thread exists (D14.3 forbids one)"
     );
 }
 
@@ -125,7 +127,7 @@ fn stop_before_binding_stops_the_episode_once_bound() {
 
         assert_eq!(
             handle.wait_terminal(),
-            SessionOutcome::Stopped,
+            EpisodeTerminalOutcome::Stopped,
             "a stop that arrived before the edge existed must not be lost"
         );
 
@@ -187,12 +189,12 @@ fn late_stop_after_completed_changes_nothing() {
         );
         activate(&mut runtime);
 
-        assert_eq!(handle.wait_terminal(), SessionOutcome::Completed);
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         handle.request_stop();
         handle.request_stop();
         assert_eq!(
             handle.observe().terminal_outcome,
-            Some(SessionOutcome::Completed),
+            Some(EpisodeTerminalOutcome::Completed),
             "stop after settlement must not rewrite the outcome"
         );
 
@@ -222,7 +224,7 @@ fn repeated_stop_requests_are_idempotent() {
         for _ in 0..5 {
             handle.request_stop();
         }
-        assert_eq!(handle.wait_terminal(), SessionOutcome::Stopped);
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
 
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet);
@@ -246,11 +248,20 @@ fn a_decode_failure_without_any_stop_lands_failed_decode() {
         activate(&mut runtime);
 
         let outcome = handle.wait_terminal();
-        assert!(
-            matches!(&outcome, SessionOutcome::Failed { stage } if stage.starts_with("decode")),
-            "a decoder failure must land Failed{{decode}}, got {outcome:?}"
+        assert_eq!(
+            outcome,
+            EpisodeTerminalOutcome::Failed,
+            "a decoder failure must land Failed, got {outcome:?}"
         );
-        assert!(!handle.observe().stop_requested, "nobody requested a stop");
+        let observation = handle.observe();
+        assert!(
+            observation
+                .failure_diagnostic
+                .as_deref()
+                .is_some_and(|stage| stage.starts_with("decode")),
+            "the decode diagnostic travels separately: {observation:?}"
+        );
+        assert!(!observation.stop_requested, "nobody requested a stop");
 
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet);
@@ -278,13 +289,17 @@ fn a_device_abort_without_stop_request_lands_failed_device() {
 
         assert_eq!(
             handle.wait_terminal(),
-            SessionOutcome::Failed {
-                stage: "device".to_owned()
-            },
+            EpisodeTerminalOutcome::Failed,
             "an abort nobody requested is a device failure, not a stop"
         );
+        let observation = handle.observe();
+        assert_eq!(
+            observation.failure_diagnostic.as_deref(),
+            Some("device"),
+            "the device diagnostic travels separately"
+        );
         assert!(
-            !handle.observe().stop_requested,
+            !observation.stop_requested,
             "no stop intent was ever recorded"
         );
 
@@ -309,7 +324,7 @@ fn binding_the_stop_target_alone_preserves_the_eof_path() {
         );
         activate(&mut runtime);
 
-        assert_eq!(handle.wait_terminal(), SessionOutcome::Completed);
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
 
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet);

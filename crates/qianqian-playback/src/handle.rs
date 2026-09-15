@@ -19,13 +19,15 @@
 //! explicit and separate:
 //!
 //! ```text
-//! terminal_outcome   Fact; None means only "no terminal Fact committed
-//!                    yet" — it is not Playing/Starting/Paused or any
-//!                    fourth outcome
-//! stop_requested     Command state; true does not mean Stopping
-//! source_format      mechanism evidence, not source identity and not a
-//!                    playback semantic state
-//! activation_error   activation diagnostic; never a terminal Failed
+//! terminal_outcome    Fact; None means only "no terminal Fact committed
+//!                     yet" — it is not Playing/Starting/Paused or any
+//!                     fourth outcome
+//! failure_diagnostic  presentation text for a Failed outcome; never part
+//!                     of the semantic contract
+//! stop_requested      Command state; true does not mean Stopping
+//! source_format       mechanism evidence, not source identity and not a
+//!                     playback semantic state
+//! activation_error    activation diagnostic; never a terminal Failed
 //! ```
 //!
 //! Fields the current architecture has not earned (Playing/Starting/
@@ -36,13 +38,40 @@ use qianqian_audio_api::ports::PcmFormat;
 
 use crate::completion::{SessionCompletion, SessionOutcome};
 
+/// The stable semantic terminal outcome of one playback episode
+/// (ADR-PBK-002 D14.2): exactly these three variants and nothing else.
+///
+/// Diagnostics — which leg failed and why — are deliberately NOT part of
+/// this contract. They are carried separately as
+/// [`PlaybackSessionObservation::failure_diagnostic`] and may change
+/// freely; no semantic subclass (decode-failed, device-failed, …) is
+/// representable in or derivable from this enum.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EpisodeTerminalOutcome {
+    /// EOF was produced, drained and played out.
+    Completed,
+    /// Stop intent was recorded at the decisive evidence boundary and no
+    /// higher-precedence failure classification won.
+    Stopped,
+    /// The episode failed before completion. The reason is diagnostic
+    /// only: read `failure_diagnostic` for presentation, never for
+    /// semantic dispatch.
+    Failed,
+}
+
 /// One coherent observation of one playback episode, snapshot under a
 /// single lock so every field value coexisted at one real instant.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlaybackSessionObservation {
     /// The committed terminal outcome, or `None` while no terminal Fact
     /// has been committed yet (pending).
-    pub terminal_outcome: Option<SessionOutcome>,
+    pub terminal_outcome: Option<EpisodeTerminalOutcome>,
+    /// Why the episode failed, when it failed and a diagnostic was
+    /// published. Presentation text, NOT part of the semantic contract:
+    /// `Completed`/`Stopped` observations never carry one, and a `Failed`
+    /// observation may or may not. Its presence, absence or spelling may
+    /// change without a semantic change.
+    pub failure_diagnostic: Option<String>,
     /// Whether stop intent has been recorded. Command state, not
     /// outcome truth.
     pub stop_requested: bool,
@@ -94,9 +123,13 @@ impl PlaybackSessionHandle {
     }
 
     /// Block until the episode's terminal Fact is committed, then return
-    /// it. Pure wait: settlement is authority-owned and is never
-    /// triggered or advanced by this call.
-    pub fn wait_terminal(&self) -> SessionOutcome {
-        self.completion.wait_terminal()
+    /// its stable semantic outcome. Pure wait: settlement is
+    /// authority-owned and is never triggered or advanced by this call.
+    /// A failure diagnostic, if any, is read separately through
+    /// [`PlaybackSessionHandle::observe`]; it is presentation, not
+    /// semantics.
+    pub fn wait_terminal(&self) -> EpisodeTerminalOutcome {
+        let outcome: SessionOutcome = self.completion.wait_terminal();
+        outcome.split().0
     }
 }

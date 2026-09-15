@@ -1,6 +1,7 @@
 //! F2 public read-seam tests: the application-facing episode surface is
 //! exactly `PlaybackSessionHandle` (`request_stop` / `observe` /
-//! `wait_terminal`) over `PlaybackSessionObservation` / `SessionOutcome`.
+//! `wait_terminal`) over `PlaybackSessionObservation` /
+//! `EpisodeTerminalOutcome`.
 //! These tests consume ONLY that public surface — the same rights a
 //! future UI adapter will have — and pin its truth-class contract:
 //! pending is the absence of a Fact, `stop_requested` is Command state,
@@ -13,7 +14,7 @@
 
 use std::time::Duration;
 
-use qianqian_playback::{PlaybackSessionHandle, SessionOutcome, playback_session_spec};
+use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionHandle, playback_session_spec};
 
 mod common;
 
@@ -128,10 +129,13 @@ fn a_stopped_episode_observes_its_fact_with_the_command_recorded() {
             let handle = handle.clone();
             move || handle.wait_terminal()
         }),
-        SessionOutcome::Stopped
+        EpisodeTerminalOutcome::Stopped
     );
     let observation = handle.observe();
-    assert_eq!(observation.terminal_outcome, Some(SessionOutcome::Stopped));
+    assert_eq!(
+        observation.terminal_outcome,
+        Some(EpisodeTerminalOutcome::Stopped)
+    );
     assert!(observation.stop_requested);
     assert!(
         observation.source_format.is_some(),

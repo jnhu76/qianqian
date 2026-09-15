@@ -9,11 +9,12 @@
 
 use qianqian_audio_api::ports::PcmFormat;
 use qianqian_headless::status::{forbidden_status_claim, format_status};
-use qianqian_playback::{PlaybackSessionObservation, SessionOutcome};
+use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionObservation};
 
 fn pending_observation() -> PlaybackSessionObservation {
     PlaybackSessionObservation {
         terminal_outcome: None,
+        failure_diagnostic: None,
         stop_requested: false,
         source_format: None,
         activation_error: None,
@@ -45,14 +46,9 @@ fn stop_intent_projects_as_command_state_not_as_a_fact() {
 #[test]
 fn each_terminal_fact_projects_its_own_line() {
     for (outcome, expected) in [
-        (SessionOutcome::Completed, "outcome: completed\n"),
-        (SessionOutcome::Stopped, "outcome: stopped\n"),
-        (
-            SessionOutcome::Failed {
-                stage: "decode: corrupt frame".to_owned(),
-            },
-            "outcome: failed\nfailure: decode: corrupt frame\n",
-        ),
+        (EpisodeTerminalOutcome::Completed, "outcome: completed\n"),
+        (EpisodeTerminalOutcome::Stopped, "outcome: stopped\n"),
+        (EpisodeTerminalOutcome::Failed, "outcome: failed\n"),
     ] {
         let observation = PlaybackSessionObservation {
             terminal_outcome: Some(outcome),
@@ -63,6 +59,7 @@ fn each_terminal_fact_projects_its_own_line() {
                 channel_mask: 0x3,
             }),
             activation_error: None,
+            failure_diagnostic: None,
         };
         let text = format_status(&observation);
         assert!(text.contains(expected), "missing {expected:?} in {text:?}");
@@ -70,6 +67,54 @@ fn each_terminal_fact_projects_its_own_line() {
         assert!(text.contains("stop_requested: false\n"));
         assert_eq!(forbidden_status_claim(&text), None);
     }
+}
+
+/// The truth-class separation the projection must keep (CORRECTIVE-1
+/// MAJOR-1): the semantic line names only the stable terminal
+/// vocabulary; the diagnostic is a separate presentation line.
+#[test]
+fn a_failed_fact_projects_semantics_first_and_diagnostic_separately() {
+    let observation = PlaybackSessionObservation {
+        terminal_outcome: Some(EpisodeTerminalOutcome::Failed),
+        failure_diagnostic: Some("decode: corrupt frame".to_owned()),
+        ..pending_observation()
+    };
+    let text = format_status(&observation);
+    // Semantic line first, no diagnostic vocabulary in it.
+    assert!(
+        text.starts_with("outcome: failed\n"),
+        "semantic line first: {text:?}"
+    );
+    // Diagnostic line separately, when one was published.
+    assert!(
+        text.contains("failure: decode: corrupt frame\n"),
+        "diagnostic on its own line: {text:?}"
+    );
+    // The semantic line must not smuggle a failure subclass: callers
+    // cannot infer DecodeFailed/DeviceFailed from the projection.
+    assert!(
+        !text.contains("failed:"),
+        "no failure subclass in the semantic line: {text:?}"
+    );
+    assert_eq!(forbidden_status_claim(&text), None);
+}
+
+/// A Failed fact MAY lack a diagnostic; the semantic line must not
+/// depend on it.
+#[test]
+fn a_failed_fact_without_a_diagnostic_still_projects_its_semantic_line() {
+    let observation = PlaybackSessionObservation {
+        terminal_outcome: Some(EpisodeTerminalOutcome::Failed),
+        failure_diagnostic: None,
+        ..pending_observation()
+    };
+    let text = format_status(&observation);
+    assert!(text.contains("outcome: failed\n"), "{text:?}");
+    assert!(
+        !text.contains("failure:"),
+        "no diagnostic line without a diagnostic: {text:?}"
+    );
+    assert_eq!(forbidden_status_claim(&text), None);
 }
 
 #[test]

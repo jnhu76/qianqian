@@ -3,18 +3,23 @@
 //!
 //! These live inside the crate boundary because the properties they pin
 //! are exactly the ones that must NOT be reachable from the product
-//! seam: evidence mutators, the settlement step, the settlement watcher
-//! and the `buffered_frames` diagnostic (D14.3 — verifier needs must
-//! not leak mechanism fields back into the product seam). The
-//! application-visible half of the behavior is pinned separately by the
-//! public integration tests (`tests/read_seam.rs`, `tests/stop_seam.rs`).
+//! seam: evidence mutators, the settlement step, the drain verdict
+//! mirroring and the `buffered_frames` diagnostic (D14.3 — verifier
+//! needs must not leak mechanism fields back into the product seam).
+//! The application-visible half of the behavior is pinned separately by
+//! the public integration tests (`tests/read_seam.rs`,
+//! `tests/stop_seam.rs`).
 //!
 //! Test-matrix references (QIANQIAN-F2-TRUTHFUL-READ-SIDE-IMPLEMENTATION-2
-//! §15): T1 fresh observation, T2 source format, T3 stop command state,
-//! T4 Completed, T5 Stopped, T6 Failed, T7 activation failure, T8
-//! observe purity, T9 wait purity, T10 consumer-free settlement
-//! (worker-last + drain-last), T11 late-stop stability, T12 coherent
-//! observation race, T15 settlement-watcher lifecycle.
+//! §15, plus CORRECTIVE-1): T1 fresh observation, T2 source format, T3
+//! stop command state, T4 Completed, T5 Stopped, T6 Failed, T7
+//! activation failure, T8 observe purity, T9 wait purity, T10
+//! consumer-free settlement (worker-last + drain-last), T11 late-stop
+//! stability, T12 coherent observation race, T15 teardown leaves no
+//! decisive evidence uncommitted. M4-RUST-A/B and W4-RUST are the
+//! dynamic decision-boundary witnesses corresponding to the formal
+//! model's M4/W4: the decisive publication paths commit synchronously
+//! (before returning), and a late stop cannot relabel the classification.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -23,7 +28,7 @@ use qianqian_audio_api::ports::DrainVerdict;
 
 use crate::completion::{SessionCompletion, SessionOutcome};
 use crate::edge::EdgeTerminal;
-use crate::handle::PlaybackSessionHandle;
+use crate::handle::{EpisodeTerminalOutcome, PlaybackSessionHandle};
 use crate::test_common::{OutputBehavior, SourceBehavior, TestDecode, TestOutput, within};
 
 const DUMMY_PATH: &str = "test://settlement-contract";
@@ -31,6 +36,20 @@ const DUMMY_PATH: &str = "test://settlement-contract";
 /// EDGE_CAPACITY_FRAMES), used as the "producer blocked on a full edge"
 /// witness.
 const EDGE_CAPACITY_FRAMES: usize = 8192;
+
+/// D14.3: no resolver/settlement thread may exist — ever. The
+/// publication paths settle synchronously on the legs' own call stacks;
+/// there is nothing for a dedicated thread to do.
+#[cfg(target_os = "linux")]
+fn assert_no_settlement_thread() {
+    assert!(
+        !crate::test_common::named_thread_alive("qianqian-settle"),
+        "a settlement/resolver thread exists (D14.3 forbids one)"
+    );
+}
+
+#[cfg(not(target_os = "linux"))]
+fn assert_no_settlement_thread() {}
 
 #[cfg(target_os = "linux")]
 fn assert_no_leg_threads() {
@@ -43,27 +62,11 @@ fn assert_no_leg_threads() {
         crate::test_common::named_thread_gone_within("qianqian-test-render", LEAK_ORACLE_GRACE),
         "render thread leaked"
     );
-    assert!(
-        crate::test_common::named_thread_gone_within("qianqian-settle", LEAK_ORACLE_GRACE),
-        "settlement watcher thread leaked"
-    );
+    assert_no_settlement_thread();
 }
 
 #[cfg(not(target_os = "linux"))]
 fn assert_no_leg_threads() {}
-
-#[cfg(target_os = "linux")]
-fn assert_settlement_watcher_never_spawned() {
-    // Activation failed before the stream opened: the watcher was never
-    // spawned, so no such thread may exist at any grace.
-    assert!(
-        !crate::test_common::named_thread_alive("qianqian-settle"),
-        "a settlement watcher exists for an episode that never went live"
-    );
-}
-
-#[cfg(not(target_os = "linux"))]
-fn assert_settlement_watcher_never_spawned() {}
 
 fn desired(id: &str, component: &'static str) -> qianqian_composition::DesiredEntry {
     qianqian_composition::DesiredEntry::enabled(
@@ -133,16 +136,21 @@ fn live_runtime(
     (runtime, consumed)
 }
 
-/// Poll the PURE read until a terminal outcome is committed (bounded).
-/// Polling is legitimate here: `observe` settles nothing, so the loop
-/// cannot be what produced the outcome — the autonomy claims below are
-/// about wait/consumer calls never being required, and observe is not a
-/// consumer trigger (T8 pins that separately).
-fn await_terminal(handle: &PlaybackSessionHandle, limit: Duration) -> SessionOutcome {
+/// Poll the PURE read until a terminal outcome is committed (bounded),
+/// then return the full observation. Polling is legitimate here:
+/// `observe` settles nothing, so the loop cannot be what produced the
+/// outcome — the autonomy claims below are about wait/consumer calls
+/// never being required, and observe is not a consumer trigger (T8 pins
+/// that separately).
+fn await_terminal(
+    handle: &PlaybackSessionHandle,
+    limit: Duration,
+) -> crate::handle::PlaybackSessionObservation {
     let deadline = std::time::Instant::now() + limit;
     loop {
-        if let Some(outcome) = handle.observe().terminal_outcome {
-            return outcome;
+        let observation = handle.observe();
+        if observation.terminal_outcome.is_some() {
+            return observation;
         }
         assert!(
             std::time::Instant::now() < deadline,
@@ -159,6 +167,7 @@ fn fresh_observation_is_pending_with_no_side_evidence() {
     let handle = PlaybackSessionHandle::new();
     let observation = handle.observe();
     assert_eq!(observation.terminal_outcome, None, "pending, not a state");
+    assert_eq!(observation.failure_diagnostic, None);
     assert!(!observation.stop_requested);
     assert_eq!(observation.source_format, None);
     assert_eq!(observation.activation_error, None);
@@ -235,9 +244,16 @@ fn t4_completed_is_committed_without_observe_or_wait() {
         );
         // Natural EOF is the drain-last shape: no observe, no wait, no
         // headless polling — the authority must commit on its own.
-        let outcome = await_terminal(&handle, Duration::from_secs(5));
-        assert_eq!(outcome, SessionOutcome::Completed);
-        assert_eq!(handle.wait_terminal(), SessionOutcome::Completed);
+        let observation = await_terminal(&handle, Duration::from_secs(5));
+        assert_eq!(
+            observation.terminal_outcome,
+            Some(EpisodeTerminalOutcome::Completed)
+        );
+        assert_eq!(
+            observation.failure_diagnostic, None,
+            "a completed episode never carries a diagnostic"
+        );
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet);
         assert_no_leg_threads();
@@ -255,9 +271,11 @@ fn t5_stopped_is_committed_without_wait_resolving() {
             handle.clone(),
         );
         handle.request_stop();
-        let outcome = await_terminal(&handle, Duration::from_secs(5));
-        assert_eq!(outcome, SessionOutcome::Stopped);
-        let observation = handle.observe();
+        let observation = await_terminal(&handle, Duration::from_secs(5));
+        assert_eq!(
+            observation.terminal_outcome,
+            Some(EpisodeTerminalOutcome::Stopped)
+        );
         assert!(
             observation.stop_requested,
             "a committed Stopped always observed recorded intent"
@@ -278,10 +296,18 @@ fn t6_decode_failure_is_committed_without_wait() {
             OutputBehavior::Consume,
             handle.clone(),
         );
-        let outcome = await_terminal(&handle, Duration::from_secs(5));
+        let observation = await_terminal(&handle, Duration::from_secs(5));
+        assert_eq!(
+            observation.terminal_outcome,
+            Some(EpisodeTerminalOutcome::Failed),
+            "D11 precedence preserved"
+        );
         assert!(
-            matches!(&outcome, SessionOutcome::Failed { stage } if stage.starts_with("decode")),
-            "D11 precedence preserved: {outcome:?}"
+            observation
+                .failure_diagnostic
+                .as_deref()
+                .is_some_and(|stage| stage.starts_with("decode")),
+            "the decode diagnostic travels separately: {observation:?}"
         );
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet);
@@ -320,7 +346,7 @@ fn t7_activation_failure_is_diagnostic_not_a_forged_failed_fact() {
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet);
         assert_no_leg_threads();
-        assert_settlement_watcher_never_spawned();
+        assert_no_settlement_thread();
     });
 }
 
@@ -328,23 +354,27 @@ fn t7_activation_failure_is_diagnostic_not_a_forged_failed_fact() {
 
 #[test]
 fn t8_observe_neither_settles_nor_mutates() {
-    // Decisive-but-unsettled state (built below in T9's shape): repeated
-    // observation must not commit anything.
+    // Publish non-decisive evidence (worker leg only, no verdict):
+    // repeated pure reads must not complete the evidence set or commit
+    // anything.
     let completion = SessionCompletion::new();
     completion.worker_exited(EdgeTerminal::Stopped);
-    completion.drain_signal().complete(DrainVerdict::Aborted);
     let handle = PlaybackSessionHandle {
         completion: completion.clone(),
     };
     for _ in 0..1000 {
         let observation = handle.observe();
         assert_eq!(observation.terminal_outcome, None, "observe cannot commit");
+        assert!(!observation.stop_requested);
     }
     assert_eq!(completion.committed(), None);
-    // On a settled core, repeated observation is stable and changes
-    // nothing (no lifecycle action, no data-plane touch: the outcome and
-    // every field are byte-identical across calls).
-    completion.settle_now();
+    // The pre-corrective "decisive-but-unsettled" construction no longer
+    // exists anywhere — that absence IS the decision-boundary fix, and
+    // M4-RUST-A/B below prove the commit happens before every decisive
+    // publication returns.
+    // On a settled core, repeated observation is byte-stable (no
+    // lifecycle action, no data-plane touch).
+    completion.decode_failed("settling evidence");
     let first = handle.observe();
     for _ in 0..1000 {
         assert_eq!(handle.observe(), first);
@@ -356,17 +386,13 @@ fn t8_observe_neither_settles_nor_mutates() {
 #[test]
 fn t9_wait_terminal_is_not_the_settlement_trigger() {
     let completion = SessionCompletion::new();
-    // Build decisive evidence WITHOUT a settlement trigger: the worker
-    // evidence path settles inline but is not yet decisive (no verdict);
-    // the drain verdict is then published with the settlement step
-    // deliberately withheld (in a live episode the watcher owns that
-    // step; here nothing owns it yet).
+    // Worker evidence only: published, not decisive. No publication path
+    // is left to run, so nothing may commit — including any wait call.
     completion.worker_exited(EdgeTerminal::Stopped);
     assert_eq!(completion.committed(), None);
-    completion.drain_signal().complete(DrainVerdict::Aborted);
-    assert_eq!(completion.committed(), None, "evidence alone is not a Fact");
-
-    let handle = PlaybackSessionHandle { completion };
+    let handle = PlaybackSessionHandle {
+        completion: completion.clone(),
+    };
     let waiter = {
         let handle = handle.clone();
         std::thread::spawn(move || handle.wait_terminal())
@@ -376,14 +402,17 @@ fn t9_wait_terminal_is_not_the_settlement_trigger() {
         !waiter.is_finished(),
         "wait_terminal must block instead of resolving"
     );
-    // The session-owned settlement step is what commits — and what
-    // wakes the waiter.
-    handle.completion.settle_now();
+    assert_eq!(
+        completion.committed(),
+        None,
+        "waiting settled nothing: pure condvar wait"
+    );
+    // The drain publication path is what completes the evidence set —
+    // and it commits synchronously, waking the waiter.
+    completion.drain_signal().complete(DrainVerdict::Aborted);
     assert_eq!(
         waiter.join().expect("waiter exits"),
-        SessionOutcome::Failed {
-            stage: "device".to_owned()
-        },
+        EpisodeTerminalOutcome::Failed,
         "no stop intent was recorded, so the abort is a device failure"
     );
 }
@@ -392,9 +421,9 @@ fn t9_wait_terminal_is_not_the_settlement_trigger() {
 
 #[test]
 fn t10_worker_last_evidence_settles_autonomously() {
-    // Drain verdict published first without its settlement step (no
-    // watcher in this white-box shape), worker evidence last: the
-    // worker publication path itself must commit.
+    // Drain verdict published first (undecided: the worker has not
+    // exited), worker evidence last: the worker publication path itself
+    // must commit before it returns.
     let completion = SessionCompletion::new();
     completion.drain_signal().complete(DrainVerdict::Drained);
     assert_eq!(completion.committed(), None);
@@ -407,30 +436,102 @@ fn t10_worker_last_evidence_settles_autonomously() {
 }
 
 #[test]
-fn t10_drain_last_evidence_settles_autonomously_via_the_real_watcher() {
+fn t10_drain_last_evidence_settles_synchronously_without_a_watcher() {
+    // Natural-EOF shape, worker evidence already in: the drain verdict
+    // is the last decisive publication; it must commit inside the
+    // complete() call — no watcher, no consumer call.
     let completion = SessionCompletion::new();
-    // Production stop order: intent is recorded before the evidence it
-    // can cause (D11 decision-time stability).
-    completion.request_stop();
-    completion
-        .spawn_settlement_watcher()
-        .expect("watcher spawns in a test process");
-    // Worker evidence first: settles, not yet decisive.
-    completion.worker_exited(EdgeTerminal::Stopped);
+    completion.worker_exited(EdgeTerminal::Eof);
     assert_eq!(completion.committed(), None);
-    // Drain verdict last: published inside the output provider's thread
-    // in production — here completed directly; the watcher must wake and
-    // commit without any consumer call.
+    completion.drain_signal().complete(DrainVerdict::Drained);
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Completed),
+        "the drain publication path settles synchronously on the publishing leg's call stack"
+    );
+}
+
+// --- M4/W4: dynamic decision-boundary witnesses (formal M4/W4 twins) --------------
+
+/// M4-RUST-A — drain-last then late stop. Proven RED on the reviewed
+/// HEAD (daf8117): the old watcher-owned settlement let `complete()`
+/// return with the decisive evidence uncommitted, so a later stop was
+/// visible to the resolver and relabelled the outcome.
+#[test]
+fn m4_drain_last_decisive_evidence_commits_before_complete_returns() {
+    let completion = SessionCompletion::new();
+    completion.worker_exited(EdgeTerminal::Stopped);
+    assert_eq!(
+        completion.committed(),
+        None,
+        "worker evidence alone is not decisive"
+    );
     completion.drain_signal().complete(DrainVerdict::Aborted);
-    let deadline = std::time::Instant::now() + Duration::from_secs(5);
-    while completion.committed().is_none() {
-        assert!(
-            std::time::Instant::now() < deadline,
-            "the settlement watcher never committed the drain-last evidence"
-        );
-        std::thread::sleep(Duration::from_millis(2));
-    }
-    assert_eq!(completion.committed(), Some(SessionOutcome::Stopped));
+    // The decision boundary: once complete() returns, the decisive
+    // classification must already be committed and immutable.
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Failed {
+            stage: "device".to_owned()
+        }),
+        "drain-last decisive evidence must commit synchronously"
+    );
+    completion.request_stop();
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Failed {
+            stage: "device".to_owned()
+        }),
+        "a late stop after the decisive boundary cannot relabel"
+    );
+}
+
+/// M4-RUST-B — worker-last then late stop. The mirror image of M4-A:
+/// the worker publication is the decisive one and must commit before
+/// `worker_exited` returns; a later stop cannot relabel.
+#[test]
+fn m4_worker_last_decisive_evidence_commits_before_worker_exited_returns() {
+    let completion = SessionCompletion::new();
+    completion.drain_signal().complete(DrainVerdict::Aborted);
+    assert_eq!(
+        completion.committed(),
+        None,
+        "an aborted drain alone is not decisive (the worker may still exit)"
+    );
+    completion.worker_exited(EdgeTerminal::Stopped);
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Failed {
+            stage: "device".to_owned()
+        }),
+        "worker-last decisive evidence must commit synchronously"
+    );
+    completion.request_stop();
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Failed {
+            stage: "device".to_owned()
+        }),
+        "a late stop after the decisive boundary cannot relabel"
+    );
+}
+
+/// W4-RUST — stop really before the boundary: the point is not "Failed
+/// always wins" but that the boundary ordering determines truth and late
+/// commands do not reinterpret it. Intent linearized BEFORE the decisive
+/// publication legitimately yields Stopped.
+#[test]
+fn w4_stop_before_the_boundary_decides_stopped() {
+    let completion = SessionCompletion::new();
+    completion.request_stop();
+    completion.worker_exited(EdgeTerminal::Stopped);
+    assert_eq!(completion.committed(), None, "no verdict yet: undecided");
+    completion.drain_signal().complete(DrainVerdict::Aborted);
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Stopped),
+        "intent recorded before the decisive boundary makes it Stopped"
+    );
 }
 
 // --- T11: late command stability ---------------------------------------------------
@@ -459,7 +560,6 @@ fn t11_late_stop_cannot_relabel_a_committed_completed() {
     let completion = SessionCompletion::new();
     completion.worker_exited(EdgeTerminal::Eof);
     completion.drain_signal().complete(DrainVerdict::Drained);
-    completion.settle_now();
     assert_eq!(completion.committed(), Some(SessionOutcome::Completed));
     completion.request_stop();
     completion.request_stop();
@@ -496,7 +596,7 @@ fn t12_every_observation_is_a_coherent_instant() {
             let handle = handle.clone();
             observers.push(std::thread::spawn(move || {
                 let deadline = std::time::Instant::now() + Duration::from_secs(5);
-                let mut seen: Option<SessionOutcome> = None;
+                let mut seen: Option<EpisodeTerminalOutcome> = None;
                 let mut stop_seen = false;
                 loop {
                     let observation = handle.observe();
@@ -506,17 +606,17 @@ fn t12_every_observation_is_a_coherent_instant() {
                         "stop_requested flipped back to false"
                     );
                     stop_seen = observation.stop_requested;
-                    if let Some(previous) = &seen {
+                    if let Some(previous) = seen {
                         assert_eq!(
-                            observation.terminal_outcome.as_ref(),
+                            observation.terminal_outcome,
                             Some(previous),
                             "the terminal Fact is immutable across observations"
                         );
                     }
                     if observation.terminal_outcome.is_some() && seen.is_none() {
-                        seen = observation.terminal_outcome.clone();
+                        seen = observation.terminal_outcome;
                     }
-                    if observation.terminal_outcome == Some(SessionOutcome::Stopped) {
+                    if observation.terminal_outcome == Some(EpisodeTerminalOutcome::Stopped) {
                         // The impossible combination under attack: a
                         // Stopped Fact commits only with recorded intent,
                         // and intent is monotone, so no coherent instant
@@ -541,7 +641,7 @@ fn t12_every_observation_is_a_coherent_instant() {
 
         std::thread::sleep(Duration::from_millis(50));
         handle.request_stop();
-        assert_eq!(handle.wait_terminal(), SessionOutcome::Stopped);
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
         let outcomes: Vec<_> = observers
             .into_iter()
             .map(|o| o.join().expect("observer exits"))
@@ -549,7 +649,7 @@ fn t12_every_observation_is_a_coherent_instant() {
         for outcome in &outcomes {
             assert_eq!(
                 outcome,
-                &Some(SessionOutcome::Stopped),
+                &Some(EpisodeTerminalOutcome::Stopped),
                 "every observer that saw a Fact saw the same committed Fact"
             );
         }
@@ -559,15 +659,16 @@ fn t12_every_observation_is_a_coherent_instant() {
     });
 }
 
-// --- T15: settlement watcher lifecycle ----------------------------------------------
+// --- T15: teardown leaves no decisive evidence uncommitted ---------------------------
 
 #[test]
-fn t15_settlement_watcher_joins_on_every_exit_path() {
-    // Normal EOF, stop, decode failure: the runtime dispose joins the
-    // watcher on the teardown path (after stream stop_and_join), proven
-    // by the leak oracle in the T4/T5/T6 bodies above. This body covers
-    // the remaining paths: mid-play dispose (teardown-time settlement)
-    // and provider withdrawal.
+fn t15_teardown_leaves_no_decisive_evidence_uncommitted() {
+    // Mid-play dispose, no stop, no wait: teardown must stop the legs in
+    // order; the render leg's stop_and_join makes it publish its verdict,
+    // and that publication settles synchronously before complete()
+    // returns — so when dispose returns, the authority has settled
+    // (D11/D14.3: teardown must not report quiesced while decisive
+    // evidence sits uncommitted). No watcher, no consumer call.
     let _lifecycle = crate::test_common::lifecycle_lock();
     within(Duration::from_secs(10), || {
         let handle = PlaybackSessionHandle::new();
@@ -579,23 +680,47 @@ fn t15_settlement_watcher_joins_on_every_exit_path() {
             OutputBehavior::Consume,
             handle.clone(),
         );
-        // Dispose mid-play, no stop, no wait: teardown must still stop
-        // the legs in order, make the render leg publish its verdict,
-        // let the watcher settle, and join it.
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet);
         assert_no_leg_threads();
-        // The teardown itself completed the decisive evidence set, so
-        // the authority settled on the teardown path (D11: teardown must
-        // not report quiesced while decisive evidence sits uncommitted).
         // An aborted episode with no recorded stop intent classifies as
         // a device failure under the current contract.
+        let observation = handle.observe();
         assert_eq!(
-            handle.observe().terminal_outcome,
-            Some(SessionOutcome::Failed {
-                stage: "device".to_owned()
-            })
+            observation.terminal_outcome,
+            Some(EpisodeTerminalOutcome::Failed)
         );
+        assert_eq!(observation.failure_diagnostic.as_deref(), Some("device"));
+    });
+}
+
+// --- no resolver thread, ever ---------------------------------------------------------
+
+#[test]
+fn no_settlement_thread_exists_while_an_episode_is_live() {
+    let _lifecycle = crate::test_common::lifecycle_lock();
+    within(Duration::from_secs(10), || {
+        let handle = PlaybackSessionHandle::new();
+        let (mut runtime, _consumed) = live_runtime(
+            SourceBehavior::Paced {
+                after: 4 * 1024,
+                delay: Duration::from_millis(50),
+            },
+            OutputBehavior::Consume,
+            handle.clone(),
+        );
+        // Sample across a real slice of the live episode: no settlement
+        // thread may appear at any point.
+        for _ in 0..25 {
+            assert_no_settlement_thread();
+            assert_eq!(handle.observe().terminal_outcome, None);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        handle.request_stop();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet);
+        assert_no_leg_threads();
     });
 }
 
@@ -662,7 +787,7 @@ fn stop_while_playing_resolves_stopped_and_disposes_quietly() {
         // paced frame is still ~170 ms away, so the stop lands with the
         // consumer parked.
         handle.request_stop();
-        assert_eq!(handle.wait_terminal(), SessionOutcome::Stopped);
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
         let snapshot = runtime.dispose();
         assert!(
             snapshot.quiet,
@@ -695,7 +820,7 @@ fn stop_wakes_a_producer_blocked_on_a_full_edge() {
             "edge pinned full (producer blocked mid-write)",
         );
         handle.request_stop();
-        assert_eq!(handle.wait_terminal(), SessionOutcome::Stopped);
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet);
         assert_no_leg_threads();
@@ -717,7 +842,7 @@ fn stop_wakes_a_consumer_blocked_on_an_empty_edge() {
         );
         wait_for_a_parked_consumer(&handle, &consumed, Duration::from_secs(5));
         handle.request_stop();
-        assert_eq!(handle.wait_terminal(), SessionOutcome::Stopped);
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet);
         assert_no_leg_threads();
@@ -731,7 +856,6 @@ fn completion_resolves_completed_only_from_eof_plus_drained() {
     let completion = SessionCompletion::new();
     // Neither leg has reported: no outcome, and the fresh core stays
     // unsettled.
-    completion.settle_now();
     assert_eq!(completion.committed(), None);
 
     completion.worker_exited(EdgeTerminal::Eof);
@@ -741,10 +865,8 @@ fn completion_resolves_completed_only_from_eof_plus_drained() {
         "EOF without drain is not completion"
     );
 
+    // The drain publication commits synchronously, inside complete().
     completion.drain_signal().complete(DrainVerdict::Drained);
-    // The drain publication site's settlement step (watcher-owned in a
-    // live episode).
-    completion.settle_now();
     assert_eq!(completion.committed(), Some(SessionOutcome::Completed));
 }
 
@@ -765,7 +887,6 @@ fn completion_reports_device_abort_as_failure() {
     let completion = SessionCompletion::new();
     completion.worker_exited(EdgeTerminal::Eof);
     completion.drain_signal().complete(DrainVerdict::Aborted);
-    completion.settle_now();
     assert_eq!(
         completion.committed(),
         Some(SessionOutcome::Failed {
@@ -790,10 +911,10 @@ fn wait_terminal_blocks_until_a_leg_publishes() {
     // decode evidence settles inline on the worker call stack and the
     // commit wakes the waiter.
     handle.completion.decode_failed("test failure");
-    assert!(matches!(
+    assert_eq!(
         waiter.join().expect("waiter exits"),
-        SessionOutcome::Failed { .. }
-    ));
+        EpisodeTerminalOutcome::Failed
+    );
 }
 
 // --- migrated resolver-level stop-precedence test (was tests/stop_seam.rs) ----------

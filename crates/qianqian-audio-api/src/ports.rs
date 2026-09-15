@@ -62,16 +62,34 @@ pub trait RenderPcmInput: Send + Sync {
 /// Session-owned drain signal: the mechanism reports one terminal render
 /// verdict exactly once. It knows nothing about sessions — it only
 /// publishes the mechanism fact "this stream finished draining" (or
-/// aborted).
+/// aborted), optionally notifying one owner-installed observer.
+///
+/// The observer is a small one-shot publication seam, not an event
+/// system: at most one observer may be installed (at construction, so it
+/// is in place before the signal can reach any publishing leg), and the
+/// first successful [`DrainSignal::complete`] invokes it synchronously,
+/// before that call returns and with no signal lock held.
 #[derive(Clone, Debug, Default)]
 pub struct DrainSignal {
     inner: Arc<DrainInner>,
 }
 
-#[derive(Debug, Default)]
+/// The one-shot terminal-evidence observer type (see
+/// [`DrainSignal::with_on_complete`]). Deliberately minimal: one
+/// function, invoked once — not an event framework.
+type OnComplete = Arc<dyn Fn(DrainVerdict) + Send + Sync>;
+
+#[derive(Default)]
 struct DrainInner {
     verdict: std::sync::Mutex<Option<DrainVerdict>>,
-    ready: std::sync::Condvar,
+    on_complete: std::sync::Mutex<Option<OnComplete>>,
+}
+
+impl std::fmt::Debug for DrainInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Lock-free rendering: Debug may run concurrently with complete.
+        f.debug_struct("DrainInner").finish_non_exhaustive()
+    }
 }
 
 /// How the render leg terminated.
@@ -88,29 +106,46 @@ impl DrainSignal {
         Self::default()
     }
 
-    /// Publish the terminal verdict (exactly once; later calls are no-ops).
+    /// Create a signal whose first successful [`DrainSignal::complete`]
+    /// invokes `observer` once, synchronously, before `complete` returns.
+    /// This is the generic terminal-evidence publication seam for the
+    /// stream's owner; the mechanism layer knows nothing about what the
+    /// observer publishes. The observer must be cheap, non-blocking, and
+    /// must not call back into this signal (a re-entrant `complete` is a
+    /// no-op first-wins anyway).
+    pub fn with_on_complete(observer: impl Fn(DrainVerdict) + Send + Sync + 'static) -> Self {
+        Self {
+            inner: Arc::new(DrainInner {
+                verdict: std::sync::Mutex::new(None),
+                on_complete: std::sync::Mutex::new(Some(Arc::new(observer))),
+            }),
+        }
+    }
+
+    /// Publish the terminal verdict (exactly once; later calls are
+    /// no-ops). On the first successful publication the installed
+    /// observer — if any — has finished running before this call
+    /// returns.
     pub fn complete(&self, verdict: DrainVerdict) {
-        let mut guard = self.inner.verdict.lock().expect("drain verdict lock");
-        if guard.is_none() {
-            *guard = Some(verdict);
-            self.inner.ready.notify_all();
-        }
-    }
-
-    /// Block until a verdict exists.
-    pub fn wait(&self) -> DrainVerdict {
-        let mut guard = self.inner.verdict.lock().expect("drain verdict lock");
-        loop {
-            if let Some(v) = *guard {
-                return v;
+        let observer = {
+            let mut guard = self.inner.verdict.lock().expect("drain verdict lock");
+            if guard.is_some() {
+                return;
             }
-            guard = self.inner.ready.wait(guard).expect("drain verdict wait");
+            *guard = Some(verdict);
+            // Invoke outside the verdict lock: the observer may acquire
+            // other locks, and no path may hold a drain lock while doing
+            // so (lock-order safety).
+            drop(guard);
+            self.inner
+                .on_complete
+                .lock()
+                .expect("drain observer lock")
+                .clone()
+        };
+        if let Some(observer) = observer {
+            observer(verdict);
         }
-    }
-
-    /// Current verdict, if any (non-blocking observation).
-    pub fn peek(&self) -> Option<DrainVerdict> {
-        *self.inner.verdict.lock().expect("drain verdict lock")
     }
 }
 

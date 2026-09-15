@@ -7,7 +7,7 @@ mod common;
 use std::time::Duration;
 
 use qianqian_composition::{CompositionKernel, DesiredEntry, Revision};
-use qianqian_playback::{PlaybackSessionHandle, SessionOutcome, playback_session_spec};
+use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionHandle, playback_session_spec};
 
 use common::{OutputBehavior, SourceBehavior, TestDecode, TestOutput, within};
 
@@ -81,7 +81,7 @@ fn steady_data_plane_performs_zero_kernel_work() {
         );
 
         let outcome = handle.wait_terminal();
-        assert_eq!(outcome, SessionOutcome::Completed);
+        assert_eq!(outcome, EpisodeTerminalOutcome::Completed);
 
         assert_eq!(
             kernel.debug_op_count(),
