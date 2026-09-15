@@ -231,7 +231,7 @@ owned resource before independently composed unit
 existing state before new state
 ```
 
-For current playback, words such as `Dead`, `Reclaimed`, `DataPlaneAuthority`, `TimelineSegment`, `Generation`, or `Window` may be useful explanatory language but are **not current architecture** unless separately earned under this rule. In particular, do not encode a second playback lifecycle beside K0 Fiber lifecycle + D11 terminal Fact + ordinary resource ownership.
+For current playback, words such as `Dead`, `Reclaimed`, `DataPlaneAuthority`, `TimelineSegment`, `Generation`, or `Window` may be useful explanatory language but are **not current architecture** unless separately earned under this rule (the authoritative enumeration of forbidden/current playback nouns lives in `ADR-PBK-002` §13/§20; this list is routing, not a second authority). In particular, do not encode a second playback lifecycle beside K0 Fiber lifecycle + D11 terminal Fact + ordinary resource ownership.
 
 ## OPEN means un-authorized, not “agent may choose”
 

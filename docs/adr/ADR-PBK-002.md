@@ -518,7 +518,7 @@ format switch
 Processing Plugin
 SRC fallback
 UI adapter Plugin membership
-PlaybackControl publication/topology beyond D14's episode handle seam
+PlaybackControl publication/topology beyond D14's episode read/control seam
 PlaybackFacts publication/topology
     (episode terminal outcome authority + commit ownership: DESIGNATED — §17 D11;
      all other playback fact kinds/publication topology remain OPEN)
@@ -951,17 +951,9 @@ operation invariant        = any extra correctness rule local to Seek/Open/etc.
 
 A new noun requires AGENTS.md abstraction-earning evidence.
 
-### D14.2 Episode-scoped control/read seam — current Phase-F implementation choice
+### D14.2 Episode-scoped control/read seam — semantic contract first
 
-F2 SHALL introduce one thin, episode-scoped domain handle in `qianqian-playback`. Current Rust working names are frozen for this implementation slice unless a review shows a concrete naming/type conflict; they are **replaceable representation, not semantic authority** — a semantics-preserving rename does not amend this section:
-
-```text
-PlaybackSessionHandle
-PlaybackSessionObservation
-EpisodeTerminalOutcome
-```
-
-This handle is:
+F2 SHALL expose its control/read surface through **one episode-scoped semantic seam**. The seam is:
 
 ```text
 NOT a Plugin
@@ -971,39 +963,33 @@ NOT a global current-playback store
 NOT a second lifecycle owner
 ```
 
-The application host/bootstrap may retain the handle **alongside** `QianqianApp`; `QianqianApp` itself must not become the playback semantic owner or store/derive playback truth.
-
-Required current surface:
+Required semantic surface:
 
 ```text
-PlaybackSessionHandle::request_stop()
-    Command only; idempotent/monotone intent.
+record stop intent      Command only; idempotent/monotone.
 
-PlaybackSessionHandle::observation()
-    pure read; no resolve/commit/lifecycle side effect.
+observe                 pure read; no resolve/commit/lifecycle side effect.
 
-PlaybackSessionHandle::wait_terminal()   (exact spelling may stay `wait` if review prefers)
-    pure blocking wait for authority-owned committed terminal Fact;
-    it MUST NOT run the semantic resolver or be required for commit progress.
+wait for terminal       pure blocking wait for the authority-owned committed
+                        terminal Fact; it MUST NOT run the semantic resolver
+                        or be required for commit progress.
 ```
 
-`PlaybackSessionObservation` SHALL keep truth classes explicit:
+The application host/bootstrap may retain this seam **alongside** `QianqianApp`; `QianqianApp` itself must not become the playback semantic owner or store/derive playback truth.
+
+The observation surface SHALL keep truth classes explicit:
 
 ```text
-terminal_outcome: Option<EpisodeTerminalOutcome>
-    Fact / pending absence only
+terminal outcome        Fact / pending absence only
 
-stop_requested: bool
-    Command state
+stop intent             Command state
 
-source_format: Option<PcmFormat>
-    mechanism evidence, explicitly labeled as such
+source format           mechanism evidence, explicitly labeled as such
 
-activation_error: Option<...>
-    diagnostic, not D11 Failed
+activation error        diagnostic, not D11 Failed
 ```
 
-`EpisodeTerminalOutcome` SHALL expose only the stable semantic variants:
+The terminal outcome values SHALL expose only the stable semantic variants:
 
 ```text
 Completed
@@ -1025,9 +1011,11 @@ Decode endpoint state
 
 `None` terminal outcome means only “no terminal Fact committed yet”; it is not `Playing`, `Starting`, `Paused`, or any fourth outcome.
 
+**Representation is deliberately NOT frozen here.** The concrete Rust shape of this seam — for example a dedicated wrapper type (working names `PlaybackSessionHandle` / `PlaybackSessionObservation` / `EpisodeTerminalOutcome`) versus a trimmed session-owned `SessionCompletion` — is exactly the **F2-READ-SIDE-SEAM-REALITY-GATE** decision (Issue #119 F2 gate, options A/B/C; Issue #141 MINOR-1 disposition). This section does not close that gate: the gate remains F2's first step and picks the representation. Whatever names it produces are **replaceable representation, not semantic authority** — a semantics-preserving rename does not amend this ADR.
+
 ### D14.3 Terminal settlement implementation target
 
-Current `SessionCompletion` / resolver remains a replaceable internal realization. F2 SHALL move consumer-visible access behind the handle and SHALL make publisher/resolver mutation surfaces crate-private or otherwise unreachable from ordinary application consumers.
+Current `SessionCompletion` / resolver remains a replaceable internal realization. F2 SHALL move consumer-visible access behind the D14.2 seam and SHALL make evidence-publisher/resolver mutation surfaces unreachable from ordinary application consumers (crate-private visibility is the current realization spelling, not the semantic requirement).
 
 The target execution shape is **authority-owned structured settlement**:
 
@@ -1147,7 +1135,7 @@ Pause/Resume, when earned, is **same-episode, non-terminal control**. It must no
 However the semantic commit point for `Paused` and the minimum output/data-plane mechanism are still OPEN. Therefore:
 
 ```text
-F3 may prototype or audit the mechanism,
+F3 may prototype or audit the mechanism (as executable evidence, outside the product path),
 but a coding agent MUST NOT publish a Paused Fact/state
 or choose a pause mechanism as architecture
 until a narrow authority decision freezes when pause is truthfully established.
