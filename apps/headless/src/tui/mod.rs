@@ -13,6 +13,11 @@
 //!          key → seam wiring
 //! ```
 //!
+//! The public surface is deliberately ONE item: [`run`], the session
+//! the application transport starts. The model/view machinery is an
+//! internal test seam (unit tests live inside the module); it is not
+//! product API and must not grow into one.
+//!
 //! Boundary discipline (the reason this module is small): the TUI reads
 //! the episode only through `PlaybackSessionHandle::observe()` and
 //! acts on it only through `request_stop()`. It never sees K0 snapshot
@@ -21,6 +26,8 @@
 //! earned (no Playing/Starting/Paused/Stopping, no position, no
 //! volume, no playlist).
 
-pub mod model;
-pub mod runtime;
-pub mod view;
+mod model;
+mod runtime;
+mod view;
+
+pub use runtime::run;

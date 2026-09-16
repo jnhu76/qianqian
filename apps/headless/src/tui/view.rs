@@ -72,3 +72,142 @@ fn controls_panel() -> Paragraph<'static> {
     Paragraph::new(vec![Line::from(" S  Stop    Q  Quit    Ctrl+C  Quit")])
         .block(Block::bordered().title(bold(" Controls ")))
 }
+
+#[cfg(test)]
+mod tests {
+    //! Rendering pinned on ratatui's `TestBackend` (a virtual terminal,
+    //! no ANSI buffers): the exact vocabulary, the truth classes, and
+    //! the forbidden-semantics negative control from [`crate::status`].
+
+    use super::*;
+    use crate::status::forbidden_status_claim;
+    use qianqian_audio_api::ports::PcmFormat;
+    use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionObservation};
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    fn pending() -> PlaybackSessionObservation {
+        PlaybackSessionObservation {
+            terminal_outcome: None,
+            failure_diagnostic: None,
+            stop_requested: false,
+            source_format: None,
+            activation_error: None,
+        }
+    }
+
+    /// Render the model on a fixed-size virtual terminal and return
+    /// the rows as plain text.
+    fn rendered(model: &TuiModel) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(60, 16)).expect("virtual terminal");
+        terminal.draw(|frame| draw(frame, model)).expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .filter_map(|x| buffer.cell((x, y)).map(|cell| cell.symbol().to_string()))
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    #[test]
+    fn a_fresh_episode_renders_pending_without_inventing_state() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        let text = rendered(&model);
+        assert!(text.contains("Source: song.flac"), "{text}");
+        assert!(text.contains("Format: pending"), "{text}");
+        assert!(text.contains("Terminal: pending"), "{text}");
+        assert!(text.contains("Stop requested: false"), "{text}");
+        // No unearned playback semantic may appear anywhere in the frame.
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
+    #[test]
+    fn each_terminal_fact_renders_its_own_label_and_stays_scannable() {
+        for (outcome, label) in [
+            (EpisodeTerminalOutcome::Completed, "Terminal: Completed"),
+            (EpisodeTerminalOutcome::Stopped, "Terminal: Stopped"),
+            (EpisodeTerminalOutcome::Failed, "Terminal: Failed"),
+        ] {
+            let mut model = TuiModel::new("song.flac");
+            model.update(PlaybackSessionObservation {
+                terminal_outcome: Some(outcome),
+                source_format: Some(PcmFormat {
+                    sample_rate: 44100,
+                    channels: 2,
+                    channel_mask: 0x3,
+                }),
+                ..pending()
+            });
+            let text = rendered(&model);
+            assert!(text.contains(label), "{label:?} missing in:\n{text}");
+            assert!(
+                text.contains("Format: 44100 Hz, 2 channels, mask 0x3"),
+                "{text}"
+            );
+            // A committed outcome keeps the shell up with a quit hint.
+            assert!(
+                text.contains(COMMITTED_HINT),
+                "committed hint missing in:\n{text}"
+            );
+            assert_eq!(forbidden_status_claim(&text), None, "{text}");
+        }
+    }
+
+    #[test]
+    fn stop_intent_renders_as_command_state_not_as_a_playback_fact() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            stop_requested: true,
+            ..pending()
+        });
+        let text = rendered(&model);
+        assert!(text.contains("Stop requested: true"), "{text}");
+        assert!(text.contains("Terminal: pending"), "still no Fact: {text}");
+        assert_eq!(forbidden_status_claim(&text), None, "no 'stopping' claim");
+    }
+
+    #[test]
+    fn an_activation_failure_renders_as_a_diagnostic_not_a_forged_fact() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            activation_error: Some("render stream open failed: no device".to_owned()),
+            ..pending()
+        });
+        let text = rendered(&model);
+        assert!(
+            text.contains("activation: render stream open failed: no device"),
+            "{text}"
+        );
+        assert!(
+            text.contains("Terminal: pending"),
+            "no terminal Fact: {text}"
+        );
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
+    #[test]
+    fn a_failed_fact_renders_its_published_diagnostic_separately() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            terminal_outcome: Some(EpisodeTerminalOutcome::Failed),
+            failure_diagnostic: Some("decode: corrupt frame".to_owned()),
+            ..pending()
+        });
+        let text = rendered(&model);
+        assert!(text.contains("Terminal: Failed"), "{text}");
+        assert!(text.contains("failure: decode: corrupt frame"), "{text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
+    #[test]
+    fn a_diagnostics_free_episode_renders_the_placeholder() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        let text = rendered(&model);
+        assert!(text.contains("(none)"), "{text}");
+    }
+}

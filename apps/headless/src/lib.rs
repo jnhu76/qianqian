@@ -11,8 +11,12 @@
 //! Since the reference-player slice, `play` opens the terminal UI
 //! shell ([`tui`]) over the same episode seam, and the scriptable
 //! stdin/stdout transport stays available behind `--machine play`.
-//! Both adapters render; neither owns playback truth.
+//! Both adapters render; neither owns playback truth. What a script
+//! can observe from the `--machine` transport — report lines, streams,
+//! exit codes — is pinned in [`machine`], which the binary renders
+//! through so behavior and contract cannot drift.
 
 pub mod cli;
+pub mod machine;
 pub mod status;
 pub mod tui;

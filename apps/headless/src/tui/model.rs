@@ -146,3 +146,149 @@ pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
         Action::Quit => Step::Exit,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use qianqian_audio_api::ports::PcmFormat;
+
+    fn pending() -> PlaybackSessionObservation {
+        PlaybackSessionObservation {
+            terminal_outcome: None,
+            failure_diagnostic: None,
+            stop_requested: false,
+            source_format: None,
+            activation_error: None,
+        }
+    }
+
+    #[test]
+    fn the_terminal_label_names_only_pending_and_the_three_facts() {
+        let mut model = TuiModel::new("song.flac");
+        assert_eq!(model.terminal_label(), "pending");
+        assert!(!model.terminal_committed());
+        for (outcome, label) in [
+            (EpisodeTerminalOutcome::Completed, "Completed"),
+            (EpisodeTerminalOutcome::Stopped, "Stopped"),
+            (EpisodeTerminalOutcome::Failed, "Failed"),
+        ] {
+            model.update(PlaybackSessionObservation {
+                terminal_outcome: Some(outcome),
+                ..pending()
+            });
+            assert_eq!(model.terminal_label(), label);
+            assert!(model.terminal_committed());
+        }
+    }
+
+    #[test]
+    fn the_format_stays_pending_until_activation_publishes_one() {
+        let mut model = TuiModel::new("song.flac");
+        assert_eq!(model.format_label(), "pending");
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            ..pending()
+        });
+        assert_eq!(model.format_label(), "44100 Hz, 2 channels, mask 0x3");
+    }
+
+    #[test]
+    fn diagnostics_stay_ordered_and_absent_without_content() {
+        let mut model = TuiModel::new("song.flac");
+        assert!(model.diagnostics().is_empty());
+        model.update(PlaybackSessionObservation {
+            activation_error: Some("no device".to_owned()),
+            failure_diagnostic: Some("corrupt frame".to_owned()),
+            ..pending()
+        });
+        assert_eq!(
+            model.diagnostics(),
+            vec![
+                "activation: no device".to_owned(),
+                "failure: corrupt frame".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn s_maps_to_stop_and_q_maps_to_quit() {
+        for key in ['s', 'S'] {
+            assert_eq!(
+                action_for_key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE)),
+                Some(Action::Stop),
+                "{key} must request stop"
+            );
+        }
+        for key in ['q', 'Q'] {
+            assert_eq!(
+                action_for_key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE)),
+                Some(Action::Quit),
+                "{key} must quit"
+            );
+        }
+        // Terminals disagree about reporting SHIFT with a letter.
+        assert_eq!(
+            action_for_key(KeyEvent::new(KeyCode::Char('S'), KeyModifiers::SHIFT)),
+            Some(Action::Stop)
+        );
+    }
+
+    #[test]
+    fn ctrl_c_keeps_its_conventional_quit_meaning() {
+        assert_eq!(
+            action_for_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)),
+            Some(Action::Quit)
+        );
+    }
+
+    #[test]
+    fn any_other_key_is_presentation_noise() {
+        for key in [
+            KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE),
+            // Chords stay noise (except Ctrl+C) so e.g. Ctrl+S/Ctrl+Q
+            // never act by accident.
+            KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Left, KeyModifiers::NONE),
+        ] {
+            assert_eq!(action_for_key(key), None, "{key:?} must be ignored");
+        }
+        // Key-release events (Windows terminals emit them) never act.
+        assert_eq!(
+            action_for_key(KeyEvent::new_with_kind(
+                KeyCode::Char('s'),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            )),
+            None
+        );
+    }
+
+    /// The stop key maps to the EXISTING request_stop seam — the same
+    /// frozen right the machine transport uses — and quit never
+    /// touches the episode.
+    #[test]
+    fn the_stop_action_routes_through_the_request_stop_seam_only() {
+        let handle = PlaybackSessionHandle::new();
+        assert!(!handle.observe().stop_requested);
+
+        assert_eq!(apply_action(Action::Stop, &handle), Step::Continue);
+        assert!(
+            handle.observe().stop_requested,
+            "S must record stop intent through the seam"
+        );
+        // Idempotent: pressing S again stays a plain seam call.
+        assert_eq!(apply_action(Action::Stop, &handle), Step::Continue);
+        assert!(handle.observe().stop_requested);
+
+        // Quit is loop control, not a playback command: no new state.
+        let before = handle.observe();
+        assert_eq!(apply_action(Action::Quit, &handle), Step::Exit);
+        assert_eq!(handle.observe(), before);
+    }
+}

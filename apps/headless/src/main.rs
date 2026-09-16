@@ -24,6 +24,12 @@ use std::process::ExitCode;
 use std::path::PathBuf;
 
 use qianqian_headless::cli::{self, Invocation};
+// Presentation/report contract of the transports; every use site is
+// playback wiring, so the imports follow the same gate.
+#[cfg(feature = "playback")]
+use qianqian_headless::machine;
+#[cfg(feature = "playback")]
+use qianqian_headless::machine::StartFailure;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -77,12 +83,9 @@ struct Episode {
     activated: bool,
 }
 
-/// Why the episode wiring never reached a running session.
-#[cfg(feature = "playback")]
-enum StartFailure {
-    Registration { message: String },
-    CompositionRefused { errors: String },
-}
+// Why the episode wiring never reached a running session. The enum and
+// its report/exit contract live in qianqian_headless::machine; the
+// wiring here only constructs it.
 
 /// Install the components for one episode over one local file.
 #[cfg(feature = "playback")]
@@ -135,17 +138,9 @@ fn start_episode(file: PathBuf) -> Result<Episode, StartFailure> {
 }
 
 #[cfg(feature = "playback")]
-fn report_start_failure(failure: StartFailure) -> ExitCode {
-    match failure {
-        StartFailure::Registration { message } => {
-            eprintln!("{message}");
-            ExitCode::from(1)
-        }
-        StartFailure::CompositionRefused { errors } => {
-            eprintln!("composition refused: {errors}");
-            ExitCode::from(2)
-        }
-    }
+fn report_start_failure(failure: machine::StartFailure) -> ExitCode {
+    eprintln!("{}", failure.report());
+    failure.exit_code()
 }
 
 #[cfg(feature = "playback")]
@@ -168,25 +163,19 @@ fn episode_without_session(mut episode: Episode, shell: Shell) -> ExitCode {
     let diagnostic = episode.handle.observe().activation_error;
     if shell == Shell::ReferencePlayer
         && let Err(error) =
-            qianqian_headless::tui::runtime::run(&episode.handle, &episode.file.to_string_lossy())
+            qianqian_headless::tui::run(&episode.handle, &episode.file.to_string_lossy())
     {
         eprintln!("reference-player shell failed: {error}");
     }
-    report_activation_failure(diagnostic.as_deref());
+    eprintln!(
+        "{}",
+        machine::activation_failure_report(diagnostic.as_deref())
+    );
     let snapshot = episode.runtime.dispose();
-    report_disposal(&snapshot);
-    ExitCode::from(1)
-}
-
-#[cfg(feature = "playback")]
-fn report_activation_failure(diagnostic: Option<&str>) {
-    match diagnostic {
-        Some(message) => eprintln!("playback session failed to activate: {message}"),
-        None => eprintln!(
-            "playback session did not activate (a required capability provider \
-             failed or is missing on this platform)"
-        ),
+    for warning in machine::disposal_warnings(&snapshot) {
+        eprintln!("{warning}");
     }
+    machine::episode_exit_code(None, snapshot.quiet)
 }
 
 /// The scriptable stdin/stdout transport (automation contract, F1/F2):
@@ -242,7 +231,7 @@ fn machine_transport(episode: Episode) -> ExitCode {
 #[cfg(feature = "playback")]
 fn tui_transport(episode: Episode) -> ExitCode {
     let shell_result =
-        qianqian_headless::tui::runtime::run(&episode.handle, &episode.file.to_string_lossy());
+        qianqian_headless::tui::run(&episode.handle, &episode.file.to_string_lossy());
     if let Err(error) = shell_result {
         eprintln!("reference-player shell failed: {error}");
     }
@@ -254,40 +243,28 @@ fn tui_transport(episode: Episode) -> ExitCode {
 
 /// Wait for the committed terminal Fact, dispose, and report. Shared
 /// by both adapters so the settle order (wait → dispose → outcome
-/// lines → disposal report) and the exit-code contract stay identical.
+/// lines → disposal report) and the exit-code contract stay identical;
+/// the observable contract itself lives in [`machine`].
 #[cfg(feature = "playback")]
 fn finish_episode(mut episode: Episode) -> ExitCode {
-    use qianqian_playback::EpisodeTerminalOutcome;
-
     let outcome = episode.handle.wait_terminal();
     let snapshot = episode.runtime.dispose();
     // The failure diagnostic is read separately from the settled
     // observation: it is presentation text, not part of the semantic
     // outcome (D14.2).
     let observation = episode.handle.observe();
-    match outcome {
-        EpisodeTerminalOutcome::Completed => {
-            println!("EOF: played out completely");
-        }
-        EpisodeTerminalOutcome::Failed => match &observation.failure_diagnostic {
-            Some(failure) => eprintln!("playback failed: {failure}"),
-            None => eprintln!("playback failed"),
-        },
-        EpisodeTerminalOutcome::Stopped => {
-            println!("stopped before completion");
+    for (stream, line) in
+        machine::outcome_report(outcome, observation.failure_diagnostic.as_deref())
+    {
+        match stream {
+            machine::ReportStream::Stdout => println!("{line}"),
+            machine::ReportStream::Stderr => eprintln!("{line}"),
         }
     }
-    report_disposal(&snapshot);
-    match outcome {
-        EpisodeTerminalOutcome::Completed | EpisodeTerminalOutcome::Stopped => {
-            if snapshot.quiet {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::from(1)
-            }
-        }
-        EpisodeTerminalOutcome::Failed => ExitCode::from(1),
+    for warning in machine::disposal_warnings(&snapshot) {
+        eprintln!("{warning}");
     }
+    machine::episode_exit_code(Some(outcome), snapshot.quiet)
 }
 
 #[cfg(not(feature = "playback"))]
@@ -298,22 +275,6 @@ fn run_playback(file: std::path::PathBuf, shell: Shell) -> ExitCode {
          rebuild with: cargo build --release --features playback"
     );
     ExitCode::from(2)
-}
-
-#[cfg(feature = "playback")]
-fn report_disposal(snapshot: &qianqian_composition::CompositionSnapshot) {
-    if snapshot.quiet {
-        return;
-    }
-    eprintln!("warning: disposal reported a latched teardown violation");
-    for (name, fiber) in &snapshot.fibers {
-        if fiber.teardown_violated {
-            eprintln!(
-                "  fiber '{name}': teardown violated (state {:?})",
-                fiber.state
-            );
-        }
-    }
 }
 
 #[cfg(feature = "playback")]
