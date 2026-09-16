@@ -10,6 +10,12 @@ qianqian-playback = { path = "../../crates/qianqian-playback" }
 qianqian-app = { path = "../../crates/qianqian-app" }
 qianqian-decode-songcore = { path = "../../crates/qianqian-decode-songcore", optional = true }
 qianqian-output-wasapi = { path = "../../crates/qianqian-output-wasapi", optional = true }
+# Presentation-only dependencies of the reference-player TUI shell. They
+# are admitted here deliberately and nowhere else: no qianqian-* crate
+# may take them (the plugin boundary gate fail-closes every unadmitted
+# internal edge), and they never cross the F2 episode seam.
+ratatui = "0.30"
+crossterm = "0.29"
 
 [dev-dependencies]
 # Test admission only (plugin-boundary hardening H2A / audit H-b): the

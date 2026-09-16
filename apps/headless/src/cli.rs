@@ -11,8 +11,13 @@ use std::path::PathBuf;
 /// the program path).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Invocation {
-    /// `play <file>`: one playback episode over one local media file.
+    /// `play <file>`: one playback episode over one local media file,
+    /// presented in the interactive reference-player shell (TUI).
     Play { file: PathBuf },
+    /// `--machine play <file>`: the same episode through the scriptable
+    /// stdin/stdout transport. This is the automation contract; the
+    /// flag is recognized in command position only, like every flag.
+    MachinePlay { file: PathBuf },
     /// `--help` / `-h`: print the usage text.
     Help,
     /// `--version` / `-V`: print the binary version.
@@ -45,6 +50,18 @@ pub fn parse_invocation(args: &[String]) -> Result<Invocation, InvocationError> 
             }),
             _ => Err(InvocationError::WrongArity { command: "play" }),
         },
+        "--machine" => match (args.get(1).map(String::as_str), args.get(2)) {
+            (Some("play"), Some(file)) if args.len() == 3 => Ok(Invocation::MachinePlay {
+                file: PathBuf::from(file),
+            }),
+            (Some("play"), _) => Err(InvocationError::WrongArity {
+                command: "--machine",
+            }),
+            (Some(other), _) => Err(InvocationError::UnknownCommand(other.to_string())),
+            (None, _) => Err(InvocationError::WrongArity {
+                command: "--machine",
+            }),
+        },
         "--help" | "-h" => match args.len() {
             1 => Ok(Invocation::Help),
             _ => Err(InvocationError::WrongArity { command: "--help" }),
@@ -65,13 +82,16 @@ pub fn usage() -> &'static str {
     "usage: qianqian-headless <command> [args]
 
 commands:
-  play <file>      play one local media file to completion
-  --help | -h      print this usage
-  --version | -V   print the version
+  play <file>            play one local media file in the interactive
+                         reference-player terminal shell
+  --machine play <file>  the same episode through the scriptable
+                         stdin/stdout transport (automation)
+  --help | -h            print this usage
+  --version | -V         print the version
 
-while `play` runs, `stop` stops the episode and `status` prints its
-truthful state (other interactive commands are recognized but not
-wired yet)
+in the machine transport, `stop` stops the episode and `status` prints
+its truthful state; in the terminal shell, S stops and Q quits (other
+interactive commands are recognized but not wired yet)
 "
 }
 
@@ -298,6 +318,62 @@ mod tests {
             let err = parse_invocation(&argv(tokens)).expect_err("unknown command");
             assert_eq!(err, InvocationError::UnknownCommand(tokens[0].to_string()));
         }
+    }
+
+    #[test]
+    fn machine_flag_selects_the_scriptable_transport() {
+        let parsed = parse_invocation(&argv(&["--machine", "play", "song.flac"]))
+            .expect("the machine transport keeps the play grammar");
+        assert_eq!(
+            parsed,
+            Invocation::MachinePlay {
+                file: PathBuf::from("song.flac")
+            }
+        );
+    }
+
+    #[test]
+    fn machine_flag_rejects_wrong_arity_and_unknown_subcommands() {
+        let err = parse_invocation(&argv(&["--machine"])).expect_err("--machine alone");
+        assert_eq!(
+            err,
+            InvocationError::WrongArity {
+                command: "--machine"
+            }
+        );
+        let err = parse_invocation(&argv(&["--machine", "play"])).expect_err("play needs a file");
+        assert_eq!(
+            err,
+            InvocationError::WrongArity {
+                command: "--machine"
+            }
+        );
+        let err = parse_invocation(&argv(&["--machine", "play", "a.flac", "b.flac"]))
+            .expect_err("one file per episode");
+        assert_eq!(
+            err,
+            InvocationError::WrongArity {
+                command: "--machine"
+            }
+        );
+        let err = parse_invocation(&argv(&["--machine", "frobnicate", "x"]))
+            .expect_err("only play follows --machine");
+        assert_eq!(
+            err,
+            InvocationError::UnknownCommand("frobnicate".to_string())
+        );
+    }
+
+    #[test]
+    fn plain_play_is_not_the_machine_transport() {
+        let parsed =
+            parse_invocation(&argv(&["play", "song.flac"])).expect("interactive play grammar");
+        assert_eq!(
+            parsed,
+            Invocation::Play {
+                file: PathBuf::from("song.flac")
+            }
+        );
     }
 
     #[test]
