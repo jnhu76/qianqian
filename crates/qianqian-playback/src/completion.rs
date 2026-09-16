@@ -55,10 +55,10 @@
 
 use std::sync::{Arc, Condvar, Mutex};
 
-use qianqian_audio_api::ports::{DrainSignal, DrainVerdict, PcmFormat};
+use qianqian_audio_api::ports::{DrainSignal, DrainVerdict, GateEvent, PcmFormat, RenderGate};
 
 use crate::edge::{EdgeTerminal, PcmEdge};
-use crate::handle::{EpisodeTerminalOutcome, PlaybackSessionObservation};
+use crate::handle::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
 
 /// How one playback episode ended. Crate-internal realization: the
 /// public semantic contract is only the stable
@@ -112,6 +112,26 @@ struct CompletionState {
     /// Command state, not outcome truth: an episode that already ended
     /// (Completed/Failed) is not retroactively renamed by a late stop.
     stop_requested: bool,
+    /// Pause intent (D14.7). Command state, same family as
+    /// `stop_requested`: recorded by `request_pause`, cleared by
+    /// `request_resume`; a later stop does not relabel it, and after
+    /// settlement it is inert history (the establishment projection
+    /// guards on the unsettled state instead).
+    pause_requested: bool,
+    /// Render engagement evidence (D14.7): the render leg is parked at
+    /// the pre-GetBuffer gate of the CURRENT pause engagement and will
+    /// submit no further PCM while parked. Never a Fact.
+    engaged: bool,
+    /// Output-tail quiescence evidence (D14.7): no frame submitted
+    /// BEFORE the current engagement remains queued for rendering.
+    /// Belongs to the current engagement only — reset on engagement and
+    /// on disengagement, so a previous pause cycle's quiescence can
+    /// never satisfy a later pause.
+    tail_quiesced: bool,
+    /// Disengagement-ack evidence latch: some pause engagement of this
+    /// episode has ended. Existence evidence for the Resumed projection
+    /// only; it never feeds control or settlement.
+    disengagement_observed: bool,
     /// The session's data-plane edge, bound by activation as the stop
     /// target. `None` until the episode binds one (or forever, if
     /// activation failed). The edge is the session-owned stop mechanism;
@@ -131,6 +151,12 @@ struct CompletionArc {
     state: Mutex<CompletionState>,
     signal: Condvar,
     drain: DrainSignal,
+    /// The episode's render pause gate (D14.7), created here with the
+    /// evidence observer so it is in place before activation can hand it
+    /// to a render stream. The gate routes pause intent to the mechanism
+    /// and acknowledges engagement/tail-quiescence/disengagement back as
+    /// mechanism evidence (never Facts, never settlement inputs).
+    gate: RenderGate,
 }
 
 impl Default for SessionCompletion {
@@ -142,36 +168,72 @@ impl Default for SessionCompletion {
 impl SessionCompletion {
     pub(crate) fn new() -> Self {
         Self {
-            state: Arc::new_cyclic(|core| CompletionArc {
-                state: Mutex::new(CompletionState {
-                    outcome: None,
-                    worker_terminal: None,
-                    decode_failure: None,
-                    drain_verdict: None,
-                    source_format: None,
-                    activation_failure: None,
-                    stop_requested: false,
-                    stop_target: None,
-                }),
-                signal: Condvar::new(),
-                drain: DrainSignal::with_on_complete({
-                    // Weak on purpose: the completion owns the signal,
-                    // so a strong observer reference would be a
-                    // reference cycle. The signal outlives publication
-                    // paths only through the render leg's own join
-                    // ordering, so an inert observer after teardown is
-                    // exactly the right semantics.
+            state: Arc::new_cyclic(|core| {
+                let gate = RenderGate::with_observer({
+                    // Weak on purpose (same posture as the drain
+                    // observer): the completion owns the gate, so a
+                    // strong observer reference would be a cycle. An
+                    // inert observer after teardown is exactly the right
+                    // semantics.
                     let core = core.clone();
-                    move |verdict| {
+                    move |event| {
                         if let Some(core) = core.upgrade() {
-                            publish_evidence(&core, |state| {
-                                if state.drain_verdict.is_none() {
-                                    state.drain_verdict = Some(verdict);
+                            publish_evidence(&core, |state| match event {
+                                // Engagement resets the tail evidence:
+                                // quiescence belongs to the current
+                                // engagement only (D14.7 corrective).
+                                GateEvent::Engaged => {
+                                    state.engaged = true;
+                                    state.tail_quiesced = false;
+                                }
+                                GateEvent::TailQuiesced => {
+                                    state.tail_quiesced = true;
+                                }
+                                GateEvent::Disengaged => {
+                                    state.engaged = false;
+                                    state.tail_quiesced = false;
+                                    state.disengagement_observed = true;
                                 }
                             });
                         }
                     }
-                }),
+                });
+                CompletionArc {
+                    state: Mutex::new(CompletionState {
+                        outcome: None,
+                        worker_terminal: None,
+                        decode_failure: None,
+                        drain_verdict: None,
+                        source_format: None,
+                        activation_failure: None,
+                        stop_requested: false,
+                        pause_requested: false,
+                        engaged: false,
+                        tail_quiesced: false,
+                        disengagement_observed: false,
+                        stop_target: None,
+                    }),
+                    signal: Condvar::new(),
+                    drain: DrainSignal::with_on_complete({
+                        // Weak on purpose: the completion owns the signal,
+                        // so a strong observer reference would be a
+                        // reference cycle. The signal outlives publication
+                        // paths only through the render leg's own join
+                        // ordering, so an inert observer after teardown is
+                        // exactly the right semantics.
+                        let core = core.clone();
+                        move |verdict| {
+                            if let Some(core) = core.upgrade() {
+                                publish_evidence(&core, |state| {
+                                    if state.drain_verdict.is_none() {
+                                        state.drain_verdict = Some(verdict);
+                                    }
+                                });
+                            }
+                        }
+                    }),
+                    gate,
+                }
             }),
         }
     }
@@ -239,9 +301,59 @@ impl SessionCompletion {
             guard.stop_requested = true;
             guard.stop_target.clone()
         };
+        // Stop releases the pause gate too (D14.7): a leg parked at the
+        // pre-GetBuffer gate is not inside read_frames, so the data-plane
+        // stop alone cannot wake it. The release publishes disengagement
+        // evidence when the leg exits; the gate never aborts the leg —
+        // the loop proceeds once more and the data-plane terminal (edge
+        // stop, EOF, failure) decides the outcome.
+        self.state.gate.set_paused(false);
         if let Some(edge) = target {
             edge.stop();
         }
+    }
+
+    /// Request the episode to pause (D14.7). Command only: records pause
+    /// intent on the episode seam and routes it to the episode's render
+    /// gate, whose loop-top check parks the render leg before any device
+    /// buffer is held. Idempotent. How (and whether) the pause physically
+    /// establishes remains mechanism evidence — the Paused projection is
+    /// derived, never recorded here. Calling this after settlement is
+    /// inert history: the intent is recorded, nothing else changes.
+    pub(crate) fn request_pause(&self) {
+        {
+            let mut guard = self.state.state.lock().expect("completion lock");
+            guard.pause_requested = true;
+        }
+        self.state.gate.set_paused(true);
+    }
+
+    /// Release a recorded pause (D14.7). Command only: clears pause
+    /// intent and releases the gate; the woken leg proceeds once more and
+    /// the data plane decides what its next read sees. Idempotent;
+    /// inert history after settlement.
+    pub(crate) fn request_resume(&self) {
+        {
+            let mut guard = self.state.state.lock().expect("completion lock");
+            guard.pause_requested = false;
+        }
+        self.state.gate.set_paused(false);
+    }
+
+    /// Release the pause gate WITHOUT touching the recorded pause intent
+    /// (D14.7 teardown obligation): session settlement/teardown must wake
+    /// every parked participant, because a leg parked at the gate cannot
+    /// observe the data-plane stop, and `stop_and_join` must terminate.
+    /// The leg's exit publishes disengagement evidence.
+    pub(crate) fn release_pause_gate(&self) {
+        self.state.gate.set_paused(false);
+    }
+
+    /// The episode's render gate, handed to the output provider at
+    /// activation. Session-internal binding seam: the application reaches
+    /// the same routing only through `request_pause`/`request_resume`.
+    pub(crate) fn render_gate(&self) -> RenderGate {
+        self.state.gate.clone()
     }
 
     /// Frames currently buffered on the session's edge, once bound.
@@ -308,6 +420,13 @@ impl SessionCompletion {
             stop_requested: guard.stop_requested,
             source_format: guard.source_format,
             activation_error: guard.activation_failure.clone(),
+            pause_requested: guard.pause_requested,
+            pause_engagement: match (guard.engaged, guard.tail_quiesced) {
+                (true, true) => PauseEngagement::TailQuiesced,
+                (true, false) => PauseEngagement::Engaged,
+                (false, _) => PauseEngagement::Disengaged,
+            },
+            pause_disengaged_observed: guard.disengagement_observed,
         }
     }
 

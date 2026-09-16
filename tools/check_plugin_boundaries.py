@@ -124,10 +124,10 @@ BUILD_EDGES = {}  # no internal build edges are admitted for any crate
 EXPORT_RULES = {
     "crates/qianqian-playback/src/lib.rs": {
         "allowed_root_public": [
-            "pub use handle::{EpisodeTerminalOutcome, PlaybackSessionHandle, PlaybackSessionObservation};",
+            "pub use handle::{\n    EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,\n};",
             "pub use session::playback_session_spec;",
         ],
-        "authority": "ADR-PBK-002 D6/D14.2/D14.3 — the admitted public surface is exactly the F2 episode seam; the episode mechanism is session-owned, not product API",
+        "authority": "ADR-PBK-002 D6/D14.2/D14.3/D14.7 — the admitted public surface is exactly the F2 episode seam (extended by the D14.7 F3 pause fields/commands, whose spelling is representation); the episode mechanism is session-owned, not product API",
     },
     # The rights freeze behind the lib.rs re-exports (review round 3):
     # an exported type's pub methods/fields live here, not in lib.rs, so
@@ -138,24 +138,34 @@ EXPORT_RULES = {
         "label": "episode-handle",
         "allowed_root_public": [
             "pub enum EpisodeTerminalOutcome {",
+            "pub enum PauseEngagement {",
             "pub struct PlaybackSessionHandle {",
             "pub struct PlaybackSessionObservation {",
             "pub terminal_outcome: Option<EpisodeTerminalOutcome>,",
             "pub failure_diagnostic: Option<String>,",
             "pub stop_requested: bool,",
+            "pub pause_requested: bool,",
             "pub source_format: Option<PcmFormat>,",
+            "pub pause_engagement: PauseEngagement,",
+            "pub pause_disengaged_observed: bool,",
             "pub activation_error: Option<String>,",
             "pub fn new() -> Self {",
             "pub fn request_stop(&self) {",
+            "pub fn request_pause(&self) {",
+            "pub fn request_resume(&self) {",
             "pub fn observe(&self) -> PlaybackSessionObservation {",
             "pub fn wait_terminal(&self) -> EpisodeTerminalOutcome {",
+            "pub fn paused(&self) -> bool {",
+            "pub fn resumed(&self) -> bool {",
         ],
-        "authority": "ADR-PBK-002 D14.2 — the App's rights over one episode are exactly "
-        "new/request_stop/observe/wait_terminal plus the five observation fields; "
-        "the handle carries no mechanism rights and no terminal-Fact authority. "
-        "A new public right (pause/resume, drain access, a new observation field) "
-        "must first earn an explicit D14/phase-authority amendment, then update "
-        "this allowlist on purpose",
+        "authority": "ADR-PBK-002 D14.2 + the D14.7 F3 amendment — the App's rights over one "
+        "episode are exactly new/request_stop/request_pause/request_resume/observe/"
+        "wait_terminal plus the admitted observation fields (D14.7 names this allowlist "
+        "update as the explicit F3-implementation architecture event: pause intent is "
+        "command state; engagement/tail-quiescence/disengagement are mechanism evidence; "
+        "paused()/resumed() are derived Projections and never correctness bases). "
+        "A further new public right must first earn an explicit D14/phase-authority "
+        "amendment, then update this allowlist on purpose",
     },
     "crates/qianqian-decode-songcore/src/lib.rs": {
         "require": [

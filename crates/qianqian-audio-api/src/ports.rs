@@ -17,7 +17,7 @@
 //! provider or consumer is wired here.
 
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex};
 
 use qianqian_composition::Capability;
 
@@ -152,13 +152,179 @@ impl DrainSignal {
     }
 }
 
+/// What one render-stream gate event acknowledges back to its owner
+/// (ADR-PBK-002 D14.7). Mechanism evidence only: these events record
+/// where the render leg physically is; they are never semantic truth.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GateEvent {
+    /// The render leg reached the loop-top gate and parked: it will
+    /// submit no further PCM while parked and holds no device buffer.
+    Engaged,
+    /// The CURRENT engagement observed its output tail quiesced (no
+    /// frame submitted before engagement remains queued for rendering).
+    /// Published at most once per engagement.
+    TailQuiesced,
+    /// The park ended (resume or a release): the leg proceeds once more
+    /// and the data plane — never the gate — decides what happens next.
+    Disengaged,
+}
+
+/// Session-owned render pause gate (ADR-PBK-002 D14.7, mechanism A):
+/// routes one episode's pause intent into a render mechanism's loop-top
+/// gate check and acknowledges engagement / tail quiescence /
+/// disengagement back to the owner as mechanism events.
+///
+/// Ownership mirrors [`DrainSignal`]: the session creates the gate (with
+/// its observer, before any mechanism can see it) and hands it to the
+/// render stream in [`RenderRequest`]; the mechanism never holds intent
+/// truth of its own. The mechanism contract is frozen:
+///
+/// ```text
+/// check the gate at the render loop top, strictly BEFORE the
+///     device-buffer acquisition (GetBuffer), never holding a device
+///     buffer across a park;
+/// while parked, submit nothing, hold no device buffer, and wait in
+///     bounded slices (notify + cap) so release and stop wake the leg
+///     with bounded latency;
+/// never abort the leg from the gate — after release the loop proceeds
+///     once more and the data plane decides;
+/// the device stream stays open — a park replaces no resource.
+/// ```
+#[derive(Clone, Debug, Default)]
+pub struct RenderGate {
+    inner: Arc<GateInner>,
+}
+
+#[derive(Default)]
+struct GateInner {
+    /// The mechanism's view of the routed pause intent. Command truth
+    /// lives with the episode owner; this flag is the routed copy the
+    /// render leg observes.
+    paused: Mutex<bool>,
+    wake: Condvar,
+    on_event: Mutex<Option<OnGateEvent>>,
+}
+
+/// The one-shot gate-evidence observer type (see
+/// [`RenderGate::with_observer`]). Deliberately minimal, like
+/// [`DrainSignal`]'s: one function invoked per event — not an event
+/// framework.
+type OnGateEvent = Arc<dyn Fn(GateEvent) + Send + Sync>;
+
+impl std::fmt::Debug for GateInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Lock-free rendering: Debug may run concurrently with the leg.
+        f.debug_struct("GateInner").finish_non_exhaustive()
+    }
+}
+
+/// Bounded park slice: the notify is the wake path, this cap is the
+/// backstop so a missed wakeup costs latency (one slice), never
+/// correctness.
+const PARK_SLICE: std::time::Duration = std::time::Duration::from_millis(10);
+
+impl RenderGate {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a gate whose first observer receives every engagement /
+    /// tail-quiescence / disengagement event, synchronously, outside the
+    /// gate's own lock. This is the owner-side evidence publication seam;
+    /// the mechanism knows nothing about what the observer publishes.
+    /// The observer must not perform unbounded work or I/O and must not
+    /// call back into this gate (owner-side synchronization such as
+    /// acquiring the owner's state lock is permitted, as for
+    /// [`DrainSignal::with_on_complete`]).
+    pub fn with_observer(observer: impl Fn(GateEvent) + Send + Sync + 'static) -> Self {
+        Self {
+            inner: Arc::new(GateInner {
+                paused: Mutex::new(false),
+                wake: Condvar::new(),
+                on_event: Mutex::new(Some(Arc::new(observer))),
+            }),
+        }
+    }    /// Route the pause intent into the mechanism: `true` parks the render
+    /// leg at its next loop-top gate check; `false` releases a parked leg
+    /// (bounded-slice latency via notify). Idempotent.
+    pub fn set_paused(&self, paused: bool) {
+        let mut guard = self.inner.paused.lock().expect("render gate lock");
+        if *guard == paused {
+            return;
+        }
+        *guard = paused;
+        drop(guard);
+        self.inner.wake.notify_all();
+    }
+
+    /// The render mechanism's loop-top gate: park while pause intent is
+    /// routed here, then return (the caller proceeds once more; the data
+    /// plane decides what its next read sees). Returns immediately when
+    /// no intent is routed.
+    ///
+    /// While parked the leg submits nothing and holds no device buffer.
+    /// Between bounded slices it calls `tail_observed_quiescent` — the
+    /// mechanism's own observation of its output tail — and publishes
+    /// [`GateEvent::TailQuiesced`] on the first `true` of the current
+    /// engagement. [`GateEvent::Engaged`] is published on park entry and
+    /// [`GateEvent::Disengaged`] on park exit.
+    pub fn park_while_paused(&self, mut tail_observed_quiescent: impl FnMut() -> bool) {
+        {
+            let guard = self.inner.paused.lock().expect("render gate lock");
+            if !*guard {
+                // Released before the leg reached the gate: nothing
+                // engaged, nothing to acknowledge.
+                return;
+            }
+        }
+        self.emit(GateEvent::Engaged);
+        let mut quiesced_published = false;
+        loop {
+            let released = {
+                let guard = self.inner.paused.lock().expect("render gate lock");
+                let (guard, _) = self
+                    .inner
+                    .wake
+                    .wait_timeout_while(guard, PARK_SLICE, |paused| *paused)
+                    .expect("render gate wait poisoned");
+                !*guard
+            };
+            if released {
+                break;
+            }
+            if !quiesced_published && tail_observed_quiescent() {
+                quiesced_published = true;
+                self.emit(GateEvent::TailQuiesced);
+            }
+        }
+        self.emit(GateEvent::Disengaged);
+    }
+
+    fn emit(&self, event: GateEvent) {
+        // Clone outside the event publication: the observer may acquire
+        // other locks, and no path may hold the gate lock while it runs
+        // (same lock-order discipline as DrainSignal::complete).
+        let observer = self
+            .inner
+            .on_event
+            .lock()
+            .expect("gate observer lock")
+            .clone();
+        if let Some(observer) = observer {
+            observer(event);
+        }
+    }
+}
+
 /// Request for one playback-specific render stream: the source format to
-/// negotiate, the pre-bound PCM input, and the session-owned drain
-/// signal. All data-plane pieces bind once, here.
+/// negotiate, the pre-bound PCM input, the session-owned drain signal,
+/// and the session-owned pause gate. All data-plane pieces bind once,
+/// here.
 pub struct RenderRequest {
     pub format: PcmFormat,
     pub input: Arc<dyn RenderPcmInput>,
     pub drain: DrainSignal,
+    pub gate: RenderGate,
 }
 
 /// One acquired render stream: owns its render thread and the physical

@@ -203,6 +203,8 @@ fn machine_transport(episode: Episode) -> ExitCode {
                 let Ok(line) = line else { break };
                 match cli::parse_interactive_line(&line) {
                     Ok(cli::InteractiveCommand::Stop) => control_handle.request_stop(),
+                    Ok(cli::InteractiveCommand::Pause) => control_handle.request_pause(),
+                    Ok(cli::InteractiveCommand::Resume) => control_handle.request_resume(),
                     Ok(cli::InteractiveCommand::Status) => {
                         print!(
                             "{}",
@@ -212,7 +214,10 @@ fn machine_transport(episode: Episode) -> ExitCode {
                         let _ = std::io::stdout().flush();
                     }
                     Ok(_) => {
-                        eprintln!("not wired yet: only 'stop' and 'status' control playback")
+                        eprintln!(
+                            "not wired yet: only 'stop', 'pause', 'resume' and 'status' \
+                             control playback"
+                        )
                     }
                     Err(error) => eprintln!("ignored input: {error}"),
                 }

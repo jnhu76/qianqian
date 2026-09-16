@@ -33,7 +33,9 @@ mod session;
 // product API. The application-facing surface is exactly the public
 // seam below; composition roots reach the episode only through
 // `playback_session_spec` + `PlaybackSessionHandle`.
-pub use handle::{EpisodeTerminalOutcome, PlaybackSessionHandle, PlaybackSessionObservation};
+pub use handle::{
+    EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,
+};
 pub use session::playback_session_spec;
 
 // Test doubles shared by the integration tests and the crate-internal

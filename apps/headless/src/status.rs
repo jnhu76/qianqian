@@ -4,13 +4,16 @@
 //! `PlaybackSessionObservation` — the coherent pure read the playback
 //! seam hands the application — into stable, scriptable lines. It owns
 //! no truth of its own and reads no mechanism state (no K0 snapshot, no
-//! logs, no PcmEdge/DrainSignal/worker/WASAPI/SongCore internals).
+//! logs, no PcmEdge/DrainSignal/RenderGate/worker/WASAPI/SongCore
+//! internals).
 //!
-//! Truth-class discipline (D14.2):
-//! `pending` states only "no terminal Fact committed yet" — never
-//! Playing/Starting/Paused/Stopping; `stop_requested` is Command state;
-//! `format` is mechanism evidence; `activation_error` is a diagnostic.
-//! The forbidden-vocabulary oracle below pins that boundary.
+//! Truth-class discipline (D14.2, D14.7): `pending` states only "no
+//! terminal Fact committed yet" — never Playing/Starting/Stopping;
+//! `stop_requested`/`pause_requested` are Command state; `format` is
+//! mechanism evidence; the `paused` line is the D14.7 establishment
+//! projection derived by the seam itself; `activation_error` is a
+//! diagnostic. The forbidden-vocabulary oracle below pins that
+//! boundary.
 
 use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionObservation};
 
@@ -47,6 +50,13 @@ pub fn format_status(observation: &PlaybackSessionObservation) -> String {
         None => out.push_str("format: unavailable\n"),
     }
     out.push_str(&format!("stop_requested: {}\n", observation.stop_requested));
+    out.push_str(&format!(
+        "pause_requested: {}\n",
+        observation.pause_requested
+    ));
+    // The D14.7 establishment projection, derived by the seam (unsettled
+    // ∧ pause intent ∧ engagement ∧ current output-tail quiescence).
+    out.push_str(&format!("paused: {}\n", observation.paused()));
     if let Some(error) = &observation.activation_error {
         out.push_str("activation_error: ");
         out.push_str(error);
@@ -58,10 +68,15 @@ pub fn format_status(observation: &PlaybackSessionObservation) -> String {
 /// Playback semantics the status projection must never claim (F2
 /// negative-control vocabulary). Matches are word-ish to avoid tripping
 /// on substrings of unrelated diagnostics.
-const FORBIDDEN_STATUS_WORDS: [&str; 7] = [
+///
+/// `paused` left this list when D14.7 froze the pause establishment
+/// (F3): the `paused:` line is now an earned, seam-derived projection,
+/// pinned to the frozen establishment conjunction by the status and
+/// TUI model tests. The remaining words name states no current
+/// authority has earned.
+const FORBIDDEN_STATUS_WORDS: [&str; 6] = [
     "playing",
     "starting",
-    "paused",
     "pausing",
     "stopping",
     "buffering",

@@ -1,0 +1,480 @@
+//! F3 pause/resume-seam tests (ADR-PBK-002 D14.7): the application-facing
+//! pause/resume commands drive the REAL Playback Session through the
+//! mechanism-A render-loop gate, on mechanism doubles at the ports seams.
+//! Platform-independent: these run wherever the workspace tests run; the
+//! physical audibility/latency claims live in the F3-GATE evidence
+//! (`experiments/f3-pause-mechanism`), not here.
+//!
+//! Truth classes under test: pause/resume are commands (inert after
+//! settlement); engagement and output-tail quiescence are mechanism
+//! evidence belonging to the CURRENT engagement only; Paused/Resumed are
+//! the derived projections of the frozen establishment conjunction; D11
+//! terminal outcomes are untouched by any of it.
+
+mod common;
+
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::time::{Duration, Instant};
+
+use qianqian_app::QianqianApp;
+use qianqian_composition::{DesiredEntry, Revision};
+use qianqian_playback::{
+    EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, playback_session_spec,
+};
+
+use common::{OutputBehavior, SourceBehavior, TestDecode, TestOutput, within};
+
+const DUMMY_PATH: &str = "test://pause-seam";
+
+fn desired(id: &str, component: &'static str) -> DesiredEntry {
+    DesiredEntry::enabled(id, component, Revision::new(1))
+}
+
+/// A decode source producing ~`seconds` of frames at the test format
+/// before clean EOF.
+fn seconds_of_audio(seconds: u64) -> SourceBehavior {
+    SourceBehavior::EofAfter(44_100 * seconds as usize)
+}
+
+/// Register the standard F3 episode: a decode source, an output double
+/// sharing the caller's consumption counter and mock device-tail flag,
+/// and the real session over `handle`.
+fn registered_runtime(
+    source: SourceBehavior,
+    output: OutputBehavior,
+    consumed: Arc<AtomicUsize>,
+    device_tail_padding: Arc<AtomicBool>,
+    handle: PlaybackSessionHandle,
+) -> QianqianApp {
+    let mut runtime = QianqianApp::new();
+
+    runtime
+        .register_component({
+            let behavior = source;
+            qianqian_composition::ComponentSpec::new("test_decode_plugin")
+                .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
+                .on_activate(move |ctx| {
+                    let service = TestDecode { behavior };
+                    ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
+                        std::rc::Rc::new(service),
+                    )
+                    .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
+                    Ok(())
+                })
+        })
+        .expect("decode provider registers");
+
+    runtime
+        .register_component({
+            qianqian_composition::ComponentSpec::new("test_output_plugin")
+                .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
+                .on_activate(move |ctx| {
+                    let service = TestOutput::observed_with_tail(
+                        output,
+                        consumed.clone(),
+                        device_tail_padding.clone(),
+                    );
+                    ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
+                        std::rc::Rc::new(service),
+                    )
+                    .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
+                    Ok(())
+                })
+        })
+        .expect("output provider registers");
+
+    runtime
+        .register_component(playback_session_spec(
+            std::path::PathBuf::from(DUMMY_PATH),
+            handle,
+        ))
+        .expect("session registers");
+    runtime
+}
+
+fn activate(runtime: &mut QianqianApp) {
+    runtime
+        .revise_desired(vec![
+            desired("decode", "test_decode_plugin"),
+            desired("output", "test_output_plugin"),
+            desired("session", "playback_session"),
+        ])
+        .expect("composition is legal");
+}
+
+/// Bounded poll for an asynchronously-published observation.
+fn wait_until(limit: Duration, mut predicate: impl FnMut() -> bool) -> bool {
+    let deadline = Instant::now() + limit;
+    loop {
+        if predicate() {
+            return true;
+        }
+        if Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+/// The full establishment wait: intent is not enough — the projection
+/// may only go true through engagement AND the current engagement's
+/// tail quiescence (the mock device tail is empty, so quiescence
+/// follows the first bounded park slice).
+fn wait_established(handle: &PlaybackSessionHandle) {
+    assert!(
+        wait_until(Duration::from_secs(5), || handle.observe().paused()),
+        "the Paused projection never established: {:?}",
+        handle.observe()
+    );
+}
+
+/// The D14.7-corrective negative oracle in isolation: with the mock
+/// device still holding queued frames, an engagement must NOT
+/// establish Paused.
+fn assert_engaged_but_not_paused(handle: &PlaybackSessionHandle) {
+    assert!(
+        wait_until(Duration::from_secs(5), || handle.observe().pause_engagement
+            == PauseEngagement::Engaged),
+        "the render leg never engaged: {:?}",
+        handle.observe()
+    );
+    let snapshot = handle.observe();
+    assert!(
+        snapshot.pause_requested && snapshot.pause_engagement == PauseEngagement::Engaged,
+        "expected engaged pause intent: {snapshot:?}"
+    );
+    assert!(
+        !snapshot.paused(),
+        "stale/absent tail quiescence must not establish Paused: {snapshot:?}"
+    );
+}
+
+/// A pause that establishes, then a resume that releases it, repeated
+/// cycles staying truthful — including the D14.7-corrective negative
+/// oracle: a NEW pause while the mock device still plays its tail must
+/// NOT project Paused, and only the NEW engagement's quiescence may.
+#[test]
+fn pause_establishes_resume_releases_and_cycles_stay_truthful() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let handle = PlaybackSessionHandle::new();
+        let mut runtime = registered_runtime(
+            seconds_of_audio(30),
+            OutputBehavior::Consume,
+            consumed.clone(),
+            device_tail_padding.clone(),
+            handle.clone(),
+        );
+        activate(&mut runtime);
+
+        // Playing before anything is paused: consumption progresses.
+        assert!(
+            wait_until(Duration::from_secs(5), || consumed.load(Ordering::SeqCst)
+                > 0),
+            "the episode never produced audio"
+        );
+        let observation = handle.observe();
+        assert!(!observation.paused(), "fresh episode: {observation:?}");
+        assert!(
+            !observation.resumed(),
+            "nothing was ever paused: {observation:?}"
+        );
+        assert!(
+            observation.pause_engagement == PauseEngagement::Disengaged,
+            "no engagement yet: {observation:?}"
+        );
+
+        // Cycle 1: pause -> full establishment -> resume -> released.
+        handle.request_pause();
+        assert!(handle.observe().pause_requested, "intent is recorded");
+        wait_established(&handle);
+        handle.request_resume();
+        assert!(
+            wait_until(Duration::from_secs(5), || {
+                let observation = handle.observe();
+                !observation.pause_requested && observation.resumed()
+            }),
+            "resume never released the projection: {:?}",
+            handle.observe()
+        );
+
+        // Cycle 2 — the stale-quiescence negative oracle: the mock
+        // device still holds queued frames while the leg re-engages.
+        device_tail_padding.store(true, Ordering::SeqCst);
+        handle.request_pause();
+        assert_engaged_but_not_paused(&handle);
+
+        // Only the CURRENT engagement's tail quiescence establishes.
+        device_tail_padding.store(false, Ordering::SeqCst);
+        wait_established(&handle);
+
+        handle.request_resume();
+        assert!(
+            wait_until(Duration::from_secs(5), || handle.observe().resumed()),
+            "second resume never released: {:?}",
+            handle.observe()
+        );
+
+        // Commands stay commands: stop settles the episode normally.
+        handle.request_stop();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// Stop from an established pause mid-play: the gate release lets the
+/// leg reach the stopped edge and the episode settles the ordinary
+/// `Stopped` fact (D14.7 terminal interactions; D11 monotonicity —
+/// late pause/resume history never relabels it).
+#[test]
+fn stop_from_an_established_pause_settles_stopped_and_late_commands_stay_inert() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let handle = PlaybackSessionHandle::new();
+        let mut runtime = registered_runtime(
+            seconds_of_audio(30),
+            OutputBehavior::Consume,
+            consumed,
+            device_tail_padding,
+            handle.clone(),
+        );
+        activate(&mut runtime);
+
+        handle.request_pause();
+        wait_established(&handle);
+
+        handle.request_stop();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        let observation = handle.observe();
+        assert_eq!(
+            observation.terminal_outcome,
+            Some(EpisodeTerminalOutcome::Stopped)
+        );
+        // The settled episode is never Paused/Resumed, whatever the
+        // mechanism evidence still latches (D14.7 unsettled guard).
+        assert!(!observation.paused());
+        assert!(!observation.resumed());
+        assert!(
+            observation.pause_requested,
+            "pause intent stays recorded history"
+        );
+
+        // Late pause/resume after settlement: inert command history.
+        handle.request_pause();
+        handle.request_resume();
+        handle.request_pause();
+        let observation = handle.observe();
+        assert_eq!(
+            observation.terminal_outcome,
+            Some(EpisodeTerminalOutcome::Stopped),
+            "D11 monotonicity: settlement is never relabelled"
+        );
+        assert!(!observation.paused());
+        assert!(!observation.resumed());
+
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// Pause intent routed before activation: the render leg's FIRST loop
+/// iteration parks at the gate (start-paused), and EOF while parked
+/// leaves the episode unsettled until it is released and drained.
+#[test]
+fn eof_while_parked_leaves_the_episode_unsettled_until_resumed() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let handle = PlaybackSessionHandle::new();
+
+        // Record pause intent BEFORE the episode exists: it is applied
+        // the moment the render leg reaches its gate.
+        handle.request_pause();
+        assert!(handle.observe().pause_requested);
+
+        // A tiny source: the worker produces, EOFs and exits while the
+        // render leg stays parked at the gate.
+        let mut runtime = registered_runtime(
+            SourceBehavior::EofAfter(64),
+            OutputBehavior::Consume,
+            consumed.clone(),
+            device_tail_padding,
+            handle.clone(),
+        );
+        activate(&mut runtime);
+
+        // Start-paused: the parked leg establishes the projection
+        // without ever having submitted a frame.
+        wait_established(&handle);
+        assert_eq!(
+            consumed.load(Ordering::SeqCst),
+            0,
+            "a parked leg must not consume"
+        );
+
+        // EOF while parked: the worker has long exited (tiny source),
+        // yet no terminal Fact may commit while the leg is parked.
+        assert!(
+            !wait_until(Duration::from_millis(500), || handle
+                .observe()
+                .terminal_outcome
+                .is_some()),
+            "the episode settled while parked at the gate (D14.7: EOF \
+             while parked stays unsettled until released)"
+        );
+
+        // Resume-and-drain completes it.
+        handle.request_resume();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// Stop from a parked post-EOF episode: the gate must NOT force-abort —
+/// the tail plays out and drains, settling the SAME Completed fact as
+/// today's stop-after-EOF (no Failed{device} fabrication).
+#[test]
+fn stop_from_parked_after_eof_still_completes() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let handle = PlaybackSessionHandle::new();
+        handle.request_pause();
+
+        let mut runtime = registered_runtime(
+            SourceBehavior::EofAfter(64),
+            OutputBehavior::Consume,
+            consumed,
+            device_tail_padding,
+            handle.clone(),
+        );
+        activate(&mut runtime);
+        wait_established(&handle);
+
+        handle.request_stop();
+        assert_eq!(
+            handle.wait_terminal(),
+            EpisodeTerminalOutcome::Completed,
+            "stop-from-paused-after-EOF must play out and drain, not fail"
+        );
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// Failure while parked settles immediately by the existing precedence,
+/// and the teardown releases the parked gate (dispose must terminate).
+#[test]
+fn failure_while_parked_settles_failed_without_wedging_teardown() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let handle = PlaybackSessionHandle::new();
+        handle.request_pause();
+
+        let mut runtime = registered_runtime(
+            SourceBehavior::FailAfter(64),
+            OutputBehavior::Consume,
+            consumed,
+            device_tail_padding,
+            handle.clone(),
+        );
+        activate(&mut runtime);
+
+        // The leg parks (never established against a failed decode —
+        // and once settled, never at all).
+        assert!(
+            wait_until(Duration::from_secs(5), || handle.observe().terminal_outcome
+                == Some(EpisodeTerminalOutcome::Failed)),
+            "failure while parked never settled: {:?}",
+            handle.observe()
+        );
+        assert!(
+            !handle.observe().paused(),
+            "a settled episode is never Paused"
+        );
+
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Failed);
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        assert_no_leg_threads();
+    });
+}
+
+/// Stop while the producer is wedged through pause backpressure: the
+/// edge is full and the decode worker is blocked mid-write; the stop
+/// wakes BOTH participants (worker via the data-plane stop, render leg
+/// via the gate release) and no thread leaks.
+#[test]
+fn stop_wakes_a_producer_blocked_through_pause_backpressure() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(30), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let handle = PlaybackSessionHandle::new();
+
+        // The consumer is slower than the producer: the bounded edge
+        // fills long before EOF and the worker blocks mid-write.
+        let mut runtime = registered_runtime(
+            seconds_of_audio(30),
+            OutputBehavior::SlowConsume {
+                per_read: Duration::from_millis(50),
+            },
+            consumed.clone(),
+            device_tail_padding,
+            handle.clone(),
+        );
+        activate(&mut runtime);
+
+        // Playback progressing, then pause: consumption halts entirely
+        // (the parked leg submits nothing), the edge fills, and the
+        // producer blocks behind it.
+        assert!(
+            wait_until(Duration::from_secs(5), || consumed.load(Ordering::SeqCst)
+                > 0),
+            "the episode never produced audio"
+        );
+        handle.request_pause();
+        wait_established(&handle);
+        let at_pause = consumed.load(Ordering::SeqCst);
+        assert!(
+            !wait_until(Duration::from_millis(400), || consumed
+                .load(Ordering::SeqCst)
+                != at_pause),
+            "a parked leg must not consume (pause backpressure)"
+        );
+
+        // Stop through the backpressure: both legs must wake.
+        handle.request_stop();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        assert_no_leg_threads();
+    });
+}
+
+#[cfg(target_os = "linux")]
+fn assert_no_leg_threads() {
+    const LEAK_ORACLE_GRACE: Duration = Duration::from_secs(2);
+    assert!(
+        common::named_thread_gone_within("qianqian-decode", LEAK_ORACLE_GRACE),
+        "decode worker thread leaked"
+    );
+    assert!(
+        common::named_thread_gone_within("qianqian-test-render", LEAK_ORACLE_GRACE),
+        "render thread leaked"
+    );
+}
+
+#[cfg(not(target_os = "linux"))]
+fn assert_no_leg_threads() {}

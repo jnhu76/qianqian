@@ -133,6 +133,13 @@ pub struct TestOutput {
     /// `buffered_frames == 0` alone cannot witness that the episode
     /// really produced audio; this counter can.
     pub consumed: Arc<std::sync::atomic::AtomicUsize>,
+    /// The mock device's output-tail occupancy (frames already consumed
+    /// but still queued to "play"), observed by the render gate's
+    /// tail-quiescence check. An instant-consuming mock holds nothing,
+    /// so the default is quiesced (false = empty tail); a test flips it
+    /// to true to model a real device still playing out already-
+    /// submitted frames.
+    pub device_tail_padding: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl TestOutput {
@@ -145,7 +152,26 @@ impl TestOutput {
         behavior: OutputBehavior,
         consumed: Arc<std::sync::atomic::AtomicUsize>,
     ) -> TestOutput {
-        TestOutput { behavior, consumed }
+        TestOutput::observed_with_tail(
+            behavior,
+            consumed,
+            Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        )
+    }
+
+    /// [`TestOutput::observed`] with the caller owning the mock device's
+    /// output-tail flag, so a pause test can model a real device whose
+    /// already-submitted frames are still queued to play.
+    pub fn observed_with_tail(
+        behavior: OutputBehavior,
+        consumed: Arc<std::sync::atomic::AtomicUsize>,
+        device_tail_padding: Arc<std::sync::atomic::AtomicBool>,
+    ) -> TestOutput {
+        TestOutput {
+            behavior,
+            consumed,
+            device_tail_padding,
+        }
     }
 }
 
@@ -166,9 +192,11 @@ impl AudioOutput for TestOutput {
                 let RenderRequest {
                     input,
                     drain,
+                    gate,
                     format: _,
                 } = request;
                 let consumed = self.consumed.clone();
+                let device_tail_padding = self.device_tail_padding.clone();
                 let thread = std::thread::Builder::new()
                     .name("qianqian-test-render".into())
                     .spawn({
@@ -181,7 +209,14 @@ impl AudioOutput for TestOutput {
                             // never wedge on a dead consumer.
                             let verdict =
                                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                                    consume_loop(input.clone(), pace, abort_after, &consumed)
+                                    consume_loop(
+                                        input.clone(),
+                                        &gate,
+                                        pace,
+                                        abort_after,
+                                        &consumed,
+                                        &device_tail_padding,
+                                    )
                                 }))
                                 .unwrap_or(DrainVerdict::Aborted);
                             if verdict == DrainVerdict::Aborted {
@@ -206,9 +241,11 @@ impl AudioOutput for TestOutput {
 
 fn consume_loop(
     input: Arc<dyn RenderPcmInput>,
+    gate: &qianqian_audio_api::ports::RenderGate,
     pace: Option<Duration>,
     abort_after: Option<usize>,
     consumed: &std::sync::atomic::AtomicUsize,
+    device_tail_padding: &std::sync::atomic::AtomicBool,
 ) -> DrainVerdict {
     use std::sync::atomic::Ordering;
     let mut dst = vec![0.0f32; 256 * usize::from(TEST_FORMAT.channels)];
@@ -220,6 +257,10 @@ fn consume_loop(
             // plane before completing the drain.
             return DrainVerdict::Aborted;
         }
+        // Mirror the real mechanism's loop-top pause gate (D14.7): the
+        // gate parks before the read; the mock's tail observation is
+        // its own device-tail counter.
+        gate.park_while_paused(|| !device_tail_padding.load(Ordering::SeqCst));
         match input.read_frames(&mut dst) {
             PcmPull::Frames(n) => {
                 consumed.fetch_add(n, Ordering::SeqCst);

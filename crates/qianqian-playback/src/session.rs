@@ -111,21 +111,30 @@ fn activate_inner(
     // first verdict publication settles the episode synchronously,
     // before `complete` returns — which also means this stream's
     // stop_and_join inverse below cannot return before the terminal
-    // publication path has run.
+    // publication path has run. The render gate routes the episode's
+    // pause intent to the same leg's loop-top check (D14.7).
     let stream = output
         .service()
         .open_stream(qianqian_audio_api::ports::RenderRequest {
             format,
             input: edge.clone(),
             drain: completion.drain_signal(),
+            gate: completion.render_gate(),
         })
         .map_err(|e| ActivationError::new(format!("render stream open failed: {}", e.message)))?;
 
     // Registered before the worker spawn, so it unwinds after the worker
     // inverse: stop+join the producer before the device is released. It
     // is a relation-bearing effect: the stream is a cross-fiber
-    // contribution toward the output provider.
+    // contribution toward the output provider. The pause gate is
+    // released first (D14.7 teardown obligation): a leg parked at the
+    // gate is not inside read_frames, so the data-plane stop alone
+    // cannot wake it and the join below would never return; the release
+    // publishes disengagement evidence and lets the leg reach the
+    // stopped edge on its own.
+    let teardown_completion = completion.clone();
     ctx.register_relation::<AudioOutputCapability>(&output, move || {
+        teardown_completion.release_pause_gate();
         stream.stop_and_join();
         Discharge::Discharged
     });

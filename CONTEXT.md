@@ -197,12 +197,14 @@ Failed
 
 Exact resolver representation/precedence remains current implementation detail unless changing it changes the external D11 propositions.
 
-F2 seam representation (reality-gate-2 verdict): the application-facing episode seam is a **public Playback Session handle** (one handle == one playback episode; minimal surface `request_stop` / `observe` / `wait_terminal`). `SessionCompletion`/resolver is an **internal replaceable realization** behind that seam, not the application API; terminal settlement runs on the Playback Session authority-owned execution/teardown path (D14.3), never consumer-triggered.
+F2 seam representation (reality-gate-2 verdict): the application-facing episode seam is a **public Playback Session handle** (one handle == one playback episode; surface `request_stop` / `request_pause` / `request_resume` / `observe` / `wait_terminal` — pause/resume added by the frozen D14.7 F3 amendment). `SessionCompletion`/resolver is an **internal replaceable realization** behind that seam, not the application API; terminal settlement runs on the Playback Session authority-owned execution/teardown path (D14.3), never consumer-triggered.
 
 The following are still OPEN:
 
 ```text
-Playing / Starting / Paused / Stopping semantics
+Playing / Starting / Stopping semantics
+(Paused/Resumed are D14.7-derived Projections, not transport states;
+ their establishment is frozen, the rest of the transport enum is not)
 position / duration authority
 seek acceptance / discontinuity / commit semantics
 open/session construction + config + replacement semantics
@@ -246,7 +248,11 @@ F3 Pause / Resume               GATE EARNED (D14.7 mechanism +
                                 engagement + output-tail-quiescence
                                 evidence; evidence
                                 experiments/f3-pause-mechanism);
-                                IMPLEMENTATION NOT STARTED
+                                IMPLEMENTATION OPEN (feat/f3-pause-resume-1:
+                                D14.7 mechanism A render-loop gate behind
+                                the episode seam; episode-handle public
+                                surface extended as the named D14.7
+                                architecture event)
 F4 Position / Duration          GOAL KEPT / AUTHORITY + COUNTERS OPEN
 F5 Seek                         REDESIGNED AROUND DISCONTINUITY PROTOCOL
 F6 Open                         CONFIG-MECHANISM-OPEN

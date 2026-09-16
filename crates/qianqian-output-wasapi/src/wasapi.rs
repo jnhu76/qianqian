@@ -5,11 +5,12 @@
 //! (first-audible-slice design §5; mechanism evidence: historical
 //! `wasapi_renderer.cpp`, recovered as mechanism only).
 //!
-//! Steady-state loop: device event -> GetCurrentPadding -> GetBuffer ->
-//! pull already-available PCM from the pre-bound frame source straight
-//! into the device buffer -> ReleaseBuffer. The render thread never
-//! touches the filesystem, a decoder, or the kernel; its only stop
-//! observation is the frame source's terminal outcomes.
+//! Steady-state loop: pause gate (D14.7, park before any device buffer
+//! is held) -> device event -> GetCurrentPadding -> GetBuffer -> pull
+//! already-available PCM from the pre-bound frame source straight into
+//! the device buffer -> ReleaseBuffer. The render thread never touches
+//! the filesystem, a decoder, or the kernel; its only stop observation
+//! is the frame source's terminal outcomes.
 //!
 //! Format negotiation is Tier 1 only (design §7): the float32 source
 //! format is submitted directly; shared-mode WASAPI mixes it to the
@@ -43,8 +44,8 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::GUID;
 
 use qianqian_audio_api::ports::{
-    AudioOutput, DrainSignal, DrainVerdict, OutputError, PcmFormat, PcmPull, RenderPcmInput,
-    RenderRequest, RenderStream,
+    AudioOutput, DrainSignal, DrainVerdict, OutputError, PcmFormat, PcmPull, RenderGate,
+    RenderPcmInput, RenderRequest, RenderStream,
 };
 
 /// Frozen WASAPI ABI values defined locally, exactly so this mechanism
@@ -95,8 +96,9 @@ impl AudioOutput for WasapiOutput {
                 let slot = slot.clone();
                 let format = request.format;
                 let render_input = request.input.clone();
+                let gate = request.gate.clone();
                 let drain = request.drain.clone();
-                move || run_render_thread(format, render_input, drain, slot)
+                move || run_render_thread(format, render_input, gate, drain, slot)
             })
             .map_err(|e| OutputError {
                 message: format!("render thread spawn failed: {e}"),
@@ -205,13 +207,14 @@ enum LoopOutcome {
 fn run_render_thread(
     format: PcmFormat,
     render_input: Arc<dyn RenderPcmInput>,
+    gate: RenderGate,
     drain: DrainSignal,
     slot: OpenSlot,
 ) {
     // A panic must not leave the completion unresolved or the producer
     // wedged: it reports like any other abort.
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        open_and_run(format, &*render_input, &slot)
+        open_and_run(format, &*render_input, &gate, &slot)
     }))
     .unwrap_or_else(|_| LoopOutcome::Aborted {
         message: "render thread panicked".to_owned(),
@@ -242,6 +245,7 @@ fn run_render_thread(
 fn open_and_run(
     format: PcmFormat,
     render_input: &dyn RenderPcmInput,
+    gate: &RenderGate,
     slot: &OpenSlot,
 ) -> LoopOutcome {
     let coinit = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
@@ -254,12 +258,13 @@ fn open_and_run(
         };
     }
     let _apartment = ComApartment(true);
-    open_and_run_inner(format, render_input, slot)
+    open_and_run_inner(format, render_input, gate, slot)
 }
 
 fn open_and_run_inner(
     format: PcmFormat,
     render_input: &dyn RenderPcmInput,
+    gate: &RenderGate,
     slot: &OpenSlot,
 ) -> LoopOutcome {
     let Some(session) = open_session(format, slot) else {
@@ -272,7 +277,7 @@ fn open_and_run_inner(
     // every path — success, error, panic — before the unwind reaches
     // this scope's boundary.
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        steady_loop(&session, &format, render_input)
+        steady_loop(&session, &format, render_input, gate)
     })) {
         Ok(outcome) => outcome,
         Err(_) => LoopOutcome::Aborted {
@@ -436,6 +441,7 @@ fn steady_loop(
     session: &DeviceSession,
     format: &PcmFormat,
     render_input: &dyn RenderPcmInput,
+    gate: &RenderGate,
 ) -> LoopOutcome {
     if let Err(e) = unsafe { session.client.Start() } {
         return LoopOutcome::Aborted {
@@ -444,6 +450,16 @@ fn steady_loop(
     }
     let channels = usize::from(format.channels);
     loop {
+        // Pause gate (D14.7, mechanism A): loop top, strictly before
+        // device-buffer acquisition, no device buffer held across the
+        // park. While parked this leg submits nothing; between bounded
+        // slices it reads the session's own output padding, and one zero
+        // observation publishes this engagement's tail-quiescence
+        // evidence. Release (resume/stop) never aborts the leg: the
+        // loop proceeds once more and the data plane decides.
+        gate.park_while_paused(|| {
+            unsafe { session.client.GetCurrentPadding() }.is_ok_and(|padding| padding == 0)
+        });
         // Period cadence; the bounded wait is also the stop-latency bound.
         unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
         let padding = match unsafe { session.client.GetCurrentPadding() } {
