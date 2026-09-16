@@ -1,0 +1,27 @@
+[package]
+name = "f3-pause-mechanism"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "F3-GATE mechanism evidence: render-loop pause gate vs IAudioClient::Stop/Start"
+
+# F3-GATE evidence crate (Issue #119 F3 pause/resume; ADR-PBK-002 D14.7).
+# Workspace-excluded on purpose: this is executable mechanism evidence and
+# a physical probe, NOT production architecture. Nothing here may be
+# imported by any qianqian-* crate; the frozen contract lands in
+# ADR-PBK-002 and the product implementation lands in a later F3 slice.
+
+[dependencies]
+
+[target.'cfg(windows)'.dependencies]
+# Same generation as the production output mechanism so the probe measures
+# the same COM surface the product render loop uses.
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+] }
