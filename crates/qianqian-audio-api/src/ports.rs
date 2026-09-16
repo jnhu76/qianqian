@@ -224,6 +224,11 @@ impl std::fmt::Debug for GateInner {
 const PARK_SLICE: std::time::Duration = std::time::Duration::from_millis(10);
 
 impl RenderGate {
+    /// A gate with no observer: intent routing works, but every
+    /// engagement / quiescence / disengagement event is silently
+    /// discarded. For mechanism tests only — a production episode's
+    /// gate is built with [`RenderGate::with_observer`] by its owner,
+    /// because D14.7 requires engagement evidence to reach the session.
     pub fn new() -> Self {
         Self::default()
     }
@@ -244,7 +249,8 @@ impl RenderGate {
                 on_event: Mutex::new(Some(Arc::new(observer))),
             }),
         }
-    }    /// Route the pause intent into the mechanism: `true` parks the render
+    }
+    /// Route the pause intent into the mechanism: `true` parks the render
     /// leg at its next loop-top gate check; `false` releases a parked leg
     /// (bounded-slice latency via notify). Idempotent.
     pub fn set_paused(&self, paused: bool) {

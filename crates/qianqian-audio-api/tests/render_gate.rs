@@ -160,12 +160,15 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
     gate.set_paused(false);
     leg.join().expect("leg 1 joins");
 
-    // Engagement 2: the device tail is NOT quiescent this time — the
-    // park must stay engaged WITHOUT quiescence evidence.
+    // Engagement 2: the tail becomes quiescent again in this cycle. The
+    // gate must RE-OBSERVE it (per-engagement reset, not a stuck latch):
+    // a second TailQuiesced proves the fresh cycle published its own
+    // evidence, and the phase before it proves the first cycle's
+    // quiescence never leaked in.
     gate.set_paused(true);
     let leg = {
         let gate = gate.clone();
-        std::thread::spawn(move || gate.park_while_paused(|| false))
+        std::thread::spawn(move || gate.park_while_paused(|| true))
     };
     assert!(
         wait_until(Duration::from_secs(5), || {
@@ -175,6 +178,38 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
         "engagement 2 never latched: {:?}",
         events.snapshot()
     );
+    // Between the two engagements no quiescence may exist, and the new
+    // engagement must earn its own evidence through a fresh observation.
+    assert!(
+        wait_until(Duration::from_secs(5), || events
+            .snapshot()
+            .iter()
+            .filter(|e| **e == GateEvent::TailQuiesced)
+            .count()
+            == 2),
+        "engagement 2 never published its own quiescence: {:?}",
+        events.snapshot()
+    );
+    let seen_final = events.snapshot();
+    assert_eq!(
+        seen_final
+            .iter()
+            .filter(|e| **e == GateEvent::Engaged)
+            .count(),
+        2,
+        "exactly two engagements: {seen_final:?}"
+    );
+    gate.set_paused(false);
+    leg.join().expect("leg 2 joins");
+
+    // A final engagement whose tail NEVER goes quiescent must stay
+    // engaged without a third TailQuiesced — the stale-latch direction
+    // of the same invariant.
+    gate.set_paused(true);
+    let leg = {
+        let gate = gate.clone();
+        std::thread::spawn(move || gate.park_while_paused(|| false))
+    };
     std::thread::sleep(Duration::from_millis(50));
     let seen_after = events.snapshot();
     assert_eq!(
@@ -182,10 +217,10 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
             .iter()
             .filter(|e| **e == GateEvent::TailQuiesced)
             .count(),
-        1,
-        "a second engagement must not inherit the first cycle's quiescence: \
-         {seen_after:?}"
+        2,
+        "an engaged-but-not-quiescent cycle must not inherit prior \
+         quiescence: {seen_after:?}"
     );
     gate.set_paused(false);
-    leg.join().expect("leg 2 joins");
+    leg.join().expect("leg 3 joins");
 }

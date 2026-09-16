@@ -299,15 +299,20 @@ impl SessionCompletion {
         let target = {
             let mut guard = self.state.state.lock().expect("completion lock");
             guard.stop_requested = true;
+            // Stop releases the pause gate too (D14.7), under the same
+            // lock hold that records the intent: gate routing is
+            // linearized with the command state, so a pause command that
+            // linearizes after this stop observes `stop_requested` and
+            // cannot re-park the episode. A leg parked at the pre-
+            // GetBuffer gate is not inside read_frames, so the
+            // data-plane stop alone cannot wake it. The release publishes
+            // disengagement evidence when the leg exits; the gate never
+            // aborts the leg — the loop proceeds once more and the
+            // data-plane terminal (edge stop, EOF, failure) decides the
+            // outcome.
+            self.state.gate.set_paused(false);
             guard.stop_target.clone()
         };
-        // Stop releases the pause gate too (D14.7): a leg parked at the
-        // pre-GetBuffer gate is not inside read_frames, so the data-plane
-        // stop alone cannot wake it. The release publishes disengagement
-        // evidence when the leg exits; the gate never aborts the leg —
-        // the loop proceeds once more and the data-plane terminal (edge
-        // stop, EOF, failure) decides the outcome.
-        self.state.gate.set_paused(false);
         if let Some(edge) = target {
             edge.stop();
         }
@@ -318,25 +323,33 @@ impl SessionCompletion {
     /// gate, whose loop-top check parks the render leg before any device
     /// buffer is held. Idempotent. How (and whether) the pause physically
     /// establishes remains mechanism evidence — the Paused projection is
-    /// derived, never recorded here. Calling this after settlement is
-    /// inert history: the intent is recorded, nothing else changes.
+    /// derived, never recorded here.
+    ///
+    /// Intent routing is linearized with the command state under the one
+    /// completion lock. A pause that linearizes after stop intent —
+    /// including the whole stop→settlement window — is recorded as inert
+    /// command history but routes nothing: a released or released-then-
+    /// stopping episode must never be re-parked (D14.7: stop and teardown
+    /// wake every parked participant with bounded latency), and a settled
+    /// episode has no leg to park.
     pub(crate) fn request_pause(&self) {
-        {
-            let mut guard = self.state.state.lock().expect("completion lock");
-            guard.pause_requested = true;
+        let mut guard = self.state.state.lock().expect("completion lock");
+        guard.pause_requested = true;
+        if guard.stop_requested || guard.outcome.is_some() {
+            return;
         }
         self.state.gate.set_paused(true);
     }
 
     /// Release a recorded pause (D14.7). Command only: clears pause
     /// intent and releases the gate; the woken leg proceeds once more and
-    /// the data plane decides what its next read sees. Idempotent;
-    /// inert history after settlement.
+    /// the data plane decides what its next read sees. Idempotent.
+    /// Release routing stays unconditional — a release can never wedge
+    /// anything, and linearization under the one completion lock keeps
+    /// the gate's view consistent with the recorded intent.
     pub(crate) fn request_resume(&self) {
-        {
-            let mut guard = self.state.state.lock().expect("completion lock");
-            guard.pause_requested = false;
-        }
+        let mut guard = self.state.state.lock().expect("completion lock");
+        guard.pause_requested = false;
         self.state.gate.set_paused(false);
     }
 
@@ -346,6 +359,7 @@ impl SessionCompletion {
     /// observe the data-plane stop, and `stop_and_join` must terminate.
     /// The leg's exit publishes disengagement evidence.
     pub(crate) fn release_pause_gate(&self) {
+        let _guard = self.state.state.lock().expect("completion lock");
         self.state.gate.set_paused(false);
     }
 

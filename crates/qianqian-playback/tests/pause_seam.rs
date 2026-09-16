@@ -463,6 +463,54 @@ fn stop_wakes_a_producer_blocked_through_pause_backpressure() {
     });
 }
 
+/// A pause command that linearizes AFTER stop intent — the deterministic
+/// shape of the stop→settlement window race — is recorded as inert
+/// command history but must NOT re-park the released episode: the gate
+/// stays released, the leg reaches the stopped edge, and the episode
+/// settles `Stopped` with bounded latency (D14.7: stop wakes every
+/// parked participant; the stop-from-paused→Stopped interaction).
+#[test]
+fn pause_routed_after_stop_cannot_repark_the_released_episode() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let handle = PlaybackSessionHandle::new();
+
+        // Stop first, THEN pause: both before activation. Without
+        // linearized routing the second command would park the gate the
+        // stop just released, and this episode would never settle.
+        handle.request_stop();
+        handle.request_pause();
+        let observation = handle.observe();
+        assert!(observation.stop_requested, "stop intent recorded");
+        assert!(
+            observation.pause_requested,
+            "pause stays recorded command history"
+        );
+
+        let mut runtime = registered_runtime(
+            seconds_of_audio(30),
+            OutputBehavior::Consume,
+            consumed,
+            device_tail_padding,
+            handle.clone(),
+        );
+        activate(&mut runtime);
+
+        // Bounded settlement: the leg must reach the stopped edge, not
+        // sit parked against released intent.
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        assert!(
+            !handle.observe().paused(),
+            "a settled episode is never Paused"
+        );
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        assert_no_leg_threads();
+    });
+}
+
 #[cfg(target_os = "linux")]
 fn assert_no_leg_threads() {
     const LEAK_ORACLE_GRACE: Duration = Duration::from_secs(2);
