@@ -27,7 +27,7 @@ on:
     paths:
       - "Cargo.toml"
       - "crates/*/Cargo.toml"
-      - "crates/*/src/lib.rs"
+      - "crates/*/src/**"
       - "apps/*/Cargo.toml"
       - "tools/check_plugin_boundaries.py"
       - ".github/workflows/plugin-boundary-gate.yml"
@@ -36,7 +36,7 @@ on:
     paths:
       - "Cargo.toml"
       - "crates/*/Cargo.toml"
-      - "crates/*/src/lib.rs"
+      - "crates/*/src/**"
       - "apps/*/Cargo.toml"
       - "tools/check_plugin_boundaries.py"
       - ".github/workflows/plugin-boundary-gate.yml"

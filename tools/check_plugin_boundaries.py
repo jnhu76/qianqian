@@ -38,6 +38,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -187,6 +188,22 @@ def internal_deps(package):
 def scan():
     violations = []
 
+    # Workspace exclusion is never architectural exclusion: every
+    # qianqian-* crate listed in [workspace] exclude must be explicitly
+    # known to this gate (audit L7 / §7.5). Non-qianqian paths in the
+    # exclude list (experiments/) are outside the production universe.
+    root_manifest = tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))
+    admitted_excluded = {Path(p).name for p in WORKSPACE_EXCLUDED_PRODUCTION}
+    for entry in root_manifest.get("workspace", {}).get("exclude", []):
+        name = Path(entry).name
+        if name.startswith(INTERNAL_PREFIX) and name not in admitted_excluded:
+            violations.append(
+                f"source: <workspace exclude>\ntarget: {name}\nkind: workspace-exclude\n"
+                f"rule: a qianqian-* crate excluded from the workspace must be explicitly "
+                f"admitted to the architecture universe (update WORKSPACE_EXCLUDED_PRODUCTION on purpose)\n"
+                f"authority: audit §7.5 / L7 — workspace exclusion never means architectural exclusion"
+            )
+
     universe = {}
     root = cargo_metadata()
     for pkg in root["packages"]:
@@ -251,6 +268,32 @@ def scan():
                     f"rule: forbidden public mechanism exposure: {snippet!r}\n"
                     f"authority: {rule['authority']}"
                 )
+
+    # Decode chain strict source scan (the chain is workspace-excluded
+    # and no CI compiles it, so this source gate is its only continuous
+    # watcher — it must not be defeatable by a new src file). Across
+    # EVERY src/*.rs of the excluded decode crate, the only externally
+    # visible item allowed is the admitted plugin constructor;
+    # everything else must be private or pub(crate). lib.rs-level
+    # "pub mod" re-opening is already forbidden by the EXPORT_RULES
+    # forbid list above; this scan covers items declared in other files.
+    decode_src = ROOT / "crates/qianqian-decode-songcore" / "src"
+    admitted_decode_surface = "pub fn songcore_decode_plugin() -> ComponentSpec {"
+    for rs in sorted(decode_src.glob("*.rs")):
+        for lineno, line in enumerate(rs.read_text(encoding="utf-8").splitlines(), 1):
+            stripped = line.strip()
+            if not stripped.startswith("pub "):
+                continue  # private / pub(crate) / comments / strings
+            if rs.name == "lib.rs" and stripped.startswith(admitted_decode_surface):
+                continue
+            violations.append(
+                f"source: crates/qianqian-decode-songcore/src/{rs.name}:{lineno}\n"
+                f"target: public export surface\nkind: source\n"
+                f"rule: the decode chain admits exactly one external item "
+                f"(songcore_decode_plugin); found: {stripped.split('{')[0].strip()!r}\n"
+                f"authority: audit §7.5 / MAJOR-3 — SOURCE_GATE_ENFORCED for the "
+                f"workspace-excluded decode chain"
+            )
 
     return violations
 
@@ -420,6 +463,25 @@ def run_negative_controls():
                 "pub use wasapi::WasapiOutput;\n\n/// Build the platform's real output mechanism.",
                 1,
             )
+        },
+    )
+    expect_fail(
+        "workspace-exclude without universe admission",
+        "kind: workspace-exclude",
+        edits={
+            "Cargo.toml": lambda t: t.replace(
+                'exclude = [\n    "crates/qianqian-decode-songcore",',
+                'exclude = [\n    "crates/qianqian-probe-exclude",\n    "crates/qianqian-decode-songcore",',
+            ),
+        },
+    )
+    expect_fail(
+        "decode chain pub item in a new src file",
+        "source: crates/qianqian-decode-songcore/src/boundary_probe_helper.rs",
+        creates={
+            "crates/qianqian-decode-songcore/src/boundary_probe_helper.rs": (
+                "pub struct BoundaryProbeMechanism;\n"
+            ),
         },
     )
 
