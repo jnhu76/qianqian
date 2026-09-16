@@ -166,12 +166,11 @@ fn run_episode(episode: Episode, shell: Shell) -> ExitCode {
 #[cfg(feature = "playback")]
 fn episode_without_session(mut episode: Episode, shell: Shell) -> ExitCode {
     let diagnostic = episode.handle.observe().activation_error;
-    if shell == Shell::ReferencePlayer {
-        if let Err(error) =
+    if shell == Shell::ReferencePlayer
+        && let Err(error) =
             qianqian_headless::tui::runtime::run(&episode.handle, &episode.file.to_string_lossy())
-        {
-            eprintln!("reference-player shell failed: {error}");
-        }
+    {
+        eprintln!("reference-player shell failed: {error}");
     }
     report_activation_failure(diagnostic.as_deref());
     let snapshot = episode.runtime.dispose();

@@ -85,14 +85,19 @@ struct TerminalGuard {
 impl TerminalGuard {
     fn acquire() -> io::Result<Self> {
         enable_raw_mode()?;
-        match execute!(io::stdout(), EnterAlternateScreen, Hide) {
-            Ok(()) => Ok(Self { restored: false }),
-            Err(error) => {
-                // Do not strand raw mode because the screen enter failed.
-                let _ = disable_raw_mode();
-                Err(error)
-            }
+        if let Err(error) = execute!(io::stdout(), EnterAlternateScreen) {
+            // Do not strand raw mode because the screen enter failed.
+            let _ = disable_raw_mode();
+            return Err(error);
         }
+        if let Err(error) = execute!(io::stdout(), Hide) {
+            // A cursor-hide failure must not strand the already-entered
+            // alternate screen.
+            let _ = execute!(io::stdout(), LeaveAlternateScreen);
+            let _ = disable_raw_mode();
+            return Err(error);
+        }
+        Ok(Self { restored: false })
     }
 
     fn restore(&mut self) {

@@ -90,8 +90,8 @@ commands:
   --version | -V         print the version
 
 in the machine transport, `stop` stops the episode and `status` prints
-its truthful state; in the terminal shell, S stops and Q quits (other
-interactive commands are recognized but not wired yet)
+its truthful state (other interactive commands are recognized but not
+wired yet); in the terminal shell, S stops and Q or Ctrl+C quits
 "
 }
 
