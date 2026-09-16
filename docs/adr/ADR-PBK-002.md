@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`) |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate) |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -1136,6 +1136,18 @@ Playlist/queue selection authority remains OPEN. The first headless Open/Next/Pr
 > blocked" text: the minimum mechanism and the truthful-establishment
 > semantics below are now FROZEN; everything not stated remains governed
 > by the general Phase-F rules.
+>
+> 2026-09-16 corrective (F3-GATE-CORRECTIVE-1; same evidence crate,
+> human review round 2). The original establishment formula equated
+> render-gate engagement with `Paused`, but mechanism A's own physical
+> evidence shows that already-submitted device audio keeps playing
+> after engagement until the device-side padding drains. The
+> establishment rule below therefore adds **output-tail quiescence**
+> evidence, demarcates `Paused`/`Resumed` as application-facing derived
+> **Projections** (never Facts, never correctness authority), and
+> weakens `Resumed` to exactly what its evidence can support. The
+> selected mechanism, the mechanism requirements, the ownership rules
+> and D11 are UNCHANGED by this corrective.
 
 Pause/Resume is **same-episode, non-terminal control owned by the
 Playback Session Plugin**. It never creates or destroys a Playback
@@ -1174,22 +1186,86 @@ state changes no Phase-F requirement needs); it may be re-earned only by
 a new narrow authority decision. Parking by letting `read_frames` block
 while `GetBuffer` is held is explicitly rejected as a pause mechanism.
 
-**Truth classes and truthful establishment.**
+**Truth classes and truthful establishment.** The mechanism's physical
+evidence separates two moments that must not be conflated: render
+engagement (the render leg parked at the gate) is **not yet an audible
+pause** — frames already submitted to the device buffer keep playing
+until the device-side padding drains. The establishment rule therefore
+rests on TWO mechanism-evidence factors plus the command state:
 
 ```text
 pause / resume intent      Command state on the episode seam
                            (idempotent; same family as stop intent)
-engagement ack             Mechanism Evidence published through the
-                           session-owned evidence path — never a Fact
-truthfully Paused          ⇔ the episode has no committed terminal
-                           outcome ∧ pause intent recorded ∧
-                           engagement evidence observed (either factor
-                           alone is not Paused; a settled episode is
-                           never Paused)
-truthfully Resumed         ⇔ the episode has no committed terminal
-                           outcome ∧ resume released ∧ disengagement
-                           evidence observed
+render engagement /        Mechanism Evidence published through the
+disengagement ack          session-owned evidence path — the render leg
+                           reached the pre-GetBuffer gate and will
+                           submit no further PCM while parked; never a
+                           Fact
+output-tail quiescence     Mechanism Evidence — no frame submitted
+                           BEFORE engagement remains queued for
+                           rendering by this output session
+Paused / Resumed           application-facing derived Projection over
+                           the above (PBK-001 §2.3 sense); NOT a
+                           semantic Fact and NOT a correctness basis
+                           (see the non-authority rule below)
 ```
+
+**Output-tail quiescence (establishment closed for mechanism A).** For
+the selected mechanism the tail-quiescence evidence is observed as
+`GetCurrentPadding() == 0` from the episode's own render session at
+some time after the engagement ack. This reading is sound for WASAPI
+shared mode and the frozen mechanism shape, as a conjunction of:
+
+```text
+platform contract   for a shared-mode rendering stream, padding is
+                    exactly the number of audio frames of this stream
+                    queued up to play in the endpoint buffer
+                    (IAudioClient::GetCurrentPadding);
+frozen mechanism    the parked leg submits nothing (gate strictly
+invariant           before GetBuffer, no device buffer held across the
+                    park), so padding cannot increase between
+                    engagement and the observation;
+therefore           one zero observation after engagement proves every
+                    pre-engagement frame has left the queued-to-play
+                    set, for the remainder of the park.
+```
+
+The proposition is deliberately narrow: it claims exactly that no audio
+submitted before pause engagement remains pending for rendering by this
+output session. It does NOT claim that the speaker/DAC produced no
+further sample at that instant, that frames already consumed by the
+engine are out of all downstream device latency, that other sessions
+are silent, or that a human hears silence. Physical evidence
+(`experiments/f3-pause-mechanism`, Windows shared-mode probe): at
+engagement the submitted tail is one device buffer (padding 576 ≈ 12 ms
+at the observed endpoint), which drains to 0 — measured
+`tail_drain_latency = T_tail_quiesced − T_engaged` — after which the
+device renders silence for the rest of the park. Mechanism B
+(device Stop/Start) freezes the padding mid-buffer and therefore can
+never observe this evidence while parked — the establishment-side
+reason B is not the selected mechanism. This evidence stays Mechanism
+Evidence; it must never be promoted to a Fact, a position/Duration
+source (F4/D14.8), or a P1–P5 trigger (no old/new realtime-world
+overlap exists here).
+
+Truthful product establishment is then the projection:
+
+```text
+Paused (projection)  ⇔ the episode has no committed terminal outcome
+                       ∧ pause intent recorded ∧ render engagement
+                       evidence observed ∧ output-tail-quiescence
+                       evidence observed
+Resumed (projection) ⇔ the episode has no committed terminal outcome
+                       ∧ resume released ∧ disengagement evidence
+                       observed
+```
+
+`Resumed` claims exactly: pause control is no longer established and
+render submission is re-enabled. It does NOT claim new audio is already
+audible — after disengagement, refilled frames still traverse the
+device buffer before sounding, and audible-time semantics remain
+F4/D14.8 territory. Either mechanism-evidence factor alone is not
+establishment; a settled episode is never Paused or Resumed.
 
 The conjunction is guarded by the episode's unsettled state: once a
 terminal Fact commits, pause truth must not evaluate true on the
@@ -1197,14 +1273,22 @@ episode regardless of mechanism engagement still being latched, so
 session settlement/teardown MUST release the pause gate (publishing
 disengagement evidence) on the authority-owned execution/teardown path.
 
-No new fact kind, no new fact authority, no fourth terminal variant, no
-`Paused` semantic Fact and no `Playing/Starting/Paused/Stopping`
-transport enum is earned: the observation surface gains pause-intent
-(command state) and mechanism-engagement (mechanism evidence) fields,
-and their spelling is representation (the episode-handle public-surface
+**Non-authority rule for the Paused/Resumed projections.** Paused and
+Resumed create no new fact kind, no new fact authority, no fourth
+terminal variant, no `Paused` semantic Fact and no
+`Playing/Starting/Paused/Stopping` transport enum: the observation
+surface gains pause-intent (command state) and
+engagement/tail-quiescence (mechanism evidence) fields, and their
+spelling is representation (the episode-handle public-surface
 allowlist update is the explicit F3-implementation architecture event).
-Product status MUST NOT infer pause from worker blocking, PcmEdge
-occupancy, FiberState, WASAPI state, logs, or UI state.
+As Projections in the PBK-001 §2.3 sense they MUST NOT be used as the
+correctness basis for resume legality, stop legality, teardown,
+terminal settlement, resource lifetime, mechanism wakeup, or K0
+lifecycle transitions; control/lifetime correctness uses the
+authority-owned command/control state and/or the direct mechanism
+state/evidence. Product status MUST NOT infer pause from worker
+blocking, PcmEdge occupancy, FiberState, UI state, or ad-hoc WASAPI
+observations outside this establishment chain.
 
 **Terminal interactions (D11 unchanged).** Stop-from-paused mid-play
 produces the existing worker-Stopped × drain-Aborted × intent history →

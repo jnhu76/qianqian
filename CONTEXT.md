@@ -240,7 +240,11 @@ F2 Observable read side         REALITY GATE CLOSED
          SessionCompletion/resolver becomes crate-internal
          replaceable realization)
 F3 Pause / Resume               GATE EARNED (D14.7 mechanism +
-                                establishment freeze; evidence
+                                establishment freeze incl.
+                                CORRECTIVE-1: Paused/Resumed =
+                                non-authoritative Projections gated on
+                                engagement + output-tail-quiescence
+                                evidence; evidence
                                 experiments/f3-pause-mechanism);
                                 IMPLEMENTATION NOT STARTED
 F4 Position / Duration          GOAL KEPT / AUTHORITY + COUNTERS OPEN

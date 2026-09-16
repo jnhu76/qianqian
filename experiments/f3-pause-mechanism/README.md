@@ -17,11 +17,16 @@ src/gate.rs      the session-owned pause gate (mechanism A control object):
                  acknowledgment, stopped = unpark-and-continue stop wake
 src/sim.rs       simulated device: buffer accounting + consumption
                  independent of the render loop + device Stop/Start (B)
+                 + a test-only drain-hold for deterministic sampling
 src/worker.rs    mock decode worker in the production decode_worker shape
 src/render.rs    the production steady_loop order with both mechanisms:
                  A = park at loop top, strictly before GetBuffer
                  B = the same park wrapped in device Stop/Start
                  plus the deliberately-broken negative-control loop
+src/establishment.rs  the corrected D14.7 Paused/Resumed projection shape
+                      (CORRECTIVE-1): command state + engagement + output-
+                      tail quiescence; plus the pre-corrective engagement-
+                      only conjunction kept as the negative-control mutant
 tests/scenarios.rs  synchronization-shape oracle suite (all platforms)
 src/bin/f3probe.rs  physical WASAPI probe (Windows only)
 RESULTS.md       the evidence record: measurements, decision table,
