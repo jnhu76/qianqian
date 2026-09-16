@@ -93,24 +93,31 @@ DEV_EDGES = {
 BUILD_EDGES = {}  # no internal build edges are admitted for any crate
 
 # ---------------------------------------------------------------------------
-# Export-surface rules (source class). Each rule: a lib.rs must contain
-# every REQUIRED snippet and no FORBIDDEN snippet. These pin the H1
-# public surfaces from re-opening (audit §7.1, L1–L6; §7.5 / MAJOR-3
-# makes the decode rules the durable decode watcher).
+# Export-surface rules. Two mechanisms, both source-class:
+#
+#   require / forbid        literal snippets in one lib.rs (decode keeps
+#                           these; its stricter per-src-file scan below
+#                           makes the forbids belt-and-braces)
+#   allowed_root_public     the crate-root file may declare EXACTLY these
+#                           externally-visible `pub` statements — no more
+#                           (unexpected surface) and no less (required
+#                           surface missing). Forbidding known spellings
+#                           is not enforcement: any NEW root public seam
+#                           (e.g. `pub fn direct_output()` handing out the
+#                           mechanism service) must RED and force an
+#                           explicit architecture decision, same
+#                           philosophy as the Cargo edge allowlist.
+#                           Statements are whitespace-canonicalized, so
+#                           rustfmt reflow does not false-RED; any
+#                           semantic change of the statement does.
 
 EXPORT_RULES = {
     "crates/qianqian-playback/src/lib.rs": {
-        "require": [
-            "pub use handle::{EpisodeTerminalOutcome, PlaybackSessionHandle, PlaybackSessionObservation}",
-            "pub use session::playback_session_spec",
+        "allowed_root_public": [
+            "pub use handle::{EpisodeTerminalOutcome, PlaybackSessionHandle, PlaybackSessionObservation};",
+            "pub use session::playback_session_spec;",
         ],
-        "forbid": [
-            "pub use edge::",
-            "SharedEdge",
-            "pub use completion::",
-            "pub use session::SessionCompletion",
-        ],
-        "authority": "ADR-PBK-002 D6/D14.2/D14.3 — episode mechanism is session-owned, not product API",
+        "authority": "ADR-PBK-002 D6/D14.2/D14.3 — the admitted public surface is exactly the F2 episode seam; the episode mechanism is session-owned, not product API",
     },
     "crates/qianqian-decode-songcore/src/lib.rs": {
         "require": [
@@ -123,14 +130,10 @@ EXPORT_RULES = {
         "authority": "ADR-PBK-002 D5/D7 — admitted surface is the plugin constructor; mechanism stays crate-private (SOURCE_GATE_ENFORCED: workspace-excluded crate)",
     },
     "crates/qianqian-output-wasapi/src/lib.rs": {
-        "require": [
-            "pub fn wasapi_output_plugin",
+        "allowed_root_public": [
+            "pub fn wasapi_output_plugin() -> ComponentSpec {",
         ],
-        "forbid": [
-            "pub use wasapi::",
-            "WasapiOutput;",
-        ],
-        "authority": "ADR-PBK-002 D5/D7 — admitted surface is the plugin constructor; mechanism stays crate-private",
+        "authority": "ADR-PBK-002 D5/D7 — the admitted public surface is exactly the plugin constructor; consumers reach the mechanism only as the AudioOutput capability service",
     },
 }
 
@@ -167,7 +170,12 @@ def cargo_metadata(manifest=None):
         tooling_fail("cargo not found")
     if out.returncode != 0:
         tooling_fail(f"cargo metadata failed for {manifest or 'workspace'}:\n{out.stderr.strip()}")
-    return json.loads(out.stdout)
+    try:
+        return json.loads(out.stdout)
+    except json.JSONDecodeError as error:
+        tooling_fail(
+            f"cargo metadata returned invalid JSON for {manifest or 'workspace'}: {error}"
+        )
 
 
 def internal_deps(package):
@@ -183,6 +191,48 @@ def internal_deps(package):
         if dep.get("target"):
             flags.append(f"target:{dep['target']}")
         yield name, kind, flags
+
+
+def root_public_declarations(text):
+    """Canonical forms of every root-level externally-visible `pub`
+    declaration: statements starting with `pub ` (pub(crate)/pub(super)
+    are not external surface), assembled until their terminator,
+    whitespace-stripped so rustfmt reflow does not false-RED. A `pub use`
+    statement ends at `;` — its brace list (`use p::{A, B}`) is payload,
+    not a block opener. Every other kind ends at the first `;` or `{`;
+    an exotic signature containing an earlier `;`/`{` (e.g.
+    `pub fn f(x: [u8; 4])`) splits into unmatched fragments — a false
+    RED, i.e. fail-closed.
+    """
+    declarations = []
+    buffer = None
+    use_stmt = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if buffer is None:
+            if line == "pub" or line.startswith("pub "):
+                buffer = line
+                tokens = line.split()
+                use_stmt = len(tokens) >= 2 and tokens[1] == "use"
+            else:
+                continue
+        else:
+            buffer += " " + line
+        # The tail of `buffer` is `line`: process its terminator now.
+        if use_stmt:
+            if ";" in line:
+                cut = buffer.find(";")
+                declarations.append("".join(buffer[: cut + 1].split()))
+                buffer, use_stmt = None, False
+            continue
+        positions = [i for i in (buffer.find(";"), buffer.find("{")) if i != -1]
+        if positions:
+            cut = min(positions)
+            declarations.append("".join(buffer[: cut + 1].split()))
+            buffer = None
+    if buffer is not None:
+        declarations.append("".join(buffer.split()) + "<unterminated>")
+    return declarations
 
 
 def scan():
@@ -254,20 +304,40 @@ def scan():
     for rel, rule in EXPORT_RULES.items():
         path = ROOT / rel
         text = path.read_text(encoding="utf-8")
-        for snippet in rule["require"]:
+        for snippet in rule.get("require", []):
             if snippet not in text:
                 violations.append(
                     f"source: {rel}\ntarget: public export surface\nkind: source\n"
                     f"rule: required public surface missing: {snippet!r}\n"
                     f"authority: {rule['authority']}"
                 )
-        for snippet in rule["forbid"]:
+        for snippet in rule.get("forbid", []):
             if snippet in text:
                 violations.append(
                     f"source: {rel}\ntarget: public export surface\nkind: source\n"
                     f"rule: forbidden public mechanism exposure: {snippet!r}\n"
                     f"authority: {rule['authority']}"
                 )
+        if "allowed_root_public" in rule:
+            found = root_public_declarations(text)
+            allowed = {"".join(a.split()) for a in rule["allowed_root_public"]}
+            for canonical in found:
+                if canonical not in allowed:
+                    violations.append(
+                        f"source: {rel}\ntarget: public export surface\nkind: source\n"
+                        f"rule: unexpected root public surface: {canonical!r}\n"
+                        f"admitted surface: {sorted(allowed)}\n"
+                        f"a new public product seam is an explicit architecture "
+                        f"decision: update this allowlist on purpose\n"
+                        f"authority: {rule['authority']}"
+                    )
+            for admitted in sorted(allowed):
+                if admitted not in found:
+                    violations.append(
+                        f"source: {rel}\ntarget: public export surface\nkind: source\n"
+                        f"rule: admitted public surface missing: {admitted!r}\n"
+                        f"authority: {rule['authority']}"
+                    )
 
     # Decode chain strict source scan (the chain is workspace-excluded
     # and no CI compiles it, so this source gate is its only continuous
@@ -319,6 +389,7 @@ def run_gate():
 
 MUTABLE_FILES = [
     "crates/qianqian-playback/Cargo.toml",
+    "crates/qianqian-playback/src/lib.rs",
     "crates/qianqian-decode-songcore/Cargo.toml",
     "crates/qianqian-decode-songcore/src/lib.rs",
     "crates/qianqian-output-wasapi/src/lib.rs",
@@ -332,6 +403,9 @@ def git_dirty(path):
         ["git", "status", "--porcelain", "--", str(ROOT / path)],
         cwd=ROOT, capture_output=True, text=True,
     )
+    if out.returncode != 0:
+        # fail-closed: a failed git status is NOT evidence of a clean tree
+        tooling_fail(f"git status failed for {path}:\n{out.stderr.strip()}")
     return bool(out.stdout.strip())
 
 
@@ -447,7 +521,7 @@ def run_negative_controls():
     )
     expect_fail(
         "M5a-source playback edge re-exported",
-        "forbidden public mechanism exposure: 'pub use edge::'",
+        "unexpected root public surface: 'pubuseedge::{PcmEdge,WriteOutcome};'",
         {
             "crates/qianqian-playback/src/lib.rs": lambda t: t.replace(
                 "pub use handle::", "pub use edge::{PcmEdge, WriteOutcome};\npub use handle::", 1
@@ -456,12 +530,33 @@ def run_negative_controls():
     )
     expect_fail(
         "M2-source output mechanism re-exported",
-        "forbidden public mechanism exposure: 'pub use wasapi::'",
+        "unexpected root public surface: 'pubusewasapi::WasapiOutput;'",
         {
             "crates/qianqian-output-wasapi/src/lib.rs": lambda t: t.replace(
                 "/// Build the platform's real output mechanism.",
                 "pub use wasapi::WasapiOutput;\n\n/// Build the platform's real output mechanism.",
                 1,
+            )
+        },
+    )
+    # M7 — an UNKNOWN new root public seam (no known mechanism spelling,
+    # no re-export): the surface is frozen, so a new pub API must RED on
+    # its own and force an explicit architecture decision.
+    expect_fail(
+        "M7-output unexpected public seam",
+        "unexpected root public surface: 'pubfnboundary_escape_probe(){'",
+        {
+            "crates/qianqian-output-wasapi/src/lib.rs": lambda t: (
+                t + "\npub fn boundary_escape_probe() {}\n"
+            )
+        },
+    )
+    expect_fail(
+        "M7-playback unexpected public seam",
+        "unexpected root public surface: 'pubfnboundary_escape_probe(){'",
+        {
+            "crates/qianqian-playback/src/lib.rs": lambda t: (
+                t + "\npub fn boundary_escape_probe() {}\n"
             )
         },
     )
