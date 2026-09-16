@@ -5,22 +5,17 @@
 //! frame counts, full-drain PCM SHA-256), never from re-deriving what the
 //! endpoint produces.
 
-mod common;
+use crate::test_common as common;
 
 use std::cell::RefCell;
-use std::path::{Path, PathBuf};
+
+use std::path::Path;
 use std::rc::Rc;
 
+use crate::{SongcoreDecode, songcore_decode_plugin};
 use qianqian_app::QianqianApp;
 use qianqian_audio_api::ports::{DecodeOutcome, PcmDecode, PcmDecodeCapability};
-use qianqian_composition::{ComponentSpec, CompositionKernel, DesiredEntry, Revision};
-use qianqian_decode_songcore::{SongcoreDecode, songcore_decode_plugin};
-
-use common::ReferenceFixture;
-
-fn fixtures_dir() -> PathBuf {
-    common::fixtures_dir()
-}
+use qianqian_composition::{ComponentSpec, DesiredEntry, Revision};
 
 fn service() -> SongcoreDecode {
     SongcoreDecode::new().expect("SongCore mechanism binds fail-closed")
@@ -30,7 +25,7 @@ fn service() -> SongcoreDecode {
 fn opens_real_files_with_reference_format() {
     for id in ["mp3-cbr-id3v23", "flac-16-44-stereo"] {
         let (fx, path) = common::load_fixture(id);
-        let mut decode_stream = service().open_media(&path).unwrap_or_else(|e| {
+        let decode_stream = service().open_media(&path).unwrap_or_else(|e| {
             panic!("{id}: real file must open: {}", e.message);
         });
         let fmt = decode_stream.format();

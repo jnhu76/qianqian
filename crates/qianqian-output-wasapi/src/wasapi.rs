@@ -66,10 +66,14 @@ const EVENT_TIMEOUT_MS: u32 = 100;
 const DRAIN_CAP: Duration = Duration::from_secs(5);
 
 /// The real output mechanism. Long-lived and stateless across opens.
-pub struct WasapiOutput;
+/// Crate-private (plugin-boundary hardening H1): the mechanism is not
+/// product API; composition roots admit this plugin through
+/// `wasapi_output_plugin` and consumers see the `AudioOutput` service
+/// trait. Built only by the crate-root `platform_provider`.
+pub(crate) struct WasapiOutput;
 
 impl WasapiOutput {
-    pub fn new() -> Result<Self, String> {
+    pub(crate) fn new() -> Result<Self, String> {
         Ok(Self)
     }
 }

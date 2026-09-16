@@ -5,12 +5,19 @@ edition.workspace = true
 description = "Headless bootstrap of Architecture v2: composition-only real playback entry"
 
 [dependencies]
-qianqian-audio-api = { path = "../../crates/qianqian-audio-api" }
 qianqian-composition = { path = "../../crates/qianqian-composition" }
 qianqian-playback = { path = "../../crates/qianqian-playback" }
 qianqian-app = { path = "../../crates/qianqian-app" }
 qianqian-decode-songcore = { path = "../../crates/qianqian-decode-songcore", optional = true }
 qianqian-output-wasapi = { path = "../../crates/qianqian-output-wasapi", optional = true }
+
+[dev-dependencies]
+# Test admission only (plugin-boundary hardening H2A / audit H-b): the
+# status-projection tests build observations over the shared PcmFormat
+# contract. Production headless must NOT depend on audio-api — the role
+# boundary for shared contracts (DrainSignal, PcmFormat, RenderRequest)
+# is enforced by the Cargo architecture gate (tools/check_plugin_boundaries.py).
+qianqian-audio-api = { path = "../../crates/qianqian-audio-api" }
 
 [features]
 default = []

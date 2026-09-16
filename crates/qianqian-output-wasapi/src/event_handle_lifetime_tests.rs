@@ -10,10 +10,10 @@
 mod windows {
     use std::sync::{Arc, Condvar, Mutex};
 
+    use crate::wasapi::WasapiOutput;
     use qianqian_audio_api::ports::{
         AudioOutput, PcmFormat, PcmPull, RenderPcmInput, RenderRequest,
     };
-    use qianqian_output_wasapi::WasapiOutput;
     use windows::Win32::Foundation::{WAIT_FAILED, WAIT_TIMEOUT};
     use windows::Win32::System::Threading::{
         CreateEventW, GetCurrentProcess, GetProcessHandleCount, WaitForSingleObject,

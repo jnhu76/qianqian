@@ -28,13 +28,20 @@ mod edge;
 mod handle;
 mod session;
 
-pub use edge::{EdgeTerminal, PcmEdge, SharedEdge, WriteOutcome};
+// The episode mechanism internals (PcmEdge / EdgeTerminal / WriteOutcome)
+// are crate-private: they are session-owned runtime resources, not
+// product API. The application-facing surface is exactly the public
+// seam below; composition roots reach the episode only through
+// `playback_session_spec` + `PlaybackSessionHandle`.
 pub use handle::{EpisodeTerminalOutcome, PlaybackSessionHandle, PlaybackSessionObservation};
 pub use session::playback_session_spec;
 
 // Test doubles shared by the integration tests and the crate-internal
 // white-box settlement tests (one copy of the mechanism harness).
-#[cfg(test)]
+// Thread-spawning suites are excluded from loom builds: loom model
+// checks must explore only the in-model edge tests, never real OS
+// threads (FV-CONC-0 partition, specs/playback-concurrency/check.sh).
+#[cfg(all(test, not(loom)))]
 #[path = "../tests/common/mod.rs"]
 mod test_common;
 
@@ -42,7 +49,18 @@ mod test_common;
 // #144 production↔formal decision-table oracle (D14.3: verifier needs
 // must not leak mechanism mutators back into the product seam, so these
 // live inside the crate boundary).
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod decision_table_oracle;
-#[cfg(test)]
+#[cfg(all(test, not(loom)))]
 mod settlement_contract_tests;
+
+// Edge mechanism tests: they exercise PcmEdge directly, so they moved
+// inside the crate boundary rather than keeping the mechanism `pub`
+// just for tests. loom_edge explores the REAL edge synchronization
+// under loom's drop-in primitives; edge_lifecycle is an ordinary
+// thread-based suite and stays out of loom builds.
+#[cfg(all(test, not(loom)))]
+mod edge_lifecycle_tests;
+
+#[cfg(all(test, loom))]
+mod loom_edge_tests;

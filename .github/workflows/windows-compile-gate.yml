@@ -30,3 +30,35 @@ jobs:
 
       - name: Device-free test suites
         run: cargo test -p qianqian-playback -p qianqian-headless
+
+      # M2 negative control (plugin-boundary hardening, audit §7.4): an
+      # external consumer reaching for the concrete WASAPI mechanism must
+      # fail to compile with a rustc privacy error. Only a Windows build
+      # sees the cfg(windows) module, so only this gate can prove it
+      # durably; Linux runs of the boundary gate cover the export-surface
+      # rules instead. The probe is created transiently and never
+      # committed (same discipline as specs/playback-concurrency M-L1).
+      - name: M2 negative control — concrete output mechanism bypass must fail
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROBE=crates/qianqian-output-wasapi/tests/m2_bypass_probe.rs
+          cat > "$PROBE" <<'EOF'
+          use qianqian_output_wasapi::wasapi::WasapiOutput;
+          #[test]
+          fn bypass() {
+              let _ = WasapiOutput::new();
+          }
+          EOF
+          LOG=m2_probe.log
+          if cargo check -p qianqian-output-wasapi --test m2_bypass_probe > "$LOG" 2>&1; then
+            rm -f "$PROBE" "$LOG"
+            echo "TOOLING-FAIL: M2 bypass compiled — the concrete output mechanism is reachable" >&2
+            exit 1
+          fi
+          grep -q "private" "$LOG" || {
+            echo "M2: failed, but not with a privacy error; refusing to count it" >&2
+            exit 1
+          }
+          rm -f "$PROBE" "$LOG"
+          echo "RESULT M2 COUNTEREXAMPLE-WITNESSED (rustc privacy refusal on Windows)"

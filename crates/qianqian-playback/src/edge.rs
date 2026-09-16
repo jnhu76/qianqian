@@ -11,7 +11,6 @@
 
 #[cfg(loom)]
 use loom::sync::{Condvar, Mutex};
-use std::sync::Arc;
 #[cfg(not(loom))]
 use std::sync::{Condvar, Mutex};
 
@@ -20,7 +19,7 @@ use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
 /// Why the producer stopped writing. Failure detail lives in the
 /// session-owned completion signal, not in the edge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WriteOutcome {
+pub(crate) enum WriteOutcome {
     /// The whole slice was accepted.
     Written,
     /// The edge was stopped (or failed) mid-write; the rest was dropped.
@@ -29,7 +28,7 @@ pub enum WriteOutcome {
 
 /// Terminal state of the edge as seen by the session.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum EdgeTerminal {
+pub(crate) enum EdgeTerminal {
     Open,
     Eof,
     Failed,
@@ -51,7 +50,7 @@ struct EdgeState {
     terminal: u8,
 }
 
-pub struct PcmEdge {
+pub(crate) struct PcmEdge {
     channels: usize,
     capacity_samples: usize,
     state: Mutex<EdgeState>,
@@ -63,7 +62,7 @@ pub struct PcmEdge {
 
 impl PcmEdge {
     /// A bounded, preallocated edge for interleaved float32 frames.
-    pub fn new(channels: u16, capacity_frames: usize) -> Self {
+    pub(crate) fn new(channels: u16, capacity_frames: usize) -> Self {
         assert!(channels > 0, "an edge without channels cannot exist");
         assert!(
             capacity_frames > 0,
@@ -86,7 +85,7 @@ impl PcmEdge {
 
     /// Producer side: block until the whole slice is accepted, or a
     /// terminal stops the write.
-    pub fn write(&self, src: &[f32]) -> WriteOutcome {
+    pub(crate) fn write(&self, src: &[f32]) -> WriteOutcome {
         let mut offset = 0usize;
         let mut guard = self.state.lock().expect("pcm edge lock");
         loop {
@@ -115,19 +114,19 @@ impl PcmEdge {
 
     /// Producer committed EOF: consumers drain what remains, then see
     /// [`PcmPull::Eof`].
-    pub fn close_eof(&self) {
+    pub(crate) fn close_eof(&self) {
         self.set_terminal(TERMINAL_EOF);
     }
 
     /// Producer failed: consumers stop immediately; the failure detail is
     /// published through the session completion, not the edge.
-    pub fn fail(&self) {
+    pub(crate) fn fail(&self) {
         self.set_terminal(TERMINAL_FAILED);
     }
 
     /// Request the data plane to stop; both endpoints unblock with
     /// terminal outcomes. Idempotent.
-    pub fn stop(&self) {
+    pub(crate) fn stop(&self) {
         self.set_terminal(TERMINAL_STOPPED);
     }
 
@@ -145,7 +144,7 @@ impl PcmEdge {
     }
 
     /// Current terminal state (session bookkeeping, not a hot-path call).
-    pub fn terminal(&self) -> EdgeTerminal {
+    pub(crate) fn terminal(&self) -> EdgeTerminal {
         let guard = self.state.lock().expect("pcm edge lock");
         match guard.terminal {
             TERMINAL_OPEN => EdgeTerminal::Open,
@@ -156,8 +155,11 @@ impl PcmEdge {
         }
     }
 
-    /// Frames currently buffered (diagnostics).
-    pub fn buffered_frames(&self) -> usize {
+    /// Frames currently buffered (diagnostics). Test-only: the
+    /// white-box settlement tests are its only consumers; no
+    /// production path reads edge occupancy (D14.2/D14.3).
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn buffered_frames(&self) -> usize {
         let guard = self.state.lock().expect("pcm edge lock");
         guard.buffered / self.channels
     }
@@ -232,6 +234,3 @@ fn copy_from_ring(ring: &[f32], read_pos: usize, dst: &mut [f32]) {
         rest.copy_from_slice(&ring[..rest.len()]);
     }
 }
-
-/// The edge is always shared between the session legs.
-pub type SharedEdge = Arc<PcmEdge>;
