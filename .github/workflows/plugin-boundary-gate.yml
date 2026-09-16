@@ -1,0 +1,67 @@
+name: Plugin Boundary Gate
+
+# Durable gate for the plugin-boundary hardening (H2,
+# docs/audits/plugin-boundary-conformance-audit.md §7.2):
+#
+#   Vocabulary Gate        retired noun / spelling discipline
+#   Plugin Boundary Gate   Cargo architecture topology + export surface
+#
+# Fail-closed contract: any unadmitted internal dependency edge (normal,
+# dev, build, optional, target-specific), any unknown internal crate in
+# the universe, or any re-opened concrete-mechanism export fails the job.
+# The negative-controls step proves the gate is not vacuous by
+# reversibly mutating the tree (M3 / M4 / M5b / unknown-crate /
+# M1-source / M5a-source / M2-source) and requiring each mutation RED.
+#
+# Enforcement classes (stated honestly, audit §7.5):
+#   qianqian-playback / qianqian-output-wasapi mechanism hiding:
+#       COMPILER-enforced on every workspace CI build (Linux + Windows);
+#       the export-surface rules here are a redundant watcher.
+#   qianqian-decode-songcore (workspace-excluded, no CI compiles it):
+#       SOURCE_GATE_ENFORCED — this gate is the continuous watcher.
+#       Upgrade path: real native compile CI (xmake + pinned-FFmpeg
+#       toolchain project; deliberately not faked here).
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "crates/*/Cargo.toml"
+      - "crates/*/src/lib.rs"
+      - "apps/*/Cargo.toml"
+      - "tools/check_plugin_boundaries.py"
+      - ".github/workflows/plugin-boundary-gate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "crates/*/Cargo.toml"
+      - "crates/*/src/lib.rs"
+      - "apps/*/Cargo.toml"
+      - "tools/check_plugin_boundaries.py"
+      - ".github/workflows/plugin-boundary-gate.yml"
+
+concurrency:
+  group: plugin-boundary-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plugin-boundary:
+    name: Cargo topology allowlist + export surface + negative controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install stable Rust (cargo metadata input)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Plugin boundary gate (topology allowlist + export surface)
+        run: python3 tools/check_plugin_boundaries.py
+
+      - name: Negative controls (gate non-vacuity, reversible mutations)
+        run: python3 tools/check_plugin_boundaries.py --negative-controls
