@@ -10,7 +10,7 @@
 // dead-code findings on the unused remainder are expected, not defects.
 #![allow(dead_code)]
 
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::Duration;
 
 /// Serializes the lifecycle tests in one binary: the named-thread leak
@@ -140,6 +140,9 @@ pub struct TestOutput {
     /// to true to model a real device still playing out already-
     /// submitted frames.
     pub device_tail_padding: Arc<std::sync::atomic::AtomicBool>,
+    /// Controllable hold on the render leg's tail observation; see
+    /// [`TailProbe`]. Unarmed by default, so it costs nothing.
+    pub tail_probe: TailProbe,
 }
 
 impl TestOutput {
@@ -171,7 +174,65 @@ impl TestOutput {
             behavior,
             consumed,
             device_tail_padding,
+            tail_probe: TailProbe::default(),
         }
+    }
+}
+
+/// Controllable hold on the render leg's tail observation. A slow — but
+/// finite — tail observation is a legal mechanism execution (the real
+/// observation is a `GetCurrentPadding` system call with no contractual
+/// duration bound), so holding the leg inside its park loop's
+/// observation makes "the leg cannot reach its released check" a stable
+/// state instead of a race. Unarmed probes pass through.
+///
+/// (The gate calls the observation only until quiescence is published
+/// for the engagement, so the deterministic hold is the engagement's
+/// FIRST armed observation — before its quiescence, if any.)
+#[derive(Clone, Default)]
+pub struct TailProbe {
+    armed: Arc<std::sync::atomic::AtomicBool>,
+    held_entered: Arc<(Mutex<bool>, Condvar)>,
+    hold_released: Arc<(Mutex<bool>, Condvar)>,
+}
+
+impl TailProbe {
+    /// Hold every armed observation (the first one signals and blocks).
+    pub fn arm(&self) {
+        self.armed.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Block until an observation is provably held inside the gate.
+    pub fn wait_held(&self) {
+        let mut held = self.held_entered.0.lock().unwrap();
+        while !*held {
+            held = self.held_entered.1.wait(held).unwrap();
+        }
+    }
+
+    /// Release the held observation.
+    pub fn unhold(&self) {
+        let mut released = self.hold_released.0.lock().unwrap();
+        *released = true;
+        self.hold_released.1.notify_all();
+    }
+
+    fn observe(&self, quiescent: bool) -> bool {
+        if self.armed.load(std::sync::atomic::Ordering::SeqCst) {
+            {
+                // Signal and drop before blocking: the held mutex must
+                // never be held across the hold wait, or the waiter in
+                // `wait_held` cannot re-acquire it after its wake.
+                let mut held = self.held_entered.0.lock().unwrap();
+                *held = true;
+                self.held_entered.1.notify_all();
+            }
+            let mut released = self.hold_released.0.lock().unwrap();
+            while !*released {
+                released = self.hold_released.1.wait(released).unwrap();
+            }
+        }
+        quiescent
     }
 }
 
@@ -197,6 +258,7 @@ impl AudioOutput for TestOutput {
                 } = request;
                 let consumed = self.consumed.clone();
                 let device_tail_padding = self.device_tail_padding.clone();
+                let tail_probe = self.tail_probe.clone();
                 let thread = std::thread::Builder::new()
                     .name("qianqian-test-render".into())
                     .spawn({
@@ -216,6 +278,7 @@ impl AudioOutput for TestOutput {
                                         abort_after,
                                         &consumed,
                                         &device_tail_padding,
+                                        &tail_probe,
                                     )
                                 }))
                                 .unwrap_or(DrainVerdict::Aborted);
@@ -246,6 +309,7 @@ fn consume_loop(
     abort_after: Option<usize>,
     consumed: &std::sync::atomic::AtomicUsize,
     device_tail_padding: &std::sync::atomic::AtomicBool,
+    tail_probe: &TailProbe,
 ) -> DrainVerdict {
     use std::sync::atomic::Ordering;
     let mut dst = vec![0.0f32; 256 * usize::from(TEST_FORMAT.channels)];
@@ -259,8 +323,8 @@ fn consume_loop(
         }
         // Mirror the real mechanism's loop-top pause gate (D14.7): the
         // gate parks before the read; the mock's tail observation is
-        // its own device-tail counter.
-        gate.park_while_paused(|| !device_tail_padding.load(Ordering::SeqCst));
+        // its own device-tail counter, passable through the probe.
+        gate.park_while_paused(|| tail_probe.observe(!device_tail_padding.load(Ordering::SeqCst)));
         match input.read_frames(&mut dst) {
             PcmPull::Frames(n) => {
                 consumed.fetch_add(n, Ordering::SeqCst);

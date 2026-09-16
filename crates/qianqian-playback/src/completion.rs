@@ -128,9 +128,13 @@ struct CompletionState {
     /// on disengagement, so a previous pause cycle's quiescence can
     /// never satisfy a later pause.
     tail_quiesced: bool,
-    /// Disengagement-ack evidence latch: some pause engagement of this
-    /// episode has ended. Existence evidence for the Resumed projection
-    /// only; it never feeds control or settlement.
+    /// Disengagement-ack evidence latch (D14.7): the CURRENT pause
+    /// cycle's render-gate disengagement has been observed. Reset when a
+    /// new pause cycle begins (pause intent false→true in
+    /// `request_pause`), so a previous cycle's disengagement can never
+    /// establish Resumed for a later one — the same current-cycle
+    /// discipline as `tail_quiesced`. Existence evidence for the
+    /// Resumed projection only; it never feeds control or settlement.
     disengagement_observed: bool,
     /// The session's data-plane edge, bound by activation as the stop
     /// target. `None` until the episode binds one (or forever, if
@@ -325,6 +329,10 @@ impl SessionCompletion {
     /// establishes remains mechanism evidence — the Paused projection is
     /// derived, never recorded here.
     ///
+    /// Recording a NEW pause cycle (intent false→true) also resets the
+    /// current-cycle disengagement evidence: a previous cycle's
+    /// disengagement must never establish Resumed for this one.
+    ///
     /// Intent routing is linearized with the command state under the one
     /// completion lock. A pause that linearizes after stop intent —
     /// including the whole stop→settlement window — is recorded as inert
@@ -334,6 +342,14 @@ impl SessionCompletion {
     /// episode has no leg to park.
     pub(crate) fn request_pause(&self) {
         let mut guard = self.state.state.lock().expect("completion lock");
+        if !guard.pause_requested {
+            // A new pause cycle begins: a previous cycle's disengagement
+            // evidence must not establish Resumed for this one — the
+            // same current-cycle discipline as the tail-quiescence
+            // reset (D14.7). Repeated pauses within one cycle change
+            // nothing.
+            guard.disengagement_observed = false;
+        }
         guard.pause_requested = true;
         if guard.stop_requested || guard.outcome.is_some() {
             return;

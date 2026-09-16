@@ -23,7 +23,7 @@ use qianqian_playback::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, playback_session_spec,
 };
 
-use common::{OutputBehavior, SourceBehavior, TestDecode, TestOutput, within};
+use common::{OutputBehavior, SourceBehavior, TailProbe, TestDecode, TestOutput, within};
 
 const DUMMY_PATH: &str = "test://pause-seam";
 
@@ -37,14 +37,28 @@ fn seconds_of_audio(seconds: u64) -> SourceBehavior {
     SourceBehavior::EofAfter(44_100 * seconds as usize)
 }
 
+/// A decode source producing ~`seconds` of frames fast, then one frame
+/// per 50ms forever — never EOF. The multi-cycle pause tests observe
+/// the Resumed projection, which the unsettled guard truthfully
+/// retracts the moment the episode settles; a finite source can drain
+/// to EOF during a test's release window and end the episode before
+/// the projection is polled, so these tests keep the episode alive.
+fn endless_audio(seconds: u64) -> SourceBehavior {
+    SourceBehavior::Paced {
+        after: 44_100 * seconds as usize,
+        delay: Duration::from_millis(50),
+    }
+}
+
 /// Register the standard F3 episode: a decode source, an output double
-/// sharing the caller's consumption counter and mock device-tail flag,
-/// and the real session over `handle`.
+/// sharing the caller's consumption counter, mock device-tail flag and
+/// tail probe, and the real session over `handle`.
 fn registered_runtime(
     source: SourceBehavior,
     output: OutputBehavior,
     consumed: Arc<AtomicUsize>,
     device_tail_padding: Arc<AtomicBool>,
+    tail_probe: TailProbe,
     handle: PlaybackSessionHandle,
 ) -> QianqianApp {
     let mut runtime = QianqianApp::new();
@@ -70,11 +84,12 @@ fn registered_runtime(
             qianqian_composition::ComponentSpec::new("test_output_plugin")
                 .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
                 .on_activate(move |ctx| {
-                    let service = TestOutput::observed_with_tail(
+                    let mut service = TestOutput::observed_with_tail(
                         output,
                         consumed.clone(),
                         device_tail_padding.clone(),
                     );
+                    service.tail_probe = tail_probe.clone();
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
                         std::rc::Rc::new(service),
                     )
@@ -162,10 +177,11 @@ fn pause_establishes_resume_releases_and_cycles_stay_truthful() {
         let device_tail_padding = Arc::new(AtomicBool::new(false));
         let handle = PlaybackSessionHandle::new();
         let mut runtime = registered_runtime(
-            seconds_of_audio(30),
+            endless_audio(30),
             OutputBehavior::Consume,
             consumed.clone(),
             device_tail_padding.clone(),
+            TailProbe::default(),
             handle.clone(),
         );
         activate(&mut runtime);
@@ -226,6 +242,92 @@ fn pause_establishes_resume_releases_and_cycles_stay_truthful() {
     });
 }
 
+/// The Resumed projection is CURRENT-CYCLE evidence, symmetric to the
+/// stale-quiescence oracle above: after a first full pause/resume cycle,
+/// a second cycle's resume must NOT project Resumed from the FIRST
+/// cycle's disengagement latch — only this cycle's own Disengaged may
+/// establish it. The render leg is held inside a slow (legal) tail
+/// observation — an engagement whose quiescence has not been observed
+/// yet, because the gate stops calling the observation once quiescence
+/// is published — so the window between the resume command and this
+/// cycle's own disengagement is a stable state, not a race. In that
+/// window the render mechanism is provably still parked: Resumed
+/// (whose claim is "render submission is re-enabled") MUST be false.
+#[test]
+fn resumed_requires_the_current_pause_cycles_disengagement() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let tail_probe = TailProbe::default();
+        let handle = PlaybackSessionHandle::new();
+        let mut runtime = registered_runtime(
+            endless_audio(30),
+            OutputBehavior::Consume,
+            consumed.clone(),
+            device_tail_padding.clone(),
+            tail_probe.clone(),
+            handle.clone(),
+        );
+        activate(&mut runtime);
+
+        assert!(
+            wait_until(Duration::from_secs(5), || consumed.load(Ordering::SeqCst)
+                > 0),
+            "the episode never produced audio"
+        );
+
+        // Cycle 1 completes in full: pause -> established -> resume ->
+        // this cycle's own disengagement evidence.
+        handle.request_pause();
+        wait_established(&handle);
+        handle.request_resume();
+        assert!(
+            wait_until(Duration::from_secs(5), || handle.observe().resumed()),
+            "cycle 1 never released: {:?}",
+            handle.observe()
+        );
+
+        // Cycle 2: re-pause and hold the leg inside its (first, legal
+        // but slow) tail observation, so it cannot reach its released
+        // check and cannot publish this cycle's disengagement.
+        tail_probe.arm();
+        handle.request_pause();
+        assert!(
+            wait_until(Duration::from_secs(5), || handle.observe().pause_engagement
+                == PauseEngagement::Engaged),
+            "the render leg never re-engaged: {:?}",
+            handle.observe()
+        );
+        tail_probe.wait_held();
+
+        handle.request_resume();
+        // The resume command is routed, but this cycle's disengagement
+        // has NOT been observed — the leg is provably still held at the
+        // gate. Cycle 1's latch must not establish Resumed here.
+        let snapshot = handle.observe();
+        assert!(
+            !snapshot.resumed(),
+            "a previous cycle's disengagement established Resumed: \
+             {snapshot:?}"
+        );
+
+        // This cycle's own Disengaged does establish it.
+        tail_probe.unhold();
+        assert!(
+            wait_until(Duration::from_secs(5), || handle.observe().resumed()),
+            "the current cycle's disengagement never established Resumed: \
+             {:?}",
+            handle.observe()
+        );
+
+        handle.request_stop();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
 /// Stop from an established pause mid-play: the gate release lets the
 /// leg reach the stopped edge and the episode settles the ordinary
 /// `Stopped` fact (D14.7 terminal interactions; D11 monotonicity —
@@ -242,6 +344,7 @@ fn stop_from_an_established_pause_settles_stopped_and_late_commands_stay_inert()
             OutputBehavior::Consume,
             consumed,
             device_tail_padding,
+            TailProbe::default(),
             handle.clone(),
         );
         activate(&mut runtime);
@@ -306,6 +409,7 @@ fn eof_while_parked_leaves_the_episode_unsettled_until_resumed() {
             OutputBehavior::Consume,
             consumed.clone(),
             device_tail_padding,
+            TailProbe::default(),
             handle.clone(),
         );
         activate(&mut runtime);
@@ -355,6 +459,7 @@ fn stop_from_parked_after_eof_still_completes() {
             OutputBehavior::Consume,
             consumed,
             device_tail_padding,
+            TailProbe::default(),
             handle.clone(),
         );
         activate(&mut runtime);
@@ -387,6 +492,7 @@ fn failure_while_parked_settles_failed_without_wedging_teardown() {
             OutputBehavior::Consume,
             consumed,
             device_tail_padding,
+            TailProbe::default(),
             handle.clone(),
         );
         activate(&mut runtime);
@@ -432,6 +538,7 @@ fn stop_wakes_a_producer_blocked_through_pause_backpressure() {
             },
             consumed.clone(),
             device_tail_padding,
+            TailProbe::default(),
             handle.clone(),
         );
         activate(&mut runtime);
@@ -494,6 +601,7 @@ fn pause_routed_after_stop_cannot_repark_the_released_episode() {
             OutputBehavior::Consume,
             consumed,
             device_tail_padding,
+            TailProbe::default(),
             handle.clone(),
         );
         activate(&mut runtime);
