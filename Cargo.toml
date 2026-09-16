@@ -12,6 +12,7 @@ exclude = [
     "crates/qianqian-decode-songcore",
     "crates/qianqian-songcore-sys",
     "experiments/songcore-call-comparison",
+    "experiments/f3-pause-mechanism",
 ]
 
 [workspace.package]
