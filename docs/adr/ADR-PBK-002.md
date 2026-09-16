@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141) |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`) |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -506,7 +506,6 @@ VolumePlugin
 ## 14. Open decisions
 
 ```text
-pause/resume semantic commit point and minimal output-control mechanism
 position / duration authority
 seek physical-output cutover mechanism beyond D14's frozen stale-PCM invariant
 open/session CONFIG mechanism under D14's no-overlap v1 semantic contract
@@ -1128,20 +1127,85 @@ Consequences already frozen:
 
 Playlist/queue selection authority remains OPEN. The first headless Open/Next/Previous slice may use only the selection source explicitly authorized by its issue/task; it must not create a global playlist authority to make the command convenient.
 
-### D14.7 Pause / Resume — semantic direction fixed, implementation still blocked
+### D14.7 Pause / Resume — same-episode non-terminal control; mechanism + establishment frozen
 
-Pause/Resume, when earned, is **same-episode, non-terminal control**. It must not create a new Playback Session Fiber and must not settle D11 terminal outcome merely because playback is paused.
+> 2026-09-16 amendment (F3-GATE; mechanism evidence:
+> `experiments/f3-pause-mechanism/` — synchronization-shape scenario
+> suite + physical WASAPI probe; roadmap: Issue #119 checkpoint). It
+> replaces the previous "semantic direction fixed, implementation still
+> blocked" text: the minimum mechanism and the truthful-establishment
+> semantics below are now FROZEN; everything not stated remains governed
+> by the general Phase-F rules.
 
-However the semantic commit point for `Paused` and the minimum output/data-plane mechanism are still OPEN. Therefore:
+Pause/Resume is **same-episode, non-terminal control owned by the
+Playback Session Plugin**. It never creates or destroys a Playback
+Session Fiber and never settles the D11 terminal outcome merely because
+playback paused or resumed.
+
+**Minimum accepted mechanism (class frozen; representation open).** The
+explicit render-loop pause gate, located in the render mechanism's loop
+strictly **before** the device-buffer acquisition (WASAPI `GetBuffer`):
 
 ```text
-F3 may prototype or audit the mechanism (as executable evidence, outside the product path),
-but a coding agent MUST NOT publish a Paused Fact/state
-or choose a pause mechanism as architecture
-until a narrow authority decision freezes when pause is truthfully established.
+pause command
+    ↓ Playback Session routes the episode's pause intent to its gate
+render loop reaches the gate check (loop top, no device buffer held)
+    ↓ parks; publishes the engagement acknowledgment (mechanism evidence)
+resume command / stop release
+    ↓ gate wakes the parked leg (bounded park slice; notify + cap)
+"unpark-and-continue": the loop proceeds once more;
+the DATA-PLANE terminal decides — the gate never aborts the leg
 ```
 
-No inference from worker blocking, PcmEdge occupancy, FiberState, or UI button state is allowed.
+Mechanism requirements frozen by that shape:
+
+```text
+the render leg MUST NOT hold a device buffer across a parked pause;
+stop (and teardown) MUST wake every parked participant with bounded latency;
+the device stream stays open — no resource replacement, no reopen;
+engagement/disengagement MUST be acknowledged back as mechanism evidence;
+P1–P5 are NOT triggered: same edge, same render stream, same device
+session — no old/new realtime-world overlap exists in this shape.
+```
+
+`IAudioClient::Stop/Start` wrapping the same park was measured credible
+but is **not selected** (it freezes mid-buffer audio and adds stream
+state changes no Phase-F requirement needs); it may be re-earned only by
+a new narrow authority decision. Parking by letting `read_frames` block
+while `GetBuffer` is held is explicitly rejected as a pause mechanism.
+
+**Truth classes and truthful establishment.**
+
+```text
+pause / resume intent      Command state on the episode seam
+                           (idempotent; same family as stop intent)
+engagement ack             Mechanism Evidence published through the
+                           session-owned evidence path — never a Fact
+truthfully Paused          ⇔ pause intent recorded ∧ engagement evidence
+                           observed (both visible on the episode
+                           observation; either alone is not Paused)
+truthfully Resumed         ⇔ resume released ∧ disengagement evidence
+```
+
+No new fact kind, no new fact authority, no fourth terminal variant, no
+`Paused` semantic Fact and no `Playing/Starting/Paused/Stopping`
+transport enum is earned: the observation surface gains pause-intent
+(command state) and mechanism-engagement (mechanism evidence) fields,
+and their spelling is representation (the episode-handle public-surface
+allowlist update is the explicit F3-implementation architecture event).
+Product status MUST NOT infer pause from worker blocking, PcmEdge
+occupancy, FiberState, WASAPI state, logs, or UI state.
+
+**Terminal interactions (D11 unchanged).** Stop-from-paused mid-play
+produces the existing worker-Stopped × drain-Aborted × intent history →
+`Stopped`. Stop-from-paused after decode EOF plays the tail out and
+drains → worker-Eof × drain-Drained → `Completed` — the same outcome as
+today's stop-after-EOF (the gate must NOT force-abort, which would
+fabricate the Failed{device} history). EOF while parked leaves the
+episode unsettled until resumed-and-drained or stopped. Failure while
+parked settles immediately by the existing precedence. Pause and resume
+commands recorded after settlement are inert command history, exactly
+like late stop intent.
 
 ### D14.8 Position / Duration — not yet a product Fact
 
@@ -1187,11 +1251,14 @@ Generation / Window / epoch / global playback store
 consumer-driven vs authority-driven semantic commit
 seek physical-output cutover mechanism
 F6 fresh-source/config handoff mechanism
-Paused semantic commit point
 Position/Duration authority
 playlist/queue authority
 volume/device-switch authority
 preload/gapless/overlap topology
 ```
+
+(The pause/resume semantic commit point and minimum mechanism left this
+list when D14.7 froze them; anything beyond the frozen D14.7 minimum
+still requires a narrow authority decision.)
 
 The rule is intentional: **OPEN means “not authorized yet,” not “Flash may invent the missing architecture.”**
