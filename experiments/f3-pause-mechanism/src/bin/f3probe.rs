@@ -17,6 +17,10 @@
 //! engage ack latency      pause command → parked acknowledgment
 //! padding timeline        already-submitted audio fate while parked
 //!                         (A: drains to zero; B: frozen)
+//! tail quiescence         T_engaged → T_tail_quiesced (first post-
+//!                         engagement padding==0 sample); the corrected
+//!                         D14.7 establishment evidence, enforced in A's
+//!                         pass criterion (B must stay unquiesced)
 //! resume latency          resume command → first refill (A) / Start (B)
 //! GetBuffer-across-park   count (must be 0, asserted)
 //! stop-from-paused        exit latency of the parked render leg
@@ -42,7 +46,7 @@ fn main() {
 #[cfg(windows)]
 mod win {
     use std::slice;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
     use std::thread::JoinHandle;
     use std::time::{Duration, Instant};
@@ -209,6 +213,14 @@ mod win {
         }
     }
 
+    /// `IAudioClient` handed from the render leg to the tail observer.
+    /// Send is sound here: both threads have joined the same MTA
+    /// (`COINIT_MULTITHREADED`), and while parked the render leg makes
+    /// NO WASAPI calls at all (the gate sits before every device call),
+    /// so the observer is the session's only caller during the park.
+    struct SendClient(IAudioClient);
+    unsafe impl Send for SendClient {}
+
     fn open_session_inner(probe: &Probe) -> Result<DeviceSession, String> {
         probe.sessions.fetch_add(1, Ordering::AcqRel);
         unsafe {
@@ -288,7 +300,7 @@ mod win {
     fn run_render_leg(
         probe: Probe,
         mechanism: Mechanism,
-        opened: std::sync::mpsc::Sender<Result<u32, String>>,
+        opened: std::sync::mpsc::Sender<Result<(u32, SendClient), String>>,
         diagnostic: std::sync::mpsc::Sender<String>,
     ) {
         unsafe {
@@ -302,7 +314,7 @@ mod win {
         {
             let session = match open_session_inner(&probe) {
                 Ok(s) => {
-                    let _ = opened.send(Ok(s.buffer_frames));
+                    let _ = opened.send(Ok((s.buffer_frames, SendClient(s.client.clone()))));
                     s
                 }
                 Err(e) => {
@@ -398,6 +410,75 @@ mod win {
         None
     }
 
+    /// Tail-observer report (D14.7 CORRECTIVE-1 output-tail quiescence
+    /// evidence): during the park the render leg submits nothing (the gate
+    /// sits strictly before GetBuffer), so the episode session's shared-mode
+    /// padding is non-increasing, and the first `0` sample establishes that
+    /// every pre-engagement frame has left the queued-to-play set
+    /// (IAudioClient::GetCurrentPadding contract: padding = frames queued up
+    /// to play in this stream's endpoint buffer).
+    struct TailReport {
+        /// (ms since park start, padding) samples at ~2 ms cadence.
+        samples: Vec<(u64, u32)>,
+        /// First sample at which padding was observed 0.
+        quiesce_ms: Option<u64>,
+        /// Once zero was observed it never rose again before the stop flag.
+        held_zero: bool,
+        error: Option<String>,
+    }
+
+    /// Runs on its own thread (same MTA as the render leg; the parked leg
+    /// makes no WASAPI calls, so the observer is the session's only caller
+    /// during the park). Exits when `stop` is set or on a padding error.
+    fn run_tail_observer(
+        client: SendClient,
+        stop: Arc<AtomicBool>,
+        parked_at: Instant,
+    ) -> TailReport {
+        unsafe {
+            let coinit = CoInitializeEx(None, COINIT_MULTITHREADED);
+            if coinit.is_err() {
+                return TailReport {
+                    samples: Vec::new(),
+                    quiesce_ms: None,
+                    held_zero: false,
+                    error: Some(format!("CoInitializeEx failed: {coinit:?}")),
+                };
+            }
+            let _apt = CoApartmentGuard;
+            let mut samples = Vec::new();
+            let mut quiesce_ms = None;
+            let mut broke_zero = false;
+            let mut error = None;
+            while !stop.load(Ordering::Acquire) {
+                match client.0.GetCurrentPadding() {
+                    Ok(p) => {
+                        let ms = parked_at.elapsed().as_millis() as u64;
+                        if p == 0 {
+                            if quiesce_ms.is_none() {
+                                quiesce_ms = Some(ms);
+                            }
+                        } else if quiesce_ms.is_some() {
+                            broke_zero = true;
+                        }
+                        samples.push((ms, p));
+                    }
+                    Err(e) => {
+                        error = Some(format!("GetCurrentPadding failed: {e}"));
+                        break;
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            TailReport {
+                held_zero: quiesce_ms.is_some() && !broke_zero,
+                samples,
+                quiesce_ms,
+                error,
+            }
+        }
+    }
+
     fn join_within<T: Send + 'static>(handle: JoinHandle<T>, timeout: Duration) -> Option<T> {
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
@@ -429,8 +510,9 @@ mod win {
             .spawn(move || run_render_leg(leg_probe, mechanism, opened_tx, diag_tx))
             .expect("render leg spawn");
 
-        let buffer_frames = match opened_rx.recv_timeout(Duration::from_secs(10)) {
-            Ok(Ok(f)) => f,
+        let (buffer_frames, session_client) = match opened_rx.recv_timeout(Duration::from_secs(10))
+        {
+            Ok(Ok((f, c))) => (f, c),
             Ok(Err(e)) => panic!("device open failed: {e}"),
             Err(_) => panic!("device open verdict timeout"),
         };
@@ -457,6 +539,19 @@ mod win {
         ));
         let parked_at = Instant::now();
 
+        // Tail-quiescence observation (D14.7 CORRECTIVE-1). Spawns at
+        // the observed engage ack; stopped and joined BEFORE the resume
+        // command so it never overlaps the render leg's WASAPI calls.
+        let tail_stop = Arc::new(AtomicBool::new(false));
+        let tail_handle = {
+            let client = session_client;
+            let stop = tail_stop.clone();
+            std::thread::Builder::new()
+                .name("probe-tail-observer".into())
+                .spawn(move || run_tail_observer(client, stop, parked_at))
+                .expect("tail observer spawn")
+        };
+
         // Park window. The render leg is the padding observer and is
         // parked, so the park window itself has no samples; the fate of
         // the already-submitted audio is established by the ENDPOINTS:
@@ -471,6 +566,29 @@ mod win {
             .and_then(|v| v.parse().ok())
             .unwrap_or(1200);
         std::thread::sleep(Duration::from_millis(park_ms));
+
+        // Park window ends: stop the tail observer and join it before
+        // any resume-side activity.
+        tail_stop.store(true, Ordering::Release);
+        let tail = tail_handle.join().expect("tail observer join");
+        let tail_quiesced = tail.quiesce_ms.is_some() && tail.held_zero;
+        let tail_last_pad = tail.samples.last().map(|(_, p)| *p);
+        report(format!(
+            "TAIL_QUIESCE mech={} quiesced={} error={} padding_at_engage={} tail_drain_ms={} held_zero_to_resume={} samples={}",
+            mechanism.name(),
+            tail_quiesced,
+            tail.error.is_some(),
+            tail.samples
+                .first()
+                .map(|(_, p)| p.to_string())
+                .unwrap_or_else(|| "?".into()),
+            tail.quiesce_ms
+                .map(|ms| ms.to_string())
+                .unwrap_or_else(|| "none".into()),
+            tail.held_zero,
+            tail.samples.len(),
+        ));
+
         let all_pads = probe.padding.lock().expect("padding log lock").clone();
         let pre_park_last = all_pads
             .iter()
@@ -549,7 +667,29 @@ mod win {
         // Device continuity is an enforced bound, not just printed
         // evidence: no reopen may happen inside the phase.
         let sessions_delta = probe.sessions.load(Ordering::Acquire) - sessions_at_open;
-        let ok = engage_ack.is_some() && getbuffer_in_park == 0 && sessions_delta == 0;
+
+        // Tail-quiescence pass criterion (D14.7 CORRECTIVE-1): for the
+        // selected mechanism A the probe MUST observe the submitted
+        // tail quiesce (padding → 0 after engagement, never rising
+        // again), within a generous bound (one device buffer at any
+        // sane period is tens of ms; 500 ms tolerates slow hosts). For
+        // B the frozen tail must stay unquiesced — the establishment
+        // discriminator between the mechanisms. An observer error fails
+        // A outright (the evidence is required); for B it is reported
+        // only, since B's frozen padding is already enforced by the
+        // endpoint check below.
+        let tail_ok = if tail.error.is_some() {
+            !matches!(mechanism, Mechanism::GateOnly)
+        } else {
+            match mechanism {
+                Mechanism::GateOnly => tail_quiesced && tail.quiesce_ms.unwrap_or(u64::MAX) <= 500,
+                Mechanism::GatePlusDeviceStop => {
+                    !tail_quiesced && tail_last_pad.is_some_and(|p| p > 0)
+                }
+            }
+        };
+
+        let ok = engage_ack.is_some() && getbuffer_in_park == 0 && sessions_delta == 0 && tail_ok;
         (leg, ok, sessions_delta)
     }
 
