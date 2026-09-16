@@ -39,7 +39,7 @@ fn main() -> ExitCode {
 
 #[cfg(feature = "playback")]
 fn run_playback(file: PathBuf) -> ExitCode {
-    use qianqian_playback::{SessionCompletion, SessionOutcome, playback_session_spec};
+    use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionHandle, playback_session_spec};
 
     let mut runtime = qianqian_app::QianqianApp::new();
     if let Err(e) = runtime.register_component(qianqian_decode_songcore::songcore_decode_plugin()) {
@@ -50,9 +50,8 @@ fn run_playback(file: PathBuf) -> ExitCode {
         eprintln!("output plugin registration failed: {e:?}");
         return ExitCode::from(1);
     }
-    let completion = SessionCompletion::new();
-    if let Err(e) =
-        runtime.register_component(playback_session_spec(file.clone(), completion.clone()))
+    let handle = PlaybackSessionHandle::new();
+    if let Err(e) = runtime.register_component(playback_session_spec(file.clone(), handle.clone()))
     {
         eprintln!("session registration failed: {e:?}");
         return ExitCode::from(1);
@@ -69,11 +68,13 @@ fn run_playback(file: PathBuf) -> ExitCode {
 
     // revise_desired settles before returning: a failed activation is
     // visible in the snapshot, and there is no episode to wait for.
+    // The K0 snapshot is composition/activation diagnostics only — never
+    // playback status truth (F2).
     let snapshot = runtime.composition_snapshot();
     if snapshot.fibers.get("session").map(|f| f.state)
         != Some(qianqian_composition::FiberState::Active)
     {
-        if let Some(message) = completion.activation_error() {
+        if let Some(message) = handle.observe().activation_error {
             eprintln!("playback session failed to activate: {message}");
         } else {
             eprintln!(
@@ -86,7 +87,7 @@ fn run_playback(file: PathBuf) -> ExitCode {
         return ExitCode::from(1);
     }
 
-    if let Some(format) = completion.source_format() {
+    if let Some(format) = handle.observe().source_format {
         println!(
             "source: {} Hz, {} channels, mask {:#x}",
             format.sample_rate, format.channels, format.channel_mask
@@ -94,11 +95,12 @@ fn run_playback(file: PathBuf) -> ExitCode {
     }
     println!("playing {} ...", file.display());
 
-    // F1 control transport: while the episode runs, stdin lines go through
-    // the frozen interactive parser; `stop` is the one wired command and
-    // requests the stop through the session's application-facing seam. The
-    // transport never touches the edge, the stream, or any mechanism.
-    let control_completion = completion.clone();
+    // F1/F2 control transport: while the episode runs, stdin lines go
+    // through the frozen interactive parser; `stop` requests the stop
+    // and `status` renders the seam's coherent observation through the
+    // shared truthful projection. The transport never touches the edge,
+    // the stream, or any mechanism.
+    let control_handle = handle.clone();
     let _control = std::thread::Builder::new()
         .name("qianqian-stdin".into())
         .spawn(move || {
@@ -106,36 +108,51 @@ fn run_playback(file: PathBuf) -> ExitCode {
             for line in std::io::stdin().lock().lines() {
                 let Ok(line) = line else { break };
                 match cli::parse_interactive_line(&line) {
-                    Ok(cli::InteractiveCommand::Stop) => control_completion.request_stop(),
-                    Ok(_) => eprintln!("not wired yet: only 'stop' controls playback"),
+                    Ok(cli::InteractiveCommand::Stop) => control_handle.request_stop(),
+                    Ok(cli::InteractiveCommand::Status) => {
+                        print!(
+                            "{}",
+                            qianqian_headless::status::format_status(&control_handle.observe())
+                        );
+                        use std::io::Write;
+                        let _ = std::io::stdout().flush();
+                    }
+                    Ok(_) => {
+                        eprintln!("not wired yet: only 'stop' and 'status' control playback")
+                    }
                     Err(error) => eprintln!("ignored input: {error}"),
                 }
             }
         });
 
-    let outcome = completion.wait();
+    let outcome = handle.wait_terminal();
     let snapshot = runtime.dispose();
-    match &outcome {
-        SessionOutcome::Completed => {
+    // The failure diagnostic is read separately from the settled
+    // observation: it is presentation text, not part of the semantic
+    // outcome (D14.2).
+    let observation = handle.observe();
+    match outcome {
+        EpisodeTerminalOutcome::Completed => {
             println!("EOF: played out completely");
         }
-        SessionOutcome::Failed { stage } => {
-            eprintln!("playback failed: {stage}");
-        }
-        SessionOutcome::Stopped => {
+        EpisodeTerminalOutcome::Failed => match &observation.failure_diagnostic {
+            Some(failure) => eprintln!("playback failed: {failure}"),
+            None => eprintln!("playback failed"),
+        },
+        EpisodeTerminalOutcome::Stopped => {
             println!("stopped before completion");
         }
     }
     report_disposal(&snapshot);
     match outcome {
-        SessionOutcome::Completed | SessionOutcome::Stopped => {
+        EpisodeTerminalOutcome::Completed | EpisodeTerminalOutcome::Stopped => {
             if snapshot.quiet {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::from(1)
             }
         }
-        SessionOutcome::Failed { .. } => ExitCode::from(1),
+        EpisodeTerminalOutcome::Failed => ExitCode::from(1),
     }
 }
 

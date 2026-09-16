@@ -1,38 +1,95 @@
-//! Session completion: the session-owned application-facing seam for one
-//! playback episode. Control intent enters through [`SessionCompletion::
-//! request_stop`]; resolved truth leaves through `wait` /
-//! `try_resolve_now`. It is not K0 semantic truth, not a Fact plane
-//! object — the App holds it, drives the episode with it, waits on it,
-//! and then initiates disposal.
+//! Episode terminal settlement core — the crate-internal realization of
+//! the D11 designated semantic authority (ADR-PBK-002 §17) and the D14.3
+//! authority-owned settlement shape. It is NOT the application seam: the
+//! application-facing episode surface is [`crate::handle::
+//! PlaybackSessionHandle`] (F2 reality-gate-2 verdict B); this type stays
+//! an internal replaceable realization behind it.
 //!
-//! One handle serves exactly one episode: activation binds one edge and
-//! the outcome memoizes on first resolution, so do not re-use a
+//! Settlement ownership (D11 / D14.3):
+//!
+//! ```text
+//! mechanism evidence producers (worker wrapper, render leg via
+//! DrainSignal, stop intent, activation diagnostics)
+//!     publish evidence only
+//!         ↓  every publication path runs the session-owned settlement
+//!            step synchronously, under the one completion lock
+//! Playback Session-owned settlement (resolve + commit exactly once)
+//!         ↓
+//! observe / wait_terminal consume the committed Fact only
+//! ```
+//!
+//! Three publication sites can complete the decisive evidence set, and
+//! all three settle on the publishing leg's own call stack:
+//!
+//! ```text
+//! decode failure evidence   → settle inside decode_failed
+//! worker terminal evidence  → settle inside worker_exited
+//! drain verdict             → the session installs a one-shot observer
+//!                             on its DrainSignal at construction, so
+//!                             the first successful complete() publishes
+//!                             and settles synchronously on the render
+//!                             leg's call stack, before complete returns
+//! ```
+//!
+//! There is no settlement watcher, resolver thread, or asynchronous gap
+//! (D14.3 forbids a resolver thread outright). `request_stop` records
+//! intent through the same completion lock, so the lock IS the decision
+//! boundary: a stop linearized before the decisive publication
+//! participates in the classification; a stop linearized after it cannot
+//! relabel the already-committed outcome (D11 late-command rule).
+//!
+//! Neither `observe_snapshot` nor `wait_terminal` resolves: a consumer
+//! call can never create the terminal Fact, and no consumer call is
+//! required for it to appear ("worker evidence last" and "drain verdict
+//! last" both commit autonomously — pinned by the M4/W4 witnesses).
+//!
+//! One core serves exactly one episode: activation binds one edge and
+//! the outcome memoizes on first settlement, so do not re-use a
 //! completion across a retried or restarted episode.
 //!
-//! Outcome precedence, stated once at the seam: a published decode
-//! failure dominates everything (it is checked first and is not
-//! relabelled by stop intent); otherwise the drain verdict plus the
-//! worker's exit terminal decide, with recorded stop intent
-//! disambiguating an aborted drain between a user stop and a device
-//! failure.
+//! Outcome precedence, stated once here: a published decode failure
+//! dominates everything (it is checked first and is not relabelled by
+//! stop intent); otherwise the drain verdict plus the worker's exit
+//! terminal decide, with recorded stop intent disambiguating an aborted
+//! drain between a user stop and a device failure.
 
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
 
-use qianqian_audio_api::ports::{DrainSignal, DrainVerdict};
+use qianqian_audio_api::ports::{DrainSignal, DrainVerdict, PcmFormat};
 
 use crate::edge::{EdgeTerminal, PcmEdge};
+use crate::handle::{EpisodeTerminalOutcome, PlaybackSessionObservation};
 
-/// How one playback episode ended.
+/// How one playback episode ended. Crate-internal realization: the
+/// public semantic contract is only the stable
+/// [`EpisodeTerminalOutcome`] triple; the failure stage here is a
+/// diagnostic (D14.2) and must not leak into the public enum.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SessionOutcome {
+pub(crate) enum SessionOutcome {
     /// EOF was produced, drained and played out.
     Completed,
     /// The episode failed before completion. The stage names which leg
-    /// failed first ("decode: ..." or "device").
+    /// failed first ("decode: ..." or "device") — a diagnostic, not a
+    /// frozen semantic variant (D14.2).
     Failed { stage: String },
     /// Stop was requested before completion.
     Stopped,
+}
+
+impl SessionOutcome {
+    /// Split into the stable public semantic outcome and the failure
+    /// diagnostic carried alongside it. This is the single truth-class
+    /// boundary (D14.2): `Completed`/`Stopped` can never carry a
+    /// diagnostic, and a `Failed` diagnostic is presentation text — its
+    /// presence, absence or spelling is not part of the semantic
+    /// contract.
+    pub(crate) fn split(self) -> (EpisodeTerminalOutcome, Option<String>) {
+        match self {
+            SessionOutcome::Completed => (EpisodeTerminalOutcome::Completed, None),
+            SessionOutcome::Stopped => (EpisodeTerminalOutcome::Stopped, None),
+            SessionOutcome::Failed { stage } => (EpisodeTerminalOutcome::Failed, Some(stage)),
+        }
+    }
 }
 
 struct CompletionState {
@@ -40,9 +97,14 @@ struct CompletionState {
     /// Terminal the decode worker observed on the edge at its exit.
     worker_terminal: Option<EdgeTerminal>,
     decode_failure: Option<String>,
+    /// The drain verdict, mirrored into the state by the session-owned
+    /// observer installed on the DrainSignal (first wins). Mirroring
+    /// keeps the resolver a pure function of the one lock-protected
+    /// record: no settlement decision ever reads a second lock.
+    drain_verdict: Option<DrainVerdict>,
     /// Source PCM format, published once at session activation
-    /// (diagnostic readback for the App).
-    source_format: Option<qianqian_audio_api::ports::PcmFormat>,
+    /// (mechanism-evidence diagnostic readback).
+    source_format: Option<PcmFormat>,
     /// Why activation raised, published by the session itself (the
     /// kernel's diagnostic surface carries the verdict, not the message).
     activation_failure: Option<String>,
@@ -53,12 +115,15 @@ struct CompletionState {
     /// The session's data-plane edge, bound by activation as the stop
     /// target. `None` until the episode binds one (or forever, if
     /// activation failed). The edge is the session-owned stop mechanism;
-    /// this handle only routes intent to it.
+    /// this core only routes intent to it.
     stop_target: Option<Arc<PcmEdge>>,
 }
 
+/// Crate-internal episode settlement core (see the module doc). The
+/// application reaches this only through
+/// [`crate::handle::PlaybackSessionHandle`].
 #[derive(Clone)]
-pub struct SessionCompletion {
+pub(crate) struct SessionCompletion {
     state: Arc<CompletionArc>,
 }
 
@@ -75,73 +140,78 @@ impl Default for SessionCompletion {
 }
 
 impl SessionCompletion {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            state: Arc::new(CompletionArc {
+            state: Arc::new_cyclic(|core| CompletionArc {
                 state: Mutex::new(CompletionState {
                     outcome: None,
                     worker_terminal: None,
                     decode_failure: None,
+                    drain_verdict: None,
                     source_format: None,
                     activation_failure: None,
                     stop_requested: false,
                     stop_target: None,
                 }),
                 signal: Condvar::new(),
-                drain: DrainSignal::new(),
+                drain: DrainSignal::with_on_complete({
+                    // Weak on purpose: the completion owns the signal,
+                    // so a strong observer reference would be a
+                    // reference cycle. The signal outlives publication
+                    // paths only through the render leg's own join
+                    // ordering, so an inert observer after teardown is
+                    // exactly the right semantics.
+                    let core = core.clone();
+                    move |verdict| {
+                        if let Some(core) = core.upgrade() {
+                            publish_evidence(&core, |state| {
+                                if state.drain_verdict.is_none() {
+                                    state.drain_verdict = Some(verdict);
+                                }
+                            });
+                        }
+                    }
+                }),
             }),
         }
     }
 
-    /// The session publishes its activation failure (first wins).
-    pub fn activation_failed(&self, message: &str) {
+    /// The session publishes its activation failure (first wins). This
+    /// is a diagnostic, not a terminal Fact: an activation that never
+    /// established a live episode leaves the terminal outcome `None`
+    /// forever (D11 activation firewall).
+    pub(crate) fn activation_failed(&self, message: &str) {
         let mut guard = self.state.state.lock().expect("completion lock");
         if guard.activation_failure.is_none() {
             guard.activation_failure = Some(message.to_owned());
         }
     }
 
-    /// Why activation raised, if it did (Host diagnostics).
-    pub fn activation_error(&self) -> Option<String> {
-        self.state
-            .state
-            .lock()
-            .expect("completion lock")
-            .activation_failure
-            .clone()
-    }
-
     /// The session publishes the endpoint's source format at activation.
-    pub fn set_source_format(&self, format: qianqian_audio_api::ports::PcmFormat) {
+    pub(crate) fn set_source_format(&self, format: PcmFormat) {
         let mut guard = self.state.state.lock().expect("completion lock");
         if guard.source_format.is_none() {
             guard.source_format = Some(format);
         }
     }
 
-    /// The source format of this episode, once activation published it.
-    pub fn source_format(&self) -> Option<qianqian_audio_api::ports::PcmFormat> {
-        self.state
-            .state
-            .lock()
-            .expect("completion lock")
-            .source_format
-    }
-
-    /// The drain signal handed to the render stream's open request.
-    pub fn drain_signal(&self) -> DrainSignal {
+    /// The drain signal handed to the render stream's open request. The
+    /// session-owned drain observer is installed at construction; the
+    /// render leg's first `complete` therefore publishes and settles
+    /// synchronously on the render leg's call stack.
+    pub(crate) fn drain_signal(&self) -> DrainSignal {
         self.state.drain.clone()
     }
 
     /// The decode worker (or its panic guard) reports a decode failure.
-    /// First failure wins; later calls are no-ops.
-    pub fn decode_failed(&self, message: &str) {
-        let mut guard = self.state.state.lock().expect("completion lock");
-        if guard.decode_failure.is_none() {
-            guard.decode_failure = Some(message.to_owned());
-        }
-        drop(guard);
-        self.state.signal.notify_all();
+    /// First failure wins; later calls are no-ops. The publication and
+    /// the settlement step run under one lock hold, inside this call.
+    pub(crate) fn decode_failed(&self, message: &str) {
+        self.publish(|state| {
+            if state.decode_failure.is_none() {
+                state.decode_failure = Some(message.to_owned());
+            }
+        });
     }
 
     /// Request the episode to stop.
@@ -149,16 +219,21 @@ impl SessionCompletion {
     /// This is a command, not a fact: it records stop intent and releases
     /// the session's data-plane stop (which is idempotent and first-wins,
     /// so it never overwrites a committed EOF or failure). How the episode
-    /// actually ends remains decided solely by [`Self::resolve`]. Calling
-    /// this after the outcome is resolved is a no-op with respect to that
-    /// outcome.
+    /// actually ends remains decided solely by the session-owned
+    /// settlement step. Calling this after the outcome is settled is a
+    /// no-op with respect to that outcome.
+    ///
+    /// Intent is recorded before the data-plane stop is released, so any
+    /// terminal evidence caused by this stop necessarily observes the
+    /// intent (D11 decision-time stability); a later stop cannot relabel
+    /// an already-decisive classification.
     ///
     /// Safe from any thread and any state:
     /// - before the session bound an edge (not yet activated): intent is
     ///   recorded and applied the moment activation binds the edge;
     /// - while playing: both legs are woken with terminal outcomes;
-    /// - after resolution: nothing changes.
-    pub fn request_stop(&self) {
+    /// - after settlement: nothing changes.
+    pub(crate) fn request_stop(&self) {
         let target = {
             let mut guard = self.state.state.lock().expect("completion lock");
             guard.stop_requested = true;
@@ -169,28 +244,13 @@ impl SessionCompletion {
         }
     }
 
-    /// Whether stop intent has been recorded. Command-state visibility
-    /// (F2 status will read it); it says nothing about the outcome.
-    pub fn stop_requested(&self) -> bool {
-        self.state
-            .state
-            .lock()
-            .expect("completion lock")
-            .stop_requested
-    }
-
     /// Frames currently buffered on the session's edge, once bound.
-    /// Diagnostic mechanism-evidence readback (same class as
-    /// [`Self::source_format`]); it is not an outcome and carries no
-    /// control authority. `None` before the session bound its edge.
-    ///
-    /// Visibility ruling (NATIVE-BOUNDARY-AUDIT-AND-F1-CLOSURE-1): this
-    /// stays public only because the integration tests that exercise it
-    /// live outside the crate. It is diagnostic mechanism evidence only —
-    /// NOT PlaybackState, NOT product semantic truth, NOT UI-facing
-    /// authority. F2 must explicitly re-admit or retire this seam; it
-    /// must not silently become a state contract by continued use.
-    pub fn buffered_frames(&self) -> Option<usize> {
+    /// Test/verifier diagnostic only (F2 ruling, D14.3): mechanism
+    /// evidence, NOT application observation and NOT UI contract. It
+    /// exists only in test builds so it cannot drift into the product
+    /// seam. `None` before the session bound its edge.
+    #[cfg(test)]
+    pub(crate) fn buffered_frames(&self) -> Option<usize> {
         let guard = self.state.state.lock().expect("completion lock");
         guard
             .stop_target
@@ -205,7 +265,7 @@ impl SessionCompletion {
     /// a stop that arrived first.
     ///
     /// Session-internal binding seam: the application reaches the same
-    /// effect only through [`Self::request_stop`].
+    /// effect only through [`SessionCompletion::request_stop`].
     pub(crate) fn bind_stop_target(&self, edge: Arc<PcmEdge>) {
         let already_requested = {
             let mut guard = self.state.state.lock().expect("completion lock");
@@ -221,63 +281,113 @@ impl SessionCompletion {
     }
 
     /// The decode worker wrapper reports the edge terminal at its exit.
-    pub fn worker_exited(&self, terminal: EdgeTerminal) {
-        let mut guard = self.state.state.lock().expect("completion lock");
-        guard.worker_terminal = Some(terminal);
-        drop(guard);
-        self.state.signal.notify_all();
+    /// The publication and the settlement step run under one lock hold,
+    /// inside this call.
+    pub(crate) fn worker_exited(&self, terminal: EdgeTerminal) {
+        self.publish(|state| state.worker_terminal = Some(terminal));
     }
 
-    /// Resolve the current outcome from the observed legs, if decided.
-    pub fn try_resolve_now(&self) -> Option<SessionOutcome> {
-        let mut guard = self.state.state.lock().expect("completion lock");
-        resolve(&mut guard, &self.state.drain)
+    /// One coherent observation of the episode, taken under a single
+    /// lock acquisition so the returned fields coexisted at one real
+    /// instant (no torn combinations such as `Stopped` with
+    /// `stop_requested == false`).
+    pub(crate) fn observe_snapshot(&self) -> PlaybackSessionObservation {
+        let guard = self.state.state.lock().expect("completion lock");
+        let (terminal_outcome, failure_diagnostic) = match &guard.outcome {
+            Some(outcome) => {
+                let (semantic, diagnostic) = outcome.clone().split();
+                (Some(semantic), diagnostic)
+            }
+            None => (None, None),
+        };
+        PlaybackSessionObservation {
+            terminal_outcome,
+            failure_diagnostic,
+            stop_requested: guard.stop_requested,
+            source_format: guard.source_format,
+            activation_error: guard.activation_failure.clone(),
+        }
     }
 
-    /// Block until the episode resolves.
-    pub fn wait(&self) -> SessionOutcome {
+    /// The committed terminal outcome, if any. Pure read: never settles.
+    /// Verifier-facing (the decision-table oracle's read); not part of
+    /// any runtime path.
+    #[cfg(test)]
+    pub(crate) fn committed(&self) -> Option<SessionOutcome> {
+        self.state
+            .state
+            .lock()
+            .expect("completion lock")
+            .outcome
+            .clone()
+    }
+
+    /// Block until the episode's terminal Fact is committed. Pure wait:
+    /// it never evaluates the contract and never commits — settlement
+    /// happens only on the session-owned publication paths, and every
+    /// commit notifies this condvar.
+    pub(crate) fn wait_terminal(&self) -> SessionOutcome {
         let mut guard = self.state.state.lock().expect("completion lock");
         loop {
-            if let Some(outcome) = resolve(&mut guard, &self.state.drain) {
-                return outcome;
+            if let Some(outcome) = &guard.outcome {
+                return outcome.clone();
             }
-            // The drain verdict lives on its own condvar inside
-            // DrainSignal, which this wait cannot block on; the bounded
-            // poll below is the bridge. 20 ms of Host-side latency is
-            // irrelevant on a control-plane wait, and the state the poll
-            // reads is written once per leg.
-            let (next, _timeout) = self
+            guard = self
                 .state
                 .signal
-                .wait_timeout(guard, Duration::from_millis(20))
+                .wait(guard)
                 .expect("completion wait poisoned");
-            guard = next;
         }
+    }
+
+    fn publish(&self, evidence: impl FnOnce(&mut CompletionState)) {
+        publish_evidence(&self.state, evidence);
     }
 }
 
-fn resolve(state: &mut CompletionState, drain: &DrainSignal) -> Option<SessionOutcome> {
-    if state.outcome.is_some() {
-        return state.outcome.clone();
+/// The one serialization boundary (D14.3): publish evidence, evaluate
+/// the terminal contract, and commit — all inside a single hold of the
+/// completion lock, the same lock `request_stop` serializes through.
+/// Stop intent is therefore read at the publication boundary itself, and
+/// no publication path can return before an already-decisive
+/// classification is committed. Idempotent; first-wins; notifies waiters
+/// only on the unsettled→committed transition. Only session-owned
+/// execution paths call this — the worker wrapper, the decode failure
+/// reporter, and the drain observer. No consumer call reaches it.
+fn publish_evidence(core: &CompletionArc, evidence: impl FnOnce(&mut CompletionState)) {
+    let mut guard = core.state.lock().expect("completion lock");
+    if guard.outcome.is_some() {
+        return; // settled: first-wins, later evidence cannot relabel
     }
+    evidence(&mut guard);
+    if let Some(outcome) = resolve(&guard) {
+        guard.outcome = Some(outcome);
+        drop(guard);
+        core.signal.notify_all();
+    }
+}
+
+/// The terminal contract, pure function of the lock-protected evidence
+/// record: decode failure first, then drain verdict × worker terminal,
+/// with recorded stop intent disambiguating an aborted drain. Called
+/// only from [`publish_evidence`], so `outcome` is still `None` here.
+fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
     // Decode failure is authoritative over everything downstream: the
     // failure was published before the edge was failed.
     if let Some(message) = &state.decode_failure {
-        state.outcome = Some(SessionOutcome::Failed {
+        return Some(SessionOutcome::Failed {
             stage: format!("decode: {message}"),
         });
-        return state.outcome.clone();
     }
     if state.worker_terminal == Some(EdgeTerminal::Failed) {
-        state.outcome = Some(SessionOutcome::Failed {
+        return Some(SessionOutcome::Failed {
             stage: "decode".to_owned(),
         });
-        return state.outcome.clone();
     }
-    match drain.peek() {
+    match state.drain_verdict {
         Some(DrainVerdict::Drained) => {
             if state.worker_terminal == Some(EdgeTerminal::Eof) {
-                state.outcome = Some(SessionOutcome::Completed);
+                return Some(SessionOutcome::Completed);
             }
         }
         Some(DrainVerdict::Aborted) => {
@@ -295,18 +405,20 @@ fn resolve(state: &mut CompletionState, drain: &DrainSignal) -> Option<SessionOu
                     // stopped the data plane on its way out": both land
                     // here with the identical Stopped terminal. Recorded
                     // stop intent is the discriminator — request_stop
-                    // publishes intent before it releases the edge, so
-                    // any stop-caused Stopped necessarily observes it.
+                    // publishes intent through the same lock before it
+                    // releases the edge, so a stop linearized before
+                    // this decisive publication necessarily observes it,
+                    // and a stop after it cannot relabel (the outcome
+                    // is already committed).
                     if state.stop_requested {
-                        state.outcome = Some(SessionOutcome::Stopped);
-                    } else {
-                        state.outcome = Some(SessionOutcome::Failed {
-                            stage: "device".to_owned(),
-                        });
+                        return Some(SessionOutcome::Stopped);
                     }
+                    return Some(SessionOutcome::Failed {
+                        stage: "device".to_owned(),
+                    });
                 }
                 Some(_) => {
-                    state.outcome = Some(SessionOutcome::Failed {
+                    return Some(SessionOutcome::Failed {
                         stage: "device".to_owned(),
                     });
                 }
@@ -314,5 +426,5 @@ fn resolve(state: &mut CompletionState, drain: &DrainSignal) -> Option<SessionOu
         }
         None => {}
     }
-    state.outcome.clone()
+    None
 }

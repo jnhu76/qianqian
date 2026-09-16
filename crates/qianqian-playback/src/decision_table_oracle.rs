@@ -6,15 +6,34 @@
 //! decision functions (`CurrentDecisionDecisive` /
 //! `CurrentDecisionVerdict`) cannot drift apart silently.
 //!
+//! Crate-internal home (F2 migration, gate-sanctioned): the F2 seam
+//! work made the evidence mutators crate-private, so the oracle drives
+//! the real resolver from inside the crate boundary instead of through
+//! the pre-F2 public `SessionCompletion` integration-test seam. Same
+//! real resolver, same write-once state recorders, same 48-row domain;
+//! the drift paths the CORRECTIVE-2 campaign pinned (resolver change /
+//! hand-edited artifact / TLA decision-function change) stay caught.
+//!
 //! What it freezes: for every evidence tuple
 //!   (stop_intent, decode_failure, worker_terminal, drain_verdict)
 //! over the full finite domain (2 × 2 × 4 × 3 = 48 rows) — driven
-//! through the real public `SessionCompletion` seam, one fresh handle
-//! per tuple, resolved exactly once — the table records the outcome
-//! class:
+//! through the real `SessionCompletion` core, one fresh core per tuple,
+//! settled exactly like production settles — the table records the
+//! outcome class:
 //!   undecided | completed | stopped | failed-decode | failed-device
 //! (the failed-decode / failed-device split preserves production's
-//! `Failed.stage` naming; the TLA verdict collapses both to "Failed").
+//! internal `Failed.stage` diagnostic naming; the TLA verdict collapses
+//! both to "Failed").
+//!
+//! Publication order mirrors the production contract: stop intent is
+//! recorded FIRST (request_stop publishes intent before it releases
+//! the data plane, so any stop-caused evidence observes it — the D11
+//! decision-time stability rule), then each evidence publication runs
+//! the session-owned settlement step synchronously inside its own call
+//! (`decode_failed` / `worker_exited` on the worker call stack; the
+//! drain verdict through the session-installed one-shot DrainSignal
+//! observer, on the publishing leg's call stack). Reading the committed
+//! outcome afterwards never creates it.
 //!
 //! The committed artifact
 //!   specs/episode-terminal-settlement/CurrentDecisionTable.tla
@@ -23,6 +42,7 @@
 //! row against the formal decision functions. Two gates, one artifact:
 //!   - this test (Verification Rust Gate) pins production ⇒ table;
 //!   - the TLC run (Formal Semantic Gate) pins table ⇒ formal defs.
+//!
 //! Any change to `completion.rs::resolve`'s decision contract therefore
 //! fails CI until the artifact is regenerated AND the formal decision
 //! functions still agree with the regenerated table.
@@ -30,21 +50,30 @@
 //! Regenerate only after an authority-recorded decision-contract
 //! change (ADR-PBK-002 §17 D11):
 //!   QIANQIAN_UPDATE_DECISION_TABLE=1 \
-//!     cargo test -p qianqian-playback --test completion_decision_table
+//!     cargo test -p qianqian-playback --lib decision_table
 //! then re-run `specs/check.sh terminal` — the TLC refinement run must
 //! still pass before the change can merge.
 //!
-//! Scope boundary (known differential, deliberately NOT in this
-//! table's domain): the table freezes the STATIC decision contract
-//! (evidence shape ⇒ verdict class, intent fixed at resolve time).
-//! The dynamic differential — production `resolve()` reads the current
-//! stop intent while the model freezes boundary intent — is recorded
-//! by D11, machine-checked on the formal side (M4/W4), and is the F2
-//! correction target.
+//! Scope boundary: the table freezes the STATIC decision contract
+//! (evidence shape ⇒ verdict class, intent fixed at the settlement
+//! boundary). The dynamic differential is closed — and, since
+//! CORRECTIVE-1, closed for a stateable reason: every decisive-evidence
+//! publication path runs authority settlement synchronously before it
+//! returns, `request_stop` and evidence publication serialize through
+//! the same completion lock, and there is no asynchronous settlement
+//! gap (the pre-corrective watcher let `complete()` return before
+//! settlement, so a late stop was visible to the resolver — M4-RUST-A
+//! in settlement_contract_tests.rs is the RED-on-old-shape witness).
+//! The model keeps machine-checking the boundary rule (M4/W4); the
+//! Rust M4-RUST-A/B and W4-RUST witnesses pin the same rule against
+//! production directly.
 
 use std::fmt::Write as _;
 
-use qianqian_playback::{DrainVerdict, EdgeTerminal, SessionCompletion, SessionOutcome};
+use qianqian_audio_api::ports::DrainVerdict;
+
+use crate::completion::{SessionCompletion, SessionOutcome};
+use crate::edge::EdgeTerminal;
 
 const TABLE_PATH: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -97,11 +126,14 @@ fn classify(outcome: Option<SessionOutcome>) -> &'static str {
     }
 }
 
-/// Drive one fresh `SessionCompletion` through the public seam exactly
-/// as the session legs drive it, then resolve once. Publication order
-/// is irrelevant on a fresh handle: every publisher here is a write-once
-/// state recorder and no edge is ever bound (so `request_stop` only
-/// records intent).
+/// Drive one fresh `SessionCompletion` core exactly as the session legs
+/// drive it, then read the committed outcome. Stop intent is recorded
+/// first (the production order); every evidence publication runs the
+/// session-owned settlement step synchronously inside its own call
+/// (decode/worker evidence on the worker call stack; the drain verdict
+/// through the session-installed one-shot DrainSignal observer), so no
+/// explicit settlement trigger exists or is needed. No edge is ever
+/// bound, so `request_stop` only records intent.
 fn production_class(
     stop_intent: bool,
     decode_failure: bool,
@@ -109,6 +141,9 @@ fn production_class(
     drain_verdict: Option<DrainVerdict>,
 ) -> &'static str {
     let completion = SessionCompletion::new();
+    if stop_intent {
+        completion.request_stop();
+    }
     if decode_failure {
         completion.decode_failed("oracle probe");
     }
@@ -118,10 +153,7 @@ fn production_class(
     if let Some(verdict) = drain_verdict {
         completion.drain_signal().complete(verdict);
     }
-    if stop_intent {
-        completion.request_stop();
-    }
-    classify(completion.try_resolve_now())
+    classify(completion.committed())
 }
 
 fn tla_bool(value: bool) -> &'static str {
@@ -138,11 +170,12 @@ const ARTIFACT_HEADER: &str = concat!(
     "(*   <<stop_intent, decode_failure, worker_terminal, drain_verdict,       *)\n",
     "(*     class>>                                                             *)\n",
     "(* 在完整有限域（2 × 2 × 4 × 3 = 48 行）上穷举冻结**当前** production      *)\n",
-    "(* 判决器（qianqian-playback SessionCompletion::resolve，经公开 seam      *)\n",
-    "(* 逐元组驱动）的 decisive 域与判决类。                                   *)\n",
+    "(* 判决器（qianqian-playback SessionCompletion::resolve，经 crate 内       *)\n",
+    "(* seam 逐元组驱动）的 decisive 域与判决类。                               *)\n",
     "(*                                                                        *)\n",
-    "(* 生成/比对：crates/qianqian-playback/tests/                              *)\n",
-    "(* completion_decision_table.rs（Verification Rust Gate 执行）。          *)\n",
+    "(* 生成/比对：crates/qianqian-playback/src/                                *)\n",
+    "(* decision_table_oracle.rs（Verification Rust Gate 执行；F2 起为          *)\n",
+    "(* crate-internal 白盒 oracle——evidence mutators 已收缩为 crate 私有）。  *)\n",
     "(* 消费：EpisodeTerminalSettlementTable.tla 的 TLC run（Formal Semantic   *)\n",
     "(* Gate 执行）逐行校验本表与 CurrentDecisionDecisive /                    *)\n",
     "(* CurrentDecisionVerdict 一致。两侧共用这一个 artifact：改               *)\n",
@@ -151,15 +184,18 @@ const ARTIFACT_HEADER: &str = concat!(
     "(*                                                                        *)\n",
     "(* 再生成（仅限 authority 记录在案的判决合同变更，ADR-PBK-002 §17 D11）：  *)\n",
     "(*   QIANQIAN_UPDATE_DECISION_TABLE=1 cargo test -p qianqian-playback \\   *)\n",
-    "(*     --test completion_decision_table                                   *)\n",
+    "(*     --lib decision_table                                               *)\n",
     "(* 之后必须重跑 specs/check.sh terminal（TLC refinement run 必须仍 PASS）。*)\n",
     "(*                                                                        *)\n",
     "(* verifier-only evidence（AGENTS.md verification authority boundary）：   *)\n",
     "(* 本表是 refinement oracle，不是 authority；语义只在 ADR-PBK-001 §2 与    *)\n",
-    "(* ADR-PBK-002 §17 D11。表冻结的是**静态**判决合同（证据形状 → 判决类，    *)\n",
-    "(* intent 在 resolve 时刻固定）；production resolve() 读当前 stop intent   *)\n",
-    "(* 的 known differential（late intent）不在此表域内——由主模型 M4/W4       *)\n",
-    "(* 机器检查、D11 记录、F2 修正。                                           *)\n",
+    "(* ADR-PBK-002 §17 D11/D14。表冻结的是**静态**判决合同（证据形状 →         *)\n",
+    "(* 判决类，intent 在 settlement 边界固定）。动态差分闭合依据               *)\n",
+    "(* （CORRECTIVE-1）：每个 decisive evidence publication 路径在返回前同步    *)\n",
+    "(* 完成 authority settlement，request_stop 与 evidence publication 经同一  *)\n",
+    "(* completion 边界串行化，不存在异步 settlement 间隙。主模型 M4/W4 继续    *)\n",
+    "(* 机器检查该边界规则；Rust 侧 M4-RUST-A/B、W4-RUST 白盒 witness 直接      *)\n",
+    "(* 钉住同一规则。                                                          *)\n",
     "(**************************************************************************)\n",
 );
 
@@ -229,7 +265,7 @@ fn current_decision_contract_is_frozen_in_the_table_artifact() {
             "(or the artifact was hand-edited).\n",
             "If this is an authority-recorded decision-contract change: regenerate with\n",
             "  QIANQIAN_UPDATE_DECISION_TABLE=1 cargo test -p qianqian-playback",
-            " --test completion_decision_table\n",
+            " --lib decision_table\n",
             "then re-run specs/check.sh terminal — the TLC refinement run",
             " (EpisodeTerminalSettlementTable) must still pass so the formal",
             " decision functions are re-validated against the new table."

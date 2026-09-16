@@ -13,8 +13,13 @@
 //! ```
 //!
 //! Effects unwind strictly LIFO, so disposal runs stop-edge, join worker,
-//! then stop-join-release the stream — the required stop -> join ->
-//! release order.
+//! then stop-join-release the stream — preserving stop -> join -> release.
+//! There is no settlement watcher/resolver thread (D14.3): every terminal
+//! evidence publication settles synchronously on the publishing leg's own
+//! call stack (the worker wrapper for decode/worker evidence; the
+//! session-installed one-shot DrainSignal observer for the drain verdict),
+//! so when both join inverses return, no decisive evidence can sit
+//! uncommitted.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -26,6 +31,7 @@ use qianqian_composition::{ActivationError, ComponentSpec, Discharge};
 
 use crate::completion::SessionCompletion;
 use crate::edge::PcmEdge;
+use crate::handle::PlaybackSessionHandle;
 
 /// Frames of PCM the edge buffers (~185 ms at 44.1 kHz stereo). Chosen
 /// from the measured decode tail (p99 ~0.2 ms per 1024-frame block,
@@ -38,13 +44,13 @@ const EDGE_CAPACITY_FRAMES: usize = 8192;
 const STAGING_FRAMES: usize = 1024;
 
 /// The Playback Session component definition. The App captures the file
-/// and the completion handle it will wait on; desired entries need no
+/// and the episode handle it will observe; desired entries need no
 /// config payload for the first slice.
-pub fn playback_session_spec(file: PathBuf, completion: SessionCompletion) -> ComponentSpec {
+pub fn playback_session_spec(file: PathBuf, handle: PlaybackSessionHandle) -> ComponentSpec {
     ComponentSpec::new("playback_session")
         .requires::<PcmDecodeCapability>()
         .requires::<AudioOutputCapability>()
-        .on_activate(move |ctx| activate(&file, &completion, ctx))
+        .on_activate(move |ctx| activate(&file, &handle.completion, ctx))
 }
 
 fn activate(
@@ -100,7 +106,12 @@ fn activate_inner(
 
     // Playback-specific render stream, pre-bound to the edge's consumer
     // half and the session's drain signal. A bounded open verdict keeps
-    // device failures inside activation.
+    // device failures inside activation. The drain signal already
+    // carries the session-owned one-shot observer: the render leg's
+    // first verdict publication settles the episode synchronously,
+    // before `complete` returns — which also means this stream's
+    // stop_and_join inverse below cannot return before the terminal
+    // publication path has run.
     let stream = output
         .service()
         .open_stream(qianqian_audio_api::ports::RenderRequest {
@@ -109,10 +120,11 @@ fn activate_inner(
             drain: completion.drain_signal(),
         })
         .map_err(|e| ActivationError::new(format!("render stream open failed: {}", e.message)))?;
-    // Registered first, so it unwinds after the worker inverse:
-    // stop+join the producer before the device is released. It is a
-    // relation-bearing effect: the stream is a cross-fiber contribution
-    // toward the output provider.
+
+    // Registered before the worker spawn, so it unwinds after the worker
+    // inverse: stop+join the producer before the device is released. It
+    // is a relation-bearing effect: the stream is a cross-fiber
+    // contribution toward the output provider.
     ctx.register_relation::<AudioOutputCapability>(&output, move || {
         stream.stop_and_join();
         Discharge::Discharged

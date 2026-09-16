@@ -35,8 +35,8 @@ name: Verification Rust Gate
 # side IS listed: the settlement decision table
 # (specs/episode-terminal-settlement/CurrentDecisionTable.tla) is
 # frozen from the production resolver by the exhaustive Rust oracle
-# (crates/qianqian-playback/tests/completion_decision_table.rs, run by
-# this gate's playback native regression), so hand-editing the artifact
+# (crates/qianqian-playback/src/decision_table_oracle.rs, run by
+# this gate's playback native regression; crate-internal since F2), so hand-editing the artifact
 # re-runs the oracle here while the Formal Semantic Gate re-checks the
 # table against the TLA decision functions.
 #

@@ -50,9 +50,9 @@ CI gate 的同步职责。production 判决分支增删后，Rust gate 仍绿、
 修正：**一个共享真值表 artifact，两侧各由一个 gate 机器绑定**：
 
 ```text
-production resolve()（经 SessionCompletion 公开 seam 逐元组驱动）
+production resolve()（经 SessionCompletion crate 内 seam 逐元组驱动；F2 起 oracle 为 crate-internal 白盒）
         │  Rust exhaustive oracle（48 元组穷举，byte-compare）
-        │  crates/qianqian-playback/tests/completion_decision_table.rs
+        │  crates/qianqian-playback/src/decision_table_oracle.rs
         ▼  Verification Rust Gate
 specs/episode-terminal-settlement/CurrentDecisionTable.tla
 （生成文件：<<stop_intent, decode_failure, worker_terminal,
@@ -287,9 +287,9 @@ authority 的 semantic fact）。
 | `EpisodeTerminalSettlementTable.cfg` | refinement oracle：`DecisionDomain` 全部 48 元组为初始状态，逐行比对 `CurrentDecisionTable`（production 冻结表）↔ `CurrentDecisionDecisive`/`CurrentDecisionVerdict` + 行完整性（含显式 key bijection） | PASS（CORRECTIVE-2；production 侧绑定由 Rust oracle run 承担） |
 
 Rust oracle run（Verification Rust Gate 内执行，不在本 check.sh）：
-`cargo test -p qianqian-playback --test completion_decision_table` ——
-48 元组经 `SessionCompletion` 公开 seam 驱动真实 `resolve()`，byte-compare
-`CurrentDecisionTable.tla`。
+`cargo test -p qianqian-playback --lib decision_table` ——
+48 元组经 `SessionCompletion` crate 内 seam 驱动真实 `resolve()`，byte-compare
+`CurrentDecisionTable.tla`（F2 迁移：evidence mutators 已收缩为 crate 私有，oracle 随之白盒化；判决合同与 48 行不变）。
 
 负控制 mutation（10，全部必须产生 counterexample）：
 
@@ -339,9 +339,9 @@ violated 集合里。
 specs/check.sh current                       # 含本套件（current formal gate）
 specs/check.sh terminal                      # 仅本套件
 specs/episode-terminal-settlement/check.sh   # 直接运行（26 条 TLC run）
-cargo test -p qianqian-playback --test completion_decision_table
+cargo test -p qianqian-playback --lib decision_table
                                              # production ↔ 表 refinement
-                                             # oracle（Rust gate 侧）
+                                             # oracle（Rust gate 侧；F2 起 crate-internal）
 ```
 
 工具链与其它套件共用 `specs/tools/tla2tools.jar`（v1.7.4，sha256 校验，

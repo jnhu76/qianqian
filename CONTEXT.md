@@ -197,6 +197,8 @@ Failed
 
 Exact resolver representation/precedence remains current implementation detail unless changing it changes the external D11 propositions.
 
+F2 seam representation (reality-gate-2 verdict): the application-facing episode seam is a **public Playback Session handle** (one handle == one playback episode; minimal surface `request_stop` / `observe` / `wait_terminal`). `SessionCompletion`/resolver is an **internal replaceable realization** behind that seam, not the application API; terminal settlement runs on the Playback Session authority-owned execution/teardown path (D14.3), never consumer-triggered.
+
 The following are still OPEN:
 
 ```text
@@ -223,10 +225,20 @@ Issue #119 is the current Phase-F v2 execution roadmap.
 ```text
 F0 CLI shell / grammar          DONE / CLOSED
 F1 Stop                         DONE / CLOSED
-F2 Observable read side         RESTART
+F2 Observable read side         REALITY GATE CLOSED
+    F2-READ-SIDE-SEAM-REALITY-GATE-2 verdict:
+        A. SessionCompletion directly as application seam   REJECT
+        B. episode-scoped public Playback Session
+           handle/wrapper                                   SELECT
+        C. split handles / generic state/fact infrastructure NOT EARNED
+    representation:
+        episode-scoped public Playback Session handle/wrapper
     next authorized step:
-    F2-READ-SIDE-SEAM-REALITY-GATE
-    compare A/B/C representation; do not preselect SessionCompletion
+        QIANQIAN-F2-TRUTHFUL-READ-SIDE-IMPLEMENTATION-2
+        (public seam request_stop/observe/wait_terminal;
+         D14.3 authority-owned settlement;
+         SessionCompletion/resolver becomes crate-internal
+         replaceable realization)
 F3 Pause / Resume               GOAL KEPT / MECHANISM OPEN
 F4 Position / Duration          GOAL KEPT / AUTHORITY + COUNTERS OPEN
 F5 Seek                         REDESIGNED AROUND DISCONTINUITY PROTOCOL

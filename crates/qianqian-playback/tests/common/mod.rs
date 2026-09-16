@@ -174,7 +174,16 @@ impl AudioOutput for TestOutput {
                     .spawn({
                         let input = input.clone();
                         move || {
-                            let verdict = consume_loop(input.clone(), pace, abort_after, &consumed);
+                            // Mirror the real render leg (wasapi.rs
+                            // run_render_thread): a panic still publishes
+                            // a verdict and stops the data plane, so the
+                            // session's synchronous drain settlement can
+                            // never wedge on a dead consumer.
+                            let verdict =
+                                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                    consume_loop(input.clone(), pace, abort_after, &consumed)
+                                }))
+                                .unwrap_or(DrainVerdict::Aborted);
                             if verdict == DrainVerdict::Aborted {
                                 // Mirror the real mechanism: a dead render
                                 // leg stops the data plane.
