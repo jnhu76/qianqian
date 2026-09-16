@@ -110,9 +110,12 @@ impl DrainSignal {
     /// invokes `observer` once, synchronously, before `complete` returns.
     /// This is the generic terminal-evidence publication seam for the
     /// stream's owner; the mechanism layer knows nothing about what the
-    /// observer publishes. The observer must be cheap, non-blocking, and
-    /// must not call back into this signal (a re-entrant `complete` is a
-    /// no-op first-wins anyway).
+    /// observer publishes. The observer runs synchronously on the
+    /// terminal publication path: it must not perform unbounded work or
+    /// I/O, and must not call back into this signal (a re-entrant
+    /// `complete` is a no-op first-wins anyway). Brief owner-side
+    /// synchronization — such as acquiring the owner's state lock — is
+    /// permitted and expected.
     pub fn with_on_complete(observer: impl Fn(DrainVerdict) + Send + Sync + 'static) -> Self {
         Self {
             inner: Arc::new(DrainInner {
