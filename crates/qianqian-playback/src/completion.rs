@@ -248,8 +248,10 @@ impl SessionCompletion {
     /// Test/verifier diagnostic only (F2 ruling, D14.3): mechanism
     /// evidence, NOT application observation and NOT UI contract. It
     /// exists only in test builds so it cannot drift into the product
-    /// seam. `None` before the session bound its edge.
-    #[cfg(test)]
+    /// seam. `None` before the session bound its edge. Partitioned out of
+    /// loom builds together with its only consumers (the thread-spawning
+    /// white-box settlement tests).
+    #[cfg(all(test, not(loom)))]
     pub(crate) fn buffered_frames(&self) -> Option<usize> {
         let guard = self.state.state.lock().expect("completion lock");
         guard
@@ -311,8 +313,9 @@ impl SessionCompletion {
 
     /// The committed terminal outcome, if any. Pure read: never settles.
     /// Verifier-facing (the decision-table oracle's read); not part of
-    /// any runtime path.
-    #[cfg(test)]
+    /// any runtime path. Partitioned out of loom builds together with
+    /// its only consumers (the white-box verifier suites).
+    #[cfg(all(test, not(loom)))]
     pub(crate) fn committed(&self) -> Option<SessionOutcome> {
         self.state
             .state

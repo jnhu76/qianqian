@@ -44,7 +44,11 @@ else
 fi
 
 echo "== loom model suite (real PcmEdge, --cfg loom) =="
-if RUSTFLAGS="--cfg loom" cargo test -p qianqian-playback --features loom --release --test loom_edge; then
+# loom_edge lives in-crate since the plugin-boundary hardening (the edge
+# mechanism is crate-private). The cfg(not(loom)) partition in lib.rs
+# excludes the thread-spawning suites from this build, so --lib compiles
+# exactly the loom model tests plus the production code they explore.
+if RUSTFLAGS="--cfg loom" cargo test -p qianqian-playback --features loom --release --lib; then
   echo "RESULT loom SCHEDULE-CLEAN"
 else
   echo "RESULT loom FAILED"
@@ -59,7 +63,7 @@ else
   # The mutated run is EXPECTED to fail (deadlock schedule). Note: pipefail
   # would invert a grep-on-pipe here, so capture to a file first.
   MUT_LOG="$(mktemp)"
-  RUSTFLAGS="--cfg loom" cargo test -p qianqian-playback --features loom --release --test loom_edge > "$MUT_LOG" 2>&1
+  RUSTFLAGS="--cfg loom" cargo test -p qianqian-playback --features loom --release --lib > "$MUT_LOG" 2>&1
   if grep -qE "deadlock|test result: FAILED" "$MUT_LOG"; then
     echo "RESULT M-L1 COUNTEREXAMPLE-WITNESSED (lost wakeup found)"
   else

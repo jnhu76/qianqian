@@ -22,7 +22,11 @@ use loom::sync::Arc;
 use loom::thread;
 
 use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
-use qianqian_playback::{EdgeTerminal, PcmEdge, WriteOutcome};
+
+// White-box: included into the crate by src/lib.rs (cfg(all(test, loom))),
+// so the modeled edge is the production mechanism reached through the
+// crate path, not a public export.
+use crate::edge::{EdgeTerminal, PcmEdge, WriteOutcome};
 
 /// L1 — concurrent write × read × stop.
 ///

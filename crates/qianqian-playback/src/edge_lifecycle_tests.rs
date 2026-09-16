@@ -2,7 +2,7 @@
 //! the Playback Session owns. Bounded, preallocated in steady state,
 //! terminals always unblock both endpoints (first-audible-slice design §4).
 
-#[path = "common/counting_allocator.rs"]
+#[path = "counting_allocator.rs"]
 mod counting_allocator;
 
 use std::sync::Arc;
@@ -10,7 +10,10 @@ use std::thread;
 use std::time::Duration;
 
 use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
-use qianqian_playback::PcmEdge;
+
+// White-box: included into the crate by src/lib.rs, so the mechanism
+// under test is reached through the crate path, not a public export.
+use crate::edge::{PcmEdge, WriteOutcome};
 
 const CHANNELS: u16 = 2;
 const CAPACITY_FRAMES: usize = 64;
@@ -23,7 +26,7 @@ fn frame(channels: u16, value: f32) -> Vec<f32> {
 fn write_then_read_roundtrips_frames() {
     let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
     let a = vec![0.25f32; 16 * usize::from(CHANNELS)];
-    assert_eq!(edge.write(&a), qianqian_playback::WriteOutcome::Written);
+    assert_eq!(edge.write(&a), WriteOutcome::Written);
 
     let mut dst = vec![0.0f32; 16 * usize::from(CHANNELS)];
     assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(16));
@@ -70,7 +73,7 @@ fn producer_blocks_when_full_and_unblocks_on_consume() {
     assert_eq!(total, 10);
     assert_eq!(
         producer.join().expect("producer exits"),
-        qianqian_playback::WriteOutcome::Written
+        WriteOutcome::Written
     );
 }
 
@@ -144,7 +147,7 @@ fn stop_unblocks_a_producer_blocked_on_a_full_edge() {
     edge.stop();
     assert_eq!(
         producer.join().expect("producer exits"),
-        qianqian_playback::WriteOutcome::Stopped,
+        WriteOutcome::Stopped,
         "stop unblocks the producer"
     );
 }
@@ -206,7 +209,7 @@ fn steady_state_read_write_performs_zero_allocations() {
             for s in src.iter_mut() {
                 *s = i as f32;
             }
-            assert_eq!(edge.write(&src), qianqian_playback::WriteOutcome::Written);
+            assert_eq!(edge.write(&src), WriteOutcome::Written);
             assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(1));
         }
     });
