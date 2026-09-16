@@ -1181,11 +1181,21 @@ pause / resume intent      Command state on the episode seam
                            (idempotent; same family as stop intent)
 engagement ack             Mechanism Evidence published through the
                            session-owned evidence path — never a Fact
-truthfully Paused          ⇔ pause intent recorded ∧ engagement evidence
-                           observed (both visible on the episode
-                           observation; either alone is not Paused)
-truthfully Resumed         ⇔ resume released ∧ disengagement evidence
+truthfully Paused          ⇔ the episode has no committed terminal
+                           outcome ∧ pause intent recorded ∧
+                           engagement evidence observed (either factor
+                           alone is not Paused; a settled episode is
+                           never Paused)
+truthfully Resumed         ⇔ the episode has no committed terminal
+                           outcome ∧ resume released ∧ disengagement
+                           evidence observed
 ```
+
+The conjunction is guarded by the episode's unsettled state: once a
+terminal Fact commits, pause truth must not evaluate true on the
+episode regardless of mechanism engagement still being latched, so
+session settlement/teardown MUST release the pause gate (publishing
+disengagement evidence) on the authority-owned execution/teardown path.
 
 No new fact kind, no new fact authority, no fourth terminal variant, no
 `Paused` semantic Fact and no `Playing/Starting/Paused/Stopping`

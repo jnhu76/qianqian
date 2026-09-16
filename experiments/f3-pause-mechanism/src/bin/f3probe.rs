@@ -546,12 +546,11 @@ mod win {
             getbuffer_in_park
         ));
 
-        let ok = engage_ack.is_some() && getbuffer_in_park == 0;
-        (
-            leg,
-            ok,
-            probe.sessions.load(Ordering::Acquire) - sessions_at_open,
-        )
+        // Device continuity is an enforced bound, not just printed
+        // evidence: no reopen may happen inside the phase.
+        let sessions_delta = probe.sessions.load(Ordering::Acquire) - sessions_at_open;
+        let ok = engage_ack.is_some() && getbuffer_in_park == 0 && sessions_delta == 0;
+        (leg, ok, sessions_delta)
     }
 
     /// Diagnostic mode (F3PROBE_INIT_MATRIX=1): report the default

@@ -144,15 +144,22 @@ Default park 1.2 s; runs 2–4 stable; run 5 = prolonged 5 s park:
                                 run2      run3      run5 (park 5s)
 A engage ack                    10 ms     10 ms     10 ms
 A padding pre-park → post-res.  576 → 0   576 → 0   576 → 0   (drained)
+A resume first refill           <1 ms     <1 ms     <1 ms
 A GetBuffer-in-park             0         0         0
 A stop-from-paused exit         3 ms      4 ms      4 ms
 A device sessions               1         1         1
 B engage ack                    10 ms     10 ms     10 ms
 B padding pre-park → post-res.  576 → 576 576 → 576 576 → 576 (frozen)
+B resume first refill           <1 ms     <1 ms     <1 ms
 B GetBuffer-in-park             0         0         0
 B device sessions               1         1         1
 B stop-from-running exit        clean     clean     clean
 ```
+
+Device-session continuity is enforced by the probe's pass criterion
+(delta == 0 within a phase), not merely printed. Resume "first refill"
+is command → first post-resume GetBuffer, millisecond-truncated
+(observed 0 in every run).
 
 Interpretation:
 
@@ -217,3 +224,24 @@ representation                episode-observation field spelling and
 Rejected-for-freeze (unless separately re-earned): PausePlugin, any
 second playback lifecycle noun, Generation/Window, a transport-state
 enum (Playing/Starting/Paused/…), mechanism-B as the frozen minimum.
+
+## 7. Fresh-context adversarial review round
+
+```text
+verdict:  ACCEPT_WITH_MINORS (fresh-context reviewer, read-only)
+lenses:   12/12 PASS on authority forgery, GetBuffer-across-park,
+          backpressure deadlock, stop-wake liveness, EOF classification
+          (verified path-by-path against the real resolver),
+          pause-truth inference, D13 admission, lifecycle nouns,
+          scope discipline, ADR coherence, vocabulary
+correctives (applied in-branch):
+  MINOR-1  D14.7 paused/resumed conjunction now guarded by
+           "episode has no committed terminal outcome"; session
+           settlement/teardown must release the gate
+  MINOR-2a mechanism-B padding>0 assert replaced by a bounded wait
+  MINOR-2b probe enforces device-session delta == 0 in its pass
+           criterion (continuity now enforced, not printed)
+  MINOR-2c resume-latency row transcribed into §4
+no MAJOR finding; suite re-run 9/9 and physical probe re-run green
+after the correctives
+```
