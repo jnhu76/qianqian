@@ -1,7 +1,10 @@
 # F1 physical gate: real SongCore decode + real WASAPI render + real CLI stop.
-# Stop section: start `play`, wait for the activation witness line, let the
-# device enter steady rendering, send `stop` through stdin, require exit 0
-# with the Stopped outcome and quiet disposal.
+# Runs the SCRIPTABLE transport (--machine play): redirected pipes cannot
+# drive the interactive terminal shell, which `play` opens since the
+# reference-player slice.
+# Stop section: start `--machine play`, wait for the activation witness
+# line, let the device enter steady rendering, send `stop` through stdin,
+# require exit 0 with the Stopped outcome and quiet disposal.
 # EOF section: play to natural end with stdin closed immediately; require
 # exit 0 with the Completed outcome - F1 must not confuse EOF with stop.
 param(
@@ -15,7 +18,7 @@ $ErrorActionPreference = "Stop"
 function Run-Episode([string]$StdinLine, [bool]$SendStop, [string]$ExpectMatch) {
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $Exe
-    $psi.Arguments = "play `"$Fixture`""
+    $psi.Arguments = "--machine play `"$Fixture`""
     $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true

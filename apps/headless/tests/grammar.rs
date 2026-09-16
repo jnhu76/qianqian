@@ -117,3 +117,54 @@ fn play_without_the_playback_feature_reports_the_rebuild_hint() {
         run.stderr
     );
 }
+
+#[test]
+fn usage_documents_both_transports() {
+    let run = invoke(&["--help"]);
+    assert!(
+        run.stdout.contains("play <file>"),
+        "the interactive grammar stays documented: {}",
+        run.stdout
+    );
+    assert!(
+        run.stdout.contains("--machine play <file>"),
+        "the scriptable transport stays documented: {}",
+        run.stdout
+    );
+}
+
+/// Negative control: `--machine` alone (or without a well-formed
+/// `play <file>` tail) is a usage error, not a silent fallback.
+#[test]
+fn machine_flag_without_a_well_formed_play_tail_is_a_usage_error() {
+    for args in [
+        &["--machine"][..],
+        &["--machine", "play"][..],
+        &["--machine", "play", "a.flac", "b.flac"][..],
+        &["--machine", "frobnicate", "x"][..],
+    ] {
+        let run = invoke(args);
+        assert_eq!(run.code, 2, "{args:?}");
+        assert!(
+            run.stderr.contains("usage: qianqian-headless"),
+            "usage errors carry the usage text: {args:?} -> {}",
+            run.stderr
+        );
+    }
+}
+
+/// Machine-transport regression: the scriptable invocation reaches the
+/// same playback slice gate as `play` — refused honestly without the
+/// feature, never silently falling back to the terminal shell (which
+/// would fail later in a piped stdin/stdout harness).
+#[cfg(not(feature = "playback"))]
+#[test]
+fn machine_play_without_the_playback_feature_reports_the_rebuild_hint() {
+    let run = invoke(&["--machine", "play", "song.flac"]);
+    assert_eq!(run.code, 2);
+    assert!(
+        run.stderr.contains("built without the playback slice"),
+        "the no-mechanism build refuses an episode honestly: {}",
+        run.stderr
+    );
+}
