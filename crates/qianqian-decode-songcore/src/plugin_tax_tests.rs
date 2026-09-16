@@ -8,23 +8,18 @@
 //! Verdict rule: |delta| inside the run's own noise band =>
 //! NO_MEASURABLE_PLUGIN_TAX; a clear excess => INVESTIGATE.
 
-mod common;
+use crate::test_common as common;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 
+use crate::SongcoreDecode;
 use qianqian_audio_api::ports::{DecodeOutcome, PcmDecode};
-use qianqian_decode_songcore::SongcoreDecode;
 use qianqian_songcore_sys as sys;
 
 use common::ReferenceFixture;
 
 const BLOCK_FRAMES: usize = 1024;
-
-fn fixtures_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../native/experiments/songcore-equivalence/fixtures")
-}
 
 fn load_fixture(id: &str) -> (ReferenceFixture, PathBuf) {
     common::load_fixture(id)

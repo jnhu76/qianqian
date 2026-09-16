@@ -22,14 +22,19 @@ use qianqian_songcore_sys as sys;
 
 /// Real decode mechanism over one SongCore native library instance.
 /// Long-lived and stateless across opens.
-pub struct SongcoreDecode {
+///
+/// Crate-private by design (plugin-boundary hardening H1): this is the
+/// concrete mechanism, not product API. Composition roots admit this
+/// plugin through [`songcore_decode_plugin`]; the capability consumer
+/// sees only the `PcmDecode` service trait.
+struct SongcoreDecode {
     _private: (),
 }
 
 impl SongcoreDecode {
     /// Bind the mechanism fail-closed: the loaded native library must
     /// report the ABI version this crate was generated against.
-    pub fn new() -> Result<Self, DecodeOpenError> {
+    fn new() -> Result<Self, DecodeOpenError> {
         let loaded = unsafe { sys::songcore_abi_version() };
         if loaded != sys::SONGCORE_ABI_VERSION {
             return Err(DecodeOpenError {
@@ -106,7 +111,9 @@ fn status_open_error(path: &Path, status: u32) -> DecodeOpenError {
 /// One playback-specific decode endpoint: owns one native song handle and
 /// the file it reads from. Released on drop (song_close), single-thread
 /// serialized by contract (`DecodedPcmStream: Send` but not `Sync`).
-pub struct SongcoreDecodeStream {
+/// Crate-private: consumers reach it only as the `DecodedPcmStream` trait
+/// object returned by the capability service.
+struct SongcoreDecodeStream {
     handle: *mut sys::song_handle,
     format: PcmFormat,
     /// Kept alive for the handle's lifetime; the callbacks borrow it raw.
@@ -312,3 +319,16 @@ mod tests {
         }
     }
 }
+
+// White-box tests, moved inside the crate boundary by the plugin-boundary
+// hardening (H1): they exercise the concrete mechanism and the real
+// native corpus, so the mechanism stays crate-private and the tests
+// reach it through the crate path. The shared fixture helper stays in
+// tests/common/ (not auto-discovered) and is included once here.
+#[cfg(test)]
+mod decode_endpoint_tests;
+#[cfg(test)]
+mod plugin_tax_tests;
+#[cfg(test)]
+#[path = "../tests/common/mod.rs"]
+mod test_common;

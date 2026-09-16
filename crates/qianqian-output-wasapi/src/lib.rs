@@ -20,11 +20,14 @@ use qianqian_composition::{ActivationError, ComponentSpec};
 #[cfg(windows)]
 mod wasapi;
 
-/// The concrete Windows mechanism, exported for direct-mechanism tests
-/// and gates the same way the decode crate exports `SongcoreDecode`.
-/// Product consumers go through the capability, not this type.
-#[cfg(windows)]
-pub use wasapi::WasapiOutput;
+// White-box mechanism test (event-handle lifetime oracle,
+// NATIVE-BOUNDARY-AUDIT-0 A3.3 corrective). It moved inside the crate
+// boundary in the plugin-boundary hardening (H1): the concrete
+// mechanism is no longer exported for tests. Windows-only by nature;
+// its leak loop needs a real render endpoint, so it belongs to the
+// Windows reality gate, not the platform-independent suites.
+#[cfg(all(test, windows))]
+mod event_handle_lifetime_tests;
 
 /// Build the platform's real output mechanism. On non-Windows this is the
 /// honest unsupported-platform report, surfaced as an activation failure.
