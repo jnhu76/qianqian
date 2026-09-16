@@ -98,11 +98,11 @@ BUILD_EDGES = {}  # no internal build edges are admitted for any crate
 #   require / forbid        literal snippets in one lib.rs (decode keeps
 #                           these; its stricter per-src-file scan below
 #                           makes the forbids belt-and-braces)
-#   allowed_root_public     the crate-root file may declare EXACTLY these
+#   allowed_root_public     the rule's file may declare EXACTLY these
 #                           externally-visible `pub` statements — no more
 #                           (unexpected surface) and no less (required
 #                           surface missing). Forbidding known spellings
-#                           is not enforcement: any NEW root public seam
+#                           is not enforcement: any NEW public seam
 #                           (e.g. `pub fn direct_output()` handing out the
 #                           mechanism service) must RED and force an
 #                           explicit architecture decision, same
@@ -110,6 +110,16 @@ BUILD_EDGES = {}  # no internal build edges are admitted for any crate
 #                           Statements are whitespace-canonicalized, so
 #                           rustfmt reflow does not false-RED; any
 #                           semantic change of the statement does.
+#                           Optional "label" names the surface in
+#                           violation output (defaults to "root").
+#
+# For playback this is TWO levels, on purpose: lib.rs freezes which names
+# leave the crate, and handle.rs freezes the RIGHTS those names carry —
+# the exported episode handle must grant the App exactly the D14.2
+# rights (request_stop / observe / wait_terminal + the observation
+# fields). A future `pub fn pause()` on the handle, or a new pub field
+# on PlaybackSessionObservation, compiles fine and changes no Cargo
+# edge — only this rule turns it into an explicit architecture event.
 
 EXPORT_RULES = {
     "crates/qianqian-playback/src/lib.rs": {
@@ -118,6 +128,34 @@ EXPORT_RULES = {
             "pub use session::playback_session_spec;",
         ],
         "authority": "ADR-PBK-002 D6/D14.2/D14.3 — the admitted public surface is exactly the F2 episode seam; the episode mechanism is session-owned, not product API",
+    },
+    # The rights freeze behind the lib.rs re-exports (review round 3):
+    # an exported type's pub methods/fields live here, not in lib.rs, so
+    # the crate-root allowlist alone cannot see them grow. pub(crate)
+    # items (completion) are not external surface and are NOT admitted;
+    # promoting one to `pub` REDs this rule.
+    "crates/qianqian-playback/src/handle.rs": {
+        "label": "episode-handle",
+        "allowed_root_public": [
+            "pub enum EpisodeTerminalOutcome {",
+            "pub struct PlaybackSessionHandle {",
+            "pub struct PlaybackSessionObservation {",
+            "pub terminal_outcome: Option<EpisodeTerminalOutcome>,",
+            "pub failure_diagnostic: Option<String>,",
+            "pub stop_requested: bool,",
+            "pub source_format: Option<PcmFormat>,",
+            "pub activation_error: Option<String>,",
+            "pub fn new() -> Self {",
+            "pub fn request_stop(&self) {",
+            "pub fn observe(&self) -> PlaybackSessionObservation {",
+            "pub fn wait_terminal(&self) -> EpisodeTerminalOutcome {",
+        ],
+        "authority": "ADR-PBK-002 D14.2 — the App's rights over one episode are exactly "
+        "new/request_stop/observe/wait_terminal plus the five observation fields; "
+        "the handle carries no mechanism rights and no terminal-Fact authority. "
+        "A new public right (pause/resume, drain access, a new observation field) "
+        "must first earn an explicit D14/phase-authority amendment, then update "
+        "this allowlist on purpose",
     },
     "crates/qianqian-decode-songcore/src/lib.rs": {
         "require": [
@@ -194,13 +232,17 @@ def internal_deps(package):
 
 
 def root_public_declarations(text):
-    """Canonical forms of every root-level externally-visible `pub`
-    declaration: statements starting with `pub ` (pub(crate)/pub(super)
+    """Canonical forms of every externally-visible `pub` declaration in
+    a rule's file: statements starting with `pub ` (pub(crate)/pub(super)
     are not external surface), assembled until their terminator,
     whitespace-stripped so rustfmt reflow does not false-RED. A `pub use`
     statement ends at `;` — its brace list (`use p::{A, B}`) is payload,
-    not a block opener. Every other kind ends at the first `;` or `{`;
-    an exotic signature containing an earlier `;`/`{` (e.g.
+    not a block opener. Every other kind ends at the first `;`, `{` or
+    `,`: the comma keeps struct fields (`pub stop_requested: bool,`) and
+    multi-parameter signatures as one deterministic canonical each, so
+    any change to a frozen declaration — a new field, a new parameter, a
+    changed return type — produces a NEW canonical and REDs. An exotic
+    signature containing an earlier `;`/`{` (e.g.
     `pub fn f(x: [u8; 4])`) splits into unmatched fragments — a false
     RED, i.e. fail-closed.
     """
@@ -225,7 +267,9 @@ def root_public_declarations(text):
                 declarations.append("".join(buffer[: cut + 1].split()))
                 buffer, use_stmt = None, False
             continue
-        positions = [i for i in (buffer.find(";"), buffer.find("{")) if i != -1]
+        positions = [
+            i for i in (buffer.find(";"), buffer.find("{"), buffer.find(",")) if i != -1
+        ]
         if positions:
             cut = min(positions)
             declarations.append("".join(buffer[: cut + 1].split()))
@@ -319,13 +363,14 @@ def scan():
                     f"authority: {rule['authority']}"
                 )
         if "allowed_root_public" in rule:
+            noun = rule.get("label", "root")
             found = root_public_declarations(text)
             allowed = {"".join(a.split()) for a in rule["allowed_root_public"]}
             for canonical in found:
                 if canonical not in allowed:
                     violations.append(
                         f"source: {rel}\ntarget: public export surface\nkind: source\n"
-                        f"rule: unexpected root public surface: {canonical!r}\n"
+                        f"rule: unexpected {noun} public surface: {canonical!r}\n"
                         f"admitted surface: {sorted(allowed)}\n"
                         f"a new public product seam is an explicit architecture "
                         f"decision: update this allowlist on purpose\n"
@@ -335,7 +380,7 @@ def scan():
                 if admitted not in found:
                     violations.append(
                         f"source: {rel}\ntarget: public export surface\nkind: source\n"
-                        f"rule: admitted public surface missing: {admitted!r}\n"
+                        f"rule: admitted {noun} public surface missing: {admitted!r}\n"
                         f"authority: {rule['authority']}"
                     )
 
@@ -390,6 +435,7 @@ def run_gate():
 MUTABLE_FILES = [
     "crates/qianqian-playback/Cargo.toml",
     "crates/qianqian-playback/src/lib.rs",
+    "crates/qianqian-playback/src/handle.rs",
     "crates/qianqian-decode-songcore/Cargo.toml",
     "crates/qianqian-decode-songcore/src/lib.rs",
     "crates/qianqian-output-wasapi/src/lib.rs",
@@ -557,6 +603,37 @@ def run_negative_controls():
         {
             "crates/qianqian-playback/src/lib.rs": lambda t: (
                 t + "\npub fn boundary_escape_probe() {}\n"
+            )
+        },
+    )
+    # M8 — handle-RIGHT expansion (review round 3): the lib.rs allowlist
+    # froze which names leave the crate; the handle.rs rule freezes what
+    # those names can DO. A new pub method on the episode handle
+    # compiles, changes no Cargo edge and adds no root export — the
+    # episode-handle allowlist must RED on it alone (D14.2: exactly
+    # request_stop / observe / wait_terminal).
+    expect_fail(
+        "M8-playback episode-handle right expansion",
+        "unexpected episode-handle public surface: 'pubfnboundary_escape_probe(&self){'",
+        {
+            "crates/qianqian-playback/src/handle.rs": lambda t: (
+                t + "\nimpl PlaybackSessionHandle {\n"
+                "    pub fn boundary_escape_probe(&self) {}\n"
+                "}\n"
+            )
+        },
+    )
+    # M8b — the observation surface is frozen at FIELD granularity: the
+    # App reads exactly the five D14.2 fields and nothing else.
+    expect_fail(
+        "M8b observation field expansion",
+        "unexpected episode-handle public surface: 'pubboundary_escape_probe:bool,'",
+        {
+            "crates/qianqian-playback/src/handle.rs": lambda t: t.replace(
+                "pub struct PlaybackSessionObservation {",
+                "pub struct PlaybackSessionObservation {\n"
+                "    pub boundary_escape_probe: bool,",
+                1,
             )
         },
     )
