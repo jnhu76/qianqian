@@ -50,6 +50,13 @@ pub struct SimDevice {
     log: Log,
     drainer: Mutex<Option<JoinHandle<()>>>,
     stop_drainer: Arc<std::sync::atomic::AtomicBool>,
+    /// Test-only determinism control: when held, the drainer thread
+    /// suspends consumption WITHOUT any device-level Stop semantics or
+    /// events (mechanism-B's `device_stop` is a different, semantic
+    /// operation). It freezes the drain timeline so a scenario can
+    /// deterministically sample the engaged-with-pending-tail state
+    /// that the physical probe measures in real time.
+    drain_held: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl SimDevice {
@@ -68,6 +75,7 @@ impl SimDevice {
             log,
             drainer: Mutex::new(None),
             stop_drainer: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            drain_held: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 
@@ -83,7 +91,10 @@ impl SimDevice {
                 }
                 std::thread::sleep(me.tick);
                 let mut st = me.state.lock().expect("sim device lock");
-                if st.consuming && st.padding > 0 {
+                if st.consuming
+                    && st.padding > 0
+                    && !me.drain_held.load(std::sync::atomic::Ordering::Acquire)
+                {
                     let take = st.padding.min(me.period_frames);
                     st.padding -= take;
                     drop(st);
@@ -101,6 +112,13 @@ impl SimDevice {
         if let Some(h) = self.drainer.lock().expect("drainer lock").take() {
             let _ = h.join();
         }
+    }
+
+    /// Test-only: suspend/resume the drainer's consumption timeline
+    /// without device-level Stop semantics or events (see field doc).
+    pub fn hold_drain(&self, hold: bool) {
+        self.drain_held
+            .store(hold, std::sync::atomic::Ordering::Release);
     }
 }
 

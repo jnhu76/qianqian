@@ -19,6 +19,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use f3_pause_mechanism::edge::PcmEdge;
+use f3_pause_mechanism::establishment::{
+    paused_projection, paused_projection_mutated_engagement_only, resumed_projection,
+    EstablishmentInputs,
+};
 use f3_pause_mechanism::events::{Event, Log};
 use f3_pause_mechanism::gate::PauseGate;
 use f3_pause_mechanism::render::{
@@ -556,6 +560,17 @@ fn mechanism_b_freezes_device_consumption_across_the_park() {
         rig.device.padding() > 0,
         "expected submitted audio to still be frozen"
     );
+    // Corrected D14.7 (F3-GATE-CORRECTIVE-1): mechanism B freezes the
+    // submitted tail, so tail quiescence can never be observed while
+    // parked and the Paused projection must stay false for the whole
+    // park — engagement alone never establishes Paused. This is the
+    // establishment-side reason B is not the selected mechanism.
+    assert!(!paused_projection(EstablishmentInputs {
+        settled: false,
+        pause_intent: rig.gate.pause_requested(),
+        engaged: rig.gate.observe().engaged,
+        tail_quiesced: false,
+    }));
     {
         let entries = rig.log.all();
         let mut in_freeze = false;
@@ -647,4 +662,201 @@ fn negative_control_buffer_held_across_pause_is_caught_by_the_oracle() {
     rig.gate.release_stop();
     let _ = join_within(broken, JOIN_TIMEOUT);
     rig.join_drainer();
+}
+
+/// CORRECTIVE-1 scenario: the Paused projection must wait for
+/// output-tail quiescence, not merely for render engagement.
+///
+/// Physical background (D14.7 corrective): mechanism A's own probe
+/// proves that after the engage ack the already-submitted device audio
+/// keeps playing until the WASAPI shared-mode padding drains
+/// (padding 576 → 0, ~12 ms at the observed endpoint). Engagement is
+/// therefore NOT an audible pause. This scenario deterministically
+/// holds the drain timeline so the exact reviewed state —
+/// terminal=none ∧ pause intent ∧ engaged ∧ output padding > 0 — is
+/// sampled, and proves the corrected projection does not claim Paused
+/// there; it becomes true exactly when the post-engagement padding==0
+/// observation (tail-quiescence evidence) arrives.
+#[test]
+fn paused_projection_establishes_only_after_output_tail_quiescence() {
+    let rig = rig();
+    rig.device.start_drainer();
+    let worker = spawn_worker(
+        Source::EofAfter(1_000_000),
+        rig.edge.clone(),
+        CHUNK,
+        CHANNELS,
+        rig.log.clone(),
+        rig.inflight.clone(),
+    );
+    let render = rig.spawn_render(Mechanism::GateOnly);
+
+    assert!(wait_for(
+        || rig
+            .log
+            .matching(|e| matches!(e, Event::Pull(Some(_))))
+            .len()
+            >= 3,
+        ENGAGE_TIMEOUT
+    ));
+
+    // Freeze the drain timeline and fill the device buffer, so the
+    // pending-tail state is deterministic (the physical probe measures
+    // the same state in real time). The loop keeps submitting until the
+    // buffer is full, then parks at the gate on the pause command.
+    rig.device.hold_drain(true);
+    assert!(
+        wait_for(
+            || rig.device.padding() >= DEVICE_FRAMES - PERIOD,
+            ENGAGE_TIMEOUT
+        ),
+        "device buffer never filled for the deterministic pending-tail state"
+    );
+    rig.log.push(Event::PauseRequested);
+    rig.gate.request_pause();
+    assert!(wait_engaged(&rig.gate));
+    assert_no_device_buffer_while_parked(&rig.log);
+    assert!(
+        rig.device.padding() > 0,
+        "drain was held but the device tail already drained"
+    );
+
+    // The reviewed state: engaged, intent recorded, unsettled, and the
+    // submitted tail still pending. Paused MUST NOT yet be claimed.
+    let pending = EstablishmentInputs {
+        settled: false,
+        pause_intent: rig.gate.pause_requested(),
+        engaged: rig.gate.observe().engaged,
+        tail_quiesced: false,
+    };
+    assert!(
+        !paused_projection(pending),
+        "Paused claimed while the submitted tail is still pending (engagement is not an audible pause)"
+    );
+
+    // Release the drain: the tail plays out. The first post-engagement
+    // padding==0 observation is the tail-quiescence evidence (no
+    // submission can have happened in between: the park-safety oracle
+    // above pins zero GetBuffer/Release while parked).
+    rig.device.hold_drain(false);
+    assert!(
+        wait_for(|| rig.device.padding() == 0, ENGAGE_TIMEOUT),
+        "submitted tail never drained to the quiescence observation"
+    );
+    assert_no_device_buffer_while_parked(&rig.log);
+    let quiesced = EstablishmentInputs {
+        tail_quiesced: true,
+        ..pending
+    };
+    assert!(
+        paused_projection(quiesced),
+        "Paused never became true even after the output tail quiesced"
+    );
+
+    // Resume: the projection symmetric flips to Resumed (pause control
+    // no longer established; render submission re-enabled — NOT a claim
+    // of already-audible audio).
+    rig.log.push(Event::ResumeRequested);
+    rig.gate.request_resume();
+    assert!(wait_disengaged(&rig.gate));
+    let resumed = EstablishmentInputs {
+        pause_intent: false,
+        engaged: false,
+        ..quiesced
+    };
+    assert!(
+        resumed_projection(resumed) && !paused_projection(resumed),
+        "Resumed projection semantics diverged from the disengagement state"
+    );
+    assert!(
+        wait_for(
+            || rig
+                .log
+                .matching(|e| matches!(e, Event::Pull(Some(_))))
+                .len()
+                > 3,
+            ENGAGE_TIMEOUT
+        ),
+        "no consumer progress after resume"
+    );
+
+    rig.session_stop();
+    assert_eq!(
+        join_within(render, JOIN_TIMEOUT),
+        Some(LoopOutcome::Aborted)
+    );
+    assert_eq!(join_within(worker, JOIN_TIMEOUT), Some(WorkerExit::Stopped));
+    rig.join_drainer();
+    assert_no_device_buffer_across_park(&rig.log);
+}
+
+/// CORRECTIVE-1 negative control: the exact bug human review found.
+/// The oracle is `!paused_projection(state)` evaluated at
+/// terminal=none ∧ pause intent ∧ engaged ∧ output padding > 0. The
+/// control proves the oracle is non-vacuous by running the
+/// PRE-CORRECTIVE definition (`Paused := unsettled ∧ intent ∧
+/// engagement`) through the same oracle — it must fail RED — and by
+/// pinning the corrected truth table over all input combinations,
+/// differing from the mutant exactly where tail quiescence matters.
+#[test]
+fn negative_control_engagement_without_tail_quiescence_never_establishes_paused() {
+    // 1. The reviewed state through the corrected oracle: GREEN.
+    let reviewed = EstablishmentInputs {
+        settled: false,
+        pause_intent: true,
+        engaged: true,
+        tail_quiesced: false,
+    };
+    assert!(!paused_projection(reviewed));
+
+    // 2. The mutation (pre-corrective engagement-only conjunction)
+    //    through the same oracle: must fail RED, i.e. the oracle
+    //    demonstrably catches the exact reviewed defect.
+    let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        assert!(
+            !paused_projection_mutated_engagement_only(reviewed),
+            "pre-corrective definition claimed Paused in the reviewed state (expected for the mutation)"
+        );
+    }))
+    .is_err();
+    assert!(
+        caught,
+        "the engagement-only mutation was NOT caught by the establishment oracle (vacuous oracle)"
+    );
+
+    // 3. Full truth table: the corrected projection is the frozen
+    //    conjunction, and the mutant disagrees exactly when the tail
+    //    evidence is missing (and never anywhere else).
+    for settled in [false, true] {
+        for intent in [false, true] {
+            for engaged in [false, true] {
+                for tail in [false, true] {
+                    let i = EstablishmentInputs {
+                        settled,
+                        pause_intent: intent,
+                        engaged,
+                        tail_quiesced: tail,
+                    };
+                    let expected = !settled && intent && engaged && tail;
+                    assert_eq!(
+                        paused_projection(i),
+                        expected,
+                        "corrected Paused truth table diverged at {i:?}"
+                    );
+                    let mutant = !settled && intent && engaged;
+                    assert_eq!(
+                        paused_projection_mutated_engagement_only(i),
+                        mutant,
+                        "mutation subject diverged from the pre-corrective definition at {i:?}"
+                    );
+                    if mutant && !expected {
+                        assert!(
+                            !tail,
+                            "mutant/corrected disagreement outside the pending-tail state"
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

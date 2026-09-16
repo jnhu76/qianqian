@@ -52,6 +52,7 @@
 //! and `RESULTS.md`; nothing here is authority.
 
 pub mod edge;
+pub mod establishment;
 pub mod events;
 pub mod gate;
 pub mod render;
