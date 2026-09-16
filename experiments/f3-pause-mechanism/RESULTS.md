@@ -208,10 +208,19 @@ During `T_engaged … T_tail_quiesced` the parked episode's submitted
 tail is still pending for rendering — the reviewed state
 (intent ∧ engaged ∧ unsettled ∧ padding > 0). Only after
 `T_tail_quiesced` is the corrected Paused projection true. Mechanism B
-can never observe quiescence while parked (padding frozen), which is
-the establishment-side discriminator that keeps B unselected. These
-timings are mechanism evidence for F4 planning; they are NOT product
-Position.
+can never observe quiescence while parked (padding frozen), so B
+cannot adopt this establishment rule without new authority — B's
+non-selection reasons remain the round-1 ones (frozen mid-buffer
+audio, added stream-state changes). These timings are mechanism
+evidence for F4 planning; they are NOT product Position.
+
+Observation note (review round 2): the B-phase observer reads
+`GetCurrentPadding` on a STOPPED stream (after `IAudioClient::Stop`).
+The platform docs do not explicitly specify padding semantics for a
+stopped shared-mode stream; on this host it consistently reported the
+frozen queue (1056) across all runs, and an observer error under B
+degrades to report-only (B's frozen-park physics are separately
+enforced by the leg-side endpoint check).
 
 Interpretation:
 

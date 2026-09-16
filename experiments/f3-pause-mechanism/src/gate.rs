@@ -10,9 +10,12 @@
 //!                   lock. Idempotent; monotone per pause/resume cycle.
 //! engaged           Mechanism acknowledgment. Written ONLY by the
 //!                   render loop under the same lock, immediately before
-//!                   it parks — this is what makes "Paused truthfully
-//!                   established" an observed mechanism fact instead of
-//!                   an inference from the command.
+//!                   it parks. Per the CORRECTED D14.7 (F3-GATE-
+//!                   CORRECTIVE-1) this is render-leg evidence only —
+//!                   NOT an audible pause: already-submitted device
+//!                   audio keeps playing until the output tail quiesces,
+//!                   and the Paused PROJECTION additionally requires
+//!                   that tail-quiescence evidence.
 //! stopped           Stop release. Written by the episode stop path /
 //!                   teardown under the same lock BEFORE (or alongside)
 //!                   the data-plane stop. Wake semantics are
@@ -171,9 +174,11 @@ impl PauseGate {
 }
 
 /// One coherent gate observation: `engaged` is mechanism evidence (the
-/// render leg parked), `pause_requested` is command state; "truthfully
-/// paused" per the D14.7 proposal is the conjunction, never either
-/// alone.
+/// render leg parked), `pause_requested` is command state. Per the
+/// corrected D14.7 (CORRECTIVE-1) the Paused projection is
+/// `unsettled ∧ pause_requested ∧ engaged ∧ tail-quiescence evidence`;
+/// this observation carries the first two factors only — engagement
+/// alone is never an audible pause.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GateObservation {
     pub pause_requested: bool,

@@ -756,6 +756,10 @@ Qianqian App 不是 playback semantic authority；K0 lifecycle facts 不是 play
 
 ```text
 Playing / Starting / Paused / Stopping semantics
+    (the transport-state semantics remain OPEN; the D14.7
+     Paused/Resumed Projections are NOT this item — they are
+     non-authoritative derived visibility, not transport lifecycle
+     states)
 position / duration authority
 seek product-state vocabulary / actual-landing authority beyond D14 minimum
 source identity / playlist authority / navigation policy
@@ -1230,23 +1234,23 @@ therefore           one zero observation after engagement proves every
                     set, for the remainder of the park.
 ```
 
-The proposition is deliberately narrow: it claims exactly that no audio
-submitted before pause engagement remains pending for rendering by this
-output session. It does NOT claim that the speaker/DAC produced no
-further sample at that instant, that frames already consumed by the
-engine are out of all downstream device latency, that other sessions
-are silent, or that a human hears silence. Physical evidence
+claim is deliberately narrow — no speaker/DAC motionlessness, no
+downstream device-latency claim, no other-session silence, no
+human-hears-silence claim. Physical evidence
 (`experiments/f3-pause-mechanism`, Windows shared-mode probe): at
-engagement the submitted tail is one device buffer (padding 576 ≈ 12 ms
-at the observed endpoint), which drains to 0 — measured
-`tail_drain_latency = T_tail_quiesced − T_engaged` — after which the
-device renders silence for the rest of the park. Mechanism B
-(device Stop/Start) freezes the padding mid-buffer and therefore can
-never observe this evidence while parked — the establishment-side
-reason B is not the selected mechanism. This evidence stays Mechanism
-Evidence; it must never be promoted to a Fact, a position/Duration
-source (F4/D14.8), or a P1–P5 trigger (no old/new realtime-world
-overlap exists here).
+engagement the observer reads the submitted tail at up to one full
+device buffer (measured padding-at-engage = 1056 frames ≈ 22 ms at the
+observed endpoint), which drains to 0 — measured
+`tail_drain_latency = T_tail_quiesced − T_engaged ≈ 28–30 ms` — after
+which this session's contribution is silence for the rest of the park.
+Mechanism B (device Stop/Start) freezes the padding mid-buffer and
+therefore cannot observe this evidence while parked; adopting this
+establishment rule under B would itself require a new narrow authority
+decision (B's non-selection reasons remain the original ones: frozen
+mid-buffer audio and added stream-state changes). This evidence stays
+Mechanism Evidence; it must never be promoted to a Fact, a
+position/Duration source (F4/D14.8), or a P1–P5 trigger (no old/new
+realtime-world overlap exists here).
 
 Truthful product establishment is then the projection:
 
