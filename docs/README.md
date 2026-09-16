@@ -21,6 +21,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Current Rust behavior | current code + tests |
 | Retired pre-reset playback models/harness | Git history / PR records — historical evidence only; removed from main by the post-#139 spec reset (still-current races are covered by today's specs/tests, see `../specs/README.md`) |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
+| Plugin boundary conformance audit (post-#145 headless path) | `audits/plugin-boundary-conformance-audit.md` — audit evidence record; hardening plan accepted, **not yet implemented** |
 | Product/repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | External failure evidence | `../evidence/README.md` — opt-in only |
@@ -57,6 +58,7 @@ EVIDENCE
      direct-pcm-flow.md, realtime-view-publication.md,
      realtime-publication-lifetime-decision.md,
      component-boundary-a0.md, first-audible-slice.md) /
+     audit records (audits/plugin-boundary-conformance-audit.md) /
      historical refs
 
 DERIVED PROJECTION
