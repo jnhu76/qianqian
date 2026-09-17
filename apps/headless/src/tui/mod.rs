@@ -22,9 +22,10 @@
 //! the episode only through `PlaybackSessionHandle::observe()` and
 //! acts on it only through `request_stop()`. It never sees K0 snapshot
 //! types, FiberState, PcmEdge, decode/output mechanisms, or any
-//! realtime path, and it renders no playback semantic that F2 has not
-//! earned (no Playing/Starting/Paused/Stopping, no position, no
-//! volume, no playlist).
+//! realtime path, and it renders no playback semantic that F2/F3 have
+//! not earned (no Playing/Starting/Stopping — Paused is the one
+//! D14.7-earned projection and there is no Resumed label after the
+//! D14.7 AUTHORITY-CORRECTIVE; no position, no volume, no playlist).
 
 mod model;
 mod runtime;

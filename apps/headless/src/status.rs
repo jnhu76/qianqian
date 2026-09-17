@@ -72,13 +72,18 @@ pub fn format_status(observation: &PlaybackSessionObservation) -> String {
 /// `paused` left this list when D14.7 froze the pause establishment
 /// (F3): the `paused:` line is now an earned, seam-derived projection,
 /// pinned to the frozen establishment conjunction by the status and
-/// TUI model tests. The remaining words name states no current
+/// TUI model tests. `resumed` entered it when the D14.7
+/// AUTHORITY-CORRECTIVE removed the Resumed product projection:
+/// disengagement evidence is never a user-facing transport claim, so a
+/// `resumed` status line is unearned vocabulary again. The remaining
+/// words name states no current
 /// authority has earned.
-const FORBIDDEN_STATUS_WORDS: [&str; 6] = [
+const FORBIDDEN_STATUS_WORDS: [&str; 7] = [
     "playing",
     "starting",
     "pausing",
     "stopping",
+    "resumed",
     "buffering",
     "buffered",
 ];

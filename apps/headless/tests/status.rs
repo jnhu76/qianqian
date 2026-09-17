@@ -220,12 +220,14 @@ fn the_forbidden_vocabulary_scan_catches_smuggled_buffer_health() {
 fn the_scan_covers_every_forbidden_word_and_passes_clean_text() {
     // `paused` is no longer forbidden: D14.7 earned the projection, and
     // the establishment conjunction is pinned by the positive tests
-    // above.
+    // above. `resumed` re-entered the forbidden set when the D14.7
+    // AUTHORITY-CORRECTIVE removed the Resumed product projection.
     for word in [
         "playing",
         "starting",
         "pausing",
         "stopping",
+        "resumed",
         "buffering",
         "buffered",
     ] {
