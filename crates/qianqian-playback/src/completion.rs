@@ -128,20 +128,17 @@ struct CompletionState {
     /// on disengagement, so a previous pause cycle's quiescence can
     /// never satisfy a later pause.
     tail_quiesced: bool,
-    /// Disengagement-ack evidence latch (D14.7): the CURRENT pause
-    /// cycle's render-gate disengagement has been observed. Reset when a
-    /// new pause cycle begins (pause intent false→true in
-    /// `request_pause`), so a previous cycle's disengagement does not
-    /// answer a later cycle's resume — the same current-cycle
-    /// discipline as `tail_quiesced`. Event attribution is deliberately
-    /// coarse (a pending prior-cycle `Disengaged` may still publish
-    /// into a new cycle); what the reset guarantees is the claim, not
-    /// the bookkeeping: `Resumed` is only ever true while the gate is
-    /// released — pause control is not established and render
-    /// submission is re-enabled — with at most one park slice of lag
-    /// before the leg reaches its released check. Existence evidence
-    /// for the Resumed projection only; it never feeds control or
-    /// settlement.
+    /// Disengagement-ack evidence latch (D14.7): the render leg's most
+    /// recent engagement has disengaged. Attribution is exact at
+    /// engagement granularity: same-leg event ordering makes
+    /// `Disengaged(old)` happen-before `Engaged(new)`, so `Engaged` is
+    /// the current-engagement fence and clears any evidence a prior
+    /// engagement left — a previous cycle's disengagement can never
+    /// answer a later cycle's resume (D14.7 corrective-2). The
+    /// false→true reset in `request_pause` stays as command-side
+    /// hygiene; the fence, not that reset, is the attribution rule.
+    /// Existence evidence for the Resumed projection only; it never
+    /// feeds control or settlement.
     disengagement_observed: bool,
     /// Set once by [`SessionCompletion::release_pause_gate`] — the
     /// authority-owned teardown path has begun releasing the pause
@@ -195,23 +192,7 @@ impl SessionCompletion {
                     let core = core.clone();
                     move |event| {
                         if let Some(core) = core.upgrade() {
-                            publish_evidence(&core, |state| match event {
-                                // Engagement resets the tail evidence:
-                                // quiescence belongs to the current
-                                // engagement only (D14.7 corrective).
-                                GateEvent::Engaged => {
-                                    state.engaged = true;
-                                    state.tail_quiesced = false;
-                                }
-                                GateEvent::TailQuiesced => {
-                                    state.tail_quiesced = true;
-                                }
-                                GateEvent::Disengaged => {
-                                    state.engaged = false;
-                                    state.tail_quiesced = false;
-                                    state.disengagement_observed = true;
-                                }
-                            });
+                            publish_evidence(&core, |state| apply_gate_event(state, event));
                         }
                     }
                 });
@@ -343,9 +324,11 @@ impl SessionCompletion {
     /// establishes remains mechanism evidence — the Paused projection is
     /// derived, never recorded here.
     ///
-    /// Recording a NEW pause cycle (intent false→true) also resets the
-    /// current-cycle disengagement evidence: a previous cycle's
-    /// disengagement must never establish Resumed for this one.
+    /// Recording a NEW pause cycle (intent false→true) also clears any
+    /// latched disengagement evidence as command-side hygiene; the
+    /// attribution rule itself is the leg's Engaged event (see
+    /// `apply_gate_event`), which fences a previous cycle's
+    /// disengagement out of this one.
     ///
     /// Intent routing is linearized with the command state under the one
     /// completion lock. A pause that linearizes after stop intent —
@@ -358,11 +341,13 @@ impl SessionCompletion {
     pub(crate) fn request_pause(&self) {
         let mut guard = self.state.state.lock().expect("completion lock");
         if !guard.pause_requested {
-            // A new pause cycle begins: a previous cycle's disengagement
-            // evidence must not answer this cycle's resume (D14.7). The
-            // reset scopes the evidence to the cycle, not the event
-            // attribution — see the field doc for the exact claim this
-            // buys. Repeated pauses within one cycle change nothing.
+            // Command-side hygiene only (D14.7 corrective-2): the event
+            // attribution fence is the leg's own Engaged event, which
+            // clears prior-cycle evidence the moment the current
+            // engagement begins. This reset just avoids reporting a
+            // stale prior-cycle disengagement in the window before that
+            // engagement is observed. Repeated pauses within one cycle
+            // change nothing.
             guard.disengagement_observed = false;
         }
         guard.pause_requested = true;
@@ -519,6 +504,36 @@ impl SessionCompletion {
     }
 }
 
+/// The one gate-evidence attribution rule (D14.7): what each render-gate
+/// event does to the evidence latches. Named so the delayed-delivery
+/// oracle below can drive the production arm synchronously — the real
+/// observer above routes every event through this function, so a test
+/// that calls it exercises exactly the attribution the leg performs.
+fn apply_gate_event(state: &mut CompletionState, event: GateEvent) {
+    match event {
+        // Engagement is the current-engagement fence: events on one
+        // render leg are ordered, so a prior engagement's Disengaged
+        // happens-before this Engaged. Whatever disengagement evidence
+        // may be latched here belongs to an engagement that has already
+        // ended — it must not answer the CURRENT cycle's resume
+        // (D14.7 corrective-2). Engagement also resets the tail
+        // evidence: quiescence belongs to the current engagement only.
+        GateEvent::Engaged => {
+            state.engaged = true;
+            state.tail_quiesced = false;
+            state.disengagement_observed = false;
+        }
+        GateEvent::TailQuiesced => {
+            state.tail_quiesced = true;
+        }
+        GateEvent::Disengaged => {
+            state.engaged = false;
+            state.tail_quiesced = false;
+            state.disengagement_observed = true;
+        }
+    }
+}
+
 /// The one serialization boundary (D14.3): publish evidence, evaluate
 /// the terminal contract, and commit — all inside a single hold of the
 /// completion lock, the same lock `request_stop` serializes through.
@@ -601,4 +616,76 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
         None => {}
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// D14.7 corrective-2, the delayed-delivery interleaving no leg-level
+    /// test can reach deterministically: the render leg has observed
+    /// resume #1's release, but its Disengaged #1 is still in flight when
+    /// pause #2 routes. The stale event publishes into the new cycle —
+    /// only the leg's own Engaged #2 (the current-engagement fence) may
+    /// clear it, and Resumed #2 must wait for the CURRENT engagement's
+    /// disengagement.
+    ///
+    /// Drives the production attribution arm (`apply_gate_event`, exactly
+    /// what the real gate observer runs) through the real publication
+    /// boundary, so deleting the Engaged-arm reset turns this RED while
+    /// every event shape stays real. The ordering constructed here is a
+    /// legal interleaving: event delivery from the leg is asynchronous
+    /// with command routing, bounded only by the park slice.
+    #[test]
+    fn a_prior_cycle_disengagement_never_answers_a_later_cycle_after_reengagement() {
+        let completion = SessionCompletion::new();
+        let core = completion.state.clone();
+
+        // Cycle 1: pause → engagement. (request_pause routes to the
+        // episode's gate; the events below stand in for the leg's
+        // acknowledgments.)
+        completion.request_pause();
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        assert!(completion.observe_snapshot().pause_requested);
+
+        // Resume #1 releases intent; the leg is about to deliver its
+        // disengagement.
+        completion.request_resume();
+
+        // Pause #2 routes BEFORE that delivery lands — the leg has
+        // passed its released check but not yet published.
+        completion.request_pause();
+
+        // ...and the PRIOR cycle's disengagement publishes into it.
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
+        assert!(
+            completion.observe_snapshot().pause_disengaged_observed,
+            "precondition: the delayed prior-cycle event did land"
+        );
+
+        // The leg re-engages for cycle 2 — the fence must clear the
+        // stale evidence.
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        assert!(
+            !completion.observe_snapshot().pause_disengaged_observed,
+            "a prior cycle's Disengaged must not survive the current engagement"
+        );
+
+        // Resume #2: before the CURRENT engagement disengages, there is
+        // no Resumed evidence.
+        completion.request_resume();
+        assert!(
+            !completion.observe_snapshot().pause_disengaged_observed,
+            "Resumed must wait for the current engagement's disengagement"
+        );
+
+        // The current engagement disengages — NOW the evidence exists.
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
+        let snap = completion.observe_snapshot();
+        assert!(snap.pause_disengaged_observed);
+
+        // None of this touched the terminal Fact: evidence latches are
+        // not settlement inputs.
+        assert_eq!(snap.terminal_outcome, None);
+    }
 }

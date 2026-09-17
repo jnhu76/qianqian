@@ -32,9 +32,8 @@
 //!                     playback semantic state
 //! pause_engagement    mechanism evidence: the CURRENT pause
 //!                     engagement's render-gate / output-tail state
-//! pause_disengaged_observed  mechanism evidence latch: the CURRENT
-//!                     pause cycle's disengagement (reset when a new
-//!                     pause cycle begins)
+//! pause_disengaged_observed  mechanism evidence latch: the render
+//!                     leg's most recent engagement has disengaged
 //! activation_error    activation diagnostic; never a terminal Failed
 //! ```
 //!
@@ -124,16 +123,14 @@ pub struct PlaybackSessionObservation {
     /// `resumed` projections guard on the unsettled state, and any
     /// other consumer of this field must too.
     pub pause_engagement: PauseEngagement,
-    /// Whether the CURRENT pause cycle's render-gate disengagement has
-    /// been observed (mechanism-evidence latch for the Resumed
-    /// projection only). Reset when a new pause cycle begins, so a
-    /// previous cycle's disengagement does not answer a later cycle's
-    /// resume — symmetric to the current-engagement tail-quiescence
-    /// discipline. Cycle scope is by reset, not event attribution: a
-    /// pending prior-cycle disengagement event may publish into a new
-    /// cycle (within at most one park slice); the guarantee is the
-    /// frozen claim — `resumed()` is true only while the gate is
-    /// released and render submission is re-enabled.
+    /// Whether the render leg's most recent engagement has disengaged
+    /// (mechanism-evidence latch for the Resumed projection only).
+    /// Attribution is exact at engagement granularity — the leg's
+    /// `Engaged` event is the current-engagement fence, so a previous
+    /// pause cycle's disengagement can never establish `Resumed` for a
+    /// later cycle. Symmetric to the current-engagement tail-quiescence
+    /// discipline. The frozen claim: `resumed()` is true only while the
+    /// gate is released and render submission is re-enabled.
     pub pause_disengaged_observed: bool,
     /// Why activation raised, if it did. Diagnostic; an episode that
     /// never started has no terminal Fact and must not be forged into
@@ -154,10 +151,10 @@ impl PlaybackSessionObservation {
     }
 
     /// The Resumed projection (D14.7): the episode is unsettled, pause
-    /// intent is released, and the CURRENT pause cycle's disengagement
-    /// evidence was observed. Claims exactly that pause control is no
-    /// longer established and render submission is re-enabled — NOT
-    /// that new audio is already audible.
+    /// intent is released, and the leg's most recent engagement has
+    /// disengaged. Claims exactly that pause control is no longer
+    /// established and render submission is re-enabled — NOT that new
+    /// audio is already audible.
     pub fn resumed(&self) -> bool {
         self.terminal_outcome.is_none() && !self.pause_requested && self.pause_disengaged_observed
     }
