@@ -1,36 +1,42 @@
 //! F4-GATE mechanism evidence: position/duration propositions and the
-//! projection algebra a future product Position would be derived from.
+//! accounting shape a future product Position is read from.
 //!
 //! This crate is evidence, not production architecture. It proposes (and
-//! executable oracles here pin) the accounting shape the F4 gate
-//! documents: two session-owned mechanism-evidence cells plus one
-//! derived, clamped, source-frame projection.
+//! executable oracles here pin) the shape the F4 gate documents: the
+//! render leg derives from its own two mechanism-local values and
+//! publishes ONE monotone source-frame sample into a session-owned cell,
+//! which the observation reads with one pure load.
 //!
 //! ```text
-//! submitted   source PCM frames handed to the render leg (== frames
-//!             submitted into the device buffer on all non-terminal
-//!             paths). Monotone within one seek epoch. Writer: the
-//!             edge read path.
-//! tail        the output mechanism's latest observation of its
-//!             queued-to-play tail (GetCurrentPadding), in source
-//!             frames. NOT monotone. Writer: the render loop / drain
-//!             loop, once per observation.
-//! published   stream-start evidence: nothing is derivable before the
-//!             mechanism published its first tail observation.
+//! handed_off  source PCM frames this episode submitted into the device
+//!             buffer (read_frames -> ReleaseBuffer(n)). Mechanism-local
+//!             accounting only: never published, never read by the
+//!             observation. Monotone within one seek epoch.
+//! tail        the render leg's own GetCurrentPadding reading of its
+//!             queued-to-play tail, in source frames. NOT monotone.
+//!             Taken once per loop iteration / park slice / drain check.
 //!
-//! raw position    = submitted - min(tail, submitted)
-//! position        = max(last_projected, raw)      (monotone clamp)
+//! writer      estimate = handed_off - min(tail, handed_off)
+//!             published = max(published, estimate)   (monotone update)
+//! reader      position = ONE pure load; undefined until the first
+//!             publication (unknown is never collapsed to zero)
 //! ```
+//!
+//! Monotonicity belongs to the publication, not to the reader: a
+//! reader-side clamp over two separately published cells cannot live
+//! inside the D14.2 pure-read seam, and is kept below only as an
+//! executable negative control.
 //!
 //! Modules:
 //!
 //! ```text
-//! src/timeline.rs        the algebra + deterministic interleaving
-//!                        oracles (all platforms)
+//! src/timeline.rs        the shape + deterministic interleaving
+//!                        oracles (all platforms), incl. the rejected
+//!                        reader-side pair as a negative control
 //! src/bin/f4probe.rs     physical WASAPI probe (Windows only):
-//!                        Experiment A (submitted vs padding vs
-//!                        consumed across pause/EOF) and Experiment
-//!                        B (IAudioClock comparison)
+//!                        Experiment A (handed-off vs padding vs
+//!                        published sample across pause/EOF) and
+//!                        Experiment B (IAudioClock comparison)
 //! src/bin/f4duration.rs  duration provenance over the SongCore ABI
 //!                        (non-Windows): Experiment C
 //! RESULTS.md             the evidence record
