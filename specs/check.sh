@@ -26,8 +26,8 @@ set -uo pipefail
 
 mode="${1:-current}"
 case "$mode" in
-  current|k0|realtime|terminal|rust) ;;
-  *) echo "usage: specs/check.sh [current|k0|realtime|terminal|rust]（缺省 current）" >&2; exit 2 ;;
+  current|k0|realtime|terminal|rust|f5) ;;
+  *) echo "usage: specs/check.sh [current|k0|realtime|terminal|rust|f5]（缺省 current）" >&2; exit 2 ;;
 esac
 
 SPEC_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
