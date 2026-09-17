@@ -1,0 +1,133 @@
+F5SEEK BEGIN songcore_abi_v1
+F5SEEK mp3-cbr-id3v23 PROBE rate=44100 channels=2 duration_us=4000000
+[mp3float @ 0x5d2b50201ac0] Could not update timestamps for skipped samples.
+[mp3float @ 0x5d2b50201ac0] Could not update timestamps for discarded samples.
+F5SEEK mp3-cbr-id3v23 REFERENCE frames=176400
+[mp3float @ 0x5d2b50201ac0] Could not update timestamps for skipped samples.
+F5SEEK mp3-cbr-id3v23 fresh-zero requested_us=0 requested_frames=0 status=SONG_OK actual_us=0 actual_frames=0 latency_ns=39115
+F5SEEK mp3-cbr-id3v23 fresh-zero MATCH offset_frames=0 skip_frames=0 landing_vs_match_delta=0 pre_target_emission=false
+F5SEEK mp3-cbr-id3v23 b2b-first requested_us=2000000 requested_frames=88200 status=SONG_OK actual_us=1985306 actual_frames=87551 latency_ns=19637
+F5SEEK mp3-cbr-id3v23 b2b-first MATCH offset_frames=89903 skip_frames=3456 landing_vs_match_delta=2352 pre_target_emission=false
+F5SEEK mp3-cbr-id3v23 b2b-second requested_us=1000000 requested_frames=44100 status=SONG_OK actual_us=992653 actual_frames=43775 latency_ns=18145
+F5SEEK mp3-cbr-id3v23 b2b-second MATCH offset_frames=46127 skip_frames=3456 landing_vs_match_delta=2352 pre_target_emission=false
+F5SEEK mp3-cbr-id3v23 pct-10 requested_us=400000 requested_frames=17640 status=SONG_OK actual_us=391837 actual_frames=17280 latency_ns=19127
+F5SEEK mp3-cbr-id3v23 pct-10 MATCH offset_frames=19631 skip_frames=3456 landing_vs_match_delta=2351 pre_target_emission=false
+F5SEEK mp3-cbr-id3v23 pct-33 requested_us=1320000 requested_frames=58212 status=SONG_OK actual_us=1306122 actual_frames=57599 latency_ns=23375
+F5SEEK mp3-cbr-id3v23 pct-33 MATCH offset_frames=59951 skip_frames=3456 landing_vs_match_delta=2352 pre_target_emission=false
+F5SEEK mp3-cbr-id3v23 pct-50 requested_us=2000000 requested_frames=88200 status=SONG_OK actual_us=1985306 actual_frames=87551 latency_ns=31660
+F5SEEK mp3-cbr-id3v23 pct-50 MATCH offset_frames=89903 skip_frames=3456 landing_vs_match_delta=2352 pre_target_emission=false
+F5SEEK mp3-cbr-id3v23 pct-66 requested_us=2640000 requested_frames=116424 status=SONG_OK actual_us=2638367 actual_frames=116351 latency_ns=23484
+F5SEEK mp3-cbr-id3v23 pct-66 MATCH offset_frames=118703 skip_frames=3456 landing_vs_match_delta=2352 pre_target_emission=false
+F5SEEK mp3-cbr-id3v23 pct-90 requested_us=3600000 requested_frames=158760 status=SONG_OK actual_us=3578776 actual_frames=157824 latency_ns=15329
+F5SEEK mp3-cbr-id3v23 pct-90 MATCH offset_frames=160175 skip_frames=3456 landing_vs_match_delta=2351 pre_target_emission=false
+F5SEEK mp3-cbr-id3v23 at-duration requested_us=4000000 requested_frames=176400 status=SONG_OK actual_us=3996735 actual_frames=176256 latency_ns=26751
+[mp3float @ 0x5d2b50201ac0] Could not update timestamps for discarded samples.
+F5SEEK mp3-cbr-id3v23 at-duration NO_CONTENT_MATCH
+F5SEEK mp3-cbr-id3v23 beyond-duration requested_us=4500000 requested_frames=198450 status=SONG_OK actual_us=3996735 actual_frames=176256 latency_ns=13856
+[mp3float @ 0x5d2b50201ac0] Could not update timestamps for discarded samples.
+F5SEEK mp3-cbr-id3v23 beyond-duration NO_CONTENT_MATCH
+F5SEEK mp3-cbr-id3v23 negative-target status=INVALID_ARGUMENT actual_us=-1 latency_ns=140
+F5SEEK mp3-cbr-id3v23 post-negative UNUSABLE_AFTER_REJECTION
+[mp3float @ 0x5d2b50201ac0] Could not update timestamps for discarded samples.
+F5SEEK mp3-cbr-id3v23 eof-tail landing_frames=176256 tail_frames=1249 expected_le=144 ok=false
+F5SEEK mp3-cbr-id3v23 DONE failures=3
+F5SEEK flac-16-44-stereo PROBE rate=44100 channels=2 duration_us=4000000
+F5SEEK flac-16-44-stereo REFERENCE frames=176400
+F5SEEK flac-16-44-stereo fresh-zero requested_us=0 requested_frames=0 status=SONG_OK actual_us=0 actual_frames=0 latency_ns=181956
+F5SEEK flac-16-44-stereo fresh-zero MATCH offset_frames=0 skip_frames=0 landing_vs_match_delta=0 pre_target_emission=false
+F5SEEK flac-16-44-stereo b2b-first requested_us=2000000 requested_frames=88200 status=SONG_OK actual_us=1985306 actual_frames=87551 latency_ns=307053
+F5SEEK flac-16-44-stereo b2b-first MATCH offset_frames=87552 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK flac-16-44-stereo b2b-first LANDING_MISMATCH reported=87551 actual=87552
+F5SEEK flac-16-44-stereo b2b-second requested_us=1000000 requested_frames=44100 status=SONG_OK actual_us=940408 actual_frames=41471 latency_ns=277076
+F5SEEK flac-16-44-stereo b2b-second MATCH offset_frames=41472 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK flac-16-44-stereo b2b-second LANDING_MISMATCH reported=41471 actual=41472
+F5SEEK flac-16-44-stereo pct-10 requested_us=400000 requested_frames=17640 status=SONG_OK actual_us=313469 actual_frames=13823 latency_ns=277005
+F5SEEK flac-16-44-stereo pct-10 MATCH offset_frames=13824 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK flac-16-44-stereo pct-10 LANDING_MISMATCH reported=13823 actual=13824
+F5SEEK flac-16-44-stereo pct-33 requested_us=1320000 requested_frames=58212 status=SONG_OK actual_us=1253878 actual_frames=55296 latency_ns=270524
+F5SEEK flac-16-44-stereo pct-33 MATCH offset_frames=55296 skip_frames=0 landing_vs_match_delta=0 pre_target_emission=true
+F5SEEK flac-16-44-stereo pct-50 requested_us=2000000 requested_frames=88200 status=SONG_OK actual_us=1985306 actual_frames=87551 latency_ns=273118
+F5SEEK flac-16-44-stereo pct-50 MATCH offset_frames=87552 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK flac-16-44-stereo pct-50 LANDING_MISMATCH reported=87551 actual=87552
+F5SEEK flac-16-44-stereo pct-66 requested_us=2640000 requested_frames=116424 status=SONG_OK actual_us=2612245 actual_frames=115200 latency_ns=275703
+F5SEEK flac-16-44-stereo pct-66 MATCH offset_frames=115200 skip_frames=0 landing_vs_match_delta=0 pre_target_emission=true
+F5SEEK flac-16-44-stereo pct-90 requested_us=3600000 requested_frames=158760 status=SONG_OK actual_us=3552653 actual_frames=156671 latency_ns=155986
+F5SEEK flac-16-44-stereo pct-90 MATCH offset_frames=156672 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK flac-16-44-stereo pct-90 LANDING_MISMATCH reported=156671 actual=156672
+F5SEEK flac-16-44-stereo at-duration requested_us=4000000 requested_frames=176400 status=SONG_OK actual_us=3761633 actual_frames=165888 latency_ns=153421
+F5SEEK flac-16-44-stereo at-duration MATCH offset_frames=165888 skip_frames=0 landing_vs_match_delta=0 pre_target_emission=true
+F5SEEK flac-16-44-stereo beyond-duration requested_us=4500000 requested_frames=198450 status=SONG_OK actual_us=3761633 actual_frames=165888 latency_ns=178529
+F5SEEK flac-16-44-stereo beyond-duration MATCH offset_frames=165888 skip_frames=0 landing_vs_match_delta=0 pre_target_emission=true
+F5SEEK flac-16-44-stereo negative-target status=INVALID_ARGUMENT actual_us=-1 latency_ns=220
+F5SEEK flac-16-44-stereo post-negative USABLE offset_frames=173824
+F5SEEK flac-16-44-stereo eof-tail landing_frames=165888 tail_frames=10512 expected_le=10512 ok=true
+F5SEEK flac-16-44-stereo DONE failures=5
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0x5d2b5021e680] Protocol name not provided, cannot determine if input is local or a network protocol, buffers and access patterns cannot be configured optimally without knowing the protocol
+F5SEEK alac-16-44-stereo PROBE rate=44100 channels=2 duration_us=4000000
+F5SEEK alac-16-44-stereo REFERENCE frames=176400
+F5SEEK alac-16-44-stereo fresh-zero requested_us=0 requested_frames=0 status=SONG_OK actual_us=0 actual_frames=0 latency_ns=203937
+F5SEEK alac-16-44-stereo fresh-zero MATCH offset_frames=0 skip_frames=0 landing_vs_match_delta=0 pre_target_emission=false
+F5SEEK alac-16-44-stereo b2b-first requested_us=2000000 requested_frames=88200 status=SONG_OK actual_us=1950476 actual_frames=86015 latency_ns=198166
+F5SEEK alac-16-44-stereo b2b-first MATCH offset_frames=86016 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-16-44-stereo b2b-first LANDING_MISMATCH reported=86015 actual=86016
+F5SEEK alac-16-44-stereo b2b-second requested_us=1000000 requested_frames=44100 status=SONG_OK actual_us=928798 actual_frames=40959 latency_ns=198857
+F5SEEK alac-16-44-stereo b2b-second MATCH offset_frames=40960 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-16-44-stereo b2b-second LANDING_MISMATCH reported=40959 actual=40960
+F5SEEK alac-16-44-stereo pct-10 requested_us=400000 requested_frames=17640 status=SONG_OK actual_us=371519 actual_frames=16383 latency_ns=196493
+F5SEEK alac-16-44-stereo pct-10 MATCH offset_frames=16384 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-16-44-stereo pct-10 LANDING_MISMATCH reported=16383 actual=16384
+F5SEEK alac-16-44-stereo pct-33 requested_us=1320000 requested_frames=58212 status=SONG_OK actual_us=1300317 actual_frames=57343 latency_ns=194890
+F5SEEK alac-16-44-stereo pct-33 MATCH offset_frames=57344 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-16-44-stereo pct-33 LANDING_MISMATCH reported=57343 actual=57344
+F5SEEK alac-16-44-stereo pct-50 requested_us=2000000 requested_frames=88200 status=SONG_OK actual_us=1950476 actual_frames=86015 latency_ns=193377
+F5SEEK alac-16-44-stereo pct-50 MATCH offset_frames=86016 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-16-44-stereo pct-50 LANDING_MISMATCH reported=86015 actual=86016
+F5SEEK alac-16-44-stereo pct-66 requested_us=2640000 requested_frames=116424 status=SONG_OK actual_us=2600635 actual_frames=114688 latency_ns=212142
+F5SEEK alac-16-44-stereo pct-66 MATCH offset_frames=114688 skip_frames=0 landing_vs_match_delta=0 pre_target_emission=true
+F5SEEK alac-16-44-stereo pct-90 requested_us=3600000 requested_frames=158760 status=SONG_OK actual_us=3529433 actual_frames=155647 latency_ns=197885
+F5SEEK alac-16-44-stereo pct-90 MATCH offset_frames=155648 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-16-44-stereo pct-90 LANDING_MISMATCH reported=155647 actual=155648
+F5SEEK alac-16-44-stereo at-duration requested_us=4000000 requested_frames=176400 status=SONG_OK actual_us=3993832 actual_frames=176127 latency_ns=21441
+F5SEEK alac-16-44-stereo at-duration SHORT_WINDOW frames_read=272
+F5SEEK alac-16-44-stereo beyond-duration requested_us=4500000 requested_frames=198450 status=SONG_OK actual_us=3993832 actual_frames=176127 latency_ns=11882
+F5SEEK alac-16-44-stereo beyond-duration SHORT_WINDOW frames_read=272
+F5SEEK alac-16-44-stereo negative-target status=INVALID_ARGUMENT actual_us=-1 latency_ns=140
+F5SEEK alac-16-44-stereo post-negative UNUSABLE_AFTER_REJECTION
+F5SEEK alac-16-44-stereo eof-tail landing_frames=176127 tail_frames=272 expected_le=273 ok=true
+F5SEEK alac-16-44-stereo DONE failures=7
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0x5d2b502404c0] Protocol name not provided, cannot determine if input is local or a network protocol, buffers and access patterns cannot be configured optimally without knowing the protocol
+F5SEEK alac-long PROBE rate=44100 channels=2 duration_us=6000000
+F5SEEK alac-long REFERENCE frames=264600
+F5SEEK alac-long fresh-zero requested_us=0 requested_frames=0 status=SONG_OK actual_us=0 actual_frames=0 latency_ns=216771
+F5SEEK alac-long fresh-zero MATCH offset_frames=0 skip_frames=0 landing_vs_match_delta=0 pre_target_emission=false
+F5SEEK alac-long b2b-first requested_us=3000000 requested_frames=132300 status=SONG_OK actual_us=2972154 actual_frames=131071 latency_ns=209287
+F5SEEK alac-long b2b-first MATCH offset_frames=131072 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-long b2b-first LANDING_MISMATCH reported=131071 actual=131072
+F5SEEK alac-long b2b-second requested_us=1500000 requested_frames=66150 status=SONG_OK actual_us=1486077 actual_frames=65535 latency_ns=207554
+F5SEEK alac-long b2b-second MATCH offset_frames=65536 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-long b2b-second LANDING_MISMATCH reported=65535 actual=65536
+F5SEEK alac-long pct-10 requested_us=600000 requested_frames=26460 status=SONG_OK actual_us=557279 actual_frames=24576 latency_ns=217232
+F5SEEK alac-long pct-10 MATCH offset_frames=24576 skip_frames=0 landing_vs_match_delta=0 pre_target_emission=true
+F5SEEK alac-long pct-33 requested_us=1980000 requested_frames=87318 status=SONG_OK actual_us=1950476 actual_frames=86015 latency_ns=204759
+F5SEEK alac-long pct-33 MATCH offset_frames=86016 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-long pct-33 LANDING_MISMATCH reported=86015 actual=86016
+F5SEEK alac-long pct-50 requested_us=3000000 requested_frames=132300 status=SONG_OK actual_us=2972154 actual_frames=131071 latency_ns=204347
+F5SEEK alac-long pct-50 MATCH offset_frames=131072 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-long pct-50 LANDING_MISMATCH reported=131071 actual=131072
+F5SEEK alac-long pct-66 requested_us=3960000 requested_frames=174636 status=SONG_OK actual_us=3900952 actual_frames=172031 latency_ns=199027
+F5SEEK alac-long pct-66 MATCH offset_frames=172032 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-long pct-66 LANDING_MISMATCH reported=172031 actual=172032
+F5SEEK alac-long pct-90 requested_us=5400000 requested_frames=238140 status=SONG_OK actual_us=5387029 actual_frames=237567 latency_ns=200020
+F5SEEK alac-long pct-90 MATCH offset_frames=237568 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-long pct-90 LANDING_MISMATCH reported=237567 actual=237568
+F5SEEK alac-long at-duration requested_us=6000000 requested_frames=264600 status=SONG_OK actual_us=5944308 actual_frames=262143 latency_ns=126650
+F5SEEK alac-long at-duration MATCH offset_frames=262144 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-long at-duration LANDING_MISMATCH reported=262143 actual=262144
+F5SEEK alac-long beyond-duration requested_us=6500000 requested_frames=286650 status=SONG_OK actual_us=5944308 actual_frames=262143 latency_ns=110891
+F5SEEK alac-long beyond-duration MATCH offset_frames=262144 skip_frames=0 landing_vs_match_delta=1 pre_target_emission=true
+F5SEEK alac-long beyond-duration LANDING_MISMATCH reported=262143 actual=262144
+F5SEEK alac-long negative-target status=INVALID_ARGUMENT actual_us=-1 latency_ns=160
+F5SEEK alac-long post-negative UNUSABLE_AFTER_REJECTION
+F5SEEK alac-long eof-tail landing_frames=262143 tail_frames=2456 expected_le=2457 ok=true
+F5SEEK alac-long DONE failures=9
+F5SEEK END failures=24

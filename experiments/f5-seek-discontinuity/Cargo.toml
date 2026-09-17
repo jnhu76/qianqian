@@ -1,0 +1,38 @@
+[package]
+name = "f5-seek-discontinuity"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "F5-GATE mechanism evidence: decoder seek reality, edge-cut protocol proof, WASAPI cutover probe"
+
+# F5-GATE evidence crate (Issue #119 F5 seek discontinuity protocol;
+# proposed ADR-PBK-002 D14.5 amendment). Workspace-excluded on purpose:
+# this is executable mechanism evidence and physical probes, NOT
+# production architecture. Nothing here may be imported by any
+# qianqian-* crate; the frozen contract lands in ADR-PBK-002 and the
+# product implementation lands in a later F5 slice, behind the
+# physical-output cutover mechanism decision this gate earns.
+
+[dependencies]
+serde_json = "1"
+
+# Decoder-seek probe (Experiment E1) and the Windows physical probe
+# dependency are target-gated the same way f4-timeline-gate gates them:
+# the SongCore binding pulls the native static archive through its
+# build.rs (host-shaped artifact tree), and the Windows probe must not
+# require it.
+[target.'cfg(not(windows))'.dependencies]
+qianqian-songcore-sys = { path = "../../crates/qianqian-songcore-sys" }
+
+[target.'cfg(windows)'.dependencies]
+# Same generation as the production output mechanism so the probe
+# measures the same COM surface the product render loop uses.
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+] }

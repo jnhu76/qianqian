@@ -14,6 +14,7 @@ exclude = [
     "experiments/songcore-call-comparison",
     "experiments/f3-pause-mechanism",
     "experiments/f4-timeline-gate",
+    "experiments/f5-seek-discontinuity",
 ]
 
 [workspace.package]

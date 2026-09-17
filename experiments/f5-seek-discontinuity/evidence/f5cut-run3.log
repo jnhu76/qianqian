@@ -1,0 +1,24 @@
+'\\wsl.localhost\Ubuntu-26.04\home\hoo\Source\qianqian\experiments\f5-seek-discontinuity'
+用作为当前目录的以上路径启动了 CMD.EXE。
+UNC 路径不受支持。默认值设为 Windows 目录。
+F5CUT BEGIN
+F5CUT A BEGIN
+F5CUT OPEN autoconvert=true
+F5CUT A buffer_frames=984
+F5CUT A steady_old handed_off=3189 iterations=6
+F5CUT A engage padding=984 handed_off=3189 pos=Some((10648, 2354023930030))
+F5CUT A quiesced padding_observations=[984, 984, 984, 984, 984, 543, 543, 543, 543, 102, 102, 102, 102, 0] drain_ms=Some(31.728199999999998) pos=Some((21848, 2354024247279))
+F5CUT A commit (padding==0 observed; submitting new signal)
+F5CUT A refill handed_off_new=3189 readings=[(0, 984), (543, 441), (543, 441), (543, 441), (543, 441), (543, 441)] pos=Some((39032, 2354024734449))
+F5CUT A VERDICT drain_ms=31.7 padding_at_engage=984 pos_advanced_through_tail=true pos_advanced_after_cut=true
+F5CUT A END ok
+F5CUT B BEGIN
+F5CUT OPEN autoconvert=true
+F5CUT B buffer_frames=984
+F5CUT B before_stop handed_off=2307 padding=984 pos=Some((3576, 2354025430272))
+F5CUT B after_stop padding=984 pos=Some((10584, 2354025435367))
+F5CUT B reset_result=Ok(())
+F5CUT B after_reset padding=0 pos=Some((0, 2354025435711))
+F5CUT B after_restart handed_off_new=2307 iterations=4 pos=Some((3576, 2354025830362)) error=None
+F5CUT B END ok
+F5CUT END failures=0
