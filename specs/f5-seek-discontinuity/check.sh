@@ -96,14 +96,16 @@ run_tlc() {
   fi
 }
 
-echo "== 正常模型（必须 PASS：TypeOK + 三条安全不变式，探索完成）"
+echo "== 正常模型（必须 PASS：TypeOK + 五条安全不变式，探索完成）"
 run_tlc "$SPEC_ROOT/SeekDiscontinuity.cfg" pass "Base / safety（commit 后旧 PCM 不可能）"
 
 echo "== witness 探针（必须 MUST-FAIL：可达性证明，防空洞不变式）"
-run_tlc "$SPEC_ROOT/probes/ReachCommit.cfg"             fail:ProbeNeverCommitted  "Witness / commit 可达"                 -continue
-run_tlc "$SPEC_ROOT/probes/WitnessOldDrainPreCommit.cfg" fail:ProbeNoOldDrainEver "Witness / pre-commit 旧输出可达（合法）" -continue
-run_tlc "$SPEC_ROOT/probes/WitnessOldEdgePreCommit.cfg"  fail:ProbeNoOldEdgeEver  "Witness / pre-commit edge 旧库可达"     -continue
-run_tlc "$SPEC_ROOT/probes/WitnessSeekRefused.cfg"       fail:ProbeNoRefusalEver  "Witness / seek 拒绝路径可达"            -continue
+run_tlc "$SPEC_ROOT/probes/ReachCommit.cfg"              fail:ProbeNeverCommitted   "Witness / commit 可达"                  -continue
+run_tlc "$SPEC_ROOT/probes/WitnessOldDrainPreCommit.cfg"  fail:ProbeNoOldDrainEver  "Witness / pre-commit 旧输出可达（合法）"  -continue
+run_tlc "$SPEC_ROOT/probes/WitnessOldEdgePreCommit.cfg"   fail:ProbeNoOldEdgeEver   "Witness / pre-commit edge 旧库可达"      -continue
+run_tlc "$SPEC_ROOT/probes/WitnessSeekRefused.cfg"        fail:ProbeNoRefusalEver   "Witness / seek 拒绝路径可达"             -continue
+run_tlc "$SPEC_ROOT/probes/WitnessSeekDestructive.cfg"    fail:ProbeNoDestructiveEver "Witness / destructive failure 路线可达" -continue
+run_tlc "$SPEC_ROOT/probes/WitnessPartialSeek.cfg"        fail:ProbeNoPartialSeekEver "Witness / 余量在外 seek 可达"           -continue
 
 echo "== 负控制（每个 mutation 必须被抓住）"
 run_tlc "$SPEC_ROOT/mutations/M1CommitBeforeTailPurge.cfg" fail:InvStaleOutput     "Mutation / M1 CommitBeforeTailPurge（不等尾排空）" -continue
@@ -111,6 +113,8 @@ run_tlc "$SPEC_ROOT/mutations/M2SeekMidWrite.cfg"           fail:InvStaleOutput 
 run_tlc "$SPEC_ROOT/mutations/M3ParkWhileHeld.cfg"         fail:InvStaleOutput     "Mutation / M3 ParkWhileHeld（held block 跨 park）" -continue
 run_tlc "$SPEC_ROOT/mutations/M4StalePositionWriter.cfg"   fail:InvPositionNoMixing "Mutation / M4 StalePositionWriter（旧 basis 复用）" -continue
 run_tlc "$SPEC_ROOT/mutations/M5CommitBeforeLanding.cfg"   fail:InvStaleOutput     "Mutation / M5 CommitBeforeLanding（未 reposition）" -continue
+run_tlc "$SPEC_ROOT/mutations/M6RefusalDropsRemainder.cfg"  fail:InvRefusalContentContinuous "Mutation / M6 RefusalDropsRemainder（拒绝丢余量）" -continue
+run_tlc "$SPEC_ROOT/mutations/M7ResumeAfterMutatedSeek.cfg" fail:InvFailClosed      "Mutation / M7 ResumeAfterMutatedSeek（失败后复活）" -continue
 
 if [[ "$fail" -ne 0 ]]; then
   echo "F5-SEEK-DISCONTINUITY: FAILED"
