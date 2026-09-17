@@ -133,12 +133,15 @@ struct CompletionState {
     /// engagement granularity: same-leg event ordering makes
     /// `Disengaged(old)` happen-before `Engaged(new)`, so `Engaged` is
     /// the current-engagement fence and clears any evidence a prior
-    /// engagement left — a previous cycle's disengagement can never
-    /// answer a later cycle's resume (D14.7 corrective-2). The
-    /// false→true reset in `request_pause` stays as command-side
-    /// hygiene; the fence, not that reset, is the attribution rule.
-    /// Existence evidence for the Resumed projection only; it never
-    /// feeds control or settlement.
+    /// engagement left — a previous cycle's disengagement can never be
+    /// misattributed to the current engagement (D14.7 corrective-2).
+    /// Crate-internal mechanism evidence only: it is NOT mirrored into
+    /// the public observation (the D14.7 AUTHORITY-CORRECTIVE removed
+    /// the `Resumed` projection this latch once existed to ground —
+    /// disengagement cannot prove a viable render leg remains), and it
+    /// never feeds control or settlement. Kept for current-engagement
+    /// bookkeeping and as the verification subject of the attribution
+    /// fence oracle.
     disengagement_observed: bool,
     /// Set once by [`SessionCompletion::release_pause_gate`] — the
     /// authority-owned teardown path has begun releasing the pause
@@ -344,10 +347,10 @@ impl SessionCompletion {
             // Command-side hygiene only (D14.7 corrective-2): the event
             // attribution fence is the leg's own Engaged event, which
             // clears prior-cycle evidence the moment the current
-            // engagement begins. This reset just avoids reporting a
-            // stale prior-cycle disengagement in the window before that
-            // engagement is observed. Repeated pauses within one cycle
-            // change nothing.
+            // engagement begins. This reset just keeps a stale
+            // prior-cycle disengagement out of the latch in the window
+            // before that engagement is observed. Repeated pauses
+            // within one cycle change nothing.
             guard.disengagement_observed = false;
         }
         guard.pause_requested = true;
@@ -463,7 +466,6 @@ impl SessionCompletion {
                 (true, false) => PauseEngagement::Engaged,
                 (false, _) => PauseEngagement::Disengaged,
             },
-            pause_disengaged_observed: guard.disengagement_observed,
         }
     }
 
@@ -515,9 +517,10 @@ fn apply_gate_event(state: &mut CompletionState, event: GateEvent) {
         // render leg are ordered, so a prior engagement's Disengaged
         // happens-before this Engaged. Whatever disengagement evidence
         // may be latched here belongs to an engagement that has already
-        // ended — it must not answer the CURRENT cycle's resume
-        // (D14.7 corrective-2). Engagement also resets the tail
-        // evidence: quiescence belongs to the current engagement only.
+        // ended — it must not be misattributed to the current
+        // engagement (D14.7 corrective-2). Engagement also resets the
+        // tail evidence: quiescence belongs to the current engagement
+        // only.
         GateEvent::Engaged => {
             state.engaged = true;
             state.tail_quiesced = false;
@@ -627,8 +630,16 @@ mod tests {
     /// resume #1's release, but its Disengaged #1 is still in flight when
     /// pause #2 routes. The stale event publishes into the new cycle —
     /// only the leg's own Engaged #2 (the current-engagement fence) may
-    /// clear it, and Resumed #2 must wait for the CURRENT engagement's
-    /// disengagement.
+    /// clear it, so the internal disengagement latch stays attributable
+    /// to the CURRENT engagement.
+    ///
+    /// This is a MECHANISM attribution oracle, not a product-projection
+    /// test: the D14.7 AUTHORITY-CORRECTIVE removed the public `Resumed`
+    /// projection this latch once grounded (disengagement evidence
+    /// cannot prove a viable render leg remains). The latch stays
+    /// crate-internal, and its per-engagement attribution discipline
+    /// stays pinned here because the same latch discipline keeps the
+    /// `PauseEngagement` spelling honest across cycles.
     ///
     /// Drives the production attribution arm (`apply_gate_event`, exactly
     /// what the real gate observer runs) through the real publication
@@ -640,6 +651,12 @@ mod tests {
     fn a_prior_cycle_disengagement_never_answers_a_later_cycle_after_reengagement() {
         let completion = SessionCompletion::new();
         let core = completion.state.clone();
+        let latched = || {
+            core.state
+                .lock()
+                .expect("completion lock")
+                .disengagement_observed
+        };
 
         // Cycle 1: pause → engagement. (request_pause routes to the
         // episode's gate; the events below stand in for the leg's
@@ -659,7 +676,7 @@ mod tests {
         // ...and the PRIOR cycle's disengagement publishes into it.
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
         assert!(
-            completion.observe_snapshot().pause_disengaged_observed,
+            latched(),
             "precondition: the delayed prior-cycle event did land"
         );
 
@@ -667,25 +684,24 @@ mod tests {
         // stale evidence.
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
         assert!(
-            !completion.observe_snapshot().pause_disengaged_observed,
+            !latched(),
             "a prior cycle's Disengaged must not survive the current engagement"
         );
 
         // Resume #2: before the CURRENT engagement disengages, there is
-        // no Resumed evidence.
+        // no current-engagement disengagement evidence.
         completion.request_resume();
         assert!(
-            !completion.observe_snapshot().pause_disengaged_observed,
-            "Resumed must wait for the current engagement's disengagement"
+            !latched(),
+            "the current engagement's disengagement cannot be attributed before it happens"
         );
 
         // The current engagement disengages — NOW the evidence exists.
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
-        let snap = completion.observe_snapshot();
-        assert!(snap.pause_disengaged_observed);
+        assert!(latched());
 
         // None of this touched the terminal Fact: evidence latches are
         // not settlement inputs.
-        assert_eq!(snap.terminal_outcome, None);
+        assert_eq!(completion.observe_snapshot().terminal_outcome, None);
     }
 }

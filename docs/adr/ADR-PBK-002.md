@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate) |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150) |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -757,9 +757,10 @@ Qianqian App 不是 playback semantic authority；K0 lifecycle facts 不是 play
 ```text
 Playing / Starting / Paused / Stopping semantics
     (the transport-state semantics remain OPEN; the D14.7
-     Paused/Resumed Projections are NOT this item — they are
-     non-authoritative derived visibility, not transport lifecycle
-     states)
+     Paused Projection is NOT this item — it is
+     non-authoritative derived visibility, not a transport lifecycle
+     state; `Resumed` was removed from the projection set by the
+     D14.7 AUTHORITY-CORRECTIVE)
 position / duration authority
 seek product-state vocabulary / actual-landing authority beyond D14 minimum
 source identity / playlist authority / navigation policy
@@ -1152,6 +1153,28 @@ Playlist/queue selection authority remains OPEN. The first headless Open/Next/Pr
 > weakens `Resumed` to exactly what its evidence can support. The
 > selected mechanism, the mechanism requirements, the ownership rules
 > and D11 are UNCHANGED by this corrective.
+>
+> 2026-09-17 corrective (F3 AUTHORITY-CORRECTIVE; PR #150
+> implementation evidence). **AUTHORITY-CORRECTIVE: the frozen
+> `Resumed` projection was too strong and is REMOVED.** The previously
+> frozen proposition — unsettled ∧ resume released ∧ disengagement
+> observed — is false for a never-activated episode: pause intent
+> routed before activation, the render gate engages, the open aborts
+> (open timeout / open failure), the abort permanently closes the gate
+> and joins the leg (`close_and_release`), activation fails — and a
+> later resume then satisfies the formula while the episode's render
+> leg is provably gone: disengagement evidence proves only that the
+> gate's CURRENT park has ended, not that a viable render leg remains
+> to submit future audio. Therefore `Resumed` is removed as an
+> application-facing Projection. Resume remains Command state
+> (`pause_requested := false`); `Disengaged` remains Mechanism Evidence
+> and stays internal to the mechanism/session reasoning (it is not
+> public product surface); the episode seam keeps exactly one
+> application-facing pause projection, `Paused`. No replacement
+> `Playing`/`Running`/`Active`/`Ready`/transport-state noun is
+> introduced. This corrective does NOT reopen: mechanism A, the Paused
+> establishment rule, D11, the RenderGate race closure (teardown wake,
+> open-abort close, engagement fence), or P1–P5.
 
 Pause/Resume is **same-episode, non-terminal control owned by the
 Playback Session Plugin**. It never creates or destroys a Playback
@@ -1208,10 +1231,15 @@ disengagement ack          session-owned evidence path — the render leg
 output-tail quiescence     Mechanism Evidence — no frame submitted
                            BEFORE engagement remains queued for
                            rendering by this output session
-Paused / Resumed           application-facing derived Projection over
-                           the above (PBK-001 §2.3 sense); NOT a
-                           semantic Fact and NOT a correctness basis
-                           (see the non-authority rule below)
+Paused                     the one application-facing derived
+                           Projection over the above (PBK-001 §2.3
+                           sense); NOT a semantic Fact and NOT a
+                           correctness basis (see the non-authority
+                           rule below). `Resumed` was removed as an
+                           application-facing Projection by the
+                           AUTHORITY-CORRECTIVE above; resume is
+                           Command state only and disengagement stays
+                           Mechanism Evidence.
 ```
 
 **Output-tail quiescence (establishment closed for mechanism A).** For
@@ -1252,47 +1280,52 @@ Mechanism Evidence; it must never be promoted to a Fact, a
 position/Duration source (F4/D14.8), or a P1–P5 trigger (no old/new
 realtime-world overlap exists here).
 
-Truthful product establishment is then the projection:
+Truthful product establishment is then the single projection:
 
 ```text
 Paused (projection)  ⇔ the episode has no committed terminal outcome
                        ∧ pause intent recorded ∧ render engagement
                        evidence observed ∧ output-tail-quiescence
                        evidence observed
-Resumed (projection) ⇔ the episode has no committed terminal outcome
-                       ∧ resume released ∧ disengagement evidence
-                       observed
 ```
 
-`Resumed` claims exactly: pause control is no longer established and
-render submission is re-enabled. It does NOT claim new audio is already
-audible — after disengagement, refilled frames still traverse the
-device buffer before sounding, and audible-time semantics remain
-F4/D14.8 territory. Either mechanism-evidence factor alone is not
-establishment; a settled episode is never Paused or Resumed.
+`Resumed` is NOT a projection (AUTHORITY-CORRECTIVE above). Resume is
+only the command `pause_requested := false`. The disengagement
+acknowledgment proves exactly that the gate's current park has ended —
+it does NOT prove that pause control is no longer established, and it
+does NOT prove that a viable render leg remains available to submit
+future audio: a never-activated/open-aborted episode may have
+permanently closed and joined that leg while its episode stays
+unsettled forever. Audible-time semantics remain F4/D14.8 territory.
+Engagement evidence alone is not establishment; a settled episode is
+never Paused.
 
-The conjunction is guarded by the episode's unsettled state: once a
-terminal Fact commits, pause truth must not evaluate true on the
-episode regardless of mechanism engagement still being latched, so
-session settlement/teardown MUST release the pause gate (publishing
+The establishment conjunction is guarded by the episode's unsettled
+state: once a terminal Fact commits, pause truth must not evaluate true
+on the episode regardless of mechanism engagement still being latched,
+so session settlement/teardown MUST release the pause gate (publishing
 disengagement evidence) on the authority-owned execution/teardown path.
 
-**Non-authority rule for the Paused/Resumed projections.** Paused and
-Resumed create no new fact kind, no new fact authority, no fourth
-terminal variant, no `Paused` semantic Fact and no
-`Playing/Starting/Paused/Stopping` transport enum: the observation
-surface gains pause-intent (command state) and
-engagement/tail-quiescence (mechanism evidence) fields, and their
-spelling is representation (the episode-handle public-surface
-allowlist update is the explicit F3-implementation architecture event).
-As Projections in the PBK-001 §2.3 sense they MUST NOT be used as the
+**Non-authority rule for the Paused projection.** Paused creates no new
+fact kind, no new fact authority, no fourth terminal variant, no
+`Paused` semantic Fact and no `Playing/Starting/Paused/Stopping`
+transport enum (the AUTHORITY-CORRECTIVE additionally removed
+`Resumed` from the projection set and forbids re-introducing it, or any
+`Running/Active/Ready` replacement, without a fresh authority
+amendment): the observation surface gains pause-intent (command state)
+and engagement/tail-quiescence (mechanism evidence) fields, and their
+spelling is representation (the episode-handle public-surface allowlist
+update is the explicit F3-implementation architecture event). As a
+Projection in the PBK-001 §2.3 sense it MUST NOT be used as the
 correctness basis for resume legality, stop legality, teardown,
 terminal settlement, resource lifetime, mechanism wakeup, or K0
 lifecycle transitions; control/lifetime correctness uses the
 authority-owned command/control state and/or the direct mechanism
 state/evidence. Product status MUST NOT infer pause from worker
 blocking, PcmEdge occupancy, FiberState, UI state, or ad-hoc WASAPI
-observations outside this establishment chain.
+observations outside this establishment chain. Disengagement evidence
+MUST NOT be promoted into a user-facing transport/product truth
+(exactly the defect the AUTHORITY-CORRECTIVE removed).
 
 **Terminal interactions (D11 unchanged).** Stop-from-paused mid-play
 produces the existing worker-Stopped × drain-Aborted × intent history →

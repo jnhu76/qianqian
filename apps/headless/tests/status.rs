@@ -20,7 +20,6 @@ fn pending_observation() -> PlaybackSessionObservation {
         pause_requested: false,
         source_format: None,
         pause_engagement: PauseEngagement::Disengaged,
-        pause_disengaged_observed: false,
         activation_error: None,
     }
 }
@@ -120,7 +119,6 @@ fn each_terminal_fact_projects_its_own_line() {
                 channel_mask: 0x3,
             }),
             pause_engagement: PauseEngagement::Disengaged,
-            pause_disengaged_observed: false,
             activation_error: None,
             failure_diagnostic: None,
         };

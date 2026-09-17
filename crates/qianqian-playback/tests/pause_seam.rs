@@ -7,9 +7,11 @@
 //!
 //! Truth classes under test: pause/resume are commands (inert after
 //! settlement); engagement and output-tail quiescence are mechanism
-//! evidence belonging to the CURRENT engagement only; Paused/Resumed are
-//! the derived projections of the frozen establishment conjunction; D11
-//! terminal outcomes are untouched by any of it.
+//! evidence belonging to the CURRENT engagement only; Paused is the
+//! derived projection of the frozen establishment conjunction; resume
+//! is command-only — disengagement is NOT a product projection
+//! (D14.7 AUTHORITY-CORRECTIVE); D11 terminal outcomes are untouched
+//! by any of it.
 
 mod common;
 
@@ -18,7 +20,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use qianqian_app::QianqianApp;
-use qianqian_composition::{DesiredEntry, Revision};
+use qianqian_composition::{DesiredEntry, FiberState, Revision};
 use qianqian_playback::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, playback_session_spec,
 };
@@ -38,11 +40,12 @@ fn seconds_of_audio(seconds: u64) -> SourceBehavior {
 }
 
 /// A decode source producing ~`seconds` of frames fast, then one frame
-/// per 50ms forever — never EOF. The multi-cycle pause tests observe
-/// the Resumed projection, which the unsettled guard truthfully
-/// retracts the moment the episode settles; a finite source can drain
-/// to EOF during a test's release window and end the episode before
-/// the projection is polled, so these tests keep the episode alive.
+/// per 50ms forever — never EOF. The multi-cycle release tests wait for
+/// the mechanism to observe a release while the episode stays alive; a
+/// finite source can drain to EOF during a test's release window and
+/// settle the episode (freezing the evidence latches at settlement)
+/// before the observation is polled, so these tests keep the episode
+/// unsettled on purpose.
 fn endless_audio(seconds: u64) -> SourceBehavior {
     SourceBehavior::Paced {
         after: 44_100 * seconds as usize,
@@ -195,15 +198,14 @@ fn pause_establishes_resume_releases_and_cycles_stay_truthful() {
         let observation = handle.observe();
         assert!(!observation.paused(), "fresh episode: {observation:?}");
         assert!(
-            !observation.resumed(),
-            "nothing was ever paused: {observation:?}"
-        );
-        assert!(
             observation.pause_engagement == PauseEngagement::Disengaged,
             "no engagement yet: {observation:?}"
         );
 
         // Cycle 1: pause -> full establishment -> resume -> released.
+        // The truthful release observation is the COMMAND state cleared
+        // plus the current engagement ended (`Disengaged` spelling):
+        // there is no Resumed projection (D14.7 AUTHORITY-CORRECTIVE).
         handle.request_pause();
         assert!(handle.observe().pause_requested, "intent is recorded");
         wait_established(&handle);
@@ -211,9 +213,10 @@ fn pause_establishes_resume_releases_and_cycles_stay_truthful() {
         assert!(
             wait_until(Duration::from_secs(5), || {
                 let observation = handle.observe();
-                !observation.pause_requested && observation.resumed()
+                !observation.pause_requested
+                    && observation.pause_engagement == PauseEngagement::Disengaged
             }),
-            "resume never released the projection: {:?}",
+            "resume never released the episode: {:?}",
             handle.observe()
         );
 
@@ -229,98 +232,16 @@ fn pause_establishes_resume_releases_and_cycles_stay_truthful() {
 
         handle.request_resume();
         assert!(
-            wait_until(Duration::from_secs(5), || handle.observe().resumed()),
+            wait_until(Duration::from_secs(5), || {
+                let observation = handle.observe();
+                !observation.pause_requested
+                    && observation.pause_engagement == PauseEngagement::Disengaged
+            }),
             "second resume never released: {:?}",
             handle.observe()
         );
 
         // Commands stay commands: stop settles the episode normally.
-        handle.request_stop();
-        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
-        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
-    });
-}
-
-/// The Resumed projection is CURRENT-CYCLE evidence, symmetric to the
-/// stale-quiescence oracle above: after a first full pause/resume cycle,
-/// a second cycle's resume must NOT project Resumed from the FIRST
-/// cycle's disengagement latch — only this cycle's own Disengaged may
-/// establish it. The render leg is held inside a slow (legal) tail
-/// observation — an engagement whose quiescence has not been observed
-/// yet, because the gate stops calling the observation once quiescence
-/// is published — so the window between the resume command and this
-/// cycle's own disengagement is a stable state, not a race. In that
-/// window the render mechanism is provably still parked: Resumed
-/// (whose claim is "render submission is re-enabled") MUST be false.
-#[test]
-fn resumed_requires_the_current_pause_cycles_disengagement() {
-    let _lifecycle = common::lifecycle_lock();
-    within(Duration::from_secs(20), move || {
-        let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail_padding = Arc::new(AtomicBool::new(false));
-        let tail_probe = TailProbe::default();
-        let handle = PlaybackSessionHandle::new();
-        let mut runtime = registered_runtime(
-            endless_audio(30),
-            OutputBehavior::Consume,
-            consumed.clone(),
-            device_tail_padding.clone(),
-            tail_probe.clone(),
-            handle.clone(),
-        );
-        activate(&mut runtime);
-
-        assert!(
-            wait_until(Duration::from_secs(5), || consumed.load(Ordering::SeqCst)
-                > 0),
-            "the episode never produced audio"
-        );
-
-        // Cycle 1 completes in full: pause -> established -> resume ->
-        // this cycle's own disengagement evidence.
-        handle.request_pause();
-        wait_established(&handle);
-        handle.request_resume();
-        assert!(
-            wait_until(Duration::from_secs(5), || handle.observe().resumed()),
-            "cycle 1 never released: {:?}",
-            handle.observe()
-        );
-
-        // Cycle 2: re-pause and hold the leg inside its (first, legal
-        // but slow) tail observation, so it cannot reach its released
-        // check and cannot publish this cycle's disengagement.
-        tail_probe.arm();
-        handle.request_pause();
-        assert!(
-            wait_until(Duration::from_secs(5), || handle.observe().pause_engagement
-                == PauseEngagement::Engaged),
-            "the render leg never re-engaged: {:?}",
-            handle.observe()
-        );
-        tail_probe.wait_held();
-
-        handle.request_resume();
-        // The resume command is routed, but this cycle's disengagement
-        // has NOT been observed — the leg is provably still held at the
-        // gate. Cycle 1's latch must not establish Resumed here.
-        let snapshot = handle.observe();
-        assert!(
-            !snapshot.resumed(),
-            "a previous cycle's disengagement established Resumed: \
-             {snapshot:?}"
-        );
-
-        // This cycle's own Disengaged does establish it.
-        tail_probe.unhold();
-        assert!(
-            wait_until(Duration::from_secs(5), || handle.observe().resumed()),
-            "the current cycle's disengagement never established Resumed: \
-             {:?}",
-            handle.observe()
-        );
-
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
         let snapshot = runtime.dispose();
@@ -359,10 +280,9 @@ fn stop_from_an_established_pause_settles_stopped_and_late_commands_stay_inert()
             observation.terminal_outcome,
             Some(EpisodeTerminalOutcome::Stopped)
         );
-        // The settled episode is never Paused/Resumed, whatever the
+        // The settled episode is never Paused, whatever the
         // mechanism evidence still latches (D14.7 unsettled guard).
         assert!(!observation.paused());
-        assert!(!observation.resumed());
         assert!(
             observation.pause_requested,
             "pause intent stays recorded history"
@@ -379,7 +299,6 @@ fn stop_from_an_established_pause_settles_stopped_and_late_commands_stay_inert()
             "D11 monotonicity: settlement is never relabelled"
         );
         assert!(!observation.paused());
-        assert!(!observation.resumed());
 
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
@@ -686,6 +605,159 @@ fn pause_routed_after_teardown_release_cannot_wedge_the_join() {
         let snapshot = runtime.dispose();
         hostile.join().expect("the hostile pauser joins");
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// The D14.7 AUTHORITY-CORRECTIVE never-activated oracle. A
+/// never-activated episode can legally accumulate pre-activation pause
+/// intent, a PARKED render gate (engagement ack), and then an open
+/// abort that permanently closes the gate and joins the leg. On that
+/// episode the previously frozen Resumed proposition (unsettled ∧
+/// resume released ∧ disengagement observed) evaluated TRUE after a
+/// later resume — while the render leg is provably gone and can never
+/// submit again. That proposition was removed as a product projection;
+/// this oracle pins the truthful residue: engagement really happened
+/// before the abort (witness), the episode stays unsettled (D11
+/// activation firewall), the activation diagnostic travels, resume
+/// stays command-only, Paused never establishes, and the closed gate
+/// admits no later engagement. The compile-time absence of a public
+/// `resumed()`/`pause_disengaged_observed` surface is pinned by the
+/// boundary gate's episode-handle allowlist + negative control.
+#[test]
+fn a_never_activated_open_aborted_episode_has_no_resumed_proposition() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(30), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let tail_probe = TailProbe::default();
+        // Armed from the start: the aborted leg is proven parked through
+        // its held (armed) tail observation inside the park loop.
+        tail_probe.arm();
+        let open_abort_engaged = Arc::new(AtomicBool::new(false));
+        let handle = PlaybackSessionHandle::new();
+
+        // Pre-activation pause: intent is routed before any leg exists.
+        handle.request_pause();
+        assert!(handle.observe().pause_requested);
+
+        let mut runtime = QianqianApp::new();
+        runtime
+            .register_component({
+                qianqian_composition::ComponentSpec::new("test_decode_plugin")
+                    .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
+                    .on_activate(|ctx| {
+                        let service = TestDecode {
+                            behavior: seconds_of_audio(30),
+                        };
+                        ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
+                            std::rc::Rc::new(service),
+                        )
+                        .map_err(|e| {
+                            qianqian_composition::ActivationError::new(format!("{e:?}"))
+                        })?;
+                        Ok(())
+                    })
+            })
+            .expect("decode provider registers");
+        runtime
+            .register_component({
+                let consumed = consumed.clone();
+                let device_tail_padding = device_tail_padding.clone();
+                let tail_probe = tail_probe.clone();
+                let open_abort_engaged = open_abort_engaged.clone();
+                qianqian_composition::ComponentSpec::new("test_output_plugin")
+                    .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
+                    .on_activate(move |ctx| {
+                        let service = TestOutput::open_timeout_abort(
+                            consumed.clone(),
+                            device_tail_padding.clone(),
+                            tail_probe.clone(),
+                            open_abort_engaged.clone(),
+                        );
+                        ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
+                            std::rc::Rc::new(service),
+                        )
+                        .map_err(|e| {
+                            qianqian_composition::ActivationError::new(format!("{e:?}"))
+                        })?;
+                        Ok(())
+                    })
+            })
+            .expect("output provider registers");
+        runtime
+            .register_component(playback_session_spec(
+                std::path::PathBuf::from(DUMMY_PATH),
+                handle.clone(),
+            ))
+            .expect("session registers");
+        activate(&mut runtime);
+
+        // The old formula's false premise, pinned as a precondition:
+        // the leg REALLY parked at the gate before the abort (so
+        // disengagement evidence really exists).
+        assert!(
+            open_abort_engaged.load(Ordering::SeqCst),
+            "precondition: the render leg never parked before the abort"
+        );
+
+        let snap = runtime.composition_snapshot();
+        assert_eq!(
+            snap.fibers.get("session").map(|f| f.state),
+            Some(FiberState::Failed),
+            "the open abort lands the session FAILED"
+        );
+
+        let observation = handle.observe();
+        // D11 activation firewall: an episode that never started has no
+        // terminal Fact — the abort is NOT forged into Failed.
+        assert_eq!(
+            observation.terminal_outcome, None,
+            "an open abort must never forge a terminal Fact: {observation:?}"
+        );
+        // The activation diagnostic travels separately.
+        assert!(
+            observation
+                .activation_error
+                .as_deref()
+                .is_some_and(|m| m.contains("render stream open failed")),
+            "activation diagnostic: {observation:?}"
+        );
+        // No Paused establishment, and no engagement latched after the
+        // abort released the parked leg.
+        assert!(!observation.paused());
+        assert_eq!(observation.pause_engagement, PauseEngagement::Disengaged);
+        assert!(
+            observation.pause_requested,
+            "pre-activation intent stays recorded history"
+        );
+
+        // The resume after the failure: command state only. There is NO
+        // public Resumed proposition to become true — the render leg is
+        // gone and the gate is permanently closed.
+        handle.request_resume();
+        let observation = handle.observe();
+        assert!(!observation.pause_requested);
+        assert!(!observation.paused());
+        assert_eq!(observation.terminal_outcome, None);
+
+        // The closed gate stays closed: a later pause records intent but
+        // routes nothing — no engagement can ever arrive, so Paused can
+        // never establish on this episode.
+        handle.request_pause();
+        assert!(handle.observe().pause_requested);
+        assert!(
+            !wait_until(Duration::from_millis(500), || handle
+                .observe()
+                .pause_engagement
+                != PauseEngagement::Disengaged),
+            "the closed gate admitted an engagement after the open abort"
+        );
+        assert!(!handle.observe().paused());
+        assert_eq!(handle.observe().terminal_outcome, None);
+
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        assert_no_leg_threads();
     });
 }
 

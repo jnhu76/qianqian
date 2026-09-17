@@ -147,7 +147,6 @@ EXPORT_RULES = {
             "pub pause_requested: bool,",
             "pub source_format: Option<PcmFormat>,",
             "pub pause_engagement: PauseEngagement,",
-            "pub pause_disengaged_observed: bool,",
             "pub activation_error: Option<String>,",
             "pub fn new() -> Self {",
             "pub fn request_stop(&self) {",
@@ -156,14 +155,15 @@ EXPORT_RULES = {
             "pub fn observe(&self) -> PlaybackSessionObservation {",
             "pub fn wait_terminal(&self) -> EpisodeTerminalOutcome {",
             "pub fn paused(&self) -> bool {",
-            "pub fn resumed(&self) -> bool {",
         ],
-        "authority": "ADR-PBK-002 D14.2 + the D14.7 F3 amendment — the App's rights over one "
-        "episode are exactly new/request_stop/request_pause/request_resume/observe/"
-        "wait_terminal plus the admitted observation fields (D14.7 names this allowlist "
-        "update as the explicit F3-implementation architecture event: pause intent is "
-        "command state; engagement/tail-quiescence/disengagement are mechanism evidence; "
-        "paused()/resumed() are derived Projections and never correctness bases). "
+        "authority": "ADR-PBK-002 D14.2 + the D14.7 F3 amendment as narrowed by the D14.7 "
+        "AUTHORITY-CORRECTIVE — the App's rights over one episode are exactly "
+        "new/request_stop/request_pause/request_resume/observe/wait_terminal plus the "
+        "admitted observation fields (pause intent is command state; engagement/"
+        "tail-quiescence are mechanism evidence; paused() is a derived Projection and "
+        "never a correctness basis; Resumed was REMOVED as an application-facing "
+        "projection — disengagement evidence cannot prove a viable render leg remains — "
+        "so resume is command-only and no disengagement latch is public surface). "
         "A further new public right must first earn an explicit D14/phase-authority "
         "amendment, then update this allowlist on purpose",
     },
@@ -634,7 +634,7 @@ def run_negative_controls():
         },
     )
     # M8b — the observation surface is frozen at FIELD granularity: the
-    # App reads exactly the five D14.2 fields and nothing else.
+    # App reads exactly the D14.2/D14.7 fields and nothing else.
     expect_fail(
         "M8b observation field expansion",
         "unexpected episode-handle public surface: 'pubboundary_escape_probe:bool,'",
@@ -643,6 +643,37 @@ def run_negative_controls():
                 "pub struct PlaybackSessionObservation {",
                 "pub struct PlaybackSessionObservation {\n"
                 "    pub boundary_escape_probe: bool,",
+                1,
+            )
+        },
+    )
+    # M8c — the D14.7 AUTHORITY-CORRECTIVE removed the Resumed product
+    # projection and the public disengagement latch: re-adding either
+    # spelling (the exact retired statements) must RED on its own and
+    # force a fresh authority decision, not slip through as "just
+    # another field".
+    expect_fail(
+        "M8c retired Resumed projection re-published",
+        "unexpected episode-handle public surface: 'pubfnresumed(&self)->bool{'",
+        {
+            "crates/qianqian-playback/src/handle.rs": lambda t: t.replace(
+                "impl PlaybackSessionObservation {",
+                "impl PlaybackSessionObservation {\n"
+                "    pub fn resumed(&self) -> bool {\n"
+                "        false\n"
+                "    }\n",
+                1,
+            )
+        },
+    )
+    expect_fail(
+        "M8c retired disengagement latch re-published",
+        "unexpected episode-handle public surface: 'pubpause_disengaged_observed:bool,'",
+        {
+            "crates/qianqian-playback/src/handle.rs": lambda t: t.replace(
+                "pub struct PlaybackSessionObservation {",
+                "pub struct PlaybackSessionObservation {\n"
+                "    pub pause_disengaged_observed: bool,",
                 1,
             )
         },

@@ -101,7 +101,6 @@ mod tests {
             pause_requested: false,
             source_format: None,
             pause_engagement: PauseEngagement::Disengaged,
-            pause_disengaged_observed: false,
             activation_error: None,
         }
     }

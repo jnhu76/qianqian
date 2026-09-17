@@ -37,7 +37,6 @@ impl TuiModel {
                 pause_requested: false,
                 source_format: None,
                 pause_engagement: PauseEngagement::Disengaged,
-                pause_disengaged_observed: false,
                 activation_error: None,
             },
         }
@@ -186,7 +185,6 @@ mod tests {
             pause_requested: false,
             source_format: None,
             pause_engagement: PauseEngagement::Disengaged,
-            pause_disengaged_observed: false,
             activation_error: None,
         }
     }
@@ -385,7 +383,10 @@ mod tests {
         });
         assert!(!model.paused(), "intent alone is not Paused");
 
-        // Engaged, but the output tail has not been observed quiesced.
+        // Engaged, but the output tail has not been observed quiesced —
+        // including after a prior cycle's release was observed (the
+        // D14.7 corrective negative oracle: stale cross-cycle evidence
+        // satisfies nothing).
         model.update(PlaybackSessionObservation {
             pause_requested: true,
             pause_engagement: PauseEngagement::Engaged,
@@ -393,7 +394,7 @@ mod tests {
         });
         assert!(
             !model.paused(),
-            "engagement without tail quiescence is not Paused"
+            "engagement without CURRENT quiescence is not Paused"
         );
 
         // Full establishment.
@@ -413,18 +414,5 @@ mod tests {
             ..pending()
         });
         assert!(!model.paused(), "a settled episode is never Paused");
-
-        // Stale quiescence from a previous cycle does not satisfy a
-        // later pause (D14.7 corrective negative oracle).
-        model.update(PlaybackSessionObservation {
-            pause_requested: true,
-            pause_engagement: PauseEngagement::Engaged,
-            pause_disengaged_observed: true,
-            ..pending()
-        });
-        assert!(
-            !model.paused(),
-            "engagement without CURRENT quiescence is not Paused"
-        );
     }
 }

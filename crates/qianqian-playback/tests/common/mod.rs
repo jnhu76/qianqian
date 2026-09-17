@@ -24,8 +24,9 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
 }
 
 use qianqian_audio_api::ports::{
-    AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainVerdict,
-    OutputError, PcmDecode, PcmFormat, PcmPull, RenderPcmInput, RenderRequest, RenderStream,
+    AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainSignal,
+    DrainVerdict, OutputError, PcmDecode, PcmFormat, PcmPull, RenderPcmInput, RenderRequest,
+    RenderStream,
 };
 
 pub const TEST_FORMAT: PcmFormat = PcmFormat {
@@ -124,6 +125,16 @@ pub enum OutputBehavior {
     /// stop was requested; this is how a genuine device abort reaches
     /// the completion resolver.
     AbortMidStream { after_reads: usize },
+    /// Open never succeeds: the render leg is spawned, parks at the
+    /// pause gate (routed pause intent must already sit there), is
+    /// PROVEN parked through the armed tail probe, then the provider
+    /// aborts it through the open-abort protocol — permanent gate
+    /// close, data-plane stop, join — and returns the open failure.
+    /// Mirrors the real WASAPI open-timeout abort
+    /// (`open_abort::abort_render_thread`): the stream never becomes a
+    /// session episode, its gate can never park again, and no decode
+    /// worker exists yet (activation never got that far).
+    OpenTimeoutAbort,
 }
 
 pub struct TestOutput {
@@ -143,6 +154,13 @@ pub struct TestOutput {
     /// Controllable hold on the render leg's tail observation; see
     /// [`TailProbe`]. Unarmed by default, so it costs nothing.
     pub tail_probe: TailProbe,
+    /// Open-abort witness (`OpenTimeoutAbort` only): set after the
+    /// spawned leg was proven parked at the pause gate (its armed tail
+    /// observation is held — the gate only calls it from inside a park)
+    /// and before the open-abort closes, releases and joins the leg.
+    /// The caller owns the flag so the test can pin the engagement
+    /// precondition of the never-activated oracle.
+    pub open_abort_engaged: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl TestOutput {
@@ -175,6 +193,25 @@ impl TestOutput {
             consumed,
             device_tail_padding,
             tail_probe: TailProbe::default(),
+            open_abort_engaged: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        }
+    }
+
+    /// [`TestOutput::observed_with_tail`] plus the caller-owned
+    /// open-abort engagement witness, for
+    /// [`OutputBehavior::OpenTimeoutAbort`].
+    pub fn open_timeout_abort(
+        consumed: Arc<std::sync::atomic::AtomicUsize>,
+        device_tail_padding: Arc<std::sync::atomic::AtomicBool>,
+        tail_probe: TailProbe,
+        open_abort_engaged: Arc<std::sync::atomic::AtomicBool>,
+    ) -> TestOutput {
+        TestOutput {
+            behavior: OutputBehavior::OpenTimeoutAbort,
+            consumed,
+            device_tail_padding,
+            tail_probe,
+            open_abort_engaged,
         }
     }
 }
@@ -210,6 +247,28 @@ impl TailProbe {
         }
     }
 
+    /// Bounded [`TailProbe::wait_held`]: false if no observation was
+    /// held within `limit`.
+    pub fn wait_held_within(&self, limit: Duration) -> bool {
+        let deadline = std::time::Instant::now() + limit;
+        let mut held = self.held_entered.0.lock().unwrap();
+        loop {
+            if *held {
+                return true;
+            }
+            let now = std::time::Instant::now();
+            if now >= deadline {
+                return false;
+            }
+            let (guard, _) = self
+                .held_entered
+                .1
+                .wait_timeout(held, deadline - now)
+                .unwrap();
+            held = guard;
+        }
+    }
+
     /// Release the held observation.
     pub fn unhold(&self) {
         let mut released = self.hold_released.0.lock().unwrap();
@@ -236,12 +295,91 @@ impl TailProbe {
     }
 }
 
+/// Spawn the mock render leg shared by the streaming behaviors: the
+/// loop-top pause gate before every read, a panic still publishing a
+/// verdict and stopping the data plane, and the drain verdict published
+/// on exit — mirroring the real mechanism's leg posture (wasapi.rs
+/// run_render_thread).
+fn spawn_test_leg(
+    input: Arc<dyn RenderPcmInput>,
+    gate: qianqian_audio_api::ports::RenderGate,
+    drain: DrainSignal,
+    pace: Option<Duration>,
+    abort_after: Option<usize>,
+    output: &TestOutput,
+) -> std::io::Result<std::thread::JoinHandle<()>> {
+    let consumed = output.consumed.clone();
+    let device_tail_padding = output.device_tail_padding.clone();
+    let tail_probe = output.tail_probe.clone();
+    std::thread::Builder::new()
+        .name("qianqian-test-render".into())
+        .spawn(move || {
+            let verdict = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                consume_loop(
+                    input.clone(),
+                    &gate,
+                    pace,
+                    abort_after,
+                    &consumed,
+                    &device_tail_padding,
+                    &tail_probe,
+                )
+            }))
+            .unwrap_or(DrainVerdict::Aborted);
+            if verdict == DrainVerdict::Aborted {
+                // Mirror the real mechanism: a dead render leg stops
+                // the data plane.
+                input.stop();
+            }
+            drain.complete(verdict);
+        })
+}
+
 impl AudioOutput for TestOutput {
     fn open_stream(&self, request: RenderRequest) -> Result<Box<dyn RenderStream>, OutputError> {
         match self.behavior {
             OutputBehavior::FailOpen => Err(OutputError {
                 message: "test device open failure".to_owned(),
             }),
+            OutputBehavior::OpenTimeoutAbort => {
+                let RenderRequest {
+                    input,
+                    drain,
+                    gate,
+                    format: _,
+                } = request;
+                let thread = spawn_test_leg(input.clone(), gate.clone(), drain, None, None, self)
+                    .map_err(|e| OutputError {
+                    message: format!("test render spawn failed: {e}"),
+                })?;
+                // The pre-activation pause intent must already sit at
+                // the gate: the leg parks at its first loop-top check,
+                // and its armed tail observation held inside the park
+                // loop is the deterministic park proof (the gate only
+                // calls the observation from inside a park, after the
+                // engagement ack).
+                assert!(
+                    self.tail_probe.wait_held_within(Duration::from_secs(5)),
+                    "the OpenTimeoutAbort leg never parked at the gate: \
+                     route pause intent before activating"
+                );
+                self.open_abort_engaged
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                // The open has now "timed out": abort through the
+                // open-abort protocol — permanent gate close first, then
+                // the data-plane stop, then the join (the
+                // `abort_render_thread` order). The stream never becomes
+                // a session episode: no decode worker exists yet, so the
+                // aborted drain verdict alone can never settle a
+                // terminal Fact (D11 activation firewall).
+                gate.close_and_release();
+                self.tail_probe.unhold();
+                input.stop();
+                let _ = thread.join();
+                Err(OutputError {
+                    message: "test open timeout abort".to_owned(),
+                })
+            }
             OutputBehavior::Consume
             | OutputBehavior::SlowConsume { .. }
             | OutputBehavior::AbortMidStream { .. } => {
@@ -256,40 +394,7 @@ impl AudioOutput for TestOutput {
                     gate,
                     format: _,
                 } = request;
-                let consumed = self.consumed.clone();
-                let device_tail_padding = self.device_tail_padding.clone();
-                let tail_probe = self.tail_probe.clone();
-                let thread = std::thread::Builder::new()
-                    .name("qianqian-test-render".into())
-                    .spawn({
-                        let input = input.clone();
-                        move || {
-                            // Mirror the real render leg (wasapi.rs
-                            // run_render_thread): a panic still publishes
-                            // a verdict and stops the data plane, so the
-                            // session's synchronous drain settlement can
-                            // never wedge on a dead consumer.
-                            let verdict =
-                                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                                    consume_loop(
-                                        input.clone(),
-                                        &gate,
-                                        pace,
-                                        abort_after,
-                                        &consumed,
-                                        &device_tail_padding,
-                                        &tail_probe,
-                                    )
-                                }))
-                                .unwrap_or(DrainVerdict::Aborted);
-                            if verdict == DrainVerdict::Aborted {
-                                // Mirror the real mechanism: a dead render
-                                // leg stops the data plane.
-                                input.stop();
-                            }
-                            drain.complete(verdict);
-                        }
-                    })
+                let thread = spawn_test_leg(input.clone(), gate, drain, pace, abort_after, self)
                     .map_err(|e| OutputError {
                         message: format!("test render spawn failed: {e}"),
                     })?;

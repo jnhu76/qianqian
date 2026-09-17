@@ -203,8 +203,11 @@ The following are still OPEN:
 
 ```text
 Playing / Starting / Stopping semantics
-(Paused/Resumed are D14.7-derived Projections, not transport states;
- their establishment is frozen, the rest of the transport enum is not)
+(Paused is a D14.7-derived Projection, not a transport state;
+ Resumed is NOT a product projection — removed by the D14.7
+ AUTHORITY-CORRECTIVE (disengagement evidence cannot prove a viable
+ render leg remains): resume is Command-only, disengagement is
+ Mechanism Evidence; the rest of the transport enum is not earned)
 position / duration authority
 seek acceptance / discontinuity / commit semantics
 open/session construction + config + replacement semantics
@@ -241,18 +244,22 @@ F2 Observable read side         REALITY GATE CLOSED
          D14.3 authority-owned settlement;
          SessionCompletion/resolver becomes crate-internal
          replaceable realization)
-F3 Pause / Resume               GATE EARNED (D14.7 mechanism +
-                                establishment freeze incl.
-                                CORRECTIVE-1: Paused/Resumed =
-                                non-authoritative Projections gated on
-                                engagement + output-tail-quiescence
-                                evidence; evidence
-                                experiments/f3-pause-mechanism);
-                                IMPLEMENTATION OPEN (feat/f3-pause-resume-1:
-                                D14.7 mechanism A render-loop gate behind
-                                the episode seam; episode-handle public
-                                surface extended as the named D14.7
-                                architecture event)
+F3 Pause / Resume               CLOSED after authority corrective
+                                (feat/f3-pause-resume-1, PR #150:
+                                D14.7 mechanism A render-loop gate
+                                behind the episode seam).
+                                Paused = earned application-facing
+                                Projection (engagement +
+                                current-engagement tail-quiescence
+                                evidence); Resumed = NOT a product
+                                Projection (AUTHORITY-CORRECTIVE:
+                                disengagement evidence cannot prove a
+                                viable render leg remains —
+                                never-activated/open-abort
+                                counterexample); resume = Command
+                                only; Disengaged = Mechanism Evidence
+                                only; evidence
+                                experiments/f3-pause-mechanism
 F4 Position / Duration          GOAL KEPT / AUTHORITY + COUNTERS OPEN
 F5 Seek                         REDESIGNED AROUND DISCONTINUITY PROTOCOL
 F6 Open                         CONFIG-MECHANISM-OPEN

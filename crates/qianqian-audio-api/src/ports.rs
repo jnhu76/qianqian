@@ -194,8 +194,8 @@ pub enum GateEvent {
 ///
 /// One gate serves exactly one render leg: the engagement evidence, the
 /// once-per-engagement tail-quiescence discipline, and the
-/// disengagement fence that scopes the owner's Resumed evidence are all
-/// sound only under that premise.
+/// disengagement fence that keeps the owner's evidence attributable to
+/// the current engagement are all sound only under that premise.
 #[derive(Clone, Debug, Default)]
 pub struct RenderGate {
     inner: Arc<GateInner>,

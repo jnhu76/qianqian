@@ -32,15 +32,19 @@
 //!                     playback semantic state
 //! pause_engagement    mechanism evidence: the CURRENT pause
 //!                     engagement's render-gate / output-tail state
-//! pause_disengaged_observed  mechanism evidence latch: the render
-//!                     leg's most recent engagement has disengaged
 //! activation_error    activation diagnostic; never a terminal Failed
 //! ```
 //!
-//! `paused()` and `resumed()` are the D14.7 derived Projections over
-//! those fields. They are derived visibility only: never correctness
-//! bases for resume/stop legality, teardown, terminal settlement,
-//! resource lifetime, mechanism wakeup, or K0 lifecycle transitions.
+//! `paused()` is the D14.7 derived Projection over those fields —
+//! derived visibility only: never a correctness basis for resume/stop
+//! legality, teardown, terminal settlement, resource lifetime,
+//! mechanism wakeup, or K0 lifecycle transitions. `Resumed` is NOT a
+//! projection (D14.7 AUTHORITY-CORRECTIVE): disengagement evidence
+//! proves only that the gate's current park ended, not that a viable
+//! render leg remains to submit future audio — a never-activated /
+//! open-aborted episode permanently closes and joins that leg. Resume
+//! stays command state only, and disengagement stays crate-internal
+//! mechanism evidence (see [`crate::completion`]).
 //!
 //! Fields the current architecture has not earned (Playing/Starting/
 //! Stopping, position/duration, buffer health, source identity, K0
@@ -119,19 +123,10 @@ pub struct PlaybackSessionObservation {
     /// (D14.7). Evidence, not a semantic transport state. Meaningful
     /// only while `terminal_outcome` is `None`: publication is
     /// first-wins and closes at settlement, so after a terminal Fact
-    /// the latched spelling may outlive the leg — the `paused`/
-    /// `resumed` projections guard on the unsettled state, and any
-    /// other consumer of this field must too.
+    /// the latched spelling may outlive the leg — the `paused`
+    /// projection guards on the unsettled state, and any other
+    /// consumer of this field must too.
     pub pause_engagement: PauseEngagement,
-    /// Whether the render leg's most recent engagement has disengaged
-    /// (mechanism-evidence latch for the Resumed projection only).
-    /// Attribution is exact at engagement granularity — the leg's
-    /// `Engaged` event is the current-engagement fence, so a previous
-    /// pause cycle's disengagement can never establish `Resumed` for a
-    /// later cycle. Symmetric to the current-engagement tail-quiescence
-    /// discipline. The frozen claim: `resumed()` is true only while the
-    /// gate is released and render submission is re-enabled.
-    pub pause_disengaged_observed: bool,
     /// Why activation raised, if it did. Diagnostic; an episode that
     /// never started has no terminal Fact and must not be forged into
     /// `Failed`.
@@ -148,15 +143,6 @@ impl PlaybackSessionObservation {
         self.terminal_outcome.is_none()
             && self.pause_requested
             && self.pause_engagement == PauseEngagement::TailQuiesced
-    }
-
-    /// The Resumed projection (D14.7): the episode is unsettled, pause
-    /// intent is released, and the leg's most recent engagement has
-    /// disengaged. Claims exactly that pause control is no longer
-    /// established and render submission is re-enabled — NOT that new
-    /// audio is already audible.
-    pub fn resumed(&self) -> bool {
-        self.terminal_outcome.is_none() && !self.pause_requested && self.pause_disengaged_observed
     }
 }
 
