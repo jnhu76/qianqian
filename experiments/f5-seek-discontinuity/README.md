@@ -22,11 +22,15 @@ src/bin/f5edge.rs      E2 — edge-cut protocol evidence (all platforms):
                        a faithful copy of the PcmEdge synchronization
                        shape plus the candidate non-terminal invalidate
                        primitive, driven through the frozen
-                       seek-discontinuity protocol (refusal-first, the
-                       worker's own single purge, park-acknowledged
-                       commit) with a stale-output oracle; randomized
-                       scenarios + blocked-producer
-                       (T4/T5) shape + rogue-staging negative control
+                       seek-discontinuity protocol (three-class provider
+                       outcome: zero-content-loss RefusedUnchanged /
+                       Applied / fail-closed MutatedThenFailed; the
+                       worker's own single purge; park-acknowledged
+                       commit) with stale-output, refusal-sequence-
+                       equivalence and fail-closed oracles; randomized
+                       scenarios + blocked-producer (T4/T5) shape +
+                       rogue-staging and drop-remainder negative
+                       controls
 src/bin/f5cut.rs       E3 — WASAPI physical cutover probe (Windows
                        only): Experiment A = park → drain-to-zero →
                        commit → refill (the candidate output-side cut)
@@ -42,7 +46,7 @@ RESULTS.md             the gate report: production inventory, stale-PCM
 ```
 
 The formal companion is `specs/f5-seek-discontinuity/`
-(safety model of the cutover protocol; base PASS + 5 mutations RED).
+(safety model of the cutover protocol; base PASS + 7 mutations RED).
 
 ## Rule
 

@@ -21,13 +21,30 @@
 //!         read on an emptied edge (stall). The write path is
 //!         bounded-slice and re-observes the command slot every
 //!         slice, so the worker always reaches its serialization
-//!         point without any destructive pre-purge.
+//!         point without any destructive pre-purge. Observing the
+//!         command mid-block stops the write at the written prefix
+//!         and RETAINS the in-flight block — the outcome decides the
+//!         remainder (finish it exactly, or discard it with the cut).
 //!     loop-top serialization point:
-//!         song_seek BEFORE anything is invalidated; a refusal ends
-//!             the cut pre-cut and inert (worst cost: one dead
-//!             staging block; playback continues unchanged)
-//!         success: discard staging (the freshly decoded, not-yet-
-//!             written pre-cut block dies here), then
+//!         song_seek BEFORE anything is invalidated. The provider
+//!             outcome is three-class (D14.5 amendment, corrective 1):
+//!         RefusedUnchanged — a refusal proven pre-mutation (the
+//!             SongCore parameter/state checks; INVALID_ARGUMENT in
+//!             the exercised ABI): nothing invalidated, and any
+//!             in-flight staging block is PRESERVED and finished
+//!             exactly, so the consumed stream equals the no-seek
+//!             control (zero content loss; playback continues
+//!             unchanged)
+//!         MutatedThenFailed — any failure not provably pre-mutation
+//!             (generic SEEK_ERROR — which the SongCore ABI also
+//!             returns AFTER a successful reposition + decoder flush —
+//!             SEEK_UNSUPPORTED, STREAM_CHANGE, DECODE_ERROR): the
+//!             old decoder continuation is not guaranteed; the worker
+//!             NEVER resumes old-cursor production and the episode
+//!             ends through the ordinary decode-failure route
+//!         Applied — success: discard staging (the freshly decoded,
+//!             not-yet-written pre-cut block and any preserved
+//!             remainder die here), then
 //!         edge.invalidate() -- THE one purge, on the worker's own
 //!             path. After this returns, this thread writes only
 //!             post-reposition PCM
@@ -49,6 +66,15 @@
 //!                them). The harness snapshots before reading, which
 //!                is the lenient direction; the commit gate on the
 //!                park acknowledgment closes the remaining gap.
+//! REFUSAL-EQUIV  a RefusedUnchanged seek must be content-inert: the
+//!                consumed frame sequence equals the no-seek control
+//!                (0..pre_frames contiguous, epoch 0, no commit).
+//!                Mutation check: dropping ONE remainder frame after
+//!                the refusal MUST trip this oracle (must-fire).
+//! FAIL-CLOSED    a MutatedThenFailed seek must end the episode via
+//!                the failure route: no landing, no commit, and only
+//!                pre-seek content (contiguous prefix) may ever have
+//!                left the edge.
 //! NO-SURVIVOR    diagnostic only: after the worker's invalidate the
 //!                edge reports zero buffered frames at the commit.
 //! NO-DEADLOCK    every run — including a producer blocked writing on
@@ -247,15 +273,18 @@ impl Edge {
     }
 }
 
-// --- protocol harness (F5-GATE frozen protocol, D14.5 amendment) --------
+// --- protocol harness (F5-GATE frozen protocol, D14.5 amendment,
+// --- corrective 1: three-class provider outcome) ------------------------
 //
 // Order under test: session records the command and parks the render
 // leg; the worker reaches its serialization point REGARDLESS of edge
 // occupancy (bounded-slice write observing the command slot — no
 // destructive pre-purge), calls song_seek BEFORE anything is
-// invalidated, and only on success purges the edge itself, publishes
-// landing and holds production until release. A refusal invalidates
-// nothing: playback continues from the pre-command content.
+// invalidated, and only on Applied purges the edge itself, publishes
+// landing and holds production until release. RefusedUnchanged
+// invalidates nothing and preserves content exactly; MutatedThenFailed
+// ends the episode through the failure route without pretending the
+// old decoder survived.
 
 const BLOCK_FRAMES: usize = 64;
 const EDGE_FRAMES: usize = 512;
@@ -281,9 +310,14 @@ struct Shared {
     /// Worker's landing evidence (landing + 1 encoding), published
     /// strictly after its own purge.
     landing: AtomicU64,
-    /// Seek-refused evidence (song_seek rejection): nothing was
-    /// invalidated; playback continues from the pre-command content.
+    /// RefusedUnchanged evidence (proven pre-mutation song_seek
+    /// rejection): nothing was invalidated; playback continues from
+    /// the pre-command content, content preserved exactly.
     seek_failed: AtomicBool,
+    /// MutatedThenFailed evidence (song_seek failure not provably
+    /// pre-mutation): the old decoder continuation is gone; the
+    /// episode takes the ordinary decode-failure route.
+    seek_destructive: AtomicBool,
     /// Worker-side note: the command has been picked up at the loop top
     /// and the seek awaits the render leg's parked evidence. Production
     /// CONTINUES while this is set (that is what lets the leg reach its
@@ -302,6 +336,32 @@ struct Shared {
     produced_pre: AtomicU64,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ProviderOutcome {
+    /// SONG_OK: the decoder repositioned; landing known (or unknown,
+    /// encoded −1, at the ABI).
+    Applied,
+    /// Proven pre-mutation refusal — the SongCore parameter/state
+    /// checks (e.g. SONG_ERR_INVALID_ARGUMENT) return before
+    /// av_seek_frame is called, so the old cursor is intact. The only
+    /// class allowed to resume old playback.
+    RefusedUnchanged,
+    /// Failure not provably pre-mutation — generic SONG_ERR_SEEK_ERROR
+    /// (which the ABI also returns after av_seek_frame succeeded and
+    /// the decoder was flushed/repositioned), SEEK_UNSUPPORTED,
+    /// STREAM_CHANGE, DECODE_ERROR. Conservative rule: unprovable
+    /// means destructive; the episode never resumes old playback.
+    MutatedThenFailed,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mutiny {
+    None,
+    /// Drop exactly one preserved remainder frame after a
+    /// RefusedUnchanged outcome (must-fire mutation witness).
+    DropRemainderFrame,
+}
+
 #[derive(Clone)]
 struct Scenario {
     label: &'static str,
@@ -314,9 +374,15 @@ struct Scenario {
     /// planted (T4/T5 shape: the worker must still reach its
     /// serialization point without any pre-purge).
     blocked_producer: bool,
-    /// song_seek refuses (SEEK_* error): the protocol must stay inert —
-    /// no purge, no landing, no commit — and playback continues.
-    seek_refused: bool,
+    /// The simulated provider result of song_seek (three-class, the
+    /// SongCore reality: INVALID_ARGUMENT-class rejections return
+    /// before the demuxer is touched; generic SEEK_ERROR can also
+    /// arrive after a successful reposition + decoder flush).
+    outcome: ProviderOutcome,
+    /// Must-fire negative control: after a RefusedUnchanged outcome,
+    /// the worker drops exactly ONE preserved remainder frame. The
+    /// REFUSAL-EQUIV oracle MUST catch the gap.
+    mutiny: Mutiny,
     /// Negative control: the worker takes the command but SKIPS the
     /// staging discard — its in-flight pre-cut block is written after
     /// the purge.
@@ -332,7 +398,8 @@ impl Default for Scenario {
             landing: 100,
             post_frames: 600,
             blocked_producer: false,
-            seek_refused: false,
+            outcome: ProviderOutcome::Applied,
+            mutiny: Mutiny::None,
             rogue_staging: false,
         }
     }
@@ -346,9 +413,24 @@ enum Outcome {
     },
     /// At least one stale frame after the commit barrier (witnesses).
     Stale { witnesses: Vec<(u64, u64)> },
-    /// Refusal path: protocol stayed inert (no purge, no landing, no
-    /// commit) and old production continued to EOF.
-    Refused { frames_consumed: usize },
+    /// RefusedUnchanged path: inert (no purge, no landing, no commit),
+    /// old production continued to EOF, and `sequence_eq` says whether
+    /// the consumed frame sequence equals the no-seek control exactly.
+    Refused {
+        frames_consumed: usize,
+        sequence_eq: bool,
+        /// First divergence from the control sequence:
+        /// (index, actual epoch, actual pos); MAX fields = the frame
+        /// was missing entirely.
+        first_mismatch: Option<(usize, u64, u64)>,
+    },
+    /// MutatedThenFailed path: the episode ended via the failure
+    /// route; `prefix_ok` says whether every consumed frame was
+    /// pre-seek content (contiguous from 0, nothing committed).
+    FailedClosed {
+        frames_consumed: usize,
+        prefix_ok: bool,
+    },
 }
 
 fn park_at_gate(shared: &Shared) {
@@ -384,6 +466,7 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
         parked_ack: AtomicBool::new(false),
         landing: AtomicU64::new(0),
         seek_failed: AtomicBool::new(false),
+        seek_destructive: AtomicBool::new(false),
         seek_pending: AtomicBool::new(false),
         released: AtomicBool::new(false),
         worker_done: Mutex::new(false),
@@ -409,6 +492,11 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
             // The most recent pre-cut block: the staging a rogue worker
             // fails to discard.
             let mut last_staging: Vec<Frame> = Vec::new();
+            // The in-flight staging block and its written prefix,
+            // preserved across the seek attempt: RefusedUnchanged must
+            // finish it exactly (zero content loss); Applied discards
+            // it with the staging.
+            let mut in_flight: Option<(Vec<Frame>, usize)> = None;
             loop {
                 // --- loop-top serialization point ---
                 if let Some(landing) = shared.command.lock().expect("cmd lock").take() {
@@ -426,57 +514,93 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                 if do_seek {
                     shared.seek_pending.store(false, Ordering::Release);
                 }
-                if let Some(landing) = if do_seek {
-                    pending_landing.take()
-                } else {
-                    None
-                } {
+                if do_seek {
                     // song_seek happens HERE, before anything is
                     // invalidated (frozen order), and strictly after the
                     // leg's parked evidence.
-                    if sc.seek_refused {
-                        // Refusal: no invalidation at all; production
-                        // continues from the current cursor; the command
-                        // is consumed. (The driver releases the leg.)
-                        shared.seek_failed.store(true, Ordering::Release);
-                    } else {
-                        // Success: staging discard, then the worker's own
-                        // purge — the load-bearing cut — then landing,
-                        // then hold production until release.
-                        if sc.rogue_staging && !last_staging.is_empty() {
-                            // NEGATIVE CONTROL: the rogue does not
-                            // discard; it re-writes the in-flight block
-                            // after the purge (below).
-                        } else {
-                            last_staging.clear();
-                        }
-                        shared.edge.invalidate();
-                        shared.landing.store(landing + 1, Ordering::Release);
-                        if sc.rogue_staging && !last_staging.is_empty() {
-                            // NEGATIVE CONTROL, part 2: hold the stale
-                            // block until AFTER the commit, then write it.
-                            // A stale block racing into the pre-commit
-                            // window proves nothing — pre-commit output is
-                            // legal (the consumer may legitimately have up
-                            // to one in-flight read) — so the control must
-                            // exercise the post-commit violation shape the
-                            // oracle exists for.
-                            while !shared.committed.load(Ordering::Acquire)
-                                && !shared.stop.load(Ordering::Acquire)
-                            {
-                                std::thread::sleep(Duration::from_micros(50));
+                    let landing = pending_landing.take().expect("picked landing");
+                    match sc.outcome {
+                        ProviderOutcome::RefusedUnchanged => {
+                            // Refusal: no invalidation at all; the
+                            // command is consumed; production continues
+                            // from the current cursor. Any preserved
+                            // remainder is finished below (the MUTINY
+                            // control corrupts it by exactly one frame
+                            // — the equivalence oracle must catch that).
+                            if sc.mutiny == Mutiny::DropRemainderFrame {
+                                if let Some((_, off)) = in_flight.as_mut() {
+                                    *off += 1;
+                                }
                             }
-                            let _ = shared.edge.write(&last_staging);
-                            last_staging.clear();
+                            shared.seek_failed.store(true, Ordering::Release);
                         }
-                        // Production hold: bounded wait, terminal-aware.
-                        let mut hold = shared.released.load(Ordering::Acquire);
-                        while !hold && !shared.stop.load(Ordering::Acquire) {
+                        ProviderOutcome::MutatedThenFailed => {
+                            // The provider repositioned (or may have)
+                            // and then failed: the old decoder
+                            // continuation is gone. Never resume
+                            // old-cursor production and never pretend
+                            // this is a refusal — the episode ends
+                            // through the ordinary decode-failure route.
+                            shared.seek_destructive.store(true, Ordering::Release);
+                            break;
+                        }
+                        ProviderOutcome::Applied => {
+                            // Success: staging discard (including any
+                            // preserved remainder), then the worker's
+                            // own purge — the load-bearing cut — then
+                            // landing, then hold production until
+                            // release.
+                            if sc.rogue_staging && !last_staging.is_empty() {
+                                // NEGATIVE CONTROL: the rogue does not
+                                // discard; it re-writes the in-flight
+                                // block after the purge (below).
+                            } else {
+                                last_staging.clear();
+                            }
+                            in_flight = None;
+                            shared.edge.invalidate();
+                            shared.landing.store(landing + 1, Ordering::Release);
+                            if sc.rogue_staging && !last_staging.is_empty() {
+                                // NEGATIVE CONTROL, part 2: hold the
+                                // stale block until AFTER the commit,
+                                // then write it. A stale block racing
+                                // into the pre-commit window proves
+                                // nothing — pre-commit output is legal
+                                // (the consumer may legitimately have up
+                                // to one in-flight read) — so the
+                                // control must exercise the post-commit
+                                // violation shape the oracle exists for.
+                                while !shared.committed.load(Ordering::Acquire)
+                                    && !shared.stop.load(Ordering::Acquire)
+                                {
+                                    std::thread::sleep(Duration::from_micros(50));
+                                }
+                                let _ = shared.edge.write(&last_staging);
+                            }
+                            // Production hold: bounded wait, terminal-aware.
+                            let mut hold = shared.released.load(Ordering::Acquire);
+                            while !hold && !shared.stop.load(Ordering::Acquire) {
+                                std::thread::sleep(Duration::from_micros(100));
+                                hold = shared.released.load(Ordering::Acquire);
+                            }
+                            epoch = 1;
+                            src_pos = landing;
+                        }
+                    }
+                }
+                // Finish a preserved in-flight staging block BEFORE any
+                // budget/EOF check or new block: a RefusedUnchanged
+                // outcome owes the stream the rest of its own content.
+                if let Some((block, mut off)) = in_flight.take() {
+                    while off < block.len() && !shared.stop.load(Ordering::Acquire) {
+                        let wrote = shared.edge.write_some(&block[off..]);
+                        off += wrote;
+                        if wrote == 0 {
                             std::thread::sleep(Duration::from_micros(100));
-                            hold = shared.released.load(Ordering::Acquire);
                         }
-                        epoch = 1;
-                        src_pos = landing;
+                    }
+                    if shared.stop.load(Ordering::Acquire) {
+                        break;
                     }
                 }
                 // EOF belongs to the current epoch's decode budget: a cut
@@ -488,7 +612,8 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                     break;
                 }
                 let seeking = pending_landing.is_some();
-                if epoch == 0 && produced_pre >= sc.pre_frames && !seeking && !sc.seek_refused {
+                let refused = sc.outcome == ProviderOutcome::RefusedUnchanged;
+                if epoch == 0 && produced_pre >= sc.pre_frames && !seeking && !refused {
                     // Honest worker waiting for the command at its loop
                     // top (pre-cut budget exhausted, no command yet).
                     let mut cmd = shared.command.lock().expect("cmd lock");
@@ -502,9 +627,10 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                     drop(cmd);
                     continue;
                 }
-                if epoch == 0 && sc.seek_refused && produced_pre >= sc.pre_frames {
-                    // A refused seek consumed the command: production
-                    // simply continues (the decoder never moved).
+                if refused && epoch == 0 && produced_pre >= sc.pre_frames {
+                    // A RefusedUnchanged seek consumed the command and
+                    // any preserved remainder was finished: production
+                    // simply ends (the decoder never moved).
                     shared.edge.close_eof();
                     break;
                 }
@@ -542,7 +668,6 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                 // reach its serialization point regardless of edge
                 // occupancy, with no destructive pre-purge.
                 let mut off = 0usize;
-                let mut abandoned = false;
                 loop {
                     if off == block.len() {
                         break;
@@ -550,12 +675,13 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                     if shared.command.lock().expect("cmd lock").is_some()
                         && shared.parked_ack.load(Ordering::Acquire)
                     {
-                        // The seek can proceed now (leg parked): abandon
-                        // the in-flight staging block — at most one
-                        // staging buffer, the only content a seek can ever
-                        // cost (and only when the decoder refuses; on
-                        // success this block dies in the purge anyway).
-                        abandoned = true;
+                        // The seek can proceed now (leg parked): stop
+                        // the block at its written prefix and RETAIN
+                        // it. The outcome owns the remainder —
+                        // RefusedUnchanged finishes it exactly (zero
+                        // content loss); Applied discards it with the
+                        // staging at the cut.
+                        in_flight = Some((block, off));
                         break;
                     }
                     let wrote = shared.edge.write_some(&block[off..]);
@@ -564,7 +690,6 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                         std::thread::sleep(Duration::from_micros(100));
                     }
                 }
-                let _ = abandoned;
                 if shared.stop.load(Ordering::Acquire) {
                     break;
                 }
@@ -643,25 +768,30 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
     // …and park the render leg (cut-attributed internal quiescence).
     *shared.hold.lock().expect("hold lock") = true;
 
-    // Wait for the landing evidence or the refusal.
+    // Wait for the landing evidence, the refusal, or the destructive
+    // failure.
     let dl = phase_deadline();
     loop {
         if shared.seek_failed.load(Ordering::Acquire) {
+            break;
+        }
+        if shared.seek_destructive.load(Ordering::Acquire) {
             break;
         }
         if shared.landing.load(Ordering::Acquire) != 0 {
             break;
         }
         if Instant::now() > dl {
-            return Err("worker never published landing or refusal".into());
+            return Err("worker never published landing, refusal, or failure".into());
         }
         std::thread::sleep(Duration::from_micros(50));
     }
 
-    if sc.seek_refused {
+    if sc.outcome == ProviderOutcome::RefusedUnchanged {
         // Refusal path: nothing may have been invalidated and nothing
         // may commit. Release the leg; playback continues from the
-        // pre-command content to natural EOF.
+        // pre-command content to natural EOF — and the consumed
+        // sequence must equal the no-seek control exactly.
         if shared.landing.load(Ordering::Acquire) != 0 {
             return Err("refused seek produced a landing".into());
         }
@@ -692,8 +822,64 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
         if post_commit != 0 {
             return Err("refused seek produced post-commit output".into());
         }
+        // REFUSAL-EQUIV: the consumed sequence IS the no-seek control
+        // output by construction (same budget, same FIFO producer):
+        // 0..pre_frames contiguous, epoch 0, nothing committed.
+        let expected: Vec<(bool, u64, u64)> =
+            (0..sc.pre_frames as u64).map(|i| (false, 0, i)).collect();
+        let first_mismatch = (0..out.len().max(expected.len()))
+            .find(|&i| out.get(i) != expected.get(i))
+            .map(|i| match out.get(i) {
+                Some(&(_, e, p)) => (i, e, p),
+                None => (i, u64::MAX, u64::MAX),
+            });
         return Ok(Outcome::Refused {
             frames_consumed: out.len(),
+            sequence_eq: first_mismatch.is_none(),
+            first_mismatch,
+        });
+    }
+
+    if sc.outcome == ProviderOutcome::MutatedThenFailed {
+        // Destructive-failure path: the episode ends via the ordinary
+        // decode-failure route. No landing, no commit, and only
+        // pre-seek content may ever have left the edge — the provider
+        // failure must NOT be papered over as a refusal.
+        if shared.landing.load(Ordering::Acquire) != 0 {
+            return Err("destructive seek produced a landing".into());
+        }
+        // Release the leg (the park was cut-attributed; the episode is
+        // failing), then tear the stream down like any decode failure.
+        *shared.hold.lock().expect("hold lock") = false;
+        shared.hold_cv.notify_all();
+        let dl = phase_deadline();
+        {
+            let mut done = shared.worker_done.lock().expect("done lock");
+            while !*done {
+                let (d, _) = shared
+                    .worker_cv
+                    .wait_timeout(done, Duration::from_millis(5))
+                    .expect("done wait");
+                done = d;
+                if Instant::now() > dl {
+                    return Err("worker never finished after destructive failure".into());
+                }
+            }
+        }
+        shared.edge.stop();
+        let _ = consumer.join();
+        let _ = producer.join();
+        if shared.committed.load(Ordering::Acquire) {
+            return Err("destructive seek committed a cutover".into());
+        }
+        let out = shared.output.lock().expect("out lock");
+        let prefix_ok = out
+            .iter()
+            .enumerate()
+            .all(|(i, &(c, e, p))| !c && e == 0 && p == i as u64);
+        return Ok(Outcome::FailedClosed {
+            frames_consumed: out.len(),
+            prefix_ok,
         });
     }
 
@@ -791,15 +977,36 @@ fn main() {
             ..Default::default()
         },
         Scenario {
-            label: "seek-refused-inert",
+            label: "seek-refused-unchanged",
             seed: 17,
-            seek_refused: true,
+            outcome: ProviderOutcome::RefusedUnchanged,
+            ..Default::default()
+        },
+        Scenario {
+            label: "blocked-producer-refused",
+            seed: 19,
+            blocked_producer: true,
+            outcome: ProviderOutcome::RefusedUnchanged,
+            ..Default::default()
+        },
+        Scenario {
+            label: "seek-destructive-failure",
+            seed: 23,
+            outcome: ProviderOutcome::MutatedThenFailed,
             ..Default::default()
         },
         Scenario {
             label: "negative-control-rogue-staging",
             seed: 13,
             rogue_staging: true,
+            ..Default::default()
+        },
+        Scenario {
+            label: "negative-control-drop-remainder",
+            seed: 29,
+            blocked_producer: true,
+            outcome: ProviderOutcome::RefusedUnchanged,
+            mutiny: Mutiny::DropRemainderFrame,
             ..Default::default()
         },
     ];
@@ -825,9 +1032,33 @@ fn main() {
             ..Default::default()
         });
     }
+    for i in 0..30u64 {
+        let mut seed = i.wrapping_mul(7919).wrapping_add(42403);
+        let jitter = xorshift(&mut seed);
+        scenarios.push(Scenario {
+            label: "random-refused-unchanged",
+            seed: jitter,
+            pre_frames: 400 + (jitter % 800) as usize,
+            outcome: ProviderOutcome::RefusedUnchanged,
+            ..Default::default()
+        });
+    }
+    for i in 0..5u64 {
+        let mut seed = i.wrapping_mul(104729).wrapping_add(7);
+        let jitter = xorshift(&mut seed);
+        scenarios.push(Scenario {
+            label: "random-destructive-failure",
+            seed: jitter,
+            pre_frames: 400 + (jitter % 800) as usize,
+            outcome: ProviderOutcome::MutatedThenFailed,
+            ..Default::default()
+        });
+    }
 
     let mut rogue_runs = 0usize;
     let mut rogue_fired = 0usize;
+    let mut mutiny_runs = 0usize;
+    let mut mutiny_fired = 0usize;
     let only_seed: Option<u64> = std::env::var("F5EDGE_SEED")
         .ok()
         .and_then(|v| v.parse().ok());
@@ -838,6 +1069,7 @@ fn main() {
             }
         }
         let is_rogue = sc.rogue_staging;
+        let is_mutiny = sc.mutiny == Mutiny::DropRemainderFrame;
         match run_scenario(sc) {
             Ok(Outcome::Clean {
                 consumed_post_commit,
@@ -866,10 +1098,43 @@ fn main() {
                     failures += 1;
                 }
             }
-            Ok(Outcome::Refused { frames_consumed }) => {
-                // The refusal path is its own assertion set inside the
-                // run (inert: no purge, no landing, no commit).
-                let _ = frames_consumed;
+            Ok(Outcome::Refused {
+                frames_consumed,
+                sequence_eq,
+                first_mismatch,
+            }) => {
+                if is_mutiny {
+                    // Must-fire control: the dropped remainder frame
+                    // MUST have been caught by REFUSAL-EQUIV.
+                    mutiny_runs += 1;
+                    if sequence_eq {
+                        println!(
+                            "F5EDGE {} seed={} MUTINY_NOT_CAUGHT (drop-remainder did not trip the equivalence oracle)",
+                            sc.label, sc.seed
+                        );
+                        failures += 1;
+                    } else {
+                        mutiny_fired += 1;
+                    }
+                } else if !sequence_eq {
+                    println!(
+                        "F5EDGE {} seed={} REFUSAL_SEQUENCE_VIOLATION consumed={} first_mismatch={:?} (refused-seek output diverged from the no-seek control)",
+                        sc.label, sc.seed, frames_consumed, first_mismatch
+                    );
+                    failures += 1;
+                }
+            }
+            Ok(Outcome::FailedClosed {
+                frames_consumed,
+                prefix_ok,
+            }) => {
+                if !prefix_ok {
+                    println!(
+                        "F5EDGE {} seed={} FAILURE_ROUTE_LEAK consumed={} (post-seek or non-contiguous content left the edge after a destructive seek failure)",
+                        sc.label, sc.seed, frames_consumed
+                    );
+                    failures += 1;
+                }
             }
             Err(e) => {
                 println!("F5EDGE {} seed={} RUN_FAILURE {e}", sc.label, sc.seed);
@@ -878,14 +1143,20 @@ fn main() {
         }
     }
     println!(
-        "F5EDGE SUMMARY runs={} protocol_failures={} rogue_runs={} rogue_fired={}",
+        "F5EDGE SUMMARY runs={} protocol_failures={} rogue_runs={} rogue_fired={} mutiny_runs={} mutiny_fired={}",
         scenarios.len(),
         failures,
         rogue_runs,
-        rogue_fired
+        rogue_fired,
+        mutiny_runs,
+        mutiny_fired
     );
     println!("F5EDGE END failures={failures}");
     std::process::exit(i32::from(
-        failures > 0 || rogue_fired != rogue_runs || rogue_runs == 0,
+        failures > 0
+            || rogue_fired != rogue_runs
+            || rogue_runs == 0
+            || mutiny_fired != mutiny_runs
+            || mutiny_runs == 0,
     ));
 }

@@ -164,24 +164,52 @@ shape (Mutex ring + two condvars + first-wins monotone terminal) with
 structured frames, plus the candidate **non-terminal invalidate**
 primitive (`read_pos=write_pos=buffered=0` under the state lock;
 terminal untouched; both condvars notified), driven through the FROZEN
-protocol of the D14.5 amendment. 3 runs × 256 scenarios:
+protocol of the D14.5 amendment as corrected by F5-GATE-CORRECTIVE-1
+(three-class provider outcome). 3 runs × 294 scenarios:
 
 ```text
 deterministic / backward-seek / landing-zero   clean (no stale output)
 blocked-producer (T4/T5: producer blocked      clean — the bounded-slice
 inside its write on a full edge at command     write observes the command
-time; the seek proceeds with no pre-purge)     and abandons the in-flight
-                                               block; the seek runs with
-                                               no pre-purge
-seek-refused (song_seek rejection path)        protocol stayed inert: no
-                                               purge, no landing, no commit;
-                                               production continued to EOF;
-                                               zero post-command loss beyond
-                                               the bounded staging block
-randomized ×200 (sizes, landings, jitter)      clean
+time; the seek proceeds with no pre-purge)     and stops at the written
+                                               prefix, preserving the
+                                               in-flight block; the seek
+                                               runs with no pre-purge
+seek-refused-unchanged (INVALID_ARGUMENT-      inert AND content-exact:
+class refusal)                                 no purge, no landing, no
+                                               commit; the preserved
+                                               remainder is finished and
+                                               production continues to EOF;
+                                               the consumed sequence EQUALS
+                                               the no-seek control (0..pre
+                                               contiguous, epoch 0) — zero
+                                               content loss (REFUSAL-EQUIV)
+blocked-producer-refused                       same, from a full-edge
+                                               blocked writer: the abandoned
+                                               prefix is resumed after the
+                                               refusal and the sequence is
+                                               still exact
+seek-destructive-failure (generic SEEK_ERROR   FAIL-CLOSED: no purge, no
+after flush — the ABI's dual-phase reality)    landing, no commit, no
+                                               post-seek content; the worker
+                                               stops producing and the
+                                               episode ends via the failure
+                                               route (only a contiguous
+                                               pre-seek prefix ever left the
+                                               edge)
+randomized honest ×200 (sizes, landings,       clean
+jitter)
+random-refused-unchanged ×30                   REFUSAL-EQUIV exact
+random-destructive-failure ×5                  FAIL-CLOSED exact
 rogue-staging negative control ×51             FIRED 51/51 (a stale block
                                                entering the edge AFTER the
                                                commit is always witnessed)
+drop-remainder must-fire control ×1            FIRED 1/1 (dropping exactly
+                                               ONE preserved remainder frame
+                                               after a refusal trips
+                                               REFUSAL-EQUIV — the
+                                               zero-loss oracle is not
+                                               vacuous)
 ```
 
 **Why the exclusion is the discipline, not the primitive.** The worker
@@ -465,39 +493,87 @@ becomes necessary (§15). Coalescing/latest-wins would each need an
 identity story; none is earned by any current product need (no arrow-key
 seek exists yet).
 
-## 13. Seek failure policy (pre-cut vs post-cut)
+## 13. Seek failure policy (three-class provider outcome)
+
+Round-3 review found the v1 two-class policy (success vs "SEEK_* error
+= inert refusal") unsound: the SongCore implementation returns generic
+`SEEK_ERROR` from TWO different phases, and only one refusal status is
+provably pre-mutation. Frozen classification (SongCore source audit,
+`native/src/songcore_ffmpeg.c song_seek`):
 
 ```text
-pre-cut failures (the episode continues its pre-command content; NEVER
-    terminal Failed):
-    - seek already in flight (§12 rejection)
-    - data plane not Open (edge terminal ≠ Open, which includes the
-      post-EOF drain window), episode settled, stop intent recorded
-    - song_seek refusal (SEEK_UNSUPPORTED / SEEK_ERROR /
-      INVALID_ARGUMENT): under the frozen ordering the refusal happens
-      BEFORE any invalidation, so edge, tail and leg continue
-      seamlessly; the only content a refusal can cost is one abandoned
-      in-flight staging block (≤ one staging buffer, present only when
-      the worker was mid-block). E1 measured the validation class
-      (decoder usable after rejection); SEEK_ERROR/UNSUPPORTED post-
-      state remains unexercised on this corpus (recorded limitation).
-post-cut: the selected mechanism confines failure to the existing D11
-    device-failure path. The purge is a fail-fast O(1) reset that
-    happens only after song_seek succeeded; a device failure during the
-    drain settles through the existing precedence exactly like any other
-    render abort. Seek introduces no new terminal variant and no
-    recovery semantics.
-    LANDING UNKNOWN (−1): the cutover still commits (stale exclusion is
-    independent of landing knowledge; the decoder has already moved —
-    rollback does not exist), and Position is withdrawn (None) for the
-    rest of the episode rather than fabricated (§8). Not observed on
-    the current corpus (E1 never saw −1 on a successful seek);
-    fail-closed honesty if it ever appears.
+Phase 0 (pre-av_seek_frame, PROVABLY non-mutating):
+    INVALID_ARGUMENT (null handle / negative target), NOT_OPEN —
+    pure parameter/state checks; the decoder is untouched. E1
+    measured the validation class (decoder usable after rejection).
+    => RefusedUnchanged: inert refusal, old playback continues with
+       ZERO content loss (the in-flight staging remainder is preserved
+       and finished — §5 REFUSAL-EQUIV).
+Phase 1 (av_seek_frame failed): SEEK_UNSUPPORTED / SEEK_ERROR —
+    FFmpeg does not promise that a failed av_seek_frame leaves the
+    demuxer state undisturbed (it may have read/discarded packets).
+    Not provably clean; nothing on this corpus exercises the
+    post-state (recorded limitation). => conservative: treat as
+    MutatedThenFailed.
+Phase 2 (av_seek_frame SUCCEEDED, then failure): avcodec_flush_buffers
+    + reset_decode_state HAVE run (decoder repositioned — destructively
+    mutated, by construction). Landing decode failure returns generic
+    SEEK_ERROR; landing conversion failure returns STREAM_CHANGE /
+    DECODE_ERROR. A handle-level read afterwards would produce
+    NEW-cursor PCM. => MutatedThenFailed.
+    The same status code SEEK_ERROR therefore covers two different
+    realities (phase 1 and phase 2); a status code alone cannot prove
+    inertness.
 ```
 
-No AUTHORITY_GAP remains here: the pre/post distinction is real but the
-frozen ordering confines post-cut failure to the existing device-failure
-path; nothing new had to be invented.
+Policy per class:
+
+```text
+RefusedUnchanged   inert diagnostic — the episode continues its
+                   pre-command content exactly (never terminal Failed).
+                   Preserve-and-finish the staging remainder: the
+                   refused-seek output equals the no-seek control
+                   (E2 REFUSAL-EQUIV; formal InvRefusalContentContinuous;
+                   the drop-one-frame mutation is witnessed by BOTH the
+                   E2 must-fire control and formal M6).
+Applied            the cut protocol (§5–§7); landing unknown (−1): the
+                   cutover still commits (stale exclusion is independent
+                   of landing knowledge; the decoder has already moved —
+                   rollback does not exist) and Position is withdrawn
+                   (None) for the rest of the episode rather than
+                   fabricated (§8). Not observed on the current corpus
+                   (E1 never saw −1 on a successful seek); fail-closed
+                   honesty if it ever appears.
+MutatedThenFailed  the old decoder continuation is not guaranteed — the
+                   episode NEVER resumes old-cursor production and the
+                   failure is NOT papered over as a refusal: it routes
+                   through the ordinary D11 decode-failure path
+                   (failure mechanism evidence → terminal Failed). No
+                   new terminal variant, no recovery semantics (formal
+                   InvFailClosed; resuming after the failure is
+                   witnessed as the pre/post-mixing hazard by M7).
+                   Conservative rule: unprovable means destructive.
+                   Upgrading a class (e.g. proving SEEK_UNSUPPORTED
+                   non-mutating on real unsupported fixtures) requires
+                   a narrow SongCore provider-contract corrective with
+                   its own evidence — explicitly out of scope here.
+
+pre-cut rejection (before any provider call): seek already in flight
+    (§12), data plane not Open (edge terminal ≠ Open, including the
+    post-EOF drain window), episode settled, stop intent recorded —
+    inert commands, no semantic effect.
+post-cut: the selected mechanism confines failure to the existing D11
+    device-failure path. The purge is a fail-fast O(1) reset that
+    happens only after song_seek succeeded; a device failure during
+    the drain settles through the existing precedence exactly like any
+    other render abort.
+```
+
+No AUTHORITY_GAP remains here: the classification gap the round-3
+review surfaced is resolved by the conservative rule above, frozen in
+the D14.5 corrective; a stronger transactional SongCore seek contract
+is a possible future provider-contract amendment, not a gate
+prerequisite.
 
 ## 14. P1–P5 check (verdict: NOT triggered — recorded, not named)
 
@@ -552,13 +628,17 @@ SeekOperation as Plugin
 ## 16. Realtime cost (frozen shape)
 
 ```text
-normal playback   ZERO new per-quantum work. The worker's loop-top
+normal playback   no new per-quantum allocation, no new lock
+                  acquisition, no dispatch, no K0/Capability work, no
+                  version/epoch comparison. The worker's loop-top
                   command check is one Mutex try on a session-owned slot
                   per staging block (decode-side, off the RT path). The
-                  render loop is untouched except that the loop-top park
-                  condition gains one more session-owned flag next to
-                  the existing pause flag (same lock, same check site —
-                  not per-block versioning).
+                  render loop is untouched except that its existing
+                  loop-top gate check gains one more session-owned
+                  seek-park flag test next to the existing pause flag
+                  (same lock, same check site — not per-block
+                  versioning). Strictly: not ZERO added work — one flag
+                  test at an existing check site.
 during seek       bounded control work OFF the quantum path: song_seek
                   (≤ ~0.4 ms measured), purge (O(1)), drain wait (≤ one
                   buffer, ~30 ms measured), one rebase store. No
@@ -572,16 +652,31 @@ reservoirs; no audio; no timing). `specs/check.sh f5`:
 
 ```text
 base     PASS — InvStaleOutput + InvPositionNoMixing + InvCommitPurged
-         over 426 distinct states (exhaustive at MAX_TAIL=2)
-witness  4 × MUST-FAIL-OK (commit reachable; pre-commit old output
+         + InvRefusalContentContinuous + InvFailClosed over 672
+         distinct states (exhaustive at MAX_TAIL=2)
+witness  6 × MUST-FAIL-OK (commit reachable; pre-commit old output
          reachable = legal; pre-commit edge-old reachable = reservoir
-         non-vacuous; seek-refusal path reachable = the frozen protocol's
-         failure half is modeled, not decorative)
-mutation 5 × COUNTEREXAMPLE-WITNESSED:
+         non-vacuous; seek-refusal path reachable; destructive-failure
+         route reachable; remainder-outstanding seek reachable = the
+         M6 precondition shape)
+mutation 7 × COUNTEREXAMPLE-WITNESSED:
          M1 commit-before-tail-purge, M2 seek-mid-write (staging not
          discarded), M3 park-while-held (render-held block), M4 stale
-         position writer, M5 commit-before-landing
+         position writer, M5 commit-before-landing, M6
+         refusal-drops-remainder (caught by
+         InvRefusalContentContinuous), M7 resume-after-mutated-seek
+         (caught by InvFailClosed — the pre/post-mixing hazard of
+         resuming old-cursor production after a destructive failure)
 ```
+
+Corrective-1 note: the model was extended so the refusal split is
+actually carried — `SeekRefusedUnchanged` returns a remainder-bearing
+worker to `writing_partial` (FinishWriteOld completes it; M6 drops it
+and is caught), and `SeekMutatedThenFailed` moves the episode to the
+decode-failure route (`episodeFailed`), with M7 proving that resuming
+production after it is detectable. The pre-corrective model abstracted
+`SeekRefused` as a bare `"seeking" → "idle"` step and could not see
+either hazard.
 
 Honesty note (round-1 review, m-6): M1/M2/M3/M5 relax real base-model
 guards and are genuine counterexample witnesses. M4 instead INJECTS a
@@ -598,7 +693,8 @@ not production correctness.
 PlaybackSessionHandle::request_seek(&self, target: Duration)
     Command only, infallible, idempotent-with-rejection semantics:
     invalid moments (in-flight seek, non-Open data plane, settled
-    episode, stop already recorded, decoder refusal) are silently
+    episode, stop already recorded, a RefusedUnchanged decoder outcome)
+    are silently
     inert like late stop/pause — the command records intent when
     accepted; outcomes stay observable only through truthful evidence
     (Position jump) and terminal truth. Duration is non-negative and
@@ -616,27 +712,36 @@ PlaybackSessionHandle::request_seek(&self, target: Duration)
 |---|---|---|---|
 | Seek target | source-relative media time (µs); zero=start; negative unrepresentable; provider decides validity; Duration never consulted | ABI native unit; E1 clamp/EOF behavior | percent-of-duration (UI convenience — invented semantics); PCM frame index (extra conversion layer for zero product gain; ABI speaks µs) |
 | Decoder landing | actual reported landing (`out_actual_position_us`) is the retained-PCM start; −1 = unknown → Position withdrawn, never requested-target | E1 (landing honest ±1 frame lossless; MP3 3-frame content tolerance) | requested target as basis (the charter §26 lie — measured to differ by up to 3816 frames ≈ 87 ms mid-stream, 10512 at the duration clamp) |
-| Edge invalidation | non-terminal invalidate primitive performed BY THE WORKER strictly after song_seek success, with the leg's parked evidence in hand; production keeps flowing until the parked evidence (no strand-inside-read stall); bounded-slice write so the serialization point is always reachable | E2 (256×3 clean; 51/51 rogue control; refusal scenario) | `drain old edge naturally` (unbounded latency, doesn't stop old production); edge replacement (P1–P5); session-side pre-purge (destructive-before-outcome — the round-1 MAJOR, removed); flush-cures-everything (the negative control disproves it) |
+| Edge invalidation | non-terminal invalidate primitive performed BY THE WORKER strictly after song_seek success, with the leg's parked evidence in hand; production keeps flowing until the parked evidence (no strand-inside-read stall); bounded-slice write so the serialization point is always reachable | E2 (294×3 clean; 51/51 rogue control; 1/1 drop-remainder must-fire; refused/destructive families) | `drain old edge naturally` (unbounded latency, doesn't stop old production); edge replacement (P1–P5); session-side pre-purge (destructive-before-outcome — the round-1 MAJOR, removed); flush-cures-everything (the negative control disproves it) |
 | Output cut | park + natural drain to padding==0 (mechanism A; same D14.7 evidence class, zero stream-state changes) | E3 A (30.2–31.9 ms; position continuous; refill normal) | Stop/Reset/Start (E3 B: freezes mid-buffer, resets device position; unnecessary); stream replacement (heavier lifecycle); pause gate alone (never removes queued PCM) |
 | Cutover commit | session-owned CommitCut = landing ∧ edge-clean ∧ tail-quiesced ∧ leg-parked(acknowledged) ∧ unsettled | §7; formal model guards | decoder-repositioned alone (decoder-only fallacy); first-new-submission (too late — drain already proves safety) |
 | Position rebase | same cell, writer-side: basis = landing frames; local handed-off reset at commit; publication monotone per published stretch; unknown landing → withdraw | §8; formal M4 note | new cell per cutover (P1–P5 + secret Generation); reader-side clamp (forbidden by D14.8); command-time jump (fabrication) |
 | Pause interaction | A: pause intent survives seek; internal seek park is cut-attributed, invisible to pause evidence; transient pause-during-cut routes normally | §10 | implicit resume (rewrites another command's state); reject-while-paused (no mechanism reason) |
 | Terminal precedence | committed terminal always wins; stop-before-cut aborts the cut; late seek inert; EOF window not seekable (data-plane-Open-only acceptance) | §11 | seek as second terminal authority; drain-window seeking (edge lifecycle reopening — a closed design door) |
 | Multiple seeks | one in flight; second rejected until commit/abort | §12 | coalescing / latest-wins (each needs a request-identity story → would earn SeekId; nothing needs it) |
-| Seek failure | pre-cut = inert (refusal BEFORE any invalidation; only cost ≤ 1 staging block mid-block); post-cut confined to existing device-failure path; unknown-landing commits with Position withdrawn | §13, E1 | seek failure ⇒ terminal Failed (forged terminal); invented recovery outcomes |
+| Seek failure | three-class provider outcome: RefusedUnchanged (proven pre-mutation only — the INVALID_ARGUMENT class) = inert, zero content loss (remainder preserved+finished); Applied = the cut, landing known or withdrawn; MutatedThenFailed (everything else, incl. generic SEEK_ERROR which the ABI also returns after a destructive reposition+flush) = ordinary D11 decode-failure route, never resumed as old playback; unknown-landing commits with Position withdrawn | §13, E1, SongCore source audit, E2 REFUSAL-EQUIV/FAIL-CLOSED, formal M6/M7 | status-code-classed refusal (the round-3 MAJOR — SEEK_ERROR is dual-phase); seek failure ⇒ forged NEW terminal variant (D11's existing Failed authority suffices); invented recovery outcomes; treating SEEK_UNSUPPORTED as inert without evidence |
 
 ## 20. Environment and limitations
 
 ```text
 E1  Linux host, static libsongcore (ABI v1), committed corpus (4
     fixtures, all seekable). SEEK_UNSUPPORTED and SEEK_ERROR post-
-    states NOT exercisable on this corpus — their policy is ABI-contract
-    reasoning, not measured. MP3 content exactness only after 3 codec
-    frames (lossy tolerance, documented by the ABI). eof-tail bound is
-    advisory for lossy (decoder-delay artifact recorded).
+    states NOT exercisable on this corpus — which is exactly why the
+    frozen classification is conservative (§13): only the measured
+    INVALID_ARGUMENT class is RefusedUnchanged; everything else is
+    treated as destructive, with the SongCore implementation source
+    (not the corpus) as the classification evidence. MP3 content
+    exactness only after 3 codec frames (lossy tolerance, documented
+    by the ABI). eof-tail bound is advisory for lossy (decoder-delay
+    artifact recorded).
 E2  mechanism probe (protocol shape copy), not the production edge;
     loom exploration of the real edge + invalidate belongs to the F5
     implementation gate. No scheduling guarantee beyond bounded waits.
+    The REFUSAL-EQUIV oracle compares against the closed-form no-seek
+    control sequence (0..pre_frames contiguous, epoch 0) — by
+    construction the exact output a no-seek run of the same budget
+    produces, so the equivalence is stronger and strictly less flaky
+    than a run-vs-run comparison.
 E3  one Windows endpoint (WSL2 host, shared mode, AUTOCONVERTPCM leg);
     3 green runs of the unit-converted probe, raw logs retained.
     Software padding/position readings are not acoustic proof — the
@@ -767,3 +872,72 @@ NIT   §6 "NOT-REPRODUCED" leftover sentence contradicted the §6
       reproduction narrative. FIXED (clause removed — it predates
       the endpoint recovery).
 ```
+
+Round 3 (fresh reviewer, independent of rounds 1–2, against 90ed0e4):
+verdict **CHANGES_REQUIRED — 2 MAJOR + 1 MINOR**, all concentrated in
+the seek failure/refusal semantics (the successful-cut protocol, output
+natural-drain mechanism, edge purge ownership, stale-output invariant,
+same-cell Position rebase, pause interaction, single-seek policy and
+the Generation/Epoch rejection were all re-confirmed PASS). Fixed here
+as **F5-GATE-CORRECTIVE-1**; every claim re-verified against raw
+evidence before fixing:
+
+```text
+MAJOR-1  the "inert refusal" actually dropped content: the E2 worker
+      advanced src_pos/produced accounting by the WHOLE block before
+      the bounded-slice write, abandoned the unwritten remainder
+      mid-block when the command + parked evidence were observed, and
+      published only seek-failed on refusal — the frames [off..n) of
+      the abandoned block never reached the edge (a silent content
+      gap), while the same authority claimed refusal was "seamless".
+      The refusal oracle never checked output continuity and the
+      formal model abstracted the remainder away entirely.
+      FIXED: the frozen protocol now preserves the in-flight staging
+      block at its written prefix; a RefusedUnchanged outcome finishes
+      the remainder exactly (zero content loss); an Applied outcome
+      discards it with the cut. New E2 REFUSAL-EQUIV oracle (refused
+      output == no-seek control, verified GREEN across 32 refused
+      scenarios ×3) + drop-one-remainder-frame must-fire control
+      (FIRED 1/1 = RED proof). Harness comment claiming "at most one
+      staging buffer is the only content a seek can ever cost"
+      removed.
+MAJOR-2  the two-class failure policy was unsound: the frozen policy
+      classed SEEK_ERROR / SEEK_UNSUPPORTED / INVALID_ARGUMENT alike
+      as pre-cut inert refusals, but the SongCore implementation
+      (native/src/songcore_ffmpeg.c song_seek) returns generic
+      SEEK_ERROR from TWO phases — a failed av_seek_frame (phase 1)
+      AND again after av_seek_frame succeeded and
+      avcodec_flush_buffers + reset_decode_state destructively
+      repositioned the decoder (phase 2, "could not reach a landing
+      point") — and a post-flush failure leaves the handle producing
+      NEW-cursor PCM (fail() records only a diagnostic, fatal_error is
+      untouched), so resuming "old playback" on a SEEK_ERROR can mix
+      pre/post content with NO committed cutover. FFmpeg likewise does
+      not promise a failed av_seek_frame leaves the demuxer
+      undisturbed, so even phase-1 statuses are not provably clean.
+      FIXED: provider outcome frozen THREE-class — RefusedUnchanged
+      (provably pre-mutation only: the parameter/state checks,
+      INVALID_ARGUMENT), Applied, MutatedThenFailed (conservative
+      rule: unprovable means destructive; routes through the ordinary
+      D11 decode-failure path, terminal Failed, never resumed as old
+      playback). E2 gains destructive-failure scenarios (6 ×3 runs,
+      FAIL-CLOSED oracle: only a contiguous pre-seek prefix may ever
+      leave the edge); the formal model splits the refusal
+      (SeekRefusedUnchanged / SeekMutatedThenFailed + episodeFailed
+      route) and gains InvRefusalContentContinuous + InvFailClosed,
+      witnesses 5–6 and mutations M6/M7 (both COUNTEREXAMPLE-
+      WITNESSED). Reclassifying a provider result upward is explicit:
+      a narrow SongCore provider-contract corrective with its own
+      evidence, out of scope here.
+MINOR   "ZERO new per-quantum work" was inaccurate (the render loop's
+      existing loop-top check gains one more flag test). FIXED: §16
+      and the ADR realtime-cost entry now enumerate exactly what is
+      and is not added.
+```
+
+Verification after the corrective (all green, this branch): cargo
+fmt/clippy/test (workspace + experiments, both host and
+x86_64-pc-windows-gnu), E2 294×3 green runs with the new oracles and
+both must-fire controls (rogue 51/51, mutiny 1/1), TLC f5 suite
+(base 672 distinct states PASS, 6 witnesses MUST-FAIL-OK, 7 mutations
+COUNTEREXAMPLE-WITNESSED), production delta still zero.
