@@ -1,0 +1,11 @@
+F4PROBE BEGIN rate=48000 ch=2 edge=8192 block=1024 tone=440Hz amplitude=0.12 total_frames=384000
+F4PROBE OPEN rate=48000 autoconvert=false buffer_frames=1056 clock_freq=384000 clock_acquired=true
+F4PROBE STEADY submitted=93216 raw=Some(92640) expected_floor=93952
+F4PROBE PAUSE submitted_at_park_end=93696 (steady was 93216, advance must be one in-flight block at most)
+F4PROBE RESUME submitted_at_resume_end=142752
+F4PROBE EOF drained_to_total=true final_submitted=384000 expected=384000 final_raw=Some(384000) diag=""
+F4PROBE BOUNDS submitted_monotone=true clamped_monotone=true max_raw_backward=96 (bound 1024) tail_le_submitted=true
+F4PROBE FREEZE_AT_QUIESCENCE window=[2400,3450]ms samples=451 first=Some(93696) last=Some(93696) constant=true
+F4PROBE CLOCK_48K samples=4092 clock_first=3864 clock_last=3057416 delta_clock=3053552 delta_consumed=382080 drift=2671472
+F4PROBE CLOCK_44K stream_rate=44100 autoconvert=true clock_freq=352800 source_relative=false
+F4PROBE END failures=0

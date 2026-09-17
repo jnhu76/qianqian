@@ -1,88 +1,122 @@
-//! The position projection algebra and its deterministic oracles.
+//! The position-evidence shape and its deterministic oracles.
 //!
 //! Nothing here touches a thread, a device or a decoder. This module
-//! pins the exact accounting the F4 gate proposes for a product
-//! Position, so the physical probe (f4probe) only has to confirm that
-//! the real WASAPI mechanism publishes the same evidence shape the
-//! algebra assumes:
+//! pins the accounting the F4 gate proposes for a product Position, so
+//! the physical probe (f4probe) only has to confirm that the real WASAPI
+//! mechanism can publish the same single monotone cell:
 //!
 //! ```text
-//! writers (mechanism legs):
-//!   submit(n)        one edge handoff / device submission of n frames
-//!   observe_tail(p)  one mechanism tail observation (p frames still
-//!                    queued to play); the first one is stream-start
-//!                    evidence
+//! writer (render leg — one execution path owns both inputs)
+//!   hand_off(n)          n source frames were submitted into the
+//!                        device buffer; mechanism-local accounting
+//!   publish_consumed(p)  the mechanism observed p frames still queued
+//!                        to play:
+//!                          estimate  = handed_off - min(p, handed_off)
+//!                          published = max(published, estimate)
+//!                        (one relaxed monotone update of one cell)
 //!
-//! reader (observation path):
-//!   raw = submitted - min(tail, submitted)
-//!   position = max(last_projected, raw)     -- monotone clamp
-//!   None before the first tail observation (unknown is not zero)
+//! reader (D14.2 observation seam)
+//!   position()           ONE relaxed load; None while the cell is
+//!                        undefined (unknown is never collapsed to 0)
 //! ```
+//!
+//! The reader keeps no state: monotonicity is owned by the publication.
+//! A reader-side clamp over two separately published cells was this
+//! gate's first draft and is REJECTED — it cannot live inside a pure
+//! read (`observe()` is "one coherent pure read"; repeating it changes
+//! nothing, settles nothing). The rejected shape is kept below as an
+//! executable negative control, never as a product rule.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 
-/// Session-owned position evidence cells in exactly the shape the gate
-/// proposes for production (atomics, published per block by the
-/// mechanism legs, read by the observation path without locks).
+/// The published cell encodes position `v` as `v + 1`, leaving the
+/// zero-initialized value as "undefined". One encoding serves both
+/// requirements: undefined needs no second load, and a monotone
+/// `fetch_max` can start from the initial value.
+const UNDEFINED: u64 = 0;
+
+/// Session-owned position-evidence cell in the shape the gate proposes
+/// for production (relaxed atomics, written once per mechanism
+/// observation, read without locks by the observation path).
 pub struct PositionEvidence {
-    submitted: AtomicU64,
+    /// Writer-local handed-off accounting. Kept as an atomic only so the
+    /// physical probe and these oracles can report it; no product reader
+    /// derives anything from it — composing it with `tail` in a reader
+    /// IS the rejected shape (see the negative-control oracle below).
+    handed_off: AtomicU64,
+    /// Writer-local last tail reading; diagnostics only, same reason.
     tail: AtomicU64,
-    tail_published: AtomicBool,
+    /// Writer-local last raw estimate; diagnostics only, same reason.
+    estimate: AtomicU64,
+    /// The one published cell (encoded; [`UNDEFINED`] until the first
+    /// publication).
+    published: AtomicU64,
+    /// Publication count — mechanism cadence diagnostic.
+    publications: AtomicU64,
 }
 
 impl PositionEvidence {
     pub fn new() -> Self {
         Self {
-            submitted: AtomicU64::new(0),
+            handed_off: AtomicU64::new(0),
             tail: AtomicU64::new(0),
-            tail_published: AtomicBool::new(false),
+            estimate: AtomicU64::new(0),
+            published: AtomicU64::new(UNDEFINED),
+            publications: AtomicU64::new(0),
         }
     }
 
-    /// Producer-side evidence: `n` source frames were handed to the
-    /// render leg (and, on every non-terminal path, submitted into the
-    /// device buffer). Monotone accumulation; the caller is the edge
-    /// read path, once per successful pull.
-    pub fn submit(&self, n: u64) {
-        self.submitted.fetch_add(n, Ordering::Relaxed);
+    /// Writer: `n` source frames were submitted into the device buffer
+    /// (`read_frames` → `ReleaseBuffer(n)` in the render leg). Returns
+    /// the writer's own running total.
+    pub fn hand_off(&self, n: u64) -> u64 {
+        self.handed_off.fetch_add(n, Ordering::Relaxed) + n
     }
 
-    /// Mechanism-side evidence: the output mechanism observed `p`
-    /// frames still queued to play. The first call of an episode is the
-    /// stream-start evidence; before it, no position is derivable.
-    pub fn observe_tail(&self, p: u64) {
+    /// Writer: the render mechanism observed `p` frames still queued to
+    /// play, derived the consumed estimate from its own handed-off total
+    /// and published it monotonically. Returns the published value.
+    pub fn publish_consumed(&self, p: u64) -> u64 {
+        let handed_off = self.handed_off.load(Ordering::Relaxed);
+        let estimate = handed_off.saturating_sub(p.min(handed_off));
         self.tail.store(p, Ordering::Relaxed);
-        self.tail_published.store(true, Ordering::Relaxed);
+        self.estimate.store(estimate, Ordering::Relaxed);
+        self.publications.fetch_add(1, Ordering::Relaxed);
+        // fetch_max returns the PREVIOUS stored value; what the reader
+        // sees afterwards is the max of that and this estimate.
+        let previous = self.published.fetch_max(estimate + 1, Ordering::Relaxed);
+        previous.max(estimate + 1) - 1
     }
 
-    /// Raw derived position: `None` before stream-start evidence
-    /// (unknown is never collapsed into zero), otherwise
-    /// `submitted - min(tail, submitted)`.
-    ///
-    /// The two loads are not atomic as a pair: a submission between
-    /// them can make one sample step backward by at most that block
-    /// (`MAX_RAW_BACKWARD_STEP` bounds it at one full block). That is
-    /// why the product projection applies [`Self::clamped`].
-    pub fn raw(&self) -> Option<u64> {
-        if !self.tail_published.load(Ordering::Relaxed) {
-            return None;
+    /// Reader: one pure load. `None` while the cell is undefined —
+    /// before the mechanism's first publication, and (at the observation
+    /// layer) once the terminal Fact withdraws the projection.
+    pub fn position(&self) -> Option<u64> {
+        match self.published.load(Ordering::Relaxed) {
+            UNDEFINED => None,
+            encoded => Some(encoded - 1),
         }
-        let submitted = self.submitted.load(Ordering::Relaxed);
-        let tail = self.tail.load(Ordering::Relaxed);
-        Some(submitted.saturating_sub(tail.min(submitted)))
     }
+}
 
-    /// The product projection: raw position clamped monotone against
-    /// the caller's last value. `None` only while the position is not
-    /// (yet or any longer) defined — before stream-start evidence or,
-    /// at the observation layer, after the terminal Fact (the
-    /// observation layer withdraws it by guard, not by cell writes).
-    pub fn clamped(&self, last: Option<u64>) -> Option<u64> {
-        match (last, self.raw()) {
-            (_, None) => None,
-            (None, Some(raw)) => Some(raw),
-            (Some(prev), Some(raw)) => Some(prev.max(raw)),
+/// Diagnostics for the physical probe and these oracles (never product
+/// surfaces, never a derivation input).
+impl PositionEvidence {
+    pub fn diag_handed_off(&self) -> u64 {
+        self.handed_off.load(Ordering::Relaxed)
+    }
+    pub fn diag_tail(&self) -> u64 {
+        self.tail.load(Ordering::Relaxed)
+    }
+    pub fn diag_estimate(&self) -> Option<u64> {
+        if self.published.load(Ordering::Relaxed) == UNDEFINED {
+            None
+        } else {
+            Some(self.estimate.load(Ordering::Relaxed))
         }
+    }
+    pub fn diag_publications(&self) -> u64 {
+        self.publications.load(Ordering::Relaxed)
     }
 }
 
@@ -92,208 +126,202 @@ impl Default for PositionEvidence {
     }
 }
 
-/// Upper bound of one raw backward step: a torn reader pair can straddle
-/// at most one block submission (1024 frames is the production staging
-/// block; the probe uses the same block size).
-pub const MAX_RAW_BACKWARD_STEP: u64 = 1024;
-
-// --- test-only accessors (the physical probe covers the real scheduler) ----
-
-#[cfg(test)]
-impl PositionEvidence {
-    /// Tear-test helper: a bare load of the submitted cell, so a test
-    /// can construct the exact two-load tear [`Self::raw`] avoids
-    /// clamping. Never part of any proposed production surface.
-    fn test_submitted(&self) -> u64 {
-        self.submitted.load(Ordering::Relaxed)
-    }
-
-    /// Tear-test helper: a bare load of the tail cell.
-    fn test_tail(&self) -> u64 {
-        self.tail.load(Ordering::Relaxed)
-    }
-
-    /// Current tail cell for scripted schedules (algebra tests only).
-    fn current_tail(&self) -> u64 {
-        self.tail.load(Ordering::Relaxed)
-    }
-}
+/// One-block backward step of the REJECTED two-cell reader shape (1024
+/// source frames is the production staging block; the probe uses the
+/// same size). It is the negative control's diagnostic — NOT a contract
+/// on the selected shape, which has no cross-cell read at all.
+pub const REJECTED_PAIR_BACKWARD_STEP: u64 = 1024;
 
 #[cfg(test)]
 mod oracles {
     use super::*;
 
-    /// The raw derivation never claims more consumed than submitted,
-    /// whatever the tail reports (a tail above submitted is capped).
+    /// Unknown stays None and never collapses into zero: handed-off
+    /// accounting alone publishes nothing.
     #[test]
-    fn raw_is_capped_by_submitted() {
+    fn undefined_is_none_not_zero_until_the_first_publication() {
         let ev = PositionEvidence::new();
-        ev.observe_tail(500);
-        assert_eq!(ev.raw(), Some(0));
-        ev.submit(100);
-        assert_eq!(ev.raw(), Some(0));
-        ev.submit(400);
-        assert_eq!(ev.raw(), Some(0));
-        ev.submit(1);
-        assert_eq!(ev.raw(), Some(1));
-        // A stale tail above submitted (a legal transient
-        // inconsistency) is capped at submitted, never wrapped and
-        // never trusted.
-        ev.observe_tail(10_000);
-        assert_eq!(ev.raw(), Some(0));
+        assert_eq!(ev.position(), None);
+        ev.hand_off(4096);
+        assert_eq!(ev.position(), None);
+        ev.publish_consumed(0);
+        assert_eq!(ev.position(), Some(4096));
     }
 
-    /// Unknown stays None and never collapses into zero: before the
-    /// mechanism's first tail observation, submitted evidence alone
-    /// derives nothing.
+    /// Each published sample is exact for the instant the writer read the
+    /// tail: the two inputs belong to one execution path.
     #[test]
-    fn unknown_before_stream_start_is_none_not_zero() {
+    fn published_value_is_exact_for_the_writers_instant() {
         let ev = PositionEvidence::new();
-        ev.submit(4096);
-        assert_eq!(ev.raw(), None);
-        assert_eq!(ev.clamped(None), None);
-        ev.observe_tail(0);
-        assert_eq!(ev.raw(), Some(4096));
+        ev.publish_consumed(0); // stream start: nothing handed off yet
+        assert_eq!(ev.position(), Some(0));
+        for _ in 0..8 {
+            ev.hand_off(1024);
+        }
+        ev.publish_consumed(4096); // queue holds half -> half consumed
+        assert_eq!(ev.position(), Some(4096));
+        ev.publish_consumed(0); // device drained everything submitted
+        assert_eq!(ev.position(), Some(8192));
     }
 
-    /// Tail reads below the queued truth make the consumed estimate run
-    /// ahead but never past submitted; the projection is honest about
-    /// its bound.
+    /// A tail reading above the handed-off total (a legal transient) is
+    /// capped at it: never wrapped, never trusted.
     #[test]
-    fn consumed_never_exceeds_submitted() {
+    fn tail_above_the_handed_off_total_is_capped_not_wrapped() {
         let ev = PositionEvidence::new();
-        ev.observe_tail(0);
-        let mut cumulative = 0u64;
+        ev.hand_off(1024);
+        ev.publish_consumed(0);
+        assert_eq!(ev.position(), Some(1024));
+        ev.publish_consumed(9999);
+        assert_eq!(ev.diag_estimate(), Some(0));
+        assert_eq!(ev.position(), Some(1024));
+    }
+
+    /// The tail reading is not monotone, so the raw estimate can regress;
+    /// the published sample cannot. Monotonicity is the publication rule,
+    /// not a caller-supplied clamp.
+    #[test]
+    fn publication_never_goes_backward_when_the_queue_grows_again() {
+        let ev = PositionEvidence::new();
+        ev.publish_consumed(0);
+        ev.hand_off(1024);
+        ev.publish_consumed(0);
+        assert_eq!(ev.position(), Some(1024));
+        ev.publish_consumed(1024); // queue grew: the raw estimate drops
+        assert_eq!(ev.diag_estimate(), Some(0));
+        assert_eq!(ev.position(), Some(1024));
+        ev.hand_off(1024); // submission resumes after quiescence
+        ev.publish_consumed(0);
+        assert_eq!(ev.position(), Some(2048));
+    }
+
+    /// The published sample is always ≤ the mechanism's own accounting.
+    #[test]
+    fn consumed_never_exceeds_the_handed_off_accounting() {
+        let ev = PositionEvidence::new();
+        ev.publish_consumed(0);
+        let mut total = 0u64;
         for block in 1..=64u64 {
             let n = block * 16;
-            ev.submit(n);
-            cumulative += n;
-            assert!(ev.raw().unwrap() <= cumulative);
+            total += n;
+            ev.hand_off(n);
+            let published = ev.publish_consumed(total.min(2048));
+            assert!(published <= ev.diag_handed_off());
         }
     }
 
-    /// Torn reader pair, constructed exactly: the reader loads
-    /// `submitted`, the render leg then submits one block and
-    /// republishes the grown tail, and only then does the reader load
-    /// `tail`. The raw value steps backward by exactly that one block;
-    /// the monotone clamp erases it. This is the worst legal tear of
-    /// the two-cell read (the production observation clamps, so a
-    /// displayed position never jitters).
+    /// Pause: after engagement the writer hands off nothing further, the
+    /// park slices keep publishing the draining tail, and the published
+    /// sample stops moving at tail quiescence — the same evidence that
+    /// establishes D14.7 Paused.
     #[test]
-    fn torn_read_backward_step_is_bounded_by_one_block_and_clamp_erases_it() {
+    fn pause_freezes_the_published_sample_at_tail_quiescence() {
         let ev = PositionEvidence::new();
-        ev.observe_tail(0);
-        // Steady state: submitted 8 blocks, device consumed all of it.
-        for _ in 0..8 {
-            ev.submit(1024);
-        }
-        ev.observe_tail(0);
-        let before = ev.raw();
-        assert_eq!(before, Some(8192));
-
-        // The tear, load by load:
-        let submitted_seen = ev.test_submitted(); // reader load #1
-        ev.submit(1024); // leg: one new block handed off
-        ev.observe_tail(1024); // leg: device queued it, consumed none
-        let tail_seen = ev.test_tail(); // reader load #2
-        let torn_raw = submitted_seen.saturating_sub(tail_seen.min(submitted_seen));
-
-        assert_eq!(submitted_seen, 8192);
-        assert_eq!(tail_seen, 1024);
-        assert_eq!(torn_raw, 7168);
-        assert_eq!(
-            before.unwrap() - torn_raw,
-            MAX_RAW_BACKWARD_STEP,
-            "the worst legal tear steps back by at most one block"
-        );
-
-        // The clamp erases exactly this: a reader holding last = 8192
-        // that performs the same torn read reports 8192, never 7168.
-        // (clamped() re-reads both cells fresh; feed it the torn value
-        // through the same max the observation layer applies.)
-        assert_eq!(ev.clamped(Some(8192)), Some(8192));
-    }
-
-    /// Pause semantics: after engagement the submitter is frozen (the
-    /// F3 gate sits before any further submission), the tail drains,
-    /// the consumed estimate rises to the frozen submitted value, and
-    /// the first tail==0 observation is exactly where the projection
-    /// freezes — the same evidence that establishes D14.7 Paused.
-    #[test]
-    fn pause_freezes_position_exactly_at_tail_quiescence() {
-        let ev = PositionEvidence::new();
-        ev.observe_tail(0);
-        // Steady: 10 blocks submitted, device has consumed 6, queues 4.
+        ev.publish_consumed(0);
         for _ in 0..10 {
-            ev.submit(1024);
+            ev.hand_off(1024);
         }
-        ev.observe_tail(4096);
-        assert_eq!(ev.raw(), Some(6144));
+        ev.publish_consumed(4096); // 6 of 10 blocks consumed
+        assert_eq!(ev.position(), Some(6144));
 
-        // Pause engaged: no further submit() from here.
-        ev.observe_tail(2048);
-        assert_eq!(ev.raw(), Some(8192));
-        let quiesced = ev.clamped(None);
-        ev.observe_tail(0);
-        let frozen = ev.clamped(quiesced);
-        assert_eq!(frozen, Some(10240));
-        assert_eq!(frozen, ev.raw());
+        // Pause engaged: no further hand_off from here.
+        ev.publish_consumed(2048);
+        assert_eq!(ev.position(), Some(8192));
+        ev.publish_consumed(0); // tail quiescence = Paused establishment
+        assert_eq!(ev.position(), Some(10240));
 
-        // Still parked, still frozen: repeated observations do not move.
+        // Still parked, still frozen: further park slices do not move it.
         for _ in 0..5 {
-            ev.observe_tail(0);
-            assert_eq!(ev.clamped(frozen), Some(10240));
+            ev.publish_consumed(0);
+            assert_eq!(ev.position(), Some(10240));
         }
     }
 
-    /// EOF: submission reaches the exact decoded total, the tail drains,
-    /// the projection rises to that total, and it equals the decoded
-    /// frame count — not the metadata duration, which is separate
-    /// evidence and may disagree.
+    /// EOF: submission reaches the exact decoded total, the device
+    /// drains, the published sample rises to that total — not to the
+    /// metadata duration, which is separate evidence and may disagree.
     #[test]
-    fn eof_rises_to_exact_decoded_total() {
+    fn eof_rises_to_the_exact_decoded_total() {
         let ev = PositionEvidence::new();
         let total: u64 = 176_400; // the committed 4 s / 44.1 kHz corpus total
-        ev.observe_tail(0);
+        ev.publish_consumed(0);
         let mut done = 0u64;
         while done < total {
             let n = (total - done).min(1024);
-            ev.submit(n);
+            ev.hand_off(n);
             done += n;
-            ev.observe_tail(done.min(2048));
+            ev.publish_consumed(done.min(2048));
         }
-        // Decoder EOF published; device still queues the tail.
-        assert!(ev.raw().unwrap() < total);
-        ev.observe_tail(0);
-        assert_eq!(ev.raw(), Some(total));
+        assert!(ev.position().unwrap() < total); // tail still queued
+        ev.publish_consumed(0);
+        assert_eq!(ev.position(), Some(total));
     }
 
-    /// Terminal withdrawal is an observation-layer guard: the cells may
+    /// Terminal withdrawal is an observation-layer guard: the cell may
     /// still hold evidence after settlement, and the observation simply
-    /// no longer derives from them (no final-position latch storage).
+    /// stops deriving the projection from it (no final-position latch
+    /// storage, no writer, no race).
     #[test]
-    fn position_is_withdrawn_once_the_terminal_fact_committed() {
+    fn terminal_withdrawal_is_observation_gating_not_a_cell_write() {
         let ev = PositionEvidence::new();
-        ev.observe_tail(0);
-        ev.submit(4096);
-        ev.observe_tail(1024);
-        assert_eq!(ev.raw(), Some(3072));
+        ev.publish_consumed(0);
+        ev.hand_off(4096);
+        ev.publish_consumed(1024);
+        assert_eq!(ev.position(), Some(3072));
 
         let terminal_committed = true;
-        let observation = if terminal_committed { None } else { ev.raw() };
-        assert_eq!(observation, None);
-        // The cells are untouched — withdrawal needs no writer, no race,
-        // no lifecycle storage.
-        assert_eq!(ev.raw(), Some(3072));
+        let observed = if terminal_committed {
+            None
+        } else {
+            ev.position()
+        };
+        assert_eq!(observed, None);
+        assert_eq!(ev.position(), Some(3072));
     }
 
-    /// Legal interleaving fuzz over a scripted schedule: for every
-    /// reader sample the clamped projection is monotone and every raw
-    /// backward step stays within one block. Deterministic pseudo-random
-    /// schedule (xorshift), no threads — the physical probe covers the
-    /// real scheduler.
+    /// Negative control: the REJECTED shape, executed. With two
+    /// separately published cells composed by the reader, one hand-off
+    /// between the two loads tears the sample backward by one block —
+    /// the defect that forced the collapse to a single published cell.
+    /// The selected shape is immune to the same interleaving.
     #[test]
-    fn scripted_interleavings_keep_the_projection_monotone_and_bounded() {
+    fn rejected_two_cell_reader_pair_tears_backward_by_one_block() {
+        let ev = PositionEvidence::new();
+        ev.publish_consumed(0);
+        for _ in 0..8 {
+            ev.hand_off(1024);
+            ev.publish_consumed(0);
+        }
+        assert_eq!(ev.position(), Some(8192));
+
+        // The rejected reader, load by load:
+        let handed_off_seen = ev.diag_handed_off(); // load #1
+        ev.hand_off(1024); // leg: one more block handed off
+        ev.publish_consumed(1024); // leg: device queued it, consumed none
+        let tail_seen = ev.diag_tail(); // load #2
+        let torn = handed_off_seen.saturating_sub(tail_seen.min(handed_off_seen));
+
+        assert_eq!(handed_off_seen, 8192);
+        assert_eq!(tail_seen, 1024);
+        assert_eq!(torn, 7168);
+        assert_eq!(
+            8192 - torn,
+            REJECTED_PAIR_BACKWARD_STEP,
+            "the rejected pair steps backward by one block"
+        );
+        assert_eq!(
+            ev.position(),
+            Some(8192),
+            "the selected single-cell publication is unaffected by the same interleaving"
+        );
+    }
+
+    /// Legal interleaving fuzz over a scripted schedule (xorshift, no
+    /// threads — the physical probe covers the real scheduler): the
+    /// published sample is exactly the running maximum of the writer's
+    /// estimates and never regresses, while the estimates themselves do.
+    #[test]
+    fn scripted_interleavings_keep_the_published_sample_monotone() {
         let mut state = 0x9E3779B97F4A7C15u64;
         let mut next = move || {
             state ^= state << 13;
@@ -302,70 +330,56 @@ mod oracles {
             state
         };
 
-        // Five rounds, each a full steady → park → quiesce → resume →
-        // EOF-drain cycle with randomized block/tail values.
         for _round in 0..5 {
             let ev = PositionEvidence::new();
-            ev.observe_tail(0);
-            let mut last_clamped = None;
-            let mut last_raw: Option<u64> = None;
-            let mut parked = false;
-            let mut frozen_at: Option<u64> = None;
+            ev.publish_consumed(0);
+            let mut last_published = ev.position();
+            let mut max_estimate = 0u64;
+            let mut regressions = 0usize;
 
             for _step in 0..400 {
-                let roll = next() % 6;
-                match roll {
-                    // Device consumed between 0 and 3 blocks of tail.
-                    0..=2 => {
-                        let tail = ev.current_tail().saturating_sub((next() % 3 + 1) * 512);
-                        ev.observe_tail(tail);
+                match next() % 5 {
+                    // Hand off a block-sized chunk.
+                    0..=1 => {
+                        ev.hand_off((next() % 4 + 1) * 256);
                     }
-                    // A submission block (none while parked).
+                    // The device consumed part of the queued tail.
+                    2 => {
+                        let tail = ev.diag_tail().saturating_sub((next() % 3 + 1) * 512);
+                        ev.publish_consumed(tail);
+                    }
+                    // The queue grows again (not monotone).
                     3 => {
-                        if !parked {
-                            ev.submit(1024);
-                            ev.observe_tail(ev.current_tail() + 1024);
-                        }
+                        let tail = ev.diag_tail() + (next() % 3) * 1024;
+                        ev.publish_consumed(tail);
                     }
-                    // Park / quiesce / resume events.
-                    4 => {
-                        parked = true; // engagement: submissions stop
-                        frozen_at = None; // the bound is per-park
-                    }
+                    // Park slice / drain observation.
                     _ => {
-                        if parked {
-                            ev.observe_tail(0); // tail quiescence
-                            frozen_at = ev.clamped(last_clamped);
-                        }
-                        parked = false;
+                        ev.publish_consumed(0);
                     }
                 }
 
-                let raw = ev.raw();
-                if let (Some(prev), Some(cur)) = (last_raw, raw) {
+                let published = ev.position().expect("published after stream start");
+                if let Some(prev) = last_published {
                     assert!(
-                        prev.saturating_sub(cur) <= MAX_RAW_BACKWARD_STEP,
-                        "raw stepped backward by more than one block: {prev} -> {cur}"
+                        published >= prev,
+                        "published went backward: {prev} -> {published}"
                     );
                 }
-                last_raw = raw;
-                let clamped = ev.clamped(last_clamped);
-                if let (Some(prev), Some(cur)) = (last_clamped, clamped) {
-                    assert!(
-                        cur >= prev,
-                        "clamped projection went backward: {prev} -> {cur}"
-                    );
+                let estimate = ev.diag_estimate().expect("estimate known");
+                if estimate < max_estimate {
+                    regressions += 1;
                 }
-                last_clamped = clamped;
-
-                // While parked (before the quiescing release), submitted
-                // is frozen and the projection may only rise to it.
-                if parked {
-                    if let Some(frozen) = frozen_at {
-                        assert!(clamped.unwrap() <= frozen + 1024);
-                    }
-                }
+                max_estimate = max_estimate.max(estimate);
+                assert_eq!(
+                    published, max_estimate,
+                    "the published sample is the running max of the estimates"
+                );
+                assert!(published <= ev.diag_handed_off());
+                last_published = Some(published);
             }
+
+            assert!(regressions > 0, "schedule never regressed an estimate");
         }
     }
 }

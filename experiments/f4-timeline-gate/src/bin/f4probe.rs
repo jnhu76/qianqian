@@ -3,30 +3,36 @@
 //!
 //! The probe mirrors the production render-loop order (gate → wait →
 //! padding → GetBuffer → read → release, `qianqian-output-wasapi`
-//! steady_loop) with the two evidence cells the F4 gate proposes:
+//! steady_loop) and drives the SAME evidence cell the gate freezes —
+//! `f4_timeline_gate::timeline::PositionEvidence`, imported from the
+//! crate lib rather than copied, so the algebra under test is the one in
+//! the gate document:
 //!
 //! ```text
-//! submitted   counted at the edge handoff site (read_frames return),
-//!             once per block — where the session-owned edge would
-//!             publish it in production
-//! tail        published from every GetCurrentPadding observation:
-//!             steady loop, park slices (≤10 ms), and the EOF drain
-//!             loop — the same reading D14.7 already trusts for
-//!             output-tail quiescence
-//! clock       Experiment B: IAudioClock position, sampled on the
-//!             render leg only (no cross-thread COM calls)
+//! writer (this render leg — one execution path owns both inputs)
+//!     hand_off(n)          counted at the device submission site, after
+//!                          ReleaseBuffer(n) succeeded — where the
+//!                          production leg's own accounting would move
+//!     publish_consumed(p)  called with every GetCurrentPadding reading:
+//!                          steady loop, park slices (≤10 ms), and the
+//!                          EOF drain loop — the same reading D14.7
+//!                          already trusts for output-tail quiescence
+//! reader (analysis thread = the observation seam)
+//!     position()           ONE pure load per sample; no reader state
 //! ```
 //!
 //! Experiments (printed as F4PROBE lines, enforced invariants set the
 //! exit code):
 //!
 //! ```text
-//! A  submitted / padding / derived consumed across steady → pause
+//! A  handed-off / padding / published sample across steady → pause
 //!    request → engagement → tail drain → Paused establishment →
-//!    resume → EOF → drain: monotonicity of submitted and of the
-//!    clamped projection, the one-block torn-read bound, tail ≤
-//!    submitted, the projection constant through the quiesced park,
-//!    consumed == exact submitted total at drain completion.
+//!    resume → EOF → drain: handed-off accounting monotone, the
+//!    published sample monotone under a pure load (zero backward
+//!    steps), the published sample never above the mechanism's own
+//!    accounting, the sample constant through the quiesced park,
+//!    published == exact handed-off total at drain completion, and the
+//!    mechanism's own publication cadence.
 //! B  IAudioClock comparison: frequency + position at 48 kHz, and the
 //!    decisive unit leg — a 44.1 kHz AUTOCONVERTPCM stream whose clock
 //!    frequency is compared against its own stream rate. The clock is
@@ -57,6 +63,7 @@ mod win {
     use std::thread::JoinHandle;
     use std::time::{Duration, Instant};
 
+    use f4_timeline_gate::timeline::PositionEvidence;
     use windows::core::GUID;
     use windows::Win32::Foundation::{CloseHandle, HANDLE};
     use windows::Win32::Media::Audio::{
@@ -103,34 +110,16 @@ mod win {
     const T_FROZEN_LO: u64 = T_PAUSE_CMD + 400;
     const T_FROZEN_HI: u64 = T_RESUME_CMD - 50;
 
-    // ---- the proposed evidence cells (session-owned in production) ----
+    // ---- probe-only diagnostics on the render leg (not product) ----
 
     #[derive(Default)]
-    struct Evidence {
-        submitted: AtomicU64,
-        tail: AtomicU64,
-        tail_published: AtomicBool,
+    struct LegDiag {
+        /// Experiment B's IAudioClock position, sampled on the leg.
         clock_pos: AtomicU64,
-    }
-
-    impl Evidence {
-        fn submit(&self, n: u64) {
-            self.submitted.fetch_add(n, Ordering::Relaxed);
-        }
-        fn observe_tail(&self, p: u32) {
-            self.tail.store(u64::from(p), Ordering::Relaxed);
-            self.tail_published.store(true, Ordering::Relaxed);
-        }
-        /// The gate's raw derivation (`src/timeline.rs` is the
-        /// normative algebra; this is the probe's live copy).
-        fn raw(&self) -> Option<u64> {
-            if !self.tail_published.load(Ordering::Relaxed) {
-                return None;
-            }
-            let submitted = self.submitted.load(Ordering::Relaxed);
-            let tail = self.tail.load(Ordering::Relaxed);
-            Some(submitted.saturating_sub(tail.min(submitted)))
-        }
+        /// How often the leg's own raw estimate regressed (the queue
+        /// growing again). Diagnostic only: the publication rule does
+        /// not depend on the answer.
+        estimate_regressions: AtomicU64,
     }
 
     // ---- loop-top pause gate (mechanism A shape, probe-local) ----
@@ -151,18 +140,22 @@ mod win {
         fn request_resume(&self) {
             self.paused.store(false, Ordering::Relaxed);
         }
-        /// Loop-top park, strictly before GetBuffer; publishes the tail
-        /// from park slices so the projection keeps moving truthfully
-        /// while the device drains, exactly as the production gate's
-        /// tail-quiescence closure does.
-        fn park_while_paused(&self, ev: &Evidence, observe: impl FnMut() -> Option<u32>) {
+        /// Loop-top park, strictly before GetBuffer. Between park slices
+        /// the production gate already asks the leg for its output-tail
+        /// reading; here that same reading is also published into the
+        /// position cell, exactly as the steady loop does — the parked
+        /// projection keeps moving truthfully while the device drains.
+        fn park_while_paused(
+            &self,
+            mut observe: impl FnMut() -> Option<u32>,
+            mut publish: impl FnMut(u32),
+        ) {
             if !self.paused.load(Ordering::Relaxed) {
                 return;
             }
-            let mut observe = observe;
             while self.paused.load(Ordering::Relaxed) {
                 if let Some(p) = observe() {
-                    ev.observe_tail(p);
+                    publish(p);
                 }
                 std::thread::sleep(Duration::from_millis(PARK_SLICE_MS));
             }
@@ -283,8 +276,8 @@ mod win {
                 if frames > 0 {
                     let want = (dst.len() / self.channels).min(frames);
                     let take = want * self.channels;
-                    for i in 0..take {
-                        dst[i] = guard.samples[(guard.read_pos + i) % self.capacity_samples];
+                    for (i, slot) in dst[..take].iter_mut().enumerate() {
+                        *slot = guard.samples[(guard.read_pos + i) % self.capacity_samples];
                     }
                     guard.read_pos = (guard.read_pos + take) % self.capacity_samples;
                     guard.buffered -= take;
@@ -417,15 +410,25 @@ mod win {
 
     // ---- the instrumented render leg (production loop order) ----
 
-    fn run_render_leg(
-        edge: Arc<ProbeEdge>,
-        ev: Arc<Evidence>,
-        gate: Arc<Gate>,
+    struct LegConfig {
         sample_rate: u32,
         autoconvert: bool,
         sample_clock: bool,
+    }
+
+    fn run_render_leg(
+        edge: Arc<ProbeEdge>,
+        ev: Arc<PositionEvidence>,
+        diag: Arc<LegDiag>,
+        gate: Arc<Gate>,
+        config: LegConfig,
         diagnostic: std::sync::mpsc::Sender<String>,
     ) {
+        let LegConfig {
+            sample_rate,
+            autoconvert,
+            sample_clock,
+        } = config;
         unsafe {
             let coinit = CoInitializeEx(None, COINIT_MULTITHREADED);
             if coinit.is_err() {
@@ -454,16 +457,34 @@ mod win {
         }
 
         let channels = usize::from(CHANNELS);
+        // The leg is the only publisher, so it can also observe whether
+        // its own raw estimate ever regresses (diagnostic only — the
+        // publication rule does not depend on the answer).
+        let publish = |p: u32| {
+            let before = ev.diag_estimate();
+            ev.publish_consumed(u64::from(p));
+            if let (Some(before), Some(after)) = (before, ev.diag_estimate()) {
+                if after < before {
+                    diag.estimate_regressions.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        };
         let message = loop {
             // Gate at loop top, before any device call this iteration.
-            gate.park_while_paused(&ev, || unsafe { session.client.GetCurrentPadding() }.ok());
+            gate.park_while_paused(
+                || unsafe { session.client.GetCurrentPadding() }.ok(),
+                publish,
+            );
 
             unsafe { WaitForSingleObject(session.event.0, EVENT_TIMEOUT_MS) };
             let padding = match unsafe { session.client.GetCurrentPadding() } {
                 Ok(p) => p,
                 Err(e) => break format!("GetCurrentPadding failed: {e}"),
             };
-            ev.observe_tail(padding);
+            // Publication: derived from this leg's own two values, before
+            // the next block is handed off, so the estimate belongs to
+            // the instant the padding was read.
+            publish(padding);
             let available = session.buffer_frames.saturating_sub(padding) as usize;
             if available == 0 {
                 continue;
@@ -475,16 +496,16 @@ mod win {
             let dst = unsafe { slice::from_raw_parts_mut(ptr as *mut f32, available * channels) };
             match edge.read_frames(dst) {
                 Pull::Frames(n) => {
-                    // The handoff site: where the session-owned edge
-                    // would publish its monotone read total.
-                    ev.submit(n as u64);
                     if let Err(e) = unsafe { session.render.ReleaseBuffer(n as u32, 0) } {
                         break format!("ReleaseBuffer failed: {e}");
                     }
+                    // Submitted into the device buffer: the accounting
+                    // moves only after the release succeeded.
+                    let _ = ev.hand_off(n as u64);
                 }
                 Pull::Eof => {
                     let _ = unsafe { session.render.ReleaseBuffer(0, 0) };
-                    break drain_to_zero(&session, &ev);
+                    break drain_to_zero(&session, &publish);
                 }
                 Pull::Stopped => {
                     let _ = unsafe { session.render.ReleaseBuffer(0, 0) };
@@ -496,7 +517,7 @@ mod win {
                 if let Some(clock) = &clock {
                     let mut pos = 0u64;
                     if unsafe { clock.GetPosition(&mut pos, None) }.is_ok() {
-                        ev.clock_pos.store(pos, Ordering::Relaxed);
+                        diag.clock_pos.store(pos, Ordering::Relaxed);
                     }
                 }
             }
@@ -508,15 +529,17 @@ mod win {
     /// Production drain shape: wait for padding to reach zero, bounded,
     /// publishing the tail from every observation (a frozen cell must
     /// not go stale for want of a published final 0).
-    fn drain_to_zero(session: &DeviceSession, ev: &Evidence) -> String {
+    fn drain_to_zero(session: &DeviceSession, publish: &impl Fn(u32)) -> String {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
             match unsafe { session.client.GetCurrentPadding() } {
                 Ok(0) => {
-                    ev.observe_tail(0);
+                    publish(0);
                     return String::new();
                 }
-                Ok(p) => ev.observe_tail(p),
+                Ok(p) => {
+                    publish(p);
+                }
                 Err(e) => return format!("drain padding check failed: {e}"),
             }
             if Instant::now() > deadline {
@@ -526,27 +549,27 @@ mod win {
         }
     }
 
-    // ---- reader / analyst thread ----
+    // ---- reader / analyst thread (the observation seam) ----
 
     #[derive(Clone, Copy)]
     struct Sample {
         at_ms: u64,
-        submitted: u64,
-        tail: u64,
-        clamped: u64,
+        position: u64,
         clock: u64,
     }
 
     struct Analysis {
         samples: Vec<Sample>,
-        submitted_monotone: bool,
-        clamped_monotone: bool,
-        max_raw_backward: u64,
-        tail_exceeded_submitted: bool,
+        handed_off_monotone: bool,
+        position_monotone: bool,
+        max_position_backward: u64,
+        position_exceeded_handed_off: bool,
+        distinct_positions: usize,
     }
 
     fn spawn_reader(
-        ev: Arc<Evidence>,
+        ev: Arc<PositionEvidence>,
+        diag: Arc<LegDiag>,
         stop: Arc<AtomicBool>,
         start: Instant,
     ) -> JoinHandle<Analysis> {
@@ -554,51 +577,50 @@ mod win {
             .name("f4-reader".into())
             .spawn(move || {
                 let mut samples = Vec::new();
-                let mut last_clamped: Option<u64> = None;
-                let mut last_raw: Option<u64> = None;
-                let mut last_submitted = 0u64;
-                let mut submitted_monotone = true;
-                let mut clamped_monotone = true;
-                let mut max_raw_backward = 0u64;
-                let mut tail_exceeded_submitted = false;
+                let mut last_position: Option<u64> = None;
+                let mut last_handed_off = 0u64;
+                let mut handed_off_monotone = true;
+                let mut position_monotone = true;
+                let mut max_position_backward = 0u64;
+                let mut position_exceeded_handed_off = false;
+                let mut distinct_positions = 0usize;
                 while !stop.load(Ordering::Relaxed) {
-                    if let Some(raw) = ev.raw() {
-                        let submitted = ev.submitted.load(Ordering::Relaxed);
-                        let tail = ev.tail.load(Ordering::Relaxed);
-                        if submitted < last_submitted {
-                            submitted_monotone = false;
+                    // The observation seam: ONE pure load. Everything else
+                    // on this line is diagnostics.
+                    if let Some(position) = ev.position() {
+                        let handed_off = ev.diag_handed_off();
+                        if handed_off < last_handed_off {
+                            handed_off_monotone = false;
                         }
-                        last_submitted = submitted;
-                        if tail > submitted {
-                            tail_exceeded_submitted = true;
+                        last_handed_off = handed_off;
+                        if position > handed_off {
+                            position_exceeded_handed_off = true;
                         }
-                        if let Some(prev) = last_raw {
-                            max_raw_backward = max_raw_backward.max(prev.saturating_sub(raw));
-                        }
-                        last_raw = Some(raw);
-                        let clamped = last_clamped.map_or(raw, |p: u64| p.max(raw));
-                        if let Some(prev) = last_clamped {
-                            if clamped < prev {
-                                clamped_monotone = false;
+                        if let Some(prev) = last_position {
+                            if position < prev {
+                                position_monotone = false;
+                                max_position_backward = max_position_backward.max(prev - position);
                             }
                         }
-                        last_clamped = Some(clamped);
+                        if last_position != Some(position) {
+                            distinct_positions += 1;
+                        }
+                        last_position = Some(position);
                         samples.push(Sample {
                             at_ms: start.elapsed().as_millis() as u64,
-                            submitted,
-                            tail,
-                            clamped,
-                            clock: ev.clock_pos.load(Ordering::Relaxed),
+                            position,
+                            clock: diag.clock_pos.load(Ordering::Relaxed),
                         });
                     }
                     std::thread::sleep(Duration::from_millis(2));
                 }
                 Analysis {
                     samples,
-                    submitted_monotone,
-                    clamped_monotone,
-                    max_raw_backward,
-                    tail_exceeded_submitted,
+                    handed_off_monotone,
+                    position_monotone,
+                    max_position_backward,
+                    position_exceeded_handed_off,
+                    distinct_positions,
                 }
             })
             .expect("reader spawn")
@@ -612,7 +634,8 @@ mod win {
 
     fn run_phase_48k() -> usize {
         let edge = Arc::new(ProbeEdge::new());
-        let ev = Arc::new(Evidence::default());
+        let ev = Arc::new(PositionEvidence::new());
+        let leg_diag = Arc::new(LegDiag::default());
         let gate = Arc::new(Gate::new());
         let reader_stop = Arc::new(AtomicBool::new(false));
         let start = Instant::now();
@@ -622,45 +645,52 @@ mod win {
         let leg_ev = ev.clone();
         let leg_edge = edge.clone();
         let leg_gate = gate.clone();
+        let leg_diag_for_leg = leg_diag.clone();
         let leg = std::thread::Builder::new()
             .name("f4-render".into())
             .spawn(move || {
                 run_render_leg(
                     leg_edge,
                     leg_ev,
+                    leg_diag_for_leg,
                     leg_gate,
-                    SAMPLE_RATE,
-                    false,
-                    true,
+                    LegConfig {
+                        sample_rate: SAMPLE_RATE,
+                        autoconvert: false,
+                        sample_clock: true,
+                    },
                     diag_tx,
                 )
             })
             .expect("render leg spawn");
-        let reader = spawn_reader(ev.clone(), reader_stop.clone(), start);
+        let reader = spawn_reader(ev.clone(), leg_diag.clone(), reader_stop.clone(), start);
 
         // Steady playback.
         std::thread::sleep(Duration::from_millis(T_PAUSE_CMD));
-        let steady_submitted = ev.submitted.load(Ordering::Relaxed);
+        let steady_handed_off = ev.diag_handed_off();
+        let steady_publications = ev.diag_publications();
         report(format!(
-            "STEADY submitted={steady_submitted} raw={:?} expected_floor={}",
-            ev.raw(),
+            "STEADY handed_off={steady_handed_off} position={:?} expected_floor={}",
+            ev.position(),
             T_PAUSE_CMD * u64::from(SAMPLE_RATE) / 1000 - 2 * CHUNK,
         ));
 
         // ---- pause: request → engage → tail drain → establishment ----
         gate.request_pause();
         shared_sleep(T_RESUME_CMD - T_PAUSE_CMD);
-        let submitted_at_park_end = ev.submitted.load(Ordering::Relaxed);
+        let handed_off_at_park_end = ev.diag_handed_off();
         report(format!(
-            "PAUSE submitted_at_park_end={submitted_at_park_end} (steady was {steady_submitted}, advance must be one in-flight block at most)"
+            "PAUSE handed_off_at_park_end={handed_off_at_park_end} position_at_park_end={:?} (steady was {steady_handed_off}, advance must be one in-flight block at most)",
+            ev.position()
         ));
 
         // ---- resume ----
         gate.request_resume();
         shared_sleep(1000);
-        let submitted_at_resume_end = ev.submitted.load(Ordering::Relaxed);
         report(format!(
-            "RESUME submitted_at_resume_end={submitted_at_resume_end}"
+            "RESUME handed_off_at_resume_end={} position={:?}",
+            ev.diag_handed_off(),
+            ev.position()
         ));
 
         // ---- EOF: producer already wrote everything; wait for drain ----
@@ -668,10 +698,10 @@ mod win {
         let drained_to_total = {
             let deadline = Instant::now() + Duration::from_secs(10);
             loop {
-                let submitted = ev.submitted.load(Ordering::Relaxed);
-                if ev.raw() == Some(submitted)
-                    && submitted >= TOTAL_FRAMES
-                    && ev.tail.load(Ordering::Relaxed) == 0
+                let handed_off = ev.diag_handed_off();
+                if ev.position() == Some(handed_off)
+                    && handed_off >= TOTAL_FRAMES
+                    && ev.diag_tail() == 0
                 {
                     break true;
                 }
@@ -688,27 +718,37 @@ mod win {
         let analysis = reader.join().expect("reader join");
         let _ = leg.join();
         let diagnostic = diag_rx.try_recv().unwrap_or_default();
-        let final_submitted = ev.submitted.load(Ordering::Relaxed);
-        let final_raw = ev.raw();
+        let final_handed_off = ev.diag_handed_off();
+        let final_position = ev.position();
+        let total_publications = ev.diag_publications();
+        let elapsed_ms = start.elapsed().as_millis().max(1) as u64;
 
         report(format!(
-            "EOF drained_to_total={drained_to_total} final_submitted={final_submitted} expected={TOTAL_FRAMES} final_raw={final_raw:?} diag=\"{diagnostic}\""
+            "EOF drained_to_total={drained_to_total} final_handed_off={final_handed_off} expected={TOTAL_FRAMES} final_position={final_position:?} diag=\"{diagnostic}\""
         ));
         report(format!(
-            "BOUNDS submitted_monotone={} clamped_monotone={} max_raw_backward={} (bound {CHUNK}) tail_le_submitted={}",
-            analysis.submitted_monotone,
-            analysis.clamped_monotone,
-            analysis.max_raw_backward,
-            !analysis.tail_exceeded_submitted,
+            "BOUNDS handed_off_monotone={} position_monotone={} max_position_backward={} (must be 0) position_le_handed_off={} writer_estimate_regressions={} (diagnostic)",
+            analysis.handed_off_monotone,
+            analysis.position_monotone,
+            analysis.max_position_backward,
+            !analysis.position_exceeded_handed_off,
+            leg_diag.estimate_regressions.load(Ordering::Relaxed),
+        ));
+        report(format!(
+            "CADENCE steady_publications={steady_publications} steady_ms={T_PAUSE_CMD} steady_per_s={} total_publications={total_publications} reader_samples={} reader_distinct_positions={} reader_per_s={} elapsed_ms={elapsed_ms}",
+            steady_publications * 1000 / T_PAUSE_CMD,
+            analysis.samples.len(),
+            analysis.distinct_positions,
+            analysis.samples.len() as u64 * 1000 / elapsed_ms,
         ));
 
-        // Frozen-window check: through the quiesced park the clamped
-        // projection must be exactly constant (submitted frozen, tail 0).
+        // Frozen-window check: through the quiesced park the published
+        // sample must be exactly constant (no hand-off, tail == 0).
         let frozen: Vec<u64> = analysis
             .samples
             .iter()
             .filter(|s| s.at_ms >= T_FROZEN_LO && s.at_ms <= T_FROZEN_HI)
-            .map(|s| s.clamped)
+            .map(|s| s.position)
             .collect();
         let frozen_constant = frozen.len() >= 100 && frozen.windows(2).all(|w| w[0] == w[1]);
         report(format!(
@@ -718,39 +758,44 @@ mod win {
             frozen.last(),
         ));
 
-        // Experiment B, 48k leg: clock position vs derived consumed
+        // Experiment B, 48k leg: clock position vs the published sample
         // across the whole phase (steady + park + resume + drain). The
-        // park is the discriminator: consumed freezes, the engine keeps
-        // processing silence, so a diverging clock documents that it
-        // counts the device timeline, not this episode's source.
+        // park is the discriminator: the position freezes, the engine
+        // keeps processing silence, so a diverging clock documents that
+        // it counts the device timeline, not this episode's source.
         let clock_pairs: Vec<(u64, u64)> = analysis
             .samples
             .iter()
             .filter(|s| s.clock > 0)
-            .map(|s| (s.clock, s.clamped))
+            .map(|s| (s.clock, s.position))
             .collect();
         if let (Some(first), Some(last)) = (clock_pairs.first(), clock_pairs.last()) {
             let d_clock = last.0.saturating_sub(first.0);
-            let d_raw = last.1.saturating_sub(first.1);
+            let d_position = last.1.saturating_sub(first.1);
+            // The clock's own unit on this endpoint is the stream-format
+            // byte rate (Experiment B's finding); the frame-domain
+            // comparison needs the stream's bytes-per-frame.
+            let bytes_per_frame = u64::from(CHANNELS) * u64::from(IEEE_FLOAT_BYTES);
+            let d_clock_frames = d_clock / bytes_per_frame;
             report(format!(
-                "CLOCK_48K samples={} clock_first={} clock_last={} delta_clock={d_clock} delta_consumed={d_raw} drift={}",
+                "CLOCK_48K samples={} clock_first={} clock_last={} delta_clock={d_clock} delta_clock_frames={d_clock_frames} delta_position={d_position} clock_minus_position_frames={}",
                 clock_pairs.len(),
                 first.0,
                 last.0,
-                d_clock as i64 - d_raw as i64
+                d_clock_frames as i64 - d_position as i64
             ));
         } else {
             report("CLOCK_48K samples=0 (clock sampling produced nothing)");
         }
 
         usize::from(
-            !analysis.submitted_monotone
-                || !analysis.clamped_monotone
-                || analysis.max_raw_backward > CHUNK
-                || analysis.tail_exceeded_submitted
+            !analysis.handed_off_monotone
+                || !analysis.position_monotone
+                || analysis.max_position_backward != 0
+                || analysis.position_exceeded_handed_off
                 || !drained_to_total
-                || final_submitted != TOTAL_FRAMES
-                || final_raw != Some(TOTAL_FRAMES)
+                || final_handed_off != TOTAL_FRAMES
+                || final_position != Some(TOTAL_FRAMES)
                 || !frozen_constant,
         )
     }
