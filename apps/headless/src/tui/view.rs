@@ -48,6 +48,11 @@ fn main_panel(model: &TuiModel) -> Paragraph<'_> {
             "Stop requested: {}",
             model.observation().stop_requested
         )),
+        Line::from(format!(
+            "Pause requested: {}",
+            model.observation().pause_requested
+        )),
+        Line::from(format!("Paused: {}", model.paused())),
     ];
     if model.terminal_committed() {
         lines.push(Line::from(""));
@@ -69,8 +74,10 @@ fn diagnostics_panel(model: &TuiModel) -> Paragraph<'_> {
 }
 
 fn controls_panel() -> Paragraph<'static> {
-    Paragraph::new(vec![Line::from(" S  Stop    Q  Quit    Ctrl+C  Quit")])
-        .block(Block::bordered().title(bold(" Controls ")))
+    Paragraph::new(vec![Line::from(
+        " Space  Pause/Resume    S  Stop    Q  Quit    Ctrl+C  Quit",
+    )])
+    .block(Block::bordered().title(bold(" Controls ")))
 }
 
 #[cfg(test)]
@@ -82,7 +89,7 @@ mod tests {
     use super::*;
     use crate::status::forbidden_status_claim;
     use qianqian_audio_api::ports::PcmFormat;
-    use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionObservation};
+    use qianqian_playback::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
 
@@ -91,15 +98,19 @@ mod tests {
             terminal_outcome: None,
             failure_diagnostic: None,
             stop_requested: false,
+            pause_requested: false,
             source_format: None,
+            pause_engagement: PauseEngagement::Disengaged,
             activation_error: None,
         }
     }
 
     /// Render the model on a fixed-size virtual terminal and return
-    /// the rows as plain text.
+    /// the rows as plain text. Tall enough for the fully-established
+    /// panel (source/format/terminal/two command lines/paused/committed
+    /// hint) to stay scannable.
     fn rendered(model: &TuiModel) -> String {
-        let mut terminal = Terminal::new(TestBackend::new(60, 16)).expect("virtual terminal");
+        let mut terminal = Terminal::new(TestBackend::new(60, 18)).expect("virtual terminal");
         terminal.draw(|frame| draw(frame, model)).expect("draw");
         let buffer = terminal.backend().buffer().clone();
         (0..buffer.area.height)
@@ -121,8 +132,42 @@ mod tests {
         assert!(text.contains("Format: pending"), "{text}");
         assert!(text.contains("Terminal: pending"), "{text}");
         assert!(text.contains("Stop requested: false"), "{text}");
-        // No unearned playback semantic may appear anywhere in the frame.
+        assert!(text.contains("Paused: false"), "{text}");
+        // No unearned playback semantic may appear anywhere in the frame
+        // (`Paused` is earned since D14.7 and pinned to the frozen
+        // establishment conjunction by the model tests).
         assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
+    /// The Paused line follows the seam's derived projection: recorded
+    /// intent without the mechanism evidence must not display Paused;
+    /// full establishment must.
+    #[test]
+    fn the_paused_line_follows_the_frozen_establishment_conjunction() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            pause_requested: true,
+            ..pending()
+        });
+        let text = rendered(&model);
+        assert!(text.contains("Pause requested: true"), "{text}");
+        assert!(text.contains("Paused: false"), "intent alone: {text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+
+        model.update(PlaybackSessionObservation {
+            pause_requested: true,
+            pause_engagement: PauseEngagement::TailQuiesced,
+            ..pending()
+        });
+        let text = rendered(&model);
+        assert!(
+            text.contains("Paused: true"),
+            "intent + engagement + tail quiescence: {text}"
+        );
+        assert!(
+            !text.contains("Terminal: Paused"),
+            "the projection is never a fourth terminal state: {text}"
+        );
     }
 
     #[test]

@@ -12,7 +12,7 @@ mod windows {
 
     use crate::wasapi::WasapiOutput;
     use qianqian_audio_api::ports::{
-        AudioOutput, PcmFormat, PcmPull, RenderPcmInput, RenderRequest,
+        AudioOutput, PcmFormat, PcmPull, RenderGate, RenderPcmInput, RenderRequest,
     };
     use windows::Win32::Foundation::{WAIT_FAILED, WAIT_TIMEOUT};
     use windows::Win32::System::Threading::{
@@ -106,6 +106,9 @@ mod windows {
                 format: TEST_FORMAT,
                 input: Arc::new(TestInput { feed }),
                 drain: Default::default(),
+                // No pause is routed in these cycles; the mechanism must
+                // sail through the loop-top gate untouched.
+                gate: RenderGate::new(),
             })
             .expect("real endpoint opens");
         stream.stop_and_join();

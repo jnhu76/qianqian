@@ -89,9 +89,10 @@ commands:
   --help | -h            print this usage
   --version | -V         print the version
 
-in the machine transport, `stop` stops the episode and `status` prints
-its truthful state (other interactive commands are recognized but not
-wired yet); in the terminal shell, S stops and Q or Ctrl+C quits
+in the machine transport, `stop` stops the episode, `pause` and
+`resume` pause and resume it, and `status` prints its truthful state
+(other interactive commands are recognized but not wired yet); in the
+terminal shell, Space pauses/resumes, S stops and Q or Ctrl+C quits
 "
 }
 

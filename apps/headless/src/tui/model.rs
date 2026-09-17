@@ -2,17 +2,19 @@
 //! into display labels, plus the keyboard grammar and its wiring to the
 //! episode seam.
 //!
-//! Same truth-class discipline as [`crate::status`] (D14.2): `pending`
-//! states only "no terminal Fact committed yet" — never
-//! Playing/Starting/Paused/Stopping; `stop_requested` is Command state;
-//! `source_format` is mechanism evidence; the diagnostics are
-//! presentation text. This module performs no I/O and holds no truth of
-//! its own; every label is derived from the last observation handed to
+//! Same truth-class discipline as [`crate::status`] (D14.2/D14.7):
+//! `pending` states only "no terminal Fact committed yet" — never
+//! Playing/Starting/Stopping; `stop_requested`/`pause_requested` are
+//! Command state; `source_format` is mechanism evidence; the `Paused`
+//! projection is derived by the seam itself from the frozen D14.7
+//! establishment conjunction; the diagnostics are presentation text.
+//! This module performs no I/O and holds no truth of its own; every
+//! label is derived from the last observation handed to
 //! [`TuiModel::update`].
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use qianqian_playback::{
-    EpisodeTerminalOutcome, PlaybackSessionHandle, PlaybackSessionObservation,
+    EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,
 };
 
 /// One frame's worth of presentation state: the source path the episode
@@ -32,7 +34,9 @@ impl TuiModel {
                 terminal_outcome: None,
                 failure_diagnostic: None,
                 stop_requested: false,
+                pause_requested: false,
                 source_format: None,
+                pause_engagement: PauseEngagement::Disengaged,
                 activation_error: None,
             },
         }
@@ -62,6 +66,12 @@ impl TuiModel {
             Some(EpisodeTerminalOutcome::Stopped) => "Stopped",
             Some(EpisodeTerminalOutcome::Failed) => "Failed",
         }
+    }
+
+    /// The Paused projection (D14.7), derived by the seam itself from
+    /// the frozen establishment conjunction. Display only.
+    pub fn paused(&self) -> bool {
+        self.observation.paused()
     }
 
     /// The source-format label: the published PCM format once
@@ -98,11 +108,14 @@ impl TuiModel {
     }
 }
 
-/// What one key press means to the shell. `Stop` is an episode
-/// command; `Quit` is loop control, not a playback semantic.
+/// What one key press means to the shell. `Stop` and `PauseResume` are
+/// episode commands; `Quit` is loop control, not a playback semantic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Stop,
+    /// Space: pause when pause intent is not recorded, resume when it
+    /// is. One key, two commands — never a local `paused` bool.
+    PauseResume,
     Quit,
 }
 
@@ -113,9 +126,9 @@ pub enum Step {
     Exit,
 }
 
-/// The shell's whole keyboard grammar: S stops, Q quits, Ctrl+C quits.
-/// Anything else is presentation noise (including key-release events,
-/// which Windows terminals emit).
+/// The shell's whole keyboard grammar: Space toggles pause/resume,
+/// S stops, Q quits, Ctrl+C quits. Anything else is presentation noise
+/// (including key-release events, which Windows terminals emit).
 pub fn action_for_key(key: KeyEvent) -> Option<Action> {
     if key.kind != KeyEventKind::Press {
         return None;
@@ -125,6 +138,7 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
     // conventional Ctrl+C quit — so Ctrl+S/Ctrl+Q never act by accident.
     let plain = key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT;
     match key.code {
+        KeyCode::Char(' ') if plain => Some(Action::PauseResume),
         KeyCode::Char('s') | KeyCode::Char('S') if plain => Some(Action::Stop),
         KeyCode::Char('q') | KeyCode::Char('Q') if plain => Some(Action::Quit),
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(Action::Quit),
@@ -134,13 +148,24 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
 
 /// The event loop's entire reaction to one key press, factored out of
 /// [`super::runtime::run`] so the key → seam wiring is testable
-/// without a terminal: S routes to the handle's `request_stop` seam —
-/// idempotent and monotone, valid before and after the terminal Fact —
-/// and Q exits the loop without touching the episode.
+/// without a terminal. Space routes to the pause/resume seams: which of
+/// the two commands is sent comes from a FRESH authoritative observation
+/// of the episode's pause-intent command state — the shell never keeps
+/// a local `paused` bool. S routes to `request_stop`; both are
+/// idempotent, valid before and after the terminal Fact. Q exits the
+/// loop without touching the episode.
 pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
     match action {
         Action::Stop => {
             handle.request_stop();
+            Step::Continue
+        }
+        Action::PauseResume => {
+            if handle.observe().pause_requested {
+                handle.request_resume();
+            } else {
+                handle.request_pause();
+            }
             Step::Continue
         }
         Action::Quit => Step::Exit,
@@ -157,7 +182,9 @@ mod tests {
             terminal_outcome: None,
             failure_diagnostic: None,
             stop_requested: false,
+            pause_requested: false,
             source_format: None,
+            pause_engagement: PauseEngagement::Disengaged,
             activation_error: None,
         }
     }
@@ -290,5 +317,102 @@ mod tests {
         let before = handle.observe();
         assert_eq!(apply_action(Action::Quit, &handle), Step::Exit);
         assert_eq!(handle.observe(), before);
+    }
+
+    #[test]
+    fn space_maps_to_the_pause_resume_toggle_and_no_other_key_does() {
+        // Same posture as the letters: terminals disagree about
+        // reporting SHIFT, so a shift-keyed space acts too.
+        for modifiers in [KeyModifiers::NONE, KeyModifiers::SHIFT] {
+            assert_eq!(
+                action_for_key(KeyEvent::new(KeyCode::Char(' '), modifiers)),
+                Some(Action::PauseResume)
+            );
+        }
+        assert_eq!(
+            action_for_key(KeyEvent::new_with_kind(
+                KeyCode::Char(' '),
+                KeyModifiers::NONE,
+                KeyEventKind::Release
+            )),
+            None
+        );
+    }
+
+    /// Space never keeps a local paused bool: the first press records
+    /// pause intent through the seam, the next press releases it, and
+    /// the choice between the two commands is read from a fresh
+    /// authoritative observation each time.
+    #[test]
+    fn the_pause_resume_action_routes_through_the_seam_both_ways() {
+        let handle = PlaybackSessionHandle::new();
+        assert!(!handle.observe().pause_requested);
+        assert!(!handle.observe().paused());
+
+        assert_eq!(apply_action(Action::PauseResume, &handle), Step::Continue);
+        assert!(
+            handle.observe().pause_requested,
+            "first Space must record pause intent through the seam"
+        );
+        // Idempotent command state: repeated presses while paused stay
+        // recorded intent, and the second press resumes.
+        assert_eq!(apply_action(Action::PauseResume, &handle), Step::Continue);
+        assert!(
+            !handle.observe().pause_requested,
+            "second Space must release the pause through the seam"
+        );
+        // Resuming without a prior pause still goes through the seam
+        // (inert intent history): the observation derives everything.
+        assert_eq!(apply_action(Action::PauseResume, &handle), Step::Continue);
+        assert!(handle.observe().pause_requested);
+    }
+
+    /// The displayed Paused projection comes from the seam's frozen
+    /// establishment conjunction, never from command state alone: an
+    /// episode with recorded pause intent but no engaged+quiesced
+    /// render evidence must not display Paused.
+    #[test]
+    fn the_paused_label_follows_the_establishment_conjunction_only() {
+        let mut model = TuiModel::new("song.flac");
+        assert!(!model.paused(), "fresh episode is not Paused");
+
+        // Pause intent recorded, but no render engagement yet.
+        model.update(PlaybackSessionObservation {
+            pause_requested: true,
+            ..pending()
+        });
+        assert!(!model.paused(), "intent alone is not Paused");
+
+        // Engaged, but the output tail has not been observed quiesced —
+        // including after a prior cycle's release was observed (the
+        // D14.7 corrective negative oracle: stale cross-cycle evidence
+        // satisfies nothing).
+        model.update(PlaybackSessionObservation {
+            pause_requested: true,
+            pause_engagement: PauseEngagement::Engaged,
+            ..pending()
+        });
+        assert!(
+            !model.paused(),
+            "engagement without CURRENT quiescence is not Paused"
+        );
+
+        // Full establishment.
+        model.update(PlaybackSessionObservation {
+            pause_requested: true,
+            pause_engagement: PauseEngagement::TailQuiesced,
+            ..pending()
+        });
+        assert!(model.paused(), "intent + engagement + quiescence is Paused");
+
+        // A committed terminal outcome breaks establishment even with
+        // the mechanism evidence still latched.
+        model.update(PlaybackSessionObservation {
+            terminal_outcome: Some(EpisodeTerminalOutcome::Stopped),
+            pause_requested: true,
+            pause_engagement: PauseEngagement::TailQuiesced,
+            ..pending()
+        });
+        assert!(!model.paused(), "a settled episode is never Paused");
     }
 }

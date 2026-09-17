@@ -131,6 +131,12 @@ fn usage_documents_both_transports() {
         "the scriptable transport stays documented: {}",
         run.stdout
     );
+    // Since F3 the transports document pause control.
+    assert!(
+        run.stdout.contains("Space pauses/resumes"),
+        "the shell pause key stays documented: {}",
+        run.stdout
+    );
 }
 
 /// Negative control: `--machine` alone (or without a well-formed

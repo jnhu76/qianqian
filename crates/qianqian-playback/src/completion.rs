@@ -55,10 +55,10 @@
 
 use std::sync::{Arc, Condvar, Mutex};
 
-use qianqian_audio_api::ports::{DrainSignal, DrainVerdict, PcmFormat};
+use qianqian_audio_api::ports::{DrainSignal, DrainVerdict, GateEvent, PcmFormat, RenderGate};
 
 use crate::edge::{EdgeTerminal, PcmEdge};
-use crate::handle::{EpisodeTerminalOutcome, PlaybackSessionObservation};
+use crate::handle::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
 
 /// How one playback episode ended. Crate-internal realization: the
 /// public semantic contract is only the stable
@@ -112,6 +112,43 @@ struct CompletionState {
     /// Command state, not outcome truth: an episode that already ended
     /// (Completed/Failed) is not retroactively renamed by a late stop.
     stop_requested: bool,
+    /// Pause intent (D14.7). Command state, same family as
+    /// `stop_requested`: recorded by `request_pause`, cleared by
+    /// `request_resume`; a later stop does not relabel it, and after
+    /// settlement it is inert history (the establishment projection
+    /// guards on the unsettled state instead).
+    pause_requested: bool,
+    /// Render engagement evidence (D14.7): the render leg is parked at
+    /// the pre-GetBuffer gate of the CURRENT pause engagement and will
+    /// submit no further PCM while parked. Never a Fact.
+    engaged: bool,
+    /// Output-tail quiescence evidence (D14.7): no frame submitted
+    /// BEFORE the current engagement remains queued for rendering.
+    /// Belongs to the current engagement only — reset on engagement and
+    /// on disengagement, so a previous pause cycle's quiescence can
+    /// never satisfy a later pause.
+    tail_quiesced: bool,
+    /// Disengagement-ack evidence latch (D14.7): the render leg's most
+    /// recent engagement has disengaged. Attribution is exact at
+    /// engagement granularity: same-leg event ordering makes
+    /// `Disengaged(old)` happen-before `Engaged(new)`, so `Engaged` is
+    /// the current-engagement fence and clears any evidence a prior
+    /// engagement left — a previous cycle's disengagement can never be
+    /// misattributed to the current engagement (D14.7 corrective-2).
+    /// Crate-internal mechanism evidence only: it is NOT mirrored into
+    /// the public observation (the D14.7 AUTHORITY-CORRECTIVE removed
+    /// the `Resumed` projection this latch once existed to ground —
+    /// disengagement cannot prove a viable render leg remains), and it
+    /// never feeds control or settlement. Kept for current-engagement
+    /// bookkeeping and as the verification subject of the attribution
+    /// fence oracle.
+    disengagement_observed: bool,
+    /// Set once by [`SessionCompletion::release_pause_gate`] — the
+    /// authority-owned teardown path has begun releasing the pause
+    /// gate. Routing witness for the D14.7 teardown wake obligation: a
+    /// pause that linearizes after this point must not re-park the leg,
+    /// or the teardown's `stop_and_join` could never return.
+    teardown_released: bool,
     /// The session's data-plane edge, bound by activation as the stop
     /// target. `None` until the episode binds one (or forever, if
     /// activation failed). The edge is the session-owned stop mechanism;
@@ -131,6 +168,12 @@ struct CompletionArc {
     state: Mutex<CompletionState>,
     signal: Condvar,
     drain: DrainSignal,
+    /// The episode's render pause gate (D14.7), created here with the
+    /// evidence observer so it is in place before activation can hand it
+    /// to a render stream. The gate routes pause intent to the mechanism
+    /// and acknowledges engagement/tail-quiescence/disengagement back as
+    /// mechanism evidence (never Facts, never settlement inputs).
+    gate: RenderGate,
 }
 
 impl Default for SessionCompletion {
@@ -142,36 +185,57 @@ impl Default for SessionCompletion {
 impl SessionCompletion {
     pub(crate) fn new() -> Self {
         Self {
-            state: Arc::new_cyclic(|core| CompletionArc {
-                state: Mutex::new(CompletionState {
-                    outcome: None,
-                    worker_terminal: None,
-                    decode_failure: None,
-                    drain_verdict: None,
-                    source_format: None,
-                    activation_failure: None,
-                    stop_requested: false,
-                    stop_target: None,
-                }),
-                signal: Condvar::new(),
-                drain: DrainSignal::with_on_complete({
-                    // Weak on purpose: the completion owns the signal,
-                    // so a strong observer reference would be a
-                    // reference cycle. The signal outlives publication
-                    // paths only through the render leg's own join
-                    // ordering, so an inert observer after teardown is
-                    // exactly the right semantics.
+            state: Arc::new_cyclic(|core| {
+                let gate = RenderGate::with_observer({
+                    // Weak on purpose (same posture as the drain
+                    // observer): the completion owns the gate, so a
+                    // strong observer reference would be a cycle. An
+                    // inert observer after teardown is exactly the right
+                    // semantics.
                     let core = core.clone();
-                    move |verdict| {
+                    move |event| {
                         if let Some(core) = core.upgrade() {
-                            publish_evidence(&core, |state| {
-                                if state.drain_verdict.is_none() {
-                                    state.drain_verdict = Some(verdict);
-                                }
-                            });
+                            publish_evidence(&core, |state| apply_gate_event(state, event));
                         }
                     }
-                }),
+                });
+                CompletionArc {
+                    state: Mutex::new(CompletionState {
+                        outcome: None,
+                        worker_terminal: None,
+                        decode_failure: None,
+                        drain_verdict: None,
+                        source_format: None,
+                        activation_failure: None,
+                        stop_requested: false,
+                        pause_requested: false,
+                        engaged: false,
+                        tail_quiesced: false,
+                        disengagement_observed: false,
+                        teardown_released: false,
+                        stop_target: None,
+                    }),
+                    signal: Condvar::new(),
+                    drain: DrainSignal::with_on_complete({
+                        // Weak on purpose: the completion owns the signal,
+                        // so a strong observer reference would be a
+                        // reference cycle. The signal outlives publication
+                        // paths only through the render leg's own join
+                        // ordering, so an inert observer after teardown is
+                        // exactly the right semantics.
+                        let core = core.clone();
+                        move |verdict| {
+                            if let Some(core) = core.upgrade() {
+                                publish_evidence(&core, |state| {
+                                    if state.drain_verdict.is_none() {
+                                        state.drain_verdict = Some(verdict);
+                                    }
+                                });
+                            }
+                        }
+                    }),
+                    gate,
+                }
             }),
         }
     }
@@ -237,11 +301,99 @@ impl SessionCompletion {
         let target = {
             let mut guard = self.state.state.lock().expect("completion lock");
             guard.stop_requested = true;
+            // Stop releases the pause gate too (D14.7), under the same
+            // lock hold that records the intent: gate routing is
+            // linearized with the command state, so a pause command that
+            // linearizes after this stop observes `stop_requested` and
+            // cannot re-park the episode. A leg parked at the pre-
+            // GetBuffer gate is not inside read_frames, so the
+            // data-plane stop alone cannot wake it. The release publishes
+            // disengagement evidence when the leg exits; the gate never
+            // aborts the leg — the loop proceeds once more and the
+            // data-plane terminal (edge stop, EOF, failure) decides the
+            // outcome.
+            self.state.gate.set_paused(false);
             guard.stop_target.clone()
         };
         if let Some(edge) = target {
             edge.stop();
         }
+    }
+
+    /// Request the episode to pause (D14.7). Command only: records pause
+    /// intent on the episode seam and routes it to the episode's render
+    /// gate, whose loop-top check parks the render leg before any device
+    /// buffer is held. Idempotent. How (and whether) the pause physically
+    /// establishes remains mechanism evidence — the Paused projection is
+    /// derived, never recorded here.
+    ///
+    /// Recording a NEW pause cycle (intent false→true) also clears any
+    /// latched disengagement evidence as command-side hygiene; the
+    /// attribution rule itself is the leg's Engaged event (see
+    /// `apply_gate_event`), which fences a previous cycle's
+    /// disengagement out of this one.
+    ///
+    /// Intent routing is linearized with the command state under the one
+    /// completion lock. A pause that linearizes after stop intent —
+    /// including the whole stop→settlement window — or after the
+    /// teardown release has begun is recorded as inert command history
+    /// but routes nothing: a released, released-then-stopping, or
+    /// tearing-down episode must never be re-parked (D14.7: stop and
+    /// teardown wake every parked participant with bounded latency), and
+    /// a settled episode has no leg to park.
+    pub(crate) fn request_pause(&self) {
+        let mut guard = self.state.state.lock().expect("completion lock");
+        if !guard.pause_requested {
+            // Command-side hygiene only (D14.7 corrective-2): the event
+            // attribution fence is the leg's own Engaged event, which
+            // clears prior-cycle evidence the moment the current
+            // engagement begins. This reset just keeps a stale
+            // prior-cycle disengagement out of the latch in the window
+            // before that engagement is observed. Repeated pauses
+            // within one cycle change nothing.
+            guard.disengagement_observed = false;
+        }
+        guard.pause_requested = true;
+        if guard.stop_requested || guard.teardown_released || guard.outcome.is_some() {
+            return;
+        }
+        self.state.gate.set_paused(true);
+    }
+
+    /// Release a recorded pause (D14.7). Command only: clears pause
+    /// intent and releases the gate; the woken leg proceeds once more and
+    /// the data plane decides what its next read sees. Idempotent.
+    /// Release routing stays unconditional — a release can never wedge
+    /// anything, and linearization under the one completion lock keeps
+    /// the gate's view consistent with the recorded intent.
+    pub(crate) fn request_resume(&self) {
+        let mut guard = self.state.state.lock().expect("completion lock");
+        guard.pause_requested = false;
+        self.state.gate.set_paused(false);
+    }
+
+    /// Release the pause gate WITHOUT touching the recorded pause intent
+    /// (D14.7 teardown obligation): session settlement/teardown must wake
+    /// every parked participant, because a leg parked at the gate cannot
+    /// observe the data-plane stop, and `stop_and_join` must terminate.
+    /// The leg's exit publishes disengagement evidence.
+    ///
+    /// The release linearizes pause routing under the same completion
+    /// lock hold (the teardown-side twin of the `request_stop` rule):
+    /// once this runs, a pause that linearizes after it is inert
+    /// history and routes nothing, so no pause can re-park the leg
+    /// between this release and the join that follows it.
+    pub(crate) fn release_pause_gate(&self) {
+        let mut guard = self.state.state.lock().expect("completion lock");
+        guard.teardown_released = true;
+        self.state.gate.set_paused(false);
+    }
+
+    /// The episode's render gate, handed to the output provider at
+    /// activation. Session-internal binding seam: the application reaches
+    /// the same routing only through `request_pause`/`request_resume`.
+    pub(crate) fn render_gate(&self) -> RenderGate {
+        self.state.gate.clone()
     }
 
     /// Frames currently buffered on the session's edge, once bound.
@@ -308,6 +460,12 @@ impl SessionCompletion {
             stop_requested: guard.stop_requested,
             source_format: guard.source_format,
             activation_error: guard.activation_failure.clone(),
+            pause_requested: guard.pause_requested,
+            pause_engagement: match (guard.engaged, guard.tail_quiesced) {
+                (true, true) => PauseEngagement::TailQuiesced,
+                (true, false) => PauseEngagement::Engaged,
+                (false, _) => PauseEngagement::Disengaged,
+            },
         }
     }
 
@@ -345,6 +503,37 @@ impl SessionCompletion {
 
     fn publish(&self, evidence: impl FnOnce(&mut CompletionState)) {
         publish_evidence(&self.state, evidence);
+    }
+}
+
+/// The one gate-evidence attribution rule (D14.7): what each render-gate
+/// event does to the evidence latches. Named so the delayed-delivery
+/// oracle below can drive the production arm synchronously — the real
+/// observer above routes every event through this function, so a test
+/// that calls it exercises exactly the attribution the leg performs.
+fn apply_gate_event(state: &mut CompletionState, event: GateEvent) {
+    match event {
+        // Engagement is the current-engagement fence: events on one
+        // render leg are ordered, so a prior engagement's Disengaged
+        // happens-before this Engaged. Whatever disengagement evidence
+        // may be latched here belongs to an engagement that has already
+        // ended — it must not be misattributed to the current
+        // engagement (D14.7 corrective-2). Engagement also resets the
+        // tail evidence: quiescence belongs to the current engagement
+        // only.
+        GateEvent::Engaged => {
+            state.engaged = true;
+            state.tail_quiesced = false;
+            state.disengagement_observed = false;
+        }
+        GateEvent::TailQuiesced => {
+            state.tail_quiesced = true;
+        }
+        GateEvent::Disengaged => {
+            state.engaged = false;
+            state.tail_quiesced = false;
+            state.disengagement_observed = true;
+        }
     }
 }
 
@@ -430,4 +619,89 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
         None => {}
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// D14.7 corrective-2, the delayed-delivery interleaving no leg-level
+    /// test can reach deterministically: the render leg has observed
+    /// resume #1's release, but its Disengaged #1 is still in flight when
+    /// pause #2 routes. The stale event publishes into the new cycle —
+    /// only the leg's own Engaged #2 (the current-engagement fence) may
+    /// clear it, so the internal disengagement latch stays attributable
+    /// to the CURRENT engagement.
+    ///
+    /// This is a MECHANISM attribution oracle, not a product-projection
+    /// test: the D14.7 AUTHORITY-CORRECTIVE removed the public `Resumed`
+    /// projection this latch once grounded (disengagement evidence
+    /// cannot prove a viable render leg remains). The latch stays
+    /// crate-internal, and its per-engagement attribution discipline
+    /// stays pinned here because the same latch discipline keeps the
+    /// `PauseEngagement` spelling honest across cycles.
+    ///
+    /// Drives the production attribution arm (`apply_gate_event`, exactly
+    /// what the real gate observer runs) through the real publication
+    /// boundary, so deleting the Engaged-arm reset turns this RED while
+    /// every event shape stays real. The ordering constructed here is a
+    /// legal interleaving: event delivery from the leg is asynchronous
+    /// with command routing, bounded only by the park slice.
+    #[test]
+    fn a_prior_cycle_disengagement_never_answers_a_later_cycle_after_reengagement() {
+        let completion = SessionCompletion::new();
+        let core = completion.state.clone();
+        let latched = || {
+            core.state
+                .lock()
+                .expect("completion lock")
+                .disengagement_observed
+        };
+
+        // Cycle 1: pause → engagement. (request_pause routes to the
+        // episode's gate; the events below stand in for the leg's
+        // acknowledgments.)
+        completion.request_pause();
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        assert!(completion.observe_snapshot().pause_requested);
+
+        // Resume #1 releases intent; the leg is about to deliver its
+        // disengagement.
+        completion.request_resume();
+
+        // Pause #2 routes BEFORE that delivery lands — the leg has
+        // passed its released check but not yet published.
+        completion.request_pause();
+
+        // ...and the PRIOR cycle's disengagement publishes into it.
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
+        assert!(
+            latched(),
+            "precondition: the delayed prior-cycle event did land"
+        );
+
+        // The leg re-engages for cycle 2 — the fence must clear the
+        // stale evidence.
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        assert!(
+            !latched(),
+            "a prior cycle's Disengaged must not survive the current engagement"
+        );
+
+        // Resume #2: before the CURRENT engagement disengages, there is
+        // no current-engagement disengagement evidence.
+        completion.request_resume();
+        assert!(
+            !latched(),
+            "the current engagement's disengagement cannot be attributed before it happens"
+        );
+
+        // The current engagement disengages — NOW the evidence exists.
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
+        assert!(latched());
+
+        // None of this touched the terminal Fact: evidence latches are
+        // not settlement inputs.
+        assert_eq!(completion.observe_snapshot().terminal_outcome, None);
+    }
 }

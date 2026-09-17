@@ -226,7 +226,13 @@ small orthogonal fact/control state
 
 Only concrete counterexamples may earn extra Plugin boundaries, Window/Generation, or a specialized Realtime Audio Runtime mechanism.
 
-Phase-F playback semantics remain OPEN (PBK-002 §14); new Phase-F implementation stays paused pending their authority design.
+Phase-F playback semantics: F3 pause/resume authority is frozen
+(D14.7, incl. the AUTHORITY-CORRECTIVE that removed `Resumed` as an
+application-facing projection — Paused is the earned Projection,
+resume is Command-only, disengagement is Mechanism Evidence) and
+implemented behind the episode seam; the remaining
+transport semantics (F4 position/duration and beyond) remain OPEN
+(PBK-002 §14) pending their authority design.
 
 ---
 

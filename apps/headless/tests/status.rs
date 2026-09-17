@@ -3,20 +3,23 @@
 //!
 //! The oracle proves two directions:
 //!   - every rendered observation is free of unearned playback
-//!     semantics (no playing/starting/paused/stopping/buffering);
+//!     semantics (no playing/starting/stopping/buffering — `paused`
+//!     left the forbidden set when D14.7 earned the projection);
 //!   - the scan itself is not vacuous — text that DOES claim a
 //!     forbidden semantic is caught.
 
 use qianqian_audio_api::ports::PcmFormat;
 use qianqian_headless::status::{forbidden_status_claim, format_status};
-use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionObservation};
+use qianqian_playback::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
 
 fn pending_observation() -> PlaybackSessionObservation {
     PlaybackSessionObservation {
         terminal_outcome: None,
         failure_diagnostic: None,
         stop_requested: false,
+        pause_requested: false,
         source_format: None,
+        pause_engagement: PauseEngagement::Disengaged,
         activation_error: None,
     }
 }
@@ -26,7 +29,8 @@ fn a_fresh_episode_projects_pending_without_inventing_state() {
     let text = format_status(&pending_observation());
     assert_eq!(
         text,
-        "outcome: pending\nformat: unavailable\nstop_requested: false\n"
+        "outcome: pending\nformat: unavailable\nstop_requested: false\n\
+         pause_requested: false\npaused: false\n"
     );
     assert_eq!(forbidden_status_claim(&text), None);
 }
@@ -43,6 +47,61 @@ fn stop_intent_projects_as_command_state_not_as_a_fact() {
     assert_eq!(forbidden_status_claim(&text), None, "no 'stopping' claim");
 }
 
+/// The `paused:` line is the D14.7 establishment projection: recorded
+/// intent alone must NOT project paused, and the full frozen
+/// conjunction (unsettled ∧ intent ∧ engagement ∧ current tail
+/// quiescence) must.
+#[test]
+fn pause_projects_through_the_frozen_establishment_conjunction() {
+    let observation = PlaybackSessionObservation {
+        pause_requested: true,
+        ..pending_observation()
+    };
+    let text = format_status(&observation);
+    assert!(text.contains("pause_requested: true\n"), "{text}");
+    assert!(
+        text.contains("paused: false\n"),
+        "intent without mechanism evidence is not Paused: {text}"
+    );
+
+    let observation = PlaybackSessionObservation {
+        pause_requested: true,
+        pause_engagement: PauseEngagement::Engaged,
+        ..pending_observation()
+    };
+    let text = format_status(&observation);
+    assert!(
+        text.contains("paused: false\n"),
+        "engagement without tail quiescence is not Paused: {text}"
+    );
+
+    let observation = PlaybackSessionObservation {
+        pause_requested: true,
+        pause_engagement: PauseEngagement::TailQuiesced,
+        ..pending_observation()
+    };
+    let text = format_status(&observation);
+    assert!(text.contains("paused: true\n"), "{text}");
+    assert_eq!(forbidden_status_claim(&text), None);
+}
+
+/// A settled episode is never Paused, whatever the mechanism evidence
+/// still shows latched (D14.7): the establishment conjunction guards on
+/// the unsettled state.
+#[test]
+fn a_settled_episode_never_projects_paused() {
+    let observation = PlaybackSessionObservation {
+        terminal_outcome: Some(EpisodeTerminalOutcome::Stopped),
+        stop_requested: true,
+        pause_requested: true,
+        pause_engagement: PauseEngagement::TailQuiesced,
+        ..pending_observation()
+    };
+    let text = format_status(&observation);
+    assert!(text.contains("outcome: stopped\n"), "{text}");
+    assert!(text.contains("paused: false\n"), "{text}");
+}
+
 #[test]
 fn each_terminal_fact_projects_its_own_line() {
     for (outcome, expected) in [
@@ -53,11 +112,13 @@ fn each_terminal_fact_projects_its_own_line() {
         let observation = PlaybackSessionObservation {
             terminal_outcome: Some(outcome),
             stop_requested: false,
+            pause_requested: false,
             source_format: Some(PcmFormat {
                 sample_rate: 44100,
                 channels: 2,
                 channel_mask: 0x3,
             }),
+            pause_engagement: PauseEngagement::Disengaged,
             activation_error: None,
             failure_diagnostic: None,
         };
@@ -65,6 +126,7 @@ fn each_terminal_fact_projects_its_own_line() {
         assert!(text.contains(expected), "missing {expected:?} in {text:?}");
         assert!(text.contains("format: 44100 Hz, 2 channels, mask 0x3\n"));
         assert!(text.contains("stop_requested: false\n"));
+        assert!(text.contains("paused: false\n"));
         assert_eq!(forbidden_status_claim(&text), None);
     }
 }
@@ -156,12 +218,16 @@ fn the_forbidden_vocabulary_scan_catches_smuggled_buffer_health() {
 
 #[test]
 fn the_scan_covers_every_forbidden_word_and_passes_clean_text() {
+    // `paused` is no longer forbidden: D14.7 earned the projection, and
+    // the establishment conjunction is pinned by the positive tests
+    // above. `resumed` re-entered the forbidden set when the D14.7
+    // AUTHORITY-CORRECTIVE removed the Resumed product projection.
     for word in [
         "playing",
         "starting",
-        "paused",
         "pausing",
         "stopping",
+        "resumed",
         "buffering",
         "buffered",
     ] {
@@ -173,4 +239,9 @@ fn the_scan_covers_every_forbidden_word_and_passes_clean_text() {
     }
     assert_eq!(forbidden_status_claim("outcome: stopped\n"), None);
     assert_eq!(forbidden_status_claim("stop_requested: false\n"), None);
+    assert_eq!(
+        forbidden_status_claim("pause_requested: true\npaused: true\n"),
+        None,
+        "the earned D14.7 projection must pass the scan"
+    );
 }

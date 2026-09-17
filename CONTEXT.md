@@ -197,12 +197,17 @@ Failed
 
 Exact resolver representation/precedence remains current implementation detail unless changing it changes the external D11 propositions.
 
-F2 seam representation (reality-gate-2 verdict): the application-facing episode seam is a **public Playback Session handle** (one handle == one playback episode; minimal surface `request_stop` / `observe` / `wait_terminal`). `SessionCompletion`/resolver is an **internal replaceable realization** behind that seam, not the application API; terminal settlement runs on the Playback Session authority-owned execution/teardown path (D14.3), never consumer-triggered.
+F2 seam representation (reality-gate-2 verdict): the application-facing episode seam is a **public Playback Session handle** (one handle == one playback episode; surface `request_stop` / `request_pause` / `request_resume` / `observe` / `wait_terminal` — pause/resume added by the frozen D14.7 F3 amendment). `SessionCompletion`/resolver is an **internal replaceable realization** behind that seam, not the application API; terminal settlement runs on the Playback Session authority-owned execution/teardown path (D14.3), never consumer-triggered.
 
 The following are still OPEN:
 
 ```text
-Playing / Starting / Paused / Stopping semantics
+Playing / Starting / Stopping semantics
+(Paused is a D14.7-derived Projection, not a transport state;
+ Resumed is NOT a product projection — removed by the D14.7
+ AUTHORITY-CORRECTIVE (disengagement evidence cannot prove a viable
+ render leg remains): resume is Command-only, disengagement is
+ Mechanism Evidence; the rest of the transport enum is not earned)
 position / duration authority
 seek acceptance / discontinuity / commit semantics
 open/session construction + config + replacement semantics
@@ -239,14 +244,22 @@ F2 Observable read side         REALITY GATE CLOSED
          D14.3 authority-owned settlement;
          SessionCompletion/resolver becomes crate-internal
          replaceable realization)
-F3 Pause / Resume               GATE EARNED (D14.7 mechanism +
-                                establishment freeze incl.
-                                CORRECTIVE-1: Paused/Resumed =
-                                non-authoritative Projections gated on
-                                engagement + output-tail-quiescence
-                                evidence; evidence
-                                experiments/f3-pause-mechanism);
-                                IMPLEMENTATION NOT STARTED
+F3 Pause / Resume               CLOSED after authority corrective
+                                (feat/f3-pause-resume-1, PR #150:
+                                D14.7 mechanism A render-loop gate
+                                behind the episode seam).
+                                Paused = earned application-facing
+                                Projection (engagement +
+                                current-engagement tail-quiescence
+                                evidence); Resumed = NOT a product
+                                Projection (AUTHORITY-CORRECTIVE:
+                                disengagement evidence cannot prove a
+                                viable render leg remains —
+                                never-activated/open-abort
+                                counterexample); resume = Command
+                                only; Disengaged = Mechanism Evidence
+                                only; evidence
+                                experiments/f3-pause-mechanism
 F4 Position / Duration          GOAL KEPT / AUTHORITY + COUNTERS OPEN
 F5 Seek                         REDESIGNED AROUND DISCONTINUITY PROTOCOL
 F6 Open                         CONFIG-MECHANISM-OPEN
