@@ -25,8 +25,8 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
 
 use qianqian_audio_api::ports::{
     AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainSignal,
-    DrainVerdict, OutputError, PcmDecode, PcmFormat, PcmPull, RenderPcmInput, RenderRequest,
-    RenderStream,
+    DrainVerdict, OutputError, PcmDecode, PcmFormat, PcmPull, PositionEvidence, RenderPcmInput,
+    RenderRequest, RenderStream,
 };
 
 pub const TEST_FORMAT: PcmFormat = PcmFormat {
@@ -50,8 +50,33 @@ pub enum SourceBehavior {
     Paced { after: usize, delay: Duration },
 }
 
+#[derive(Clone)]
 pub struct TestDecode {
     pub behavior: SourceBehavior,
+    /// Source duration evidence the probe reports (D14.8). `None` is the
+    /// provider's unknown path — the mock's default, so an episode built
+    /// without saying otherwise observes no duration, exactly like a
+    /// container that declares none.
+    pub duration: Option<Duration>,
+}
+
+impl TestDecode {
+    /// A decode double whose probe reports no duration (unknown).
+    pub fn new(behavior: SourceBehavior) -> Self {
+        Self {
+            behavior,
+            duration: None,
+        }
+    }
+
+    /// A decode double whose probe reports `duration` as source
+    /// evidence.
+    pub fn with_duration(behavior: SourceBehavior, duration: Duration) -> Self {
+        Self {
+            behavior,
+            duration: Some(duration),
+        }
+    }
 }
 
 impl PcmDecode for TestDecode {
@@ -69,6 +94,7 @@ impl PcmDecode for TestDecode {
             fail_after: fail,
             pace_delay: pace,
             format: TEST_FORMAT,
+            duration: self.duration,
         }))
     }
 }
@@ -78,11 +104,16 @@ struct TestDecodeStream {
     fail_after: bool,
     pace_delay: Option<Duration>,
     format: PcmFormat,
+    duration: Option<Duration>,
 }
 
 impl DecodedPcmStream for TestDecodeStream {
     fn format(&self) -> PcmFormat {
         self.format
+    }
+
+    fn source_duration(&self) -> Option<Duration> {
+        self.duration
     }
 
     fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
@@ -106,6 +137,95 @@ impl DecodedPcmStream for TestDecodeStream {
         }
         self.remaining -= n;
         Ok(DecodeOutcome::Frames(n))
+    }
+}
+
+/// How the mock output device plays out the tail it holds between two
+/// observations of it — the mock's only clock. Frames enter the tail on
+/// submission and leave it at this rate, so a leg that submits faster
+/// than the rate accumulates a queue, and a leg that stops submitting
+/// (a parked pause) watches it drain.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Playout {
+    /// The device plays out everything it holds before the next
+    /// observation: it never accumulates a queue. This is the default —
+    /// the `Consume` behavior's "instant consumer", the mock device that
+    /// holds nothing.
+    Everything,
+    /// The device plays out at most this many frames per observation,
+    /// and nothing at all for `0` (a device frozen mid-buffer, or one
+    /// whose queue outlives the observation window).
+    FramesPerObservation(u64),
+}
+
+/// The mock device's queued-to-play tail, by the frame — the same
+/// physical quantity the real mechanism reads with `GetCurrentPadding`
+/// and the leg's position evidence subtracts (D14.8). One model, two
+/// uses: the F3 establishment oracle asks whether it is quiesced
+/// (`== 0`), and the F4 accounting derives from its value.
+#[derive(Clone)]
+pub struct DeviceTail {
+    queued: Arc<std::sync::atomic::AtomicU64>,
+    playout: Arc<std::sync::atomic::AtomicU64>,
+}
+
+/// The internal spelling of [`Playout::Everything`]: a rate no queue
+/// length can exceed.
+const PLAY_OUT_EVERYTHING: u64 = u64::MAX;
+
+impl Default for DeviceTail {
+    fn default() -> Self {
+        Self {
+            queued: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            playout: Arc::new(std::sync::atomic::AtomicU64::new(PLAY_OUT_EVERYTHING)),
+        }
+    }
+}
+
+impl DeviceTail {
+    /// Change the mock device's playout rate (see [`Playout`]).
+    pub fn set_playout(&self, playout: Playout) {
+        let rate = match playout {
+            Playout::Everything => PLAY_OUT_EVERYTHING,
+            Playout::FramesPerObservation(frames) => frames,
+        };
+        self.playout
+            .store(rate, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// The frames currently queued to play — a witness for assertions,
+    /// never an input to any product path.
+    pub fn queued(&self) -> u64 {
+        self.queued.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Put `frames` into the queue as if the leg had submitted them.
+    /// (The leg's own submissions go through [`DeviceTail::submit`].)
+    pub fn seed(&self, frames: u64) {
+        self.queued
+            .fetch_add(frames, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// One tail observation: the device plays out its slice, then
+    /// reports what is still queued.
+    fn observe(&self) -> u64 {
+        use std::sync::atomic::Ordering;
+        let rate = self.playout.load(Ordering::SeqCst);
+        let mut remaining = self.queued.load(Ordering::SeqCst);
+        if rate >= remaining {
+            remaining = 0;
+        } else {
+            remaining -= rate;
+        }
+        self.queued.store(remaining, Ordering::SeqCst);
+        remaining
+    }
+
+    /// The device accepted `n` submitted frames into its queue (the
+    /// mock's `ReleaseBuffer(n)` acceptance).
+    fn submit(&self, n: u64) {
+        self.queued
+            .fetch_add(n, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -146,11 +266,12 @@ pub struct TestOutput {
     pub consumed: Arc<std::sync::atomic::AtomicUsize>,
     /// The mock device's output-tail occupancy (frames already consumed
     /// but still queued to "play"), observed by the render gate's
-    /// tail-quiescence check. An instant-consuming mock holds nothing,
-    /// so the default is quiesced (false = empty tail); a test flips it
-    /// to true to model a real device still playing out already-
-    /// submitted frames.
-    pub device_tail_padding: Arc<std::sync::atomic::AtomicBool>,
+    /// tail-quiescence check and by the leg's position accounting
+    /// (D14.7/D14.8). An instant-consuming mock holds nothing, so the
+    /// default is an empty tail that drains everything at each
+    /// observation; a test changes the playout rate to model a real
+    /// device still playing out already-submitted frames.
+    pub device_tail: DeviceTail,
     /// Controllable hold on the render leg's tail observation; see
     /// [`TailProbe`]. Unarmed by default, so it costs nothing.
     pub tail_probe: TailProbe,
@@ -173,25 +294,22 @@ impl TestOutput {
         behavior: OutputBehavior,
         consumed: Arc<std::sync::atomic::AtomicUsize>,
     ) -> TestOutput {
-        TestOutput::observed_with_tail(
-            behavior,
-            consumed,
-            Arc::new(std::sync::atomic::AtomicBool::new(false)),
-        )
+        TestOutput::observed_with_tail(behavior, consumed, DeviceTail::default())
     }
 
     /// [`TestOutput::observed`] with the caller owning the mock device's
-    /// output-tail flag, so a pause test can model a real device whose
-    /// already-submitted frames are still queued to play.
+    /// output tail, so a pause test can model a real device whose
+    /// already-submitted frames are still queued to play, and a
+    /// position test can model one that drains at a given rate.
     pub fn observed_with_tail(
         behavior: OutputBehavior,
         consumed: Arc<std::sync::atomic::AtomicUsize>,
-        device_tail_padding: Arc<std::sync::atomic::AtomicBool>,
+        device_tail: DeviceTail,
     ) -> TestOutput {
         TestOutput {
             behavior,
             consumed,
-            device_tail_padding,
+            device_tail,
             tail_probe: TailProbe::default(),
             open_abort_engaged: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
@@ -202,14 +320,14 @@ impl TestOutput {
     /// [`OutputBehavior::OpenTimeoutAbort`].
     pub fn open_timeout_abort(
         consumed: Arc<std::sync::atomic::AtomicUsize>,
-        device_tail_padding: Arc<std::sync::atomic::AtomicBool>,
+        device_tail: DeviceTail,
         tail_probe: TailProbe,
         open_abort_engaged: Arc<std::sync::atomic::AtomicBool>,
     ) -> TestOutput {
         TestOutput {
             behavior: OutputBehavior::OpenTimeoutAbort,
             consumed,
-            device_tail_padding,
+            device_tail,
             tail_probe,
             open_abort_engaged,
         }
@@ -299,17 +417,19 @@ impl TailProbe {
 /// loop-top pause gate before every read, a panic still publishing a
 /// verdict and stopping the data plane, and the drain verdict published
 /// on exit — mirroring the real mechanism's leg posture (wasapi.rs
-/// run_render_thread).
+/// run_render_thread), including its F4 frame accounting and position
+/// publication.
 fn spawn_test_leg(
     input: Arc<dyn RenderPcmInput>,
     gate: qianqian_audio_api::ports::RenderGate,
     drain: DrainSignal,
+    position: PositionEvidence,
     pace: Option<Duration>,
     abort_after: Option<usize>,
     output: &TestOutput,
 ) -> std::io::Result<std::thread::JoinHandle<()>> {
     let consumed = output.consumed.clone();
-    let device_tail_padding = output.device_tail_padding.clone();
+    let device_tail = output.device_tail.clone();
     let tail_probe = output.tail_probe.clone();
     std::thread::Builder::new()
         .name("qianqian-test-render".into())
@@ -318,11 +438,14 @@ fn spawn_test_leg(
                 consume_loop(
                     input.clone(),
                     &gate,
+                    &position,
                     pace,
                     abort_after,
-                    &consumed,
-                    &device_tail_padding,
-                    &tail_probe,
+                    &MockDevice {
+                        tail: &device_tail,
+                        tail_probe: &tail_probe,
+                        consumed: &consumed,
+                    },
                 )
             }))
             .unwrap_or(DrainVerdict::Aborted);
@@ -346,10 +469,19 @@ impl AudioOutput for TestOutput {
                     input,
                     drain,
                     gate,
+                    position,
                     format: _,
                 } = request;
-                let thread = spawn_test_leg(input.clone(), gate.clone(), drain, None, None, self)
-                    .map_err(|e| OutputError {
+                let thread = spawn_test_leg(
+                    input.clone(),
+                    gate.clone(),
+                    drain,
+                    position,
+                    None,
+                    None,
+                    self,
+                )
+                .map_err(|e| OutputError {
                     message: format!("test render spawn failed: {e}"),
                 })?;
                 // The pre-activation pause intent must already sit at
@@ -392,12 +524,21 @@ impl AudioOutput for TestOutput {
                     input,
                     drain,
                     gate,
+                    position,
                     format: _,
                 } = request;
-                let thread = spawn_test_leg(input.clone(), gate, drain, pace, abort_after, self)
-                    .map_err(|e| OutputError {
-                        message: format!("test render spawn failed: {e}"),
-                    })?;
+                let thread = spawn_test_leg(
+                    input.clone(),
+                    gate,
+                    drain,
+                    position,
+                    pace,
+                    abort_after,
+                    self,
+                )
+                .map_err(|e| OutputError {
+                    message: format!("test render spawn failed: {e}"),
+                })?;
                 Ok(Box::new(TestStream {
                     input,
                     thread: Some(thread),
@@ -407,18 +548,30 @@ impl AudioOutput for TestOutput {
     }
 }
 
+/// The mock device as the render leg sees it: the queue it reads and
+/// submits into, the injected hold on that observation, and the
+/// consumption witness the tests assert on.
+struct MockDevice<'a> {
+    tail: &'a DeviceTail,
+    tail_probe: &'a TailProbe,
+    consumed: &'a std::sync::atomic::AtomicUsize,
+}
+
 fn consume_loop(
     input: Arc<dyn RenderPcmInput>,
     gate: &qianqian_audio_api::ports::RenderGate,
+    position: &PositionEvidence,
     pace: Option<Duration>,
     abort_after: Option<usize>,
-    consumed: &std::sync::atomic::AtomicUsize,
-    device_tail_padding: &std::sync::atomic::AtomicBool,
-    tail_probe: &TailProbe,
+    device: &MockDevice<'_>,
 ) -> DrainVerdict {
     use std::sync::atomic::Ordering;
     let mut dst = vec![0.0f32; 256 * usize::from(TEST_FORMAT.channels)];
     let mut reads = 0usize;
+    // The mock leg's own frame accounting (D14.8): frames successfully
+    // submitted into the mock device's queue, mirroring the real leg's
+    // `handed_off` local.
+    let mut handed_off: u64 = 0;
     loop {
         if abort_after.is_some_and(|limit| reads >= limit) {
             // Device died mid-stream: the render loop exits on its own.
@@ -428,12 +581,28 @@ fn consume_loop(
         }
         // Mirror the real mechanism's loop-top pause gate (D14.7): the
         // gate parks before the read; the mock's tail observation is
-        // its own device-tail counter, passable through the probe.
-        gate.park_while_paused(|| tail_probe.observe(!device_tail_padding.load(Ordering::SeqCst)));
+        // its own device-tail queue, passable through the probe. The
+        // same reading feeds the position accounting (D14.8): submission
+        // is frozen while parked, so the park slices are what walk the
+        // published sample up to the frozen handed-off total.
+        gate.park_while_paused(|| {
+            let tail = device.tail.observe();
+            position.publish_consumed(handed_off, tail);
+            device.tail_probe.observe(tail == 0)
+        });
+        // Mirror the real loop's per-iteration padding observation:
+        // publish the consumed estimate as of THIS instant, from the
+        // handed-off total as it stands BEFORE the submission below.
+        let tail = device.tail.observe();
+        position.publish_consumed(handed_off, tail);
         match input.read_frames(&mut dst) {
             PcmPull::Frames(n) => {
-                consumed.fetch_add(n, Ordering::SeqCst);
+                device.consumed.fetch_add(n, Ordering::SeqCst);
                 reads += 1;
+                // The mock's ReleaseBuffer(n): the device took the block,
+                // so only now does it earn handed-off accounting.
+                device.tail.submit(n as u64);
+                handed_off += n as u64;
                 if let Some(per_read) = pace {
                     std::thread::sleep(per_read);
                 }
