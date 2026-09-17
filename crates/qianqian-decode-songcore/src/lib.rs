@@ -12,6 +12,7 @@ use std::os::raw::c_void;
 use std::path::Path;
 use std::rc::Rc;
 use std::slice;
+use std::time::Duration;
 
 use qianqian_audio_api::ports::{
     DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, PcmDecode, PcmDecodeCapability,
@@ -108,6 +109,21 @@ fn status_open_error(path: &Path, status: u32) -> DecodeOpenError {
     }
 }
 
+/// The container-declared duration as product evidence (ADR-PBK-002
+/// D14.8). The ABI documents `duration_us == -1` as "the container
+/// declares no duration"; every negative value is treated the same way,
+/// fail-closed, so no sentinel can be mistaken for a real length.
+///
+/// A reported `0` is NOT folded into "unknown": it stays a legitimate
+/// zero-length source, which the observation can therefore distinguish
+/// from an absent duration. The value is relayed as mechanism evidence
+/// and never corrected here — not at EOF, and not against the decoded
+/// frame total (the probe measured a truncated stream still declaring
+/// its full original length).
+fn probe_duration(duration_us: i64) -> Option<Duration> {
+    u64::try_from(duration_us).ok().map(Duration::from_micros)
+}
+
 /// One playback-specific decode endpoint: owns one native song handle and
 /// the file it reads from. Released on drop (song_close), single-thread
 /// serialized by contract (`DecodedPcmStream: Send` but not `Sync`).
@@ -116,6 +132,13 @@ fn status_open_error(path: &Path, status: u32) -> DecodeOpenError {
 struct SongcoreDecodeStream {
     handle: *mut sys::song_handle,
     format: PcmFormat,
+    /// Source duration evidence from the same `song_probe` snapshot that
+    /// produced the format: the container's own declaration, `None` when
+    /// it declared none (the ABI's `-1` sentinel). Truth class per
+    /// ADR-PBK-002 D14.8: optional source-scoped Mechanism Evidence —
+    /// never a Fact and not exact in general (a truncated stream still
+    /// declares its original length).
+    duration: Option<Duration>,
     /// Kept alive for the handle's lifetime; the callbacks borrow it raw.
     /// Declared after `handle` so drop runs song_close while the file is
     /// still alive. Never read: its whole job is being alive, then dropped.
@@ -179,6 +202,7 @@ impl SongcoreDecodeStream {
                 channels: info.channels as u16,
                 channel_mask: info.channel_mask,
             },
+            duration: probe_duration(info.duration_us),
             file: unsafe { Box::from_raw(io.userdata as *mut File) },
         }))
     }
@@ -202,6 +226,10 @@ impl SongcoreDecodeStream {
 impl DecodedPcmStream for SongcoreDecodeStream {
     fn format(&self) -> PcmFormat {
         self.format
+    }
+
+    fn source_duration(&self) -> Option<Duration> {
+        self.duration
     }
 
     fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
