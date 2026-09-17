@@ -59,7 +59,7 @@ fn registered_runtime(
             qianqian_composition::ComponentSpec::new("test_decode_plugin")
                 .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
                 .on_activate(move |ctx| {
-                    let service = TestDecode { behavior };
+                    let service = TestDecode::new(behavior);
                     ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
                         std::rc::Rc::new(service),
                     )

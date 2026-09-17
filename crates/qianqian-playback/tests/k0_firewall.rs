@@ -24,7 +24,7 @@ fn kernel_with_session(handle: &PlaybackSessionHandle) -> CompositionKernel {
                 .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
                 .on_activate(move |ctx| {
                     ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
-                        std::rc::Rc::new(TestDecode { behavior }),
+                        std::rc::Rc::new(TestDecode::new(behavior)),
                     )
                     .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
                     Ok(())

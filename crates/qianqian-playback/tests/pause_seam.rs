@@ -25,7 +25,9 @@ use qianqian_playback::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, playback_session_spec,
 };
 
-use common::{OutputBehavior, SourceBehavior, TailProbe, TestDecode, TestOutput, within};
+use common::{
+    DeviceTail, OutputBehavior, Playout, SourceBehavior, TailProbe, TestDecode, TestOutput, within,
+};
 
 const DUMMY_PATH: &str = "test://pause-seam";
 
@@ -60,7 +62,7 @@ fn registered_runtime(
     source: SourceBehavior,
     output: OutputBehavior,
     consumed: Arc<AtomicUsize>,
-    device_tail_padding: Arc<AtomicBool>,
+    device_tail: DeviceTail,
     tail_probe: TailProbe,
     handle: PlaybackSessionHandle,
 ) -> QianqianApp {
@@ -72,7 +74,7 @@ fn registered_runtime(
             qianqian_composition::ComponentSpec::new("test_decode_plugin")
                 .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
                 .on_activate(move |ctx| {
-                    let service = TestDecode { behavior };
+                    let service = TestDecode::new(behavior);
                     ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
                         std::rc::Rc::new(service),
                     )
@@ -90,7 +92,7 @@ fn registered_runtime(
                     let mut service = TestOutput::observed_with_tail(
                         output,
                         consumed.clone(),
-                        device_tail_padding.clone(),
+                        device_tail.clone(),
                     );
                     service.tail_probe = tail_probe.clone();
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
@@ -137,8 +139,9 @@ fn wait_until(limit: Duration, mut predicate: impl FnMut() -> bool) -> bool {
 
 /// The full establishment wait: intent is not enough — the projection
 /// may only go true through engagement AND the current engagement's
-/// tail quiescence (the mock device tail is empty, so quiescence
-/// follows the first bounded park slice).
+/// tail quiescence (the mock device plays its queue out — `Playout::
+/// Everything`, the default — so the first bounded park slice drains
+/// it and quiescence follows).
 fn wait_established(handle: &PlaybackSessionHandle) {
     assert!(
         wait_until(Duration::from_secs(5), || handle.observe().paused()),
@@ -177,13 +180,13 @@ fn pause_establishes_resume_releases_and_cycles_stay_truthful() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let device_tail = DeviceTail::default();
         let handle = PlaybackSessionHandle::new();
         let mut runtime = registered_runtime(
             endless_audio(30),
             OutputBehavior::Consume,
             consumed.clone(),
-            device_tail_padding.clone(),
+            device_tail.clone(),
             TailProbe::default(),
             handle.clone(),
         );
@@ -221,13 +224,15 @@ fn pause_establishes_resume_releases_and_cycles_stay_truthful() {
         );
 
         // Cycle 2 — the stale-quiescence negative oracle: the mock
-        // device still holds queued frames while the leg re-engages.
-        device_tail_padding.store(true, Ordering::SeqCst);
+        // device still holds queued frames while the leg re-engages (its
+        // playout stops, so the frames it already accepted stay queued).
+        device_tail.set_playout(Playout::FramesPerObservation(0));
         handle.request_pause();
         assert_engaged_but_not_paused(&handle);
 
-        // Only the CURRENT engagement's tail quiescence establishes.
-        device_tail_padding.store(false, Ordering::SeqCst);
+        // Only the CURRENT engagement's tail quiescence establishes: the
+        // device plays its queue out again, so the tail drains.
+        device_tail.set_playout(Playout::Everything);
         wait_established(&handle);
 
         handle.request_resume();
@@ -258,13 +263,13 @@ fn stop_from_an_established_pause_settles_stopped_and_late_commands_stay_inert()
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let device_tail = DeviceTail::default();
         let handle = PlaybackSessionHandle::new();
         let mut runtime = registered_runtime(
             seconds_of_audio(30),
             OutputBehavior::Consume,
             consumed,
-            device_tail_padding,
+            device_tail,
             TailProbe::default(),
             handle.clone(),
         );
@@ -313,7 +318,7 @@ fn eof_while_parked_leaves_the_episode_unsettled_until_resumed() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let device_tail = DeviceTail::default();
         let handle = PlaybackSessionHandle::new();
 
         // Record pause intent BEFORE the episode exists: it is applied
@@ -327,7 +332,7 @@ fn eof_while_parked_leaves_the_episode_unsettled_until_resumed() {
             SourceBehavior::EofAfter(64),
             OutputBehavior::Consume,
             consumed.clone(),
-            device_tail_padding,
+            device_tail,
             TailProbe::default(),
             handle.clone(),
         );
@@ -369,7 +374,7 @@ fn stop_from_parked_after_eof_still_completes() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let device_tail = DeviceTail::default();
         let handle = PlaybackSessionHandle::new();
         handle.request_pause();
 
@@ -377,7 +382,7 @@ fn stop_from_parked_after_eof_still_completes() {
             SourceBehavior::EofAfter(64),
             OutputBehavior::Consume,
             consumed,
-            device_tail_padding,
+            device_tail,
             TailProbe::default(),
             handle.clone(),
         );
@@ -402,7 +407,7 @@ fn failure_while_parked_settles_failed_without_wedging_teardown() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let device_tail = DeviceTail::default();
         let handle = PlaybackSessionHandle::new();
         handle.request_pause();
 
@@ -410,7 +415,7 @@ fn failure_while_parked_settles_failed_without_wedging_teardown() {
             SourceBehavior::FailAfter(64),
             OutputBehavior::Consume,
             consumed,
-            device_tail_padding,
+            device_tail,
             TailProbe::default(),
             handle.clone(),
         );
@@ -445,7 +450,7 @@ fn stop_wakes_a_producer_blocked_through_pause_backpressure() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let device_tail = DeviceTail::default();
         let handle = PlaybackSessionHandle::new();
 
         // The consumer is slower than the producer: the bounded edge
@@ -456,7 +461,7 @@ fn stop_wakes_a_producer_blocked_through_pause_backpressure() {
                 per_read: Duration::from_millis(50),
             },
             consumed.clone(),
-            device_tail_padding,
+            device_tail,
             TailProbe::default(),
             handle.clone(),
         );
@@ -500,7 +505,7 @@ fn pause_routed_after_stop_cannot_repark_the_released_episode() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let device_tail = DeviceTail::default();
         let handle = PlaybackSessionHandle::new();
 
         // Stop first, THEN pause: both before activation. Without
@@ -519,7 +524,7 @@ fn pause_routed_after_stop_cannot_repark_the_released_episode() {
             seconds_of_audio(30),
             OutputBehavior::Consume,
             consumed,
-            device_tail_padding,
+            device_tail,
             TailProbe::default(),
             handle.clone(),
         );
@@ -554,14 +559,14 @@ fn pause_routed_after_teardown_release_cannot_wedge_the_join() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let device_tail = DeviceTail::default();
         let tail_probe = TailProbe::default();
         let handle = PlaybackSessionHandle::new();
         let mut runtime = registered_runtime(
             endless_audio(30),
             OutputBehavior::Consume,
             consumed.clone(),
-            device_tail_padding.clone(),
+            device_tail.clone(),
             tail_probe.clone(),
             handle.clone(),
         );
@@ -628,7 +633,7 @@ fn a_never_activated_open_aborted_episode_has_no_resumed_proposition() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
-        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let device_tail = DeviceTail::default();
         let tail_probe = TailProbe::default();
         // Armed from the start: the aborted leg is proven parked through
         // its held (armed) tail observation inside the park loop.
@@ -646,9 +651,7 @@ fn a_never_activated_open_aborted_episode_has_no_resumed_proposition() {
                 qianqian_composition::ComponentSpec::new("test_decode_plugin")
                     .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
                     .on_activate(|ctx| {
-                        let service = TestDecode {
-                            behavior: seconds_of_audio(30),
-                        };
+                        let service = TestDecode::new(seconds_of_audio(30));
                         ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
                             std::rc::Rc::new(service),
                         )
@@ -662,7 +665,7 @@ fn a_never_activated_open_aborted_episode_has_no_resumed_proposition() {
         runtime
             .register_component({
                 let consumed = consumed.clone();
-                let device_tail_padding = device_tail_padding.clone();
+                let device_tail = device_tail.clone();
                 let tail_probe = tail_probe.clone();
                 let open_abort_engaged = open_abort_engaged.clone();
                 qianqian_composition::ComponentSpec::new("test_output_plugin")
@@ -670,7 +673,7 @@ fn a_never_activated_open_aborted_episode_has_no_resumed_proposition() {
                     .on_activate(move |ctx| {
                         let service = TestOutput::open_timeout_abort(
                             consumed.clone(),
-                            device_tail_padding.clone(),
+                            device_tail.clone(),
                             tail_probe.clone(),
                             open_abort_engaged.clone(),
                         );

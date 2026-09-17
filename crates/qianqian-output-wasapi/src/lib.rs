@@ -25,6 +25,12 @@ mod wasapi;
 // the module doc; tested on every platform.
 mod open_abort;
 
+// Source-order oracle for the Windows-only render loop's F4 frame
+// accounting (D14.8): it reads `wasapi.rs` as text, so it runs on every
+// platform even though the mechanism it pins does not.
+#[cfg(test)]
+mod render_order_oracle;
+
 // White-box mechanism test (event-handle lifetime oracle,
 // NATIVE-BOUNDARY-AUDIT-0 A3.3 corrective). It moved inside the crate
 // boundary in the plugin-boundary hardening (H1): the concrete

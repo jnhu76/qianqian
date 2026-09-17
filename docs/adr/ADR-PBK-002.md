@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint; 2026-09-17 — §20 D14.8 implementation note (F4-IMPLEMENTATION-1, PR #152): the chosen representation and the terminal/duration conformance reading are recorded in D14.8 — representation only, no proposition changed; 2026-09-17 — §20 D14.8 F4-IMPLEMENTATION-CORRECTIVE-1 (same PR, fresh review): the position observation gate must also withdraw on a recorded activation failure — a raising activation can leave a published sample behind (the render mechanism opens before the decode-worker spawn; the open-abort leg publishes from its park slice), so "never-activated fabricates no Position" is not satisfied by the terminal-Fact condition alone (conformance, no new state) |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -1640,6 +1640,47 @@ fields/methods, the Decode seam that surfaces the probe duration, and
 the withdrawal spelling are F4-implementation decisions under D14.10;
 they must not create new architecture nouns. `PlaybackSnapshot` and
 global stores remain forbidden.
+
+> 2026-09-17 implementation note (F4-IMPLEMENTATION-1). Representation
+> and conformance only — the propositions above are unchanged, and the
+> choices below are replaceable representation under D14.10. The
+> implementation realized them as: one `PositionEvidence` cell in
+> `qianqian-audio-api::ports` (a session-owned episode resource handed
+> to the render leg through `RenderRequest`, like the D14.7 gate; not a
+> Capability and not a Plugin), storing `position + 1` in one relaxed
+> `AtomicU64` with the zero-initialized value meaning undefined and a
+> saturating encode at the top of its legal domain; the render leg keeps
+> `handed_off` as a plain local and publishes from the padding readings
+> it already takes (steady loop, park slices, drain path), crediting the
+> total only after a successful `ReleaseBuffer`; the observation exposes
+> `position: Option<u64>` (source PCM frames) and
+> `source_duration: Option<Duration>`, both admitted by the episode-
+> handle public-surface allowlist as the explicit implementation event.
+> Conformance reading recorded because it is easy to get backwards:
+> only the position projection is withdrawn at the terminal Fact
+> (`None`, with no cell write and no stored final position), while the
+> duration evidence is source-scoped and stays observable after
+> settlement — exactly the shape the frozen text gives it ("the same
+> shape as `source_format`").
+>
+> 2026-09-17 corrective (F4-IMPLEMENTATION-CORRECTIVE-1, same PR). The
+> observation gate above was initially keyed on the terminal Fact alone;
+> fresh review showed that is not sufficient for the frozen
+> never-activated proposition, and the reachable path is the render
+> mechanism's own open-abort protocol. Activation's last fallible step
+> (the decode-worker spawn) runs after the render stream is open, and an
+> open-aborted leg parks at the D14.7 gate on its way to a failed open —
+> publishing from the park slice it takes there — so an activation that
+> raises can leave a cell holding `Some(0)` for an episode that never
+> played. The gate therefore reads two conditions inside the same lock
+> hold: no committed terminal Fact AND no recorded activation failure.
+> This is a conformance fix under D14.8 ("never-activated / open-aborted
+> episode fabricates no Position"), not a new rule, and it introduces no
+> new state: `activation_failure` already existed as the activation
+> diagnostic. Duration is deliberately unaffected (source-scoped
+> evidence), and the cell still holds whatever the mechanism published —
+> withdrawal stays an observation gate, with no cell write, so a late
+> publication by a dying leg cannot resurrect the projection.
 
 ### D14.9 Volume / Device switch — no generic state invention
 

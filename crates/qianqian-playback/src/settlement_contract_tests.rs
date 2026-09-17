@@ -16,7 +16,9 @@
 //! activation failure, T8 observe purity, T9 wait purity, T10
 //! consumer-free settlement (worker-last + drain-last), T11 late-stop
 //! stability, T12 coherent observation race, T15 teardown leaves no
-//! decisive evidence uncommitted. M4-RUST-A/B and W4-RUST are the
+//! decisive evidence uncommitted, T16 (F4-IMPLEMENTATION-CORRECTIVE-1)
+//! activation failure withdraws a position the render mechanism already
+//! published. M4-RUST-A/B and W4-RUST are the
 //! dynamic decision-boundary witnesses corresponding to the formal
 //! model's M4/W4: the decisive publication paths commit synchronously
 //! (before returning), and a late stop cannot relabel the classification.
@@ -96,7 +98,7 @@ fn live_runtime(
                 .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
                 .on_activate(move |ctx| {
                     ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
-                        std::rc::Rc::new(TestDecode { behavior }),
+                        std::rc::Rc::new(TestDecode::new(behavior)),
                     )
                     .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
                     Ok(())
@@ -949,5 +951,76 @@ fn a_stop_cannot_downgrade_a_decode_failure() {
         Some(SessionOutcome::Failed {
             stage: "decode: test decode failure".to_owned()
         })
+    );
+}
+
+// --- T16: activation failure withdraws a published position ------------------------
+
+/// F4-IMPLEMENTATION-CORRECTIVE-1. Activation's last fallible step (the
+/// decode-worker spawn) runs AFTER the render mechanism is open and
+/// publishing, and the open-abort protocol makes the same state
+/// end-to-end reachable — a leg that parks at the gate publishes from its
+/// park slice on the way to a failed open. So `terminal_outcome == None`,
+/// `activation_error == Some(_)` and a NON-EMPTY position cell really
+/// coexist in the product, and D14.8 forbids deriving a projection from
+/// them.
+///
+/// This pins the gate itself, including the interleaving no end-to-end
+/// test can produce deterministically (a spawn failure on a live,
+/// still-publishing leg) and the no-resurrection rule for a sample that
+/// lands after the failure was recorded. The reachable counterpart is
+/// `activation_failure_withdraws_an_already_published_position` in
+/// `tests/position_seam.rs`.
+#[test]
+fn t16_activation_failure_withdraws_the_projection_without_touching_the_cell() {
+    let completion = SessionCompletion::new();
+    let handle = PlaybackSessionHandle {
+        completion: completion.clone(),
+    };
+    let cell = completion.position_evidence();
+    // The leg published before activation raised — the value the
+    // reachable open-abort form really ends up holding.
+    cell.publish_consumed(0, 0);
+    assert_eq!(cell.published(), Some(0), "precondition: a sample exists");
+    completion.set_source_duration(Duration::from_secs(4));
+
+    completion.activation_failed("decode worker spawn failed: test");
+
+    for _ in 0..8 {
+        let observation = handle.observe();
+        assert_eq!(
+            observation.position, None,
+            "an episode that never played has no position, however many \
+             samples its dying mechanism published: {observation:?}"
+        );
+        assert_eq!(
+            observation.terminal_outcome, None,
+            "the failure stays a diagnostic (D11 activation firewall)"
+        );
+        assert!(observation.activation_error.is_some());
+    }
+    assert_eq!(
+        cell.published(),
+        Some(0),
+        "withdrawal is the observation gate, not a cell write"
+    );
+
+    // A sample published AFTER the failure was recorded — the dying
+    // leg's last iterating slice — must not resurrect the projection.
+    cell.publish_consumed(4096, 0);
+    let observation = handle.observe();
+    assert_eq!(
+        observation.position, None,
+        "a late publication cannot resurrect a withdrawn projection: {observation:?}"
+    );
+    assert_eq!(
+        observation.source_duration,
+        Some(Duration::from_secs(4)),
+        "duration is source-scoped evidence and is not withdrawn"
+    );
+    assert_eq!(
+        completion.committed(),
+        None,
+        "an activation failure never settles anything"
     );
 }

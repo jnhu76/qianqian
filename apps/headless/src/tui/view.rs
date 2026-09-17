@@ -42,6 +42,11 @@ fn main_panel(model: &TuiModel) -> Paragraph<'_> {
         Line::from(""),
         Line::from(format!("Source: {}", model.source())),
         Line::from(format!("Format: {}", model.format_label())),
+        // Read-side presentation only (D14.8): the position Projection
+        // over the source duration evidence. No seek affordance, no
+        // gutter, no interaction — the shell displays what the seam
+        // observed and owns no position of its own.
+        Line::from(format!("Position: {}", model.timeline_label())),
         Line::from(""),
         Line::from(format!("Terminal: {}", model.terminal_label())),
         Line::from(format!(
@@ -92,6 +97,7 @@ mod tests {
     use qianqian_playback::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use std::time::Duration;
 
     fn pending() -> PlaybackSessionObservation {
         PlaybackSessionObservation {
@@ -100,6 +106,8 @@ mod tests {
             stop_requested: false,
             pause_requested: false,
             source_format: None,
+            source_duration: None,
+            position: None,
             pause_engagement: PauseEngagement::Disengaged,
             activation_error: None,
         }
@@ -107,10 +115,10 @@ mod tests {
 
     /// Render the model on a fixed-size virtual terminal and return
     /// the rows as plain text. Tall enough for the fully-established
-    /// panel (source/format/terminal/two command lines/paused/committed
-    /// hint) to stay scannable.
+    /// panel (source/format/position/terminal/two command lines/paused
+    /// and the committed hint) to stay scannable.
     fn rendered(model: &TuiModel) -> String {
-        let mut terminal = Terminal::new(TestBackend::new(60, 18)).expect("virtual terminal");
+        let mut terminal = Terminal::new(TestBackend::new(60, 20)).expect("virtual terminal");
         terminal.draw(|frame| draw(frame, model)).expect("draw");
         let buffer = terminal.backend().buffer().clone();
         (0..buffer.area.height)
@@ -130,6 +138,10 @@ mod tests {
         let text = rendered(&model);
         assert!(text.contains("Source: song.flac"), "{text}");
         assert!(text.contains("Format: pending"), "{text}");
+        assert!(
+            text.contains("Position: --:-- / --:--"),
+            "no timeline evidence yet — and no fabricated zero:\n{text}"
+        );
         assert!(text.contains("Terminal: pending"), "{text}");
         assert!(text.contains("Stop requested: false"), "{text}");
         assert!(text.contains("Paused: false"), "{text}");
@@ -137,6 +149,58 @@ mod tests {
         // (`Paused` is earned since D14.7 and pinned to the frozen
         // establishment conjunction by the model tests).
         assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
+    /// The F4 timeline is read-side output only: the four combinations
+    /// of the two independent evidence sides render as themselves, with
+    /// `--:--` for what does not exist, and the frame adds no seek
+    /// affordance (no gutter, no cursor, no arrow-key hint).
+    #[test]
+    fn the_timeline_line_renders_each_evidential_combination() {
+        for (position, duration, expected) in [
+            (
+                Some(44_100 * 42),
+                Some(Duration::from_secs(238)),
+                "Position: 00:42 / 03:58",
+            ),
+            (Some(44_100 * 42), None, "Position: 00:42 / --:--"),
+            (
+                None,
+                Some(Duration::from_secs(238)),
+                "Position: --:-- / 03:58",
+            ),
+            (None, None, "Position: --:-- / --:--"),
+        ] {
+            let mut model = TuiModel::new("song.flac");
+            model.update(PlaybackSessionObservation {
+                source_format: Some(PcmFormat {
+                    sample_rate: 44100,
+                    channels: 2,
+                    channel_mask: 0x3,
+                }),
+                position,
+                source_duration: duration,
+                ..pending()
+            });
+            let text = rendered(&model);
+            assert!(text.contains(expected), "{expected:?} missing in:\n{text}");
+            assert_eq!(forbidden_status_claim(&text), None, "{text}");
+        }
+    }
+
+    /// The controls panel stays exactly the F3 grammar: no seek key, no
+    /// scrub affordance — F4 is read-side.
+    #[test]
+    fn the_controls_panel_offers_no_seek_affordance() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        let text = rendered(&model);
+        for unearned in ["Seek", "seek", "←", "→", "Left", "Right"] {
+            assert!(
+                !text.contains(unearned),
+                "no seek affordance may appear in F4: {unearned:?} in\n{text}"
+            );
+        }
     }
 
     /// The Paused line follows the seam's derived projection: recorded

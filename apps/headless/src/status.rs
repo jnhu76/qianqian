@@ -7,13 +7,15 @@
 //! logs, no PcmEdge/DrainSignal/RenderGate/worker/WASAPI/SongCore
 //! internals).
 //!
-//! Truth-class discipline (D14.2, D14.7): `pending` states only "no
-//! terminal Fact committed yet" — never Playing/Starting/Stopping;
-//! `stop_requested`/`pause_requested` are Command state; `format` is
-//! mechanism evidence; the `paused` line is the D14.7 establishment
-//! projection derived by the seam itself; `activation_error` is a
-//! diagnostic. The forbidden-vocabulary oracle below pins that
-//! boundary.
+//! Truth-class discipline (D14.2, D14.7, D14.8): `pending` states only
+//! "no terminal Fact committed yet" — never Playing/Starting/Stopping;
+//! `stop_requested`/`pause_requested` are Command state; `format` and
+//! `duration` are mechanism evidence; `position` is the seam's derived
+//! Projection; the `paused` line is the D14.7 establishment projection
+//! derived by the seam itself; `activation_error` is a diagnostic. The
+//! forbidden-vocabulary oracle below pins that boundary.
+
+use std::time::Duration;
 
 use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionObservation};
 
@@ -49,6 +51,12 @@ pub fn format_status(observation: &PlaybackSessionObservation) -> String {
         }
         None => out.push_str("format: unavailable\n"),
     }
+    // The F4 timeline (D14.8) on one line: the position Projection over
+    // the source duration evidence, each side independently absent when
+    // its evidence is — never a fabricated zero.
+    out.push_str("position: ");
+    out.push_str(&format_timeline(observation));
+    out.push('\n');
     out.push_str(&format!("stop_requested: {}\n", observation.stop_requested));
     out.push_str(&format!(
         "pause_requested: {}\n",
@@ -63,6 +71,58 @@ pub fn format_status(observation: &PlaybackSessionObservation) -> String {
         out.push('\n');
     }
     out
+}
+
+/// The F4 timeline projection (D14.8) as one display string:
+/// `00:42 / 03:58`, with `--:--` for a side whose evidence does not
+/// exist.
+///
+/// Presentation only, and deliberately thin:
+///
+/// ```text
+/// left   the Position Projection — source frames divided by the
+///        published source sample rate. Unknown (never guessed) when
+///        either the sample or the format is absent.
+/// right  the source duration Mechanism Evidence as reported. It is NOT
+///        exact and is never adjusted to agree with the left side.
+/// ```
+///
+/// The two sides are independent evidence, so all four combinations are
+/// reachable: a position with no known duration, a duration with no
+/// sample yet, and both absent. Nothing here is a playback semantic, and
+/// nothing here claims the position is audible — it is the
+/// device-consumed presentation location.
+///
+/// The position conversion is `frames / source sample rate`, truncated
+/// to whole seconds (the display never rounds a position up past the
+/// evidence). It yields `--:--` when there is no published sample (the
+/// projection is absent — unknown, not zero), when no source format was
+/// published, or in the structurally impossible zero-rate case, which
+/// fails closed rather than dividing by a guessed rate.
+pub fn format_timeline(observation: &PlaybackSessionObservation) -> String {
+    let position_time = observation
+        .position
+        .zip(observation.source_format.map(|format| format.sample_rate))
+        .and_then(|(frames, sample_rate)| match sample_rate {
+            0 => None,
+            rate => Some(Duration::from_secs(frames / u64::from(rate))),
+        });
+    let position = position_time
+        .map(format_clock)
+        .unwrap_or_else(|| "--:--".to_owned());
+    let duration = observation
+        .source_duration
+        .map(format_clock)
+        .unwrap_or_else(|| "--:--".to_owned());
+    format!("{position} / {duration}")
+}
+
+/// `mm:ss` (minutes not zero-padded beyond two digits, so an hour-long
+/// track reads `63:20` rather than wrapping). Negative values cannot
+/// occur: both inputs are unsigned durations.
+fn format_clock(seconds: Duration) -> String {
+    let seconds = seconds.as_secs();
+    format!("{:02}:{:02}", seconds / 60, seconds % 60)
 }
 
 /// Playback semantics the status projection must never claim (F2

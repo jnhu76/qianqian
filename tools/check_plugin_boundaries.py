@@ -146,6 +146,8 @@ EXPORT_RULES = {
             "pub stop_requested: bool,",
             "pub pause_requested: bool,",
             "pub source_format: Option<PcmFormat>,",
+            "pub source_duration: Option<Duration>,",
+            "pub position: Option<u64>,",
             "pub pause_engagement: PauseEngagement,",
             "pub activation_error: Option<String>,",
             "pub fn new() -> Self {",
@@ -157,13 +159,17 @@ EXPORT_RULES = {
             "pub fn paused(&self) -> bool {",
         ],
         "authority": "ADR-PBK-002 D14.2 + the D14.7 F3 amendment as narrowed by the D14.7 "
-        "AUTHORITY-CORRECTIVE — the App's rights over one episode are exactly "
-        "new/request_stop/request_pause/request_resume/observe/wait_terminal plus the "
-        "admitted observation fields (pause intent is command state; engagement/"
+        "AUTHORITY-CORRECTIVE + the D14.8 F4 amendment — the App's rights over one episode "
+        "are exactly new/request_stop/request_pause/request_resume/observe/wait_terminal "
+        "plus the admitted observation fields (pause intent is command state; engagement/"
         "tail-quiescence are mechanism evidence; paused() is a derived Projection and "
         "never a correctness basis; Resumed was REMOVED as an application-facing "
         "projection — disengagement evidence cannot prove a viable render leg remains — "
-        "so resume is command-only and no disengagement latch is public surface). "
+        "so resume is command-only and no disengagement latch is public surface). F4 adds "
+        "exactly two fields: `position` (the D14.8 Projection — ONE loaded sample in "
+        "source PCM frames, so no handed-off total, no device tail, no raw estimate and no "
+        "second cell may appear on this surface: a reader must not be able to reconstruct "
+        "device state) and `source_duration` (optional source-scoped Mechanism Evidence). "
         "A further new public right must first earn an explicit D14/phase-authority "
         "amendment, then update this allowlist on purpose",
     },
