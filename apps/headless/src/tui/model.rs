@@ -36,6 +36,8 @@ impl TuiModel {
                 stop_requested: false,
                 pause_requested: false,
                 source_format: None,
+                source_duration: None,
+                position: None,
                 pause_engagement: PauseEngagement::Disengaged,
                 activation_error: None,
             },
@@ -84,6 +86,15 @@ impl TuiModel {
             ),
             None => "pending".to_owned(),
         }
+    }
+
+    /// The F4 timeline line (D14.8): `00:42 / 03:58`, with `--:--` for a
+    /// side whose evidence does not exist yet (or is unknown). Rendered
+    /// by the same projection helper the scriptable status text uses, so
+    /// the two read-side surfaces cannot disagree; the model keeps no
+    /// position of its own (no `last_position`, no local playback truth).
+    pub fn timeline_label(&self) -> String {
+        crate::status::format_timeline(&self.observation)
     }
 
     /// Diagnostics worth showing, in stable order. Both are
@@ -176,6 +187,7 @@ pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
 mod tests {
     use super::*;
     use qianqian_audio_api::ports::PcmFormat;
+    use std::time::Duration;
 
     fn pending() -> PlaybackSessionObservation {
         PlaybackSessionObservation {
@@ -184,6 +196,8 @@ mod tests {
             stop_requested: false,
             pause_requested: false,
             source_format: None,
+            source_duration: None,
+            position: None,
             pause_engagement: PauseEngagement::Disengaged,
             activation_error: None,
         }
@@ -221,6 +235,62 @@ mod tests {
             ..pending()
         });
         assert_eq!(model.format_label(), "44100 Hz, 2 channels, mask 0x3");
+    }
+
+    /// The timeline line is the D14.8 projection rendered by the shared
+    /// read-side helper, and the model keeps no position of its own: the
+    /// label is exactly what the current observation says, including
+    /// `--:--` for a side whose evidence is absent.
+    #[test]
+    fn the_timeline_label_follows_the_observation_only() {
+        let mut model = TuiModel::new("song.flac");
+        assert_eq!(
+            model.timeline_label(),
+            "--:-- / --:--",
+            "no evidence yet, and never a fabricated zero"
+        );
+
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            position: Some(44_100 * 42),
+            ..pending()
+        });
+        assert_eq!(
+            model.timeline_label(),
+            "00:42 / --:--",
+            "an unknown duration must not hide a known position"
+        );
+
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            position: Some(44_100 * 42),
+            source_duration: Some(Duration::from_secs(238)),
+            ..pending()
+        });
+        assert_eq!(model.timeline_label(), "00:42 / 03:58");
+
+        // A settled episode (the seam withdraws the position) keeps the
+        // duration evidence and shows no position — no final-position
+        // latch is invented here either.
+        model.update(PlaybackSessionObservation {
+            terminal_outcome: Some(EpisodeTerminalOutcome::Completed),
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            source_duration: Some(Duration::from_secs(238)),
+            ..pending()
+        });
+        assert_eq!(model.timeline_label(), "--:-- / 03:58");
     }
 
     #[test]

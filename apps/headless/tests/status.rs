@@ -1,16 +1,26 @@
 //! F2 status-projection tests: the truthful text rendering of one
 //! episode observation, plus its negative-control oracle (T13).
+//! Extended by F4 with the timeline line (D14.8).
 //!
 //! The oracle proves two directions:
 //!   - every rendered observation is free of unearned playback
 //!     semantics (no playing/starting/stopping/buffering — `paused`
-//!     left the forbidden set when D14.7 earned the projection);
+//!     left the forbidden set when D14.7 earned the projection, and the
+//!     F4 `position:` line is the D14.8 Projection);
 //!   - the scan itself is not vacuous — text that DOES claim a
 //!     forbidden semantic is caught.
 
+use std::time::Duration;
+
 use qianqian_audio_api::ports::PcmFormat;
-use qianqian_headless::status::{forbidden_status_claim, format_status};
+use qianqian_headless::status::{forbidden_status_claim, format_status, format_timeline};
 use qianqian_playback::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
+
+const TEST_FORMAT: PcmFormat = PcmFormat {
+    sample_rate: 44100,
+    channels: 2,
+    channel_mask: 0x3,
+};
 
 fn pending_observation() -> PlaybackSessionObservation {
     PlaybackSessionObservation {
@@ -19,6 +29,8 @@ fn pending_observation() -> PlaybackSessionObservation {
         stop_requested: false,
         pause_requested: false,
         source_format: None,
+        source_duration: None,
+        position: None,
         pause_engagement: PauseEngagement::Disengaged,
         activation_error: None,
     }
@@ -29,8 +41,8 @@ fn a_fresh_episode_projects_pending_without_inventing_state() {
     let text = format_status(&pending_observation());
     assert_eq!(
         text,
-        "outcome: pending\nformat: unavailable\nstop_requested: false\n\
-         pause_requested: false\npaused: false\n"
+        "outcome: pending\nformat: unavailable\nposition: --:-- / --:--\n\
+         stop_requested: false\npause_requested: false\npaused: false\n"
     );
     assert_eq!(forbidden_status_claim(&text), None);
 }
@@ -113,11 +125,9 @@ fn each_terminal_fact_projects_its_own_line() {
             terminal_outcome: Some(outcome),
             stop_requested: false,
             pause_requested: false,
-            source_format: Some(PcmFormat {
-                sample_rate: 44100,
-                channels: 2,
-                channel_mask: 0x3,
-            }),
+            source_format: Some(TEST_FORMAT),
+            source_duration: None,
+            position: None,
             pause_engagement: PauseEngagement::Disengaged,
             activation_error: None,
             failure_diagnostic: None,
@@ -188,6 +198,150 @@ fn an_activation_failure_projects_the_diagnostic_not_a_forged_fact() {
     let text = format_status(&observation);
     assert!(text.contains("outcome: pending\n"), "no terminal Fact yet");
     assert!(text.contains("activation_error: render stream open failed: no device\n"));
+    assert_eq!(forbidden_status_claim(&text), None);
+}
+
+// --- F4: the timeline projection (D14.8) --------------------------------
+
+/// The four combinations of the two independent evidence sides, none of
+/// which may fabricate a zero.
+#[test]
+fn the_timeline_projects_each_side_independently() {
+    // 42 s of 44.1 kHz frames is 1_852_200 frames.
+    let known_position = Some(1_852_200u64);
+    let known_duration = Some(Duration::from_secs(238)); // 03:58
+
+    let both = PlaybackSessionObservation {
+        source_format: Some(TEST_FORMAT),
+        position: known_position,
+        source_duration: known_duration,
+        ..pending_observation()
+    };
+    assert_eq!(format_timeline(&both), "00:42 / 03:58");
+    assert!(
+        format_status(&both).contains("position: 00:42 / 03:58\n"),
+        "{}",
+        format_status(&both)
+    );
+
+    let unknown_duration = PlaybackSessionObservation {
+        source_format: Some(TEST_FORMAT),
+        position: known_position,
+        ..pending_observation()
+    };
+    assert_eq!(format_timeline(&unknown_duration), "00:42 / --:--");
+
+    let unknown_position = PlaybackSessionObservation {
+        source_format: Some(TEST_FORMAT),
+        source_duration: known_duration,
+        ..pending_observation()
+    };
+    assert_eq!(format_timeline(&unknown_position), "--:-- / 03:58");
+
+    let neither = pending_observation();
+    assert_eq!(format_timeline(&neither), "--:-- / --:--");
+}
+
+/// A published position sample with no published source format has no
+/// honest time: the display must not divide by a guessed sample rate.
+#[test]
+fn a_position_without_a_published_format_projects_as_unknown() {
+    let observation = PlaybackSessionObservation {
+        position: Some(44_100),
+        source_duration: Some(Duration::from_secs(1)),
+        ..pending_observation()
+    };
+    assert_eq!(format_timeline(&observation), "--:-- / 00:01");
+}
+
+/// The display never rounds up past the evidence, and it stays a clock
+/// rather than wrapping at an hour.
+#[test]
+fn the_clock_truncates_and_does_not_wrap_at_an_hour() {
+    // One frame short of 43 s.
+    let just_under = PlaybackSessionObservation {
+        source_format: Some(TEST_FORMAT),
+        position: Some(44_100 * 43 - 1),
+        ..pending_observation()
+    };
+    assert_eq!(format_timeline(&just_under), "00:42 / --:--");
+
+    let long = PlaybackSessionObservation {
+        source_format: Some(TEST_FORMAT),
+        position: Some(44_100 * 3_800), // 63:20
+        source_duration: Some(Duration::from_secs(3_800)),
+        ..pending_observation()
+    };
+    assert_eq!(format_timeline(&long), "63:20 / 63:20");
+}
+
+/// A reported duration is evidence, never an exact truth, and never a
+/// promise the position must catch up to: a duration with no position
+/// sample projects exactly that, and the two sides are never reconciled.
+#[test]
+fn the_duration_side_is_independent_evidence() {
+    let observation = PlaybackSessionObservation {
+        source_format: Some(TEST_FORMAT),
+        position: Some(44_100),                          // 00:01 consumed
+        source_duration: Some(Duration::from_secs(240)), // 04:00 declared
+        ..pending_observation()
+    };
+    assert_eq!(format_timeline(&observation), "00:01 / 04:00");
+
+    // A zero-length declaration is evidence too, not "unknown" — and it
+    // stays distinct from the absent case above.
+    let empty = PlaybackSessionObservation {
+        source_format: Some(TEST_FORMAT),
+        position: Some(0),
+        source_duration: Some(Duration::ZERO),
+        ..pending_observation()
+    };
+    assert_eq!(format_timeline(&empty), "00:00 / 00:00");
+}
+
+/// The position sample is frames of the source, so the conversion uses
+/// the published source rate — and a rate of zero can never divide.
+#[test]
+fn the_conversion_uses_the_published_source_rate() {
+    let at_48k = PlaybackSessionObservation {
+        source_format: Some(PcmFormat {
+            sample_rate: 48_000,
+            channels: 2,
+            channel_mask: 0x3,
+        }),
+        position: Some(48_000 * 42),
+        ..pending_observation()
+    };
+    assert_eq!(format_timeline(&at_48k), "00:42 / --:--");
+
+    // Structurally impossible (a format with zero channels/rate cannot
+    // be negotiated), and it fails closed rather than dividing.
+    let zero_rate = PlaybackSessionObservation {
+        source_format: Some(PcmFormat {
+            sample_rate: 0,
+            channels: 2,
+            channel_mask: 0x3,
+        }),
+        position: Some(48_000 * 42),
+        ..pending_observation()
+    };
+    assert_eq!(format_timeline(&zero_rate), "--:-- / --:--");
+}
+
+/// A settled episode withdraws the position projection (the seam does),
+/// while the duration stays observable evidence — the status text must
+/// render exactly that, and must not invent a final position.
+#[test]
+fn a_settled_episode_projects_no_position_but_keeps_the_duration() {
+    let observation = PlaybackSessionObservation {
+        terminal_outcome: Some(EpisodeTerminalOutcome::Completed),
+        source_format: Some(TEST_FORMAT),
+        source_duration: Some(Duration::from_secs(238)),
+        position: None,
+        ..pending_observation()
+    };
+    let text = format_status(&observation);
+    assert!(text.contains("position: --:-- / 03:58\n"), "{text}");
     assert_eq!(forbidden_status_claim(&text), None);
 }
 
