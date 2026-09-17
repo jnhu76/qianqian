@@ -1,0 +1,8 @@
+[mp3float @ 0x5fd4ac0eebc0] Could not update timestamps for skipped samples.
+[mp3float @ 0x5fd4ac0eebc0] Could not update timestamps for discarded samples.
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0x5fd4ac0e9640] Protocol name not provided, cannot determine if input is local or a network protocol, buffers and access patterns cannot be configured optimally without knowing the protocol
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0x5fd4ac0e9640] Protocol name not provided, cannot determine if input is local or a network protocol, buffers and access patterns cannot be configured optimally without knowing the protocol
+[mp3 @ 0x5fd4ac0e9640] filesize and duration do not match (growing file?)
+[mp3float @ 0x5fd4ac0eebc0] Could not update timestamps for skipped samples.
+[flac @ 0x5fd4ac10d680] invalid residual
+[flac @ 0x5fd4ac10d680] decode_frame() failed

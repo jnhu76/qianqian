@@ -13,6 +13,7 @@ exclude = [
     "crates/qianqian-songcore-sys",
     "experiments/songcore-call-comparison",
     "experiments/f3-pause-mechanism",
+    "experiments/f4-timeline-gate",
 ]
 
 [workspace.package]
