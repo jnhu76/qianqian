@@ -6,50 +6,61 @@
 //! frame structs instead of raw f32 samples — the concurrency protocol
 //! under test is identical, and structured frames make the stale-output
 //! oracle exact. On top of it sits the candidate non-terminal
-//! invalidate primitive and the proposed seek-discontinuity protocol:
+//! invalidate primitive and the frozen seek-discontinuity protocol
+//! (D14.5 amendment):
 //!
 //! ```text
 //! session (driver)
-//!     parks the render leg at its loop-top gate (no buffer held)
-//!     edge.invalidate()            -- phase 1: empties the queue and
-//!                                     unblocks a producer blocked on a
-//!                                     full edge; any in-flight block
-//!                                     lands in the emptied ring and
-//!                                     dies in phase 2
-//!     waits for the worker's landing evidence
-//!     commits the cutover; releases the render leg
+//!     records the seek command and parks the render leg at its
+//!         loop-top gate (parked = holds no buffer)
+//!     commits the cutover only after the worker's landing evidence
+//!         AND the leg's park acknowledgment, then releases the leg
 //! worker (producer)
+//!     KEEPS PRODUCING until the leg's parked evidence is visible:
+//!         stopping earlier could strand the leg inside a blocked
+//!         read on an emptied edge (stall). The write path is
+//!         bounded-slice and re-observes the command slot every
+//!         slice, so the worker always reaches its serialization
+//!         point without any destructive pre-purge.
 //!     loop-top serialization point:
-//!         take seek command; discard staging (the freshly decoded,
-//!             not-yet-written pre-cut block dies here);
-//!         edge.invalidate()        -- phase 2: the load-bearing cut.
-//!                                     After this returns, this thread
-//!                                     writes only post-reposition PCM
-//!         publish landing evidence
-//!     produce post-cut frames
+//!         song_seek BEFORE anything is invalidated; a refusal ends
+//!             the cut pre-cut and inert (worst cost: one dead
+//!             staging block; playback continues unchanged)
+//!         success: discard staging (the freshly decoded, not-yet-
+//!             written pre-cut block dies here), then
+//!         edge.invalidate() -- THE one purge, on the worker's own
+//!             path. After this returns, this thread writes only
+//!             post-reposition PCM
+//!         publish landing evidence; hold production until the
+//!             session releases (the hold begins only after the leg
+//!             is parked, so no reader is stranded)
 //! render leg (consumer)
-//!     loop-top park (internal seek quiescence), then pull
+//!     loop-top park (internal seek quiescence, cut-attributed),
+//!     then pull
 //! ```
 //!
 //! Oracles:
 //!
 //! ```text
 //! STALE-OUTPUT   a frame tagged pre-cut may never be handed out to a
-//!                consumer that observed the commit barrier before its
-//!                read began. Frames consumed BEFORE the commit are
-//!                legal old output (the frozen invariant permits them).
-//! NO-SURVIVOR    after the worker's phase-2 invalidate, the edge
-//!                reports zero buffered frames at the commit.
-//! NO-DEADLOCK    every run — including a producer blocked writing on a
-//!                full edge when the cut begins — terminates.
+//!                consumer that observed the commit barrier before
+//!                its read began. Frames consumed BEFORE the commit
+//!                are legal old output (the frozen invariant permits
+//!                them). The harness snapshots before reading, which
+//!                is the lenient direction; the commit gate on the
+//!                park acknowledgment closes the remaining gap.
+//! NO-SURVIVOR    diagnostic only: after the worker's invalidate the
+//!                edge reports zero buffered frames at the commit.
+//! NO-DEADLOCK    every run — including a producer blocked writing on
+//!                a full edge when the cut begins — terminates.
 //! ```
 //!
-//! Negative control: a producer that reaches its serialization point
-//! but SKIPS the staging discard (writes its freshly decoded pre-cut
-//! block after the phase-2 invalidate) MUST trip STALE-OUTPUT. The
-//! invalidate primitive alone is not safe; the serialization-point
-//! discipline — staging discard on the worker's own path — is what
-//! excludes stale PCM.
+//! Negative control: a worker that takes the command but SKIPS the
+//! staging discard and re-writes its stale block only AFTER the
+//! commit MUST trip STALE-OUTPUT. The invalidate primitive alone is
+//! not safe; the serialization-point discipline — staging discard on
+//! the worker's own path, song_seek before invalidation, and the
+//! park-acknowledged commit — is what excludes stale PCM.
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -139,6 +150,32 @@ impl Edge {
         }
     }
 
+    /// Non-blocking helper for the harness's bounded-slice write
+    /// (the ADR's frozen representation example: the worker's write
+    /// wait observes the command slot, so it can always reach its
+    /// serialization point regardless of edge occupancy — no
+    /// destructive pre-purge). Writes what fits; returns the count.
+    fn write_some(&self, src: &[Frame]) -> usize {
+        let mut guard = self.state.lock().expect("edge lock");
+        if guard.terminal != TERMINAL_OPEN {
+            return 0;
+        }
+        let free = self.capacity - guard.buffered;
+        let take = free.min(src.len());
+        if take == 0 {
+            return 0;
+        }
+        let write_pos = guard.write_pos;
+        for i in 0..take {
+            guard.ring[(write_pos + i) % self.capacity] = src[i];
+        }
+        guard.write_pos = (guard.write_pos + take) % self.capacity;
+        guard.buffered += take;
+        drop(guard);
+        self.data_ready.notify_all();
+        take
+    }
+
     /// Consumer side (production `read_frames` shape).
     fn read(&self, dst: &mut [Frame]) -> Pull {
         let mut guard = self.state.lock().expect("edge lock");
@@ -169,10 +206,11 @@ impl Edge {
     /// touching the terminal (flush ≠ terminal; the edge stays Open,
     /// first-wins terminal semantics untouched). Correctness contract:
     /// the caller must have proven no endpoint can still deliver stale
-    /// data across the reset — in the protocol that is the session at
-    /// phase 1 (safe because the consumer is parked out of read) and
-    /// the worker itself at its serialization point (phase 2, safe
-    /// because the caller is the only writer, on its own path).
+    /// data across the reset — in the frozen protocol that is the
+    /// worker itself, exactly once, at its serialization point after a
+    /// successful song_seek: the render leg is parked out of read
+    /// (the commit is gated on the park acknowledgment) and the worker
+    /// is the only writer, on its own path.
     fn invalidate(&self) {
         {
             let mut guard = self.state.lock().expect("edge lock");
@@ -209,7 +247,15 @@ impl Edge {
     }
 }
 
-// --- protocol harness ----------------------------------------------------
+// --- protocol harness (F5-GATE frozen protocol, D14.5 amendment) --------
+//
+// Order under test: session records the command and parks the render
+// leg; the worker reaches its serialization point REGARDLESS of edge
+// occupancy (bounded-slice write observing the command slot — no
+// destructive pre-purge), calls song_seek BEFORE anything is
+// invalidated, and only on success purges the edge itself, publishes
+// landing and holds production until release. A refusal invalidates
+// nothing: playback continues from the pre-command content.
 
 const BLOCK_FRAMES: usize = 64;
 const EDGE_FRAMES: usize = 512;
@@ -218,21 +264,34 @@ const RUN_CAP: Duration = Duration::from_secs(10);
 struct Shared {
     edge: Edge,
     /// Worker command slot, taken at the worker's loop-top serialization
-    /// point. `Some(encoded)` while a seek is pending pickup; the
-    /// landing is stored `landing + 1` so a legitimate landing of 0
-    /// stays distinguishable from "not yet published".
+    /// point. `Some(landing)` while a seek is pending pickup.
     command: Mutex<Option<u64>>,
     wake_worker: Condvar,
-    /// Render-leg park flag (internal seek quiescence). Truth-class
-    /// separation from any pause state is structural here: nothing in
-    /// this harness shares state with a pause concept.
+    /// Render-leg park flag (internal seek quiescence; cut-attributed —
+    /// structurally separate from any pause concept in this harness).
     hold: Mutex<bool>,
     hold_cv: Condvar,
     /// Cutover commit barrier (session-owned protocol state).
     committed: AtomicBool,
+    /// Consumer's park acknowledgment: the leg reached its loop-top gate
+    /// and is parked. The frozen protocol gates the commit on this
+    /// evidence (the render leg must be out of read and hold no buffer
+    /// at the commit); without it the commit races an in-flight read.
+    parked_ack: AtomicBool,
     /// Worker's landing evidence (landing + 1 encoding), published
-    /// strictly after its phase-2 invalidate.
+    /// strictly after its own purge.
     landing: AtomicU64,
+    /// Seek-refused evidence (song_seek rejection): nothing was
+    /// invalidated; playback continues from the pre-command content.
+    seek_failed: AtomicBool,
+    /// Worker-side note: the command has been picked up at the loop top
+    /// and the seek awaits the render leg's parked evidence. Production
+    /// CONTINUES while this is set (that is what lets the leg reach its
+    /// gate promptly).
+    seek_pending: AtomicBool,
+    /// Release with basis (commit route): the worker holds production
+    /// between landing and this flag.
+    released: AtomicBool,
     worker_done: Mutex<bool>,
     worker_cv: Condvar,
     /// Consumer output record: (committed-at-read-start, epoch, pos).
@@ -250,13 +309,17 @@ struct Scenario {
     pre_frames: usize,
     landing: u64,
     post_frames: usize,
-    /// Park the consumer first, then let the producer fill the edge to
-    /// capacity and block inside write() before the cut begins (T4/T5
-    /// shape).
+    /// Park the consumer first, then let the producer fill the edge and
+    /// block inside its bounded-slice write before the command is
+    /// planted (T4/T5 shape: the worker must still reach its
+    /// serialization point without any pre-purge).
     blocked_producer: bool,
-    /// Negative control: the worker takes the command and performs the
-    /// phase-2 invalidate, but SKIPS the staging discard — its freshly
-    /// decoded pre-cut block is written after the cut.
+    /// song_seek refuses (SEEK_* error): the protocol must stay inert —
+    /// no purge, no landing, no commit — and playback continues.
+    seek_refused: bool,
+    /// Negative control: the worker takes the command but SKIPS the
+    /// staging discard — its in-flight pre-cut block is written after
+    /// the purge.
     rogue_staging: bool,
 }
 
@@ -269,24 +332,30 @@ impl Default for Scenario {
             landing: 100,
             post_frames: 600,
             blocked_producer: false,
+            seek_refused: false,
             rogue_staging: false,
         }
     }
 }
 
-#[derive(Debug)]
 enum Outcome {
-    /// No stale frame after the commit barrier.
+    /// No stale frame after the commit barrier; protocol invariants held.
     Clean {
         consumed_post_commit: usize,
         buffered_at_commit_observation: usize,
     },
     /// At least one stale frame after the commit barrier (witnesses).
     Stale { witnesses: Vec<(u64, u64)> },
+    /// Refusal path: protocol stayed inert (no purge, no landing, no
+    /// commit) and old production continued to EOF.
+    Refused { frames_consumed: usize },
 }
 
 fn park_at_gate(shared: &Shared) {
     let mut parked = shared.hold.lock().expect("hold lock");
+    if *parked {
+        shared.parked_ack.store(true, Ordering::Release);
+    }
     while *parked && !shared.stop.load(Ordering::Acquire) {
         let (p, _) = shared
             .hold_cv
@@ -294,6 +363,7 @@ fn park_at_gate(shared: &Shared) {
             .expect("hold wait");
         parked = p;
     }
+    shared.parked_ack.store(false, Ordering::Release);
 }
 
 fn xorshift(state: &mut u64) -> u64 {
@@ -311,7 +381,11 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
         hold: Mutex::new(false),
         hold_cv: Condvar::new(),
         committed: AtomicBool::new(false),
+        parked_ack: AtomicBool::new(false),
         landing: AtomicU64::new(0),
+        seek_failed: AtomicBool::new(false),
+        seek_pending: AtomicBool::new(false),
+        released: AtomicBool::new(false),
         worker_done: Mutex::new(false),
         worker_cv: Condvar::new(),
         output: Mutex::new(Vec::new()),
@@ -329,49 +403,90 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
             let mut epoch: u64 = 0;
             let mut produced_pre = 0usize;
             let mut produced_post = 0usize;
+            // The picked-up command: the seek runs once the leg's parked
+            // evidence arrives.
+            let mut pending_landing: Option<u64> = None;
             // The most recent pre-cut block: the staging a rogue worker
             // fails to discard.
             let mut last_staging: Vec<Frame> = Vec::new();
             loop {
                 // --- loop-top serialization point ---
-                let picked = shared.command.lock().expect("cmd lock").take();
-                if let Some(landing) = picked {
-                    if !(sc.rogue_staging && !last_staging.is_empty()) {
-                        // Honest: staging discard. The freshly decoded,
-                        // not-yet-written pre-cut block dies here.
-                        last_staging.clear();
-                    } else if sc.rogue_staging {
-                        // The captured old block was already written
-                        // before the loop top; a rogue keeps it alive —
-                        // it re-writes it right after the cut below.
-                    }
-                    shared.edge.invalidate();
-                    shared.landing.store(landing + 1, Ordering::Release);
-                    epoch = 1;
-                    src_pos = landing;
-                    if sc.rogue_staging && !last_staging.is_empty() {
-                        // NEGATIVE CONTROL: the stale staging block is
-                        // published into the freshly cut edge.
-                        let _ = shared.edge.write(&last_staging);
-                        last_staging.clear();
+                if let Some(landing) = shared.command.lock().expect("cmd lock").take() {
+                    // Note the pickup; the seek itself waits for the
+                    // render leg's parked evidence. Production CONTINUES
+                    // meanwhile (that is what lets the leg reach its
+                    // loop-top gate promptly — stopping production here
+                    // could strand a leg inside a blocked read on an
+                    // empty edge and stall the protocol).
+                    pending_landing = Some(landing);
+                    shared.seek_pending.store(true, Ordering::Release);
+                }
+                let do_seek = pending_landing.is_some()
+                    && shared.parked_ack.load(Ordering::Acquire);
+                if do_seek {
+                    shared.seek_pending.store(false, Ordering::Release);
+                }
+                if let Some(landing) = if do_seek { pending_landing.take() } else { None } {
+                    // song_seek happens HERE, before anything is
+                    // invalidated (frozen order), and strictly after the
+                    // leg's parked evidence.
+                    if sc.seek_refused {
+                        // Refusal: no invalidation at all; production
+                        // continues from the current cursor; the command
+                        // is consumed. (The driver releases the leg.)
+                        shared.seek_failed.store(true, Ordering::Release);
+                    } else {
+                        // Success: staging discard, then the worker's own
+                        // purge — the load-bearing cut — then landing,
+                        // then hold production until release.
+                        if sc.rogue_staging && !last_staging.is_empty() {
+                            // NEGATIVE CONTROL: the rogue does not
+                            // discard; it re-writes the in-flight block
+                            // after the purge (below).
+                        } else {
+                            last_staging.clear();
+                        }
+                        shared.edge.invalidate();
+                        shared.landing.store(landing + 1, Ordering::Release);
+                        if sc.rogue_staging && !last_staging.is_empty() {
+                            // NEGATIVE CONTROL, part 2: hold the stale
+                            // block until AFTER the commit, then write it.
+                            // A stale block racing into the pre-commit
+                            // window proves nothing — pre-commit output is
+                            // legal (the consumer may legitimately have up
+                            // to one in-flight read) — so the control must
+                            // exercise the post-commit violation shape the
+                            // oracle exists for.
+                            while !shared.committed.load(Ordering::Acquire)
+                                && !shared.stop.load(Ordering::Acquire)
+                            {
+                                std::thread::sleep(Duration::from_micros(50));
+                            }
+                            let _ = shared.edge.write(&last_staging);
+                            last_staging.clear();
+                        }
+                        // Production hold: bounded wait, terminal-aware.
+                        let mut hold = shared.released.load(Ordering::Acquire);
+                        while !hold && !shared.stop.load(Ordering::Acquire) {
+                            std::thread::sleep(Duration::from_micros(100));
+                            hold = shared.released.load(Ordering::Acquire);
+                        }
+                        epoch = 1;
+                        src_pos = landing;
                     }
                 }
-                // EOF belongs to the current epoch's decode budget: a
-                // cut that lands mid-production freezes the pre-cut
-                // budget below its planned total, and the decoder's EOF
-                // after the reposition is what ends production — the
-                // same shape as a real seek near EOF.
+                // EOF belongs to the current epoch's decode budget: a cut
+                // freezes the pre-cut budget below its planned total, and
+                // the decoder's EOF after the reposition is what ends
+                // production — the same shape as a real seek near EOF.
                 if epoch == 1 && produced_post >= sc.post_frames {
                     shared.edge.close_eof();
                     break;
                 }
-                if epoch == 0 && produced_pre >= sc.pre_frames {
+                let seeking = pending_landing.is_some();
+                if epoch == 0 && produced_pre >= sc.pre_frames && !seeking && !sc.seek_refused {
                     // Honest worker waiting for the command at its loop
-                    // top. (The real worker would keep producing old PCM
-                    // until the command arrives; holding here keeps the
-                    // scenario deterministic without weakening what the
-                    // oracles see — the edge still holds the pre-cut
-                    // queue the cut must purge.)
+                    // top (pre-cut budget exhausted, no command yet).
                     let mut cmd = shared.command.lock().expect("cmd lock");
                     while cmd.is_none() && !shared.stop.load(Ordering::Acquire) {
                         let (c, _) = shared
@@ -383,11 +498,25 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                     drop(cmd);
                     continue;
                 }
-                let n = BLOCK_FRAMES.min(if epoch == 0 {
-                    sc.pre_frames - produced_pre
+                if epoch == 0 && sc.seek_refused && produced_pre >= sc.pre_frames {
+                    // A refused seek consumed the command: production
+                    // simply continues (the decoder never moved).
+                    shared.edge.close_eof();
+                    break;
+                }
+                let n = if epoch == 0 {
+                    // While a pickup awaits the parked evidence, the old
+                    // budget is a floor: production keeps flowing (that is
+                    // the point) and the purge later drops whatever
+                    // accumulated.
+                    if seeking {
+                        BLOCK_FRAMES
+                    } else {
+                        BLOCK_FRAMES.min(sc.pre_frames - produced_pre)
+                    }
                 } else {
-                    sc.post_frames - produced_post
-                });
+                    BLOCK_FRAMES.min(sc.post_frames - produced_post)
+                };
                 let block: Vec<Frame> = (0..n)
                     .map(|i| Frame { epoch, pos: src_pos + i as u64 })
                     .collect();
@@ -399,7 +528,39 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                 } else {
                     produced_post += n;
                 }
-                if !shared.edge.write(&block) {
+                // Bounded-slice write observing the command slot (the
+                // frozen representation example): the worker can always
+                // reach its serialization point regardless of edge
+                // occupancy, with no destructive pre-purge.
+                let mut off = 0usize;
+                let mut abandoned = false;
+                loop {
+                    if off == block.len() {
+                        break;
+                    }
+                    if shared
+                        .command
+                        .lock()
+                        .expect("cmd lock")
+                        .is_some()
+                        && shared.parked_ack.load(Ordering::Acquire)
+                    {
+                        // The seek can proceed now (leg parked): abandon
+                        // the in-flight staging block — at most one
+                        // staging buffer, the only content a seek can ever
+                        // cost (and only when the decoder refuses; on
+                        // success this block dies in the purge anyway).
+                        abandoned = true;
+                        break;
+                    }
+                    let wrote = shared.edge.write_some(&block[off..]);
+                    off += wrote;
+                    if wrote == 0 {
+                        std::thread::sleep(Duration::from_micros(100));
+                    }
+                }
+                let _ = abandoned;
+                if shared.stop.load(Ordering::Acquire) {
                     break;
                 }
                 let _ = xorshift(&mut rng);
@@ -421,8 +582,13 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                 if shared.stop.load(Ordering::Acquire) {
                     break;
                 }
-                // Barrier snapshot BEFORE the read (conservative: a flip
-                // mid-read counts the frame as post-commit).
+                // Snapshot BEFORE the read. The read is attributed with
+                // the barrier state as of its start, so a commit that
+                // lands mid-read classifies that read as PRE-commit —
+                // the lenient direction for the stale oracle. The gap is
+                // closed by scenario construction: the commit only fires
+                // while the consumer is parked (no read in flight at
+                // commit), which is itself a frozen protocol invariant.
                 let committed = shared.committed.load(Ordering::Acquire);
                 match shared.edge.read(&mut dst) {
                     Pull::Frames(n) => {
@@ -435,13 +601,11 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
         })
     };
 
-    // Driver (session double). Fresh deadline per phase: a phase that
-    // burns its budget must fail THAT phase, not silently poison every
-    // later wait with an already-expired deadline.
+    // Driver (session double). Fresh deadline per phase.
     let phase_deadline = || Instant::now() + RUN_CAP;
     if sc.blocked_producer {
         // Park first, then let the producer fill the edge and block in
-        // write() — the T4/T5 starting state.
+        // its bounded-slice write — the T4/T5 starting state.
         *shared.hold.lock().expect("hold lock") = true;
         let mut full_observations = 0u32;
         let dl = phase_deadline();
@@ -457,12 +621,8 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
             return Err("could not establish a blocked producer".into());
         }
     } else {
-        // Let the pre-cut region flow to at least half the pre-cut
-        // budget (progress-based, not occupancy-based: a fast consumer
-        // keeps occupancy near zero while the flow is perfectly healthy),
-        // then park the consumer and let the producer exhaust its
-        // pre-cut budget — the edge then holds the stale queue tail (or
-        // the producer is blocked writing it), the state the cut purges.
+        // Progress-based pre-flow (occupancy-based waits flake: a fast
+        // consumer keeps the queue near zero while the flow is healthy).
         let dl = phase_deadline();
         let half = sc.pre_frames / 2;
         while shared.produced_pre.load(Ordering::Acquire) < half as u64 {
@@ -471,39 +631,85 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
             }
             std::thread::sleep(Duration::from_micros(50));
         }
-        *shared.hold.lock().expect("hold lock") = true;
-        let dl = phase_deadline();
-        while shared.produced_pre.load(Ordering::Acquire) < sc.pre_frames as u64 {
-            if Instant::now() > dl {
-                return Err("producer never exhausted its pre-cut budget".into());
-            }
-            std::thread::sleep(Duration::from_micros(50));
-        }
     }
     // Plant the seek command…
     *shared.command.lock().expect("cmd lock") = Some(sc.landing);
     shared.wake_worker.notify_all();
-    // …phase 1: session-side invalidate (also the blocked-writer wake).
-    shared.edge.invalidate();
-    // …wait for the landing evidence (strictly after phase 2)…
+    // …and park the render leg (cut-attributed internal quiescence).
+    *shared.hold.lock().expect("hold lock") = true;
+
+    // Wait for the landing evidence or the refusal.
     let dl = phase_deadline();
-    while shared.landing.load(Ordering::Acquire) == 0 {
+    loop {
+        if shared.seek_failed.load(Ordering::Acquire) {
+            break;
+        }
+        if shared.landing.load(Ordering::Acquire) != 0 {
+            break;
+        }
         if Instant::now() > dl {
-            return Err("worker never published the landing".into());
+            return Err("worker never published landing or refusal".into());
         }
         std::thread::sleep(Duration::from_micros(50));
     }
-    // Diagnostic only (record, never a verdict): frames may legitimately
-    // already be queued here — the worker starts post-cut production
-    // right after publishing the landing, so a non-zero count says
-    // nothing about staleness. The staleness verdict is the STALE-OUTPUT
-    // oracle below, which sees every frame the consumer is handed.
+
+    if sc.seek_refused {
+        // Refusal path: nothing may have been invalidated and nothing
+        // may commit. Release the leg; playback continues from the
+        // pre-command content to natural EOF.
+        if shared.landing.load(Ordering::Acquire) != 0 {
+            return Err("refused seek produced a landing".into());
+        }
+        *shared.hold.lock().expect("hold lock") = false;
+        shared.hold_cv.notify_all();
+        let dl = phase_deadline();
+        {
+            let mut done = shared.worker_done.lock().expect("done lock");
+            while !*done {
+                let (d, _) = shared
+                    .worker_cv
+                    .wait_timeout(done, Duration::from_millis(5))
+                    .expect("done wait");
+                done = d;
+                if Instant::now() > dl {
+                    return Err("worker never finished after refusal".into());
+                }
+            }
+        }
+        shared.edge.stop();
+        let _ = consumer.join();
+        let _ = producer.join();
+        if shared.committed.load(Ordering::Acquire) {
+            return Err("refused seek committed a cutover".into());
+        }
+        let out = shared.output.lock().expect("out lock");
+        let post_commit = out.iter().filter(|&&(c, _, _)| c).count();
+        if post_commit != 0 {
+            return Err("refused seek produced post-commit output".into());
+        }
+        return Ok(Outcome::Refused { frames_consumed: out.len() });
+    }
+
+    // The frozen commit precondition includes the leg actually being
+    // parked (engagement evidence) — wait for the acknowledgment, or the
+    // commit races an in-flight read and the oracle misclassifies it.
+    let dl = phase_deadline();
+    while !shared.parked_ack.load(Ordering::Acquire) {
+        if Instant::now() > dl {
+            return Err("consumer never reached the park (no engagement evidence)".into());
+        }
+        std::thread::sleep(Duration::from_micros(50));
+    }
+    // Diagnostic only (record, never a verdict): frames may
+    // legitimately already be queued — staleness is decided by the
+    // STALE-OUTPUT oracle below.
     let buffered_at_commit_observation = shared.edge.buffered();
-    // …commit, then release the consumer.
+    // Commit, then release with the basis (worker resumes production).
     shared.committed.store(true, Ordering::Release);
+    shared.released.store(true, Ordering::Release);
     *shared.hold.lock().expect("hold lock") = false;
     shared.hold_cv.notify_all();
-    // …EOF ends every run (the rogue finishes its post-cut budget too).
+    // EOF ends every run (the rogue finishes its post-cut budget too).
     {
         let dl = phase_deadline();
         let mut done = shared.worker_done.lock().expect("done lock");
@@ -575,6 +781,12 @@ fn main() {
             ..Default::default()
         },
         Scenario {
+            label: "seek-refused-inert",
+            seed: 17,
+            seek_refused: true,
+            ..Default::default()
+        },
+        Scenario {
             label: "negative-control-rogue-staging",
             seed: 13,
             rogue_staging: true,
@@ -606,23 +818,23 @@ fn main() {
 
     let mut rogue_runs = 0usize;
     let mut rogue_fired = 0usize;
+    let only_seed: Option<u64> = std::env::var("F5EDGE_SEED").ok().and_then(|v| v.parse().ok());
     for sc in &scenarios {
+        if let Some(sd) = only_seed { if sc.seed != sd { continue; } }
         let is_rogue = sc.rogue_staging;
-        let result = run_scenario(sc);
-        match result {
+        match run_scenario(sc) {
             Ok(Outcome::Clean {
                 consumed_post_commit,
                 buffered_at_commit_observation,
             }) => {
                 if is_rogue {
                     println!(
-                        "F5EDGE {} seed={} UNEXPECTED_CLEAN post_commit_frames={consumed_post_commit} \
-                         (negative control did not fire)",
+                        "F5EDGE {} seed={} UNEXPECTED_CLEAN post_commit_frames={consumed_post_commit} buffered_at_commit={buffered_at_commit_observation} (negative control did not fire)",
                         sc.label, sc.seed
                     );
                     failures += 1;
                 }
-                let _ = buffered_at_commit_observation;
+                let _ = (consumed_post_commit, buffered_at_commit_observation);
             }
             Ok(Outcome::Stale { witnesses }) => {
                 if is_rogue {
@@ -637,6 +849,11 @@ fn main() {
                     );
                     failures += 1;
                 }
+            }
+            Ok(Outcome::Refused { frames_consumed }) => {
+                // The refusal path is its own assertion set inside the
+                // run (inert: no purge, no landing, no commit).
+                let _ = frames_consumed;
             }
             Err(e) => {
                 println!("F5EDGE {} seed={} RUN_FAILURE {e}", sc.label, sc.seed);

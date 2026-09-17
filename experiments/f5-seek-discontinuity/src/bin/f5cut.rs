@@ -79,6 +79,11 @@ struct DeviceSession {
     client: IAudioClient,
     event: EventHandle,
     buffer_frames: u32,
+    /// Device-position units per second at this endpoint (IAudioClock
+    /// GetFrequency). The unit is endpoint-specific (f4probe measured a
+    /// byte-class unit on one endpoint); all position comparisons below
+    /// convert through it and never mix units with frame counts.
+    clock_freq: u64,
 }
 
 impl Drop for DeviceSession {
@@ -162,11 +167,15 @@ fn open_session() -> Result<DeviceSession, String> {
         let render: IAudioRenderClient = client
             .GetService()
             .map_err(|e| format!("render client acquire failed: {e}"))?;
+        let clock: Option<IAudioClock> = client.GetService().ok();
+        let clock_freq = clock.as_ref().and_then(|c| c.GetFrequency().ok()).unwrap_or(0);
+        println!("F5CUT OPEN clock_freq={clock_freq} (0 = unavailable)");
         Ok(DeviceSession {
             render,
             client,
             event,
             buffer_frames,
+            clock_freq,
         })
     }
 }
@@ -309,14 +318,33 @@ fn experiment_a() -> Result<(), String> {
     let pos_engage = pos_at_engage.map(|p| p.0).unwrap_or(0);
     let pos_quiesced = pos_at_quiesced.map(|p| p.0).unwrap_or(0);
     let pos_after = pos_after_refill.map(|p| p.0).unwrap_or(0);
-    let pos_advanced_through_tail = pos_quiesced >= pos_engage + u64::from(padding_at_engage);
     let pos_advanced_after_cut = pos_after > pos_quiesced;
-    println!("F5CUT A VERDICT drain_ms={drain_ms:.1} padding_at_engage={padding_at_engage} pos_advanced_through_tail={pos_advanced_through_tail} pos_advanced_after_cut={pos_advanced_after_cut}");
+    // Convert the queued-frame count into device-position units through
+    // the endpoint's own frequency (the unit is endpoint-specific —
+    // comparing raw device units against frame counts was a probe bug in
+    // the superseded run 1). 50% tolerance for clock granularity: the
+    // claim is "the device consumed the tail", not a latency measurement.
+    let tail_in_units = if s.clock_freq > 0 {
+        u64::from(padding_at_engage) * s.clock_freq / u64::from(SAMPLE_RATE)
+    } else {
+        0
+    };
+    let advanced_units = pos_quiesced.saturating_sub(pos_engage);
+    let pos_advanced_through_tail = if tail_in_units > 0 {
+        advanced_units * 2 >= tail_in_units
+    } else {
+        true
+    };
+    println!(
+        "F5CUT A VERDICT drain_ms={drain_ms:.1} padding_at_engage={padding_at_engage} advanced_units={advanced_units} tail_in_units={tail_in_units} pos_advanced_through_tail={pos_advanced_through_tail} pos_advanced_after_cut={pos_advanced_after_cut}"
+    );
     if !pos_advanced_after_cut {
         return Err("device position did not advance after the cut".into());
     }
     if !pos_advanced_through_tail {
-        println!("F5CUT A NOTE position advance through tail smaller than engage padding (clock granularity observation, not a failure)");
+        return Err(format!(
+            "device position advanced {advanced_units} units but the queued tail was ~{tail_in_units} units — the tail was not consumed"
+        ));
     }
     println!("F5CUT A END ok");
     Ok(())

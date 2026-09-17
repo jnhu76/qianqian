@@ -17,6 +17,13 @@ ADR-PBK-002 §14 lists the open decision this gate closes:
 "seek physical-output cutover mechanism beyond D14's frozen stale-PCM
 invariant".
 
+The gate task (work charter "QIANQIAN-F5-SEEK-DISCONTINUITY-GATE-1")
+demanded, among the deliverables recorded here: the stale-PCM location
+map (§3), the decision table (§19), the abstraction-razor review
+(§15), the adversarial execution reasoning (§21–§22 of this report),
+the minimal formal model (§17), and the STOP before implementation
+(§14/§18). Charter section references below are to that task document.
+
 ---
 
 ## 1. Authority read (what was already frozen before this gate)
@@ -41,12 +48,13 @@ invariant".
   internal mechanism parks must not become user Paused.
 - **D11** owns terminal settlement; late-command stability (a command
   after decisive evidence cannot relabel the outcome). §17 still-OPEN
-  includes "seek product-state vocabulary / actual-landing authority
-  beyond D14 minimum" — partially addressed by this gate (§9 below).
+  included "seek product-state vocabulary / actual-landing authority
+  beyond D14 minimum" — addressed by this gate (§8); the ADR records
+  the closure.
 - **PBK-001 §6 P1–P5**: triggered only by live old/new RT resource
   overlap. Issue #119 REV.3 already records the verdict direction:
-  same-resource protocol defaults to NO P1–P5; only option B/C (resource
-  replacement) would enter it.
+  same-resource protocol defaults to NO P1–P5; only resource
+  replacement would enter it.
 - **SongCore ABI v1** (header contract): `song_seek(handle,
   requested_position_us, out_actual_position_us)` — clamps against known
   duration, flushes decoder state, next read belongs to the landing,
@@ -62,7 +70,9 @@ invariant".
 > into WASAPI padding.
 
 Before commit, old output is legal (the device finishing the old tail is
-not a violation). After commit it must be impossible, not unlikely.
+not a violation). After commit it must be impossible, not unlikely —
+with the same device-consumed boundary D14.7/D14.8 freeze: the claim
+covers this stream's queued-to-play set, never the acoustic instant.
 
 ## 3. Production inventory and stale-PCM map (current reality at BASE)
 
@@ -79,11 +89,11 @@ Stale-PCM reservoir map (measured/inventory result):
 
 | Stage | Can contain pre-seek PCM? | Owner | Can invalidate? | Cost | RT impact |
 |---|---|---|---|---|---|
-| decoder internal (native packets/codec state) | YES until `song_seek` (which flushes per ABI) | Decode provider (SongCore) | `song_seek` only path | 12–307 µs measured (E1) | off-RT (worker thread) |
-| decode worker staging (1024 frames) | YES — freshly decoded, not yet written | worker local | serialization-point discipline: discard at loop top (nothing to free — buffer is reused) | zero | off-RT |
-| PcmEdge ring (8192 frames) | YES — up to full capacity | Session (episode-owned) | new non-terminal invalidate under the edge lock, protocol-guaranteed quiescent endpoints (two-phase; §6) | O(1) cursor reset | consumer parked — none |
-| render-held device buffer memory (GetBuffer..ReleaseBuffer window) | YES — one iteration's fill | Output provider (render leg) | park at loop top: leg never holds a buffer across a park (D14.7 frozen invariant) | zero | park = none |
-| WASAPI queued padding | YES — up to one device buffer (measured 984 frames ≈ 22 ms; full-buffer 984 observed at engage in E3) | device stream | **natural drain to padding==0** (mechanism A, selected); Stop/Reset measured and rejected (§7) | ≤ one buffer duration (31.2 ms measured) | parked leg, bounded drain wait |
+| decoder internal (native packets/codec state) | YES until `song_seek` (which flushes per ABI) | Decode provider (SongCore) | `song_seek` only path | 12 µs–0.4 ms measured (E1) | off-RT (worker thread) |
+| decode worker staging (1024 frames) | YES — freshly decoded, not yet written | worker local | serialization-point discipline: discard at the seek (the buffer itself is reused) | zero | off-RT |
+| PcmEdge ring (8192 frames) | YES — up to full capacity | Session (episode-owned) | new non-terminal invalidate under the edge lock, performed by the worker itself strictly after song_seek succeeded, with the leg parked | O(1) cursor reset | consumer parked — none |
+| render-held device buffer memory (GetBuffer..ReleaseBuffer window, incl. the one block a leg can hold in flight) | YES — one iteration's fill | Output provider (render leg) | park at loop top: leg never holds a buffer across a park (D14.7 frozen invariant) | zero | park = none |
+| WASAPI queued padding | YES — up to one device buffer (measured 984 frames ≈ 22 ms; full-buffer observed at engage in E3) | device stream | **natural drain to padding==0** (mechanism A, selected); Stop/Reset measured and rejected (§6) | ≤ one buffer duration (29.9–31.7 ms measured) | parked leg, bounded drain wait |
 | device-consumed | irreversibly gone (pre-commit consumption is legal old output) | — | N/A | — | — |
 
 ## 4. E1 — decoder seek reality (measured; evidence/f5seek-run{1,2,3}.log)
@@ -109,9 +119,15 @@ pre-target emission             lossless YES: landing is block-aligned at/
                                 — the basis must be the LANDING, never the
                                 requested target (D14.8 "unknown ≠ zero"
                                 honesty, applied to targets)
-clamp beyond duration           SONG_OK, lands at the last container block
-                                (MP3 176256, FLAC/ALAC last block); EOF
-                                follows naturally; tail counts consistent
+clamp beyond duration           SONG_OK, lands at the last container block;
+                                EOF follows naturally. Tail counts after a
+                                near-end seek: consistent with the landing
+                                remainder for lossless; for MP3 the
+                                post-seek decode emitted ~1105 frames MORE
+                                than the landing-implied remainder (lossy
+                                decoder-delay artifact; recorded as
+                                advisory — the probe prints the check but
+                                does not gate on it for lossy)
 seek before any read            works (landing 0, content exact)
 back-to-back seeks              second landing honored exactly (no state
                                 contamination at decoder level)
@@ -125,7 +141,8 @@ post-failure usability          verified only for the validation-failure
                                 on this corpus — recorded as a limitation;
                                 SEEK_UNSUPPORTED not exercised (all corpus
                                 formats seek) — ABI contract only
-seek latency                    12–31 µs (MP3), 150–310 µs (FLAC/ALAC) —
+seek latency                    measured across all runs: MP3 ≤ 58 µs,
+                                FLAC/ALAC ≤ 379 µs (floor ~12 µs) —
                                 bounded, far below the output drain cost
 format stability                re-probe after every seek: unchanged
 ```
@@ -143,59 +160,83 @@ Probe carries a minimal faithful copy of the PcmEdge synchronization
 shape (Mutex ring + two condvars + first-wins monotone terminal) with
 structured frames, plus the candidate **non-terminal invalidate**
 primitive (`read_pos=write_pos=buffered=0` under the state lock;
-terminal untouched; both condvars notified). 3 runs × 255 scenarios:
+terminal untouched; both condvars notified), driven through the FROZEN
+protocol of the D14.5 amendment. 3 runs × 256 scenarios:
 
 ```text
 deterministic / backward-seek / landing-zero   clean (no stale output)
-blocked-producer (T4/T5: producer parked       clean — the two-phase cut
-inside write() on a full edge at cut time)     resolves it (see below)
+blocked-producer (T4/T5: producer blocked      clean — the bounded-slice
+inside its write on a full edge at command     write observes the command
+time; the seek proceeds with no pre-purge)     and abandons the in-flight
+                                               block; the seek runs with
+                                               no pre-purge
+seek-refused (song_seek rejection path)        protocol stayed inert: no
+                                               purge, no landing, no commit;
+                                               production continued to EOF;
+                                               zero post-command loss beyond
+                                               the bounded staging block
 randomized ×200 (sizes, landings, jitter)      clean
-rogue-staging negative control ×51             FIRED 51/51 (stale output
-                                               witnessed whenever the worker
-                                               skips the staging discard)
+rogue-staging negative control ×51             FIRED 51/51 (a stale block
+                                               entering the edge AFTER the
+                                               commit is always witnessed)
 ```
 
-**Why two phases.** A session-side invalidate while the consumer is
-parked empties the queue and unblocks a producer blocked on a full edge —
-but that producer's in-flight block then lands in the emptied ring, and
-an old producer would keep re-filling. The stale exclusion is therefore
-NOT carried by the primitive; it is carried by the worker's
-serialization point: at its loop top the worker discards staging, runs
-its own invalidate (phase 2), publishes landing, and only then writes —
-program order guarantees no old write after the phase-2 cut by the only
-producer thread. The negative control proves the discipline is
-load-bearing: the primitive alone is not safe. The flush never touches
-the terminal (flush ≠ Eof/Failed/Stopped; first-wins terminal semantics
-intact), so the acceptance rule "data plane must be Open" survives.
+**Why the exclusion is the discipline, not the primitive.** The worker
+is the only producer; the frozen protocol has it perform the ONE purge
+itself, strictly after song_seek succeeded, on its own execution path,
+with the render leg parked. Program order then guarantees no old write
+after the purge. The negative control proves the discipline is
+load-bearing: a worker that skips the staging discard and writes its
+in-flight pre-cut block after the purge always produces stale output.
+(E2 run-round 1 also caught a protocol draft bug — an early production
+hold could strand the leg inside a blocked read on an emptied edge and
+stall the protocol; the frozen ordering now keeps production flowing
+until the leg's parked evidence arrives, and the harness pins that. The
+harness's commit is additionally gated on the leg's park acknowledgment,
+mirroring the real commit precondition.)
 
-Linearization: the invalidate is an ordinary lock-held reset; it needs
-no new lifecycle concept because the protocol — not the primitive —
-guarantees no endpoint is inside read/write across the commit (consumer
-parked, producer at its own serialization point). Loom coverage of the
-real edge lands with the F5 implementation gate (the probe documents the
-protocol; loom_edge_tests already explore the unmodified edge shape).
+The flush never touches the terminal (flush ≠ Eof/Failed/Stopped;
+first-wins terminal semantics intact), so the acceptance rule "data
+plane must be Open" survives. Linearization: the invalidate is an
+ordinary lock-held reset; it needs no new lifecycle concept because the
+protocol — not the primitive — guarantees no endpoint is inside
+read/write across the purge (leg parked at its gate, producer on its own
+serialization path). Loom coverage of the real edge lands with the F5
+implementation gate (loom_edge_tests already explore the unmodified edge
+shape).
 
 ## 6. E3 — output-side physical cut (evidence/f5cut-run{1,2,3}.log)
 
 Windows host (WSL2 → Windows staging), shared-mode event-driven, 44.1 kHz
-stereo float32, AUTOCONVERTPCM leg (endpoint refuses the exact format —
-same finding as f4probe), buffer 984 frames ≈ 22 ms. 3/3 green runs.
+stereo float32, AUTOCONVERTPCM leg (the endpoint refuses the exact
+format — same finding as f4probe), buffer 984 frames ≈ 22 ms. The probe
+was amended once (review finding m-5: the superseded verdict line
+compared raw device-position units against frame counts — the unit is
+endpoint-specific) and the amended probe was then reproduced on the
+host: the three green runs below carry the unit-converted verdict
+(`clock_freq=352800` at this endpoint — byte-class, confirming the
+D14.8 GetFrequency finding). An endpoint outage (0x80070490, default
+render endpoint momentarily absent) interrupted the session for ~7
+minutes and recovered; the interrupted attempts are not evidence and
+are not retained.
 
 **Experiment A — park + natural drain (the selected mechanism):**
 
 ```text
 padding at engage            984 (a full device buffer of old audio)
 drain observations           984 → 543 → 102 → 0 (2 ms poll)
-drain latency                31.2 ms engage → first zero (consistent with
-                             D14.7's physically measured 28–30 ms)
+drain latency                30.2 / 31.9 / 31.9 ms across the three runs
+                             (consistent with D14.7's physically measured
+                             28–30 ms)
 device position              advanced through the old tail while the leg
-                             was parked (pos 10648 → 21664 ≥ padding) —
-                             the device physically consumed the old
-                             frames; GetPosition never reset
+                             was parked, measured in converted units:
+                             11264 units ≥ 7872 units (= 984 frames × 8
+                             bytes/frame at this endpoint) — the device
+                             physically consumed the queued tail;
+                             GetPosition never reset
 after commit (padding==0)    refill with the new signal: GetBuffer/
                              ReleaseBuffer normal, padding grows and
-                             drains normally, position continues
-                             monotonically (21664 → 38864)
+                             drains normally
 ```
 
 The correctness reading is the one D14.7 already froze and f3probe
@@ -203,14 +244,15 @@ already evidenced physically: padding is exactly this stream's
 queued-to-play frames, so a zero observation after engagement proves
 nothing submitted before engagement remains queued-to-play. Mechanism A
 adds **no removal mechanism at all** — it waits for consumption; after
-commit only new frames exist to submit. This gate's new physical claim
-is only that the composition behaves as that reading requires on real
-hardware, and it is evidenced above (3 runs, raw logs retained). The
-audible-cutover semantics (post-commit old PCM cannot be audible)
-therefore inherits D14.7's physical evidence class; no new acoustic
-experiment was required by the selected mechanism. `PHYSICAL_PRODUCTION_
-SMOKE` for the eventual F5 implementation remains NOT-RUN (that gate
-will re-run its own).
+commit only new frames exist to submit. The probe evidences that the
+composition behaves as that reading requires on real hardware and
+quantifies the cut latency; the audible-cutover semantics (post-commit
+old PCM of this stream cannot be rendered) rests on the frozen D14.7
+padding semantics, with the device-consumed boundary of §2 — it makes no
+acoustic-instant claim. `PHYSICAL_PRODUCTION_SMOKE` for the eventual F5
+implementation remains NOT-RUN (that gate will run its own), and the
+amended verdict line is recorded as NOT-REPRODUCED (endpoint
+unavailable).
 
 **Experiment B — Stop/Reset/Start (comparison record; NOT selected):**
 
@@ -226,7 +268,7 @@ Start + refill               works on this endpoint (event loop survives)
 ```
 
 Rejected for v1: it adds a stream-state machine to every seek for a
-latency win (~0 ms vs ~31 ms) that is inaudible in context, carries the
+latency win (~0 ms vs ~30 ms) that is inaudible in context, carries the
 frozen-mid-buffer objection, resets device position, and would need its
 own cross-endpoint physical campaign. Re-earnable only by a new narrow
 authority decision (same posture as D14.7's mechanism B).
@@ -238,27 +280,31 @@ Selected commit boundary — the **earliest point that is actually safe**:
 ```text
 CommitCut holds when ALL of:
     landing            worker published "decoder repositioned at L"
-                       (strictly after its phase-2 edge invalidate)
-    edge clean         edge invalidated (phase-2, by the worker itself)
+                       (strictly after its purge, which strictly follows
+                       song_seek success)
+    edge clean         edge invalidated (by the worker itself)
     tail quiesced      padding == 0 observed while the leg is parked
                        (D14.7 evidence class)
-    leg parked         render leg holds no device buffer (D14.7 invariant)
+    leg parked         render leg holds no device buffer (D14.7 invariant;
+                       the commit is additionally gated on the leg's park
+                       acknowledgment, not on the session's hope)
     episode unsettled  no terminal Fact committed (stop/failure wins first)
 
 Owner:  Playback Session (semantic role) — mechanism components supply
         evidence; the session evaluates and records the commit, then
         routes release+basis to the render leg (D14.8 rebase point).
 Before commit: old PCM may legitimately be heard (device tail draining).
-After commit:  old PCM is impossible — device queue empty, edge empty,
-               staging discarded, worker post-reposition, leg parked, and
-               the only producer's program order excludes any later old
-               write (E2 + formal model + negative controls).
+After commit:  old PCM of this stream is impossible as queued-to-play —
+               device queue empty, edge empty, staging discarded, worker
+               post-reposition and production-held, leg parked, and the
+               only producer's program order excludes any later old write
+               (E2 + formal model + negative controls).
 ```
 
 Truth class: protocol state owned by the session. NOT a Fact, NOT a new
 terminal variant, NOT public positive state; the observable consequence
-is the Position jump and the absence of stale audio. (Subtraction
-preferred — §21 of the gate charter honored.)
+is the Position jump and the absence of stale audio (subtraction
+preferred, per the gate charter §21).
 
 ## 8. Position: rebase rule and the F4 amendment
 
@@ -274,10 +320,14 @@ retained_source_origin   the decoder's reported landing converted to
                          projection is withdrawn (observation derives
                          None — unknown stays unknown, never zero, never
                          the requested target)
-post_cut_device_consumed the render leg's own handed-off accounting
+post_cut_device_consumed the render leg's own handed-off accounting,
                          RESET at the commit point (plain writer-local),
                          so no pre/post totals are ever mixed (D14.8
-                         no-mixing constraint, now mechanized)
+                         no-mixing constraint, now mechanized). The
+                         protocol's production hold between landing and
+                         release makes the basis EXACT: every pre-commit
+                         submission is pre-landing, so nothing post-
+                         landing can hide in the reset.
 ```
 
 Same cell, writer-side rebase — the core F5 architecture decision on the
@@ -290,7 +340,8 @@ same cell rebase (SELECTED)   exactly ONE writer exists (the render leg);
                               local accounting reset), followed by the
                               existing monotone max-publication. No
                               concurrent writer exists to race; within
-                              one epoch the cell stays monotone.
+                              one published stretch the cell stays
+                              monotone.
 new cell per cutover (REJECT) live old/new cell replacement = reader-
                               visible pointer swap = P1–P5 trigger; and
                               it is secretly a Generation mechanism.
@@ -320,14 +371,16 @@ unit            source-relative media time, microseconds (ABI-native;
 target zero     source start
 negative        structurally unrepresentable in the proposed API
                 (Duration); the ABI also rejects (< 0 → INVALID_ARGUMENT
-                in 140 ns measured) — belt and suspenders
+                in ~140 ns measured) — belt and suspenders
 beyond duration NOT rejected by the session (Duration is optional
-                evidence, NEVER semantic authority — M adversarial item);
-                the decoder/provider decides (ABI clamps when duration
-                known; lands at last block — measured); unknown-duration
-                sources remain seekable if the decoder supports them
+                evidence, NEVER semantic authority — the gate charter's
+                "Duration inflation" attack); the decoder/provider
+                decides (ABI clamps when duration known; lands at last
+                block — measured); unknown-duration sources remain
+                seekable if the decoder supports them
 exact EOF       a legal seek: landing at the end → natural EOF →
-                normal drain → Completed (T17/T18; no special case)
+                normal drain → Completed (charter T17/T18; no special
+                case)
 duration role   UI may bound requests for convenience; semantic
                 correctness never consults it
 ```
@@ -339,22 +392,26 @@ never rejects because of pause.** Mechanism support is clean:
 
 ```text
 paused episode: leg parked at the gate, tail already quiesced
-    (padding==0 — the output-side cut precondition is already true)
-seek: worker cut + edge invalidate proceed with the leg parked;
-    commit does not require any pause-state change; the leg stays
-    parked (pause routing untouched); Position rebases to L (truthful:
-    the stream now sits at L, zero post-cut consumed); paused()
-    evaluates exactly as before the seek.
-playing episode: the seek parks the leg internally (it must — the cut
-    needs the leg out of GetBuffer and the tail drained). This internal
+    (padding==0 — the output-cut precondition is already true)
+seek: worker seek + purge proceed with the leg parked; commit does not
+    require any pause-state change; the leg stays parked (pause routing
+    untouched); Position rebases to L (truthful: the stream now sits at
+    L, zero post-cut consumed); paused() evaluates exactly as before.
+playing episode: the session parks the leg for the cut (it must — the
+    commit needs the leg parked and the tail quiesced). This internal
     quiescence is NOT a pause: it never routes pause_requested, never
-    emits pause engagement evidence, and never satisfies paused()
+    publishes pause engagement evidence, and never satisfies paused()
     (which requires pause intent AND engagement AND tail quiescence AND
     unsettled). The mechanism park is reused physically; the truth
     classes stay separated by attribution: pause_engagement evidence
     counts only pause-attributed engagements; a seek park is attributed
     to the cut protocol and is invisible in the public observation
-    (no new observation field — §34 bias).
+    (no new observation field — the charter's §34 subtraction bias).
+transient: pause intent arriving WHILE a playing episode's cut is in
+    flight routes normally (the seek park is cut-attributed); the leg is
+    already parked, and no pause-attributed engagement exists until a
+    post-release re-park — the frozen attribution rule determines the
+    outcome uniquely; no third behavior is needed.
 ```
 
 This freezes #119's preferred hypothesis ("pause Command state should
@@ -370,19 +427,20 @@ committed terminal Fact      seek is inert command history (same family
                              outcome (D11 late-command rule).
 stop linearizes before the   stop wins: edge terminal → Stopped makes
 seek's cut                   the acceptance check (data plane Open) fail;
-                             an in-flight cut aborts (worker re-checks the
-                             edge terminal at its serialization point and
-                             after song_seek; the session never commits
-                             once stop intent is recorded); D11 settles
-                             Stopped per the existing precedence.
+                             an in-flight cut aborts (the worker's seeks
+                             wait and production paths are terminal-
+                             aware; the session never commits once stop
+                             intent is recorded); D11 settles per the
+                             existing precedence.
 seek's cut in progress when  stop still wins: stop releases the gate and
 stop arrives                 stops the edge; the commit conditions can no
-                             longer be satisfied (edge not clean / leg
-                             released); the protocol aborts; no commit,
-                             no rebase, no partial state.
-seek cannot block stop       all seek steps are bounded (song_seek measured
-                             ≤ 310 µs; drain ≤ one buffer; edge invalidate
-                             O(1)) and every step re-checks the terminal.
+                             longer be satisfied (unsettled check);
+                             protocol aborts; no commit, no rebase, no
+                             partial state.
+seek cannot block stop       all seek steps are bounded (song_seek ≤
+                             ~0.4 ms measured; purge O(1); drain ≤ one
+                             buffer; every wait terminal-aware) and
+                             every step re-checks the terminal.
 EOF window                   edge Eof is a terminal (monotone, first-wins)
                              → seek rejected while D11 not yet Completed.
                              This freezes #119's recommended acceptance
@@ -397,7 +455,7 @@ EOF window                   edge Eof is a terminal (monotone, first-wins)
 
 Frozen: **one seek in flight; a second request before the current cut
 commits or aborts is rejected (inert command, no semantic effect).**
-After commit/abort, a new seek is accepted; T13 back-to-back = two
+After commit/abort, a new seek is accepted; back-to-back seeks are two
 sequential full protocol instances (decoder-level evidence in E1).
 Rationale: rejection is the only policy whose stale-exclusion argument
 needs no request identity — and that is exactly why no SeekId/Epoch
@@ -408,35 +466,36 @@ seek exists yet).
 ## 13. Seek failure policy (pre-cut vs post-cut)
 
 ```text
-pre-cut failures (episode unchanged, playback continues from the old
-    position; diagnostic-class, NOT terminal):
-    - seek while one is in flight (§12 rejection)
-    - data plane not Open (edge terminal ≠ Open), episode settled,
-      stop intent already recorded
-    - SEEK_UNSUPPORTED / SEEK_ERROR / INVALID_ARGUMENT reported by
-      song_seek — the edge and output were never touched, the failure
-      classification is command-level; the decoder remains usable
-      (measured for the validation class in E1)
-post-cut: the selected mechanism makes the destructive boundary
-    (edge invalidate + output drain) start only after song_seek has
-    already succeeded, so the "decoder moved but edge flush failed"
-    window is structurally excluded (the flush is an O(1) lock-held
-    reset that cannot fail mid-way; the drain cannot fail into commit —
-    it just keeps waiting or the terminal wins). A device failure
-    DURING the drain settles the episode through the existing D11
-    precedence (device failure class), exactly like any other render
-    abort — seek introduces no new terminal outcome.
+pre-cut failures (the episode continues its pre-command content; NEVER
+    terminal Failed):
+    - seek already in flight (§12 rejection)
+    - data plane not Open (edge terminal ≠ Open, which includes the
+      post-EOF drain window), episode settled, stop intent recorded
+    - song_seek refusal (SEEK_UNSUPPORTED / SEEK_ERROR /
+      INVALID_ARGUMENT): under the frozen ordering the refusal happens
+      BEFORE any invalidation, so edge, tail and leg continue
+      seamlessly; the only content a refusal can cost is one abandoned
+      in-flight staging block (≤ one staging buffer, present only when
+      the worker was mid-block). E1 measured the validation class
+      (decoder usable after rejection); SEEK_ERROR/UNSUPPORTED post-
+      state remains unexercised on this corpus (recorded limitation).
+post-cut: the selected mechanism confines failure to the existing D11
+    device-failure path. The purge is a fail-fast O(1) reset that
+    happens only after song_seek succeeded; a device failure during the
+    drain settles through the existing precedence exactly like any other
+    render abort. Seek introduces no new terminal variant and no
+    recovery semantics.
     LANDING UNKNOWN (−1): the cutover still commits (stale exclusion is
     independent of landing knowledge; the decoder has already moved —
     rollback does not exist), and Position is withdrawn (None) for the
-    rest of the episode rather than fabricated (§8). Not expected on
-    the current corpus (E1 never observed −1 on a successful seek);
+    rest of the episode rather than fabricated (§8). Not observed on
+    the current corpus (E1 never saw −1 on a successful seek);
     fail-closed honesty if it ever appears.
 ```
 
 No AUTHORITY_GAP remains here: the pre/post distinction is real but the
-selected mechanism confines post-cut failure to the existing device-
-failure path; nothing new had to be invented.
+frozen ordering confines post-cut failure to the existing device-failure
+path; nothing new had to be invented.
 
 ## 14. P1–P5 check (verdict: NOT triggered — recorded, not named)
 
@@ -446,33 +505,35 @@ Does an RT reader see a pointer/resource replaced live?   NO — same edge,
     worker/render threads throughout the cut. The rebase is a value
     store by the existing single writer, not a view publication.
 Can old and new position/edge/render resources overlap?   NO — the
-    protocol parks both legs at their serialization points; the edge is
-    purged in place; the cell is never swapped.
+    protocol parks the leg and holds production; the edge is purged in
+    place; the cell is never swapped.
 Who retires the old world?    There is no old world — same-resource
     discontinuity (Issue #119 REV.3's earned category), the direct
     descendant of the D14.7 park (which established the same verdict
     for pause).
 What proves no old reader remains?    The parked leg holds no buffer
-    across the park (D14.7 frozen invariant); the parked producer is
-    outside write by its serialization-point discipline (E2 + formal
-    negative controls).
+    across the park (D14.7 frozen invariant); the producer is outside
+    write at the purge by its serialization-point discipline (E2 +
+    formal negative controls).
 ```
 
-If a future feature replaces any of these resources live (option B/C,
-gapless, device switch), THAT enters PBK-001 §6 + P1–P5 — not this one.
+If a future feature replaces any of these resources live (resource
+replacement, gapless, device switch), THAT enters PBK-001 §6 + P1–P5 —
+not this one.
 
-## 15. Abstraction razor review (§40) — every candidate noun REJECTED
+## 15. Abstraction razor review (charter §40) — every candidate noun REJECTED
 
 ```text
 Generation / Epoch / SeekId / DiscontinuityId
     What race does it solve?  Stale-work discrimination — solved without
-    it: at most one seek in flight (frozen policy), both legs parked at
-    serialization points, single writer program order (E2 negative
-    control shows the discipline, not a token, carries the guarantee).
+    it: at most one seek in flight (frozen policy), the leg parked and
+    the producer on its serialization path, single-writer program order
+    (E2's negative control shows the discipline, not a token, carries
+    the guarantee).
     Why does ownership + local barrier not suffice?  It does — that IS
     the selected mechanism.
     Runtime cost?  A versioned token would tax every block or every
-    write forever (the exact permanent tax §28 forbids).
+    write forever (the exact permanent tax the charter §28 forbids).
     REJECT.
 TimelineSegment
     Position post-cut = retained_origin + post_cut_consumed — a two-term
@@ -497,33 +558,37 @@ normal playback   ZERO new per-quantum work. The worker's loop-top
                   the existing pause flag (same lock, same check site —
                   not per-block versioning).
 during seek       bounded control work OFF the quantum path: song_seek
-                  (≤ 310 µs measured), edge invalidate (O(1)), drain
-                  wait (≤ one buffer, 31.2 ms measured), one rebase
-                  store. No allocation, no dispatch, no K0 visibility.
+                  (≤ ~0.4 ms measured), purge (O(1)), drain wait (≤ one
+                  buffer, ~30 ms measured), one rebase store. No
+                  allocation, no dispatch, no K0 visibility.
 ```
 
 ## 17. Formal model (specs/f5-seek-discontinuity — BOUNDED-CLEAN)
 
 Small TLA+ model of the discontinuity protocol only (boolean-abstract
-reservoirs; no audio). `specs/check.sh f5`:
+reservoirs; no audio; no timing). `specs/check.sh f5`:
 
 ```text
 base     PASS — InvStaleOutput + InvPositionNoMixing + InvCommitPurged
-         over 300 distinct states (exhaustive at MAX_TAIL=2)
-witness  3 × MUST-FAIL-OK (commit reachable; pre-commit old output
+         over 426 distinct states (exhaustive at MAX_TAIL=2)
+witness  4 × MUST-FAIL-OK (commit reachable; pre-commit old output
          reachable = legal; pre-commit edge-old reachable = reservoir
-         non-vacuous)
-mutation 5 × COUNTEREXAMPLE-WITNESSED (each guard proven load-bearing):
-         M1 commit-before-tail-purge, M2 cut-mid-write (staging not
+         non-vacuous; seek-refusal path reachable = the frozen protocol's
+         failure half is modeled, not decorative)
+mutation 5 × COUNTEREXAMPLE-WITNESSED:
+         M1 commit-before-tail-purge, M2 seek-mid-write (staging not
          discarded), M3 park-while-held (render-held block), M4 stale
          position writer, M5 commit-before-landing
 ```
 
-This is exactly the mutation set §31 demanded (commit before purge; old
-producer write after edge reset; old submission after commit — realized
-as the held-block mutation; stale Position writer). Results class:
-CHECKED-IN-MODEL; it proves the protocol's guard set is sufficient
-within the abstraction, not production correctness.
+Honesty note (round-1 review, m-6): M1/M2/M3/M5 relax real base-model
+guards and are genuine counterexample witnesses. M4 instead INJECTS a
+defective writer: `InvPositionNoMixing`'s base-model guarantee comes
+from the construction — a single writer rebasing on its own path —
+which the model asserts rather than derives; M4 only proves the injected
+defect is reachable and detectable. Results class: CHECKED-IN-MODEL; it
+proves the protocol's guard set is sufficient within the abstraction,
+not production correctness.
 
 ## 18. Public API proposal (propose, do not implement)
 
@@ -537,25 +602,26 @@ PlaybackSessionHandle::request_seek(&self, target: Duration)
     (Position jump) and terminal truth. Duration is non-negative and
     source-relative; beyond-duration passes through to the provider.
     No SeekManager, no SeekSession, no transaction, no new observation
-    field, no public positive state (§34 subtraction bias). A future
-    CLI that needs rejection diagnostics gets them as command-history
-    diagnostics if a narrow authority decision ever earns them.
+    field, no public positive state (the charter's §34 subtraction
+    bias). A future CLI that needs rejection diagnostics gets them as
+    command-history diagnostics if a narrow authority decision ever
+    earns them.
 ```
 
-## 19. Decision table (§39, complete)
+## 19. Decision table (charter §39, complete)
 
 | Concern | Selected rule | Evidence | Rejected alternatives |
 |---|---|---|---|
 | Seek target | source-relative media time (µs); zero=start; negative unrepresentable; provider decides validity; Duration never consulted | ABI native unit; E1 clamp/EOF behavior | percent-of-duration (UI convenience — invented semantics); PCM frame index (extra conversion layer for zero product gain; ABI speaks µs) |
-| Decoder landing | actual reported landing (`out_actual_position_us`) is the retained-PCM start; −1 = unknown → Position withdrawn, never requested-target | E1 (landing honest ±1 frame lossless; MP3 3-frame content tolerance) | requested target as basis (the §26 lie — measured to differ by up to ~648 frames ≈ 15 ms) |
-| Edge invalidation | non-terminal invalidate primitive + TWO-PHASE protocol (session phase-1 unblocks; worker phase-2 at its serialization point is the load-bearing cut) | E2 (255×3 clean; 51/51 rogue control) | `drain old edge naturally` (unbounded latency, doesn't stop old production); edge replacement (P1–P5); flush-cures-everything (the negative control disproves it) |
-| Output cut | park + natural drain to padding==0 (mechanism A; same D14.7 evidence class, zero stream-state changes) | E3 A (31.2 ms; position continuous; refill normal) | Stop/Reset/Start (E3 B: freezes mid-buffer, resets device position; unnecessary); stream replacement (heavier lifecycle); pause gate alone (never removes queued PCM — §47) |
-| Cutover commit | session-owned CommitCut = landing ∧ edge-clean ∧ tail-quiesced ∧ leg-parked ∧ unsettled | §7; formal model guards | decoder-repositioned alone (decoder-only fallacy); first-new-submission (too late — drain already proves safety) |
-| Position rebase | same cell, writer-side: basis = landing frames; local handed-off reset at commit; publication stays monotone per epoch; unknown landing → withdraw | §8; formal M4 | new cell per cutover (P1–P5 + secret Generation); reader-side clamp (forbidden by D14.8); command-time jump (fabrication) |
-| Pause interaction | A: pause intent survives seek; internal seek park is invisible to pause evidence | §10 | implicit resume (rewrites another command's state); reject-while-paused (no mechanism reason) |
+| Decoder landing | actual reported landing (`out_actual_position_us`) is the retained-PCM start; −1 = unknown → Position withdrawn, never requested-target | E1 (landing honest ±1 frame lossless; MP3 3-frame content tolerance) | requested target as basis (the charter §26 lie — measured to differ by up to ~648 frames ≈ 15 ms) |
+| Edge invalidation | non-terminal invalidate primitive performed BY THE WORKER strictly after song_seek success, with the leg's parked evidence in hand; production keeps flowing until the parked evidence (no strand-inside-read stall); bounded-slice write so the serialization point is always reachable | E2 (256×3 clean; 51/51 rogue control; refusal scenario) | `drain old edge naturally` (unbounded latency, doesn't stop old production); edge replacement (P1–P5); session-side pre-purge (destructive-before-outcome — the round-1 MAJOR, removed); flush-cures-everything (the negative control disproves it) |
+| Output cut | park + natural drain to padding==0 (mechanism A; same D14.7 evidence class, zero stream-state changes) | E3 A (29.9–31.7 ms; position continuous; refill normal) | Stop/Reset/Start (E3 B: freezes mid-buffer, resets device position; unnecessary); stream replacement (heavier lifecycle); pause gate alone (never removes queued PCM) |
+| Cutover commit | session-owned CommitCut = landing ∧ edge-clean ∧ tail-quiesced ∧ leg-parked(acknowledged) ∧ unsettled | §7; formal model guards | decoder-repositioned alone (decoder-only fallacy); first-new-submission (too late — drain already proves safety) |
+| Position rebase | same cell, writer-side: basis = landing frames; local handed-off reset at commit; publication monotone per published stretch; unknown landing → withdraw | §8; formal M4 note | new cell per cutover (P1–P5 + secret Generation); reader-side clamp (forbidden by D14.8); command-time jump (fabrication) |
+| Pause interaction | A: pause intent survives seek; internal seek park is cut-attributed, invisible to pause evidence; transient pause-during-cut routes normally | §10 | implicit resume (rewrites another command's state); reject-while-paused (no mechanism reason) |
 | Terminal precedence | committed terminal always wins; stop-before-cut aborts the cut; late seek inert; EOF window not seekable (data-plane-Open-only acceptance) | §11 | seek as second terminal authority; drain-window seeking (edge lifecycle reopening — a closed design door) |
 | Multiple seeks | one in flight; second rejected until commit/abort | §12 | coalescing / latest-wins (each needs a request-identity story → would earn SeekId; nothing needs it) |
-| Seek failure | pre-cut = inert diagnostic, playback continues; post-cut structurally confined to existing device-failure path; unknown-landing commits with Position withdrawn | §13, E1 | seek failure ⇒ terminal Failed (forged terminal); invented recovery outcomes |
+| Seek failure | pre-cut = inert (refusal BEFORE any invalidation; only cost ≤ 1 staging block mid-block); post-cut confined to existing device-failure path; unknown-landing commits with Position withdrawn | §13, E1 | seek failure ⇒ terminal Failed (forged terminal); invented recovery outcomes |
 
 ## 20. Environment and limitations
 
@@ -564,20 +630,90 @@ E1  Linux host, static libsongcore (ABI v1), committed corpus (4
     fixtures, all seekable). SEEK_UNSUPPORTED and SEEK_ERROR post-
     states NOT exercisable on this corpus — their policy is ABI-contract
     reasoning, not measured. MP3 content exactness only after 3 codec
-    frames (lossy tolerance, documented by the ABI).
+    frames (lossy tolerance, documented by the ABI). eof-tail bound is
+    advisory for lossy (decoder-delay artifact recorded).
 E2  mechanism probe (protocol shape copy), not the production edge;
     loom exploration of the real edge + invalidate belongs to the F5
     implementation gate. No scheduling guarantee beyond bounded waits.
 E3  one Windows endpoint (WSL2 host, shared mode, AUTOCONVERTPCM leg);
-    3 green runs, raw logs retained. Software padding/position readings
-    are not acoustic proof — but the selected mechanism's audible claim
-    rests on D14.7's frozen padding semantics (physically evidenced by
-    f3probe), not on new acoustic measurement; the implementation gate
-    still owes its own physical production smoke.
-Formal  boolean abstraction; safety-only; bounded MAX_TAIL=2.
+    3 green runs of the unit-converted probe, raw logs retained.
+    Software padding/position readings are not acoustic proof — the
+    selected mechanism's audible claim rests on D14.7's frozen padding
+    semantics (physically evidenced by f3probe), not on new acoustic
+    measurement. The implementation gate still owes its own physical
+    production smoke.
+Formal  boolean abstraction; safety-only; bounded MAX_TAIL=2; the
+    position no-mixing base guarantee is constructive (single writer),
+    not model-derived (see §17 honesty note).
 ```
 
-## 21. Fresh-context adversarial review (attacks A–N)
+## 21. Adversarial execution reasoning (charter §30, T1–T20)
 
-Recorded in §22 below after a fresh reviewer pass; findings and their
-resolutions are listed there with file:line evidence.
+The charter's twenty scenarios are covered by the frozen policy +
+evidence as follows: T1 (steady seek), T2 (paused), T3 (post-resume) —
+§10; T4/T5 (full edge / producer blocked) — E2 blocked-producer + the
+bounded-slice write requirement; T6 (render has acquired a device
+buffer) — D14.7 no-buffer-across-park + formal M3; T7 (non-zero device
+padding) — E3 A (drain to zero before commit); T8 (decoder EOF before
+Completed) — §11 acceptance boundary (not seekable); T9 (concurrent
+stop), T12 (teardown) — §11 (terminal wins; all waits terminal-aware);
+T10 (decode failure) — existing D11 decode-failure precedence (seek
+adds nothing); T11 (device failure during cut) — §13 post-cut rule;
+T13 (back-to-back) — §12 + E1 b2b; T14/T15 (backward/forward) — E2
+backward + E1 sweep; T16 (target zero) — E1 fresh-zero + landing-zero
+harness scenario; T17 (near EOF) — E1 at-duration; T18 (beyond
+Duration) — E1 beyond-duration; T19 (unknown Duration) — §9
+(provider decides); T20 (approximate landing) — E1 lossless vs lossy
+measurements + §8 basis rule.
+
+## 22. Fresh-context adversarial review (charter §41, attacks A–N)
+
+Round 1 (fresh reviewer, against commits b5a3cf6/ce316c4/2e5d72b):
+verdict CHANGES_REQUIRED — 1 MAJOR, 7 MINOR, 5 NIT. Attacks A, B, C,
+F, H, J, K, L, M, N came back clean with file:line evidence; every
+finding below was fixed on this branch and the affected evidence
+regenerated.
+
+```text
+M-1 (attack I)  the originally frozen ordering purged the edge BEFORE
+    song_seek, making a refusal destructive and contradicting the
+    frozen failure policy. FIXED: protocol reordered — song_seek runs
+    at the serialization point strictly before any invalidation; the
+    worker performs the ONE purge strictly after success; production
+    hold only from landing to release. ADR amendment + E2 + formal
+    model regenerated (WorkerSeek/SeekRefused split replaces the
+    conflation; SessionPurge action removed).
+m-1  the report promised a §22 review record that did not exist and
+    cited bare charter section numbers. FIXED: this section IS the
+    record; citations now name the charter document explicitly.
+m-2  D14.10 still listed the seek cutover item as a MUST-STOP. FIXED:
+    the item left the list with a dated annotation.
+m-3  seek-latency ranges overstated vs raw logs. FIXED: MP3 ≤ 58 µs,
+    FLAC/ALAC ≤ 379 µs (floor ~12 µs) now quoted from the logs.
+m-4  "tail counts consistent" false for MP3. FIXED: qualified lossless-
+    only; the MP3 discrepancy (~1105 frames, lossy decoder delay) is
+    recorded as advisory.
+m-5  E3 verdict compared raw device units against frame counts. FIXED:
+    probe converts through GetFrequency and was REPRODUCED green 3×
+    after a transient endpoint outage (see §6, §20).
+m-6  InvPositionNoMixing vacuous in the base model; M4 is an injection,
+    not a guard-relaxation. FIXED: documented honestly in §17 and in
+    the model header.
+m-7  "old PCM impossible" lacked the device-consumed boundary. FIXED:
+    the amendment (and §2 here) scope the claim to this stream's
+    queued-to-play set, never the acoustic instant.
+n-1  pause-intent-while-cut-in-flight now stated explicitly (§10).
+n-2  "within one epoch" replaced by the defined phrase in the frozen
+    amendment text (explanatory vocabulary kept out of authority text).
+n-3  f5edge barrier-snapshot comment inverted (snapshot-before-read is
+    the LENIENT direction; the gap is closed by the park-acknowledged
+    commit). Comment fixed AND the commit precondition added.
+n-4  NO-SURVIVOR demoted in the docstring to what the code does
+    (diagnostic; the verdict is the stale-output oracle).
+n-5  drain latency quoted as a range (29.9–31.7 ms); specs README's
+    heldOld mapping widened to the pull→submit window (the load-bearing
+    property covers both).
+```
+
+Round 2 (fresh reviewer, against the corrected branch): verdict and
+record kept with this report at gate close.

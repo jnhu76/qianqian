@@ -4,21 +4,23 @@ UNC 路径不受支持。默认值设为 Windows 目录。
 F5CUT BEGIN
 F5CUT A BEGIN
 F5CUT OPEN autoconvert=true
+F5CUT OPEN clock_freq=352800 (0 = unavailable)
 F5CUT A buffer_frames=984
 F5CUT A steady_old handed_off=3189 iterations=6
-F5CUT A engage padding=984 handed_off=3189 pos=Some((10648, 2353805120962))
-F5CUT A quiesced padding_observations=[984, 984, 984, 984, 984, 543, 543, 543, 543, 102, 102, 102, 102, 0] drain_ms=Some(31.2079) pos=Some((21664, 2353805432972))
+F5CUT A engage padding=984 handed_off=3189 pos=Some((10632, 2411047009372))
+F5CUT A quiesced padding_observations=[984, 984, 984, 984, 984, 543, 543, 543, 543, 102, 102, 102, 102, 0] drain_ms=Some(31.9239) pos=Some((21896, 2411047328576))
 F5CUT A commit (padding==0 observed; submitting new signal)
-F5CUT A refill handed_off_new=3189 readings=[(0, 984), (543, 441), (543, 441), (543, 441), (543, 441), (543, 441)] pos=Some((38864, 2353805920601))
-F5CUT A VERDICT drain_ms=31.2 padding_at_engage=984 pos_advanced_through_tail=true pos_advanced_after_cut=true
+F5CUT A refill handed_off_new=3189 readings=[(0, 984), (543, 441), (543, 441), (543, 441), (543, 441), (543, 441)] pos=Some((38848, 2411047809171))
+F5CUT A VERDICT drain_ms=31.9 padding_at_engage=984 advanced_units=11264 tail_in_units=7872 pos_advanced_through_tail=true pos_advanced_after_cut=true
 F5CUT A END ok
 F5CUT B BEGIN
 F5CUT OPEN autoconvert=true
+F5CUT OPEN clock_freq=352800 (0 = unavailable)
 F5CUT B buffer_frames=984
-F5CUT B before_stop handed_off=2307 padding=984 pos=Some((3576, 2353806654824))
-F5CUT B after_stop padding=984 pos=Some((10584, 2353806661137))
+F5CUT B before_stop handed_off=2307 padding=984 pos=Some((3576, 2411048519689))
+F5CUT B after_stop padding=984 pos=Some((10584, 2411048523713))
 F5CUT B reset_result=Ok(())
-F5CUT B after_reset padding=0 pos=Some((0, 2353806661385))
-F5CUT B after_restart handed_off_new=2307 iterations=4 pos=Some((3576, 2353807054809)) error=None
+F5CUT B after_reset padding=0 pos=Some((0, 2411048523908))
+F5CUT B after_restart handed_off_new=2307 iterations=4 pos=Some((3576, 2411048919663)) error=None
 F5CUT B END ok
 F5CUT END failures=0
