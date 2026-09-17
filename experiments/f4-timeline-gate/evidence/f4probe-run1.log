@@ -1,0 +1,12 @@
+F4PROBE BEGIN rate=48000 ch=2 edge=8192 block=1024 tone=440Hz amplitude=0.12 total_frames=384000
+F4PROBE OPEN rate=48000 autoconvert=false buffer_frames=1056 clock_freq=384000 clock_acquired=true
+F4PROBE STEADY handed_off=93216 position=Some(92160) expected_floor=93952
+F4PROBE PAUSE handed_off_at_park_end=93696 position_at_park_end=Some(93696) (steady was 93216, advance must be one in-flight block at most)
+F4PROBE RESUME handed_off_at_resume_end=142272 position=Some(141216)
+F4PROBE EOF drained_to_total=true final_handed_off=384000 expected=384000 final_position=Some(384000) diag=""
+F4PROBE BOUNDS handed_off_monotone=true position_monotone=true max_position_backward=0 (must be 0) position_le_handed_off=true writer_estimate_regressions=0 (diagnostic)
+F4PROBE CADENCE steady_publications=193 steady_ms=2000 steady_per_s=96 total_publications=948 reader_samples=4131 reader_distinct_positions=802 reader_per_s=423 elapsed_ms=9761
+F4PROBE FREEZE_AT_QUIESCENCE window=[2400,3450]ms samples=453 first=Some(93696) last=Some(93696) constant=true
+F4PROBE CLOCK_48K samples=4123 clock_first=24 clock_last=3057456 delta_clock=3057432 delta_clock_frames=382179 delta_position=383040 clock_minus_position_frames=-861
+F4PROBE CLOCK_44K stream_rate=44100 autoconvert=true clock_freq=352800 source_relative=false
+F4PROBE END failures=0

@@ -1,0 +1,8 @@
+F4DURATION BEGIN songcore_abi_v1
+F4DURATION mp3-cbr-id3v23 container_us=4000000 stream_us=4000000 exact_frames=176400 exact_us=4000000 reference_frames=176400 container_delta_us=0 decode_failed=false stalled=false pass=true
+F4DURATION flac-16-44-stereo container_us=4000000 stream_us=4000000 exact_frames=176400 exact_us=4000000 reference_frames=176400 container_delta_us=0 decode_failed=false stalled=false pass=true
+F4DURATION alac-16-44-stereo container_us=4000000 stream_us=4000000 exact_frames=176400 exact_us=4000000 reference_frames=176400 container_delta_us=0 decode_failed=false stalled=false pass=true
+F4DURATION alac-long container_us=6000000 stream_us=6000000 exact_frames=264600 exact_us=6000000 reference_frames=264600 container_delta_us=0 decode_failed=false stalled=false pass=true
+F4DURATION mp3-cbr-id3v23/truncated-70pct container_us=4000000 stream_us=4000000 exact_frames=124463 exact_us=2822290 reference_frames=176400 container_delta_us=1177710 decode_failed=false stalled=false pass=true
+F4DURATION flac-16-44-stereo/truncated-70pct container_us=4000000 stream_us=4000000 exact_frames=119808 exact_us=2716734 reference_frames=176400 container_delta_us=1283266 decode_failed=true stalled=false pass=true
+F4DURATION END failures=0

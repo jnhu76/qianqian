@@ -1,0 +1,36 @@
+[package]
+name = "f4-timeline-gate"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "F4-GATE mechanism evidence: position/duration propositions, projection algebra, physical padding/clock probe, duration provenance"
+
+# F4-GATE evidence crate (Issue #119 F4 position/duration; proposed
+# ADR-PBK-002 D14.8 amendment). Workspace-excluded on purpose: this is
+# executable mechanism evidence and physical probes, NOT production
+# architecture. Nothing here may be imported by any qianqian-* crate;
+# the frozen contract lands in ADR-PBK-002 and the product
+# implementation lands in a later F4 slice.
+
+[dependencies]
+serde_json = "1"
+
+# Duration-provenance probe only (Experiment C): the SongCore binding
+# pulls the native static archive through its build.rs, which is a
+# host-shaped artifact tree. The Windows physical probe must not
+# require it, so the dependency is target-gated out of Windows builds.
+[target.'cfg(not(windows))'.dependencies]
+qianqian-songcore-sys = { path = "../../crates/qianqian-songcore-sys" }
+
+[target.'cfg(windows)'.dependencies]
+# Same generation as the production output mechanism so the probe measures
+# the same COM surface the product render loop uses.
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+] }
