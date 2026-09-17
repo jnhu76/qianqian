@@ -619,6 +619,73 @@ fn pause_routed_after_stop_cannot_repark_the_released_episode() {
     });
 }
 
+/// A pause that linearizes AFTER the teardown release must not re-park
+/// the leg: the stream teardown releases the gate and then joins it, so
+/// a pause landing between the two would wedge `stop_and_join` forever
+/// (the teardown-side twin of the stop-linearization oracle). The leg
+/// is held inside a slow (legal) tail observation, so it cannot observe
+/// the release until the hostile pause has routed and the probe lets
+/// go — the ordering is decided by the routing linearization, not by a
+/// race.
+#[test]
+fn pause_routed_after_teardown_release_cannot_wedge_the_join() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(30), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail_padding = Arc::new(AtomicBool::new(false));
+        let tail_probe = TailProbe::default();
+        let handle = PlaybackSessionHandle::new();
+        let mut runtime = registered_runtime(
+            endless_audio(30),
+            OutputBehavior::Consume,
+            consumed.clone(),
+            device_tail_padding.clone(),
+            tail_probe.clone(),
+            handle.clone(),
+        );
+        activate(&mut runtime);
+
+        assert!(
+            wait_until(Duration::from_secs(5), || consumed.load(Ordering::SeqCst)
+                > 0),
+            "the episode never produced audio"
+        );
+
+        // Park the leg and hold it inside its first (slow, legal) tail
+        // observation: from here it cannot observe any release until the
+        // probe lets go.
+        tail_probe.arm();
+        handle.request_pause();
+        assert!(
+            wait_until(Duration::from_secs(5), || handle.observe().pause_engagement
+                == PauseEngagement::Engaged),
+            "the render leg never engaged: {:?}",
+            handle.observe()
+        );
+        tail_probe.wait_held();
+
+        // Fire the hostile pause from another thread well after dispose
+        // began (dispose is already inside the teardown join by then:
+        // the release runs within microseconds of dispose on this
+        // thread, five orders of magnitude before the pause fires), and
+        // only then let the leg re-check. With linearized routing the
+        // post-release pause is inert and the leg exits; without it, it
+        // re-parks and the join below never returns.
+        let hostile = {
+            let handle = handle.clone();
+            let tail_probe = tail_probe.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(100));
+                handle.request_pause();
+                tail_probe.unhold();
+            })
+        };
+        let snapshot = runtime.dispose();
+        hostile.join().expect("the hostile pauser joins");
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
 #[cfg(target_os = "linux")]
 fn assert_no_leg_threads() {
     const LEAK_ORACLE_GRACE: Duration = Duration::from_secs(2);

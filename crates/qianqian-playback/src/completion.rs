@@ -131,11 +131,22 @@ struct CompletionState {
     /// Disengagement-ack evidence latch (D14.7): the CURRENT pause
     /// cycle's render-gate disengagement has been observed. Reset when a
     /// new pause cycle begins (pause intent false→true in
-    /// `request_pause`), so a previous cycle's disengagement can never
-    /// establish Resumed for a later one — the same current-cycle
-    /// discipline as `tail_quiesced`. Existence evidence for the
-    /// Resumed projection only; it never feeds control or settlement.
+    /// `request_pause`), so a previous cycle's disengagement does not
+    /// answer a later cycle's resume — the same current-cycle
+    /// discipline as `tail_quiesced`. Event attribution is deliberately
+    /// coarse (a pending prior-cycle `Disengaged` may still publish
+    /// into a new cycle); what the reset guarantees is the claim, not
+    /// the bookkeeping: `Resumed` is only ever true while the gate is
+    /// released and the leg is demonstrably not parked. Existence
+    /// evidence for the Resumed projection only; it never feeds control
+    /// or settlement.
     disengagement_observed: bool,
+    /// Set once by [`SessionCompletion::release_pause_gate`] — the
+    /// authority-owned teardown path has begun releasing the pause
+    /// gate. Routing witness for the D14.7 teardown wake obligation: a
+    /// pause that linearizes after this point must not re-park the leg,
+    /// or the teardown's `stop_and_join` could never return.
+    teardown_released: bool,
     /// The session's data-plane edge, bound by activation as the stop
     /// target. `None` until the episode binds one (or forever, if
     /// activation failed). The edge is the session-owned stop mechanism;
@@ -215,6 +226,7 @@ impl SessionCompletion {
                         engaged: false,
                         tail_quiesced: false,
                         disengagement_observed: false,
+                        teardown_released: false,
                         stop_target: None,
                     }),
                     signal: Condvar::new(),
@@ -335,23 +347,24 @@ impl SessionCompletion {
     ///
     /// Intent routing is linearized with the command state under the one
     /// completion lock. A pause that linearizes after stop intent —
-    /// including the whole stop→settlement window — is recorded as inert
-    /// command history but routes nothing: a released or released-then-
-    /// stopping episode must never be re-parked (D14.7: stop and teardown
-    /// wake every parked participant with bounded latency), and a settled
-    /// episode has no leg to park.
+    /// including the whole stop→settlement window — or after the
+    /// teardown release has begun is recorded as inert command history
+    /// but routes nothing: a released, released-then-stopping, or
+    /// tearing-down episode must never be re-parked (D14.7: stop and
+    /// teardown wake every parked participant with bounded latency), and
+    /// a settled episode has no leg to park.
     pub(crate) fn request_pause(&self) {
         let mut guard = self.state.state.lock().expect("completion lock");
         if !guard.pause_requested {
             // A new pause cycle begins: a previous cycle's disengagement
-            // evidence must not establish Resumed for this one — the
-            // same current-cycle discipline as the tail-quiescence
-            // reset (D14.7). Repeated pauses within one cycle change
-            // nothing.
+            // evidence must not answer this cycle's resume (D14.7). The
+            // reset scopes the evidence to the cycle, not the event
+            // attribution — see the field doc for the exact claim this
+            // buys. Repeated pauses within one cycle change nothing.
             guard.disengagement_observed = false;
         }
         guard.pause_requested = true;
-        if guard.stop_requested || guard.outcome.is_some() {
+        if guard.stop_requested || guard.teardown_released || guard.outcome.is_some() {
             return;
         }
         self.state.gate.set_paused(true);
@@ -374,8 +387,15 @@ impl SessionCompletion {
     /// every parked participant, because a leg parked at the gate cannot
     /// observe the data-plane stop, and `stop_and_join` must terminate.
     /// The leg's exit publishes disengagement evidence.
+    ///
+    /// The release linearizes pause routing under the same completion
+    /// lock hold (the teardown-side twin of the `request_stop` rule):
+    /// once this runs, a pause that linearizes after it is inert
+    /// history and routes nothing, so no pause can re-park the leg
+    /// between this release and the join that follows it.
     pub(crate) fn release_pause_gate(&self) {
-        let _guard = self.state.state.lock().expect("completion lock");
+        let mut guard = self.state.state.lock().expect("completion lock");
+        guard.teardown_released = true;
         self.state.gate.set_paused(false);
     }
 

@@ -117,7 +117,12 @@ pub struct PlaybackSessionObservation {
     /// Mechanism evidence.
     pub source_format: Option<PcmFormat>,
     /// The current pause engagement's mechanism-evidence state
-    /// (D14.7). Evidence, not a semantic transport state.
+    /// (D14.7). Evidence, not a semantic transport state. Meaningful
+    /// only while `terminal_outcome` is `None`: publication is
+    /// first-wins and closes at settlement, so after a terminal Fact
+    /// the latched spelling may outlive the leg — the `paused`/
+    /// `resumed` projections guard on the unsettled state, and any
+    /// other consumer of this field must too.
     pub pause_engagement: PauseEngagement,
     /// Whether the CURRENT pause cycle's render-gate disengagement has
     /// been observed (mechanism-evidence latch for the Resumed

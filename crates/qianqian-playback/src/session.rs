@@ -129,7 +129,9 @@ fn activate_inner(
     // contribution toward the output provider. The pause gate is
     // released first (D14.7 teardown obligation): a leg parked at the
     // gate is not inside read_frames, so the data-plane stop alone
-    // cannot wake it and the join below would never return; the release
+    // cannot wake it and the join below would never return. The release
+    // linearizes pause routing under the completion lock, so no pause
+    // can re-park the leg between this release and the join; its exit
     // publishes disengagement evidence and lets the leg reach the
     // stopped edge on its own.
     let teardown_completion = completion.clone();

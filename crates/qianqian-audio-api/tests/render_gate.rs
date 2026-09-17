@@ -204,12 +204,25 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
 
     // A final engagement whose tail NEVER goes quiescent must stay
     // engaged without a third TailQuiesced — the stale-latch direction
-    // of the same invariant.
+    // of the same invariant. The engagement is witnessed latched first,
+    // so the negative assertion cannot pass vacuously on a leg that
+    // never parked.
     gate.set_paused(true);
     let leg = {
         let gate = gate.clone();
         std::thread::spawn(move || gate.park_while_paused(|| false))
     };
+    assert!(
+        wait_until(Duration::from_secs(5), || {
+            let seen = events.snapshot();
+            seen.iter().filter(|e| **e == GateEvent::Engaged).count() == 3
+        }),
+        "engagement 3 never latched: {:?}",
+        events.snapshot()
+    );
+    // The tail observation runs every bounded slice (~10ms); a stale
+    // latch would have published a third TailQuiesced within this
+    // window.
     std::thread::sleep(Duration::from_millis(50));
     let seen_after = events.snapshot();
     assert_eq!(
