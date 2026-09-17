@@ -210,8 +210,9 @@ Playing / Starting / Stopping semantics
  Mechanism Evidence; the rest of the transport enum is not earned)
 position / duration authority
     (D14.8 PROPOSED on the F4 gate branch: episode-local Position
-     Projection + optional Duration evidence, never a Fact; pending
-     human review)
+     Projection — one monotone mechanism-evidence sample published by
+     the render leg, read as a pure load — + optional Duration
+     evidence, never a Fact; pending human review)
 seek acceptance / discontinuity / commit semantics
 open/session construction + config + replacement semantics
 playlist/queue authority
@@ -263,16 +264,20 @@ F3 Pause / Resume               CLOSED after authority corrective
                                 only; Disengaged = Mechanism Evidence
                                 only; evidence
                                 experiments/f3-pause-mechanism
-F4 Position / Duration          GATE PROPOSED (research/f4-timeline-gate-1):
+F4 Position / Duration          GATE PROPOSED (research/f4-timeline-gate-1,
+                                F4-GATE-CORRECTIVE-1):
                                 D14.8 freezes the propositions —
                                 Position = episode-local device-consumed
-                                Projection (submitted − tail, clamped,
-                                source frames; freezes exactly at the
-                                D14.7 tail-quiescence evidence), Duration =
-                                optional source-scoped Mechanism Evidence
-                                (unknown stays unknown). Evidence:
-                                experiments/f4-timeline-gate. Production
-                                implementation NOT in this gate.
+                                Projection (the render leg publishes one
+                                monotone mechanism-evidence sample from
+                                its own handed-off and tail readings; the
+                                application reads it with one pure load;
+                                freezes exactly at the D14.7
+                                tail-quiescence evidence, never at command
+                                time), Duration = optional source-scoped
+                                Mechanism Evidence (unknown stays unknown).
+                                Evidence: experiments/f4-timeline-gate.
+                                Production implementation NOT in this gate.
 F5 Seek                         REDESIGNED AROUND DISCONTINUITY PROTOCOL
 F6 Open                         CONFIG-MECHANISM-OPEN
 Next / Previous                 AFTER OPEN; separate navigation step

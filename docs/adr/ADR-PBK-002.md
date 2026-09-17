@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (submitted − tail, clamped) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`) |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -1288,8 +1288,8 @@ Mechanism Evidence; it must never be promoted to a Fact or a P1–P5
 trigger (no old/new realtime-world overlap exists here). Its reuse as
 the raw position-evidence source is not a silent promotion: the D14.8
 amendment makes that a separate, explicit selection of the same
-platform reading (the tail cell), while the establishment latch keeps
-its F3 meaning.
+platform reading (the derivation's tail reading), while the
+establishment latch keeps its F3 meaning.
 
 Truthful product establishment is then the single projection:
 
@@ -1360,21 +1360,29 @@ like late stop intent.
 > their writer/reader rules below are now FROZEN; everything not
 > stated remains governed by the general Phase-F rules. This amendment
 > does not by itself merge any production code; it defines what the
-> F4 implementation must realize.
+> F4 implementation must realize. A pre-merge review
+> (F4-GATE-CORRECTIVE-1) then moved monotonicity from a reader-side
+> clamp to the writer-side publication — see "Derivation ownership";
+> the propositions themselves were not changed.
 
-F4 is read-side only. Position/Duration create no new Plugin,
-Capability, Fact kind, fact authority, lifecycle noun, or global store
-(D13/D14.1). P1–P5 are NOT triggered: the evidence cells below are new
-session-owned resources bound at activation and never replaced live —
-no old/new realtime-world overlap exists.
+F4 creates no new Plugin, Capability, Fact kind, fact authority,
+lifecycle noun, or global store (D13/D14.1). Its only mechanism surface
+is one session-owned, episode-scoped evidence cell — published
+monotonically by the render leg, read purely by the observation. The
+cell is an owned resource of the existing Plugin boundaries, handed to
+the render leg the same way the D14.7 render gate already is (D6); it is
+not a Capability and not a Plugin. P1–P5 are NOT triggered: the cell is
+bound at activation and never replaced live, so no old/new
+realtime-world overlap exists.
 
 **Position proposition (frozen).** Product Position for one playback
 episode is the application-facing **Projection**:
 
 > the source-relative location of device-consumed presentation for the
-> current episode's render stream, derived as
-> `submitted − min(tail, submitted)`, clamped monotone at the
-> observation boundary, in source PCM frames.
+> current episode's render stream, in source PCM frames: a monotone
+> non-decreasing sample published by the render mechanism as
+> `handed-off-so-far − queued tail`, read by the application as one
+> pure load of that sample.
 >
 > "Device-consumed" means the output engine has taken those frames out
 > of this stream's device buffer for rendering. The proposition
@@ -1384,75 +1392,124 @@ episode is the application-facing **Projection**:
 > device-consumption estimate, never a measurement of the acoustic
 > instant and never an audibility claim.
 
+**Derivation ownership (frozen).** The subtraction happens on the render
+leg's own execution path, where the handed-off total and the tail
+reading both live as mechanism-local values, and monotonicity is owned
+by the publication rather than by the reader:
+
+```text
+writer (render leg — one execution path owns both inputs)
+    handed_off   plain local accounting of the frames this episode has
+                 submitted into the device buffer
+                 (read_frames -> ReleaseBuffer(n), wasapi steady loop)
+    tail         the leg's own GetCurrentPadding reading
+    publish      published = max(published,
+                                 handed_off - min(tail, handed_off))
+                 one monotone non-decreasing relaxed update of the
+                 session-owned cell
+
+reader (D14.2 observation seam)
+    position     one pure load of the published cell
+                 (undefined until the leg's first publication)
+```
+
+A **reader-side clamp is REJECTED** (F4-GATE-CORRECTIVE-1). `observe()`
+is one coherent *pure* read of the episode (D14.2) and its purity is
+part of the contract — repeating it changes nothing and it settles
+nothing. A monotone clamp cannot live inside that read: it would make
+the read stateful/mutating, or push Position into application-local
+presentation state (which is then no longer the episode's projection but
+UI truth), or relocate the same mutation into the session's read path.
+Publishing monotonically on the writer side dissolves the conflict — the
+reader needs no state because the cell it reads already applied it. The
+rejected shape survives only as an executable negative control in the
+evidence crate, never as a product rule.
+
 Truth classes:
 
 ```text
-submitted        Mechanism Evidence. Cumulative source frames handed
-                 to the render leg by the session-owned PcmEdge read
-                 path (== frames submitted into the device buffer on
-                 all non-terminal paths). Monotone within one episode
-                 (within one seek epoch once F5 exists). Writer: the
-                 edge read path, one relaxed publication per block,
-                 published at the hand-off itself. That hand-off is
-                 adjacent to the device submission in the current
-                 production shape (edge `read_frames` → `ReleaseBuffer
-                 (n)`, wasapi steady loop); a handed-out block that is
-                 never submitted may occur only on a terminal abort,
-                 after which the projection is withdrawn. This is NOT
-                 the decoded count (decode runs ahead) and NOT the
-                 product position by itself (the device tail is not yet
-                 subtracted).
+handed_off       Mechanism-local accounting, NOT a published cell.
+                 The render leg's own count of the source frames it
+                 took from the session-owned edge and submitted into
+                 the device buffer (`read_frames` → `ReleaseBuffer(n)`,
+                 wasapi steady loop; a handed-out block that is never
+                 submitted can only be a terminal abort, after which the
+                 projection is withdrawn). Monotone within one episode
+                 (within one seek epoch once F5 exists). It lives only
+                 inside the render execution path; it is the
+                 projection's base, never a product surface. This is NOT
+                 the decoded count (decode runs ahead).
 
-tail             Mechanism Evidence. The output mechanism's own latest
-                 observation of its queued-to-play tail
-                 (GetCurrentPadding), in source frames. NOT monotone.
-                 Writer: the output mechanism, one relaxed publication
-                 per render-loop iteration, per park slice, and on the
-                 drain path. This is the same platform reading D14.7
-                 already trusts for output-tail quiescence — the
-                 establishment latch remains what it was; D14.8
-                 selects the raw padding reading as the tail cell's
-                 source, which is a new narrow decision made here, not
-                 a silent reuse of the establishment evidence.
+tail             Mechanism Evidence, read on that same execution path:
+                 the output mechanism's own latest observation of its
+                 queued-to-play tail (GetCurrentPadding), in source
+                 frames. NOT monotone. This is the same platform reading
+                 D14.7 already trusts for output-tail quiescence — the
+                 establishment latch keeps its F3 meaning; D14.8 selects
+                 the raw padding reading as the derivation's subtrahend,
+                 which is a new narrow decision made here, not a silent
+                 reuse of the establishment evidence. No extra device
+                 call is needed: the park slice and the steady loop
+                 already take this reading.
 
-Position         Projection (PBK-001 §2.3 sense) derived from the two
-                 cells at the observation boundary. Never a Fact;
-                 never a correctness basis for control, lifetime,
-                 settlement, resource lifetime, mechanism wakeup, or
-                 K0 lifecycle transitions.
+position_evidence  Mechanism Evidence cell: session-owned, episode-
+                 scoped, bound at activation. The render leg publishes
+                 it monotonically (the `publish` rule above) once per
+                 render-loop iteration, per park slice, and on the drain
+                 path. This is the ONLY cross-thread surface F4 adds.
+                 Never a Fact; it carries no exactness claim beyond the
+                 mechanism's own instant (see the `freshness` rule).
+
+Position         Projection (PBK-001 §2.3 sense): the application-
+                 facing visibility of `position_evidence` — one pure
+                 load while the episode is unsettled (D14.2 read seam).
+                 Never a Fact; never a correctness basis for control,
+                 lifetime, settlement, resource lifetime, mechanism
+                 wakeup, or K0 lifecycle transitions.
 ```
 
 Frozen behavioral rules:
 
 ```text
-unknown ≠ zero    Position is undefined (None) until the output
-                  mechanism publishes its first tail observation
-                  (the stream-start evidence); before that, no
-                  position exists — not zero. It is undefined again
-                  once the terminal Fact is committed: the projection
-                  is withdrawn with the mechanism (no final-position
-                  latch storage is earned). A never-activated /
-                  open-aborted episode can therefore never fabricate
-                  one.
+unknown ≠ zero    Position is undefined (None) until the render
+                  mechanism publishes its first sample (the
+                  stream-start evidence); before that, no position
+                  exists — not zero. It is undefined again once the
+                  terminal Fact is committed: the projection is
+                  withdrawn with the mechanism (no final-position latch
+                  storage is earned — the read seam simply stops
+                  deriving it). A never-activated / open-aborted
+                  episode can therefore never fabricate one.
 
-monotonicity      The two cells are published independently, so a read
-                  is not atomic as a pair: raw differs from the truth
-                  by at most one in-flight block in either direction
-                  (±1024 source frames at the production block size;
-                  ≈21 ms at 48 kHz). It leads the truth by up to one
-                  block whenever the tail cell is one iteration stale
-                  (measured at stream start) and can tear backward by
-                  one block (measured max backward step 96). No
-                  accumulating error: both cells are exact counts /
-                  readings. The observation boundary clamps to
-                  max(last, raw), which removes the backward half of
-                  that bound only. Displayed position is monotone
-                  non-decreasing; raw evidence stays raw.
+publication       The single writer publishes monotonically:
+                  `published = max(published, handed_off −
+                  min(tail, handed_off))`, relaxed. Monotonicity is
+                  owned by the publication, not by any reader: a pure
+                  load cannot go backward because the cell it reads
+                  cannot. The max is not an accuracy repair applied to
+                  a torn read — there is no cross-cell read anywhere in
+                  F4: both inputs belong to one execution path and are
+                  consumed in the same loop iteration.
+
+freshness         Each published sample is exact only for the instant
+                  the writer read the tail. The reader holds no state
+                  and MUST NOT be promised any bound on how old its
+                  sample is: the age of what a pure load returns is the
+                  reader's own poll interval plus the mechanism's
+                  publication cadence — an asynchrony property of the
+                  reader's schedule, not a concurrency correctness
+                  invariant (relaxed atomics give coherence per
+                  location, never freshness). The mechanism owes the
+                  reader exactly three things: never backward, never
+                  above its own handed-off accounting, never
+                  fabricated. Any "± one in-flight block"-style error
+                  bound is withdrawn as a contract; a measured
+                  publication cadence is mechanism evidence, not a
+                  promise.
 
 writer lifetime   Each writer exists only while its mechanism is live.
-                  The edge read path and the render leg are
-                  teardown-owned resources, so after the render leg's
-                  teardown no publication can occur, and after the
+                  The render leg is a teardown-owned resource, so after
+                  its teardown no publication can occur, and after the
                   terminal Fact the projection is not derived at all —
                   a late publication by a dying leg is unobservable.
                   No post-settlement timeline state is written and none
@@ -1461,18 +1518,19 @@ writer lifetime   Each writer exists only while its mechanism is live.
 pause             Position freezes exactly where D14.7 Paused
                   establishes: submissions stop at render-gate
                   engagement (measured post-command advance: one
-                  in-flight block), the tail drains, and consumed
-                  reaches the frozen submitted value at tail
-                  quiescence — the same instant Paused establishes.
-                  Before that instant (pause command issued, tail
-                  still draining) the projection truthfully keeps
-                  advancing; it MUST NOT be frozen at command time.
+                  in-flight block), the park slices keep publishing
+                  while the tail drains, the published sample rises to
+                  the frozen handed-off total, and it stops moving at
+                  tail quiescence — the same instant Paused establishes.
+                  Before that instant (pause command issued, tail still
+                  draining) the projection truthfully keeps advancing;
+                  it MUST NOT be frozen at command time.
 
-EOF / terminal    Decoder EOF does not move Position to Duration.
-                  Consumed rises to the exact submitted total as the
-                  device drains (at D11 Completed the Drained verdict
-                  is the same tail == 0 reading). The submitted total
-                  equals the exact decoded total only because the
+EOF / terminal    Decoder EOF does not move Position to Duration. The
+                  published sample rises to the exact handed-off total
+                  as the device drains (at D11 Completed the Drained
+                  verdict is the same tail == 0 reading). The handed-off
+                  total equals the exact decoded total only because the
                   Completed path hands out every produced frame: the
                   edge producer blocks rather than dropping, and
                   buffered frames are abandoned only on a
@@ -1483,15 +1541,15 @@ EOF / terminal    Decoder EOF does not move Position to Duration.
                   asserted or forced. Stopped/Failed settle the same
                   withdrawal rule.
 
-seek (F5 rule)    The cells are episode-local accumulators whose
+seek (F5 rule)    The accumulator is episode-local and its
                   source-relative meaning is defined only within one
-                  seek epoch; the projection MUST NOT mix pre- and
-                  post-cutover submitted totals. How the cells are
-                  rebased and how the seek's landing offset enters the
-                  projection are owned by the F5 cutover decision
-                  (still OPEN): F4 freezes only the no-mixing
-                  constraint and earns no base term, Generation,
-                  SeekId, or TimelineSegment for it.
+                  seek epoch; the monotone publication MUST NOT mix
+                  pre- and post-cutover handed-off totals. How the
+                  accumulator is rebased and how the seek's landing
+                  offset enters the projection are owned by the F5
+                  cutover decision (still OPEN): F4 freezes only the
+                  no-mixing constraint and earns no base term,
+                  Generation, SeekId, or TimelineSegment for it.
 ```
 
 **Duration proposition (frozen).** Product Duration is **optional
@@ -1524,8 +1582,8 @@ terminal rule     At D11 Completed the final consumed position equals
 
 **Non-authority rule.** Position/Duration MUST NOT be inferred from
 buffer occupancy (`buffered_frames`), K0 lifecycle, FiberState, logs,
-decoded-frame counts alone, submitted counts alone, UI state, or ad-hoc
-device observations outside the two cells above. Position is not a
+decoded-frame counts alone, handed-off counts alone, UI state, or ad-hoc
+device observations outside the published sample above. Position is not a
 fourth transport state and does not join the D11 terminal contract;
 the D14.7 Paused projection and Position are independent derivations
 over partially shared evidence (tail quiescence), and neither is the
@@ -1534,24 +1592,40 @@ audibility — the frozen proposition is device-consumed presentation
 position in source frames; physical-audibility claims from software
 counters remain forbidden.
 
-**Realtime cost boundary (frozen shape).** Writers publish once per
-block (relaxed atomics; no locks, no allocation, no per-frame
-accounting, no generic dispatch, no K0 visibility); the reader derives
-at observation time under the existing completion-lock snapshot. The
-per-quantum path gains O(1) relaxed RMW on two episode-local cells —
-nothing else.
+**Realtime cost boundary (frozen shape).** The render leg keeps one
+plain local counter and derives from its own two values: per loop
+iteration / park slice / drain observation it performs one relaxed
+monotone RMW on one episode-local cell, with no new device call (the
+padding reading already exists in the loop and in the D14.7 park
+closure). No locks, no allocation, no per-frame accounting, no generic
+dispatch, no K0 visibility. The reader performs one relaxed load inside
+the existing observation read: no lock of its own, no reader-side state.
+Nothing enters the per-quantum path beyond O(1) work on a cell that is
+cache-hot on the rendering thread.
 
 **Rejected alternatives (evidence-backed).**
 
 - decoded-frame count as product position: runs ahead of consumption
   (edge + device queue advance while paused) — Mechanism Evidence
   only, not exposed.
-- submitted count alone: ahead of consumed by up to one device buffer;
-  kept only as the derivation base.
-- IAudioClock: measured shared-mode frequency is the stream-format
-  BYTE rate (48 kHz → 384000; 44.1 kHz AUTOCONVERTPCM → 352800), never
-  source frames; after unit conversion it tracks consumed within ~8 ms
-  and adds no source-relative truth — rejected as the larger mechanism
+- handed-off count alone: ahead of consumed by up to one device buffer;
+  kept only as the mechanism-local derivation base.
+- two separately published cells with a reader-side monotone clamp:
+  rejected (F4-GATE-CORRECTIVE-1). It cannot be realized inside the
+  frozen pure-read seam (see derivation ownership), and it is
+  unnecessary once the writer publishes monotonically. The torn-pair
+  counterexample that motivated this collapse is kept as an executable
+  negative control in the evidence crate — never as a product rule.
+- IAudioClock: on the exercised endpoint, GetFrequency numerically
+  matched the initialized stream format's byte rate (48 kHz float32 →
+  384000 = 48000 × 8; 44.1 kHz AUTOCONVERTPCM → 352800). That is an
+  observation about this endpoint, not a general rule: the API's
+  documented contract only guarantees that the frequency unit is
+  compatible with GetPosition's unit, and the unit may vary across
+  streams/devices. Either way the clock requires unit/origin
+  interpretation and adds no source-relative truth the algebra lacks
+  (after a byte→frame conversion it tracked the same consumed quantity
+  within ~8 ms) — rejected as the larger mechanism
   (smallest-mechanism razor); re-earnable only by a new narrow
   authority decision.
 - Fact-promoting Position: no designated semantic authority or
@@ -1560,11 +1634,12 @@ nothing else.
   future narrow authority decision.
 
 **Representation deliberately NOT frozen here.** The concrete Rust
-spelling of the evidence cells, the observation fields/methods, the
-Decode seam that surfaces the probe duration, and the withdrawal
-spelling are F4-implementation decisions under D14.10; they must not
-create new architecture nouns. `PlaybackSnapshot` and global stores
-remain forbidden.
+spelling of the evidence cell (including how the monotone value encodes
+"undefined" while remaining a pure read), the observation
+fields/methods, the Decode seam that surfaces the probe duration, and
+the withdrawal spelling are F4-implementation decisions under D14.10;
+they must not create new architecture nouns. `PlaybackSnapshot` and
+global stores remain forbidden.
 
 ### D14.9 Volume / Device switch — no generic state invention
 

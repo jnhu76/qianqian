@@ -357,8 +357,10 @@ Still OPEN:
 ```text
 pause/resume semantics
 position/duration authority (D14.8 PROPOSED on the F4 gate branch:
-    episode-local device-consumed Position Projection + optional
-    Duration evidence — never a Fact; pending human review)
+    episode-local device-consumed Position Projection — one monotone
+    mechanism-evidence sample published by the render leg, read as one
+    pure load — + optional Duration evidence; never a Fact; pending
+    human review)
 seek mechanism/authority
 open/session replacement representation
 playlist/queue authority

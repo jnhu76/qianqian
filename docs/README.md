@@ -232,8 +232,9 @@ application-facing projection — Paused is the earned Projection,
 resume is Command-only, disengagement is Mechanism Evidence) and
 implemented behind the episode seam; F4 position/duration authority is
 PROPOSED frozen by the D14.8 amendment on the F4 gate branch (pending
-human review; Position = episode-local device-consumed Projection,
-Duration = optional source evidence); the remaining transport
+human review; Position = episode-local device-consumed Projection, read
+as one pure load of a monotone mechanism-evidence sample published by
+the render leg; Duration = optional source evidence); the remaining transport
 semantics stay OPEN (PBK-002 §14) pending their authority design.
 
 ---
