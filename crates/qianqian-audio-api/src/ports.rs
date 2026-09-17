@@ -437,9 +437,9 @@ impl PositionEvidence {
     /// already have the reading it is passing in (F4 adds no device call).
     pub fn publish_consumed(&self, handed_off: u64, tail: u64) {
         let estimate = handed_off - tail.min(handed_off);
-        // Saturated by construction: `estimate <= u64::MAX - 1` implies
-        // `estimate + 1` is representable, and the saturating add keeps
-        // that true for the unreachable boundary sample too.
+        // The encode saturates so it stays total: the unreachable
+        // u64::MAX sample maps to the top of the legal domain instead of
+        // wrapping into 0, which would have read as "undefined".
         let encoded = estimate.saturating_add(1);
         // The single writer is monotone, so the max is a guard against a
         // regressing tail reading (the queue growing again) rather than a
