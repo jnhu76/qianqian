@@ -109,6 +109,9 @@ mod windows {
                 // No pause is routed in these cycles; the mechanism must
                 // sail through the loop-top gate untouched.
                 gate: RenderGate::new(),
+                // The real leg publishes position evidence into this
+                // cell; nothing reads it in this oracle.
+                position: Default::default(),
             })
             .expect("real endpoint opens");
         stream.stop_and_join();

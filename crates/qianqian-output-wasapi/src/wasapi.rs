@@ -12,6 +12,17 @@
 //! the filesystem, a decoder, or the kernel; its only stop observation
 //! is the frame source's terminal outcomes.
 //!
+//! Frame accounting and position evidence (D14.8): the same loop owns one
+//! plain local `handed_off` total — source frames successfully submitted
+//! into the device buffer — and publishes `handed_off - padding`
+//! monotonically into the session-owned position cell from the padding
+//! readings it already takes (steady loop, park slices, drain path). The
+//! publication is ordered strictly BEFORE the submission of the current
+//! iteration, so the estimate can never count a block the device has not
+//! been given yet; the accounting is credited only AFTER `ReleaseBuffer`
+//! succeeds. This adds no device call, no lock and no allocation to the
+//! render path.
+//!
 //! Format negotiation is Tier 1 only (design §7): the float32 source
 //! format is submitted directly; shared-mode WASAPI mixes it to the
 //! device mix format itself. A device that refuses the source format
@@ -44,8 +55,8 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::GUID;
 
 use qianqian_audio_api::ports::{
-    AudioOutput, DrainSignal, DrainVerdict, OutputError, PcmFormat, PcmPull, RenderGate,
-    RenderPcmInput, RenderRequest, RenderStream,
+    AudioOutput, DrainSignal, DrainVerdict, OutputError, PcmFormat, PcmPull, PositionEvidence,
+    RenderGate, RenderPcmInput, RenderRequest, RenderStream,
 };
 
 use crate::open_abort::abort_render_thread;
@@ -100,7 +111,8 @@ impl AudioOutput for WasapiOutput {
                 let render_input = request.input.clone();
                 let gate = request.gate.clone();
                 let drain = request.drain.clone();
-                move || run_render_thread(format, render_input, gate, drain, slot)
+                let position = request.position.clone();
+                move || run_render_thread(format, render_input, gate, drain, position, slot)
             })
             .map_err(|e| OutputError {
                 message: format!("render thread spawn failed: {e}"),
@@ -199,12 +211,13 @@ fn run_render_thread(
     render_input: Arc<dyn RenderPcmInput>,
     gate: RenderGate,
     drain: DrainSignal,
+    position: PositionEvidence,
     slot: OpenSlot,
 ) {
     // A panic must not leave the completion unresolved or the producer
     // wedged: it reports like any other abort.
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        open_and_run(format, &*render_input, &gate, &slot)
+        open_and_run(format, &*render_input, &gate, &position, &slot)
     }))
     .unwrap_or_else(|_| LoopOutcome::Aborted {
         message: "render thread panicked".to_owned(),
@@ -236,6 +249,7 @@ fn open_and_run(
     format: PcmFormat,
     render_input: &dyn RenderPcmInput,
     gate: &RenderGate,
+    position: &PositionEvidence,
     slot: &OpenSlot,
 ) -> LoopOutcome {
     let coinit = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
@@ -248,13 +262,14 @@ fn open_and_run(
         };
     }
     let _apartment = ComApartment(true);
-    open_and_run_inner(format, render_input, gate, slot)
+    open_and_run_inner(format, render_input, gate, position, slot)
 }
 
 fn open_and_run_inner(
     format: PcmFormat,
     render_input: &dyn RenderPcmInput,
     gate: &RenderGate,
+    position: &PositionEvidence,
     slot: &OpenSlot,
 ) -> LoopOutcome {
     let Some(session) = open_session(format, slot) else {
@@ -267,7 +282,7 @@ fn open_and_run_inner(
     // every path — success, error, panic — before the unwind reaches
     // this scope's boundary.
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        steady_loop(&session, &format, render_input, gate)
+        steady_loop(&session, &format, render_input, gate, position)
     })) {
         Ok(outcome) => outcome,
         Err(_) => LoopOutcome::Aborted {
@@ -432,6 +447,7 @@ fn steady_loop(
     format: &PcmFormat,
     render_input: &dyn RenderPcmInput,
     gate: &RenderGate,
+    position: &PositionEvidence,
 ) -> LoopOutcome {
     if let Err(e) = unsafe { session.client.Start() } {
         return LoopOutcome::Aborted {
@@ -439,6 +455,12 @@ fn steady_loop(
         };
     }
     let channels = usize::from(format.channels);
+    // F4 (D14.8) writer-local accounting: the source frames THIS episode
+    // has successfully submitted into the device buffer. A plain local on
+    // this execution path — never a cell, never a product surface. It is
+    // the projection's base and the reason one render leg is the only
+    // writer of the episode's position cell.
+    let mut handed_off: u64 = 0;
     loop {
         // Pause gate (D14.7, mechanism A): loop top, strictly before
         // device-buffer acquisition, no device buffer held across the
@@ -447,8 +469,18 @@ fn steady_loop(
         // observation publishes this engagement's tail-quiescence
         // evidence. Release (resume/stop) never aborts the leg: the
         // loop proceeds once more and the data plane decides.
+        //
+        // The same reading feeds F4 (D14.8): submission is frozen while
+        // parked, so publishing the consumed estimate from each slice is
+        // exactly how the sample rises to the frozen handed-off total as
+        // the device drains — one device observation, two explicit
+        // semantic uses, truth classes kept separate.
         gate.park_while_paused(|| {
-            unsafe { session.client.GetCurrentPadding() }.is_ok_and(|padding| padding == 0)
+            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {
+                return false;
+            };
+            position.publish_consumed(handed_off, u64::from(padding));
+            padding == 0
         });
         // Period cadence; the bounded wait is also the stop-latency bound.
         unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
@@ -456,6 +488,15 @@ fn steady_loop(
             Ok(p) => p,
             Err(e) => break abort_msg(format!("GetCurrentPadding failed: {e}")),
         };
+        // F4 (D14.8) publication order — the pairing is the contract:
+        // this estimate is derived from the handed-off total as it stands
+        // BEFORE this iteration submits anything, because it is paired
+        // with a padding reading taken at that same instant. Publishing
+        // after `handed_off += n` below (or crediting `n` before
+        // `ReleaseBuffer` succeeds) would count the new block as already
+        // consumed and overstate the position by up to one device block.
+        // The source-order oracle `render_order_oracle.rs` pins this.
+        position.publish_consumed(handed_off, u64::from(padding));
         let available = session.buffer_frames.saturating_sub(padding) as usize;
         if available == 0 {
             continue;
@@ -472,11 +513,16 @@ fn steady_loop(
                 if let Err(e) = unsafe { session.render.ReleaseBuffer(n as u32, 0) } {
                     break abort_msg(format!("ReleaseBuffer failed: {e}"));
                 }
+                // Only a successful device submission earns handed-off
+                // accounting (D14.8): a failed ReleaseBuffer must not
+                // count the block. `n <= available`, so the total is
+                // bounded by what the device buffer could have taken.
+                handed_off += n as u64;
             }
             PcmPull::Eof => {
                 // Edge drained: everything produced has been submitted.
                 let _ = unsafe { session.render.ReleaseBuffer(0, 0) };
-                break drain_to_zero(session);
+                break drain_to_zero(session, position, handed_off);
             }
             PcmPull::Stopped => {
                 let _ = unsafe { session.render.ReleaseBuffer(0, 0) };
@@ -490,12 +536,27 @@ fn steady_loop(
 
 /// Wait until the device has played out everything submitted
 /// (padding reaches zero), bounded. EOF must be audible, not just queued.
-fn drain_to_zero(session: &DeviceSession) -> LoopOutcome {
+///
+/// The same readings keep the F4 position evidence current: the leg
+/// submits nothing more here, so each observation publishes the rising
+/// consumed estimate, and the zero observation that ends the drain
+/// publishes the exact handed-off total. That total is consumption
+/// truth — it is not compared with, corrected by, or forced onto the
+/// reported source duration.
+fn drain_to_zero(
+    session: &DeviceSession,
+    position: &PositionEvidence,
+    handed_off: u64,
+) -> LoopOutcome {
     let deadline = Instant::now() + DRAIN_CAP;
     loop {
         match unsafe { session.client.GetCurrentPadding() } {
-            Ok(0) => return LoopOutcome::Drained,
-            Ok(_) => {}
+            Ok(padding) => {
+                position.publish_consumed(handed_off, u64::from(padding));
+                if padding == 0 {
+                    return LoopOutcome::Drained;
+                }
+            }
             Err(e) => return abort_msg(format!("drain padding check failed: {e}")),
         }
         if Instant::now() > deadline {
