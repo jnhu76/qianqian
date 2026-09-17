@@ -103,10 +103,11 @@ echo "== witness 探针（必须 MUST-FAIL：可达性证明，防空洞不变�
 run_tlc "$SPEC_ROOT/probes/ReachCommit.cfg"             fail:ProbeNeverCommitted  "Witness / commit 可达"                 -continue
 run_tlc "$SPEC_ROOT/probes/WitnessOldDrainPreCommit.cfg" fail:ProbeNoOldDrainEver "Witness / pre-commit 旧输出可达（合法）" -continue
 run_tlc "$SPEC_ROOT/probes/WitnessOldEdgePreCommit.cfg"  fail:ProbeNoOldEdgeEver  "Witness / pre-commit edge 旧库可达"     -continue
+run_tlc "$SPEC_ROOT/probes/WitnessSeekRefused.cfg"       fail:ProbeNoRefusalEver  "Witness / seek 拒绝路径可达"            -continue
 
 echo "== 负控制（每个 mutation 必须被抓住）"
 run_tlc "$SPEC_ROOT/mutations/M1CommitBeforeTailPurge.cfg" fail:InvStaleOutput     "Mutation / M1 CommitBeforeTailPurge（不等尾排空）" -continue
-run_tlc "$SPEC_ROOT/mutations/M2CutMidWrite.cfg"           fail:InvStaleOutput     "Mutation / M2 CutMidWrite（staging 未丢弃）"      -continue
+run_tlc "$SPEC_ROOT/mutations/M2SeekMidWrite.cfg"           fail:InvStaleOutput     "Mutation / M2 SeekMidWrite（staging 未丢弃）"      -continue
 run_tlc "$SPEC_ROOT/mutations/M3ParkWhileHeld.cfg"         fail:InvStaleOutput     "Mutation / M3 ParkWhileHeld（held block 跨 park）" -continue
 run_tlc "$SPEC_ROOT/mutations/M4StalePositionWriter.cfg"   fail:InvPositionNoMixing "Mutation / M4 StalePositionWriter（旧 basis 复用）" -continue
 run_tlc "$SPEC_ROOT/mutations/M5CommitBeforeLanding.cfg"   fail:InvStaleOutput     "Mutation / M5 CommitBeforeLanding（未 reposition）" -continue
