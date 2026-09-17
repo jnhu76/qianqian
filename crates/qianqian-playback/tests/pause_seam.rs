@@ -626,7 +626,10 @@ fn pause_routed_after_stop_cannot_repark_the_released_episode() {
 /// is held inside a slow (legal) tail observation, so it cannot observe
 /// the release until the hostile pause has routed and the probe lets
 /// go — the ordering is decided by the routing linearization, not by a
-/// race.
+/// race. If extreme scheduling ever delayed dispose past the hostile
+/// pause, the test would degrade to the safe interleaving (still
+/// passing, no longer exercising the suppressor); the mutation check
+/// is what proves the oracle's bite.
 #[test]
 fn pause_routed_after_teardown_release_cannot_wedge_the_join() {
     let _lifecycle = common::lifecycle_lock();

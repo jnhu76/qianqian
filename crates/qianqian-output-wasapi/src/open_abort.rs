@@ -8,6 +8,14 @@
 //!
 //! Windows-only by mechanism, not by protocol: this module carries no
 //! COM and compiles — and is tested — on every platform.
+//!
+//! Boundary note: the release here is the provider's own, not routed
+//! through the episode completion lock (the stream was never handed to
+//! a session, so there is nothing to linearize against). A composition
+//! root that ever hands the episode handle out before activation
+//! settles would own a residual re-park window between this release
+//! and the join; today's root holds the handle on the thread that is
+//! blocked inside the synchronous activation settle.
 
 use std::sync::Arc;
 use std::thread::JoinHandle;
