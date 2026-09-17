@@ -137,9 +137,11 @@ struct CompletionState {
     /// coarse (a pending prior-cycle `Disengaged` may still publish
     /// into a new cycle); what the reset guarantees is the claim, not
     /// the bookkeeping: `Resumed` is only ever true while the gate is
-    /// released and the leg is demonstrably not parked. Existence
-    /// evidence for the Resumed projection only; it never feeds control
-    /// or settlement.
+    /// released — pause control is not established and render
+    /// submission is re-enabled — with at most one park slice of lag
+    /// before the leg reaches its released check. Existence evidence
+    /// for the Resumed projection only; it never feeds control or
+    /// settlement.
     disengagement_observed: bool,
     /// Set once by [`SessionCompletion::release_pause_gate`] — the
     /// authority-owned teardown path has begun releasing the pause

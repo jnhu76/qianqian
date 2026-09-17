@@ -127,8 +127,13 @@ pub struct PlaybackSessionObservation {
     /// Whether the CURRENT pause cycle's render-gate disengagement has
     /// been observed (mechanism-evidence latch for the Resumed
     /// projection only). Reset when a new pause cycle begins, so a
-    /// previous cycle's disengagement never establishes Resumed —
-    /// symmetric to the current-engagement tail-quiescence discipline.
+    /// previous cycle's disengagement does not answer a later cycle's
+    /// resume — symmetric to the current-engagement tail-quiescence
+    /// discipline. Cycle scope is by reset, not event attribution: a
+    /// pending prior-cycle disengagement event may publish into a new
+    /// cycle (within at most one park slice); the guarantee is the
+    /// frozen claim — `resumed()` is true only while the gate is
+    /// released and render submission is re-enabled.
     pub pause_disengaged_observed: bool,
     /// Why activation raised, if it did. Diagnostic; an episode that
     /// never started has no terminal Fact and must not be forged into

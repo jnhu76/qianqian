@@ -20,6 +20,11 @@ use qianqian_composition::{ActivationError, ComponentSpec};
 #[cfg(windows)]
 mod wasapi;
 
+// Platform-independent open-abort protocol (D14.7): aborting a gated
+// render thread releases the routed pause intent before the join. See
+// the module doc; tested on every platform.
+mod open_abort;
+
 // White-box mechanism test (event-handle lifetime oracle,
 // NATIVE-BOUNDARY-AUDIT-0 A3.3 corrective). It moved inside the crate
 // boundary in the plugin-boundary hardening (H1): the concrete

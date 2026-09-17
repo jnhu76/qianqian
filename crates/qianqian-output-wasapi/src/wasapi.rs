@@ -48,6 +48,8 @@ use qianqian_audio_api::ports::{
     RenderPcmInput, RenderRequest, RenderStream,
 };
 
+use crate::open_abort::abort_render_thread;
+
 /// Frozen WASAPI ABI values defined locally, exactly so this mechanism
 /// never depends on which constants a given Windows SDK happens to export
 /// (same posture as the historical renderer).
@@ -125,11 +127,11 @@ impl AudioOutput for WasapiOutput {
                 negotiated: format,
             })),
             (Some(OpenVerdict::Failed { message }), _) => {
-                abort_thread(handle, &request.input);
+                abort_render_thread(handle, &request.input, &request.gate);
                 Err(OutputError { message })
             }
             (None, true) => {
-                abort_thread(handle, &request.input);
+                abort_render_thread(handle, &request.input, &request.gate);
                 Err(OutputError {
                     message: "WASAPI device open did not reach a verdict in time".to_owned(),
                 })
@@ -139,18 +141,6 @@ impl AudioOutput for WasapiOutput {
             }
         }
     }
-}
-
-/// Wake and join a render thread whose stream was never handed to the
-/// session (open failure / timeout). The thread observes the data-plane
-/// stop at its first read, or exits through its own failed verdict.
-///
-/// Callers must not hold the open-verdict mutex across this join: a
-/// render thread that is publishing its verdict needs that same mutex,
-/// so joining while holding it would wait forever.
-fn abort_thread(handle: JoinHandle<()>, render_input: &Arc<dyn RenderPcmInput>) {
-    render_input.stop();
-    let _ = handle.join();
 }
 
 /// One acquired render stream: owns the render thread and the device
