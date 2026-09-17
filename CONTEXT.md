@@ -279,10 +279,10 @@ F4 Position / Duration          GATE MERGED (research/f4-timeline-gate-1,
                                 unknown stays unknown; evidence
                                 experiments/f4-timeline-gate).
                                 IMPLEMENTED on feat/f4-position-duration-1
-                                behind the episode seam: one session-owned
-                                cell, observation fields position/duration,
-                                headless read-side timeline — pending human
-                                review
+                                (PR #152) behind the episode seam: one
+                                session-owned cell, observation fields
+                                position/duration, headless read-side
+                                timeline — pending human review
 F5 Seek                         REDESIGNED AROUND DISCONTINUITY PROTOCOL
 F6 Open                         CONFIG-MECHANISM-OPEN
 Next / Previous                 AFTER OPEN; separate navigation step

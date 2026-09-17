@@ -235,8 +235,8 @@ frozen by the D14.8 amendment (Position = episode-local
 device-consumed Projection, read as one pure load of a monotone
 mechanism-evidence sample published by the render leg; Duration =
 optional source-scoped Mechanism Evidence whose unknown stays unknown)
-and implemented behind the same seam — pending human review of the F4
-implementation PR; the remaining transport semantics stay OPEN
+and implemented behind the same seam (PR #152) — pending human review;
+the remaining transport semantics stay OPEN
 (PBK-002 §14) pending their authority design.
 
 ---
