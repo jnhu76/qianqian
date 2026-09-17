@@ -30,6 +30,15 @@
 //! pause_requested     Command state (D14.7); true does not mean Paused
 //! source_format       mechanism evidence, not source identity and not a
 //!                     playback semantic state
+//! source_duration     optional source-scoped mechanism evidence from the
+//!                     decode probe — NOT exact, and None means unknown
+//! position            Projection (D14.8): one pure load of the episode's
+//!                     render-leg position-evidence cell, in source PCM
+//!                     frames, derived only while the episode is
+//!                     unsettled. None means "no sample published yet"
+//!                     (or withdrawn after a terminal Fact) — never
+//!                     position zero, and never a claim about the
+//!                     acoustic instant
 //! pause_engagement    mechanism evidence: the CURRENT pause
 //!                     engagement's render-gate / output-tail state
 //! activation_error    activation diagnostic; never a terminal Failed
@@ -47,8 +56,13 @@
 //! mechanism evidence (see [`crate::completion`]).
 //!
 //! Fields the current architecture has not earned (Playing/Starting/
-//! Stopping, position/duration, buffer health, source identity, K0
-//! FiberState) are structurally absent.
+//! Stopping, transport states, buffer health, source identity, K0
+//! FiberState, and every raw mechanism counter — a handed-off total, a
+//! device tail, a raw estimate, a decoded count) are structurally
+//! absent: the application reads ONE position sample and reconstructs
+//! no device state from two cells.
+
+use std::time::Duration;
 
 use qianqian_audio_api::ports::PcmFormat;
 
@@ -119,6 +133,40 @@ pub struct PlaybackSessionObservation {
     /// The episode's source PCM format once activation published it.
     /// Mechanism evidence.
     pub source_format: Option<PcmFormat>,
+    /// The duration the decode mechanism reported for this source at
+    /// probe/open time (D14.8), or `None` when it reported none.
+    ///
+    /// Truth class: optional source-scoped **Mechanism Evidence** —
+    /// NEVER a Fact, and not exact in general (the container's own
+    /// declaration may over-claim what the source actually decodes to).
+    /// `None` means unknown, never zero. Unlike `position`, this evidence
+    /// is not a playback-state projection: it stays observable after the
+    /// terminal Fact, like `source_format`.
+    pub source_duration: Option<Duration>,
+    /// The current episode's position Projection (D14.8): one pure load
+    /// of the render leg's published sample — the source-relative
+    /// location of device-consumed presentation, in source PCM frames.
+    ///
+    /// Truth class: **Projection**. Never a Fact, never a transport
+    /// state, and never a correctness basis for control, lifetime,
+    /// settlement or K0 lifecycle. It is not a decoded, submitted or
+    /// audible position: it deliberately excludes all latency
+    /// downstream of the device-consumption point (engine queue,
+    /// hardware, DAC).
+    ///
+    /// `None` means no sample exists: before the render mechanism
+    /// publishes its first one, and again once a terminal Fact is
+    /// committed (the projection is withdrawn with the mechanism — no
+    /// final-position value is stored). It never means position zero,
+    /// and it is never fabricated for a never-activated episode.
+    ///
+    /// The sample is exact only for the instant the render leg read its
+    /// tail; this read promises no freshness bound (the age of a sample
+    /// is the reader's poll interval plus the mechanism's publication
+    /// cadence, not a concurrency invariant). What it does promise:
+    /// never backward, never above the writer's own handed-off
+    /// accounting, never fabricated.
+    pub position: Option<u64>,
     /// The current pause engagement's mechanism-evidence state
     /// (D14.7). Evidence, not a semantic transport state. Meaningful
     /// only while `terminal_outcome` is `None`: publication is

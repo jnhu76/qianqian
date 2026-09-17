@@ -96,6 +96,13 @@ fn activate_inner(
         .map_err(|e| ActivationError::new(format!("decode open failed: {}", e.message)))?;
     let format = decode_stream.format();
     completion.set_source_format(format);
+    // Duration evidence (D14.8), relayed once at activation from the
+    // same decode probe that produced the format. A provider that
+    // reported none leaves the evidence unset — unknown stays unknown,
+    // never zero and never an estimate.
+    if let Some(duration) = decode_stream.source_duration() {
+        completion.set_source_duration(duration);
+    }
 
     // The one bounded PCM edge: session-owned, preallocated now. It is
     // also the stop target: application-facing stop intent arrives here
@@ -112,7 +119,10 @@ fn activate_inner(
     // before `complete` returns — which also means this stream's
     // stop_and_join inverse below cannot return before the terminal
     // publication path has run. The render gate routes the episode's
-    // pause intent to the same leg's loop-top check (D14.7).
+    // pause intent to the same leg's loop-top check (D14.7), and the
+    // position cell is where that leg publishes its consumed estimate
+    // from the tail readings it already takes (D14.8) — one episode-owned
+    // cell, never replaced live, so P1–P5 are not triggered.
     let stream = output
         .service()
         .open_stream(qianqian_audio_api::ports::RenderRequest {
@@ -120,6 +130,7 @@ fn activate_inner(
             input: edge.clone(),
             drain: completion.drain_signal(),
             gate: completion.render_gate(),
+            position: completion.position_evidence(),
         })
         .map_err(|e| ActivationError::new(format!("render stream open failed: {}", e.message)))?;
 

@@ -54,8 +54,11 @@
 //! drain between a user stop and a device failure.
 
 use std::sync::{Arc, Condvar, Mutex};
+use std::time::Duration;
 
-use qianqian_audio_api::ports::{DrainSignal, DrainVerdict, GateEvent, PcmFormat, RenderGate};
+use qianqian_audio_api::ports::{
+    DrainSignal, DrainVerdict, GateEvent, PcmFormat, PositionEvidence, RenderGate,
+};
 
 use crate::edge::{EdgeTerminal, PcmEdge};
 use crate::handle::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
@@ -105,6 +108,13 @@ struct CompletionState {
     /// Source PCM format, published once at session activation
     /// (mechanism-evidence diagnostic readback).
     source_format: Option<PcmFormat>,
+    /// Source duration evidence (D14.8), published once at session
+    /// activation from the decode provider's probe/open report. Optional
+    /// source-scoped Mechanism Evidence: unset means "no duration was
+    /// reported" (unknown), which is never collapsed into zero and never
+    /// estimated. It stays observable after a terminal Fact — it is
+    /// source evidence, not a playback-state projection.
+    source_duration: Option<Duration>,
     /// Why activation raised, published by the session itself (the
     /// kernel's diagnostic surface carries the verdict, not the message).
     activation_failure: Option<String>,
@@ -174,6 +184,14 @@ struct CompletionArc {
     /// and acknowledges engagement/tail-quiescence/disengagement back as
     /// mechanism evidence (never Facts, never settlement inputs).
     gate: RenderGate,
+    /// The episode's position-evidence cell (D14.8), created here and
+    /// handed to the same render stream through its open request. It is
+    /// deliberately NOT part of the lock-protected state: the render leg
+    /// publishes into it from its realtime path with one relaxed atomic
+    /// update, and the observation reads it with one relaxed load while
+    /// holding the state lock — so the hot atomic never shares a lock,
+    /// and never a cache line, with the settlement state.
+    position: PositionEvidence,
 }
 
 impl Default for SessionCompletion {
@@ -206,6 +224,7 @@ impl SessionCompletion {
                         decode_failure: None,
                         drain_verdict: None,
                         source_format: None,
+                        source_duration: None,
                         activation_failure: None,
                         stop_requested: false,
                         pause_requested: false,
@@ -235,6 +254,7 @@ impl SessionCompletion {
                         }
                     }),
                     gate,
+                    position: PositionEvidence::new(),
                 }
             }),
         }
@@ -256,6 +276,18 @@ impl SessionCompletion {
         let mut guard = self.state.state.lock().expect("completion lock");
         if guard.source_format.is_none() {
             guard.source_format = Some(format);
+        }
+    }
+
+    /// The session publishes the duration the decode mechanism reported
+    /// for this source at probe/open time (D14.8). Called only when the
+    /// provider reported one; a provider that reported none leaves the
+    /// evidence unset, and unset observationally means unknown (`None`) —
+    /// never zero, never an estimate. First-wins, like the format.
+    pub(crate) fn set_source_duration(&self, duration: Duration) {
+        let mut guard = self.state.state.lock().expect("completion lock");
+        if guard.source_duration.is_none() {
+            guard.source_duration = Some(duration);
         }
     }
 
@@ -396,6 +428,14 @@ impl SessionCompletion {
         self.state.gate.clone()
     }
 
+    /// The episode's position-evidence cell, handed to the output
+    /// provider at activation (D14.8). Session-internal binding seam: the
+    /// application never reaches the cell, only the projection
+    /// `observe_snapshot` derives from it.
+    pub(crate) fn position_evidence(&self) -> PositionEvidence {
+        self.state.position.clone()
+    }
+
     /// Frames currently buffered on the session's edge, once bound.
     /// Test/verifier diagnostic only (F2 ruling, D14.3): mechanism
     /// evidence, NOT application observation and NOT UI contract. It
@@ -445,6 +485,14 @@ impl SessionCompletion {
     /// lock acquisition so the returned fields coexisted at one real
     /// instant (no torn combinations such as `Stopped` with
     /// `stop_requested == false`).
+    ///
+    /// The position sample is the one field that is not part of that
+    /// single-instant promise: it is one pure load of the episode's
+    /// position cell (D14.8), which the render leg publishes to
+    /// independently and which gives no freshness bound. The load is
+    /// taken only while the episode is unsettled — a settled episode
+    /// withdraws the projection — and it is a read: nothing here writes,
+    /// clamps, or settles anything.
     pub(crate) fn observe_snapshot(&self) -> PlaybackSessionObservation {
         let guard = self.state.state.lock().expect("completion lock");
         let (terminal_outcome, failure_diagnostic) = match &guard.outcome {
@@ -459,6 +507,16 @@ impl SessionCompletion {
             failure_diagnostic,
             stop_requested: guard.stop_requested,
             source_format: guard.source_format,
+            source_duration: guard.source_duration,
+            position: if terminal_outcome.is_none() {
+                self.state.position.published()
+            } else {
+                // Withdrawal is this gate, not a cell write: the render
+                // mechanism keeps whatever it last published until its
+                // own teardown drops it, and a late publication by a
+                // dying leg is simply not derived from.
+                None
+            },
             activation_error: guard.activation_failure.clone(),
             pause_requested: guard.pause_requested,
             pause_engagement: match (guard.engaged, guard.tail_quiesced) {
