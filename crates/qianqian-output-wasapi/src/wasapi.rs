@@ -14,14 +14,14 @@
 //!
 //! Frame accounting and position evidence (D14.8): the same loop owns one
 //! plain local `handed_off` total — source frames successfully submitted
-//! into the device buffer — and publishes `handed_off - padding`
-//! monotonically into the session-owned position cell from the padding
-//! readings it already takes (steady loop, park slices, drain path). The
-//! publication is ordered strictly BEFORE the submission of the current
-//! iteration, so the estimate can never count a block the device has not
-//! been given yet; the accounting is credited only AFTER `ReleaseBuffer`
-//! succeeds. This adds no device call, no lock and no allocation to the
-//! render path.
+//! into the device buffer — and publishes `handed_off -
+//! min(padding, handed_off)` monotonically into the session-owned
+//! position cell from the padding readings it already takes (steady loop,
+//! park slices, drain path). The publication is ordered strictly BEFORE
+//! the submission of the current iteration, so the estimate can never
+//! count a block the device has not been given yet; the accounting is
+//! credited only AFTER `ReleaseBuffer` succeeds. This adds no device
+//! call, no lock and no allocation to the render path.
 //!
 //! Format negotiation is Tier 1 only (design §7): the float32 source
 //! format is submitted directly; shared-mode WASAPI mixes it to the

@@ -411,11 +411,14 @@ impl PositionEvidence {
     /// The largest representable sample, in source PCM frames.
     ///
     /// The cell stores `sample + 1`, so this is the top of the encoding's
-    /// legal domain; the one value above it encodes "undefined" instead.
-    /// Reaching it would take a single live episode submitting
+    /// legal domain: a sample above it (including the u64::MAX one) is
+    /// stored — and later read back — as this value. The one value below
+    /// the domain, zero, is the undefined sentinel instead.
+    ///
+    /// Reaching the top would take a single live episode submitting
     /// `u64::MAX - 1` source frames into its device buffer, each one
     /// consumed at the source rate by the output engine — a frame count
-    /// bounded by real elapsed time (~1.8e19 frames is ≈ 5.8e11 years at
+    /// bounded by real elapsed time (~1.8e19 frames is ≈ 1.3e7 years at
     /// 44.1 kHz). The saturated value is never published in practice, and
     /// a saturated publication would still be monotone, still ≤ the
     /// writer's accounting, and still never fabricated.
@@ -559,7 +562,7 @@ pub trait DecodedPcmStream: Send {
     fn format(&self) -> PcmFormat;
 
     /// The source duration this mechanism reported at probe/open time,
-    /// or `None` when it reported none it can stand behind.
+    /// or `None` when it reported none.
     ///
     /// Truth class (ADR-PBK-002 D14.8): optional **source-scoped
     /// Mechanism Evidence**, relayed once by the session as episode

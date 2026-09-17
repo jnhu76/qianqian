@@ -111,8 +111,14 @@ pub enum PauseEngagement {
     TailQuiesced,
 }
 
-/// One coherent observation of one playback episode, snapshot under a
-/// single lock so every field value coexisted at one real instant.
+/// One coherent observation of one playback episode: the episode state
+/// is read under a single lock, so those fields coexisted at one real
+/// instant. `position` is the one exception, and deliberately so — it is
+/// a separate pure load of the mechanism's cell, which the render leg
+/// publishes to independently and which promises no freshness bound
+/// (D14.8). Its own doc states what it does and does not promise; do not
+/// read it as "the position at the instant the terminal outcome was
+/// read".
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlaybackSessionObservation {
     /// The committed terminal outcome, or `None` while no terminal Fact
@@ -166,6 +172,16 @@ pub struct PlaybackSessionObservation {
     /// cadence, not a concurrency invariant). What it does promise:
     /// never backward, never above the writer's own handed-off
     /// accounting, never fabricated.
+    ///
+    /// Pause coupling (D14.8): while the episode is parked at the D14.7
+    /// gate no frame is submitted, so the sample holds at the frozen
+    /// total — that is the freeze point, and it is later than the pause
+    /// command. A release legitimately ends the park and lets the loop
+    /// proceed once more (resume, or the stop that wakes it), so an
+    /// observation taken before a release is a sample, not a latch: the
+    /// writer may still publish one more in-flight block, exactly the
+    /// advance the frozen rule measures at command time. It stays within
+    /// the never-above-the-accounting promise throughout.
     pub position: Option<u64>,
     /// The current pause engagement's mechanism-evidence state
     /// (D14.7). Evidence, not a semantic transport state. Meaningful
