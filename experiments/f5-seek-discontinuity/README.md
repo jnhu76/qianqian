@@ -21,9 +21,11 @@ src/bin/f5seek.rs      E1 — decoder seek reality over the SongCore ABI
 src/bin/f5edge.rs      E2 — edge-cut protocol evidence (all platforms):
                        a faithful copy of the PcmEdge synchronization
                        shape plus the candidate non-terminal invalidate
-                       primitive, driven through the proposed two-phase
-                       seek-discontinuity protocol with a stale-output
-                       oracle; randomized scenarios + blocked-producer
+                       primitive, driven through the frozen
+                       seek-discontinuity protocol (refusal-first, the
+                       worker's own single purge, park-acknowledged
+                       commit) with a stale-output oracle; randomized
+                       scenarios + blocked-producer
                        (T4/T5) shape + rogue-staging negative control
 src/bin/f5cut.rs       E3 — WASAPI physical cutover probe (Windows
                        only): Experiment A = park → drain-to-zero →

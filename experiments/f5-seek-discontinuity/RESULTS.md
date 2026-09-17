@@ -114,8 +114,11 @@ requested vs reported landing   FLAC/ALAC: reported landing = first retained
                                 seek tolerance; no content-level exactness
                                 is promised for lossy
 pre-target emission             lossless YES: landing is block-aligned at/
-                                before target (up to ~648 frames ≈ 15 ms
-                                early, e.g. requested 88200 → retained 87552)
+                                before target (measured up to 3816 frames
+                                ≈ 87 ms early mid-stream — flac pct-10:
+                                requested 17640 → landed 13824 — and up
+                                to 10512 frames at the duration clamp;
+                                the b2b 88200 → 87552 case is 648)
                                 — the basis must be the LANDING, never the
                                 requested target (D14.8 "unknown ≠ zero"
                                 honesty, applied to targets)
@@ -250,9 +253,8 @@ quantifies the cut latency; the audible-cutover semantics (post-commit
 old PCM of this stream cannot be rendered) rests on the frozen D14.7
 padding semantics, with the device-consumed boundary of §2 — it makes no
 acoustic-instant claim. `PHYSICAL_PRODUCTION_SMOKE` for the eventual F5
-implementation remains NOT-RUN (that gate will run its own), and the
-amended verdict line is recorded as NOT-REPRODUCED (endpoint
-unavailable).
+implementation remains NOT-RUN (that gate will run its own physical
+production smoke).
 
 **Experiment B — Stop/Reset/Start (comparison record; NOT selected):**
 
@@ -613,9 +615,9 @@ PlaybackSessionHandle::request_seek(&self, target: Duration)
 | Concern | Selected rule | Evidence | Rejected alternatives |
 |---|---|---|---|
 | Seek target | source-relative media time (µs); zero=start; negative unrepresentable; provider decides validity; Duration never consulted | ABI native unit; E1 clamp/EOF behavior | percent-of-duration (UI convenience — invented semantics); PCM frame index (extra conversion layer for zero product gain; ABI speaks µs) |
-| Decoder landing | actual reported landing (`out_actual_position_us`) is the retained-PCM start; −1 = unknown → Position withdrawn, never requested-target | E1 (landing honest ±1 frame lossless; MP3 3-frame content tolerance) | requested target as basis (the charter §26 lie — measured to differ by up to ~648 frames ≈ 15 ms) |
+| Decoder landing | actual reported landing (`out_actual_position_us`) is the retained-PCM start; −1 = unknown → Position withdrawn, never requested-target | E1 (landing honest ±1 frame lossless; MP3 3-frame content tolerance) | requested target as basis (the charter §26 lie — measured to differ by up to 3816 frames ≈ 87 ms mid-stream, 10512 at the duration clamp) |
 | Edge invalidation | non-terminal invalidate primitive performed BY THE WORKER strictly after song_seek success, with the leg's parked evidence in hand; production keeps flowing until the parked evidence (no strand-inside-read stall); bounded-slice write so the serialization point is always reachable | E2 (256×3 clean; 51/51 rogue control; refusal scenario) | `drain old edge naturally` (unbounded latency, doesn't stop old production); edge replacement (P1–P5); session-side pre-purge (destructive-before-outcome — the round-1 MAJOR, removed); flush-cures-everything (the negative control disproves it) |
-| Output cut | park + natural drain to padding==0 (mechanism A; same D14.7 evidence class, zero stream-state changes) | E3 A (29.9–31.7 ms; position continuous; refill normal) | Stop/Reset/Start (E3 B: freezes mid-buffer, resets device position; unnecessary); stream replacement (heavier lifecycle); pause gate alone (never removes queued PCM) |
+| Output cut | park + natural drain to padding==0 (mechanism A; same D14.7 evidence class, zero stream-state changes) | E3 A (30.2–31.9 ms; position continuous; refill normal) | Stop/Reset/Start (E3 B: freezes mid-buffer, resets device position; unnecessary); stream replacement (heavier lifecycle); pause gate alone (never removes queued PCM) |
 | Cutover commit | session-owned CommitCut = landing ∧ edge-clean ∧ tail-quiesced ∧ leg-parked(acknowledged) ∧ unsettled | §7; formal model guards | decoder-repositioned alone (decoder-only fallacy); first-new-submission (too late — drain already proves safety) |
 | Position rebase | same cell, writer-side: basis = landing frames; local handed-off reset at commit; publication monotone per published stretch; unknown landing → withdraw | §8; formal M4 note | new cell per cutover (P1–P5 + secret Generation); reader-side clamp (forbidden by D14.8); command-time jump (fabrication) |
 | Pause interaction | A: pause intent survives seek; internal seek park is cut-attributed, invisible to pause evidence; transient pause-during-cut routes normally | §10 | implicit resume (rewrites another command's state); reject-while-paused (no mechanism reason) |
@@ -726,5 +728,42 @@ n-5  drain latency quoted as a range (29.9–31.7 ms); specs README's
     property covers both).
 ```
 
-Round 2 (fresh reviewer, against the corrected branch): verdict and
-record kept with this report at gate close.
+Round 2 (fresh reviewer, independent of round 1, against the corrected
+branch at 59deaca): verdict **PASS — no MAJOR findings**. Battery:
+R2-A refusal destruction (the M-1 class), R2-B race holes, R2-C
+authority forgery / vocabulary, R2-D evidence truthfulness, R2-E
+formal honesty (live check.sh run), R2-F scope discipline (zero
+production delta), R2-G P1–P5 / realtime firewall, R2-H position &
+terminal authority, R2-I documentation consistency, R2-J ABI
+soundness, R2-K gates & hygiene (all green at HEAD), R2-L stop
+conditions. The load-bearing attacks (A, B, C, F, G, H, J, K, L)
+passed on the frozen text itself. 5 MINOR + 3 NIT, all documentation/
+evidence-number hygiene, all fixed on this branch and re-verified:
+
+```text
+R2-D  ADR/RESULTS quoted stale numbers vs retained logs: drain range
+      29.9–31.7 ms (logs: 30.2/31.9/31.9), "255×3" scenarios (logs:
+      runs=256), landing-early bound "~648 frames ≈ 15 ms" (logs: up
+      to 3816 frames ≈ 87 ms mid-stream, 10512 at the duration
+      clamp). FIXED to the logged values (ADR amendment text, §3
+      row, §19 rows).
+R2-E  specs/f5-seek-discontinuity/RESULTS.md still recorded the
+      superseded two-phase run (997/300, 3 witnesses, M2
+      CutMidWrite). FIXED: rewritten to the current refusal-first
+      model record (1349/426, 4 witnesses, M2 SeekMidWrite), the
+      superseded record marked historical.
+R2-I  ADR header "Amended" ledger lacked the 2026-09-17 F5-GATE
+      entry, and the D14.5 spine row "physical cutover gate stays
+      OPEN" had no local annotation. FIXED: ledger entry added;
+      annotation added after the spine block; the superseded REV.3
+      step sketch got a dated supersession pointer; the D14.8
+      "never backward" freshness bullet now names the amended
+      between-committed-discontinuities scope.
+R2-A  stale "two-phase" protocol naming survived in the experiments
+      README and the specs RESULTS gloss (the frozen refusal-first
+      order itself was verified correct in ADR, harness, and model).
+      FIXED: both spots now describe the frozen ordering.
+NIT   §6 "NOT-REPRODUCED" leftover sentence contradicted the §6
+      reproduction narrative. FIXED (clause removed — it predates
+      the endpoint recovery).
+```

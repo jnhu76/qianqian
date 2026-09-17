@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint; 2026-09-17 — §20 D14.8 implementation note (F4-IMPLEMENTATION-1, PR #152): the chosen representation and the terminal/duration conformance reading are recorded in D14.8 — representation only, no proposition changed; 2026-09-17 — §20 D14.8 F4-IMPLEMENTATION-CORRECTIVE-1 (same PR, fresh review): the position observation gate must also withdraw on a recorded activation failure — a raising activation can leave a published sample behind (the render mechanism opens before the decode-worker spawn; the open-abort leg publishes from its park slice), so "never-activated fabricates no Position" is not satisfied by the terminal-Fact condition alone (conformance, no new state) |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint; 2026-09-17 — §20 D14.8 implementation note (F4-IMPLEMENTATION-1, PR #152): the chosen representation and the terminal/duration conformance reading are recorded in D14.8 — representation only, no proposition changed; 2026-09-17 — §20 D14.8 F4-IMPLEMENTATION-CORRECTIVE-1 (same PR, fresh review): the position observation gate must also withdraw on a recorded activation failure — a raising activation can leave a published sample behind (the render mechanism opens before the decode-worker spawn; the open-abort leg publishes from its park slice), so "never-activated fabricates no Position" is not satisfied by the terminal-Fact condition alone (conformance, no new state); 2026-09-17 — §20 D14.5 seek-discontinuity mechanism + policy freeze (F5-GATE, evidence `experiments/f5-seek-discontinuity/` + `specs/f5-seek-discontinuity/`): refusal-first frozen ordering, park + natural drain output mechanism, same-cell position rebase, P1–P5 untriggered; F5 implementation still blocked |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -1101,7 +1101,10 @@ The implementation protocol (decode-side serialization → old-staging discard �
 decoder reposition → edge invalidate/flush → physical output cutover → landing
 acknowledgement) is roadmap execution detail owned by Issue #119 F5
 (SEEK DISCONTINUITY PROTOCOL REV.3, three-layer cutover). This ADR freezes
-only its semantic spine:
+only its semantic spine *(that REV.3 step sketch is historical — superseded
+2026-09-17 by the F5-GATE amendment below, which freezes the execution
+ordering: seek refusal decided first, then staging discard, then the single
+worker-side edge purge)*:
 
 ```text
 same-episode ownership            no new Plugin/Fiber/lifecycle noun
@@ -1114,6 +1117,8 @@ no single vague success bit       command accepted / decoder repositioned /
 physical cutover gate stays OPEN  F5 implementation STOPs here
 ```
 
+*(The "stays OPEN" row above is resolved by the 2026-09-17 F5-GATE amendment below; the stop rule itself remains: F5 implementation does not start until a later slice is explicitly authorized against the frozen text.)*
+
 `seek command accepted`, `decoder repositioned`, `old PCM invalidated`, `physical output cutover`, and `actual landing` are not to be collapsed into one vague success bit if the implementation exposes them internally.
 
 **The physical output cutover mechanism is still OPEN.** F5 production implementation must stop at that gap until a narrow mechanism decision proves one of the existing-output reset/reopen/minimal-cutover choices. A coding agent may not invent `Generation`, a generic cache protocol, or a new runtime to bypass this gate. *(Resolved 2026-09-17 by the F5-GATE amendment below, which freezes the mechanism decisions; that amendment's own block rule governs: the F5 production implementation still stops until a later slice is explicitly authorized against the frozen text.)*
@@ -1121,7 +1126,7 @@ physical cutover gate stays OPEN  F5 implementation STOPs here
 > 2026-09-17 amendment (F5-GATE; mechanism evidence:
 > `experiments/f5-seek-discontinuity/` — E1 decoder-seek reality probe
 > [SongCore ABI v1, committed corpus], E2 edge-cut protocol probe
-> [faithful edge-sync copy, 255×3 scenarios, 51/51 negative control],
+> [faithful edge-sync copy, 256×3 scenarios, 51/51 negative control],
 > E3 physical WASAPI cutover probe [shared-mode, Windows host, 3 green
 > runs]; formal: `specs/f5-seek-discontinuity/` — safety model, 5
 > mutations COUNTEREXAMPLE-WITNESSED; roadmap: Issue #119 checkpoint).
@@ -1201,7 +1206,7 @@ commit boundary       the session records the cutover commit iff
                       no terminal evidence and owns no second terminal
                       authority.
 output mechanism      park + natural drain (the device consumes the old
-                      tail pre-commit; measured 29.9–31.7 ms across
+                      tail pre-commit; measured 30.2–31.9 ms across
                       three runs at one full device buffer on the probe
                       endpoint). Stop/Reset/
                       Start is REJECTED for v1 (measured: freezes
@@ -1685,7 +1690,9 @@ freshness         Each published sample is exact only for the instant
                   reader's schedule, not a concurrency correctness
                   invariant (relaxed atomics give coherence per
                   location, never freshness). The mechanism owes the
-                  reader exactly three things: never backward, never
+                  reader exactly three things: never backward (between
+                  committed seek discontinuities — the D14.8 seek rule
+                  below records the F5-GATE re-scope), never
                   above its own handed-off accounting, never
                   fabricated. Any "± one in-flight block"-style error
                   bound is withdrawn as a contract; a measured
