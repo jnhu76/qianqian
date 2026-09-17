@@ -1641,6 +1641,28 @@ the withdrawal spelling are F4-implementation decisions under D14.10;
 they must not create new architecture nouns. `PlaybackSnapshot` and
 global stores remain forbidden.
 
+> 2026-09-17 implementation note (F4-IMPLEMENTATION-1). Representation
+> and conformance only — the propositions above are unchanged, and the
+> choices below are replaceable representation under D14.10. The
+> implementation realized them as: one `PositionEvidence` cell in
+> `qianqian-audio-api::ports` (a session-owned episode resource handed
+> to the render leg through `RenderRequest`, like the D14.7 gate; not a
+> Capability and not a Plugin), storing `position + 1` in one relaxed
+> `AtomicU64` with the zero-initialized value meaning undefined and a
+> saturating encode at the top of its legal domain; the render leg keeps
+> `handed_off` as a plain local and publishes from the padding readings
+> it already takes (steady loop, park slices, drain path), crediting the
+> total only after a successful `ReleaseBuffer`; the observation exposes
+> `position: Option<u64>` (source PCM frames) and
+> `source_duration: Option<Duration>`, both admitted by the episode-
+> handle public-surface allowlist as the explicit implementation event.
+> Conformance reading recorded because it is easy to get backwards:
+> only the position projection is withdrawn at the terminal Fact
+> (`None`, with no cell write and no stored final position), while the
+> duration evidence is source-scoped and stays observable after
+> settlement — exactly the shape the frozen text gives it ("the same
+> shape as `source_format`").
+
 ### D14.9 Volume / Device switch — no generic state invention
 
 F7/F8 remain bounded by their current roadmap goals, but their authority/mechanism is not frozen here. A coding agent must not choose between session-owned control, output-provider control, episode replacement, stream replacement, or a generic control bus without a narrow authority/mechanism decision.
