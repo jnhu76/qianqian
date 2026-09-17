@@ -242,6 +242,8 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
 /// no later pause intent — routed or hostile — can ever park a leg
 /// again. A leg that arrives after the close finds the gate shut:
 /// immediate return, no engagement, no events. There is no un-close.
+/// The park runs on a helper thread under a bounded wait so a regressed
+/// gate fails with a diagnosis instead of hanging the suite.
 #[test]
 fn a_closed_gate_never_parks_or_engages_again() {
     let events = Events::default();
@@ -253,13 +255,30 @@ fn a_closed_gate_never_parks_or_engages_again() {
     // Hostile later intent, routed after the close: inert by design.
     gate.set_paused(true);
 
-    let mut tail_calls = 0usize;
-    gate.park_while_paused(|| {
-        tail_calls += 1;
-        false
-    });
-
-    assert_eq!(tail_calls, 0, "the closed gate must not park the leg");
+    let tail_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let (tx, rx) = std::sync::mpsc::channel();
+    {
+        let gate = gate.clone();
+        let tail_calls = tail_calls.clone();
+        std::thread::spawn(move || {
+            gate.park_while_paused(|| {
+                tail_calls.fetch_add(1, Ordering::SeqCst);
+                false
+            });
+            let _ = tx.send(());
+        });
+    }
+    assert_eq!(
+        rx.recv_timeout(Duration::from_secs(5)),
+        Ok(()),
+        "the closed gate parked the leg: it never returned from \
+         park_while_paused"
+    );
+    assert_eq!(
+        tail_calls.load(Ordering::SeqCst),
+        0,
+        "the closed gate must not park the leg"
+    );
     assert!(
         events.snapshot().is_empty(),
         "the closed gate must publish no engagement evidence: {:?}",

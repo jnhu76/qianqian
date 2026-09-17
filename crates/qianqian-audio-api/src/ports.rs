@@ -191,6 +191,11 @@ pub enum GateEvent {
 ///     once more and the data plane decides;
 /// the device stream stays open — a park replaces no resource.
 /// ```
+///
+/// One gate serves exactly one render leg: the engagement evidence, the
+/// once-per-engagement tail-quiescence discipline, and the
+/// disengagement fence that scopes the owner's Resumed evidence are all
+/// sound only under that premise.
 #[derive(Clone, Debug, Default)]
 pub struct RenderGate {
     inner: Arc<GateInner>,
