@@ -166,8 +166,8 @@ impl Edge {
             return 0;
         }
         let write_pos = guard.write_pos;
-        for i in 0..take {
-            guard.ring[(write_pos + i) % self.capacity] = src[i];
+        for (i, frame) in src[..take].iter().enumerate() {
+            guard.ring[(write_pos + i) % self.capacity] = *frame;
         }
         guard.write_pos = (guard.write_pos + take) % self.capacity;
         guard.buffered += take;
@@ -186,8 +186,8 @@ impl Edge {
             if guard.buffered > 0 {
                 let take = dst.len().min(guard.buffered);
                 let read_pos = guard.read_pos;
-                for i in 0..take {
-                    dst[i] = guard.ring[(read_pos + i) % self.capacity];
+                for (i, slot) in dst[..take].iter_mut().enumerate() {
+                    *slot = guard.ring[(read_pos + i) % self.capacity];
                 }
                 guard.read_pos = (guard.read_pos + take) % self.capacity;
                 guard.buffered -= take;
@@ -421,12 +421,16 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                     pending_landing = Some(landing);
                     shared.seek_pending.store(true, Ordering::Release);
                 }
-                let do_seek = pending_landing.is_some()
-                    && shared.parked_ack.load(Ordering::Acquire);
+                let do_seek =
+                    pending_landing.is_some() && shared.parked_ack.load(Ordering::Acquire);
                 if do_seek {
                     shared.seek_pending.store(false, Ordering::Release);
                 }
-                if let Some(landing) = if do_seek { pending_landing.take() } else { None } {
+                if let Some(landing) = if do_seek {
+                    pending_landing.take()
+                } else {
+                    None
+                } {
                     // song_seek happens HERE, before anything is
                     // invalidated (frozen order), and strictly after the
                     // leg's parked evidence.
@@ -518,12 +522,17 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                     BLOCK_FRAMES.min(sc.post_frames - produced_post)
                 };
                 let block: Vec<Frame> = (0..n)
-                    .map(|i| Frame { epoch, pos: src_pos + i as u64 })
+                    .map(|i| Frame {
+                        epoch,
+                        pos: src_pos + i as u64,
+                    })
                     .collect();
                 src_pos += n as u64;
                 if epoch == 0 {
                     produced_pre += n;
-                    shared.produced_pre.store(produced_pre as u64, Ordering::Release);
+                    shared
+                        .produced_pre
+                        .store(produced_pre as u64, Ordering::Release);
                     last_staging = block.clone();
                 } else {
                     produced_post += n;
@@ -538,11 +547,7 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
                     if off == block.len() {
                         break;
                     }
-                    if shared
-                        .command
-                        .lock()
-                        .expect("cmd lock")
-                        .is_some()
+                    if shared.command.lock().expect("cmd lock").is_some()
                         && shared.parked_ack.load(Ordering::Acquire)
                     {
                         // The seek can proceed now (leg parked): abandon
@@ -687,7 +692,9 @@ fn run_scenario(sc: &Scenario) -> Result<Outcome, String> {
         if post_commit != 0 {
             return Err("refused seek produced post-commit output".into());
         }
-        return Ok(Outcome::Refused { frames_consumed: out.len() });
+        return Ok(Outcome::Refused {
+            frames_consumed: out.len(),
+        });
     }
 
     // The frozen commit precondition includes the leg actually being
@@ -761,7 +768,10 @@ fn main() {
     let mut failures = 0usize;
 
     let mut scenarios = vec![
-        Scenario { label: "deterministic-honest", ..Default::default() },
+        Scenario {
+            label: "deterministic-honest",
+            ..Default::default()
+        },
         Scenario {
             label: "backward-seek-honest",
             seed: 7,
@@ -818,9 +828,15 @@ fn main() {
 
     let mut rogue_runs = 0usize;
     let mut rogue_fired = 0usize;
-    let only_seed: Option<u64> = std::env::var("F5EDGE_SEED").ok().and_then(|v| v.parse().ok());
+    let only_seed: Option<u64> = std::env::var("F5EDGE_SEED")
+        .ok()
+        .and_then(|v| v.parse().ok());
     for sc in &scenarios {
-        if let Some(sd) = only_seed { if sc.seed != sd { continue; } }
+        if let Some(sd) = only_seed {
+            if sc.seed != sd {
+                continue;
+            }
+        }
         let is_rogue = sc.rogue_staging;
         match run_scenario(sc) {
             Ok(Outcome::Clean {
@@ -869,5 +885,7 @@ fn main() {
         rogue_fired
     );
     println!("F5EDGE END failures={failures}");
-    std::process::exit(i32::from(failures > 0 || rogue_fired != rogue_runs || rogue_runs == 0));
+    std::process::exit(i32::from(
+        failures > 0 || rogue_fired != rogue_runs || rogue_runs == 0,
+    ));
 }

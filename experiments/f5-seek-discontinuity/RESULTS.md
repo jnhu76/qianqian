@@ -647,6 +647,17 @@ Formal  boolean abstraction; safety-only; bounded MAX_TAIL=2; the
     not model-derived (see §17 honesty note).
 ```
 
+Post-evidence source note: after the recorded runs, all three probes
+were reorganized for gate hygiene only — the platform-specific probe
+bodies moved into cfg-gated modules (the f4probe pattern) so the
+crate builds and clippy-clean for both the Linux host and the
+x86_64-pc-windows-gnu target, plus two mechanical lint fixes (an
+identity `as f32` cast removed, one function renamed snake_case).
+These are code motions with identical experiment logic; they are
+verified by two-target compile plus fresh Linux smoke runs of E1/E2
+(green), not by new physical E3 runs — the retained E3 logs remain
+the runs of the semantically identical pre-reorganization source.
+
 ## 21. Adversarial execution reasoning (charter §30, T1–T20)
 
 The charter's twenty scenarios are covered by the frozen policy +
