@@ -506,7 +506,6 @@ VolumePlugin
 ## 14. Open decisions
 
 ```text
-seek physical-output cutover mechanism beyond D14's frozen stale-PCM invariant
 open/session CONFIG mechanism under D14's no-overlap v1 semantic contract
 playlist / queue authority and whether it earns PlaylistPlugin
 next / previous navigation policy beyond D14's no-overlap replacement semantic shape
@@ -529,7 +528,13 @@ P1–P5 concrete production mechanism
 (No longer OPEN: position / duration authority — designated as the
 D14.8 episode-local Position Projection and optional Duration evidence
 by the 2026-09-17 F4-GATE amendment. The D14.8 representation and the
-seek-epoch rebase rule's F5 mechanism remain governed by D14.8/D14.5.)
+seek-epoch rebase rule's F5 mechanism remain governed by D14.8/D14.5.
+No longer OPEN either: seek physical-output cutover mechanism beyond
+D14's frozen stale-PCM invariant — frozen by the 2026-09-17 F5-GATE
+amendment inside D14.5 (same-resource discontinuity protocol; park +
+natural-drain output cut selected, Stop/Reset/Start rejected with
+physical evidence); F5 production implementation still stops until a
+later slice is explicitly authorized against that frozen text.)
 
 Reduction rule for all future phases:
 
@@ -766,6 +771,11 @@ Playing / Starting / Paused / Stopping semantics
      state; `Resumed` was removed from the projection set by the
      D14.7 AUTHORITY-CORRECTIVE)
 seek product-state vocabulary / actual-landing authority beyond D14 minimum
+    (no longer OPEN: the 2026-09-17 F5-GATE amendment in D14.5 froze
+     the actual-landing authority — the decode provider's reported
+     landing, relayed by the session as the Position rebase basis,
+     unknown = withdraw the projection — and the product-state
+     vocabulary: no new public seek state, no Seek completion Fact)
 source identity / playlist authority / navigation policy
 volume / device-switch authority
 PlaybackFacts publication topology beyond D14 read seam
@@ -1106,7 +1116,127 @@ physical cutover gate stays OPEN  F5 implementation STOPs here
 
 `seek command accepted`, `decoder repositioned`, `old PCM invalidated`, `physical output cutover`, and `actual landing` are not to be collapsed into one vague success bit if the implementation exposes them internally.
 
-**The physical output cutover mechanism is still OPEN.** F5 production implementation must stop at that gap until a narrow mechanism decision proves one of the existing-output reset/reopen/minimal-cutover choices. A coding agent may not invent `Generation`, a generic cache protocol, or a new runtime to bypass this gate.
+**The physical output cutover mechanism is still OPEN.** F5 production implementation must stop at that gap until a narrow mechanism decision proves one of the existing-output reset/reopen/minimal-cutover choices. A coding agent may not invent `Generation`, a generic cache protocol, or a new runtime to bypass this gate. *(Resolved 2026-09-17 by the F5-GATE amendment below, which freezes the mechanism decisions; that amendment's own block rule governs: the F5 production implementation still stops until a later slice is explicitly authorized against the frozen text.)*
+
+> 2026-09-17 amendment (F5-GATE; mechanism evidence:
+> `experiments/f5-seek-discontinuity/` — E1 decoder-seek reality probe
+> [SongCore ABI v1, committed corpus], E2 edge-cut protocol probe
+> [faithful edge-sync copy, 255×3 scenarios, 51/51 negative control],
+> E3 physical WASAPI cutover probe [shared-mode, Windows host, 3 green
+> runs]; formal: `specs/f5-seek-discontinuity/` — safety model, 5
+> mutations COUNTEREXAMPLE-WITNESSED; roadmap: Issue #119 checkpoint).
+> The semantic spine above is UNCHANGED — the amendment freezes the
+> mechanism and policy decisions the gate earned and closes the §14
+> open item ("seek physical-output cutover mechanism"). The F5
+> production implementation remains blocked until a later slice is
+> explicitly authorized against this frozen text; nothing here merges
+> production code by itself.
+
+**Frozen by this amendment:**
+
+```text
+acceptance            seek is a same-episode Command accepted only while
+                      the data plane is Open (edge terminal == Open) and
+                      the episode is unsettled, with no seek in flight
+                      (one-seek-in-flight; a second request before the
+                      current cut commits or aborts is inert). The drain
+                      window after decoder EOF (edge Eof, D11 not yet
+                      settled) is explicitly NOT seekable in v1 —
+                      reopening an Eof edge is a closed design door.
+cutover protocol      same-resource discontinuity protocol (no resource
+                      is replaced): the render leg parks at its loop-top
+                      gate holding no device buffer (the D14.7 park
+                      invariant, attributed to the cut — an internal seek
+                      park is NOT pause engagement evidence and never
+                      routes pause intent); the session empties the edge
+                      (phase-1 invalidate; unblocks a producer blocked on
+                      a full edge); the worker discards its staging and
+                      invalidates the edge itself at its serialization
+                      point (phase-2 — the load-bearing stale-PCM
+                      exclusion is this program-order discipline, not
+                      the primitive); it then repositions via song_seek
+                      and publishes its actual landing as mechanism
+                      evidence. Stop intent wins at every point: it
+                      aborts the protocol (no commit, no rebase) and D11
+                      settles exactly as it would have without seek.
+commit boundary       the session records the cutover commit iff
+                      landing published ∧ edge invalidated ∧ output tail
+                      quiesced (padding == 0 while parked — the D14.7
+                      evidence class) ∧ leg parked ∧ episode unsettled.
+                      Before commit, old output is legal; after commit,
+                      old PCM is impossible. Seek contributes no terminal
+                      evidence and owns no second terminal authority.
+output mechanism      park + natural drain (the device consumes the old
+                      tail pre-commit; measured 31.2 ms at one full
+                      device buffer on the probe endpoint). Stop/Reset/
+                      Start is REJECTED for v1 (measured: freezes
+                      mid-buffer audio, resets the device position
+                      origin, adds a stream-state machine for an
+                      inaudible latency win) and is re-earnable only by
+                      a new narrow authority decision. No stream is
+                      replaced; P1–P5 are NOT triggered (same edge,
+                      same stream, same device session, same position
+                      cell, same threads; no old/new RT-world overlap).
+position rebase       realizes the D14.8 seek paragraph: the rebase
+                      happens on the render leg's own execution path at
+                      commit release — basis := the decoder's reported
+                      actual landing in source frames (−1 = unknown → no
+                      basis exists; the Position projection is withdrawn
+                      for the rest of the episode: unknown stays
+                      unknown, never zero, never the requested target),
+                      and the leg's handed-off accounting resets, so
+                      pre- and post-cutover totals are never mixed.
+                      Same cell, one writer, plain store at the commit;
+                      the publication stays monotone WITHIN one epoch.
+                      **Position monotonicity scope is hereby amended:
+                      monotone between committed discontinuities** — a
+                      committed cutover may step the published sample
+                      backward exactly once, on the writer's path, and
+                      that step is the discontinuity. No new cell, no
+                      Generation/SeekId/TimelineSegment; the requested
+                      target NEVER substitutes for the landing (E1
+                      measured lossless block-aligned landings up to
+                      ~648 frames before target).
+pause interaction     pause intent SURVIVES seek: a seek never implicitly
+                      resumes and is never rejected because of pause.
+                      A paused episode's already-quiesced tail satisfies
+                      the output-cut precondition; the leg stays parked
+                      through the cut; paused() evaluates unchanged.
+failure policy        pre-cut failures (seek in flight, data plane not
+                      Open, settled episode, song_seek refusal
+                      incl. SEEK_UNSUPPORTED/SEEK_ERROR/INVALID_ARGUMENT)
+                      are inert diagnostics — playback continues from
+                      the old position; they are NEVER terminal Failed.
+                      The selected mechanism confines post-cut failure
+                      to the existing D11 device-failure path (the edge
+                      invalidate is a fail-fast O(1) reset; a device
+                      failure during the drain settles through the
+                      existing precedence). Seek introduces no new
+                      terminal variant and no recovery semantics.
+realtime cost         zero new per-quantum work in normal playback (the
+                      render loop gains one more session-owned flag at
+                      its existing loop-top check; the worker gains a
+                      loop-top command check off the RT path); seek work
+                      is bounded control work outside the quantum path.
+public surface        proposed future command:
+                      `PlaybackSessionHandle::request_seek(&self,
+                      target: Duration)` — infallible, non-negative,
+                      source-relative; invalid moments are inert. No
+                      SeekManager/SeekSession/transaction noun; no new
+                      observation field and no public positive seek
+                      state (consumers observe the Position jump). The
+                      allowlist update at implementation time remains
+                      the explicit architecture event (D14.10).
+```
+
+The command accepted / decoder repositioned / old PCM invalidated /
+physical output cutover / actual landing propositions stay separable
+(they are separate protocol states above); the implementation must not
+collapse them into one success bit. Seek completion is NOT a Fact and
+not a product state; nothing here earns `Generation`, `Epoch`, `SeekId`,
+`DiscontinuityId`, `TimelineSegment`, or a public `SeekState` — the
+razor review is recorded in the gate report (`experiments/f5-seek-
+discontinuity/RESULTS.md` §15).
 
 ### D14.6 Open / Next / Previous — no-overlap replacement v1
 
@@ -1547,8 +1677,13 @@ seek (F5 rule)    The accumulator is episode-local and its
                   pre- and post-cutover handed-off totals. How the
                   accumulator is rebased and how the seek's landing
                   offset enters the projection are owned by the F5
-                  cutover decision (still OPEN): F4 freezes only the
-                  no-mixing constraint and earns no base term,
+                  cutover decision (no longer OPEN: frozen 2026-09-17
+                  by the F5-GATE amendment in D14.5 — same-cell,
+                  writer-side rebase at commit release; basis = the
+                  decoder's reported actual landing; unknown landing
+                  withdraws the projection; monotonicity scope amended
+                  to "between committed discontinuities"): F4 freezes
+                  only the no-mixing constraint and earns no base term,
                   Generation, SeekId, or TimelineSegment for it.
 ```
 
