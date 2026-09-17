@@ -490,7 +490,8 @@ impl SessionCompletion {
     /// single-instant promise: it is one pure load of the episode's
     /// position cell (D14.8), which the render leg publishes to
     /// independently and which gives no freshness bound. The load is
-    /// taken only while the episode is unsettled — a settled episode
+    /// taken only for an episode that is both live and unsettled — a
+    /// committed terminal Fact, or a recorded activation failure,
     /// withdraws the projection — and it is a read: nothing here writes,
     /// clamps, or settles anything.
     pub(crate) fn observe_snapshot(&self) -> PlaybackSessionObservation {
@@ -508,7 +509,18 @@ impl SessionCompletion {
             stop_requested: guard.stop_requested,
             source_format: guard.source_format,
             source_duration: guard.source_duration,
-            position: if terminal_outcome.is_none() {
+            // Two withdrawal conditions, both read inside this lock
+            // hold. The activation-failure one is not redundant with
+            // settlement: the render mechanism opens — and starts
+            // publishing from the loop-top readings it already takes —
+            // BEFORE the last fallible activation step (the decode
+            // worker spawn), and an open-aborted stream publishes from
+            // the park slice of the very leg that is about to be
+            // aborted. So an activation that raises can leave a
+            // non-empty cell behind for an episode that never existed.
+            // "Never activated" means no position, however many samples
+            // the dying mechanism managed to publish.
+            position: if terminal_outcome.is_none() && guard.activation_failure.is_none() {
                 self.state.position.published()
             } else {
                 // Withdrawal is this gate, not a cell write: the render

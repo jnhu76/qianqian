@@ -34,11 +34,11 @@
 //!                     decode probe — NOT exact, and None means unknown
 //! position            Projection (D14.8): one pure load of the episode's
 //!                     render-leg position-evidence cell, in source PCM
-//!                     frames, derived only while the episode is
-//!                     unsettled. None means "no sample published yet"
-//!                     (or withdrawn after a terminal Fact) — never
-//!                     position zero, and never a claim about the
-//!                     acoustic instant
+//!                     frames, derived only while the episode is live
+//!                     and unsettled. None means "no sample published
+//!                     yet" (or withdrawn after a terminal Fact or an
+//!                     activation failure) — never position zero, and
+//!                     never a claim about the acoustic instant
 //! pause_engagement    mechanism evidence: the CURRENT pause
 //!                     engagement's render-gate / output-tail state
 //! activation_error    activation diagnostic; never a terminal Failed
@@ -161,10 +161,14 @@ pub struct PlaybackSessionObservation {
     /// hardware, DAC).
     ///
     /// `None` means no sample exists: before the render mechanism
-    /// publishes its first one, and again once a terminal Fact is
-    /// committed (the projection is withdrawn with the mechanism — no
-    /// final-position value is stored). It never means position zero,
-    /// and it is never fabricated for a never-activated episode.
+    /// publishes its first one, and again once the episode stops being a
+    /// live one — a committed terminal Fact withdraws the projection (no
+    /// final-position value is stored), and so does a recorded activation
+    /// failure, because the mechanism that publishes is opened before the
+    /// last fallible activation step, so a raising activation can leave
+    /// samples in the cell for an episode that never played. It never
+    /// means position zero, and it is never fabricated for a
+    /// never-activated episode.
     ///
     /// The sample is exact only for the instant the render leg read its
     /// tail; this read promises no freshness bound (the age of a sample

@@ -4,7 +4,9 @@
 //!
 //! Truth classes under test: `position` is the episode's Projection —
 //! one pure load of the cell the render leg publishes into, absent
-//! (never zero) before the first publication and after a terminal Fact;
+//! (never zero) before the first publication and after the episode
+//! stops being a live one (a terminal Fact, or an activation failure —
+//! the mechanism publishes before activation's last fallible step);
 //! `source_duration` is optional source-scoped Mechanism Evidence that
 //! is NOT exact and NOT withdrawn by settlement; neither is a Fact, and
 //! neither feeds settlement or control.
@@ -46,7 +48,7 @@
 mod common;
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use qianqian_app::QianqianApp;
@@ -110,6 +112,64 @@ fn registered_runtime(
                         device_tail.clone(),
                     );
                     service.tail_probe = TailProbe::default();
+                    ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
+                        std::rc::Rc::new(service),
+                    )
+                    .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
+                    Ok(())
+                })
+        })
+        .expect("output provider registers");
+
+    runtime
+        .register_component(playback_session_spec(
+            std::path::PathBuf::from(DUMMY_PATH),
+            handle,
+        ))
+        .expect("session registers");
+    runtime
+}
+
+/// The open-abort episode (`OutputBehavior::OpenTimeoutAbort`). Same
+/// episode as `registered_runtime`, except that the output double must
+/// own the caller's tail probe and engagement witness — they ARE the park
+/// proof and the pre-abort publication witness — so it is built with the
+/// open-abort constructor rather than the plain one.
+fn open_abort_runtime(
+    decode: TestDecode,
+    consumed: Arc<AtomicUsize>,
+    device_tail: DeviceTail,
+    tail_probe: TailProbe,
+    open_abort_engaged: Arc<AtomicBool>,
+    handle: PlaybackSessionHandle,
+) -> QianqianApp {
+    let mut runtime = QianqianApp::new();
+
+    runtime
+        .register_component({
+            qianqian_composition::ComponentSpec::new("test_decode_plugin")
+                .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
+                .on_activate(move |ctx| {
+                    ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
+                        std::rc::Rc::new(decode.clone()),
+                    )
+                    .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
+                    Ok(())
+                })
+        })
+        .expect("decode provider registers");
+
+    runtime
+        .register_component({
+            qianqian_composition::ComponentSpec::new("test_output_plugin")
+                .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
+                .on_activate(move |ctx| {
+                    let service = TestOutput::open_timeout_abort(
+                        consumed.clone(),
+                        device_tail.clone(),
+                        tail_probe.clone(),
+                        open_abort_engaged.clone(),
+                    );
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
                         std::rc::Rc::new(service),
                     )
@@ -208,6 +268,84 @@ fn a_never_activated_episode_never_fabricates_a_position() {
             handle.observe().source_duration,
             Some(Duration::from_secs(4)),
             "the duration evidence was established before the failure and stays"
+        );
+        assert_eq!(consumed.load(Ordering::SeqCst), 0, "nothing ever played");
+
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// The never-activated rule has a second, reachable face — the one
+/// F4-IMPLEMENTATION-CORRECTIVE-1 was raised on. Activation's last
+/// fallible step is the decode-worker spawn, and it runs AFTER the render
+/// mechanism is already open and publishing; the open-abort protocol is
+/// the same class made deterministic: its leg parks at the gate on the
+/// way to a failed open, and the park slice publishes from the padding
+/// reading it takes there. So a cell that holds a sample coexists with an
+/// episode that never played, and the projection must withdraw it.
+///
+/// The witness chain, in order: the mock's park slice publishes and THEN
+/// calls the armed tail observation that raises the hold (so the hold
+/// proves the publication ran), and `open_abort_engaged` is set only
+/// after that hold was observed — hence the flag is the test's evidence
+/// that the cell was non-empty before the abort. Reverting the gate makes
+/// this test RED, which is what keeps the chain non-vacuous.
+#[test]
+fn activation_failure_withdraws_an_already_published_position() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail = DeviceTail::default();
+        let tail_probe = TailProbe::default();
+        tail_probe.arm();
+        let open_abort_engaged = Arc::new(AtomicBool::new(false));
+        let handle = PlaybackSessionHandle::new();
+        // Pre-activation pause intent: it is what makes the aborted leg
+        // park (and therefore publish) before its open fails.
+        handle.request_pause();
+
+        let mut runtime = open_abort_runtime(
+            // The decode probe reports a duration before the render open
+            // fails, so the duration is established while the position
+            // never becomes observable.
+            TestDecode::with_duration(SourceBehavior::EofAfter(64), Duration::from_secs(4)),
+            consumed.clone(),
+            device_tail.clone(),
+            tail_probe.clone(),
+            open_abort_engaged.clone(),
+            handle.clone(),
+        );
+        activate(&mut runtime);
+
+        assert!(
+            open_abort_engaged.load(Ordering::SeqCst),
+            "precondition: the leg never parked before the abort, so no \
+             publication can have happened"
+        );
+        let observation = handle.observe();
+        assert_eq!(
+            observation.position, None,
+            "an activation failure must withdraw the sample the dying leg \
+             already published: {observation:?}"
+        );
+        assert_eq!(
+            observation.terminal_outcome, None,
+            "and the activation failure is still not a terminal Fact (D11 \
+             firewall): {observation:?}"
+        );
+        assert!(
+            observation
+                .activation_error
+                .as_deref()
+                .is_some_and(|m| m.contains("render stream open failed")),
+            "the diagnostic travelled: {observation:?}"
+        );
+        assert_eq!(
+            observation.source_duration,
+            Some(Duration::from_secs(4)),
+            "duration is source evidence, not playback state: it stays \
+             observable after the failure"
         );
         assert_eq!(consumed.load(Ordering::SeqCst), 0, "nothing ever played");
 
