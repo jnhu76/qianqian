@@ -237,3 +237,32 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
     gate.set_paused(false);
     leg.join().expect("leg 3 joins");
 }
+
+/// The open-abort lifetime (D14.7 corrective-2): once a gate is closed,
+/// no later pause intent — routed or hostile — can ever park a leg
+/// again. A leg that arrives after the close finds the gate shut:
+/// immediate return, no engagement, no events. There is no un-close.
+#[test]
+fn a_closed_gate_never_parks_or_engages_again() {
+    let events = Events::default();
+    let events_clone = events.clone();
+    let gate = RenderGate::with_observer(move |event| events_clone.record(event));
+
+    gate.set_paused(true);
+    gate.close_and_release();
+    // Hostile later intent, routed after the close: inert by design.
+    gate.set_paused(true);
+
+    let mut tail_calls = 0usize;
+    gate.park_while_paused(|| {
+        tail_calls += 1;
+        false
+    });
+
+    assert_eq!(tail_calls, 0, "the closed gate must not park the leg");
+    assert!(
+        events.snapshot().is_empty(),
+        "the closed gate must publish no engagement evidence: {:?}",
+        events.snapshot()
+    );
+}

@@ -17,6 +17,7 @@
 //! provider or consumer is wired here.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 
 use qianqian_composition::Capability;
@@ -201,6 +202,14 @@ struct GateInner {
     /// lives with the episode owner; this flag is the routed copy the
     /// render leg observes.
     paused: Mutex<bool>,
+    /// Once true, this gate can never park a leg again: the open-abort
+    /// lifetime (a stream being torn down without ever becoming a
+    /// session episode), so a later `set_paused(true)` — e.g. pause
+    /// intent routed for an episode that never opened — must be inert.
+    /// Ordinary mechanism-lifetime state of an owned resource, not a
+    /// new lifecycle noun. There is no un-close: a closed gate is
+    /// finished.
+    closed: AtomicBool,
     wake: Condvar,
     on_event: Mutex<Option<OnGateEvent>>,
 }
@@ -245,6 +254,7 @@ impl RenderGate {
         Self {
             inner: Arc::new(GateInner {
                 paused: Mutex::new(false),
+                closed: AtomicBool::new(false),
                 wake: Condvar::new(),
                 on_event: Mutex::new(Some(Arc::new(observer))),
             }),
@@ -252,14 +262,35 @@ impl RenderGate {
     }
     /// Route the pause intent into the mechanism: `true` parks the render
     /// leg at its next loop-top gate check; `false` releases a parked leg
-    /// (bounded-slice latency via notify). Idempotent.
+    /// (bounded-slice latency via notify). Idempotent. Inert on a closed
+    /// gate: a closed gate never parks again (see
+    /// [`RenderGate::close_and_release`]).
     pub fn set_paused(&self, paused: bool) {
+        if self.inner.closed.load(Ordering::Acquire) {
+            return;
+        }
         let mut guard = self.inner.paused.lock().expect("render gate lock");
         if *guard == paused {
             return;
         }
         *guard = paused;
         drop(guard);
+        self.inner.wake.notify_all();
+    }
+
+    /// Close the gate permanently: the episode's render leg must never
+    /// park here again. This is the open-abort release — a stream whose
+    /// open failed or timed out is being torn down without ever
+    /// becoming a session episode, and the abort join that follows must
+    /// be safe against ANY later pause intent on this gate, routed or
+    /// hostile: once closed, `set_paused` routes nothing and a leg
+    /// between two park calls finds the gate shut at its next loop-top
+    /// check. A parked leg is woken with bounded latency (notify + the
+    /// park-slice cap) and proceeds once more; the data plane — here the
+    /// stop issued by the abort itself — decides how it ends. Idempotent;
+    /// there is no un-close.
+    pub fn close_and_release(&self) {
+        self.inner.closed.store(true, Ordering::Release);
         self.inner.wake.notify_all();
     }
 
@@ -273,13 +304,14 @@ impl RenderGate {
     /// mechanism's own observation of its output tail — and publishes
     /// [`GateEvent::TailQuiesced`] on the first `true` of the current
     /// engagement. [`GateEvent::Engaged`] is published on park entry and
-    /// [`GateEvent::Disengaged`] on park exit.
+    /// [`GateEvent::Disengaged`] on park exit. Returns immediately (no
+    /// events) on a closed gate.
     pub fn park_while_paused(&self, mut tail_observed_quiescent: impl FnMut() -> bool) {
         {
             let guard = self.inner.paused.lock().expect("render gate lock");
-            if !*guard {
-                // Released before the leg reached the gate: nothing
-                // engaged, nothing to acknowledge.
+            if !*guard || self.inner.closed.load(Ordering::Acquire) {
+                // Released or closed before the leg reached the gate:
+                // nothing engaged, nothing to acknowledge.
                 return;
             }
         }
@@ -288,12 +320,15 @@ impl RenderGate {
         loop {
             let released = {
                 let guard = self.inner.paused.lock().expect("render gate lock");
+                let closed = &self.inner.closed;
                 let (guard, _) = self
                     .inner
                     .wake
-                    .wait_timeout_while(guard, PARK_SLICE, |paused| *paused)
+                    .wait_timeout_while(guard, PARK_SLICE, |paused| {
+                        *paused && !closed.load(Ordering::Acquire)
+                    })
                     .expect("render gate wait poisoned");
-                !*guard
+                !*guard || closed.load(Ordering::Acquire)
             };
             if released {
                 break;

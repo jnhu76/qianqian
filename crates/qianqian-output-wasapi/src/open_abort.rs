@@ -11,29 +11,32 @@
 //!
 //! Boundary note: the release here is the provider's own, not routed
 //! through the episode completion lock (the stream was never handed to
-//! a session, so there is nothing to linearize against). A composition
-//! root that ever hands the episode handle out before activation
-//! settles would own a residual re-park window between this release
-//! and the join; today's root holds the handle on the thread that is
-//! blocked inside the synchronous activation settle.
+//! a session, so there is nothing to linearize against). The release is
+//! therefore made permanent at the mechanism itself —
+//! [`RenderGate::close_and_release`]: once the abort begins, no later
+//! pause intent on this gate (routed through a handle handed out before
+//! activation settles, or otherwise) can re-park the leg the join is
+//! waiting on. The gate is finished either way: its stream will never
+//! become an episode.
 
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use qianqian_audio_api::ports::{RenderGate, RenderPcmInput};
 
-/// Release the routed pause intent, stop the data plane, then join.
-/// Callers must not hold any lock the joining thread needs (the WASAPI
+/// Close the gate permanently, stop the data plane, then join. Callers
+/// must not hold any lock the joining thread needs (the WASAPI
 /// open-verdict mutex, for one). The production caller is the Windows
 /// mechanism; on other platforms the protocol stays live through its
-/// test, which pins the release-before-join order.
+/// tests, which pin the close-before-join order and the closed gate's
+/// immunity to a hostile later pause.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub(crate) fn abort_render_thread(
     handle: JoinHandle<()>,
     render_input: &Arc<dyn RenderPcmInput>,
     gate: &RenderGate,
 ) {
-    gate.set_paused(false);
+    gate.close_and_release();
     render_input.stop();
     let _ = handle.join();
 }
@@ -42,7 +45,9 @@ pub(crate) fn abort_render_thread(
 mod tests {
     use super::*;
     use qianqian_audio_api::ports::{GateEvent, PcmPull};
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::mpsc;
+    use std::sync::{Condvar, Mutex};
     use std::time::Duration;
 
     struct IdleInput;
@@ -114,5 +119,178 @@ mod tests {
         join_within(Duration::from_secs(5), move || {
             abort_render_thread(leg, &input, &gate)
         });
+    }
+
+    /// The leg's first read holds until the abort's stop has been
+    /// observed AND the test releases it, so the hostile re-pause below
+    /// lands while the leg is deterministically alive between two
+    /// loop-top gate visits. Its first pull is deliberately
+    /// non-terminal, forcing the leg back to the gate — the exact point
+    /// a re-park wedge would form.
+    #[derive(Default)]
+    struct HeldState {
+        stopped: bool,
+        let_through: bool,
+    }
+
+    struct HeldInput {
+        first_call: AtomicBool,
+        state: Mutex<HeldState>,
+        cv: Condvar,
+        on_stop: Mutex<Option<mpsc::Sender<()>>>,
+    }
+
+    impl HeldInput {
+        fn new(on_stop: mpsc::Sender<()>) -> Self {
+            Self {
+                first_call: AtomicBool::new(true),
+                state: Mutex::new(HeldState::default()),
+                cv: Condvar::new(),
+                on_stop: Mutex::new(Some(on_stop)),
+            }
+        }
+
+        fn release(&self) {
+            let mut state = self.state.lock().expect("held input lock");
+            state.let_through = true;
+            drop(state);
+            self.cv.notify_all();
+        }
+    }
+
+    impl RenderPcmInput for HeldInput {
+        fn read_frames(&self, dst: &mut [f32]) -> PcmPull {
+            if self.first_call.swap(false, Ordering::AcqRel) {
+                let mut state = self.state.lock().expect("held input lock");
+                while !state.stopped || !state.let_through {
+                    state = self.cv.wait(state).expect("held input wait");
+                }
+                dst.fill(0.0);
+                return PcmPull::Frames(dst.len());
+            }
+            PcmPull::Stopped
+        }
+
+        fn stop(&self) {
+            let mut state = self.state.lock().expect("held input lock");
+            state.stopped = true;
+            if let Some(tx) = self.on_stop.lock().expect("on_stop lock").take() {
+                let _ = tx.send(());
+            }
+            drop(state);
+            self.cv.notify_all();
+        }
+    }
+
+    /// The corrective-2 wedge: the abort's close is permanent, so a
+    /// hostile pause routed AFTER it — the handle handed out before
+    /// activation settles is a supported seam state — can never re-park
+    /// the leg the join is waiting on. The abort is already past its
+    /// close (proven by the observed data-plane stop) when the hostile
+    /// intent lands; the leg is then forced around one more loop-top
+    /// gate visit before it may exit. Without the closed state the
+    /// hostile pause re-establishes the parked state there and the join
+    /// wedges forever; with it the gate admits no second park.
+    #[test]
+    fn a_hostile_repause_after_the_close_cannot_repark_the_aborting_leg() {
+        let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let recorder = events.clone();
+        let gate = RenderGate::with_observer(move |event| {
+            recorder.lock().expect("events lock").push(event);
+        });
+
+        let (stopped_tx, stopped_rx) = mpsc::channel();
+        let held = Arc::new(HeldInput::new(stopped_tx));
+        let input: Arc<dyn RenderPcmInput> = held.clone();
+
+        // The steady loop's loop-top posture: the gate is checked before
+        // EVERY read, so the leg re-visits it after any non-terminal
+        // pull.
+        let leg = {
+            let gate = gate.clone();
+            let input = input.clone();
+            std::thread::spawn(move || {
+                let mut buf = [0.0f32; 64];
+                loop {
+                    gate.park_while_paused(|| false);
+                    if matches!(input.read_frames(&mut buf), PcmPull::Stopped) {
+                        break;
+                    }
+                }
+            })
+        };
+
+        gate.set_paused(true);
+        let parked = {
+            let deadline = std::time::Instant::now() + Duration::from_secs(5);
+            loop {
+                if events
+                    .lock()
+                    .expect("events lock")
+                    .contains(&GateEvent::Engaged)
+                {
+                    break true;
+                }
+                if std::time::Instant::now() >= deadline {
+                    break false;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        };
+        assert!(parked, "the leg never reached the gate");
+
+        let (done_tx, done_rx) = mpsc::channel();
+        {
+            let input = input.clone();
+            let gate = gate.clone();
+            std::thread::spawn(move || {
+                abort_render_thread(leg, &input, &gate);
+                let _ = done_tx.send(());
+            });
+        }
+
+        // The stop is issued strictly after the close inside the abort,
+        // so observing it proves the gate is already closed.
+        assert_eq!(
+            stopped_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the abort never reached its data-plane stop"
+        );
+
+        // Hostile re-pause on the closed gate: routed pause intent, the
+        // exact shape a pre-activation handle's request_pause produces.
+        // On a closed gate this is inert by design.
+        gate.set_paused(true);
+
+        // Let the held read finish; the leg must pass one more loop-top
+        // gate visit before it can exit.
+        held.release();
+
+        assert_eq!(
+            done_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the open-abort join wedged: a hostile re-pause after the close \
+             re-parked the leg"
+        );
+
+        // And the gate recorded exactly one engagement: it never
+        // admitted a second park after the close.
+        let recorded = events.lock().expect("events lock");
+        assert_eq!(
+            recorded
+                .iter()
+                .filter(|e| **e == GateEvent::Engaged)
+                .count(),
+            1,
+            "the closed gate admitted a second park: {recorded:?}"
+        );
+        assert_eq!(
+            recorded
+                .iter()
+                .filter(|e| **e == GateEvent::Disengaged)
+                .count(),
+            1,
+            "the leg disengaged exactly once: {recorded:?}"
+        );
     }
 }
