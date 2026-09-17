@@ -185,6 +185,13 @@ fn repeated_reads_are_pure_loads() {
 
     // ...nor changes one: repeating the read changes nothing, and
     // nothing about the cell's value depends on how often it is read.
+    //
+    // Stated limit: this is the OBSERVABLE consequence, not the purity
+    // proof. An idempotent reader-side clamp would be invisible here
+    // because the cell is already monotone; what rules that shape out is
+    // that `published()` is a single load with no writable state
+    // anywhere in the read path (and the observation surface admits no
+    // second cell to clamp against).
     for _ in 0..64 {
         assert_eq!(cell.published(), sample);
     }
@@ -192,8 +199,7 @@ fn repeated_reads_are_pure_loads() {
     // A reader cannot reconstruct device state from this cell: the type
     // exposes no handed-off total, no tail, and no raw estimate — the
     // rejected two-cell composition has no API here (see the negative
-    // control in `f4` evidence and the observation surface allowlist,
-    // which admits exactly one timeline field).
+    // control below).
     cell.publish_consumed(3 * BLOCK, 0);
     assert_eq!(cell.published(), Some(3 * BLOCK));
 }

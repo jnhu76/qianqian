@@ -5,6 +5,15 @@
 //! the REAL Playback Session composition, lifecycle and completion logic
 //! can be exercised on any platform and under adversarial timing. The
 //! Windows real-sound gate covers the physical path.
+//!
+//! The mock render leg mirrors the real loop's D14.8 accounting (publish
+//! at every tail observation from the pre-submission total, credit only
+//! after the mock's submission succeeds). Two things it structurally
+//! cannot witness, so no test here may claim them: a FAILED device
+//! submission (the mock has no failing ReleaseBuffer path — that rests on
+//! the order oracle in `qianqian-output-wasapi`) and FRAME UNITS (the
+//! mock is unit-agnostic — the real unit rule is a property of the
+//! WASAPI stream negotiation).
 
 // Shared test support: each test binary uses a subset, so per-binary
 // dead-code findings on the unused remainder are expected, not defects.

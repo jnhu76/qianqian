@@ -9,14 +9,39 @@
 //! is NOT exact and NOT withdrawn by settlement; neither is a Fact, and
 //! neither feeds settlement or control.
 //!
-//! What the mechanism doubles cannot cover is covered elsewhere: the
-//! publication algebra by `qianqian-audio-api`'s `position_evidence`
-//! oracles, and the Windows render loop's call ORDER — publish from the
-//! pre-submission total, credit only after a successful submission,
-//! publish in the park slices and on the drain path — by that crate's
-//! source-order oracle (`render_order_oracle.rs`). This file adds the
-//! end-to-end behavior: the same protocol driven through a real session,
-//! a real gate, a real completion and the real observation seam.
+//! What the mechanism doubles cannot cover is covered elsewhere, and what
+//! they structurally cannot see is stated rather than implied:
+//!
+//! ```text
+//! covered elsewhere
+//!   algebra      qianqian-audio-api's `position_evidence` oracles
+//!   real leg     the Windows render loop's call order, by that crate's
+//!                source-order oracle (`render_order_oracle.rs`): publish
+//!                from the pre-submission total, credit only after a
+//!                successful submission, publish in the park slices and
+//!                on the drain path
+//!
+//! blind spots of ANY double-driven test here
+//!   failed submission   the mock has no failing ReleaseBuffer, so "a
+//!                       failed submission is never counted" rests on the
+//!                       order oracle (P3) and on reading the real loop,
+//!                       not on this file
+//!   frame units         the mock is unit-agnostic: it cannot witness
+//!                       that GetCurrentPadding and the submitted counts
+//!                       are the same frame unit. That is a property of
+//!                       the real negotiation path (the stream is
+//!                       initialized at the source format, no
+//!                       conversion), pinned there, not here
+//!   purity proof        the purity test below is behavioural; the
+//!                       structural fact that makes it airtight is that
+//!                       `published()` is a plain load and
+//!                       `observe_snapshot` writes nothing, so no
+//!                       reader-side state can exist at all
+//! ```
+//!
+//! This file adds the end-to-end behavior: the same protocol driven
+//! through a real session, a real gate, a real completion and the real
+//! observation seam.
 
 mod common;
 
@@ -308,8 +333,14 @@ fn pause_freezes_the_sample_at_tail_quiescence_not_at_the_command() {
     within(Duration::from_secs(30), move || {
         let consumed = Arc::new(AtomicUsize::new(0));
         let device_tail = DeviceTail::default();
-        // Slower than the leg submits: a real queue exists to drain.
-        device_tail.set_playout(Playout::FramesPerObservation(100));
+        // The device plays out exactly one submission per observation and
+        // starts out holding a standoff of already-queued frames, so the
+        // queue is stable while the leg plays and drains one step per
+        // park slice once it is parked: a deterministic drain instead of
+        // a race against how much the leg happens to have queued.
+        const STANDOFF: u64 = 32 * BLOCK;
+        device_tail.set_playout(Playout::FramesPerObservation(BLOCK));
+        device_tail.seed(STANDOFF);
         let handle = PlaybackSessionHandle::new();
         let mut runtime = registered_runtime(
             TestDecode::new(SourceBehavior::EofAfter(LONG_SOURCE)),
@@ -322,15 +353,14 @@ fn pause_freezes_the_sample_at_tail_quiescence_not_at_the_command() {
         );
         activate(&mut runtime);
         wait_for_a_position(&handle);
-
-        // Precondition: the queue really lags, so there IS something to
-        // drain after the pause command.
+        // The sample can only rise above the standoff once the episode has
+        // actually submitted past it (the tail reading is capped at the
+        // handed-off total), so let it play well past that before pausing.
         assert!(
             wait_until(Duration::from_secs(10), || {
-                let observation = handle.observe();
-                observation.position.expect("published") < consumed.load(Ordering::SeqCst) as u64
+                consumed.load(Ordering::SeqCst) as u64 > STANDOFF + 8 * BLOCK
             }),
-            "the mock device never queued frames"
+            "the episode never submitted past the standoff"
         );
 
         handle.request_pause();
@@ -340,11 +370,18 @@ fn pause_freezes_the_sample_at_tail_quiescence_not_at_the_command() {
             !at_command.paused(),
             "the command alone establishes nothing (D14.7): {at_command:?}"
         );
+        assert!(
+            device_tail.queued() > 0,
+            "precondition: the device is still holding queued frames"
+        );
 
-        // The tail drains: the projection truthfully keeps advancing.
+        // The tail drains: the projection truthfully keeps advancing —
+        // and it advances WHILE the device still holds queued frames, not
+        // only once the queue happens to reach zero.
         assert!(
             wait_until(Duration::from_secs(10), || {
                 handle.observe().position.expect("published") > at_command_position
+                    && device_tail.queued() > 0
             }),
             "the sample was frozen at command time instead of draining \
              toward the handed-off total: at_command={at_command_position}, \
@@ -463,6 +500,61 @@ fn a_pause_that_never_quiesces_leaves_the_sample_where_it_was() {
 }
 
 // --- terminal withdrawal ------------------------------------------------
+
+/// Stop from an ESTABLISHED pause: the release ends the park and lets the
+/// writer proceed once more, so the sample may advance by at most the one
+/// in-flight block the frozen rule already measures at pause-command
+/// time — and then the terminal Fact withdraws the projection with no
+/// final-position latch anywhere. This is the interaction the pause and
+/// terminal rules meet on, so it is pinned rather than assumed.
+#[test]
+fn stop_from_an_established_pause_withdraws_without_latching_a_final_sample() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(30), move || {
+        let consumed = Arc::new(AtomicUsize::new(0));
+        let device_tail = DeviceTail::default();
+        device_tail.set_playout(Playout::FramesPerObservation(100));
+        let handle = PlaybackSessionHandle::new();
+        let mut runtime = registered_runtime(
+            TestDecode::new(SourceBehavior::EofAfter(LONG_SOURCE)),
+            OutputBehavior::SlowConsume {
+                per_read: Duration::from_millis(2),
+            },
+            consumed.clone(),
+            device_tail,
+            handle.clone(),
+        );
+        activate(&mut runtime);
+        wait_for_a_position(&handle);
+
+        handle.request_pause();
+        assert!(
+            wait_until(Duration::from_secs(10), || handle.observe().paused()),
+            "Paused never established: {:?}",
+            handle.observe()
+        );
+        let parked = handle.observe();
+        let frozen = parked.position.expect("published");
+        let submitted_at_park = consumed.load(Ordering::SeqCst) as u64;
+        assert_eq!(
+            frozen, submitted_at_park,
+            "at quiescence the sample equals the frozen handed-off total"
+        );
+
+        handle.request_stop();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        let settled = handle.observe();
+        assert_eq!(settled.position, None, "withdrawn, not latched");
+        assert!(
+            consumed.load(Ordering::SeqCst) as u64 >= frozen,
+            "the accounting never goes backward across the release"
+        );
+        assert!(!settled.paused(), "a settled episode is never Paused");
+
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
 
 /// Every terminal Fact withdraws the position projection (no final
 /// position is stored anywhere), while the source duration evidence
@@ -641,6 +733,16 @@ fn a_zero_length_duration_is_distinguishable_from_unknown() {
 /// not the position, not the projection, not the terminal state. The
 /// sample is whatever the mechanism published, and reading it never
 /// advances, clamps, repairs or settles anything.
+///
+/// Behavioural oracle, and one with a stated limit: an idempotent
+/// reader-side clamp over an already-monotone cell would be invisible to
+/// it (and to any observation-level test). What rules that shape out is
+/// structural, not behavioural — nothing in the read path can hold state
+/// or write: `PositionEvidence::published` is a single load and
+/// `observe_snapshot` only reads. This test pins the observable
+/// consequence (quiescent state in, identical state out, nothing
+/// consumed); the absence of reader state is pinned by the code shape and
+/// by the observation-surface allowlist.
 #[test]
 fn repeating_an_observation_changes_nothing() {
     let _lifecycle = common::lifecycle_lock();
