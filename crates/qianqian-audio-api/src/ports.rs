@@ -17,8 +17,9 @@
 //! provider or consumer is wired here.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
+use std::time::Duration;
 
 use qianqian_composition::Capability;
 
@@ -362,15 +363,124 @@ impl RenderGate {
     }
 }
 
+/// Session-owned, episode-scoped position-evidence cell (ADR-PBK-002
+/// D14.8): the render leg publishes one monotone sample of the
+/// device-consumed presentation position into it, and the observation
+/// path reads that sample as one pure load.
+///
+/// Truth class: **Mechanism Evidence**. Never a Fact, never a transport
+/// state, and never a correctness basis for control, lifetime,
+/// settlement, resource lifetime, mechanism wakeup or K0 lifecycle.
+/// The sample is exact only for the instant its writer took the tail
+/// reading; a reader is promised no bound on how old its sample is
+/// (freshness is a scheduling property of the reader, not a concurrency
+/// invariant) — only that the published sample never goes backward,
+/// never exceeds the writer's own handed-off accounting, and is never
+/// fabricated.
+///
+/// Writer contract (D14.8): exactly ONE writer — the episode's render
+/// leg — which owns both derivation inputs on its own execution path:
+///
+/// ```text
+/// handed_off   the frames this episode's leg has submitted into the
+///              device buffer, its own plain local accounting
+/// tail         that leg's own queued-to-play reading
+///              (GetCurrentPadding), taken on the same execution path
+/// publish      published = max(published, handed_off - min(tail, handed_off))
+/// ```
+///
+/// The subtraction therefore happens on the render leg's path, and the
+/// monotonicity is owned by the publication: no reader composes a
+/// position from two cells, keeps a previous value, or clamps anything —
+/// which is what keeps the D14.2 observation a pure read. The update is
+/// one relaxed monotone RMW: no lock, no allocation, no blocking, no
+/// device call of its own.
+///
+/// Encoding: the zero-initialized cell means **undefined** (no sample
+/// published yet — "unknown is not zero"); a sample of `N` source frames
+/// is stored as `N + 1`, saturating at [`PositionEvidence::MAX_POSITION`].
+/// The encoding is total: it neither wraps nor panics at the domain
+/// boundary, and the boundary itself is unreachable for a live episode
+/// (see [`PositionEvidence::MAX_POSITION`]).
+#[derive(Clone, Debug, Default)]
+pub struct PositionEvidence {
+    published: Arc<AtomicU64>,
+}
+
+impl PositionEvidence {
+    /// The largest representable sample, in source PCM frames.
+    ///
+    /// The cell stores `sample + 1`, so this is the top of the encoding's
+    /// legal domain; the one value above it encodes "undefined" instead.
+    /// Reaching it would take a single live episode submitting
+    /// `u64::MAX - 1` source frames into its device buffer, each one
+    /// consumed at the source rate by the output engine — a frame count
+    /// bounded by real elapsed time (~1.8e19 frames is ≈ 5.8e11 years at
+    /// 44.1 kHz). The saturated value is never published in practice, and
+    /// a saturated publication would still be monotone, still ≤ the
+    /// writer's accounting, and still never fabricated.
+    pub const MAX_POSITION: u64 = u64::MAX - 1;
+
+    /// A cell with no published sample (undefined — not zero).
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Writer: publish the consumed estimate this leg derives from its
+    /// own `handed_off` accounting and its own `tail` reading, taken at
+    /// the same instant. `tail` is capped at `handed_off` (a tail reading
+    /// above it is a legal transient, never a wrap), and the publication
+    /// keeps the running maximum.
+    ///
+    /// Mechanism path: called from the render thread's tail observations.
+    /// One relaxed RMW, no device call, no lock — and the caller must
+    /// already have the reading it is passing in (F4 adds no device call).
+    pub fn publish_consumed(&self, handed_off: u64, tail: u64) {
+        let estimate = handed_off - tail.min(handed_off);
+        // Saturated by construction: `estimate <= u64::MAX - 1` implies
+        // `estimate + 1` is representable, and the saturating add keeps
+        // that true for the unreachable boundary sample too.
+        let encoded = estimate.saturating_add(1);
+        // The single writer is monotone, so the max is a guard against a
+        // regressing tail reading (the queue growing again) rather than a
+        // repair of a torn read: both inputs come from one execution path.
+        self.published.fetch_max(encoded, Ordering::Relaxed);
+    }
+
+    /// Reader: one pure load of the published sample, in source PCM
+    /// frames. `None` while no sample has been published (the episode's
+    /// render leg has not reached its first tail observation, or the
+    /// caller is gating the projection away — e.g. after a terminal
+    /// Fact, where the D14.8 projection is withdrawn). Repeating it
+    /// changes nothing.
+    pub fn published(&self) -> Option<u64> {
+        match self.published.load(Ordering::Relaxed) {
+            // The zero-initialized cell is the undefined sentinel, so a
+            // published 0-frame sample is encoded as 1 and never
+            // collapses into "unknown".
+            0 => None,
+            encoded => Some(encoded - 1),
+        }
+    }
+}
+
 /// Request for one playback-specific render stream: the source format to
 /// negotiate, the pre-bound PCM input, the session-owned drain signal,
-/// and the session-owned pause gate. All data-plane pieces bind once,
-/// here.
+/// the session-owned pause gate, and the session-owned position-evidence
+/// cell. All data-plane pieces bind once, here.
 pub struct RenderRequest {
     pub format: PcmFormat,
     pub input: Arc<dyn RenderPcmInput>,
     pub drain: DrainSignal,
     pub gate: RenderGate,
+    /// The episode's position-evidence cell (D14.8). The render leg's F4
+    /// obligation is exactly this: from the tail readings it already
+    /// takes, publish its own consumed estimate into this cell — one
+    /// monotone relaxed update per observation, from the same execution
+    /// path that owns the handed-off accounting. The cell is an owned
+    /// resource of the episode (like the gate), not a Capability; the
+    /// leg neither reads it nor creates one.
+    pub position: PositionEvidence,
 }
 
 /// One acquired render stream: owns its render thread and the physical
@@ -447,6 +557,25 @@ pub trait DecodedPcmStream: Send {
     /// for the endpoint's lifetime (the native mechanism fails closed on
     /// mid-stream format changes rather than contradicting this value).
     fn format(&self) -> PcmFormat;
+
+    /// The source duration this mechanism reported at probe/open time,
+    /// or `None` when it reported none it can stand behind.
+    ///
+    /// Truth class (ADR-PBK-002 D14.8): optional **source-scoped
+    /// Mechanism Evidence**, relayed once by the session as episode
+    /// evidence. Never a Fact, and NOT exact in general — it is the
+    /// container's own declaration, so it may over- or under-claim what
+    /// the decodable audio actually contains (a truncated stream still
+    /// reports its declared length). Only the actual decoded total at
+    /// decode EOF is exact, and that is terminal consumption truth, not
+    /// this value.
+    ///
+    /// Unknown stays unknown: a provider whose probe reported no duration
+    /// (a sentinel such as a negative value) returns `None` — it must
+    /// never convert that into zero or into an estimate. A legitimate
+    /// zero-length source reports `Some(ZERO)`, which is therefore
+    /// distinguishable from "unknown".
+    fn source_duration(&self) -> Option<Duration>;
 
     /// Read up to `dst.len() / channels` frames into `dst` as interleaved
     /// float32. Blocking-free; decode work happens here.
