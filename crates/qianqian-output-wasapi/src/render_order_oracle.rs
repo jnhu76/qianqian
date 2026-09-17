@@ -12,16 +12,24 @@
 //!
 //! ```text
 //! P1  the steady loop publishes before it acquires a device buffer
-//!     (GetBuffer), so no reading can be paired with a handed-off total
-//!     that already includes the block about to be submitted;
-//! P2  the steady loop publishes before it credits this iteration's
-//!     submission, i.e. from the pre-submission total;
+//!     (the shipped order; P2 carries the binding constraint)
+//! P2  EVERY publication site in the steady loop precedes this
+//!     iteration's credit, so no site can pair the key's padding
+//!     reading with a handed-off total that already includes the block
+//!     being submitted;
 //! P3  the credit follows a successful ReleaseBuffer and its failure
 //!     break, so a failed submission cannot be counted;
 //! P4  exactly one place in the whole mechanism credits frames;
-//! P5  the park-slice observation publishes (the paused drain advances
-//!     the sample to the frozen total);
-//! P6  the EOF drain publishes and credits nothing.
+//! P5  the park-slice observation publishes;
+//! P6  the EOF drain publishes and credits nothing;
+//! P7  only CODE sites count: a call moved into a comment mentions the
+//!     same text without executing anything, so sites are matched at
+//!     statement position, never inside a line that has code before it;
+//! P8  the park slice publishes UNCONDITIONALLY (at its argument's top
+//!     level). Quiescence is the slice whose publication matters most —
+//!     it is what walks a paused episode's sample up to the frozen
+//!     total — so a publication gated behind a condition, which skips
+//!     exactly that slice, must RED.
 //! ```
 //!
 //! This is a REGRESSION PIN, not a semantic proof: it says the shipped
@@ -53,32 +61,52 @@ fn check_render_order(source: &str) -> Vec<String> {
     };
 
     // The park slice publishes from its own padding read; the loop's own
-    // publication site is what P1/P2 constrain. Checking the raw body
-    // would let the park closure's copy satisfy them (its call is the
-    // first in the text), so the closure's argument is removed first and
-    // checked separately by P5.
+    // publication sites are what P1/P2/P7 constrain. Checking the raw
+    // body would let the park closure's copy satisfy them (its call is
+    // the first in the text), so the closure's argument is removed first
+    // and checked separately by P5/P8.
     let unparked = without_park_argument(steady);
-    let publish = unparked.find(PUBLISH);
+    let publications = code_sites(&unparked, PUBLISH);
     let acquire = unparked.find(ACQUIRE);
     let credit = unparked.find(CREDIT);
     let submit_ok = unparked.find(SUBMIT_OK);
     let submit_fail = unparked.find(SUBMIT_FAIL);
 
     check(
-        "P1: the steady loop publishes before device-buffer acquisition",
-        matches!((publish, acquire), (Some(p), Some(a)) if p < a),
+        "P1: the steady loop publishes before device-buffer acquisition (shipped order)",
+        matches!(publications.first(), Some(&p) if matches!(acquire, Some(a) if p < a)),
     );
+    // Every publication site in the loop, not only the first: a second
+    // one added after the credit pairs the same iteration's padding with
+    // the post-submission total — the overstatement D14.8 names.
     check(
-        "P2: the steady loop publishes from the pre-submission total",
-        matches!((publish, credit), (Some(p), Some(c)) if p < c),
+        "P2: every loop publication uses the pre-submission total",
+        !publications.is_empty()
+            && matches!(credit, Some(c) if publications.iter().all(|&p| p < c)),
     );
     check(
         "P3: the credit follows a successful submission and its failure break",
         matches!((submit_ok, submit_fail, credit), (Some(ok), Some(fail), Some(c)) if ok < c && fail < c),
     );
+    // P8 is checked over the park argument as a whole: its own sites,
+    // its own nesting.
+    let park_argument = argument_of(steady, PARK);
     check(
         "P5: the park-slice observation publishes",
-        argument_of(steady, PARK).is_some_and(|argument| argument.contains(PUBLISH)),
+        park_argument.is_some_and(|argument| !code_sites(argument, PUBLISH).is_empty()),
+    );
+    // The park slice must publish at ITS OWN reading, unconditionally:
+    // quiescence is the one slice whose publication matters most (it is
+    // what walks a paused episode's sample to the frozen total), so a
+    // publication gated behind a condition — skipping exactly that
+    // slice — must RED.
+    check(
+        "P8: the park slice publishes unconditionally, at its closure's top level",
+        park_argument.is_some_and(|argument| {
+            code_sites(argument, PUBLISH)
+                .into_iter()
+                .any(|at| depth_inside_closure(argument, at) == 0)
+        }),
     );
 
     let Some(drain) = body_of(source, DRAIN) else {
@@ -87,10 +115,42 @@ fn check_render_order(source: &str) -> Vec<String> {
     };
     check(
         "P6: the EOF drain publishes and credits nothing",
-        drain.contains(PUBLISH) && !drain.contains(CREDIT),
+        !code_sites(drain, PUBLISH).is_empty() && drain.find(CREDIT).is_none(),
     );
 
     violations
+}
+
+/// Every occurrence of `needle` in `text` that is a CODE site rather than
+/// a mention: it must stand on its own line, so a call moved into a
+/// comment (which would otherwise satisfy a text match without executing
+/// anything) is not counted.
+fn code_sites(text: &str, needle: &str) -> Vec<usize> {
+    text.match_indices(needle)
+        .map(|(at, _)| at)
+        .filter(|&at| {
+            let line_start = text[..at].rfind('\n').map_or(0, |nl| nl + 1);
+            text[line_start..at].chars().all(char::is_whitespace)
+        })
+        .collect()
+}
+
+/// The `{`-nesting depth of `at` relative to the closure body it sits in:
+/// 0 means the site is a statement of the closure's own block, 1 means it
+/// is one block deeper (inside an `if`, a loop, …). A closure written
+/// without a block (nothing but a call) has no nesting to speak of, so
+/// its sites are top level by definition.
+fn depth_inside_closure(argument: &str, at: usize) -> usize {
+    let Some(open) = argument.find('{').filter(|&open| open < at) else {
+        return 0;
+    };
+    brace_depth_at(&argument[open + 1..], at - open - 1)
+}
+
+/// The `{`-nesting depth at `at` within `text`, so a statement wrapped in
+/// a conditional can be told from a top-level one.
+fn brace_depth_at(text: &str, at: usize) -> usize {
+    text[..at].matches('{').count() - text[..at].matches('}').count()
 }
 
 /// The steady loop's publication, as the oracle recognizes it.
@@ -387,6 +447,62 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
         assert!(
             violations.iter().any(|v| v.starts_with("P6")),
             "a silent drain must be rejected: {violations:?}"
+        );
+    }
+
+    /// A SECOND publication added after the credit — the shape a
+    /// refactor could introduce while keeping the first one intact —
+    /// pairs the same iteration's padding with the post-submission
+    /// total. The first-site-only version of this check let it through;
+    /// every site is constrained now.
+    #[test]
+    fn a_second_publication_after_the_credit_is_rejected() {
+        let source = include_str!("wasapi.rs").replace(
+            CREDIT,
+            &format!("{CREDIT}\n        {PUBLISH}handed_off, u64::from(padding));"),
+        );
+        let violations = check_render_order(&source);
+        assert!(
+            violations.iter().any(|v| v.starts_with("P2")),
+            "a publication after the credit must be rejected, wherever it \
+             sits relative to the first one: {violations:?}"
+        );
+    }
+
+    /// A park slice that publishes only when the tail is NOT quiesced
+    /// skips exactly the observation that matters most: quiescence is
+    /// where a paused episode's sample is walked up to the frozen total,
+    /// and `paused()` establishes at the same instant.
+    #[test]
+    fn a_park_slice_that_skips_its_quiescent_publication_is_rejected() {
+        let source = include_str!("wasapi.rs").replace(
+            &format!("            {PUBLISH}handed_off, u64::from(padding));\n"),
+            &format!(
+                "            if padding != 0 {{\n                {PUBLISH}handed_off, u64::from(padding));\n            }}\n"
+            ),
+        );
+        let violations = check_render_order(&source);
+        assert!(
+            violations.iter().any(|v| v.starts_with("P8")),
+            "a conditional park publication must be rejected: {violations:?}"
+        );
+    }
+
+    /// A comment that merely mentions the call is not a call. The
+    /// text-matching version of this check counted it, so deleting the
+    /// publication degraded into renaming it.
+    #[test]
+    fn a_publication_moved_into_a_comment_is_rejected() {
+        let source = include_str!("wasapi.rs").replace(
+            &format!("        {PUBLISH}handed_off, u64::from(padding));\n"),
+            &format!("        // {PUBLISH}handed_off, u64::from(padding));\n"),
+        );
+        let violations = check_render_order(&source);
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.starts_with("P1") || v.starts_with("P2")),
+            "a commented-out publication is not a publication: {violations:?}"
         );
     }
 
