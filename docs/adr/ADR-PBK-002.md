@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150) |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (submitted − tail, clamped) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`) |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -506,7 +506,6 @@ VolumePlugin
 ## 14. Open decisions
 
 ```text
-position / duration authority
 seek physical-output cutover mechanism beyond D14's frozen stale-PCM invariant
 open/session CONFIG mechanism under D14's no-overlap v1 semantic contract
 playlist / queue authority and whether it earns PlaylistPlugin
@@ -526,6 +525,11 @@ preload / gapless
 Realtime Audio Runtime representation
 P1–P5 concrete production mechanism
 ```
+
+(No longer OPEN: position / duration authority — designated as the
+D14.8 episode-local Position Projection and optional Duration evidence
+by the 2026-09-17 F4-GATE amendment. The D14.8 representation and the
+seek-epoch rebase rule's F5 mechanism remain governed by D14.8/D14.5.)
 
 Reduction rule for all future phases:
 
@@ -761,7 +765,6 @@ Playing / Starting / Paused / Stopping semantics
      non-authoritative derived visibility, not a transport lifecycle
      state; `Resumed` was removed from the projection set by the
      D14.7 AUTHORITY-CORRECTIVE)
-position / duration authority
 seek product-state vocabulary / actual-landing authority beyond D14 minimum
 source identity / playlist authority / navigation policy
 volume / device-switch authority
@@ -771,6 +774,11 @@ EpisodeId / Generation / Window
 multi-session / preload / gapless
 Realtime Audio Runtime representation
 ```
+
+(No longer OPEN: position / duration authority — DESIGNATED by the
+D14.8 amendment as the episode-local Position Projection plus optional
+source-scoped Duration evidence. Neither is a transport semantic and
+neither is a Fact; the transport enum above stays OPEN independently.)
 
 ---
 
@@ -1276,9 +1284,12 @@ therefore cannot observe this evidence while parked; adopting this
 establishment rule under B would itself require a new narrow authority
 decision (B's non-selection reasons remain the original ones: frozen
 mid-buffer audio and added stream-state changes). This evidence stays
-Mechanism Evidence; it must never be promoted to a Fact, a
-position/Duration source (F4/D14.8), or a P1–P5 trigger (no old/new
-realtime-world overlap exists here).
+Mechanism Evidence; it must never be promoted to a Fact or a P1–P5
+trigger (no old/new realtime-world overlap exists here). Its reuse as
+the raw position-evidence source is not a silent promotion: the D14.8
+amendment makes that a separate, explicit selection of the same
+platform reading (the tail cell), while the establishment latch keeps
+its F3 meaning.
 
 Truthful product establishment is then the single projection:
 
@@ -1338,11 +1349,222 @@ parked settles immediately by the existing precedence. Pause and resume
 commands recorded after settlement are inert command history, exactly
 like late stop intent.
 
-### D14.8 Position / Duration — not yet a product Fact
+### D14.8 Position / Duration — episode-local Projection + optional source evidence
 
-F4 MUST NOT infer product position/duration from buffer occupancy, K0 lifecycle, or arbitrary decoder/output counters. Mechanism counters may exist as diagnostics/evidence, but product `Position`/`Duration` authority remains OPEN until a narrow authority decision defines the proposition and writer.
+> 2026-09-17 amendment (F4-GATE; mechanism evidence:
+> `experiments/f4-timeline-gate/` — projection-algebra oracles,
+> physical WASAPI probe `f4probe` [shared-mode, Windows host],
+> duration provenance probe `f4duration` [SongCore ABI v1]; roadmap:
+> Issue #119 checkpoint). It replaces the previous "not yet a product
+> Fact" stub: the F4 propositions, truth classes, evidence cells and
+> their writer/reader rules below are now FROZEN; everything not
+> stated remains governed by the general Phase-F rules. This amendment
+> does not by itself merge any production code; it defines what the
+> F4 implementation must realize.
 
-No `PlaybackSnapshot` or global state store may be introduced merely to make F4 convenient.
+F4 is read-side only. Position/Duration create no new Plugin,
+Capability, Fact kind, fact authority, lifecycle noun, or global store
+(D13/D14.1). P1–P5 are NOT triggered: the evidence cells below are new
+session-owned resources bound at activation and never replaced live —
+no old/new realtime-world overlap exists.
+
+**Position proposition (frozen).** Product Position for one playback
+episode is the application-facing **Projection**:
+
+> the source-relative location of device-consumed presentation for the
+> current episode's render stream, derived as
+> `submitted − min(tail, submitted)`, clamped monotone at the
+> observation boundary, in source PCM frames.
+>
+> "Device-consumed" means the output engine has taken those frames out
+> of this stream's device buffer for rendering. The proposition
+> deliberately excludes all latency downstream of that point (engine
+> queue, hardware, DAC): the acoustic instant for the boundary frame is
+> later by that unmeasured remainder. It is therefore a bounded
+> device-consumption estimate, never a measurement of the acoustic
+> instant and never an audibility claim.
+
+Truth classes:
+
+```text
+submitted        Mechanism Evidence. Cumulative source frames handed
+                 to the render leg by the session-owned PcmEdge read
+                 path (== frames submitted into the device buffer on
+                 all non-terminal paths). Monotone within one episode
+                 (within one seek epoch once F5 exists). Writer: the
+                 edge read path, one relaxed publication per block,
+                 published at the hand-off itself. That hand-off is
+                 adjacent to the device submission in the current
+                 production shape (edge `read_frames` → `ReleaseBuffer
+                 (n)`, wasapi steady loop); a handed-out block that is
+                 never submitted may occur only on a terminal abort,
+                 after which the projection is withdrawn. This is NOT
+                 the decoded count (decode runs ahead) and NOT the
+                 product position by itself (the device tail is not yet
+                 subtracted).
+
+tail             Mechanism Evidence. The output mechanism's own latest
+                 observation of its queued-to-play tail
+                 (GetCurrentPadding), in source frames. NOT monotone.
+                 Writer: the output mechanism, one relaxed publication
+                 per render-loop iteration, per park slice, and on the
+                 drain path. This is the same platform reading D14.7
+                 already trusts for output-tail quiescence — the
+                 establishment latch remains what it was; D14.8
+                 selects the raw padding reading as the tail cell's
+                 source, which is a new narrow decision made here, not
+                 a silent reuse of the establishment evidence.
+
+Position         Projection (PBK-001 §2.3 sense) derived from the two
+                 cells at the observation boundary. Never a Fact;
+                 never a correctness basis for control, lifetime,
+                 settlement, resource lifetime, mechanism wakeup, or
+                 K0 lifecycle transitions.
+```
+
+Frozen behavioral rules:
+
+```text
+unknown ≠ zero    Position is undefined (None) until the output
+                  mechanism publishes its first tail observation
+                  (the stream-start evidence); before that, no
+                  position exists — not zero. It is undefined again
+                  once the terminal Fact is committed: the projection
+                  is withdrawn with the mechanism (no final-position
+                  latch storage is earned). A never-activated /
+                  open-aborted episode can therefore never fabricate
+                  one.
+
+monotonicity      The two cells are published independently, so a read
+                  is not atomic as a pair: raw differs from the truth
+                  by at most one in-flight block in either direction
+                  (±1024 source frames at the production block size;
+                  ≈21 ms at 48 kHz). It leads the truth by up to one
+                  block whenever the tail cell is one iteration stale
+                  (measured at stream start) and can tear backward by
+                  one block (measured max backward step 96). No
+                  accumulating error: both cells are exact counts /
+                  readings. The observation boundary clamps to
+                  max(last, raw), which removes the backward half of
+                  that bound only. Displayed position is monotone
+                  non-decreasing; raw evidence stays raw.
+
+writer lifetime   Each writer exists only while its mechanism is live.
+                  The edge read path and the render leg are
+                  teardown-owned resources, so after the render leg's
+                  teardown no publication can occur, and after the
+                  terminal Fact the projection is not derived at all —
+                  a late publication by a dying leg is unobservable.
+                  No post-settlement timeline state is written and none
+                  is stored.
+
+pause             Position freezes exactly where D14.7 Paused
+                  establishes: submissions stop at render-gate
+                  engagement (measured post-command advance: one
+                  in-flight block), the tail drains, and consumed
+                  reaches the frozen submitted value at tail
+                  quiescence — the same instant Paused establishes.
+                  Before that instant (pause command issued, tail
+                  still draining) the projection truthfully keeps
+                  advancing; it MUST NOT be frozen at command time.
+
+EOF / terminal    Decoder EOF does not move Position to Duration.
+                  Consumed rises to the exact submitted total as the
+                  device drains (at D11 Completed the Drained verdict
+                  is the same tail == 0 reading). The submitted total
+                  equals the exact decoded total only because the
+                  Completed path hands out every produced frame: the
+                  edge producer blocks rather than dropping, and
+                  buffered frames are abandoned only on a
+                  stopped/failed terminal — verdicts that do not claim
+                  Drained. Measured on the clean probe run:
+                  384000 == 384000. Whether the reported Duration is
+                  also equal is NOT guaranteed and MUST NOT be
+                  asserted or forced. Stopped/Failed settle the same
+                  withdrawal rule.
+
+seek (F5 rule)    The cells are episode-local accumulators whose
+                  source-relative meaning is defined only within one
+                  seek epoch; the projection MUST NOT mix pre- and
+                  post-cutover submitted totals. How the cells are
+                  rebased and how the seek's landing offset enters the
+                  projection are owned by the F5 cutover decision
+                  (still OPEN): F4 freezes only the no-mixing
+                  constraint and earns no base term, Generation,
+                  SeekId, or TimelineSegment for it.
+```
+
+**Duration proposition (frozen).** Product Duration is **optional
+source-scoped Mechanism Evidence**: the duration the decode mechanism
+reports for the source at probe/open time (SongCore
+`song_probe` / audio-stream-info `duration_us`; the no-timestamp
+sentinel means unknown):
+
+```text
+owner             Decode provider (probe evidence), relayed once by
+                  the session as episode evidence — the same shape as
+                  source_format.
+truth class       Mechanism Evidence. NEVER a Fact; it carries no
+                  exactness guarantee.
+unknown           unknown stays unknown (absent / sentinel → None);
+                  do not estimate to fill the UI.
+exactness         NOT exact in general. Measured (f4duration): the
+                  intact curated corpus matched the exact decoded
+                  total (delta 0), but a 30%-truncated CBR MP3 still
+                  reported the full 4.0 s while only 2.82 s was
+                  decodable (+1.18 s, ~29% overclaim); truncated FLAC
+                  failed decode cleanly. Only the actual decoded
+                  total at decode EOF is exact, and it exists only at
+                  the end; it is terminal consumption truth, NOT the
+                  product Duration.
+terminal rule     At D11 Completed the final consumed position equals
+                  the exact decoded total; no claim binds it to the
+                  reported Duration evidence.
+```
+
+**Non-authority rule.** Position/Duration MUST NOT be inferred from
+buffer occupancy (`buffered_frames`), K0 lifecycle, FiberState, logs,
+decoded-frame counts alone, submitted counts alone, UI state, or ad-hoc
+device observations outside the two cells above. Position is not a
+fourth transport state and does not join the D11 terminal contract;
+the D14.7 Paused projection and Position are independent derivations
+over partially shared evidence (tail quiescence), and neither is the
+correctness basis of the other. Product status MUST NOT claim acoustic
+audibility — the frozen proposition is device-consumed presentation
+position in source frames; physical-audibility claims from software
+counters remain forbidden.
+
+**Realtime cost boundary (frozen shape).** Writers publish once per
+block (relaxed atomics; no locks, no allocation, no per-frame
+accounting, no generic dispatch, no K0 visibility); the reader derives
+at observation time under the existing completion-lock snapshot. The
+per-quantum path gains O(1) relaxed RMW on two episode-local cells —
+nothing else.
+
+**Rejected alternatives (evidence-backed).**
+
+- decoded-frame count as product position: runs ahead of consumption
+  (edge + device queue advance while paused) — Mechanism Evidence
+  only, not exposed.
+- submitted count alone: ahead of consumed by up to one device buffer;
+  kept only as the derivation base.
+- IAudioClock: measured shared-mode frequency is the stream-format
+  BYTE rate (48 kHz → 384000; 44.1 kHz AUTOCONVERTPCM → 352800), never
+  source frames; after unit conversion it tracks consumed within ~8 ms
+  and adds no source-relative truth — rejected as the larger mechanism
+  (smallest-mechanism razor); re-earnable only by a new narrow
+  authority decision.
+- Fact-promoting Position: no designated semantic authority or
+  exactness contract is earned; the Projection serves every current
+  product proposition. Promotion remains possible only through a
+  future narrow authority decision.
+
+**Representation deliberately NOT frozen here.** The concrete Rust
+spelling of the evidence cells, the observation fields/methods, the
+Decode seam that surfaces the probe duration, and the withdrawal
+spelling are F4-implementation decisions under D14.10; they must not
+create new architecture nouns. `PlaybackSnapshot` and global stores
+remain forbidden.
 
 ### D14.9 Volume / Device switch — no generic state invention
 
@@ -1382,14 +1604,15 @@ Generation / Window / epoch / global playback store
 consumer-driven vs authority-driven semantic commit
 seek physical-output cutover mechanism
 F6 fresh-source/config handoff mechanism
-Position/Duration authority
+position/duration propositions beyond the frozen D14.8 minimum
 playlist/queue authority
 volume/device-switch authority
 preload/gapless/overlap topology
 ```
 
 (The pause/resume semantic commit point and minimum mechanism left this
-list when D14.7 froze them; anything beyond the frozen D14.7 minimum
-still requires a narrow authority decision.)
+list when D14.7 froze them; the position/duration propositions left it
+when D14.8 froze theirs. Anything beyond the frozen minima still
+requires a narrow authority decision.)
 
 The rule is intentional: **OPEN means “not authorized yet,” not “Flash may invent the missing architecture.”**
