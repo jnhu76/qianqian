@@ -1144,31 +1144,66 @@ acceptance            seek is a same-episode Command accepted only while
                       settled) is explicitly NOT seekable in v1 —
                       reopening an Eof edge is a closed design door.
 cutover protocol      same-resource discontinuity protocol (no resource
-                      is replaced): the render leg parks at its loop-top
-                      gate holding no device buffer (the D14.7 park
-                      invariant, attributed to the cut — an internal seek
-                      park is NOT pause engagement evidence and never
-                      routes pause intent); the session empties the edge
-                      (phase-1 invalidate; unblocks a producer blocked on
-                      a full edge); the worker discards its staging and
-                      invalidates the edge itself at its serialization
-                      point (phase-2 — the load-bearing stale-PCM
-                      exclusion is this program-order discipline, not
-                      the primitive); it then repositions via song_seek
-                      and publishes its actual landing as mechanism
-                      evidence. Stop intent wins at every point: it
-                      aborts the protocol (no commit, no rebase) and D11
-                      settles exactly as it would have without seek.
+                      is replaced). The session records the command and
+                      parks the render leg at its loop-top gate (the
+                      D14.7 park invariant — no device buffer held
+                      across a park — attributed to the cut: an
+                      internal seek park is NOT pause engagement
+                      evidence and never routes pause intent). Ordering
+                      is load-bearing in two places. First, the worker
+                      keeps producing until the leg's parked evidence
+                      has arrived — an early production hold could
+                      strand the leg inside a blocked read on an
+                      emptied edge and stall the protocol (the flowing
+                      production is what keeps the park reachable). The
+                      worker must also be able to reach its
+                      serialization point with bounded latency
+                      regardless of edge occupancy (representation
+                      open; e.g. a bounded-slice write wait that
+                      observes the command slot). Second, at the
+                      serialization point — with the parked evidence in
+                      hand — the worker calls song_seek BEFORE anything
+                      is invalidated:
+                        refusal → the worker publishes seek-failed
+                        mechanism evidence and resumes production from
+                        its current cursor; edge, device tail and
+                        render leg continue the pre-command content
+                        (the session releases the leg). A refusal is
+                        therefore pre-cut and inert; the only content
+                        it can ever cost is one abandoned in-flight
+                        staging block (at most one staging buffer).
+                        success at landing L → the worker discards its
+                        staging, invalidates the edge itself (the ONE
+                        purge — the load-bearing stale-PCM exclusion
+                        is this program-order discipline on the only
+                        producer thread, not the primitive), publishes
+                        its actual landing as mechanism evidence, and
+                        holds production (writes nothing) until
+                        release.
+                      The session — seeing the landing with the leg
+                      parked — waits for the output tail to quiesce and
+                      then commits. The production hold keeps every
+                      pre-commit submission pre-landing, so the rebase
+                      basis L is exact: no post-landing pre-commit new
+                      frame exists to mix into, or lose from, the
+                      position accounting.
 commit boundary       the session records the cutover commit iff
                       landing published ∧ edge invalidated ∧ output tail
                       quiesced (padding == 0 while parked — the D14.7
                       evidence class) ∧ leg parked ∧ episode unsettled.
                       Before commit, old output is legal; after commit,
-                      old PCM is impossible. Seek contributes no terminal
-                      evidence and owns no second terminal authority.
+                      no PCM of this stream that was queued-to-play
+                      before the commit can ever be rendered — the same
+                      device-consumed boundary D14.7/D14.8 freeze: the
+                      claim covers this stream's queued-to-play set
+                      (padding), never the acoustic instant or the
+                      unmeasured downstream latency. Seek contributes
+                      no terminal evidence and owns no second terminal
+                      authority.
 output mechanism      park + natural drain (the device consumes the old
-                      tail pre-commit; measured 31.2 ms at one full
-                      device buffer on the probe endpoint). Stop/Reset/
+                      tail pre-commit; measured 29.9–31.7 ms across
+                      three runs at one full device buffer on the probe
+                      endpoint). Stop/Reset/
                       Start is REJECTED for v1 (measured: freezes
                       mid-buffer audio, resets the device position
                       origin, adds a stream-state machine for an
@@ -1185,9 +1220,13 @@ position rebase       realizes the D14.8 seek paragraph: the rebase
                       for the rest of the episode: unknown stays
                       unknown, never zero, never the requested target),
                       and the leg's handed-off accounting resets, so
-                      pre- and post-cutover totals are never mixed.
-                      Same cell, one writer, plain store at the commit;
-                      the publication stays monotone WITHIN one epoch.
+                      pre- and post-cutover totals are never mixed (the
+                      protocol's production hold between landing and
+                      release makes the basis exact — every pre-commit
+                      submission is pre-landing). Same cell, one writer,
+                      plain store at the commit; within one published
+                      stretch — i.e. between committed discontinuities —
+                      the publication stays monotone.
                       **Position monotonicity scope is hereby amended:
                       monotone between committed discontinuities** — a
                       committed cutover may step the published sample
@@ -1202,17 +1241,33 @@ pause interaction     pause intent SURVIVES seek: a seek never implicitly
                       A paused episode's already-quiesced tail satisfies
                       the output-cut precondition; the leg stays parked
                       through the cut; paused() evaluates unchanged.
-failure policy        pre-cut failures (seek in flight, data plane not
-                      Open, settled episode, song_seek refusal
-                      incl. SEEK_UNSUPPORTED/SEEK_ERROR/INVALID_ARGUMENT)
-                      are inert diagnostics — playback continues from
-                      the old position; they are NEVER terminal Failed.
-                      The selected mechanism confines post-cut failure
-                      to the existing D11 device-failure path (the edge
-                      invalidate is a fail-fast O(1) reset; a device
-                      failure during the drain settles through the
-                      existing precedence). Seek introduces no new
-                      terminal variant and no recovery semantics.
+                      Conversely, pause intent arriving while a playing
+                      episode's cut is in flight routes normally (the
+                      seek park is cut-attributed); the leg is already
+                      parked, and no pause-attributed engagement exists
+                      until a post-release re-park — the frozen
+                      attribution rule determines the outcome uniquely.
+failure policy        pre-cut failures are inert diagnostics — playback
+                      continues from the pre-command content; they are
+                      NEVER terminal Failed. They are exactly: seek
+                      already in flight; data plane not Open (edge
+                      terminal != Open, which includes the post-EOF
+                      drain window); settled episode or stop intent
+                      already recorded; song_seek refusal
+                      (SEEK_UNSUPPORTED / SEEK_ERROR /
+                      INVALID_ARGUMENT) — under the frozen ordering the
+                      refusal happens BEFORE any invalidation, so edge,
+                      tail and leg continue seamlessly; the only content
+                      a refusal can ever lose is one abandoned in-flight
+                      staging block (at most one staging buffer) in the
+                      blocked-writer case. Post-cut, the selected
+                      mechanism confines failure to the existing D11
+                      device-failure path (the edge invalidate is a
+                      fail-fast O(1) reset that happens only after
+                      song_seek has succeeded; a device failure during
+                      the drain settles through the existing
+                      precedence). Seek introduces no new terminal
+                      variant and no recovery semantics.
 realtime cost         zero new per-quantum work in normal playback (the
                       render loop gains one more session-owned flag at
                       its existing loop-top check; the worker gains a
@@ -1853,7 +1908,6 @@ new Plugin / Capability / K0 primitive
 new lifetime taxonomy
 Generation / Window / epoch / global playback store
 consumer-driven vs authority-driven semantic commit
-seek physical-output cutover mechanism
 F6 fresh-source/config handoff mechanism
 position/duration propositions beyond the frozen D14.8 minimum
 playlist/queue authority
@@ -1863,7 +1917,9 @@ preload/gapless/overlap topology
 
 (The pause/resume semantic commit point and minimum mechanism left this
 list when D14.7 froze them; the position/duration propositions left it
-when D14.8 froze theirs. Anything beyond the frozen minima still
-requires a narrow authority decision.)
+when D14.8 froze theirs; the seek physical-output cutover mechanism
+left it when the 2026-09-17 F5-GATE amendment froze it inside D14.5.
+Anything beyond the frozen minima still requires a narrow authority
+decision.)
 
 The rule is intentional: **OPEN means “not authorized yet,” not “Flash may invent the missing architecture.”**
