@@ -223,15 +223,25 @@ seek acceptance / discontinuity / commit semantics
      one-seek-in-flight, pause intent survives; P1–P5 untriggered —
      pending human review of the implementation PR)
 open/session construction + config + replacement semantics
-playlist/queue authority
-next / previous
-volume authority
+    (F6-AUTHORITY-PROMOTION-1 froze the propositions and mechanism in
+     D14.6 — probe-before-destruction + whole-episode-composition
+     replacement + authority-owned operation results + failure-clean
+     start — on S-PROBE physical evidence; implementation pending)
+volume realtime apply placement
+    (D14.9 volume owner/semantics + IAudioStreamVolume candidate
+     frozen by F6-AUTHORITY-PROMOTION-1; the physical apply placement
+     is PENDING V-PROBE)
 device switch / replaceable render binding
 PlaybackControl topology
 PlaybackFacts publication topology
 multi-session / preload / gapless
 Realtime Audio Runtime representation
 ```
+
+Closed by the same 2026-09-18 F6-AUTHORITY-PROMOTION-1 (D14.6/D14.9
+amendment): playlist/queue authority (application navigation state,
+commit-on-activation — no new authority) and next/previous policy
+(inert boundaries, no auto-next, Open replaces the playlist).
 
 ---
 
@@ -310,9 +320,26 @@ F5 Seek                         GATE MERGED (PR #154, D14.5:
                                 is one atomic three-valued sample, a FAILED
                                 tail observation escapes the park bounded —
                                 pending human review
-F6 Open                         CONFIG-MECHANISM-OPEN
-Next / Previous                 AFTER OPEN; separate navigation step
-F7 Volume                       GOAL KEPT / authority mechanism to earn
+F6 Open                         AUTHORITY PROMOTED (architecture/
+                                f6-open-authority-promotion-1:
+                                F6-AUTHORITY-PROMOTION-1 amends D14.6 —
+                                probe-before-destruction + whole-episode-
+                                composition replacement + commit formula +
+                                failure-clean start, frozen on S-PROBE
+                                GREEN physical evidence, evidence
+                                experiments/f6-source-probe; acoustic
+                                human-ear item recorded UNAVAILABLE)
+                                IMPLEMENTATION PENDING (feat/f6-open-1)
+Next / Previous                 AUTHORITY CLOSED as application
+                                navigation state (commit-on-activation,
+                                inert boundaries, no auto-next; same
+                                amendment) — IMPLEMENTATION PENDING
+                                (feat/navigation-1)
+F7 Volume                       owner/semantics PROMOTED (D14.9
+                                amendment: App-owned desired level,
+                                stream-local realization,
+                                IAudioStreamVolume candidate); physical
+                                RT apply placement PENDING V-PROBE
 F8 Devices / Device switch      split; switch mechanism still OPEN
 ```
 
