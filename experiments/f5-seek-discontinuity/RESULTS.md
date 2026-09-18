@@ -504,6 +504,25 @@ EOF window                   edge Eof is a terminal (monotone, first-wins)
 > (completion.rs white-box) plus mutation M10, and the liveness pin is
 > `a_cut_over_a_never_draining_device_still_tears_down` (seek_seam)
 > plus mutation M9.
+>
+> **§11 corrective 2 (2026-09-18, F5-SEEK-IMPLEMENTATION-CORRECTIVE-4,
+> same branch; human review of corrective 3).** The "every wait
+> terminal-aware" row's OTHER half: a terminal must be PRODUCIBLE from
+> inside the output park, and the parked leg's tail probe answered one
+> bool — a tail observation that itself FAILED (an invalidated
+> endpoint's `GetCurrentPadding` error) was masked as "not quiesced
+> yet", so the park waited forever and the loop-level abort that stops
+> the data plane (the thing that produces the terminal the
+> corrective-3 worker escape reads) never ran: the frozen
+> device-failure path was structurally unreachable from inside a park.
+> The probe now answers three truth classes (Pending / Quiesced /
+> Failed) and a Failed observation ends the park bounded — no
+> quiescence publishes for it — handing the decision to the existing
+> device-failure path (conformance, no new failure class). Pins: the
+> per-attribution gate failure-exit oracles, source-order P13, the
+> end-to-end `a_device_failure_inside_the_cut_park_settles_failed_through_d11`
+> (seek_seam), and mutation M11 (the Failed arms collapsed back into
+> the Pending treatment) — gate now M1–M11, 11/11.
 
 ## 12. Multiple seeks (smallest truthful policy)
 

@@ -304,7 +304,12 @@ F5 Seek                         GATE MERGED (PR #154, D14.5:
                                 gate (single steady acquisition, paused
                                 rebase mid-park), seek/worker-exit
                                 linearization, per-cut evidence reset,
-                                mutations M1–M10 — pending human review
+                                mutations M1–M11; corrective-3/4 (human
+                                rulings, conformance only): worker waits
+                                read the data plane terminal, cut decision
+                                is one atomic three-valued sample, a FAILED
+                                tail observation escapes the park bounded —
+                                pending human review
 F6 Open                         CONFIG-MECHANISM-OPEN
 Next / Previous                 AFTER OPEN; separate navigation step
 F7 Volume                       GOAL KEPT / authority mechanism to earn
