@@ -91,6 +91,7 @@ fn main() {
         "O4" => o4(&main_file, &candidates),
         "O5" => o5(&main_file, &candidates),
         "O6" => o6(&main_file, &candidates),
+        "O7" => o7(&main_file, &candidates),
         other => {
             eprintln!("verdict=RED reason: unknown scenario {other:?}");
             std::process::exit(2);
@@ -145,9 +146,10 @@ impl EpisodeStart for RealSource {
             .map_err(|e| e.message)
     }
 
-    fn start(&self, source: &Path) -> StartAttempt {
+    fn start(&self, source: &Path, initial_output_level: u8) -> StartAttempt {
         let mut runtime = QianqianApp::new();
         let handle = PlaybackSessionHandle::new();
+        handle.request_output_level(initial_output_level);
         if let Err(e) =
             runtime.register_component(qianqian_decode_songcore::songcore_decode_plugin())
         {
@@ -655,6 +657,85 @@ fn o6(main: &Path, candidates: &[PathBuf]) -> Outcome {
             "prev_steps_ok": prev_steps,
             "inert_end": inert_end,
             "prev_inert_at_first": prev_inert,
+            "quit_disposal": format!("{:?}", report.disposal),
+        })),
+    )
+}
+
+/// O7 — volume (Stage F, D14.9): the App's desired stream factor
+/// routes through the live episode; volume commands never settle
+/// truth; the render leg keeps consuming under applies (position
+/// publication advancing, including at factor 0.0 — silence is still
+/// submitted frames); the desired level survives episode replacement
+/// and is delivered to the fresh episode before activation.
+fn o7(main: &Path, candidates: &[PathBuf]) -> Outcome {
+    let mut reasons = Vec::new();
+    let candidate = candidates[0].clone();
+    let mut player = ReferencePlayerApp::new(RealSource);
+    if !matches!(player.open(main), OpenOutcome::Opened) {
+        return (
+            "RED",
+            vec!["O7: the first Open did not establish".into()],
+            None,
+        );
+    }
+    let a = player.active_handle().expect("committed").clone();
+    if !expect_liveness(&a, 2, "O7 pre-volume A", &mut reasons) {
+        return ("RED", reasons, None);
+    }
+
+    // Route a lower factor mid-episode.
+    let volume = player.change_volume(-40);
+    if volume != 60 {
+        reasons.push(format!("O7: change_volume landed at {volume}, expected 60"));
+        return ("RED", reasons, None);
+    }
+    eprintln!("verdict=GREEN reason: O7 volume routed to {volume}/100");
+    if !expect_liveness(&a, 4, "O7 post-volume A", &mut reasons) {
+        return ("RED", reasons, None);
+    }
+    let still_unsettled = a.observe().terminal_outcome.is_none();
+    if !still_unsettled {
+        reasons.push("O7: a volume command settled the episode".into());
+    }
+
+    // Volume 0 (silence): frames keep being consumed — position
+    // publication is frame accounting, not loudness.
+    let volume = player.change_volume(-60);
+    if volume != 0 {
+        reasons.push(format!("O7: volume 0 clamp failed, got {volume}"));
+        return ("RED", reasons, None);
+    }
+    let silent_live = expect_liveness(&a, 2, "O7 silent A", &mut reasons);
+
+    // Replacement carries the App's desired level (60 restored, then
+    // replacement) into the fresh episode before activation.
+    player.change_volume(60); // back to 60
+    if !matches!(player.open(&candidate), OpenOutcome::Opened) {
+        reasons.push("O7: the replacement with the routed level failed".into());
+        return ("RED", reasons, None);
+    }
+    let carried = player.desired_volume() == 60;
+    let b_live = player
+        .active_handle()
+        .is_some_and(|h| expect_liveness(h, 2, "O7 replacement episode", &mut reasons));
+
+    let report = quit_report(&mut player);
+    let ok = volume == 0
+        && still_unsettled
+        && silent_live
+        && carried
+        && b_live
+        && report.terminal == Some(EpisodeTerminalOutcome::Stopped)
+        && report.disposal == Some(qianqian_composition::DisposeVerdict::Discharged);
+    (
+        if ok { "GREEN" } else { "RED" },
+        reasons,
+        Some(serde_json::json!({
+            "volume_route_ok": volume == 0,
+            "unsettled_after_volume": still_unsettled,
+            "silent_still_consuming": silent_live,
+            "level_survived_replacement": carried,
             "quit_disposal": format!("{:?}", report.disposal),
         })),
     )

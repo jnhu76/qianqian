@@ -44,9 +44,9 @@ use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::Media::Audio::{
-    AUDCLNT_E_UNSUPPORTED_FORMAT, AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-    IAudioClient, IAudioRenderClient, IMMDeviceEnumerator, MMDeviceEnumerator,
-    WAVEFORMATEXTENSIBLE, eMultimedia, eRender,
+    AUDCLNT_E_DEVICE_INVALIDATED, AUDCLNT_E_UNSUPPORTED_FORMAT, AUDCLNT_SHAREMODE_SHARED,
+    AUDCLNT_STREAMFLAGS_EVENTCALLBACK, IAudioClient, IAudioRenderClient, IAudioStreamVolume,
+    IMMDeviceEnumerator, MMDeviceEnumerator, WAVEFORMATEXTENSIBLE, eMultimedia, eRender,
 };
 use windows::Win32::System::Com::{
     CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize,
@@ -55,8 +55,8 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::GUID;
 
 use qianqian_audio_api::ports::{
-    AudioOutput, DrainSignal, DrainVerdict, GateSlice, OutputError, ParkOutcome, PcmFormat,
-    PcmPull, PositionEvidence, RenderGate, RenderPcmInput, RenderRequest, RenderStream,
+    AudioOutput, DrainSignal, DrainVerdict, GateSlice, OutputError, OutputLevel, ParkOutcome,
+    PcmFormat, PcmPull, PositionEvidence, RenderGate, RenderPcmInput, RenderRequest, RenderStream,
     SeekParkRelease, TailProbeOutcome,
 };
 
@@ -113,7 +113,8 @@ impl AudioOutput for WasapiOutput {
                 let gate = request.gate.clone();
                 let drain = request.drain.clone();
                 let position = request.position.clone();
-                move || run_render_thread(format, render_input, gate, drain, position, slot)
+                let level = request.level.clone();
+                move || run_render_thread(format, render_input, gate, drain, position, level, slot)
             })
             .map_err(|e| OutputError {
                 message: format!("render thread spawn failed: {e}"),
@@ -213,12 +214,13 @@ fn run_render_thread(
     gate: RenderGate,
     drain: DrainSignal,
     position: PositionEvidence,
+    level: OutputLevel,
     slot: OpenSlot,
 ) {
     // A panic must not leave the completion unresolved or the producer
     // wedged: it reports like any other abort.
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        open_and_run(format, &*render_input, &gate, &position, &slot)
+        open_and_run(format, &*render_input, &gate, &position, &level, &slot)
     }))
     .unwrap_or_else(|_| LoopOutcome::Aborted {
         message: "render thread panicked".to_owned(),
@@ -251,6 +253,7 @@ fn open_and_run(
     render_input: &dyn RenderPcmInput,
     gate: &RenderGate,
     position: &PositionEvidence,
+    level: &OutputLevel,
     slot: &OpenSlot,
 ) -> LoopOutcome {
     let coinit = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
@@ -263,7 +266,7 @@ fn open_and_run(
         };
     }
     let _apartment = ComApartment(true);
-    open_and_run_inner(format, render_input, gate, position, slot)
+    open_and_run_inner(format, render_input, gate, position, level, slot)
 }
 
 fn open_and_run_inner(
@@ -271,9 +274,10 @@ fn open_and_run_inner(
     render_input: &dyn RenderPcmInput,
     gate: &RenderGate,
     position: &PositionEvidence,
+    level: &OutputLevel,
     slot: &OpenSlot,
 ) -> LoopOutcome {
-    let Some(session) = open_session(format, slot) else {
+    let Some(session) = open_session(format, level, slot) else {
         return LoopOutcome::Aborted {
             message: "device open failed (see open verdict)".to_owned(),
         };
@@ -333,6 +337,13 @@ struct DeviceSession {
     client: IAudioClient,
     event: EventHandle,
     buffer_frames: u32,
+    /// The episode's desired stream factor (D14.9 cell) and the
+    /// mechanism handle that realizes it, plus the last value this leg
+    /// applied (the loop-top compare).
+    level: OutputLevel,
+    stream_volume: IAudioStreamVolume,
+    channels: u32,
+    applied_bits: std::cell::Cell<u32>,
 }
 
 impl Drop for DeviceSession {
@@ -351,7 +362,7 @@ impl Drop for DeviceSession {
 /// returns the session on success.
 /// Device open + Tier-1 negotiation. Publishes exactly one open verdict;
 /// returns the session on success.
-fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSession> {
+fn open_session(format: PcmFormat, level: &OutputLevel, slot: &OpenSlot) -> Option<DeviceSession> {
     let publish = |v: OpenVerdict| {
         let (m, cv) = &**slot;
         let mut guard = m.lock().expect("open verdict lock");
@@ -426,6 +437,25 @@ fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSession> {
         Ok(r) => r,
         Err(e) => return fail(format!("render client acquire failed: {e}")),
     };
+    // D14.9: the episode's desired stream factor applies ONCE at stream
+    // open, before first meaningful submission — the initial routed
+    // value (or unity) is in effect before the stream ever starts. A
+    // failure here is an open failure (the episode fails cleanly, like
+    // any other device-open refusal).
+    let stream_volume: IAudioStreamVolume = match unsafe { client.GetService() } {
+        Ok(v) => v,
+        Err(e) => return fail(format!("stream volume acquire failed: {e}")),
+    };
+    let channels = match unsafe { stream_volume.GetChannelCount() } {
+        Ok(c) => c,
+        Err(e) => return fail(format!("stream volume channels failed: {e}")),
+    };
+    let initial = level.load();
+    let mut initial_levels = vec![initial; channels as usize];
+    if let Err(e) = unsafe { stream_volume.SetAllVolumes(&initial_levels) } {
+        return fail(format!("initial stream volume apply failed: {e}"));
+    }
+    drop(initial_levels);
 
     publish(OpenVerdict::Opened { format });
     // One open diagnostic per episode — the real-sound gate's negotiated
@@ -439,6 +469,10 @@ fn open_session(format: PcmFormat, slot: &OpenSlot) -> Option<DeviceSession> {
         client,
         event,
         buffer_frames,
+        level: level.clone(),
+        stream_volume,
+        channels,
+        applied_bits: std::cell::Cell::new(initial.to_bits()),
     })
 }
 
@@ -533,6 +567,39 @@ fn steady_loop(
         );
         if park_failed {
             break abort_msg("tail observation failed while parked".to_owned());
+        }
+        // D14.9 loop-top output-level apply (V-PROBE-grounded): ONE
+        // relaxed load + compare per iteration; SetAllVolumes runs here
+        // — before the device wait and GetBuffer, never inside the
+        // quantum. Failure grading (D14.9): device loss routes through
+        // THIS loop's existing device-failure exit (D11 may settle
+        // Failed); any other failure is an ordinary recoverable
+        // mechanism failure — one diagnostic, playback continues at the
+        // last applied level.
+        {
+            let routed = session.level.load();
+            let routed_bits = routed.to_bits();
+            if routed_bits != session.applied_bits.get() {
+                let routed_levels = vec![routed; session.channels as usize];
+                match unsafe { session.stream_volume.SetAllVolumes(&routed_levels) } {
+                    Ok(()) => session.applied_bits.set(routed_bits),
+                    Err(e) if e.code() == AUDCLNT_E_DEVICE_INVALIDATED => {
+                        break abort_msg(format!(
+                            "stream volume apply failed (device invalidated): {e}"
+                        ));
+                    }
+                    Err(e) => {
+                        static DIAGNOSED: std::sync::atomic::AtomicBool =
+                            std::sync::atomic::AtomicBool::new(false);
+                        if !DIAGNOSED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                            eprintln!(
+                                "[qianqian-wasapi] stream volume apply failed (recoverable; \
+                                 holding the last applied level): {e}"
+                            );
+                        }
+                    }
+                }
+            }
         }
         // Period cadence; the bounded wait is also the stop-latency bound.
         unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };

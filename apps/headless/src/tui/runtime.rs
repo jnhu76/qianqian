@@ -145,6 +145,16 @@ fn handle_key<S: EpisodeStart>(
             perform_navigation(model, player, Navigation::Previous);
             Step::Continue
         }
+        Action::VolumeUp => {
+            let volume = player.change_volume(VOLUME_STEP);
+            model.set_status(Some(format!("volume {volume}/100")));
+            Step::Continue
+        }
+        Action::VolumeDown => {
+            let volume = player.change_volume(-VOLUME_STEP);
+            model.set_status(Some(format!("volume {volume}/100")));
+            Step::Continue
+        }
         // Episode commands route through the player's committed seam;
         // with no episode they are inert (there is nothing to command).
         action => {
@@ -162,6 +172,10 @@ enum Navigation {
     Next,
     Previous,
 }
+
+/// The D14.9 volume step: one key press, five points of the desired
+/// stream factor. One product decision, one constant.
+const VOLUME_STEP: i16 = 5;
 
 /// Perform one navigation selection through the player (D14.6): the
 /// SAME Open replacement, with the cursor moving only on commit. The
@@ -222,6 +236,7 @@ fn refresh<S: EpisodeStart>(model: &mut TuiModel, player: &ReferencePlayerApp<S>
             .map(|p| p.to_string_lossy().into_owned()),
     );
     model.set_navigation(player.navigation_position());
+    model.set_volume(Some(player.desired_volume()));
     if let Some(handle) = player.active_handle() {
         model.update(handle.observe());
     }

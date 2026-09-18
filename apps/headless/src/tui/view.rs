@@ -25,7 +25,7 @@ pub fn draw(frame: &mut Frame, model: &TuiModel) {
     let [main, diagnostics, controls] = Layout::vertical([
         Constraint::Min(6),
         Constraint::Length(3),
-        Constraint::Length(6),
+        Constraint::Length(7),
     ])
     .areas(frame.area());
     frame.render_widget(main_panel(model), main);
@@ -69,6 +69,9 @@ fn main_panel(model: &TuiModel) -> Paragraph<'_> {
                 "Track: {position}/{total} (navigation cursor)"
             )));
         }
+        if let Some(volume) = model.volume_label() {
+            lines.push(Line::from(format!("Volume: {volume} (desired)")));
+        }
         open_lines(model, &mut lines);
         return Paragraph::new(lines).block(
             Block::bordered()
@@ -100,6 +103,9 @@ fn main_panel(model: &TuiModel) -> Paragraph<'_> {
     if let Some((position, total)) = model.navigation_position() {
         lines.push(Line::from(format!("Track: {position}/{total}")));
     }
+    if let Some(volume) = model.volume_label() {
+        lines.push(Line::from(format!("Volume: {volume} (desired)")));
+    }
     if model.terminal_committed() {
         lines.push(Line::from(""));
         lines.push(Line::from(COMMITTED_HINT));
@@ -126,6 +132,7 @@ fn controls_panel() -> Paragraph<'static> {
         Line::from(" S  Stop            Q  Quit    Ctrl+C  Quit"),
         Line::from(" O  Open source"),
         Line::from(" N  Next            P  Previous"),
+        Line::from(" +  Louder          -  Softer"),
     ])
     .block(Block::bordered().title(bold(" Controls ")))
 }
@@ -490,6 +497,23 @@ mod tests {
         assert_eq!(forbidden_status_claim(&text), None, "{text}");
     }
 
+    /// The volume line renders the App's desired stream factor (D14.9
+    /// read side: exactly the configured value, never an acoustic or
+    /// mechanism claim).
+    #[test]
+    fn the_volume_line_renders_the_desired_factor() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        assert!(
+            !rendered(&model).contains("Volume:"),
+            "before the first refresh the model holds no level and renders none"
+        );
+        model.set_volume(Some(80));
+        let text = rendered(&model);
+        assert!(text.contains("Volume: 80/100 (desired)"), "{text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
     /// The controls panel documents the O key — and the panel grew one
     /// row for it.
     #[test]
@@ -500,5 +524,7 @@ mod tests {
         assert!(text.contains("O  Open source"), "{text}");
         assert!(text.contains("N  Next"), "{text}");
         assert!(text.contains("P  Previous"), "{text}");
+        assert!(text.contains("+  Louder"), "{text}");
+        assert!(text.contains("-  Softer"), "{text}");
     }
 }

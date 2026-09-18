@@ -597,6 +597,7 @@ impl AudioOutput for TestOutput {
                     drain,
                     gate,
                     position,
+                    level: _,
                     format: _,
                 } = request;
                 let thread = spawn_test_leg(
@@ -652,6 +653,7 @@ impl AudioOutput for TestOutput {
                     drain,
                     gate,
                     position,
+                    level: _,
                     format: _,
                 } = request;
                 let thread = spawn_test_leg(

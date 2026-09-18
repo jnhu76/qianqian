@@ -246,12 +246,19 @@ impl qianqian_headless::player::EpisodeStart for RealEpisodeSource {
             .map_err(|e| e.message)
     }
 
-    fn start(&self, source: &Path) -> qianqian_headless::player::StartAttempt {
+    fn start(
+        &self,
+        source: &Path,
+        initial_output_level: u8,
+    ) -> qianqian_headless::player::StartAttempt {
         use qianqian_headless::player::StartAttempt;
         use qianqian_playback::PlaybackSessionHandle;
 
         let mut runtime = qianqian_app::QianqianApp::new();
         let handle = PlaybackSessionHandle::new();
+        // The App's desired stream factor (D14.9) routes BEFORE
+        // activation, so the mechanism applies it at stream open.
+        handle.request_output_level(initial_output_level);
         if let Err(e) =
             runtime.register_component(qianqian_decode_songcore::songcore_decode_plugin())
         {

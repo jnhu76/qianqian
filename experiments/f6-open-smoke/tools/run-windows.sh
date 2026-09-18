@@ -73,5 +73,6 @@ run O3 "--cand flac-valid.flac"
 run O4 "--cand mp3-valid.mp3"
 run O5 "--cand mp3-valid.mp3 --cand flac-valid.flac --cand mp3-valid.mp3"
 run O6 "--cand mp3-valid.mp3 --cand flac-valid.flac"
+run O7 "--cand mp3-valid.mp3"
 
 echo "run $RUN complete; logs in evidence/logs/, env in $ENVFILE"
