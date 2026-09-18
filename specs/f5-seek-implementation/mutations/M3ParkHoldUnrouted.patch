@@ -1,5 +1,5 @@
 diff --git a/crates/qianqian-playback/src/completion.rs b/crates/qianqian-playback/src/completion.rs
-index f3739f3..65af526 100644
+index cca2c17..ebd53b4 100644
 --- a/crates/qianqian-playback/src/completion.rs
 +++ b/crates/qianqian-playback/src/completion.rs
 @@ -538,7 +538,6 @@ impl SessionCompletion {

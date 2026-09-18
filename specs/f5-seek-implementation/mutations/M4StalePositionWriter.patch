@@ -1,8 +1,8 @@
 diff --git a/crates/qianqian-audio-api/src/ports.rs b/crates/qianqian-audio-api/src/ports.rs
-index e61b9ac..43a59ee 100644
+index b0bc4fa..9063b8c 100644
 --- a/crates/qianqian-audio-api/src/ports.rs
 +++ b/crates/qianqian-audio-api/src/ports.rs
-@@ -705,7 +705,7 @@ impl PositionEvidence {
+@@ -718,7 +718,7 @@ impl PositionEvidence {
              // and a writer that knows the basis is gone never publishes.
              None => 0,
          };

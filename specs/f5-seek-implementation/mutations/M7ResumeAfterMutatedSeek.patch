@@ -1,8 +1,8 @@
 diff --git a/crates/qianqian-playback/src/session.rs b/crates/qianqian-playback/src/session.rs
-index ee7026f..e532fb8 100644
+index 178dc14..3e5c249 100644
 --- a/crates/qianqian-playback/src/session.rs
 +++ b/crates/qianqian-playback/src/session.rs
-@@ -294,8 +294,6 @@ fn decode_worker(
+@@ -302,8 +302,6 @@ fn decode_worker(
                                  completion.decode_failed(&format!(
                                      "seek failed: {diagnostic}"
                                  ));
