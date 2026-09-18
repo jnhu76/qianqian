@@ -1,0 +1,13 @@
+run: 3
+date_utc: 2026-09-18T14:22:59Z
+repo_main_sha: 76c205a74ad2e4d1e00facd02259825ad2d648ca
+harness_tree_dirty_files:
+  ?? experiments/f6-source-probe/
+exe_sha256: d589f843701de94e8206a94ed7c0ee7368f9121bc04d1c8e5007898f14bc6ead
+main45_sha256: e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e
+mp3_valid_sha256: feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058
+flac_valid_sha256: d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2
+m4a_valid_sha256: 2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c
+audio_device: Realtek High Definition Audio
+endpoint_note: default render endpoint (shared mode, event-driven), as opened by the harness log line
+windows: Microsoft Windows 11 Pro (zh-CN caption unrenderable in WSL capture) build 26200

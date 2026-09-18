@@ -1,0 +1,170 @@
+{
+  "expected": "GREEN",
+  "matched_expectation": true,
+  "old_episode": {
+    "activation_error": null,
+    "dispose_quiet": true,
+    "failure_diagnostic": null,
+    "source_format": {
+      "channels": 2,
+      "sample_rate": 44100
+    },
+    "terminal": "Stopped"
+  },
+  "position_samples": [
+    [
+      0,
+      null
+    ],
+    [
+      200,
+      8379
+    ],
+    [
+      400,
+      17199
+    ],
+    [
+      600,
+      26019
+    ],
+    [
+      800,
+      34839
+    ],
+    [
+      1000,
+      43659
+    ],
+    [
+      1200,
+      52479
+    ],
+    [
+      1401,
+      61299
+    ],
+    [
+      1601,
+      70119
+    ],
+    [
+      1801,
+      78939
+    ],
+    [
+      2001,
+      87759
+    ],
+    [
+      2202,
+      96579
+    ],
+    [
+      2402,
+      105399
+    ],
+    [
+      2602,
+      114660
+    ],
+    [
+      2802,
+      123480
+    ],
+    [
+      3003,
+      132300
+    ],
+    [
+      3203,
+      141120
+    ],
+    [
+      3403,
+      149940
+    ],
+    [
+      3604,
+      158760
+    ],
+    [
+      3804,
+      167580
+    ],
+    [
+      4004,
+      176400
+    ]
+  ],
+  "probes": [
+    {
+      "candidate": "missing-file.mp3",
+      "elapsed_us": 1371,
+      "error": "cannot open 'missing-file.mp3': 系统找不到指定的文件。 (os error 2)",
+      "expect_valid": false,
+      "facts": null,
+      "ok": true,
+      "step": 0,
+      "t_ms": 1000
+    },
+    {
+      "candidate": "empty.mp3",
+      "elapsed_us": 460,
+      "error": "song_open refused 'empty.mp3': status 104",
+      "expect_valid": false,
+      "facts": null,
+      "ok": true,
+      "step": 2,
+      "t_ms": 1601
+    },
+    {
+      "candidate": "garbage.mp3",
+      "elapsed_us": 414,
+      "error": "song_open refused 'garbage.mp3': status 104",
+      "expect_valid": false,
+      "facts": null,
+      "ok": true,
+      "step": 4,
+      "t_ms": 2202
+    },
+    {
+      "candidate": "missing-file.mp3",
+      "elapsed_us": 310,
+      "error": "cannot open 'missing-file.mp3': 系统找不到指定的文件。 (os error 2)",
+      "expect_valid": false,
+      "facts": null,
+      "ok": true,
+      "step": 6,
+      "t_ms": 2602
+    },
+    {
+      "candidate": "empty.mp3",
+      "elapsed_us": 434,
+      "error": "song_open refused 'empty.mp3': status 104",
+      "expect_valid": false,
+      "facts": null,
+      "ok": true,
+      "step": 8,
+      "t_ms": 3203
+    },
+    {
+      "candidate": "garbage.mp3",
+      "elapsed_us": 449,
+      "error": "song_open refused 'garbage.mp3': status 104",
+      "expect_valid": false,
+      "facts": null,
+      "ok": true,
+      "step": 10,
+      "t_ms": 3604
+    }
+  ],
+  "reasons": [],
+  "sample_rate": 44100,
+  "scenario": "S7",
+  "verdict": "GREEN",
+  "window_ms": [
+    1000,
+    3604
+  ]
+}
