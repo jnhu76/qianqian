@@ -1386,7 +1386,11 @@ discontinuity/RESULTS.md` §15).
 > release-pending bookkeeping off the RT path), because a later seek's
 > hold would otherwise wipe an unconsumed `Committed` and lose the
 > rebase — the pause-shaped interleaving the seek matrices caught and
-> now pin (`a_committed_release_is_never_wiped_by_a_later_seek`). The
+> now pin (`a_committed_release_is_never_wiped_by_a_later_seek` — a
+> name this note invented before implementation; the duty is actually
+> pinned by the white-box "slot stays occupied through the commit"
+> assertion, the end-to-end `a_second_seek_while_one_is_in_flight_is_inert`,
+> and the gate's `a_new_hold_drops_a_stale_unconsumed_release` oracle). The
 > position cell gains `rebase(landing)` — the one legal backward step,
 > a plain store whose `None` encoding withdraws the sample; the
 > withdrawal is episode-permanent on the leg's discipline (a later
@@ -1405,7 +1409,8 @@ discontinuity/RESULTS.md` §15).
 > matrices), crate-internal white-box protocol tests, loom L5–L7, and
 > the implementation mutation gate `specs/f5-seek-implementation/`
 > (M1–M7, 7/7 COUNTEREXAMPLE-WITNESSED — the Rust twins of the gate
-> suite's TLA+ mutations). Windows physical smoke evidence is a gate of
+> suite's TLA+ mutations). *(Counts superseded by corrective 3 below:
+> 16 matrices, M1–M10, 10/10.)* Windows physical smoke evidence is a gate of
 > the implementation PR, not of this note.
 >
 > 2026-09-18 implementation corrective 1 (F5-SEEK-IMPLEMENTATION-
@@ -1534,8 +1539,15 @@ discontinuity/RESULTS.md` §15).
 > premature commit call is a Pending no-op, so M5 pins the program-order
 > violation literally: publishing the landing only after the wait).
 > `qianqian-headless`'s token pin and its usage text are corrected with
-> the reader. Windows physical smoke evidence remains a gate of the
-> implementation PR, not of this note.
+> the reader. One consequence is recorded rather than fixed: a device
+> that neither quiesces its tail nor fails and meets neither a stop nor
+> a teardown leaves the applied cut Pending indefinitely — the episode
+> is silently stalled (`Pending`, no timeout, no signal). The superseded
+> bool spelling had the same property (its wait also required the tail
+> condition and had no timeout), so nothing regressed, and a timeout
+> would be NEW authority (a new failure policy row), which this
+> corrective deliberately does not invent. Windows physical smoke
+> evidence remains a gate of the implementation PR, not of this note.
 
 ### D14.6 Open / Next / Previous — no-overlap replacement v1
 
