@@ -1,0 +1,10 @@
+run: 1
+date_utc: 2026-09-18T18:36:40Z
+repo_head_sha: 255076aee0edaf482e073138edceab1cc33bc3db
+branch: main
+harness_tree_status:
+  ?? experiments/v-probe/
+exe_sha256: 06bcff69426d1e4c6a7c523c7a3b919ee6f494d326b474ea78a7bcd6f3a65a47
+windows_caption_raw: Microsoft Windows 11 ×¨Òµ°æ
+audio_device: Realtek High Definition Audio
+endpoint_note: default render endpoint (shared mode, event-driven float32), opened by the harness; factors are stream-local (IAudioStreamVolume)

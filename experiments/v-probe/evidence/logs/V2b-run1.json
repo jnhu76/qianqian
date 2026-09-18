@@ -1,0 +1,8 @@
+{
+  "scenario": "V2b",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "stream_factors": "pinned at 1.0 while the session master moved"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "scenario": "V4",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "iterations": 2000,
+    "max_ns": 653600,
+    "max_position_gap_frames": 2008,
+    "median_ns": 81700,
+    "min_ns": 72600,
+    "p99_ns": 134700,
+    "position_monotone": true,
+    "stream_survived": true
+  }
+}
