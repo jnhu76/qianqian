@@ -1,8 +1,8 @@
 diff --git a/crates/qianqian-playback/src/completion.rs b/crates/qianqian-playback/src/completion.rs
-index cca2c17..ebd53b4 100644
+index a4e1707..9ce2104 100644
 --- a/crates/qianqian-playback/src/completion.rs
 +++ b/crates/qianqian-playback/src/completion.rs
-@@ -538,7 +538,6 @@ impl SessionCompletion {
+@@ -537,7 +537,6 @@ impl SessionCompletion {
          // satisfies the output-cut precondition and the pause intent
          // survives the seek) — routing the hold is harmless there; the
          // seek-park engages when the leg next reaches its loop top.

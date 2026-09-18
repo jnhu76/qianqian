@@ -1,8 +1,8 @@
 diff --git a/crates/qianqian-playback/src/completion.rs b/crates/qianqian-playback/src/completion.rs
-index cca2c17..b1180d9 100644
+index a4e1707..ee5f6c6 100644
 --- a/crates/qianqian-playback/src/completion.rs
 +++ b/crates/qianqian-playback/src/completion.rs
-@@ -640,8 +640,7 @@ impl SessionCompletion {
+@@ -639,8 +639,7 @@ impl SessionCompletion {
      pub(crate) fn commit_seek_cutover(&self, landing: Option<u64>) -> bool {
          let decision = {
              let mut guard = self.state.state.lock().expect("completion lock");

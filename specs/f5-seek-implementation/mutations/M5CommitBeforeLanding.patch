@@ -1,8 +1,8 @@
 diff --git a/crates/qianqian-playback/src/session.rs b/crates/qianqian-playback/src/session.rs
-index 178dc14..2fe5b8e 100644
+index 14bbb81..147fa11 100644
 --- a/crates/qianqian-playback/src/session.rs
 +++ b/crates/qianqian-playback/src/session.rs
-@@ -316,6 +316,7 @@ fn decode_worker(
+@@ -312,6 +312,7 @@ fn decode_worker(
                                  // commit decision routes the release.
                                  remainder = None;
                                  edge.invalidate();

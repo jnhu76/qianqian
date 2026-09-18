@@ -1,5 +1,5 @@
 diff --git a/crates/qianqian-playback/src/session.rs b/crates/qianqian-playback/src/session.rs
-index 178dc14..3f1e6fb 100644
+index 14bbb81..f14c438 100644
 --- a/crates/qianqian-playback/src/session.rs
 +++ b/crates/qianqian-playback/src/session.rs
 @@ -286,6 +286,7 @@ fn decode_worker(
