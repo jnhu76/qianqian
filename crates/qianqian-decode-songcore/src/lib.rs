@@ -223,6 +223,39 @@ impl SongcoreDecodeStream {
     }
 }
 
+/// Raw `song_seek` status → the frozen semantic class (ADR-PBK-002
+/// D14.5), payload-free so the mapping is pinnable without a live
+/// handle. Exactly ONE status proves the pre-call decoding continuation
+/// intact: `SONG_ERR_INVALID_ARGUMENT` is the ABI's pure parameter
+/// check, which runs only on an OPEN handle (the not-probed guard
+/// returns earlier) and mutates nothing before returning.
+///
+/// Everything else is destructive by the conservative rule — unprovable
+/// means destructive:
+///   - `SONG_ERR_NOT_OPEN` reports `!probed || !dec`: the handle is NOT
+///     in an opened/probed state, so it certifies no usable old cursor.
+///     A constructed endpoint is always probed, so this status is an
+///     abnormal provider state, not an inert refusal — it must fail
+///     closed (the F5 gate earned `INVALID_ARGUMENT` only, and never
+///     measured a not-opened handle's continuation).
+///   - generic `SEEK_ERROR` is returned both before `av_seek_frame` and
+///     again after a successful reposition + decoder flush/reset, so
+///     the status code alone proves nothing.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SeekClass {
+    Applied,
+    RefusedUnchanged,
+    MutatedThenFailed,
+}
+
+fn classify_seek_status(status: u32) -> SeekClass {
+    match status {
+        sys::SONG_OK => SeekClass::Applied,
+        sys::SONG_ERR_INVALID_ARGUMENT => SeekClass::RefusedUnchanged,
+        _ => SeekClass::MutatedThenFailed,
+    }
+}
+
 impl DecodedPcmStream for SongcoreDecodeStream {
     fn format(&self) -> PcmFormat {
         self.format
@@ -264,8 +297,8 @@ impl DecodedPcmStream for SongcoreDecodeStream {
         let target_us = i64::try_from(target.as_micros()).unwrap_or(i64::MAX);
         let mut landing_us: i64 = -1;
         let status = unsafe { sys::song_seek(self.handle, target_us, &mut landing_us) };
-        match status {
-            sys::SONG_OK => {
+        match classify_seek_status(status) {
+            SeekClass::Applied => {
                 // The ABI reports the retained-PCM start measured from
                 // the first decoded frame's timestamp; -1 is the
                 // explicit "landing unknown" sentinel (never
@@ -279,22 +312,8 @@ impl DecodedPcmStream for SongcoreDecodeStream {
                 });
                 ProviderSeekOutcome::Applied { landing }
             }
-            // Proven pre-mutation refusals: the native `song_seek` checks
-            // these BEFORE any FFmpeg call — the null/illegal-argument
-            // guard and the not-probed state guard
-            // (native/src/songcore_ffmpeg.c `song_seek`, phase 0) — so
-            // the pre-call decoding continuation is guaranteed intact.
-            // Measured (F5 gate E1): the decoder stays usable after the
-            // rejection. Every other failure — including generic
-            // SEEK_ERROR, which the same native code ALSO returns after
-            // a successful reposition + decoder flush ("could not reach
-            // a landing point") — cannot prove inertness from a status
-            // code alone, so the conservative frozen rule applies:
-            // unprovable means destructive.
-            sys::SONG_ERR_INVALID_ARGUMENT | sys::SONG_ERR_NOT_OPEN => {
-                ProviderSeekOutcome::RefusedUnchanged
-            }
-            _ => ProviderSeekOutcome::MutatedThenFailed {
+            SeekClass::RefusedUnchanged => ProviderSeekOutcome::RefusedUnchanged,
+            SeekClass::MutatedThenFailed => ProviderSeekOutcome::MutatedThenFailed {
                 diagnostic: self.last_error(),
             },
         }
@@ -389,6 +408,57 @@ mod tests {
         let ud = RawFile::from_temp();
         unsafe {
             assert_eq!(file_seek(ud.as_ud(), -1), -1);
+        }
+    }
+
+    /// The raw-status → semantic-class map (ADR-PBK-002 D14.5) is the one
+    /// place the F5 fail-closed rule can be lost silently: the session
+    /// resumes its old cursor ONLY on `RefusedUnchanged`. Exactly one
+    /// status earns that class — the ABI's pure parameter check, which
+    /// runs on an OPEN handle and mutates nothing.
+    ///
+    /// `SONG_ERR_NOT_OPEN` in particular is NOT a refusal: it reports
+    /// that the handle is not in an opened/probed state, hence certifies
+    /// no usable old cursor. Promoting it would let a broken decode
+    /// continuation look inert (F5-SEEK-IMPLEMENTATION-CORRECTIVE-2).
+    #[test]
+    fn only_invalid_argument_earns_a_pre_mutation_refusal() {
+        assert_eq!(classify_seek_status(sys::SONG_OK), SeekClass::Applied);
+        assert_eq!(
+            classify_seek_status(sys::SONG_ERR_INVALID_ARGUMENT),
+            SeekClass::RefusedUnchanged
+        );
+
+        // The whole declared ABI surface besides that one status — plus
+        // EOF — is unprovable, therefore destructive.
+        let destructive = [
+            ("SONG_EOF", sys::SONG_EOF),
+            ("SONG_ERR_NOT_OPEN", sys::SONG_ERR_NOT_OPEN),
+            ("SONG_ERR_STATE", sys::SONG_ERR_STATE),
+            ("SONG_ERR_IO", sys::SONG_ERR_IO),
+            (
+                "SONG_ERR_UNSUPPORTED_CONTAINER",
+                sys::SONG_ERR_UNSUPPORTED_CONTAINER,
+            ),
+            ("SONG_ERR_NO_AUDIO_STREAM", sys::SONG_ERR_NO_AUDIO_STREAM),
+            (
+                "SONG_ERR_UNSUPPORTED_CODEC",
+                sys::SONG_ERR_UNSUPPORTED_CODEC,
+            ),
+            ("SONG_ERR_CORRUPT_DATA", sys::SONG_ERR_CORRUPT_DATA),
+            ("SONG_ERR_DECODE_ERROR", sys::SONG_ERR_DECODE_ERROR),
+            ("SONG_ERR_SEEK_UNSUPPORTED", sys::SONG_ERR_SEEK_UNSUPPORTED),
+            ("SONG_ERR_SEEK_ERROR", sys::SONG_ERR_SEEK_ERROR),
+            ("SONG_ERR_STREAM_CHANGE", sys::SONG_ERR_STREAM_CHANGE),
+            ("SONG_ERR_OUT_OF_MEMORY", sys::SONG_ERR_OUT_OF_MEMORY),
+            ("SONG_ERR_INTERNAL_ERROR", sys::SONG_ERR_INTERNAL_ERROR),
+        ];
+        for (name, status) in destructive {
+            assert_eq!(
+                classify_seek_status(status),
+                SeekClass::MutatedThenFailed,
+                "{name} must never let the session resume old-cursor production"
+            );
         }
     }
 }
