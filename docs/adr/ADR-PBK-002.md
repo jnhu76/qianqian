@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint; 2026-09-17 — §20 D14.8 implementation note (F4-IMPLEMENTATION-1, PR #152): the chosen representation and the terminal/duration conformance reading are recorded in D14.8 — representation only, no proposition changed; 2026-09-17 — §20 D14.8 F4-IMPLEMENTATION-CORRECTIVE-1 (same PR, fresh review): the position observation gate must also withdraw on a recorded activation failure — a raising activation can leave a published sample behind (the render mechanism opens before the decode-worker spawn; the open-abort leg publishes from its park slice), so "never-activated fabricates no Position" is not satisfied by the terminal-Fact condition alone (conformance, no new state); 2026-09-17 — §20 D14.5 seek-discontinuity mechanism + policy freeze (F5-GATE, evidence `experiments/f5-seek-discontinuity/` + `specs/f5-seek-discontinuity/`): refusal-first frozen ordering, park + natural drain output mechanism, same-cell position rebase, P1–P5 untriggered; 2026-09-18 — §20 D14.5 F5-GATE-CORRECTIVE-1 (pre-merge review): refusal made zero-content-loss (an in-flight staging block observed mid-write is preserved and finished exactly), and the song_seek provider outcome is frozen three-class — RefusedUnchanged (provably pre-mutation only, the INVALID_ARGUMENT class) / Applied / MutatedThenFailed (routes through the ordinary D11 decode-failure path; generic SEEK_ERROR is NOT a refusal because the ABI also returns it after a destructive reposition + decoder flush); F5 implementation still blocked; 2026-09-18 — §20 D14.5 implementation note (F5-SEEK-IMPLEMENTATION-1, branch `feat/f5-seek-1`): the chosen representation (three-class provider outcome, bounded-slice write + non-terminal edge invalidate, gate-consumed release payload, cell rebase as the one legal backward step) is recorded in D14.5 — representation only, no proposition changed; amended same day (F5-SEEK-IMPLEMENTATION-CORRECTIVE-1, fresh adversarial review): the loop-top parks are unified into one gate operation — realizing the realtime-cost row literally (no new lock acquisition) and withdrawing the first note's extra-acquisition differential — the committed rebase lands mid-park while a paused leg STAYS paused, seek acceptance is one atomic hold linearized against the worker's exit (an accepted seek can never outlive its resolver), and the per-cut evidence latches reset at each acceptance; 2026-09-18 — §20 D14.5 F5-SEEK-IMPLEMENTATION-CORRECTIVE-2 (same branch, authority-conformance review): the provider classification is narrowed to the frozen refusal set — `SONG_ERR_NOT_OPEN` had been promoted to `RefusedUnchanged` and now takes the conservative default (`MutatedThenFailed`), because a not-opened handle certifies no usable old cursor; the gate report's phase-0 lumping is corrected in place (marked corrective) and the map is pinned executably (positive + negative controls); 2026-09-18 — §20 D14.5 F5-SEEK-IMPLEMENTATION-CORRECTIVE-3 (same branch, pre-merge review of the implementation PR): two conformance gaps in the applied-cut path closed without new failure classes — (a) the protocol's post-apply waits now read the frozen failure policy's own "data plane not Open" episode-ending class on the worker's path (teardown stopped the plane before the worker join, so a permanently non-quiescing tail wedged the join); (b) the cutover decision is ONE atomic three-valued sample (Committed / Aborted / Pending) so a transient park-evidence gap is Pending and can never release a purged cut's leg without its rebase ("the only exits from an applied cut are the commit or an episode ending"); plus the `--machine` seek token reader fails closed instead of panicking on unrepresentable float spellings; the implementation mutation gate grows to M1–M10 (10/10 counterexample-witnessed, M1/M5 re-pinned to the corrected shape); 2026-09-18 — §20 D14.5 F5-SEEK-IMPLEMENTATION-CORRECTIVE-4 (same branch, human review of corrective-3): the R1 liveness class has two halves and only the worker's was closed — the parked leg's own tail probe still answered one bool, so a tail observation that itself FAILED (an invalidated endpoint's `GetCurrentPadding` error) was masked as "not quiesced yet" and the park could never reach the loop-level abort that produces the terminal the worker's escape needs; the probe now answers `TailProbeOutcome` (Pending / Quiesced / Failed) and a Failed observation ends the park bounded — no quiescence publishes for it, the release-payload consumption discipline still holds on the leg's path, and `ParkOutcome::TailProbeFailed` hands the decision to the mechanism's EXISTING device-failure path (conformance, no amendment, no new failure class); the implementation mutation gate grows to M1–M11 (11/11 counterexample-witnessed, M11 = the Failed arms collapsed back into the Pending treatment) |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint; 2026-09-17 — §20 D14.8 implementation note (F4-IMPLEMENTATION-1, PR #152): the chosen representation and the terminal/duration conformance reading are recorded in D14.8 — representation only, no proposition changed; 2026-09-17 — §20 D14.8 F4-IMPLEMENTATION-CORRECTIVE-1 (same PR, fresh review): the position observation gate must also withdraw on a recorded activation failure — a raising activation can leave a published sample behind (the render mechanism opens before the decode-worker spawn; the open-abort leg publishes from its park slice), so "never-activated fabricates no Position" is not satisfied by the terminal-Fact condition alone (conformance, no new state); 2026-09-17 — §20 D14.5 seek-discontinuity mechanism + policy freeze (F5-GATE, evidence `experiments/f5-seek-discontinuity/` + `specs/f5-seek-discontinuity/`): refusal-first frozen ordering, park + natural drain output mechanism, same-cell position rebase, P1–P5 untriggered; 2026-09-18 — §20 D14.5 F5-GATE-CORRECTIVE-1 (pre-merge review): refusal made zero-content-loss (an in-flight staging block observed mid-write is preserved and finished exactly), and the song_seek provider outcome is frozen three-class — RefusedUnchanged (provably pre-mutation only, the INVALID_ARGUMENT class) / Applied / MutatedThenFailed (routes through the ordinary D11 decode-failure path; generic SEEK_ERROR is NOT a refusal because the ABI also returns it after a destructive reposition + decoder flush); F5 implementation still blocked; 2026-09-18 — §20 D14.5 implementation note (F5-SEEK-IMPLEMENTATION-1, branch `feat/f5-seek-1`): the chosen representation (three-class provider outcome, bounded-slice write + non-terminal edge invalidate, gate-consumed release payload, cell rebase as the one legal backward step) is recorded in D14.5 — representation only, no proposition changed; amended same day (F5-SEEK-IMPLEMENTATION-CORRECTIVE-1, fresh adversarial review): the loop-top parks are unified into one gate operation — realizing the realtime-cost row literally (no new lock acquisition) and withdrawing the first note's extra-acquisition differential — the committed rebase lands mid-park while a paused leg STAYS paused, seek acceptance is one atomic hold linearized against the worker's exit (an accepted seek can never outlive its resolver), and the per-cut evidence latches reset at each acceptance; 2026-09-18 — §20 D14.5 F5-SEEK-IMPLEMENTATION-CORRECTIVE-2 (same branch, authority-conformance review): the provider classification is narrowed to the frozen refusal set — `SONG_ERR_NOT_OPEN` had been promoted to `RefusedUnchanged` and now takes the conservative default (`MutatedThenFailed`), because a not-opened handle certifies no usable old cursor; the gate report's phase-0 lumping is corrected in place (marked corrective) and the map is pinned executably (positive + negative controls); 2026-09-18 — §20 D14.5 F5-SEEK-IMPLEMENTATION-CORRECTIVE-3 (same branch, pre-merge review of the implementation PR): two conformance gaps in the applied-cut path closed without new failure classes — (a) the protocol's post-apply waits now read the frozen failure policy's own "data plane not Open" episode-ending class on the worker's path (teardown stopped the plane before the worker join, so a permanently non-quiescing tail wedged the join); (b) the cutover decision is ONE atomic three-valued sample (Committed / Aborted / Pending) so a transient park-evidence gap is Pending and can never release a purged cut's leg without its rebase ("the only exits from an applied cut are the commit or an episode ending"); plus the `--machine` seek token reader fails closed instead of panicking on unrepresentable float spellings; the implementation mutation gate grows to M1–M10 (10/10 counterexample-witnessed, M1/M5 re-pinned to the corrected shape); 2026-09-18 — §20 D14.5 F5-SEEK-IMPLEMENTATION-CORRECTIVE-4 (same branch, human review of corrective-3): the R1 liveness class has two halves and only the worker's was closed — the parked leg's own tail probe still answered one bool, so a tail observation that itself FAILED (an invalidated endpoint's `GetCurrentPadding` error) was masked as "not quiesced yet" and the park could never reach the loop-level abort that produces the terminal the worker's escape needs; the probe now answers `TailProbeOutcome` (Pending / Quiesced / Failed) and a Failed observation ends the park bounded — no quiescence publishes for it, the release-payload consumption discipline still holds on the leg's path, and `ParkOutcome::TailProbeFailed` hands the decision to the mechanism's EXISTING device-failure path (conformance, no amendment, no new failure class); the implementation mutation gate grows to M1–M11 (11/11 counterexample-witnessed, M11 = the Failed arms collapsed back into the Pending treatment); 2026-09-18 — §20 D14.6 F6-AUTHORITY-PROMOTION-1: the F6 CONFIG-MECHANISM-OPEN and probe/concurrency disclosures are decided on physical evidence (evidence `experiments/f6-source-probe/` PR #157; design source the merged #155 transport-closure package) — probe-before-destruction frozen (an invalid Open candidate never kills live playback; the probe is one public stateless decode-provider SourceFacts query, owns no RT resource, never an episode, P1–P5 untriggered; S-PROBE GREEN ×3 physical runs with the acoustic human-ear witness recorded UNAVAILABLE and the green made explicitly conditional on it), replacement mechanism = whole-episode-composition replacement at the App boundary (fresh QianqianApp per episode; the file is a constructor argument; no config channel / registry / hot component replacement), replacement commit = old-side clear (no current composition root or authoritative Discharged outcome — never forged) ∧ authoritative activation result Activated (covering provider activation failure / unresolved dependency / session activation failure; never absence-of-diagnostic, never a CompositionSnapshot read — PBK-001 §2.3), the start operation is failure-clean (Discharged ⇒ ActivationFailedClean with the attempted root disposed; cleanup TeardownViolated ⇒ FAIL-STOP retaining the root), D1 gains the App realization note and D5 provider lifetime becomes episode-scoped; the same amendment closes §14 playlist/queue authority as application navigation state (commit-on-activation, inert boundaries, no auto-next/auto-skip, Open replaces the playlist — no new authority, no PlaylistPlugin) and freezes the D14.9 volume owner/semantics (App-owned desired 0..=100, stream-local realization, IAudioStreamVolume candidate; the physical realtime apply placement stays pending V-PROBE and remains a D14.10 stop-list item) |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -88,6 +88,13 @@ K0 authority 中的 `component` / `ComponentSpec` 仍可作为 formal/implementa
 代码类型：`QianqianApp`；crate：`qianqian-app`。
 
 App 在它操作的 composition 之外；它不是因为“Everything is a Plugin”就自动变成 Plugin。
+
+Realization note (2026-09-18 F6-AUTHORITY-PROMOTION-1; D14.6): the
+reference player's canonical realization is one process-level host that
+sequentially owns multiple non-overlapping `QianqianApp` composition
+roots — one per playback episode. Episodes never overlap; each
+replacement constructs a fresh root after the old one is fully retired;
+one root is never mutated into another live episode.
 
 ### Composition Kernel (K0)
 
@@ -343,11 +350,13 @@ Subordinate resources stay resources when they do not need independent K0 compos
 ```text
 Decode Plugin
     mechanism provider
-    lifetime currently spans playback episodes
+    lifetime spans one playback episode (2026-09-18 F6 promotion:
+    re-mounted per episode; was "spans playback episodes" before the
+    whole-episode-composition replacement mechanism, D14.6)
 
 Output Plugin
     mechanism provider
-    lifetime currently spans playback episodes
+    lifetime spans one playback episode (same amendment)
 ```
 
 它们不拥有 one current song / one current decode endpoint / one current render stream / one playback edge；这些 episode-scoped resources 属于 Playback Session Plugin。
@@ -402,7 +411,7 @@ multi-session topology
 session construction/config representation beyond D14's current Phase-F seam
 ```
 
-特别是：当前 `ComponentSpec` 捕获 file/completion 的实现不自动成为未来 `open` 的永久 contract；D14 只冻结 Phase-F 当前最小 **old episode fully retires before new episode becomes live** 的 v1 语义约束。怎样把新 source/config 送进 fresh Playback Session definition 仍是 F6 CONFIG-MECHANISM-OPEN，必须另行窄门裁决。
+特别是：当前 `ComponentSpec` 捕获 file/completion 的实现不自动成为未来 `open` 的永久 contract；D14 只冻结 Phase-F 当前最小 **old episode fully retires before new episode becomes live** 的 v1 语义约束。新 source/config 的送入机制已由 2026-09-18 F6-AUTHORITY-PROMOTION-1 裁决（whole-episode-composition replacement，见 D14.6 amendment）。
 
 ---
 
@@ -506,10 +515,9 @@ VolumePlugin
 ## 14. Open decisions
 
 ```text
-open/session CONFIG mechanism under D14's no-overlap v1 semantic contract
-playlist / queue authority and whether it earns PlaylistPlugin
-next / previous navigation policy beyond D14's no-overlap replacement semantic shape
-volume authority / mechanism
+volume realtime apply placement / perturbation bounds (V-PROBE pending;
+    the D14.9 candidate mechanism IAudioStreamVolume and its
+    owner/semantics are frozen — this row is what remains)
 device switch authority / replacement mechanism
 format switch
 Processing Plugin
@@ -533,8 +541,20 @@ No longer OPEN either: seek physical-output cutover mechanism beyond
 D14's frozen stale-PCM invariant — frozen by the 2026-09-17 F5-GATE
 amendment inside D14.5 (same-resource discontinuity protocol; park +
 natural-drain output cut selected, Stop/Reset/Start rejected with
-physical evidence); F5 production implementation still stops until a
-later slice is explicitly authorized against that frozen text.)
+physical evidence); the F5 production implementation has since landed
+(feat/f5-seek-1, PR #156, merged 2026-09-18). No
+longer OPEN, by the 2026-09-18 F6-AUTHORITY-PROMOTION-1 amendment
+(D14.6, evidence `experiments/f6-source-probe/` PR #157): the
+open/session CONFIG mechanism — whole-episode-composition replacement
+at the App boundary, probe-before-destruction frozen with S-PROBE
+GREEN; playlist / queue authority — closed as application navigation
+state with commit-on-activation (no new authority, no PlaylistPlugin);
+next / previous navigation policy — inert boundaries, no auto-next/no
+auto-skip, Open replaces the playlist (D14.6 amendment); volume
+authority / mechanism — App-owned desired level, stream-local
+realization, IAudioStreamVolume candidate frozen in D14.9 with the
+physical RT placement deliberately left to V-PROBE, which stays OPEN
+above.)
 
 Reduction rule for all future phases:
 
@@ -1627,7 +1647,168 @@ old episode, if still live
 new Playback Session episode may become live
 ```
 
-The exact configuration/handoff mechanism that creates a fresh session definition for the new source is still **F6 CONFIG-MECHANISM-OPEN**. Current `ComponentSpec` definitions are fixed and current `playback_session_spec(file, ...)` captures source config, so a coding agent MUST NOT invent hot component replacement, a mutable global source slot, a registry, or another config channel to make Open work. F6 production code remains blocked until that narrow mechanism decision is explicitly made.
+The exact configuration/handoff mechanism that creates a fresh session definition for the new source is frozen by the 2026-09-18 F6-AUTHORITY-PROMOTION-1 amendment below.
+
+> **2026-09-18 amendment (F6-AUTHORITY-PROMOTION-1).** Evidence base:
+> `experiments/f6-source-probe/` + PR #157 (S_PROBE_GREEN, 3 physical
+> runs × 11 scenarios on a real Windows host, NEG negative control
+> fired; acoustic human-ear witness UNAVAILABLE, recorded as a
+> conditional-green review item); design source: the merged #155
+> transport-closure package. The two D14 openings this amendment
+> decides are `F6 CONFIG-MECHANISM-OPEN` and the probe/concurrency
+> disclosure; everything not stated below remains governed by the
+> general Phase-F rules.
+>
+> **F6 propositions (frozen).**
+>
+> ```text
+> Open = an application composition Command that replaces the WHOLE
+>        episode composition. NOT PlaybackSessionHandle::open(), NOT a
+>        K0 command, NOT a session mutation. No Open Fact, no
+>        Opening/Opened/SourceTransition state: the user-visible result
+>        is the new episode's existing D14.2 observation, and Open's
+>        own success/failure is application composition feedback
+>        (operation results), never a playback semantic.
+>
+> probe-before-destruction (Candidate B): Open(path) first probes the
+>        candidate source OFF the live playback path. An invalid
+>        candidate is REFUSED with a diagnostic and the old episode is
+>        untouched. The frozen product property is: an invalid Open
+>        candidate never kills live playback. A RED S-PROBE would have
+>        reopened this decision instead of promoting it; the probe
+>        runs while the old episode's decode worker holds its own
+>        SongCore handle — physically evidenced green by F6-S-PROBE.
+>
+> probe ≠ episode: the probe is one public, stateless decode-provider
+>        mechanism query (open → read format/duration facts → close),
+>        owning NO render stream, NO edge, NO worker, NO device
+>        session, NO PCM read. It is not a second live episode and
+>        does not trigger P1–P5. Its output is mechanism evidence for
+>        an application composition decision ("this source opened and
+>        declared X at probe time") — advisory, never episode truth;
+>        the new activation's own open/probe publishes the
+>        authoritative source evidence. Public-surface amendment
+>        (intentional, narrow): the decode provider crate exposes
+>        exactly this query — `SourceFacts` only, never
+>        SongcoreDecode / DecodedPcmStream / song handles / service
+>        internals; the implementing slice MUST sync
+>        tools/check_plugin_boundaries.py with the surface.
+>
+> mechanism (C3, whole-episode-composition replacement): each Open
+>        constructs a FRESH QianqianApp composition root whose
+>        session definition takes the file as a constructor argument.
+>        No config channel, no per-instance config payload, no
+>        registry, no hot component replacement exists. Canonical
+>        refinement (recorded in D1): one process-level
+>        reference-player host sequentially owns multiple
+>        non-overlapping `QianqianApp` composition roots, one per
+>        playback episode. Provider lifetime becomes episode-scoped
+>        (recorded in D5); per-Open re-mount cost is two stateless
+>        re-activations plus the per-episode device open every
+>        candidate pays anyway.
+>
+> replacement commit
+>     := old-side clear
+>        AND new episode's authoritative activation result == Activated
+> old-side clear
+>     := no current composition root
+>            (first episode, or the previous start ended
+>             ActivationFailedClean)
+>        OR the current composition's authoritative disposal
+>           outcome == Discharged
+>
+> No disposal outcome is forged when no root exists. Both operands are
+> synchronous results of the authority-owned control operations the
+> App itself invokes — NOT Facts, NOT new K0 primitives, NOT snapshot
+> reads. Control correctness MUST NOT depend on CompositionSnapshot
+> (PBK-001 §2.3 firewall; snapshots stay read-side diagnostics).
+> `Activated` is defined over the WHOLE fresh composition ("the fresh
+> desired composition successfully established the required Playback
+> Session episode") — covering provider activation failure, unresolved
+> dependency and session activation failure alike; never
+> absence-of-diagnostic, never a snapshot FiberState read.
+>
+> replacement sequence (per Open):
+>     candidate probe
+>       invalid ⇒ REFUSED, old untouched
+>     if old root exists:
+>         request_stop() (iff unsettled) → wait_terminal() (D11 truth)
+>         → dispose() → require authoritative Discharged
+>       already-terminal old: skip stop/wait, dispose directly
+>     construct fresh QianqianApp → activate desired composition
+>     → require authoritative Activated
+> ```
+>
+> **Failure classes (frozen, no rollback anywhere).**
+>
+> ```text
+> invalid candidate            refused before any destructive step;
+>                              old playback continues untouched
+> old-episode settlement       existing D11/D14.5/D14.7 semantics; Open
+>                              waits on wait_terminal; no timeout is
+>                              invented in v1
+> old teardown failure         authoritative disposal outcome
+>                              TeardownViolated ⇒ FAIL-STOP: the
+>                              violated latch has no exit (§G.6), no
+>                              new episode is constructed, no further
+>                              Open/Next/Previous runs in this process;
+>                              the App RETAINS the violated root until
+>                              process termination (drop runs no
+>                              teardown inverses); recovery is not
+>                              assumed
+> new activation failure       the start operation is FAILURE-CLEAN:
+>   (after old is gone)        the attempted fresh root is authoritatively
+>                              disposed before the failure returns.
+>                              cleanup Discharged ⇒
+>                              ActivationFailedClean(diagnostic), no
+>                              runtime remains, later Open legal;
+>                              cleanup TeardownViolated ⇒ FAIL-STOP
+>                              retaining the attempted root. The old
+>                              world stays gone; "activation did not
+>                              establish" never means "the attempted
+>                              root may be dropped"
+> ```
+>
+> Frozen non-events: paused old episode settles per D14.7 stop-from-paused
+> (mid-play `Stopped`; post-EOF drain `Completed`); a new episode starts
+> unpaused. Open during an in-flight Seek: replacement owns the larger
+> lifecycle; frozen D14.5 refusal/precedence rules govern the cut.
+> Repeated Open is App-thread-serialized — one complete replace
+> operation at a time. No preload / crossfade / gapless / old-new render
+> overlap / speculative second output stream / transactional reopen /
+> multi-session topology in v1 (§8 of the design; unchanged).
+>
+> **Representation still OPEN (implementation-slice decisions, not
+> agent inventions):** the probe query's Rust spelling; the
+> disposal/activation result seams' Rust spelling (candidate shapes
+> `DisposeOutcome::{Discharged, TeardownViolated}` /
+> `StartOutcome::{Activated, ActivationFailedClean}`); Open input UX.
+> C4 (config source + re-incarnation) stays unearned unless a future
+> preload/multi-session gate needs providers to survive episodes.
+>
+> **Playlist / queue authority — CLOSED by the same amendment**
+> (design source: NAVIGATION-GATE; this closes the §14 item with "no
+> new authority"): the playlist and the current index are application
+> navigation state owned by the reference-player App
+> (`Vec<PathBuf>` + `Option<usize>`); nothing outside the App ever
+> reads them; NO PlaylistPlugin, NavigationPlugin, PlaylistFact,
+> CurrentTrackFact or any new observable. Index truth is
+> **commit-on-activation**: the index moves only on F6 replacement
+> commit evidence, and is never playback truth — the read side stays
+> the D14.2 observation. Next/Previous select a candidate and invoke
+> the same Open replacement: inert at both ends (no wrap, no
+> stop-the-player side effect), no repeat, no shuffle, no EOF
+> auto-next, no failed-candidate auto-skip (one keypress advances at
+> most one candidate; a probe refusal leaves index and playback
+> untouched). Direct user Open replaces the playlist with the single
+> opened path and selects index 0 — on commit. Post-destruction
+> activation failure leaves the index at the old entry with no episode
+> and no runtime residue (failure-clean start above); the cursor then
+> names a track that no longer plays — honest, because the cursor is
+> navigation state, not audible-source truth. A latched teardown
+> violation permanently disables further replacement (fail-stop above);
+> no navigation recovery path exists. Direct jump-to-item selection and
+> startup-args grammar details remain open representation.
 
 Consequences already frozen:
 
@@ -1638,7 +1819,7 @@ Consequences already frozen:
 - The old episode keeps any already-committed terminal truth; replacement cannot relabel it。
 - If intentional replacement stop was recorded before that episode's terminal evidence became decisive and no higher-precedence failure wins, the existing `Stopped` terminal variant is sufficient. Do **not** invent `Superseded` / `Preempted` as a new terminal Fact for v1. Replacement cause may remain diagnostic/control context if needed。
 
-Playlist/queue selection authority remains OPEN. The first headless Open/Next/Previous slice may use only the selection source explicitly authorized by its issue/task; it must not create a global playlist authority to make the command convenient.
+Playlist/queue selection authority was CLOSED by the 2026-09-18 F6-AUTHORITY-PROMOTION-1 amendment (application navigation state; commit-on-activation; see D14.6).
 
 ### D14.7 Pause / Resume — same-episode non-terminal control; mechanism + establishment frozen
 
@@ -2191,7 +2372,91 @@ global stores remain forbidden.
 
 ### D14.9 Volume / Device switch — no generic state invention
 
-F7/F8 remain bounded by their current roadmap goals, but their authority/mechanism is not frozen here. A coding agent must not choose between session-owned control, output-provider control, episode replacement, stream replacement, or a generic control bus without a narrow authority/mechanism decision.
+> **2026-09-18 amendment (F6-AUTHORITY-PROMOTION-1, volume
+> owner/semantics).** Design source: the merged #155 package's
+> VOLUME-GATE; Microsoft Learn WASAPI documentation cited there. The
+> volume authority/mechanism question left this D14.9 opening; the
+> propositions below are FROZEN, with exactly one element still
+> pending: the physical realtime apply placement (V-PROBE).
+>
+> **Volume owner / semantics (frozen).**
+>
+> ```text
+> desired_volume ∈ 0..=100 (integer, clamped; step 5; no
+>                acceleration; no dB curve promise; 50 makes no
+>                "half perceived loudness" claim)
+> truth class:   application configuration (Command family — routed
+>                like pause intent, D14.7 precedent), NOT a Fact, NOT
+>                mechanism evidence about loudness, NOT a fourth
+>                transport anything
+> owner:         the reference-player App owns it; it survives
+>                episode replacement because replacement rebuilds the
+>                episode, not the App; each fresh episode's output
+>                mechanism receives the App's current desired level
+>                and applies it at stream open (before first
+>                meaningful submission). No persistence to disk in v1.
+> realization:   stream-local. App → episode seam command (idempotent)
+>                → session-owned output-level control (an owned
+>                episode resource — NOT a Capability, NOT a Plugin,
+>                NOT a Fact) → carried to the render mechanism in the
+>                RenderRequest (representation open) → mechanism
+>                applies it per stream. No global mixer ownership; no
+>                endpoint master volume; no ISimpleAudioVolume as the
+>                player setting (session-scoped, SndVol-coupled,
+>                persistent across restarts); no software PCM
+>                multiplication on Windows (permanent per-sample RT
+>                tax; recorded as the portable FALLBACK for platforms
+>                without a stream-local control).
+> apply points:  applied once at stream open, and re-applied at the
+>                render loop top when the routed value changed (one
+>                relaxed load + compare per iteration); never inside
+>                the quantum between GetBuffer and ReleaseBuffer. THIS
+>                PLACEMENT IS CANDIDATE, NOT FINAL — see pending item.
+> read side:     the TUI value means exactly the App's desired stream
+>                factor — NOT the effective acoustic level, NOT the
+>                Windows session master, NOT the endpoint volume, NOT
+>                a mechanism readback (GetAllVolumes stays unexposed to
+>                the product read side). Guarantee = factor
+>                independence (V2a/V2b), never audible independence;
+>                the session-master factor SndVol controls remains an
+>                independent multiplier of audible output that the
+>                player neither owns, displays, nor writes.
+> zero / mute:   Volume = 0 suffices for v1; no separate Mute state.
+> terminal:      a volume command itself NEVER establishes or settles
+>                terminal truth; it is non-terminal, same-episode, no
+>                PCM topology cut — it never flushes the edge, parks
+>                the leg (beyond the loop-top apply), resets Position
+>                or creates a discontinuity. A failed control call is
+>                mechanism evidence graded by what it reveals: an
+>                ordinary recoverable failure may warrant only a
+>                diagnostic; device/service loss (e.g.
+>                AUDCLNT_E_DEVICE_INVALIDATED) routes through the
+>                EXISTING output/device-failure policy, under which D11
+>                may settle `Failed`.
+> ```
+>
+> **Windows candidate mechanism (selected on documentation evidence;
+> physical RT placement PENDING V-PROBE):** `IAudioStreamVolume` via
+> `GetService` on the episode's own render client; `SetAllVolumes`
+> across all channels (level/100.0); stream-local by contract
+> (Microsoft: "controls the volume of an individual stream in a
+> session relative to the other streams in the session"). Its physical
+> facts on the exercised endpoint do not close before V-PROBE
+> (V1a same-process/same-session stream isolation, V1b other-process,
+> V2a player→mixer factor independence, V2b mixer→stream-factor
+> independence with audible change EXPECTED, V3 lifecycle
+> persistence, V4 apply-placement perturbation measurement, V5
+> failure routing with the log-and-pretend shape FAILING). Reopen
+> conditions: V1a cross-stream coupling, or V2a/V2b either side
+> writing the other's factor, or V4/V5 showing the loop-top apply
+> materially perturbs the render leg — any of these REOPENS the
+> apply-point/ownership decision before a Volume implementation
+> freezes it. Until V-PROBE is green, a coding agent MUST NOT treat
+> the apply placement as frozen.
+>
+> Representation still open: the output-level control's Rust spelling;
+> the RenderRequest field shape; non-Windows mechanisms (per-platform
+> realization behind the same App-owned desired level).
 
 What is already forbidden:
 
@@ -2202,6 +2467,11 @@ no per-quantum plugin dispatch
 no generic EventBus as control plane
 no new Plugin merely named Volume/DeviceSwitch
 ```
+
+Device switch authority / replacement mechanism remains OPEN (D14.9
+pre-amendment scope unchanged); enumeration is an Output-side mechanism
+query and switching still needs either a session-owned replaceable
+render binding or whole-episode replacement, explicitly earned.
 
 ### D14.10 What Flash/coding agents may and may not decide
 
@@ -2225,18 +2495,21 @@ new Plugin / Capability / K0 primitive
 new lifetime taxonomy
 Generation / Window / epoch / global playback store
 consumer-driven vs authority-driven semantic commit
-F6 fresh-source/config handoff mechanism
 position/duration propositions beyond the frozen D14.8 minimum
-playlist/queue authority
-volume/device-switch authority
 preload/gapless/overlap topology
+volume realtime apply placement (pending V-PROBE; the D14.9 candidate
+    mechanism and its owner/semantics left this list with the
+    2026-09-18 F6 promotion — the placement has not)
 ```
 
 (The pause/resume semantic commit point and minimum mechanism left this
 list when D14.7 froze them; the position/duration propositions left it
 when D14.8 froze theirs; the seek physical-output cutover mechanism
-left it when the 2026-09-17 F5-GATE amendment froze it inside D14.5.
-Anything beyond the frozen minima still requires a narrow authority
+left it when the 2026-09-17 F5-GATE amendment froze it inside D14.5;
+the F6 fresh-source/config handoff mechanism and the playlist/queue
+authority left it with the 2026-09-18 F6-AUTHORITY-PROMOTION-1
+amendment (D14.6). Anything beyond the frozen minima still requires a
+narrow authority
 decision.)
 
 The rule is intentional: **OPEN means “not authorized yet,” not “Flash may invent the missing architecture.”**
