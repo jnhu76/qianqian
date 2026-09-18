@@ -155,14 +155,17 @@ EXPORT_RULES = {
             "pub fn request_pause(&self) {",
             "pub fn request_resume(&self) {",
             "pub fn request_seek(&self, target: Duration) {",
+            "pub fn request_output_level(&self, level: u8) {",
             "pub fn observe(&self) -> PlaybackSessionObservation {",
             "pub fn wait_terminal(&self) -> EpisodeTerminalOutcome {",
             "pub fn paused(&self) -> bool {",
         ],
         "authority": "ADR-PBK-002 D14.2 + the D14.7 F3 amendment as narrowed by the D14.7 "
-        "AUTHORITY-CORRECTIVE + the D14.8 F4 amendment + the D14.5 F5 amendment — the App's "
+        "AUTHORITY-CORRECTIVE + the D14.8 F4 amendment + the D14.5 F5 amendment + the D14.9 "
+        "F6 promotion and its 2026-09-19 VOLUME-IMPLEMENTATION-1 grounding — the App's "
         "rights over one episode are exactly "
-        "new/request_stop/request_pause/request_resume/request_seek/observe/wait_terminal "
+        "new/request_stop/request_pause/request_resume/request_seek/request_output_level/"
+        "observe/wait_terminal "
         "plus the admitted observation fields (pause intent is command state; engagement/"
         "tail-quiescence are mechanism evidence; paused() is a derived Projection and "
         "never a correctness basis; Resumed was REMOVED as an application-facing "
@@ -177,9 +180,13 @@ EXPORT_RULES = {
         "Position rebase (to the decoder's ACTUAL landing, or withdrawn for an unknown "
         "landing) and the ordinary D11 Failed route for a destructive provider failure — "
         "so no positive seek state, no seek completion Fact, no request identity and no "
-        "landing/outcome accessor may appear on this surface. A further new public right "
-        "must first earn an explicit D14/phase-authority amendment, then update this "
-        "allowlist on purpose",
+        "landing/outcome accessor may appear on this surface. D14.9 (as grounded by "
+        "V-PROBE) adds exactly one command: `request_output_level(0..=100)` — the App's "
+        "desired stream factor as an idempotent, non-terminal Command (clamped at the "
+        "seam; routed into the session-owned OutputLevel cell; never a Fact, never a "
+        "mechanism readback — no volume getter may appear on this surface). A further new "
+        "public right must first earn an explicit D14/phase-authority amendment, then "
+        "update this allowlist on purpose",
     },
     "crates/qianqian-decode-songcore/src/lib.rs": {
         "require": [
