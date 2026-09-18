@@ -369,13 +369,22 @@ fn decode_worker(
                                     && completion.seek_release_pending()
                                 {
                                     if edge.terminal() != crate::edge::EdgeTerminal::Open {
-                                        // The data plane ended under the cut.
-                                        // The routed payload stays routed for
-                                        // the exiting leg — never overwritten
-                                        // with a second release — and the slot
-                                        // is free to clear because acceptance
-                                        // requires an Open data plane, so no
-                                        // later hold can wipe the rebase.
+                                        // The data plane ended under the cut:
+                                        // the routed payload stays routed for
+                                        // the exiting leg, and the slot frees.
+                                        // Freeing it cannot lose a rebase that
+                                        // mattered — the only terminal a cut can
+                                        // meet here is the stop the render abort
+                                        // or the teardown itself issued, after
+                                        // which the worker writes nothing more —
+                                        // but that guarantee is bounded by that
+                                        // fact, NOT by acceptance (whose atomic
+                                        // hold re-validates the session latches,
+                                        // not the edge), so the claim is stated
+                                        // no stronger than it is: a racing
+                                        // acceptance against a just-stopped plane
+                                        // could still plant and wipe a payload
+                                        // no leg will read.
                                         completion.clear_seek_in_flight();
                                         return;
                                     }

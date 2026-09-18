@@ -650,17 +650,21 @@ impl SessionCompletion {
     }
 
     /// Whether the seek protocol must abort instead of proceeding:
-    /// stop intent recorded, the episode already settled, or the
-    /// authority-owned teardown release has begun. Every wait in the
-    /// protocol re-checks this, so stop always wins and no protocol
-    /// step can wedge teardown. The frozen failure policy's third
-    /// episode-ending class — "data plane not Open" (edge terminal !=
-    /// Open) — is deliberately NOT here: it is the worker's own read,
+    /// the session-recorded episode endings of
+    /// [`episode_ending_evidence`] — stop intent, a committed terminal
+    /// Fact, or the authority-owned teardown release. Every seek step
+    /// re-checks them, so stop always wins. The frozen failure policy's
+    /// third episode-ending class — "data plane not Open" (edge terminal
+    /// != Open) — is deliberately NOT here: it is the worker's own read,
     /// taken on its own path without reaching the data plane under this
-    /// lock, in the same class as the recorded endings above.
+    /// lock, in the same class as the recorded endings above. The
+    /// applied cut's wait does not call this directly — it reads the
+    /// same evidence through [`SessionCompletion::seek_cutover_decision`],
+    /// which samples it atomically with the commit boundary — but the
+    /// predicate is identical by construction.
     pub(crate) fn seek_aborted(&self) -> bool {
         let guard = self.state.state.lock().expect("completion lock");
-        guard.stop_requested || guard.outcome.is_some() || guard.teardown_released
+        episode_ending_evidence(&guard)
     }
 
     /// The worker publishes the three-class provider outcome's inert
@@ -743,8 +747,7 @@ impl SessionCompletion {
     pub(crate) fn seek_cutover_decision(&self, landing: Option<u64>) -> CutoverDecision {
         let decision = {
             let mut guard = self.state.state.lock().expect("completion lock");
-            let episode_ending =
-                guard.stop_requested || guard.outcome.is_some() || guard.teardown_released;
+            let episode_ending = episode_ending_evidence(&guard);
             let parked_and_quiesced = (guard.engaged && guard.tail_quiesced)
                 || (guard.seek_engaged && guard.seek_tail_quiesced);
             if episode_ending {
@@ -1034,6 +1037,18 @@ impl SessionCompletion {
     fn publish(&self, evidence: impl FnOnce(&mut CompletionState)) {
         publish_evidence(&self.state, evidence);
     }
+}
+
+/// The episode endings the SESSION records — the frozen failure policy's
+/// pre-cut abort classes minus the worker-read "data plane not Open"
+/// (which cannot be read here without reaching the data plane under this
+/// lock), and the seek protocol's only abort conditions. ONE spelling:
+/// [`SessionCompletion::seek_aborted`] and the cutover decision must
+/// agree exactly — a cut's wait re-checks the endings while the decision
+/// samples them with the commit boundary, so a drift between the two
+/// would be a liveness or a lost-rebase defect, not a nuance.
+fn episode_ending_evidence(state: &CompletionState) -> bool {
+    state.stop_requested || state.outcome.is_some() || state.teardown_released
 }
 
 /// The one gate-evidence attribution rule (D14.7 + the D14.5 seek
@@ -1508,6 +1523,33 @@ mod tests {
         completion.clear_seek_in_flight();
         assert!(!completion.seek_in_flight());
         assert!(!completion.seek_release_pending());
+
+        // The data plane ending under a committed cut (session.rs takes
+        // this exit): freeing the slot leaves an unconsumed payload
+        // ROUTED — the exiting leg still reads what the decision routed,
+        // and no second release is manufactured over it. (The payload is
+        // only ever routed by a decision; a slot free never touches it.)
+        let completion = SessionCompletion::new();
+        let core = completion.state.clone();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        completion.request_seek(Duration::from_secs(1));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekEngaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekTailQuiesced));
+        completion.seek_landing_published(Some(9));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(9)),
+            CutoverDecision::Committed
+        );
+        completion.clear_seek_in_flight();
+        assert!(
+            completion.seek_release_pending(),
+            "the routed rebase survives the slot free: the leg consumes, \
+             it is not overwritten"
+        );
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Committed { landing: Some(9) })
+        );
 
         // An UNKNOWN landing commits too: the payload carries None, and
         // the projection's withdrawal is the leg's own discipline.
