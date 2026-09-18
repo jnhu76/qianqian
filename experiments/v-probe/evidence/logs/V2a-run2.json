@@ -1,0 +1,8 @@
+{
+  "scenario": "V2a",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "master_unchanged_at": 1.0
+  }
+}

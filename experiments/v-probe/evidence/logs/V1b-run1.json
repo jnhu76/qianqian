@@ -1,0 +1,15 @@
+{
+  "scenario": "V1b",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "factor": 0.5,
+    "max": 0.5,
+    "min": 0.5,
+    "poll_window_ms": [
+      1789759855763,
+      1789759859780
+    ],
+    "stable": true
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "scenario": "V5",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "device_loss_note": "AUDCLNT_E_DEVICE_INVALIDATED (0x88890004) is the device-loss class; its physical trigger (endpoint disable) is deliberately not performed on this host. The frozen D14.9 routing (device loss → the existing device-failure policy) is implementation-gated in the Stage F slice and reviewed there.",
+    "malformed_set_error": "Error { code: HRESULT(0x80070057), message: \"参数错误。\" }",
+    "uninitialized_getservice_error": "Error { code: HRESULT(0x88890001), message: \"\" }"
+  }
+}

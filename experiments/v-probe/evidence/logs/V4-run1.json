@@ -1,0 +1,33 @@
+{
+  "scenario": "V4",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "applies_observed": 200,
+    "applies_succeeded": 200,
+    "apply_max_ns": 509500,
+    "apply_median_ns": 262700,
+    "apply_min_ns": 138500,
+    "apply_p99_ns": 462300,
+    "final_factor": 0.6000000238418579,
+    "iteration_p99_ns": 10575100,
+    "position_advancing": true,
+    "position_monotone": true,
+    "position_samples": [
+      3736,
+      216576,
+      429952,
+      643768,
+      857184,
+      1070728,
+      1283896,
+      1497536,
+      1711272,
+      1925088
+    ],
+    "routed_changes": 200,
+    "routing_window_ms": 6054,
+    "shape": "same-thread loop-top apply (pump thread), routed by the main thread",
+    "stream_survived": true
+  }
+}

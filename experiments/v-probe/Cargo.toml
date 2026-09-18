@@ -1,0 +1,43 @@
+[package]
+name = "v-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "V-PROBE physical evidence: IAudioStreamVolume mechanism facts on a real Windows endpoint (ADR-PBK-002 D14.9 pending item)"
+
+# V-PROBE evidence crate (Issue #119; Stage E of the F6-NAVIGATION-
+# VOLUME campaign). Workspace-excluded on purpose: executable mechanism
+# evidence, NOT production architecture. Nothing here may be imported
+# by any qianqian-* crate. The probe drives the WASAPI mechanism
+# DIRECTLY (the same windows-rs bindings the production output crate
+# uses) to settle the D14.9 pending item: the physical facts of the
+# IAudioStreamVolume candidate before the volume implementation may
+# freeze its apply placement.
+#
+# Scenarios (D14.9; two-tier reopen):
+#   V1a  same-process stream isolation       failure ⇒ mechanism re-decision
+#   V1b  other-process stream isolation      (documentary for the tier)
+#   V2a  player→mixer factor independence    failure ⇒ mechanism re-decision
+#   V2b  mixer→stream factor independence    failure ⇒ mechanism re-decision
+#   V3   lifecycle persistence (Stop/Start)  context for the placement
+#   V4   apply-placement perturbation        finding ⇒ apply-point/ownership
+#                                        reconsideration only
+#   V5   failure-signal existence            typed, distinguishable errors;
+#                                        log-and-pretend is impossible to
+#                                        justify — routing itself is
+#                                        implementation-gated (Stage F)
+
+[workspace]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Threading",
+    "Win32_System_Variant",
+] }

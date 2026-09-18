@@ -14,3 +14,4 @@ experiments/f5-seek-discontinuity/target
 # the other experiments; each is listed explicitly so a stray new
 # experiment fails loudly instead of silently shipping its target/).
 experiments/f6-open-smoke/target
+experiments/v-probe/target

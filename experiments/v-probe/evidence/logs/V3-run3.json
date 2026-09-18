@@ -1,0 +1,9 @@
+{
+  "scenario": "V3",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "after_stop_start": 0.4000000059604645,
+    "set": 0.4
+  }
+}
