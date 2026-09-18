@@ -211,6 +211,44 @@ pub enum SeekParkRelease {
     Aborted,
 }
 
+/// The render leg's answer to ONE tail observation (the
+/// [`GateSlice::TailProbe`] slice of [`RenderGate::park_loop_top`]).
+/// Three truth classes, never collapsible: a device that still holds
+/// queued frames, a drained tail, and an observation that could not be
+/// taken at all (F5 implementation corrective-4: a failed observation
+/// is NOT "not quiesced yet" — masking it as a pending tail would park
+/// the leg forever while the seek worker waits for quiescence evidence
+/// a dead device can never publish).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TailProbeOutcome {
+    /// Frames submitted before the park remain queued: keep waiting in
+    /// bounded slices.
+    Pending,
+    /// Nothing submitted before the park remains queued: the tail is
+    /// quiescent — the D14.5/D14.7 quiescence evidence.
+    Quiesced,
+    /// The observation itself failed (a real output-mechanism failure,
+    /// e.g. an invalidated endpoint): not quiescence evidence and not a
+    /// wait-forever condition — the gate releases the leg without
+    /// publishing quiescence and reports the failure back, so the
+    /// mechanism's existing device-failure path decides.
+    Failed,
+}
+
+/// What [`RenderGate::park_loop_top`] hands back to the render leg when
+/// the gated work ends. The leg proceeds either way — the gate never
+/// aborts it; a failed tail observation is the mechanism's own failure
+/// evidence, returned for the mechanism's existing failure path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ParkOutcome {
+    /// Parked work finished (or none was routed): proceed with the loop.
+    Proceeded,
+    /// The leg's own tail observation failed while parked: no quiescence
+    /// was published for it and the gate released the leg without
+    /// waiting further (F5 implementation corrective-4).
+    TailProbeFailed,
+}
+
 /// One unit of loop-top work [`RenderGate::park_loop_top`] hands back to
 /// the render leg while it is gated (D14.7 + D14.5). One closure sees
 /// every slice, so the leg's own accounting locals stay owned by exactly
@@ -218,10 +256,11 @@ pub enum SeekParkRelease {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GateSlice {
     /// Between park slices (the D14.7/D14.5 park invariant's bounded
-    /// wait): observe the output tail NOW and return whether it is
-    /// quiescent (no frame submitted before the park remains queued for
-    /// rendering). The leg keeps its own D14.8 publication discipline on
-    /// this slice.
+    /// wait): observe the output tail NOW and return its outcome —
+    /// quiescent, still pending, or the observation itself failed
+    /// ([`TailProbeOutcome`]; never answer a failed observation with
+    /// quiescence or with an endless pending). The leg keeps its own
+    /// D14.8 publication discipline on this slice.
     TailProbe,
     /// A routed seek release payload was consumed — exactly once — on
     /// this leg's path: apply the instruction (a committed rebase, or
@@ -229,7 +268,7 @@ pub enum GateSlice {
     /// mid-park when the leg is parked by PAUSE, so a committed cut
     /// rebases a paused leg while it STAYS parked — the pause intent
     /// survives the seek and the rebase is bookkeeping, never a
-    /// submission (the bool return is ignored on this slice).
+    /// submission (the return value is ignored on this slice).
     SeekRelease(SeekParkRelease),
 }
 
@@ -256,6 +295,12 @@ pub enum GateSlice {
 ///     with bounded latency;
 /// never abort the leg from the gate — after release the loop proceeds
 ///     once more and the data plane decides;
+/// a failed tail observation is neither quiescence nor a reason to keep
+///     waiting: the gate publishes no quiescence for it, releases the
+///     leg without further slices, and reports the failed probe back
+///     (F5 implementation corrective-4) — the mechanism's existing
+///     device-failure path decides; the gate itself still never aborts
+///     the leg;
 /// the device stream stays open — a park replaces no resource.
 /// ```
 ///
@@ -487,14 +532,27 @@ impl RenderGate {
     /// proceeds once more, and the data plane decides.
     ///
     /// Closed gate: returns immediately, always.
-    pub fn park_loop_top(&self, mut slice: impl FnMut(GateSlice) -> bool) {
+    ///
+    /// A FAILED tail observation ends whichever park is running (the
+    /// only bounded exit that is not an owner release): no quiescence
+    /// is published for it, the park's disengagement fence still
+    /// publishes, any routed release payload is still consumed on the
+    /// leg's path, and [`ParkOutcome::TailProbeFailed`] is returned so
+    /// the mechanism's existing device-failure path decides. After a
+    /// pause park that failed its probe, a still-routed seek hold does
+    /// NOT park again — more slices from a dead device can produce
+    /// neither quiescence nor recovery.
+    pub fn park_loop_top(
+        &self,
+        mut slice: impl FnMut(GateSlice) -> TailProbeOutcome,
+    ) -> ParkOutcome {
         // The steady-path totality: ONE acquisition, O(1) tests.
         {
             let guard = self.inner.intent.lock().expect("render gate lock");
             if self.inner.closed.load(Ordering::Acquire)
                 || (!guard.paused && !guard.seek_hold && guard.seek_release.is_none())
             {
-                return;
+                return ParkOutcome::Proceeded;
             }
         }
         // Routed work exists. The pause shape runs first (the loop's
@@ -503,13 +561,16 @@ impl RenderGate {
         // mid-park. The seek shape runs after, so a hold still routed
         // after the pause ended parks this same call. These extra
         // acquisitions exist only on the non-steady path.
-        if self.routed_snapshot().0 {
-            self.pause_park(&mut slice);
+        if self.routed_snapshot().0
+            && let ParkOutcome::TailProbeFailed = self.pause_park(&mut slice)
+        {
+            return ParkOutcome::TailProbeFailed;
         }
         let (_, seek_hold, payload) = self.routed_snapshot();
         if seek_hold || payload {
-            self.seek_park(&mut slice);
+            return self.seek_park(&mut slice);
         }
+        ParkOutcome::Proceeded
     }
 
     /// One lock acquisition's view of what is routed: (pause, seek hold,
@@ -524,17 +585,18 @@ impl RenderGate {
     /// and — the F5 implementation corrective-1 addition — consumes a
     /// routed seek release payload MID-PARK, handing it to the leg while
     /// it stays parked.
-    fn pause_park(&self, slice: &mut impl FnMut(GateSlice) -> bool) {
+    fn pause_park(&self, slice: &mut impl FnMut(GateSlice) -> TailProbeOutcome) -> ParkOutcome {
         {
             let guard = self.inner.intent.lock().expect("render gate lock");
             if !guard.paused || self.inner.closed.load(Ordering::Acquire) {
                 // Released or closed before the leg reached the gate:
                 // nothing engaged, nothing to acknowledge.
-                return;
+                return ParkOutcome::Proceeded;
             }
         }
         self.emit(GateEvent::Engaged);
         let mut quiesced_published = false;
+        let mut probe_failed = false;
         loop {
             // The payload joins the wait predicate: a commit routed
             // while the leg is parked wakes it immediately for the
@@ -563,12 +625,32 @@ impl RenderGate {
             if released {
                 break;
             }
-            if !quiesced_published && slice(GateSlice::TailProbe) {
-                quiesced_published = true;
-                self.emit(GateEvent::TailQuiesced);
+            if !quiesced_published {
+                match slice(GateSlice::TailProbe) {
+                    TailProbeOutcome::Quiesced => {
+                        quiesced_published = true;
+                        self.emit(GateEvent::TailQuiesced);
+                    }
+                    TailProbeOutcome::Pending => {}
+                    TailProbeOutcome::Failed => {
+                        probe_failed = true;
+                        break;
+                    }
+                }
             }
         }
         self.emit(GateEvent::Disengaged);
+        if probe_failed {
+            // A routed payload may have missed the mid-park window as
+            // the failure cut the wait short: deliver it on the way out
+            // so the once-on-this-leg discipline holds on every exit —
+            // the leg proceeds once more before its failure path runs.
+            if let Some(release) = self.take_release_internal() {
+                slice(GateSlice::SeekRelease(release));
+            }
+            return ParkOutcome::TailProbeFailed;
+        }
+        ParkOutcome::Proceeded
     }
 
     /// The seek-attributed park body (D14.5): parks while a seek hold is
@@ -576,11 +658,11 @@ impl RenderGate {
     /// (Aborted when none) to the leg on its own path. A hold released
     /// before the leg arrived still has its payload consumed here — the
     /// rebase instruction belongs to this leg's next submission decision.
-    fn seek_park(&self, slice: &mut impl FnMut(GateSlice) -> bool) {
+    fn seek_park(&self, slice: &mut impl FnMut(GateSlice) -> TailProbeOutcome) -> ParkOutcome {
         {
             let mut guard = self.inner.intent.lock().expect("render gate lock");
             if self.inner.closed.load(Ordering::Acquire) {
-                return;
+                return ParkOutcome::Proceeded;
             }
             if !guard.seek_hold {
                 // The hold was already released before this leg reached
@@ -594,11 +676,12 @@ impl RenderGate {
                 if let Some(release) = release {
                     slice(GateSlice::SeekRelease(release));
                 }
-                return;
+                return ParkOutcome::Proceeded;
             }
         }
         self.emit(GateEvent::SeekEngaged);
         let mut quiesced_published = false;
+        let mut probe_failed = false;
         loop {
             let released = {
                 let guard = self.inner.intent.lock().expect("render gate lock");
@@ -615,16 +698,32 @@ impl RenderGate {
             if released {
                 break;
             }
-            if !quiesced_published && slice(GateSlice::TailProbe) {
-                quiesced_published = true;
-                self.emit(GateEvent::SeekTailQuiesced);
+            if !quiesced_published {
+                match slice(GateSlice::TailProbe) {
+                    TailProbeOutcome::Quiesced => {
+                        quiesced_published = true;
+                        self.emit(GateEvent::SeekTailQuiesced);
+                    }
+                    TailProbeOutcome::Pending => {}
+                    TailProbeOutcome::Failed => {
+                        probe_failed = true;
+                        break;
+                    }
+                }
             }
         }
+        // ONE exit funnel — the failure exit shares it: the fence
+        // publishes, and the leg's next submission decision still sees
+        // the routed release (Aborted when the session routed none).
         self.emit(GateEvent::SeekDisengaged);
         let release = self
             .take_release_internal()
             .unwrap_or(SeekParkRelease::Aborted);
         slice(GateSlice::SeekRelease(release));
+        if probe_failed {
+            return ParkOutcome::TailProbeFailed;
+        }
+        ParkOutcome::Proceeded
     }
 
     /// Consume a pending release payload under the intent lock (the

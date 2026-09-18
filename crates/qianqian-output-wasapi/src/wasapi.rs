@@ -55,8 +55,9 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::GUID;
 
 use qianqian_audio_api::ports::{
-    AudioOutput, DrainSignal, DrainVerdict, GateSlice, OutputError, PcmFormat, PcmPull,
-    PositionEvidence, RenderGate, RenderPcmInput, RenderRequest, RenderStream, SeekParkRelease,
+    AudioOutput, DrainSignal, DrainVerdict, GateSlice, OutputError, ParkOutcome, PcmFormat,
+    PcmPull, PositionEvidence, RenderGate, RenderPcmInput, RenderRequest, RenderStream,
+    SeekParkRelease, TailProbeOutcome,
 };
 
 use crate::open_abort::abort_render_thread;
@@ -487,34 +488,52 @@ fn steady_loop(
         // submitted — including while the leg STAYS PARKED by pause
         // (pause intent survives the seek; the rebase is bookkeeping,
         // never a submission).
-        gate.park_loop_top(|gated| match gated {
-            GateSlice::TailProbe => {
-                let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {
-                    return false;
-                };
-                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
-                padding == 0
-            }
-            GateSlice::SeekRelease(release) => match release {
-                SeekParkRelease::Committed { landing } => {
-                    handed_off = 0;
-                    if landing.is_none() {
-                        publishing = false;
+        //
+        // A FAILED tail observation is a device failure, never "not
+        // quiesced yet" (F5 implementation corrective-4): the gate
+        // releases the leg without publishing quiescence and reports
+        // the failure back, and THIS loop's existing failure exit — the
+        // same one a steady-path GetCurrentPadding error takes — stops
+        // the data plane on the way out, which is what makes the edge
+        // terminal and the seek worker's data-plane escape fire.
+        let park_failed = matches!(
+            gate.park_loop_top(|gated| match gated {
+                GateSlice::TailProbe => {
+                    let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {
+                        return TailProbeOutcome::Failed;
+                    };
+                    publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
+                    if padding == 0 {
+                        TailProbeOutcome::Quiesced
+                    } else {
+                        TailProbeOutcome::Pending
                     }
-                    if let Some(landing) = landing.filter(|_| publishing) {
-                        basis = landing;
-                    }
-                    // A withdrawal is for the REST of the episode (D14.5
-                    // position rebase): once an unknown landing turned
-                    // publishing off, a later KNOWN landing neither
-                    // resurrects publication nor un-withdraws the cell —
-                    // `rebase(None)` is an idempotent re-withdrawal.
-                    position.rebase(if publishing { landing } else { None });
-                    false
                 }
-                SeekParkRelease::Aborted => false,
-            },
-        });
+                GateSlice::SeekRelease(release) => match release {
+                    SeekParkRelease::Committed { landing } => {
+                        handed_off = 0;
+                        if landing.is_none() {
+                            publishing = false;
+                        }
+                        if let Some(landing) = landing.filter(|_| publishing) {
+                            basis = landing;
+                        }
+                        // A withdrawal is for the REST of the episode (D14.5
+                        // position rebase): once an unknown landing turned
+                        // publishing off, a later KNOWN landing neither
+                        // resurrects publication nor un-withdraws the cell —
+                        // `rebase(None)` is an idempotent re-withdrawal.
+                        position.rebase(if publishing { landing } else { None });
+                        TailProbeOutcome::Pending
+                    }
+                    SeekParkRelease::Aborted => TailProbeOutcome::Pending,
+                },
+            }),
+            ParkOutcome::TailProbeFailed
+        );
+        if park_failed {
+            break abort_msg("tail observation failed while parked".to_owned());
+        }
         // Period cadence; the bounded wait is also the stop-latency bound.
         unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
         let padding = match unsafe { session.client.GetCurrentPadding() } {

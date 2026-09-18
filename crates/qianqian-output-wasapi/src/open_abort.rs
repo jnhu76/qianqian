@@ -44,7 +44,7 @@ pub(crate) fn abort_render_thread(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use qianqian_audio_api::ports::{GateEvent, GateSlice, PcmPull};
+    use qianqian_audio_api::ports::{GateEvent, GateSlice, PcmPull, TailProbeOutcome};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::mpsc;
     use std::sync::{Condvar, Mutex};
@@ -95,9 +95,9 @@ mod tests {
                 // The steady loop's loop-top posture: park before any
                 // read, quiescence unobserved.
                 gate.park_loop_top(|slice| match slice {
-                    GateSlice::TailProbe => false,
-                    GateSlice::SeekRelease(_) => false,
-                })
+                    GateSlice::TailProbe => TailProbeOutcome::Pending,
+                    GateSlice::SeekRelease(_) => TailProbeOutcome::Pending,
+                });
             })
         };
         let parked = {
@@ -216,8 +216,8 @@ mod tests {
                 let mut buf = [0.0f32; 64];
                 loop {
                     gate.park_loop_top(|slice| match slice {
-                        GateSlice::TailProbe => false,
-                        GateSlice::SeekRelease(_) => false,
+                        GateSlice::TailProbe => TailProbeOutcome::Pending,
+                        GateSlice::SeekRelease(_) => TailProbeOutcome::Pending,
                     });
                     if matches!(input.read_frames(&mut buf), PcmPull::Stopped) {
                         break;

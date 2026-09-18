@@ -46,6 +46,12 @@
 //! P12 the retired per-park gate calls (`park_while_paused` /
 //!     `park_while_seek_hold`) appear nowhere — a reintroduction would
 //!     silently restore the two-acquisition steady iteration.
+//! P13 the tail arm answers a FAILED observation with
+//!     `TailProbeOutcome::Failed` exactly once (F5 implementation
+//!     corrective-4): masking a device failure as "not quiesced yet" —
+//!     the pre-corrective bool, or collapsing Failed into Pending —
+//!     parks the leg forever while the seek worker waits for quiescence
+//!     evidence a dead device can never publish.
 //! ```
 //!
 //! This is a REGRESSION PIN, not a semantic proof: it says the shipped
@@ -137,6 +143,15 @@ fn check_render_order(source: &str) -> Vec<String> {
                 .any(|at| depth_inside_closure(arm, at) == 0)
         }),
     );
+    // P13 is the corrective-4 source oracle: a tail observation that
+    // itself fails must answer `Failed` from the closure — masking it
+    // as pending (or as the pre-corrective bool) parks the leg forever
+    // while the seek worker waits for quiescence evidence a dead
+    // device can never publish.
+    check(
+        "P13: a failed tail observation answers Failed, never a masked pending",
+        tail_arm.is_some_and(|arm| code_sites(arm, TAIL_FAIL_ANSWER).len() == 1),
+    );
 
     // P11/P12 are the C4 source oracle (implementation corrective-1):
     // the frozen realtime row's "no new lock acquisition" is realized
@@ -220,6 +235,9 @@ const PARK: &str = "gate.park_loop_top(";
 const TAIL_ARM: &str = "GateSlice::TailProbe";
 /// The seek-release arm of the gate closure.
 const RELEASE_ARM: &str = "GateSlice::SeekRelease";
+/// The failed-observation answer the tail arm must give exactly once
+/// (P13, F5 implementation corrective-4).
+const TAIL_FAIL_ANSWER: &str = "return TailProbeOutcome::Failed;";
 /// The retired per-park spellings (P12: their reintroduction restores
 /// the two-acquisition steady iteration).
 const RETIRED_PARK: &str = "gate.park_while_paused(";
@@ -598,18 +616,16 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     }
 
     /// A pause park slice that publishes only when the tail is NOT
-    /// quiesced skips exactly the observation that matters most:
+    /// quiescent skips exactly the observation that matters most:
     /// quiescence is where a paused episode's sample is walked up to the
-    /// frozen total. The mutation anchors on the pause park's call site
-    /// (rustfmt renders both park closures at the same indent, so the
-    /// indentation is not a discriminator — the call marker is) and
-    /// wraps the closure's publication in the exact condition that
-    /// skips the quiescent slice.
+    /// frozen total. The mutation anchors on the tail-probe arm of the
+    /// ONE unified closure and wraps the publication in the exact
+    /// condition that skips the quiescent slice.
     #[test]
     fn a_park_slice_that_skips_its_quiescent_publication_is_rejected() {
         let source = include_str!("wasapi.rs").replace(
-            "GateSlice::TailProbe => {\n                let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                    return false;\n                };\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
-            "GateSlice::TailProbe => {\n                let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                    return false;\n                };\n                if padding != 0 {\n                    publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n                }",
+            "GateSlice::TailProbe => {\n                    let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                        return TailProbeOutcome::Failed;\n                    };\n                    publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
+            "GateSlice::TailProbe => {\n                    let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                        return TailProbeOutcome::Failed;\n                    };\n                    if padding != 0 {\n                        publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n                    }",
         );
         let violations = check_render_order(&source);
         assert!(
@@ -619,6 +635,41 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
         assert!(
             !violations.iter().any(|v| v.starts_with("P5")),
             "the mutation must hide the publication, not remove it: {violations:?}"
+        );
+    }
+
+    /// P13 is the corrective-4 source oracle: inside the park, a FAILED
+    /// tail observation must return `TailProbeOutcome::Failed` — the
+    /// pre-corrective shape masked a `GetCurrentPadding` error as "not
+    /// quiesced yet" (`return false`, or collapsing Failed into
+    /// Pending), parking the leg forever while the seek worker waited
+    /// for quiescence evidence a dead device could never publish. Both
+    /// degradations must RED.
+    #[test]
+    fn a_failed_tail_observation_masked_as_pending_is_rejected() {
+        let violations = check_render_order(include_str!("wasapi.rs"));
+        assert!(
+            !violations.iter().any(|v| v.starts_with("P13")),
+            "the shipped closure must answer a failed observation with Failed: {violations:?}"
+        );
+        // Degradation 1: the corrective's own regression — Failed
+        // collapsed back into an endless pending.
+        let masked = include_str!("wasapi.rs").replace(
+            "return TailProbeOutcome::Failed;",
+            "return TailProbeOutcome::Pending;",
+        );
+        let violations = check_render_order(&masked);
+        assert!(
+            violations.iter().any(|v| v.starts_with("P13")),
+            "a failed observation treated as pending re-wedges the park: {violations:?}"
+        );
+        // Degradation 2: the pre-corrective spelling — the bool mask.
+        let old_shape =
+            include_str!("wasapi.rs").replace("return TailProbeOutcome::Failed;", "return false;");
+        let violations = check_render_order(&old_shape);
+        assert!(
+            violations.iter().any(|v| v.starts_with("P13")),
+            "the pre-corrective bool mask must stay rejected: {violations:?}"
         );
     }
 

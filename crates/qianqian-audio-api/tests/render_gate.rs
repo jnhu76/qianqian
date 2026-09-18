@@ -10,15 +10,30 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use qianqian_audio_api::ports::{GateEvent, GateSlice, RenderGate};
+use qianqian_audio_api::ports::{GateEvent, GateSlice, ParkOutcome, RenderGate, TailProbeOutcome};
 
 /// Run the unified loop-top gate with `tail` as the tail probe, ignoring
 /// seek releases (none is routed in these tests).
 fn pause_only(gate: &RenderGate, mut tail: impl FnMut() -> bool) {
+    pause_with_outcome(gate, move || {
+        if tail() {
+            TailProbeOutcome::Quiesced
+        } else {
+            TailProbeOutcome::Pending
+        }
+    });
+}
+
+/// [`pause_only`] with the leg answering the probe in its own truth
+/// class — the failure injection point (F5 implementation corrective-4).
+fn pause_with_outcome(
+    gate: &RenderGate,
+    mut tail: impl FnMut() -> TailProbeOutcome,
+) -> ParkOutcome {
     gate.park_loop_top(|slice| match slice {
         GateSlice::TailProbe => tail(),
-        GateSlice::SeekRelease(_) => false,
-    });
+        GateSlice::SeekRelease(_) => TailProbeOutcome::Pending,
+    })
 }
 
 /// A bounded poll so timing assertions fail with a diagnosis, not a
@@ -293,6 +308,54 @@ fn a_closed_gate_never_parks_or_engages_again() {
     assert!(
         events.snapshot().is_empty(),
         "the closed gate must publish no engagement evidence: {:?}",
+        events.snapshot()
+    );
+}
+
+/// F5 implementation corrective-4 (C9, the pause-attributed half): a
+/// tail observation that itself FAILS is neither quiescence evidence
+/// nor "not quiesced yet" — masking it as pending would park the leg
+/// forever while only an owner release could wake it. The park must end
+/// on its own, bounded, with NO TailQuiesced published (a failed
+/// observation is not commit evidence) and the disengagement fence
+/// still published, and the gate must report the failure back instead
+/// of aborting the leg itself. The pause intent stays routed the whole
+/// time — no release ever wakes this park.
+#[test]
+fn a_failed_tail_observation_exits_the_pause_park_without_quiescence() {
+    let events = Events::default();
+    let events_clone = events.clone();
+    let gate = RenderGate::with_observer(move |event| events_clone.record(event));
+    gate.set_paused(true);
+    let parked = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let parked_clone = parked.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    {
+        let gate = gate.clone();
+        std::thread::spawn(move || {
+            let outcome = pause_with_outcome(&gate, || {
+                parked_clone.store(true, Ordering::SeqCst);
+                TailProbeOutcome::Failed
+            });
+            let _ = tx.send(outcome);
+        });
+    }
+    assert!(
+        wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)),
+        "the leg never parked"
+    );
+    let outcome = rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("the park must end on the failed observation, with pause intent still routed");
+    assert_eq!(
+        outcome,
+        ParkOutcome::TailProbeFailed,
+        "the gate reports the mechanism's own failed observation; it never aborts the leg"
+    );
+    assert_eq!(
+        events.snapshot(),
+        vec![GateEvent::Engaged, GateEvent::Disengaged],
+        "no quiescence may publish for a failed observation: {:?}",
         events.snapshot()
     );
 }

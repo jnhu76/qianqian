@@ -11,7 +11,9 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use qianqian_audio_api::ports::{GateEvent, GateSlice, RenderGate, SeekParkRelease};
+use qianqian_audio_api::ports::{
+    GateEvent, GateSlice, ParkOutcome, RenderGate, SeekParkRelease, TailProbeOutcome,
+};
 
 /// A bounded poll so timing assertions fail with a diagnosis, not a
 /// hang.
@@ -53,10 +55,16 @@ fn gate_probe(
     let captured: Arc<Mutex<Option<SeekParkRelease>>> = Arc::new(Mutex::new(None));
     let sink = captured.clone();
     gate.park_loop_top(|slice| match slice {
-        GateSlice::TailProbe => tail(),
+        GateSlice::TailProbe => {
+            if tail() {
+                TailProbeOutcome::Quiesced
+            } else {
+                TailProbeOutcome::Pending
+            }
+        }
         GateSlice::SeekRelease(release) => {
             *sink.lock().expect("release lock") = Some(release);
-            false
+            TailProbeOutcome::Pending
         }
     });
     captured
@@ -246,14 +254,14 @@ fn a_committed_release_rebases_a_pause_parked_leg_while_still_parked() {
         leg_gate.park_loop_top(|slice| match slice {
             GateSlice::TailProbe => {
                 parked_clone.store(true, Ordering::SeqCst);
-                true // quiesce on the first slice: the commit precondition
+                TailProbeOutcome::Quiesced // on the first slice: the commit precondition
             }
             GateSlice::SeekRelease(release) => {
                 // Consumed MID-PARK, on the leg's own path, while the
                 // pause intent keeps it parked.
                 *captured.lock().expect("release lock") = Some(release);
                 rebased_clone.store(true, Ordering::SeqCst);
-                false
+                TailProbeOutcome::Pending
             }
         });
         captured
@@ -426,5 +434,67 @@ fn the_seek_park_calls_the_tail_observation_only_while_parked() {
     assert!(
         after <= before + 1,
         "no observation runs after the release (before={before}, after={after})"
+    );
+}
+
+/// F5 implementation corrective-4 (C9): inside the cut-attributed park,
+/// a tail observation that itself FAILS must end the park bounded — it
+/// is neither `SeekTailQuiesced` (a failed observation is not commit
+/// evidence the worker could sample) nor an endless pending (nothing
+/// owner-driven will ever satisfy a dead device). The park's ONE exit
+/// funnel still hands the leg its release (`Aborted` when none was
+/// routed — the once-on-this-leg consumption discipline holds on every
+/// exit), the disengagement fence still publishes, and the gate reports
+/// the failure back instead of aborting the leg itself. No release is
+/// ever routed here: only the failed observation ends this park.
+#[test]
+fn a_failed_tail_observation_exits_the_seek_park_reported_and_settled() {
+    let events = Events::default();
+    let events_clone = events.clone();
+    let gate = RenderGate::with_observer(move |event| events_clone.record(event));
+    gate.set_seek_hold(true);
+    let parked = Arc::new(AtomicBool::new(false));
+    let parked_clone = parked.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    {
+        let gate = gate.clone();
+        std::thread::spawn(move || {
+            let captured: Arc<Mutex<Option<SeekParkRelease>>> = Arc::new(Mutex::new(None));
+            let sink = captured.clone();
+            let outcome = gate.park_loop_top(|slice| match slice {
+                GateSlice::TailProbe => {
+                    parked_clone.store(true, Ordering::SeqCst);
+                    TailProbeOutcome::Failed
+                }
+                GateSlice::SeekRelease(release) => {
+                    *sink.lock().expect("release lock") = Some(release);
+                    TailProbeOutcome::Pending
+                }
+            });
+            let _ = tx.send((captured, outcome));
+        });
+    }
+    assert!(
+        wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)),
+        "the leg never parked under the routed hold"
+    );
+    let (captured, outcome) = rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("the park must end on the failed observation, with no release routed");
+    assert_eq!(
+        outcome,
+        ParkOutcome::TailProbeFailed,
+        "the gate reports the mechanism's own failed observation; it never aborts the leg"
+    );
+    assert_eq!(
+        *captured.lock().expect("release lock"),
+        Some(SeekParkRelease::Aborted),
+        "the failure exit still consumes the leg's release through the ONE exit funnel"
+    );
+    assert_eq!(
+        events.snapshot(),
+        vec![GateEvent::SeekEngaged, GateEvent::SeekDisengaged],
+        "no seek quiescence may publish for a failed observation: {:?}",
+        events.snapshot()
     );
 }

@@ -1191,7 +1191,7 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
 mod tests {
     use super::*;
     #[cfg(not(loom))]
-    use qianqian_audio_api::ports::{GateSlice, RenderGate};
+    use qianqian_audio_api::ports::{GateSlice, RenderGate, TailProbeOutcome};
 
     /// Drive the unified loop-top gate and capture any routed release
     /// payload the leg consumes. The tail probe never quiesces, so a
@@ -1202,10 +1202,10 @@ mod tests {
     fn consume_release(gate: &RenderGate) -> Option<SeekParkRelease> {
         let captured = std::cell::Cell::new(None);
         gate.park_loop_top(|slice| match slice {
-            GateSlice::TailProbe => false,
+            GateSlice::TailProbe => TailProbeOutcome::Pending,
             GateSlice::SeekRelease(release) => {
                 captured.set(Some(release));
-                false
+                TailProbeOutcome::Pending
             }
         });
         captured.into_inner()

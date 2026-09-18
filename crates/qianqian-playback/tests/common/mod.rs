@@ -44,8 +44,9 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
 
 use qianqian_audio_api::ports::{
     AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainSignal,
-    DrainVerdict, GateSlice, OutputError, PcmDecode, PcmFormat, PcmPull, PositionEvidence,
-    ProviderSeekOutcome, RenderGate, RenderPcmInput, RenderRequest, RenderStream, SeekParkRelease,
+    DrainVerdict, GateSlice, OutputError, ParkOutcome, PcmDecode, PcmFormat, PcmPull,
+    PositionEvidence, ProviderSeekOutcome, RenderGate, RenderPcmInput, RenderRequest, RenderStream,
+    SeekParkRelease, TailProbeOutcome,
 };
 
 pub const TEST_FORMAT: PcmFormat = PcmFormat {
@@ -241,11 +242,16 @@ pub enum Playout {
 /// physical quantity the real mechanism reads with `GetCurrentPadding`
 /// and the leg's position evidence subtracts (D14.8). One model, two
 /// uses: the F3 establishment oracle asks whether it is quiesced
-/// (`== 0`), and the F4 accounting derives from its value.
+/// (`== 0`), and the F4 accounting derives from its value. Arming
+/// [`DeviceTail::fail_observations`] models the observation itself
+/// failing (an invalidated endpoint): every later observation returns
+/// `None`, the truth class the real mechanism's `GetCurrentPadding`
+/// error occupies (F5 implementation corrective-4).
 #[derive(Clone)]
 pub struct DeviceTail {
     queued: Arc<std::sync::atomic::AtomicU64>,
     playout: Arc<std::sync::atomic::AtomicU64>,
+    failing: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// The internal spelling of [`Playout::Everything`]: a rate no queue
@@ -257,6 +263,7 @@ impl Default for DeviceTail {
         Self {
             queued: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             playout: Arc::new(std::sync::atomic::AtomicU64::new(PLAY_OUT_EVERYTHING)),
+            failing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 }
@@ -270,6 +277,15 @@ impl DeviceTail {
         };
         self.playout
             .store(rate, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Fail every later tail observation (see the struct doc): the mock
+    /// endpoint invalidates, so the observation itself reports failure —
+    /// a truth class distinct from a non-empty queue, and never
+    /// quiescence.
+    pub fn fail_observations(&self) {
+        self.failing
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// The frames currently queued to play — a witness for assertions,
@@ -286,9 +302,13 @@ impl DeviceTail {
     }
 
     /// One tail observation: the device plays out its slice, then
-    /// reports what is still queued.
-    fn observe(&self) -> u64 {
+    /// reports what is still queued — or `None` when the observation
+    /// itself failed (the armed failure mode).
+    fn observe(&self) -> Option<u64> {
         use std::sync::atomic::Ordering;
+        if self.failing.load(Ordering::SeqCst) {
+            return None;
+        }
         let rate = self.playout.load(Ordering::SeqCst);
         let mut remaining = self.queued.load(Ordering::SeqCst);
         if rate >= remaining {
@@ -297,7 +317,7 @@ impl DeviceTail {
             remaining -= rate;
         }
         self.queued.store(remaining, Ordering::SeqCst);
-        remaining
+        Some(remaining)
     }
 
     /// The device accepted `n` submitted frames into its queue (the
@@ -713,38 +733,58 @@ fn consume_loop(
         // up to the frozen handed-off total. The release slice applies
         // a committed cutover's rebase on this path before any further
         // submission — including while the leg STAYS PARKED by pause.
-        gate.park_loop_top(|slice| match slice {
-            GateSlice::TailProbe => {
-                let tail = device.tail.observe();
-                publish_consumed(position, basis, handed_off, tail, publishing);
-                device.tail_probe.observe(tail == 0)
-            }
-            GateSlice::SeekRelease(release) => {
-                match release {
-                    SeekParkRelease::Committed { landing } => {
-                        handed_off = 0;
-                        if landing.is_none() {
-                            publishing = false;
-                        }
-                        if let Some(landing) = landing.filter(|_| publishing) {
-                            basis = landing;
-                        }
-                        // A withdrawal is for the REST of the episode (D14.5
-                        // position rebase) — identical to the real leg's
-                        // wasapi.rs rebase arm: a later KNOWN landing after
-                        // an unknown one neither resurrects publication nor
-                        // un-withdraws the cell.
-                        position.rebase(if publishing { landing } else { None });
+        // A FAILED observation exits the park and aborts the leg
+        // through the same verdict a steady-path observation failure
+        // takes — mirroring the real mechanism's corrective-4 posture:
+        // the device failure propagates out of the park, the data plane
+        // is stopped by the dead leg's exit, and no quiescence evidence
+        // ever publishes for a failed observation.
+        let park_failed = matches!(
+            gate.park_loop_top(|slice| match slice {
+                GateSlice::TailProbe => {
+                    let Some(tail) = device.tail.observe() else {
+                        return TailProbeOutcome::Failed;
+                    };
+                    publish_consumed(position, basis, handed_off, tail, publishing);
+                    if device.tail_probe.observe(tail == 0) {
+                        TailProbeOutcome::Quiesced
+                    } else {
+                        TailProbeOutcome::Pending
                     }
-                    SeekParkRelease::Aborted => {}
                 }
-                false
-            }
-        });
+                GateSlice::SeekRelease(release) => {
+                    match release {
+                        SeekParkRelease::Committed { landing } => {
+                            handed_off = 0;
+                            if landing.is_none() {
+                                publishing = false;
+                            }
+                            if let Some(landing) = landing.filter(|_| publishing) {
+                                basis = landing;
+                            }
+                            // A withdrawal is for the REST of the episode (D14.5
+                            // position rebase) — identical to the real leg's
+                            // wasapi.rs rebase arm: a later KNOWN landing after
+                            // an unknown one neither resurrects publication nor
+                            // un-withdraws the cell.
+                            position.rebase(if publishing { landing } else { None });
+                        }
+                        SeekParkRelease::Aborted => {}
+                    }
+                    TailProbeOutcome::Pending
+                }
+            }),
+            ParkOutcome::TailProbeFailed
+        );
+        if park_failed {
+            return DrainVerdict::Aborted;
+        }
         // Mirror the real loop's per-iteration padding observation:
         // publish the consumed estimate as of THIS instant, from the
         // handed-off total as it stands BEFORE the submission below.
-        let tail = device.tail.observe();
+        let Some(tail) = device.tail.observe() else {
+            return DrainVerdict::Aborted;
+        };
         publish_consumed(position, basis, handed_off, tail, publishing);
         match input.read_frames(&mut dst) {
             PcmPull::Frames(n) => {
