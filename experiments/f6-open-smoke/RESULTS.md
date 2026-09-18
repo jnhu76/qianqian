@@ -3,21 +3,21 @@
 Campaign: QIANQIAN-F6-NAVIGATION-VOLUME-AUTONOMOUS-1, Stage C
 (F6 Open implementation). Authority under test: ADR-PBK-002 D14.6
 (F6-AUTHORITY-PROMOTION-1 + the Stage D playlist closure, same
-amendment). Branches: `feat/f6-open-1` then `feat/navigation-1`
-(per-run `repo_head_sha` in the ENV files). The current evidence set
-(O1–O6, three runs) was produced by ONE cross-build from the committed
-`feat/navigation-1` review-fix tree (exe sha 212193bc…, identical
-across the three ENV files — the binding evidence, not per-run
-rebuilds); earlier sets (4754edc2… Stage C, 4e3da393… first Stage D
-run, whose O6 lacked the previous-direction witnesses) are superseded
-by this re-run.
+amendment). Branch: `feat/volume-1` (per-run `branch:` and `repo_head_sha:` in
+the ENV files). The current evidence set (O1–O7, three runs) was
+produced by ONE cross-build from the committed Stage F tree (exe sha
+5eb295d9…, identical across the three ENV files — the binding
+evidence, not per-run rebuilds, and committed as the build input's
+own commit); the earlier sets (4754edc2… Stage C, 212193bc…
+Stage D, and the interim builds between harness fixes) are superseded
+by this re-run and named in the commit history.
 
 ## Verdict
 
-**OPEN_SMOKE_GREEN ×3 — 18/18 scenario-runs GREEN** (Stage D added O6,
-navigation; the O1–O5 matrix re-ran fresh with the Stage D binary) —
-conditional on the same UNAVAILABLE acoustic human-ear witness as
-S-PROBE (below).
+**OPEN_SMOKE_GREEN ×3 — 21/21 scenario-runs GREEN** (Stage D added
+O6 navigation; Stage F added O7 volume; the full matrix re-ran fresh
+with the Stage F binary) — conditional on the same UNAVAILABLE
+acoustic human-ear witness as S-PROBE (below).
 
 ## Environment (all runs)
 
@@ -34,11 +34,11 @@ endpoint:    [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3,
 
 ## Scenario matrix
 
-| run | O1 | O2 | O3 | O4 | O5 | O6 (nav) |
-|-----|----|----|----|----|----|----------|
-| 1   | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN |
-| 2   | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN |
-| 3   | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN |
+| run | O1 | O2 | O3 | O4 | O5 | O6 (nav) | O7 (vol) |
+|-----|----|----|----|----|----|----------|----------|
+| 1   | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN |
+| 2   | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN |
+| 3   | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN |
 
 Representative measured evidence (full JSON per scenario in
 `evidence/logs/`):
@@ -63,6 +63,16 @@ Representative measured evidence (full JSON per scenario in
 - **O5 repeated replacement**: three consecutive replacements
   (MP3 → FLAC → MP3) each settled the previous episode `Stopped` and
   committed the next; final quit `Stopped` + `Discharged`, quiet.
+- **O7 volume (Stage F)**: the desired stream factor routed to 60
+  mid-episode — the episode stayed unsettled and kept consuming; at
+  factor 0.0 (silence) the position publication KEPT advancing
+  (silence is still submitted frames — frame accounting, not
+  loudness); the App's desired level survived episode replacement (the
+  physical witness is App-state survival and playback continuity;
+  pre-activation DELIVERY into the fresh mechanism is pinned
+  executably by the volume_seam and player tests — no mechanism
+  readback exists by design); quit Stopped + Discharged. A volume
+  command never settled terminal truth.
 - **O6 navigation (Stage D)**: a 3-file startup playlist walked with
   next/previous through the SAME real replacement — every step in
   BOTH directions witnessed the committed source equals the selected

@@ -132,6 +132,7 @@ fn activate_inner(
             drain: completion.drain_signal(),
             gate: completion.render_gate(),
             position: completion.position_evidence(),
+            level: completion.output_level(),
         })
         .map_err(|e| ActivationError::new(format!("render stream open failed: {}", e.message)))?;
 

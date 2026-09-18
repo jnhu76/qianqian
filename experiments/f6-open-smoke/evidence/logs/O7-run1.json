@@ -1,0 +1,12 @@
+{
+  "scenario": "O7",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "level_survived_replacement": true,
+    "quit_disposal": "Some(Discharged)",
+    "silent_still_consuming": true,
+    "unsettled_after_volume": true,
+    "volume_route_ok": true
+  }
+}

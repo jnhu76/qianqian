@@ -57,7 +57,8 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use qianqian_audio_api::ports::{
-    DrainSignal, DrainVerdict, GateEvent, PcmFormat, PositionEvidence, RenderGate, SeekParkRelease,
+    DrainSignal, DrainVerdict, GateEvent, OutputLevel, PcmFormat, PositionEvidence, RenderGate,
+    SeekParkRelease,
 };
 
 use crate::edge::{EdgeTerminal, PcmEdge};
@@ -256,6 +257,16 @@ struct CompletionArc {
     /// holding the state lock — so the hot atomic never shares a lock,
     /// and never a cache line, with the settlement state.
     position: PositionEvidence,
+    /// The episode's output-level cell (ADR-PBK-002 D14.9), created
+    /// here and handed to the same render stream through its open
+    /// request — the same ownership posture as the position cell: the
+    /// mechanism applies it on its own path with relaxed atomic reads,
+    /// so the cell never shares a lock with the settlement state. The
+    /// application routes into it ONLY through the episode seam's
+    /// idempotent `request_output_level` command; it is application
+    /// configuration in transit, never a Fact and never settlement
+    /// input.
+    output_level: OutputLevel,
 }
 
 impl Default for SessionCompletion {
@@ -346,6 +357,7 @@ impl SessionCompletion {
                     gate,
                     seek_slot: Mutex::new(SeekSlot::default()),
                     position: PositionEvidence::new(),
+                    output_level: OutputLevel::new(),
                 }
             }),
         }
@@ -859,6 +871,15 @@ impl SessionCompletion {
     /// `observe_snapshot` derives from it.
     pub(crate) fn position_evidence(&self) -> PositionEvidence {
         self.state.position.clone()
+    }
+
+    /// The episode's output-level cell, handed to the output provider
+    /// at activation (D14.9). Session-internal binding seam: the
+    /// application routes into the cell only through the episode seam's
+    /// idempotent command, and never reads it back (D14.9 forbids a
+    /// mechanism readback on the product read side).
+    pub(crate) fn output_level(&self) -> OutputLevel {
+        self.state.output_level.clone()
     }
 
     /// Frames currently buffered on the session's edge, once bound.

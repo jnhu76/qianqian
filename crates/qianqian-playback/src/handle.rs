@@ -294,6 +294,24 @@ impl PlaybackSessionHandle {
         self.completion.request_seek(target);
     }
 
+    /// Request the episode's output level (ADR-PBK-002 D14.9): the
+    /// App's desired stream factor, `0..=100` (clamped; values above
+    /// 100 are capped at 100). Idempotent Command, same-episode,
+    /// non-terminal: it routes into the session-owned output-level cell
+    /// the mechanism applies at its loop top, and it NEVER establishes
+    /// or settles terminal truth — no PCM topology cut, no edge flush,
+    /// no position reset, no discontinuity. A volume command after the
+    /// terminal Fact is inert command history, like late stop intent.
+    /// The value means exactly the App's desired stream factor — never
+    /// the effective acoustic level, the Windows session master, or any
+    /// mechanism readback.
+    pub fn request_output_level(&self, level: u8) {
+        let level = level.min(100);
+        self.completion
+            .output_level()
+            .route(f32::from(level) / 100.0);
+    }
+
     /// One coherent observation of the episode. Pure read: no resolve,
     /// no commit, no lifecycle action, no edge or drain operation.
     /// Repeating it changes nothing.

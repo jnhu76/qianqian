@@ -1,14 +1,15 @@
 opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(45s)
 [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
-verdict=GREEN reason: O4 pre-seek A position advancing (2/2)
-verdict=GREEN reason: O4 post-seek position Some(1806048) (pre 30429) stop_requested=false
-verdict=GREEN reason: O4 post-seek A position advancing (2/2)
+verdict=GREEN reason: O7 pre-volume A position advancing (2/2)
+verdict=GREEN reason: O7 volume routed to 60/100
+verdict=GREEN reason: O7 post-volume A position advancing (4/4)
+verdict=GREEN reason: O7 silent A position advancing (2/2)
 opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(4s)
 [qianqian-wasapi] render aborted: data plane stopped
 [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
-verdict=GREEN reason: O4 new episode B established 44100 Hz x 2 mask 0x3
+verdict=GREEN reason: O7 replacement episode position advancing (2/2)
 [qianqian-wasapi] render aborted: data plane stopped
 verdict=GREEN reason: quit terminal Stopped
 verdict=GREEN reason: quit disposal quiet=true
-[mp3float @ 000002652b6d80c0] Could not update timestamps for skipped samples.
-[mp3float @ 000002652b6ade80] Could not update timestamps for skipped samples.
+[mp3float @ 000002acf30580c0] Could not update timestamps for skipped samples.
+[mp3float @ 000002acf320de80] Could not update timestamps for skipped samples.

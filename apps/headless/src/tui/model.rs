@@ -39,6 +39,10 @@ pub struct TuiModel {
     /// The player's navigation projection (1-based cursor, playlist
     /// length), refreshed with the episode.
     navigation_position: Option<(usize, usize)>,
+    /// The App's desired stream factor (D14.9 read side: exactly the
+    /// configured value — never an acoustic level or mechanism
+    /// readback).
+    volume: Option<u8>,
 }
 
 impl TuiModel {
@@ -61,6 +65,7 @@ impl TuiModel {
             open_input: None,
             status: None,
             navigation_position: None,
+            volume: None,
         }
     }
 
@@ -73,6 +78,16 @@ impl TuiModel {
     /// Record the player's navigation projection (D14.6).
     pub fn set_navigation(&mut self, position: Option<(usize, usize)>) {
         self.navigation_position = position;
+    }
+
+    /// Record the player's desired stream factor (D14.9 read side).
+    pub fn set_volume(&mut self, volume: Option<u8>) {
+        self.volume = volume;
+    }
+
+    /// The desired stream factor label: the App's configured value.
+    pub fn volume_label(&self) -> Option<String> {
+        self.volume.map(|v| format!("{v}/100"))
     }
 
     /// Follow the player's committed episode: `Some(path)` after a
@@ -254,6 +269,11 @@ pub enum Action {
     /// P: select the previous playlist entry. A shell action like
     /// [`Action::Open`].
     Previous,
+    /// '+'/'=': raise the App's desired stream factor by one step
+    /// (D14.9: step 5). A shell action like [`Action::Open`].
+    VolumeUp,
+    /// '-': lower the App's desired stream factor by one step.
+    VolumeDown,
     Quit,
 }
 
@@ -311,6 +331,8 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
         KeyCode::Char('o') | KeyCode::Char('O') if plain => Some(Action::Open),
         KeyCode::Char('n') | KeyCode::Char('N') if plain => Some(Action::Next),
         KeyCode::Char('p') | KeyCode::Char('P') if plain => Some(Action::Previous),
+        KeyCode::Char('+') | KeyCode::Char('=') if plain => Some(Action::VolumeUp),
+        KeyCode::Char('-') | KeyCode::Char('_') if plain => Some(Action::VolumeDown),
         KeyCode::Char('q') | KeyCode::Char('Q') if plain => Some(Action::Quit),
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(Action::Quit),
         KeyCode::Left if plain => Some(Action::SeekBackward),
@@ -352,11 +374,12 @@ pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
             Step::Continue
         }
         // The shell actions never reach this wiring: the runtime routes
-        // Open to the input line and Next/Previous to the player's
-        // navigation before any episode command is considered. These
-        // arms exist so the match stays exhaustive; they must not touch
-        // the episode.
+        // Open to the input line, Next/Previous to the player's
+        // navigation, and the volume keys to the player's desired level
+        // before any episode command is considered. These arms exist so
+        // the match stays exhaustive; they must not touch the episode.
         Action::Open | Action::Next | Action::Previous => Step::Continue,
+        Action::VolumeUp | Action::VolumeDown => Step::Continue,
         Action::Quit => Step::Exit,
     }
 }
@@ -758,6 +781,35 @@ mod tests {
             before,
             "navigation is not an episode command"
         );
+    }
+
+    /// The '+'/'=' and '-'/'_' keys map to the two volume actions
+    /// (D14.9: step 5 at the shell), and apply_action must never let
+    /// them touch the episode.
+    #[test]
+    fn volume_keys_map_to_the_volume_actions_and_apply_action_never_touches_the_episode() {
+        assert_eq!(
+            action_for_key(KeyEvent::new(KeyCode::Char('+'), KeyModifiers::NONE)),
+            Some(Action::VolumeUp)
+        );
+        assert_eq!(
+            action_for_key(KeyEvent::new(KeyCode::Char('='), KeyModifiers::NONE)),
+            Some(Action::VolumeUp)
+        );
+        assert_eq!(
+            action_for_key(KeyEvent::new(KeyCode::Char('-'), KeyModifiers::NONE)),
+            Some(Action::VolumeDown)
+        );
+        assert_eq!(
+            action_for_key(KeyEvent::new(KeyCode::Char('_'), KeyModifiers::NONE)),
+            Some(Action::VolumeDown)
+        );
+
+        let handle = PlaybackSessionHandle::new();
+        let before = handle.observe();
+        assert_eq!(apply_action(Action::VolumeUp, &handle), Step::Continue);
+        assert_eq!(apply_action(Action::VolumeDown, &handle), Step::Continue);
+        assert_eq!(handle.observe(), before, "volume is not an episode command");
     }
 
     /// The Open input line lifecycle: begin → edit → confirm returns

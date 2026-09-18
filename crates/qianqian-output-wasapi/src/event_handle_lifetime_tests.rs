@@ -112,6 +112,9 @@ mod windows {
                 // The real leg publishes position evidence into this
                 // cell; nothing reads it in this oracle.
                 position: Default::default(),
+                // Unity: these cycles assert handle lifetime, not the
+                // D14.9 level; the open-time apply reads this cell.
+                level: Default::default(),
             })
             .expect("real endpoint opens");
         stream.stop_and_join();

@@ -17,7 +17,7 @@
 //! provider or consumer is wired here.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
@@ -886,15 +886,80 @@ impl PositionEvidence {
     }
 }
 
+/// Session-owned output-level cell (ADR-PBK-002 D14.9): carries ONE
+/// episode's desired stream factor from the application's routed command
+/// to the render mechanism. Truth class: application configuration in
+/// transit (Command family, like the pause intent the gate routes) —
+/// NOT a Fact, NOT mechanism evidence about loudness, NOT a playback
+/// semantic. The cell is an owned resource of the episode (like the
+/// gate and the position cell), never a Capability.
+///
+/// Writers: the session (routing the episode seam's idempotent command)
+/// and the initial value the App configured before activation. Reader:
+/// the render mechanism — once at stream open (before first meaningful
+/// submission) and once per loop top when the routed value changed (one
+/// relaxed load + compare; V-PROBE-grounded placement). Never read by
+/// the product read side: D14.9 forbids a mechanism readback
+/// (GetAllVolumes stays unexposed); the displayed value is the App's
+/// own desired level, not this cell and not any acoustic truth.
+#[derive(Clone, Debug)]
+pub struct OutputLevel {
+    /// The desired factor as f32 bits (0.0 = silent, 1.0 = unity).
+    /// Relaxed coherence suffices: one writer-routed value, one
+    /// mechanism reader, and the apply placement is bounded by design —
+    /// a stale-by-one-iteration factor costs nothing (the next loop top
+    /// re-checks).
+    factor_bits: Arc<AtomicU32>,
+}
+
+impl Default for OutputLevel {
+    fn default() -> Self {
+        Self {
+            factor_bits: Arc::new(AtomicU32::new(1.0f32.to_bits())),
+        }
+    }
+}
+
+impl OutputLevel {
+    /// The cell every episode starts with: unity (no attenuation). A
+    /// fresh episode sounds at the App's routed level because the App
+    /// routes BEFORE activation, not because the mechanism guesses.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Route the desired factor (the session, from the episode seam's
+    /// idempotent command). The mechanism applies it at its loop top.
+    pub fn route(&self, factor: f32) {
+        let factor = factor.clamp(0.0, 1.0);
+        self.factor_bits.store(factor.to_bits(), Ordering::Relaxed);
+    }
+
+    /// One mechanism-side read (stream open + loop top).
+    pub fn load(&self) -> f32 {
+        f32::from_bits(self.factor_bits.load(Ordering::Relaxed))
+    }
+}
+
 /// Request for one playback-specific render stream: the source format to
 /// negotiate, the pre-bound PCM input, the session-owned drain signal,
-/// the session-owned pause gate, and the session-owned position-evidence
-/// cell. All data-plane pieces bind once, here.
+/// the session-owned pause gate, the session-owned position-evidence
+/// cell, and the session-owned output-level cell (D14.9). All data-plane
+/// pieces bind once, here.
 pub struct RenderRequest {
     pub format: PcmFormat,
     pub input: Arc<dyn RenderPcmInput>,
     pub drain: DrainSignal,
     pub gate: RenderGate,
+    /// The episode's output-level cell (ADR-PBK-002 D14.9): the desired
+    /// stream factor the mechanism applies — once at stream open (before
+    /// first meaningful submission) and re-applied at the render loop top
+    /// when the routed value changed (one relaxed load + compare per
+    /// iteration; never inside the quantum). Grounded by V-PROBE
+    /// (experiments/v-probe, 2026-09-19): factor isolation and
+    /// independence, loop-top apply boundedness, position clock
+    /// advancing and monotone under applies.
+    pub level: OutputLevel,
     /// The episode's position-evidence cell (D14.8). The render leg's F4
     /// obligation is exactly this: from the tail readings it already
     /// takes, publish its own consumed estimate into this cell — one

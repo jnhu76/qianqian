@@ -222,15 +222,6 @@ seek acceptance / discontinuity / commit semantics
      conjunction, same-cell position rebase to the ACTUAL landing,
      one-seek-in-flight, pause intent survives; P1–P5 untriggered —
      pending human review of the implementation PR)
-open/session construction + config + replacement semantics
-    (F6-AUTHORITY-PROMOTION-1 froze the propositions and mechanism in
-     D14.6 — probe-before-destruction + whole-episode-composition
-     replacement + authority-owned operation results + failure-clean
-     start — on S-PROBE physical evidence; implementation pending)
-volume realtime apply placement
-    (D14.9 volume owner/semantics + IAudioStreamVolume candidate
-     frozen by F6-AUTHORITY-PROMOTION-1; the physical apply placement
-     is PENDING V-PROBE)
 device switch / replaceable render binding
 PlaybackControl topology
 PlaybackFacts publication topology
@@ -329,17 +320,27 @@ F6 Open                         AUTHORITY PROMOTED (architecture/
                                 GREEN physical evidence, evidence
                                 experiments/f6-source-probe; acoustic
                                 human-ear item recorded UNAVAILABLE)
-                                IMPLEMENTATION PENDING (feat/f6-open-1)
+                                IMPLEMENTED (feat/f6-open-1, PR #159;
+                                C7 matrix + 4/4 mutation gate +
+                                OPEN_SMOKE_GREEN x3 physical; 3 review
+                                rounds to 0/0/0/0)
 Next / Previous                 AUTHORITY CLOSED as application
                                 navigation state (commit-on-activation,
                                 inert boundaries, no auto-next; same
-                                amendment) — IMPLEMENTATION PENDING
-                                (feat/navigation-1)
-F7 Volume                       owner/semantics PROMOTED (D14.9
-                                amendment: App-owned desired level,
-                                stream-local realization,
-                                IAudioStreamVolume candidate); physical
-                                RT apply placement PENDING V-PROBE
+                                amendment) — IMPLEMENTED (feat/
+                                navigation-1, PR #160; Stage D matrix +
+                                O6 physical walk x3; 3 review rounds to
+                                0/0/0/0)
+F7 Volume                       owner/semantics PROMOTED (D14.9);
+                                apply placement GROUNDED by V-PROBE
+                                (experiments/v-probe, PR #161:
+                                V_PROBE_GREEN x3, no reopen fired) and
+                                IMPLEMENTED (feat/volume-1: OutputLevel
+                                cell in RenderRequest, loop-top apply,
+                                request_output_level seam command,
+                                App-owned desired 0..=100 step 5; O7
+                                physical row; narrow ADR grounding
+                                amendment carried)
 F8 Devices / Device switch      split; switch mechanism still OPEN
 ```
 

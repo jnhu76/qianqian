@@ -95,10 +95,12 @@ pub trait EpisodeStart {
     fn probe(&self, candidate: &Path) -> Result<(), String>;
 
     /// Construct a FRESH composition root for `source` and drive its
-    /// desired composition to quiescence. Never disposes anything: the
-    /// CALLER owns the returned root on both arms (commit, or the
-    /// failure-clean disposal).
-    fn start(&self, source: &Path) -> StartAttempt;
+    /// desired composition to quiescence. `initial_output_level` is the
+    /// App's desired stream factor (0..=100, D14.9) routed into the
+    /// episode BEFORE activation, so the mechanism applies it at stream
+    /// open. Never disposes anything: the CALLER owns the returned root
+    /// on both arms (commit, or the failure-clean disposal).
+    fn start(&self, source: &Path, initial_output_level: u8) -> StartAttempt;
 }
 
 /// One fresh-root start attempt. The start operation itself never
@@ -194,6 +196,13 @@ pub struct ReferencePlayerApp<S: EpisodeStart> {
     fail_stop: Option<String>,
     playlist: Vec<PathBuf>,
     cursor: Option<usize>,
+    /// The App's desired stream factor, `0..=100` (D14.9: integer,
+    /// clamped; the TUI steps it by 5). Application configuration —
+    /// NOT a Fact, NOT mechanism evidence, never a readback. It
+    /// survives episode replacement because replacement rebuilds the
+    /// episode, not the App; each fresh episode receives it BEFORE
+    /// activation and its mechanism applies it at stream open.
+    desired_volume: u8,
 }
 
 impl<S: EpisodeStart> ReferencePlayerApp<S> {
@@ -207,6 +216,7 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
             fail_stop: None,
             playlist: Vec::new(),
             cursor: None,
+            desired_volume: 100,
         }
     }
 
@@ -234,6 +244,30 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
         }
         self.playlist = entries;
         self.cursor = Some(0);
+    }
+
+    /// The App's desired stream factor (0..=100). The read side means
+    /// exactly this configured value — never the effective acoustic
+    /// level, the Windows session master, or any mechanism readback
+    /// (D14.9).
+    pub fn desired_volume(&self) -> u8 {
+        self.desired_volume
+    }
+
+    /// Change the desired stream factor by `delta` (clamped to
+    /// 0..=100), and route it into the live episode's seam if one is
+    /// committed (idempotent Command; the mechanism applies it at its
+    /// loop top). Returns the new desired value. A volume command never
+    /// touches terminal truth.
+    pub fn change_volume(&mut self, delta: i16) -> u8 {
+        let desired = (i16::from(self.desired_volume) + delta).clamp(0, 100) as u8;
+        if desired != self.desired_volume {
+            self.desired_volume = desired;
+            if let Some(handle) = self.active.as_ref().map(|e| e.handle.clone()) {
+                handle.request_output_level(desired);
+            }
+        }
+        desired
     }
 
     /// The navigation projection the shell renders: the 1-based
@@ -333,7 +367,7 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
         // 3. Fresh start, then the replacement commit condition: the
         //    old-side clear (the arm above) AND the authoritative
         //    activation evidence.
-        let attempt = self.start.start(candidate);
+        let attempt = self.start.start(candidate, self.desired_volume);
         if let Some(refusal) = attempt.refused {
             return self.failure_clean_start(attempt.runtime, refusal);
         }
@@ -692,6 +726,7 @@ mod tests {
         attach_handle: bool,
         violating_cleanup: bool,
         refuse_composition: bool,
+        start_levels: Arc<Mutex<Vec<u8>>>,
     }
 
     impl FakeEpisodeSource {
@@ -702,6 +737,7 @@ mod tests {
                 attach_handle: true,
                 violating_cleanup: false,
                 refuse_composition: false,
+                start_levels: Arc::new(Mutex::new(Vec::new())),
             }
         }
 
@@ -720,7 +756,7 @@ mod tests {
             Ok(())
         }
 
-        fn start(&self, source: &Path) -> StartAttempt {
+        fn start(&self, source: &Path, initial_output_level: u8) -> StartAttempt {
             let root = self.generation.fetch_add(1, Ordering::Relaxed) + 1;
             let mut runtime = QianqianApp::new();
             runtime
@@ -747,7 +783,12 @@ mod tests {
                         )),
                 )
                 .expect("fresh root admits the fake output definition");
+            self.start_levels
+                .lock()
+                .expect("start levels")
+                .push(initial_output_level);
             let mounted = PlaybackSessionHandle::new();
+            mounted.request_output_level(initial_output_level);
             runtime
                 .register_component(playback_session_spec(source.to_path_buf(), mounted.clone()))
                 .expect("fresh root admits the playback session definition");
@@ -1446,6 +1487,76 @@ mod tests {
             Some((1, 2)),
             "the episode settled; the navigation state did not move"
         );
+    }
+
+    // --- Stage F: the D14.9 desired-volume ownership -------------------
+
+    /// The default desired level is unity (100): a fresh App never
+    /// attenuates by surprise. change_volume clamps at BOTH ends and
+    /// routes into the live episode's seam; the level survives episode
+    /// replacement because it is App state, and each fresh start
+    /// receives it BEFORE activation.
+    #[test]
+    fn desired_volume_defaults_clamps_and_survives_replacement() {
+        let source = FakeEpisodeSource::new();
+        let levels = Arc::clone(&source.start_levels);
+        let mut player = player_with(source);
+        assert_eq!(player.desired_volume(), 100);
+
+        assert_eq!(player.change_volume(-30), 70);
+        assert_eq!(player.change_volume(-30), 40);
+        assert_eq!(player.change_volume(-30), 10);
+        assert_eq!(
+            player.change_volume(-30),
+            0,
+            "clamped at silence, never below"
+        );
+        assert_eq!(player.change_volume(-30), 0);
+        assert_eq!(player.change_volume(25), 25);
+        assert_eq!(
+            player.change_volume(500),
+            100,
+            "clamped at unity, never above"
+        );
+
+        // Routing with no live episode is a no-op of state only.
+        assert!(player.active_handle().is_none());
+
+        // The level survives replacement and rides INTO the fresh start:
+        // the fake composer records the level it received BEFORE
+        // activation (the value the mechanism's open-time apply reads).
+        player.change_volume(-20); // 80
+        assert!(opened(&player.open(Path::new(LIVE_A))));
+        assert_eq!(player.desired_volume(), 80);
+        assert_eq!(
+            levels.lock().expect("start levels").as_slice(),
+            &[80u8],
+            "the fresh start received the App's desired level pre-activation"
+        );
+        let handle = player.active_handle().expect("committed").clone();
+        handle.request_output_level(45);
+        assert_eq!(
+            player.desired_volume(),
+            80,
+            "the read side is the App's own state, not the episode's"
+        );
+    }
+
+    /// The volume keys step by 5 and never touch the episode's truth:
+    /// a routed change leaves the episode unsettled.
+    #[test]
+    fn change_volume_routes_without_touching_terminal_truth() {
+        let source = FakeEpisodeSource::new();
+        let mut player = player_with(source);
+        assert!(opened(&player.open(Path::new(LIVE_A))));
+        let handle = player.active_handle().expect("committed").clone();
+
+        let before = handle.observe();
+        assert_eq!(player.change_volume(-25), 75);
+        let after = handle.observe();
+        assert_eq!(after.terminal_outcome, None);
+        assert_eq!(after.stop_requested, before.stop_requested);
+        assert_eq!(after.pause_requested, before.pause_requested);
     }
 
     /// C7-13: quit settles, disposes and reports — the live episode
