@@ -99,8 +99,6 @@ pub fn outcome_report(
     }
 }
 
-/// Teardown warnings a script must see from a disposal snapshot
-/// (empty when the disposal was quiet). Printed on stderr.
 /// The pinned verdict line for a root disposal that did NOT end
 /// Discharged (F6): a latched §G.6 teardown violation has no exit, and
 /// the report says so in exactly this spelling. `None` for a clean
@@ -115,6 +113,8 @@ pub fn disposal_verdict_warning(verdict: &DisposeVerdict) -> Option<String> {
     }
 }
 
+/// Teardown warnings a script must see from a disposal snapshot
+/// (empty when the disposal was quiet). Printed on stderr.
 pub fn disposal_warnings(snapshot: &CompositionSnapshot) -> Vec<String> {
     if snapshot.quiet {
         return Vec::new();
@@ -228,6 +228,15 @@ mod tests {
         assert_eq!(
             outcome_report(EpisodeTerminalOutcome::Failed, None),
             vec![(ReportStream::Stderr, "playback failed".to_owned())]
+        );
+    }
+
+    #[test]
+    fn the_disposal_verdict_warning_pins_the_violation_spelling() {
+        assert_eq!(disposal_verdict_warning(&DisposeVerdict::Discharged), None);
+        assert_eq!(
+            disposal_verdict_warning(&DisposeVerdict::TeardownViolated),
+            Some("fail-stop: disposal reported a latched teardown violation (no exit)".to_owned())
         );
     }
 
