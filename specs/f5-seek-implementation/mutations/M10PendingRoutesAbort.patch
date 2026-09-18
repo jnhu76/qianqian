@@ -1,0 +1,12 @@
+diff --git a/crates/qianqian-playback/src/completion.rs b/crates/qianqian-playback/src/completion.rs
+--- a/crates/qianqian-playback/src/completion.rs
++++ b/crates/qianqian-playback/src/completion.rs
+@@ -753,7 +753,7 @@
+                 guard.cut_committed = true;
+                 CutoverDecision::Committed
+             } else {
+-                CutoverDecision::Pending
++                CutoverDecision::Aborted
+             }
+         };
+         match decision {

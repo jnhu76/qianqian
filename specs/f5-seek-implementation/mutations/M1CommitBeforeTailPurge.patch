@@ -1,14 +1,13 @@
 diff --git a/crates/qianqian-playback/src/completion.rs b/crates/qianqian-playback/src/completion.rs
-index a4e1707..ee5f6c6 100644
 --- a/crates/qianqian-playback/src/completion.rs
 +++ b/crates/qianqian-playback/src/completion.rs
-@@ -639,8 +639,7 @@ impl SessionCompletion {
-     pub(crate) fn commit_seek_cutover(&self, landing: Option<u64>) -> bool {
-         let decision = {
+@@ -745,8 +745,7 @@
              let mut guard = self.state.state.lock().expect("completion lock");
+             let episode_ending =
+                 guard.stop_requested || guard.outcome.is_some() || guard.teardown_released;
 -            let parked_and_quiesced = (guard.engaged && guard.tail_quiesced)
 -                || (guard.seek_engaged && guard.seek_tail_quiesced);
 +            let parked_and_quiesced = true;
-             let unsettled =
-                 guard.outcome.is_none() && !guard.stop_requested && !guard.teardown_released;
-             if guard.seek_landing.is_some() && parked_and_quiesced && unsettled {
+             if episode_ending {
+                 CutoverDecision::Aborted
+             } else if guard.seek_landing.is_some() && parked_and_quiesced {

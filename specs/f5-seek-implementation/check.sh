@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # specs/f5-seek-implementation/check.sh — F5 seek IMPLEMENTATION mutation
-# gate (QIANQIAN-F5-SEEK-IMPLEMENTATION-1 + its corrective-1).
+# gate (QIANQIAN-F5-SEEK-IMPLEMENTATION-1 + its correctives 1 and 3; the
+# corrective-2 classification pin lives in the decode crate's own tests).
 #
 # The guardrails M1–M7 correspond to the F5-GATE formal suite's
 # mutations (specs/f5-seek-discontinuity/mutations, TLA+). There each was
@@ -9,11 +10,12 @@
 # guardrail is load-bearing in the shipped mechanism, not only in the
 # model:
 #
-#   M1 CommitBeforeTailPurge      commit_seek_cutover drops the park ∧
+#   M1 CommitBeforeTailPurge      the cutover decision drops the park ∧
 #                                 quiesced conjunct (completion.rs)
 #                                  → caught by the white-box commit-
-#                                 conjunction test (commit without ANY
-#                                 engagement evidence must refuse).
+#                                 conjunction test (a decision without ANY
+#                                 engagement evidence is Pending, never a
+#                                 commit).
 #   M2 SeekMidWritePurgeFirst     the ONE purge fires before the provider
 #                                 outcome exists (session.rs)
 #                                  → caught by the refusal zero-loss
@@ -31,11 +33,18 @@
 #                                 step disappears (ports.rs)
 #                                  → caught by the position algebra
 #                                 (rebase-to-lower must lower the sample).
-#   M5 CommitBeforeLanding        the worker commits before the landing
-#                                 evidence is published (session.rs)
+#   M5 CommitBeforeLanding        the worker's commit point precedes the
+#                                 landing evidence's publication
+#                                 (session.rs; re-pinned by corrective-3:
+#                                 with an idempotent three-valued decision
+#                                 a premature call is a Pending no-op, so
+#                                 the guardrail is pinned as the program-
+#                                 order violation it names — publishing
+#                                 the landing only after the wait leaves
+#                                 the boundary permanently unsatisfiable)
 #                                  → caught by the forward-seek matrix
-#                                 (the commit refuses → abort release →
-#                                 the projection never rebases).
+#                                 (the commit never happens → the cut
+#                                 never lands → the matrix times out).
 #   M6 RefusalDropsRemainder      the refusal discards the preserved
 #                                 unwritten tail (session.rs)
 #                                  → caught by the refusal zero-loss
@@ -55,6 +64,21 @@
 #   accepted_seek_gets_fresh_cut_evidence must see fresh latches and
 #   refuse a commit without cycle 2's own landing).
 #
+# M9 and M10 are corrective-3's own guardrails (the cut's liveness and
+# the lost-rebase race):
+#   M9  WaitIgnoresDataPlane: the applied cut's wait stops reading the
+#       data plane's terminal, so it can only exit on the session's own
+#       endings — which teardown records AFTER the worker join (session.rs)
+#        → caught by the never-draining-device teardown oracle (the join
+#       never returns → the harness bound fires).
+#   M10 PendingRoutesAbort: a decision sample without the park/quiescence
+#       evidence is classified as an episode ending and routes an abort
+#       release (completion.rs)
+#        → caught by the park-handover gap oracle (a decision taken in the
+#       leg's pause→cut handover must be Pending and route nothing; the
+#       abort release there resumes a purged cut's leg with its PRE-CUT
+#       position accounting).
+#
 # Fail-closed contract:
 #   - the native regression (playback + audio-api crates) must come back
 #     green and non-empty, else exit != 0;
@@ -63,7 +87,7 @@
 #     must restore byte-exact;
 #   - refuses to run on a dirty touched file.
 #
-# Result vocabulary follows issue #124. A green run states that the seven
+# Result vocabulary follows issue #124. A green run states that the ten
 # guardrails are load-bearing in the implementation under the pinned
 # oracles — not a general proof of the seek semantics (that authority is
 # ADR-PBK-002 §20 D14.5; the model-level evidence is the f5-seek-
@@ -183,8 +207,16 @@ run_mutation M8StaleCutEvidence M8StaleCutEvidence.patch \
   -p qianqian-playback --lib \
   completion::tests::a_second_accepted_seek_gets_fresh_cut_evidence
 
+run_mutation M9WaitIgnoresDataPlane M9WaitIgnoresDataPlane.patch \
+  -p qianqian-playback --test seek_seam \
+  a_cut_over_a_never_draining_device_still_tears_down
+
+run_mutation M10PendingRoutesAbort M10PendingRoutesAbort.patch \
+  -p qianqian-playback --lib \
+  completion::tests::a_park_handover_evidence_gap_is_pending_and_never_an_abort
+
 if [[ "$fail" -eq 0 ]]; then
-  echo "SUITE: GUARDRAILS-LOAD-BEARING (native green; all 8 mutations caught)"
+  echo "SUITE: GUARDRAILS-LOAD-BEARING (native green; all 10 mutations caught)"
 else
   echo "SUITE: FAILED (see RESULT lines above)"
 fi

@@ -1,12 +1,19 @@
 diff --git a/crates/qianqian-playback/src/session.rs b/crates/qianqian-playback/src/session.rs
-index 14bbb81..147fa11 100644
 --- a/crates/qianqian-playback/src/session.rs
 +++ b/crates/qianqian-playback/src/session.rs
-@@ -312,6 +312,7 @@ fn decode_worker(
+@@ -316,7 +316,6 @@
                                  // commit decision routes the release.
                                  remainder = None;
                                  edge.invalidate();
-+                                let _ = completion.commit_seek_cutover(landing);
-                                 completion.seek_landing_published(landing);
-                                 loop {
-                                     if completion.seek_aborted() {
+-                                completion.seek_landing_published(landing);
+                                 // The cut is irrevocable from here: the old
+                                 // staging is discarded and the edge purged.
+                                 // The wait and the decision are therefore
+@@ -357,6 +356,7 @@
+                                         }
+                                     }
+                                 }
++                                completion.seek_landing_published(landing);
+                                 // The commit routed the rebase release;
+                                 // the one-seek slot stays occupied until
+                                 // the LEG has consumed the payload (a
