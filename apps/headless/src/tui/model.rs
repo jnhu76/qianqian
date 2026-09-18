@@ -16,6 +16,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use qianqian_playback::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,
 };
+use std::time::Duration;
 
 /// One frame's worth of presentation state: the source path the episode
 /// was opened with and the latest coherent observation.
@@ -119,15 +120,47 @@ impl TuiModel {
     }
 }
 
-/// What one key press means to the shell. `Stop` and `PauseResume` are
-/// episode commands; `Quit` is loop control, not a playback semantic.
+/// What one key press means to the shell. `Stop`, `PauseResume` and the
+/// seek arrows are episode commands; `Quit` is loop control, not a
+/// playback semantic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Stop,
     /// Space: pause when pause intent is not recorded, resume when it
     /// is. One key, two commands — never a local `paused` bool.
     PauseResume,
+    /// Left arrow: seek one [`SEEK_STEP`] earlier (D14.5).
+    SeekBackward,
+    /// Right arrow: seek one [`SEEK_STEP`] later (D14.5).
+    SeekForward,
     Quit,
+}
+
+/// The fixed seek step the arrow keys request (D14.5). One product
+/// decision, one constant — deliberately not a configuration surface.
+pub const SEEK_STEP: Duration = Duration::from_secs(5);
+
+/// The seek target one arrow key requests, derived from ONE coherent
+/// observation of the episode: the position Projection (D14.8, source
+/// PCM frames) converted with that same observation's published sample
+/// rate (the stream runs at the source format, so frames and rate are
+/// one unit world — the F4 negotiation rule). `None` means the arrow is
+/// inert for this episode: with no position sample (or no rate to
+/// convert it) there is no target to compute, and a seek with no
+/// computable target is never SENT — no fabricated zero, no seek to the
+/// episode start, no command at all.
+pub fn seek_target(observation: &PlaybackSessionObservation, forward: bool) -> Option<Duration> {
+    let rate = u64::from(observation.source_format?.sample_rate);
+    if rate == 0 {
+        return None;
+    }
+    let position = observation.position?;
+    let current = Duration::from_micros(position * 1_000_000 / rate);
+    Some(if forward {
+        current.saturating_add(SEEK_STEP)
+    } else {
+        current.saturating_sub(SEEK_STEP)
+    })
 }
 
 /// One event-loop step after a key press.
@@ -137,22 +170,26 @@ pub enum Step {
     Exit,
 }
 
-/// The shell's whole keyboard grammar: Space toggles pause/resume,
-/// S stops, Q quits, Ctrl+C quits. Anything else is presentation noise
-/// (including key-release events, which Windows terminals emit).
+/// The shell's whole keyboard grammar: Left/Right seek in fixed steps,
+/// Space toggles pause/resume, S stops, Q quits, Ctrl+C quits. Anything
+/// else is presentation noise (including key-release events, which
+/// Windows terminals emit).
 pub fn action_for_key(key: KeyEvent) -> Option<Action> {
     if key.kind != KeyEventKind::Press {
         return None;
     }
-    // Letters act on their plain or shift-keyed form (terminals
-    // disagree about reporting SHIFT); chords stay noise except the
-    // conventional Ctrl+C quit — so Ctrl+S/Ctrl+Q never act by accident.
+    // Letters and arrows act on their plain or shift-keyed form
+    // (terminals disagree about reporting SHIFT); chords stay noise
+    // except the conventional Ctrl+C quit — so Ctrl+S/Ctrl+Q and
+    // Ctrl+arrows never act by accident.
     let plain = key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT;
     match key.code {
         KeyCode::Char(' ') if plain => Some(Action::PauseResume),
         KeyCode::Char('s') | KeyCode::Char('S') if plain => Some(Action::Stop),
         KeyCode::Char('q') | KeyCode::Char('Q') if plain => Some(Action::Quit),
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(Action::Quit),
+        KeyCode::Left if plain => Some(Action::SeekBackward),
+        KeyCode::Right if plain => Some(Action::SeekForward),
         _ => None,
     }
 }
@@ -162,9 +199,12 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
 /// without a terminal. Space routes to the pause/resume seams: which of
 /// the two commands is sent comes from a FRESH authoritative observation
 /// of the episode's pause-intent command state — the shell never keeps
-/// a local `paused` bool. S routes to `request_stop`; both are
-/// idempotent, valid before and after the terminal Fact. Q exits the
-/// loop without touching the episode.
+/// a local `paused` bool. The arrows route a fixed-step seek (D14.5):
+/// the target is derived from one fresh coherent observation, and an
+/// episode whose position is unknown gets NO command at all. S routes
+/// to `request_stop`; all of these are idempotent, valid before and
+/// after the terminal Fact. Q exits the loop without touching the
+/// episode.
 pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
     match action {
         Action::Stop => {
@@ -176,6 +216,12 @@ pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
                 handle.request_resume();
             } else {
                 handle.request_pause();
+            }
+            Step::Continue
+        }
+        Action::SeekBackward | Action::SeekForward => {
+            if let Some(target) = seek_target(&handle.observe(), action == Action::SeekForward) {
+                handle.request_seek(target);
             }
             Step::Continue
         }
@@ -351,7 +397,8 @@ mod tests {
             KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
             KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
             KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
-            KeyEvent::new(KeyCode::Left, KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Up, KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
         ] {
             assert_eq!(action_for_key(key), None, "{key:?} must be ignored");
         }
@@ -364,6 +411,97 @@ mod tests {
             )),
             None
         );
+    }
+
+    /// The F5 arrow grammar: Left and Right map to the two seek
+    /// directions, in their plain and shift-keyed forms (same terminal
+    /// posture as the letters), on press only — and chords (Ctrl+arrow)
+    /// stay noise.
+    #[test]
+    fn arrows_map_to_the_fixed_step_seek_actions() {
+        for (key, action) in [
+            (KeyCode::Left, Action::SeekBackward),
+            (KeyCode::Right, Action::SeekForward),
+        ] {
+            assert_eq!(
+                action_for_key(KeyEvent::new(key, KeyModifiers::NONE)),
+                Some(action)
+            );
+            assert_eq!(
+                action_for_key(KeyEvent::new(key, KeyModifiers::SHIFT)),
+                Some(action),
+                "shift-keyed arrows act like plain ones"
+            );
+            assert_eq!(
+                action_for_key(KeyEvent::new_with_kind(
+                    key,
+                    KeyModifiers::NONE,
+                    KeyEventKind::Release
+                )),
+                None,
+                "release events never act"
+            );
+            assert_eq!(
+                action_for_key(KeyEvent::new(key, KeyModifiers::CONTROL)),
+                None,
+                "chorded arrows stay noise"
+            );
+        }
+    }
+
+    /// The seek target is a fixed step around the observed position,
+    /// converted with the SAME observation's published rate, saturating
+    /// at zero on the backward side — and it is `None` (no command at
+    /// all) whenever either side of the evidence is missing: no
+    /// fabricated zero, no seek to the episode start.
+    #[test]
+    fn the_seek_target_is_a_fixed_step_of_the_coherent_observation_or_inert() {
+        let observation_with =
+            |position: Option<u64>, sample_rate: Option<u32>| PlaybackSessionObservation {
+                position,
+                source_format: sample_rate.map(|sample_rate| PcmFormat {
+                    sample_rate,
+                    channels: 2,
+                    channel_mask: 0x3,
+                }),
+                ..pending()
+            };
+        // Unknown position: inert in both directions.
+        let no_position = observation_with(None, Some(44_100));
+        assert_eq!(seek_target(&no_position, true), None);
+        assert_eq!(seek_target(&no_position, false), None);
+        // No published rate: no unit to convert with, inert.
+        let no_format = observation_with(Some(100), None);
+        assert_eq!(seek_target(&no_format, true), None);
+
+        // 42 s at 44.1 kHz: the step is exactly five seconds of media
+        // time, and the backward step saturates at zero (Duration is
+        // non-negative by type).
+        let at_42s = observation_with(Some(44_100 * 42), Some(44_100));
+        assert_eq!(seek_target(&at_42s, true), Some(Duration::from_secs(47)));
+        assert_eq!(seek_target(&at_42s, false), Some(Duration::from_secs(37)));
+        let at_2s = observation_with(Some(2 * 44_100), Some(44_100));
+        assert_eq!(
+            seek_target(&at_2s, false),
+            Some(Duration::from_secs(0)),
+            "before zero the step saturates at the episode start"
+        );
+
+        // The conversion uses the observation's own rate: 42 s at
+        // 48 kHz is the same media time from different frames.
+        let at_48k = observation_with(Some(48_000 * 42), Some(48_000));
+        assert_eq!(seek_target(&at_48k, true), Some(Duration::from_secs(47)));
+    }
+
+    /// An episode whose position is unknown gets NO seek command: the
+    /// arrows change nothing (and panic on nothing).
+    #[test]
+    fn the_seek_actions_change_nothing_when_the_position_is_unknown() {
+        let handle = PlaybackSessionHandle::new();
+        let before = handle.observe();
+        assert_eq!(apply_action(Action::SeekForward, &handle), Step::Continue);
+        assert_eq!(apply_action(Action::SeekBackward, &handle), Step::Continue);
+        assert_eq!(handle.observe(), before);
     }
 
     /// The stop key maps to the EXISTING request_stop seam — the same

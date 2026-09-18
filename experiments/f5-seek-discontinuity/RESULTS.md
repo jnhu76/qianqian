@@ -481,6 +481,49 @@ EOF window                   edge Eof is a terminal (monotone, first-wins)
                              design door — left closed.)
 ```
 
+> **§11 corrective (2026-09-18, F5-SEEK-IMPLEMENTATION-CORRECTIVE-3,
+> pre-merge review of the implementation PR).** The "every wait
+> terminal-aware" row above states the requirement; the first
+> implementation satisfied it only for the endings the SESSION records
+> (stop intent / settlement / teardown release) and not for the data
+> plane's own terminal — and teardown records its release only after
+> the worker join, so a cut whose commit boundary was permanently
+> unreachable (a device whose queued tail never quiesces) wedged the
+> join and the leg was never released. The post-apply wait now reads
+> the data plane's terminal on the worker's path and takes the frozen
+> abort route there (no new failure class, no seek-side terminal
+> evidence). The same review found the commit decision answering a
+> single bool: sampled after a separate wait read, a transient gap in
+> the leg's park evidence (the pause→cut handover publishes
+> Disengaged-then-SeekEngaged) could be classified as an abort and
+> release an already-purged cut's leg with no rebase. The decision is
+> now ONE atomic three-valued sample — Committed / Aborted / Pending —
+> where only a recorded episode ending aborts and a missing evidence
+> sample is Pending; the pin is
+> `a_park_handover_evidence_gap_is_pending_and_never_an_abort`
+> (completion.rs white-box) plus mutation M10, and the liveness pin is
+> `a_cut_over_a_never_draining_device_still_tears_down` (seek_seam)
+> plus mutation M9.
+>
+> **§11 corrective 2 (2026-09-18, F5-SEEK-IMPLEMENTATION-CORRECTIVE-4,
+> same branch; human review of corrective 3).** The "every wait
+> terminal-aware" row's OTHER half: a terminal must be PRODUCIBLE from
+> inside the output park, and the parked leg's tail probe answered one
+> bool — a tail observation that itself FAILED (an invalidated
+> endpoint's `GetCurrentPadding` error) was masked as "not quiesced
+> yet", so the park waited forever and the loop-level abort that stops
+> the data plane (the thing that produces the terminal the
+> corrective-3 worker escape reads) never ran: the frozen
+> device-failure path was structurally unreachable from inside a park.
+> The probe now answers three truth classes (Pending / Quiesced /
+> Failed) and a Failed observation ends the park bounded — no
+> quiescence publishes for it — handing the decision to the existing
+> device-failure path (conformance, no new failure class). Pins: the
+> per-attribution gate failure-exit oracles, source-order P13, the
+> end-to-end `a_device_failure_inside_the_cut_park_settles_failed_through_d11`
+> (seek_seam), and mutation M11 (the Failed arms collapsed back into
+> the Pending treatment) — gate now M1–M11, 11/11.
+
 ## 12. Multiple seeks (smallest truthful policy)
 
 Frozen: **one seek in flight; a second request before the current cut
@@ -574,6 +617,34 @@ review surfaced is resolved by the conservative rule above, frozen in
 the D14.5 corrective; a stronger transactional SongCore seek contract
 is a possible future provider-contract amendment, not a gate
 prerequisite.
+
+### §13 corrective (2026-09-18, F5-SEEK-IMPLEMENTATION-CORRECTIVE-2)
+
+The phase-0 listing above over-claimed: `NOT_OPEN` IS non-mutating, but
+non-mutation alone does not earn `RefusedUnchanged`. That class promises
+something stronger — the pre-call decoding continuation remains valid
+and USABLE — while `NOT_OPEN` reports `!h->probed || !h->dec`, a handle
+that is not in an opened/probed state: there is no certified old cursor
+to resume, so resuming old playback on it is exactly the hazard the
+class exists to exclude. E1 measured the validation class
+(`INVALID_ARGUMENT` — decoder usable after rejection); it never measured
+a not-opened handle. Promotion therefore follows the frozen
+conservative default:
+
+```text
+INVALID_ARGUMENT   → RefusedUnchanged   (the only proven class)
+NOT_OPEN           → MutatedThenFailed  (unprovable means destructive)
+SEEK_ERROR         → MutatedThenFailed
+SEEK_UNSUPPORTED   → MutatedThenFailed
+```
+
+The phase-0 wording above is superseded for `NOT_OPEN`; authority is
+ADR-PBK-002 §20 D14.5 (`RefusedUnchanged` = the INVALID_ARGUMENT class
+only). Executable pins at the provider seam (`qianqian-decode-songcore`):
+the pure raw-status → class map, plus two raw-ABI boundary probes — an
+unprobed handle really answers `SONG_ERR_NOT_OPEN` and classifies
+destructive, and an `INVALID_ARGUMENT` rejection leaves the decode
+continuation bit-identical to a no-seek control handle.
 
 ## 14. P1–P5 check (verdict: NOT triggered — recorded, not named)
 

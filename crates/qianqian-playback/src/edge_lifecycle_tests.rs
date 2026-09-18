@@ -13,10 +13,31 @@ use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
 
 // White-box: included into the crate by src/lib.rs, so the mechanism
 // under test is reached through the crate path, not a public export.
-use crate::edge::{PcmEdge, WriteOutcome};
+use crate::edge::{EdgeTerminal, PcmEdge};
 
 const CHANNELS: u16 = 2;
 const CAPACITY_FRAMES: usize = 64;
+
+/// The production write shape (the decode worker's interruptible loop in
+/// session.rs, without the seek observation): bounded `write_some` slices
+/// until the edge has taken everything, or `false` when a terminal ended
+/// the write. F5 removed the edge's blocking whole-slice write — the
+/// steady write must stay interruptible — so this suite exercises exactly
+/// the primitives production uses.
+fn write_all(edge: &PcmEdge, src: &[f32]) -> bool {
+    let mut off = 0usize;
+    while off < src.len() {
+        let wrote = edge.write_some(&src[off..]);
+        off += wrote;
+        if wrote == 0 {
+            if edge.terminal() != EdgeTerminal::Open {
+                return false;
+            }
+            edge.wait_for_space(Duration::from_millis(1));
+        }
+    }
+    true
+}
 
 fn frame(channels: u16, value: f32) -> Vec<f32> {
     vec![value; usize::from(channels)]
@@ -26,7 +47,7 @@ fn frame(channels: u16, value: f32) -> Vec<f32> {
 fn write_then_read_roundtrips_frames() {
     let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
     let a = vec![0.25f32; 16 * usize::from(CHANNELS)];
-    assert_eq!(edge.write(&a), WriteOutcome::Written);
+    assert!(write_all(&edge, &a), "the whole slice fits");
 
     let mut dst = vec![0.0f32; 16 * usize::from(CHANNELS)];
     assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(16));
@@ -39,7 +60,7 @@ fn reader_sees_partial_frames_as_whole_frames_only() {
     // One and a half frames buffered: only the whole frame is readable.
     let mut samples = frame(CHANNELS, 0.5);
     samples.push(0.5);
-    edge.write(&samples);
+    assert!(write_all(&edge, &samples));
     let mut dst = vec![0.0f32; 8 * usize::from(CHANNELS)];
     assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(1));
 }
@@ -51,7 +72,7 @@ fn producer_blocks_when_full_and_unblocks_on_consume() {
         let edge = edge.clone();
         thread::spawn(move || {
             let big = vec![0.0f32; 10 * usize::from(CHANNELS)];
-            edge.write(&big)
+            write_all(&edge, &big)
         })
     };
     // The producer must be blocked (10 frames into a 4-frame edge).
@@ -71,16 +92,16 @@ fn producer_blocks_when_full_and_unblocks_on_consume() {
         }
     }
     assert_eq!(total, 10);
-    assert_eq!(
+    assert!(
         producer.join().expect("producer exits"),
-        WriteOutcome::Written
+        "the whole slice is eventually accepted"
     );
 }
 
 #[test]
 fn eof_drains_before_terminating_and_stays_terminal() {
     let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
-    edge.write(&frame(CHANNELS, 0.1));
+    assert!(write_all(&edge, &frame(CHANNELS, 0.1)));
     edge.close_eof();
 
     let mut dst = vec![0.0f32; 8 * usize::from(CHANNELS)];
@@ -100,7 +121,7 @@ fn torn_remainder_at_eof_terminates_instead_of_wedging() {
     let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
     let mut torn = frame(CHANNELS, 0.5);
     torn.push(0.5); // one and a half frames
-    edge.write(&torn);
+    assert!(write_all(&edge, &torn));
     edge.close_eof();
 
     let mut dst = vec![0.0f32; 8 * usize::from(CHANNELS)];
@@ -139,15 +160,14 @@ fn stop_unblocks_a_producer_blocked_on_a_full_edge() {
         let edge = edge.clone();
         thread::spawn(move || {
             let big = vec![0.0f32; 10 * usize::from(CHANNELS)];
-            edge.write(&big)
+            write_all(&edge, &big)
         })
     };
     thread::sleep(Duration::from_millis(50));
     assert!(!producer.is_finished());
     edge.stop();
-    assert_eq!(
-        producer.join().expect("producer exits"),
-        WriteOutcome::Stopped,
+    assert!(
+        !producer.join().expect("producer exits"),
         "stop unblocks the producer"
     );
 }
@@ -155,7 +175,7 @@ fn stop_unblocks_a_producer_blocked_on_a_full_edge() {
 #[test]
 fn fail_terminal_stops_the_consumer() {
     let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
-    edge.write(&frame(CHANNELS, 0.2));
+    assert!(write_all(&edge, &frame(CHANNELS, 0.2)));
     edge.fail();
     let mut dst = vec![0.0f32; 8 * usize::from(CHANNELS)];
     assert_eq!(
@@ -175,7 +195,7 @@ fn ring_wraps_without_losing_frames() {
         let edge = edge.clone();
         thread::spawn(move || {
             for i in 0..17u32 {
-                edge.write(&frame(CHANNELS, i as f32));
+                assert!(write_all(&edge, &frame(CHANNELS, i as f32)));
             }
             edge.close_eof();
         })
@@ -198,7 +218,7 @@ fn steady_state_read_write_performs_zero_allocations() {
     let edge = PcmEdge::new(CHANNELS, CAPACITY_FRAMES);
     // Warm the edge: one full write, one full read.
     let warm = vec![0.0f32; CAPACITY_FRAMES * usize::from(CHANNELS)];
-    edge.write(&warm);
+    assert!(write_all(&edge, &warm));
     let mut dst = vec![0.0f32; usize::from(CHANNELS)];
     let mut src = vec![0.0f32; usize::from(CHANNELS)];
     edge.read_frames(&mut dst);
@@ -209,7 +229,7 @@ fn steady_state_read_write_performs_zero_allocations() {
             for s in src.iter_mut() {
                 *s = i as f32;
             }
-            assert_eq!(edge.write(&src), WriteOutcome::Written);
+            assert_eq!(edge.write_some(&src), usize::from(CHANNELS));
             assert_eq!(edge.read_frames(&mut dst), PcmPull::Frames(1));
         }
     });

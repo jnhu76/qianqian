@@ -1,0 +1,13 @@
+diff --git a/crates/qianqian-playback/src/completion.rs b/crates/qianqian-playback/src/completion.rs
+--- a/crates/qianqian-playback/src/completion.rs
++++ b/crates/qianqian-playback/src/completion.rs
+@@ -748,8 +748,7 @@
+         let decision = {
+             let mut guard = self.state.state.lock().expect("completion lock");
+             let episode_ending = episode_ending_evidence(&guard);
+-            let parked_and_quiesced = (guard.engaged && guard.tail_quiesced)
+-                || (guard.seek_engaged && guard.seek_tail_quiesced);
++            let parked_and_quiesced = true;
+             if episode_ending {
+                 CutoverDecision::Aborted
+             } else if guard.seek_landing.is_some() && parked_and_quiesced {

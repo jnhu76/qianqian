@@ -197,7 +197,7 @@ Failed
 
 Exact resolver representation/precedence remains current implementation detail unless changing it changes the external D11 propositions.
 
-F2 seam representation (reality-gate-2 verdict): the application-facing episode seam is a **public Playback Session handle** (one handle == one playback episode; surface `request_stop` / `request_pause` / `request_resume` / `observe` / `wait_terminal` — pause/resume added by the frozen D14.7 F3 amendment). `SessionCompletion`/resolver is an **internal replaceable realization** behind that seam, not the application API; terminal settlement runs on the Playback Session authority-owned execution/teardown path (D14.3), never consumer-triggered.
+F2 seam representation (reality-gate-2 verdict): the application-facing episode seam is a **public Playback Session handle** (one handle == one playback episode; surface `request_stop` / `request_pause` / `request_resume` / `request_seek` / `observe` / `wait_terminal` — pause/resume added by the frozen D14.7 F3 amendment, seek by the frozen D14.5 F5 amendment). `SessionCompletion`/resolver is an **internal replaceable realization** behind that seam, not the application API; terminal settlement runs on the Playback Session authority-owned execution/teardown path (D14.3), never consumer-triggered.
 
 The following are still OPEN:
 
@@ -216,6 +216,12 @@ position / duration authority
      observable after settlement and whose unknown stays None; neither
      is a Fact — pending human review of the implementation PR)
 seek acceptance / discontinuity / commit semantics
+    (F5-IMPLEMENTATION-1 realized the frozen D14.5 shape: refusal-first
+     ordering with song_seek before ANY invalidation, three-class
+     provider outcome, park + natural-drain output cut, commit boundary
+     conjunction, same-cell position rebase to the ACTUAL landing,
+     one-seek-in-flight, pause intent survives; P1–P5 untriggered —
+     pending human review of the implementation PR)
 open/session construction + config + replacement semantics
 playlist/queue authority
 next / previous
@@ -283,7 +289,27 @@ F4 Position / Duration          GATE MERGED (research/f4-timeline-gate-1,
                                 session-owned cell, observation fields
                                 position/duration, headless read-side
                                 timeline — pending human review
-F5 Seek                         REDESIGNED AROUND DISCONTINUITY PROTOCOL
+F5 Seek                         GATE MERGED (PR #154, D14.5:
+                                refusal-first frozen ordering, three-class
+                                provider outcome, park + natural-drain
+                                output mechanism, commit boundary,
+                                same-cell position rebase; evidence
+                                experiments/f5-seek-discontinuity +
+                                specs/f5-seek-discontinuity).
+                                IMPLEMENTED on feat/f5-seek-1 behind the
+                                episode seam: worker-owned cutover
+                                protocol, public request_seek command,
+                                TUI Left/Right ±5 s; corrective-1 (fresh
+                                adversarial review): unified loop-top
+                                gate (single steady acquisition, paused
+                                rebase mid-park), seek/worker-exit
+                                linearization, per-cut evidence reset,
+                                mutations M1–M11; corrective-3/4 (human
+                                rulings, conformance only): worker waits
+                                read the data plane terminal, cut decision
+                                is one atomic three-valued sample, a FAILED
+                                tail observation escapes the park bounded —
+                                pending human review
 F6 Open                         CONFIG-MECHANISM-OPEN
 Next / Previous                 AFTER OPEN; separate navigation step
 F7 Volume                       GOAL KEPT / authority mechanism to earn

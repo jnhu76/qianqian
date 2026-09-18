@@ -1,0 +1,26 @@
+--- a/crates/qianqian-audio-api/src/ports.rs
++++ b/crates/qianqian-audio-api/src/ports.rs
+@@ -632,10 +632,7 @@
+                         self.emit(GateEvent::TailQuiesced);
+                     }
+                     TailProbeOutcome::Pending => {}
+-                    TailProbeOutcome::Failed => {
+-                        probe_failed = true;
+-                        break;
+-                    }
++                    TailProbeOutcome::Failed => {}
+                 }
+             }
+         }
+@@ -705,10 +702,7 @@
+                         self.emit(GateEvent::SeekTailQuiesced);
+                     }
+                     TailProbeOutcome::Pending => {}
+-                    TailProbeOutcome::Failed => {
+-                        probe_failed = true;
+-                        break;
+-                    }
++                    TailProbeOutcome::Failed => {}
+                 }
+             }
+         }

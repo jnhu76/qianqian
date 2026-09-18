@@ -23,13 +23,14 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
 use qianqian_audio_api::ports::{
     AudioOutputCapability, DecodeOutcome, DecodedPcmStream, PcmDecodeCapability,
 };
 use qianqian_composition::{ActivationError, ComponentSpec, Discharge};
 
-use crate::completion::SessionCompletion;
+use crate::completion::{CutoverDecision, SessionCompletion};
 use crate::edge::PcmEdge;
 use crate::handle::PlaybackSessionHandle;
 
@@ -177,8 +178,56 @@ fn activate_inner(
     Ok(())
 }
 
+/// Bounded wait slice for the decode worker's seek-protocol waits (the
+/// commit decision poll and the interruptible write's back-off). Off
+/// the RT path: the bound is the worker's serialization/commit latency,
+/// never correctness.
+const WORKER_WAIT_SLICE: Duration = Duration::from_millis(2);
+
+/// How one bounded write advanced, from the decode worker's
+/// interruptible write loop.
+enum WriteStep {
+    /// The whole slice was accepted.
+    Whole,
+    /// A terminal stopped the write; the episode is ending.
+    Stopped,
+    /// A seek became actionable (command observed AND leg-parked
+    /// evidence) at the written prefix: the unwritten tail is
+    /// preserved for the provider outcome to own.
+    CutPoint,
+}
+
 /// The decode worker: SongCore/FFmpeg/filesystem work lives only here.
-/// Refills a once-allocated staging buffer and feeds the bounded edge.
+/// Refills a once-allocated staging buffer and feeds the bounded edge,
+/// and — since F5 (ADR-PBK-002 D14.5) — runs the session-owned seek
+/// protocol on its own execution path:
+///
+/// ```text
+/// loop-top pickup (one slot try per staging block)
+///     ↓ seek pends; production CONTINUES (that is what keeps the
+///       leg's park reachable — an early hold could strand the leg
+///       inside a blocked read on an emptied edge)
+/// bounded-slice write re-observes the command slot each slice
+///     ↓ actionable (command ∧ leg parked) → stop at the written
+///       prefix, PRESERVE the unwritten tail
+/// serialization point (leg parked, holds no device buffer):
+///     provider seek BEFORE anything is invalidated
+///         RefusedUnchanged → no invalidation; release the leg; finish
+///             the preserved remainder EXACTLY (zero content loss;
+///             the refused output equals the no-seek control)
+///         MutatedThenFailed → never resume old-cursor production;
+///             ordinary decode-failure evidence → D11 Failed
+///         Applied → discard the staging (incl. the preserved tail),
+///             edge.invalidate() — THE one purge, on this path —
+///             publish the actual landing, hold production, and let
+///             the session's commit decision (tail quiesced ∧ parked ∧
+///             unsettled, sampled atomically per poll) route the rebase
+///             release; a poll without that evidence is PENDING — the
+///             protocol keeps waiting, and only an episode ending
+///             (recorded stop intent / settlement / teardown, or the
+///             data plane's own terminal) ends it without a rebase.
+///             Then resume post-cut production.
+/// ```
 fn decode_worker(
     mut decode_stream: Box<dyn DecodedPcmStream>,
     edge: Arc<PcmEdge>,
@@ -189,7 +238,197 @@ fn decode_worker(
     let catch = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         // Startup allocation only; the steady loop reuses this buffer.
         let mut staging = vec![0.0f32; staging_frames * channels];
+        // The seek command picked up at the loop top, awaiting the leg's
+        // parked evidence. Production keeps flowing while it pends.
+        let mut pending_seek: Option<Duration> = None;
+        // The preserved unwritten tail of an in-flight staging block,
+        // observed mid-block when a seek became actionable. Owned
+        // storage: one bounded allocation per seek at most, decode-side.
+        let mut remainder: Option<Vec<f32>> = None;
         loop {
+            // --- loop-top seek pickup (the one slot try per block) ---
+            if pending_seek.is_none() && remainder.is_none() {
+                pending_seek = completion.take_seek_command();
+            }
+
+            // --- serialization point ---
+            // A preserved remainder does NOT defer the seek: it is THIS
+            // seek's in-flight staging, retained (prompt §10 / D14.5
+            // corrective 1) until the provider outcome is known — the
+            // refusal finishes it, the cut discards it.
+            if let Some(target) = pending_seek {
+                if completion.seek_aborted() {
+                    // Stop / teardown / settlement won the race: the seek
+                    // is inert command history. No provider call, no
+                    // invalidation, no state.
+                    completion.release_seek_without_commit();
+                    pending_seek = None;
+                } else if completion.leg_parked_evidence() {
+                    // The parked evidence is eventually-true, not
+                    // instantaneous: a just-resumed leg may still have
+                    // its engagement latched for the microseconds before
+                    // its Disengaged publication lands. That is the
+                    // precondition's honest strength — the load-bearing
+                    // re-validation is the commit boundary, which
+                    // requires FRESH paired park + quiescence evidence
+                    // under the same lock stop linearizes through.
+                    // Defense in depth: the data plane was Open at
+                    // acceptance; re-validate here, where the provider is
+                    // about to be called. An edge that went terminal in
+                    // between (EOF drain window, a stop racing the
+                    // pickup) is not seekable.
+                    if edge.terminal() != crate::edge::EdgeTerminal::Open {
+                        completion.release_seek_without_commit();
+                        pending_seek = None;
+                    } else {
+                        match decode_stream.seek(target) {
+                            qianqian_audio_api::ports::ProviderSeekOutcome::RefusedUnchanged => {
+                                // Proven pre-mutation: the old world is
+                                // intact. Release the leg immediately (it
+                                // resumes reading the un-purged edge);
+                                // the preserved remainder is finished
+                                // below, and only then does the slot
+                                // free (a second seek must not park the
+                                // leg mid-remainder).
+                                completion.seek_refused();
+                                completion.release_seek_park();
+                                pending_seek = None;
+                            }
+                            qianqian_audio_api::ports::ProviderSeekOutcome::MutatedThenFailed {
+                                diagnostic,
+                            } => {
+                                // Unprovable means destructive: the old
+                                // decoder continuation is not guaranteed.
+                                // NEVER resume old-cursor production —
+                                // the episode takes the ordinary
+                                // decode-failure route (D11).
+                                completion.release_seek_without_commit();
+                                completion.decode_failed(&format!("seek failed: {diagnostic}"));
+                                edge.fail();
+                                return;
+                            }
+                            qianqian_audio_api::ports::ProviderSeekOutcome::Applied { landing } => {
+                                // Success: staging discard (including any
+                                // preserved remainder — it belongs to the
+                                // pre-cut world), then the ONE purge on
+                                // this path, then landing evidence, then
+                                // the production hold until the session's
+                                // commit decision routes the release.
+                                remainder = None;
+                                edge.invalidate();
+                                completion.seek_landing_published(landing);
+                                // The cut is irrevocable from here: the old
+                                // staging is discarded and the edge purged.
+                                // The wait and the decision are therefore
+                                // ONE sampled step per iteration — the
+                                // session samples the commit boundary and
+                                // the episode-ending latches in a single
+                                // lock hold, so a transient gap in the
+                                // park/quiescence evidence is Pending and
+                                // the protocol keeps waiting; it can never
+                                // fall back to pre-cut accounting (no
+                                // rebase) while the episode is still live.
+                                // The one episode-ending class the session
+                                // state cannot see is the data plane's own
+                                // terminal (the frozen failure policy's
+                                // "data plane not Open": stop, a device
+                                // abort that stopped the plane, teardown),
+                                // so it is tested here on this path.
+                                loop {
+                                    match completion.seek_cutover_decision(landing) {
+                                        CutoverDecision::Committed | CutoverDecision::Aborted => {
+                                            break;
+                                        }
+                                        CutoverDecision::Pending => {
+                                            if edge.terminal() != crate::edge::EdgeTerminal::Open {
+                                                // The data plane ended under
+                                                // the cut. No rebase is owed
+                                                // to an episode this owner is
+                                                // already ending, and the
+                                                // seek publishes no evidence
+                                                // of its own: settle through
+                                                // the existing D11 path.
+                                                completion.release_seek_without_commit();
+                                                return;
+                                            }
+                                            std::thread::sleep(WORKER_WAIT_SLICE);
+                                        }
+                                    }
+                                }
+                                // The commit routed the rebase release;
+                                // the one-seek slot stays occupied until
+                                // the LEG has consumed the payload (a
+                                // later seek's hold would otherwise wipe
+                                // an unconsumed `Committed` and lose the
+                                // rebase). Bounded polls off the RT
+                                // path; stop/teardown and a data plane
+                                // that ends under the cut win immediately
+                                // (an already-routed payload stays routed
+                                // for the exiting leg).
+                                while !completion.seek_aborted()
+                                    && completion.seek_release_pending()
+                                {
+                                    if edge.terminal() != crate::edge::EdgeTerminal::Open {
+                                        // The data plane ended under the cut:
+                                        // the routed payload stays routed for
+                                        // the exiting leg, and the slot frees.
+                                        // Freeing it cannot lose a rebase that
+                                        // mattered — the only terminal a cut can
+                                        // meet here is the stop the render abort
+                                        // or the teardown itself issued, after
+                                        // which the worker writes nothing more —
+                                        // but that guarantee is bounded by that
+                                        // fact, NOT by acceptance (whose atomic
+                                        // hold re-validates the session latches,
+                                        // not the edge), so the claim is stated
+                                        // no stronger than it is: a racing
+                                        // acceptance against a just-stopped plane
+                                        // could still plant and wipe a payload
+                                        // no leg will read.
+                                        completion.clear_seek_in_flight();
+                                        return;
+                                    }
+                                    std::thread::sleep(WORKER_WAIT_SLICE);
+                                }
+                                completion.clear_seek_in_flight();
+                                pending_seek = None;
+                                // Post-cut production resumes from the
+                                // provider's cursor below.
+                            }
+                        }
+                    }
+                }
+                // else: the command pends at the loop top while
+                // production keeps flowing (that is what lets the leg
+                // reach its park promptly).
+            }
+
+            // Finish a preserved remainder BEFORE any new decode: a
+            // refused seek owes the stream the rest of its own content,
+            // frame-for-frame. The slot stays occupied until this
+            // completes, and the leg has been released, so the edge
+            // drains normally.
+            if let Some(data) = remainder.take() {
+                let mut off = 0usize;
+                while off < data.len() {
+                    let wrote = edge.write_some(&data[off..]);
+                    off += wrote;
+                    if wrote == 0 {
+                        if edge.terminal() != crate::edge::EdgeTerminal::Open {
+                            break;
+                        }
+                        edge.wait_for_space(WORKER_WAIT_SLICE);
+                    }
+                }
+                if off < data.len() {
+                    // A terminal ended the episode mid-remainder (stop /
+                    // failure): the old world is being torn down anyway.
+                    return;
+                }
+                completion.clear_seek_in_flight();
+            }
+
+            // Decode one staging block.
             match decode_stream.read_frames(&mut staging) {
                 // A zero-frame response must still observe the data plane:
                 // a decoder that never progresses cannot pin the worker
@@ -200,8 +439,21 @@ fn decode_worker(
                     }
                 }
                 Ok(DecodeOutcome::Frames(n)) => {
-                    if edge.write(&staging[..n * channels]) == crate::edge::WriteOutcome::Stopped {
-                        return;
+                    let total = n * channels;
+                    match write_observing_seek(
+                        &edge,
+                        &completion,
+                        &staging[..total],
+                        &mut pending_seek,
+                        &mut remainder,
+                    ) {
+                        WriteStep::Whole => {}
+                        WriteStep::Stopped => return,
+                        WriteStep::CutPoint => {
+                            // The unwritten tail is preserved in
+                            // `remainder`; the next loop top runs the
+                            // serialization point.
+                        }
                     }
                 }
                 Ok(DecodeOutcome::Eof) => {
@@ -230,7 +482,78 @@ fn decode_worker(
             edge.fail();
         }
     }
+    // The single exit funnel (normal and panic paths alike): publish the
+    // terminal evidence AND mark the worker gone — the acceptance side
+    // of the seek/worker-exit linearization — then abort any stranded
+    // seek. The order is load-bearing (implementation corrective-1): a
+    // request_seek accepted before the `worker_gone` publication is
+    // found and released by the cleanup; one attempted after it is
+    // rejected by acceptance. Without the cleanup, a request accepted
+    // against an about-to-exit worker (the request × EOF interleaving)
+    // could route a hold nobody ever releases and wedge the episode's
+    // final drain.
     completion.worker_exited(edge.terminal());
+    completion.abort_stranded_seek();
+}
+
+/// The interruptible bounded-slice write (D14.5): write `src` into the
+/// edge while re-observing the seek command slot, so the worker always
+/// reaches its serialization point with bounded latency regardless of
+/// edge occupancy — no destructive pre-purge. When a seek becomes
+/// actionable (command observed, leg parked, no abort) the write stops
+/// at its written prefix and the unwritten tail is PRESERVED: the
+/// provider outcome owns it (a refusal finishes it exactly — zero
+/// content loss; an applied cut discards it with the staging).
+///
+/// Lock discipline: every acquisition here (slot peek, completion
+/// evidence reads, edge lock) is taken alone, never nested and never
+/// held across a wait — no thread holds the edge mutex while waiting on
+/// the render park or the session state (F5 lock-order audit). Across
+/// the whole seek surface the one nesting that exists is uniform and
+/// one-directional — the command routers take gate-intent while holding
+/// the completion-state lock, never the reverse — so no cycle is
+/// reachable.
+fn write_observing_seek(
+    edge: &PcmEdge,
+    completion: &SessionCompletion,
+    src: &[f32],
+    pending_seek: &mut Option<Duration>,
+    remainder: &mut Option<Vec<f32>>,
+) -> WriteStep {
+    let mut off = 0usize;
+    loop {
+        if off == src.len() {
+            return WriteStep::Whole;
+        }
+        // Seek observation point: a command counts as observed whether
+        // it still sits in the slot or was already picked up at the
+        // loop top.
+        let observed = pending_seek.is_some() || completion.seek_command_observed();
+        if observed && !completion.seek_aborted() && completion.leg_parked_evidence() {
+            // The command may still sit in the slot (this write observed
+            // it before the next loop-top pickup): promote it into
+            // `pending_seek` so the serialization point at the next loop
+            // top runs THIS seek. The preserved remainder is that seek's
+            // own in-flight staging, not a deferral — skipping the
+            // serialization point here would leave the leg parked while
+            // the worker blocks finishing the remainder into the full
+            // edge it can no longer drain (a wedge the seek matrices
+            // caught).
+            if pending_seek.is_none() {
+                *pending_seek = completion.take_seek_command();
+            }
+            *remainder = Some(src[off..].to_vec());
+            return WriteStep::CutPoint;
+        }
+        let wrote = edge.write_some(&src[off..]);
+        off += wrote;
+        if wrote == 0 {
+            if edge.terminal() != crate::edge::EdgeTerminal::Open {
+                return WriteStep::Stopped;
+            }
+            edge.wait_for_space(WORKER_WAIT_SLICE);
+        }
+    }
 }
 
 /// Map a kernel resolution error to a human-readable diagnostic without

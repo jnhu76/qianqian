@@ -235,3 +235,102 @@ fn the_rejected_two_cell_reader_pair_tears_backward_by_one_block() {
         "the rejected reader pair steps backward by one in-flight block"
     );
 }
+
+/// F5 (ADR-PBK-002 D14.5): a committed cutover rebases the SAME cell on
+/// the writer's side — the one legal backward step. The stretch basis
+/// after the rebase is the decoder's reported ACTUAL landing, and
+/// monotone publication holds again within the new stretch.
+#[test]
+fn a_committed_rebase_is_the_one_legal_backward_step() {
+    let cell = PositionEvidence::new();
+    // Pre-cut stretch: the episode played into its 8th block.
+    cell.publish_consumed(8 * BLOCK, 0);
+    assert_eq!(cell.published(), Some(8 * BLOCK));
+
+    // The cutover commits: the decoder reported landing at 2 blocks.
+    // (Deliberately NOT the requested target — see the next test.)
+    cell.rebase(Some(2 * BLOCK));
+    assert_eq!(
+        cell.published(),
+        Some(2 * BLOCK),
+        "the rebase is the one legal backward step"
+    );
+
+    // Post-cut publications are monotone WITHIN the new stretch: the
+    // same-cell rule keeps pre-cut and post-cut accounting from mixing.
+    // (The real writer passes `basis + handed_off` — the stretch basis
+    // folded into the handed-off total, exactly as the render loop's
+    // helper does; the raw calls here mirror that argument shape.)
+    cell.publish_consumed(2 * BLOCK, 0);
+    assert_eq!(cell.published(), Some(2 * BLOCK));
+    cell.publish_consumed(2 * BLOCK + 3 * BLOCK, 0);
+    assert_eq!(cell.published(), Some(5 * BLOCK));
+
+    // A regressing tail reading still cannot pull the sample backward
+    // across the stretch boundary (the max is the stretch invariant).
+    cell.publish_consumed(2 * BLOCK + 3 * BLOCK, 3 * BLOCK);
+    assert_eq!(cell.published(), Some(5 * BLOCK));
+}
+
+/// Landing at frame zero is a REAL position, not undefined: the +1
+/// encoding keeps `Some(0)` distinct from the never-published sentinel
+/// (a backward cutover to the very start of the source must not read as
+/// "no sample").
+#[test]
+fn a_zero_landing_is_a_position_not_undefined() {
+    let cell = PositionEvidence::new();
+    cell.publish_consumed(4 * BLOCK, 0);
+    cell.rebase(Some(0));
+    assert_eq!(cell.published(), Some(0));
+    assert_ne!(cell.published(), None, "zero is not the undefined sentinel");
+}
+
+/// Unknown landing withdraws the projection: the cell returns to the
+/// undefined sentinel and the sample is gone. Permanence is the WRITER's
+/// obligation (the leg's publishing flag stops all further publication),
+/// not a cell-side enforcement — the cell is one atomic sample with no
+/// authority to judge its writer, and this test pins that boundary
+/// honestly rather than pretending the cell could enforce it.
+#[test]
+fn an_unknown_landing_withdraws_the_sample_forever_on_the_writers_discipline() {
+    let cell = PositionEvidence::new();
+    cell.publish_consumed(4 * BLOCK, 0);
+    assert!(cell.published().is_some());
+    cell.rebase(None);
+    assert_eq!(
+        cell.published(),
+        None,
+        "unknown is not zero, not the target"
+    );
+
+    // The writer's obligation: after an unknown-landing cutover the leg
+    // publishes NOTHING more. The cell itself does not (and must not)
+    // police a rogue write — a publication that nevertheless happens
+    // would raise the sample again, which is exactly why the discipline
+    // lives in the leg (publishing = false) and its test in the seek
+    // matrices, not here.
+    cell.publish_consumed(BLOCK, 0);
+    assert_eq!(
+        cell.published(),
+        Some(BLOCK),
+        "the cell enforces nothing against a rogue writer; withdrawal is the writer's discipline"
+    );
+}
+
+/// The rebase is a writer-side store: readers keep their one-pure-load
+/// contract across it (no clamp, no state, no second cell).
+#[test]
+fn reads_after_a_rebase_stay_pure_and_stable() {
+    let cell = PositionEvidence::new();
+    cell.publish_consumed(4 * BLOCK, 0);
+    cell.rebase(Some(BLOCK));
+    assert_eq!(cell.published(), Some(BLOCK));
+    assert_eq!(
+        cell.published(),
+        Some(BLOCK),
+        "repeating a read changes nothing"
+    );
+    cell.rebase(Some(3 * BLOCK));
+    assert_eq!(cell.published(), Some(3 * BLOCK));
+    assert_eq!(cell.published(), Some(3 * BLOCK));
+}

@@ -157,24 +157,129 @@ impl DrainSignal {
 /// What one render-stream gate event acknowledges back to its owner
 /// (ADR-PBK-002 D14.7). Mechanism evidence only: these events record
 /// where the render leg physically is; they are never semantic truth.
+///
+/// The `Seek*` variants are the F5 cutover's cut-attributed park
+/// acknowledgments (ADR-PBK-002 D14.5): an internal seek park is NOT
+/// pause engagement evidence and never routes pause intent. They exist
+/// so the session can gate the seek protocol and its cutover commit on
+/// real "leg parked / tail quiesced" evidence without misattributing
+/// that park to pause; they never become product surface.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GateEvent {
     /// The render leg reached the loop-top gate and parked: it will
     /// submit no further PCM while parked and holds no device buffer.
+    /// Pause-attributed (D14.7).
     Engaged,
-    /// The CURRENT engagement observed its output tail quiesced (no
+    /// The CURRENT pause engagement observed its output tail quiesced (no
     /// frame submitted before engagement remains queued for rendering).
     /// Published at most once per engagement.
     TailQuiesced,
-    /// The park ended (resume or a release): the leg proceeds once more
-    /// and the data plane — never the gate — decides what happens next.
+    /// The pause park ended (resume or a release): the leg proceeds once
+    /// more and the data plane — never the gate — decides what happens
+    /// next.
     Disengaged,
+    /// The render leg parked at the loop-top gate under a routed seek
+    /// hold (the D14.5 cutover park, reuse of the D14.7 park invariant —
+    /// no device buffer held across the park). Cut-attributed, never
+    /// pause engagement evidence.
+    SeekEngaged,
+    /// The CURRENT seek park observed its output tail quiesced (the
+    /// D14.5 commit-boundary evidence class: padding == 0 while parked).
+    /// Published at most once per seek park.
+    SeekTailQuiesced,
+    /// The seek park ended (a release routed by the session): the leg
+    /// proceeds once more and the data plane decides what happens next.
+    SeekDisengaged,
 }
 
-/// Session-owned render pause gate (ADR-PBK-002 D14.7, mechanism A):
-/// routes one episode's pause intent into a render mechanism's loop-top
-/// gate check and acknowledges engagement / tail quiescence /
-/// disengagement back to the owner as mechanism events.
+/// Why (and with what payload) a routed seek park was released
+/// (ADR-PBK-002 D14.5). The session owns the cutover commit; this value
+/// is how the commit release reaches the render leg on its own execution
+/// path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SeekParkRelease {
+    /// The cutover committed: the leg must rebase its position
+    /// accounting BEFORE any further submission. `landing` is the
+    /// decoder's reported actual landing in source PCM frames; `None`
+    /// means the landing is unknown, which withdraws the Position
+    /// projection for the rest of the episode (unknown stays unknown —
+    /// never zero, never the requested target).
+    Committed { landing: Option<u64> },
+    /// No cutover happened (refusal, destructive failure, stop, or
+    /// teardown): no rebase instruction exists and the leg's position
+    /// accounting is untouched.
+    Aborted,
+}
+
+/// The render leg's answer to ONE tail observation (the
+/// [`GateSlice::TailProbe`] slice of [`RenderGate::park_loop_top`]).
+/// Three truth classes, never collapsible: a device that still holds
+/// queued frames, a drained tail, and an observation that could not be
+/// taken at all (F5 implementation corrective-4: a failed observation
+/// is NOT "not quiesced yet" — masking it as a pending tail would park
+/// the leg forever while the seek worker waits for quiescence evidence
+/// a dead device can never publish).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TailProbeOutcome {
+    /// Frames submitted before the park remain queued: keep waiting in
+    /// bounded slices.
+    Pending,
+    /// Nothing submitted before the park remains queued: the tail is
+    /// quiescent — the D14.5/D14.7 quiescence evidence.
+    Quiesced,
+    /// The observation itself failed (a real output-mechanism failure,
+    /// e.g. an invalidated endpoint): not quiescence evidence and not a
+    /// wait-forever condition — the gate releases the leg without
+    /// publishing quiescence and reports the failure back, so the
+    /// mechanism's existing device-failure path decides.
+    Failed,
+}
+
+/// What [`RenderGate::park_loop_top`] hands back to the render leg when
+/// the gated work ends. The leg proceeds either way — the gate never
+/// aborts it; a failed tail observation is the mechanism's own failure
+/// evidence, returned for the mechanism's existing failure path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ParkOutcome {
+    /// Parked work finished (or none was routed): proceed with the loop.
+    Proceeded,
+    /// The leg's own tail observation failed while parked: no quiescence
+    /// was published for it and the gate released the leg without
+    /// waiting further (F5 implementation corrective-4).
+    TailProbeFailed,
+}
+
+/// One unit of loop-top work [`RenderGate::park_loop_top`] hands back to
+/// the render leg while it is gated (D14.7 + D14.5). One closure sees
+/// every slice, so the leg's own accounting locals stay owned by exactly
+/// one execution path.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GateSlice {
+    /// Between park slices (the D14.7/D14.5 park invariant's bounded
+    /// wait): observe the output tail NOW and return its outcome —
+    /// quiescent, still pending, or the observation itself failed
+    /// ([`TailProbeOutcome`]; never answer a failed observation with
+    /// quiescence or with an endless pending). The leg keeps its own
+    /// D14.8 publication discipline on this slice.
+    TailProbe,
+    /// A routed seek release payload was consumed — exactly once — on
+    /// this leg's path: apply the instruction (a committed rebase, or
+    /// nothing for an abort) BEFORE any further submission. Delivered
+    /// mid-park when the leg is parked by PAUSE, so a committed cut
+    /// rebases a paused leg while it STAYS parked — the pause intent
+    /// survives the seek and the rebase is bookkeeping, never a
+    /// submission (the return value is ignored on this slice).
+    SeekRelease(SeekParkRelease),
+}
+
+/// Session-owned render gate (ADR-PBK-002 D14.7 mechanism A + the D14.5
+/// F5 seek hold): routes one episode's pause intent and seek holds into
+/// a render mechanism's loop-top gate check and acknowledges
+/// engagement / tail quiescence / disengagement back to the owner as
+/// mechanism events — pause-attributed and cut-attributed (seek) events
+/// kept structurally separate, so an internal seek park can never
+/// fabricate `Paused` evidence and a pause park never satisfies a seek
+/// commit.
 ///
 /// Ownership mirrors [`DrainSignal`]: the session creates the gate (with
 /// its observer, before any mechanism can see it) and hands it to the
@@ -190,6 +295,12 @@ pub enum GateEvent {
 ///     with bounded latency;
 /// never abort the leg from the gate — after release the loop proceeds
 ///     once more and the data plane decides;
+/// a failed tail observation is neither quiescence nor a reason to keep
+///     waiting: the gate publishes no quiescence for it, releases the
+///     leg without further slices, and reports the failed probe back
+///     (F5 implementation corrective-4) — the mechanism's existing
+///     device-failure path decides; the gate itself still never aborts
+///     the leg;
 /// the device stream stays open — a park replaces no resource.
 /// ```
 ///
@@ -204,10 +315,17 @@ pub struct RenderGate {
 
 #[derive(Default)]
 struct GateInner {
-    /// The mechanism's view of the routed pause intent. Command truth
-    /// lives with the episode owner; this flag is the routed copy the
-    /// render leg observes.
-    paused: Mutex<bool>,
+    /// The mechanism's view of the routed intent. Command truth lives
+    /// with the episode owner; these fields are the routed copies the
+    /// render leg observes. The pause flag, the seek-hold flag and the
+    /// release payload share one lock deliberately: the render loop's
+    /// ONE loop-top gate operation inspects all of them under a single
+    /// acquisition, so a steady iteration of normal playback pays
+    /// exactly ONE uncontended mutex acquisition and O(1) flag tests —
+    /// the frozen D14.5 realtime row ("no new lock acquisition; the
+    /// existing loop-top gate check gains one more seek-park flag
+    /// test"), realized literally. No dispatch, no allocation.
+    intent: Mutex<GateIntent>,
     /// Once true, this gate can never park a leg again: the open-abort
     /// lifetime (a stream being torn down without ever becoming a
     /// session episode), so a later `set_paused(true)` — e.g. pause
@@ -218,6 +336,24 @@ struct GateInner {
     closed: AtomicBool,
     wake: Condvar,
     on_event: Mutex<Option<OnGateEvent>>,
+}
+
+#[derive(Default)]
+struct GateIntent {
+    /// Routed pause intent (D14.7): `true` parks the leg at its next
+    /// loop-top gate check.
+    paused: bool,
+    /// Routed seek hold (D14.5): `true` parks the leg at its next
+    /// loop-top gate check under a cut-attributed park, structurally
+    /// separate from any pause concept.
+    seek_hold: bool,
+    /// The release instruction for a seek park, stored by the session
+    /// BEFORE it clears `seek_hold` (same lock hold), so a waking leg
+    /// observes hold-clear and payload together. Consumed exactly once
+    /// by the leg's seek gate — at the park's exit, or at its entry
+    /// when the hold was already released before the leg arrived (one
+    /// leg, one seek at a time; there is no second consumer).
+    seek_release: Option<SeekParkRelease>,
 }
 
 /// The one-shot gate-evidence observer type (see
@@ -259,7 +395,7 @@ impl RenderGate {
     pub fn with_observer(observer: impl Fn(GateEvent) + Send + Sync + 'static) -> Self {
         Self {
             inner: Arc::new(GateInner {
-                paused: Mutex::new(false),
+                intent: Mutex::new(GateIntent::default()),
                 closed: AtomicBool::new(false),
                 wake: Condvar::new(),
                 on_event: Mutex::new(Some(Arc::new(observer))),
@@ -275,13 +411,64 @@ impl RenderGate {
         if self.inner.closed.load(Ordering::Acquire) {
             return;
         }
-        let mut guard = self.inner.paused.lock().expect("render gate lock");
-        if *guard == paused {
+        let mut guard = self.inner.intent.lock().expect("render gate lock");
+        if guard.paused == paused {
             return;
         }
-        *guard = paused;
+        guard.paused = paused;
         drop(guard);
         self.inner.wake.notify_all();
+    }
+
+    /// Route a seek hold into the mechanism (ADR-PBK-002 D14.5): `true`
+    /// parks the render leg at its next loop-top gate check under a
+    /// cut-attributed park; `false` releases a seek-parked leg with no
+    /// payload (an abort). Idempotent. Inert on a closed gate.
+    ///
+    /// Routing a NEW hold resets any release payload a previous cycle
+    /// left unconsumed: one seek runs at a time (the session's one-seek
+    /// policy), so a stale payload could only be debris.
+    pub fn set_seek_hold(&self, held: bool) {
+        if self.inner.closed.load(Ordering::Acquire) {
+            return;
+        }
+        let mut guard = self.inner.intent.lock().expect("render gate lock");
+        if guard.seek_hold == held {
+            return;
+        }
+        guard.seek_hold = held;
+        if held {
+            guard.seek_release = None;
+        }
+        drop(guard);
+        self.inner.wake.notify_all();
+    }
+
+    /// Release a routed seek hold with the session's decision. `release`
+    /// is stored before the hold clears (one lock hold), so the waking
+    /// leg observes hold-clear and payload together and the leg's seek
+    /// gate consumes the payload exactly once (at the park exit, or at
+    /// its entry if the leg had not parked). Wake is immediate (notify):
+    /// the leg's park slice is the latency bound. Inert on a closed
+    /// gate.
+    pub fn release_seek_hold(&self, release: SeekParkRelease) {
+        if self.inner.closed.load(Ordering::Acquire) {
+            return;
+        }
+        let mut guard = self.inner.intent.lock().expect("render gate lock");
+        guard.seek_release = Some(release);
+        guard.seek_hold = false;
+        drop(guard);
+        self.inner.wake.notify_all();
+    }
+
+    /// Whether a routed seek release payload still awaits consumption.
+    /// Session bookkeeping for the post-commit duty (the one-seek slot
+    /// stays occupied until the leg has consumed the release, so no
+    /// later hold can wipe a committed rebase) — not a hot-path call.
+    pub fn seek_release_pending(&self) -> bool {
+        let guard = self.inner.intent.lock().expect("render gate lock");
+        guard.seek_release.is_some()
     }
 
     /// Close the gate permanently: the episode's render leg must never
@@ -300,51 +487,254 @@ impl RenderGate {
         self.inner.wake.notify_all();
     }
 
-    /// The render mechanism's loop-top gate: park while pause intent is
-    /// routed here, then return (the caller proceeds once more; the data
-    /// plane decides what its next read sees). Returns immediately when
-    /// no intent is routed.
+    /// The render mechanism's ONE loop-top gate operation (D14.7 park
+    /// invariant + the D14.5 cut park, unified): check pause intent, seek
+    /// hold and any routed release payload under a SINGLE intent-lock
+    /// acquisition — strictly before the device-buffer acquisition, no
+    /// device buffer held across a park — then run whatever is routed.
     ///
-    /// While parked the leg submits nothing and holds no device buffer.
-    /// Between bounded slices it calls `tail_observed_quiescent` — the
-    /// mechanism's own observation of its output tail — and publishes
-    /// [`GateEvent::TailQuiesced`] on the first `true` of the current
-    /// engagement. [`GateEvent::Engaged`] is published on park entry and
-    /// [`GateEvent::Disengaged`] on park exit. Returns immediately (no
-    /// events) on a closed gate.
-    pub fn park_while_paused(&self, mut tail_observed_quiescent: impl FnMut() -> bool) {
+    /// Steady shape (the frozen D14.5 realtime row, realized literally
+    /// since the F5 implementation corrective-1 unification): when
+    /// nothing is routed, this is ONE uncontended mutex acquisition and
+    /// O(1) flag tests — no second acquisition, no dispatch, no
+    /// allocation. (The pre-unification spelling paid a second
+    /// acquisition per steady iteration for the seek check; "no new lock
+    /// acquisition" is a frozen proposition, not a representation
+    /// detail.)
+    ///
+    /// Shapes, from that one acquisition:
+    ///
+    /// ```text
+    /// nothing routed  → return immediately; no events, no consumption.
+    /// payload only    → consume it exactly once (no park, no events)
+    ///                   and hand it to the leg: the rebase instruction
+    ///                   lands before any further submission even when
+    ///                   the hold was already released before arrival.
+    /// seek hold       → the cut-attributed park: publish only Seek*
+    ///                   events, wait in bounded slices probing the tail,
+    ///                   then consume the routed release (Aborted when
+    ///                   none) and hand it to the leg.
+    /// pause intent    → the pause-attributed park: publish only pause
+    ///                   events, wait in bounded slices probing the tail.
+    ///                   While parked, a routed seek release payload is
+    ///                   consumed mid-park and handed to the leg — which
+    ///                   STAYS PARKED: pause intent survives the seek,
+    ///                   and a committed cut rebases a paused leg before
+    ///                   its resume, as pure bookkeeping (the leg submits
+    ///                   nothing while parked). A seek hold routed during
+    ///                   a pause park therefore resolves under the pause
+    ///                   attribution; no Seek* park events publish.
+    /// ```
+    ///
+    /// After a pause park ends (resume/release), a hold routed in the
+    /// meantime parks this same call — the leg cannot submit past an
+    /// unresolved cut. Release never aborts the leg: every shape
+    /// proceeds once more, and the data plane decides.
+    ///
+    /// Closed gate: returns immediately, always.
+    ///
+    /// A FAILED tail observation ends whichever park is running (the
+    /// only bounded exit that is not an owner release): no quiescence
+    /// is published for it, the park's disengagement fence still
+    /// publishes, any routed release payload is still consumed on the
+    /// leg's path, and [`ParkOutcome::TailProbeFailed`] is returned so
+    /// the mechanism's existing device-failure path decides. After a
+    /// pause park that failed its probe, a still-routed seek hold does
+    /// NOT park again — more slices from a dead device can produce
+    /// neither quiescence nor recovery.
+    pub fn park_loop_top(
+        &self,
+        mut slice: impl FnMut(GateSlice) -> TailProbeOutcome,
+    ) -> ParkOutcome {
+        // The steady-path totality: ONE acquisition, O(1) tests.
         {
-            let guard = self.inner.paused.lock().expect("render gate lock");
-            if !*guard || self.inner.closed.load(Ordering::Acquire) {
+            let guard = self.inner.intent.lock().expect("render gate lock");
+            if self.inner.closed.load(Ordering::Acquire)
+                || (!guard.paused && !guard.seek_hold && guard.seek_release.is_none())
+            {
+                return ParkOutcome::Proceeded;
+            }
+        }
+        // Routed work exists. The pause shape runs first (the loop's
+        // frozen order: pause before seek); it stays parked through a
+        // cut that commits while paused and consumes the payload
+        // mid-park. The seek shape runs after, so a hold still routed
+        // after the pause ended parks this same call. These extra
+        // acquisitions exist only on the non-steady path.
+        if self.routed_snapshot().0
+            && let ParkOutcome::TailProbeFailed = self.pause_park(&mut slice)
+        {
+            return ParkOutcome::TailProbeFailed;
+        }
+        let (_, seek_hold, payload) = self.routed_snapshot();
+        if seek_hold || payload {
+            return self.seek_park(&mut slice);
+        }
+        ParkOutcome::Proceeded
+    }
+
+    /// One lock acquisition's view of what is routed: (pause, seek hold,
+    /// pending release payload).
+    fn routed_snapshot(&self) -> (bool, bool, bool) {
+        let guard = self.inner.intent.lock().expect("render gate lock");
+        (guard.paused, guard.seek_hold, guard.seek_release.is_some())
+    }
+
+    /// The pause-attributed park body (D14.7): parks while pause intent
+    /// is routed, publishes Engaged / TailQuiesced (once) / Disengaged,
+    /// and — the F5 implementation corrective-1 addition — consumes a
+    /// routed seek release payload MID-PARK, handing it to the leg while
+    /// it stays parked.
+    fn pause_park(&self, slice: &mut impl FnMut(GateSlice) -> TailProbeOutcome) -> ParkOutcome {
+        {
+            let guard = self.inner.intent.lock().expect("render gate lock");
+            if !guard.paused || self.inner.closed.load(Ordering::Acquire) {
                 // Released or closed before the leg reached the gate:
                 // nothing engaged, nothing to acknowledge.
-                return;
+                return ParkOutcome::Proceeded;
             }
         }
         self.emit(GateEvent::Engaged);
         let mut quiesced_published = false;
+        let mut probe_failed = false;
+        loop {
+            // The payload joins the wait predicate: a commit routed
+            // while the leg is parked wakes it immediately for the
+            // mid-park consumption instead of at the slice cap.
+            let (released, payload) = {
+                let guard = self.inner.intent.lock().expect("render gate lock");
+                let closed = &self.inner.closed;
+                let (mut guard, _) = self
+                    .inner
+                    .wake
+                    .wait_timeout_while(guard, PARK_SLICE, |intent| {
+                        intent.paused
+                            && !closed.load(Ordering::Acquire)
+                            && intent.seek_release.is_none()
+                    })
+                    .expect("render gate wait poisoned");
+                let payload = guard.seek_release.take();
+                (!guard.paused || closed.load(Ordering::Acquire), payload)
+            };
+            if let Some(release) = payload {
+                // Consumed on the leg's own path; the leg applies the
+                // instruction and keeps parked (a rebase is bookkeeping,
+                // never a submission).
+                slice(GateSlice::SeekRelease(release));
+            }
+            if released {
+                break;
+            }
+            if !quiesced_published {
+                match slice(GateSlice::TailProbe) {
+                    TailProbeOutcome::Quiesced => {
+                        quiesced_published = true;
+                        self.emit(GateEvent::TailQuiesced);
+                    }
+                    TailProbeOutcome::Pending => {}
+                    TailProbeOutcome::Failed => {
+                        probe_failed = true;
+                        break;
+                    }
+                }
+            }
+        }
+        self.emit(GateEvent::Disengaged);
+        if probe_failed {
+            // A routed payload may have missed the mid-park window as
+            // the failure cut the wait short: deliver it on the way out
+            // so the once-on-this-leg discipline holds on every exit —
+            // the leg proceeds once more before its failure path runs.
+            if let Some(release) = self.take_release_internal() {
+                slice(GateSlice::SeekRelease(release));
+            }
+            return ParkOutcome::TailProbeFailed;
+        }
+        ParkOutcome::Proceeded
+    }
+
+    /// The seek-attributed park body (D14.5): parks while a seek hold is
+    /// routed, publishes only Seek* events, and hands the routed release
+    /// (Aborted when none) to the leg on its own path. A hold released
+    /// before the leg arrived still has its payload consumed here — the
+    /// rebase instruction belongs to this leg's next submission decision.
+    fn seek_park(&self, slice: &mut impl FnMut(GateSlice) -> TailProbeOutcome) -> ParkOutcome {
+        {
+            let mut guard = self.inner.intent.lock().expect("render gate lock");
+            if self.inner.closed.load(Ordering::Acquire) {
+                return ParkOutcome::Proceeded;
+            }
+            if !guard.seek_hold {
+                // The hold was already released before this leg reached
+                // the gate: whatever release was routed still belongs to
+                // THIS leg's next submission decision (the session
+                // routes it for this episode's one seek). Consume it
+                // here — no park happened, no park events publish, and
+                // the rebase still lands before any further submission.
+                let release = guard.seek_release.take();
+                drop(guard);
+                if let Some(release) = release {
+                    slice(GateSlice::SeekRelease(release));
+                }
+                return ParkOutcome::Proceeded;
+            }
+        }
+        self.emit(GateEvent::SeekEngaged);
+        let mut quiesced_published = false;
+        let mut probe_failed = false;
         loop {
             let released = {
-                let guard = self.inner.paused.lock().expect("render gate lock");
+                let guard = self.inner.intent.lock().expect("render gate lock");
                 let closed = &self.inner.closed;
                 let (guard, _) = self
                     .inner
                     .wake
-                    .wait_timeout_while(guard, PARK_SLICE, |paused| {
-                        *paused && !closed.load(Ordering::Acquire)
+                    .wait_timeout_while(guard, PARK_SLICE, |intent| {
+                        intent.seek_hold && !closed.load(Ordering::Acquire)
                     })
                     .expect("render gate wait poisoned");
-                !*guard || closed.load(Ordering::Acquire)
+                !guard.seek_hold || closed.load(Ordering::Acquire)
             };
             if released {
                 break;
             }
-            if !quiesced_published && tail_observed_quiescent() {
-                quiesced_published = true;
-                self.emit(GateEvent::TailQuiesced);
+            if !quiesced_published {
+                match slice(GateSlice::TailProbe) {
+                    TailProbeOutcome::Quiesced => {
+                        quiesced_published = true;
+                        self.emit(GateEvent::SeekTailQuiesced);
+                    }
+                    TailProbeOutcome::Pending => {}
+                    TailProbeOutcome::Failed => {
+                        probe_failed = true;
+                        break;
+                    }
+                }
             }
         }
-        self.emit(GateEvent::Disengaged);
+        // ONE exit funnel — the failure exit shares it: the fence
+        // publishes, and the leg's next submission decision still sees
+        // the routed release (Aborted when the session routed none).
+        self.emit(GateEvent::SeekDisengaged);
+        let release = self
+            .take_release_internal()
+            .unwrap_or(SeekParkRelease::Aborted);
+        slice(GateSlice::SeekRelease(release));
+        if probe_failed {
+            return ParkOutcome::TailProbeFailed;
+        }
+        ParkOutcome::Proceeded
+    }
+
+    /// Consume a pending release payload under the intent lock (the
+    /// internal arm of the take-once consumption contract).
+    fn take_release_internal(&self) -> Option<SeekParkRelease> {
+        self.inner
+            .intent
+            .lock()
+            .expect("render gate lock")
+            .seek_release
+            .take()
     }
 
     fn emit(&self, event: GateEvent) {
@@ -465,6 +855,35 @@ impl PositionEvidence {
             encoded => Some(encoded - 1),
         }
     }
+
+    /// Writer: rebase the cell at one committed seek cutover
+    /// (ADR-PBK-002 D14.5, same-cell writer-side discontinuity). A plain
+    /// store — the ONE legal backward step, exactly once per committed
+    /// cutover — performed by the render leg on its own execution path
+    /// BEFORE any post-cut submission or publication, so pre- and
+    /// post-cutover accounting can never mix. After this store the
+    /// monotone `publish_consumed` rule holds again within the new
+    /// stretch (the store is the stretch boundary).
+    ///
+    /// `Some(landing)` stores the decoder's reported actual landing in
+    /// source PCM frames as the new basis. `None` means the landing is
+    /// unknown: the cell is returned to the undefined sentinel, and the
+    /// writer publishes nothing for the rest of the episode — unknown
+    /// stays unknown, never zero and never the requested target.
+    ///
+    /// There is exactly one writer per episode (the render leg), and the
+    /// frozen protocol guarantees no post-cut publication can precede
+    /// this store on that writer's path, so no ordering beyond relaxed
+    /// coherence is owed.
+    pub fn rebase(&self, landing: Option<u64>) {
+        let encoded = match landing {
+            Some(landing) => landing.saturating_add(1),
+            // The undefined sentinel: the projection reads `None` again,
+            // and a writer that knows the basis is gone never publishes.
+            None => 0,
+        };
+        self.published.store(encoded, Ordering::Relaxed);
+    }
 }
 
 /// Request for one playback-specific render stream: the source format to
@@ -548,6 +967,35 @@ pub struct DecodeError {
     pub message: String,
 }
 
+/// The three-class semantic outcome of a provider seek
+/// (ADR-PBK-002 D14.5, F5-GATE-CORRECTIVE-1). The classification is the
+/// PROVIDER's contractual duty: a caller must not infer it from raw
+/// status names, because the same status code can cover provably
+/// distinct phases (the SongCore ABI returns generic SEEK_ERROR both
+/// from a failed reposition and again after a successful reposition +
+/// decoder flush).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ProviderSeekOutcome {
+    /// The provider repositioned its decoder. `landing` is the actual
+    /// landing position in source PCM frames — the retained-PCM start
+    /// the NEXT read belongs to — or `None` when the provider cannot
+    /// determine it (explicitly unknown, never manufactured; the
+    /// Position projection is withdrawn for the episode, never replaced
+    /// by the requested target).
+    Applied { landing: Option<u64> },
+    /// Proven pre-mutation refusal: the provider guarantees the pre-call
+    /// decoding continuation remains valid — the rejection happened in
+    /// pure parameter/state validation BEFORE any decoder or demuxer
+    /// state could change. The caller may finish its in-flight staging
+    /// exactly and resume the old cursor with zero content loss.
+    RefusedUnchanged,
+    /// Any failure NOT provably pre-mutation. The decoding continuation
+    /// is not guaranteed (the reposition may already have happened and
+    /// been flushed); the caller must NEVER resume old-cursor
+    /// production. `diagnostic` is presentation text.
+    MutatedThenFailed { diagnostic: String },
+}
+
 /// One playback-specific decode endpoint: from encoded media to
 /// source-format decoded PCM.
 ///
@@ -583,6 +1031,19 @@ pub trait DecodedPcmStream: Send {
     /// Read up to `dst.len() / channels` frames into `dst` as interleaved
     /// float32. Blocking-free; decode work happens here.
     fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError>;
+
+    /// Reposition this endpoint to `target` — source-relative media
+    /// time (ADR-PBK-002 D14.5; the F5 seek command path). Validity and
+    /// clamping are the PROVIDER's decision (duration evidence is never
+    /// consulted by the caller); after an [`ProviderSeekOutcome::Applied`]
+    /// outcome the next `read_frames` belongs to the reported landing.
+    ///
+    /// The three-class outcome is this contract's whole point: the
+    /// caller may resume its old cursor ONLY on
+    /// [`ProviderSeekOutcome::RefusedUnchanged`], whose guarantee — the
+    /// pre-call decoding continuation remains valid — is proven by the
+    /// provider's own classification, never inferred from a status name.
+    fn seek(&mut self, target: Duration) -> ProviderSeekOutcome;
 }
 
 /// Decode capability service: opens local media files as owned decode

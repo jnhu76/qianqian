@@ -90,9 +90,13 @@ commands:
   --version | -V         print the version
 
 in the machine transport, `stop` stops the episode, `pause` and
-`resume` pause and resume it, and `status` prints its truthful state
-(other interactive commands are recognized but not wired yet); in the
-terminal shell, Space pauses/resumes, S stops and Q or Ctrl+C quits
+`resume` pause and resume it, `seek <time>` requests a same-episode
+seek (`<time>` is a decimal seconds field, or MINUTES:SECONDS with a
+decimal seconds part, of source media time; an unreadable token sends
+nothing), and `status` prints its truthful state (other interactive
+commands are recognized but not wired yet); in the terminal shell,
+Space pauses/resumes, Left/Right seek in fixed steps, S stops and Q or
+Ctrl+C quits
 "
 }
 
@@ -119,8 +123,11 @@ pub enum InteractiveCommand {
     Stop,
     Pause,
     Resume,
-    /// `seek <time>`: the time token stays opaque until seek semantics
-    /// (and the time grammar they imply) are frozen in a later phase.
+    /// `seek <time>`: the time token is READ by the shell into a
+    /// source-relative request ([`parse_seek_time`]: a decimal seconds
+    /// field, or `MINUTES:SECONDS` with a decimal seconds part);
+    /// whether the episode accepts it, refuses it or lands elsewhere is
+    /// the frozen D14.5 protocol's business, never the shell's.
     Seek {
         time: String,
     },
@@ -237,6 +244,43 @@ fn one_arg(
             got,
         }),
     }
+}
+
+/// Read a `seek <time>` token as source-relative media time (D14.5).
+/// The token is read as a decimal seconds field; a first `:` splits it
+/// into a minutes field and a seconds field that must be in `[0, 60)`.
+/// Being a Rust float parse, every spelling that parses is accepted
+/// (`90`, `1.5`, `.5`, `5e3`, `+5`) — the shell owns readability, not
+/// taste. Seconds are the episode's media time; the token is a REQUEST,
+/// and everything the frozen protocol says about acceptance, refusal
+/// and the actual landing applies downstream. `None` = the shell cannot
+/// read the token as a non-negative, representable time, so no command
+/// is sent (inert input, never a fabricated target) — the shell has no
+/// failure channel into the episode, so it fails closed here instead.
+pub fn parse_seek_time(token: &str) -> Option<std::time::Duration> {
+    let seconds = match token.split_once(':') {
+        Some((m, s)) => {
+            let minutes: u64 = m.parse().ok()?;
+            let seconds: f64 = s.parse().ok()?;
+            if !(0.0..60.0).contains(&seconds) {
+                return None;
+            }
+            minutes as f64 * 60.0 + seconds
+        }
+        None => {
+            let seconds: f64 = token.parse().ok()?;
+            if seconds < 0.0 {
+                return None;
+            }
+            seconds
+        }
+    };
+    // `try_from_secs_f64` is the failing twin of `from_secs_f64`, which
+    // PANICS on NaN, infinities and values outside the Duration range —
+    // reachable from plain tokens (`nan`, `inf`, `1e400`, a minutes
+    // field near u64::MAX). Readability is a shell-side property: an
+    // unreadable token is inert input, never an abort.
+    std::time::Duration::try_from_secs_f64(seconds).ok()
 }
 
 #[cfg(test)]
@@ -430,6 +474,55 @@ mod tests {
                 parse_interactive_line(line).expect("known one-arg command"),
                 expected
             );
+        }
+    }
+
+    /// The seek time reader (D14.5): plain seconds, fractional seconds
+    /// and mm:ss are media time; unreadable or negative tokens are
+    /// `None` — the shell sends NO command rather than fabricating a
+    /// target. Time zero is a legal request (the provider owns
+    /// validity); the grammar only decides readability.
+    #[test]
+    fn seek_time_tokens_read_as_media_time_or_none() {
+        use std::time::Duration;
+        assert_eq!(parse_seek_time("90"), Some(Duration::from_secs(90)));
+        assert_eq!(parse_seek_time("1.5"), Some(Duration::from_millis(1500)));
+        assert_eq!(parse_seek_time("2:05"), Some(Duration::from_secs(125)));
+        assert_eq!(
+            parse_seek_time("0:00"),
+            Some(Duration::ZERO),
+            "time zero is a legal request, not an unreadable token"
+        );
+        assert_eq!(parse_seek_time("75:00"), Some(Duration::from_secs(4500)));
+        // The reader is a plain Rust float parse, so spellings beyond the
+        // obvious decimal ones read too. Pinned so the doc contract
+        // ("readability is the shell's, not taste") stays true.
+        assert_eq!(parse_seek_time("5e3"), Some(Duration::from_secs(5000)));
+        assert_eq!(parse_seek_time(".5"), Some(Duration::from_millis(500)));
+        assert_eq!(parse_seek_time("+5"), Some(Duration::from_secs(5)));
+        // Unreadable tokens include the ones a float parser ACCEPTS but
+        // no Duration can represent: NaN, infinities (including the
+        // `1e400` overflow spelling) and a seconds value beyond the
+        // Duration range. They are inert input exactly like `abc` —
+        // never a panic in the command reader, and never a fabricated
+        // target.
+        for bad in [
+            "",
+            "-30",
+            "1:99",
+            "abc",
+            "1:2:3",
+            ":",
+            "-0:01",
+            "nan",
+            "NaN",
+            "inf",
+            "-inf",
+            "1e400",
+            "1e20",
+            "18446744073709551615:00",
+        ] {
+            assert_eq!(parse_seek_time(bad), None, "{bad:?} is unreadable");
         }
     }
 

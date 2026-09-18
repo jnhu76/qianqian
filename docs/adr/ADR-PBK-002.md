@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint; 2026-09-17 — §20 D14.8 implementation note (F4-IMPLEMENTATION-1, PR #152): the chosen representation and the terminal/duration conformance reading are recorded in D14.8 — representation only, no proposition changed; 2026-09-17 — §20 D14.8 F4-IMPLEMENTATION-CORRECTIVE-1 (same PR, fresh review): the position observation gate must also withdraw on a recorded activation failure — a raising activation can leave a published sample behind (the render mechanism opens before the decode-worker spawn; the open-abort leg publishes from its park slice), so "never-activated fabricates no Position" is not satisfied by the terminal-Fact condition alone (conformance, no new state); 2026-09-17 — §20 D14.5 seek-discontinuity mechanism + policy freeze (F5-GATE, evidence `experiments/f5-seek-discontinuity/` + `specs/f5-seek-discontinuity/`): refusal-first frozen ordering, park + natural drain output mechanism, same-cell position rebase, P1–P5 untriggered; 2026-09-18 — §20 D14.5 F5-GATE-CORRECTIVE-1 (pre-merge review): refusal made zero-content-loss (an in-flight staging block observed mid-write is preserved and finished exactly), and the song_seek provider outcome is frozen three-class — RefusedUnchanged (provably pre-mutation only, the INVALID_ARGUMENT class) / Applied / MutatedThenFailed (routes through the ordinary D11 decode-failure path; generic SEEK_ERROR is NOT a refusal because the ABI also returns it after a destructive reposition + decoder flush); F5 implementation still blocked |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint; 2026-09-17 — §20 D14.8 implementation note (F4-IMPLEMENTATION-1, PR #152): the chosen representation and the terminal/duration conformance reading are recorded in D14.8 — representation only, no proposition changed; 2026-09-17 — §20 D14.8 F4-IMPLEMENTATION-CORRECTIVE-1 (same PR, fresh review): the position observation gate must also withdraw on a recorded activation failure — a raising activation can leave a published sample behind (the render mechanism opens before the decode-worker spawn; the open-abort leg publishes from its park slice), so "never-activated fabricates no Position" is not satisfied by the terminal-Fact condition alone (conformance, no new state); 2026-09-17 — §20 D14.5 seek-discontinuity mechanism + policy freeze (F5-GATE, evidence `experiments/f5-seek-discontinuity/` + `specs/f5-seek-discontinuity/`): refusal-first frozen ordering, park + natural drain output mechanism, same-cell position rebase, P1–P5 untriggered; 2026-09-18 — §20 D14.5 F5-GATE-CORRECTIVE-1 (pre-merge review): refusal made zero-content-loss (an in-flight staging block observed mid-write is preserved and finished exactly), and the song_seek provider outcome is frozen three-class — RefusedUnchanged (provably pre-mutation only, the INVALID_ARGUMENT class) / Applied / MutatedThenFailed (routes through the ordinary D11 decode-failure path; generic SEEK_ERROR is NOT a refusal because the ABI also returns it after a destructive reposition + decoder flush); F5 implementation still blocked; 2026-09-18 — §20 D14.5 implementation note (F5-SEEK-IMPLEMENTATION-1, branch `feat/f5-seek-1`): the chosen representation (three-class provider outcome, bounded-slice write + non-terminal edge invalidate, gate-consumed release payload, cell rebase as the one legal backward step) is recorded in D14.5 — representation only, no proposition changed; amended same day (F5-SEEK-IMPLEMENTATION-CORRECTIVE-1, fresh adversarial review): the loop-top parks are unified into one gate operation — realizing the realtime-cost row literally (no new lock acquisition) and withdrawing the first note's extra-acquisition differential — the committed rebase lands mid-park while a paused leg STAYS paused, seek acceptance is one atomic hold linearized against the worker's exit (an accepted seek can never outlive its resolver), and the per-cut evidence latches reset at each acceptance; 2026-09-18 — §20 D14.5 F5-SEEK-IMPLEMENTATION-CORRECTIVE-2 (same branch, authority-conformance review): the provider classification is narrowed to the frozen refusal set — `SONG_ERR_NOT_OPEN` had been promoted to `RefusedUnchanged` and now takes the conservative default (`MutatedThenFailed`), because a not-opened handle certifies no usable old cursor; the gate report's phase-0 lumping is corrected in place (marked corrective) and the map is pinned executably (positive + negative controls); 2026-09-18 — §20 D14.5 F5-SEEK-IMPLEMENTATION-CORRECTIVE-3 (same branch, pre-merge review of the implementation PR): two conformance gaps in the applied-cut path closed without new failure classes — (a) the protocol's post-apply waits now read the frozen failure policy's own "data plane not Open" episode-ending class on the worker's path (teardown stopped the plane before the worker join, so a permanently non-quiescing tail wedged the join); (b) the cutover decision is ONE atomic three-valued sample (Committed / Aborted / Pending) so a transient park-evidence gap is Pending and can never release a purged cut's leg without its rebase ("the only exits from an applied cut are the commit or an episode ending"); plus the `--machine` seek token reader fails closed instead of panicking on unrepresentable float spellings; the implementation mutation gate grows to M1–M10 (10/10 counterexample-witnessed, M1/M5 re-pinned to the corrected shape); 2026-09-18 — §20 D14.5 F5-SEEK-IMPLEMENTATION-CORRECTIVE-4 (same branch, human review of corrective-3): the R1 liveness class has two halves and only the worker's was closed — the parked leg's own tail probe still answered one bool, so a tail observation that itself FAILED (an invalidated endpoint's `GetCurrentPadding` error) was masked as "not quiesced yet" and the park could never reach the loop-level abort that produces the terminal the worker's escape needs; the probe now answers `TailProbeOutcome` (Pending / Quiesced / Failed) and a Failed observation ends the park bounded — no quiescence publishes for it, the release-payload consumption discipline still holds on the leg's path, and `ParkOutcome::TailProbeFailed` hands the decision to the mechanism's EXISTING device-failure path (conformance, no amendment, no new failure class); the implementation mutation gate grows to M1–M11 (11/11 counterexample-witnessed, M11 = the Failed arms collapsed back into the Pending treatment) |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -1359,6 +1359,254 @@ not a product state; nothing here earns `Generation`, `Epoch`, `SeekId`,
 `DiscontinuityId`, `TimelineSegment`, or a public `SeekState` — the
 razor review is recorded in the gate report (`experiments/f5-seek-
 discontinuity/RESULTS.md` §15).
+
+> 2026-09-18 implementation note (F5-SEEK-IMPLEMENTATION-1, branch
+> `feat/f5-seek-1`). Representation only — no proposition above changed.
+> The frozen shape is realized as follows: the public command is
+> `PlaybackSessionHandle::request_seek(&self, target: Duration)`
+> (infallible, non-negative by type; acceptance fails closed on the
+> frozen conditions; the D14.10 allowlist update is done and negative-
+> controlled). The provider outcome is the three-class enum
+> `ProviderSeekOutcome` (`RefusedUnchanged` / `Applied { landing:
+> Option<u64> }` / `MutatedThenFailed { diagnostic }`). The edge's
+> blocking whole-slice write is retired for the bounded-slice primitives
+> the protocol names (`write_some` + `wait_for_space`), and the ONE
+> purge is the non-terminal `PcmEdge::invalidate()` — O(1) cursor reset,
+> terminal untouched, both endpoints woken (loom L5–L7 pin it under
+> every interleaving). The cut's park is routed as a gate seek hold; the
+> commit decision routes a release PAYLOAD (`Committed { landing }` /
+> `Aborted`) that the leg consumes AT ITS SEEK GATE — at the park's exit
+> or, for a cutover committed while the leg was held by PAUSE (whose
+> pause slices stop observing after their own quiescence), at the gate's
+> entry — so the rebase happens on the leg's path before any further
+> submission under every interleaving (payload-awaits-consumption;
+> pinned by the render-gate seek oracles). The one-seek slot stays
+> occupied through that consumption: the worker frees it only after the
+> routed release has been consumed (it polls the gate's
+> release-pending bookkeeping off the RT path), because a later seek's
+> hold would otherwise wipe an unconsumed `Committed` and lose the
+> rebase — the pause-shaped interleaving the seek matrices caught and
+> now pin (`a_committed_release_is_never_wiped_by_a_later_seek` — a
+> name this note invented before implementation; the duty is actually
+> pinned by the white-box "slot stays occupied through the commit"
+> assertion, the end-to-end `a_second_seek_while_one_is_in_flight_is_inert`,
+> and the gate's `a_new_hold_drops_a_stale_unconsumed_release` oracle). The
+> position cell gains `rebase(landing)` — the one legal backward step,
+> a plain store whose `None` encoding withdraws the sample; the
+> withdrawal is episode-permanent on the leg's discipline (a later
+> KNOWN landing neither resurrects publication nor un-withdraws the
+> cell). One conformance fix was made
+> against the frozen program order during implementation: a seek
+> observed mid-write may still sit in the command slot, and the cut
+> point now promotes it into the worker's pending command so the
+> serialization point runs THIS seek — "the preserved remainder does
+> not defer the seek" is literal (the unpromoted spelling wedged the
+> leg's park against the remainder finish; the seek matrices witnessed
+> it). One realtime-cost differential was recorded by this note (two
+> consecutive gate-intent checks, one extra uncontended acquisition)
+> and is WITHDRAWN by the corrective below, which restores the frozen
+> row literally. Evidence: `tests/seek_seam.rs` (14 end-to-end
+> matrices), crate-internal white-box protocol tests, loom L5–L7, and
+> the implementation mutation gate `specs/f5-seek-implementation/`
+> (M1–M7, 7/7 COUNTEREXAMPLE-WITNESSED — the Rust twins of the gate
+> suite's TLA+ mutations). *(Counts superseded by corrective 3 below:
+> 16 matrices, M1–M10, 10/10; superseded again by corrective 4 below:
+> 17 matrices, M1–M11, 11/11.)* Windows physical smoke evidence is a gate of
+> the implementation PR, not of this note.
+>
+> 2026-09-18 implementation corrective 1 (F5-SEEK-IMPLEMENTATION-
+> CORRECTIVE-1, same branch; fresh adversarial review of the
+> implementation PR, four MAJORs). Representation and mechanism
+> conformance only — the frozen propositions above are unchanged.
+> (C1, paused rebase) The release payload is consumed on the leg's path
+> THROUGH the unified loop-top gate even while the leg is parked by
+> PAUSE: a committed cut rebases a paused leg MID-PARK — the position
+> projection reads at the landing BEFORE the resume — and the pause
+> intent survives untouched; the first note's "consume at the gate's
+> entry after resume" spelling is superseded (it deferred the rebase
+> past the whole pause window, an observable conformance defect).
+> (C4, realtime cost) The D14.7 pause park and the D14.5 cut park are
+> unified into ONE loop-top gate operation on the shared intent lock:
+> a steady iteration of normal playback is a single uncontended mutex
+> acquisition with O(1) flag tests — the frozen realtime-cost row is
+> realized literally ("no new lock acquisition; the existing loop-top
+> gate check gains one more seek-park flag test") and the differential
+> recorded above no longer exists; a source-order oracle pins exactly
+> one loop-top gate call in the mechanism. (C2, seek × worker-exit
+> linearization) Acceptance is one atomic unit under a single
+> completion-lock hold — re-validation, the one-seek plant, the
+> cut-cycle evidence reset, and the hold routing — and the worker's
+> single exit funnel publishes worker-liveness evidence BEFORE an exit
+> duty aborts any accepted seek the leaving worker can no longer
+> resolve. The frozen acceptance set is unchanged in substance (a
+> worker that has left its protocol is not a live data plane; on every
+> real exit path the edge terminal has already left Open, so the Open
+> condition already covers the substance — the added check makes the
+> linearization envelope exact: no plant can exist whose only resolver
+> is gone, which closes the request_seek × worker-EOF wedge where a
+> hold nobody would release parks the leg past the final drain and D11
+> Completed never settles). (C3, current-cut attribution) The per-cut
+> evidence latches (landing, refusal, commit) belong to the CURRENT cut
+> cycle and are reset when the next seek is accepted — a second commit
+> requires the SECOND seek's own landing evidence, exactly the
+> current-engagement attribution discipline D14.7 freezes for pause;
+> without the reset a second commit could ride the first seek's
+> landing. Evidence added by the corrective: the render-gate oracles
+> for the unified gate (mid-park consumption, single-acquisition
+> shapes), the white-box seek/worker-exit linearization pair, the
+> white-box second-seek evidence oracle, an end-to-end seek × EOF
+> sweep, the strengthened paused-rebase matrices, mutation M8 (deleting
+> the evidence reset must RED), and the render-order oracle's P11/P12
+> (one loop-top gate call; the retired per-park calls gone).
+>
+> 2026-09-18 implementation corrective 2 (F5-SEEK-IMPLEMENTATION-
+> CORRECTIVE-2, same branch; authority-conformance review). No
+> proposition above changed — this closes a DRIFT: the first
+> implementation inherited the gate report's phase-0 lumping and
+> classified `SONG_ERR_NOT_OPEN` as `RefusedUnchanged`, exceeding the
+> frozen refusal set ("provably pre-mutation: the INVALID_ARGUMENT
+> class"). Not mutating is not the same as certifying a usable old
+> cursor: `NOT_OPEN` reports `!h->probed || !h->dec` — a handle that is
+> NOT in an opened/probed state — so it cannot prove the pre-call
+> decoding continuation valid, and on a probed endpoint it is an
+> abnormal provider state rather than an inert refusal. The provider
+> classification is narrowed to the frozen set: `SONG_ERR_INVALID_ARGUMENT`
+> → `RefusedUnchanged`; every other non-success status →
+> `MutatedThenFailed` (the conservative default, "unprovable means
+> destructive"). The gate report's phase-0 wording is corrected in place
+> as a marked corrective (`experiments/f5-seek-discontinuity/RESULTS.md`
+> §13). Evidence: a pure raw-status → class map pin plus two raw-ABI
+> boundary probes in `qianqian-decode-songcore` — an unprobed handle
+> really answers `SONG_ERR_NOT_OPEN` and classifies destructive, and an
+> `INVALID_ARGUMENT` rejection leaves the decode continuation
+> bit-identical to a no-seek control handle. Both directions are
+> negative-controlled: widening the refusal set REDs the map pin,
+> narrowing it REDs both pins.
+>
+> 2026-09-18 implementation corrective 3 (F5-SEEK-IMPLEMENTATION-
+> CORRECTIVE-3, same branch; pre-merge review of the implementation
+> PR). No proposition above changed and no new failure class is
+> introduced — this closes two CONFORMANCE gaps in the applied-cut
+> path, both of which made the implementation weaker or less live than
+> the frozen text already requires.
+> (R1, liveness) The frozen failure policy's episode-ending class
+> "data plane not Open (edge terminal != Open)" was implemented at the
+> cut's ACCEPTANCE and at its serialization point, but not in the
+> protocol's own waits after the provider APPLIED: those polled only
+> the session-recorded endings (stop intent / settlement / teardown
+> release), and teardown records its release only AFTER the worker
+> join — the decode relation unwinds before the output relation's
+> release. A cut whose commit boundary is permanently unreachable (a
+> device whose queued-to-play tail never quiesces, or a device abort
+> that stopped the plane) therefore wedged teardown forever: the join
+> could not return and the leg was never released. The waits now read
+> the data plane's terminal on the worker's own path and take the
+> abort route there — the same class the policy already names, no new
+> refusal, no new terminal evidence, no seek-side settlement (the data
+> plane's owner settles through the existing D11 precedence).
+> (R3, lost rebase) The commit boundary and the episode-ending latches
+> are latched evidence, and the leg's pause→cut park handover publishes
+> Disengaged-then-SeekEngaged — so an implementation that sampled the
+> wait on one read and the decision on another could see the boundary
+> hold and then an evidence gap, and route an abort release strictly
+> after the provider applied and the edge was purged: the leg would
+> resume with its PRE-CUT position accounting, reverting the cut
+> through an evidence artifact. The decision is now ONE atomic sample
+> with three outcomes — Committed (the boundary held; commit recorded,
+> rebase release routed) / Aborted (an episode ending is recorded: the
+> only abort) / Pending (the boundary is not satisfiable YET: nothing
+> recorded, nothing routed, the protocol keeps waiting). A missing
+> park/quiescence sample is a statement about the evidence, never about
+> the episode; the only exits from an applied cut are the commit or an
+> episode ending.
+> (R2, shell conformance) The `--machine` seek token reader used the
+> panicking `Duration::from_secs_f64`; tokens a float parser accepts
+> but no Duration can represent (`nan`, `inf`, `1e400`, a minutes field
+> near `u64::MAX`) aborted the command reader instead of being inert
+> input, contradicting the shell's own contract that an unreadable
+> token sends NO command. It now fails closed (`try_from_secs_f64`) and
+> the token grammar pin covers those spellings.
+> Evidence: `tests/seek_seam.rs` gains the never-draining-device
+> teardown oracle (and its stop control) and reaches 16 end-to-end
+> matrices; the crate-internal white-box suite gains the park-handover
+> gap oracle (`a_park_handover_evidence_gap_is_pending_and_never_an_abort`)
+> and re-spells the commit-conjunction oracle three-valuedly; the
+> implementation mutation gate grows to ten patches
+> (`specs/f5-seek-implementation/`, M1–M10, 10/10
+> COUNTEREXAMPLE-WITNESSED) — M9 (the wait ignores the data plane's
+> terminal) REDs the teardown oracle by harness bound, M10 (a pending
+> sample classified as an abort) REDs the handover oracle, M1 and M5
+> are re-pinned to the corrected shape (with an idempotent decision a
+> premature commit call is a Pending no-op, so M5 pins the program-order
+> violation literally: publishing the landing only after the wait).
+> `qianqian-headless`'s token pin and its usage text are corrected with
+> the reader. One consequence is recorded rather than fixed: a device
+> that neither quiesces its tail nor fails and meets neither a stop nor
+> a teardown leaves the applied cut Pending indefinitely — the episode
+> is silently stalled (`Pending`, no timeout, no signal). The superseded
+> bool spelling had the same property (its wait also required the tail
+> condition and had no timeout), so nothing regressed, and a timeout
+> would be NEW authority (a new failure policy row), which this
+> corrective deliberately does not invent. Windows physical smoke
+> evidence remains a gate of the implementation PR, not of this note.
+
+> 2026-09-18 implementation corrective 4 (F5-SEEK-IMPLEMENTATION-
+> CORRECTIVE-4, same branch; human review of corrective-3). No
+> proposition above changed and no new failure class is introduced —
+> this closes the REMAINING half of corrective-3's R1 liveness ruling.
+> (C9, device failure inside the park) Corrective-3 taught the
+> protocol's WAITS to read the data plane's terminal; but a terminal
+> is produced only by something that stops the plane, and inside a
+> park nothing below the loop could run: the parked leg's tail probe
+> answered ONE bool, so a tail observation that itself FAILED — a
+> real endpoint invalidation surfacing as a `GetCurrentPadding` error
+> — was masked as "not quiesced yet". The park then waited forever,
+> the edge stayed Open, and the worker's corrective-3 escape (correct
+> as far as it went) waited on a terminal the masked park could never
+> let happen: the frozen "existing output/device-failure" class was
+> structurally unreachable from inside a park. The probe now answers
+> `TailProbeOutcome` — Pending (keep waiting in bounded slices) /
+> Quiesced (the D14.5/D14.7 quiescence evidence) / Failed (the
+> observation itself failed) — and the three classes are never
+> collapsible: a Failed observation is neither quiescence evidence nor
+> a wait-forever condition. The gate releases the leg WITHOUT
+> publishing quiescence for the failed observation, still consumes any
+> routed release payload on the leg's path (the once-on-this-leg
+> discipline holds on every exit), still publishes the park's
+> disengagement fence, and returns `ParkOutcome::TailProbeFailed` —
+> the gate itself still never aborts the leg; the MECHANISM's existing
+> device-failure path decides (for the WASAPI render loop, the same
+> abort exit a steady-path padding error already took: the loop
+> aborts, the dead leg stops the data plane, the edge goes terminal,
+> the worker's escape fires, and D11 precedence settles `Failed`).
+> After a pause park whose probe failed, a still-routed seek hold does
+> not park again — more slices from a dead device can produce neither
+> quiescence nor recovery.
+> Evidence: the gate protocol suites gain a failure-exit oracle per
+> park attribution (a failed observation ends the park bounded with no
+> quiescence published, both with and without a routed payload); the
+> render-order source oracle grows P13 (the tail arm answers Failed
+> exactly once — the masked-pending and pre-corrective-bool
+> degradations RED; P8 re-anchored to the three-class arm); the mock
+> render leg mirrors the production posture; and `tests/seek_seam.rs`
+> gains the REAL failure-shape oracle the review required — the leg is
+> provably parked under the cut's hold (its armed observation held
+> inside the gate), the endpoint then invalidates, no stop is ever
+> requested, and the episode settles D11 `Failed` bounded — reaching
+> 17 end-to-end matrices. The implementation mutation gate grows to
+> eleven patches (`specs/f5-seek-implementation/`, M1–M11, 11/11
+> COUNTEREXAMPLE-WITNESSED) — M11 (both gate Failed arms collapsed
+> into the Pending treatment, i.e. the pre-corrective mask) REDs the
+> device-failure-in-park oracle by harness bound. One consequence of
+> corrective 3 narrows: its recorded unbounded-Pending stall required a
+> device whose tail neither quiesces NOR FAILS — an observation
+> failure is no longer a stall but the episode ending; the remaining
+> stall premise (an observation that keeps succeeding while the tail
+> never quiesces, no stop, no teardown) stands as recorded there, and
+> a timeout remains NEW authority this corrective deliberately does
+> not invent. Windows physical smoke remains a gate of the
+> implementation PR, to be run at the final head after this
+> corrective.
 
 ### D14.6 Open / Next / Previous — no-overlap replacement v1
 

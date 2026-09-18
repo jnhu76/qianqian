@@ -1,0 +1,21 @@
+diff --git a/crates/qianqian-playback/src/session.rs b/crates/qianqian-playback/src/session.rs
+--- a/crates/qianqian-playback/src/session.rs
++++ b/crates/qianqian-playback/src/session.rs
+@@ -340,17 +340,6 @@
+                                             break;
+                                         }
+                                         CutoverDecision::Pending => {
+-                                            if edge.terminal() != crate::edge::EdgeTerminal::Open {
+-                                                // The data plane ended under
+-                                                // the cut. No rebase is owed
+-                                                // to an episode this owner is
+-                                                // already ending, and the
+-                                                // seek publishes no evidence
+-                                                // of its own: settle through
+-                                                // the existing D11 path.
+-                                                completion.release_seek_without_commit();
+-                                                return;
+-                                            }
+                                             std::thread::sleep(WORKER_WAIT_SLICE);
+                                         }
+                                     }

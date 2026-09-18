@@ -1,7 +1,12 @@
+diff --git a/crates/qianqian-playback/src/edge.rs b/crates/qianqian-playback/src/edge.rs
+index 2811bce..cc230be 100644
 --- a/crates/qianqian-playback/src/edge.rs
 +++ b/crates/qianqian-playback/src/edge.rs
-@@ -142,4 +142,3 @@
+@@ -196,7 +196,6 @@ impl PcmEdge {
+             }
          }
          self.space_freed.notify_all();
 -        self.data_ready.notify_all();
      }
+ 
+     /// Current terminal state (session bookkeeping, not a hot-path call).

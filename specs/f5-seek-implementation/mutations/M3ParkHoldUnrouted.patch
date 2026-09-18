@@ -1,0 +1,17 @@
+diff --git a/crates/qianqian-playback/src/completion.rs b/crates/qianqian-playback/src/completion.rs
+index c5ebcf5..119ffe3 100644
+--- a/crates/qianqian-playback/src/completion.rs
++++ b/crates/qianqian-playback/src/completion.rs
+@@ -590,12 +590,8 @@ impl SessionCompletion {
+             // this hold through this same lock.
+             guard.seek_landing = None;
+             guard.seek_refused = false;
+             guard.cut_committed = false;
+-            // The cut's park routes INSIDE this hold, so it can never
+-            // lag the plant: the worker-exit cleanup always finds and
+-            // releases exactly what an acceptance routed.
+-            self.state.gate.set_seek_hold(true);
+         }
+     }
+ 
+     /// The decode worker's loop-top pickup: take the planted command, if

@@ -55,8 +55,9 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::GUID;
 
 use qianqian_audio_api::ports::{
-    AudioOutput, DrainSignal, DrainVerdict, OutputError, PcmFormat, PcmPull, PositionEvidence,
-    RenderGate, RenderPcmInput, RenderRequest, RenderStream,
+    AudioOutput, DrainSignal, DrainVerdict, GateSlice, OutputError, ParkOutcome, PcmFormat,
+    PcmPull, PositionEvidence, RenderGate, RenderPcmInput, RenderRequest, RenderStream,
+    SeekParkRelease, TailProbeOutcome,
 };
 
 use crate::open_abort::abort_render_thread;
@@ -455,33 +456,84 @@ fn steady_loop(
         };
     }
     let channels = usize::from(format.channels);
-    // F4 (D14.8) writer-local accounting: the source frames THIS episode
-    // has successfully submitted into the device buffer. A plain local on
-    // this execution path — never a cell, never a product surface. It is
-    // the projection's base and the reason one render leg is the only
-    // writer of the episode's position cell.
+    // F4 (D14.8) writer-local accounting: the source frames THIS stretch
+    // has successfully submitted into the device buffer — since the
+    // episode start, or since the last committed seek cutover (F5/D14.5
+    // resets it on the leg's own path). A plain local on this execution
+    // path — never a cell, never a product surface. It is the
+    // projection's base and the reason one render leg is the only writer
+    // of the episode's position cell.
     let mut handed_off: u64 = 0;
+    // The current published stretch's basis in source frames (0 at the
+    // episode start; the decoder's actual landing after a committed
+    // cutover), and whether publishing is live at all (false forever
+    // after an unknown-landing cutover).
+    let mut basis: u64 = 0;
+    let mut publishing: bool = true;
     loop {
-        // Pause gate (D14.7, mechanism A): loop top, strictly before
-        // device-buffer acquisition, no device buffer held across the
-        // park. While parked this leg submits nothing; between bounded
-        // slices it reads the session's own output padding, and one zero
-        // observation publishes this engagement's tail-quiescence
-        // evidence. Release (resume/stop) never aborts the leg: the
-        // loop proceeds once more and the data plane decides.
+        // THE loop-top gate (D14.7 mechanism A + the D14.5 cut park,
+        // unified into one operation): strictly before device-buffer
+        // acquisition, no device buffer held across a park, and — the
+        // frozen D14.5 realtime row — ONE intent-lock acquisition for a
+        // steady iteration of normal playback (O(1) flag tests, no
+        // second acquisition, no dispatch, no allocation).
         //
-        // The same reading feeds F4 (D14.8): submission is frozen while
-        // parked, so publishing the consumed estimate from each slice is
-        // exactly how the sample rises to the frozen handed-off total as
-        // the device drains — one device observation, two explicit
-        // semantic uses, truth classes kept separate.
-        gate.park_while_paused(|| {
-            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {
-                return false;
-            };
-            position.publish_consumed(handed_off, u64::from(padding));
-            padding == 0
-        });
+        // The tail slice's reading feeds F4 (D14.8) as before: while
+        // parked, submission is frozen, so publishing the consumed
+        // estimate from each slice is exactly how the sample rises to
+        // the frozen handed-off total as the device drains — one device
+        // observation, two explicit semantic uses, truth classes kept
+        // separate. The seek-release slice applies a committed cutover's
+        // rebase HERE, on this path, before anything further can be
+        // submitted — including while the leg STAYS PARKED by pause
+        // (pause intent survives the seek; the rebase is bookkeeping,
+        // never a submission).
+        //
+        // A FAILED tail observation is a device failure, never "not
+        // quiesced yet" (F5 implementation corrective-4): the gate
+        // releases the leg without publishing quiescence and reports
+        // the failure back, and THIS loop's existing failure exit — the
+        // same one a steady-path GetCurrentPadding error takes — stops
+        // the data plane on the way out, which is what makes the edge
+        // terminal and the seek worker's data-plane escape fire.
+        let park_failed = matches!(
+            gate.park_loop_top(|gated| match gated {
+                GateSlice::TailProbe => {
+                    let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {
+                        return TailProbeOutcome::Failed;
+                    };
+                    publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
+                    if padding == 0 {
+                        TailProbeOutcome::Quiesced
+                    } else {
+                        TailProbeOutcome::Pending
+                    }
+                }
+                GateSlice::SeekRelease(release) => match release {
+                    SeekParkRelease::Committed { landing } => {
+                        handed_off = 0;
+                        if landing.is_none() {
+                            publishing = false;
+                        }
+                        if let Some(landing) = landing.filter(|_| publishing) {
+                            basis = landing;
+                        }
+                        // A withdrawal is for the REST of the episode (D14.5
+                        // position rebase): once an unknown landing turned
+                        // publishing off, a later KNOWN landing neither
+                        // resurrects publication nor un-withdraws the cell —
+                        // `rebase(None)` is an idempotent re-withdrawal.
+                        position.rebase(if publishing { landing } else { None });
+                        TailProbeOutcome::Pending
+                    }
+                    SeekParkRelease::Aborted => TailProbeOutcome::Pending,
+                },
+            }),
+            ParkOutcome::TailProbeFailed
+        );
+        if park_failed {
+            break abort_msg("tail observation failed while parked".to_owned());
+        }
         // Period cadence; the bounded wait is also the stop-latency bound.
         unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
         let padding = match unsafe { session.client.GetCurrentPadding() } {
@@ -496,7 +548,7 @@ fn steady_loop(
         // `ReleaseBuffer` succeeds) would count the new block as already
         // consumed and overstate the position by up to one device block.
         // The source-order oracle `render_order_oracle.rs` pins this.
-        position.publish_consumed(handed_off, u64::from(padding));
+        publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
         let available = session.buffer_frames.saturating_sub(padding) as usize;
         if available == 0 {
             continue;
@@ -522,7 +574,7 @@ fn steady_loop(
             PcmPull::Eof => {
                 // Edge drained: everything produced has been submitted.
                 let _ = unsafe { session.render.ReleaseBuffer(0, 0) };
-                break drain_to_zero(session, position, handed_off);
+                break drain_to_zero(session, position, handed_off, basis, publishing);
             }
             PcmPull::Stopped => {
                 let _ = unsafe { session.render.ReleaseBuffer(0, 0) };
@@ -547,12 +599,14 @@ fn drain_to_zero(
     session: &DeviceSession,
     position: &PositionEvidence,
     handed_off: u64,
+    basis: u64,
+    publishing: bool,
 ) -> LoopOutcome {
     let deadline = Instant::now() + DRAIN_CAP;
     loop {
         match unsafe { session.client.GetCurrentPadding() } {
             Ok(padding) => {
-                position.publish_consumed(handed_off, u64::from(padding));
+                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
                 if padding == 0 {
                     return LoopOutcome::Drained;
                 }
@@ -563,6 +617,26 @@ fn drain_to_zero(
             return abort_msg("drain deadline passed before the device played out".to_owned());
         }
         unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
+    }
+}
+
+/// F4 (D14.8) publication with the F5 stretch basis: the consumed
+/// estimate is `basis + handed_off − min(tail, handed_off)`, where
+/// `handed_off` counts only the CURRENT stretch (since the last
+/// committed cutover — or the episode start). `basis` is rebased by the
+/// leg itself at a committed cutover; after an unknown-landing cutover
+/// `publishing` is false forever and nothing is published (unknown
+/// stays unknown). One relaxed monotone RMW; the caller already holds
+/// the tail reading.
+fn publish_consumed(
+    position: &PositionEvidence,
+    basis: u64,
+    handed_off: u64,
+    tail: u64,
+    publishing: bool,
+) {
+    if publishing {
+        position.publish_consumed(basis + handed_off, tail);
     }
 }
 

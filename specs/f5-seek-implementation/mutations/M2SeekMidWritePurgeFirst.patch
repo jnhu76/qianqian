@@ -1,0 +1,12 @@
+diff --git a/crates/qianqian-playback/src/session.rs b/crates/qianqian-playback/src/session.rs
+index 14bbb81..079e25d 100644
+--- a/crates/qianqian-playback/src/session.rs
++++ b/crates/qianqian-playback/src/session.rs
+@@ -277,6 +277,7 @@ fn decode_worker(
+                         completion.release_seek_without_commit();
+                         pending_seek = None;
+                     } else {
++                        edge.invalidate();
+                         match decode_stream.seek(target) {
+                             qianqian_audio_api::ports::ProviderSeekOutcome::RefusedUnchanged => {
+                                 // Proven pre-mutation: the old world is

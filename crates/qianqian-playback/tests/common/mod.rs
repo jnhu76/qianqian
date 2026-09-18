@@ -8,17 +8,27 @@
 //!
 //! The mock render leg mirrors the real loop's D14.8 accounting (publish
 //! at every tail observation from the pre-submission total, credit only
-//! after the mock's submission succeeds). Two things it structurally
-//! cannot witness, so no test here may claim them: a FAILED device
-//! submission (the mock has no failing ReleaseBuffer path — that rests on
-//! the order oracle in `qianqian-output-wasapi`) and FRAME UNITS (the
-//! mock is unit-agnostic — the real unit rule is a property of the
-//! WASAPI stream negotiation).
+//! after the mock's submission succeeds) and, since F5, the real loop's
+//! seek shape (D14.5): the loop-top pause park followed by the
+//! cut-attributed seek park whose released payload rebases the stretch
+//! basis on the leg's own path (including the payload-awaits-consumption
+//! case of a cut committed while pause-parked) — exactly the
+//! steady_loop posture in wasapi.rs. The mock decode source
+//! position-tags every frame (sample value = absolute frame index) so
+//! tests can assert content continuity across a cutover without knowing
+//! where the cut landed.
+//!
+//! Two things the mock structurally cannot witness, so no test here may
+//! claim them: a FAILED device submission (the mock has no failing
+//! ReleaseBuffer path — that rests on the order oracle in
+//! `qianqian-output-wasapi`) and FRAME UNITS (the mock is unit-agnostic
+//! — the real unit rule is a property of the WASAPI stream negotiation).
 
 // Shared test support: each test binary uses a subset, so per-binary
 // dead-code findings on the unused remainder are expected, not defects.
 #![allow(dead_code)]
 
+use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -34,8 +44,9 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
 
 use qianqian_audio_api::ports::{
     AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainSignal,
-    DrainVerdict, OutputError, PcmDecode, PcmFormat, PcmPull, PositionEvidence, RenderPcmInput,
-    RenderRequest, RenderStream,
+    DrainVerdict, GateSlice, OutputError, ParkOutcome, PcmDecode, PcmFormat, PcmPull,
+    PositionEvidence, ProviderSeekOutcome, RenderGate, RenderPcmInput, RenderRequest, RenderStream,
+    SeekParkRelease, TailProbeOutcome,
 };
 
 pub const TEST_FORMAT: PcmFormat = PcmFormat {
@@ -67,6 +78,13 @@ pub struct TestDecode {
     /// without saying otherwise observes no duration, exactly like a
     /// container that declares none.
     pub duration: Option<Duration>,
+    /// Scripted provider seek outcomes (D14.5), consumed in order by the
+    /// endpoint's `seek`; an empty script lands exactly at the requested
+    /// target (clamped to the source's frame total). Script entries are
+    /// taken verbatim — a scripted `Applied { landing }` need not match
+    /// the requested target, which is how tests prove the Position
+    /// rebases to the ACTUAL landing, never the request.
+    pub seeks: Vec<ProviderSeekOutcome>,
 }
 
 impl TestDecode {
@@ -75,6 +93,7 @@ impl TestDecode {
         Self {
             behavior,
             duration: None,
+            seeks: Vec::new(),
         }
     }
 
@@ -84,6 +103,7 @@ impl TestDecode {
         Self {
             behavior,
             duration: Some(duration),
+            seeks: Vec::new(),
         }
     }
 }
@@ -99,21 +119,37 @@ impl PcmDecode for TestDecode {
             SourceBehavior::Paced { after, delay } => (after, false, Some(delay)),
         };
         Ok(Box::new(TestDecodeStream {
-            remaining: n,
+            total: n as u64,
+            cursor: 0,
             fail_after: fail,
             pace_delay: pace,
             format: TEST_FORMAT,
             duration: self.duration,
+            seek_script: self.seeks.clone().into(),
         }))
     }
 }
 
+/// `target` expressed in this source's frame units (the episode format's
+/// sample rate) — the mock's stand-in for the provider's own
+/// media-time→frame decision.
+fn target_frames(target: Duration, sample_rate: u32) -> u64 {
+    ((target.as_micros() * u64::from(sample_rate) as u128) / 1_000_000) as u64
+}
+
 struct TestDecodeStream {
-    remaining: usize,
+    /// Total frames of fast (unpaced) source content.
+    total: u64,
+    /// The next frame this endpoint will produce. Every sample of frame
+    /// `i` carries the value `i as f32`, so the consumed-content oracle
+    /// can assert continuity across a seek cutover without knowing where
+    /// the cut landed.
+    cursor: u64,
     fail_after: bool,
     pace_delay: Option<Duration>,
     format: PcmFormat,
     duration: Option<Duration>,
+    seek_script: VecDeque<ProviderSeekOutcome>,
 }
 
 impl DecodedPcmStream for TestDecodeStream {
@@ -126,7 +162,8 @@ impl DecodedPcmStream for TestDecodeStream {
     }
 
     fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
-        if self.remaining == 0 {
+        let avail = self.total.saturating_sub(self.cursor);
+        let n = if avail == 0 {
             if self.fail_after {
                 return Err(DecodeError {
                     message: "test decode failure".to_owned(),
@@ -134,18 +171,52 @@ impl DecodedPcmStream for TestDecodeStream {
             }
             if let Some(delay) = self.pace_delay {
                 std::thread::sleep(delay);
-                self.remaining = 1; // one paced frame per call, forever
+                1 // one paced frame per call, forever, past the fast total
             } else {
                 return Ok(DecodeOutcome::Eof);
             }
-        }
+        } else {
+            let channels = usize::from(self.format.channels);
+            (dst.len() / channels).min(avail as usize)
+        };
         let channels = usize::from(self.format.channels);
-        let n = (dst.len() / channels).min(self.remaining).max(1);
-        for s in dst[..n * channels].iter_mut() {
-            *s = 0.25;
+        for f in 0..n {
+            let value = (self.cursor + f as u64) as f32;
+            for s in dst[f * channels..(f + 1) * channels].iter_mut() {
+                *s = value;
+            }
         }
-        self.remaining -= n;
+        self.cursor += n as u64;
         Ok(DecodeOutcome::Frames(n))
+    }
+
+    fn seek(&mut self, target: Duration) -> ProviderSeekOutcome {
+        let outcome = match self.seek_script.pop_front() {
+            Some(scripted) => scripted,
+            // Unscripted default: the well-behaved provider — land
+            // exactly at the requested target, clamped to the source.
+            None => ProviderSeekOutcome::Applied {
+                landing: Some(target_frames(target, self.format.sample_rate).min(self.total)),
+            },
+        };
+        match &outcome {
+            ProviderSeekOutcome::Applied { landing } => {
+                // The endpoint's cursor moves to the landing the provider
+                // REPORTS (an unknown landing produces from around the
+                // requested target — the content continues; only the
+                // Position projection is withdrawn).
+                self.cursor = match landing {
+                    Some(landing) => (*landing).min(self.total),
+                    None => target_frames(target, self.format.sample_rate).min(self.total),
+                };
+            }
+            // Proven pre-mutation: the cursor is untouched.
+            ProviderSeekOutcome::RefusedUnchanged => {}
+            // Destructive: the worker never reads again, so the cursor
+            // value is irrelevant — leave it untouched.
+            ProviderSeekOutcome::MutatedThenFailed { .. } => {}
+        }
+        outcome
     }
 }
 
@@ -171,11 +242,16 @@ pub enum Playout {
 /// physical quantity the real mechanism reads with `GetCurrentPadding`
 /// and the leg's position evidence subtracts (D14.8). One model, two
 /// uses: the F3 establishment oracle asks whether it is quiesced
-/// (`== 0`), and the F4 accounting derives from its value.
+/// (`== 0`), and the F4 accounting derives from its value. Arming
+/// [`DeviceTail::fail_observations`] models the observation itself
+/// failing (an invalidated endpoint): every later observation returns
+/// `None`, the truth class the real mechanism's `GetCurrentPadding`
+/// error occupies (F5 implementation corrective-4).
 #[derive(Clone)]
 pub struct DeviceTail {
     queued: Arc<std::sync::atomic::AtomicU64>,
     playout: Arc<std::sync::atomic::AtomicU64>,
+    failing: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// The internal spelling of [`Playout::Everything`]: a rate no queue
@@ -187,6 +263,7 @@ impl Default for DeviceTail {
         Self {
             queued: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             playout: Arc::new(std::sync::atomic::AtomicU64::new(PLAY_OUT_EVERYTHING)),
+            failing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 }
@@ -200,6 +277,15 @@ impl DeviceTail {
         };
         self.playout
             .store(rate, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Fail every later tail observation (see the struct doc): the mock
+    /// endpoint invalidates, so the observation itself reports failure —
+    /// a truth class distinct from a non-empty queue, and never
+    /// quiescence.
+    pub fn fail_observations(&self) {
+        self.failing
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// The frames currently queued to play — a witness for assertions,
@@ -216,9 +302,13 @@ impl DeviceTail {
     }
 
     /// One tail observation: the device plays out its slice, then
-    /// reports what is still queued.
-    fn observe(&self) -> u64 {
+    /// reports what is still queued — or `None` when the observation
+    /// itself failed (the armed failure mode).
+    fn observe(&self) -> Option<u64> {
         use std::sync::atomic::Ordering;
+        if self.failing.load(Ordering::SeqCst) {
+            return None;
+        }
         let rate = self.playout.load(Ordering::SeqCst);
         let mut remaining = self.queued.load(Ordering::SeqCst);
         if rate >= remaining {
@@ -227,7 +317,7 @@ impl DeviceTail {
             remaining -= rate;
         }
         self.queued.store(remaining, Ordering::SeqCst);
-        remaining
+        Some(remaining)
     }
 
     /// The device accepted `n` submitted frames into its queue (the
@@ -273,6 +363,12 @@ pub struct TestOutput {
     /// `buffered_frames == 0` alone cannot witness that the episode
     /// really produced audio; this counter can.
     pub consumed: Arc<std::sync::atomic::AtomicUsize>,
+    /// The consumed-content witness (F5): the channel-0 sample value of
+    /// every frame the mock leg successfully submitted, in submission
+    /// order. The position-tagged decode double makes this a frame-index
+    /// sequence, so a committed cutover must appear as exactly one
+    /// discontinuity `K → landing` and a refusal as none.
+    pub consumed_values: Arc<Mutex<Vec<f32>>>,
     /// The mock device's output-tail occupancy (frames already consumed
     /// but still queued to "play"), observed by the render gate's
     /// tail-quiescence check and by the leg's position accounting
@@ -315,9 +411,28 @@ impl TestOutput {
         consumed: Arc<std::sync::atomic::AtomicUsize>,
         device_tail: DeviceTail,
     ) -> TestOutput {
+        TestOutput::observed_with_content(
+            behavior,
+            consumed,
+            Arc::new(Mutex::new(Vec::new())),
+            device_tail,
+        )
+    }
+
+    /// [`TestOutput::observed_with_tail`] plus the caller owning the
+    /// consumed-content witness (F5): the seek matrices assert on the
+    /// exact submitted sample sequence, so the witness must outlive the
+    /// service the runtime captured.
+    pub fn observed_with_content(
+        behavior: OutputBehavior,
+        consumed: Arc<std::sync::atomic::AtomicUsize>,
+        consumed_values: Arc<Mutex<Vec<f32>>>,
+        device_tail: DeviceTail,
+    ) -> TestOutput {
         TestOutput {
             behavior,
             consumed,
+            consumed_values,
             device_tail,
             tail_probe: TailProbe::default(),
             open_abort_engaged: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -336,6 +451,7 @@ impl TestOutput {
         TestOutput {
             behavior: OutputBehavior::OpenTimeoutAbort,
             consumed,
+            consumed_values: Arc::new(Mutex::new(Vec::new())),
             device_tail,
             tail_probe,
             open_abort_engaged,
@@ -438,6 +554,7 @@ fn spawn_test_leg(
     output: &TestOutput,
 ) -> std::io::Result<std::thread::JoinHandle<()>> {
     let consumed = output.consumed.clone();
+    let consumed_values = output.consumed_values.clone();
     let device_tail = output.device_tail.clone();
     let tail_probe = output.tail_probe.clone();
     std::thread::Builder::new()
@@ -454,6 +571,7 @@ fn spawn_test_leg(
                         tail: &device_tail,
                         tail_probe: &tail_probe,
                         consumed: &consumed,
+                        consumed_values: &consumed_values,
                     },
                 )
             }))
@@ -558,17 +676,32 @@ impl AudioOutput for TestOutput {
 }
 
 /// The mock device as the render leg sees it: the queue it reads and
-/// submits into, the injected hold on that observation, and the
-/// consumption witness the tests assert on.
+/// submits into, the injected hold on that observation, the consumption
+/// witnesses the tests assert on, and the content witness.
 struct MockDevice<'a> {
     tail: &'a DeviceTail,
     tail_probe: &'a TailProbe,
     consumed: &'a std::sync::atomic::AtomicUsize,
+    consumed_values: &'a Mutex<Vec<f32>>,
+}
+
+/// The mock stand-in for the leg's `publish_consumed` helper (wasapi.rs):
+/// the F5 stretch basis folded into the F4 consumed estimate.
+fn publish_consumed(
+    position: &PositionEvidence,
+    basis: u64,
+    handed_off: u64,
+    tail: u64,
+    publishing: bool,
+) {
+    if publishing {
+        position.publish_consumed(basis + handed_off, tail);
+    }
 }
 
 fn consume_loop(
     input: Arc<dyn RenderPcmInput>,
-    gate: &qianqian_audio_api::ports::RenderGate,
+    gate: &RenderGate,
     position: &PositionEvidence,
     pace: Option<Duration>,
     abort_after: Option<usize>,
@@ -577,10 +710,13 @@ fn consume_loop(
     use std::sync::atomic::Ordering;
     let mut dst = vec![0.0f32; 256 * usize::from(TEST_FORMAT.channels)];
     let mut reads = 0usize;
-    // The mock leg's own frame accounting (D14.8): frames successfully
-    // submitted into the mock device's queue, mirroring the real leg's
-    // `handed_off` local.
+    // The mock leg's own frame accounting (D14.8 + the F5 stretch basis,
+    // D14.5), mirroring the real loop's locals: handed-off counts only
+    // the CURRENT stretch, and the basis is rebased by the leg itself at
+    // a committed cutover.
     let mut handed_off: u64 = 0;
+    let mut basis: u64 = 0;
+    let mut publishing: bool = true;
     loop {
         if abort_after.is_some_and(|limit| reads >= limit) {
             // Device died mid-stream: the render loop exits on its own.
@@ -588,26 +724,79 @@ fn consume_loop(
             // plane before completing the drain.
             return DrainVerdict::Aborted;
         }
-        // Mirror the real mechanism's loop-top pause gate (D14.7): the
-        // gate parks before the read; the mock's tail observation is
-        // its own device-tail queue, passable through the probe. The
-        // same reading feeds the position accounting (D14.8): submission
-        // is frozen while parked, so the park slices are what walk the
-        // published sample up to the frozen handed-off total.
-        gate.park_while_paused(|| {
-            let tail = device.tail.observe();
-            position.publish_consumed(handed_off, tail);
-            device.tail_probe.observe(tail == 0)
-        });
+        // Mirror the real mechanism's ONE loop-top gate (D14.7 pause
+        // park + D14.5 cut park, unified): the gate parks before the
+        // read; the mock's tail observation is its own device-tail
+        // queue, passable through the probe. The same reading feeds the
+        // position accounting (D14.8): submission is frozen while
+        // parked, so the park slices are what walk the published sample
+        // up to the frozen handed-off total. The release slice applies
+        // a committed cutover's rebase on this path before any further
+        // submission — including while the leg STAYS PARKED by pause.
+        // A FAILED observation exits the park and aborts the leg
+        // through the same verdict a steady-path observation failure
+        // takes — mirroring the real mechanism's corrective-4 posture:
+        // the device failure propagates out of the park, the data plane
+        // is stopped by the dead leg's exit, and no quiescence evidence
+        // ever publishes for a failed observation.
+        let park_failed = matches!(
+            gate.park_loop_top(|slice| match slice {
+                GateSlice::TailProbe => {
+                    let Some(tail) = device.tail.observe() else {
+                        return TailProbeOutcome::Failed;
+                    };
+                    publish_consumed(position, basis, handed_off, tail, publishing);
+                    if device.tail_probe.observe(tail == 0) {
+                        TailProbeOutcome::Quiesced
+                    } else {
+                        TailProbeOutcome::Pending
+                    }
+                }
+                GateSlice::SeekRelease(release) => {
+                    match release {
+                        SeekParkRelease::Committed { landing } => {
+                            handed_off = 0;
+                            if landing.is_none() {
+                                publishing = false;
+                            }
+                            if let Some(landing) = landing.filter(|_| publishing) {
+                                basis = landing;
+                            }
+                            // A withdrawal is for the REST of the episode (D14.5
+                            // position rebase) — identical to the real leg's
+                            // wasapi.rs rebase arm: a later KNOWN landing after
+                            // an unknown one neither resurrects publication nor
+                            // un-withdraws the cell.
+                            position.rebase(if publishing { landing } else { None });
+                        }
+                        SeekParkRelease::Aborted => {}
+                    }
+                    TailProbeOutcome::Pending
+                }
+            }),
+            ParkOutcome::TailProbeFailed
+        );
+        if park_failed {
+            return DrainVerdict::Aborted;
+        }
         // Mirror the real loop's per-iteration padding observation:
         // publish the consumed estimate as of THIS instant, from the
         // handed-off total as it stands BEFORE the submission below.
-        let tail = device.tail.observe();
-        position.publish_consumed(handed_off, tail);
+        let Some(tail) = device.tail.observe() else {
+            return DrainVerdict::Aborted;
+        };
+        publish_consumed(position, basis, handed_off, tail, publishing);
         match input.read_frames(&mut dst) {
             PcmPull::Frames(n) => {
                 device.consumed.fetch_add(n, Ordering::SeqCst);
                 reads += 1;
+                // The content witness: the channel-0 value of every
+                // submitted frame, in order.
+                {
+                    let mut values = device.consumed_values.lock().unwrap();
+                    let channels = usize::from(TEST_FORMAT.channels);
+                    values.extend(dst[..n * channels].iter().step_by(channels).copied());
+                }
                 // The mock's ReleaseBuffer(n): the device took the block,
                 // so only now does it earn handed-off accounting.
                 device.tail.submit(n as u64);

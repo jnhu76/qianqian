@@ -1,0 +1,13 @@
+diff --git a/crates/qianqian-audio-api/src/ports.rs b/crates/qianqian-audio-api/src/ports.rs
+index b0bc4fa..9063b8c 100644
+--- a/crates/qianqian-audio-api/src/ports.rs
++++ b/crates/qianqian-audio-api/src/ports.rs
+@@ -718,7 +718,7 @@ impl PositionEvidence {
+             // and a writer that knows the basis is gone never publishes.
+             None => 0,
+         };
+-        self.published.store(encoded, Ordering::Relaxed);
++        self.published.fetch_max(encoded, Ordering::Relaxed);
+     }
+ }
+ 
