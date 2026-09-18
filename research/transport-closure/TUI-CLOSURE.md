@@ -92,6 +92,14 @@ works regardless. Commands are processed sequentially on the App thread;
 a replacement is one blocking composition operation (F6 §7), so there
 is no concurrent-command state to design.
 
+Fail-stop guard (F6 §6): once any disposal snapshot reports
+`quiet == false` (latched teardown violation), the App enters
+fail-stop — the status area is replaced by a fatal banner
+(`Fatal teardown violation — restart required`), every transport and
+composition command becomes inert, and only Q / Ctrl+C remain. This is
+App composition control, not a new playback state; recovery would need
+its own separately earned authority.
+
 ## 4. No second transport state machine (campaign §39)
 
 The App keeps **composition/navigation/configuration state only**:
@@ -126,7 +134,9 @@ Episode-sourced diagnostics (activation failure, failure_diagnostic)
 continue to render through the existing Diagnostics panel exactly as
 today. Where a failure leaves old playback untouched (probe refusal,
 volume failure), the Track/State panels keep rendering the live
-observation — the diagnostic never overwrites playback truth.
+observation — the diagnostic never overwrites playback truth. One case
+is not transient: a latched teardown violation is the fatal banner of
+the fail-stop guard (§3), never a status line.
 
 ## 6. Open input (v1)
 
@@ -178,14 +188,25 @@ Everything else stays presentation noise (existing rule).
 ```text
 1. F5-IMPLEMENTATION            (separate branch, already authorized
                                  against frozen D14.5; merge first)
-2. AUTHORITY-PROMOTION          (tiny slice promoting THIS package's
-                                 accepted decisions into ADR-PBK-002 /
-                                 Issue #119 — DECISION-MATRIX §2)
-3. F6-IMPLEMENTATION            (probe surface + App replacement loop)
-4. NAVIGATION-IMPLEMENTATION    (playlist/index on top of F6)
-5. VOLUME-IMPLEMENTATION        (V-PROBE first, then seam command +
-                                 mechanism realization)
-6. TRANSPORT-DOGFOOD            (whole key map, Windows physical pass)
+2. F6-S-PROBE                   (evidence-only slice: probe during
+                                 live playback on a Windows host,
+                                 ×3 green runs — no production feature
+                                 work; F6 §3)
+3. AUTHORITY-PROMOTION          (only on S-PROBE GREEN: promote this
+                                 package's accepted decisions into
+                                 ADR-PBK-002 / Issue #119 —
+                                 DECISION-MATRIX §2; a RED S-PROBE
+                                 reopens the F6 mechanism decision
+                                 instead of promoting)
+4. F6-IMPLEMENTATION            (probe surface + App replacement loop)
+5. NAVIGATION-IMPLEMENTATION    (playlist/index on top of F6)
+6. V-PROBE                      (volume mechanism physical facts —
+                                 VOLUME §10; the apply mechanism does
+                                 not fully close before this)
+7. VOLUME-IMPLEMENTATION        (seam command + mechanism realization
+                                 against the V-PROBE-measured apply
+                                 points)
+8. TRANSPORT-DOGFOOD            (whole key map, Windows physical pass)
 ```
 
 This campaign authorizes none of those slices; each needs its own

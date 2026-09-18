@@ -153,6 +153,12 @@ No navigation-specific synchronization exists: there is nothing to
 synchronize — replacement is the single serialization point (App-thread
 sequential commands, F6 §7 last row).
 
+Fail-stop propagation (from F6 §6): a latched teardown violation during
+any replacement permanently disables further replacement in this
+process — Next/Previous/Open become inert until restart. No navigation
+recovery path exists, and none may be invented around the F6 fail-stop
+rule.
+
 ## 7. Playlist display
 
 ```text

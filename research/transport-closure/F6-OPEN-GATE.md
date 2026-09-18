@@ -112,19 +112,36 @@ It reuses the existing open/probe machinery internally (SongCore
 `song_open` + `song_probe`); it reads no PCM frames. Failure classes of
 the probe are exactly `DecodeOpenError` today.
 
-**Concurrency disclosure (S-PROBE, mandated at F6-IMPLEMENTATION).**
+**Concurrency disclosure (S-PROBE — evidence slice BEFORE promotion).**
 The probe runs while the old episode's decode worker may still hold its
 own SongCore handle — production's first two-concurrent-native-handles
 scenario (today `open_media` is strictly one-handle-at-a-time in
 effect, one episode per process). SongCore is expected to support
 independent per-handle contexts, but that is a native-behavior claim no
-document in this package can prove: F6-IMPLEMENTATION must confirm it
-on a Windows host — probe during live playback, ×3 green runs, old
-stream content and cadence unaffected, probe verdicts correct — before
-treating Candidate B as physically confirmed, the same way V-PROBE
-gates volume and E3 gated seek cutover. If S-PROBE fails, the fallback
-is disclosed and narrow: probe after settlement (Candidate A ordering
-with the same probe surface), never an undocumented native change.
+document in this package can prove. The evidence order therefore
+matches the F5 E3 discipline — mechanism physical fact → evidence →
+authority freeze → implementation:
+
+```text
+F5-IMPLEMENTATION merge
+    ↓
+F6-S-PROBE                evidence-only slice, no production feature
+                          work: probe during live playback on a Windows
+                          host, ×3 green runs — old stream content and
+                          cadence unaffected, probe verdicts correct
+    ↓ GREEN               Candidate B (probe-before-destruction) may be
+                          frozen by the authority-promotion slice
+    ↓ RED                 Candidate B is NOT promotable: the fallback
+                          (probe after settlement) abandons the product
+                          property "an invalid source never kills live
+                          playback", which is an F6 authority change —
+                          the mechanism decision REOPENS instead of
+                          silently degrading to Candidate A
+    ↓
+AUTHORITY-PROMOTION → F6-IMPLEMENTATION
+```
+
+An undocumented native change is never a fallback.
 
 ## 4. Replacement mechanism — the narrow config decision
 
@@ -189,7 +206,9 @@ Open(path)
                                                 snapshot returned
     ↓ snapshot.quiet == true                  — old fully retired
                                                 (composition evidence,
-                                                not a Fact — §5)
+                                                not a Fact — §5);
+                                                quiet == false is
+                                                FAIL-STOP (§6)
     ↓ start_episode(path)                     — fresh composition:
                                                 new definitions, new
                                                 handle, revise_desired,
@@ -240,14 +259,21 @@ NAVIGATION-GATE §3, consumes precisely this evidence).
 |---|---|---|
 | new-source validation failure | Open REFUSED before any destructive step; diagnostic surfaced (§9 of TUI gate) | **continues untouched** |
 | old-episode settlement failure | governed by the existing D11/frozen D14.5/D14.7 semantics; Open waits on `wait_terminal`. D11 promises no liveness: a hung decoder blocks Open — no timeout is invented in v1 | settles as itself |
-| old teardown failure | dispose snapshot `quiet == false` ⇒ replacement ABORTS (fail-closed: no new episode starts on a violated teardown); latched violations reported; the process stays usable — a later Open starts from a fresh composition | old world already gone; truth immutable |
+| old teardown failure | dispose snapshot `quiet == false` ⇒ **FAIL-STOP**. A latched teardown violation means discharge was **not proven**: K0 keeps the violated fiber mounted — it is never eligible for unload or slot removal, the violated latch has no exit, and the effect records remain as provenance tombstones (`kernel.rs` §G.6 reality). No new episode is constructed, and NO further Open / Next / Previous replacement is attempted in this process. The TUI shows `Fatal teardown violation — restart required` and keeps only Q/Ctrl+C. Recovery-after-violation is not assumed; it would have to be earned as its own separate authority decision | old world **NOT proven discharged**; truth immutable |
 | new activation failure (after old is gone) | existing `activation_error` diagnostic through the D14.2 seam; no rollback, no hidden reopen: the old world stays gone (D14.6: replacement cannot relabel committed truth) | **gone** (stopped) |
 
-No rollback to the destroyed old episode exists at any point after the
-destructive step begins. Once disposal has run, the old world is gone;
-there is no reopen semantics. The only "undo" a user has is pressing
-Open/N again — with the old source, which is a new replacement, not a
-rollback.
+No rollback exists at any point. Disposal has exactly two honest
+readings. `quiet == true` proves the old world discharged: replacement
+may proceed, and the only "undo" a user has is issuing a new
+replacement command — a new Open/N with the old source is a new
+replacement, not a rollback. `quiet == false` proves nothing: the K0
+violated-teardown latch has no exit, the violated fiber stays mounted
+(never eligible for unload or removal, effect records remain as
+tombstones), so no new episode and no further replacement may be
+attempted in this process — fail-stop until restart (row above).
+"Later Open starts from a fresh composition" is available only after a
+QUIET disposal or a clean process start, never after a latched
+violation.
 
 ## 7. F6 required decision table (campaign §12)
 

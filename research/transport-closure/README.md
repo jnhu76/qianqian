@@ -129,17 +129,21 @@ TUI           = one reference-player shell whose App state is composition/
 target:      this design package (documentation only)
 tools:       authority documents listed above; production source reading;
              Microsoft Learn WASAPI documentation (VOLUME-GATE §7);
-             one fresh-context adversarial review round (§48): VERDICT
-             PASS, 0 MAJOR / 5 MINOR, all MINOR findings fixed — record
-             in ADVERSARIAL-REVIEW.md §5
+             review rounds: (1) fresh-context adversarial review (§48)
+             VERDICT PASS, 0 MAJOR / 5 MINOR; (2) human review of
+             PR #155 VERDICT CHANGES_REQUIRED, 2 MAJOR / 1 MINOR —
+             all findings fixed; records in ADVERSARIAL-REVIEW.md §5
 bounds:      no production code was run or modified; no Windows host was
              driven; all mechanism-behavior claims for volume are
              documentation-cited and carry a mandated physical
-             confirmation probe (V-PROBE) at the VOLUME-IMPLEMENTATION
-             gate; the F6 probe-during-live-playback concurrency claim
-             carries the same class of obligation (S-PROBE) at
-             F6-IMPLEMENTATION — exactly as F5's E3 did for seek
-             cutover
+             confirmation probe (V-PROBE) before the volume apply
+             mechanism closes; the F6 probe-during-live-playback
+             concurrency claim carries the same class of obligation
+             (F6-S-PROBE) sequenced as an evidence-only slice BETWEEN
+             the F5 merge and authority promotion — a RED S-PROBE
+             reopens the F6 mechanism decision instead of promoting
+             (exactly the F5 E3 discipline: physical fact → evidence →
+             authority freeze → implementation)
 result class: reviewed design, READY_FOR_HUMAN_REVIEW
 ```
 

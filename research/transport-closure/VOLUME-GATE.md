@@ -199,10 +199,20 @@ Apply-point rule (mechanism-side, frozen shape):
 - re-applied at the render loop top when the routed value changed:
   one relaxed load + compare per iteration (the same cost class as the
   F5-approved loop-top seek-park flag test), and on change ONE
-  SetAllVolumes — a bounded, non-blocking control call performed on the
-  leg's own thread, which also keeps the COM interface pointer on the
-  thread that created it (GetService/Release thread discipline);
+  SetAllVolumes performed on the leg's own thread, which also keeps
+  the COM interface pointer on the thread that created it
+  (GetService/Release thread discipline);
 - never inside the quantum between GetBuffer and ReleaseBuffer.
+
+What is deliberately NOT claimed: the documentation contracts
+SetAllVolumes' stream-local scope and its 0.0–1.0 domain — it does NOT
+promise non-blocking or bounded-latency behavior, and the
+thread-discipline note above is about interface lifetime, not an
+RT-safety proof. No non-blocking / bounded-latency guarantee is claimed
+anywhere in this design. V-PROBE V4/V5 (§10) measures the render leg's
+actual perturbation; a materially disturbing result reopens the
+apply-point/ownership decision before VOLUME-IMPLEMENTATION freezes
+it.
 ```
 
 ## 7. Volume change while playing / paused (non-events, frozen)
@@ -268,9 +278,20 @@ V2  SndVol/mixer interaction: mixer slider moves do not change the
     stream's applied level (no coupling)
 V3  a replaced stream starts at engine level 1.0 and the re-applied
     desired level is audible-immediately at open (persistence rule)
-V4  change latency: + press → level change observable within a bounded,
-    small number of render iterations; no discontinuity in the stream
-    (no click/pop beyond the gain step), no Position reset
+V4  change application: repeated +/- presses, and changes while
+    paused, produce no render-loop perturbation — measured render
+    iteration latency and underrun/glitch behavior; no stream
+    discontinuity (no click/pop beyond the gain step), no Position
+    reset
+V5  failure path: SetAllVolumes under device invalidation / service
+    failure degrades to the mechanism diagnostic without wedging the
+    render leg
+
+If V4/V5 show the loop-top apply materially perturbs the render leg,
+the apply-point/ownership mechanism MUST be reconsidered before
+VOLUME-IMPLEMENTATION freezes it. The mechanism candidate
+(IAudioStreamVolume) stays selected on documentation evidence; its
+physical RT placement does not close before V-PROBE.
 ```
 
 ## 11. D13 / D14.9 admission check (record)

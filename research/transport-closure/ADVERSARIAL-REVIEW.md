@@ -196,7 +196,10 @@ cross-gate collisions, F5 assumptions, D11 compatibility, P1–P5
 implications, RT permanent cost, TUI scope creep.
 
 ```text
-VERDICT: PASS
+Round 1 (fresh-context):  VERDICT: PASS  (0 MAJOR, 5 MINOR — fixed)
+Round 2 (human, PR #155): VERDICT: CHANGES_REQUIRED
+                          (2 MAJOR, 1 MINOR — fixed below)
+Final state: all findings resolved; READY_FOR_HUMAN_REVIEW
 ```
 
 Review rounds:
@@ -237,6 +240,8 @@ MINOR-3  probe_media during live playback means two concurrent native
          S-PROBE (probe-during-live-playback confirmation on a Windows
          host, ×3 green runs) at F6-IMPLEMENTATION, analogous to
          V-PROBE; README §4 bounds updated.
+         (Placement corrected by Round 2 MAJOR-2: S-PROBE moved to an
+         evidence-only slice BEFORE authority promotion — see below.)
 
 MINOR-4  ADVERSARIAL §1.F claimed "wait_terminal returning means the
          worker has exited" — imprecise. FIXED: wait_terminal proves
@@ -248,4 +253,69 @@ MINOR-5  "campaign §N" citations point at a document that is not in
          the repository. FIXED: README §5 now explains what they
          reference and that the load-bearing content is restated
          inline.
+```
+
+### Round 2 — human review of PR #155
+
+Independent human review of the package at `60dec50`; verdict
+`CHANGES_REQUIRED` with 2 MAJOR + 1 MINOR; Navigation judged PASS,
+Volume ownership/mechanism selection judged PASS. All findings fixed
+in place (this corrective is POST-F5-TRANSPORT-CLOSURE-CORRECTIVE-1);
+no gate document was rewritten.
+
+```text
+MAJOR-1  teardown violation must be FAIL-STOP. The package claimed
+         "process stays usable — a later Open starts from a fresh
+         composition" after a `quiet == false` disposal. That
+         contradicted K0 reality, verified in kernel.rs: a violated
+         fiber is never eligible for unload (eligible_unload) or slot
+         removal (removal_candidate), the violated latch has no exit
+         ("the episode may not close over a violated teardown
+         contract"), and violated effect records remain as provenance
+         tombstones — so quiet == false means discharge is NOT proven,
+         not "old world gone but unhealthy". Letting a new episode
+         mount on an unproven-discharged world would violate the F6
+         no-overlap root invariant itself.
+         FIXED: F6 §6 now rules quiet == false ⇒ FAIL-STOP (no new
+         episode, no further Open/Next/Previous replacement in this
+         process, restart required); the §4 replacement ladder marks
+         quiet == false as fail-stop; TUI §3 adds the fail-stop guard
+         and fatal banner (only Q/Ctrl+C remain); TUI §5 marks it
+         non-transient; NAVIGATION §6 records the propagation
+         (replacement permanently disabled until restart);
+         DECISION-MATRIX §1 updated. No recovery authority is assumed;
+         recovery-after-violation would need its own earned decision.
+
+MAJOR-2  S-PROBE ordering inverted — the plan promoted F6 authority
+         before validating its load-bearing physical premise. The
+         fallback (probe after settlement) abandons the product
+         property "an invalid source never kills live playback",
+         which is an F6 authority change, not a representation
+         detail — so Candidate B is not promotable without the
+         physical evidence.
+         FIXED: the route now matches the F5 E3 discipline
+         (mechanism physical fact → evidence → authority freeze →
+         implementation): F5 merge → F6-S-PROBE (evidence-only slice,
+         no production feature work) → promotion only on GREEN; a RED
+         S-PROBE reopens the F6 mechanism decision instead. TUI §8
+         ladder reordered (S-PROBE as step 2, promotion as step 3);
+         F6 §3 rewritten; DECISION-MATRIX §2 promotion plan gated.
+         Volume promotion split accordingly: owner/semantics CLOSED,
+         Windows candidate mechanism = IAudioStreamVolume, physical
+         RT placement pending V-PROBE — the apply mechanism does not
+         fully close before V-PROBE.
+
+MINOR-1  SetAllVolumes was described as "bounded, non-blocking" —
+         a claim the official documentation does not make (it
+         contracts stream-local scope and the 0.0–1.0 domain only;
+         the GetService/Release thread note is lifetime discipline,
+         not an RT-safety proof).
+         FIXED: VOLUME §6 withdraws the claim ("no non-blocking /
+         bounded-latency guarantee is claimed anywhere in this
+         design"); V-PROBE V4 was rewritten and V5 added — measure
+         render iteration latency and underrun/glitch behavior across
+         repeated +/- presses and paused changes, plus the
+         device-invalidated failure path; a materially perturbing
+         result reopens the apply-point/ownership decision before
+         VOLUME-IMPLEMENTATION freezes it.
 ```
