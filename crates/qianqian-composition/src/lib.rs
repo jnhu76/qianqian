@@ -35,4 +35,4 @@ pub use context::{ActivationCtx, Binding, ResolveError, TeardownCtx};
 pub use desired::{CompositionError, CompositionErrors, DesiredEntry, Revision};
 pub use diagnostic::{CompositionSnapshot, FiberDiagnostic, RelationDiagnostic};
 pub use fiber::FiberState;
-pub use kernel::{CompositionKernel, EffectHandle, StepOutcome};
+pub use kernel::{CompositionKernel, DisposeVerdict, EffectHandle, StepOutcome};

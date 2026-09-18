@@ -331,7 +331,7 @@ fn worker_thread_stops_and_joins_before_service_release() {
         "service held while active"
     );
 
-    let snap = runtime.dispose();
+    let snap = runtime.dispose().snapshot;
 
     assert!(
         seq.contains("stop_signalled"),
@@ -383,7 +383,7 @@ fn os_file_handle_released_by_registered_inverse() {
         "the resource is a real file with real bytes, not a counter"
     );
 
-    let snap = runtime.dispose();
+    let snap = runtime.dispose().snapshot;
 
     assert!(
         seq.before("releasing_file", "real_file_destructed"),
@@ -576,7 +576,7 @@ fn root_disposal_drains_all_real_resources() {
         .revise_desired(vec![desired("thread_owner"), desired("file_owner")])
         .expect("legal desired composition");
 
-    let snap = runtime.dispose();
+    let snap = runtime.dispose().snapshot;
 
     assert!(
         seq.contains("worker_joined"),

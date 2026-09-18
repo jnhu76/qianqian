@@ -17,12 +17,21 @@
 //! between draws). UI refresh cadence: the loop waits for input up to
 //! [`TICK`], so a quiet terminal redraws about every 150 ms and a key
 //! press is answered within the same budget.
+//!
+//! The one deliberate exception to non-blocking key handling is the
+//! Open operation (ADR-PBK-002 D14.6): `ReferencePlayerApp::open` runs
+//! the whole frozen replacement sequence synchronously on this thread
+//! (repeated Open is App-thread-serialized), so the O key's Enter can
+//! block for as long as the old episode needs to settle. That stall IS
+//! the replacement being honest about its ordering — no async
+//! machinery is earned in v1.
 
 use std::io::{self, Write};
+use std::path::Path;
 use std::time::Duration;
 
 use crossterm::cursor::{Hide, Show};
-use crossterm::event::{self, Event};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
@@ -30,20 +39,24 @@ use crossterm::terminal::{
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
-use qianqian_playback::PlaybackSessionHandle;
+use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 
-use super::model::{Step, TuiModel, action_for_key, apply_action};
+use super::model::{Action, Step, TuiModel, action_for_key, apply_action};
 use super::view;
 
 /// UI refresh cadence (~100–250 ms band).
 pub const TICK: Duration = Duration::from_millis(150);
 
-/// Run the reference-player shell over one episode handle until the
-/// user quits. Restores the terminal on every exit path that unwinds
+/// Run the reference-player shell over the player until the user
+/// quits. Restores the terminal on every exit path that unwinds
 /// through this frame (normal quit, I/O error, panic unwind) before
-/// returning; the caller owns everything episode-lifecycle related
-/// (stop request, terminal wait, dispose).
-pub fn run(handle: &PlaybackSessionHandle, source: &str) -> Result<(), String> {
+/// returning; the caller owns everything else (quit, disposal
+/// reporting, exit codes). `initial_status` is presented as the first
+/// Open-operation feedback line (e.g. the startup Open's outcome).
+pub fn run<S: EpisodeStart>(
+    player: &mut ReferencePlayerApp<S>,
+    initial_status: Option<String>,
+) -> Result<(), String> {
     let mut guard =
         TerminalGuard::acquire().map_err(|error| format!("terminal setup failed: {error}"))?;
 
@@ -51,8 +64,9 @@ pub fn run(handle: &PlaybackSessionHandle, source: &str) -> Result<(), String> {
     let mut terminal =
         Terminal::new(backend).map_err(|error| format!("terminal setup failed: {error}"))?;
 
-    let mut model = TuiModel::new(source);
-    model.update(handle.observe());
+    let mut model = TuiModel::new(String::new());
+    model.set_status(initial_status);
+    refresh(&mut model, player);
 
     loop {
         terminal
@@ -62,9 +76,7 @@ pub fn run(handle: &PlaybackSessionHandle, source: &str) -> Result<(), String> {
         if event::poll(TICK).map_err(|error| format!("terminal input failed: {error}"))? {
             match event::read().map_err(|error| format!("terminal input failed: {error}"))? {
                 Event::Key(key) => {
-                    if let Some(action) = action_for_key(key)
-                        && matches!(apply_action(action, handle), Step::Exit)
-                    {
+                    if handle_key(key, &mut model, player) == Step::Exit {
                         break;
                     }
                 }
@@ -74,11 +86,100 @@ pub fn run(handle: &PlaybackSessionHandle, source: &str) -> Result<(), String> {
             }
         }
 
-        model.update(handle.observe());
+        refresh(&mut model, player);
     }
 
     guard.restore();
     Ok(())
+}
+
+/// One key press against the shell state. While the Open input line is
+/// active it captures the editing keys (Enter performs the Open
+/// through the player; Esc cancels; an empty line confirms nothing);
+/// otherwise the frozen grammar applies, with the Open action routed
+/// to the input line and every episode command routed through the
+/// player's committed seam.
+fn handle_key<S: EpisodeStart>(
+    key: crossterm::event::KeyEvent,
+    model: &mut TuiModel,
+    player: &mut ReferencePlayerApp<S>,
+) -> Step {
+    if key.kind != crossterm::event::KeyEventKind::Press {
+        return Step::Continue;
+    }
+    if model.open_input_active() {
+        match key.code {
+            KeyCode::Enter => {
+                if let Some(candidate) = model.confirm_open_input() {
+                    perform_open(model, player, Path::new(&candidate));
+                }
+            }
+            KeyCode::Esc => model.cancel_open_input(),
+            KeyCode::Backspace => model.open_input_backspace(),
+            // The conventional quit keeps working from inside the line.
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                return Step::Exit;
+            }
+            KeyCode::Char(c)
+                if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT =>
+            {
+                model.open_input_push(c)
+            }
+            _ => {}
+        }
+        return Step::Continue;
+    }
+    let Some(action) = action_for_key(key) else {
+        return Step::Continue;
+    };
+    match action {
+        Action::Open => {
+            model.begin_open_input();
+            Step::Continue
+        }
+        // Episode commands route through the player's committed seam;
+        // with no episode they are inert (there is nothing to command).
+        action => {
+            if let Some(handle) = player.active_handle() {
+                apply_action(action, handle)
+            } else {
+                Step::Continue
+            }
+        }
+    }
+}
+
+/// Perform the Open composition command through the player and record
+/// the outcome as the status line's feedback — application composition
+/// feedback (D14.6), never a playback semantic.
+fn perform_open<S: EpisodeStart>(
+    model: &mut TuiModel,
+    player: &mut ReferencePlayerApp<S>,
+    candidate: &Path,
+) {
+    let feedback = match player.open(candidate) {
+        OpenOutcome::Opened => format!("opened {}", candidate.display()),
+        OpenOutcome::Refused { diagnostic } => format!("open refused: {diagnostic}"),
+        OpenOutcome::ActivationFailedClean { diagnostic } => {
+            format!("open failed (clean): {diagnostic}")
+        }
+        OpenOutcome::FailStop { diagnostic } => format!("FAIL-STOP: {diagnostic}"),
+    };
+    model.set_status(Some(feedback));
+}
+
+/// Follow the player's committed episode: swap the source label when
+/// the committed episode changed, and take the new episode's one pure
+/// observation for this refresh.
+fn refresh<S: EpisodeStart>(model: &mut TuiModel, player: &ReferencePlayerApp<S>) {
+    model.set_episode(
+        player
+            .active_source()
+            .map(|p| p.to_string_lossy().into_owned()),
+    );
+    if let Some(handle) = player.active_handle() {
+        model.update(handle.observe());
+    }
 }
 
 /// Owns the entered terminal modes until the shell is done. Restore is

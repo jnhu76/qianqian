@@ -18,8 +18,14 @@
 //! can observe from the `--machine` transport — report lines, streams,
 //! exit codes — is pinned in [`machine`], which the binary renders
 //! through so behavior and contract cannot drift.
+//!
+//! Since F6, the reference player's episode lifetime is owned by
+//! [`player`]: the application composition owner of Open/replacement
+//! (ADR-PBK-002 D14.6) — one process-level host sequentially owning
+//! non-overlapping composition roots, one per episode.
 
 pub mod cli;
 pub mod machine;
+pub mod player;
 pub mod status;
 pub mod tui;

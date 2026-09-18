@@ -271,7 +271,7 @@ fn a_never_activated_episode_never_fabricates_a_position() {
         );
         assert_eq!(consumed.load(Ordering::SeqCst), 0, "nothing ever played");
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -349,7 +349,7 @@ fn activation_failure_withdraws_an_already_published_position() {
         );
         assert_eq!(consumed.load(Ordering::SeqCst), 0, "nothing ever played");
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -393,7 +393,7 @@ fn unknown_position_stays_none_until_the_mechanism_publishes() {
 
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -453,7 +453,7 @@ fn the_published_sample_is_monotone_and_never_exceeds_the_submitted_total() {
 
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -573,7 +573,7 @@ fn pause_freezes_the_sample_at_tail_quiescence_not_at_the_command() {
 
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -632,7 +632,7 @@ fn a_pause_that_never_quiesces_leaves_the_sample_where_it_was() {
 
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -689,7 +689,7 @@ fn stop_from_an_established_pause_withdraws_without_latching_a_final_sample() {
         );
         assert!(!settled.paused(), "a settled episode is never Paused");
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -789,7 +789,7 @@ fn each_terminal_fact_withdraws_the_position_and_keeps_the_duration() {
                 "case {name}: a settled episode is never Paused"
             );
 
-            let snapshot = runtime.dispose();
+            let snapshot = runtime.dispose().snapshot;
             assert!(
                 snapshot.quiet,
                 "case {name}: teardown must stay quiet: {snapshot:?}"
@@ -826,7 +826,7 @@ fn an_unreported_duration_stays_unknown() {
             None,
             "unknown stays unknown after settlement too — never zero"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -860,7 +860,7 @@ fn a_zero_length_duration_is_distinguishable_from_unknown() {
         );
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -935,7 +935,7 @@ fn repeating_an_observation_changes_nothing() {
 
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }

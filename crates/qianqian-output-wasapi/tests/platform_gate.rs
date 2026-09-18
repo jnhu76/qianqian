@@ -41,7 +41,7 @@ fn non_windows_activation_fails_loudly_without_ghost_provisions() {
             .is_none_or(|p| p.is_empty()),
         "a raised activation publishes no provision"
     );
-    let snap = runtime.dispose();
+    let snap = runtime.dispose().snapshot;
     assert!(snap.quiet, "the failed fiber disposes cleanly");
 }
 
@@ -64,6 +64,6 @@ fn windows_activation_publishes_the_capability() {
         Some(Some("output")),
         "the real output mechanism is kernel truth on Windows"
     );
-    let snap = runtime.dispose();
+    let snap = runtime.dispose().snapshot;
     assert!(snap.quiet);
 }

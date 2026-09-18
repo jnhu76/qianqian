@@ -184,12 +184,13 @@ EXPORT_RULES = {
     "crates/qianqian-decode-songcore/src/lib.rs": {
         "require": [
             "pub fn songcore_decode_plugin",
+            "pub fn probe_media(path: &Path) -> Result<SourceFacts, DecodeOpenError> {",
         ],
         "forbid": [
             "pub struct SongcoreDecode",
             "pub use",
         ],
-        "authority": "ADR-PBK-002 D5/D7 — admitted surface is the plugin constructor; mechanism stays crate-private (SOURCE_GATE_ENFORCED: workspace-excluded crate)",
+        "authority": "ADR-PBK-002 D5/D7 + the D14.6 F6-AUTHORITY-PROMOTION-1 amendment — admitted surface is the plugin constructor plus exactly ONE public stateless source-preflight query (probe_media: open → declared facts → close; no PCM read, no RT resource, mechanism evidence for an Open composition decision, never episode truth); the concrete mechanism stays crate-private (SOURCE_GATE_ENFORCED: workspace-excluded crate)",
     },
     "crates/qianqian-output-wasapi/src/lib.rs": {
         "allowed_root_public": [
@@ -426,26 +427,32 @@ def scan():
     # and no CI compiles it, so this source gate is its only continuous
     # watcher — it must not be defeatable by a new src file). Across
     # EVERY src/*.rs of the excluded decode crate, the only externally
-    # visible item allowed is the admitted plugin constructor;
-    # everything else must be private or pub(crate). lib.rs-level
-    # "pub mod" re-opening is already forbidden by the EXPORT_RULES
-    # forbid list above; this scan covers items declared in other files.
+    # visible items allowed are the admitted plugin constructor and the
+    # D14.6 public stateless source-preflight query (exactly its frozen
+    # spelling: SourceFacts in, DecodeOpenError out); everything else
+    # must be private or pub(crate). lib.rs-level "pub mod" re-opening
+    # is already forbidden by the EXPORT_RULES forbid list above; this
+    # scan covers items declared in other files.
     decode_src = ROOT / "crates/qianqian-decode-songcore" / "src"
-    admitted_decode_surface = "pub fn songcore_decode_plugin() -> ComponentSpec {"
+    admitted_decode_surface = {
+        "pub fn songcore_decode_plugin() -> ComponentSpec {",
+        "pub fn probe_media(path: &Path) -> Result<SourceFacts, DecodeOpenError> {",
+    }
     for rs in sorted(decode_src.glob("*.rs")):
         for lineno, line in enumerate(rs.read_text(encoding="utf-8").splitlines(), 1):
             stripped = line.strip()
             if not stripped.startswith("pub "):
                 continue  # private / pub(crate) / comments / strings
-            if rs.name == "lib.rs" and stripped.startswith(admitted_decode_surface):
+            if rs.name == "lib.rs" and stripped in admitted_decode_surface:
                 continue
             violations.append(
                 f"source: crates/qianqian-decode-songcore/src/{rs.name}:{lineno}\n"
                 f"target: public export surface\nkind: source\n"
-                f"rule: the decode chain admits exactly one external item "
-                f"(songcore_decode_plugin); found: {stripped.split('{')[0].strip()!r}\n"
+                f"rule: the decode chain admits exactly the plugin constructor and "
+                f"the D14.6 probe query; found: {stripped.split('{')[0].strip()!r}\n"
                 f"authority: audit §7.5 / MAJOR-3 — SOURCE_GATE_ENFORCED for the "
-                f"workspace-excluded decode chain"
+                f"workspace-excluded decode chain; D14.6 F6-AUTHORITY-PROMOTION-1 "
+                f"(the narrow public-surface amendment, synced with the surface)"
             )
 
     return violations

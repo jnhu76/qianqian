@@ -131,7 +131,7 @@ fn stop_before_binding_stops_the_episode_once_bound() {
             "a stop that arrived before the edge existed must not be lost"
         );
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -169,7 +169,7 @@ fn stop_before_a_failing_activation_leaves_the_diagnostic_in_charge() {
             "the activation failure is published"
         );
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -198,7 +198,7 @@ fn late_stop_after_completed_changes_nothing() {
             "stop after settlement must not rewrite the outcome"
         );
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -226,7 +226,7 @@ fn repeated_stop_requests_are_idempotent() {
         }
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -263,7 +263,7 @@ fn a_decode_failure_without_any_stop_lands_failed_decode() {
         );
         assert!(!observation.stop_requested, "nobody requested a stop");
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -303,7 +303,7 @@ fn a_device_abort_without_stop_request_lands_failed_device() {
             "no stop intent was ever recorded"
         );
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -326,7 +326,7 @@ fn binding_the_stop_target_alone_preserves_the_eof_path() {
 
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });

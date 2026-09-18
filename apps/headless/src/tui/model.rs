@@ -18,11 +18,24 @@ use qianqian_playback::{
 };
 use std::time::Duration;
 
-/// One frame's worth of presentation state: the source path the episode
-/// was opened with and the latest coherent observation.
+/// One frame's worth of presentation state: the episode the player has
+/// committed (source path + latest coherent observation), the Open
+/// input line while it is active, and the last Open operation's
+/// feedback. All of it is presentation: the shell keeps no playback
+/// truth of its own.
 pub struct TuiModel {
-    source: String,
+    /// The committed episode's source path. `None` is a real state
+    /// (F6): no episode is live — a clean-failed Open leaves no
+    /// runtime, and the honest panel says so instead of fabricating
+    /// labels.
+    source: Option<String>,
     observation: PlaybackSessionObservation,
+    /// The Open input line (D14.6): shell representation of the Open
+    /// input UX, which the ADR leaves open. `None` = not in input mode.
+    open_input: Option<String>,
+    /// The last Open operation's feedback — application composition
+    /// feedback (D14.6), never a playback semantic.
+    status: Option<String>,
 }
 
 impl TuiModel {
@@ -30,7 +43,7 @@ impl TuiModel {
     /// every label starts at the honest "unknown/pending" projection.
     pub fn new(source: impl Into<String>) -> Self {
         Self {
-            source: source.into(),
+            source: Some(source.into()),
             observation: PlaybackSessionObservation {
                 terminal_outcome: None,
                 failure_diagnostic: None,
@@ -42,6 +55,8 @@ impl TuiModel {
                 pause_engagement: PauseEngagement::Disengaged,
                 activation_error: None,
             },
+            open_input: None,
+            status: None,
         }
     }
 
@@ -51,8 +66,68 @@ impl TuiModel {
         self.observation = observation;
     }
 
-    pub fn source(&self) -> &str {
-        &self.source
+    /// Follow the player's committed episode: `Some(path)` after a
+    /// committed replacement, `None` after a clean-failed one.
+    pub fn set_episode(&mut self, source: Option<String>) {
+        self.source = source;
+    }
+
+    /// The committed episode's source path, if one is live.
+    pub fn source(&self) -> Option<&str> {
+        self.source.as_deref()
+    }
+
+    /// Record one Open operation's feedback line (composition
+    /// feedback, never a playback semantic).
+    pub fn set_status(&mut self, status: Option<String>) {
+        self.status = status;
+    }
+
+    pub fn status(&self) -> Option<&str> {
+        self.status.as_deref()
+    }
+
+    /// Enter Open input mode (the O key). Idempotent: a second O while
+    /// editing restarts the line empty.
+    pub fn begin_open_input(&mut self) {
+        self.open_input = Some(String::new());
+    }
+
+    /// Whether the Open input line is active.
+    pub fn open_input_active(&self) -> bool {
+        self.open_input.is_some()
+    }
+
+    /// The line's current content, while editing.
+    pub fn open_input(&self) -> Option<&str> {
+        self.open_input.as_deref()
+    }
+
+    pub fn open_input_push(&mut self, c: char) {
+        if let Some(line) = &mut self.open_input {
+            line.push(c);
+        }
+    }
+
+    pub fn open_input_backspace(&mut self) {
+        if let Some(line) = &mut self.open_input {
+            line.pop();
+        }
+    }
+
+    /// Confirm the line: returns the candidate path and closes input
+    /// mode. An empty line is a cancel (`None`), never an Open of "".
+    pub fn confirm_open_input(&mut self) -> Option<String> {
+        let line = self.open_input.take()?;
+        if line.is_empty() {
+            return None;
+        }
+        Some(line)
+    }
+
+    /// Leave Open input mode without opening anything.
+    pub fn cancel_open_input(&mut self) {
+        self.open_input = None;
     }
 
     pub fn observation(&self) -> &PlaybackSessionObservation {
@@ -121,8 +196,10 @@ impl TuiModel {
 }
 
 /// What one key press means to the shell. `Stop`, `PauseResume` and the
-/// seek arrows are episode commands; `Quit` is loop control, not a
-/// playback semantic.
+/// seek arrows are episode commands; `Open` and `Quit` are shell
+/// actions, not playback semantics — `Open` is owned by the runtime
+/// (it needs the player and the input-line state; [`apply_action`]
+/// routes episode commands only), `Quit` is loop control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Stop,
@@ -133,6 +210,9 @@ pub enum Action {
     SeekBackward,
     /// Right arrow: seek one [`SEEK_STEP`] later (D14.5).
     SeekForward,
+    /// O: begin the Open input line (D14.6). A shell action; the
+    /// runtime performs the Open through the player.
+    Open,
     Quit,
 }
 
@@ -171,9 +251,9 @@ pub enum Step {
 }
 
 /// The shell's whole keyboard grammar: Left/Right seek in fixed steps,
-/// Space toggles pause/resume, S stops, Q quits, Ctrl+C quits. Anything
-/// else is presentation noise (including key-release events, which
-/// Windows terminals emit).
+/// Space toggles pause/resume, S stops, O opens the Open input line,
+/// Q quits, Ctrl+C quits. Anything else is presentation noise
+/// (including key-release events, which Windows terminals emit).
 pub fn action_for_key(key: KeyEvent) -> Option<Action> {
     if key.kind != KeyEventKind::Press {
         return None;
@@ -186,6 +266,7 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
     match key.code {
         KeyCode::Char(' ') if plain => Some(Action::PauseResume),
         KeyCode::Char('s') | KeyCode::Char('S') if plain => Some(Action::Stop),
+        KeyCode::Char('o') | KeyCode::Char('O') if plain => Some(Action::Open),
         KeyCode::Char('q') | KeyCode::Char('Q') if plain => Some(Action::Quit),
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(Action::Quit),
         KeyCode::Left if plain => Some(Action::SeekBackward),
@@ -194,17 +275,18 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
     }
 }
 
-/// The event loop's entire reaction to one key press, factored out of
-/// [`super::runtime::run`] so the key → seam wiring is testable
-/// without a terminal. Space routes to the pause/resume seams: which of
-/// the two commands is sent comes from a FRESH authoritative observation
-/// of the episode's pause-intent command state — the shell never keeps
-/// a local `paused` bool. The arrows route a fixed-step seek (D14.5):
-/// the target is derived from one fresh coherent observation, and an
-/// episode whose position is unknown gets NO command at all. S routes
-/// to `request_stop`; all of these are idempotent, valid before and
-/// after the terminal Fact. Q exits the loop without touching the
-/// episode.
+/// The event loop's entire reaction to one EPISODE-COMMAND key press,
+/// factored out of [`super::runtime::run`] so the key → seam wiring is
+/// testable without a terminal. Space routes to the pause/resume seams:
+/// which of the two commands is sent comes from a FRESH authoritative
+/// observation of the episode's pause-intent command state — the shell
+/// never keeps a local `paused` bool. The arrows route a fixed-step
+/// seek (D14.5): the target is derived from one fresh coherent
+/// observation, and an episode whose position is unknown gets NO
+/// command at all. S routes to `request_stop`; all of these are
+/// idempotent, valid before and after the terminal Fact. Q exits the
+/// loop without touching the episode. The Open action is routed by the
+/// runtime itself (input line + player) and must not arrive here.
 pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
     match action {
         Action::Stop => {
@@ -225,6 +307,11 @@ pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
             }
             Step::Continue
         }
+        // The Open action never reaches this wiring: the runtime routes
+        // it to the input line and the player before any episode
+        // command is considered. This arm exists so the match stays
+        // exhaustive; it must not touch the episode.
+        Action::Open => Step::Continue,
         Action::Quit => Step::Exit,
     }
 }
@@ -573,6 +660,92 @@ mod tests {
         // (inert intent history): the observation derives everything.
         assert_eq!(apply_action(Action::PauseResume, &handle), Step::Continue);
         assert!(handle.observe().pause_requested);
+    }
+
+    /// The Open key maps to the shell action (plain and shift-keyed),
+    /// and apply_action must never let it touch the episode: the
+    /// runtime owns it.
+    #[test]
+    fn o_maps_to_the_shell_open_action_and_apply_action_never_touches_the_episode() {
+        for key in ['o', 'O'] {
+            assert_eq!(
+                action_for_key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE)),
+                Some(Action::Open),
+                "{key} must begin the Open input line"
+            );
+        }
+        assert_eq!(
+            action_for_key(KeyEvent::new(KeyCode::Char('O'), KeyModifiers::SHIFT)),
+            Some(Action::Open)
+        );
+
+        let handle = PlaybackSessionHandle::new();
+        let before = handle.observe();
+        assert_eq!(apply_action(Action::Open, &handle), Step::Continue);
+        assert_eq!(handle.observe(), before, "Open is not an episode command");
+    }
+
+    /// The Open input line lifecycle: begin → edit → confirm returns
+    /// the path and closes the line; an empty line and Esc are cancels;
+    /// a second O restarts the line.
+    #[test]
+    fn the_open_input_line_edits_confirms_and_cancels() {
+        let mut model = TuiModel::new("song.flac");
+        assert!(!model.open_input_active());
+        assert_eq!(model.open_input(), None);
+
+        model.begin_open_input();
+        assert!(model.open_input_active());
+        assert_eq!(model.open_input(), Some(""));
+        for c in "/media/b.flac".chars() {
+            model.open_input_push(c);
+        }
+        assert_eq!(model.open_input(), Some("/media/b.flac"));
+        model.open_input_backspace();
+        assert_eq!(model.open_input(), Some("/media/b.fla"));
+
+        assert_eq!(
+            model.confirm_open_input(),
+            Some("/media/b.fla".to_owned()),
+            "confirm returns the candidate and closes the line"
+        );
+        assert!(!model.open_input_active());
+
+        // An empty line confirms nothing — it is a cancel, never an
+        // Open of "".
+        model.begin_open_input();
+        assert_eq!(model.confirm_open_input(), None);
+        assert!(!model.open_input_active());
+
+        // Esc cancels a non-empty line.
+        model.begin_open_input();
+        model.open_input_push('x');
+        model.cancel_open_input();
+        assert_eq!(model.open_input(), None);
+    }
+
+    /// The committed episode follows the player: a clean-failed Open
+    /// leaves `None` (an honest no-episode state), a committed
+    /// replacement moves the path.
+    #[test]
+    fn the_model_follows_the_player_committed_episode() {
+        let mut model = TuiModel::new("song.flac");
+        assert_eq!(model.source(), Some("song.flac"));
+        model.set_episode(Some("/media/b.flac".to_owned()));
+        assert_eq!(model.source(), Some("/media/b.flac"));
+        model.set_episode(None);
+        assert_eq!(model.source(), None, "no episode is a real F6 state");
+    }
+
+    /// The status line is plain presentation: recorded, read, replaced.
+    #[test]
+    fn the_status_line_records_open_operation_feedback() {
+        let mut model = TuiModel::new("song.flac");
+        assert_eq!(model.status(), None);
+        model.set_status(Some("open refused: unsupported container".to_owned()));
+        assert_eq!(model.status(), Some("open refused: unsupported container"));
+        model.set_status(None);
+        assert_eq!(model.status(), None);
     }
 
     /// The displayed Paused projection comes from the seam's frozen

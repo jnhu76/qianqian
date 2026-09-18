@@ -249,7 +249,7 @@ fn pause_establishes_resume_releases_and_cycles_stay_truthful() {
         // Commands stay commands: stop settles the episode normally.
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -305,7 +305,7 @@ fn stop_from_an_established_pause_settles_stopped_and_late_commands_stay_inert()
         );
         assert!(!observation.paused());
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -361,7 +361,7 @@ fn eof_while_parked_leaves_the_episode_unsettled_until_resumed() {
         // Resume-and-drain completes it.
         handle.request_resume();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -395,7 +395,7 @@ fn stop_from_parked_after_eof_still_completes() {
             EpisodeTerminalOutcome::Completed,
             "stop-from-paused-after-EOF must play out and drain, not fail"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -435,7 +435,7 @@ fn failure_while_parked_settles_failed_without_wedging_teardown() {
         );
 
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Failed);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
         assert_no_leg_threads();
     });
@@ -488,7 +488,7 @@ fn stop_wakes_a_producer_blocked_through_pause_backpressure() {
         // Stop through the backpressure: both legs must wake.
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
         assert_no_leg_threads();
     });
@@ -537,7 +537,7 @@ fn pause_routed_after_stop_cannot_repark_the_released_episode() {
             !handle.observe().paused(),
             "a settled episode is never Paused"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
         assert_no_leg_threads();
     });
@@ -607,7 +607,7 @@ fn pause_routed_after_teardown_release_cannot_wedge_the_join() {
                 tail_probe.unhold();
             })
         };
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         hostile.join().expect("the hostile pauser joins");
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
@@ -758,7 +758,7 @@ fn a_never_activated_open_aborted_episode_has_no_resumed_proposition() {
         assert!(!handle.observe().paused());
         assert_eq!(handle.observe().terminal_outcome, None);
 
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
         assert_no_leg_threads();
     });

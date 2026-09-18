@@ -288,7 +288,7 @@ fn a_committed_forward_seek_jumps_the_content_exactly_at_the_actual_landing() {
             "the seek must not disturb the episode's ordinary EOF course"
         );
         assert_one_cut_to(&content(&witnesses), FIVE_SECONDS);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -324,7 +324,7 @@ fn a_committed_backward_seek_rebases_the_position_legally_backward() {
         );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         assert_one_cut_to(&content(&witnesses), 8_820); // 200 ms at 44.1 kHz
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -369,7 +369,7 @@ fn a_zero_landing_publishes_position_zero_not_undefined() {
         );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         assert_one_cut_to(&content(&witnesses), 0);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -392,7 +392,7 @@ fn a_beyond_duration_target_is_the_providers_decision() {
         handle.request_seek(Duration::from_secs(999));
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         assert_one_cut_to(&content(&witnesses), landing);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -456,7 +456,7 @@ fn an_unknown_landing_withdraws_the_position_for_the_rest_of_the_episode() {
         assert_eq!(breaks.len(), 2);
         assert_eq!(values[breaks[0]] as u64, FIVE_SECONDS);
         assert_eq!(values[breaks[1]] as u64, later_landing);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -486,7 +486,7 @@ fn a_refused_seek_finishes_its_own_remainder_with_zero_content_loss() {
         );
         let control: Vec<f32> = (0..SOURCE_FRAMES).map(|i| i as f32).collect();
         assert_eq!(values, control, "zero content loss, frame for frame");
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -537,7 +537,7 @@ fn a_destructive_provider_failure_fails_the_episode_and_never_resumes() {
             handle.observe().position.is_none(),
             "the terminal Fact withdraws the projection"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -597,7 +597,7 @@ fn a_paused_episode_commits_its_seek_and_rebases_while_still_paused() {
         assert!(!handle.observe().paused(), "resumed is not paused");
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         assert_one_cut_to(&content(&witnesses), FIVE_SECONDS);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -635,7 +635,7 @@ fn a_second_seek_while_one_is_in_flight_is_inert() {
         // Exactly one cut, to the FIRST seek's landing — a queueing or
         // latest-wins policy would show a second cut (to 6 s or 7 s).
         assert_one_cut_to(&content(&witnesses), FIVE_SECONDS);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -716,7 +716,7 @@ fn a_paused_episode_can_seek_again_after_its_committed_cut() {
             values[breaks[0]] as u64, second_landing,
             "the visible cut must be the SECOND landing"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -756,7 +756,7 @@ fn stop_intent_wins_over_an_in_flight_seek() {
             stopped_at,
             "a stopped episode produces nothing further"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -800,7 +800,7 @@ fn a_cut_over_a_never_draining_device_still_tears_down() {
             "the episode stays UNSETTLED with the cut in flight: {stuck:?}"
         );
         // The liveness claim: teardown completes.
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -828,7 +828,7 @@ fn a_stop_releases_a_cut_over_a_never_draining_device() {
         std::thread::sleep(Duration::from_millis(200));
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -903,7 +903,7 @@ fn a_device_failure_inside_the_cut_park_settles_failed_through_d11() {
             stopped_at,
             "a failed episode must never resume production"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -932,7 +932,7 @@ fn a_seek_after_the_episode_has_settled_is_inert() {
             settled.position.is_none(),
             "the projection stays withdrawn after the terminal Fact"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
@@ -996,7 +996,7 @@ fn seek_acceptance_racing_worker_eof_settles_without_wedge() {
             handle.observe().position.is_none(),
             "the terminal Fact withdraws the projection"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
