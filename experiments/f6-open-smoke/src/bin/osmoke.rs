@@ -15,6 +15,9 @@
 //!                                   Stopped; B established and consuming
 //! O5  repeated A→B→C→D replacement  every old Stopped + Discharged, every
 //!                                   new established; quit reports Discharged
+//! O6  navigation (Stage D)          next/previous walk a 3-file startup
+//!                                   playlist through the real replacement;
+//!                                   both ends inert; cursor moves on commit
 //! ```
 //!
 //! The audible continuity property stays a human-ear item (F5/F6
@@ -87,6 +90,7 @@ fn main() {
         "O3" => o3(&main_file, &candidates),
         "O4" => o4(&main_file, &candidates),
         "O5" => o5(&main_file, &candidates),
+        "O6" => o6(&main_file, &candidates),
         other => {
             eprintln!("verdict=RED reason: unknown scenario {other:?}");
             std::process::exit(2);
@@ -546,6 +550,111 @@ fn o4(main: &Path, candidates: &[PathBuf]) -> Outcome {
             "pre_seek_position": before,
             "post_seek_position": after.position,
             "old_terminal": format!("{:?}", a_final.terminal_outcome),
+            "quit_disposal": format!("{:?}", report.disposal),
+        })),
+    )
+}
+
+/// O6 — navigation (Stage D, D14.6 playlist closure): a startup
+/// playlist of three real files; next/previous walk it through the
+/// SAME real replacement; the far end is inert; the cursor only moves
+/// on commit. Mechanical witnesses per step (both directions): the
+/// committed source is the selected entry, the new episode consumes
+/// (position publication advancing), and the previous one settled
+/// Stopped.
+fn o6(main: &Path, candidates: &[PathBuf]) -> Outcome {
+    let mut reasons = Vec::new();
+    let mut player = ReferencePlayerApp::new(RealSource);
+    if !matches!(player.open(main), OpenOutcome::Opened) {
+        return (
+            "RED",
+            vec!["O6: the first Open did not establish".into()],
+            None,
+        );
+    }
+    player.seed_startup_playlist(vec![
+        main.to_path_buf(),
+        candidates[0].clone(),
+        candidates[1].clone(),
+    ]);
+    if player.navigation_position() != Some((1, 3)) {
+        reasons.push(format!(
+            "O6: startup cursor {:?}",
+            player.navigation_position()
+        ));
+        return ("RED", reasons, None);
+    }
+
+    let mut steps = Vec::new();
+    let mut previous = player.active_handle().expect("committed").clone();
+
+    // next → entry 2; next → entry 3; next → inert end.
+    for expected in [candidates[0].clone(), candidates[1].clone()] {
+        match player.next_track() {
+            Some(OpenOutcome::Opened) => {}
+            other => {
+                reasons.push(format!("O6: next returned {other:?}"));
+                return ("RED", reasons, None);
+            }
+        }
+        let settled = previous.observe().terminal_outcome == Some(EpisodeTerminalOutcome::Stopped);
+        let committed_source = player.active_source() == Some(expected.as_path());
+        let live = player
+            .active_handle()
+            .is_some_and(|h| expect_liveness(h, 2, "O6 next episode", &mut reasons));
+        steps.push(settled && live && committed_source);
+        eprintln!(
+            "verdict=GREEN reason: O6 next → {} settled_old={settled} source_ok={committed_source}",
+            expected.display()
+        );
+        previous = player.active_handle().expect("committed").clone();
+    }
+    let inert_end = player.next_track().is_none();
+    if !inert_end {
+        reasons.push("O6: next at the last entry was not inert".into());
+    }
+
+    // previous → entry 2, then entry 1 (back to the startup file);
+    // each through the same sequence, with the SAME witnesses as next.
+    let mut prev_steps = Vec::new();
+    for expected in [candidates[0].clone(), main.to_path_buf()] {
+        match player.previous_track() {
+            Some(OpenOutcome::Opened) => {}
+            other => {
+                reasons.push(format!("O6: previous returned {other:?}"));
+                return ("RED", reasons, None);
+            }
+        }
+        let settled = previous.observe().terminal_outcome == Some(EpisodeTerminalOutcome::Stopped);
+        let committed_source = player.active_source() == Some(expected.as_path());
+        let live = player
+            .active_handle()
+            .is_some_and(|h| expect_liveness(h, 2, "O6 previous episode", &mut reasons));
+        prev_steps.push(settled && live && committed_source);
+        eprintln!(
+            "verdict=GREEN reason: O6 previous → {} settled_old={settled} source_ok={committed_source}",
+            expected.display()
+        );
+        previous = player.active_handle().expect("committed").clone();
+    }
+    // previous at the first entry: inert.
+    let prev_inert = player.previous_track().is_none();
+
+    let report = quit_report(&mut player);
+    let ok = steps.iter().all(|&r| r)
+        && prev_steps.iter().all(|&r| r)
+        && inert_end
+        && prev_inert
+        && report.terminal == Some(EpisodeTerminalOutcome::Stopped)
+        && report.disposal == Some(qianqian_composition::DisposeVerdict::Discharged);
+    (
+        if ok { "GREEN" } else { "RED" },
+        reasons,
+        Some(serde_json::json!({
+            "next_steps_ok": steps,
+            "prev_steps_ok": prev_steps,
+            "inert_end": inert_end,
+            "prev_inert_at_first": prev_inert,
             "quit_disposal": format!("{:?}", report.disposal),
         })),
     )

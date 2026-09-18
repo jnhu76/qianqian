@@ -20,9 +20,12 @@
 //!
 //! Boundary discipline (the reason this module is small): the TUI
 //! reads the episode only through `PlaybackSessionHandle::observe()`,
-//! acts on it only through the command seams, and performs Open only
-//! through [`crate::player::ReferencePlayerApp::open`] — whose outcome
-//! is application composition feedback rendered as text. It never sees
+//! acts on it only through the command seams, performs Open only
+//! through [`crate::player::ReferencePlayerApp::open`], and navigates
+//! only through the player's `next_track`/`previous_track` (D14.6
+//! playlist closure; the Track line is presentation of the player's
+//! own navigation state) — whose outcomes are application composition
+//! feedback rendered as text. It never sees
 //! K0 snapshot types, FiberState, PcmEdge, decode/output mechanisms, or
 //! any realtime path, and it renders no playback semantic that F2/F3/F6
 //! have not earned (no Playing/Starting/Stopping — Paused is the one

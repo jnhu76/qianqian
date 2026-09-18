@@ -1,0 +1,18 @@
+{
+  "scenario": "O6",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "inert_end": true,
+    "next_steps_ok": [
+      true,
+      true
+    ],
+    "prev_inert_at_first": true,
+    "prev_steps_ok": [
+      true,
+      true
+    ],
+    "quit_disposal": "Some(Discharged)"
+  }
+}

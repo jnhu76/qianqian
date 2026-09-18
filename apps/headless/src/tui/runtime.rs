@@ -137,6 +137,14 @@ fn handle_key<S: EpisodeStart>(
             model.begin_open_input();
             Step::Continue
         }
+        Action::Next => {
+            perform_navigation(model, player, Navigation::Next);
+            Step::Continue
+        }
+        Action::Previous => {
+            perform_navigation(model, player, Navigation::Previous);
+            Step::Continue
+        }
         // Episode commands route through the player's committed seam;
         // with no episode they are inert (there is nothing to command).
         action => {
@@ -147,6 +155,42 @@ fn handle_key<S: EpisodeStart>(
             }
         }
     }
+}
+
+/// Which navigation key was pressed.
+enum Navigation {
+    Next,
+    Previous,
+}
+
+/// Perform one navigation selection through the player (D14.6): the
+/// SAME Open replacement, with the cursor moving only on commit. The
+/// inert ends (no wrap) report honestly; every other outcome is the
+/// Open outcome under the operation's name.
+fn perform_navigation<S: EpisodeStart>(
+    model: &mut TuiModel,
+    player: &mut ReferencePlayerApp<S>,
+    navigation: Navigation,
+) {
+    let (name, outcome) = match navigation {
+        Navigation::Next => ("next", player.next_track()),
+        Navigation::Previous => ("previous", player.previous_track()),
+    };
+    let feedback = match outcome {
+        None => format!("no {name} track"),
+        Some(outcome) => match outcome {
+            OpenOutcome::Opened => match player.active_source() {
+                Some(source) => format!("{name}: opened {}", source.display()),
+                None => format!("{name}: opened"),
+            },
+            OpenOutcome::Refused { diagnostic } => format!("{name} refused: {diagnostic}"),
+            OpenOutcome::ActivationFailedClean { diagnostic } => {
+                format!("{name} failed (clean): {diagnostic}")
+            }
+            OpenOutcome::FailStop { diagnostic } => format!("FAIL-STOP: {diagnostic}"),
+        },
+    };
+    model.set_status(Some(feedback));
 }
 
 /// Perform the Open composition command through the player and record
@@ -177,6 +221,7 @@ fn refresh<S: EpisodeStart>(model: &mut TuiModel, player: &ReferencePlayerApp<S>
             .active_source()
             .map(|p| p.to_string_lossy().into_owned()),
     );
+    model.set_navigation(player.navigation_position());
     if let Some(handle) = player.active_handle() {
         model.update(handle.observe());
     }

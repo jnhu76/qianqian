@@ -6,6 +6,6 @@
     "old_stop_requested": true,
     "old_terminal": "Some(Stopped)",
     "quit_disposal": "Some(Discharged)",
-    "replacement_elapsed_ms": 62
+    "replacement_elapsed_ms": 52
   }
 }

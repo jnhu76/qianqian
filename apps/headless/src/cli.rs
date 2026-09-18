@@ -11,9 +11,11 @@ use std::path::PathBuf;
 /// the program path).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Invocation {
-    /// `play <file>`: one playback episode over one local media file,
-    /// presented in the interactive reference-player shell (TUI).
-    Play { file: PathBuf },
+    /// `play <file> [files…]`: local media files for the interactive
+    /// reference-player shell (TUI). The FIRST is opened as the startup
+    /// episode; ALL of them seed the startup playlist (D14.6 navigation;
+    /// the multi-file startup grammar is open representation).
+    Play { files: Vec<PathBuf> },
     /// `--machine play <file>`: the same episode through the scriptable
     /// stdin/stdout transport. This is the automation contract; the
     /// flag is recognized in command position only, like every flag.
@@ -44,9 +46,9 @@ pub fn parse_invocation(args: &[String]) -> Result<Invocation, InvocationError> 
         return Err(InvocationError::MissingCommand);
     };
     match command.as_str() {
-        "play" => match args.get(1) {
-            Some(file) if args.len() == 2 => Ok(Invocation::Play {
-                file: PathBuf::from(file),
+        "play" => match args.len() {
+            n if n >= 2 => Ok(Invocation::Play {
+                files: args[1..].iter().map(PathBuf::from).collect(),
             }),
             _ => Err(InvocationError::WrongArity { command: "play" }),
         },
@@ -82,13 +84,15 @@ pub fn usage() -> &'static str {
     "usage: qianqian-headless <command> [args]
 
 commands:
-  play <file>            play one local media file in the interactive
+  play <file> [files…]   play local media files in the interactive
                          reference-player terminal shell
   --machine play <file>  the same episode through the scriptable
                          stdin/stdout transport (automation)
   --help | -h            print this usage
   --version | -V         print the version
 
+in the reference-player shell: arrows seek, Space pauses/resumes, S
+  stops, O opens a source, N/P navigate the startup playlist, Q quits.
 in the machine transport, `stop` stops the episode, `pause` and
 `resume` pause and resume it, `seek <time>` requests a same-episode
 seek (`<time>` is a decimal seconds field, or MINUTES:SECONDS with a
@@ -298,7 +302,7 @@ mod tests {
         assert_eq!(
             parsed,
             Invocation::Play {
-                file: PathBuf::from("song.flac")
+                files: vec![PathBuf::from("song.flac")]
             }
         );
     }
@@ -309,11 +313,24 @@ mod tests {
         assert_eq!(err, InvocationError::WrongArity { command: "play" });
     }
 
+    /// Stage D (D14.6 navigation): `play` takes ONE OR MORE files — the
+    /// first is the startup episode, all of them seed the startup
+    /// playlist (open representation). The OLD one-file-per-episode
+    /// arity rule is deliberately retired for `play` (it stays frozen
+    /// for `--machine play`).
     #[test]
-    fn play_with_extra_arguments_is_an_arity_error() {
-        let err = parse_invocation(&argv(&["play", "a.flac", "b.flac"]))
-            .expect_err("one file per episode");
-        assert_eq!(err, InvocationError::WrongArity { command: "play" });
+    fn play_takes_one_or_more_files_for_the_startup_playlist() {
+        assert_eq!(
+            parse_invocation(&argv(&["play", "a.flac", "b.flac", "c.flac"]))
+                .expect("multi-file play is the Stage D grammar"),
+            Invocation::Play {
+                files: vec![
+                    PathBuf::from("a.flac"),
+                    PathBuf::from("b.flac"),
+                    PathBuf::from("c.flac")
+                ]
+            }
+        );
     }
 
     #[test]
@@ -416,7 +433,7 @@ mod tests {
         assert_eq!(
             parsed,
             Invocation::Play {
-                file: PathBuf::from("song.flac")
+                files: vec![PathBuf::from("song.flac")]
             }
         );
     }

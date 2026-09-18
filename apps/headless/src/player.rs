@@ -53,6 +53,22 @@
 //!                      retaining the attempted root
 //! ```
 //!
+//! Playlist / navigation (D14.6, closed by the same amendment): the
+//! playlist and the current index are APPLICATION NAVIGATION STATE
+//! owned by this player (`Vec<PathBuf>` + `Option<usize>`); nothing
+//! outside the App ever reads them, and no PlaylistFact /
+//! CurrentTrackFact / PlaylistPlugin / NavigationPlugin exists. The
+//! index is commit-on-activation: it moves only on replacement commit
+//! evidence (a direct Open replaces the playlist to the single opened
+//! path at index 0; Next/Previous move it one entry, only on commit).
+//! Both navigation ends are inert (no wrap, no side effect); there is
+//! no repeat, no shuffle, no EOF auto-next, no failed-candidate
+//! auto-skip. A clean activation failure leaves the cursor at the old
+//! entry — which then names a track that no longer plays; honest,
+//! because the cursor is navigation state, not audible-source truth.
+//! A latched §G.6 violation permanently disables navigation too; no
+//! recovery path exists.
+//!
 //! The provider set behind [`EpisodeStart`] is the wiring's business
 //! (the real host mounts the SongCore decode + WASAPI output plugins;
 //! the unit matrix mounts fake providers over the REAL kernel and the
@@ -164,22 +180,33 @@ struct RetainedViolatedRoot {
 }
 
 /// The reference player's composition state: at most one live episode,
-/// plus the fail-stop latch and any retained violated root.
+/// plus the fail-stop latch and any retained violated root — and the
+/// playlist / current-index APPLICATION NAVIGATION STATE (D14.6, the
+/// playlist-authority closure): `Vec<PathBuf>` + `Option<usize>`,
+/// owned here, read by nothing outside the App. The index is
+/// commit-on-activation: it moves only on F6 replacement commit
+/// evidence and is never playback truth — the read side stays the
+/// D14.2 observation.
 pub struct ReferencePlayerApp<S: EpisodeStart> {
     start: S,
     active: Option<ActiveEpisode>,
     violated: Option<RetainedViolatedRoot>,
     fail_stop: Option<String>,
+    playlist: Vec<PathBuf>,
+    cursor: Option<usize>,
 }
 
 impl<S: EpisodeStart> ReferencePlayerApp<S> {
-    /// A player with no episode, no latch and no retained root.
+    /// A player with no episode, no latch, no retained root and an
+    /// empty playlist.
     pub fn new(start: S) -> Self {
         Self {
             start,
             active: None,
             violated: None,
             fail_stop: None,
+            playlist: Vec::new(),
+            cursor: None,
         }
     }
 
@@ -191,6 +218,31 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// The live episode's source path, if an episode is committed.
     pub fn active_source(&self) -> Option<&Path> {
         Some(self.active.as_ref()?.source.as_path())
+    }
+
+    /// Seed the STARTUP playlist (open representation per D14.6: the
+    /// startup-args grammar details are not frozen). The transport
+    /// calls this ONCE, right after the first Open committed:
+    /// `entries[0]` IS the committed first episode, so the cursor
+    /// starts at 0 on commit evidence. Nothing else ever appends to
+    /// the playlist — a direct Open REPLACES it.
+    pub fn seed_startup_playlist(&mut self, entries: Vec<PathBuf>) {
+        if entries.is_empty() {
+            // Total over the input: an empty seed leaves the navigation
+            // state untouched (there is no committed entry to point at).
+            return;
+        }
+        self.playlist = entries;
+        self.cursor = Some(0);
+    }
+
+    /// The navigation projection the shell renders: the 1-based
+    /// position of the cursor and the playlist length. Presentation of
+    /// application navigation state — never playback truth, never an
+    /// observable beyond this App's own shell (D14.6: no
+    /// PlaylistFact / CurrentTrackFact exists).
+    pub fn navigation_position(&self) -> Option<(usize, usize)> {
+        Some((self.cursor? + 1, self.playlist.len()))
     }
 
     /// Whether the §G.6 fail-stop latch is set (no further Open runs).
@@ -206,8 +258,57 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// The Open composition command (D14.6): replace the whole episode
     /// composition with one for `candidate`. Runs the frozen replacement
     /// sequence synchronously; see the module docs for the truth-class
-    /// and failure-class contract.
+    /// and failure-class contract. A DIRECT Open also replaces the
+    /// playlist with the single opened path and selects index 0 — ON
+    /// COMMIT only (D14.6 playlist closure): a refusal and a clean
+    /// activation failure leave the navigation state exactly as it was.
     pub fn open(&mut self, candidate: &Path) -> OpenOutcome {
+        let outcome = self.replace_episode(candidate);
+        if matches!(outcome, OpenOutcome::Opened) {
+            self.playlist = vec![candidate.to_owned()];
+            self.cursor = Some(0);
+        }
+        outcome
+    }
+
+    /// Next (D14.6 playlist closure): select the candidate AFTER the
+    /// cursor and invoke the same Open replacement. `None` = inert
+    /// (no cursor, or the cursor already names the last entry — no
+    /// wrap, no side effect, not even a probe). The cursor moves only
+    /// on replacement commit evidence; a refusal or a clean activation
+    /// failure leaves it where it was (one keypress advances at most
+    /// one candidate).
+    pub fn next_track(&mut self) -> Option<OpenOutcome> {
+        let index = self
+            .cursor
+            .and_then(|cursor| cursor.checked_add(1))
+            .filter(|&index| index < self.playlist.len())?;
+        Some(self.navigate_to(index))
+    }
+
+    /// Previous (D14.6 playlist closure): the mirror of [`Self::next_track`].
+    /// `None` = inert (no cursor, or the cursor already names the first
+    /// entry — no wrap, no side effect).
+    pub fn previous_track(&mut self) -> Option<OpenOutcome> {
+        let index = self.cursor?.checked_sub(1)?;
+        Some(self.navigate_to(index))
+    }
+
+    /// One navigation replacement: the SAME frozen sequence as a direct
+    /// Open, with the cursor moved to the selected entry only on commit.
+    fn navigate_to(&mut self, index: usize) -> OpenOutcome {
+        let candidate = self.playlist[index].clone();
+        let outcome = self.replace_episode(&candidate);
+        if matches!(outcome, OpenOutcome::Opened) {
+            self.cursor = Some(index);
+        }
+        outcome
+    }
+
+    /// The frozen D14.6 replacement sequence itself (probe → old-side
+    /// clear → fresh root → authority-evidence commit), owning no
+    /// navigation state.
+    fn replace_episode(&mut self, candidate: &Path) -> OpenOutcome {
         // The §G.6 latch has no exit: once set, no further Open runs in
         // this process (and the retained root stays retained).
         if let Some(reason) = self.fail_stop.as_deref() {
@@ -1112,6 +1213,239 @@ mod tests {
                 );
             }
         }
+    }
+
+    // --- Stage D: the D14.6 playlist / navigation closure -------------
+
+    const C: &str = "/media/live-c.flac";
+
+    /// Direct Open REPLACES the playlist with the single opened path
+    /// and selects index 0 — on commit only (D14.6).
+    #[test]
+    fn direct_open_replaces_the_playlist_on_commit() {
+        let source = FakeEpisodeSource::new();
+        let mut player = player_with(source);
+        assert!(opened(&player.open(Path::new(LIVE_A))));
+        player.seed_startup_playlist(vec![PathBuf::from(LIVE_A), PathBuf::from(B)]);
+        assert_eq!(player.navigation_position(), Some((1, 2)));
+
+        // A committed direct Open replaces the whole playlist.
+        assert!(opened(&player.open(Path::new(LIVE_B))));
+        assert_eq!(
+            player.navigation_position(),
+            Some((1, 1)),
+            "the playlist is now exactly the opened path at index 0"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(LIVE_B)));
+
+        // A REFUSED direct Open leaves the navigation state untouched.
+        assert!(matches!(
+            player.open(Path::new("/media/invalid-x.txt")),
+            OpenOutcome::Refused { .. }
+        ));
+        assert_eq!(player.navigation_position(), Some((1, 1)));
+
+        // A CLEAN-FAILED direct Open leaves it untouched too: the
+        // cursor then names a track that no longer plays — honest
+        // navigation state, not audible-source truth.
+        assert!(matches!(
+            player.open(Path::new("/media/failstart.flac")),
+            OpenOutcome::ActivationFailedClean { .. }
+        ));
+        assert_eq!(player.navigation_position(), Some((1, 1)));
+        assert!(player.active_handle().is_none());
+    }
+
+    /// Next selects the entry AFTER the cursor and commits the cursor
+    /// only on replacement commit evidence.
+    #[test]
+    fn next_commits_the_cursor_on_the_replacement_commit() {
+        let source = FakeEpisodeSource::new();
+        let events_handle = source.log.clone();
+        let mut player = player_with(source);
+        assert!(opened(&player.open(Path::new(LIVE_A))));
+        player.seed_startup_playlist(vec![
+            PathBuf::from(LIVE_A),
+            PathBuf::from(LIVE_B),
+            PathBuf::from(C),
+        ]);
+        let a = player.active_handle().expect("committed").clone();
+
+        assert_eq!(
+            player.next_track(),
+            Some(OpenOutcome::Opened),
+            "next opens the entry after the cursor"
+        );
+        assert_eq!(player.navigation_position(), Some((2, 3)));
+        assert_eq!(player.active_source(), Some(Path::new(LIVE_B)));
+        assert_eq!(
+            a.observe().terminal_outcome,
+            Some(EpisodeTerminalOutcome::Stopped),
+            "the previous entry's episode settles through the same D14.6 sequence"
+        );
+        let events = events_handle.lock().unwrap().clone();
+        assert!(
+            events.iter().any(|e| e == "probe /media/live-b.flac")
+                && events.iter().any(|e| e.starts_with("teardown 1 "))
+                && events.iter().any(|e| e.starts_with("activate 2 ")),
+            "next IS an Open replacement (same frozen sequence)\n{events:?}"
+        );
+    }
+
+    /// Both ends are inert: no wrap, no probe, no side effect.
+    #[test]
+    fn navigation_at_both_ends_is_inert() {
+        let source = FakeEpisodeSource::new();
+        let events_handle = source.log.clone();
+        let mut player = player_with(source);
+
+        // No playlist at all: inert.
+        assert_eq!(player.next_track(), None);
+        assert_eq!(player.previous_track(), None);
+
+        assert!(opened(&player.open(Path::new(LIVE_A))));
+        player.seed_startup_playlist(vec![PathBuf::from(LIVE_A), PathBuf::from(LIVE_B)]);
+
+        // At the FIRST entry: previous is inert.
+        assert_eq!(player.previous_track(), None);
+        assert_eq!(player.navigation_position(), Some((1, 2)));
+
+        // Advance to the LAST entry, then next is inert.
+        assert_eq!(player.next_track(), Some(OpenOutcome::Opened));
+        assert_eq!(player.navigation_position(), Some((2, 2)));
+        let next_event_count = events_handle.lock().unwrap().len();
+        assert_eq!(player.next_track(), None, "no wrap");
+        assert_eq!(
+            events_handle.lock().unwrap().len(),
+            next_event_count,
+            "an inert navigation runs nothing, not even a probe"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(LIVE_B)));
+    }
+
+    /// A probe refusal during navigation leaves index AND playback
+    /// untouched (one keypress advances at most one candidate).
+    #[test]
+    fn navigation_refusal_leaves_index_and_playback_untouched() {
+        let source = FakeEpisodeSource::new();
+        let events_handle = source.log.clone();
+        let mut player = player_with(source);
+        assert!(opened(&player.open(Path::new(LIVE_A))));
+        player.seed_startup_playlist(vec![
+            PathBuf::from(LIVE_A),
+            PathBuf::from("/media/invalid-mid.flac"),
+            PathBuf::from(C),
+        ]);
+
+        assert!(matches!(
+            player.next_track(),
+            Some(OpenOutcome::Refused { .. })
+        ));
+        assert_eq!(
+            player.navigation_position(),
+            Some((1, 3)),
+            "the cursor did not move"
+        );
+        assert_eq!(player.active_source(), Some(Path::new(LIVE_A)));
+        let events = events_handle.lock().unwrap().clone();
+        assert!(
+            !events.iter().any(|e| e.starts_with("teardown 1 ")),
+            "the live episode was not touched\n{events:?}"
+        );
+
+        // The NEXT keypress advances at most one candidate: it selects
+        // the entry after the CURSOR — the refused entry sits at
+        // cursor+1, so the player retries it. No auto-skip exists.
+        assert!(matches!(
+            player.next_track(),
+            Some(OpenOutcome::Refused { .. })
+        ));
+        assert_eq!(player.navigation_position(), Some((1, 3)));
+    }
+
+    /// Post-destruction activation failure keeps the cursor at the old
+    /// entry with no episode and no runtime residue (D14.6).
+    #[test]
+    fn navigation_activation_failure_keeps_the_cursor_at_the_old_entry() {
+        let source = FakeEpisodeSource::new();
+        let events_handle = source.log.clone();
+        let mut player = player_with(source);
+        assert!(opened(&player.open(Path::new(LIVE_A))));
+        player.seed_startup_playlist(vec![
+            PathBuf::from(LIVE_A),
+            PathBuf::from("/media/failstart.flac"),
+            PathBuf::from(C),
+        ]);
+
+        assert!(matches!(
+            player.next_track(),
+            Some(OpenOutcome::ActivationFailedClean { .. })
+        ));
+        assert_eq!(player.navigation_position(), Some((1, 3)));
+        assert!(player.active_handle().is_none(), "no episode survives");
+        let events = events_handle.lock().unwrap().clone();
+        assert!(
+            events.iter().any(|e| e.starts_with("teardown 2 ")),
+            "the attempted root was disposed (failure-clean)\n{events:?}"
+        );
+
+        // A later navigation is legal and cursor-driven: the next press
+        // retries the failed entry (cursor never moved), which fails
+        // again — the escape is a direct Open, not an auto-skip.
+        assert!(matches!(
+            player.next_track(),
+            Some(OpenOutcome::ActivationFailedClean { .. })
+        ));
+        assert_eq!(player.navigation_position(), Some((1, 3)));
+    }
+
+    /// A latched §G.6 violation disables navigation: any replacement a
+    /// selection reaches refuses through the same latch (the inert ends
+    /// stay inert — selection precedes the latch).
+    #[test]
+    fn fail_stop_disables_navigation() {
+        let mut source = FakeEpisodeSource::new();
+        source.violating_cleanup = true;
+        let mut player = player_with(source);
+        assert!(opened(&player.open(Path::new(LIVE_A))));
+        player.seed_startup_playlist(vec![PathBuf::from(LIVE_A), PathBuf::from(LIVE_B)]);
+
+        // The direct Open of the failing candidate retires the live
+        // entry first; that disposal violates (the composer's flag), so
+        // the OLD-side arm latches. The cursor stays at the old entry.
+        assert!(matches!(
+            player.open(Path::new("/media/failstart.flac")),
+            OpenOutcome::FailStop { .. }
+        ));
+        assert_eq!(player.navigation_position(), Some((1, 2)));
+
+        // The end behind the cursor is inert as always (selection
+        // precedes the latch).
+        assert_eq!(player.previous_track(), None);
+        // The reachable end refuses through the latch.
+        assert!(matches!(
+            player.next_track(),
+            Some(OpenOutcome::FailStop { .. })
+        ));
+    }
+
+    /// The navigation projection follows the CURSOR, not the episode:
+    /// a naturally-settled episode does not move or clear it — the
+    /// cursor is navigation state, never playback truth (D14.6).
+    #[test]
+    fn the_navigation_projection_follows_the_cursor_not_the_episode() {
+        let source = FakeEpisodeSource::new();
+        let mut player = player_with(source);
+        assert!(opened(&player.open(Path::new(A))));
+        player.seed_startup_playlist(vec![PathBuf::from(A), PathBuf::from(B)]);
+        let handle = player.active_handle().expect("committed").clone();
+
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert_eq!(
+            player.navigation_position(),
+            Some((1, 2)),
+            "the episode settled; the navigation state did not move"
+        );
     }
 
     /// C7-13: quit settles, disposes and reports — the live episode

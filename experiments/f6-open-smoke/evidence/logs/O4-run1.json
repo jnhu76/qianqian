@@ -4,7 +4,7 @@
   "reasons": [],
   "evidence": {
     "old_terminal": "Some(Stopped)",
-    "post_seek_position": 1806048,
+    "post_seek_position": 1805607,
     "pre_seek_position": 30429,
     "quit_disposal": "Some(Discharged)"
   }
