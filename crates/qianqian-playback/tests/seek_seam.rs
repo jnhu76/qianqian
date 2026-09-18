@@ -34,7 +34,8 @@
 //!                     (rebase as the one legal backward step, zero
 //!                     landing, withdrawal discipline)
 //!   real leg order    the Windows render loop's source-order oracle
-//!                     (publish/unconditional-slice rules P1–P12)
+//!                     (publish/unconditional-slice rules P1–P13,
+//!                     including the failed-observation answer P13)
 //!   protocol latches  the completion's own white-box tests inside the
 //!                     crate (slot policy, acceptance conditions, the
 //!                     commit conjunction, first-wins latches) —
@@ -827,6 +828,81 @@ fn a_stop_releases_a_cut_over_a_never_draining_device() {
         std::thread::sleep(Duration::from_millis(200));
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// The device itself fails WHILE the leg is parked under the cut's
+/// hold — the R1 half teardown cannot speak for (F5 implementation
+/// corrective-4): no stop is requested, nothing tears the data plane
+/// down, and the failed tail observation is the ONLY event that can
+/// end the park. The mock's held observation pins the leg provably
+/// inside the park before the failure is armed, so the interleaving is
+/// deterministic, not raced. The whole chain must then run through
+/// existing semantics only: the leg exits the park through its own
+/// failure path, the dead render leg stops the data plane (the edge
+/// goes terminal), the seek worker's data-plane escape fires, the
+/// drain reports Aborted, and the episode settles D11 `Failed` — the
+/// frozen "existing output/device-failure" class. Before the
+/// corrective, the park masked the failure as "not quiesced yet": the
+/// leg parked forever, the edge stayed Open, and the worker stayed
+/// Pending with no episode ending ever recorded — this test fails by
+/// the harness bound, not by an assertion, if that mask returns.
+#[test]
+fn a_device_failure_inside_the_cut_park_settles_failed_through_d11() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let (witnesses, handle, mut runtime) = episode(Vec::new());
+        wait_for_position_past(&handle, HALF_A_SECOND);
+        // Freeze the device mid-buffer first: the park's tail can never
+        // quiesce, so whatever ends the park below cannot be an
+        // incidental drain.
+        witnesses
+            .device_tail
+            .set_playout(Playout::FramesPerObservation(0));
+        assert!(
+            wait_until(Duration::from_secs(5), || witnesses.device_tail.queued()
+                > 0),
+            "precondition: the device holds queued-to-play frames"
+        );
+        // Hold the leg's next PARK observation (only a park calls it):
+        // once the accepted seek parks the leg, its first probe blocks
+        // here — the deterministic in-park window.
+        witnesses.tail_probe.arm();
+        handle.request_seek(Duration::from_secs(5));
+        assert!(
+            witnesses
+                .tail_probe
+                .wait_held_within(Duration::from_secs(5)),
+            "the leg never parked under the cut's hold"
+        );
+        // The endpoint invalidates while that observation is in flight:
+        // every later observation — the park's next slice first — fails.
+        witnesses.device_tail.fail_observations();
+        witnesses.tail_probe.unhold();
+        assert_eq!(
+            handle.wait_terminal(),
+            EpisodeTerminalOutcome::Failed,
+            "a device failure inside the cut park is the existing D11 \
+             output/device-failure class — never a hang, never Stopped"
+        );
+        let failed = handle.observe();
+        assert!(
+            failed.failure_diagnostic.is_some(),
+            "the device failure carries its diagnostic: {failed:?}"
+        );
+        assert!(
+            failed.position.is_none(),
+            "the terminal Fact withdraws the projection"
+        );
+        let stopped_at = witnesses.consumed.load(Ordering::SeqCst);
+        std::thread::sleep(Duration::from_millis(200));
+        assert_eq!(
+            witnesses.consumed.load(Ordering::SeqCst),
+            stopped_at,
+            "a failed episode must never resume production"
+        );
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });

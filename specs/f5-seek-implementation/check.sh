@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # specs/f5-seek-implementation/check.sh — F5 seek IMPLEMENTATION mutation
-# gate (QIANQIAN-F5-SEEK-IMPLEMENTATION-1 + its correctives 1 and 3; the
-# corrective-2 classification pin lives in the decode crate's own tests).
+# gate (QIANQIAN-F5-SEEK-IMPLEMENTATION-1 + its correctives 1, 3 and 4;
+# the corrective-2 classification pin lives in the decode crate's own
+# tests).
 #
 # The guardrails M1–M7 correspond to the F5-GATE formal suite's
 # mutations (specs/f5-seek-discontinuity/mutations, TLA+). There each was
@@ -81,6 +82,14 @@
 #       abort release there resumes a purged cut's leg with its PRE-CUT
 #       position accounting).
 #
+# M11 is corrective-4's own guardrail (the device failure must escape
+# the park): the gate's Failed arms collapse into the Pending treatment,
+# i.e. a tail observation that itself failed is masked as "not quiesced
+# yet" — the pre-corrective shape (ports.rs)
+#  → caught by the device-failure-in-park oracle (the leg parks forever,
+# the edge stays Open, no episode ending is ever recorded → the harness
+# bound fires).
+#
 # Fail-closed contract:
 #   - the native regression (playback + audio-api crates) must come back
 #     green and non-empty, else exit != 0;
@@ -89,11 +98,11 @@
 #     must restore byte-exact;
 #   - refuses to run on a dirty touched file.
 #
-# Result vocabulary follows issue #124. A green run states that the ten
-# guardrails are load-bearing in the implementation under the pinned
-# oracles — not a general proof of the seek semantics (that authority is
-# ADR-PBK-002 §20 D14.5; the model-level evidence is the f5-seek-
-# discontinuity suite).
+# Result vocabulary follows issue #124. A green run states that the
+# eleven guardrails are load-bearing in the implementation under the
+# pinned oracles — not a general proof of the seek semantics (that
+# authority is ADR-PBK-002 §20 D14.5; the model-level evidence is the
+# f5-seek-discontinuity suite).
 
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -224,8 +233,12 @@ run_mutation M10PendingRoutesAbort M10PendingRoutesAbort.patch \
   -p qianqian-playback --lib \
   completion::tests::a_park_handover_evidence_gap_is_pending_and_never_an_abort
 
+run_mutation M11FailedProbeWaits M11FailedProbeWaits.patch \
+  -p qianqian-playback --test seek_seam \
+  a_device_failure_inside_the_cut_park_settles_failed_through_d11
+
 if [[ "$fail" -eq 0 ]]; then
-  echo "SUITE: GUARDRAILS-LOAD-BEARING (native green; all 10 mutations caught)"
+  echo "SUITE: GUARDRAILS-LOAD-BEARING (native green; all 11 mutations caught)"
 else
   echo "SUITE: FAILED (see RESULT lines above)"
 fi
