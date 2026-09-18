@@ -13,18 +13,9 @@
 use loom::sync::{Condvar, Mutex};
 #[cfg(not(loom))]
 use std::sync::{Condvar, Mutex};
+use std::time::Duration;
 
 use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
-
-/// Why the producer stopped writing. Failure detail lives in the
-/// session-owned completion signal, not in the edge.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum WriteOutcome {
-    /// The whole slice was accepted.
-    Written,
-    /// The edge was stopped (or failed) mid-write; the rest was dropped.
-    Stopped,
-}
 
 /// Terminal state of the edge as seen by the session.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -83,33 +74,78 @@ impl PcmEdge {
         }
     }
 
-    /// Producer side: block until the whole slice is accepted, or a
-    /// terminal stops the write.
-    pub(crate) fn write(&self, src: &[f32]) -> WriteOutcome {
-        let mut offset = 0usize;
+    /// Producer side, bounded slice: write what currently fits and
+    /// return immediately with the sample count accepted (0 when the
+    /// edge is full or a terminal is set). This is the F5 seek
+    /// protocol's bounded-slice write primitive: the decode worker's
+    /// write wait observes the seek command slot between slices, so the
+    /// worker always reaches its serialization point with bounded
+    /// latency regardless of edge occupancy — no destructive pre-purge
+    /// (D14.5).
+    ///
+    /// Partial writes leave the accepted prefix in the ring (FIFO
+    /// integrity is unchanged); the caller owns the rest of the slice.
+    pub(crate) fn write_some(&self, src: &[f32]) -> usize {
         let mut guard = self.state.lock().expect("pcm edge lock");
-        loop {
-            if guard.terminal != TERMINAL_OPEN {
-                return WriteOutcome::Stopped;
-            }
-            if offset == src.len() {
-                return WriteOutcome::Written;
-            }
-            let free = self.capacity_samples - guard.buffered;
-            if free == 0 {
-                guard = self.space_freed.wait(guard).expect("pcm edge lock");
-                continue;
-            }
-            let take = free.min(src.len() - offset);
-            let write_pos = guard.write_pos;
-            copy_into_ring(&mut guard.samples, write_pos, &src[offset..offset + take]);
-            guard.write_pos = (guard.write_pos + take) % self.capacity_samples;
-            guard.buffered += take;
-            offset += take;
-            drop(guard);
-            self.data_ready.notify_all();
-            guard = self.state.lock().expect("pcm edge lock");
+        if guard.terminal != TERMINAL_OPEN {
+            return 0;
         }
+        let free = self.capacity_samples - guard.buffered;
+        let take = free.min(src.len());
+        if take == 0 {
+            return 0;
+        }
+        let write_pos = guard.write_pos;
+        copy_into_ring(&mut guard.samples, write_pos, &src[..take]);
+        guard.write_pos = (guard.write_pos + take) % self.capacity_samples;
+        guard.buffered += take;
+        drop(guard);
+        self.data_ready.notify_all();
+        take
+    }
+
+    /// Producer wait for free space or a state change, bounded by
+    /// `slice`: the interruptible write loop's back-off between bounded
+    /// slices. Wakes on space freed, any terminal, or the timeout (the
+    /// timeout is the backstop that re-observes the seek command slot;
+    /// a missed notify costs one slice of latency, never correctness).
+    /// The caller holds no other lock across this wait.
+    pub(crate) fn wait_for_space(&self, slice: Duration) {
+        let guard = self.state.lock().expect("pcm edge lock");
+        let _ = self
+            .space_freed
+            .wait_timeout_while(guard, slice, |state| {
+                state.terminal == TERMINAL_OPEN
+                    && state.buffered == self.capacity_samples
+            })
+            .expect("pcm edge lock");
+    }
+
+    /// The F5 non-terminal invalidate (ADR-PBK-002 D14.5): drop every
+    /// buffered frame WITHOUT touching the terminal — the edge stays
+    /// Open, first-wins terminal semantics are untouched, and both
+    /// endpoints are woken (a consumer parked on an emptied edge must
+    /// re-observe; a producer parked on a full edge gets its space).
+    /// O(1): cursor reset, no data movement.
+    ///
+    /// Correctness contract: the caller must have proven no endpoint can
+    /// still deliver stale data across the reset. In the frozen protocol
+    /// that is the decode worker itself, exactly once, at its
+    /// serialization point strictly AFTER a successful provider seek:
+    /// the render leg is parked out of read (the commit is gated on
+    /// park evidence) and the worker is the only producer, on its own
+    /// path. This primitive is NOT exposed as a generic application
+    /// operation — the discipline, not the primitive, is the
+    /// load-bearing stale-PCM exclusion.
+    pub(crate) fn invalidate(&self) {
+        {
+            let mut guard = self.state.lock().expect("pcm edge lock");
+            guard.read_pos = 0;
+            guard.write_pos = 0;
+            guard.buffered = 0;
+        }
+        self.space_freed.notify_all();
+        self.data_ready.notify_all();
     }
 
     /// Producer committed EOF: consumers drain what remains, then see

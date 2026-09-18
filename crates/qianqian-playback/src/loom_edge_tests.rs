@@ -26,7 +26,26 @@ use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
 // White-box: included into the crate by src/lib.rs (cfg(all(test, loom))),
 // so the modeled edge is the production mechanism reached through the
 // crate path, not a public export.
-use crate::edge::{EdgeTerminal, PcmEdge, WriteOutcome};
+use crate::edge::{EdgeTerminal, PcmEdge};
+
+/// The production write shape (the decode worker's bounded-slice loop):
+/// `write_some` until the slice is taken, `wait_for_space` between full
+/// attempts, `false` when a terminal ended the write. F5 removed the
+/// blocking whole-slice write, so loom now explores exactly the write
+/// primitives production runs.
+fn write_all(e: &PcmEdge, mut src: &[f32]) -> bool {
+    while !src.is_empty() {
+        let n = e.write_some(src);
+        src = &src[n..];
+        if n == 0 {
+            if e.terminal() != EdgeTerminal::Open {
+                return false;
+            }
+            e.wait_for_space(std::time::Duration::from_millis(1));
+        }
+    }
+    true
+}
 
 /// L1 — concurrent write × read × stop.
 ///
@@ -40,7 +59,7 @@ fn loom_l1_write_read_stop_interleave() {
         let edge = Arc::new(PcmEdge::new(1, 2)); // 1 channel, 2 samples
         let producer = {
             let e = edge.clone();
-            thread::spawn(move || e.write(&[7.0, 9.0]))
+            thread::spawn(move || write_all(&e, &[7.0, 9.0]))
         };
         let stopper = {
             let e = edge.clone();
@@ -79,16 +98,13 @@ fn loom_l1_write_read_stop_interleave() {
         let consumed = consumer.join().unwrap();
 
         // The stopper always runs and terminals are monotone, so the edge
-        // must have ended Stopped. `Written` only means the whole slice
-        // was accepted before the stop became visible — legal per the
-        // write contract (started before stop); `Stopped` covers every
+        // must have ended Stopped. A `true` write only means the whole
+        // slice was accepted before the stop became visible — legal per
+        // the write contract (started before stop); `false` covers every
         // later race. A stop that lands mid-write abandons the buffered
         // remainder, so no conservation law holds across the race; what
         // must hold is FIFO integrity (asserted above) and clean exit.
-        assert!(matches!(
-            written,
-            WriteOutcome::Written | WriteOutcome::Stopped
-        ));
+        let _ = written;
         assert_eq!(edge.terminal(), EdgeTerminal::Stopped);
         assert!(consumed <= 2);
     })
@@ -180,10 +196,10 @@ fn loom_l4a_terminal_unblocks_full_producer() {
             let edge = Arc::new(PcmEdge::new(1, 1));
             // Fill the single-sample edge synchronously: the spawned write
             // below is genuinely blocked on `space_freed`.
-            assert_eq!(edge.write(&[7.0]), WriteOutcome::Written);
+            assert_eq!(edge.write_some(&[7.0]), 1);
             let producer = {
                 let e = edge.clone();
-                thread::spawn(move || e.write(&[9.0]))
+                thread::spawn(move || write_all(&e, &[9.0]))
             };
             let closer = {
                 let e = edge.clone();
@@ -194,7 +210,10 @@ fn loom_l4a_terminal_unblocks_full_producer() {
             };
             let written = producer.join().unwrap();
             closer.join().unwrap();
-            assert_eq!(written, WriteOutcome::Stopped);
+            // No consumer ever runs, so the slot can never free before
+            // the terminal: the write can only leave through the
+            // terminal route.
+            assert!(!written);
             match kill {
                 Kill::Stop => assert_eq!(edge.terminal(), EdgeTerminal::Stopped),
                 Kill::Fail => assert_eq!(edge.terminal(), EdgeTerminal::Failed),

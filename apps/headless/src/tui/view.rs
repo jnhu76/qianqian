@@ -79,9 +79,10 @@ fn diagnostics_panel(model: &TuiModel) -> Paragraph<'_> {
 }
 
 fn controls_panel() -> Paragraph<'static> {
-    Paragraph::new(vec![Line::from(
-        " Space  Pause/Resume    S  Stop    Q  Quit    Ctrl+C  Quit",
-    )])
+    Paragraph::new(vec![
+        Line::from(" ←/→  Seek ±5s      Space  Pause/Resume"),
+        Line::from(" S  Stop            Q  Quit    Ctrl+C  Quit"),
+    ])
     .block(Block::bordered().title(bold(" Controls ")))
 }
 
@@ -152,9 +153,9 @@ mod tests {
     }
 
     /// The F4 timeline is read-side output only: the four combinations
-    /// of the two independent evidence sides render as themselves, with
-    /// `--:--` for what does not exist, and the frame adds no seek
-    /// affordance (no gutter, no cursor, no arrow-key hint).
+    /// of the two independent evidence sides render as themselves, and
+    /// the timeline line itself adds no seek affordance (no gutter, no
+    /// cursor — the fixed-step seek keys live in the controls panel).
     #[test]
     fn the_timeline_line_renders_each_evidential_combination() {
         for (position, duration, expected) in [
@@ -188,17 +189,21 @@ mod tests {
         }
     }
 
-    /// The controls panel stays exactly the F3 grammar: no seek key, no
-    /// scrub affordance — F4 is read-side.
+    /// The controls panel documents the F5-earned seek keys — the
+    /// fixed ±5 s step and nothing beyond it: no scrub affordance, no
+    /// proportional or unbounded seek vocabulary.
     #[test]
-    fn the_controls_panel_offers_no_seek_affordance() {
+    fn the_controls_panel_documents_the_fixed_step_seek_keys() {
         let mut model = TuiModel::new("song.flac");
         model.update(pending());
         let text = rendered(&model);
-        for unearned in ["Seek", "seek", "←", "→", "Left", "Right"] {
+        for earned in ["←/→", "Seek ±5s"] {
+            assert!(text.contains(earned), "{earned:?} missing in:\n{text}");
+        }
+        for unearned in ["scrub", "Scrub", "%"] {
             assert!(
                 !text.contains(unearned),
-                "no seek affordance may appear in F4: {unearned:?} in\n{text}"
+                "no scrub affordance may appear: {unearned:?} in\n{text}"
             );
         }
     }

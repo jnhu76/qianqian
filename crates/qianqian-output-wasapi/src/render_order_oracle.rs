@@ -29,7 +29,17 @@
 //!     level). Quiescence is the slice whose publication matters most —
 //!     it is what walks a paused episode's sample up to the frozen
 //!     total — so a publication gated behind a condition, which skips
-//!     exactly that slice, must RED.
+//!     exactly that slice, must RED;
+//! P9  since F5 every publication in the mechanism routes through the
+//!     one basis-aware helper (`publish_consumed(position, …)`, which
+//!     folds the stretch basis into the estimate), and the mechanism
+//!     holds EXACTLY ONE direct cell publication — inside that helper.
+//!     A second direct `position.publish_consumed(` anywhere would be a
+//!     publication path the basis discipline cannot see;
+//! P10 the seek-park slice publishes unconditionally (its closure's top
+//!     level) — the F5 twin of P5/P8: while a cut is parked, the sample
+//!     must still walk up to the frozen handed-off total as the device
+//!     drains to the commit boundary.
 //! ```
 //!
 //! This is a REGRESSION PIN, not a semantic proof: it says the shipped
@@ -53,6 +63,17 @@ fn check_render_order(source: &str) -> Vec<String> {
     check(
         "P4: exactly one handed-off credit in the mechanism",
         source.matches(CREDIT).count() == 1,
+    );
+
+    // P9 is file-wide too: exactly one direct cell publication, and it
+    // lives inside the basis-aware helper (whose own `if publishing`
+    // gate is the F5 withdrawal discipline, not a reordering hazard).
+    let direct_publish_count = source.matches(DIRECT_PUBLISH).count();
+    let helper_publish =
+        body_of(source, PUBLISH_HELPER).is_some_and(|body| code_sites(body, DIRECT_PUBLISH).len() == 1);
+    check(
+        "P9: exactly one direct cell publication, inside the basis-aware helper",
+        direct_publish_count == 1 && helper_publish,
     );
 
     let Some(steady) = body_of(source, STEADY_LOOP) else {
@@ -109,6 +130,20 @@ fn check_render_order(source: &str) -> Vec<String> {
         }),
     );
 
+    // P10 is the seek park's twin of P5/P8 (F5): while seek-parked the
+    // sample must still walk up to the frozen handed-off total as the
+    // device drains — it is what the tail-quiescence boundary observes —
+    // so the seek-park slice publishes, unconditionally.
+    let seek_argument = argument_of(steady, SEEK_PARK);
+    check(
+        "P10: the seek-park slice publishes, unconditionally at its closure's top level",
+        seek_argument.is_some_and(|argument| {
+            code_sites(argument, PUBLISH)
+                .into_iter()
+                .any(|at| depth_inside_closure(argument, at) == 0)
+        }),
+    );
+
     let Some(drain) = body_of(source, DRAIN) else {
         violations.push("P6: drain body not found".to_owned());
         return violations;
@@ -153,8 +188,15 @@ fn brace_depth_at(text: &str, at: usize) -> usize {
     text[..at].matches('{').count() - text[..at].matches('}').count()
 }
 
-/// The steady loop's publication, as the oracle recognizes it.
-const PUBLISH: &str = "position.publish_consumed(";
+/// The steady loop's publication, as the oracle recognizes it: since F5
+/// every publication routes through the basis-aware helper, so a
+/// publication site is a helper CALL (its argument begins with the
+/// position cell).
+const PUBLISH: &str = "publish_consumed(position,";
+/// The one direct cell publication (inside the helper).
+const DIRECT_PUBLISH: &str = "position.publish_consumed(";
+/// The basis-aware publication helper's signature.
+const PUBLISH_HELPER: &str = "fn publish_consumed(";
 /// The device-buffer acquisition.
 const ACQUIRE: &str = "session.render.GetBuffer(";
 /// The successful-submission call (ReleaseBuffer of a real block).
@@ -166,6 +208,8 @@ const SUBMIT_FAIL: &str = "\"ReleaseBuffer failed:";
 const CREDIT: &str = "handed_off += n as u64;";
 /// The loop-top pause gate.
 const PARK: &str = "park_while_paused(";
+/// The loop-top seek gate (F5).
+const SEEK_PARK: &str = "park_while_seek_hold(";
 const STEADY_LOOP: &str = "fn steady_loop(";
 const DRAIN: &str = "fn drain_to_zero(";
 
@@ -215,18 +259,38 @@ fn argument_span(text: &str, call: &str) -> Option<(usize, usize)> {
     None
 }
 
-/// `steady` with the pause gate's argument removed — i.e. the loop's own
-/// body, without the park slice's copy of the publication.
+/// `steady` with BOTH park gates' arguments removed — i.e. the loop's
+/// own body, without the park slices' copies of the publication (each
+/// park slice is checked separately by P5/P8 and P10).
 fn without_park_argument(steady: &str) -> String {
-    match argument_span(steady, PARK) {
-        Some((start, end)) => format!("{}{}", &steady[..start], &steady[end..]),
-        None => steady.to_owned(),
+    let mut unparked = steady.to_owned();
+    for park in [PARK, SEEK_PARK] {
+        if let Some((start, end)) = argument_span(&unparked, park) {
+            unparked = format!("{}{}", &unparked[..start], &unparked[end..]);
+        }
     }
+    unparked
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The basis-aware publication helper exactly as the mechanism
+    /// ships it, for the synthetic bodies below (P9 requires it).
+    const HELPER: &str = r#"
+fn publish_consumed(
+    position: &PositionEvidence,
+    basis: u64,
+    handed_off: u64,
+    tail: u64,
+    publishing: bool,
+) {
+    if publishing {
+        position.publish_consumed(basis + handed_off, tail);
+    }
+}
+"#;
 
     /// The production mechanism itself: the shipped render loop has the
     /// frozen order. This is the regression pin — a reordering of
@@ -247,32 +311,40 @@ mod tests {
     /// padding reading with a block about to be submitted — is rejected.
     #[test]
     fn publishing_after_device_buffer_acquisition_is_rejected() {
-        let violations = check_render_order(
+        let violations = check_render_order(&format!(
             r#"
-fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {
+{HELPER}
+fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {{
     let mut handed_off: u64 = 0;
-    loop {
-        let padding = unsafe { session.client.GetCurrentPadding() }.unwrap_or(0);
-        let ptr = unsafe { session.render.GetBuffer(available as u32) };
-        position.publish_consumed(handed_off, u64::from(padding));
-        let dst = unsafe { slice::from_raw_parts_mut(ptr as *mut f32, available) };
-        match render_input.read_frames(dst) {
-            PcmPull::Frames(n) => {
-                if let Err(e) = unsafe { session.render.ReleaseBuffer(n as u32, 0) } {
-                    break abort_msg(format!("ReleaseBuffer failed: {e}"));
-                }
+    let mut basis: u64 = 0;
+    let mut publishing: bool = true;
+    loop {{
+        gate.park_while_paused(|| {{
+            let tail = 0;
+            publish_consumed(position, basis, handed_off, tail, publishing);
+            true
+        }});
+        let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
+        let ptr = unsafe {{ session.render.GetBuffer(available as u32) }};
+        publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
+        let dst = unsafe {{ slice::from_raw_parts_mut(ptr as *mut f32, available) }};
+        match render_input.read_frames(dst) {{
+            PcmPull::Frames(n) => {{
+                if let Err(e) = unsafe {{ session.render.ReleaseBuffer(n as u32, 0) }} {{
+                    break abort_msg(format!("ReleaseBuffer failed: {{e}}"));
+                }}
                 handed_off += n as u64;
-            }
-        }
-    }
-}
+            }}
+        }}
+    }}
+}}
 
-fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {
-    position.publish_consumed(handed_off, 0);
+fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {{
+    publish_consumed(position, 0, handed_off, 0, true);
     LoopOutcome::Drained
-}
-"#,
-        );
+}}
+"#
+        ));
         assert!(
             violations.iter().any(|v| v.starts_with("P1")),
             "the order check must reject a publish after GetBuffer: {violations:?}"
@@ -284,41 +356,43 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     /// submitted.
     #[test]
     fn publishing_from_the_post_submission_total_is_rejected() {
-        let violations = check_render_order(
+        let violations = check_render_order(&format!(
             r#"
-fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {
+{HELPER}
+fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {{
     let mut handed_off: u64 = 0;
-    loop {
-        gate.park_while_paused(|| { position.publish_consumed(handed_off, 0); true });
-        let padding = unsafe { session.client.GetCurrentPadding() }.unwrap_or(0);
-        let ptr = unsafe { session.render.GetBuffer(available as u32) };
-        let dst = unsafe { slice::from_raw_parts_mut(ptr as *mut f32, available) };
-        match render_input.read_frames(dst) {
-            PcmPull::Frames(n) => {
-                if let Err(e) = unsafe { session.render.ReleaseBuffer(n as u32, 0) } {
-                    break abort_msg(format!("ReleaseBuffer failed: {e}"));
-                }
+    let mut basis: u64 = 0;
+    let mut publishing: bool = true;
+    loop {{
+        gate.park_while_paused(|| {{
+            publish_consumed(position, basis, handed_off, 0, publishing);
+            true
+        }});
+        let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
+        let ptr = unsafe {{ session.render.GetBuffer(available as u32) }};
+        let dst = unsafe {{ slice::from_raw_parts_mut(ptr as *mut f32, available) }};
+        match render_input.read_frames(dst) {{
+            PcmPull::Frames(n) => {{
+                if let Err(e) = unsafe {{ session.render.ReleaseBuffer(n as u32, 0) }} {{
+                    break abort_msg(format!("ReleaseBuffer failed: {{e}}"));
+                }}
                 handed_off += n as u64;
-                position.publish_consumed(handed_off, u64::from(padding));
-            }
-        }
-    }
-}
+                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
+            }}
+        }}
+    }}
+}}
 
-fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {
-    position.publish_consumed(handed_off, 0);
+fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {{
+    publish_consumed(position, 0, handed_off, 0, true);
     LoopOutcome::Drained
-}
-"#,
-        );
+}}
+"#
+        ));
         assert!(
             violations.iter().any(|v| v.starts_with("P2")),
             "the loop's publication must be checked, not the park slice's \
              copy: {violations:?}"
-        );
-        assert!(
-            violations.iter().any(|v| v.starts_with("P1")),
-            "and it is also past the acquisition: {violations:?}"
         );
     }
 
@@ -327,33 +401,39 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     /// never accepted.
     #[test]
     fn crediting_before_a_successful_submission_is_rejected() {
-        let violations = check_render_order(
+        let violations = check_render_order(&format!(
             r#"
-fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {
+{HELPER}
+fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {{
     let mut handed_off: u64 = 0;
-    loop {
-        gate.park_while_paused(|| { position.publish_consumed(handed_off, 0); true });
-        let padding = unsafe { session.client.GetCurrentPadding() }.unwrap_or(0);
-        position.publish_consumed(handed_off, u64::from(padding));
-        let ptr = unsafe { session.render.GetBuffer(available as u32) };
-        let dst = unsafe { slice::from_raw_parts_mut(ptr as *mut f32, available) };
-        match render_input.read_frames(dst) {
-            PcmPull::Frames(n) => {
+    let mut basis: u64 = 0;
+    let mut publishing: bool = true;
+    loop {{
+        gate.park_while_paused(|| {{
+            publish_consumed(position, basis, handed_off, 0, publishing);
+            true
+        }});
+        let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
+        publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
+        let ptr = unsafe {{ session.render.GetBuffer(available as u32) }};
+        let dst = unsafe {{ slice::from_raw_parts_mut(ptr as *mut f32, available) }};
+        match render_input.read_frames(dst) {{
+            PcmPull::Frames(n) => {{
                 handed_off += n as u64;
-                if let Err(e) = unsafe { session.render.ReleaseBuffer(n as u32, 0) } {
-                    break abort_msg(format!("ReleaseBuffer failed: {e}"));
-                }
-            }
-        }
-    }
-}
+                if let Err(e) = unsafe {{ session.render.ReleaseBuffer(n as u32, 0) }} {{
+                    break abort_msg(format!("ReleaseBuffer failed: {{e}}"));
+                }}
+            }}
+        }}
+    }}
+}}
 
-fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {
-    position.publish_consumed(handed_off, 0);
+fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {{
+    publish_consumed(position, 0, handed_off, 0, true);
     LoopOutcome::Drained
-}
-"#,
-        );
+}}
+"#
+        ));
         assert!(
             violations.iter().any(|v| v.starts_with("P3")),
             "a credit above the submission must be rejected: {violations:?}"
@@ -380,33 +460,36 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     /// without publishing breaks that.
     #[test]
     fn a_park_slice_that_does_not_publish_is_rejected() {
-        let violations = check_render_order(
+        let violations = check_render_order(&format!(
             r#"
-fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {
+{HELPER}
+fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {{
     let mut handed_off: u64 = 0;
-    loop {
-        gate.park_while_paused(|| unsafe { session.client.GetCurrentPadding() }.is_ok_and(|p| p == 0));
-        let padding = unsafe { session.client.GetCurrentPadding() }.unwrap_or(0);
-        position.publish_consumed(handed_off, u64::from(padding));
-        let ptr = unsafe { session.render.GetBuffer(available as u32) };
-        let dst = unsafe { slice::from_raw_parts_mut(ptr as *mut f32, available) };
-        match render_input.read_frames(dst) {
-            PcmPull::Frames(n) => {
-                if let Err(e) = unsafe { session.render.ReleaseBuffer(n as u32, 0) } {
-                    break abort_msg(format!("ReleaseBuffer failed: {e}"));
-                }
+    let mut basis: u64 = 0;
+    let mut publishing: bool = true;
+    loop {{
+        gate.park_while_paused(|| unsafe {{ session.client.GetCurrentPadding() }}.is_ok_and(|p| p == 0));
+        let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
+        publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
+        let ptr = unsafe {{ session.render.GetBuffer(available as u32) }};
+        let dst = unsafe {{ slice::from_raw_parts_mut(ptr as *mut f32, available) }};
+        match render_input.read_frames(dst) {{
+            PcmPull::Frames(n) => {{
+                if let Err(e) = unsafe {{ session.render.ReleaseBuffer(n as u32, 0) }} {{
+                    break abort_msg(format!("ReleaseBuffer failed: {{e}}"));
+                }}
                 handed_off += n as u64;
-            }
-        }
-    }
-}
+            }}
+        }}
+    }}
+}}
 
-fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {
-    position.publish_consumed(handed_off, 0);
+fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {{
+    publish_consumed(position, 0, handed_off, 0, true);
     LoopOutcome::Drained
-}
-"#,
-        );
+}}
+"#
+        ));
         assert!(
             violations.iter().any(|v| v.starts_with("P5")),
             "a park slice that never publishes must be rejected: {violations:?}"
@@ -418,32 +501,38 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     /// none).
     #[test]
     fn a_drain_path_that_stops_publishing_is_rejected() {
-        let violations = check_render_order(
+        let violations = check_render_order(&format!(
             r#"
-fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {
+{HELPER}
+fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {{
     let mut handed_off: u64 = 0;
-    loop {
-        gate.park_while_paused(|| { position.publish_consumed(handed_off, 0); true });
-        let padding = unsafe { session.client.GetCurrentPadding() }.unwrap_or(0);
-        position.publish_consumed(handed_off, u64::from(padding));
-        let ptr = unsafe { session.render.GetBuffer(available as u32) };
-        let dst = unsafe { slice::from_raw_parts_mut(ptr as *mut f32, available) };
-        match render_input.read_frames(dst) {
-            PcmPull::Frames(n) => {
-                if let Err(e) = unsafe { session.render.ReleaseBuffer(n as u32, 0) } {
-                    break abort_msg(format!("ReleaseBuffer failed: {e}"));
-                }
+    let mut basis: u64 = 0;
+    let mut publishing: bool = true;
+    loop {{
+        gate.park_while_paused(|| {{
+            publish_consumed(position, basis, handed_off, 0, publishing);
+            true
+        }});
+        let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
+        publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
+        let ptr = unsafe {{ session.render.GetBuffer(available as u32) }};
+        let dst = unsafe {{ slice::from_raw_parts_mut(ptr as *mut f32, available) }};
+        match render_input.read_frames(dst) {{
+            PcmPull::Frames(n) => {{
+                if let Err(e) = unsafe {{ session.render.ReleaseBuffer(n as u32, 0) }} {{
+                    break abort_msg(format!("ReleaseBuffer failed: {{e}}"));
+                }}
                 handed_off += n as u64;
-            }
-        }
-    }
-}
+            }}
+        }}
+    }}
+}}
 
-fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {
+fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {{
     LoopOutcome::Drained
-}
-"#,
-        );
+}}
+"#
+        ));
         assert!(
             violations.iter().any(|v| v.starts_with("P6")),
             "a silent drain must be rejected: {violations:?}"
@@ -459,7 +548,9 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     fn a_second_publication_after_the_credit_is_rejected() {
         let source = include_str!("wasapi.rs").replace(
             CREDIT,
-            &format!("{CREDIT}\n        {PUBLISH}handed_off, u64::from(padding));"),
+            &format!(
+                "{CREDIT}\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);"
+            ),
         );
         let violations = check_render_order(&source);
         assert!(
@@ -469,22 +560,51 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
         );
     }
 
-    /// A park slice that publishes only when the tail is NOT quiesced
-    /// skips exactly the observation that matters most: quiescence is
-    /// where a paused episode's sample is walked up to the frozen total,
-    /// and `paused()` establishes at the same instant.
+    /// A pause park slice that publishes only when the tail is NOT
+    /// quiesced skips exactly the observation that matters most:
+    /// quiescence is where a paused episode's sample is walked up to the
+    /// frozen total. The mutation anchors on the pause park's own
+    /// publication — the seek park's sits one indent deeper and is
+    /// P10's business — and wraps it in the exact condition that skips
+    /// the quiescent slice.
     #[test]
     fn a_park_slice_that_skips_its_quiescent_publication_is_rejected() {
         let source = include_str!("wasapi.rs").replace(
-            &format!("            {PUBLISH}handed_off, u64::from(padding));\n"),
-            &format!(
-                "            if padding != 0 {{\n                {PUBLISH}handed_off, u64::from(padding));\n            }}\n"
-            ),
+            "                return false;\n            };\n            publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
+            "                return false;\n            };\n            if padding != 0 {\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n            }",
         );
         let violations = check_render_order(&source);
         assert!(
             violations.iter().any(|v| v.starts_with("P8")),
             "a conditional park publication must be rejected: {violations:?}"
+        );
+        assert!(
+            !violations.iter().any(|v| v.starts_with("P10")),
+            "the mutation must have touched the pause park, not the seek \
+             park: {violations:?}"
+        );
+    }
+
+    /// The seek park slice carries the same unconditional-publication
+    /// constraint (P10): while a cut is parked, the sample must still
+    /// walk up to the frozen handed-off total — it is what the commit
+    /// boundary's tail-quiescence observes. The mutation must leave the
+    /// pause park GREEN.
+    #[test]
+    fn a_seek_park_that_skips_its_quiescent_publication_is_rejected() {
+        let source = include_str!("wasapi.rs").replace(
+            "                };\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
+            "                };\n                if padding != 0 {\n                    publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n                }",
+        );
+        let violations = check_render_order(&source);
+        assert!(
+            violations.iter().any(|v| v.starts_with("P10")),
+            "a conditional seek-park publication must be rejected: {violations:?}"
+        );
+        assert!(
+            !violations.iter().any(|v| v.starts_with("P8")),
+            "the mutation must have touched the seek park, not the pause \
+             park: {violations:?}"
         );
     }
 
@@ -494,8 +614,8 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     #[test]
     fn a_publication_moved_into_a_comment_is_rejected() {
         let source = include_str!("wasapi.rs").replace(
-            &format!("        {PUBLISH}handed_off, u64::from(padding));\n"),
-            &format!("        // {PUBLISH}handed_off, u64::from(padding));\n"),
+            "pins this.\n        publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
+            "pins this.\n        // publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
         );
         let violations = check_render_order(&source);
         assert!(
@@ -503,6 +623,51 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
                 .iter()
                 .any(|v| v.starts_with("P1") || v.starts_with("P2")),
             "a commented-out publication is not a publication: {violations:?}"
+        );
+    }
+
+    /// A site that bypasses the basis-aware helper — writing the
+    /// stretch arithmetic (or a bare total) inline — reintroduces the
+    /// dual-accounting F5 retired: P9 pins the helper as the single
+    /// implementation of the publication.
+    #[test]
+    fn a_publication_that_bypasses_the_helper_is_rejected() {
+        let violations = check_render_order(&format!(
+            r#"
+{HELPER}
+fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutcome {{
+    let mut handed_off: u64 = 0;
+    let mut basis: u64 = 0;
+    let mut publishing: bool = true;
+    loop {{
+        gate.park_while_paused(|| {{
+            publish_consumed(position, basis, handed_off, 0, publishing);
+            true
+        }});
+        let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
+        position.publish_consumed(basis + handed_off, u64::from(padding));
+        let ptr = unsafe {{ session.render.GetBuffer(available as u32) }};
+        let dst = unsafe {{ slice::from_raw_parts_mut(ptr as *mut f32, available) }};
+        match render_input.read_frames(dst) {{
+            PcmPull::Frames(n) => {{
+                if let Err(e) = unsafe {{ session.render.ReleaseBuffer(n as u32, 0) }} {{
+                    break abort_msg(format!("ReleaseBuffer failed: {{e}}"));
+                }}
+                handed_off += n as u64;
+            }}
+        }}
+    }}
+}}
+
+fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_off: u64) -> LoopOutcome {{
+    publish_consumed(position, 0, handed_off, 0, true);
+    LoopOutcome::Drained
+}}
+"#
+        ));
+        assert!(
+            violations.iter().any(|v| v.starts_with("P9")),
+            "a publication outside the helper must be rejected: {violations:?}"
         );
     }
 

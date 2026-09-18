@@ -58,6 +58,7 @@ use std::time::Duration;
 
 use qianqian_audio_api::ports::{
     DrainSignal, DrainVerdict, GateEvent, PcmFormat, PositionEvidence, RenderGate,
+    SeekParkRelease,
 };
 
 use crate::edge::{EdgeTerminal, PcmEdge};
@@ -164,6 +165,51 @@ struct CompletionState {
     /// activation failed). The edge is the session-owned stop mechanism;
     /// this core only routes intent to it.
     stop_target: Option<Arc<PcmEdge>>,
+    /// Seek-park engagement evidence (D14.5): the render leg is parked
+    /// at the pre-GetBuffer gate under a routed seek hold (a
+    /// cut-attributed park — never pause engagement, never `Paused`
+    /// truth). Never a Fact; a commit precondition only.
+    seek_engaged: bool,
+    /// Output-tail quiescence of the CURRENT seek park (D14.5):
+    /// padding == 0 observed while seek-parked. Belongs to the current
+    /// seek park only; cleared on seek engagement and disengagement.
+    seek_tail_quiesced: bool,
+    /// Seek landing evidence (D14.5): the decode worker published
+    /// "provider repositioned at L" (strictly after its edge purge).
+    /// `None` = not published; `Some(None)` = published with an unknown
+    /// landing (the Position projection is withdrawn for the episode).
+    /// Mechanism evidence; never a Fact, never product surface.
+    seek_landing: Option<Option<u64>>,
+    /// A [`SeekSlot`] command that the worker picked up and resolved as
+    /// a proven pre-mutation refusal (`RefusedUnchanged`): inert
+    /// protocol history, recorded for verification only.
+    seek_refused: bool,
+    /// The session's cutover commit record (D14.5): true iff the
+    /// session-owned protocol path evaluated `landing published ∧ edge
+    /// invalidated ∧ tail quiesced ∧ leg parked ∧ episode unsettled`
+    /// and recorded the commit. Protocol state owned by the session —
+    /// NOT a Fact, NOT a terminal variant, NOT public surface. The
+    /// observable consequences are the Position jump and the absence of
+    /// stale audio.
+    cut_committed: bool,
+}
+
+/// The seek command slot (D14.5): the one command a seek request may
+/// plant for the decode worker to pick up at its loop-top serialization
+/// path. A dedicated small lock — deliberately NOT the completion state
+/// lock — because the worker peeks it once per staging block (the
+/// frozen realtime-cost budget: "one Mutex try on a session-owned slot
+/// per staging block", decode-side, off the RT path) and the completion
+/// lock already carries every evidence publication.
+#[derive(Default)]
+struct SeekSlot {
+    /// The planted seek target, `None` once the worker picked it up.
+    command: Option<Duration>,
+    /// One-seek-in-flight marker (D14.5 frozen policy): set at planting,
+    /// cleared by the worker only when the protocol fully resolved
+    /// (committed, refused with its remainder finished, abandoned, or
+    /// destructive-failed). A second request while this is set is inert.
+    in_flight: bool,
 }
 
 /// Crate-internal episode settlement core (see the module doc). The
@@ -180,10 +226,14 @@ struct CompletionArc {
     drain: DrainSignal,
     /// The episode's render pause gate (D14.7), created here with the
     /// evidence observer so it is in place before activation can hand it
-    /// to a render stream. The gate routes pause intent to the mechanism
-    /// and acknowledges engagement/tail-quiescence/disengagement back as
-    /// mechanism evidence (never Facts, never settlement inputs).
+    /// to a render stream. The gate routes pause intent and seek holds
+    /// to the mechanism and acknowledges engagement/tail-quiescence/
+    /// disengagement back as mechanism evidence (never Facts, never
+    /// settlement inputs).
     gate: RenderGate,
+    /// The seek command slot (D14.5), separate from `state` — see
+    /// [`SeekSlot`].
+    seek_slot: Mutex<SeekSlot>,
     /// The episode's position-evidence cell (D14.8), created here and
     /// handed to the same render stream through its open request. It is
     /// deliberately NOT part of the lock-protected state: the render leg
@@ -233,6 +283,11 @@ impl SessionCompletion {
                         disengagement_observed: false,
                         teardown_released: false,
                         stop_target: None,
+                        seek_engaged: false,
+                        seek_tail_quiesced: false,
+                        seek_landing: None,
+                        seek_refused: false,
+                        cut_committed: false,
                     }),
                     signal: Condvar::new(),
                     drain: DrainSignal::with_on_complete({
@@ -254,6 +309,7 @@ impl SessionCompletion {
                         }
                     }),
                     gate,
+                    seek_slot: Mutex::new(SeekSlot::default()),
                     position: PositionEvidence::new(),
                 }
             }),
@@ -344,7 +400,16 @@ impl SessionCompletion {
             // aborts the leg — the loop proceeds once more and the
             // data-plane terminal (edge stop, EOF, failure) decides the
             // outcome.
+            //
+            // A routed seek hold is released by the same token (D14.5:
+            // stop wins over an in-flight cut; the hold must not keep
+            // the leg parked across the shutdown). Any pending release
+            // payload stays stored; a leg waking into a stopping episode
+            // treats an unconsumed payload exactly like its own exit
+            // path: consume, apply-or-ignore, and let the data-plane
+            // terminal decide.
             self.state.gate.set_paused(false);
+            self.state.gate.set_seek_hold(false);
             guard.stop_target.clone()
         };
         if let Some(edge) = target {
@@ -404,6 +469,235 @@ impl SessionCompletion {
         self.state.gate.set_paused(false);
     }
 
+    // --- F5 seek protocol (ADR-PBK-002 D14.5) --------------------------------
+    //
+    // The seek command is a same-episode Command; the cutover protocol
+    // runs on the decode worker (a session-owned execution path). These
+    // methods are the session-owned control surface of that protocol:
+    // acceptance, command planting, evidence reads for the worker, and
+    // the commit/abort decisions. The render leg's rebase happens on
+    // the leg's own path through the gate's release payload.
+
+    /// Record a seek command (D14.5 acceptance) and route the cut's
+    /// park to the render leg. Inert — a command with no semantic
+    /// effect, exactly like late stop/pause — unless every frozen
+    /// acceptance condition holds:
+    ///
+    /// ```text
+    /// episode unsettled (no terminal Fact committed)
+    /// data plane Open (the bound edge exists and its terminal is Open —
+    ///     the post-EOF drain window is explicitly NOT seekable)
+    /// no stop intent already recorded, no teardown release begun
+    /// no seek already in flight (one-seek policy; no queueing)
+    /// ```
+    ///
+    /// `target` is source-relative media time, non-negative by type.
+    /// Beyond-duration targets pass through: the PROVIDER decides
+    /// validity and clamping (duration evidence is never consulted
+    /// here). Acceptance records the command and parks the leg; it does
+    /// NOT imply a cutover — "a seek request is not a cutover".
+    pub(crate) fn request_seek(&self, target: Duration) {
+        // Acceptance reads the command state and the edge terminal; the
+        // edge is reached only after this lock is dropped (the
+        // established completion→edge discipline: `request_stop`'s
+        // pattern). A terminal that changes in the window between this
+        // check and the worker's pickup is caught again at the worker's
+        // serialization point — acceptance and pickup are two defense
+        // lines, not one.
+        let edge = {
+            let guard = self.state.state.lock().expect("completion lock");
+            if guard.outcome.is_some()
+                || guard.stop_requested
+                || guard.teardown_released
+                || guard.activation_failure.is_some()
+            {
+                return;
+            }
+            guard.stop_target.clone()
+        };
+        let Some(edge) = edge else {
+            return; // never activated / no data plane
+        };
+        if edge.terminal() != crate::edge::EdgeTerminal::Open {
+            return; // data plane not Open (includes the post-EOF drain window)
+        }
+        // Plant the command under the slot lock: the one-seek policy is
+        // decided here, atomically with the planting. No queueing, no
+        // coalescing, no request identity — this is why no SeekId
+        // exists.
+        {
+            let mut slot = self.state.seek_slot.lock().expect("seek slot lock");
+            if slot.in_flight {
+                return; // one seek in flight; the second request is inert
+            }
+            slot.in_flight = true;
+            slot.command = Some(target);
+        }
+        // Park the render leg for the cut. The leg may be parked by
+        // pause already (a paused episode is seekable: its quiesced tail
+        // satisfies the output-cut precondition and the pause intent
+        // survives the seek) — routing the hold is harmless there; the
+        // seek-park engages when the leg next reaches its loop top.
+        self.state.gate.set_seek_hold(true);
+    }
+
+    /// The decode worker's loop-top pickup: take the planted command, if
+    /// any. One call per staging block (the frozen per-block budget).
+    pub(crate) fn take_seek_command(&self) -> Option<Duration> {
+        let mut slot = self.state.seek_slot.lock().expect("seek slot lock");
+        slot.command.take()
+    }
+
+    /// The worker's mid-write observation: is a seek command outstanding
+    /// in the slot? Used by the interruptible write between bounded
+    /// slices (with no other lock held). A `try_lock` peek: contention
+    /// with a planting writer resolves to "not yet observed" and the
+    /// next slice re-peeks — the serialization point is bounded by the
+    /// wait slice, not by lock ordering.
+    pub(crate) fn seek_command_observed(&self) -> bool {
+        match self.state.seek_slot.try_lock() {
+            Ok(slot) => slot.command.is_some(),
+            Err(_) => false,
+        }
+    }
+
+    /// "The render leg is parked at its pre-GetBuffer gate and holds no
+    /// device buffer" — the D14.5 worker precondition for calling the
+    /// provider, satisfied under EITHER attribution: a seek-parked leg
+    /// (the cut's own park) or a pause-parked leg (a paused episode's
+    /// seek reuses the current pause engagement, whose park is the same
+    /// physical evidence class).
+    pub(crate) fn leg_parked_evidence(&self) -> bool {
+        let guard = self.state.state.lock().expect("completion lock");
+        guard.engaged || guard.seek_engaged
+    }
+
+    /// Whether the seek protocol must abort instead of proceeding:
+    /// stop intent recorded, the episode already settled, or the
+    /// authority-owned teardown release has begun. Every wait in the
+    /// protocol re-checks this, so stop always wins and no protocol
+    /// step can wedge teardown.
+    pub(crate) fn seek_aborted(&self) -> bool {
+        let guard = self.state.state.lock().expect("completion lock");
+        guard.stop_requested || guard.outcome.is_some() || guard.teardown_released
+    }
+
+    /// The D14.5 commit-boundary tail condition, paired per park kind:
+    /// "output tail quiesced while the leg is parked" holds iff the leg
+    /// is parked under one attribution AND THAT engagement observed its
+    /// tail quiesced. The pairing is what keeps a previous park's
+    /// quiescence from satisfying a later park.
+    pub(crate) fn seek_tail_condition(&self) -> bool {
+        let guard = self.state.state.lock().expect("completion lock");
+        (guard.engaged && guard.tail_quiesced) || (guard.seek_engaged && guard.seek_tail_quiesced)
+    }
+
+    /// The worker publishes the three-class provider outcome's inert
+    /// class (evidence only — no terminal effect, no purge, no rebase):
+    /// a proven pre-mutation `RefusedUnchanged`.
+    pub(crate) fn seek_refused(&self) {
+        self.publish(|state| state.seek_refused = true);
+    }
+
+    /// The worker publishes the landing evidence AFTER its own edge
+    /// purge (the frozen program order: song_seek → staging discard →
+    /// invalidate → landing → hold). `None` landing = the provider
+    /// could not report one (unknown stays unknown; the commit still
+    /// happens — stale exclusion is independent of landing knowledge —
+    /// and the Position projection is withdrawn for the episode).
+    pub(crate) fn seek_landing_published(&self, landing: Option<u64>) {
+        self.publish(|state| {
+            if state.seek_landing.is_none() {
+                state.seek_landing = Some(landing);
+            }
+        });
+    }
+
+    /// The session's cutover-commit decision (D14.5 commit boundary),
+    /// evaluated and recorded atomically under the completion lock —
+    /// the same lock stop intent linearizes through, so "stop before
+    /// the commit wins" holds by construction. Returns `true` iff the
+    /// commit was recorded; in that case the rebase release has been
+    /// routed to the render leg. On `false` (stop/teardown/settled won
+    /// the race) the release is routed as an abort instead: no commit,
+    /// no rebase, no partial state.
+    ///
+    /// Preconditions the CALLER owns (worker program order, not lock
+    /// state): the provider succeeded, the staging was discarded, and
+    /// `edge.invalidate()` has already returned on the worker's path.
+    /// Preconditions evaluated HERE under the lock: landing published,
+    /// tail quiesced while the leg is parked, episode unsettled.
+    pub(crate) fn commit_seek_cutover(&self, landing: Option<u64>) -> bool {
+        let decision = {
+            let mut guard = self.state.state.lock().expect("completion lock");
+            let parked_and_quiesced = (guard.engaged && guard.tail_quiesced)
+                || (guard.seek_engaged && guard.seek_tail_quiesced);
+            let unsettled =
+                guard.outcome.is_none() && !guard.stop_requested && !guard.teardown_released;
+            if guard.seek_landing.is_some() && parked_and_quiesced && unsettled {
+                guard.cut_committed = true;
+                true
+            } else {
+                false
+            }
+        };
+        if decision {
+            // The protocol resolved: release the one-seek slot so a
+            // later seek is acceptable, then route the rebase release.
+            let mut slot = self.state.seek_slot.lock().expect("seek slot lock");
+            slot.in_flight = false;
+            slot.command = None;
+            drop(slot);
+            self.state
+                .gate
+                .release_seek_hold(SeekParkRelease::Committed { landing });
+        } else {
+            self.state.gate.release_seek_hold(SeekParkRelease::Aborted);
+        }
+        decision
+    }
+
+    /// Release the render leg from a routed seek park with NO rebase
+    /// payload (an abort). The refusal path uses this alone: the leg
+    /// resumes the old world immediately, and the one-in-flight slot
+    /// stays occupied until the preserved remainder has been finished
+    /// (a second seek must not park the leg mid-remainder).
+    pub(crate) fn release_seek_park(&self) {
+        self.state.gate.release_seek_hold(SeekParkRelease::Aborted);
+    }
+
+    /// Free the one-in-flight slot: the seek protocol fully resolved.
+    pub(crate) fn clear_seek_in_flight(&self) {
+        let mut slot = self.state.seek_slot.lock().expect("seek slot lock");
+        slot.in_flight = false;
+        slot.command = None;
+    }
+
+    /// Release the leg AND free the slot: the abandon / destructive
+    /// failure / no-commit routes, where nothing of the protocol
+    /// remains to finish.
+    pub(crate) fn release_seek_without_commit(&self) {
+        self.release_seek_park();
+        self.clear_seek_in_flight();
+    }
+
+    /// Whether the one-in-flight slot is currently occupied (the frozen
+    /// one-seek policy, observable for verification only).
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn seek_in_flight(&self) -> bool {
+        self.state.seek_slot.lock().expect("seek slot lock").in_flight
+    }
+
+    /// Verification reads of the seek protocol latches (crate-internal
+    /// only; never product surface). Partitioned out of loom builds
+    /// with their test consumers.
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn seek_protocol_state(&self) -> (bool, bool, Option<Option<u64>>) {
+        let guard = self.state.state.lock().expect("completion lock");
+        (guard.seek_refused, guard.cut_committed, guard.seek_landing)
+    }
+
+
     /// Release the pause gate WITHOUT touching the recorded pause intent
     /// (D14.7 teardown obligation): session settlement/teardown must wake
     /// every parked participant, because a leg parked at the gate cannot
@@ -419,6 +713,13 @@ impl SessionCompletion {
         let mut guard = self.state.state.lock().expect("completion lock");
         guard.teardown_released = true;
         self.state.gate.set_paused(false);
+        // The teardown wake obligation covers a seek-parked leg too
+        // (D14.5): a leg parked at the seek gate is likewise not inside
+        // read_frames, so the data-plane stop alone cannot wake it. The
+        // release routes no payload: a seek park woken by teardown is an
+        // aborted protocol (any already-stored payload stays stored and
+        // is simply consumed-or-ignored by the exiting leg).
+        self.state.gate.set_seek_hold(false);
     }
 
     /// The episode's render gate, handed to the output provider at
@@ -576,11 +877,19 @@ impl SessionCompletion {
     }
 }
 
-/// The one gate-evidence attribution rule (D14.7): what each render-gate
-/// event does to the evidence latches. Named so the delayed-delivery
-/// oracle below can drive the production arm synchronously — the real
-/// observer above routes every event through this function, so a test
-/// that calls it exercises exactly the attribution the leg performs.
+/// The one gate-evidence attribution rule (D14.7 + the D14.5 seek
+/// additions): what each render-gate event does to the evidence latches.
+/// Named so the delayed-delivery oracle below can drive the production
+/// arm synchronously — the real observer above routes every event
+/// through this function, so a test that calls it exercises exactly the
+/// attribution the leg performs.
+///
+/// Attribution stays structurally separate per park kind: pause events
+/// maintain the pause latches, seek events maintain the seek latches. A
+/// cut-attributed seek park therefore can never satisfy the Paused
+/// establishment (which reads only the pause pair), and a pause park can
+/// never satisfy the seek commit (which reads only the paired seek — or
+/// paired pause — engagement+quiescence conjunction).
 fn apply_gate_event(state: &mut CompletionState, event: GateEvent) {
     match event {
         // Engagement is the current-engagement fence: events on one
@@ -603,6 +912,19 @@ fn apply_gate_event(state: &mut CompletionState, event: GateEvent) {
             state.engaged = false;
             state.tail_quiesced = false;
             state.disengagement_observed = true;
+        }
+        // The seek park's evidence pair: same fence discipline as the
+        // pause pair, attributed to the cut protocol only (D14.5).
+        GateEvent::SeekEngaged => {
+            state.seek_engaged = true;
+            state.seek_tail_quiesced = false;
+        }
+        GateEvent::SeekTailQuiesced => {
+            state.seek_tail_quiesced = true;
+        }
+        GateEvent::SeekDisengaged => {
+            state.seek_engaged = false;
+            state.seek_tail_quiesced = false;
         }
     }
 }
@@ -694,6 +1016,7 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use qianqian_audio_api::ports::SeekParkOutcome;
 
     /// D14.7 corrective-2, the delayed-delivery interleaving no leg-level
     /// test can reach deterministically: the render leg has observed
@@ -773,5 +1096,225 @@ mod tests {
         // None of this touched the terminal Fact: evidence latches are
         // not settlement inputs.
         assert_eq!(completion.observe_snapshot().terminal_outcome, None);
+    }
+
+    // --- F5 seek protocol, white-box (D14.5) --------------------------------
+    //
+    // The slot policy, the acceptance conditions, the commit conjunction
+    // and the first-wins evidence latches are deliberately NOT product
+    // surface (no public positive seek state), so their direct pins live
+    // here inside the crate boundary. The end-to-end consequences are
+    // pinned publicly by tests/seek_seam.rs. These tests consume the
+    // crate-internal verification readers, which are excluded from loom
+    // builds with their consumers.
+
+    /// The one-seek policy at its storage: a request plants exactly one
+    /// command and occupies the slot; the command is taken once; the
+    /// slot stays occupied through pickup (it frees when the protocol
+    /// RESOLVES, not when the worker picks the command up); a second
+    /// request while occupied is inert; a resolved slot accepts again.
+    #[cfg(not(loom))]
+    #[test]
+    fn the_seek_slot_plants_one_command_and_a_second_is_inert() {
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+
+        completion.request_seek(Duration::from_secs(5));
+        assert!(
+            completion.seek_in_flight(),
+            "an accepted seek occupies the one-in-flight slot"
+        );
+        assert_eq!(completion.take_seek_command(), Some(Duration::from_secs(5)));
+        assert_eq!(
+            completion.take_seek_command(),
+            None,
+            "the command is taken exactly once"
+        );
+        assert!(
+            completion.seek_in_flight(),
+            "the slot stays occupied until the protocol resolves, not at \
+             pickup — a second request must not slip in mid-protocol"
+        );
+
+        completion.request_seek(Duration::from_secs(7));
+        assert_eq!(
+            completion.take_seek_command(),
+            None,
+            "one seek in flight: the second request is inert (no queue, \
+             no coalescing, no latest-wins)"
+        );
+
+        completion.clear_seek_in_flight();
+        completion.request_seek(Duration::from_secs(7));
+        assert_eq!(
+            completion.take_seek_command(),
+            Some(Duration::from_secs(7)),
+            "a resolved seek frees the slot for a later one"
+        );
+    }
+
+    /// Every frozen acceptance condition fails closed: no data plane,
+    /// a non-Open edge (EOF drain window, failed edge), recorded stop
+    /// intent, and a settled episode each leave the slot unoccupied —
+    /// and a PAUSED episode is seekable (positive control: pause intent
+    /// is not an acceptance condition).
+    #[cfg(not(loom))]
+    #[test]
+    fn seek_acceptance_fails_closed_on_every_frozen_condition() {
+        // Never activated: no data plane exists to cut.
+        let completion = SessionCompletion::new();
+        completion.request_seek(Duration::from_secs(1));
+        assert!(!completion.seek_in_flight());
+
+        // The post-EOF drain window: the edge terminal is no longer Open.
+        let completion = SessionCompletion::new();
+        let edge = Arc::new(PcmEdge::new(2, 8192));
+        completion.bind_stop_target(edge.clone());
+        edge.close_eof();
+        completion.request_seek(Duration::from_secs(1));
+        assert!(!completion.seek_in_flight());
+
+        // A failed data plane is equally not seekable.
+        let completion = SessionCompletion::new();
+        let edge = Arc::new(PcmEdge::new(2, 8192));
+        completion.bind_stop_target(edge.clone());
+        edge.fail();
+        completion.request_seek(Duration::from_secs(1));
+        assert!(!completion.seek_in_flight());
+
+        // Recorded stop intent.
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        completion.request_stop();
+        completion.request_seek(Duration::from_secs(1));
+        assert!(!completion.seek_in_flight());
+
+        // A settled episode: decode failure settles synchronously, and
+        // the terminal Fact freezes the command surface.
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        completion.decode_failed("test failure");
+        assert_eq!(
+            completion.observe_snapshot().terminal_outcome,
+            Some(EpisodeTerminalOutcome::Failed)
+        );
+        completion.request_seek(Duration::from_secs(1));
+        assert!(!completion.seek_in_flight());
+
+        // Positive control: a paused episode is seekable.
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        completion.request_pause();
+        completion.request_seek(Duration::from_secs(1));
+        assert!(
+            completion.seek_in_flight(),
+            "a paused episode is seekable — pause intent is not an \
+             acceptance condition"
+        );
+    }
+
+    /// The commit boundary is a conjunction, evaluated atomically:
+    /// (landing published) ∧ (leg parked ∧ THAT engagement's tail
+    /// quiesced, under either attribution) ∧ episode unsettled. Each
+    /// missing conjunct routes an ABORT release (no wedged park); the
+    /// full conjunction commits and routes the landing payload exactly
+    /// once; an UNKNOWN landing commits too — stale exclusion is
+    /// independent of landing knowledge — and stop intent recorded
+    /// before the decision wins it.
+    #[cfg(not(loom))]
+    #[test]
+    fn the_commit_boundary_requires_its_full_conjunction() {
+        // Parked + quiesced, but the landing was never published.
+        let completion = SessionCompletion::new();
+        let core = completion.state.clone();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
+        assert!(!completion.commit_seek_cutover(Some(123)));
+        assert_eq!(
+            completion.render_gate().park_while_seek_hold(|| false),
+            SeekParkOutcome::Released(SeekParkRelease::Aborted),
+            "the losing decision still releases the leg"
+        );
+
+        // Stop intent recorded before the decision wins the race.
+        let completion = SessionCompletion::new();
+        let core = completion.state.clone();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        completion.request_stop();
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
+        completion.seek_landing_published(Some(123));
+        assert!(!completion.commit_seek_cutover(Some(123)));
+        assert_eq!(
+            completion.render_gate().park_while_seek_hold(|| false),
+            SeekParkOutcome::Released(SeekParkRelease::Aborted),
+        );
+
+        // The full conjunction commits; the payload reaches the leg
+        // exactly once and the slot frees.
+        let completion = SessionCompletion::new();
+        let core = completion.state.clone();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
+        completion.seek_landing_published(Some(123));
+        assert!(completion.commit_seek_cutover(Some(123)));
+        let (refused, committed, landing) = completion.seek_protocol_state();
+        assert!(!refused);
+        assert!(committed);
+        assert_eq!(landing, Some(Some(123)));
+        assert!(!completion.seek_in_flight());
+        assert_eq!(
+            completion.render_gate().park_while_seek_hold(|| false),
+            SeekParkOutcome::Released(SeekParkRelease::Committed {
+                landing: Some(123)
+            }),
+            "the commit's rebase payload carries the ACTUAL landing"
+        );
+        assert_eq!(
+            completion.render_gate().park_while_seek_hold(|| false),
+            SeekParkOutcome::NotParked,
+            "the payload is consumed exactly once"
+        );
+
+        // An UNKNOWN landing commits too: the payload carries None, and
+        // the projection's withdrawal is the leg's own discipline.
+        let completion = SessionCompletion::new();
+        let core = completion.state.clone();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
+        completion.seek_landing_published(None);
+        assert!(completion.commit_seek_cutover(None));
+        assert_eq!(
+            completion.render_gate().park_while_seek_hold(|| false),
+            SeekParkOutcome::Released(SeekParkRelease::Committed { landing: None }),
+        );
+    }
+
+    /// The refusal and landing latches are first-wins evidence: the
+    /// first published value is the episode's truth, later publications
+    /// are inert history — including "unknown" once published.
+    #[cfg(not(loom))]
+    #[test]
+    fn the_refusal_and_landing_latches_are_first_wins_evidence() {
+        let completion = SessionCompletion::new();
+        completion.seek_refused();
+        completion.seek_landing_published(Some(1));
+        completion.seek_landing_published(Some(2));
+        let (refused, committed, landing) = completion.seek_protocol_state();
+        assert!(refused, "the inert outcome class was recorded");
+        assert!(!committed, "a refusal never commits a cut");
+        assert_eq!(landing, Some(Some(1)), "the first landing wins");
+
+        let completion = SessionCompletion::new();
+        completion.seek_landing_published(None);
+        completion.seek_landing_published(Some(9));
+        assert_eq!(
+            completion.seek_protocol_state().2,
+            Some(None),
+            "unknown, once published, is the landing — never upgraded"
+        );
     }
 }

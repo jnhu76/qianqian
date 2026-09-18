@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use qianqian_audio_api::ports::{
     DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, PcmDecode, PcmDecodeCapability,
-    PcmFormat,
+    PcmFormat, ProviderSeekOutcome,
 };
 use qianqian_composition::{ActivationError, ComponentSpec};
 use qianqian_songcore_sys as sys;
@@ -252,6 +252,51 @@ impl DecodedPcmStream for SongcoreDecodeStream {
             _ => Err(DecodeError {
                 message: self.last_error(),
             }),
+        }
+    }
+
+    fn seek(&mut self, target: Duration) -> ProviderSeekOutcome {
+        // The ABI's native unit is microseconds; clamp the (unbounded)
+        // Duration into it rather than inventing a wrap. Beyond-duration
+        // and invalid targets stay the PROVIDER's decision (the ABI
+        // clamps against known duration; negative is unrepresentable
+        // here).
+        let target_us = i64::try_from(target.as_micros()).unwrap_or(i64::MAX);
+        let mut landing_us: i64 = -1;
+        let status = unsafe { sys::song_seek(self.handle, target_us, &mut landing_us) };
+        match status {
+            sys::SONG_OK => {
+                // The ABI reports the retained-PCM start measured from
+                // the first decoded frame's timestamp; -1 is the
+                // explicit "landing unknown" sentinel (never
+                // manufactured, never replaced by the requested target).
+                // Convert to source PCM frames — the Position
+                // projection's unit — rounding the µs quantization
+                // (measured ±1 frame; mechanism noise, not a lie).
+                let landing = u64::try_from(landing_us).ok().map(|us| {
+                    let rate = u128::from(self.format.sample_rate);
+                    ((u128::from(us) * rate + 500_000) / 1_000_000) as u64
+                });
+                ProviderSeekOutcome::Applied { landing }
+            }
+            // Proven pre-mutation refusals: the native `song_seek` checks
+            // these BEFORE any FFmpeg call — the null/illegal-argument
+            // guard and the not-probed state guard
+            // (native/src/songcore_ffmpeg.c `song_seek`, phase 0) — so
+            // the pre-call decoding continuation is guaranteed intact.
+            // Measured (F5 gate E1): the decoder stays usable after the
+            // rejection. Every other failure — including generic
+            // SEEK_ERROR, which the same native code ALSO returns after
+            // a successful reposition + decoder flush ("could not reach
+            // a landing point") — cannot prove inertness from a status
+            // code alone, so the conservative frozen rule applies:
+            // unprovable means destructive.
+            sys::SONG_ERR_INVALID_ARGUMENT | sys::SONG_ERR_NOT_OPEN => {
+                ProviderSeekOutcome::RefusedUnchanged
+            }
+            _ => ProviderSeekOutcome::MutatedThenFailed {
+                diagnostic: self.last_error(),
+            },
         }
     }
 }

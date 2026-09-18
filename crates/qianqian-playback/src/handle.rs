@@ -7,6 +7,7 @@
 //! request_stop()     record stop intent (Command, not a Fact)
 //! request_pause()    record pause intent (Command, not a Fact; D14.7)
 //! request_resume()   release a recorded pause intent (Command)
+//! request_seek()     record a seek command (Command, not a Fact; D14.5)
 //! observe()          one coherent pure read of the episode
 //! wait_terminal()    pure blocking wait for the committed terminal Fact
 //! ```
@@ -262,6 +263,35 @@ impl PlaybackSessionHandle {
     /// history after settlement.
     pub fn request_resume(&self) {
         self.completion.request_resume();
+    }
+
+    /// Request a seek to `target` — source-relative media time
+    /// (ADR-PBK-002 D14.5). Infallible Command, non-negative by type;
+    /// it records the seek and routes the cut's park to the render
+    /// mechanism when — and only when — every frozen acceptance
+    /// condition holds (episode unsettled, data plane Open, no stop
+    /// intent, no seek already in flight). Invalid moments are inert,
+    /// exactly like late stop/pause intent; a second seek while one is
+    /// in flight is inert (one-seek policy — no queueing, no
+    /// coalescing, no latest-wins, no request identity).
+    ///
+    /// THIS COMMAND IS NOT A CUTOVER, and its acceptance is not a
+    /// success result: acceptance records intent only. The decoder
+    /// reposition, the edge purge, the physical output cutover, and the
+    /// actual landing stay separable protocol states owned by the
+    /// session's own execution paths. There is deliberately no public
+    /// positive seek state and no seek completion Fact: the observable
+    /// consequences are the Position jump at the committed cutover
+    /// (Position rebases to the decoder's ACTUAL landing — never the
+    /// requested target — and withdraws for the episode if the landing
+    /// was unknown) and, for a destructive provider failure, the
+    /// ordinary terminal `Failed` through the existing D11 path.
+    ///
+    /// Pause intent survives a seek: a paused episode is seekable, the
+    /// seek never implicitly resumes, and `paused()` keeps evaluating
+    /// from the frozen D14.7 establishment chain.
+    pub fn request_seek(&self, target: Duration) {
+        self.completion.request_seek(target);
     }
 
     /// One coherent observation of the episode. Pure read: no resolve,

@@ -28,8 +28,8 @@ mod edge;
 mod handle;
 mod session;
 
-// The episode mechanism internals (PcmEdge / EdgeTerminal / WriteOutcome)
-// are crate-private: they are session-owned runtime resources, not
+// The episode mechanism internals (PcmEdge / EdgeTerminal) are
+// crate-private: they are session-owned runtime resources, not
 // product API. The application-facing surface is exactly the public
 // seam below; composition roots reach the episode only through
 // `playback_session_spec` + `PlaybackSessionHandle`.
