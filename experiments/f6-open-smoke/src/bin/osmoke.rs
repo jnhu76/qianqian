@@ -411,9 +411,10 @@ fn o2(main: &Path, candidates: &[PathBuf]) -> Outcome {
     // SAME committed source, the old episode holds no stop intent and
     // no terminal, and its position publication keeps advancing.
     let same_source = player.active_source() == Some(a_path.as_path());
+    let post_refusal_stop = a.observe().stop_requested;
     let still_live = refused
         && same_source
-        && !a.observe().stop_requested
+        && !post_refusal_stop
         && a.observe().terminal_outcome.is_none()
         && expect_liveness(&a, 4, "O2 post-refusal A", &mut reasons);
     if !same_source {
@@ -438,7 +439,7 @@ fn o2(main: &Path, candidates: &[PathBuf]) -> Outcome {
         reasons,
         Some(serde_json::json!({
             "refused": refused,
-            "post_refusal_stop_requested": a.observe().stop_requested,
+            "post_refusal_stop_requested": post_refusal_stop,
             "quit_disposal": format!("{:?}", report.disposal),
         })),
     )
