@@ -154,13 +154,15 @@ EXPORT_RULES = {
             "pub fn request_stop(&self) {",
             "pub fn request_pause(&self) {",
             "pub fn request_resume(&self) {",
+            "pub fn request_seek(&self, target: Duration) {",
             "pub fn observe(&self) -> PlaybackSessionObservation {",
             "pub fn wait_terminal(&self) -> EpisodeTerminalOutcome {",
             "pub fn paused(&self) -> bool {",
         ],
         "authority": "ADR-PBK-002 D14.2 + the D14.7 F3 amendment as narrowed by the D14.7 "
-        "AUTHORITY-CORRECTIVE + the D14.8 F4 amendment — the App's rights over one episode "
-        "are exactly new/request_stop/request_pause/request_resume/observe/wait_terminal "
+        "AUTHORITY-CORRECTIVE + the D14.8 F4 amendment + the D14.5 F5 amendment — the App's "
+        "rights over one episode are exactly "
+        "new/request_stop/request_pause/request_resume/request_seek/observe/wait_terminal "
         "plus the admitted observation fields (pause intent is command state; engagement/"
         "tail-quiescence are mechanism evidence; paused() is a derived Projection and "
         "never a correctness basis; Resumed was REMOVED as an application-facing "
@@ -170,8 +172,14 @@ EXPORT_RULES = {
         "source PCM frames, so no handed-off total, no device tail, no raw estimate and no "
         "second cell may appear on this surface: a reader must not be able to reconstruct "
         "device state) and `source_duration` (optional source-scoped Mechanism Evidence). "
-        "A further new public right must first earn an explicit D14/phase-authority "
-        "amendment, then update this allowlist on purpose",
+        "F5 adds exactly one command: `request_seek` (D14.5) — an infallible one-way "
+        "Command whose acceptance is NOT a cutover; the observable consequences are the "
+        "Position rebase (to the decoder's ACTUAL landing, or withdrawn for an unknown "
+        "landing) and the ordinary D11 Failed route for a destructive provider failure — "
+        "so no positive seek state, no seek completion Fact, no request identity and no "
+        "landing/outcome accessor may appear on this surface. A further new public right "
+        "must first earn an explicit D14/phase-authority amendment, then update this "
+        "allowlist on purpose",
     },
     "crates/qianqian-decode-songcore/src/lib.rs": {
         "require": [
@@ -284,8 +292,22 @@ def root_public_declarations(text):
                 buffer, use_stmt = None, False
             continue
         positions = [
-            i for i in (buffer.find(";"), buffer.find("{"), buffer.find(",")) if i != -1
+            i for i in (buffer.find(";"), buffer.find("{")) if i != -1
         ]
+        # A comma cuts only OUTSIDE parentheses: a struct field ends at
+        # its trailing comma, but a comma inside a parameter list (e.g.
+        # `pub fn seek(&self, target: Duration)`) is part of one
+        # deterministic canonical — the signature's terminator is the
+        # brace that follows.
+        depth = 0
+        for idx, ch in enumerate(buffer):
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth = max(0, depth - 1)
+            elif ch == "," and depth == 0:
+                positions.append(idx)
+                break
         if positions:
             cut = min(positions)
             declarations.append("".join(buffer[: cut + 1].split()))
