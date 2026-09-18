@@ -356,11 +356,13 @@ impl Drop for SongcoreDecodeStream {
 pub fn probe_media(path: &Path) -> Result<SourceFacts, DecodeOpenError> {
     // Constructing the stream performs exactly song_open + song_probe
     // (the production open path); dropping it runs song_close. No
-    // `read_frames` call exists on this path.
+    // `read_frames` call exists on this path. The declared facts are
+    // read through the endpoint trait — the same evidence the session
+    // relays at activation.
     let stream = SongcoreDecodeStream::open(path)?;
     let facts = SourceFacts {
-        format: stream.format,
-        duration: stream.duration,
+        format: stream.format(),
+        duration: stream.source_duration(),
     };
     drop(stream);
     Ok(facts)

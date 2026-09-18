@@ -9,3 +9,8 @@ specs/tools/tla2tools.jar
 experiments/f3-pause-mechanism/target
 experiments/f4-timeline-gate/target
 experiments/f5-seek-discontinuity/target
+
+# Evidence-crate build directories are local only (same discipline as
+# the other experiments; each is listed explicitly so a stray new
+# experiment fails loudly instead of silently shipping its target/).
+experiments/f6-open-smoke/target
