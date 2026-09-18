@@ -481,6 +481,30 @@ EOF window                   edge Eof is a terminal (monotone, first-wins)
                              design door — left closed.)
 ```
 
+> **§11 corrective (2026-09-18, F5-SEEK-IMPLEMENTATION-CORRECTIVE-3,
+> pre-merge review of the implementation PR).** The "every wait
+> terminal-aware" row above states the requirement; the first
+> implementation satisfied it only for the endings the SESSION records
+> (stop intent / settlement / teardown release) and not for the data
+> plane's own terminal — and teardown records its release only after
+> the worker join, so a cut whose commit boundary was permanently
+> unreachable (a device whose queued tail never quiesces) wedged the
+> join and the leg was never released. The post-apply wait now reads
+> the data plane's terminal on the worker's path and takes the frozen
+> abort route there (no new failure class, no seek-side terminal
+> evidence). The same review found the commit decision answering a
+> single bool: sampled after a separate wait read, a transient gap in
+> the leg's park evidence (the pause→cut handover publishes
+> Disengaged-then-SeekEngaged) could be classified as an abort and
+> release an already-purged cut's leg with no rebase. The decision is
+> now ONE atomic three-valued sample — Committed / Aborted / Pending —
+> where only a recorded episode ending aborts and a missing evidence
+> sample is Pending; the pin is
+> `a_park_handover_evidence_gap_is_pending_and_never_an_abort`
+> (completion.rs white-box) plus mutation M10, and the liveness pin is
+> `a_cut_over_a_never_draining_device_still_tears_down` (seek_seam)
+> plus mutation M9.
+
 ## 12. Multiple seeks (smallest truthful policy)
 
 Frozen: **one seek in flight; a second request before the current cut
