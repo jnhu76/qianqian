@@ -1,0 +1,7 @@
+{
+  "scenario": "O1",
+  "verdict": "RED",
+  "reasons": [
+    "O1 pre-replacement A: position publication not advancing (0/2, last None)"
+  ]
+}

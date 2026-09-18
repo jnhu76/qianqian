@@ -103,7 +103,10 @@ fn main() {
         reasons,
         evidence,
     };
-    println!("{}", serde_json::to_string_pretty(&v).expect("verdict json"));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&v).expect("verdict json")
+    );
     if verdict == "GREEN" {
         std::process::exit(0);
     }
@@ -119,6 +122,12 @@ struct RealSource;
 
 impl EpisodeStart for RealSource {
     fn probe(&self, candidate: &Path) -> Result<(), String> {
+        // Differential switch: QN_OSMOKE_SKIP_PROBE=1 skips the real
+        // probe query to isolate a suspected probe/episode interaction.
+        if std::env::var("QN_OSMOKE_SKIP_PROBE").as_deref() == Ok("1") {
+            eprintln!("opened: probe SKIPPED by QN_OSMOKE_SKIP_PROBE");
+            return Ok(());
+        }
         qianqian_decode_songcore::probe_media(candidate)
             .map(|facts| {
                 eprintln!(
@@ -144,8 +153,7 @@ impl EpisodeStart for RealSource {
                 refused: Some(format!("decode plugin registration failed: {e:?}")),
             };
         }
-        if let Err(e) = runtime.register_component(qianqian_output_wasapi::wasapi_output_plugin())
-        {
+        if let Err(e) = runtime.register_component(qianqian_output_wasapi::wasapi_output_plugin()) {
             return StartAttempt {
                 runtime,
                 handle,
@@ -183,16 +191,52 @@ impl EpisodeStart for RealSource {
 }
 
 fn entry(id: &str, component: &'static str) -> qianqian_composition::DesiredEntry {
-    qianqian_composition::DesiredEntry::enabled(id, component, qianqian_composition::Revision::new(1))
+    qianqian_composition::DesiredEntry::enabled(
+        id,
+        component,
+        qianqian_composition::Revision::new(1),
+    )
 }
 
-/// Whether the episode's published position advanced in `windows`
-/// consecutive samples. Returns (advances, total, last_sample).
-fn sample_advance(
+fn dump_observation(handle: &PlaybackSessionHandle, label: &str) {
+    let o = handle.observe();
+    eprintln!(
+        "obs={label} terminal={:?} failure={:?} stop={} pause={} engagement={:?} position={:?} fmt={:?}",
+        o.terminal_outcome,
+        o.failure_diagnostic,
+        o.stop_requested,
+        o.pause_requested,
+        o.pause_engagement,
+        o.position,
+        o.source_format,
+    );
+}
+
+fn expect_liveness(
     handle: &PlaybackSessionHandle,
     windows: usize,
-) -> (usize, usize, Option<u64>) {
+    label: &str,
+    reasons: &mut Vec<String>,
+) -> bool {
+    // Wait for the FIRST publication: the render leg's startup (device
+    // open to first consumed-frame publication) is legitimately
+    // sub-second but has no contractual bound, so the harness bounds
+    // its own WAIT — never the mechanism. Without this, the oracle
+    // fires inside the startup gap (measured ~0.5 s on this host) and
+    // reports healthy episodes RED.
+    let deadline = Instant::now() + Duration::from_secs(5);
     let mut last = handle.observe().position;
+    while last.is_none() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(100));
+        last = handle.observe().position;
+    }
+    if last.is_none() {
+        dump_observation(handle, label);
+        reasons.push(format!(
+            "{label}: no position publication within the 5 s startup wait"
+        ));
+        return false;
+    }
     let mut advances = 0usize;
     for _ in 0..windows {
         std::thread::sleep(WINDOW);
@@ -203,25 +247,20 @@ fn sample_advance(
         }
         last = current;
     }
-    (advances, windows, last)
-}
-
-fn expect_liveness(
-    handle: &PlaybackSessionHandle,
-    windows: usize,
-    label: &str,
-    reasons: &mut Vec<String>,
-) -> bool {
-    let (advances, total, last) = sample_advance(handle, windows);
-    let live = advances * 2 > total; // strictly more than half the windows
+    let live = advances * 2 > total_windows(windows); // strictly more than half
     if live {
-        eprintln!("verdict=GREEN reason: {label} position advancing ({advances}/{total}, last {last:?})");
+        eprintln!("verdict=GREEN reason: {label} position advancing ({advances}/{windows})");
     } else {
+        dump_observation(handle, label);
         reasons.push(format!(
-            "{label}: position publication not advancing ({advances}/{total}, last {last:?})"
+            "{label}: position publication not advancing ({advances}/{windows})"
         ));
     }
     live
+}
+
+fn total_windows(windows: usize) -> usize {
+    windows
 }
 
 fn expect_established(
@@ -234,8 +273,7 @@ fn expect_established(
         return false;
     };
     let observation = handle.observe();
-    let established =
-        observation.source_format.is_some() && observation.activation_error.is_none();
+    let established = observation.source_format.is_some() && observation.activation_error.is_none();
     if established {
         let format = observation.source_format.expect("checked");
         eprintln!(
@@ -259,7 +297,10 @@ fn quit_report(player: &mut ReferencePlayerApp<RealSource>) -> QuitReport {
         eprintln!("verdict=GREEN reason: quit terminal {terminal:?}");
     }
     if let Some(snapshot) = &report.snapshot {
-        eprintln!("verdict=GREEN reason: quit disposal quiet={}", snapshot.quiet);
+        eprintln!(
+            "verdict=GREEN reason: quit disposal quiet={}",
+            snapshot.quiet
+        );
     }
     report
 }
@@ -270,9 +311,28 @@ fn o1(main: &Path, candidates: &[PathBuf]) -> Outcome {
     let candidate = candidates[0].clone();
     let mut player = ReferencePlayerApp::new(RealSource);
     if !matches!(player.open(main), OpenOutcome::Opened) {
-        return ("RED", vec!["O1: the first Open did not establish".into()], None);
+        return (
+            "RED",
+            vec!["O1: the first Open did not establish".into()],
+            None,
+        );
     }
     let a = player.active_handle().expect("committed").clone();
+    // QN_OSMOKE_TRACE=1: long observation trace instead of the oracle.
+    if std::env::var("QN_OSMOKE_TRACE").as_deref() == Ok("1") {
+        for i in 0..20 {
+            std::thread::sleep(Duration::from_millis(250));
+            let o = a.observe();
+            eprintln!(
+                "trace[{i}] t={:?} pos={:?} term={:?} fail={:?} eng={:?}",
+                i * 250,
+                o.position,
+                o.terminal_outcome,
+                o.failure_diagnostic,
+                o.pause_engagement
+            );
+        }
+    }
     if !expect_liveness(&a, 2, "O1 pre-replacement A", &mut reasons) {
         return ("RED", reasons, None);
     }
@@ -290,14 +350,17 @@ fn o1(main: &Path, candidates: &[PathBuf]) -> Outcome {
     let b_live = b_established
         && player
             .active_handle()
-            .is_some_and(|h| sample_advance(h, 2).0 > 0);
+            .is_some_and(|h| expect_liveness(h, 2, "O1 new episode B consuming", &mut reasons));
     let report = quit_report(&mut player);
     let ok = b_established
         && b_live
         && a_final.terminal_outcome == Some(EpisodeTerminalOutcome::Stopped)
         && report.disposal == Some(qianqian_composition::DisposeVerdict::Discharged);
     if a_final.terminal_outcome != Some(EpisodeTerminalOutcome::Stopped) {
-        reasons.push(format!("O1: old episode settled {:?}", a_final.terminal_outcome));
+        reasons.push(format!(
+            "O1: old episode settled {:?}",
+            a_final.terminal_outcome
+        ));
     }
     if report.disposal != Some(qianqian_composition::DisposeVerdict::Discharged) {
         reasons.push(format!("O1: quit disposal {:?}", report.disposal));
@@ -322,7 +385,11 @@ fn o2(main: &Path, candidates: &[PathBuf]) -> Outcome {
     let valid = candidates[1].clone();
     let mut player = ReferencePlayerApp::new(RealSource);
     if !matches!(player.open(main), OpenOutcome::Opened) {
-        return ("RED", vec!["O2: the first Open did not establish".into()], None);
+        return (
+            "RED",
+            vec!["O2: the first Open did not establish".into()],
+            None,
+        );
     }
     let a_path = player.active_source().expect("committed").to_owned();
     let a = player.active_handle().expect("committed").clone();
@@ -383,7 +450,11 @@ fn o3(main: &Path, candidates: &[PathBuf]) -> Outcome {
     let candidate = candidates[0].clone();
     let mut player = ReferencePlayerApp::new(RealSource);
     if !matches!(player.open(main), OpenOutcome::Opened) {
-        return ("RED", vec!["O3: the first Open did not establish".into()], None);
+        return (
+            "RED",
+            vec!["O3: the first Open did not establish".into()],
+            None,
+        );
     }
     let a = player.active_handle().expect("committed").clone();
     if !expect_liveness(&a, 2, "O3 pre-pause A", &mut reasons) {
@@ -433,7 +504,11 @@ fn o4(main: &Path, candidates: &[PathBuf]) -> Outcome {
     let candidate = candidates[0].clone();
     let mut player = ReferencePlayerApp::new(RealSource);
     if !matches!(player.open(main), OpenOutcome::Opened) {
-        return ("RED", vec!["O4: the first Open did not establish".into()], None);
+        return (
+            "RED",
+            vec!["O4: the first Open did not establish".into()],
+            None,
+        );
     }
     let a = player.active_handle().expect("committed").clone();
     if !expect_liveness(&a, 2, "O4 pre-seek A", &mut reasons) {
@@ -480,13 +555,21 @@ fn o5(main: &Path, candidates: &[PathBuf]) -> Outcome {
     let mut reasons = Vec::new();
     let mut player = ReferencePlayerApp::new(RealSource);
     if !matches!(player.open(main), OpenOutcome::Opened) {
-        return ("RED", vec!["O5: the first Open did not establish".into()], None);
+        return (
+            "RED",
+            vec!["O5: the first Open did not establish".into()],
+            None,
+        );
     }
     let mut previous = player.active_handle().expect("committed").clone();
     let mut replacements = Vec::new();
     for (n, candidate) in candidates.iter().enumerate() {
-        if !expect_liveness(&previous, 1, &format!("O5 episode {n} pre-replacement"), &mut reasons)
-        {
+        if !expect_liveness(
+            &previous,
+            1,
+            &format!("O5 episode {n} pre-replacement"),
+            &mut reasons,
+        ) {
             return ("RED", reasons, None);
         }
         let outcome = player.open(candidate);

@@ -1,0 +1,7 @@
+{
+  "scenario": "O3",
+  "verdict": "RED",
+  "reasons": [
+    "O3 pre-pause A: position publication not advancing (1/2, last Some(26019))"
+  ]
+}

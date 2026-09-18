@@ -1,0 +1,4 @@
+opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(45s)
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+verdict=RED reason: O4 pre-seek A: position publication not advancing (1/2, last Some(26019))
+[mp3float @ 000001ce0ac680c0] Could not update timestamps for skipped samples.
