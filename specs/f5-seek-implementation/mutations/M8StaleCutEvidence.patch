@@ -1,0 +1,16 @@
+diff --git a/crates/qianqian-playback/src/completion.rs b/crates/qianqian-playback/src/completion.rs
+index c5ebcf5..ddc9e72 100644
+--- a/crates/qianqian-playback/src/completion.rs
++++ b/crates/qianqian-playback/src/completion.rs
+@@ -587,11 +587,8 @@ impl SessionCompletion {
+             // against the worker's in-flight protocol: the one-seek slot
+             // only frees after the previous protocol fully resolved,
+             // and the worker's next-cycle publications serialize after
+             // this hold through this same lock.
+-            guard.seek_landing = None;
+-            guard.seek_refused = false;
+-            guard.cut_committed = false;
+             // The cut's park routes INSIDE this hold, so it can never
+             // lag the plant: the worker-exit cleanup always finds and
+             // releases exactly what an acceptance routed.
+             self.state.gate.set_seek_hold(true);

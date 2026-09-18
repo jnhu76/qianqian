@@ -1,12 +1,17 @@
 diff --git a/crates/qianqian-playback/src/completion.rs b/crates/qianqian-playback/src/completion.rs
-index a4e1707..9ce2104 100644
+index c5ebcf5..119ffe3 100644
 --- a/crates/qianqian-playback/src/completion.rs
 +++ b/crates/qianqian-playback/src/completion.rs
-@@ -537,7 +537,6 @@ impl SessionCompletion {
-         // satisfies the output-cut precondition and the pause intent
-         // survives the seek) — routing the hold is harmless there; the
-         // seek-park engages when the leg next reaches its loop top.
--        self.state.gate.set_seek_hold(true);
+@@ -590,12 +590,8 @@ impl SessionCompletion {
+             // this hold through this same lock.
+             guard.seek_landing = None;
+             guard.seek_refused = false;
+             guard.cut_committed = false;
+-            // The cut's park routes INSIDE this hold, so it can never
+-            // lag the plant: the worker-exit cleanup always finds and
+-            // releases exactly what an acceptance routed.
+-            self.state.gate.set_seek_hold(true);
+         }
      }
  
      /// The decode worker's loop-top pickup: take the planted command, if

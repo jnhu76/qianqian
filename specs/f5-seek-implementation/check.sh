@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # specs/f5-seek-implementation/check.sh — F5 seek IMPLEMENTATION mutation
-# gate (QIANQIAN-F5-SEEK-IMPLEMENTATION-1).
+# gate (QIANQIAN-F5-SEEK-IMPLEMENTATION-1 + its corrective-1).
 #
-# The seven guardrails M1–M7 correspond to the F5-GATE formal suite's
+# The guardrails M1–M7 correspond to the F5-GATE formal suite's
 # mutations (specs/f5-seek-discontinuity/mutations, TLA+). There each was
 # a model mutation; here each is applied to the PRODUCTION Rust code and
 # MUST be caught by the executable suites — the proof that the same
@@ -46,6 +46,14 @@
 #                                  → caught by the destructive matrix
 #                                 (production must stop for good at the
 #                                 Failed terminal).
+#
+# M8 is corrective-1's own guardrail (current-cut attribution): the
+#   per-cut evidence latches are reset when a new seek is accepted;
+#   deleting the reset lets a second commit ride the FIRST seek's
+#   landing evidence (completion.rs)
+#    → caught by the white-box second-seek evidence oracle (a_second_
+#   accepted_seek_gets_fresh_cut_evidence must see fresh latches and
+#   refuse a commit without cycle 2's own landing).
 #
 # Fail-closed contract:
 #   - the native regression (playback + audio-api crates) must come back
@@ -171,8 +179,12 @@ run_mutation M7ResumeAfterMutatedSeek M7ResumeAfterMutatedSeek.patch \
   -p qianqian-playback --test seek_seam \
   a_destructive_provider_failure_fails_the_episode_and_never_resumes
 
+run_mutation M8StaleCutEvidence M8StaleCutEvidence.patch \
+  -p qianqian-playback --lib \
+  completion::tests::a_second_accepted_seek_gets_fresh_cut_evidence
+
 if [[ "$fail" -eq 0 ]]; then
-  echo "SUITE: GUARDRAILS-LOAD-BEARING (native green; all 7 mutations caught)"
+  echo "SUITE: GUARDRAILS-LOAD-BEARING (native green; all 8 mutations caught)"
 else
   echo "SUITE: FAILED (see RESULT lines above)"
 fi
