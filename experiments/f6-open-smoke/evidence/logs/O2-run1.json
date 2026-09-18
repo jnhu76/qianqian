@@ -3,7 +3,7 @@
   "verdict": "GREEN",
   "reasons": [],
   "evidence": {
-    "post_refusal_stop_requested": true,
+    "post_refusal_stop_requested": false,
     "quit_disposal": "Some(Discharged)",
     "refused": true
   }
