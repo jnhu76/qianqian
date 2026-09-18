@@ -2,17 +2,21 @@
 
 Campaign: QIANQIAN-F6-NAVIGATION-VOLUME-AUTONOMOUS-1, Stage C
 (F6 Open implementation). Authority under test: ADR-PBK-002 D14.6
-(F6-AUTHORITY-PROMOTION-1). Branch: `feat/f6-open-1`, source commits
-f160cb1..HEAD (per-run `repo_head_sha` in the ENV files). The exe was
-cross-built ONCE from the committed tree (HEAD = b39ccae) before this
-evidence run set; all three runs therefore record the SAME
-`exe_sha256` (4754edc2…) — the binary was not rebuilt between runs,
-and the identical shas are the binding evidence, not per-run rebuilds.
+(F6-AUTHORITY-PROMOTION-1 + the Stage D playlist closure, same
+amendment). Branches: `feat/f6-open-1` then `feat/navigation-1`
+(per-run `repo_head_sha` in the ENV files). The current evidence set
+(O1–O6, three runs) was produced by ONE cross-build from the committed
+`feat/navigation-1` tree (exe sha 4e3da393…, identical across the
+three ENV files — the binding evidence, not per-run rebuilds); the
+earlier 15/15 set (exe 4754edc2…) was the Stage C matrix, superseded
+here by the re-run.
 
 ## Verdict
 
-**OPEN_SMOKE_GREEN ×3 — 15/15 scenario-runs GREEN** — conditional on
-the same UNAVAILABLE acoustic human-ear witness as S-PROBE (below).
+**OPEN_SMOKE_GREEN ×3 — 18/18 scenario-runs GREEN** (Stage D added O6,
+navigation; the O1–O5 matrix re-ran fresh with the Stage D binary) —
+conditional on the same UNAVAILABLE acoustic human-ear witness as
+S-PROBE (below).
 
 ## Environment (all runs)
 
@@ -29,11 +33,11 @@ endpoint:    [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3,
 
 ## Scenario matrix
 
-| run | O1 | O2 | O3 | O4 | O5 |
-|-----|----|----|----|----|----|
-| 1   | GREEN | GREEN | GREEN | GREEN | GREEN |
-| 2   | GREEN | GREEN | GREEN | GREEN | GREEN |
-| 3   | GREEN | GREEN | GREEN | GREEN | GREEN |
+| run | O1 | O2 | O3 | O4 | O5 | O6 (nav) |
+|-----|----|----|----|----|----|----------|
+| 1   | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN |
+| 2   | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN |
+| 3   | GREEN | GREEN | GREEN | GREEN | GREEN | GREEN |
 
 Representative measured evidence (full JSON per scenario in
 `evidence/logs/`):
@@ -58,6 +62,13 @@ Representative measured evidence (full JSON per scenario in
 - **O5 repeated replacement**: three consecutive replacements
   (MP3 → FLAC → MP3) each settled the previous episode `Stopped` and
   committed the next; final quit `Stopped` + `Discharged`, quiet.
+- **O6 navigation (Stage D)**: a 3-file startup playlist walked with
+  next/previous through the SAME real replacement — every step
+  settled the previous episode `Stopped`, established and consumed
+  with the new one; the last-entry next was inert; previous at the
+  first entry was inert; final quit `Stopped` + `Discharged`, quiet.
+  Commit-on-activation and the inert ends are pinned executably by
+  the Stage D unit matrix; this run witnesses them on real devices.
 
 ## Findings produced by this evidence round (all fixed on-branch)
 
