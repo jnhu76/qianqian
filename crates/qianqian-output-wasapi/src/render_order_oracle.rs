@@ -36,10 +36,16 @@
 //!     holds EXACTLY ONE direct cell publication — inside that helper.
 //!     A second direct `position.publish_consumed(` anywhere would be a
 //!     publication path the basis discipline cannot see;
-//! P10 the seek-park slice publishes unconditionally (its closure's top
-//!     level) — the F5 twin of P5/P8: while a cut is parked, the sample
-//!     must still walk up to the frozen handed-off total as the device
-//!     drains to the commit boundary.
+//! P10 (merged into P5/P8 by the loop-top unification): the seek and
+//!     pause parks share ONE tail-probe arm since the unified gate, so
+//!     one slice check covers both attributions;
+//! P11 exactly ONE loop-top gate call exists in the whole mechanism —
+//!     the frozen D14.5 realtime row ("no new lock acquisition")
+//!     realized as a single unified inspection; a second gate call in
+//!     the steady path is the defect the row forbids;
+//! P12 the retired per-park gate calls (`park_while_paused` /
+//!     `park_while_seek_hold`) appear nowhere — a reintroduction would
+//!     silently restore the two-acquisition steady iteration.
 //! ```
 //!
 //! This is a REGRESSION PIN, not a semantic proof: it says the shipped
@@ -109,39 +115,40 @@ fn check_render_order(source: &str) -> Vec<String> {
         "P3: the credit follows a successful submission and its failure break",
         matches!((submit_ok, submit_fail, credit), (Some(ok), Some(fail), Some(c)) if ok < c && fail < c),
     );
-    // P8 is checked over the park argument as a whole: its own sites,
-    // its own nesting.
-    let park_argument = argument_of(steady, PARK);
-    check(
-        "P5: the park-slice observation publishes",
-        park_argument.is_some_and(|argument| !code_sites(argument, PUBLISH).is_empty()),
-    );
-    // The park slice must publish at ITS OWN reading, unconditionally:
+    // P5/P8 are checked over the tail-probe arm of the ONE gate
+    // closure — since the loop-top unification that single arm serves
+    // BOTH park attributions (pause and cut), so one slice check covers
+    // both. The slice must publish, at its own reading, unconditionally:
     // quiescence is the one slice whose publication matters most (it is
-    // what walks a paused episode's sample to the frozen total), so a
+    // what walks a parked episode's sample to the frozen total), so a
     // publication gated behind a condition — skipping exactly that
     // slice — must RED.
+    let park_argument = argument_of(steady, PARK);
+    let tail_arm = park_argument.and_then(|argument| arm_body(argument, TAIL_ARM, RELEASE_ARM));
     check(
-        "P8: the park slice publishes unconditionally, at its closure's top level",
-        park_argument.is_some_and(|argument| {
-            code_sites(argument, PUBLISH)
+        "P5: the park-slice observation publishes",
+        tail_arm.is_some_and(|arm| !code_sites(arm, PUBLISH).is_empty()),
+    );
+    check(
+        "P8: the park slice publishes unconditionally, at its arm's top level",
+        tail_arm.is_some_and(|arm| {
+            code_sites(arm, PUBLISH)
                 .into_iter()
-                .any(|at| depth_inside_closure(argument, at) == 0)
+                .any(|at| depth_inside_closure(arm, at) == 0)
         }),
     );
 
-    // P10 is the seek park's twin of P5/P8 (F5): while seek-parked the
-    // sample must still walk up to the frozen handed-off total as the
-    // device drains — it is what the tail-quiescence boundary observes —
-    // so the seek-park slice publishes, unconditionally.
-    let seek_argument = argument_of(steady, SEEK_PARK);
+    // P11/P12 are the C4 source oracle (implementation corrective-1):
+    // the frozen realtime row's "no new lock acquisition" is realized
+    // as ONE unified loop-top inspection.
     check(
-        "P10: the seek-park slice publishes, unconditionally at its closure's top level",
-        seek_argument.is_some_and(|argument| {
-            code_sites(argument, PUBLISH)
-                .into_iter()
-                .any(|at| depth_inside_closure(argument, at) == 0)
-        }),
+        "P11: exactly one loop-top gate call in the mechanism",
+        code_sites(source, PARK).len() == 1,
+    );
+    check(
+        "P12: the retired per-park gate calls are gone",
+        code_sites(source, RETIRED_PARK).is_empty()
+            && code_sites(source, RETIRED_SEEK_PARK).is_empty(),
     );
 
     let Some(drain) = body_of(source, DRAIN) else {
@@ -206,10 +213,17 @@ const SUBMIT_OK: &str = "session.render.ReleaseBuffer(n as u32, 0)";
 const SUBMIT_FAIL: &str = "\"ReleaseBuffer failed:";
 /// The one frame-accounting credit.
 const CREDIT: &str = "handed_off += n as u64;";
-/// The loop-top pause gate.
-const PARK: &str = "park_while_paused(";
-/// The loop-top seek gate (F5).
-const SEEK_PARK: &str = "park_while_seek_hold(";
+/// THE one loop-top gate (D14.7 + D14.5 unified; implementation
+/// corrective-1).
+const PARK: &str = "gate.park_loop_top(";
+/// The tail-probe arm of the gate closure (both park attributions).
+const TAIL_ARM: &str = "GateSlice::TailProbe";
+/// The seek-release arm of the gate closure.
+const RELEASE_ARM: &str = "GateSlice::SeekRelease";
+/// The retired per-park spellings (P12: their reintroduction restores
+/// the two-acquisition steady iteration).
+const RETIRED_PARK: &str = "gate.park_while_paused(";
+const RETIRED_SEEK_PARK: &str = "gate.park_while_seek_hold(";
 const STEADY_LOOP: &str = "fn steady_loop(";
 const DRAIN: &str = "fn drain_to_zero(";
 
@@ -259,15 +273,22 @@ fn argument_span(text: &str, call: &str) -> Option<(usize, usize)> {
     None
 }
 
-/// `steady` with BOTH park gates' arguments removed — i.e. the loop's
-/// own body, without the park slices' copies of the publication (each
-/// park slice is checked separately by P5/P8 and P10).
+/// The body of the `head` match arm inside a gate-closure argument: the
+/// text from the end of the arm's pattern to the start of the following
+/// arm (or the end of the argument).
+fn arm_body<'a>(argument: &'a str, head: &str, next: &str) -> Option<&'a str> {
+    let start = argument.find(head)? + head.len();
+    let end = argument.find(next).unwrap_or(argument.len()).max(start);
+    Some(&argument[start..end])
+}
+
+/// `steady` with the gate closure's argument removed — i.e. the loop's
+/// own body, without the park slice's copy of the publication (the
+/// slice is checked separately by P5/P8).
 fn without_park_argument(steady: &str) -> String {
     let mut unparked = steady.to_owned();
-    for park in [PARK, SEEK_PARK] {
-        if let Some((start, end)) = argument_span(&unparked, park) {
-            unparked = format!("{}{}", &unparked[..start], &unparked[end..]);
-        }
+    if let Some((start, end)) = argument_span(&unparked, PARK) {
+        unparked = format!("{}{}", &unparked[..start], &unparked[end..]);
     }
     unparked
 }
@@ -319,10 +340,13 @@ fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutc
     let mut basis: u64 = 0;
     let mut publishing: bool = true;
     loop {{
-        gate.park_while_paused(|| {{
-            let tail = 0;
-            publish_consumed(position, basis, handed_off, tail, publishing);
-            true
+        gate.park_loop_top(|gated| match gated {{
+            GateSlice::TailProbe => {{
+                let tail = 0;
+                publish_consumed(position, basis, handed_off, tail, publishing);
+                true
+            }}
+            GateSlice::SeekRelease(_) => false,
         }});
         let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
         let ptr = unsafe {{ session.render.GetBuffer(available as u32) }};
@@ -364,9 +388,12 @@ fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutc
     let mut basis: u64 = 0;
     let mut publishing: bool = true;
     loop {{
-        gate.park_while_paused(|| {{
-            publish_consumed(position, basis, handed_off, 0, publishing);
-            true
+        gate.park_loop_top(|gated| match gated {{
+            GateSlice::TailProbe => {{
+                publish_consumed(position, basis, handed_off, 0, publishing);
+                true
+            }}
+            GateSlice::SeekRelease(_) => false,
         }});
         let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
         let ptr = unsafe {{ session.render.GetBuffer(available as u32) }};
@@ -409,9 +436,12 @@ fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutc
     let mut basis: u64 = 0;
     let mut publishing: bool = true;
     loop {{
-        gate.park_while_paused(|| {{
-            publish_consumed(position, basis, handed_off, 0, publishing);
-            true
+        gate.park_loop_top(|gated| match gated {{
+            GateSlice::TailProbe => {{
+                publish_consumed(position, basis, handed_off, 0, publishing);
+                true
+            }}
+            GateSlice::SeekRelease(_) => false,
         }});
         let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
         publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
@@ -468,7 +498,11 @@ fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutc
     let mut basis: u64 = 0;
     let mut publishing: bool = true;
     loop {{
-        gate.park_while_paused(|| unsafe {{ session.client.GetCurrentPadding() }}.is_ok_and(|p| p == 0));
+        gate.park_loop_top(|gated| match gated {{
+            GateSlice::TailProbe => unsafe {{ session.client.GetCurrentPadding() }}
+                .is_ok_and(|p| p == 0),
+            GateSlice::SeekRelease(_) => false,
+        }});
         let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
         publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
         let ptr = unsafe {{ session.render.GetBuffer(available as u32) }};
@@ -509,9 +543,12 @@ fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutc
     let mut basis: u64 = 0;
     let mut publishing: bool = true;
     loop {{
-        gate.park_while_paused(|| {{
-            publish_consumed(position, basis, handed_off, 0, publishing);
-            true
+        gate.park_loop_top(|gated| match gated {{
+            GateSlice::TailProbe => {{
+                publish_consumed(position, basis, handed_off, 0, publishing);
+                true
+            }}
+            GateSlice::SeekRelease(_) => false,
         }});
         let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
         publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
@@ -571,8 +608,8 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     #[test]
     fn a_park_slice_that_skips_its_quiescent_publication_is_rejected() {
         let source = include_str!("wasapi.rs").replace(
-            "gate.park_while_paused(|| {\n            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                return false;\n            };\n            publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
-            "gate.park_while_paused(|| {\n            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                return false;\n            };\n            if padding != 0 {\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n            }",
+            "GateSlice::TailProbe => {\n                let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                    return false;\n                };\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
+            "GateSlice::TailProbe => {\n                let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                    return false;\n                };\n                if padding != 0 {\n                    publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n                }",
         );
         let violations = check_render_order(&source);
         assert!(
@@ -580,32 +617,50 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
             "a conditional park publication must be rejected: {violations:?}"
         );
         assert!(
-            !violations.iter().any(|v| v.starts_with("P10")),
-            "the mutation must have touched the pause park, not the seek \
-             park: {violations:?}"
+            !violations.iter().any(|v| v.starts_with("P5")),
+            "the mutation must hide the publication, not remove it: {violations:?}"
         );
     }
 
-    /// The seek park slice carries the same unconditional-publication
-    /// constraint (P10): while a cut is parked, the sample must still
-    /// walk up to the frozen handed-off total — it is what the commit
-    /// boundary's tail-quiescence observes. The mutation must leave the
-    /// pause park GREEN.
+    /// P11 is the C4 source oracle: the frozen realtime row's "no new
+    /// lock acquisition" is realized as ONE unified loop-top inspection,
+    /// so a second gate call in the steady path — the pre-unification
+    /// two-call spelling, or any added check — must RED.
     #[test]
-    fn a_seek_park_that_skips_its_quiescent_publication_is_rejected() {
+    fn a_second_loop_top_gate_call_is_rejected() {
         let source = include_str!("wasapi.rs").replace(
-            "gate.park_while_seek_hold(|| {\n            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                return false;\n            };\n            publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
-            "gate.park_while_seek_hold(|| {\n            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                return false;\n            };\n            if padding != 0 {\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n            }",
+            "        // Period cadence; the bounded wait is also the stop-latency bound.",
+            "        gate.park_loop_top(|gated| match gated {\n            GateSlice::TailProbe => true,\n            GateSlice::SeekRelease(_) => false,\n });\n        // Period cadence; the bounded wait is also the stop-latency bound.",
         );
         let violations = check_render_order(&source);
         assert!(
-            violations.iter().any(|v| v.starts_with("P10")),
-            "a conditional seek-park publication must be rejected: {violations:?}"
+            violations.iter().any(|v| v.starts_with("P11")),
+            "a second loop-top gate call must be rejected: {violations:?}"
         );
+    }
+
+    /// P12: reintroducing the retired per-park spelling — e.g. a merge
+    /// that drags a pre-unification hunk back in — must RED, because it
+    /// silently restores the two-acquisition steady iteration.
+    #[test]
+    fn a_reintroduced_retired_park_call_is_rejected() {
+        let source = include_str!("wasapi.rs").replace(
+            "        // Period cadence; the bounded wait is also the stop-latency bound.",
+            "        // gate.park_while_paused(|| false);\n        // Period cadence; the bounded wait is also the stop-latency bound.",
+        );
+        let violations = check_render_order(&source);
         assert!(
-            !violations.iter().any(|v| v.starts_with("P8")),
-            "the mutation must have touched the seek park, not the pause \
-             park: {violations:?}"
+            !violations.iter().any(|v| v.starts_with("P12")),
+            "a commented mention is not a call (P7's rule): {violations:?}"
+        );
+        let source = include_str!("wasapi.rs").replace(
+            "        // Period cadence; the bounded wait is also the stop-latency bound.",
+            "        gate.park_while_paused(|| false);\n        // Period cadence; the bounded wait is also the stop-latency bound.",
+        );
+        let violations = check_render_order(&source);
+        assert!(
+            violations.iter().any(|v| v.starts_with("P12")),
+            "a reintroduced retired park call must be rejected: {violations:?}"
         );
     }
 
@@ -641,9 +696,12 @@ fn steady_loop(session: &DeviceSession, position: &PositionEvidence) -> LoopOutc
     let mut basis: u64 = 0;
     let mut publishing: bool = true;
     loop {{
-        gate.park_while_paused(|| {{
-            publish_consumed(position, basis, handed_off, 0, publishing);
-            true
+        gate.park_loop_top(|gated| match gated {{
+            GateSlice::TailProbe => {{
+                publish_consumed(position, basis, handed_off, 0, publishing);
+                true
+            }}
+            GateSlice::SeekRelease(_) => false,
         }});
         let padding = unsafe {{ session.client.GetCurrentPadding() }}.unwrap_or(0);
         position.publish_consumed(basis + handed_off, u64::from(padding));

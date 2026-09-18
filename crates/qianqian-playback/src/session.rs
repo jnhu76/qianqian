@@ -434,7 +434,18 @@ fn decode_worker(
             edge.fail();
         }
     }
+    // The single exit funnel (normal and panic paths alike): publish the
+    // terminal evidence AND mark the worker gone — the acceptance side
+    // of the seek/worker-exit linearization — then abort any stranded
+    // seek. The order is load-bearing (implementation corrective-1): a
+    // request_seek accepted before the `worker_gone` publication is
+    // found and released by the cleanup; one attempted after it is
+    // rejected by acceptance. Without the cleanup, a request accepted
+    // against an about-to-exit worker (the request × EOF interleaving)
+    // could route a hold nobody ever releases and wedge the episode's
+    // final drain.
     completion.worker_exited(edge.terminal());
+    completion.abort_stranded_seek();
 }
 
 /// The interruptible bounded-slice write (D14.5): write `src` into the

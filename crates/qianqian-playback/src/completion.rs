@@ -164,6 +164,15 @@ struct CompletionState {
     /// activation failed). The edge is the session-owned stop mechanism;
     /// this core only routes intent to it.
     stop_target: Option<Arc<PcmEdge>>,
+    /// Worker-liveness evidence (D14.5 implementation corrective-1):
+    /// set by [`SessionCompletion::worker_exited`] — the single exit
+    /// funnel — under the completion lock, BEFORE the worker's stranded-
+    /// seek cleanup runs. It is the acceptance side of the seek/worker-
+    /// exit linearization: an accepted seek must either be resolved by a
+    /// live worker or aborted by that worker's exit cleanup; a request
+    /// that passes acceptance after `worker_gone` is set would have no
+    /// resolver left, so acceptance rejects it. Never public surface.
+    worker_gone: bool,
     /// Seek-park engagement evidence (D14.5): the render leg is parked
     /// at the pre-GetBuffer gate under a routed seek hold (a
     /// cut-attributed park — never pause engagement, never `Paused`
@@ -177,16 +186,22 @@ struct CompletionState {
     /// "provider repositioned at L" (strictly after its edge purge).
     /// `None` = not published; `Some(None)` = published with an unknown
     /// landing (the Position projection is withdrawn for the episode).
-    /// Mechanism evidence; never a Fact, never product surface.
+    /// Belongs to the CURRENT cut cycle — reset when the next seek is
+    /// accepted (implementation corrective-1: a previous cut's landing
+    /// must never satisfy a later commit boundary, the same
+    /// current-engagement attribution discipline D14.7 freezes for
+    /// pause). Mechanism evidence; never a Fact, never product surface.
     seek_landing: Option<Option<u64>>,
     /// A [`SeekSlot`] command that the worker picked up and resolved as
     /// a proven pre-mutation refusal (`RefusedUnchanged`): inert
-    /// protocol history, recorded for verification only.
+    /// protocol history of the CURRENT cut cycle, reset at the next
+    /// acceptance like the other cut latches.
     seek_refused: bool,
-    /// The session's cutover commit record (D14.5): true iff the
+    /// The session's cutover-commit record (D14.5): true iff the
     /// session-owned protocol path evaluated `landing published ∧ edge
     /// invalidated ∧ tail quiesced ∧ leg parked ∧ episode unsettled`
-    /// and recorded the commit. Protocol state owned by the session —
+    /// and recorded the commit. Belongs to the CURRENT cut cycle (reset
+    /// at the next acceptance). Protocol state owned by the session —
     /// NOT a Fact, NOT a terminal variant, NOT public surface. The
     /// observable consequences are the Position jump and the absence of
     /// stale audio.
@@ -282,6 +297,7 @@ impl SessionCompletion {
                         disengagement_observed: false,
                         teardown_released: false,
                         stop_target: None,
+                        worker_gone: false,
                         seek_engaged: false,
                         seek_tail_quiesced: false,
                         seek_landing: None,
@@ -487,6 +503,8 @@ impl SessionCompletion {
     /// data plane Open (the bound edge exists and its terminal is Open —
     ///     the post-EOF drain window is explicitly NOT seekable)
     /// no stop intent already recorded, no teardown release begun
+    /// the decode worker is still alive (an accepted seek needs a live
+    ///     resolver — implementation corrective-1)
     /// no seek already in flight (one-seek policy; no queueing)
     /// ```
     ///
@@ -495,20 +513,34 @@ impl SessionCompletion {
     /// validity and clamping (duration evidence is never consulted
     /// here). Acceptance records the command and parks the leg; it does
     /// NOT imply a cutover — "a seek request is not a cutover".
+    ///
+    /// The acceptance is one atomic unit (implementation corrective-1,
+    /// the seek/worker-exit linearization): the second hold below
+    /// re-validates every condition, plants the command, resets the
+    /// current cut cycle's evidence, and routes the cut's park — all
+    /// under ONE completion-lock hold. A seek is therefore either wholly
+    /// accepted before the worker's exit publication (whose stranded-
+    /// seek cleanup runs after it and aborts exactly this plant) or
+    /// wholly rejected after it; no interleaving can leave a planted
+    /// command whose only resolver has left. Without this, a
+    /// `request_seek` × worker-EOF interleaving could route a hold
+    /// nobody releases and wedge the episode's final drain — D11
+    /// Completed would never settle.
     pub(crate) fn request_seek(&self, target: Duration) {
-        // Acceptance reads the command state and the edge terminal; the
-        // edge is reached only after this lock is dropped (the
-        // established completion→edge discipline: `request_stop`'s
-        // pattern). A terminal that changes in the window between this
-        // check and the worker's pickup is caught again at the worker's
-        // serialization point — acceptance and pickup are two defense
-        // lines, not one.
+        // First hold: cheap reject against the command state and worker
+        // liveness. The edge is reached only after this lock is dropped
+        // (the established completion→edge discipline: `request_stop`'s
+        // pattern). A terminal that changes in the window between the
+        // holds is caught again by the second hold's re-validation and
+        // at the worker's own serialization point — defense lines, not
+        // one.
         let edge = {
             let guard = self.state.state.lock().expect("completion lock");
             if guard.outcome.is_some()
                 || guard.stop_requested
                 || guard.teardown_released
                 || guard.activation_failure.is_some()
+                || guard.worker_gone
             {
                 return;
             }
@@ -520,24 +552,50 @@ impl SessionCompletion {
         if edge.terminal() != crate::edge::EdgeTerminal::Open {
             return; // data plane not Open (includes the post-EOF drain window)
         }
-        // Plant the command under the slot lock: the one-seek policy is
-        // decided here, atomically with the planting. No queueing, no
-        // coalescing, no request identity — this is why no SeekId
-        // exists.
+        // The atomic acceptance unit (see the doc above). Lock order:
+        // completion state → seek slot → gate intent, each nested only
+        // in that direction (the routers' established
+        // gate-intent-under-completion-lock discipline; the slot is
+        // nested here for the first time — nothing ever takes the state
+        // lock while holding the slot, so no cycle is reachable).
         {
-            let mut slot = self.state.seek_slot.lock().expect("seek slot lock");
-            if slot.in_flight {
-                return; // one seek in flight; the second request is inert
+            let mut guard = self.state.state.lock().expect("completion lock");
+            if guard.outcome.is_some()
+                || guard.stop_requested
+                || guard.teardown_released
+                || guard.activation_failure.is_some()
+                || guard.worker_gone
+            {
+                return;
             }
-            slot.in_flight = true;
-            slot.command = Some(target);
+            {
+                // Plant under the slot lock: the one-seek policy is
+                // decided here, atomically with the planting. No
+                // queueing, no coalescing, no request identity — this
+                // is why no SeekId exists.
+                let mut slot = self.state.seek_slot.lock().expect("seek slot lock");
+                if slot.in_flight {
+                    return; // one seek in flight; the second request is inert
+                }
+                slot.in_flight = true;
+                slot.command = Some(target);
+            }
+            // A NEW cut cycle owns fresh evidence: the previous cycle's
+            // landing/refusal/commit latches must never satisfy THIS
+            // cycle's commit boundary (the same current-engagement
+            // attribution discipline D14.7 freezes for pause). Safe
+            // against the worker's in-flight protocol: the one-seek slot
+            // only frees after the previous protocol fully resolved,
+            // and the worker's next-cycle publications serialize after
+            // this hold through this same lock.
+            guard.seek_landing = None;
+            guard.seek_refused = false;
+            guard.cut_committed = false;
+            // The cut's park routes INSIDE this hold, so it can never
+            // lag the plant: the worker-exit cleanup always finds and
+            // releases exactly what an acceptance routed.
+            self.state.gate.set_seek_hold(true);
         }
-        // Park the render leg for the cut. The leg may be parked by
-        // pause already (a paused episode is seekable: its quiesced tail
-        // satisfies the output-cut precondition and the pause intent
-        // survives the seek) — routing the hold is harmless there; the
-        // seek-park engages when the leg next reaches its loop top.
-        self.state.gate.set_seek_hold(true);
     }
 
     /// The decode worker's loop-top pickup: take the planted command, if
@@ -790,10 +848,48 @@ impl SessionCompletion {
     }
 
     /// The decode worker wrapper reports the edge terminal at its exit.
+    /// This is the worker's single exit funnel (normal and panic paths):
+    /// it publishes the terminal evidence AND — first, under the same
+    /// lock hold — marks the worker gone, which is the acceptance side
+    /// of the seek/worker-exit linearization. The caller MUST run
+    /// [`SessionCompletion::abort_stranded_seek`] after this returns.
     /// The publication and the settlement step run under one lock hold,
     /// inside this call.
     pub(crate) fn worker_exited(&self, terminal: EdgeTerminal) {
-        self.publish(|state| state.worker_terminal = Some(terminal));
+        self.publish(|state| {
+            state.worker_terminal = Some(terminal);
+            state.worker_gone = true;
+        });
+    }
+
+    /// The decode worker's exit duty (implementation corrective-1): a
+    /// seek accepted before this worker's exit can never be resolved by
+    /// a worker that is leaving — abort it here, strictly AFTER
+    /// [`SessionCompletion::worker_exited`] published `worker_gone`.
+    /// Acceptance linearizes against that publication: a plant whose
+    /// acceptance hold ran before it is found and cleared here; a plant
+    /// attempted after it is rejected by the acceptance re-validation.
+    /// Every exit path reaches this — including a refusal whose
+    /// preserved remainder was cut short by a stop (slot still occupied)
+    /// — and re-routing an abort is idempotent: the episode is ending,
+    /// the leg consumes-or-ignores the payload, and the data plane
+    /// decides.
+    pub(crate) fn abort_stranded_seek(&self) {
+        let stranded = {
+            let mut slot = self.state.seek_slot.lock().expect("seek slot lock");
+            if slot.in_flight || slot.command.is_some() {
+                slot.in_flight = false;
+                slot.command = None;
+                true
+            } else {
+                false
+            }
+        };
+        if stranded {
+            // No commit, no rebase, no partial state: the protocol's
+            // only resolver is gone.
+            self.state.gate.release_seek_hold(SeekParkRelease::Aborted);
+        }
     }
 
     /// One coherent observation of the episode, taken under a single
@@ -1031,7 +1127,25 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
 mod tests {
     use super::*;
     #[cfg(not(loom))]
-    use qianqian_audio_api::ports::SeekParkOutcome;
+    use qianqian_audio_api::ports::{GateSlice, RenderGate};
+
+    /// Drive the unified loop-top gate and capture any routed release
+    /// payload the leg consumes. The tail probe never quiesces, so a
+    /// routed hold would park this call — tests that use this helper
+    /// drive consumption shapes only (payload routed before arrival, or
+    /// nothing routed).
+    #[cfg(not(loom))]
+    fn consume_release(gate: &RenderGate) -> Option<SeekParkRelease> {
+        let captured = std::cell::Cell::new(None);
+        gate.park_loop_top(|slice| match slice {
+            GateSlice::TailProbe => false,
+            GateSlice::SeekRelease(release) => {
+                captured.set(Some(release));
+                false
+            }
+        });
+        captured.into_inner()
+    }
 
     /// D14.7 corrective-2, the delayed-delivery interleaving no leg-level
     /// test can reach deterministically: the render leg has observed
@@ -1247,8 +1361,8 @@ mod tests {
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
         assert!(!completion.commit_seek_cutover(Some(123)));
         assert_eq!(
-            completion.render_gate().park_while_seek_hold(|| false),
-            SeekParkOutcome::Released(SeekParkRelease::Aborted),
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Aborted),
             "the losing decision still releases the leg"
         );
 
@@ -1261,8 +1375,8 @@ mod tests {
         completion.seek_landing_published(Some(7));
         assert!(!completion.commit_seek_cutover(Some(7)));
         assert_eq!(
-            completion.render_gate().park_while_seek_hold(|| false),
-            SeekParkOutcome::Released(SeekParkRelease::Aborted),
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Aborted),
         );
 
         // Stop intent recorded before the decision wins the race.
@@ -1275,8 +1389,8 @@ mod tests {
         completion.seek_landing_published(Some(123));
         assert!(!completion.commit_seek_cutover(Some(123)));
         assert_eq!(
-            completion.render_gate().park_while_seek_hold(|| false),
-            SeekParkOutcome::Released(SeekParkRelease::Aborted),
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Aborted),
         );
 
         // The full conjunction commits; the payload reaches the leg
@@ -1308,13 +1422,13 @@ mod tests {
             "the routed payload awaits the leg's consumption"
         );
         assert_eq!(
-            completion.render_gate().park_while_seek_hold(|| false),
-            SeekParkOutcome::Released(SeekParkRelease::Committed { landing: Some(123) }),
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Committed { landing: Some(123) }),
             "the commit's rebase payload carries the ACTUAL landing"
         );
         assert_eq!(
-            completion.render_gate().park_while_seek_hold(|| false),
-            SeekParkOutcome::NotParked,
+            consume_release(&completion.render_gate()),
+            None,
             "the payload is consumed exactly once"
         );
         // The worker's post-consumption duty (session.rs): once the
@@ -1334,8 +1448,8 @@ mod tests {
         completion.seek_landing_published(None);
         assert!(completion.commit_seek_cutover(None));
         assert_eq!(
-            completion.render_gate().park_while_seek_hold(|| false),
-            SeekParkOutcome::Released(SeekParkRelease::Committed { landing: None }),
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Committed { landing: None }),
         );
 
         // The same conjunction holds under the SEEK attribution: the
@@ -1375,6 +1489,133 @@ mod tests {
             completion.seek_protocol_state().2,
             Some(None),
             "unknown, once published, is the landing — never upgraded"
+        );
+    }
+
+    /// Implementation corrective-1 (C3, current-cut attribution): the
+    /// per-cut evidence latches belong to the CURRENT cut cycle. A
+    /// second accepted seek resets them, so cycle 1's landing can never
+    /// satisfy cycle 2's commit boundary — the commit predicate must be
+    /// discharged by cycle 2's OWN landing publication, exactly the
+    /// current-engagement discipline D14.7 freezes for pause. (Before
+    /// the reset existed, `seek_landing` was episode-first-wins and a
+    /// second commit could ride cycle 1's evidence.)
+    #[cfg(not(loom))]
+    #[test]
+    fn a_second_accepted_seek_gets_fresh_cut_evidence() {
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        let core = completion.state.clone();
+
+        // Cycle 1 runs to a full commit: landing 10 published, commit,
+        // payload consumed, slot freed.
+        completion.request_seek(Duration::from_secs(1));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
+        completion.seek_landing_published(Some(10));
+        assert!(completion.commit_seek_cutover(Some(10)));
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Committed { landing: Some(10) })
+        );
+        completion.clear_seek_in_flight();
+        assert_eq!(
+            completion.seek_protocol_state(),
+            (false, true, Some(Some(10))),
+            "precondition: cycle 1's evidence is latched"
+        );
+
+        // Accepting cycle 2 resets the latches...
+        completion.request_seek(Duration::from_secs(2));
+        assert_eq!(
+            completion.seek_protocol_state(),
+            (false, false, None),
+            "a new cut cycle must not inherit the previous cycle's \
+             landing, refusal or commit evidence"
+        );
+
+        // ...so cycle 1's landing no longer satisfies the commit
+        // boundary; the losing decision still releases the leg.
+        assert!(
+            !completion.commit_seek_cutover(Some(10)),
+            "cycle 2's commit must require cycle 2's own landing evidence"
+        );
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Aborted),
+        );
+
+        // Publishing cycle 2's OWN landing is what discharges the
+        // boundary.
+        completion.seek_landing_published(Some(20));
+        assert!(completion.commit_seek_cutover(Some(20)));
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Committed { landing: Some(20) })
+        );
+    }
+
+    /// Implementation corrective-1 (C2, seek/worker-exit
+    /// linearization): an accepted seek either lives to be resolved by
+    /// its worker or is aborted by that worker's exit — never stranded
+    /// under a hold nobody will release (which would park the leg past
+    /// the final drain and wedge D11 Completed). Both linearization
+    /// sides, driven deterministically through the real acceptance and
+    /// the real exit funnel:
+    ///
+    /// ```text
+    /// (a) plant before the worker's exit publication
+    ///     → the exit cleanup finds and aborts exactly that plant;
+    /// (b) request after the worker's exit publication
+    ///     → acceptance rejects (no live resolver), no plant, no hold.
+    /// ```
+    ///
+    /// Every acceptance hold is atomic (plant + latch reset + hold
+    /// routing under ONE completion-lock hold), so these two sides
+    /// exhaust the interleavings: a partial acceptance cannot exist.
+    #[cfg(not(loom))]
+    #[test]
+    fn an_accepted_seek_cannot_outlive_its_worker_exit() {
+        // (a) The plant precedes the worker's exit.
+        let completion = SessionCompletion::new();
+        let edge = Arc::new(PcmEdge::new(2, 8192));
+        completion.bind_stop_target(edge.clone());
+        completion.request_seek(Duration::from_secs(3));
+        assert!(completion.seek_in_flight(), "precondition: accepted");
+        // The worker's real EOF exit shape, on the funnel's order:
+        // worker_gone publication first, then the stranded-seek cleanup.
+        edge.close_eof();
+        completion.worker_exited(EdgeTerminal::Eof);
+        completion.abort_stranded_seek();
+        assert!(
+            !completion.seek_in_flight(),
+            "the exit cleanup freed the slot of the plant it found"
+        );
+        // The routed abort reaches the leg exactly once: no hold remains
+        // to park it, no payload lingers.
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Aborted),
+        );
+        assert_eq!(consume_release(&completion.render_gate()), None);
+
+        // (b) The request follows the worker's exit.
+        let completion = SessionCompletion::new();
+        let edge = Arc::new(PcmEdge::new(2, 8192));
+        completion.bind_stop_target(edge.clone());
+        edge.close_eof();
+        completion.worker_exited(EdgeTerminal::Eof);
+        completion.abort_stranded_seek();
+        completion.request_seek(Duration::from_secs(3));
+        assert!(
+            !completion.seek_in_flight(),
+            "acceptance after the worker's exit publication is rejected: \
+             a seek with no live resolver must never plant"
+        );
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            None,
+            "nothing was routed"
         );
     }
 }

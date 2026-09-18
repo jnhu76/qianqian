@@ -1,14 +1,25 @@
 //! RenderGate protocol tests (F3, ADR-PBK-002 D14.7): the
-//! session-owned pause gate's park/release discipline at the ports seam.
-//! These pin the mechanism contract every render provider inherits:
-//! park in bounded slices, acknowledge engagement / tail quiescence /
-//! disengagement as evidence, never abort the caller's leg.
+//! session-owned pause gate's park/release discipline at the ports seam,
+//! driven through the ONE unified loop-top operation these tests' render
+//! providers inherit (`park_loop_top`). They pin: park in bounded
+//! slices, acknowledge engagement / tail quiescence / disengagement as
+//! evidence, never abort the caller's leg. (These tests route no seek
+//! protocol; the seek shapes live in `render_gate_seek.rs`.)
 
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use qianqian_audio_api::ports::{GateEvent, RenderGate};
+use qianqian_audio_api::ports::{GateEvent, GateSlice, RenderGate};
+
+/// Run the unified loop-top gate with `tail` as the tail probe, ignoring
+/// seek releases (none is routed in these tests).
+fn pause_only(gate: &RenderGate, mut tail: impl FnMut() -> bool) {
+    gate.park_loop_top(|slice| match slice {
+        GateSlice::TailProbe => tail(),
+        GateSlice::SeekRelease(_) => false,
+    });
+}
 
 /// A bounded poll so timing assertions fail with a diagnosis, not a
 /// hang.
@@ -48,7 +59,7 @@ fn an_unengaged_gate_parks_nothing_and_publishes_nothing() {
     let events_clone = events.clone();
     let gate = RenderGate::with_observer(move |event| events_clone.record(event));
     let mut tail_calls = 0usize;
-    gate.park_while_paused(|| {
+    pause_only(&gate, || {
         tail_calls += 1;
         true
     });
@@ -66,7 +77,7 @@ fn a_release_that_lands_before_the_park_publishes_nothing() {
     gate.set_paused(true);
     gate.set_paused(false);
     let mut tail_calls = 0usize;
-    gate.park_while_paused(|| {
+    pause_only(&gate, || {
         tail_calls += 1;
         true
     });
@@ -92,10 +103,10 @@ fn a_park_publishes_engagement_quiescence_and_disengagement_then_returns() {
         std::thread::spawn(move || {
             // Quiescent only from the third observation on: the first
             // slices must not publish quiescence.
-            gate.park_while_paused(|| tail_calls.fetch_add(1, Ordering::SeqCst) >= 2);
+            pause_only(&gate, || tail_calls.fetch_add(1, Ordering::SeqCst) >= 2);
             // The leg is back at its loop top; the gate must not park it
             // again on the same routed intent (it was released).
-            gate.park_while_paused(|| false);
+            pause_only(&gate, || false);
         })
     };
 
@@ -148,7 +159,7 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
     gate.set_paused(true);
     let leg = {
         let gate = gate.clone();
-        std::thread::spawn(move || gate.park_while_paused(|| true))
+        std::thread::spawn(move || pause_only(&gate, || true))
     };
     assert!(
         wait_until(Duration::from_secs(5), || events
@@ -168,7 +179,7 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
     gate.set_paused(true);
     let leg = {
         let gate = gate.clone();
-        std::thread::spawn(move || gate.park_while_paused(|| true))
+        std::thread::spawn(move || pause_only(&gate, || true))
     };
     assert!(
         wait_until(Duration::from_secs(5), || {
@@ -210,7 +221,7 @@ fn tail_quiescence_belongs_to_each_engagement_separately() {
     gate.set_paused(true);
     let leg = {
         let gate = gate.clone();
-        std::thread::spawn(move || gate.park_while_paused(|| false))
+        std::thread::spawn(move || pause_only(&gate, || false))
     };
     assert!(
         wait_until(Duration::from_secs(5), || {
@@ -261,7 +272,7 @@ fn a_closed_gate_never_parks_or_engages_again() {
         let gate = gate.clone();
         let tail_calls = tail_calls.clone();
         std::thread::spawn(move || {
-            gate.park_while_paused(|| {
+            pause_only(&gate, || {
                 tail_calls.fetch_add(1, Ordering::SeqCst);
                 false
             });
@@ -272,7 +283,7 @@ fn a_closed_gate_never_parks_or_engages_again() {
         rx.recv_timeout(Duration::from_secs(5)),
         Ok(()),
         "the closed gate parked the leg: it never returned from \
-         park_while_paused"
+         the loop-top gate"
     );
     assert_eq!(
         tail_calls.load(Ordering::SeqCst),

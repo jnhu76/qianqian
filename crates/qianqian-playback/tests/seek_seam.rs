@@ -34,7 +34,7 @@
 //!                     (rebase as the one legal backward step, zero
 //!                     landing, withdrawal discipline)
 //!   real leg order    the Windows render loop's source-order oracle
-//!                     (publish/unconditional-slice rules P1–P10)
+//!                     (publish/unconditional-slice rules P1–P12)
 //!   protocol latches  the completion's own white-box tests inside the
 //!                     crate (slot policy, acceptance conditions, the
 //!                     commit conjunction, first-wins latches) —
@@ -545,16 +545,19 @@ fn a_destructive_provider_failure_fails_the_episode_and_never_resumes() {
 
 /// A paused episode is seekable: the cutover commits through the PAUSE
 /// engagement (its park is the same physical evidence class), the pause
-/// intent and the Paused projection SURVIVE the seek, and on resume the
-/// leg consumes the rebase payload at its gate check — before any
-/// further submission — so the projection climbs from the landing and
-/// the content shows exactly the one cut.
+/// intent and the Paused projection SURVIVE the seek, and — the
+/// implementation corrective-1 behavior (C1) — the REBASE lands WHILE
+/// STILL PAUSED: the leg consumes the committed payload mid-park, so
+/// the projection reads at the landing before any resume. On resume the
+/// content shows exactly the one cut and the projection climbs from the
+/// landing.
 #[test]
-fn a_paused_episode_commits_its_seek_and_stays_paused_until_resumed() {
+fn a_paused_episode_commits_its_seek_and_rebases_while_still_paused() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
         let (witnesses, handle, mut runtime) = episode(Vec::new());
         wait_for_position_past(&handle, HALF_A_SECOND);
+        let pre_seek_sample = handle.observe().position.expect("playing");
         handle.request_pause();
         assert!(
             wait_until(Duration::from_secs(5), || handle.observe().paused()),
@@ -562,8 +565,9 @@ fn a_paused_episode_commits_its_seek_and_stays_paused_until_resumed() {
             handle.observe()
         );
         handle.request_seek(Duration::from_secs(5));
-        // The commit must have routed while still paused, and nothing
-        // about the seek may have implicit-resumed the episode.
+        // The commit must have routed — and REBASED — while still
+        // paused, and nothing about the seek may have implicit-resumed
+        // the episode.
         std::thread::sleep(Duration::from_millis(200));
         let during = handle.observe();
         assert!(
@@ -573,6 +577,12 @@ fn a_paused_episode_commits_its_seek_and_stays_paused_until_resumed() {
         assert_eq!(
             during.terminal_outcome, None,
             "a seek is never a terminal event"
+        );
+        assert!(
+            during.position.is_some_and(|p| p >= FIVE_SECONDS),
+            "the committed cut must rebase the projection to the landing \
+             BEFORE the resume (still paused): {during:?} (pre-seek sample \
+             {pre_seek_sample})"
         );
         handle.request_resume();
         assert!(
@@ -629,23 +639,29 @@ fn a_second_seek_while_one_is_in_flight_is_inert() {
     });
 }
 
-/// The commit does not end a cut: its rebase payload is part of the cut
-/// until the leg CONSUMES it. A cut committed while the leg is held by
-/// PAUSE leaves the payload awaiting (pause slices stopped observing),
-/// and a seek fired in that window must be INERT — a new hold would
-/// wipe the awaiting `Committed` and the episode would keep its OLD
-/// position basis forever (the rebase lost). After resume the content
-/// cuts exactly once, at the FIRST seek's landing.
+/// A committed cut RESOLVES while the leg is pause-parked (the leg
+/// consumes the payload mid-park and the worker frees the slot), so a
+/// paused episode is seekable AGAIN immediately: a second seek fired
+/// while still paused commits through the same pause attribution, cuts
+/// again, and rebases the projection to the SECOND landing — still
+/// without any resume. Nothing of the first cut is lost: its purge
+/// already happened, and the never-wiped rule (slot occupied through
+/// consumption, pinned white-box) makes an unwiped-payload hazard
+/// unreachable — a new hold can only route after the previous payload
+/// was consumed. Both mid-pause cuts purge pre-resume content, so the
+/// consumed content shows exactly ONE visible discontinuity, at the
+/// SECOND landing, after the resume.
 #[test]
-fn a_committed_release_is_never_wiped_by_a_later_seek() {
+fn a_paused_episode_can_seek_again_after_its_committed_cut() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
+        let second_landing = 6 * ONE_SECOND;
         let (witnesses, handle, mut runtime) = episode(vec![
             ProviderSeekOutcome::Applied {
                 landing: Some(FIVE_SECONDS),
             },
             ProviderSeekOutcome::Applied {
-                landing: Some(6 * ONE_SECOND),
+                landing: Some(second_landing),
             },
         ]);
         wait_for_position_past(&handle, HALF_A_SECOND);
@@ -655,29 +671,50 @@ fn a_committed_release_is_never_wiped_by_a_later_seek() {
             "precondition: the episode never established Paused"
         );
         handle.request_seek(Duration::from_secs(5));
-        // The cut commits through the pause engagement; its payload
-        // awaits the parked leg (pause slices are quiesced-and-blind).
-        std::thread::sleep(Duration::from_millis(200));
-        assert!(
-            handle.observe().paused(),
-            "precondition: the seek must not have resumed the episode"
-        );
-        // Fires while the first cut's payload provably still awaits.
-        handle.request_seek(Duration::from_secs(6));
-        std::thread::sleep(Duration::from_millis(100));
-        handle.request_resume();
+        // Cut #1 commits and rebases while still paused (C1).
         assert!(
             wait_until(Duration::from_secs(5), || handle
                 .observe()
                 .position
                 .is_some_and(|p| p >= FIVE_SECONDS)),
-            "the projection must rebase to the FIRST seek's landing: {:?}",
+            "cut #1 must rebase the projection mid-pause: {:?}",
             handle.observe()
         );
+        assert!(handle.observe().paused(), "still paused after cut #1");
+        // The slot has been freed by the resolved cut, so this second
+        // request is accepted and commits through the same pause
+        // attribution.
+        handle.request_seek(Duration::from_secs(6));
+        assert!(
+            wait_until(Duration::from_secs(5), || handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= second_landing)),
+            "cut #2 must rebase the projection mid-pause to its own \
+             landing: {:?}",
+            handle.observe()
+        );
+        let still = handle.observe();
+        assert!(
+            still.paused(),
+            "the episode never resumed through either cut: {still:?}"
+        );
+        handle.request_resume();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
-        // Exactly one cut, at the first landing: the later seek never
-        // cut, and the committed rebase was never lost.
-        assert_one_cut_to(&content(&witnesses), FIVE_SECONDS);
+        // Both mid-pause cuts purged their pre-resume content, so the
+        // consumed sequence shows exactly ONE visible discontinuity —
+        // at the SECOND landing, after the resume.
+        let values = content(&witnesses);
+        let breaks = discontinuities(&values);
+        assert_eq!(
+            breaks.len(),
+            1,
+            "mid-pause cuts purge pre-resume content (breaks: {breaks:?})"
+        );
+        assert_eq!(
+            values[breaks[0]] as u64, second_landing,
+            "the visible cut must be the SECOND landing"
+        );
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
@@ -761,4 +798,57 @@ fn a_seek_on_a_never_activated_episode_is_inert() {
     let observation = handle.observe();
     assert_eq!(observation.terminal_outcome, None);
     assert_eq!(observation.position, None);
+}
+
+// --- seek x worker EOF (implementation corrective-1, C2) ------------------
+
+/// A request_seek racing the worker's EOF exit can never wedge the
+/// episode: the acceptance/worker-exit linearization (atomic acceptance
+/// hold + the exit funnel's stranded-seek cleanup, pinned deterministically
+/// white-box) means every interleaving ends one of two ways — the seek is
+/// rejected, or it is accepted and then aborted by the worker's exit —
+/// and EITHER way the episode's ordinary EOF course completes. This is
+/// the integration sweep over that envelope: requests are hammered while
+/// the episode approaches and enters its EOF window, and the terminal
+/// MUST settle `Completed` (a stranded hold would park the leg past the
+/// final drain and D11 Completed would never settle). The deterministic
+/// halves live in the completion's white-box suite; this sweep exists to
+/// catch an integration-shaped regression the white-box cannot spell.
+#[test]
+fn seek_acceptance_racing_worker_eof_settles_without_wedge() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(30), move || {
+        let (_witnesses, handle, mut runtime) = episode(Vec::new());
+        wait_for_position_past(&handle, 7 * ONE_SECOND);
+        // Hammer the acceptance envelope with a BOUNDED burst while the
+        // worker approaches and passes its EOF exit. Requests target a
+        // LATE landing (7.5 s), so even an accepted-and-completed cut
+        // keeps the ordinary short course to EOF instead of rewinding
+        // the episode into a self-sustaining replay loop; and the burst
+        // is finite (200 requests, 2 ms apart), so the sweep always
+        // terminates. An accepted seek whose worker then exits is
+        // aborted by the exit cleanup — either way the drain completes.
+        let hammer_handle = handle.clone();
+        let hammer = std::thread::spawn(move || {
+            for _ in 0..200 {
+                hammer_handle.request_seek(Duration::from_millis(7500));
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        });
+        hammer.join().expect("the hammer thread joins");
+        let outcome = handle.wait_terminal();
+        assert_eq!(
+            outcome,
+            EpisodeTerminalOutcome::Completed,
+            "the seek × EOF race must never wedge the drain or relabel \
+             the episode's ordinary EOF course (diagnostic: {:?})",
+            handle.observe()
+        );
+        assert!(
+            handle.observe().position.is_none(),
+            "the terminal Fact withdraws the projection"
+        );
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
 }

@@ -55,8 +55,8 @@ use windows::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 use windows::core::GUID;
 
 use qianqian_audio_api::ports::{
-    AudioOutput, DrainSignal, DrainVerdict, OutputError, PcmFormat, PcmPull, PositionEvidence,
-    RenderGate, RenderPcmInput, RenderRequest, RenderStream, SeekParkOutcome, SeekParkRelease,
+    AudioOutput, DrainSignal, DrainVerdict, GateSlice, OutputError, PcmFormat, PcmPull,
+    PositionEvidence, RenderGate, RenderPcmInput, RenderRequest, RenderStream, SeekParkRelease,
 };
 
 use crate::open_abort::abort_render_thread;
@@ -470,44 +470,32 @@ fn steady_loop(
     let mut basis: u64 = 0;
     let mut publishing: bool = true;
     loop {
-        // Pause gate (D14.7, mechanism A): loop top, strictly before
-        // device-buffer acquisition, no device buffer held across the
-        // park. While parked this leg submits nothing; between bounded
-        // slices it reads the session's own output padding, and one zero
-        // observation publishes this engagement's tail-quiescence
-        // evidence. Release (resume/stop) never aborts the leg: the
-        // loop proceeds once more and the data plane decides.
+        // THE loop-top gate (D14.7 mechanism A + the D14.5 cut park,
+        // unified into one operation): strictly before device-buffer
+        // acquisition, no device buffer held across a park, and — the
+        // frozen D14.5 realtime row — ONE intent-lock acquisition for a
+        // steady iteration of normal playback (O(1) flag tests, no
+        // second acquisition, no dispatch, no allocation).
         //
-        // The same reading feeds F4 (D14.8): submission is frozen while
-        // parked, so publishing the consumed estimate from each slice is
-        // exactly how the sample rises to the frozen handed-off total as
-        // the device drains — one device observation, two explicit
-        // semantic uses, truth classes kept separate.
-        gate.park_while_paused(|| {
-            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {
-                return false;
-            };
-            publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
-            padding == 0
-        });
-        // Seek gate (D14.5, cut-attributed): the same loop-top park
-        // invariant — no device buffer held, submits nothing — with
-        // separate attribution (Seek* events only, never pause
-        // evidence). The release payload carries the commit decision;
-        // on a committed cutover the rebase happens HERE, before this
-        // path can submit anything further — including the case where
-        // the cutover committed while this leg was held by PAUSE (the
-        // hold is already released; the gate consumes the awaiting
-        // payload at this check, so the rebase never skips a submitting
-        // leg; pause intent survives the seek).
-        if let SeekParkOutcome::Released(release) = gate.park_while_seek_hold(|| {
-            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {
-                return false;
-            };
-            publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
-            padding == 0
-        }) {
-            match release {
+        // The tail slice's reading feeds F4 (D14.8) as before: while
+        // parked, submission is frozen, so publishing the consumed
+        // estimate from each slice is exactly how the sample rises to
+        // the frozen handed-off total as the device drains — one device
+        // observation, two explicit semantic uses, truth classes kept
+        // separate. The seek-release slice applies a committed cutover's
+        // rebase HERE, on this path, before anything further can be
+        // submitted — including while the leg STAYS PARKED by pause
+        // (pause intent survives the seek; the rebase is bookkeeping,
+        // never a submission).
+        gate.park_loop_top(|gated| match gated {
+            GateSlice::TailProbe => {
+                let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {
+                    return false;
+                };
+                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
+                padding == 0
+            }
+            GateSlice::SeekRelease(release) => match release {
                 SeekParkRelease::Committed { landing } => {
                     handed_off = 0;
                     if landing.is_none() {
@@ -522,10 +510,11 @@ fn steady_loop(
                     // resurrects publication nor un-withdraws the cell —
                     // `rebase(None)` is an idempotent re-withdrawal.
                     position.rebase(if publishing { landing } else { None });
+                    false
                 }
-                SeekParkRelease::Aborted => {}
-            }
-        }
+                SeekParkRelease::Aborted => false,
+            },
+        });
         // Period cadence; the bounded wait is also the stop-latency bound.
         unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
         let padding = match unsafe { session.client.GetCurrentPadding() } {

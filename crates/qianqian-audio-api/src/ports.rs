@@ -211,23 +211,26 @@ pub enum SeekParkRelease {
     Aborted,
 }
 
-/// What [`RenderGate::park_while_seek_hold`] did.
+/// One unit of loop-top work [`RenderGate::park_loop_top`] hands back to
+/// the render leg while it is gated (D14.7 + D14.5). One closure sees
+/// every slice, so the leg's own accounting locals stay owned by exactly
+/// one execution path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SeekParkOutcome {
-    /// Nothing happened: no hold was routed (and no routed release
-    /// awaited consumption), or the gate is closed. No seek events were
-    /// published and no release value was consumed.
-    NotParked,
-    /// A routed release reached the leg on its own execution path — the
-    /// rebase instruction (if any) MUST be applied before any further
-    /// submission. This covers both physical shapes: a leg that parked
-    /// and was released, and a leg that never parked (its hold was
-    /// already released — e.g. a cutover committed while the leg was
-    /// held by PAUSE — and the payload awaited consumption at this
-    /// gate). Which shape occurred is the park-evidence events' truth,
-    /// not this value's; either way the payload is consumed exactly
-    /// once.
-    Released(SeekParkRelease),
+pub enum GateSlice {
+    /// Between park slices (the D14.7/D14.5 park invariant's bounded
+    /// wait): observe the output tail NOW and return whether it is
+    /// quiescent (no frame submitted before the park remains queued for
+    /// rendering). The leg keeps its own D14.8 publication discipline on
+    /// this slice.
+    TailProbe,
+    /// A routed seek release payload was consumed — exactly once — on
+    /// this leg's path: apply the instruction (a committed rebase, or
+    /// nothing for an abort) BEFORE any further submission. Delivered
+    /// mid-park when the leg is parked by PAUSE, so a committed cut
+    /// rebases a paused leg while it STAYS parked — the pause intent
+    /// survives the seek and the rebase is bookkeeping, never a
+    /// submission (the bool return is ignored on this slice).
+    SeekRelease(SeekParkRelease),
 }
 
 /// Session-owned render gate (ADR-PBK-002 D14.7 mechanism A + the D14.5
@@ -269,15 +272,14 @@ pub struct RenderGate {
 struct GateInner {
     /// The mechanism's view of the routed intent. Command truth lives
     /// with the episode owner; these fields are the routed copies the
-    /// render leg observes. The pause flag and the seek-hold flag share
-    /// one lock deliberately: the render loop's existing loop-top gate
-    /// check gains the seek-park flag test at the same check site, so a
-    /// steady iteration pays two consecutive O(1) checks on this lock —
-    /// one extra UNCONTENDED mutex acquisition and one extra flag test
-    /// over the pre-F5 shape, no dispatch, no allocation (the frozen
-    /// one-acquisition spelling of the D14.5 realtime-cost row is
-    /// recorded as a representation differential in that section's
-    /// implementation note).
+    /// render leg observes. The pause flag, the seek-hold flag and the
+    /// release payload share one lock deliberately: the render loop's
+    /// ONE loop-top gate operation inspects all of them under a single
+    /// acquisition, so a steady iteration of normal playback pays
+    /// exactly ONE uncontended mutex acquisition and O(1) flag tests —
+    /// the frozen D14.5 realtime row ("no new lock acquisition; the
+    /// existing loop-top gate check gains one more seek-park flag
+    /// test"), realized literally. No dispatch, no allocation.
     intent: Mutex<GateIntent>,
     /// Once true, this gate can never park a leg again: the open-abort
     /// lifetime (a stream being torn down without ever becoming a
@@ -440,19 +442,89 @@ impl RenderGate {
         self.inner.wake.notify_all();
     }
 
-    /// The render mechanism's loop-top pause gate (D14.7): park while
-    /// pause intent is routed here, then return (the caller proceeds
-    /// once more; the data plane decides what its next read sees).
-    /// Returns immediately when no intent is routed.
+    /// The render mechanism's ONE loop-top gate operation (D14.7 park
+    /// invariant + the D14.5 cut park, unified): check pause intent, seek
+    /// hold and any routed release payload under a SINGLE intent-lock
+    /// acquisition — strictly before the device-buffer acquisition, no
+    /// device buffer held across a park — then run whatever is routed.
     ///
-    /// While parked the leg submits nothing and holds no device buffer.
-    /// Between bounded slices it calls `tail_observed_quiescent` — the
-    /// mechanism's own observation of its output tail — and publishes
-    /// [`GateEvent::TailQuiesced`] on the first `true` of the current
-    /// engagement. [`GateEvent::Engaged`] is published on park entry and
-    /// [`GateEvent::Disengaged`] on park exit. Returns immediately (no
-    /// events) on a closed gate.
-    pub fn park_while_paused(&self, mut tail_observed_quiescent: impl FnMut() -> bool) {
+    /// Steady shape (the frozen D14.5 realtime row, realized literally
+    /// since the F5 implementation corrective-1 unification): when
+    /// nothing is routed, this is ONE uncontended mutex acquisition and
+    /// O(1) flag tests — no second acquisition, no dispatch, no
+    /// allocation. (The pre-unification spelling paid a second
+    /// acquisition per steady iteration for the seek check; "no new lock
+    /// acquisition" is a frozen proposition, not a representation
+    /// detail.)
+    ///
+    /// Shapes, from that one acquisition:
+    ///
+    /// ```text
+    /// nothing routed  → return immediately; no events, no consumption.
+    /// payload only    → consume it exactly once (no park, no events)
+    ///                   and hand it to the leg: the rebase instruction
+    ///                   lands before any further submission even when
+    ///                   the hold was already released before arrival.
+    /// seek hold       → the cut-attributed park: publish only Seek*
+    ///                   events, wait in bounded slices probing the tail,
+    ///                   then consume the routed release (Aborted when
+    ///                   none) and hand it to the leg.
+    /// pause intent    → the pause-attributed park: publish only pause
+    ///                   events, wait in bounded slices probing the tail.
+    ///                   While parked, a routed seek release payload is
+    ///                   consumed mid-park and handed to the leg — which
+    ///                   STAYS PARKED: pause intent survives the seek,
+    ///                   and a committed cut rebases a paused leg before
+    ///                   its resume, as pure bookkeeping (the leg submits
+    ///                   nothing while parked). A seek hold routed during
+    ///                   a pause park therefore resolves under the pause
+    ///                   attribution; no Seek* park events publish.
+    /// ```
+    ///
+    /// After a pause park ends (resume/release), a hold routed in the
+    /// meantime parks this same call — the leg cannot submit past an
+    /// unresolved cut. Release never aborts the leg: every shape
+    /// proceeds once more, and the data plane decides.
+    ///
+    /// Closed gate: returns immediately, always.
+    pub fn park_loop_top(&self, mut slice: impl FnMut(GateSlice) -> bool) {
+        // The steady-path totality: ONE acquisition, O(1) tests.
+        {
+            let guard = self.inner.intent.lock().expect("render gate lock");
+            if self.inner.closed.load(Ordering::Acquire)
+                || (!guard.paused && !guard.seek_hold && guard.seek_release.is_none())
+            {
+                return;
+            }
+        }
+        // Routed work exists. The pause shape runs first (the loop's
+        // frozen order: pause before seek); it stays parked through a
+        // cut that commits while paused and consumes the payload
+        // mid-park. The seek shape runs after, so a hold still routed
+        // after the pause ended parks this same call. These extra
+        // acquisitions exist only on the non-steady path.
+        if self.routed_snapshot().0 {
+            self.pause_park(&mut slice);
+        }
+        let (_, seek_hold, payload) = self.routed_snapshot();
+        if seek_hold || payload {
+            self.seek_park(&mut slice);
+        }
+    }
+
+    /// One lock acquisition's view of what is routed: (pause, seek hold,
+    /// pending release payload).
+    fn routed_snapshot(&self) -> (bool, bool, bool) {
+        let guard = self.inner.intent.lock().expect("render gate lock");
+        (guard.paused, guard.seek_hold, guard.seek_release.is_some())
+    }
+
+    /// The pause-attributed park body (D14.7): parks while pause intent
+    /// is routed, publishes Engaged / TailQuiesced (once) / Disengaged,
+    /// and — the F5 implementation corrective-1 addition — consumes a
+    /// routed seek release payload MID-PARK, handing it to the leg while
+    /// it stays parked.
+    fn pause_park(&self, slice: &mut impl FnMut(GateSlice) -> bool) {
         {
             let guard = self.inner.intent.lock().expect("render gate lock");
             if !guard.paused || self.inner.closed.load(Ordering::Acquire) {
@@ -464,22 +536,34 @@ impl RenderGate {
         self.emit(GateEvent::Engaged);
         let mut quiesced_published = false;
         loop {
-            let released = {
+            // The payload joins the wait predicate: a commit routed
+            // while the leg is parked wakes it immediately for the
+            // mid-park consumption instead of at the slice cap.
+            let (released, payload) = {
                 let guard = self.inner.intent.lock().expect("render gate lock");
                 let closed = &self.inner.closed;
-                let (guard, _) = self
+                let (mut guard, _) = self
                     .inner
                     .wake
                     .wait_timeout_while(guard, PARK_SLICE, |intent| {
-                        intent.paused && !closed.load(Ordering::Acquire)
+                        intent.paused
+                            && !closed.load(Ordering::Acquire)
+                            && intent.seek_release.is_none()
                     })
                     .expect("render gate wait poisoned");
-                !guard.paused || closed.load(Ordering::Acquire)
+                let payload = guard.seek_release.take();
+                (!guard.paused || closed.load(Ordering::Acquire), payload)
             };
+            if let Some(release) = payload {
+                // Consumed on the leg's own path; the leg applies the
+                // instruction and keeps parked (a rebase is bookkeeping,
+                // never a submission).
+                slice(GateSlice::SeekRelease(release));
+            }
             if released {
                 break;
             }
-            if !quiesced_published && tail_observed_quiescent() {
+            if !quiesced_published && slice(GateSlice::TailProbe) {
                 quiesced_published = true;
                 self.emit(GateEvent::TailQuiesced);
             }
@@ -487,39 +571,16 @@ impl RenderGate {
         self.emit(GateEvent::Disengaged);
     }
 
-    /// The render mechanism's loop-top seek gate (ADR-PBK-002 D14.5,
-    /// F5 cutover): park while a seek hold is routed here, then return
-    /// what the session decided. The physical mechanism is the D14.7
-    /// park invariant reused at the same loop-top point — the leg holds
-    /// no device buffer across the park and submits nothing — but the
-    /// attribution stays separate: this park publishes only the
-    /// `Seek*` gate events and never routes or relabels pause intent.
-    ///
-    /// While parked, between bounded slices it calls
-    /// `tail_observed_quiescent` and publishes
-    /// [`GateEvent::SeekTailQuiesced`] on the first `true` of the
-    /// current seek park (the D14.5 commit-boundary evidence class).
-    /// [`GateEvent::SeekEngaged`] is published on park entry and
-    /// [`GateEvent::SeekDisengaged`] on park exit.
-    ///
-    /// Consumption is the invariant, parking is not: a routed release
-    /// payload is consumed exactly once by this call — at the park's
-    /// exit when the leg parked, or immediately at entry when the hold
-    /// was already released (the payload-awaits-consumption shape: a
-    /// cutover committed while the leg was held by PAUSE, whose slices
-    /// stop observing after their own quiescence, must still be rebased
-    /// at this gate — the leg's next submission opportunity — and never
-    /// on a stale stretch basis). [`SeekParkOutcome::NotParked`] (no
-    /// events, no consumption) only when no hold AND no routed payload
-    /// exists, or the gate is closed.
-    pub fn park_while_seek_hold(
-        &self,
-        mut tail_observed_quiescent: impl FnMut() -> bool,
-    ) -> SeekParkOutcome {
+    /// The seek-attributed park body (D14.5): parks while a seek hold is
+    /// routed, publishes only Seek* events, and hands the routed release
+    /// (Aborted when none) to the leg on its own path. A hold released
+    /// before the leg arrived still has its payload consumed here — the
+    /// rebase instruction belongs to this leg's next submission decision.
+    fn seek_park(&self, slice: &mut impl FnMut(GateSlice) -> bool) {
         {
             let mut guard = self.inner.intent.lock().expect("render gate lock");
             if self.inner.closed.load(Ordering::Acquire) {
-                return SeekParkOutcome::NotParked;
+                return;
             }
             if !guard.seek_hold {
                 // The hold was already released before this leg reached
@@ -528,10 +589,12 @@ impl RenderGate {
                 // routes it for this episode's one seek). Consume it
                 // here — no park happened, no park events publish, and
                 // the rebase still lands before any further submission.
-                return match guard.seek_release.take() {
-                    Some(release) => SeekParkOutcome::Released(release),
-                    None => SeekParkOutcome::NotParked,
-                };
+                let release = guard.seek_release.take();
+                drop(guard);
+                if let Some(release) = release {
+                    slice(GateSlice::SeekRelease(release));
+                }
+                return;
             }
         }
         self.emit(GateEvent::SeekEngaged);
@@ -552,14 +615,16 @@ impl RenderGate {
             if released {
                 break;
             }
-            if !quiesced_published && tail_observed_quiescent() {
+            if !quiesced_published && slice(GateSlice::TailProbe) {
                 quiesced_published = true;
                 self.emit(GateEvent::SeekTailQuiesced);
             }
         }
         self.emit(GateEvent::SeekDisengaged);
-        let release = self.take_release_internal();
-        SeekParkOutcome::Released(release.unwrap_or(SeekParkRelease::Aborted))
+        let release = self
+            .take_release_internal()
+            .unwrap_or(SeekParkRelease::Aborted);
+        slice(GateSlice::SeekRelease(release));
     }
 
     /// Consume a pending release payload under the intent lock (the

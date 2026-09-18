@@ -44,9 +44,8 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
 
 use qianqian_audio_api::ports::{
     AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainSignal,
-    DrainVerdict, OutputError, PcmDecode, PcmFormat, PcmPull, PositionEvidence,
-    ProviderSeekOutcome, RenderGate, RenderPcmInput, RenderRequest, RenderStream, SeekParkOutcome,
-    SeekParkRelease,
+    DrainVerdict, GateSlice, OutputError, PcmDecode, PcmFormat, PcmPull, PositionEvidence,
+    ProviderSeekOutcome, RenderGate, RenderPcmInput, RenderRequest, RenderStream, SeekParkRelease,
 };
 
 pub const TEST_FORMAT: PcmFormat = PcmFormat {
@@ -705,45 +704,43 @@ fn consume_loop(
             // plane before completing the drain.
             return DrainVerdict::Aborted;
         }
-        // Mirror the real mechanism's loop-top pause gate (D14.7): the
-        // gate parks before the read; the mock's tail observation is
-        // its own device-tail queue, passable through the probe. The
-        // same reading feeds the position accounting (D14.8): submission
-        // is frozen while parked, so the park slices are what walk the
-        // published sample up to the frozen handed-off total.
-        gate.park_while_paused(|| {
-            let tail = device.tail.observe();
-            publish_consumed(position, basis, handed_off, tail, publishing);
-            device.tail_probe.observe(tail == 0)
-        });
-        // Mirror the real loop's cut-attributed seek park (D14.5): same
-        // loop-top park invariant, separate attribution, and the release
-        // payload rebases the stretch basis on this path before any
-        // further submission.
-        if let SeekParkOutcome::Released(release) = gate.park_while_seek_hold(|| {
-            let tail = device.tail.observe();
-            publish_consumed(position, basis, handed_off, tail, publishing);
-            device.tail_probe.observe(tail == 0)
-        }) {
-            match release {
-                SeekParkRelease::Committed { landing } => {
-                    handed_off = 0;
-                    if landing.is_none() {
-                        publishing = false;
-                    }
-                    if let Some(landing) = landing.filter(|_| publishing) {
-                        basis = landing;
-                    }
-                    // A withdrawal is for the REST of the episode (D14.5
-                    // position rebase) — identical to the real leg's
-                    // wasapi.rs rebase arm: a later KNOWN landing after
-                    // an unknown one neither resurrects publication nor
-                    // un-withdraws the cell.
-                    position.rebase(if publishing { landing } else { None });
-                }
-                SeekParkRelease::Aborted => {}
+        // Mirror the real mechanism's ONE loop-top gate (D14.7 pause
+        // park + D14.5 cut park, unified): the gate parks before the
+        // read; the mock's tail observation is its own device-tail
+        // queue, passable through the probe. The same reading feeds the
+        // position accounting (D14.8): submission is frozen while
+        // parked, so the park slices are what walk the published sample
+        // up to the frozen handed-off total. The release slice applies
+        // a committed cutover's rebase on this path before any further
+        // submission — including while the leg STAYS PARKED by pause.
+        gate.park_loop_top(|slice| match slice {
+            GateSlice::TailProbe => {
+                let tail = device.tail.observe();
+                publish_consumed(position, basis, handed_off, tail, publishing);
+                device.tail_probe.observe(tail == 0)
             }
-        }
+            GateSlice::SeekRelease(release) => {
+                match release {
+                    SeekParkRelease::Committed { landing } => {
+                        handed_off = 0;
+                        if landing.is_none() {
+                            publishing = false;
+                        }
+                        if let Some(landing) = landing.filter(|_| publishing) {
+                            basis = landing;
+                        }
+                        // A withdrawal is for the REST of the episode (D14.5
+                        // position rebase) — identical to the real leg's
+                        // wasapi.rs rebase arm: a later KNOWN landing after
+                        // an unknown one neither resurrects publication nor
+                        // un-withdraws the cell.
+                        position.rebase(if publishing { landing } else { None });
+                    }
+                    SeekParkRelease::Aborted => {}
+                }
+                false
+            }
+        });
         // Mirror the real loop's per-iteration padding observation:
         // publish the consumed estimate as of THIS instant, from the
         // handed-off total as it stands BEFORE the submission below.
