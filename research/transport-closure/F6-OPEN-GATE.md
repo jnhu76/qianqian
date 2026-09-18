@@ -209,7 +209,12 @@ that operation mid-process:
 Open(path)
     ↓ App probes path (§3)                    — invalid ⇒ REFUSED,
                                                 old episode untouched
-    ↓ if old episode unsettled:
+    ↓ if no current composition root          — first episode / after
+      (first episode, or previous start        ActivationFailedClean:
+      ended ActivationFailedClean):            old-side clear holds;
+      skip stop/wait/dispose                   no disposal outcome is
+                                                forged (§5)
+    ↓ else, if old episode unsettled:
         old_handle.request_stop()             — intentional stop command
         old_handle.wait_terminal()            — D11 authority-owned
                                                 settlement observed
@@ -269,9 +274,22 @@ together (DECISION-MATRIX §2).
 
 ```text
 replacement commit
-    := old composition's authoritative disposal outcome == Discharged
+    := old-side clear
        ∧ new episode's authoritative activation result == Activated
+
+old-side clear
+    := no current composition root
+           (first episode, or the previous start ended
+            ActivationFailedClean — §6)
+       OR the current composition's authoritative disposal
+          outcome == Discharged
 ```
+
+No disposal outcome is forged when no root exists: `old-side clear`
+makes the no-current-root case (first startup, Open after a clean
+failed start) explicit instead of pretending a `Discharged` verdict
+that never happened. One formula covers first startup, Open after
+`ActivationFailedClean`, and Open after a previously clean disposal.
 
 Both operands are **synchronous results of the authority-owned control
 operations the App itself invokes** (the disposal operation and the
@@ -392,7 +410,7 @@ evidence — breaking the no-overlap invariant this gate exists to hold.
 | validation timing | before any destructive step; App-owned probe (decode-provider query) | §3; invalid file must not kill valid playback |
 | old stop boundary | `request_stop()` on the old handle iff unsettled; frozen D14.4 semantics | existing Command; idempotent |
 | teardown boundary | `dispose()` after settlement observed; the authoritative disposal outcome (§5) is the discharge evidence | existing K0 mechanism + one narrow authority-owned result seam (F6-IMPLEMENTATION) |
-| new activation boundary | only after a `Discharged` disposal outcome | D14.6 no-overlap, structural |
+| new activation boundary | only after old-side clear (§5: no current root, or a `Discharged` disposal outcome) | D14.6 no-overlap, structural |
 | invalid new source | Open refused; diagnostic; old untouched | §3 Candidate B |
 | new activation failure | start operation is failure-clean: attempted root authoritatively disposed before the failure returns (`Discharged` ⇒ `ActivationFailedClean`, no runtime remains; cleanup `TeardownViolated` ⇒ FAIL-STOP retaining the root); diagnostic via `activation_error`; no episode; no rollback | §6; honest dead-end; `drop` ≠ teardown |
 | paused old episode | stop-from-paused follows frozen D14.7 terminal interactions (mid-play → `Stopped`; post-EOF drain → `Completed`) | D14.7 frozen; no new rule |

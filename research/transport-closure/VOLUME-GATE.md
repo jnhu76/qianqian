@@ -128,9 +128,14 @@ Session Volume Controls):
    levels 0.0..=1.0; out-of-range ⇒ E_INVALIDARG (fail-closed).
 - shared-mode only (this player is shared-mode; exclusive mode is out
    of scope for the reference player).
-- SndVol does NOT reflect it (the mixer shows only ISimpleAudioVolume)
-   ⇒ no mixer coupling; external applications cannot reach another
-   process's stream volume ⇒ §47-A/I pass by contract.
+- SndVol does NOT reflect it (the mixer shows only ISimpleAudioVolume):
+   external applications and the mixer cannot read or write this
+   stream factor. Honest scope note (consistent with §2's four-factor
+   product): the session-master factor that SndVol DOES control
+   remains an independent multiplier of the AUDIBLE output — the
+   player neither owns, displays, nor writes it. The guarantee is
+   factor independence, never audible independence; V-PROBE V2a/V2b
+   (§10) pin exactly this distinction.
 - it is one multiplicative factor of the engine's per-stream volume;
    the engine applies it to this stream's samples — no PCM passes
    through player code ⇒ no per-sample player-side RT cost.
@@ -230,9 +235,15 @@ while paused:      desired level changes immediately (App state);
                    state unchanged, no unpause
 ```
 
-A failed `SetAllVolumes` (e.g. `AUDCLNT_E_DEVICE_INVALIDATED`) is a
-mechanism diagnostic on the existing device-failure paths; the volume
-command itself never settles D11 and never fails an episode.
+The volume command itself is non-terminal: it never establishes or
+settles D11 truth. A failed `SetAllVolumes` is mechanism evidence, and
+its consequence is owned by the existing failure policy, graded by
+what the failure reveals: an ordinary recoverable control-call failure
+may warrant only a diagnostic, while device/service loss (e.g.
+`AUDCLNT_E_DEVICE_INVALIDATED` — endpoint removed, reconfigured or
+disabled) routes through the existing output/device-failure policy,
+under which D11 may settle `Failed`. A volume change is non-terminal;
+underlying device loss is not.
 
 ## 8. Persistence across Open / Next / Previous (frozen)
 
@@ -253,11 +264,18 @@ Volume = 0   sufficient for v1 (stream-level silence; other audio
              semantics are needed yet; Mute can be earned later).
 TUI keys     + / =  up;  - / _  down; fixed step 5; clamp 0..=100;
              no acceleration, no dB display, no mute key.
-TUI value    "Vol 70%" renders the App's DESIRED level only. The
-             mechanism-observed actual level is deliberately NOT read
-             back (GetAllVolumes stays unexposed): no false hardware
-             fact, and §47-I is structurally impossible — the displayed
-             number is the request, not a measurement.
+TUI value    "Vol 70%" renders the App's DESIRED stream factor only:
+             NOT the effective acoustic level, NOT the Windows session
+             master, NOT the endpoint volume. The mechanism-observed
+             stream factor is deliberately NOT read back into the
+             product (GetAllVolumes stays unexposed to the read side;
+             V-PROBE V2b uses it only inside the probe rig): the
+             displayed number is the request, not a measurement.
+             SndVol's session-master factor remains an independent
+             multiplier of the audible output (§2); the player neither
+             owns, displays, nor writes it, so external session-master
+             moves change loudness without ever making the displayed
+             desire a lie.
 ```
 
 Microsoft's UI-confusion caution (app sliders for stream volume may be
@@ -279,8 +297,19 @@ V1a SetAllVolumes on stream A does not alter a simultaneously
     applies to ALL streams in the session)
 V1b a simultaneously rendering stream of ANOTHER process is unchanged
     (secondary confirmation; cannot substitute for V1a)
-V2  SndVol/mixer interaction: mixer slider moves do not change the
-    stream's applied level (no coupling)
+V2a player → mixer independence: qianqian calls
+    SetAllVolumes(stream A); assert the SndVol / ISimpleAudioVolume
+    session-master value does NOT move (a volume command never
+    rewrites the mixer)
+V2b mixer → stream-factor independence: change the SndVol /
+    ISimpleAudioVolume session-master; assert GetAllVolumes(stream A)
+    still reports qianqian's desired stream factor (the mixer never
+    rewrites the stream factor). EXPECTED and REQUIRED: the audible /
+    effective output DOES change — the session master is an
+    independent multiplicative factor (§2's product). Interpreting
+    that audible change as coupling would be a WRONG oracle: a fully
+    correct IAudioStreamVolume implementation changes loudness when
+    SndVol moves
 V3  a replaced stream starts at engine level 1.0 and the re-applied
     desired level is audible-immediately at open (persistence rule)
 V4  change application: repeated +/- presses, and changes while
@@ -292,9 +321,11 @@ V5  failure path: SetAllVolumes under device invalidation / service
     failure degrades to the mechanism diagnostic without wedging the
     render leg
 
-If V1a shows cross-stream coupling within one audio session, the
-stream-local isolation claim fails and the §5 mechanism decision
-REOPENS. If V4/V5 show the loop-top apply materially perturbs the
+Reopen conditions: V1a cross-stream coupling within one audio session,
+or V2a/V2b either side writing the other's factor ⇒ the
+isolation/independence claims fail and the §5 mechanism decision
+REOPENS. An audible change under V2b alone is the EXPECTED result, not
+a failure. If V4/V5 show the loop-top apply materially perturbs the
 render leg, the apply-point/ownership mechanism MUST be reconsidered
 before VOLUME-IMPLEMENTATION freezes it. The mechanism candidate
 (IAudioStreamVolume) stays selected on documentation evidence; its

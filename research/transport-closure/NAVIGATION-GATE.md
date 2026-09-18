@@ -63,8 +63,9 @@ Candidate B  commit-on-activation                     SELECTED
           old playback untouched, diagnostic shown
         → F6 replacement runs
         → only when the replacement commit evidence exists
-          (F6 §5: authoritative disposal outcome Discharged ∧
-          authoritative activation result Activated)
+          (F6 §5: old-side clear — no current root or a Discharged
+          disposal outcome — ∧ authoritative activation result
+          Activated)
           does current_index := candidate
 ```
 

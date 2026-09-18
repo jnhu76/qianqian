@@ -143,18 +143,26 @@ operation result:
 ```text
 Open failed: <reason>          (probe refusal / composition refusal)
 Next: <path> is not readable    (probe refusal; playback unchanged)
-volume: <mechanism diagnostic>  (rare; playback unchanged)
+volume: <mechanism diagnostic>  (command is non-terminal; a revealed
+                                 device/service loss follows the
+                                 existing output-failure route — D11
+                                 may settle Failed)
 ```
 
 Diagnostics are presentation: they never become states, never join the
 observation, and clear on the next successful operation or tick.
 Episode-sourced diagnostics (activation failure, failure_diagnostic)
 continue to render through the existing Diagnostics panel exactly as
-today. Where a failure leaves old playback untouched (probe refusal,
-volume failure), the Track/State panels keep rendering the live
-observation — the diagnostic never overwrites playback truth. One case
-is not transient: a latched teardown violation is the fatal banner of
-the fail-stop guard (§3), never a status line.
+today. Where a failure leaves old playback untouched (probe refusal; a
+volume control-call failure that reveals no device loss), the
+Track/State panels keep rendering the live observation — the
+diagnostic never overwrites playback truth. When a volume failure
+reveals device/service loss, the existing output/device-failure route
+owns the consequence and D11 may settle the episode `Failed` — the
+volume command itself stays non-terminal (VOLUME §7); the panels then
+render that settled truth. One case is not transient: a latched
+teardown violation is the fatal banner of the fail-stop guard (§3),
+never a status line.
 
 ## 6. Open input (v1)
 

@@ -161,13 +161,20 @@ H. Does zero require a separate Mute state?
    needed yet (VOLUME §9).
 
 I. Can external OS/session changes make the TUI value a lie?
-   NO — the TUI displays the DESIRED level (the App's request), not a
-   mechanism/system reading; no external actor can change what the App
-   desires. The audible product remains the documented product of
-   several factors, which the player never displays or claims.
-   The mixer-coupling scenario that WOULD have created this lie
-   (ISimpleAudioVolume) was rejected on those grounds (VOLUME §5-B1,
-   §9).
+   NO — the TUI displays the DESIRED stream factor (the App's
+   request), not a mechanism/system reading; no external actor can
+   change what the App desires. Honest decomposition (VOLUME §2, §10
+   V2a/V2b): SndVol controls the session-master factor, which remains
+   an independent multiplier of the AUDIBLE output — external moves do
+   change loudness, and a correct implementation must not pretend
+   otherwise (V2b EXPECTS the audible change). The guarantee is factor
+   independence, not audible independence: the player never writes the
+   session master (V2a) and never has its stream factor rewritten by
+   it (V2b), so the displayed number stays the player's own desire.
+   The session-master candidate (ISimpleAudioVolume) was rejected
+   because it would put the player's own control INTO the externally
+   editable factor, making the displayed desire falsifiable
+   (VOLUME §5-B1, §9).
 
 J. Does the backend mechanism leak into the generic application API?
    NO — the seam is `request_output_level(VolumeLevel)` with
@@ -202,6 +209,8 @@ Round 2 (human, PR #155): VERDICT: CHANGES_REQUIRED
 Round 3 (human, PR #155): VERDICT: CHANGES_REQUIRED
                           (1 MAJOR, 4 MINOR, 2 NIT — fixed below)
 Round 4 (human, PR #155): VERDICT: CHANGES_REQUIRED
+                          (1 MAJOR, 2 MINOR — fixed below)
+Round 5 (human, PR #155): VERDICT: CHANGES_REQUIRED
                           (1 MAJOR, 2 MINOR — fixed below)
 Final state: all findings resolved; READY_FOR_HUMAN_REVIEW
 ```
@@ -455,4 +464,70 @@ MINOR-2  "zero new mechanism" overclaimed: the package adds probe_media
          mechanism" (no config channel / registry / hot-replacement
          machinery) in F6 §4 and the PR body; F6 §4 states the honest
          seam inventory.
+```
+
+### Round 5 — human review of PR #155 (CORRECTIVE-4)
+
+Independent human review of the package at `bf03a13`; verdict
+`CHANGES_REQUIRED` with 1 MAJOR + 2 MINOR. CORRECTIVE-3 was judged
+PASS: the failed-fresh-root lifecycle hole is closed, fail-stop
+retention is correct, `Activated` is no longer inferred from
+snapshot/diagnostic. The whole F6/Navigation architecture passed; the
+remaining findings calibrate the Volume gate's physical oracle. All
+fixed in place (POST-F5-TRANSPORT-CLOSURE-CORRECTIVE-4).
+
+```text
+MAJOR-1  V-PROBE V2's physical oracle was wrong. It required "mixer
+         slider moves do not change the stream's applied level" — but
+         SndVol controls the ISimpleAudioVolume session-master, an
+         INDEPENDENT multiplicative factor of effective volume
+         (stream × channel-session × session-master × policy). A fully
+         correct IAudioStreamVolume implementation changes audible
+         output when SndVol moves, so testing audible output would
+         have judged a correct implementation RED and wrongly reopened
+         the mechanism decision. V-PROBE is an acceptance gate, so a
+         wrong oracle there is a gate defect, not a wording nit.
+         FIXED: V2 split into V2a (player → mixer independence:
+         SetAllVolumes must not move the session-master value) and
+         V2b (mixer → stream-factor independence: session-master
+         moves must not rewrite the stream factor GetAllVolumes
+         reports), with V2b's audible change recorded as EXPECTED and
+         REQUIRED. The guarantee everywhere is factor independence,
+         never audible independence; §2's four-factor product was
+         already right and V2 now agrees with it. The same conflation
+         in ADVERSARIAL §3.I was corrected (SndVol's audible influence
+         always existed; the player neither owns, displays, nor writes
+         that factor), and VOLUME §5-B2/§9 now state the scope
+         honestly.
+
+MINOR-1  Volume failure presentation claimed "playback unchanged" —
+         too strong: the gate's own example failure
+         (AUDCLNT_E_DEVICE_INVALIDATED) is device/service loss, where
+         playback cannot be guaranteed unchanged, and the existing D11
+         device-failure route may settle Failed.
+         FIXED: rule frozen as "the volume command itself is
+         non-terminal; underlying device loss is not" — VOLUME §7 now
+         grades SetAllVolumes failures by what they reveal (ordinary
+         recoverable control-call failure ⇒ diagnostic may suffice;
+         device/service loss ⇒ existing output/device-failure policy
+         owns the consequence, D11 may settle Failed); TUI §5 drops
+         "(playback unchanged)" and renders the settled truth;
+         V-PROBE V5 now requires consistent routing through that
+         policy (not a guaranteed diagnostic); DECISION-MATRIX §2
+         volume propositions updated.
+
+MINOR-2  "replacement commit = old disposal Discharged ∧ new
+         Activated" had no no-active-root case: after a clean
+         ActivationFailedClean (or at first startup) there is no old
+         root and no real Discharged outcome, and the formula invited
+         forging one.
+         FIXED: F6 §5 defines `old-side clear := no current
+         composition root OR authoritative disposal outcome ==
+         Discharged`, and `replacement commit := old-side clear ∧
+         authoritative activation result == Activated` — one formula
+         covering first startup, Open after ActivationFailedClean, and
+         Open after a clean disposal, with "no disposal outcome is
+         forged" stated. The §4 ladder gained the no-root branch,
+         NAVIGATION §3, DECISION-MATRIX §1 (replacement boundary +
+         index commit) and §2 were synced.
 ```

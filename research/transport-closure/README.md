@@ -117,20 +117,25 @@ new Facts, zero new lifecycle nouns, and no P1–P5 trigger**:
 
 ```text
 Open          = an application composition operation that replaces the
-                WHOLE episode composition (old runtime disposed with an
-                authoritative `Discharged` outcome before the new one
-                is built; the fresh start is failure-clean — an
-                activation failure disposes the attempted root before
-                returning, so no runtime is orphaned; commit consumes
-                authority-owned operation results, never composition
-                snapshots), after an App-owned source probe refuses
-                invalid files without touching old playback
+                WHOLE episode composition (old side clear before the
+                new one is built — no current root, or disposed with
+                an authoritative `Discharged` outcome; the fresh start
+                is failure-clean — an activation failure disposes the
+                attempted root before returning, so no runtime is
+                orphaned; commit consumes authority-owned operation
+                results, never composition snapshots), after an
+                App-owned source probe refuses invalid files without
+                touching old playback
 Navigation    = App-owned Vec<PathBuf> + Option<usize>; Next/Previous
                 select a candidate and invoke the same Open replacement;
                 the index commits only when the new episode is live
 Volume        = App-owned desired level (application configuration)
                 routed as a command to the episode's output mechanism,
-                realized per-stream by WASAPI IAudioStreamVolume
+                realized per-stream by WASAPI IAudioStreamVolume; TUI
+                shows the desired stream factor, never effective
+                loudness (factor independence — V2a/V2b — not audible
+                independence); a revealed device loss follows the
+                existing D11 device-failure route
 TUI           = one reference-player shell whose App state is composition/
                 navigation/config only; every playback truth stays behind
                 the existing D14.2 observation seam
@@ -143,12 +148,11 @@ target:      this design package (documentation only)
 tools:       authority documents listed above; production source reading;
              Microsoft Learn WASAPI documentation (VOLUME-GATE §7);
              review rounds: (1) fresh-context adversarial review (§48)
-             VERDICT PASS, 0 MAJOR / 5 MINOR; (2) human review of
-             PR #155 VERDICT CHANGES_REQUIRED, 2 MAJOR / 1 MINOR;
-             (3) human review of PR #155 VERDICT CHANGES_REQUIRED,
-             1 MAJOR / 4 MINOR / 2 NIT; (4) human review of PR #155
-             VERDICT CHANGES_REQUIRED, 1 MAJOR / 2 MINOR — all
-             findings fixed; records in ADVERSARIAL-REVIEW.md §5
+             VERDICT PASS, 0 MAJOR / 5 MINOR; (2)–(5) human reviews of
+             PR #155, VERDICT CHANGES_REQUIRED each — (2) 2 MAJOR /
+             1 MINOR, (3) 1 MAJOR / 4 MINOR / 2 NIT, (4) 1 MAJOR /
+             2 MINOR, (5) 1 MAJOR / 2 MINOR — all findings fixed;
+             records in ADVERSARIAL-REVIEW.md §5
 bounds:      no production code was run or modified; no Windows host was
              driven; all mechanism-behavior claims for volume are
              documentation-cited and carry a mandated physical
