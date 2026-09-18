@@ -4,15 +4,17 @@ Campaign: QIANQIAN-F6-NAVIGATION-VOLUME-AUTONOMOUS-1, Stage E.
 Authority under test: ADR-PBK-002 D14.9 (the volume amendment's
 pending item: the physical realtime apply placement of the
 `IAudioStreamVolume` candidate). Branch: `research/v-probe-1`; the committed evidence set was
-produced by ONE cross-build from the committed review-fix tree
-(exe sha 8c127364…, identical across all three ENV files, committed
-deliberately as `evidence/binaries/v-probe-8c127364.exe`). Three
-earlier evidence sets are superseded by this re-run and named for the
-record: 06bcff69 (first build; V4 measured a cross-thread call
-instead of the candidate shape; ENV files recorded branch: main),
-2df0ee04 (first same-thread V4; criterion routed faster than the loop
-cadence), and the intermediate builds between harness fixes; their
-findings drove the harness fixes recorded in the commit history.
+produced by ONE cross-build of the committed harness (exe sha
+f279c122…, identical across all three ENV files), and that binary is
+committed in the same branch as
+`evidence/binaries/v-probe-f279c122.exe` (sha256 re-verified against
+the filename). Earlier evidence sets are superseded by this re-run
+and named for the record: 06bcff69 (first build; V4 measured a
+cross-thread call instead of the candidate shape; ENV files recorded
+branch: main), 2df0ee04 (first same-thread V4; the routing criterion
+exceeded the loop cadence), 8c127364 (second same-thread V4; verdict
+did not yet count successes separately). Their findings drove the
+harness fixes recorded in the commit history.
 
 ## Verdict
 
@@ -51,7 +53,8 @@ Measured evidence (full JSON per scenario in `evidence/logs/`):
 - **V2b mixer→stream**: session master set to 0.3/0.6/0.3/restored,
   with a readback after each write proving the write effective
   (e.g. run1: 0.300/0.600/0.300/1.000); the stream factors stayed
-  pinned at 1.0 (±0.01) throughout. The master is restored on every
+  pinned at 1.0 (±0.01) throughout — the sampled min/max are recorded
+  in each JSON (run1: 1.0/1.0). The master is restored on every
   exit path via a guard. The AUDIBLE change the master move causes is
   EXPECTED by D14.9 and is an ear-witness item (UNAVAILABLE —
   recorded conditional, same posture as S-PROBE/OPEN-SMOKE).
@@ -73,11 +76,11 @@ Measured evidence (full JSON per scenario in `evidence/logs/`):
 
   | run | applied | median | p99 | max | iteration p99 | position |
   |-----|---------|--------|-----|-----|---------------|----------|
-  | 1   | 200/200 | 262.7 µs | 508.6 µs | 593.9 µs | 10.54 ms | advancing, monotone |
-  | 2   | 200/200 | 261.1 µs | 457.6 µs | 538.9 µs | 10.51 ms | advancing, monotone |
-  | 3   | 200/200 | 261.8 µs | 433.7 µs | 537.6 µs | 10.60 ms | advancing, monotone |
+  | 1   | 200/200 | 262.7 µs | 462.3 µs | 509.5 µs | 10.58 ms | advancing, monotone |
+  | 2   | 200/200 | 257.1 µs | 406.8 µs | 434.2 µs | 10.58 ms | advancing, monotone |
+  | 3   | 200/200 | 261.6 µs | 435.7 µs | 460.0 µs | 10.55 ms | advancing, monotone |
 
-  Every apply ≤ 0.6 ms and every apply SUCCEEDED (successes counted
+  Every apply ≤ 0.51 ms and every apply SUCCEEDED (successes counted
   separately from attempts; the final stream factor equals the last
   routed value 0.6 — asserted); the iteration cadence held at the
   device period (p99 ≈ 10.5 ms); the position clock stayed advancing
