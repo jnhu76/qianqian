@@ -575,6 +575,34 @@ the D14.5 corrective; a stronger transactional SongCore seek contract
 is a possible future provider-contract amendment, not a gate
 prerequisite.
 
+### §13 corrective (2026-09-18, F5-SEEK-IMPLEMENTATION-CORRECTIVE-2)
+
+The phase-0 listing above over-claimed: `NOT_OPEN` IS non-mutating, but
+non-mutation alone does not earn `RefusedUnchanged`. That class promises
+something stronger — the pre-call decoding continuation remains valid
+and USABLE — while `NOT_OPEN` reports `!h->probed || !h->dec`, a handle
+that is not in an opened/probed state: there is no certified old cursor
+to resume, so resuming old playback on it is exactly the hazard the
+class exists to exclude. E1 measured the validation class
+(`INVALID_ARGUMENT` — decoder usable after rejection); it never measured
+a not-opened handle. Promotion therefore follows the frozen
+conservative default:
+
+```text
+INVALID_ARGUMENT   → RefusedUnchanged   (the only proven class)
+NOT_OPEN           → MutatedThenFailed  (unprovable means destructive)
+SEEK_ERROR         → MutatedThenFailed
+SEEK_UNSUPPORTED   → MutatedThenFailed
+```
+
+The phase-0 wording above is superseded for `NOT_OPEN`; authority is
+ADR-PBK-002 §20 D14.5 (`RefusedUnchanged` = the INVALID_ARGUMENT class
+only). Executable pins at the provider seam (`qianqian-decode-songcore`):
+the pure raw-status → class map, plus two raw-ABI boundary probes — an
+unprobed handle really answers `SONG_ERR_NOT_OPEN` and classifies
+destructive, and an `INVALID_ARGUMENT` rejection leaves the decode
+continuation bit-identical to a no-seek control handle.
+
 ## 14. P1–P5 check (verdict: NOT triggered — recorded, not named)
 
 ```text
