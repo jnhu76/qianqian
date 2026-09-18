@@ -140,6 +140,33 @@ type Outcome = (&'static str, Vec<String>, Option<serde_json::Value>);
 struct SendPtr<T>(T);
 unsafe impl<T> Send for SendPtr<T> {}
 
+/// The D14.9 candidate apply point, realized for the V4 measurement:
+/// a desired-factor cell the RENDER THREAD loads once per loop top
+/// (relaxed load + compare), applying through SetAllVolumes BETWEEN
+/// wait-for-event and GetBuffer — never inside the quantum. The pump
+/// thread owns the apply; the main thread only routes the value.
+struct ApplyCell {
+    desired: std::sync::atomic::AtomicU32, // f32 bits; u32::MAX = none
+    durations_ns: std::sync::Mutex<Vec<u64>>,
+    iteration_ns: std::sync::Mutex<Vec<u64>>,
+}
+
+impl ApplyCell {
+    fn new() -> Self {
+        Self {
+            desired: std::sync::atomic::AtomicU32::new(u32::MAX),
+            durations_ns: std::sync::Mutex::new(Vec::new()),
+            iteration_ns: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+    fn route(&self, factor: f32) {
+        self.desired.store(
+            factor.to_bits(),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
+}
+
 /// One opened render stream: the production open shape, mechanism-side.
 struct ProbeStream {
     client: IAudioClient,
@@ -153,6 +180,15 @@ impl ProbeStream {
     /// Open + initialize + start a silence-pumping stream (the
     /// production open shape).
     fn open(label: &str) -> Result<Self, String> {
+        Self::open_inner(label, None)
+    }
+
+    /// Same, with a loop-top apply cell (the V4 candidate shape).
+    fn open_with_apply_cell(label: &str, cell: std::sync::Arc<ApplyCell>) -> Result<Self, String> {
+        Self::open_inner(label, Some(cell))
+    }
+
+    fn open_inner(label: &str, apply_cell: Option<std::sync::Arc<ApplyCell>>) -> Result<Self, String> {
         unsafe {
             let enumerator: IMMDeviceEnumerator =
                 CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
@@ -201,6 +237,7 @@ impl ProbeStream {
             let pump_render = SendPtr(render.clone());
             let pump_client = SendPtr(client.clone());
             let pump_event = SendPtr(event);
+            let pump_volume = SendPtr(stream_volume.clone());
             let pump = std::thread::Builder::new()
                 .name(format!("vprobe-pump-{label}"))
                 .spawn(move || {
@@ -208,9 +245,50 @@ impl ProbeStream {
                     let SendPtr(render) = &pump_render;
                     let SendPtr(client) = &pump_client;
                     let SendPtr(event) = &pump_event;
+                    let SendPtr(stream_volume) = &pump_volume;
                     let frame_bytes = CHANNELS as usize * 4;
                     let silence = vec![0u8; buffer as usize * frame_bytes];
+                    // The D14.9 candidate loop-top apply: one relaxed
+                    // load + compare per iteration, applied BETWEEN the
+                    // event wait and GetBuffer — never inside the
+                    // quantum. Applied value and durations stay on this
+                    // thread (the same thread that submits).
+                    let mut last_applied = u32::MAX;
+                    let mut apply = |stream_volume: &IAudioStreamVolume,
+                                     desired: u32,
+                                     durations: &std::sync::Mutex<Vec<u64>>| {
+                        let start = Instant::now();
+                        let result = unsafe {
+                            stream_volume.SetAllVolumes(&[f32::from_bits(desired); CHANNELS as usize])
+                        };
+                        durations.lock().expect("apply durations").push(
+                            start.elapsed().as_nanos() as u64
+                        );
+                        result.is_ok()
+                    };
                     while !pump_stop.load(std::sync::atomic::Ordering::Relaxed) {
+                        let iteration_start = Instant::now();
+                        let iteration_result = (|| -> bool {
+                            if let Some(cell) = &apply_cell {
+                                let desired = cell
+                                    .desired
+                                    .load(std::sync::atomic::Ordering::Relaxed);
+                                if desired != last_applied {
+                                    let applied = apply(
+                                        stream_volume,
+                                        desired,
+                                        &cell.durations_ns,
+                                    );
+                                    if applied {
+                                        last_applied = desired;
+                                    }
+                                }
+                            }
+                            true
+                        })();
+                        if !iteration_result {
+                            break;
+                        }
                         if WaitForSingleObject(*event, 100) != WAIT_OBJECT_0 {
                             continue;
                         }
@@ -232,6 +310,12 @@ impl ProbeStream {
                             );
                         }
                         let _ = render.ReleaseBuffer(available, 0);
+                        if let Some(cell) = &apply_cell {
+                            cell.iteration_ns
+                                .lock()
+                                .expect("iteration durations")
+                                .push(iteration_start.elapsed().as_nanos() as u64);
+                        }
                     }
                 })
                 .map_err(|e| format!("{label}: pump spawn: {e}"))?;
@@ -309,13 +393,16 @@ fn v1a() -> Outcome {
         }
     };
     let b0 = b.factor().unwrap_or(f32::NAN);
+    let mut b_samples = Vec::new();
+    let mut b_samples_2 = Vec::new();
+    let (mut a_at_03, mut a_at_06) = (f32::NAN, f32::NAN);
     let ok = (|| -> Result<bool, String> {
         a.set_factor(0.3)?;
-        let b_samples = sample_factor(&b, 20, Duration::from_millis(50))?;
-        let a_at_03 = a.factor()?;
+        b_samples = sample_factor(&b, 20, Duration::from_millis(50))?;
+        a_at_03 = a.factor()?;
         a.set_factor(0.6)?;
-        let b_samples_2 = sample_factor(&b, 20, Duration::from_millis(50))?;
-        let a_at_06 = a.factor()?;
+        b_samples_2 = sample_factor(&b, 20, Duration::from_millis(50))?;
+        a_at_06 = a.factor()?;
         Ok(all_within(&b_samples, b0)
             && all_within(&b_samples_2, b0)
             && (a_at_03 - 0.3).abs() <= EPS
@@ -334,7 +421,10 @@ fn v1a() -> Outcome {
             reasons,
             Some(serde_json::json!({
                 "b_baseline": b0,
-                "isolation": "both directions, sampled",
+                "b_after_a_set_0.3": b_samples,
+                "b_after_a_set_0.6": b_samples_2,
+                "a_readback_at_0.3": a_at_03,
+                "a_readback_at_0.6": a_at_06,
             })),
         ),
         Ok(false) => {
@@ -420,6 +510,10 @@ fn child_stream(seconds: u64, factor: f32) -> i32 {
         stream.shutdown();
         return 1;
     }
+    let window_start = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
     let (min, max, stable) = (|| {
         let mut min = f32::MAX;
         let mut max = 0.0f32;
@@ -435,6 +529,10 @@ fn child_stream(seconds: u64, factor: f32) -> i32 {
         }
         (min, max, (min - factor).abs() <= EPS && (max - factor).abs() <= EPS)
     })();
+    let window_end = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
     stream.shutdown();
     println!(
         "{}",
@@ -443,6 +541,7 @@ fn child_stream(seconds: u64, factor: f32) -> i32 {
             "min": min,
             "max": max,
             "stable": stable,
+            "poll_window_ms": [window_start, window_end],
         })
     );
     if stable { 0 } else { 1 }
@@ -514,24 +613,48 @@ fn v2b() -> Outcome {
         Err(e) => return ("RED", vec![e], None),
     };
     stream.set_factor(1.0).ok();
+    // Restore the session master on EVERY exit path: a probe must not
+    // leave the host's audio state moved.
+    struct MasterGuard<'a>(&'a IAudioClient, f32);
+    impl Drop for MasterGuard<'_> {
+        fn drop(&mut self) {
+            unsafe {
+                let _ = set_master(self.0, self.1);
+            }
+        }
+    }
+    let mut master_readbacks = Vec::new();
     let ok = (|| -> Result<bool, String> {
         let master0 = unsafe { simple_master(&stream.client)? };
+        let _guard = MasterGuard(&stream.client, master0);
+        let mut moved = true;
         for master in [0.3f32, 0.6, 0.3, master0] {
             unsafe { set_master(&stream.client, master)? };
-            std::thread::sleep(Duration::from_millis(100));
+            std::thread::sleep(Duration::from_millis(50));
+            // Readback: the master write must actually be effective (a
+            // silent no-op would make this scenario vacuous).
+            let readback = unsafe { simple_master(&stream.client)? };
+            master_readbacks.push(readback);
+            if (readback - master).abs() > EPS {
+                moved = false;
+            }
             let samples = sample_factor(&stream, 5, Duration::from_millis(40))?;
             if !all_within(&samples, 1.0) {
                 return Ok(false);
             }
         }
-        Ok(true)
+        let _ = _guard; // keep the guard alive until here
+        Ok(moved)
     })();
     stream.shutdown();
     match ok {
         Ok(true) => (
             "GREEN",
             reasons,
-            Some(serde_json::json!({ "stream_factors": "pinned at 1.0 while the session master moved" })),
+            Some(serde_json::json!({
+                "stream_factors": "pinned at 1.0 while the session master moved",
+                "master_readbacks": master_readbacks,
+            })),
         ),
         Ok(false) => {
             reasons.push("V2b: the session-master move moved the stream factors".into());
@@ -551,6 +674,7 @@ fn v3() -> Outcome {
         Ok(s) => s,
         Err(e) => return ("RED", vec![e], None),
     };
+    let mut factor_after = f32::NAN;
     let ok = (|| -> Result<bool, String> {
         stream.set_factor(0.4)?;
         unsafe {
@@ -559,11 +683,16 @@ fn v3() -> Outcome {
             stream.client.Start().map_err(|e| format!("Start: {e}"))?;
         }
         std::thread::sleep(Duration::from_millis(300));
-        Ok((stream.factor()? - 0.4).abs() <= EPS)
+        factor_after = stream.factor()?;
+        Ok((factor_after - 0.4).abs() <= EPS)
     })();
     stream.shutdown();
     match ok {
-        Ok(true) => ("GREEN", reasons, None),
+        Ok(true) => (
+            "GREEN",
+            reasons,
+            Some(serde_json::json!({ "set": 0.4, "after_stop_start": factor_after })),
+        ),
         Ok(false) => {
             reasons.push("V3: the stream factor did not survive Stop/Start".into());
             ("RED", reasons, None)
@@ -582,21 +711,20 @@ fn v3() -> Outcome {
 /// continuity, and stream survival.
 fn v4() -> Outcome {
     let mut reasons = Vec::new();
-    let mut stream = match ProbeStream::open("S") {
+    // The candidate placement, executed by the pump thread itself:
+    // main only ROUTES the desired factor into the cell; the pump
+    // loads it once per loop top and applies when it changed — the
+    // SAME thread that submits, between the event wait and GetBuffer.
+    let cell = std::sync::Arc::new(ApplyCell::new());
+    let mut stream = match ProbeStream::open_with_apply_cell("S", cell.clone()) {
         Ok(s) => s,
         Err(e) => return ("RED", vec![e], None),
     };
-    let clock: Result<IAudioClock, String> = unsafe {
-        stream
-            .client
-            .GetService()
-            .map_err(|e| format!("IAudioClock: {e}"))
-    };
-    let clock = match clock {
+    let clock: IAudioClock = match unsafe { stream.client.GetService::<IAudioClock>() } {
         Ok(c) => c,
         Err(e) => {
             stream.shutdown();
-            return ("RED", vec![e], None);
+            return ("RED", vec![format!("IAudioClock: {e}")], None);
         }
     };
     let position = |clock: &IAudioClock| -> Option<u64> {
@@ -605,70 +733,107 @@ fn v4() -> Outcome {
         Some(pos)
     };
 
-    let iterations = 2000usize;
-    let mut durations = Vec::with_capacity(iterations);
-    let mut max_position_gap = 0u64;
-    let mut monotone = true;
-    let mut last_pos = position(&clock).unwrap_or(0);
-    for i in 0..iterations {
-        let factor = if i % 2 == 0 { 0.5 } else { 0.6 };
-        let start = Instant::now();
-        let result = stream.set_factor(factor);
-        durations.push(start.elapsed().as_nanos() as u64);
-        if result.is_err() {
-            reasons.push(format!("V4: apply failed at iteration {i}"));
-            stream.shutdown();
-            return ("RED", reasons, None);
-        }
-        if i % 50 == 0 {
+    let changes = 1000usize;
+    let mut position_samples = Vec::new();
+    let routed_start = Instant::now();
+    for i in 0..changes {
+        cell.route(if i % 2 == 0 { 0.5 } else { 0.6 });
+        std::thread::sleep(Duration::from_millis(2));
+        if i % 100 == 0 {
             if let Some(pos) = position(&clock) {
-                if pos < last_pos {
-                    monotone = false;
-                }
-                max_position_gap = max_position_gap.max(pos - last_pos);
-                last_pos = pos;
+                position_samples.push(pos);
             }
         }
     }
-    // The stream must still be running and the clock alive.
+    let routed_elapsed = routed_start.elapsed();
+    // Let the pump drain the final routed value.
+    std::thread::sleep(Duration::from_millis(300));
+
+    let durations: Vec<u64> = cell.durations_ns.lock().expect("apply durations").clone();
+    let iterations: Vec<u64> = cell.iteration_ns.lock().expect("iteration durations").clone();
+    let applied = durations.len();
     let still_running = position(&clock).is_some() && stream.factor().is_ok();
-    durations.sort_unstable();
-    let p = |q: f64| durations[((durations.len() - 1) as f64 * q) as usize];
-    let min = durations[0];
-    let median = p(0.5);
-    let p99 = p(0.99);
-    let max = durations[durations.len() - 1];
+    let final_factor = stream.factor().ok();
+
+    // Position continuity: strictly advancing between every sampled
+    // pair, and monotone overall.
+    let mut monotone = true;
+    let mut advancing = true;
+    for pair in position_samples.windows(2) {
+        if pair[1] < pair[0] {
+            monotone = false;
+        }
+        if pair[1] == pair[0] {
+            advancing = false;
+        }
+    }
+    let mut sorted = durations.clone();
+    sorted.sort_unstable();
+    let (min, median, p99, max) = if sorted.is_empty() {
+        reasons.push("V4: the pump applied nothing — the loop-top apply never ran".into());
+        (0, 0, 0, 0)
+    } else {
+        let p = |q: f64| sorted[((sorted.len() - 1) as f64 * q) as usize];
+        (sorted[0], p(0.5), p(0.99), sorted[sorted.len() - 1])
+    };
+    let mut iter_sorted = iterations.clone();
+    iter_sorted.sort_unstable();
+    let iter_p99 = if iter_sorted.is_empty() {
+        0
+    } else {
+        iter_sorted[((iter_sorted.len() - 1) as f64 * 0.99) as usize]
+    };
     stream.shutdown();
 
-    // The placement bound under test: the apply call is a bounded,
-    // small control operation (sub-millisecond at p99) and the clock
-    // never goes backward.
-    let bounded = p99 < 1_000_000;
+    // The placement bound under test: the loop-top apply is a bounded,
+    // small control operation (sub-millisecond at p99), every routed
+    // change was applied, the iteration stayed bounded, and the clock
+    // kept advancing.
+    let bounded = p99 > 0 && p99 < 1_000_000;
     if !bounded {
         reasons.push(format!(
-            "V4: p99 apply duration {} ns exceeds the 1 ms placement bound",
-            p99
+            "V4: p99 loop-top apply duration {p99} ns exceeds the 1 ms placement bound (or nothing applied)"
         ));
+    }
+    if applied < changes {
+        reasons.push(format!("V4: only {applied}/{changes} routed changes were applied"));
+    }
+    if iter_p99 >= 20_000_000 {
+        reasons.push(format!("V4: p99 iteration duration {iter_p99} ns exceeded 20 ms"));
     }
     if !monotone {
         reasons.push("V4: the position clock went backward under applies".into());
     }
+    if !advancing {
+        reasons.push("V4: the position clock stalled under applies".into());
+    }
     if !still_running {
         reasons.push("V4: the stream did not survive the apply churn".into());
     }
-    let ok = bounded && monotone && still_running;
+    let ok = bounded
+        && applied >= changes
+        && iter_p99 < 20_000_000
+        && monotone
+        && advancing
+        && still_running;
     (
         if ok { "GREEN" } else { "RED" },
         reasons,
         Some(serde_json::json!({
-            "iterations": iterations,
-            "min_ns": min,
-            "median_ns": median,
-            "p99_ns": p99,
-            "max_ns": max,
+            "shape": "same-thread loop-top apply (pump thread), routed by the main thread",
+            "routed_changes": changes,
+            "applies_observed": applied,
+            "routing_window_ms": routed_elapsed.as_millis() as u64,
+            "apply_min_ns": min,
+            "apply_median_ns": median,
+            "apply_p99_ns": p99,
+            "apply_max_ns": max,
+            "iteration_p99_ns": iter_p99,
+            "position_samples": position_samples,
             "position_monotone": monotone,
-            "max_position_gap_frames": max_position_gap,
+            "position_advancing": advancing,
             "stream_survived": still_running,
+            "final_factor": final_factor,
         })),
     )
 }
@@ -679,53 +844,66 @@ fn v5() -> Outcome {
     let mut reasons = Vec::new();
     let mut evidence = serde_json::Map::new();
 
-    // (a) malformed input: zero channels → typed error.
-    let malformed = std::thread::spawn(|| {
-        let mut stream = match ProbeStream::open("S") {
-            Ok(s) => s,
-            Err(e) => return Some(format!("open: {e}")),
-        };
-        let result = unsafe {
-            stream
-                .stream_volume
-                .SetAllVolumes(&[])
-        };
+    // (a) malformed input: an EMPTY level slice → typed error. An
+    // open/setup failure is a RED reason, never evidence (a vacuous
+    // GREEN here would defeat the scenario's whole purpose).
+    let malformed = std::thread::spawn(|| -> Result<Option<String>, String> {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        }
+        let mut stream = ProbeStream::open("S").map_err(|e| format!("open: {e}"))?;
+        let result = unsafe { stream.stream_volume.SetAllVolumes(&[]) };
         stream.shutdown();
-        result.err().map(|e| format!("{e:?}"))
+        Ok(result.err().map(|e| format!("{e:?}")))
     })
     .join()
     .expect("v5a thread");
     match malformed {
-        Some(error) => {
+        Ok(Some(error)) => {
             evidence.insert("malformed_set_error".into(), serde_json::json!(error));
         }
-        None => {
-            reasons.push("V5: SetAllVolumes(0, []) did NOT fail — no signal".into());
+        Ok(None) => {
+            reasons.push("V5: SetAllVolumes with an empty level slice did NOT fail — no signal".into());
+            return ("RED", reasons, Some(serde_json::Value::Object(evidence)));
+        }
+        Err(setup) => {
+            reasons.push(format!("V5: setup failed before the malformed call: {setup}"));
             return ("RED", reasons, Some(serde_json::Value::Object(evidence)));
         }
     }
 
-    // (b) uninitialized client: GetService must fail typed.
-    let uninitialized = std::thread::spawn(|| {
+    // (b) uninitialized client: GetService must fail typed. Graceful on
+    // environment failure (RED, not a panic).
+    let uninitialized = std::thread::spawn(|| -> Result<Option<String>, String> {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        }
         unsafe {
             let enumerator: IMMDeviceEnumerator =
-                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).expect("enumerator");
+                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)
+                    .map_err(|e| format!("enumerator: {e}"))?;
             let device = enumerator
                 .GetDefaultAudioEndpoint(eRender, eMultimedia)
-                .expect("endpoint");
-            let client: IAudioClient = device.Activate(CLSCTX_ALL, None).expect("activate");
+                .map_err(|e| format!("endpoint: {e}"))?;
+            let client: IAudioClient = device
+                .Activate(CLSCTX_ALL, None)
+                .map_err(|e| format!("activate: {e}"))?;
             let result: Result<IAudioStreamVolume, _> = client.GetService();
-            result.err().map(|e| format!("{e:?}"))
+            Ok(result.err().map(|e| format!("{e:?}")))
         }
     })
     .join()
     .expect("v5b thread");
     match uninitialized {
-        Some(error) => {
+        Ok(Some(error)) => {
             evidence.insert("uninitialized_getservice_error".into(), serde_json::json!(error));
         }
-        None => {
+        Ok(None) => {
             reasons.push("V5: GetService on an uninitialized client did NOT fail".into());
+            return ("RED", reasons, Some(serde_json::Value::Object(evidence)));
+        }
+        Err(setup) => {
+            reasons.push(format!("V5: setup failed before the uninitialized call: {setup}"));
             return ("RED", reasons, Some(serde_json::Value::Object(evidence)));
         }
     }
