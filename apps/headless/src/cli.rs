@@ -90,9 +90,12 @@ commands:
   --version | -V         print the version
 
 in the machine transport, `stop` stops the episode, `pause` and
-`resume` pause and resume it, and `status` prints its truthful state
-(other interactive commands are recognized but not wired yet); in the
-terminal shell, Space pauses/resumes, S stops and Q or Ctrl+C quits
+`resume` pause and resume it, `seek <time>` requests a same-episode
+seek (`SS`, `SS.s`, `MM:SS` or `MM:SS.s` of source media time; an
+unreadable token sends nothing), and `status` prints its truthful
+state (other interactive commands are recognized but not wired yet);
+in the terminal shell, Space pauses/resumes, Left/Right seek in fixed
+steps, S stops and Q or Ctrl+C quits
 "
 }
 
@@ -119,8 +122,11 @@ pub enum InteractiveCommand {
     Stop,
     Pause,
     Resume,
-    /// `seek <time>`: the time token stays opaque until seek semantics
-    /// (and the time grammar they imply) are frozen in a later phase.
+    /// `seek <time>`: the time token is READ by the shell into a
+    /// source-relative request ([`parse_seek_time`], the frozen `SS` /
+    /// `SS.s` / `MM:SS` / `MM:SS.s` grammar); whether the episode
+    /// accepts it, refuses it or lands elsewhere is the frozen D14.5
+    /// protocol's business, never the shell's.
     Seek {
         time: String,
     },
@@ -244,8 +250,9 @@ fn one_arg(
 /// the episode's media time; the token is a REQUEST, and everything the
 /// frozen protocol says about acceptance, refusal and the actual
 /// landing applies downstream. `None` = the shell cannot read the token
-/// as a non-negative time, so no command is sent (inert input, never a
-/// fabricated target).
+/// as a non-negative, representable time, so no command is sent (inert
+/// input, never a fabricated target) — the shell has no failure channel
+/// into the episode, so it fails closed here instead.
 pub fn parse_seek_time(token: &str) -> Option<std::time::Duration> {
     let seconds = match token.split_once(':') {
         Some((m, s)) => {
@@ -264,7 +271,12 @@ pub fn parse_seek_time(token: &str) -> Option<std::time::Duration> {
             seconds
         }
     };
-    Some(std::time::Duration::from_secs_f64(seconds))
+    // `try_from_secs_f64` is the failing twin of `from_secs_f64`, which
+    // PANICS on NaN, infinities and values outside the Duration range —
+    // reachable from plain tokens (`nan`, `inf`, `1e400`, a minutes
+    // field near u64::MAX). Readability is a shell-side property: an
+    // unreadable token is inert input, never an abort.
+    std::time::Duration::try_from_secs_f64(seconds).ok()
 }
 
 #[cfg(test)]
@@ -478,7 +490,28 @@ mod tests {
             "time zero is a legal request, not an unreadable token"
         );
         assert_eq!(parse_seek_time("75:00"), Some(Duration::from_secs(4500)));
-        for bad in ["", "-30", "1:99", "abc", "1:2:3", ":", "-0:01"] {
+        // Unreadable tokens include the ones a float parser ACCEPTS but
+        // no Duration can represent: NaN, infinities (including the
+        // `1e400` overflow spelling) and a seconds value beyond the
+        // Duration range. They are inert input exactly like `abc` —
+        // never a panic in the command reader, and never a fabricated
+        // target.
+        for bad in [
+            "",
+            "-30",
+            "1:99",
+            "abc",
+            "1:2:3",
+            ":",
+            "-0:01",
+            "nan",
+            "NaN",
+            "inf",
+            "-inf",
+            "1e400",
+            "1e20",
+            "18446744073709551615:00",
+        ] {
             assert_eq!(parse_seek_time(bad), None, "{bad:?} is unreadable");
         }
     }
