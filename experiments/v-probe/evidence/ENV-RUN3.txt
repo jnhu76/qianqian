@@ -1,27 +1,38 @@
 run: 3
-date_utc: 2026-09-18T18:37:34Z
-repo_head_sha: 74cd00439283a6534b1f19e37de756246c8ca89c
-branch: main
+date_utc: 2026-09-18T19:01:37Z
+repo_head_sha: 3ae7eaf30a315329a1334f409b79ac97f0fa361f
+branch: research/v-probe-1
 harness_tree_status:
    M experiments/v-probe/evidence/ENV-RUN1.txt
+   M experiments/v-probe/evidence/ENV-RUN2.txt
+   M experiments/v-probe/evidence/ENV-RUN3.txt
+   M experiments/v-probe/evidence/logs/V1a-run1.json
+   M experiments/v-probe/evidence/logs/V1a-run2.json
+   D experiments/v-probe/evidence/logs/V1a-run3.json
+   D experiments/v-probe/evidence/logs/V1a-run3.stderr
+   M experiments/v-probe/evidence/logs/V1b-run1.json
+   M experiments/v-probe/evidence/logs/V1b-run2.json
+   D experiments/v-probe/evidence/logs/V1b-run3.json
+   D experiments/v-probe/evidence/logs/V1b-run3.stderr
+   D experiments/v-probe/evidence/logs/V2a-run3.json
+   D experiments/v-probe/evidence/logs/V2a-run3.stderr
+   M experiments/v-probe/evidence/logs/V2b-run1.json
+   M experiments/v-probe/evidence/logs/V2b-run2.json
+   D experiments/v-probe/evidence/logs/V2b-run3.json
+   D experiments/v-probe/evidence/logs/V2b-run3.stderr
+   M experiments/v-probe/evidence/logs/V3-run1.json
+   M experiments/v-probe/evidence/logs/V3-run2.json
+   D experiments/v-probe/evidence/logs/V3-run3.json
+   D experiments/v-probe/evidence/logs/V3-run3.stderr
    M experiments/v-probe/evidence/logs/V4-run1.json
-  ?? experiments/v-probe/evidence/ENV-RUN2.txt
-  ?? experiments/v-probe/evidence/ENV-RUN3.txt
-  ?? experiments/v-probe/evidence/logs/V1a-run2.json
-  ?? experiments/v-probe/evidence/logs/V1a-run2.stderr
-  ?? experiments/v-probe/evidence/logs/V1b-run2.json
-  ?? experiments/v-probe/evidence/logs/V1b-run2.stderr
-  ?? experiments/v-probe/evidence/logs/V2a-run2.json
-  ?? experiments/v-probe/evidence/logs/V2a-run2.stderr
-  ?? experiments/v-probe/evidence/logs/V2b-run2.json
-  ?? experiments/v-probe/evidence/logs/V2b-run2.stderr
-  ?? experiments/v-probe/evidence/logs/V3-run2.json
-  ?? experiments/v-probe/evidence/logs/V3-run2.stderr
-  ?? experiments/v-probe/evidence/logs/V4-run2.json
-  ?? experiments/v-probe/evidence/logs/V4-run2.stderr
-  ?? experiments/v-probe/evidence/logs/V5-run2.json
-  ?? experiments/v-probe/evidence/logs/V5-run2.stderr
-exe_sha256: 06bcff69426d1e4c6a7c523c7a3b919ee6f494d326b474ea78a7bcd6f3a65a47
+   M experiments/v-probe/evidence/logs/V4-run1.stderr
+   M experiments/v-probe/evidence/logs/V4-run2.json
+   M experiments/v-probe/evidence/logs/V4-run2.stderr
+   D experiments/v-probe/evidence/logs/V4-run3.json
+   D experiments/v-probe/evidence/logs/V4-run3.stderr
+   D experiments/v-probe/evidence/logs/V5-run3.json
+   D experiments/v-probe/evidence/logs/V5-run3.stderr
+exe_sha256: 0d43e2b758daced30c6fab40f0bd5a23f32fb43858dd5d00ea66a8a4da2ed19a
 windows_caption_raw: Microsoft Windows 11 ×¨Òµ°æ
 audio_device: Realtek High Definition Audio
 endpoint_note: default render endpoint (shared mode, event-driven float32), opened by the harness; factors are stream-local (IAudioStreamVolume)

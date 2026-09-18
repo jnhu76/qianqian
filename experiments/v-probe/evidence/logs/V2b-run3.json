@@ -3,6 +3,12 @@
   "verdict": "GREEN",
   "reasons": [],
   "evidence": {
+    "master_readbacks": [
+      0.30000001192092896,
+      0.6000000238418579,
+      0.30000001192092896,
+      1.0
+    ],
     "stream_factors": "pinned at 1.0 while the session master moved"
   }
 }
