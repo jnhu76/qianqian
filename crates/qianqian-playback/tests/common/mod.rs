@@ -44,8 +44,9 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
 
 use qianqian_audio_api::ports::{
     AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainSignal,
-    DrainVerdict, OutputError, PcmDecode, PcmFormat, PcmPull, PositionEvidence, ProviderSeekOutcome,
-    RenderGate, RenderPcmInput, RenderRequest, RenderStream, SeekParkOutcome, SeekParkRelease,
+    DrainVerdict, OutputError, PcmDecode, PcmFormat, PcmPull, PositionEvidence,
+    ProviderSeekOutcome, RenderGate, RenderPcmInput, RenderRequest, RenderStream, SeekParkOutcome,
+    SeekParkRelease,
 };
 
 pub const TEST_FORMAT: PcmFormat = PcmFormat {

@@ -9,9 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use qianqian_audio_api::ports::{
-    GateEvent, RenderGate, SeekParkOutcome, SeekParkRelease,
-};
+use qianqian_audio_api::ports::{GateEvent, RenderGate, SeekParkOutcome, SeekParkRelease};
 
 /// A bounded poll so timing assertions fail with a diagnosis, not a
 /// hang.
@@ -61,7 +59,10 @@ fn an_unheld_seek_gate_parks_nothing_and_publishes_nothing() {
     assert!(events.snapshot().is_empty(), "{:?}", events.snapshot());
     // A second check finds the same nothing: no hold routed means no
     // payload can exist to consume.
-    assert_eq!(gate.park_while_seek_hold(|| true), SeekParkOutcome::NotParked);
+    assert_eq!(
+        gate.park_while_seek_hold(|| true),
+        SeekParkOutcome::NotParked
+    );
 }
 
 /// A release that lands before the leg reaches the gate: the hold is
@@ -169,12 +170,16 @@ fn a_committed_release_reaches_the_parked_leg_exactly_once() {
     let parked = Arc::new(AtomicBool::new(false));
     let parked_clone = parked.clone();
     let leg_gate = gate.clone();
-    let leg = std::thread::spawn(move || leg_gate.park_while_seek_hold(move || {
-        parked_clone.store(true, Ordering::SeqCst);
-        true
-    }));
+    let leg = std::thread::spawn(move || {
+        leg_gate.park_while_seek_hold(move || {
+            parked_clone.store(true, Ordering::SeqCst);
+            true
+        })
+    });
     assert!(wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)));
-    gate.release_seek_hold(SeekParkRelease::Committed { landing: Some(44_100) });
+    gate.release_seek_hold(SeekParkRelease::Committed {
+        landing: Some(44_100),
+    });
     let outcome = leg.join().expect("leg exits");
     assert_eq!(
         outcome,
@@ -184,7 +189,10 @@ fn a_committed_release_reaches_the_parked_leg_exactly_once() {
     );
     // Consumed by the park's exit: the next gate check finds no hold
     // and no payload — one payload, one consumer.
-    assert_eq!(gate.park_while_seek_hold(|| true), SeekParkOutcome::NotParked);
+    assert_eq!(
+        gate.park_while_seek_hold(|| true),
+        SeekParkOutcome::NotParked
+    );
 }
 
 /// A committed release stored while the leg is held by PAUSE — the
@@ -271,10 +279,12 @@ fn a_new_hold_drops_a_stale_unconsumed_release() {
     let parked = Arc::new(AtomicBool::new(false));
     let parked_clone = parked.clone();
     let leg_gate = gate.clone();
-    let leg = std::thread::spawn(move || leg_gate.park_while_seek_hold(move || {
-        parked_clone.store(true, Ordering::SeqCst);
-        true
-    }));
+    let leg = std::thread::spawn(move || {
+        leg_gate.park_while_seek_hold(move || {
+            parked_clone.store(true, Ordering::SeqCst);
+            true
+        })
+    });
     assert!(wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)));
     gate.release_seek_hold(SeekParkRelease::Aborted);
     let outcome = leg.join().expect("leg exits");
@@ -296,7 +306,10 @@ fn a_closed_gate_never_seek_parks_again() {
     // Close first: a hold routed afterwards routes nothing.
     gate.close_and_release();
     gate.set_seek_hold(true);
-    assert_eq!(gate.park_while_seek_hold(|| true), SeekParkOutcome::NotParked);
+    assert_eq!(
+        gate.park_while_seek_hold(|| true),
+        SeekParkOutcome::NotParked
+    );
     // A leg already parked when the close lands is woken with bounded
     // latency and leaves with the abort shape.
     let events2 = Events::default();
@@ -308,10 +321,12 @@ fn a_closed_gate_never_seek_parks_again() {
     let parked = Arc::new(AtomicBool::new(false));
     let parked_clone = parked.clone();
     let leg_gate = gate2.clone();
-    let leg = std::thread::spawn(move || leg_gate.park_while_seek_hold(move || {
-        parked_clone.store(true, Ordering::SeqCst);
-        false // never quiesce: the close, not quiescence, must end the park
-    }));
+    let leg = std::thread::spawn(move || {
+        leg_gate.park_while_seek_hold(move || {
+            parked_clone.store(true, Ordering::SeqCst);
+            false // never quiesce: the close, not quiescence, must end the park
+        })
+    });
     assert!(wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)));
     gate2.close_and_release();
     let outcome = leg.join().expect("leg exits");

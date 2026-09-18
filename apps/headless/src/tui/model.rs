@@ -149,10 +149,7 @@ pub const SEEK_STEP: Duration = Duration::from_secs(5);
 /// convert it) there is no target to compute, and a seek with no
 /// computable target is never SENT — no fabricated zero, no seek to the
 /// episode start, no command at all.
-pub fn seek_target(
-    observation: &PlaybackSessionObservation,
-    forward: bool,
-) -> Option<Duration> {
+pub fn seek_target(observation: &PlaybackSessionObservation, forward: bool) -> Option<Duration> {
     let rate = u64::from(observation.source_format?.sample_rate);
     if rate == 0 {
         return None;
@@ -459,8 +456,8 @@ mod tests {
     /// fabricated zero, no seek to the episode start.
     #[test]
     fn the_seek_target_is_a_fixed_step_of_the_coherent_observation_or_inert() {
-        let observation_with = |position: Option<u64>, sample_rate: Option<u32>| {
-            PlaybackSessionObservation {
+        let observation_with =
+            |position: Option<u64>, sample_rate: Option<u32>| PlaybackSessionObservation {
                 position,
                 source_format: sample_rate.map(|sample_rate| PcmFormat {
                     sample_rate,
@@ -468,8 +465,7 @@ mod tests {
                     channel_mask: 0x3,
                 }),
                 ..pending()
-            }
-        };
+            };
         // Unknown position: inert in both directions.
         let no_position = observation_with(None, Some(44_100));
         assert_eq!(seek_target(&no_position, true), None);

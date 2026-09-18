@@ -50,8 +50,8 @@
 
 mod common;
 
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use qianqian_app::QianqianApp;
@@ -384,10 +384,9 @@ fn a_beyond_duration_target_is_the_providers_decision() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
         let landing = SOURCE_FRAMES as u64 - 100;
-        let (witnesses, handle, mut runtime) =
-            episode(vec![ProviderSeekOutcome::Applied {
-                landing: Some(landing),
-            }]);
+        let (witnesses, handle, mut runtime) = episode(vec![ProviderSeekOutcome::Applied {
+            landing: Some(landing),
+        }]);
         wait_for_position_past(&handle, HALF_A_SECOND);
         handle.request_seek(Duration::from_secs(999));
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
@@ -419,7 +418,10 @@ fn an_unknown_landing_withdraws_the_position_for_the_rest_of_the_episode() {
         wait_for_position_past(&handle, HALF_A_SECOND);
         handle.request_seek(Duration::from_secs(5));
         assert!(
-            wait_until(Duration::from_secs(5), || handle.observe().position.is_none()),
+            wait_until(Duration::from_secs(5), || handle
+                .observe()
+                .position
+                .is_none()),
             "the unknown landing withdraws the projection"
         );
         // A second committed cutover WITH a known landing must not
@@ -468,8 +470,7 @@ fn an_unknown_landing_withdraws_the_position_for_the_rest_of_the_episode() {
 fn a_refused_seek_finishes_its_own_remainder_with_zero_content_loss() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
-        let (witnesses, handle, mut runtime) =
-            episode(vec![ProviderSeekOutcome::RefusedUnchanged]);
+        let (witnesses, handle, mut runtime) = episode(vec![ProviderSeekOutcome::RefusedUnchanged]);
         wait_for_position_past(&handle, HALF_A_SECOND);
         handle.request_seek(Duration::from_secs(5));
         assert_eq!(
@@ -500,11 +501,10 @@ fn a_refused_seek_finishes_its_own_remainder_with_zero_content_loss() {
 fn a_destructive_provider_failure_fails_the_episode_and_never_resumes() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
-        let (witnesses, handle, mut runtime) = episode(vec![
-            ProviderSeekOutcome::MutatedThenFailed {
+        let (witnesses, handle, mut runtime) =
+            episode(vec![ProviderSeekOutcome::MutatedThenFailed {
                 diagnostic: "mid-stream corruption".to_owned(),
-            },
-        ]);
+            }]);
         wait_for_position_past(&handle, HALF_A_SECOND);
         handle.request_seek(Duration::from_secs(5));
         assert_eq!(
@@ -609,7 +609,9 @@ fn a_second_seek_while_one_is_in_flight_is_inert() {
         witnesses.tail_probe.arm();
         handle.request_seek(Duration::from_secs(5));
         assert!(
-            witnesses.tail_probe.wait_held_within(Duration::from_secs(5)),
+            witnesses
+                .tail_probe
+                .wait_held_within(Duration::from_secs(5)),
             "precondition: the leg never parked under the cut's hold"
         );
         // Both later requests linearize while the first seek is provably
@@ -696,7 +698,9 @@ fn stop_intent_wins_over_an_in_flight_seek() {
         witnesses.tail_probe.arm();
         handle.request_seek(Duration::from_secs(5));
         assert!(
-            witnesses.tail_probe.wait_held_within(Duration::from_secs(5)),
+            witnesses
+                .tail_probe
+                .wait_held_within(Duration::from_secs(5)),
             "precondition: the leg never parked under the cut's hold"
         );
         handle.request_stop();

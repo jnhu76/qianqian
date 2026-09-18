@@ -500,15 +500,13 @@ fn steady_loop(
         // hold is already released; the gate consumes the awaiting
         // payload at this check, so the rebase never skips a submitting
         // leg; pause intent survives the seek).
-        if let SeekParkOutcome::Released(release) =
-            gate.park_while_seek_hold(|| {
-                let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {
-                    return false;
-                };
-                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
-                padding == 0
-            })
-        {
+        if let SeekParkOutcome::Released(release) = gate.park_while_seek_hold(|| {
+            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {
+                return false;
+            };
+            publish_consumed(position, basis, handed_off, u64::from(padding), publishing);
+            padding == 0
+        }) {
             match release {
                 SeekParkRelease::Committed { landing } => {
                     handed_off = 0;

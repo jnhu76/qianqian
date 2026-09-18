@@ -297,7 +297,11 @@ fn an_unknown_landing_withdraws_the_sample_forever_on_the_writers_discipline() {
     cell.publish_consumed(4 * BLOCK, 0);
     assert!(cell.published().is_some());
     cell.rebase(None);
-    assert_eq!(cell.published(), None, "unknown is not zero, not the target");
+    assert_eq!(
+        cell.published(),
+        None,
+        "unknown is not zero, not the target"
+    );
 
     // The writer's obligation: after an unknown-landing cutover the leg
     // publishes NOTHING more. The cell itself does not (and must not)
@@ -321,7 +325,11 @@ fn reads_after_a_rebase_stay_pure_and_stable() {
     cell.publish_consumed(4 * BLOCK, 0);
     cell.rebase(Some(BLOCK));
     assert_eq!(cell.published(), Some(BLOCK));
-    assert_eq!(cell.published(), Some(BLOCK), "repeating a read changes nothing");
+    assert_eq!(
+        cell.published(),
+        Some(BLOCK),
+        "repeating a read changes nothing"
+    );
     cell.rebase(Some(3 * BLOCK));
     assert_eq!(cell.published(), Some(3 * BLOCK));
     assert_eq!(cell.published(), Some(3 * BLOCK));

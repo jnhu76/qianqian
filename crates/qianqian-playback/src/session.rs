@@ -299,15 +299,11 @@ fn decode_worker(
                                 // the episode takes the ordinary
                                 // decode-failure route (D11).
                                 completion.release_seek_without_commit();
-                                completion.decode_failed(&format!(
-                                    "seek failed: {diagnostic}"
-                                ));
+                                completion.decode_failed(&format!("seek failed: {diagnostic}"));
                                 edge.fail();
                                 return;
                             }
-                            qianqian_audio_api::ports::ProviderSeekOutcome::Applied {
-                                landing,
-                            } => {
+                            qianqian_audio_api::ports::ProviderSeekOutcome::Applied { landing } => {
                                 // Success: staging discard (including any
                                 // preserved remainder — it belongs to the
                                 // pre-cut world), then the ONE purge on
@@ -396,7 +392,13 @@ fn decode_worker(
                 }
                 Ok(DecodeOutcome::Frames(n)) => {
                     let total = n * channels;
-                    match write_observing_seek(&edge, &completion, &staging[..total], &mut pending_seek, &mut remainder) {
+                    match write_observing_seek(
+                        &edge,
+                        &completion,
+                        &staging[..total],
+                        &mut pending_seek,
+                        &mut remainder,
+                    ) {
                         WriteStep::Whole => {}
                         WriteStep::Stopped => return,
                         WriteStep::CutPoint => {

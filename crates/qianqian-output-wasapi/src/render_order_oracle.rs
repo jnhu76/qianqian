@@ -69,8 +69,8 @@ fn check_render_order(source: &str) -> Vec<String> {
     // lives inside the basis-aware helper (whose own `if publishing`
     // gate is the F5 withdrawal discipline, not a reordering hazard).
     let direct_publish_count = source.matches(DIRECT_PUBLISH).count();
-    let helper_publish =
-        body_of(source, PUBLISH_HELPER).is_some_and(|body| code_sites(body, DIRECT_PUBLISH).len() == 1);
+    let helper_publish = body_of(source, PUBLISH_HELPER)
+        .is_some_and(|body| code_sites(body, DIRECT_PUBLISH).len() == 1);
     check(
         "P9: exactly one direct cell publication, inside the basis-aware helper",
         direct_publish_count == 1 && helper_publish,
@@ -563,15 +563,16 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     /// A pause park slice that publishes only when the tail is NOT
     /// quiesced skips exactly the observation that matters most:
     /// quiescence is where a paused episode's sample is walked up to the
-    /// frozen total. The mutation anchors on the pause park's own
-    /// publication — the seek park's sits one indent deeper and is
-    /// P10's business — and wraps it in the exact condition that skips
-    /// the quiescent slice.
+    /// frozen total. The mutation anchors on the pause park's call site
+    /// (rustfmt renders both park closures at the same indent, so the
+    /// indentation is not a discriminator — the call marker is) and
+    /// wraps the closure's publication in the exact condition that
+    /// skips the quiescent slice.
     #[test]
     fn a_park_slice_that_skips_its_quiescent_publication_is_rejected() {
         let source = include_str!("wasapi.rs").replace(
-            "                return false;\n            };\n            publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
-            "                return false;\n            };\n            if padding != 0 {\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n            }",
+            "gate.park_while_paused(|| {\n            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                return false;\n            };\n            publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
+            "gate.park_while_paused(|| {\n            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                return false;\n            };\n            if padding != 0 {\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n            }",
         );
         let violations = check_render_order(&source);
         assert!(
@@ -593,8 +594,8 @@ fn drain_to_zero(session: &DeviceSession, position: &PositionEvidence, handed_of
     #[test]
     fn a_seek_park_that_skips_its_quiescent_publication_is_rejected() {
         let source = include_str!("wasapi.rs").replace(
-            "                };\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
-            "                };\n                if padding != 0 {\n                    publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n                }",
+            "gate.park_while_seek_hold(|| {\n            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                return false;\n            };\n            publish_consumed(position, basis, handed_off, u64::from(padding), publishing);",
+            "gate.park_while_seek_hold(|| {\n            let Ok(padding) = (unsafe { session.client.GetCurrentPadding() }) else {\n                return false;\n            };\n            if padding != 0 {\n                publish_consumed(position, basis, handed_off, u64::from(padding), publishing);\n            }",
         );
         let violations = check_render_order(&source);
         assert!(

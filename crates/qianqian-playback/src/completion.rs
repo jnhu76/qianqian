@@ -57,8 +57,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use qianqian_audio_api::ports::{
-    DrainSignal, DrainVerdict, GateEvent, PcmFormat, PositionEvidence, RenderGate,
-    SeekParkRelease,
+    DrainSignal, DrainVerdict, GateEvent, PcmFormat, PositionEvidence, RenderGate, SeekParkRelease,
 };
 
 use crate::edge::{EdgeTerminal, PcmEdge};
@@ -697,7 +696,11 @@ impl SessionCompletion {
     /// one-seek policy, observable for verification only).
     #[cfg(all(test, not(loom)))]
     pub(crate) fn seek_in_flight(&self) -> bool {
-        self.state.seek_slot.lock().expect("seek slot lock").in_flight
+        self.state
+            .seek_slot
+            .lock()
+            .expect("seek slot lock")
+            .in_flight
     }
 
     /// Verification reads of the seek protocol latches (crate-internal
@@ -708,7 +711,6 @@ impl SessionCompletion {
         let guard = self.state.state.lock().expect("completion lock");
         (guard.seek_refused, guard.cut_committed, guard.seek_landing)
     }
-
 
     /// Release the pause gate WITHOUT touching the recorded pause intent
     /// (D14.7 teardown obligation): session settlement/teardown must wake
@@ -1307,9 +1309,7 @@ mod tests {
         );
         assert_eq!(
             completion.render_gate().park_while_seek_hold(|| false),
-            SeekParkOutcome::Released(SeekParkRelease::Committed {
-                landing: Some(123)
-            }),
+            SeekParkOutcome::Released(SeekParkRelease::Committed { landing: Some(123) }),
             "the commit's rebase payload carries the ACTUAL landing"
         );
         assert_eq!(
