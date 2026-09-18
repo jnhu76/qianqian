@@ -2427,7 +2427,9 @@ global stores remain forbidden.
 >                render loop top when the routed value changed (one
 >                relaxed load + compare per iteration); never inside
 >                the quantum between GetBuffer and ReleaseBuffer. THIS
->                PLACEMENT IS CANDIDATE, NOT FINAL — see pending item.
+>                PLACEMENT IS CANDIDATE, NOT FINAL — (grounded
+>                2026-09-19 by V-PROBE; see the VOLUME-IMPLEMENTATION-1
+>                note below)
 > read side:     the TUI value means exactly the App's desired stream
 >                factor — NOT the effective acoustic level, NOT the
 >                Windows session master, NOT the endpoint volume, NOT
@@ -2452,7 +2454,8 @@ global stores remain forbidden.
 > ```
 >
 > **Windows candidate mechanism (selected on documentation evidence;
-> physical RT placement PENDING V-PROBE):** `IAudioStreamVolume` via
+> physical RT placement PENDING V-PROBE — grounded 2026-09-19, see
+> the VOLUME-IMPLEMENTATION-1 note below):** `IAudioStreamVolume` via
 > `GetService` on the episode's own render client; `SetAllVolumes`
 > across all channels (level/100.0); stream-local by contract
 > (Microsoft: "controls the volume of an individual stream in a

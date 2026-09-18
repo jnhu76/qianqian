@@ -67,10 +67,12 @@ Representative measured evidence (full JSON per scenario in
   mid-episode — the episode stayed unsettled and kept consuming; at
   factor 0.0 (silence) the position publication KEPT advancing
   (silence is still submitted frames — frame accounting, not
-  loudness); the desired level survived episode replacement (delivered
-  before activation); quit Stopped + Discharged. A volume command
-  never settled terminal truth — physically witnessed on the product
-  path.
+  loudness); the App's desired level survived episode replacement (the
+  physical witness is App-state survival and playback continuity;
+  pre-activation DELIVERY into the fresh mechanism is pinned
+  executably by the volume_seam and player tests — no mechanism
+  readback exists by design); quit Stopped + Discharged. A volume
+  command never settled terminal truth.
 - **O6 navigation (Stage D)**: a 3-file startup playlist walked with
   next/previous through the SAME real replacement — every step in
   BOTH directions witnessed the committed source equals the selected

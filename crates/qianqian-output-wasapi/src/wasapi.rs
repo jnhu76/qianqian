@@ -339,7 +339,9 @@ struct DeviceSession {
     buffer_frames: u32,
     /// The episode's desired stream factor (D14.9 cell) and the
     /// mechanism handle that realizes it, plus the last value this leg
-    /// applied (the loop-top compare).
+    /// APPLIED or ATTEMPTED (the loop-top compare; on a recoverable
+    /// apply failure the failing routed value is recorded as attempted
+    /// so it is not re-issued every iteration).
     level: OutputLevel,
     stream_volume: IAudioStreamVolume,
     channels: u32,

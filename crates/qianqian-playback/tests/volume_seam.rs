@@ -236,7 +236,6 @@ fn a_volume_command_after_the_terminal_fact_is_inert_history() {
         .clone()
         .expect("the mechanism received the level cell");
     handle.request_output_level(70);
-    let before = handle.observe();
 
     handle.request_stop();
     assert_eq!(
@@ -251,18 +250,21 @@ fn a_volume_command_after_the_terminal_fact_is_inert_history() {
         settled.terminal_outcome,
         Some(EpisodeTerminalOutcome::Stopped)
     );
-
-    // Late volume: the cell still holds the routed value (inert
-    // history), and the settled truth is untouched.
-    handle.request_output_level(10);
-    let after = handle.observe();
-    assert_eq!(
-        after.terminal_outcome,
-        Some(EpisodeTerminalOutcome::Stopped)
+    assert!(
+        (cell.load() - 0.7).abs() <= 0.01,
+        "the pre-settle route holds in the cell"
     );
-    assert_eq!(after.failure_diagnostic, settled.failure_diagnostic);
-    assert_eq!(after.stop_requested, before.stop_requested || true);
-    let _ = cell.load();
+
+    // Late volume: the cell still routes (inert history the mechanism
+    // will never read again), and the settled truth is untouched —
+    // the whole observation is identical to the settled one.
+    handle.request_output_level(10);
+    assert!(
+        (cell.load() - 0.1).abs() <= 0.01,
+        "the late route lands in the cell"
+    );
+    let after = handle.observe();
+    assert_eq!(after, settled, "a late volume command changes no truth");
 
     let snapshot = runtime.dispose().snapshot;
     assert!(snapshot.quiet);
