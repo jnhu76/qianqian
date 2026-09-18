@@ -78,7 +78,11 @@ index event, no new observable; the index is App-private state.
 Corollary (post-destruction activation failure): if the probe passed
 but the new episode's activation fails, the old episode is already
 settled (user-intentional replacement) and the index stays at the old
-entry. The cursor then names a track that no longer plays — honest,
+entry. The failed attempted root leaves no residue: the start
+operation is failure-clean (F6 §6), so by the time `active` returns
+to `None` the attempted composition has already been authoritatively
+discharged — no orphan runtime exists for the next Open to collide
+with. The cursor then names a track that no longer plays — honest,
 because the cursor is navigation state, not audible-source truth; the
 Track/State panel (driven by the observation seam) shows "no episode"
 plus the diagnostic. No auto-retry, no auto-skip.
@@ -127,7 +131,8 @@ If the Next/Previous candidate fails validation (probe):
     diagnostic surfaced (TUI gate §7). No automatic skip, no search/
     retry behavior, no silent multi-track advance.
 If activation fails after replacement began:
-    see §3 corollary — index unchanged, no episode, diagnostic.
+    see §3 corollary — index unchanged, no episode, diagnostic,
+    no runtime remains (failure-clean start, F6 §6).
 ```
 
 One keypress advances at most one candidate; failures never cascade.

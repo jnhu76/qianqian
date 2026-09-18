@@ -89,8 +89,10 @@ crates/qianqian-app/src/lib.rs              QianqianApp: register/revise_
                                             desired/dispose; definitions
                                             fixed for kernel lifetime;
                                             dispose returns only the
-                                            diagnostic snapshot — the
-                                            authoritative disposal/
+                                            diagnostic snapshot; Drop
+                                            runs NO teardown inverses
+                                            (explicit dispose only) —
+                                            the authoritative disposal/
                                             activation outcome seams of
                                             F6 §5 are implementation-
                                             slice surface
@@ -117,10 +119,12 @@ new Facts, zero new lifecycle nouns, and no P1–P5 trigger**:
 Open          = an application composition operation that replaces the
                 WHOLE episode composition (old runtime disposed with an
                 authoritative `Discharged` outcome before the new one
-                is built; commit consumes authority-owned operation
-                results, never composition snapshots), after an
-                App-owned source probe refuses invalid files without
-                touching old playback
+                is built; the fresh start is failure-clean — an
+                activation failure disposes the attempted root before
+                returning, so no runtime is orphaned; commit consumes
+                authority-owned operation results, never composition
+                snapshots), after an App-owned source probe refuses
+                invalid files without touching old playback
 Navigation    = App-owned Vec<PathBuf> + Option<usize>; Next/Previous
                 select a candidate and invoke the same Open replacement;
                 the index commits only when the new episode is live
@@ -142,8 +146,9 @@ tools:       authority documents listed above; production source reading;
              VERDICT PASS, 0 MAJOR / 5 MINOR; (2) human review of
              PR #155 VERDICT CHANGES_REQUIRED, 2 MAJOR / 1 MINOR;
              (3) human review of PR #155 VERDICT CHANGES_REQUIRED,
-             1 MAJOR / 4 MINOR / 2 NIT — all findings fixed; records
-             in ADVERSARIAL-REVIEW.md §5
+             1 MAJOR / 4 MINOR / 2 NIT; (4) human review of PR #155
+             VERDICT CHANGES_REQUIRED, 1 MAJOR / 2 MINOR — all
+             findings fixed; records in ADVERSARIAL-REVIEW.md §5
 bounds:      no production code was run or modified; no Windows host was
              driven; all mechanism-behavior claims for volume are
              documentation-cited and carry a mandated physical

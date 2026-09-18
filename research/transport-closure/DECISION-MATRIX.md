@@ -11,7 +11,7 @@ Status: reviewed design proposals, not canonical authority.
 | F6 owner | App composition operation replacing the whole episode composition (fresh `QianqianApp` per episode) | `PlaybackSessionHandle::open(path)` (same-episode command — wrong owner, D6); per-episode component definitions C1 (unbounded catalog, registry-by-another-name); K0 per-entry config payload C2 (kernel widening); App-owned config source + revision re-incarnation C4 (more authority surface, zero v1 gain; recorded as first candidate to revisit for preload/multi-session) | D14.6 expected shape; kernel staged-replacement reality (`kernel.rs step()`); provider re-mount cost trivial (`SongcoreDecode::new`, `WasapiOutput::new`); device open is per-episode under every candidate |
 | new source preflight | App-owned probe BEFORE any destructive step, via one public decode-provider mechanism query (`probe_media`: open → probe → close, no PCM read) | destructive-first (Candidate A — loses valid playback on invalid files); probe inside new activation (= A); probe Capability + one-shot probe Fiber (K0 abuse); App constructs its own decode mechanism instance (H1 boundary breach) | Campaign §7; `SongcoreDecode` crate-private today (no seam exists — this is the narrow decision D14.6 deferred); probe owns no RT resource ⇒ not an overlap; gated by F6-S-PROBE — evidence-only, BEFORE promotion (RED reopens this row) |
 | replacement boundary | stop intent (iff unsettled) → `wait_terminal` → `dispose()` → authoritative disposal outcome `Discharged` → mount fresh composition → authoritative activation result `Activated` | committing before discharge (violates D14.6); reading commit decisions off `CompositionSnapshot` / fiber states (read-side projection — diagnostics only, PBK-001 §2.3) | D14.6 frozen ordering term-by-term; no-overlap structural, P1–P5 untriggered; commit consumes authority-owned operation results (F6 §5) |
-| failed Open | probe refusal ⇒ inert (old untouched, diagnostic); activation failure after old is gone ⇒ visible `activation_error`, no episode, NO rollback; latched teardown violation (disposal outcome `TeardownViolated`) ⇒ process FAIL-STOP — no further replacement, restart required | hidden retry/reopen; rollback to a destroyed/unproven old episode; auto-fallback to another candidate; "later Open after a violated disposal" | §6 failure classes; D14.6 (old truth immutable); campaign §8; K0 §G.6 — the violated latch has no exit and the violated fiber is never eligible for unload/removal |
+| failed Open | probe refusal ⇒ inert (old untouched, diagnostic); activation failure after old is gone ⇒ the start operation is failure-clean — the attempted root is authoritatively disposed before the failure returns (`Discharged` ⇒ visible `activation_error`, no episode, no runtime remains, a later Open is legal; cleanup `TeardownViolated` ⇒ FAIL-STOP retaining the violated root until process termination), NO rollback; latched teardown violation (disposal outcome `TeardownViolated`) ⇒ process FAIL-STOP — no further replacement, restart required | hidden retry/reopen; rollback to a destroyed/unproven old episode; dropping a failed attempted root as if cleanly disposed (`drop` runs no teardown); auto-fallback to another candidate; "later Open after a violated disposal" | §6 failure classes + failure-clean ladder; D14.6 (old truth immutable); campaign §8; K0 §G.6 — the violated latch has no exit and the violated fiber is never eligible for unload/removal |
 | playlist owner | reference-player App: `Vec<PathBuf> + Option<usize>` | PlaylistPlugin / Playback Session / K0 / providers / database abstraction | D13 oracle table (NAVIGATION §8); nothing outside the App ever reads it |
 | index commit | commit-on-activation: index moves only on F6 commit evidence (authoritative disposal outcome `Discharged` ∧ authoritative activation result `Activated`) | optimistic (cursor lies on failure) | NAVIGATION §3; index is navigation state, never playback truth |
 | Next/Prev ends | inert at first/last; no wrap | wrap; auto-stop at ends | smallest deterministic rule; campaign §18 |
@@ -50,7 +50,19 @@ F6 gate → ADR-PBK-002 (amend D14.6 / new D14 block)
                        result Activated — control consumes
                        authority-owned operation results and NEVER
                        CompositionSnapshot (PBK-001 §2.3; snapshots
-                       stay diagnostic); no rollback after destructive
+                       stay diagnostic); Activated = the fresh
+                       composition successfully established the
+                       required Playback Session episode — covering
+                       provider activation failure / unresolved
+                       dependency / session activation failure, never
+                       absence-of-diagnostic, never a snapshot read;
+                       the start operation is failure-clean — a failed
+                       fresh activation returns control only after the
+                       attempted composition is authoritatively
+                       discharged (Discharged ⇒ ActivationFailedClean,
+                       future Open legal; TeardownViolated ⇒ FAIL-STOP
+                       retaining the violated root until process
+                       termination); no rollback after destructive
                        teardown; failure-class table (F6 §6)
     mechanism        : whole-episode-composition replacement at the App
                        boundary; authoritative disposal-outcome and

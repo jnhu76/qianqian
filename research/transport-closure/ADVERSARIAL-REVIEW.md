@@ -201,6 +201,8 @@ Round 2 (human, PR #155): VERDICT: CHANGES_REQUIRED
                           (2 MAJOR, 1 MINOR — fixed below)
 Round 3 (human, PR #155): VERDICT: CHANGES_REQUIRED
                           (1 MAJOR, 4 MINOR, 2 NIT — fixed below)
+Round 4 (human, PR #155): VERDICT: CHANGES_REQUIRED
+                          (1 MAJOR, 2 MINOR — fixed below)
 Final state: all findings resolved; READY_FOR_HUMAN_REVIEW
 ```
 
@@ -400,4 +402,57 @@ NIT-2    Blocking-Open UI liveness was implicit. FIXED: TUI §3 states
          that v1 accepts blocking replacement control (D11 promises no
          terminal liveness) and that responsive cancellation of a hung
          replacement is NOT promised.
+```
+
+### Round 4 — human review of PR #155 (CORRECTIVE-3)
+
+Independent human review of the package at `792a3e4`; verdict
+`CHANGES_REQUIRED` with 1 MAJOR + 2 MINOR. Round 3's snapshot fix was
+judged truly fixed; the alignment matrix passed every contract except
+"explicit composition teardown ownership on the failed-new-root
+path". All findings fixed in place
+(POST-F5-TRANSPORT-CLOSURE-CORRECTIVE-3).
+
+```text
+MAJOR-1  Activation failure did not mean the fresh QianqianApp was
+         gone. `drop` runs no teardown inverses (the lib.rs contract),
+         the failed attempted root can still hold Active Decode/Output
+         fibers (session Failed/Pending or never run), and the design
+         let `active = None` drop it while a later Open could start a
+         third composition with no discharge evidence for the failed
+         one — breaking D14.6 no-overlap on the failure path.
+         FIXED: the start operation is FAILURE-CLEAN (F6 §6): a
+         fresh-composition start that does not establish disposes the
+         attempted root itself before returning — cleanup Discharged ⇒
+         ActivationFailedClean(diagnostic), no runtime remains, a
+         future Open is legal; that cleanup disposal reporting
+         TeardownViolated ⇒ FAIL-STOP. Fail-stop additionally RETAINS
+         the violated composition root until process termination —
+         never dropped as if cleanly disposed. `Activated` is defined
+         over the whole fresh composition ("successfully established
+         the required Playback Session episode") — covering provider
+         activation failure, unresolved dependency and session
+         activation failure alike; never absence-of-session-diagnostic,
+         never a snapshot read (F6 §5). NAVIGATION §3/§5 record the
+         no-orphan consequence; TUI §2/§3 record no failed-root holder
+         + fail-stop retention; DECISION-MATRIX §1/§2 updated. Not a
+         rollback: the old episode stays gone; only the failed new
+         world is cleaned up.
+
+MINOR-1  V-PROBE V1 measured the wrong isolation target: stream A vs
+         another PROCESS's stream B — a test even the rejected
+         ISimpleAudioVolume could pass, since another process usually
+         has another audio session. FIXED: V1 split into V1a (the
+         discriminating experiment: two simultaneously rendering
+         streams in the SAME process / same default audio session;
+         SetAllVolumes(A) leaves B unchanged) and V1b (secondary:
+         other-process stream unchanged; cannot substitute for V1a).
+         A V1a coupling failure reopens the §5 mechanism decision.
+
+MINOR-2  "zero new mechanism" overclaimed: the package adds probe_media
+         and two result seams — new API surfaces if not new
+         subsystems. FIXED: reworded to "zero new source-configuration
+         mechanism" (no config channel / registry / hot-replacement
+         machinery) in F6 §4 and the PR body; F6 §4 states the honest
+         seam inventory.
 ```

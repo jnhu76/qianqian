@@ -198,7 +198,8 @@ C4  App-owned single-use config source +        REJECTED for v1
     needs providers to survive across episodes.
 ```
 
-**Why C3 satisfies D14.6 with zero new mechanism.** The App already
+**Why C3 satisfies D14.6 with zero new source-configuration
+mechanism.** The App already
 builds exactly one episode-composition per run
 (`apps/headless/src/main.rs start_episode`): register decode/output/
 session definitions → `revise_desired` → episode. C3 makes Open repeat
@@ -226,13 +227,22 @@ Open(path)
     ↓ start_episode(path)                     — fresh composition:
                                                 new definitions, new
                                                 handle, revise_desired,
-                                                activation probes/opens
+                                                activation probes/opens;
+                                                FAILURE-CLEAN — a start
+                                                that does not establish
+                                                disposes the attempted
+                                                root itself before
+                                                returning (§6)
     ↓ activation result == Activated          — new episode live
                                                 (authority-owned start
                                                 outcome, §5)
 ```
 
-Every step is an existing mechanism; nothing is invented. The ordering
+Every step runs on an existing mechanism except the narrow seams this
+gate already declares (§3 probe query, §5 result seams): those are new
+API surfaces, not new source-configuration machinery — no config
+channel, no registry, no hot-replacement mechanism exists because the
+file is a constructor argument of a fresh composition. The ordering
 matches D14.6's frozen product-level sequence term by term
 (intentional stop → D11 settlement → old Fiber withdrawn +
 teardown/discharge complete → new episode may become live), and the
@@ -291,8 +301,30 @@ both are diagnostic uses. The F6-IMPLEMENTATION slice therefore
 introduces the two narrow result seams (representation deferred to that
 slice; candidate shapes `DisposeOutcome::{Discharged, TeardownViolated}`
 or `Result<(), TeardownViolation>`, and
-`StartOutcome::{Activated, ActivationFailed(diagnostic)}`), recorded in
+`StartOutcome::{Activated, ActivationFailedClean(diagnostic)}` — the
+failure variant returned only after the attempted root is
+authoritatively discharged, §6), recorded in
 DECISION-MATRIX §2 as part of the promoted mechanism.
+
+`Activated` is defined over the WHOLE fresh composition, never over
+one diagnostic:
+
+```text
+Activated
+    := the fresh desired composition successfully established
+       the required Playback Session episode
+
+NOT:  absence of a session activation diagnostic — a Decode/Output
+      provider failure or an unresolved dependency can leave the
+      session with nothing to report;
+NOT:  a snapshot FiberState read (the frozen rule above).
+```
+
+The start operation's authority-owned result therefore covers provider
+activation failure, unresolved dependency and session activation
+failure alike — supplied by the K0/App control operation's own
+outcome, or by a validated activation acknowledgment inside the start
+operation (representation deferred to F6-IMPLEMENTATION).
 
 This is D14.6's own "old Playback Session Fiber withdrawn +
 teardown/discharge complete" boundary, made explicit so the App has
@@ -306,8 +338,8 @@ operation results).
 |---|---|---|
 | new-source validation failure | Open REFUSED before any destructive step; diagnostic surfaced (§9 of TUI gate) | **continues untouched** |
 | old-episode settlement failure | governed by the existing D11/frozen D14.5/D14.7 semantics; Open waits on `wait_terminal`. D11 promises no liveness: a hung decoder blocks Open — no timeout is invented in v1 | settles as itself |
-| old teardown failure | authoritative disposal outcome `TeardownViolated` ⇒ **FAIL-STOP**. A latched teardown violation means discharge was **not proven**: K0 keeps the violated fiber mounted — it is never eligible for unload or slot removal, the violated latch has no exit, and the effect records remain as provenance tombstones (`kernel.rs` §G.6 reality). No new episode is constructed, and NO further Open / Next / Previous replacement is attempted in this process. The TUI shows `Fatal teardown violation — restart required` and keeps only Q/Ctrl+C. Recovery-after-violation is not assumed; it would have to be earned as its own separate authority decision | old world **NOT proven discharged**; truth immutable |
-| new activation failure (after old is gone) | start outcome `ActivationFailed`; the diagnostic surfaces through the existing `activation_error` D14.2 seam; no rollback, no hidden reopen: the old world stays gone (D14.6: replacement cannot relabel committed truth) | **gone** (stopped) |
+| old teardown failure | authoritative disposal outcome `TeardownViolated` ⇒ **FAIL-STOP**. A latched teardown violation means discharge was **not proven**: K0 keeps the violated fiber mounted — it is never eligible for unload or slot removal, the violated latch has no exit, and the effect records remain as provenance tombstones (`kernel.rs` §G.6 reality). No new episode is constructed, and NO further Open / Next / Previous replacement is attempted in this process. The App RETAINS ownership of the violated composition root until process termination — it is never dropped as if cleanly disposed (`drop` runs no teardown inverses); Q/Ctrl+C take the immediate-termination path with no graceful-disposal claim. The TUI shows `Fatal teardown violation — restart required` and keeps only Q/Ctrl+C. Recovery-after-violation is not assumed; it would have to be earned as its own separate authority decision | old world **NOT proven discharged**; truth immutable |
+| new activation failure (after old is gone) | **the start operation is failure-clean** (ladder below): the attempted fresh root is disposed by the start operation itself before any failure result returns — cleanup `Discharged` ⇒ `ActivationFailedClean(diagnostic)`, NO runtime remains, the diagnostic surfaces through the existing `activation_error` D14.2 seam, and a later Open is legal; that cleanup disposal reporting `TeardownViolated` ⇒ FAIL-STOP (row above, applied to the attempted root). No rollback, no hidden reopen: the old world stays gone (D14.6: replacement cannot relabel committed truth). "Activation did not establish" never means "the attempted root may be dropped": only authoritative discharge retires a composition | **gone** (stopped); attempted fresh root cleaned up or fail-stop |
 
 No rollback exists at any point. The disposal outcome has exactly two
 honest readings. `Discharged` proves the old world retired: replacement
@@ -322,6 +354,36 @@ until restart (row above). "Later Open starts from a fresh
 composition" is available only after a `Discharged` disposal or a
 clean process start, never after a latched violation.
 
+**The start operation is failure-clean.** "Did not successfully become
+an episode" does not mean "that fresh composition root no longer
+exists": `QianqianApp` has no `Drop` teardown — only authoritative
+discharge retires a composition, and a failed attempted root can still
+hold Active Decode/Output fibers. A failed fresh-composition start may
+therefore return control to the reusable TUI only after that attempted
+composition itself has been authoritatively discharged:
+
+```text
+construct fresh QianqianApp
+    ↓ attempt activation
+    ├─ Activated            → ActiveEpisode(runtime, handle, file)
+    └─ activation did not establish
+         → dispose the attempted fresh runtime
+         ├─ Discharged       → ActivationFailedClean(diagnostic);
+         │                     no runtime remains; a future Open is
+         │                     legal
+         └─ TeardownViolated → FAIL-STOP: the violated runtime is
+                               RETAINED by the App until process
+                               termination — never dropped as if
+                               cleanly disposed — and no further
+                               Open/Next/Previous runs
+```
+
+This is not a rollback: the old episode is already gone; the operation
+only cleans up the failed new world. Skipping the cleanup would leak
+the attempted root's live fibers on `drop` and let a following Open
+start a third composition while the failed one has no discharge
+evidence — breaking the no-overlap invariant this gate exists to hold.
+
 ## 7. F6 required decision table (campaign §12)
 
 | Concern | Selected rule | Why |
@@ -332,7 +394,7 @@ clean process start, never after a latched violation.
 | teardown boundary | `dispose()` after settlement observed; the authoritative disposal outcome (§5) is the discharge evidence | existing K0 mechanism + one narrow authority-owned result seam (F6-IMPLEMENTATION) |
 | new activation boundary | only after a `Discharged` disposal outcome | D14.6 no-overlap, structural |
 | invalid new source | Open refused; diagnostic; old untouched | §3 Candidate B |
-| new activation failure | diagnostic via `activation_error`; no episode; no rollback | §6; honest dead-end |
+| new activation failure | start operation is failure-clean: attempted root authoritatively disposed before the failure returns (`Discharged` ⇒ `ActivationFailedClean`, no runtime remains; cleanup `TeardownViolated` ⇒ FAIL-STOP retaining the root); diagnostic via `activation_error`; no episode; no rollback | §6; honest dead-end; `drop` ≠ teardown |
 | paused old episode | stop-from-paused follows frozen D14.7 terminal interactions (mid-play → `Stopped`; post-EOF drain → `Completed`) | D14.7 frozen; no new rule |
 | already-terminal old episode | skip stop/wait; dispose directly | settlement already committed; truth immutable |
 | Open during Seek | record stop intent; the frozen D14.5 refusal/precedence rules govern the in-flight cut (refuses pre-cut, or abandons without commit; episode settles per existing precedence); replacement proceeds after settlement | replacement owns the larger lifecycle; same-episode Seek cannot outlive it; no navigation/open-specific seek sync invented |
@@ -356,7 +418,8 @@ abstraction-earning rule, as D14.6 already states.
 
 ```text
 App layer (apps/headless): Open(path) composition operation, yielding
-                           the authoritative start outcome (§5)
+                           the authoritative start outcome (§5);
+                           failure-clean per §6
 composition App/kernel:    authoritative disposal outcome on dispose
                            (§5) — both are ordinary synchronous
                            operation results, not Facts and not K0

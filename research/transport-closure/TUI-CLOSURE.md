@@ -49,6 +49,13 @@ PlaybackSession          = exactly one playback episode (unchanged)
 Output provider          = rendering + player-local volume mechanism
 ```
 
+No failed-root holder exists in this shape because none is needed: the
+start operation is failure-clean (F6 §6) — an activation that does not
+establish disposes the attempted composition before returning, so
+`active = None` never orphans a runtime. The one retention duty: in
+fail-stop the App HOLDS the violated composition root until process
+termination; it is never dropped as if cleanly disposed.
+
 Adversarial test result: this shape suffices for every campaign §44
 collision (ADVERSARIAL-REVIEW.md §4); therefore:
 
@@ -105,7 +112,10 @@ transport and composition command becomes inert, and only Q / Ctrl+C
 remain, taking the immediate-termination path: no stop/wait/dispose is
 attempted and no graceful disposal is claimed, because the world is
 already proven not normally dischargeable (the violated latch has no
-exit). This is App composition control, not a new playback state;
+exit). The App retains ownership of the violated composition root
+until Q / Ctrl+C terminate the process — it is never dropped as if
+cleanly disposed (`drop` runs no teardown inverses). This is App
+composition control, not a new playback state;
 recovery would need its own separately earned authority.
 
 ## 4. No second transport state machine (campaign §39)

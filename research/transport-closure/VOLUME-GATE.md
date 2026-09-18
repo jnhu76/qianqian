@@ -272,8 +272,13 @@ narrow Windows-host probe (E3 precedent) must demonstrate, ×3 green
 runs, on the exercised endpoint:
 
 ```text
-V1  SetAllVolumes on stream A does not alter a simultaneously rendering
-    stream B of another process (player-local isolation)
+V1a SetAllVolumes on stream A does not alter a simultaneously
+    rendering stream B in the SAME process / same default audio
+    session — the DISCRIMINATING experiment against
+    ISimpleAudioVolume, which fails exactly here (session volume
+    applies to ALL streams in the session)
+V1b a simultaneously rendering stream of ANOTHER process is unchanged
+    (secondary confirmation; cannot substitute for V1a)
 V2  SndVol/mixer interaction: mixer slider moves do not change the
     stream's applied level (no coupling)
 V3  a replaced stream starts at engine level 1.0 and the re-applied
@@ -287,9 +292,11 @@ V5  failure path: SetAllVolumes under device invalidation / service
     failure degrades to the mechanism diagnostic without wedging the
     render leg
 
-If V4/V5 show the loop-top apply materially perturbs the render leg,
-the apply-point/ownership mechanism MUST be reconsidered before
-VOLUME-IMPLEMENTATION freezes it. The mechanism candidate
+If V1a shows cross-stream coupling within one audio session, the
+stream-local isolation claim fails and the §5 mechanism decision
+REOPENS. If V4/V5 show the loop-top apply materially perturbs the
+render leg, the apply-point/ownership mechanism MUST be reconsidered
+before VOLUME-IMPLEMENTATION freezes it. The mechanism candidate
 (IAudioStreamVolume) stays selected on documentation evidence; its
 physical RT placement does not close before V-PROBE.
 ```
