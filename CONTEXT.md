@@ -299,8 +299,12 @@ F5 Seek                         GATE MERGED (PR #154, D14.5:
                                 IMPLEMENTED on feat/f5-seek-1 behind the
                                 episode seam: worker-owned cutover
                                 protocol, public request_seek command,
-                                TUI Left/Right ±5 s — pending human
-                                review + Windows physical smoke
+                                TUI Left/Right ±5 s; corrective-1 (fresh
+                                adversarial review): unified loop-top
+                                gate (single steady acquisition, paused
+                                rebase mid-park), seek/worker-exit
+                                linearization, per-cut evidence reset,
+                                mutations M1–M8 — pending human review
 F6 Open                         CONFIG-MECHANISM-OPEN
 Next / Previous                 AFTER OPEN; separate navigation step
 F7 Volume                       GOAL KEPT / authority mechanism to earn
