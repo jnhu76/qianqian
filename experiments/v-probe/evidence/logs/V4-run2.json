@@ -1,33 +1,31 @@
 {
   "scenario": "V4",
-  "verdict": "RED",
-  "reasons": [
-    "V4: only 64/1000 routed changes were applied"
-  ],
+  "verdict": "GREEN",
+  "reasons": [],
   "evidence": {
-    "applies_observed": 64,
-    "apply_max_ns": 397500,
-    "apply_median_ns": 252300,
-    "apply_min_ns": 134600,
-    "apply_p99_ns": 385500,
+    "applies_observed": 200,
+    "apply_max_ns": 516500,
+    "apply_median_ns": 262200,
+    "apply_min_ns": 148500,
+    "apply_p99_ns": 431000,
     "final_factor": 0.6000000238418579,
-    "iteration_p99_ns": 10501100,
+    "iteration_p99_ns": 10527500,
     "position_advancing": true,
     "position_monotone": true,
     "position_samples": [
-      0,
-      74752,
-      159488,
-      240624,
-      322768,
-      407144,
-      491152,
-      573232,
-      654368,
-      738320
+      3752,
+      216976,
+      430456,
+      644144,
+      857424,
+      1071880,
+      1285856,
+      1499656,
+      1713200,
+      1927024
     ],
-    "routed_changes": 1000,
-    "routing_window_ms": 2343,
+    "routed_changes": 200,
+    "routing_window_ms": 6058,
     "shape": "same-thread loop-top apply (pump thread), routed by the main thread",
     "stream_survived": true
   }
