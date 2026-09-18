@@ -344,6 +344,9 @@ struct DeviceSession {
     stream_volume: IAudioStreamVolume,
     channels: u32,
     applied_bits: std::cell::Cell<u32>,
+    /// Per-episode latch for the recoverable-failure diagnostic (D14.9
+    /// grading: ONE bounded diagnostic per episode, not per iteration).
+    volume_diagnosed: std::cell::Cell<bool>,
 }
 
 impl Drop for DeviceSession {
@@ -451,7 +454,7 @@ fn open_session(format: PcmFormat, level: &OutputLevel, slot: &OpenSlot) -> Opti
         Err(e) => return fail(format!("stream volume channels failed: {e}")),
     };
     let initial = level.load();
-    let mut initial_levels = vec![initial; channels as usize];
+    let initial_levels = vec![initial; channels as usize];
     if let Err(e) = unsafe { stream_volume.SetAllVolumes(&initial_levels) } {
         return fail(format!("initial stream volume apply failed: {e}"));
     }
@@ -473,6 +476,7 @@ fn open_session(format: PcmFormat, level: &OutputLevel, slot: &OpenSlot) -> Opti
         stream_volume,
         channels,
         applied_bits: std::cell::Cell::new(initial.to_bits()),
+        volume_diagnosed: std::cell::Cell::new(false),
     })
 }
 
@@ -588,10 +592,14 @@ fn steady_loop(
                             "stream volume apply failed (device invalidated): {e}"
                         ));
                     }
+                    // Recoverable failure (D14.9 grading): ONE diagnostic
+                    // per episode, then the failing routed value is
+                    // recorded as attempted — playback holds the last
+                    // APPLIED level and no failing COM call is re-issued
+                    // per iteration; the next ROUTED change retries once.
                     Err(e) => {
-                        static DIAGNOSED: std::sync::atomic::AtomicBool =
-                            std::sync::atomic::AtomicBool::new(false);
-                        if !DIAGNOSED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                        session.applied_bits.set(routed_bits);
+                        if !session.volume_diagnosed.replace(true) {
                             eprintln!(
                                 "[qianqian-wasapi] stream volume apply failed (recoverable; \
                                  holding the last applied level): {e}"

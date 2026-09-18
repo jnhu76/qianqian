@@ -726,7 +726,7 @@ mod tests {
         attach_handle: bool,
         violating_cleanup: bool,
         refuse_composition: bool,
-        start_levels: Mutex<Vec<u8>>,
+        start_levels: Arc<Mutex<Vec<u8>>>,
     }
 
     impl FakeEpisodeSource {
@@ -737,7 +737,7 @@ mod tests {
                 attach_handle: true,
                 violating_cleanup: false,
                 refuse_composition: false,
-                start_levels: Mutex::new(Vec::new()),
+                start_levels: Arc::new(Mutex::new(Vec::new())),
             }
         }
 
@@ -1499,6 +1499,7 @@ mod tests {
     #[test]
     fn desired_volume_defaults_clamps_and_survives_replacement() {
         let source = FakeEpisodeSource::new();
+        let levels = Arc::clone(&source.start_levels);
         let mut player = player_with(source);
         assert_eq!(player.desired_volume(), 100);
 
@@ -1521,10 +1522,17 @@ mod tests {
         // Routing with no live episode is a no-op of state only.
         assert!(player.active_handle().is_none());
 
-        // The level survives replacement and rides INTO the fresh start.
+        // The level survives replacement and rides INTO the fresh start:
+        // the fake composer records the level it received BEFORE
+        // activation (the value the mechanism's open-time apply reads).
         player.change_volume(-20); // 80
         assert!(opened(&player.open(Path::new(LIVE_A))));
         assert_eq!(player.desired_volume(), 80);
+        assert_eq!(
+            levels.lock().expect("start levels").as_slice(),
+            &[80u8],
+            "the fresh start received the App's desired level pre-activation"
+        );
         let handle = player.active_handle().expect("committed").clone();
         handle.request_output_level(45);
         assert_eq!(
