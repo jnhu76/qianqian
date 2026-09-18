@@ -1697,10 +1697,11 @@ The exact configuration/handoff mechanism that creates a fresh session definitio
 >        declared X at probe time") — advisory, never episode truth;
 >        the new activation's own open/probe publishes the
 >        authoritative source evidence. D13 record: the probe query
->        and the Open/replacement operation earn NO Plugin, NO
->        Capability and NO composition identity — a plain one-shot
->        read operation owned by its caller; the existing owners lose
->        nothing by owning it. Public-surface amendment
+>        earns NO Plugin, NO Capability and NO composition identity —
+>        a plain one-shot read operation owned by its caller; the
+>        Open/replacement operation likewise earns none (an App
+>        composition Command, not a K0 participant). The existing
+>        owners lose nothing by owning them. Public-surface amendment
 >        (intentional, narrow): the decode provider crate exposes
 >        exactly this query — `SourceFacts` only, never
 >        SongcoreDecode / DecodedPcmStream / song handles / service
@@ -2464,8 +2465,8 @@ global stores remain forbidden.
 > failure routing with the log-and-pretend shape FAILING). Reopen
 > conditions, two tiers as designed: a V1a cross-stream coupling
 > failure, or either V2a/V2b factor-writing direction, reopens **the
-> mechanism decision itself** (the IAudioStreamVolume selection,
-> D14.9's §5-B2 candidate); a V4/V5 finding that the apply point
+> mechanism decision itself** (the IAudioStreamVolume selection, the
+> VOLUME-GATE §5-B2 candidate); a V4/V5 finding that the apply point
 > materially perturbs the render leg reconsiders **the
 > apply-point/ownership mechanism**. Until V-PROBE is green, a coding
 > agent MUST NOT treat the apply placement — or the mechanism
