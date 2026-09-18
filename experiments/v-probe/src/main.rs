@@ -9,7 +9,11 @@
 //!
 //! Scenario contract (one process = one scenario = one JSON verdict on
 //! stdout; `verdict=` lines on stderr; exit 0 iff GREEN; a 120 s
-//! watchdog exits 42):
+//! watchdog exits 42 — that exit leaks the wedged scenario's live
+//! streams/pump threads by design, judged LOW: WASAPI clients are
+//! process-scoped and reclaimed at teardown, and the only
+//! host-persistent write, V2b's session master, is restored by a guard
+//! on all normal paths)):
 //!
 //! ```text
 //! V1a  same-process isolation       stream A's factor changes must
@@ -634,11 +638,15 @@ fn v2b() -> Outcome {
         }
     }
     let mut master_readbacks = Vec::new();
+    let factor_samples: std::sync::Mutex<Option<(f32, f32)>> =
+        std::sync::Mutex::new(None);
     let ok = (|| -> Result<bool, String> {
         let master0 = unsafe { simple_master(&stream.client)? };
         let _guard = MasterGuard(&stream.client, master0);
         let mut moved = true;
         let mut factors_moved = false;
+        let mut factor_min = f32::MAX;
+        let mut factor_max = 0.0f32;
         for master in [0.3f32, 0.6, 0.3, master0] {
             unsafe { set_master(&stream.client, master)? };
             std::thread::sleep(Duration::from_millis(50));
@@ -650,11 +658,14 @@ fn v2b() -> Outcome {
                 moved = false;
             }
             let samples = sample_factor(&stream, 5, Duration::from_millis(40))?;
+            factor_min = factor_min.min(samples.iter().cloned().fold(f32::MAX, f32::min));
+            factor_max = factor_max.max(samples.iter().cloned().fold(0.0f32, f32::max));
             if !all_within(&samples, 1.0) {
                 factors_moved = true;
             }
         }
         let _ = _guard; // keep the guard alive until here
+        *factor_samples.lock().expect("samples") = Some((factor_min, factor_max));
         if !moved {
             return Err("V2b: the master write was not effective (no-op readback)".into());
         }
@@ -667,6 +678,8 @@ fn v2b() -> Outcome {
             reasons,
             Some(serde_json::json!({
                 "stream_factors": "pinned at 1.0 (±0.01) while the session master moved",
+                "stream_factor_min": factor_samples.lock().expect("samples").map(|(lo, _)| lo),
+                "stream_factor_max": factor_samples.lock().expect("samples").map(|(_, hi)| hi),
                 "master_readbacks": master_readbacks,
             })),
         ),
