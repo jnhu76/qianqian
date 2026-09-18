@@ -291,18 +291,21 @@ impl qianqian_headless::player::EpisodeStart for RealEpisodeSource {
 /// no episode exists, so there is no terminal Fact to wait for and
 /// none may be forged (D14.2).
 #[cfg(feature = "playback")]
-fn machine_transport(episode: Episode) -> ExitCode {
+fn machine_transport(mut episode: Episode) -> ExitCode {
     if !episode.activated {
         let diagnostic = episode.handle.observe().activation_error;
         eprintln!(
             "{}",
             machine::activation_failure_report(diagnostic.as_deref())
         );
-        let snapshot = episode.runtime.dispose();
-        for warning in machine::disposal_warnings(&snapshot) {
+        let disposal = episode.runtime.dispose();
+        for warning in machine::disposal_warnings(&disposal.snapshot) {
             eprintln!("{warning}");
         }
-        return machine::episode_exit_code(None, snapshot.quiet);
+        if disposal.verdict == qianqian_composition::DisposeVerdict::TeardownViolated {
+            eprintln!("fail-stop: disposal reported a latched teardown violation");
+        }
+        return machine::episode_exit_code(None, disposal.snapshot.quiet);
     }
 
     if let Some(format) = episode.handle.observe().source_format {
@@ -361,7 +364,7 @@ fn machine_transport(episode: Episode) -> ExitCode {
 #[cfg(feature = "playback")]
 fn finish_episode(mut episode: Episode) -> ExitCode {
     let outcome = episode.handle.wait_terminal();
-    let snapshot = episode.runtime.dispose();
+    let disposal = episode.runtime.dispose();
     // The failure diagnostic is read separately from the settled
     // observation: it is presentation text, not part of the semantic
     // outcome (D14.2).
@@ -374,10 +377,13 @@ fn finish_episode(mut episode: Episode) -> ExitCode {
             machine::ReportStream::Stderr => eprintln!("{line}"),
         }
     }
-    for warning in machine::disposal_warnings(&snapshot) {
+    for warning in machine::disposal_warnings(&disposal.snapshot) {
         eprintln!("{warning}");
     }
-    machine::episode_exit_code(Some(outcome), snapshot.quiet)
+    if disposal.verdict == qianqian_composition::DisposeVerdict::TeardownViolated {
+        eprintln!("warning: disposal verdict was TeardownViolated, not Discharged");
+    }
+    machine::episode_exit_code(Some(outcome), disposal.snapshot.quiet)
 }
 
 #[cfg(not(feature = "playback"))]

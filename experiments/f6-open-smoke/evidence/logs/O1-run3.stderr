@@ -4,11 +4,11 @@ verdict=GREEN reason: O1 pre-replacement A position advancing (2/2)
 opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(4s)
 [qianqian-wasapi] render aborted: data plane stopped
 [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
-verdict=GREEN reason: O1 replacement committed in 53.6696ms
+verdict=GREEN reason: O1 replacement committed in 51.4415ms
 verdict=GREEN reason: O1 new episode B established 44100 Hz x 2 mask 0x3
 verdict=GREEN reason: O1 new episode B consuming position advancing (2/2)
 [qianqian-wasapi] render aborted: data plane stopped
 verdict=GREEN reason: quit terminal Stopped
 verdict=GREEN reason: quit disposal quiet=true
-[mp3float @ 00000270bb0b80c0] Could not update timestamps for skipped samples.
-[mp3float @ 00000270bb086c00] Could not update timestamps for skipped samples.
+[mp3float @ 0000016e1f0780c0] Could not update timestamps for skipped samples.
+[mp3float @ 0000016e1f206c00] Could not update timestamps for skipped samples.

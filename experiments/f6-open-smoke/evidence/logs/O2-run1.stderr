@@ -1,4 +1,13 @@
 opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(45s)
 [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
-verdict=RED reason: O2 pre-refusal A: position publication not advancing (1/2, last Some(26019))
-[mp3float @ 0000027e4c6c4100] Could not update timestamps for skipped samples.
+verdict=GREEN reason: O2 pre-refusal A position advancing (2/2)
+verdict=GREEN reason: O2 refusal diagnostic: SongCore refused 'garbage.mp3': status 104
+verdict=GREEN reason: O2 post-refusal A position advancing (4/4)
+opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(4s)
+[qianqian-wasapi] render aborted: data plane stopped
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+[qianqian-wasapi] render aborted: data plane stopped
+verdict=GREEN reason: quit terminal Stopped
+verdict=GREEN reason: quit disposal quiet=true
+[mp3float @ 000001e494184100] Could not update timestamps for skipped samples.
+[mp3float @ 000001e4941a1fc0] Could not update timestamps for skipped samples.
