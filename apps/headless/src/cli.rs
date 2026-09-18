@@ -239,6 +239,34 @@ fn one_arg(
     }
 }
 
+/// Read a `seek <time>` token as source-relative media time (D14.5).
+/// Accepted grammar: `SS`, `SS.s`, `MM:SS` and `MM:SS.s` — seconds are
+/// the episode's media time; the token is a REQUEST, and everything the
+/// frozen protocol says about acceptance, refusal and the actual
+/// landing applies downstream. `None` = the shell cannot read the token
+/// as a non-negative time, so no command is sent (inert input, never a
+/// fabricated target).
+pub fn parse_seek_time(token: &str) -> Option<std::time::Duration> {
+    let seconds = match token.split_once(':') {
+        Some((m, s)) => {
+            let minutes: u64 = m.parse().ok()?;
+            let seconds: f64 = s.parse().ok()?;
+            if !(0.0..60.0).contains(&seconds) {
+                return None;
+            }
+            minutes as f64 * 60.0 + seconds
+        }
+        None => {
+            let seconds: f64 = token.parse().ok()?;
+            if seconds < 0.0 {
+                return None;
+            }
+            seconds
+        }
+    };
+    Some(std::time::Duration::from_secs_f64(seconds))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -430,6 +458,28 @@ mod tests {
                 parse_interactive_line(line).expect("known one-arg command"),
                 expected
             );
+        }
+    }
+
+    /// The seek time reader (D14.5): plain seconds, fractional seconds
+    /// and mm:ss are media time; unreadable or negative tokens are
+    /// `None` — the shell sends NO command rather than fabricating a
+    /// target. Time zero is a legal request (the provider owns
+    /// validity); the grammar only decides readability.
+    #[test]
+    fn seek_time_tokens_read_as_media_time_or_none() {
+        use std::time::Duration;
+        assert_eq!(parse_seek_time("90"), Some(Duration::from_secs(90)));
+        assert_eq!(parse_seek_time("1.5"), Some(Duration::from_millis(1500)));
+        assert_eq!(parse_seek_time("2:05"), Some(Duration::from_secs(125)));
+        assert_eq!(
+            parse_seek_time("0:00"),
+            Some(Duration::ZERO),
+            "time zero is a legal request, not an unreadable token"
+        );
+        assert_eq!(parse_seek_time("75:00"), Some(Duration::from_secs(4500)));
+        for bad in ["", "-30", "1:99", "abc", "1:2:3", ":", "-0:01"] {
+            assert_eq!(parse_seek_time(bad), None, "{bad:?} is unreadable");
         }
     }
 

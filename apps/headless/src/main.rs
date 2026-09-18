@@ -205,6 +205,14 @@ fn machine_transport(episode: Episode) -> ExitCode {
                     Ok(cli::InteractiveCommand::Stop) => control_handle.request_stop(),
                     Ok(cli::InteractiveCommand::Pause) => control_handle.request_pause(),
                     Ok(cli::InteractiveCommand::Resume) => control_handle.request_resume(),
+                    Ok(cli::InteractiveCommand::Seek { time }) => {
+                        match cli::parse_seek_time(&time) {
+                            Some(target) => control_handle.request_seek(target),
+                            None => {
+                                eprintln!("ignored input: cannot read seek time {time:?}")
+                            }
+                        }
+                    }
                     Ok(cli::InteractiveCommand::Status) => {
                         print!(
                             "{}",
@@ -215,8 +223,8 @@ fn machine_transport(episode: Episode) -> ExitCode {
                     }
                     Ok(_) => {
                         eprintln!(
-                            "not wired yet: only 'stop', 'pause', 'resume' and 'status' \
-                             control playback"
+                            "not wired yet: only 'stop', 'pause', 'resume', 'seek' and \
+                             'status' control playback"
                         )
                     }
                     Err(error) => eprintln!("ignored input: {error}"),

@@ -60,6 +60,7 @@ case "$mode" in
     ;;
   f5)
     run_suite f5-seek-discontinuity
+    run_suite f5-seek-implementation
     ;;
   rust)
     run_suite composition-kernel-0-rust
