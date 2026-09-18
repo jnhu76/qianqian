@@ -946,6 +946,20 @@ pub struct PcmFormat {
     pub channel_mask: u64,
 }
 
+/// What one stateless source-probe query reports (ADR-PBK-002 D14.6, the
+/// F6-AUTHORITY-PROMOTION-1 amendment): the container's declared facts at
+/// probe time — format and optional duration — read WITHOUT producing a
+/// single PCM frame. Truth class: mechanism evidence for an application
+/// composition decision (an Open preflight); advisory, never episode
+/// truth — the episode activation's own open/probe publishes the
+/// authoritative source evidence. `duration == None` means the container
+/// declared none (unknown stays unknown, never zero).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SourceFacts {
+    pub format: PcmFormat,
+    pub duration: Option<Duration>,
+}
+
 /// One frame-level terminal outcome of a decode endpoint read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeOutcome {

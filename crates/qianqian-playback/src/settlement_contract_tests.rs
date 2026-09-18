@@ -209,7 +209,7 @@ fn source_format_publishes_without_any_terminal_claim() {
             );
             std::thread::sleep(Duration::from_millis(2));
         }
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -256,7 +256,7 @@ fn t4_completed_is_committed_without_observe_or_wait() {
             "a completed episode never carries a diagnostic"
         );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -282,7 +282,7 @@ fn t5_stopped_is_committed_without_wait_resolving() {
             observation.stop_requested,
             "a committed Stopped always observed recorded intent"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -311,7 +311,7 @@ fn t6_decode_failure_is_committed_without_wait() {
                 .is_some_and(|stage| stage.starts_with("decode")),
             "the decode diagnostic travels separately: {observation:?}"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -345,7 +345,7 @@ fn t7_activation_failure_is_diagnostic_not_a_forged_failed_fact() {
             observation.activation_error.is_some(),
             "the activation diagnostic is published"
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
         assert_no_settlement_thread();
@@ -655,7 +655,7 @@ fn t12_every_observation_is_a_coherent_instant() {
                 "every observer that saw a Fact saw the same committed Fact"
             );
         }
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -682,7 +682,7 @@ fn t15_teardown_leaves_no_decisive_evidence_uncommitted() {
             OutputBehavior::Consume,
             handle.clone(),
         );
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
         // An aborted episode with no recorded stop intent classifies as
@@ -720,7 +720,7 @@ fn no_settlement_thread_exists_while_an_episode_is_live() {
         }
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -790,7 +790,7 @@ fn stop_while_playing_resolves_stopped_and_disposes_quietly() {
         // consumer parked.
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(
             snapshot.quiet,
             "a stopped episode must dispose quietly: {snapshot:?}"
@@ -823,7 +823,7 @@ fn stop_wakes_a_producer_blocked_on_a_full_edge() {
         );
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });
@@ -845,7 +845,7 @@ fn stop_wakes_a_consumer_blocked_on_an_empty_edge() {
         wait_for_a_parked_consumer(&handle, &consumed, Duration::from_secs(5));
         handle.request_stop();
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
-        let snapshot = runtime.dispose();
+        let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet);
         assert_no_leg_threads();
     });

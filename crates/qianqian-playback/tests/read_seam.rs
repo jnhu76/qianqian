@@ -143,6 +143,6 @@ fn a_stopped_episode_observes_its_fact_with_the_command_recorded() {
         "a settled real episode published its mechanism-evidence format"
     );
     assert_eq!(observation.activation_error, None);
-    let snapshot = runtime.dispose();
+    let snapshot = runtime.dispose().snapshot;
     assert!(snapshot.quiet);
 }

@@ -1,0 +1,23 @@
+opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(45s)
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+verdict=GREEN reason: O5 episode 0 pre-replacement position advancing (1/1)
+opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(4s)
+[qianqian-wasapi] render aborted: data plane stopped
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+verdict=GREEN reason: O5 replacement 0 → mp3-valid.mp3 opened=true old_stopped=true
+verdict=GREEN reason: O5 episode 1 pre-replacement position advancing (1/1)
+opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(4s)
+[qianqian-wasapi] render aborted: data plane stopped
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+verdict=GREEN reason: O5 replacement 1 → flac-valid.flac opened=true old_stopped=true
+verdict=GREEN reason: O5 episode 2 pre-replacement position advancing (1/1)
+opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(4s)
+[qianqian-wasapi] render aborted: data plane stopped
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+verdict=GREEN reason: O5 replacement 2 → mp3-valid.mp3 opened=true old_stopped=true
+[qianqian-wasapi] render aborted: data plane stopped
+verdict=GREEN reason: quit terminal Stopped
+verdict=GREEN reason: quit disposal quiet=true
+[mp3float @ 0000025959d03080] Could not update timestamps for skipped samples.
+[mp3float @ 0000025959d45380] Could not update timestamps for skipped samples.
+[mp3float @ 0000025959ceebc0] Could not update timestamps for skipped samples.

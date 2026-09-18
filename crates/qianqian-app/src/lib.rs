@@ -8,14 +8,16 @@
 //! kernel and never inspects plugin semantics.
 //!
 //! Shutdown is explicit: [`QianqianApp::dispose`] retires the whole
-//! composition and returns the post-disposal composition snapshot. Dropping an
-//! [`QianqianApp`] without calling `dispose` does **not** run teardown
-//! inverses — the kernel carries no `Drop` — so a latched violation can
-//! only ever be observed through the explicit seam.
+//! composition and returns the AUTHORITATIVE disposal outcome (the
+//! kernel's own operation verdict) plus the post-disposal composition
+//! snapshot. Dropping an [`QianqianApp`] without calling `dispose` does
+//! **not** run teardown inverses — the kernel carries no `Drop` — so a
+//! latched violation can only ever be observed through the explicit
+//! seam.
 
 use qianqian_composition::{
     ComponentRegistrationError, ComponentSpec, CompositionErrors, CompositionKernel,
-    CompositionSnapshot, DesiredEntry,
+    CompositionSnapshot, DesiredEntry, DisposeVerdict,
 };
 
 /// The running application assembled through the generic Composition Kernel.
@@ -24,6 +26,15 @@ pub struct QianqianApp {
     /// lifetime, held entirely by the kernel. The root keeps no parallel
     /// service-handle state.
     composition: CompositionKernel,
+}
+
+/// The authoritative root-disposal result: the kernel operation's own
+/// verdict (control-legal) plus the post-disposal composition snapshot
+/// (read-side projection; never a success certificate).
+#[derive(Debug)]
+pub struct DisposeOutcome {
+    pub verdict: DisposeVerdict,
+    pub snapshot: CompositionSnapshot,
 }
 
 impl Default for QianqianApp {
@@ -73,16 +84,18 @@ impl QianqianApp {
         Ok(())
     }
 
-    /// Explicit root disposal: retire every fiber, drain, and return the
-    /// post-disposal composition snapshot.
-    ///
-    /// The snapshot is an observation, not a success certificate: a latched
-    /// teardown-contract violation stays visible in it
-    /// ([`qianqian_composition::FiberDiagnostic::teardown_violated`],
+    /// The authoritative root-disposal result (ADR-PBK-002 D14.6, the
+    /// F6-AUTHORITY-PROMOTION-1 amendment). The verdict is the control
+    /// plane's own operation outcome — the ONLY control-legal reading of
+    /// a disposal; the snapshot rides along as the same read-side
+    /// diagnostic projection as ever: an observation, never a success
+    /// certificate. A latched teardown-contract violation stays visible
+    /// in it ([`qianqian_composition::FiberDiagnostic::teardown_violated`],
     /// `quiet == false`) and is never reported past as a clean completion.
-    pub fn dispose(&mut self) -> CompositionSnapshot {
-        self.composition.dispose_root();
-        self.composition.snapshot()
+    pub fn dispose(&mut self) -> DisposeOutcome {
+        let verdict = self.composition.dispose_root();
+        let snapshot = self.composition.snapshot();
+        DisposeOutcome { verdict, snapshot }
     }
 }
 
@@ -228,7 +241,13 @@ mod tests {
             .expect("legal");
         assert_eq!(inverses_run.get(), 0, "activation alone runs no inverse");
 
-        let snap = runtime.dispose();
+        let outcome = runtime.dispose();
+        assert_eq!(
+            outcome.verdict,
+            qianqian_composition::DisposeVerdict::Discharged,
+            "a clean disposal proves discharged"
+        );
+        let snap = outcome.snapshot;
         assert_eq!(
             inverses_run.get(),
             1,
@@ -253,7 +272,13 @@ mod tests {
             .revise_desired(vec![desired_probe("violating")])
             .expect("legal");
 
-        let snap = runtime.dispose();
+        let outcome = runtime.dispose();
+        assert_eq!(
+            outcome.verdict,
+            qianqian_composition::DisposeVerdict::TeardownViolated,
+            "the authoritative verdict — not the snapshot — reports the violation"
+        );
+        let snap = outcome.snapshot;
         let fiber = snap
             .fibers
             .get("violating")

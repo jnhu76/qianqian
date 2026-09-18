@@ -119,7 +119,7 @@ fn session_completes_through_eof_and_disposes_quietly() {
             "EOF + drain = completion"
         );
 
-        let snap = runtime.dispose();
+        let snap = runtime.dispose().snapshot;
         assert!(snap.quiet, "clean shutdown");
 
         #[cfg(target_os = "linux")]
@@ -160,7 +160,7 @@ fn session_reports_decode_failure_and_cleans_up() {
             "the decode diagnostic travels separately: {observation:?}"
         );
 
-        let snap = runtime.dispose();
+        let snap = runtime.dispose().snapshot;
         assert!(snap.quiet, "failure shutdown is still clean");
     });
 }
@@ -194,7 +194,7 @@ fn output_open_failure_fails_activation_without_leaks() {
             "a failed activation never started an episode: no terminal Fact to read"
         );
 
-        let snap = runtime.dispose();
+        let snap = runtime.dispose().snapshot;
         assert!(snap.quiet);
 
         #[cfg(target_os = "linux")]
@@ -231,7 +231,7 @@ fn stopping_a_playing_session_disposes_promptly_without_leaks() {
             .expect("legal");
 
         // No wait: stop immediately, mid-playback.
-        let snap = runtime.dispose();
+        let snap = runtime.dispose().snapshot;
         assert!(snap.quiet, "dispose settles after a mid-stream stop");
         // F2: teardown itself completes the evidence set and the
         // authority settles on its own path (pinned exactly in the
@@ -283,7 +283,7 @@ fn withdrawing_a_provider_degrades_the_session_to_pending() {
             "the session degrades over its vanished dependency"
         );
 
-        let snap = runtime.dispose();
+        let snap = runtime.dispose().snapshot;
         assert!(snap.quiet);
     });
 }

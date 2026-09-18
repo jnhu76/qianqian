@@ -17,7 +17,7 @@
 
 use std::process::ExitCode;
 
-use qianqian_composition::CompositionSnapshot;
+use qianqian_composition::{CompositionSnapshot, DisposeVerdict};
 use qianqian_playback::EpisodeTerminalOutcome;
 
 /// Why an episode never reached a running session.
@@ -96,6 +96,20 @@ pub fn outcome_report(
             Some(failure) => (ReportStream::Stderr, format!("playback failed: {failure}")),
             None => (ReportStream::Stderr, "playback failed".to_owned()),
         }],
+    }
+}
+
+/// The pinned verdict line for a root disposal that did NOT end
+/// Discharged (F6): a latched §G.6 teardown violation has no exit, and
+/// the report says so in exactly this spelling. `None` for a clean
+/// discharge (the disposal report stays silent about success —
+/// quietness is the success signal).
+pub fn disposal_verdict_warning(verdict: &DisposeVerdict) -> Option<String> {
+    match verdict {
+        DisposeVerdict::Discharged => None,
+        DisposeVerdict::TeardownViolated => {
+            Some("fail-stop: disposal reported a latched teardown violation (no exit)".to_owned())
+        }
     }
 }
 
@@ -214,6 +228,15 @@ mod tests {
         assert_eq!(
             outcome_report(EpisodeTerminalOutcome::Failed, None),
             vec![(ReportStream::Stderr, "playback failed".to_owned())]
+        );
+    }
+
+    #[test]
+    fn the_disposal_verdict_warning_pins_the_violation_spelling() {
+        assert_eq!(disposal_verdict_warning(&DisposeVerdict::Discharged), None);
+        assert_eq!(
+            disposal_verdict_warning(&DisposeVerdict::TeardownViolated),
+            Some("fail-stop: disposal reported a latched teardown violation (no exit)".to_owned())
         );
     }
 

@@ -1,0 +1,14 @@
+{
+  "scenario": "O5",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "quit_disposal": "Some(Discharged)",
+    "quit_terminal": "Some(Stopped)",
+    "replacements_ok": [
+      true,
+      true,
+      true
+    ]
+  }
+}

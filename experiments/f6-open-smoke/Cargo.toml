@@ -1,0 +1,39 @@
+[package]
+name = "f6-open-smoke"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "F6 Open physical smoke: the real ReferencePlayerApp replaces whole episode compositions on a real Windows host"
+
+# F6-OPEN-SMOKE evidence crate (Issue #119 F6 Open gate, Stage C
+# physical evidence). Workspace-excluded on purpose: executable
+# mechanism evidence, NOT production architecture. Nothing here may be
+# imported by any qianqian-* crate. The harness drives the PRODUCTION
+# reference player type (qianqian-headless::player::ReferencePlayerApp)
+# with the REAL provider wiring (SongCore decode probe_media + WASAPI
+# output) on the real host — the same wiring the headless binary
+# carries in its main.rs.
+#
+# The acoustic continuity property stays a human-ear item (F5/F6
+# precedent); what this harness proves mechanically is the frozen
+# D14.6 replacement behavior end to end on real devices and real
+# media: refusal-before-destruction, D11 settlement of the replaced
+# episode, authoritative establishment of the new one, failure-clean
+# starts, and clean repeated replacement.
+
+# Self-contained evidence crate: an empty [workspace] table keeps cargo
+# from walking up into the production workspace without touching the
+# root manifest (production delta stays zero).
+[workspace]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+qianqian-app = { path = "../../crates/qianqian-app" }
+qianqian-composition = { path = "../../crates/qianqian-composition" }
+qianqian-playback = { path = "../../crates/qianqian-playback" }
+qianqian-audio-api = { path = "../../crates/qianqian-audio-api" }
+qianqian-decode-songcore = { path = "../../crates/qianqian-decode-songcore" }
+qianqian-output-wasapi = { path = "../../crates/qianqian-output-wasapi" }
+# The production reference player: the whole subject of this smoke.
+qianqian-headless = { path = "../../apps/headless" }

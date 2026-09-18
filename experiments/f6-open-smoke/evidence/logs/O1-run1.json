@@ -1,0 +1,11 @@
+{
+  "scenario": "O1",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "old_stop_requested": true,
+    "old_terminal": "Some(Stopped)",
+    "quit_disposal": "Some(Discharged)",
+    "replacement_elapsed_ms": 62
+  }
+}

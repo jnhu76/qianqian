@@ -1,0 +1,10 @@
+{
+  "scenario": "O2",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "post_refusal_stop_requested": false,
+    "quit_disposal": "Some(Discharged)",
+    "refused": true
+  }
+}

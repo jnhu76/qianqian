@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use qianqian_audio_api::ports::{
     DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, PcmDecode, PcmDecodeCapability,
-    PcmFormat, ProviderSeekOutcome,
+    PcmFormat, ProviderSeekOutcome, SourceFacts,
 };
 use qianqian_composition::{ActivationError, ComponentSpec};
 use qianqian_songcore_sys as sys;
@@ -331,6 +331,41 @@ impl Drop for SongcoreDecodeStream {
             unsafe { sys::song_close(self.handle) };
         }
     }
+}
+
+/// The F6 source preflight query (ADR-PBK-002 D14.6, the
+/// F6-AUTHORITY-PROMOTION-1 amendment): ONE public, stateless mechanism
+/// query — open the media, read the container's declared facts, close.
+/// It reuses the production open/probe machinery internally (`song_open`
+/// + `song_probe`) and reads NO PCM frames; it owns no render stream, no
+/// edge, no worker, no device session — nothing RT-visible — so it is
+/// not a second live playback episode and does not trigger P1–P5.
+///
+/// The result is mechanism evidence for an application composition
+/// decision (an Open preflight: "this source opened and declared X at
+/// probe time") — advisory, never episode truth; the episode
+/// activation's own open/probe publishes the authoritative
+/// `source_format` / `source_duration` evidence. Failure classes are
+/// exactly [`DecodeOpenError`] today.
+///
+/// D13 record: a plain one-shot read operation owned by its caller —
+/// no Capability, no Plugin, no composition identity. This is the
+/// decode provider's ONLY public surface besides the plugin
+/// constructor; the boundary gate rule was updated by the same
+/// amendment on purpose.
+pub fn probe_media(path: &Path) -> Result<SourceFacts, DecodeOpenError> {
+    // Constructing the stream performs exactly song_open + song_probe
+    // (the production open path); dropping it runs song_close. No
+    // `read_frames` call exists on this path. The declared facts are
+    // read through the endpoint trait — the same evidence the session
+    // relays at activation.
+    let stream = SongcoreDecodeStream::open(path)?;
+    let facts = SourceFacts {
+        format: stream.format(),
+        duration: stream.source_duration(),
+    };
+    drop(stream);
+    Ok(facts)
 }
 
 /// The Decode Plugin component definition: provides the `PcmDecode`
