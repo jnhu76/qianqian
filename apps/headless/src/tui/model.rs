@@ -36,6 +36,9 @@ pub struct TuiModel {
     /// The last Open operation's feedback — application composition
     /// feedback (D14.6), never a playback semantic.
     status: Option<String>,
+    /// The player's navigation projection (1-based cursor, playlist
+    /// length), refreshed with the episode.
+    navigation_position: Option<(usize, usize)>,
 }
 
 impl TuiModel {
@@ -57,6 +60,7 @@ impl TuiModel {
             },
             open_input: None,
             status: None,
+            navigation_position: None,
         }
     }
 
@@ -64,6 +68,11 @@ impl TuiModel {
     /// the caller got the observation from the episode seam.
     pub fn update(&mut self, observation: PlaybackSessionObservation) {
         self.observation = observation;
+    }
+
+    /// Record the player's navigation projection (D14.6).
+    pub fn set_navigation(&mut self, position: Option<(usize, usize)>) {
+        self.navigation_position = position;
     }
 
     /// Follow the player's committed episode: `Some(path)` after a
@@ -98,6 +107,14 @@ impl TuiModel {
     /// feedback, never a playback semantic).
     pub fn set_status(&mut self, status: Option<String>) {
         self.status = status;
+    }
+
+    /// The navigation projection (D14.6): the 1-based cursor position
+    /// and the playlist length, straight from the player's committed
+    /// navigation state — presentation of application navigation state,
+    /// never playback truth.
+    pub fn navigation_position(&self) -> Option<(usize, usize)> {
+        self.navigation_position
     }
 
     pub fn status(&self) -> Option<&str> {
@@ -231,6 +248,12 @@ pub enum Action {
     /// O: begin the Open input line (D14.6). A shell action; the
     /// runtime performs the Open through the player.
     Open,
+    /// N: select the next playlist entry and Open it through the same
+    /// replacement (D14.6 navigation). A shell action like [`Action::Open`].
+    Next,
+    /// P: select the previous playlist entry. A shell action like
+    /// [`Action::Open`].
+    Previous,
     Quit,
 }
 
@@ -270,6 +293,7 @@ pub enum Step {
 
 /// The shell's whole keyboard grammar: Left/Right seek in fixed steps,
 /// Space toggles pause/resume, S stops, O opens the Open input line,
+/// N/P select the next/previous playlist entry (D14.6 navigation),
 /// Q quits, Ctrl+C quits. Anything else is presentation noise
 /// (including key-release events, which Windows terminals emit).
 pub fn action_for_key(key: KeyEvent) -> Option<Action> {
@@ -285,6 +309,8 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
         KeyCode::Char(' ') if plain => Some(Action::PauseResume),
         KeyCode::Char('s') | KeyCode::Char('S') if plain => Some(Action::Stop),
         KeyCode::Char('o') | KeyCode::Char('O') if plain => Some(Action::Open),
+        KeyCode::Char('n') | KeyCode::Char('N') if plain => Some(Action::Next),
+        KeyCode::Char('p') | KeyCode::Char('P') if plain => Some(Action::Previous),
         KeyCode::Char('q') | KeyCode::Char('Q') if plain => Some(Action::Quit),
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(Action::Quit),
         KeyCode::Left if plain => Some(Action::SeekBackward),
@@ -325,11 +351,12 @@ pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
             }
             Step::Continue
         }
-        // The Open action never reaches this wiring: the runtime routes
-        // it to the input line and the player before any episode
-        // command is considered. This arm exists so the match stays
-        // exhaustive; it must not touch the episode.
-        Action::Open => Step::Continue,
+        // The shell actions never reach this wiring: the runtime routes
+        // Open to the input line and Next/Previous to the player's
+        // navigation before any episode command is considered. These
+        // arms exist so the match stays exhaustive; they must not touch
+        // the episode.
+        Action::Open | Action::Next | Action::Previous => Step::Continue,
         Action::Quit => Step::Exit,
     }
 }
@@ -701,6 +728,36 @@ mod tests {
         let before = handle.observe();
         assert_eq!(apply_action(Action::Open, &handle), Step::Continue);
         assert_eq!(handle.observe(), before, "Open is not an episode command");
+    }
+
+    /// The N/P keys map to the two navigation actions (plain and
+    /// shift-keyed), and apply_action must never let them touch the
+    /// episode: like Open, they are shell actions the runtime routes.
+    #[test]
+    fn n_and_p_map_to_the_navigation_actions_and_apply_action_never_touches_the_episode() {
+        for (key, action) in [('n', Action::Next), ('p', Action::Previous)] {
+            assert_eq!(
+                action_for_key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE)),
+                Some(action)
+            );
+            assert_eq!(
+                action_for_key(KeyEvent::new(
+                    KeyCode::Char(key.to_ascii_uppercase()),
+                    KeyModifiers::SHIFT
+                )),
+                Some(action)
+            );
+        }
+
+        let handle = PlaybackSessionHandle::new();
+        let before = handle.observe();
+        assert_eq!(apply_action(Action::Next, &handle), Step::Continue);
+        assert_eq!(apply_action(Action::Previous, &handle), Step::Continue);
+        assert_eq!(
+            handle.observe(),
+            before,
+            "navigation is not an episode command"
+        );
     }
 
     /// The Open input line lifecycle: begin → edit → confirm returns

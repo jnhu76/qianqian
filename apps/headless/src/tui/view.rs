@@ -25,7 +25,7 @@ pub fn draw(frame: &mut Frame, model: &TuiModel) {
     let [main, diagnostics, controls] = Layout::vertical([
         Constraint::Min(6),
         Constraint::Length(3),
-        Constraint::Length(5),
+        Constraint::Length(6),
     ])
     .areas(frame.area());
     frame.render_widget(main_panel(model), main);
@@ -64,6 +64,11 @@ fn main_panel(model: &TuiModel) -> Paragraph<'_> {
             Line::from(""),
             Line::from("no episode — press O to open a source"),
         ];
+        if let Some((position, total)) = model.navigation_position() {
+            lines.push(Line::from(format!(
+                "Track: {position}/{total} (navigation cursor)"
+            )));
+        }
         open_lines(model, &mut lines);
         return Paragraph::new(lines).block(
             Block::bordered()
@@ -92,6 +97,9 @@ fn main_panel(model: &TuiModel) -> Paragraph<'_> {
         )),
         Line::from(format!("Paused: {}", model.paused())),
     ];
+    if let Some((position, total)) = model.navigation_position() {
+        lines.push(Line::from(format!("Track: {position}/{total}")));
+    }
     if model.terminal_committed() {
         lines.push(Line::from(""));
         lines.push(Line::from(COMMITTED_HINT));
@@ -117,6 +125,7 @@ fn controls_panel() -> Paragraph<'static> {
         Line::from(" ←/→  Seek ±5s      Space  Pause/Resume"),
         Line::from(" S  Stop            Q  Quit    Ctrl+C  Quit"),
         Line::from(" O  Open source"),
+        Line::from(" N  Next            P  Previous"),
     ])
     .block(Block::bordered().title(bold(" Controls ")))
 }
@@ -452,6 +461,35 @@ mod tests {
         }
     }
 
+    /// The navigation projection renders as a Track line in the
+    /// episode panel (D14.6; presentation of navigation state only).
+    #[test]
+    fn the_track_line_renders_the_navigation_projection() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        assert!(
+            !rendered(&model).contains("Track:"),
+            "no playlist, no Track line"
+        );
+        model.set_navigation(Some((2, 3)));
+        let text = rendered(&model);
+        assert!(text.contains("Track: 2/3"), "{text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
+    /// The no-episode panel keeps the honest navigation line when a
+    /// cursor survives a clean failure — labeled a cursor, never a
+    /// playback claim (the forbidden-vocabulary scan must stay clean).
+    #[test]
+    fn the_no_episode_navigation_line_says_not_playing() {
+        let mut model = TuiModel::new("song.flac");
+        model.set_episode(None);
+        model.set_navigation(Some((1, 3)));
+        let text = rendered(&model);
+        assert!(text.contains("Track: 1/3 (navigation cursor)"), "{text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
     /// The controls panel documents the O key — and the panel grew one
     /// row for it.
     #[test]
@@ -460,5 +498,7 @@ mod tests {
         model.update(pending());
         let text = rendered(&model);
         assert!(text.contains("O  Open source"), "{text}");
+        assert!(text.contains("N  Next"), "{text}");
+        assert!(text.contains("P  Previous"), "{text}");
     }
 }

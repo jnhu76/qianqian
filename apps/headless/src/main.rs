@@ -45,8 +45,8 @@ fn main() -> ExitCode {
             println!("qianqian-headless {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
-        Ok(Invocation::Play { file }) => run_playback(file, Shell::ReferencePlayer),
-        Ok(Invocation::MachinePlay { file }) => run_playback(file, Shell::Machine),
+        Ok(Invocation::Play { files }) => run_playback(files, Shell::ReferencePlayer),
+        Ok(Invocation::MachinePlay { file }) => run_playback(vec![file], Shell::Machine),
         Err(error) => {
             eprintln!("error: {error}");
             eprint!("{}", cli::usage());
@@ -67,14 +67,24 @@ enum Shell {
 }
 
 #[cfg(feature = "playback")]
-fn run_playback(file: PathBuf, shell: Shell) -> ExitCode {
+fn run_playback(files: Vec<PathBuf>, shell: Shell) -> ExitCode {
     match shell {
-        Shell::Machine => match start_episode(file) {
+        Shell::Machine => match start_episode(single_file(files)) {
             Ok(episode) => machine_transport(episode),
             Err(failure) => report_start_failure(failure),
         },
-        Shell::ReferencePlayer => reference_player_transport(file),
+        Shell::ReferencePlayer => reference_player_transport(files),
     }
+}
+
+/// The machine transport's argv is pinned to exactly one file (grammar
+/// level); this unreachable-else conversion keeps that invariant local.
+#[cfg(feature = "playback")]
+fn single_file(files: Vec<PathBuf>) -> PathBuf {
+    let mut it = files.into_iter();
+    let first = it.next().expect("grammar guarantees one file");
+    debug_assert!(it.next().is_none(), "--machine play takes exactly one file");
+    first
 }
 
 #[cfg(feature = "playback")]
@@ -158,11 +168,16 @@ fn report_start_failure(failure: machine::StartFailure) -> ExitCode {
 /// reports with the SAME honest contract as the scriptable transport
 /// (outcome lines, disposal warnings, the exit-code table).
 #[cfg(feature = "playback")]
-fn reference_player_transport(file: PathBuf) -> ExitCode {
+fn reference_player_transport(files: Vec<PathBuf>) -> ExitCode {
     use qianqian_headless::player::{OpenOutcome, ReferencePlayerApp};
 
     let mut player = ReferencePlayerApp::new(RealEpisodeSource);
-    let first = player.open(&file);
+    let first = player.open(&files[0]);
+    if matches!(first, OpenOutcome::Opened) {
+        // The startup playlist (D14.6 navigation; open representation):
+        // entry 0 IS the episode this Open just committed.
+        player.seed_startup_playlist(files.clone());
+    }
     if let OpenOutcome::FailStop { diagnostic } = &first {
         // A latched §G.6 violation has no exit and earns no shell.
         eprintln!("fail-stop: {diagnostic}");
@@ -387,8 +402,8 @@ fn finish_episode(mut episode: Episode) -> ExitCode {
 }
 
 #[cfg(not(feature = "playback"))]
-fn run_playback(file: std::path::PathBuf, shell: Shell) -> ExitCode {
-    let _ = (file, shell);
+fn run_playback(files: Vec<std::path::PathBuf>, shell: Shell) -> ExitCode {
+    let _ = (files, shell);
     eprintln!(
         "this binary was built without the playback slice; \
          rebuild with: cargo build --release --features playback"
