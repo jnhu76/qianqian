@@ -1,0 +1,11 @@
+{
+  "scenario": "V1b",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "factor": 0.5,
+    "max": 0.5,
+    "min": 0.5,
+    "stable": true
+  }
+}

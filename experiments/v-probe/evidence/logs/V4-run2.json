@@ -4,11 +4,11 @@
   "reasons": [],
   "evidence": {
     "iterations": 2000,
-    "max_ns": 504400,
+    "max_ns": 236800,
     "max_position_gap_frames": 1624,
-    "median_ns": 78900,
-    "min_ns": 70800,
-    "p99_ns": 116900,
+    "median_ns": 80200,
+    "min_ns": 77100,
+    "p99_ns": 130300,
     "position_monotone": true,
     "stream_survived": true
   }

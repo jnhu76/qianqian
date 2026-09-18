@@ -1,9 +1,23 @@
 run: 1
-date_utc: 2026-09-18T18:36:40Z
-repo_head_sha: 255076aee0edaf482e073138edceab1cc33bc3db
+date_utc: 2026-09-18T18:37:12Z
+repo_head_sha: 74cd00439283a6534b1f19e37de756246c8ca89c
 branch: main
 harness_tree_status:
-  ?? experiments/v-probe/
+   M experiments/v-probe/evidence/ENV-RUN1.txt
+   D experiments/v-probe/evidence/logs/V1a-run1.json
+   D experiments/v-probe/evidence/logs/V1a-run1.stderr
+   D experiments/v-probe/evidence/logs/V1b-run1.json
+   D experiments/v-probe/evidence/logs/V1b-run1.stderr
+   D experiments/v-probe/evidence/logs/V2a-run1.json
+   D experiments/v-probe/evidence/logs/V2a-run1.stderr
+   D experiments/v-probe/evidence/logs/V2b-run1.json
+   D experiments/v-probe/evidence/logs/V2b-run1.stderr
+   D experiments/v-probe/evidence/logs/V3-run1.json
+   D experiments/v-probe/evidence/logs/V3-run1.stderr
+   D experiments/v-probe/evidence/logs/V4-run1.json
+   D experiments/v-probe/evidence/logs/V4-run1.stderr
+   D experiments/v-probe/evidence/logs/V5-run1.json
+   D experiments/v-probe/evidence/logs/V5-run1.stderr
 exe_sha256: 06bcff69426d1e4c6a7c523c7a3b919ee6f494d326b474ea78a7bcd6f3a65a47
 windows_caption_raw: Microsoft Windows 11 ×¨Òµ°æ
 audio_device: Realtek High Definition Audio

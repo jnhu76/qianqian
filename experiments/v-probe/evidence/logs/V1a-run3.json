@@ -1,0 +1,9 @@
+{
+  "scenario": "V1a",
+  "verdict": "GREEN",
+  "reasons": [],
+  "evidence": {
+    "b_baseline": 1.0,
+    "isolation": "both directions, sampled"
+  }
+}
