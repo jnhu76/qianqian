@@ -87,7 +87,13 @@ crates/qianqian-composition/src/kernel.rs   step(): staged replacement —
                                             the fresh incarnation
 crates/qianqian-app/src/lib.rs              QianqianApp: register/revise_
                                             desired/dispose; definitions
-                                            fixed for kernel lifetime
+                                            fixed for kernel lifetime;
+                                            dispose returns only the
+                                            diagnostic snapshot — the
+                                            authoritative disposal/
+                                            activation outcome seams of
+                                            F6 §5 are implementation-
+                                            slice surface
 apps/headless/src/main.rs                   start_episode(file) builds one
                                             runtime per process run
 crates/qianqian-decode-songcore/src/lib.rs  SongcoreDecode is crate-
@@ -109,9 +115,12 @@ new Facts, zero new lifecycle nouns, and no P1–P5 trigger**:
 
 ```text
 Open          = an application composition operation that replaces the
-                WHOLE episode composition (old runtime disposed and quiet
-                before the new one is built), after an App-owned source
-                probe refuses invalid files without touching old playback
+                WHOLE episode composition (old runtime disposed with an
+                authoritative `Discharged` outcome before the new one
+                is built; commit consumes authority-owned operation
+                results, never composition snapshots), after an
+                App-owned source probe refuses invalid files without
+                touching old playback
 Navigation    = App-owned Vec<PathBuf> + Option<usize>; Next/Previous
                 select a candidate and invoke the same Open replacement;
                 the index commits only when the new episode is live
@@ -131,8 +140,10 @@ tools:       authority documents listed above; production source reading;
              Microsoft Learn WASAPI documentation (VOLUME-GATE §7);
              review rounds: (1) fresh-context adversarial review (§48)
              VERDICT PASS, 0 MAJOR / 5 MINOR; (2) human review of
-             PR #155 VERDICT CHANGES_REQUIRED, 2 MAJOR / 1 MINOR —
-             all findings fixed; records in ADVERSARIAL-REVIEW.md §5
+             PR #155 VERDICT CHANGES_REQUIRED, 2 MAJOR / 1 MINOR;
+             (3) human review of PR #155 VERDICT CHANGES_REQUIRED,
+             1 MAJOR / 4 MINOR / 2 NIT — all findings fixed; records
+             in ADVERSARIAL-REVIEW.md §5
 bounds:      no production code was run or modified; no Windows host was
              driven; all mechanism-behavior claims for volume are
              documentation-cited and carry a mandated physical

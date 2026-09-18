@@ -199,6 +199,8 @@ implications, RT permanent cost, TUI scope creep.
 Round 1 (fresh-context):  VERDICT: PASS  (0 MAJOR, 5 MINOR — fixed)
 Round 2 (human, PR #155): VERDICT: CHANGES_REQUIRED
                           (2 MAJOR, 1 MINOR — fixed below)
+Round 3 (human, PR #155): VERDICT: CHANGES_REQUIRED
+                          (1 MAJOR, 4 MINOR, 2 NIT — fixed below)
 Final state: all findings resolved; READY_FOR_HUMAN_REVIEW
 ```
 
@@ -285,6 +287,9 @@ MAJOR-1  teardown violation must be FAIL-STOP. The package claimed
          (replacement permanently disabled until restart);
          DECISION-MATRIX §1 updated. No recovery authority is assumed;
          recovery-after-violation would need its own earned decision.
+         (Verdict source renamed by Round 3 MAJOR-1: the fail-stop
+         trigger is now the authoritative disposal outcome —
+         `TeardownViolated` — not a snapshot `quiet` read.)
 
 MAJOR-2  S-PROBE ordering inverted — the plan promoted F6 authority
          before validating its load-bearing physical premise. The
@@ -318,4 +323,81 @@ MINOR-1  SetAllVolumes was described as "bounded, non-blocking" —
          device-invalidated failure path; a materially perturbing
          result reopens the apply-point/ownership decision before
          VOLUME-IMPLEMENTATION freezes it.
+```
+
+### Round 3 — human review of PR #155 (CORRECTIVE-2)
+
+Independent human review of the package at `d07da30`; verdict
+`CHANGES_REQUIRED` with 1 MAJOR + 4 MINOR + 2 NIT. The round-2
+corrective was judged PASS on its own terms: the fail-stop semantics,
+the S-PROBE-before-promotion ordering, D11 terminal-authority
+discipline, D13 navigation, the P1–P5 judgment and volume ownership
+all passed. The remaining blocker was an ADR-firewall regression. All
+findings fixed in place
+(POST-F5-TRANSPORT-CLOSURE-CORRECTIVE-2); no gate document rewritten.
+
+```text
+MAJOR-1  CompositionSnapshot was used as control correctness
+         authority — a direct PBK-001 §2.3 violation, in two places:
+         F6 gated new-episode creation on `dispose()`'s snapshot
+         `quiet`, and Navigation committed `current_index` on
+         `composition_snapshot()`'s `FiberState::Active`. The
+         snapshot's own production contract declares it a read-side
+         projection for diagnostics/tests ("an observation, not a
+         success certificate"); control decisions consumed it anyway.
+         The projection firewall built in F2/F4 must not be re-entered
+         through the K0 snapshot back door.
+         FIXED: F6 §5 freezes the rule — F6/Navigation correctness
+         MUST NOT depend on CompositionSnapshot; replacement commit
+         consumes two authority-owned control-operation results (the
+         authoritative disposal outcome and the authoritative
+         activation result, with candidate Rust shapes recorded and
+         spelling deferred to F6-IMPLEMENTATION). The §4 ladder, §6
+         failure classes, §7 decision table, NAVIGATION §3, TUI §3/§9
+         and DECISION-MATRIX §1/§2 were rewritten accordingly. No new
+         Fact kind, no snapshot rename, no new K0 primitive — ordinary
+         synchronous operation results.
+
+MINOR-1  C3's canonical topology refinement was under-recorded: a
+         fresh QianqianApp per episode changes the Qianqian App's
+         realization from "the one application composition root" to
+         "one process-level reference-player host sequentially owning
+         multiple non-overlapping composition roots, one per episode".
+         FIXED: DECISION-MATRIX §2 promotion now explicitly records
+         the refinement sentence and updates D1 (App realization
+         note) + D5 (provider lifetime property) + D14.6 (mechanism)
+         together; F6 §4 points at it.
+
+MINOR-2  `probe_media` is an intentional decode-provider
+         public-surface amendment (today the public surface admits
+         only the plugin constructor; enforced by
+         check_plugin_boundaries.py), not a plain helper. FIXED: F6 §3
+         records the amendment and freezes the narrow contract — the
+         App may call ONE provider-owned, stateless preflight query
+         exposing SourceFacts only, never SongcoreDecode /
+         DecodedPcmStream / song handles / service internals; the
+         implementing slice must sync check_plugin_boundaries.py;
+         DECISION-MATRIX §2 records the amendment.
+
+MINOR-3  The PR #155 body lagged the package (still round-1 text:
+         one review, S-PROBE at F6-IMPLEMENTATION, quiet-snapshot
+         commit evidence). FIXED: the body was rewritten to the
+         current state — three review rounds, S-PROBE before
+         promotion, authority-owned commit results.
+
+MINOR-4  TUI §8 key-unlock numbering misread its own ladder
+         ("N/P after 4; +/- after 5; O after 3"). FIXED: ←/→ after 1;
+         O after 4; N/P after 5; +/- after 7.
+
+NIT-1    Fail-stop Q still described the graceful shutdown path, but a
+         world with a latched teardown violation is proven not
+         normally dischargeable. FIXED: TUI §3 freezes two Q paths —
+         normal Q = stop → wait → dispose → exit; fail-stop Q /
+         Ctrl+C = immediate process termination, no stop/wait/dispose
+         attempted, no graceful-disposal claim, no recovery designed.
+
+NIT-2    Blocking-Open UI liveness was implicit. FIXED: TUI §3 states
+         that v1 accepts blocking replacement control (D11 promises no
+         terminal liveness) and that responsive cancellation of a hung
+         replacement is NOT promised.
 ```

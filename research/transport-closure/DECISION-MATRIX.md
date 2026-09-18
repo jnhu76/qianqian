@@ -10,10 +10,10 @@ Status: reviewed design proposals, not canonical authority.
 |---|---|---|---|
 | F6 owner | App composition operation replacing the whole episode composition (fresh `QianqianApp` per episode) | `PlaybackSessionHandle::open(path)` (same-episode command — wrong owner, D6); per-episode component definitions C1 (unbounded catalog, registry-by-another-name); K0 per-entry config payload C2 (kernel widening); App-owned config source + revision re-incarnation C4 (more authority surface, zero v1 gain; recorded as first candidate to revisit for preload/multi-session) | D14.6 expected shape; kernel staged-replacement reality (`kernel.rs step()`); provider re-mount cost trivial (`SongcoreDecode::new`, `WasapiOutput::new`); device open is per-episode under every candidate |
 | new source preflight | App-owned probe BEFORE any destructive step, via one public decode-provider mechanism query (`probe_media`: open → probe → close, no PCM read) | destructive-first (Candidate A — loses valid playback on invalid files); probe inside new activation (= A); probe Capability + one-shot probe Fiber (K0 abuse); App constructs its own decode mechanism instance (H1 boundary breach) | Campaign §7; `SongcoreDecode` crate-private today (no seam exists — this is the narrow decision D14.6 deferred); probe owns no RT resource ⇒ not an overlap; gated by F6-S-PROBE — evidence-only, BEFORE promotion (RED reopens this row) |
-| replacement boundary | stop intent (iff unsettled) → `wait_terminal` → `dispose()` → quiet snapshot = commit evidence → mount fresh composition | committing before discharge (violates D14.6); treating Fiber states as commit truth (K0 lifecycle is composition evidence, not playback truth — but here it is *composition* commit evidence, which is exactly its job) | D14.6 frozen ordering term-by-term; no-overlap structural, P1–P5 untriggered |
-| failed Open | probe refusal ⇒ inert (old untouched, diagnostic); activation failure after old is gone ⇒ visible `activation_error`, no episode, NO rollback; latched teardown violation (`quiet == false`) ⇒ process FAIL-STOP — no further replacement, restart required | hidden retry/reopen; rollback to a destroyed/unproven old episode; auto-fallback to another candidate; "later Open after a violated disposal" | §6 failure classes; D14.6 (old truth immutable); campaign §8; K0 §G.6 — the violated latch has no exit and the violated fiber is never eligible for unload/removal |
+| replacement boundary | stop intent (iff unsettled) → `wait_terminal` → `dispose()` → authoritative disposal outcome `Discharged` → mount fresh composition → authoritative activation result `Activated` | committing before discharge (violates D14.6); reading commit decisions off `CompositionSnapshot` / fiber states (read-side projection — diagnostics only, PBK-001 §2.3) | D14.6 frozen ordering term-by-term; no-overlap structural, P1–P5 untriggered; commit consumes authority-owned operation results (F6 §5) |
+| failed Open | probe refusal ⇒ inert (old untouched, diagnostic); activation failure after old is gone ⇒ visible `activation_error`, no episode, NO rollback; latched teardown violation (disposal outcome `TeardownViolated`) ⇒ process FAIL-STOP — no further replacement, restart required | hidden retry/reopen; rollback to a destroyed/unproven old episode; auto-fallback to another candidate; "later Open after a violated disposal" | §6 failure classes; D14.6 (old truth immutable); campaign §8; K0 §G.6 — the violated latch has no exit and the violated fiber is never eligible for unload/removal |
 | playlist owner | reference-player App: `Vec<PathBuf> + Option<usize>` | PlaylistPlugin / Playback Session / K0 / providers / database abstraction | D13 oracle table (NAVIGATION §8); nothing outside the App ever reads it |
-| index commit | commit-on-activation: index moves only on F6 commit evidence (quiet disposal ∧ new episode Active) | optimistic (cursor lies on failure) | NAVIGATION §3; index is navigation state, never playback truth |
+| index commit | commit-on-activation: index moves only on F6 commit evidence (authoritative disposal outcome `Discharged` ∧ authoritative activation result `Activated`) | optimistic (cursor lies on failure) | NAVIGATION §3; index is navigation state, never playback truth |
 | Next/Prev ends | inert at first/last; no wrap | wrap; auto-stop at ends | smallest deterministic rule; campaign §18 |
 | EOF auto-next | NO in v1 | auto-Next on Completed | campaign §19: avoids an autonomous composition trigger against D11/F6 for zero first-closure need |
 | volume owner | App owns desired level (application configuration); session routes it; output mechanism realizes it per stream | VolumePlugin/mechanism-owned truth/global store (D14.9 forbidden list) | VOLUME §2–§3, §11 |
@@ -45,16 +45,34 @@ F6 gate → ADR-PBK-002 (amend D14.6 / new D14 block)
     propositions     : Open is an App composition Command (no new Fact);
                        probe-before-destruction (invalid source never
                        kills live playback; probe ≠ episode, no P1–P5);
-                       replacement commit = quiet disposal ∧ new episode
-                       Active; no rollback after destructive teardown;
-                       failure-class table (F6 §6)
+                       replacement commit = authoritative disposal
+                       outcome Discharged ∧ authoritative activation
+                       result Activated — control consumes
+                       authority-owned operation results and NEVER
+                       CompositionSnapshot (PBK-001 §2.3; snapshots
+                       stay diagnostic); no rollback after destructive
+                       teardown; failure-class table (F6 §6)
     mechanism        : whole-episode-composition replacement at the App
-                       boundary; decode-provider public probe query;
-                       decode/output provider lifetime property changes
-                       from "spans episodes" to "spans one episode" (D5
-                       property note)
-    still open       : probe_surface Rust spelling; Open input UX;
-                       C4 re-incarnation mechanism (only if a future
+                       boundary; authoritative disposal-outcome and
+                       activation-result seams (ordinary operation
+                       results, not Facts; Rust spelling open);
+                       decode-provider public probe query — an
+                       INTENTIONAL decode-provider public-surface
+                       amendment, contract frozen narrow: SourceFacts
+                       only, never SongcoreDecode / DecodedPcmStream /
+                       song handles / service internals;
+                       check_plugin_boundaries.py synced by the
+                       implementing slice; canonical topology
+                       refinement recorded — one process-level
+                       reference-player host sequentially owns multiple
+                       non-overlapping QianqianApp composition roots,
+                       one per playback episode; promotion updates D1
+                       (App realization note) + D5 (provider lifetime
+                       "spans episodes" → "spans one episode") + D14.6
+                       together, not D14.6/D5 alone
+    still open       : probe_surface Rust spelling; disposal/activation
+                       result Rust spelling; Open input UX; C4
+                       re-incarnation mechanism (only if a future
                        preload/multi-session gate needs it)
 
 NAVIGATION gate → ADR-PBK-002 §14 item "playlist / queue authority"

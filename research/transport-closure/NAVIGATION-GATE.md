@@ -63,15 +63,17 @@ Candidate B  commit-on-activation                     SELECTED
           old playback untouched, diagnostic shown
         → F6 replacement runs
         → only when the replacement commit evidence exists
-          (F6 §5: old disposal quiet ∧ new episode Active)
+          (F6 §5: authoritative disposal outcome Discharged ∧
+          authoritative activation result Activated)
           does current_index := candidate
 ```
 
-The smallest activation evidence the App can use is exactly the F6 §5
-commit evidence — kernel composition snapshots the App already reads
-(`dispose()` snapshot quiet; `composition_snapshot()` fiber Active). No
-`NavigationFact`, no index event, no new observable; the index is
-App-private state.
+The commit evidence is exactly the F6 §5 authority-owned operation
+results: the disposal outcome and the start outcome returned by the
+control operations the App itself invoked. The App never reads a
+composition snapshot for control (PBK-001 §2.3 — snapshots stay
+read-side projections for diagnostics/tests). No `NavigationFact`, no
+index event, no new observable; the index is App-private state.
 
 Corollary (post-destruction activation failure): if the probe passed
 but the new episode's activation fails, the old episode is already

@@ -112,6 +112,17 @@ It reuses the existing open/probe machinery internally (SongCore
 `song_open` + `song_probe`); it reads no PCM frames. Failure classes of
 the probe are exactly `DecodeOpenError` today.
 
+**Boundary amendment record.** Making `probe_media` public is an
+INTENTIONAL amendment of the decode-provider public-surface contract
+(today: the plugin constructor only; `SongcoreDecode` crate-private per
+H1; enforced by `tools/check_plugin_boundaries.py`). The promoted
+contract is narrow: the App may call ONE provider-owned, stateless
+preflight query exposing `SourceFacts` only — never `SongcoreDecode`,
+`DecodedPcmStream`, a song handle, or capability/service internals. The
+F6-IMPLEMENTATION slice must update `check_plugin_boundaries.py`
+together with the surface, and the promotion plan records the amendment
+(DECISION-MATRIX §2).
+
 **Concurrency disclosure (S-PROBE — evidence slice BEFORE promotion).**
 The probe runs while the old episode's decode worker may still hold its
 own SongCore handle — production's first two-concurrent-native-handles
@@ -202,18 +213,23 @@ Open(path)
         old_handle.wait_terminal()            — D11 authority-owned
                                                 settlement observed
     ↓ old_runtime.dispose()                   — K0 retires every Fiber,
-                                                teardown/discharge runs,
-                                                snapshot returned
-    ↓ snapshot.quiet == true                  — old fully retired
-                                                (composition evidence,
-                                                not a Fact — §5);
-                                                quiet == false is
+                                                teardown/discharge runs;
+                                                the operation yields its
+                                                authoritative disposal
+                                                outcome (§5)
+    ↓ disposal outcome == Discharged          — old fully retired per
+                                                the authority-owned
+                                                result (not a Fact, not
+                                                a snapshot read — §5);
+                                                TeardownViolated is
                                                 FAIL-STOP (§6)
     ↓ start_episode(path)                     — fresh composition:
                                                 new definitions, new
                                                 handle, revise_desired,
                                                 activation probes/opens
-    ↓ new session fiber Active                — new episode live
+    ↓ activation result == Activated          — new episode live
+                                                (authority-owned start
+                                                outcome, §5)
 ```
 
 Every step is an existing mechanism; nothing is invented. The ordering
@@ -231,27 +247,58 @@ Per-Open cost, honestly stated: two stateless provider re-activations
 trivial) plus the per-episode device open that every candidate pays
 (`RenderStream` owns the device session per episode today). Provider
 lifetime property changes from "spans playback episodes" (D5's current
-property, not a requirement) to "spans one episode"; the
-authority-promotion slice records this property change explicitly.
+property, not a requirement) to "spans one episode". C3 also refines
+the Qianqian App's canonical realization: one process-level
+reference-player host sequentially owns multiple non-overlapping
+`QianqianApp` composition roots, one per playback episode. The
+authority-promotion slice records both explicitly, updating D1
+(App realization note), D5 (provider lifetime) and D14.6 (mechanism)
+together (DECISION-MATRIX §2).
 
-## 5. Replacement commit point
+## 5. Replacement commit point — authority-owned operation results
 
 ```text
 replacement commit
-    := old composition disposal observed quiet
-       (post-dispose snapshot: every Fiber retired, no latched
-        teardown violation)
-       ∧ new episode mounted and Active (composition snapshot)
+    := old composition's authoritative disposal outcome == Discharged
+       ∧ new episode's authoritative activation result == Activated
 ```
 
-Truth class: **composition/mechanism evidence**, read by the App from
-the kernel snapshots it already consumes. It is NOT a Fact, gets no
-public surface, and is not playback truth — the new episode's playback
-truth remains the D14.2 observation. This is D14.6's own
-"old Playback Session Fiber withdrawn + teardown/discharge complete"
-boundary, made explicit so the App has exactly one place where
-"the replacement happened" is decided (navigation index commit,
-NAVIGATION-GATE §3, consumes precisely this evidence).
+Both operands are **synchronous results of the authority-owned control
+operations the App itself invokes** (the disposal operation and the
+start-episode composition operation). They are NOT Facts (no fact kind,
+no public surface, no consumer outside the App), NOT new K0 primitives,
+and NOT snapshot reads. The frozen rule (PBK-001 §2.3 firewall):
+
+```text
+F6 / Navigation control correctness MUST NOT depend on
+CompositionSnapshot.
+
+Disposal success and activation success are supplied by
+authoritative control-operation outcomes, or by validated
+authority-owned evidence from the authority that ran the
+operation (e.g. the session's own activation outcome).
+
+CompositionSnapshot remains exactly what its own contract
+says: a read-side projection for diagnostics/tests — "the
+snapshot is an observation, not a success certificate."
+```
+
+This is not a new architecture noun: it is the ordinary Rust result of
+an operation the App already performs. Current production reality makes
+the gap explicit — `dispose()` returns only the diagnostic snapshot,
+and the headless wiring infers activation from a snapshot fiber state;
+both are diagnostic uses. The F6-IMPLEMENTATION slice therefore
+introduces the two narrow result seams (representation deferred to that
+slice; candidate shapes `DisposeOutcome::{Discharged, TeardownViolated}`
+or `Result<(), TeardownViolation>`, and
+`StartOutcome::{Activated, ActivationFailed(diagnostic)}`), recorded in
+DECISION-MATRIX §2 as part of the promoted mechanism.
+
+This is D14.6's own "old Playback Session Fiber withdrawn +
+teardown/discharge complete" boundary, made explicit so the App has
+exactly one place where "the replacement happened" is decided
+(navigation index commit, NAVIGATION-GATE §3, consumes precisely these
+operation results).
 
 ## 6. Failure classes (explicitly separated)
 
@@ -259,21 +306,21 @@ NAVIGATION-GATE §3, consumes precisely this evidence).
 |---|---|---|
 | new-source validation failure | Open REFUSED before any destructive step; diagnostic surfaced (§9 of TUI gate) | **continues untouched** |
 | old-episode settlement failure | governed by the existing D11/frozen D14.5/D14.7 semantics; Open waits on `wait_terminal`. D11 promises no liveness: a hung decoder blocks Open — no timeout is invented in v1 | settles as itself |
-| old teardown failure | dispose snapshot `quiet == false` ⇒ **FAIL-STOP**. A latched teardown violation means discharge was **not proven**: K0 keeps the violated fiber mounted — it is never eligible for unload or slot removal, the violated latch has no exit, and the effect records remain as provenance tombstones (`kernel.rs` §G.6 reality). No new episode is constructed, and NO further Open / Next / Previous replacement is attempted in this process. The TUI shows `Fatal teardown violation — restart required` and keeps only Q/Ctrl+C. Recovery-after-violation is not assumed; it would have to be earned as its own separate authority decision | old world **NOT proven discharged**; truth immutable |
-| new activation failure (after old is gone) | existing `activation_error` diagnostic through the D14.2 seam; no rollback, no hidden reopen: the old world stays gone (D14.6: replacement cannot relabel committed truth) | **gone** (stopped) |
+| old teardown failure | authoritative disposal outcome `TeardownViolated` ⇒ **FAIL-STOP**. A latched teardown violation means discharge was **not proven**: K0 keeps the violated fiber mounted — it is never eligible for unload or slot removal, the violated latch has no exit, and the effect records remain as provenance tombstones (`kernel.rs` §G.6 reality). No new episode is constructed, and NO further Open / Next / Previous replacement is attempted in this process. The TUI shows `Fatal teardown violation — restart required` and keeps only Q/Ctrl+C. Recovery-after-violation is not assumed; it would have to be earned as its own separate authority decision | old world **NOT proven discharged**; truth immutable |
+| new activation failure (after old is gone) | start outcome `ActivationFailed`; the diagnostic surfaces through the existing `activation_error` D14.2 seam; no rollback, no hidden reopen: the old world stays gone (D14.6: replacement cannot relabel committed truth) | **gone** (stopped) |
 
-No rollback exists at any point. Disposal has exactly two honest
-readings. `quiet == true` proves the old world discharged: replacement
+No rollback exists at any point. The disposal outcome has exactly two
+honest readings. `Discharged` proves the old world retired: replacement
 may proceed, and the only "undo" a user has is issuing a new
 replacement command — a new Open/N with the old source is a new
-replacement, not a rollback. `quiet == false` proves nothing: the K0
-violated-teardown latch has no exit, the violated fiber stays mounted
-(never eligible for unload or removal, effect records remain as
-tombstones), so no new episode and no further replacement may be
-attempted in this process — fail-stop until restart (row above).
-"Later Open starts from a fresh composition" is available only after a
-QUIET disposal or a clean process start, never after a latched
-violation.
+replacement, not a rollback. `TeardownViolated` proves the opposite —
+that discharge was NOT achieved: the K0 violated-teardown latch has no
+exit, the violated fiber stays mounted (never eligible for unload or
+removal, effect records remain as tombstones), so no new episode and
+no further replacement may be attempted in this process — fail-stop
+until restart (row above). "Later Open starts from a fresh
+composition" is available only after a `Discharged` disposal or a
+clean process start, never after a latched violation.
 
 ## 7. F6 required decision table (campaign §12)
 
@@ -282,8 +329,8 @@ violation.
 | Open owner | App composition operation (owns current episode runtime + handle; Playback Session never replaces itself) | §4; D14.6 expected shape; session = exactly one episode (D6) |
 | validation timing | before any destructive step; App-owned probe (decode-provider query) | §3; invalid file must not kill valid playback |
 | old stop boundary | `request_stop()` on the old handle iff unsettled; frozen D14.4 semantics | existing Command; idempotent |
-| teardown boundary | `dispose()` after settlement observed; quiet snapshot is the discharge evidence | existing K0 mechanism |
-| new activation boundary | only after quiet disposal evidence | D14.6 no-overlap, structural |
+| teardown boundary | `dispose()` after settlement observed; the authoritative disposal outcome (§5) is the discharge evidence | existing K0 mechanism + one narrow authority-owned result seam (F6-IMPLEMENTATION) |
+| new activation boundary | only after a `Discharged` disposal outcome | D14.6 no-overlap, structural |
 | invalid new source | Open refused; diagnostic; old untouched | §3 Candidate B |
 | new activation failure | diagnostic via `activation_error`; no episode; no rollback | §6; honest dead-end |
 | paused old episode | stop-from-paused follows frozen D14.7 terminal interactions (mid-play → `Stopped`; post-EOF drain → `Completed`) | D14.7 frozen; no new rule |
@@ -308,8 +355,16 @@ abstraction-earning rule, as D14.6 already states.
 ## 9. What F6 adds to the public surface (proposal, not promoted)
 
 ```text
-App layer (apps/headless): Open(path) composition operation
-qianqian-decode-songcore:  probe_media(path) mechanism query (§3)
+App layer (apps/headless): Open(path) composition operation, yielding
+                           the authoritative start outcome (§5)
+composition App/kernel:    authoritative disposal outcome on dispose
+                           (§5) — both are ordinary synchronous
+                           operation results, not Facts and not K0
+                           primitives; Rust spelling deferred to
+                           F6-IMPLEMENTATION
+qianqian-decode-songcore:  probe_media(path) mechanism query (§3) — an
+                           intentional, narrow public-surface amendment
+                           of the decode-provider contract
 Playback Session seam:     UNCHANGED in this gate (no open/replacement
                            method on PlaybackSessionHandle — Open is not
                            a same-episode command; §10 of the campaign
@@ -317,7 +372,9 @@ Playback Session seam:     UNCHANGED in this gate (no open/replacement
                            would put a composition operation inside the
                            one-episode owner and is rejected)
 New nouns:                 NONE (no OpenFact, no Opening state, no
-                           SourceTransition, no ReplacementId)
+                           SourceTransition, no ReplacementId; the §5
+                           operation results are return values, not
+                           taxonomy)
 New Plugins:               NONE (D13 oracles: TrackOpenOperation /
                            probe query / replacement operation are all
                            "existing Plugin can own / plain call" cases)

@@ -84,21 +84,29 @@ N / P  → App select candidate index → probe → same F6 replacement
          [no episode ⇒ desired level still updates; applied at the
           next episode's stream open]
 Q      → App shutdown: stop unsettled episode, wait terminal,
-         dispose, exit
+         dispose, exit          [normal mode; in fail-stop Q takes the
+                                 immediate-termination path below]
 ```
 
 Every episode command guards on `active`; every composition command
 works regardless. Commands are processed sequentially on the App thread;
 a replacement is one blocking composition operation (F6 §7), so there
-is no concurrent-command state to design.
+is no concurrent-command state to design. Liveness disclosure (v1):
+replacement blocks the App thread until the old episode settles
+(F6 §6); D11 promises no terminal liveness, so a hung settlement
+blocks every command including Q. v1 accepts blocking replacement
+control; responsive cancellation of a hung replacement is NOT promised.
 
-Fail-stop guard (F6 §6): once any disposal snapshot reports
-`quiet == false` (latched teardown violation), the App enters
-fail-stop — the status area is replaced by a fatal banner
-(`Fatal teardown violation — restart required`), every transport and
-composition command becomes inert, and only Q / Ctrl+C remain. This is
-App composition control, not a new playback state; recovery would need
-its own separately earned authority.
+Fail-stop guard (F6 §6): once any disposal operation returns the
+authoritative outcome `TeardownViolated` (latched teardown violation,
+F6 §5), the App enters fail-stop — the status area is replaced by a
+fatal banner (`Fatal teardown violation — restart required`), every
+transport and composition command becomes inert, and only Q / Ctrl+C
+remain, taking the immediate-termination path: no stop/wait/dispose is
+attempted and no graceful disposal is claimed, because the world is
+already proven not normally dischargeable (the violated latch has no
+exit). This is App composition control, not a new playback state;
+recovery would need its own separately earned authority.
 
 ## 4. No second transport state machine (campaign §39)
 
@@ -211,8 +219,8 @@ Everything else stays presentation noise (existing rule).
 
 This campaign authorizes none of those slices; each needs its own
 explicit issue/task against the promoted text. The TUI keys light up
-progressively with their gates (←/→ only after 1; N/P after 4; +/-
-after 5; O after 3).
+progressively with their gates (←/→ after 1; O after 4; N/P after 5;
++/- after 7).
 
 ## 9. Realtime / firewall conformance (record)
 
@@ -221,4 +229,6 @@ load+compare at the existing loop-top (volume apply-on-change) — the
 same cost shape the F5-GATE amendment already accepted for the
 seek-park flag. No command, key, playlist, index, or volume value ever
 touches the data plane; K0 performs no per-quantum work; the App reads
-only the D14.2 observation and kernel snapshots on control boundaries.
+only the D14.2 observation and authority-owned control-operation
+results (F6 §5) on control boundaries; kernel composition snapshots
+remain diagnostics.
