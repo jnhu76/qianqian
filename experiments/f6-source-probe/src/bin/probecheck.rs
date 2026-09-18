@@ -115,8 +115,8 @@ mod ffi {
 }
 
 fn sprobe_probe(path: &PathBuf) -> Result<ProbeFactsLite, String> {
-    use std::os::raw::c_void;
     use qianqian_songcore_sys as sys;
+    use std::os::raw::c_void;
 
     let loaded = unsafe { sys::songcore_abi_version() };
     if loaded != sys::SONGCORE_ABI_VERSION {

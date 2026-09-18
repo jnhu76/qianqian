@@ -46,8 +46,10 @@ per-scenario probe schedule on a second native handle, and samples the
 old episode's D14.2 observation seam at 200 ms. Oracles:
 
 ```text
-probe verdict   every probe op matches its expectation (valid → facts
-                with plausible rate/channels; invalid → refused)
+probe verdict   every probe op matches its expectation (valid → the
+                open+probe sequence succeeds and its facts are
+                RECORDED, not semantically validated; invalid →
+                refused at open/probe/host-IO)
 position        old-episode Position advances ≥70% of
                 source_rate × elapsed over the playing window;
                 regressions only within 2.5 s of a seek command
@@ -71,8 +73,8 @@ probe verdicts stay correct — plus process stability (clean exit).
 S1  live × valid MP3 probe (×6)              S7  3 invalid candidates ×2
 S2  live × valid FLAC probe (×6)             S8  successful probe held
 S3  live × corrupt candidate (×6)                1 s, dropped; old plays on
-S4  12 probe/open/drop cycles                S9  alternating valid/invalid ×10
-    (every 3rd holds 250 ms)                 S10 hold handle open 3.2 s while
+S4  12 probes + 4 held open/drop             S9  alternating valid/invalid ×10
+    cycles (16 ops)                          S10 hold handle open 3.2 s while
 S5  paused episode × 4 probes                    probing a second candidate,
 S6  probes around a seek (1.0 s)                 then close; probe again
 NEG dead-episode negative control

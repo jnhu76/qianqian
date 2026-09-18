@@ -53,7 +53,7 @@ ENVFILE="$REPO/experiments/f6-source-probe/evidence/ENV-RUN${RUN}.txt"
   echo "mp3_valid_sha256: $(sha256sum "$STAGE_WSL/mp3-valid.mp3" | cut -d' ' -f1)"
   echo "flac_valid_sha256: $(sha256sum "$STAGE_WSL/flac-valid.flac" | cut -d' ' -f1)"
   echo "m4a_valid_sha256: $(sha256sum "$STAGE_WSL/m4a-valid.m4a" | cut -d' ' -f1)"
-  echo "windows: $(powershell.exe -NoProfile -Command '(Get-CimInstance Win32_OperatingSystem).Caption; (Get-CimInstance Win32_OperatingSystem).BuildNumber' | tr -d '\r' | paste -sd' ' -)"
+  echo "windows_caption_raw: $(powershell.exe -NoProfile -Command '(Get-CimInstance Win32_OperatingSystem).Caption' | tr -d '\r')"
   echo "audio_device: $(powershell.exe -NoProfile -Command '(Get-CimInstance Win32_SoundDevice | Select-Object -First 1).Name' | tr -d '\r')"
   echo "endpoint_note: default render endpoint (shared mode, event-driven), as opened by the harness log line"
 } > "$ENVFILE"
@@ -63,15 +63,18 @@ cd "$STAGE_WSL"
 run() { # run <scenario> <json-name> <args...>
   local scenario="$1"; local name="$2"; shift 2
   local log="$LOGDIR/${name}-run${RUN}.json"
+  local err="$LOGDIR/${name}-run${RUN}.stderr"
   # shellcheck disable=SC2086
   if cmd.exe /c "sprobe.exe --scenario $scenario --main main45.mp3 $*" \
-      > "$log" 2> "$LOGDIR/.stderr-tmp"; then
+      > "$log" 2> "$err"; then
     echo "run$RUN $name: matched (exit 0)"
   else
     local rc=$?
     echo "run$RUN $name: MISMATCH (exit $rc)"
   fi
-  cat "$LOGDIR/.stderr-tmp" | tr -d '\r' | grep -E "verdict=|reason:" | sed "s/^/    /" || true
+  # stderr is a committed artifact: it carries the production output
+  # plugin's endpoint-open line and every harness reason line.
+  tr -d '\r' < "$err" | grep -E "verdict=|reason:|opened:" | sed "s/^/    /" || true
 }
 
 run S1  s1  "--cand mp3-valid.mp3"

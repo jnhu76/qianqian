@@ -118,48 +118,105 @@ fn scenario(name: &str) -> Option<(Vec<Step>, bool)> {
     // fire for the harness to count as falsifiable.
     let steps = match name {
         "S1" => vec![
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
         ],
         "S2" => vec![
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
         ],
         "S3" => vec![
-            Step::Probe { cand: 0, expect_valid: false },
+            Step::Probe {
+                cand: 0,
+                expect_valid: false,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: false },
+            Step::Probe {
+                cand: 0,
+                expect_valid: false,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: false },
+            Step::Probe {
+                cand: 0,
+                expect_valid: false,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: false },
+            Step::Probe {
+                cand: 0,
+                expect_valid: false,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: false },
+            Step::Probe {
+                cand: 0,
+                expect_valid: false,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: false },
+            Step::Probe {
+                cand: 0,
+                expect_valid: false,
+            },
         ],
         "S4" => {
             let mut v = Vec::new();
             for i in 0..12 {
-                v.push(Step::Probe { cand: 0, expect_valid: true });
+                v.push(Step::Probe {
+                    cand: 0,
+                    expect_valid: true,
+                });
                 if i % 3 == 2 {
                     v.push(Step::ProbeHold {
                         cand: 0,
@@ -174,42 +231,87 @@ fn scenario(name: &str) -> Option<(Vec<Step>, bool)> {
         "S5" => vec![
             Step::Sleep(Duration::from_millis(400)),
             Step::PauseCmd,
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::ResumeCmd,
             Step::Sleep(Duration::from_millis(1200)),
         ],
         "S6" => vec![
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(600)),
             Step::SeekCmd(1.0),
             Step::Sleep(Duration::from_millis(300)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(600)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(600)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(600)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(600)),
         ],
         "S7" => vec![
-            Step::Probe { cand: 0, expect_valid: false },
+            Step::Probe {
+                cand: 0,
+                expect_valid: false,
+            },
             Step::Sleep(Duration::from_millis(500)),
-            Step::Probe { cand: 1, expect_valid: false },
+            Step::Probe {
+                cand: 1,
+                expect_valid: false,
+            },
             Step::Sleep(Duration::from_millis(500)),
-            Step::Probe { cand: 2, expect_valid: false },
+            Step::Probe {
+                cand: 2,
+                expect_valid: false,
+            },
             Step::Sleep(Duration::from_millis(500)),
-            Step::Probe { cand: 0, expect_valid: false },
+            Step::Probe {
+                cand: 0,
+                expect_valid: false,
+            },
             Step::Sleep(Duration::from_millis(500)),
-            Step::Probe { cand: 1, expect_valid: false },
+            Step::Probe {
+                cand: 1,
+                expect_valid: false,
+            },
             Step::Sleep(Duration::from_millis(500)),
-            Step::Probe { cand: 2, expect_valid: false },
+            Step::Probe {
+                cand: 2,
+                expect_valid: false,
+            },
         ],
         "S8" => vec![
             Step::ProbeHold {
@@ -218,11 +320,20 @@ fn scenario(name: &str) -> Option<(Vec<Step>, bool)> {
                 expect_valid: true,
             },
             Step::Sleep(Duration::from_millis(600)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(600)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(600)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
         ],
         "S9" => {
             let mut v = Vec::new();
@@ -238,26 +349,53 @@ fn scenario(name: &str) -> Option<(Vec<Step>, bool)> {
             v
         }
         "S10" => vec![
-            Step::OpenHold { cand: 0, expect_valid: true },
+            Step::OpenHold {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(800)),
-            Step::ProbeWhileHeld { cand: 1, expect_valid: true },
+            Step::ProbeWhileHeld {
+                cand: 1,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(800)),
-            Step::ProbeWhileHeld { cand: 1, expect_valid: true },
+            Step::ProbeWhileHeld {
+                cand: 1,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(800)),
-            Step::ProbeWhileHeld { cand: 1, expect_valid: true },
+            Step::ProbeWhileHeld {
+                cand: 1,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(800)),
             Step::CloseHeld,
-            Step::Probe { cand: 1, expect_valid: true },
+            Step::Probe {
+                cand: 1,
+                expect_valid: true,
+            },
         ],
         "NEG" => vec![
             Step::StopCmd,
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
             Step::Sleep(Duration::from_millis(700)),
-            Step::Probe { cand: 0, expect_valid: true },
+            Step::Probe {
+                cand: 0,
+                expect_valid: true,
+            },
         ],
         _ => return None,
     };
@@ -307,6 +445,11 @@ unsafe extern "C" fn file_size(ud: *mut c_void) -> i64 {
 /// One temporary native handle + its kept-alive host file. Drop runs
 /// `song_close` exactly like the production endpoint. The probe NEVER
 /// reads PCM frames.
+///
+/// Drop-order guarantee (Rust reference): `Drop::drop` runs BEFORE any
+/// field is dropped, so `song_close` below always executes while the
+/// `file` box is still alive for the callbacks to borrow — the same
+/// behavior the production endpoint relies on.
 struct ProbeHandle {
     handle: *mut sys::song_handle,
     /// Kept alive for the handle's lifetime; the callbacks borrow it raw
@@ -364,11 +507,17 @@ fn probe_open(path: &Path) -> Result<ProbeHandle, String> {
     let status = unsafe { sys::song_open(&io, &mut handle) };
     if status != sys::SONG_OK {
         unsafe { drop(Box::from_raw(io.userdata as *mut std::fs::File)) };
-        return Err(format!("song_open refused '{}': status {status}", path.display()));
+        return Err(format!(
+            "song_open refused '{}': status {status}",
+            path.display()
+        ));
     }
     if handle.is_null() {
         unsafe { drop(Box::from_raw(io.userdata as *mut std::fs::File)) };
-        return Err(format!("song_open '{}' returned SONG_OK with null handle", path.display()));
+        return Err(format!(
+            "song_open '{}' returned SONG_OK with null handle",
+            path.display()
+        ));
     }
     Ok(ProbeHandle {
         handle,
@@ -451,9 +600,8 @@ fn start_episode(file: &Path) -> Result<Episode, String> {
             handle.clone(),
         ))
         .map_err(|e| format!("session registration failed: {e:?}"))?;
-    let desired = |id: &str, component: &'static str| {
-        DesiredEntry::enabled(id, component, Revision::new(1))
-    };
+    let desired =
+        |id: &str, component: &'static str| DesiredEntry::enabled(id, component, Revision::new(1));
     runtime
         .revise_desired(vec![
             desired("decode", "songcore_decode_plugin"),
@@ -464,7 +612,11 @@ fn start_episode(file: &Path) -> Result<Episode, String> {
     // Activation diagnostics only (same class as the production
     // wiring's use): decides whether waiting for a terminal Fact is
     // meaningful. Not a correctness input to any oracle below.
-    let activated = runtime.composition_snapshot().fibers.get("session").map(|f| f.state)
+    let activated = runtime
+        .composition_snapshot()
+        .fibers
+        .get("session")
+        .map(|f| f.state)
         == Some(FiberState::Active);
     if !activated {
         return Err(format!(
@@ -534,9 +686,7 @@ fn verdict_of(
     // Position-advance oracle over consecutive sample pairs inside the
     // playing window (pause interval excluded, freeze-checked below).
     let in_playing = |t: u128| -> bool {
-        t >= window.0
-            && t <= window.1
-            && !pause_interval.is_some_and(|(a, b)| t >= a && t <= b)
+        t >= window.0 && t <= window.1 && !pause_interval.is_some_and(|(a, b)| t >= a && t <= b)
     };
     let mut advance: u64 = 0;
     let mut expected: f64 = 0.0;
@@ -555,17 +705,16 @@ fn verdict_of(
         match (p0, p1) {
             (Some(a), Some(b)) => {
                 saw_some = true;
-                expected += sample_rate as f64 * (t1 - t0).min(SAMPLE_INTERVAL.as_millis() * 3)
-                    as f64
+                expected += sample_rate as f64
+                    * (t1 - t0).min(SAMPLE_INTERVAL.as_millis() * 3) as f64
                     / 1000.0;
                 if b >= a {
                     advance += b - a;
                 } else {
                     // A regression is legal only around a seek command
                     // (the rebase to the actual landing).
-                    let near_seek = seek_cmd_ms.is_some_and(|s| {
-                        t1.saturating_sub(s) <= SEEK_REGRESSION_WINDOW_MS
-                    });
+                    let near_seek = seek_cmd_ms
+                        .is_some_and(|s| t1.saturating_sub(s) <= SEEK_REGRESSION_WINDOW_MS);
                     if !near_seek {
                         reasons.push(format!(
                             "position regressed {} frames at {} ms without a seek",
@@ -657,22 +806,30 @@ fn main() {
     };
 
     let outcome = run_scenario(main_path.as_path(), &cands, &steps);
-    let (mut reasons, old_report, samples_json, probes, window, pause_interval, seek_cmd_ms, sample_rate) =
-        match outcome {
-            Ok(v) => v,
-            Err(e) => {
-                eprintln!("HARNESS ERROR: {e}");
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "scenario": scenario_name,
-                        "verdict": "HARNESS_ERROR",
-                        "error": e,
-                    })
-                );
-                std::process::exit(1);
-            }
-        };
+    let (
+        mut reasons,
+        old_report,
+        samples_json,
+        probes,
+        window,
+        pause_interval,
+        seek_cmd_ms,
+        sample_rate,
+    ) = match outcome {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("HARNESS ERROR: {e}");
+            println!(
+                "{}",
+                serde_json::json!({
+                    "scenario": scenario_name,
+                    "verdict": "HARNESS_ERROR",
+                    "error": e,
+                })
+            );
+            std::process::exit(1);
+        }
+    };
 
     let samples = samples_json_to_tuples(&samples_json);
     let (green, oracle_reasons) = verdict_of(
@@ -772,7 +929,11 @@ fn run_scenario(
                     .ok_or_else(|| format!("scenario references missing cand {cand}"))?;
                 probes.push(probe_source(path, idx, now_ms(&samples), *expect_valid));
             }
-            Step::ProbeHold { cand, hold, expect_valid } => {
+            Step::ProbeHold {
+                cand,
+                hold,
+                expect_valid,
+            } => {
                 let path = cands
                     .get(*cand)
                     .ok_or_else(|| format!("scenario references missing cand {cand}"))?;
@@ -800,9 +961,7 @@ fn run_scenario(
                 let path = cands
                     .get(*cand)
                     .ok_or_else(|| format!("scenario references missing cand {cand}"))?;
-                match probe_open(path)
-                    .and_then(|h| probe_facts(&h).map(|f| (h, f)).map_err(|e| e))
-                {
+                match probe_open(path).and_then(|h| probe_facts(&h).map(|f| (h, f))) {
                     Ok((h, _facts)) => {
                         if !*expect_valid {
                             reasons.push("OpenHold expected invalid but opened".into());
@@ -868,7 +1027,22 @@ fn run_scenario(
     std::thread::sleep(Duration::from_millis(250));
 
     // Settle: stop intent iff unsettled (the production tui_transport
-    // discipline), wait for the D11 Fact, dispose, report.
+    // discipline), wait for the D11 Fact, dispose, report. A watchdog
+    // bounds the whole settle: wait_terminal is a pure wait with no
+    // timeout, so a wedged episode would otherwise hang the runner
+    // instead of surfacing as a failed run (evidence-robustness bound;
+    // 30 s is far beyond any observed settle).
+    // 30 s is far beyond any observed settle). The binding is kept so
+    // the thread's lifetime is explicit on the normal path; a fired
+    // watchdog exits the whole process with a distinctive code.
+    let _settle_watchdog = std::thread::Builder::new()
+        .name("sprobe-settle-watchdog".into())
+        .spawn(|| {
+            std::thread::sleep(Duration::from_secs(30));
+            eprintln!("SETTLE WATCHDOG FIRED: episode did not settle within 30 s");
+            std::process::exit(42);
+        })
+        .expect("watchdog spawn");
     if episode.handle.observe().terminal_outcome.is_none() {
         episode.handle.request_stop();
     }
