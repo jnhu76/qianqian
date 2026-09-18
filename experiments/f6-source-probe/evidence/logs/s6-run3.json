@@ -1,0 +1,201 @@
+{
+  "expected": "GREEN",
+  "matched_expectation": true,
+  "old_episode": {
+    "activation_error": null,
+    "dispose_quiet": true,
+    "failure_diagnostic": null,
+    "source_format": {
+      "channels": 2,
+      "sample_rate": 44100
+    },
+    "terminal": "Stopped"
+  },
+  "position_samples": [
+    [
+      0,
+      null
+    ],
+    [
+      200,
+      8379
+    ],
+    [
+      400,
+      17199
+    ],
+    [
+      601,
+      26019
+    ],
+    [
+      801,
+      34839
+    ],
+    [
+      1001,
+      43659
+    ],
+    [
+      1202,
+      52479
+    ],
+    [
+      1402,
+      61299
+    ],
+    [
+      1602,
+      70560
+    ],
+    [
+      1802,
+      79380
+    ],
+    [
+      2003,
+      50832
+    ],
+    [
+      2203,
+      59652
+    ],
+    [
+      2404,
+      68472
+    ],
+    [
+      2604,
+      77292
+    ],
+    [
+      2804,
+      86112
+    ],
+    [
+      3004,
+      94932
+    ],
+    [
+      3205,
+      103752
+    ],
+    [
+      3405,
+      112572
+    ],
+    [
+      3605,
+      121392
+    ],
+    [
+      3805,
+      130212
+    ],
+    [
+      4005,
+      139032
+    ],
+    [
+      4206,
+      147852
+    ],
+    [
+      4406,
+      156672
+    ],
+    [
+      4606,
+      165492
+    ],
+    [
+      4807,
+      174312
+    ]
+  ],
+  "probes": [
+    {
+      "candidate": "mp3-valid.mp3",
+      "elapsed_us": 796,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 0,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 0,
+      "t_ms": 1001
+    },
+    {
+      "candidate": "mp3-valid.mp3",
+      "elapsed_us": 792,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 0,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 4,
+      "t_ms": 2003
+    },
+    {
+      "candidate": "mp3-valid.mp3",
+      "elapsed_us": 872,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 0,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 6,
+      "t_ms": 2604
+    },
+    {
+      "candidate": "mp3-valid.mp3",
+      "elapsed_us": 824,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 0,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 8,
+      "t_ms": 3205
+    },
+    {
+      "candidate": "mp3-valid.mp3",
+      "elapsed_us": 642,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 0,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 10,
+      "t_ms": 3805
+    }
+  ],
+  "reasons": [],
+  "sample_rate": 44100,
+  "scenario": "S6",
+  "verdict": "GREEN",
+  "window_ms": [
+    1001,
+    4406
+  ]
+}

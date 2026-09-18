@@ -1,0 +1,5 @@
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+[qianqian-wasapi] render aborted: data plane stopped
+NEG: verdict=RED matched=true
+  reason: position absent in 10 playing-window samples (first at 1401 ms) — the episode was not live/rendering
+[mp3float @ 00000247eedf7480] Could not update timestamps for skipped samples.

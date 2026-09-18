@@ -1,0 +1,220 @@
+{
+  "expected": "GREEN",
+  "matched_expectation": true,
+  "old_episode": {
+    "activation_error": null,
+    "dispose_quiet": true,
+    "failure_diagnostic": null,
+    "source_format": {
+      "channels": 2,
+      "sample_rate": 44100
+    },
+    "terminal": "Stopped"
+  },
+  "position_samples": [
+    [
+      0,
+      null
+    ],
+    [
+      200,
+      8379
+    ],
+    [
+      400,
+      17199
+    ],
+    [
+      600,
+      26019
+    ],
+    [
+      801,
+      34839
+    ],
+    [
+      1001,
+      43659
+    ],
+    [
+      1202,
+      52920
+    ],
+    [
+      1402,
+      61740
+    ],
+    [
+      1602,
+      70560
+    ],
+    [
+      1803,
+      79380
+    ],
+    [
+      2003,
+      88200
+    ],
+    [
+      2204,
+      97020
+    ],
+    [
+      2404,
+      105840
+    ],
+    [
+      2604,
+      114660
+    ],
+    [
+      2805,
+      123480
+    ],
+    [
+      3005,
+      132300
+    ],
+    [
+      3205,
+      141120
+    ],
+    [
+      3405,
+      149940
+    ],
+    [
+      3606,
+      158760
+    ],
+    [
+      3806,
+      167580
+    ],
+    [
+      4006,
+      176400
+    ],
+    [
+      4207,
+      185220
+    ],
+    [
+      4407,
+      194040
+    ],
+    [
+      4607,
+      202860
+    ],
+    [
+      4808,
+      211680
+    ],
+    [
+      5008,
+      220500
+    ]
+  ],
+  "probes": [
+    {
+      "candidate": "flac-valid.flac",
+      "elapsed_us": 630,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 16,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 0,
+      "t_ms": 1001
+    },
+    {
+      "candidate": "flac-valid.flac",
+      "elapsed_us": 821,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 16,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 2,
+      "t_ms": 1803
+    },
+    {
+      "candidate": "flac-valid.flac",
+      "elapsed_us": 649,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 16,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 4,
+      "t_ms": 2404
+    },
+    {
+      "candidate": "flac-valid.flac",
+      "elapsed_us": 796,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 16,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 6,
+      "t_ms": 3205
+    },
+    {
+      "candidate": "flac-valid.flac",
+      "elapsed_us": 801,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 16,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 8,
+      "t_ms": 3806
+    },
+    {
+      "candidate": "flac-valid.flac",
+      "elapsed_us": 666,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 16,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 10,
+      "t_ms": 4607
+    }
+  ],
+  "reasons": [],
+  "sample_rate": 44100,
+  "scenario": "S2",
+  "verdict": "GREEN",
+  "window_ms": [
+    1001,
+    4607
+  ]
+}

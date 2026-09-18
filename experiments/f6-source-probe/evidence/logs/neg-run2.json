@@ -1,0 +1,164 @@
+{
+  "expected": "RED",
+  "matched_expectation": true,
+  "old_episode": {
+    "activation_error": null,
+    "dispose_quiet": true,
+    "failure_diagnostic": null,
+    "source_format": {
+      "channels": 2,
+      "sample_rate": 44100
+    },
+    "terminal": "Stopped"
+  },
+  "position_samples": [
+    [
+      0,
+      null
+    ],
+    [
+      200,
+      8379
+    ],
+    [
+      400,
+      17199
+    ],
+    [
+      600,
+      26019
+    ],
+    [
+      801,
+      34839
+    ],
+    [
+      1001,
+      43659
+    ],
+    [
+      1201,
+      52479
+    ],
+    [
+      1401,
+      null
+    ],
+    [
+      1602,
+      null
+    ],
+    [
+      1802,
+      null
+    ],
+    [
+      2003,
+      null
+    ],
+    [
+      2203,
+      null
+    ],
+    [
+      2403,
+      null
+    ],
+    [
+      2604,
+      null
+    ],
+    [
+      2804,
+      null
+    ],
+    [
+      3004,
+      null
+    ],
+    [
+      3204,
+      null
+    ],
+    [
+      3405,
+      null
+    ],
+    [
+      3605,
+      null
+    ]
+  ],
+  "probes": [
+    {
+      "candidate": "mp3-valid.mp3",
+      "elapsed_us": 762,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 0,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 1,
+      "t_ms": 1001
+    },
+    {
+      "candidate": "mp3-valid.mp3",
+      "elapsed_us": 774,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 0,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 3,
+      "t_ms": 1802
+    },
+    {
+      "candidate": "mp3-valid.mp3",
+      "elapsed_us": 727,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 0,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 5,
+      "t_ms": 2403
+    },
+    {
+      "candidate": "mp3-valid.mp3",
+      "elapsed_us": 826,
+      "error": null,
+      "expect_valid": true,
+      "facts": {
+        "bits_per_sample": 0,
+        "channels": 2,
+        "duration_us": 4000000,
+        "sample_rate": 44100
+      },
+      "ok": true,
+      "step": 7,
+      "t_ms": 3204
+    }
+  ],
+  "reasons": [
+    "position absent in 10 playing-window samples (first at 1401 ms) — the episode was not live/rendering"
+  ],
+  "sample_rate": 44100,
+  "scenario": "NEG",
+  "verdict": "RED",
+  "window_ms": [
+    1001,
+    3204
+  ]
+}
