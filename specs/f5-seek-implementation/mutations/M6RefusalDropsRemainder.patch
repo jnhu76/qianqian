@@ -1,0 +1,12 @@
+diff --git a/crates/qianqian-playback/src/session.rs b/crates/qianqian-playback/src/session.rs
+index ee7026f..b8f22e9 100644
+--- a/crates/qianqian-playback/src/session.rs
++++ b/crates/qianqian-playback/src/session.rs
+@@ -278,6 +278,7 @@ fn decode_worker(
+                                 // below, and only then does the slot
+                                 // free (a second seek must not park the
+                                 // leg mid-remainder).
++                                remainder = None;
+                                 completion.seek_refused();
+                                 completion.release_seek_park();
+                                 pending_seek = None;

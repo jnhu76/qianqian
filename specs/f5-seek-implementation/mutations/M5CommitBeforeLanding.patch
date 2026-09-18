@@ -1,0 +1,12 @@
+diff --git a/crates/qianqian-playback/src/session.rs b/crates/qianqian-playback/src/session.rs
+index ee7026f..1562f6c 100644
+--- a/crates/qianqian-playback/src/session.rs
++++ b/crates/qianqian-playback/src/session.rs
+@@ -308,6 +308,7 @@ fn decode_worker(
+                                 // commit decision routes the release.
+                                 remainder = None;
+                                 edge.invalidate();
++                                let _ = completion.commit_seek_cutover(landing);
+                                 completion.seek_landing_published(landing);
+                                 loop {
+                                     if completion.seek_aborted() {

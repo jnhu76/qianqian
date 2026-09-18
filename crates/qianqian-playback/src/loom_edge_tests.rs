@@ -12,9 +12,11 @@
 //! edge is the only genuinely interleaved shared state in the playback
 //! session. Properties: L1 write/read/stop interleaving with FIFO ring
 //! integrity; L3 first-terminal-wins over {EOF, failure, stop}; L4
-//! blocked-endpoint wakeup under every terminal. A clean run is
-//! SCHEDULE-CLEAN within the stated thread/operation bounds
-//! (vocabulary #124) — not a general proof.
+//! blocked-endpoint wakeup under every terminal; L5–L7 (F5/D14.5) the
+//! non-terminal `invalidate` under every interleaving with the live
+//! endpoints — it purges, wakes, and never touches terminal truth. A
+//! clean run is SCHEDULE-CLEAN within the stated thread/operation
+//! bounds (vocabulary #124) — not a general proof.
 
 #![cfg(loom)]
 
@@ -272,4 +274,143 @@ fn loom_l4b_terminal_unblocks_blocked_consumer() {
             }
         });
     }
+}
+
+/// L5 — the F5 purge (D14.5): `invalidate` interleaved with the live
+/// producer and consumer. Whatever the schedule, the consumer's read
+/// sequence is a legal observation of {purge happened before/after this
+/// or that frame}: one of `[]`, `[7]`, `[9]`, `[7,9]` — never a
+/// reordered, duplicated or torn sequence (ring integrity survives the
+/// cursor reset), and the run always terminates through the committed
+/// EOF. `[9,7]` would be stale pre-cut content reaching the consumer
+/// after post-cut content — the exclusion the frozen protocol owes.
+#[test]
+fn loom_l5_invalidate_interleave_keeps_fifo_and_terminates() {
+    loom::model(|| {
+        let edge = Arc::new(PcmEdge::new(1, 2));
+        // One stale frame sits in the edge when the purge fires.
+        assert_eq!(edge.write_some(&[7.0]), 1);
+        let consumer = {
+            let e = edge.clone();
+            thread::spawn(move || {
+                let mut dst = [0.0f32; 2];
+                let mut seen = Vec::new();
+                loop {
+                    match e.read_frames(&mut dst) {
+                        PcmPull::Frames(k) => seen.extend_from_slice(&dst[..k]),
+                        PcmPull::Eof => break seen,
+                        PcmPull::Stopped => panic!("no stop is ever issued"),
+                    }
+                }
+            })
+        };
+        let invalidator = {
+            let e = edge.clone();
+            thread::spawn(move || e.invalidate())
+        };
+        let producer = {
+            let e = edge.clone();
+            thread::spawn(move || write_all(&e, &[9.0]))
+        };
+        invalidator.join().unwrap();
+        producer.join().unwrap();
+        edge.close_eof();
+        let seen = consumer.join().unwrap();
+        assert_eq!(edge.terminal(), EdgeTerminal::Eof);
+        assert!(
+            matches!(seen.as_slice(), [] | [7.0] | [9.0] | [7.0, 9.0]),
+            "an illegal post-purge observation: {seen:?}"
+        );
+    })
+}
+
+/// L6 — `invalidate` is NOT a terminal: raced against a terminal
+/// setter it never wins, never overwrites, and never resurrects a
+/// closed data plane (a purge landing after the terminal cannot reopen
+/// the edge or change its identity).
+#[test]
+fn loom_l6_invalidate_never_touches_terminal_truth() {
+    /// Which terminal the setter commits against the purge.
+    #[derive(Clone, Copy)]
+    enum Kill {
+        Eof,
+        Stop,
+    }
+    for kill in [Kill::Eof, Kill::Stop] {
+        loom::model(move || {
+            let edge = Arc::new(PcmEdge::new(1, 2));
+            let setter = {
+                let e = edge.clone();
+                thread::spawn(move || match kill {
+                    Kill::Eof => e.close_eof(),
+                    Kill::Stop => e.stop(),
+                })
+            };
+            let invalidator = {
+                let e = edge.clone();
+                thread::spawn(move || e.invalidate())
+            };
+            setter.join().unwrap();
+            // The purge lands after the setter under every explored
+            // schedule of this join — the after-the-terminal face.
+            edge.invalidate();
+            invalidator.join().unwrap();
+            match kill {
+                Kill::Eof => assert_eq!(edge.terminal(), EdgeTerminal::Eof),
+                Kill::Stop => assert_eq!(edge.terminal(), EdgeTerminal::Stopped),
+            }
+            let mut dst = [0.0f32; 1];
+            match kill {
+                Kill::Eof => assert!(matches!(edge.read_frames(&mut dst), PcmPull::Eof)),
+                Kill::Stop => {
+                    assert!(matches!(edge.read_frames(&mut dst), PcmPull::Stopped))
+                }
+            }
+        });
+    }
+}
+
+/// L7 — the purge unblocks a producer parked on a FULL edge (no lost
+/// wakeup) and the parked-over frame never reaches the consumer: the
+/// writer can only complete after the purge freed its slot, so the
+/// consumer sees exactly the post-cut content.
+#[test]
+fn loom_l7_invalidate_unblocks_full_producer_and_purges_the_stale_frame() {
+    loom::model(|| {
+        let edge = Arc::new(PcmEdge::new(1, 1));
+        // Fill the single-sample edge synchronously: the spawned write
+        // below is genuinely blocked on `space_freed`.
+        assert_eq!(edge.write_some(&[7.0]), 1);
+        let producer = {
+            let e = edge.clone();
+            thread::spawn(move || write_all(&e, &[9.0]))
+        };
+        let invalidator = {
+            let e = edge.clone();
+            thread::spawn(move || e.invalidate())
+        };
+        invalidator.join().unwrap();
+        let written = producer.join().unwrap();
+        assert!(
+            written,
+            "the purge frees the slot; the write must complete without \
+             any terminal"
+        );
+        assert_eq!(edge.terminal(), EdgeTerminal::Open);
+        edge.close_eof();
+        let mut dst = [0.0f32; 2];
+        let mut seen = Vec::new();
+        loop {
+            match edge.read_frames(&mut dst) {
+                PcmPull::Frames(k) => seen.extend_from_slice(&dst[..k]),
+                PcmPull::Eof => break,
+                PcmPull::Stopped => panic!("no stop is ever issued"),
+            }
+        }
+        assert_eq!(
+            seen,
+            vec![9.0],
+            "the pre-cut frame must never be delivered after the purge"
+        );
+    })
 }

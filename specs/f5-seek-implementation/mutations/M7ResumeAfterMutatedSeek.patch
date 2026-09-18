@@ -1,0 +1,13 @@
+diff --git a/crates/qianqian-playback/src/session.rs b/crates/qianqian-playback/src/session.rs
+index ee7026f..e532fb8 100644
+--- a/crates/qianqian-playback/src/session.rs
++++ b/crates/qianqian-playback/src/session.rs
+@@ -294,8 +294,6 @@ fn decode_worker(
+                                 completion.decode_failed(&format!(
+                                     "seek failed: {diagnostic}"
+                                 ));
+-                                edge.fail();
+-                                return;
+                             }
+                             qianqian_audio_api::ports::ProviderSeekOutcome::Applied {
+                                 landing,

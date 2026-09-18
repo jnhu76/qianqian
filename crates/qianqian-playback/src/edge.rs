@@ -111,14 +111,30 @@ impl PcmEdge {
     /// a missed notify costs one slice of latency, never correctness).
     /// The caller holds no other lock across this wait.
     pub(crate) fn wait_for_space(&self, slice: Duration) {
-        let guard = self.state.lock().expect("pcm edge lock");
-        let _ = self
-            .space_freed
-            .wait_timeout_while(guard, slice, |state| {
-                state.terminal == TERMINAL_OPEN
-                    && state.buffered == self.capacity_samples
-            })
-            .expect("pcm edge lock");
+        let mut guard = self.state.lock().expect("pcm edge lock");
+        #[cfg(loom)]
+        {
+            // loom's Condvar has no wait_timeout_while; this loop is the
+            // same contract — wait while open-and-full, bounded by the
+            // slice, spuriously-wake safe — and loom models the timeout
+            // branch of `wait_timeout` itself.
+            while guard.terminal == TERMINAL_OPEN && guard.buffered == self.capacity_samples {
+                let (woken, _) = self
+                    .space_freed
+                    .wait_timeout(guard, slice)
+                    .expect("pcm edge lock");
+                guard = woken;
+            }
+        }
+        #[cfg(not(loom))]
+        {
+            let _ = self
+                .space_freed
+                .wait_timeout_while(guard, slice, |state| {
+                    state.terminal == TERMINAL_OPEN && state.buffered == self.capacity_samples
+                })
+                .expect("pcm edge lock");
+        }
     }
 
     /// The F5 non-terminal invalidate (ADR-PBK-002 D14.5): drop every

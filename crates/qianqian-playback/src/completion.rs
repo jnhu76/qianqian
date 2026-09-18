@@ -1016,6 +1016,7 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(loom))]
     use qianqian_audio_api::ports::SeekParkOutcome;
 
     /// D14.7 corrective-2, the delayed-delivery interleaving no leg-level
@@ -1237,6 +1238,19 @@ mod tests {
             "the losing decision still releases the leg"
         );
 
+        // The park half must actually BE there: landing published and
+        // the episode unsettled, but no engagement ever published its
+        // quiescence — no commit (the commit boundary is not reachable
+        // by landing knowledge alone).
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        completion.seek_landing_published(Some(7));
+        assert!(!completion.commit_seek_cutover(Some(7)));
+        assert_eq!(
+            completion.render_gate().park_while_seek_hold(|| false),
+            SeekParkOutcome::Released(SeekParkRelease::Aborted),
+        );
+
         // Stop intent recorded before the decision wins the race.
         let completion = SessionCompletion::new();
         let core = completion.state.clone();
@@ -1290,6 +1304,20 @@ mod tests {
         assert_eq!(
             completion.render_gate().park_while_seek_hold(|| false),
             SeekParkOutcome::Released(SeekParkRelease::Committed { landing: None }),
+        );
+
+        // The same conjunction holds under the SEEK attribution: the
+        // cut's own park (SeekEngaged + ITS quiescence) satisfies the
+        // boundary with no pause engagement at all.
+        let completion = SessionCompletion::new();
+        let core = completion.state.clone();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekEngaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekTailQuiesced));
+        completion.seek_landing_published(Some(55));
+        assert!(
+            completion.commit_seek_cutover(Some(55)),
+            "the cut-attributed park is the same evidence class"
         );
     }
 
