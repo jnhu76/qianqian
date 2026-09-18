@@ -105,16 +105,32 @@ fn play_with_missing_file_is_a_usage_error() {
 
 /// Stage D (D14.6 navigation): `play` takes ONE OR MORE files — the
 /// first opens, all seed the startup playlist (open representation).
-/// The multi-file form therefore parses and runs; the binary here is
-/// built without the playback slice, so the honest observable is the
-/// feature-gate refusal (exit 2), NOT a grammar refusal.
+/// The multi-file form therefore parses and RUNS; each feature
+/// configuration pins its own honest observable for that run.
+#[cfg(not(feature = "playback"))]
 #[test]
-fn play_with_extra_files_parses_and_hits_the_feature_gate_without_playback() {
+fn play_with_extra_files_hits_the_feature_gate_without_playback() {
     let extra = invoke(&["play", "a.flac", "b.flac"]);
     assert_eq!(extra.code, 2);
     assert!(
         extra.stderr.contains("built without the playback slice"),
         "the multi-file grammar parses; the no-playback build refuses at the feature gate: {}",
+        extra.stderr
+    );
+}
+
+/// The playback-configuration twin: the multi-file invocation parses,
+/// the first (missing) file is REFUSED by the probe before any
+/// destructive step, the shell-less run reports the refusal and exits
+/// 1 through the no-episode exit contract (no terminal Fact exists).
+#[cfg(feature = "playback")]
+#[test]
+fn play_with_extra_files_parses_and_reports_the_probe_refusal() {
+    let extra = invoke(&["play", "a.flac", "b.flac"]);
+    assert_eq!(extra.code, 1);
+    assert!(
+        extra.stderr.contains("open refused:"),
+        "the startup Open's refusal must be reported: {}",
         extra.stderr
     );
 }
