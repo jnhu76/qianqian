@@ -359,3 +359,77 @@ fn a_failed_tail_observation_exits_the_pause_park_without_quiescence() {
         events.snapshot()
     );
 }
+
+/// The failed-park exit with a REAL routed payload: a committed cut
+/// whose release payload arrives while the leg is pause-parked, and
+/// whose probe then fails, must still deliver the rebase instruction to
+/// the leg (mid-park or on the failure exit — exactly once either way)
+/// before the mechanism's failure path runs. The pause-park failure
+/// exit's payload-delivery arm, exercised with a routed Committed
+/// payload — the seek-side twin pins the exit funnel's Aborted shape
+/// (render_gate_seek.rs).
+#[test]
+fn a_failed_pause_park_still_delivers_a_routed_committed_payload() {
+    use qianqian_audio_api::ports::SeekParkRelease;
+    use std::sync::Mutex;
+    let events = Events::default();
+    let events_clone = events.clone();
+    let gate = RenderGate::with_observer(move |event| events_clone.record(event));
+    gate.set_paused(true);
+    let parked = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let parked_clone = parked.clone();
+    let captured: Arc<Mutex<Option<SeekParkRelease>>> = Arc::new(Mutex::new(None));
+    let sink = captured.clone();
+    let failed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let failed_reader = failed.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    {
+        let gate = gate.clone();
+        let failed_reader = failed_reader.clone();
+        std::thread::spawn(move || {
+            let outcome = gate.park_loop_top(|slice| match slice {
+                GateSlice::TailProbe => {
+                    parked_clone.store(true, Ordering::SeqCst);
+                    if failed_reader.load(Ordering::SeqCst) {
+                        TailProbeOutcome::Failed
+                    } else {
+                        TailProbeOutcome::Pending
+                    }
+                }
+                GateSlice::SeekRelease(release) => {
+                    *sink.lock().expect("release lock") = Some(release);
+                    TailProbeOutcome::Pending
+                }
+            });
+            let _ = tx.send(outcome);
+        });
+    }
+    assert!(
+        wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)),
+        "the leg never parked"
+    );
+    // The cut commits while the leg is parked: the payload routes
+    // MID-PARK and must reach the leg while it stays parked.
+    gate.release_seek_hold(SeekParkRelease::Committed { landing: Some(9) });
+    wait_until(Duration::from_secs(5), || {
+        captured.lock().expect("release lock").is_some()
+    });
+    // Then the device's observation fails: the park must still end
+    // bounded, with no quiescence published.
+    failed.store(true, Ordering::SeqCst);
+    let outcome = rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("the park must end on the failed observation");
+    assert_eq!(outcome, ParkOutcome::TailProbeFailed);
+    assert_eq!(
+        *captured.lock().expect("release lock"),
+        Some(SeekParkRelease::Committed { landing: Some(9) }),
+        "the committed rebase reached the leg before the failure exit"
+    );
+    assert_eq!(
+        events.snapshot(),
+        vec![GateEvent::Engaged, GateEvent::Disengaged],
+        "no quiescence may publish for the failed observation: {:?}",
+        events.snapshot()
+    );
+}
