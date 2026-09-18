@@ -797,7 +797,15 @@ seek product-state vocabulary / actual-landing authority beyond D14 minimum
      unknown = withdraw the projection — and the product-state
      vocabulary: no new public seek state, no Seek completion Fact)
 source identity / playlist authority / navigation policy
+    (partially no longer OPEN: the 2026-09-18 F6-AUTHORITY-PROMOTION-1
+     amendment in D14.6 closed playlist/queue authority — application
+     navigation state, commit-on-activation, no new authority — and the
+     next/previous navigation policy; source identity remains OPEN)
 volume / device-switch authority
+    (partially no longer OPEN: the same amendment froze the volume
+     owner/semantics and the IAudioStreamVolume candidate in D14.9 —
+     the physical realtime apply placement stays OPEN pending V-PROBE;
+     device-switch authority remains OPEN)
 PlaybackFacts publication topology beyond D14 read seam
 PlaybackSnapshot
 EpisodeId / Generation / Window
@@ -1653,7 +1661,8 @@ The exact configuration/handoff mechanism that creates a fresh session definitio
 > `experiments/f6-source-probe/` + PR #157 (S_PROBE_GREEN, 3 physical
 > runs × 11 scenarios on a real Windows host, NEG negative control
 > fired; acoustic human-ear witness UNAVAILABLE, recorded as a
-> conditional-green review item); design source: the merged #155
+> conditional-green review item — a failed ear check reopens this
+> verdict); design source: the merged #155
 > transport-closure package. The two D14 openings this amendment
 > decides are `F6 CONFIG-MECHANISM-OPEN` and the probe/concurrency
 > disclosure; everything not stated below remains governed by the
@@ -1687,7 +1696,11 @@ The exact configuration/handoff mechanism that creates a fresh session definitio
 >        an application composition decision ("this source opened and
 >        declared X at probe time") — advisory, never episode truth;
 >        the new activation's own open/probe publishes the
->        authoritative source evidence. Public-surface amendment
+>        authoritative source evidence. D13 record: the probe query
+>        and the Open/replacement operation earn NO Plugin, NO
+>        Capability and NO composition identity — a plain one-shot
+>        read operation owned by its caller; the existing owners lose
+>        nothing by owning it. Public-surface amendment
 >        (intentional, narrow): the decode provider crate exposes
 >        exactly this query — `SourceFacts` only, never
 >        SongcoreDecode / DecodedPcmStream / song handles / service
@@ -1749,7 +1762,9 @@ The exact configuration/handoff mechanism that creates a fresh session definitio
 >                              invented in v1
 > old teardown failure         authoritative disposal outcome
 >                              TeardownViolated ⇒ FAIL-STOP: the
->                              violated latch has no exit (§G.6), no
+>                              violated latch has no exit
+>                              (composition-kernel-0-design.md §G.6),
+>                              no
 >                              new episode is constructed, no further
 >                              Open/Next/Previous runs in this process;
 >                              the App RETAINS the violated root until
@@ -2383,7 +2398,7 @@ global stores remain forbidden.
 >
 > ```text
 > desired_volume ∈ 0..=100 (integer, clamped; step 5; no
->                acceleration; no dB curve promise; 50 makes no
+>                dB curve promise; 50 makes no
 >                "half perceived loudness" claim)
 > truth class:   application configuration (Command family — routed
 >                like pause intent, D14.7 precedent), NOT a Fact, NOT
@@ -2447,12 +2462,14 @@ global stores remain forbidden.
 > independence with audible change EXPECTED, V3 lifecycle
 > persistence, V4 apply-placement perturbation measurement, V5
 > failure routing with the log-and-pretend shape FAILING). Reopen
-> conditions: V1a cross-stream coupling, or V2a/V2b either side
-> writing the other's factor, or V4/V5 showing the loop-top apply
-> materially perturbs the render leg — any of these REOPENS the
-> apply-point/ownership decision before a Volume implementation
-> freezes it. Until V-PROBE is green, a coding agent MUST NOT treat
-> the apply placement as frozen.
+> conditions, two tiers as designed: a V1a cross-stream coupling
+> failure, or either V2a/V2b factor-writing direction, reopens **the
+> mechanism decision itself** (the IAudioStreamVolume selection,
+> D14.9's §5-B2 candidate); a V4/V5 finding that the apply point
+> materially perturbs the render leg reconsiders **the
+> apply-point/ownership mechanism**. Until V-PROBE is green, a coding
+> agent MUST NOT treat the apply placement — or the mechanism
+> selection against a failed V1a/V2a/V2b — as frozen.
 >
 > Representation still open: the output-level control's Rust spelling;
 > the RenderRequest field shape; non-Windows mechanisms (per-platform
@@ -2469,9 +2486,7 @@ no new Plugin merely named Volume/DeviceSwitch
 ```
 
 Device switch authority / replacement mechanism remains OPEN (D14.9
-pre-amendment scope unchanged); enumeration is an Output-side mechanism
-query and switching still needs either a session-owned replaceable
-render binding or whole-episode replacement, explicitly earned.
+pre-amendment scope unchanged) and stays a D14.10 stop-list item.
 
 ### D14.10 What Flash/coding agents may and may not decide
 
@@ -2500,6 +2515,7 @@ preload/gapless/overlap topology
 volume realtime apply placement (pending V-PROBE; the D14.9 candidate
     mechanism and its owner/semantics left this list with the
     2026-09-18 F6 promotion — the placement has not)
+device switch authority / replacement mechanism
 ```
 
 (The pause/resume semantic commit point and minimum mechanism left this
