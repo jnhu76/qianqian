@@ -7,7 +7,7 @@
 | Accepted after | PR #118 corrective adversarial review: taxonomy, historical provenance, authority routing, vocabulary-gate scope |
 | Supersedes | — |
 | Amends | ADR-PBK-001 current vocabulary and earned playback composition decisions; PBK-001 foundations / Fact contract / P1–P5 remain unchanged |
-| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint; 2026-09-17 — §20 D14.8 implementation note (F4-IMPLEMENTATION-1, PR #152): the chosen representation and the terminal/duration conformance reading are recorded in D14.8 — representation only, no proposition changed; 2026-09-17 — §20 D14.8 F4-IMPLEMENTATION-CORRECTIVE-1 (same PR, fresh review): the position observation gate must also withdraw on a recorded activation failure — a raising activation can leave a published sample behind (the render mechanism opens before the decode-worker spawn; the open-abort leg publishes from its park slice), so "never-activated fabricates no Position" is not satisfied by the terminal-Fact condition alone (conformance, no new state) |
+| Amended | 2026-09-14 — §17 D11 episode terminal outcome semantic authority; 2026-09-14 — §18 D12 Everything-is-a-Plugin taxonomy corrective (Issue #138); 2026-09-14 — §19 D13 Plugin admission invariant (PR #139); 2026-09-15 — §17 D11 terminal-settlement ownership corrective + §20 D14 Phase-F playback semantic execution guard (formal evidence PR #142, reality audit Issue #141); 2026-09-16 — §20 D14.7 pause/resume mechanism + establishment freeze (F3-GATE, evidence `experiments/f3-pause-mechanism/`); 2026-09-16 — §20 D14.7 pause establishment corrective: render engagement ≠ audible pause; Paused gated on output-tail quiescence evidence and demarcated as a non-authoritative Projection (F3-GATE-CORRECTIVE-1, same evidence crate); 2026-09-17 — §20 D14.7 AUTHORITY-CORRECTIVE: `Resumed` removed as an application-facing Projection — disengagement evidence cannot prove a viable render leg remains (never-activated/open-abort counterexample); resume is Command only, disengagement stays Mechanism Evidence (PR #150); 2026-09-17 — §20 D14.8 Position/Duration propositions frozen: episode-local device-consumed Position Projection (a monotone mechanism-evidence sample published by the render leg, read as one pure load) + optional source-scoped Duration Mechanism Evidence (F4-GATE, evidence `experiments/f4-timeline-gate/`); 2026-09-17 — §20 D14.8 F4-GATE-CORRECTIVE-1 (pre-merge review): the reader-side monotone clamp and the two-cell reader pair are REMOVED — monotonicity is owned by the writer-side publication, which is what keeps `observe()` a pure read; the "± one in-flight block" accuracy statement is withdrawn as a concurrency correctness bound (freshness is not a bound); the IAudioClock byte-rate wording is narrowed to the exercised endpoint; 2026-09-17 — §20 D14.8 implementation note (F4-IMPLEMENTATION-1, PR #152): the chosen representation and the terminal/duration conformance reading are recorded in D14.8 — representation only, no proposition changed; 2026-09-17 — §20 D14.8 F4-IMPLEMENTATION-CORRECTIVE-1 (same PR, fresh review): the position observation gate must also withdraw on a recorded activation failure — a raising activation can leave a published sample behind (the render mechanism opens before the decode-worker spawn; the open-abort leg publishes from its park slice), so "never-activated fabricates no Position" is not satisfied by the terminal-Fact condition alone (conformance, no new state); 2026-09-17 — §20 D14.5 seek-discontinuity mechanism + policy freeze (F5-GATE, evidence `experiments/f5-seek-discontinuity/` + `specs/f5-seek-discontinuity/`): refusal-first frozen ordering, park + natural drain output mechanism, same-cell position rebase, P1–P5 untriggered; 2026-09-18 — §20 D14.5 F5-GATE-CORRECTIVE-1 (pre-merge review): refusal made zero-content-loss (an in-flight staging block observed mid-write is preserved and finished exactly), and the song_seek provider outcome is frozen three-class — RefusedUnchanged (provably pre-mutation only, the INVALID_ARGUMENT class) / Applied / MutatedThenFailed (routes through the ordinary D11 decode-failure path; generic SEEK_ERROR is NOT a refusal because the ABI also returns it after a destructive reposition + decoder flush); F5 implementation still blocked |
 | Evidence | PR #117 FIRST_AUDIBLE_SLICE; current K0 / playback production reality audited in Issue #138 |
 
 ---
@@ -506,7 +506,6 @@ VolumePlugin
 ## 14. Open decisions
 
 ```text
-seek physical-output cutover mechanism beyond D14's frozen stale-PCM invariant
 open/session CONFIG mechanism under D14's no-overlap v1 semantic contract
 playlist / queue authority and whether it earns PlaylistPlugin
 next / previous navigation policy beyond D14's no-overlap replacement semantic shape
@@ -529,7 +528,13 @@ P1–P5 concrete production mechanism
 (No longer OPEN: position / duration authority — designated as the
 D14.8 episode-local Position Projection and optional Duration evidence
 by the 2026-09-17 F4-GATE amendment. The D14.8 representation and the
-seek-epoch rebase rule's F5 mechanism remain governed by D14.8/D14.5.)
+seek-epoch rebase rule's F5 mechanism remain governed by D14.8/D14.5.
+No longer OPEN either: seek physical-output cutover mechanism beyond
+D14's frozen stale-PCM invariant — frozen by the 2026-09-17 F5-GATE
+amendment inside D14.5 (same-resource discontinuity protocol; park +
+natural-drain output cut selected, Stop/Reset/Start rejected with
+physical evidence); F5 production implementation still stops until a
+later slice is explicitly authorized against that frozen text.)
 
 Reduction rule for all future phases:
 
@@ -766,6 +771,11 @@ Playing / Starting / Paused / Stopping semantics
      state; `Resumed` was removed from the projection set by the
      D14.7 AUTHORITY-CORRECTIVE)
 seek product-state vocabulary / actual-landing authority beyond D14 minimum
+    (no longer OPEN: the 2026-09-17 F5-GATE amendment in D14.5 froze
+     the actual-landing authority — the decode provider's reported
+     landing, relayed by the session as the Position rebase basis,
+     unknown = withdraw the projection — and the product-state
+     vocabulary: no new public seek state, no Seek completion Fact)
 source identity / playlist authority / navigation policy
 volume / device-switch authority
 PlaybackFacts publication topology beyond D14 read seam
@@ -1091,7 +1101,10 @@ The implementation protocol (decode-side serialization → old-staging discard �
 decoder reposition → edge invalidate/flush → physical output cutover → landing
 acknowledgement) is roadmap execution detail owned by Issue #119 F5
 (SEEK DISCONTINUITY PROTOCOL REV.3, three-layer cutover). This ADR freezes
-only its semantic spine:
+only its semantic spine *(that REV.3 step sketch is historical — superseded
+2026-09-17 by the F5-GATE amendment below, which freezes the execution
+ordering: seek refusal decided first, then staging discard, then the single
+worker-side edge purge)*:
 
 ```text
 same-episode ownership            no new Plugin/Fiber/lifecycle noun
@@ -1104,9 +1117,248 @@ no single vague success bit       command accepted / decoder repositioned /
 physical cutover gate stays OPEN  F5 implementation STOPs here
 ```
 
+*(The "stays OPEN" row above is resolved by the 2026-09-17 F5-GATE amendment below; the stop rule itself remains: F5 implementation does not start until a later slice is explicitly authorized against the frozen text.)*
+
 `seek command accepted`, `decoder repositioned`, `old PCM invalidated`, `physical output cutover`, and `actual landing` are not to be collapsed into one vague success bit if the implementation exposes them internally.
 
-**The physical output cutover mechanism is still OPEN.** F5 production implementation must stop at that gap until a narrow mechanism decision proves one of the existing-output reset/reopen/minimal-cutover choices. A coding agent may not invent `Generation`, a generic cache protocol, or a new runtime to bypass this gate.
+**The physical output cutover mechanism is still OPEN.** F5 production implementation must stop at that gap until a narrow mechanism decision proves one of the existing-output reset/reopen/minimal-cutover choices. A coding agent may not invent `Generation`, a generic cache protocol, or a new runtime to bypass this gate. *(Resolved 2026-09-17 by the F5-GATE amendment below, which freezes the mechanism decisions; that amendment's own block rule governs: the F5 production implementation still stops until a later slice is explicitly authorized against the frozen text.)*
+
+> 2026-09-17 amendment (F5-GATE; mechanism evidence:
+> `experiments/f5-seek-discontinuity/` — E1 decoder-seek reality probe
+> [SongCore ABI v1, committed corpus], E2 edge-cut protocol probe
+> [faithful edge-sync copy, 256×3 scenarios, 51/51 negative control],
+> E3 physical WASAPI cutover probe [shared-mode, Windows host, 3 green
+> runs]; formal: `specs/f5-seek-discontinuity/` — safety model, 5
+> mutations COUNTEREXAMPLE-WITNESSED; roadmap: Issue #119 checkpoint).
+> The semantic spine above is UNCHANGED — the amendment freezes the
+> mechanism and policy decisions the gate earned and closes the §14
+> open item ("seek physical-output cutover mechanism"). The F5
+> production implementation remains blocked until a later slice is
+> explicitly authorized against this frozen text; nothing here merges
+> production code by itself.
+>
+> 2026-09-18 corrective 1 (F5-GATE-CORRECTIVE-1, pre-merge review;
+> fresh evidence: SongCore implementation audit
+> `native/src/songcore_ffmpeg.c song_seek`, E2 re-run — 294 scenarios ×3
+> green runs incl. refused/destructive families, 51/51 rogue negative
+> control, 1/1 drop-remainder must-fire, REFUSAL-EQUIV + FAIL-CLOSED
+> oracles; formal model re-run — 672 states, 6 witnesses, 7 mutations
+> incl. new M6/M7). The refusal semantics are
+> split and made honest, in two moves. (a) Refusal is ZERO-content-
+> loss: the in-flight staging block observed mid-write is stopped at
+> its written prefix and PRESERVED; a refusal finishes it exactly, so
+> the refused-seek output equals the no-seek control. The earlier
+> "at most one abandoned in-flight staging block" loss claim is
+> WITHDRAWN — it contradicted inertness. (b) The song_seek provider
+> outcome is THREE-class — `RefusedUnchanged` (provably pre-mutation:
+> only the SongCore parameter/state checks, INVALID_ARGUMENT class),
+> `Applied` (success; landing known or unknown), `MutatedThenFailed`
+> (every failure not provably pre-mutation) — and `MutatedThenFailed`
+> routes through the ordinary D11 decode-failure path (terminal
+> Failed) instead of resuming old playback: the ABI returns generic
+> SEEK_ERROR both before av_seek_frame and again after a successful
+> reposition + decoder flush/reset, so a status code alone cannot
+> prove inertness, and the conservative rule is "unprovable means
+> destructive". Representation spelling (Rust names) stays open to the
+> implementation gate; only the three properties are frozen. The
+> successful-cut protocol, output mechanism, commit boundary, position
+> rebase and pause interaction below are unchanged.
+
+**Frozen by this amendment:**
+
+```text
+acceptance            seek is a same-episode Command accepted only while
+                      the data plane is Open (edge terminal == Open) and
+                      the episode is unsettled, with no seek in flight
+                      (one-seek-in-flight; a second request before the
+                      current cut commits or aborts is inert). The drain
+                      window after decoder EOF (edge Eof, D11 not yet
+                      settled) is explicitly NOT seekable in v1 —
+                      reopening an Eof edge is a closed design door.
+cutover protocol      same-resource discontinuity protocol (no resource
+                      is replaced). The session records the command and
+                      parks the render leg at its loop-top gate (the
+                      D14.7 park invariant — no device buffer held
+                      across a park — attributed to the cut: an
+                      internal seek park is NOT pause engagement
+                      evidence and never routes pause intent). Ordering
+                      is load-bearing in two places. First, the worker
+                      keeps producing until the leg's parked evidence
+                      has arrived — an early production hold could
+                      strand the leg inside a blocked read on an
+                      emptied edge and stall the protocol (the flowing
+                      production is what keeps the park reachable). The
+                      worker must also be able to reach its
+                      serialization point with bounded latency
+                      regardless of edge occupancy (representation
+                      open; e.g. a bounded-slice write wait that
+                      observes the command slot). Second, at the
+                      serialization point — with the parked evidence in
+                      hand — the worker calls song_seek BEFORE anything
+                      is invalidated. Observing the command mid-block
+                      stops the bounded-slice write at its written
+                      prefix and PRESERVES the in-flight staging block;
+                      the provider outcome owns the remainder. The
+                      outcome is three-class (SongCore reality: only
+                      the pre-av_seek_frame parameter/state checks are
+                      provably non-mutating):
+                        RefusedUnchanged (proven pre-mutation refusal,
+                        the INVALID_ARGUMENT class) → the worker
+                        publishes seek-failed mechanism evidence,
+                        finishes the preserved remainder exactly, and
+                        resumes production from its current cursor;
+                        edge, device tail and render leg continue the
+                        pre-command content (the session releases the
+                        leg). A refusal is therefore pre-cut and inert
+                        with ZERO content loss: the consumed stream
+                        equals the no-seek control.
+                        MutatedThenFailed (any failure not provably
+                        pre-mutation — generic SEEK_ERROR, which the
+                        SongCore ABI also returns after a successful
+                        reposition and decoder flush/reset,
+                        SEEK_UNSUPPORTED, STREAM_CHANGE,
+                        DECODE_ERROR) → the old decoder continuation is
+                        not guaranteed; the episode takes the ordinary
+                        decode-failure route (D11 failure evidence →
+                        terminal Failed) and NEVER resumes old-cursor
+                        production. Conservative rule: unprovable means
+                        destructive.
+                        Applied (success) at landing L → the worker
+                        discards its staging (including any preserved
+                        remainder), invalidates the edge itself (the ONE
+                        purge — the load-bearing stale-PCM exclusion
+                        is this program-order discipline on the only
+                        producer thread, not the primitive), publishes
+                        its actual landing as mechanism evidence, and
+                        holds production (writes nothing) until
+                        release.
+                      The session — seeing the landing with the leg
+                      parked — waits for the output tail to quiesce and
+                      then commits. The production hold keeps every
+                      pre-commit submission pre-landing, so the rebase
+                      basis L is exact: no post-landing pre-commit new
+                      frame exists to mix into, or lose from, the
+                      position accounting.
+commit boundary       the session records the cutover commit iff
+                      landing published ∧ edge invalidated ∧ output tail
+                      quiesced (padding == 0 while parked — the D14.7
+                      evidence class) ∧ leg parked ∧ episode unsettled.
+                      Before commit, old output is legal; after commit,
+                      no PCM of this stream that was queued-to-play
+                      before the commit can ever be rendered — the same
+                      device-consumed boundary D14.7/D14.8 freeze: the
+                      claim covers this stream's queued-to-play set
+                      (padding), never the acoustic instant or the
+                      unmeasured downstream latency. Seek contributes
+                      no terminal evidence and owns no second terminal
+                      authority.
+output mechanism      park + natural drain (the device consumes the old
+                      tail pre-commit; measured 30.2–31.9 ms across
+                      three runs at one full device buffer on the probe
+                      endpoint). Stop/Reset/
+                      Start is REJECTED for v1 (measured: freezes
+                      mid-buffer audio, resets the device position
+                      origin, adds a stream-state machine for an
+                      inaudible latency win) and is re-earnable only by
+                      a new narrow authority decision. No stream is
+                      replaced; P1–P5 are NOT triggered (same edge,
+                      same stream, same device session, same position
+                      cell, same threads; no old/new RT-world overlap).
+position rebase       realizes the D14.8 seek paragraph: the rebase
+                      happens on the render leg's own execution path at
+                      commit release — basis := the decoder's reported
+                      actual landing in source frames (−1 = unknown → no
+                      basis exists; the Position projection is withdrawn
+                      for the rest of the episode: unknown stays
+                      unknown, never zero, never the requested target),
+                      and the leg's handed-off accounting resets, so
+                      pre- and post-cutover totals are never mixed (the
+                      protocol's production hold between landing and
+                      release makes the basis exact — every pre-commit
+                      submission is pre-landing). Same cell, one writer,
+                      plain store at the commit; within one published
+                      stretch — i.e. between committed discontinuities —
+                      the publication stays monotone.
+                      **Position monotonicity scope is hereby amended:
+                      monotone between committed discontinuities** — a
+                      committed cutover may step the published sample
+                      backward exactly once, on the writer's path, and
+                      that step is the discontinuity. No new cell, no
+                      Generation/SeekId/TimelineSegment; the requested
+                      target NEVER substitutes for the landing (E1
+                      measured lossless block-aligned landings up to
+                      ~648 frames before target).
+pause interaction     pause intent SURVIVES seek: a seek never implicitly
+                      resumes and is never rejected because of pause.
+                      A paused episode's already-quiesced tail satisfies
+                      the output-cut precondition; the leg stays parked
+                      through the cut; paused() evaluates unchanged.
+                      Conversely, pause intent arriving while a playing
+                      episode's cut is in flight routes normally (the
+                      seek park is cut-attributed); the leg is already
+                      parked, and no pause-attributed engagement exists
+                      until a post-release re-park — the frozen
+                      attribution rule determines the outcome uniquely.
+failure policy        pre-cut failures are inert diagnostics — playback
+                      continues from the pre-command content; they are
+                      NEVER terminal Failed. They are exactly: seek
+                      already in flight; data plane not Open (edge
+                      terminal != Open, which includes the post-EOF
+                      drain window); settled episode or stop intent
+                      already recorded; a RefusedUnchanged song_seek
+                      outcome (the provably pre-mutation class,
+                      INVALID_ARGUMENT) — under the frozen ordering it
+                      happens BEFORE any invalidation and the preserved
+                      staging remainder is finished, so edge, tail and
+                      leg continue seamlessly with zero content loss.
+                      Any other song_seek failure status (SEEK_ERROR /
+                      SEEK_UNSUPPORTED / STREAM_CHANGE / DECODE_ERROR)
+                      is NOT a refusal: the SongCore ABI returns generic
+                      SEEK_ERROR both from a failed av_seek_frame and
+                      again after a successful reposition + decoder
+                      flush, so a status code alone cannot prove the old
+                      decoder survived; such an outcome is classified
+                      MutatedThenFailed and routes through the ordinary
+                      D11 decode-failure path (terminal Failed) — it is
+                      never papered over as a refusal. Reclassifying a
+                      provider result as RefusedUnchanged requires a
+                      narrow SongCore provider-contract corrective with
+                      its own evidence (SEEK_UNSUPPORTED stays
+                      destructive until such evidence exists). Post-cut,
+                      the selected mechanism confines failure to the
+                      existing D11 device-failure path (the edge
+                      invalidate is a fail-fast O(1) reset that happens
+                      only after song_seek has succeeded; a device
+                      failure during the drain settles through the
+                      existing precedence). Seek introduces no new
+                      terminal variant and no recovery semantics.
+realtime cost         normal playback adds no new allocation, no new lock
+                      acquisition, no dispatch, no K0/Capability work
+                      and no version/epoch comparison per quantum; the
+                      render loop's existing loop-top gate check gains
+                      one more session-owned seek-park flag test, and
+                      the worker gains a loop-top command check off the
+                      RT path; seek work is bounded control work
+                      outside the quantum path.
+public surface        proposed future command:
+                      `PlaybackSessionHandle::request_seek(&self,
+                      target: Duration)` — infallible, non-negative,
+                      source-relative; invalid moments are inert. No
+                      SeekManager/SeekSession/transaction noun; no new
+                      observation field and no public positive seek
+                      state (consumers observe the Position jump). The
+                      allowlist update at implementation time remains
+                      the explicit architecture event (D14.10).
+```
+
+The command accepted / decoder repositioned / old PCM invalidated /
+physical output cutover / actual landing propositions stay separable
+(they are separate protocol states above); the implementation must not
+collapse them into one success bit. Seek completion is NOT a Fact and
+not a product state; nothing here earns `Generation`, `Epoch`, `SeekId`,
+`DiscontinuityId`, `TimelineSegment`, or a public `SeekState` — the
+razor review is recorded in the gate report (`experiments/f5-seek-
+discontinuity/RESULTS.md` §15).
 
 ### D14.6 Open / Next / Previous — no-overlap replacement v1
 
@@ -1500,7 +1752,9 @@ freshness         Each published sample is exact only for the instant
                   reader's schedule, not a concurrency correctness
                   invariant (relaxed atomics give coherence per
                   location, never freshness). The mechanism owes the
-                  reader exactly three things: never backward, never
+                  reader exactly three things: never backward (between
+                  committed seek discontinuities — the D14.8 seek rule
+                  below records the F5-GATE re-scope), never
                   above its own handed-off accounting, never
                   fabricated. Any "± one in-flight block"-style error
                   bound is withdrawn as a contract; a measured
@@ -1547,8 +1801,13 @@ seek (F5 rule)    The accumulator is episode-local and its
                   pre- and post-cutover handed-off totals. How the
                   accumulator is rebased and how the seek's landing
                   offset enters the projection are owned by the F5
-                  cutover decision (still OPEN): F4 freezes only the
-                  no-mixing constraint and earns no base term,
+                  cutover decision (no longer OPEN: frozen 2026-09-17
+                  by the F5-GATE amendment in D14.5 — same-cell,
+                  writer-side rebase at commit release; basis = the
+                  decoder's reported actual landing; unknown landing
+                  withdraws the projection; monotonicity scope amended
+                  to "between committed discontinuities"): F4 freezes
+                  only the no-mixing constraint and earns no base term,
                   Generation, SeekId, or TimelineSegment for it.
 ```
 
@@ -1718,7 +1977,6 @@ new Plugin / Capability / K0 primitive
 new lifetime taxonomy
 Generation / Window / epoch / global playback store
 consumer-driven vs authority-driven semantic commit
-seek physical-output cutover mechanism
 F6 fresh-source/config handoff mechanism
 position/duration propositions beyond the frozen D14.8 minimum
 playlist/queue authority
@@ -1728,7 +1986,9 @@ preload/gapless/overlap topology
 
 (The pause/resume semantic commit point and minimum mechanism left this
 list when D14.7 froze them; the position/duration propositions left it
-when D14.8 froze theirs. Anything beyond the frozen minima still
-requires a narrow authority decision.)
+when D14.8 froze theirs; the seek physical-output cutover mechanism
+left it when the 2026-09-17 F5-GATE amendment froze it inside D14.5.
+Anything beyond the frozen minima still requires a narrow authority
+decision.)
 
 The rule is intentional: **OPEN means “not authorized yet,” not “Flash may invent the missing architecture.”**

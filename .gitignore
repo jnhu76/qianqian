@@ -8,3 +8,4 @@ specs/tools/tla2tools.jar
 .zcode/plan.md
 experiments/f3-pause-mechanism/target
 experiments/f4-timeline-gate/target
+experiments/f5-seek-discontinuity/target

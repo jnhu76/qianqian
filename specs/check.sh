@@ -26,8 +26,8 @@ set -uo pipefail
 
 mode="${1:-current}"
 case "$mode" in
-  current|k0|realtime|terminal|rust) ;;
-  *) echo "usage: specs/check.sh [current|k0|realtime|terminal|rust]（缺省 current）" >&2; exit 2 ;;
+  current|k0|realtime|terminal|rust|f5) ;;
+  *) echo "usage: specs/check.sh [current|k0|realtime|terminal|rust|f5]（缺省 current）" >&2; exit 2 ;;
 esac
 
 SPEC_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -47,6 +47,7 @@ case "$mode" in
     run_suite composition-kernel-0
     run_suite realtime-publication
     run_suite episode-terminal-settlement
+    run_suite f5-seek-discontinuity
     ;;
   k0)
     run_suite composition-kernel-0
@@ -57,6 +58,9 @@ case "$mode" in
   terminal)
     run_suite episode-terminal-settlement
     ;;
+  f5)
+    run_suite f5-seek-discontinuity
+    ;;
   rust)
     run_suite composition-kernel-0-rust
     run_suite playback-concurrency
@@ -64,10 +68,11 @@ case "$mode" in
 esac
 
 case "$mode" in
-  current)    what="全部当前 TLA+ 验证（K0 + realtime publication + episode terminal settlement）" ;;
+  current)    what="全部当前 TLA+ 验证（K0 + realtime publication + episode terminal settlement + f5 seek discontinuity）" ;;
   k0)         what="K0 套件" ;;
   realtime)   what="realtime publication 套件" ;;
   terminal)   what="episode terminal settlement 套件" ;;
+  f5)         what="f5 seek discontinuity 套件" ;;
   rust)       what="全部当前 Rust 侧验证（matrices + Miri + loom + 负控制）" ;;
 esac
 
