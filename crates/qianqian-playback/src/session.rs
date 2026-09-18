@@ -30,7 +30,7 @@ use qianqian_audio_api::ports::{
 };
 use qianqian_composition::{ActivationError, ComponentSpec, Discharge};
 
-use crate::completion::SessionCompletion;
+use crate::completion::{CutoverDecision, SessionCompletion};
 use crate::edge::PcmEdge;
 use crate::handle::PlaybackSessionHandle;
 
@@ -221,8 +221,12 @@ enum WriteStep {
 ///             edge.invalidate() — THE one purge, on this path —
 ///             publish the actual landing, hold production, and let
 ///             the session's commit decision (tail quiesced ∧ parked ∧
-///             unsettled) route the rebase release; then resume
-///             post-cut production
+///             unsettled, sampled atomically per poll) route the rebase
+///             release; a poll without that evidence is PENDING — the
+///             protocol keeps waiting, and only an episode ending
+///             (recorded stop intent / settlement / teardown, or the
+///             data plane's own terminal) ends it without a rebase.
+///             Then resume post-cut production.
 /// ```
 fn decode_worker(
     mut decode_stream: Box<dyn DecodedPcmStream>,
@@ -313,33 +317,68 @@ fn decode_worker(
                                 remainder = None;
                                 edge.invalidate();
                                 completion.seek_landing_published(landing);
+                                // The cut is irrevocable from here: the old
+                                // staging is discarded and the edge purged.
+                                // The wait and the decision are therefore
+                                // ONE sampled step per iteration — the
+                                // session samples the commit boundary and
+                                // the episode-ending latches in a single
+                                // lock hold, so a transient gap in the
+                                // park/quiescence evidence is Pending and
+                                // the protocol keeps waiting; it can never
+                                // fall back to pre-cut accounting (no
+                                // rebase) while the episode is still live.
+                                // The one episode-ending class the session
+                                // state cannot see is the data plane's own
+                                // terminal (the frozen failure policy's
+                                // "data plane not Open": stop, a device
+                                // abort that stopped the plane, teardown),
+                                // so it is tested here on this path.
                                 loop {
-                                    if completion.seek_aborted() {
-                                        break;
+                                    match completion.seek_cutover_decision(landing) {
+                                        CutoverDecision::Committed | CutoverDecision::Aborted => {
+                                            break;
+                                        }
+                                        CutoverDecision::Pending => {
+                                            if edge.terminal() != crate::edge::EdgeTerminal::Open {
+                                                // The data plane ended under
+                                                // the cut. No rebase is owed
+                                                // to an episode this owner is
+                                                // already ending, and the
+                                                // seek publishes no evidence
+                                                // of its own: settle through
+                                                // the existing D11 path.
+                                                completion.release_seek_without_commit();
+                                                return;
+                                            }
+                                            std::thread::sleep(WORKER_WAIT_SLICE);
+                                        }
                                     }
-                                    if completion.seek_tail_condition() {
-                                        break;
-                                    }
-                                    std::thread::sleep(WORKER_WAIT_SLICE);
                                 }
-                                // Commit iff landing published ∧ edge
-                                // invalidated (both true by this path's
-                                // program order) ∧ tail quiesced ∧ leg
-                                // parked ∧ episode unsettled. On abort
-                                // (stop/teardown won) no commit, no
-                                // rebase, no partial state. Either way
-                                // the release is routed.
-                                let _ = completion.commit_seek_cutover(landing);
                                 // The commit routed the rebase release;
                                 // the one-seek slot stays occupied until
                                 // the LEG has consumed the payload (a
                                 // later seek's hold would otherwise wipe
                                 // an unconsumed `Committed` and lose the
                                 // rebase). Bounded polls off the RT
-                                // path; stop/teardown wins immediately.
+                                // path; stop/teardown and a data plane
+                                // that ends under the cut win immediately
+                                // (an already-routed payload stays routed
+                                // for the exiting leg).
                                 while !completion.seek_aborted()
                                     && completion.seek_release_pending()
                                 {
+                                    if edge.terminal() != crate::edge::EdgeTerminal::Open {
+                                        // The data plane ended under the cut.
+                                        // The routed payload stays routed for
+                                        // the exiting leg — never overwritten
+                                        // with a second release — and the slot
+                                        // is free to clear because acceptance
+                                        // requires an Open data plane, so no
+                                        // later hold can wipe the rebase.
+                                        completion.clear_seek_in_flight();
+                                        return;
+                                    }
                                     std::thread::sleep(WORKER_WAIT_SLICE);
                                 }
                                 completion.clear_seek_in_flight();

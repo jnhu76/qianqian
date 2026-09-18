@@ -60,7 +60,7 @@ use qianqian_composition::{DesiredEntry, Revision};
 use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionHandle};
 
 use common::{
-    DeviceTail, OutputBehavior, SourceBehavior, TailProbe, TestDecode, TestOutput, within,
+    DeviceTail, OutputBehavior, Playout, SourceBehavior, TailProbe, TestDecode, TestOutput, within,
 };
 
 const DUMMY_PATH: &str = "test://seek-seam";
@@ -755,6 +755,78 @@ fn stop_intent_wins_over_an_in_flight_seek() {
             stopped_at,
             "a stopped episode produces nothing further"
         );
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+// --- unreachable commit boundary: liveness -------------------------------
+
+/// The D14.5 commit boundary can be permanently unreachable when the
+/// device's queued-to-play tail never quiesces (here: a device frozen
+/// mid-buffer, emptying nothing per observation). The episode must still
+/// be able to END: teardown stops the data plane first (the decode
+/// relation's `edge.stop()`, before the worker join), and that is the
+/// frozen failure policy's own "data plane not Open" episode-ending
+/// class — the seek wait observes it, routes the abort release, and the
+/// join returns. Before the protocol's waits read the data plane, they
+/// polled only the session's own endings, which teardown records AFTER
+/// the join: a cut over a never-quiescing tail wedged teardown forever.
+/// This test is that counterexample's oracle — it fails by the harness
+/// bound, not by an assertion, if the wait stops escaping.
+#[test]
+fn a_cut_over_a_never_draining_device_still_tears_down() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let (witnesses, handle, mut runtime) = episode(Vec::new());
+        wait_for_position_past(&handle, HALF_A_SECOND);
+        // Freeze the device mid-buffer: every later tail observation
+        // reports a non-empty queue, so the cut's park can never publish
+        // its quiescence and the boundary is unreachable by construction.
+        witnesses
+            .device_tail
+            .set_playout(Playout::FramesPerObservation(0));
+        handle.request_seek(Duration::from_secs(5));
+        assert!(
+            wait_until(Duration::from_secs(5), || witnesses.device_tail.queued()
+                > 0),
+            "precondition: the device holds queued-to-play frames"
+        );
+        std::thread::sleep(Duration::from_millis(200));
+        let stuck = handle.observe();
+        assert_eq!(
+            stuck.terminal_outcome, None,
+            "the episode stays UNSETTLED with the cut in flight: {stuck:?}"
+        );
+        // The liveness claim: teardown completes.
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// Control for the regression above: an application stop releases the
+/// cut over the same never-draining device through the recorded stop
+/// intent (the class the wait already re-checked), so this side was
+/// never the wedge. It pins that the fix did not make stop the only
+/// escape the protocol has.
+#[test]
+fn a_stop_releases_a_cut_over_a_never_draining_device() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(20), move || {
+        let (witnesses, handle, mut runtime) = episode(Vec::new());
+        wait_for_position_past(&handle, HALF_A_SECOND);
+        witnesses
+            .device_tail
+            .set_playout(Playout::FramesPerObservation(0));
+        handle.request_seek(Duration::from_secs(5));
+        assert!(
+            wait_until(Duration::from_secs(5), || witnesses.device_tail.queued()
+                > 0),
+            "precondition: the device holds queued-to-play frames"
+        );
+        std::thread::sleep(Duration::from_millis(200));
+        handle.request_stop();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });

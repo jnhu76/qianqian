@@ -264,6 +264,26 @@ impl Default for SessionCompletion {
     }
 }
 
+/// What ONE [`SessionCompletion::seek_cutover_decision`] sample concluded
+/// about an applied cut (ADR-PBK-002 D14.5). Three-valued on purpose:
+/// "the commit boundary does not hold yet" and "the episode is ending"
+/// are different statements about different things, and only the second
+/// one may release a purged cut's render leg without its rebase.
+/// Crate-internal protocol vocabulary — never a Fact, never a terminal
+/// variant, never public surface.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CutoverDecision {
+    /// The commit boundary held; the commit is recorded and the rebase
+    /// release routed to the render leg.
+    Committed,
+    /// An episode ending is recorded (stop intent, a committed terminal
+    /// Fact, or the teardown release); the release is routed as an abort.
+    Aborted,
+    /// The boundary is not satisfiable yet — current park/quiescence
+    /// evidence is missing. Nothing recorded, nothing routed.
+    Pending,
+}
+
 impl SessionCompletion {
     pub(crate) fn new() -> Self {
         Self {
@@ -633,20 +653,14 @@ impl SessionCompletion {
     /// stop intent recorded, the episode already settled, or the
     /// authority-owned teardown release has begun. Every wait in the
     /// protocol re-checks this, so stop always wins and no protocol
-    /// step can wedge teardown.
+    /// step can wedge teardown. The frozen failure policy's third
+    /// episode-ending class — "data plane not Open" (edge terminal !=
+    /// Open) — is deliberately NOT here: it is the worker's own read,
+    /// taken on its own path without reaching the data plane under this
+    /// lock, in the same class as the recorded endings above.
     pub(crate) fn seek_aborted(&self) -> bool {
         let guard = self.state.state.lock().expect("completion lock");
         guard.stop_requested || guard.outcome.is_some() || guard.teardown_released
-    }
-
-    /// The D14.5 commit-boundary tail condition, paired per park kind:
-    /// "output tail quiesced while the leg is parked" holds iff the leg
-    /// is parked under one attribution AND THAT engagement observed its
-    /// tail quiesced. The pairing is what keeps a previous park's
-    /// quiescence from satisfying a later park.
-    pub(crate) fn seek_tail_condition(&self) -> bool {
-        let guard = self.state.state.lock().expect("completion lock");
-        (guard.engaged && guard.tail_quiesced) || (guard.seek_engaged && guard.seek_tail_quiesced)
     }
 
     /// The worker publishes the three-class provider outcome's inert
@@ -670,22 +684,54 @@ impl SessionCompletion {
         });
     }
 
-    /// The session's cutover-commit decision (D14.5 commit boundary),
-    /// evaluated and recorded atomically under the completion lock —
-    /// the same lock stop intent linearizes through, so "stop before
-    /// the commit wins" holds by construction. Returns `true` iff the
-    /// commit was recorded; in that case the rebase release has been
-    /// routed to the render leg. On `false` (stop/teardown/settled won
-    /// the race) the release is routed as an abort instead: no commit,
-    /// no rebase, no partial state.
+    /// The session's cutover disposition for one APPLIED cut (D14.5
+    /// commit boundary), sampled — together with the episode-ending
+    /// latches — in ONE completion-lock hold: the same lock stop intent
+    /// and every terminal publication linearize through, so one call is
+    /// one real-instant view of the whole decision. There is no second
+    /// sample for a transient evidence gap to land between.
+    ///
+    /// ```text
+    /// Committed   the boundary held: landing published ∧ leg parked ∧
+    ///             THAT park's tail quiesced ∧ episode unsettled (the
+    ///             "edge invalidated" conjunct is the caller's program
+    ///             order and already true by the time it asks). The
+    ///             commit is recorded and the rebase release routed.
+    /// Aborted     an episode ending is recorded — stop intent, a
+    ///             committed terminal Fact, or the authority-owned
+    ///             teardown release. No commit, no rebase, no partial
+    ///             state; the release is routed as an abort.
+    /// Pending     the boundary is not satisfiable YET. NOT an abort:
+    ///             missing current park/quiescence evidence is a
+    ///             statement about the evidence, never about the
+    ///             episode. Nothing is recorded and nothing is routed;
+    ///             the caller keeps waiting.
+    /// ```
+    ///
+    /// The atomicity and the three-valuedness are one corrective
+    /// (implementation corrective-3). The evidence a commit reads is
+    /// latched per park, and the leg's pause→cut park handover publishes
+    /// Disengaged-then-SeekEngaged; a two-sample spelling (wait on one
+    /// read, decide on another) could therefore observe the conjunction
+    /// and then a gap, and classifying that gap as an abort would
+    /// release the leg with NO rebase strictly after the provider
+    /// applied and the edge was purged — silently restoring the pre-cut
+    /// position accounting through an evidence artifact. The only exits
+    /// from an applied cut are `Committed` or an episode ending.
     ///
     /// Preconditions the CALLER owns (worker program order, not lock
     /// state): the provider succeeded, the staging was discarded, and
     /// `edge.invalidate()` has already returned on the worker's path.
-    /// Preconditions evaluated HERE under the lock: landing published,
-    /// tail quiesced while the leg is parked, episode unsettled.
+    /// The one episode-ending condition this cannot read without
+    /// reaching the data plane — "data plane not Open" (the frozen
+    /// failure policy's own class: edge terminal != Open, which includes
+    /// the post-EOF drain window and a device abort's stop) — is the
+    /// caller's: it tests the edge on its own path, outside this lock,
+    /// and takes the abort route there. No new terminal evidence is
+    /// published on that route: the data plane's owner settles the
+    /// episode through the existing D11 precedence.
     ///
-    /// The one-seek slot is NOT freed here, on either branch: a
+    /// The one-seek slot is NOT freed here, on the Committed branch: a
     /// committed release is part of the cut until the LEG has consumed
     /// it (a later hold would wipe an unconsumed `Committed` and lose
     /// the rebase — the seek matrices caught that exact pause-shaped
@@ -694,26 +740,29 @@ impl SessionCompletion {
     /// the abort branch no free is needed at all: every abort condition
     /// (stop intent, settled, teardown release) implies the episode is
     /// ending, so the slot is never consulted again.
-    pub(crate) fn commit_seek_cutover(&self, landing: Option<u64>) -> bool {
+    pub(crate) fn seek_cutover_decision(&self, landing: Option<u64>) -> CutoverDecision {
         let decision = {
             let mut guard = self.state.state.lock().expect("completion lock");
+            let episode_ending =
+                guard.stop_requested || guard.outcome.is_some() || guard.teardown_released;
             let parked_and_quiesced = (guard.engaged && guard.tail_quiesced)
                 || (guard.seek_engaged && guard.seek_tail_quiesced);
-            let unsettled =
-                guard.outcome.is_none() && !guard.stop_requested && !guard.teardown_released;
-            if guard.seek_landing.is_some() && parked_and_quiesced && unsettled {
+            if episode_ending {
+                CutoverDecision::Aborted
+            } else if guard.seek_landing.is_some() && parked_and_quiesced {
                 guard.cut_committed = true;
-                true
+                CutoverDecision::Committed
             } else {
-                false
+                CutoverDecision::Pending
             }
         };
-        if decision {
-            self.state
+        match decision {
+            CutoverDecision::Committed => self
+                .state
                 .gate
-                .release_seek_hold(SeekParkRelease::Committed { landing });
-        } else {
-            self.state.gate.release_seek_hold(SeekParkRelease::Aborted);
+                .release_seek_hold(SeekParkRelease::Committed { landing }),
+            CutoverDecision::Aborted => self.state.gate.release_seek_hold(SeekParkRelease::Aborted),
+            CutoverDecision::Pending => {}
         }
         decision
     }
@@ -721,7 +770,7 @@ impl SessionCompletion {
     /// Whether the current cut's routed release still awaits the leg's
     /// consumption. The worker polls this after a commit and frees the
     /// one-seek slot only when it clears — see
-    /// [`SessionCompletion::commit_seek_cutover`].
+    /// [`SessionCompletion::seek_cutover_decision`].
     pub(crate) fn seek_release_pending(&self) -> bool {
         self.state.gate.seek_release_pending()
     }
@@ -1342,14 +1391,16 @@ mod tests {
         );
     }
 
-    /// The commit boundary is a conjunction, evaluated atomically:
-    /// (landing published) ∧ (leg parked ∧ THAT engagement's tail
-    /// quiesced, under either attribution) ∧ episode unsettled. Each
-    /// missing conjunct routes an ABORT release (no wedged park); the
-    /// full conjunction commits and routes the landing payload exactly
-    /// once; an UNKNOWN landing commits too — stale exclusion is
-    /// independent of landing knowledge — and stop intent recorded
-    /// before the decision wins it.
+    /// The commit boundary is a conjunction, evaluated in ONE atomic
+    /// sample: (landing published) ∧ (leg parked ∧ THAT engagement's
+    /// tail quiesced, under either attribution) ∧ episode unsettled.
+    /// A missing conjunct is PENDING — nothing recorded, NOTHING
+    /// routed, the protocol keeps waiting (releasing the leg there is
+    /// exactly how an applied cut would lose its rebase). A recorded
+    /// episode ending is the only abort, and it routes the abort
+    /// release; the full conjunction commits and routes the landing
+    /// payload exactly once; an UNKNOWN landing commits too — stale
+    /// exclusion is independent of landing knowledge.
     #[cfg(not(loom))]
     #[test]
     fn the_commit_boundary_requires_its_full_conjunction() {
@@ -1359,11 +1410,19 @@ mod tests {
         completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
-        assert!(!completion.commit_seek_cutover(Some(123)));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(123)),
+            CutoverDecision::Pending
+        );
+        assert!(
+            !completion.seek_protocol_state().1,
+            "a pending boundary records no commit"
+        );
         assert_eq!(
             consume_release(&completion.render_gate()),
-            Some(SeekParkRelease::Aborted),
-            "the losing decision still releases the leg"
+            None,
+            "a pending boundary routes NOTHING: the leg stays parked \
+             rather than resuming without its rebase"
         );
 
         // The park half must actually BE there: landing published and
@@ -1373,13 +1432,19 @@ mod tests {
         let completion = SessionCompletion::new();
         completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
         completion.seek_landing_published(Some(7));
-        assert!(!completion.commit_seek_cutover(Some(7)));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(7)),
+            CutoverDecision::Pending
+        );
         assert_eq!(
             consume_release(&completion.render_gate()),
-            Some(SeekParkRelease::Aborted),
+            None,
+            "no park evidence, no release — the boundary is not \
+             satisfiable by landing knowledge alone"
         );
 
-        // Stop intent recorded before the decision wins the race.
+        // Stop intent recorded before the decision wins the race: the
+        // one abort, and it releases the leg.
         let completion = SessionCompletion::new();
         let core = completion.state.clone();
         completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
@@ -1387,7 +1452,10 @@ mod tests {
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
         completion.seek_landing_published(Some(123));
-        assert!(!completion.commit_seek_cutover(Some(123)));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(123)),
+            CutoverDecision::Aborted
+        );
         assert_eq!(
             consume_release(&completion.render_gate()),
             Some(SeekParkRelease::Aborted),
@@ -1405,7 +1473,10 @@ mod tests {
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
         completion.seek_landing_published(Some(123));
-        assert!(completion.commit_seek_cutover(Some(123)));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(123)),
+            CutoverDecision::Committed
+        );
         let (refused, committed, landing) = completion.seek_protocol_state();
         assert!(!refused);
         assert!(committed);
@@ -1446,7 +1517,10 @@ mod tests {
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
         completion.seek_landing_published(None);
-        assert!(completion.commit_seek_cutover(None));
+        assert_eq!(
+            completion.seek_cutover_decision(None),
+            CutoverDecision::Committed
+        );
         assert_eq!(
             consume_release(&completion.render_gate()),
             Some(SeekParkRelease::Committed { landing: None }),
@@ -1461,9 +1535,78 @@ mod tests {
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekEngaged));
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekTailQuiesced));
         completion.seek_landing_published(Some(55));
-        assert!(
-            completion.commit_seek_cutover(Some(55)),
+        assert_eq!(
+            completion.seek_cutover_decision(Some(55)),
+            CutoverDecision::Committed,
             "the cut-attributed park is the same evidence class"
+        );
+    }
+
+    /// Implementation corrective-3 (the lost-rebase race). The commit
+    /// boundary reads per-park latched evidence, and the render leg's
+    /// pause→cut park handover publishes `Disengaged` (its pause park
+    /// ended) before `SeekEngaged` (the hold parks it again) — so the
+    /// conjunction is momentarily unsatisfiable IN the handover even
+    /// though the cut is already applied and purged. A decision taken
+    /// there must be PENDING, never an abort: an abort release resumes
+    /// the leg with its pre-cut position accounting, i.e. reverts the
+    /// applied cut through an evidence artifact. The handover shape is
+    /// driven here step by step through the real attribution function.
+    #[cfg(not(loom))]
+    #[test]
+    fn a_park_handover_evidence_gap_is_pending_and_never_an_abort() {
+        let completion = SessionCompletion::new();
+        let core = completion.state.clone();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        completion.request_seek(Duration::from_secs(1));
+        // Paused episode: pause engagement + its quiescence preceded the
+        // cut, and the cut's landing is already published (the provider
+        // applied; the edge purge is the worker's program order).
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
+        completion.seek_landing_published(Some(41));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(41)),
+            CutoverDecision::Committed,
+            "precondition: the boundary is satisfiable under the pause park"
+        );
+        let _ = consume_release(&completion.render_gate());
+        completion.clear_seek_in_flight();
+
+        // Cycle 2, this time sampled IN the handover: the pause park has
+        // disengaged and the cut park has not engaged yet.
+        completion.request_seek(Duration::from_secs(2));
+        completion.seek_landing_published(Some(82));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(82)),
+            CutoverDecision::Pending,
+            "a missing park sample is a statement about the EVIDENCE, not \
+             about the episode"
+        );
+        assert!(
+            !completion.seek_release_pending(),
+            "the leg must stay parked (the cut's hold is still routed, no \
+             release payload exists): an abort release here would resume it \
+             with the PRE-CUT position accounting while the provider is \
+             already at the new landing"
+        );
+        assert!(
+            !completion.seek_protocol_state().1,
+            "no commit is recorded from a pending sample either"
+        );
+
+        // The cut park engages and quiesces: the SAME decision now
+        // commits — the protocol was waiting, not failing.
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekEngaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekTailQuiesced));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(82)),
+            CutoverDecision::Committed
+        );
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Committed { landing: Some(82) })
         );
     }
 
@@ -1513,7 +1656,10 @@ mod tests {
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
         completion.seek_landing_published(Some(10));
-        assert!(completion.commit_seek_cutover(Some(10)));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(10)),
+            CutoverDecision::Committed
+        );
         assert_eq!(
             consume_release(&completion.render_gate()),
             Some(SeekParkRelease::Committed { landing: Some(10) })
@@ -1535,20 +1681,25 @@ mod tests {
         );
 
         // ...so cycle 1's landing no longer satisfies the commit
-        // boundary; the losing decision still releases the leg.
-        assert!(
-            !completion.commit_seek_cutover(Some(10)),
+        // boundary: cycle 2 is PENDING on its own evidence — not an
+        // abort, and nothing is routed.
+        assert_eq!(
+            completion.seek_cutover_decision(Some(10)),
+            CutoverDecision::Pending,
             "cycle 2's commit must require cycle 2's own landing evidence"
         );
-        assert_eq!(
-            consume_release(&completion.render_gate()),
-            Some(SeekParkRelease::Aborted),
+        assert!(
+            !completion.seek_release_pending(),
+            "a pending cycle routes nothing"
         );
 
         // Publishing cycle 2's OWN landing is what discharges the
         // boundary.
         completion.seek_landing_published(Some(20));
-        assert!(completion.commit_seek_cutover(Some(20)));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(20)),
+            CutoverDecision::Committed
+        );
         assert_eq!(
             consume_release(&completion.render_gate()),
             Some(SeekParkRelease::Committed { landing: Some(20) })
