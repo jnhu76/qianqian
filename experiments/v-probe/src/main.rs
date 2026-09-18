@@ -142,13 +142,15 @@ unsafe impl<T> Send for SendPtr<T> {}
 
 /// The D14.9 candidate apply point, realized for the V4 measurement:
 /// a desired-factor cell the RENDER THREAD loads once per loop top
-/// (relaxed load + compare), applying through SetAllVolumes BETWEEN
-/// wait-for-event and GetBuffer — never inside the quantum. The pump
+/// (relaxed load + compare), applying through SetAllVolumes AT the
+/// loop top — before the device wait and before GetBuffer, never
+/// inside the quantum between GetBuffer and ReleaseBuffer. The pump
 /// thread owns the apply; the main thread only routes the value.
 struct ApplyCell {
     desired: std::sync::atomic::AtomicU32, // f32 bits; u32::MAX = none
     durations_ns: std::sync::Mutex<Vec<u64>>,
     iteration_ns: std::sync::Mutex<Vec<u64>>,
+    successes: std::sync::atomic::AtomicU64,
 }
 
 impl ApplyCell {
@@ -157,6 +159,7 @@ impl ApplyCell {
             desired: std::sync::atomic::AtomicU32::new(u32::MAX),
             durations_ns: std::sync::Mutex::new(Vec::new()),
             iteration_ns: std::sync::Mutex::new(Vec::new()),
+            successes: std::sync::atomic::AtomicU64::new(0),
         }
     }
     fn route(&self, factor: f32) {
@@ -249,14 +252,16 @@ impl ProbeStream {
                     let frame_bytes = CHANNELS as usize * 4;
                     let silence = vec![0u8; buffer as usize * frame_bytes];
                     // The D14.9 candidate loop-top apply: one relaxed
-                    // load + compare per iteration, applied BETWEEN the
-                    // event wait and GetBuffer — never inside the
-                    // quantum. Applied value and durations stay on this
-                    // thread (the same thread that submits).
+                    // load + compare per iteration, applied AT the loop
+                    // top (before the device wait and GetBuffer) —
+                    // never inside the quantum. Applied value and
+                    // durations stay on this thread (the same thread
+                    // that submits).
                     let mut last_applied = u32::MAX;
                     let mut apply = |stream_volume: &IAudioStreamVolume,
                                      desired: u32,
-                                     durations: &std::sync::Mutex<Vec<u64>>| {
+                                     durations: &std::sync::Mutex<Vec<u64>>,
+                                     successes: &std::sync::atomic::AtomicU64| {
                         let start = Instant::now();
                         let result = unsafe {
                             stream_volume.SetAllVolumes(&[f32::from_bits(desired); CHANNELS as usize])
@@ -264,7 +269,11 @@ impl ProbeStream {
                         durations.lock().expect("apply durations").push(
                             start.elapsed().as_nanos() as u64
                         );
-                        result.is_ok()
+                        let ok = result.is_ok();
+                        if ok {
+                            successes.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
+                        ok
                     };
                     while !pump_stop.load(std::sync::atomic::Ordering::Relaxed) {
                         let iteration_start = Instant::now();
@@ -278,6 +287,7 @@ impl ProbeStream {
                                         stream_volume,
                                         desired,
                                         &cell.durations_ns,
+                                        &cell.successes,
                                     );
                                     if applied {
                                         last_applied = desired;
@@ -628,6 +638,7 @@ fn v2b() -> Outcome {
         let master0 = unsafe { simple_master(&stream.client)? };
         let _guard = MasterGuard(&stream.client, master0);
         let mut moved = true;
+        let mut factors_moved = false;
         for master in [0.3f32, 0.6, 0.3, master0] {
             unsafe { set_master(&stream.client, master)? };
             std::thread::sleep(Duration::from_millis(50));
@@ -640,11 +651,14 @@ fn v2b() -> Outcome {
             }
             let samples = sample_factor(&stream, 5, Duration::from_millis(40))?;
             if !all_within(&samples, 1.0) {
-                return Ok(false);
+                factors_moved = true;
             }
         }
         let _ = _guard; // keep the guard alive until here
-        Ok(moved)
+        if !moved {
+            return Err("V2b: the master write was not effective (no-op readback)".into());
+        }
+        Ok(!factors_moved)
     })();
     stream.shutdown();
     match ok {
@@ -652,7 +666,7 @@ fn v2b() -> Outcome {
             "GREEN",
             reasons,
             Some(serde_json::json!({
-                "stream_factors": "pinned at 1.0 while the session master moved",
+                "stream_factors": "pinned at 1.0 (±0.01) while the session master moved",
                 "master_readbacks": master_readbacks,
             })),
         ),
@@ -714,7 +728,8 @@ fn v4() -> Outcome {
     // The candidate placement, executed by the pump thread itself:
     // main only ROUTES the desired factor into the cell; the pump
     // loads it once per loop top and applies when it changed — the
-    // SAME thread that submits, between the event wait and GetBuffer.
+    // SAME thread that submits, at the loop top before the device
+    // wait and GetBuffer.
     let cell = std::sync::Arc::new(ApplyCell::new());
     let mut stream = match ProbeStream::open_with_apply_cell("S", cell.clone()) {
         Ok(s) => s,
@@ -759,6 +774,9 @@ fn v4() -> Outcome {
     let durations: Vec<u64> = cell.durations_ns.lock().expect("apply durations").clone();
     let iterations: Vec<u64> = cell.iteration_ns.lock().expect("iteration durations").clone();
     let applied = durations.len();
+    let successes =
+        cell.successes
+            .load(std::sync::atomic::Ordering::Relaxed) as usize;
     let still_running = position(&clock).is_some() && stream.factor().is_ok();
     let final_factor = stream.factor().ok();
 
@@ -807,6 +825,18 @@ fn v4() -> Outcome {
             "V4: only {applied}/{changes} routed changes were applied (below the 90% cadence bound)"
         ));
     }
+    if successes != applied {
+        reasons.push(format!(
+            "V4: {applied} applies but only {successes} succeeded"
+        ));
+    }
+    if let Some(final_factor) = final_factor {
+        if (final_factor - 0.6).abs() > 0.01 {
+            reasons.push(format!(
+                "V4: final factor {final_factor} does not match the last routed value 0.6"
+            ));
+        }
+    }
     if iter_p99 >= 20_000_000 {
         reasons.push(format!("V4: p99 iteration duration {iter_p99} ns exceeded 20 ms"));
     }
@@ -821,6 +851,7 @@ fn v4() -> Outcome {
     }
     let ok = bounded
         && applied * 10 >= changes * 9
+        && successes == applied
         && iter_p99 < 20_000_000
         && monotone
         && advancing
@@ -832,6 +863,7 @@ fn v4() -> Outcome {
             "shape": "same-thread loop-top apply (pump thread), routed by the main thread",
             "routed_changes": changes,
             "applies_observed": applied,
+            "applies_succeeded": successes,
             "routing_window_ms": routed_elapsed.as_millis() as u64,
             "apply_min_ns": min,
             "apply_median_ns": median,

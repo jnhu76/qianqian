@@ -1,6 +1,6 @@
 run: 1
-date_utc: 2026-09-18T19:03:34Z
-repo_head_sha: 175ef40dd2706a37b0b2ba52fab971d3c8be20ea
+date_utc: 2026-09-18T19:22:11Z
+repo_head_sha: 4f3ceb36a0ec3d7f72e3c73e4d190d0701e32589
 branch: research/v-probe-1
 harness_tree_status:
    M experiments/v-probe/evidence/ENV-RUN1.txt
@@ -48,7 +48,9 @@ harness_tree_status:
    D experiments/v-probe/evidence/logs/V5-run2.stderr
    D experiments/v-probe/evidence/logs/V5-run3.json
    D experiments/v-probe/evidence/logs/V5-run3.stderr
-exe_sha256: 2df0ee04c3b29b64bd18c649e7661772c208924fce99b451dc25ee8ad7538ea1
+   M experiments/v-probe/src/main.rs
+  ?? experiments/v-probe/evidence/binaries/v-probe-2df0ee04.exe
+exe_sha256: 8c12736408ab98a28cd7ece00466813d74d279ae90cf85e706133a7a763704df
 windows_caption_raw: Microsoft Windows 11 ×¨Òµ°æ
 audio_device: Realtek High Definition Audio
 endpoint_note: default render endpoint (shared mode, event-driven float32), opened by the harness; factors are stream-local (IAudioStreamVolume)

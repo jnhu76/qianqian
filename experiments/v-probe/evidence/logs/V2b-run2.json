@@ -9,6 +9,6 @@
       0.30000001192092896,
       1.0
     ],
-    "stream_factors": "pinned at 1.0 while the session master moved"
+    "stream_factors": "pinned at 1.0 (±0.01) while the session master moved"
   }
 }

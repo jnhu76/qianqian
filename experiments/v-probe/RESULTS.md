@@ -5,11 +5,14 @@ Authority under test: ADR-PBK-002 D14.9 (the volume amendment's
 pending item: the physical realtime apply placement of the
 `IAudioStreamVolume` candidate). Branch: `research/v-probe-1`; the committed evidence set was
 produced by ONE cross-build from the committed review-fix tree
-(exe sha 0d43e2b7…, identical across all three ENV files). Two
-earlier evidence sets (exe 06bcff69…, whose V4 measured a cross-thread
-call instead of the candidate shape, and whose ENV files honestly
-recorded branch: main) are superseded by this re-run; their findings
-drove the harness fixes recorded in the commit history.
+(exe sha 8c127364…, identical across all three ENV files, committed
+deliberately as `evidence/binaries/v-probe-8c127364.exe`). Three
+earlier evidence sets are superseded by this re-run and named for the
+record: 06bcff69 (first build; V4 measured a cross-thread call
+instead of the candidate shape; ENV files recorded branch: main),
+2df0ee04 (first same-thread V4; criterion routed faster than the loop
+cadence), and the intermediate builds between harness fixes; their
+findings drove the harness fixes recorded in the commit history.
 
 ## Verdict
 
@@ -57,24 +60,29 @@ Measured evidence (full JSON per scenario in `evidence/logs/`):
   0.40000000596 in run1).
 - **V4 apply placement (the decision input)**: the CANDIDATE shape,
   executed by the render-pump thread itself — one relaxed load +
-  compare per loop top, `SetAllVolumes` applied BETWEEN the event
-  wait and GetBuffer (never inside the quantum), with the main thread
-  only routing the desired value into the cell. 200 routed changes at
+  compare per loop top, `SetAllVolumes` applied AT the loop top —
+  before the device wait and before GetBuffer, never inside the
+  quantum — with the main thread only routing the desired value into
+  the cell. 200 routed changes at
   30 ms (slower than the ~10 ms loop cadence, so each change lands on
   its own loop top; the designed coalescing of faster routing was
-  observed and recorded — 1000 changes at 2 ms produced ~26 applies
-  at the cadence):
+  observed in an uncommitted RED run of the previous build (1000
+  changes at 2 ms produced ~26 applies at the cadence) and is
+  recorded in the fix commit's message (175ef40), not as evidence
+  JSON):
 
   | run | applied | median | p99 | max | iteration p99 | position |
   |-----|---------|--------|-----|-----|---------------|----------|
-  | 1   | 200/200 | 260.0 µs | 412.4 µs | 490.7 µs | 10.60 ms | advancing, monotone |
-  | 2   | 200/200 | 262.2 µs | 431.0 µs | 516.5 µs | 10.53 ms | advancing, monotone |
-  | 3   | 200/200 | 251.7 µs | 399.3 µs | 427.5 µs | 10.56 ms | advancing, monotone |
+  | 1   | 200/200 | 262.7 µs | 508.6 µs | 593.9 µs | 10.54 ms | advancing, monotone |
+  | 2   | 200/200 | 261.1 µs | 457.6 µs | 538.9 µs | 10.51 ms | advancing, monotone |
+  | 3   | 200/200 | 261.8 µs | 433.7 µs | 537.6 µs | 10.60 ms | advancing, monotone |
 
-  Every apply ≤ 0.52 ms; the iteration cadence held at the device
-  period (p99 ≈ 10.5 ms); the position clock stayed advancing and
-  monotone throughout; the stream survived all churn. The candidate
-  placement is measured bounded and non-perturbing at this
+  Every apply ≤ 0.6 ms and every apply SUCCEEDED (successes counted
+  separately from attempts; the final stream factor equals the last
+  routed value 0.6 — asserted); the iteration cadence held at the
+  device period (p99 ≈ 10.5 ms); the position clock stayed advancing
+  and monotone throughout; the stream survived all churn. The
+  candidate placement is measured bounded and non-perturbing at this
   granularity, ON the submitting thread.
 - **V5 failure signals**: `SetAllVolumes(&[])` fails typed
   (HRESULT 0x80070057 E_INVALIDARG); `GetService` on an uninitialized
@@ -108,8 +116,9 @@ the implementation.
 ## Boundary
 
 - Proves: factor-level isolation and independence on the exercised
-  endpoint, lifecycle persistence, apply-call boundedness and clock
-  continuity, and the existence of typed failure signals.
+  endpoint, lifecycle persistence, apply-call boundedness with a
+  position clock that stays advancing and monotone, and the existence
+  of typed failure signals.
 - Does NOT prove: audible-level behavior (no ear witness), behavior on
   endpoints other than the exercised one, or the device-loss routing
   (documented, implementation-gated).
