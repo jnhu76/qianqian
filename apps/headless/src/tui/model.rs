@@ -155,7 +155,7 @@ pub fn seek_target(observation: &PlaybackSessionObservation, forward: bool) -> O
         return None;
     }
     let position = observation.position?;
-    let current = Duration::from_micros((position * 1_000_000 / rate) as u64);
+    let current = Duration::from_micros(position * 1_000_000 / rate);
     Some(if forward {
         current.saturating_add(SEEK_STEP)
     } else {

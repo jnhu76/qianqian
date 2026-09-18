@@ -348,11 +348,11 @@ fn a_zero_landing_publishes_position_zero_not_undefined() {
         let mut saw_rebased_sample = false;
         wait_until(Duration::from_secs(5), || {
             let observation = handle.observe();
-            if let Some(p) = observation.position {
-                if p < HALF_A_SECOND {
-                    saw_rebased_sample = true;
-                    return true;
-                }
+            if let Some(p) = observation.position
+                && p < HALF_A_SECOND
+            {
+                saw_rebased_sample = true;
+                return true;
             }
             // Stop early once the episode settled: past the terminal the
             // projection is withdrawn by design, which would mask the

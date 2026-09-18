@@ -144,7 +144,7 @@ fn a_seek_park_publishes_only_seek_events_in_order() {
     let (outcome, observations) = leg.join().expect("leg exits");
     assert_eq!(outcome, SeekParkOutcome::Released(SeekParkRelease::Aborted));
     assert!(
-        observations >= 2 && observations <= 4,
+        (2..=4).contains(&observations),
         "bounded-slice parking: {observations} observations"
     );
     assert_eq!(
@@ -351,12 +351,11 @@ fn the_seek_park_calls_the_tail_observation_only_while_parked() {
     let parked_clone = parked.clone();
     let leg_gate = gate.clone();
     let leg = std::thread::spawn(move || {
-        let outcome = leg_gate.park_while_seek_hold(|| {
+        leg_gate.park_while_seek_hold(|| {
             calls_writer.fetch_add(1, Ordering::SeqCst);
             parked_clone.store(true, Ordering::SeqCst);
             true
-        });
-        outcome
+        })
     });
     assert!(wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)));
     let before = calls.load(Ordering::SeqCst);
