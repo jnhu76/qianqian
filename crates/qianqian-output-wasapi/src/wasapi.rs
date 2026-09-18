@@ -512,14 +512,18 @@ fn steady_loop(
             match release {
                 SeekParkRelease::Committed { landing } => {
                     handed_off = 0;
-                    match landing {
-                        Some(landing) => {
-                            basis = landing;
-                            publishing = true;
-                        }
-                        None => publishing = false,
+                    if landing.is_none() {
+                        publishing = false;
                     }
-                    position.rebase(landing);
+                    if let Some(landing) = landing.filter(|_| publishing) {
+                        basis = landing;
+                    }
+                    // A withdrawal is for the REST of the episode (D14.5
+                    // position rebase): once an unknown landing turned
+                    // publishing off, a later KNOWN landing neither
+                    // resurrects publication nor un-withdraws the cell —
+                    // `rebase(None)` is an idempotent re-withdrawal.
+                    position.rebase(if publishing { landing } else { None });
                 }
                 SeekParkRelease::Aborted => {}
             }

@@ -260,6 +260,14 @@ fn decode_worker(
                     completion.release_seek_without_commit();
                     pending_seek = None;
                 } else if completion.leg_parked_evidence() {
+                    // The parked evidence is eventually-true, not
+                    // instantaneous: a just-resumed leg may still have
+                    // its engagement latched for the microseconds before
+                    // its Disengaged publication lands. That is the
+                    // precondition's honest strength — the load-bearing
+                    // re-validation is the commit boundary, which
+                    // requires FRESH paired park + quiescence evidence
+                    // under the same lock stop linearizes through.
                     // Defense in depth: the data plane was Open at
                     // acceptance; re-validate here, where the provider is
                     // about to be called. An edge that went terminal in
@@ -324,9 +332,21 @@ fn decode_worker(
                                 // parked ∧ episode unsettled. On abort
                                 // (stop/teardown won) no commit, no
                                 // rebase, no partial state. Either way
-                                // the release is routed and the slot
-                                // freed inside the commit decision.
+                                // the release is routed.
                                 let _ = completion.commit_seek_cutover(landing);
+                                // The commit routed the rebase release;
+                                // the one-seek slot stays occupied until
+                                // the LEG has consumed the payload (a
+                                // later seek's hold would otherwise wipe
+                                // an unconsumed `Committed` and lose the
+                                // rebase). Bounded polls off the RT
+                                // path; stop/teardown wins immediately.
+                                while !completion.seek_aborted()
+                                    && completion.seek_release_pending()
+                                {
+                                    std::thread::sleep(WORKER_WAIT_SLICE);
+                                }
+                                completion.clear_seek_in_flight();
                                 pending_seek = None;
                                 // Post-cut production resumes from the
                                 // provider's cursor below.
@@ -427,7 +447,11 @@ fn decode_worker(
 /// Lock discipline: every acquisition here (slot peek, completion
 /// evidence reads, edge lock) is taken alone, never nested and never
 /// held across a wait — no thread holds the edge mutex while waiting on
-/// the render park or the session state (F5 lock-order audit).
+/// the render park or the session state (F5 lock-order audit). Across
+/// the whole seek surface the one nesting that exists is uniform and
+/// one-directional — the command routers take gate-intent while holding
+/// the completion-state lock, never the reverse — so no cycle is
+/// reachable.
 fn write_observing_seek(
     edge: &PcmEdge,
     completion: &SessionCompletion,

@@ -111,6 +111,10 @@ impl PcmEdge {
     /// a missed notify costs one slice of latency, never correctness).
     /// The caller holds no other lock across this wait.
     pub(crate) fn wait_for_space(&self, slice: Duration) {
+        // `mut` for the loom branch below (it reassigns the guard across
+        // wait_timeout returns); the std branch uses wait_timeout_while
+        // and never reassigns, hence the allow.
+        #[allow(unused_mut)]
         let mut guard = self.state.lock().expect("pcm edge lock");
         #[cfg(loom)]
         {

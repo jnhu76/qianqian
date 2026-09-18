@@ -1380,16 +1380,31 @@ discontinuity/RESULTS.md` §15).
 > pause slices stop observing after their own quiescence), at the gate's
 > entry — so the rebase happens on the leg's path before any further
 > submission under every interleaving (payload-awaits-consumption;
-> pinned by the render-gate seek oracles). The position cell gains
-> `rebase(landing)` — the one legal backward step, a plain store whose
-> `None` encoding withdraws the sample. One conformance fix was made
+> pinned by the render-gate seek oracles). The one-seek slot stays
+> occupied through that consumption: the worker frees it only after the
+> routed release has been consumed (it polls the gate's
+> release-pending bookkeeping off the RT path), because a later seek's
+> hold would otherwise wipe an unconsumed `Committed` and lose the
+> rebase — the pause-shaped interleaving the seek matrices caught and
+> now pin (`a_committed_release_is_never_wiped_by_a_later_seek`). The
+> position cell gains `rebase(landing)` — the one legal backward step,
+> a plain store whose `None` encoding withdraws the sample; the
+> withdrawal is episode-permanent on the leg's discipline (a later
+> KNOWN landing neither resurrects publication nor un-withdraws the
+> cell). One conformance fix was made
 > against the frozen program order during implementation: a seek
 > observed mid-write may still sit in the command slot, and the cut
 > point now promotes it into the worker's pending command so the
 > serialization point runs THIS seek — "the preserved remainder does
 > not defer the seek" is literal (the unpromoted spelling wedged the
 > leg's park against the remainder finish; the seek matrices witnessed
-> it). Evidence: `tests/seek_seam.rs` (12 end-to-end matrices),
+> it). One realtime-cost differential is recorded against the frozen
+> row: the steady iteration realizes the loop-top check as two
+> consecutive O(1) checks on the shared gate-intent lock — one extra
+> UNCONTENDED mutex acquisition plus the frozen extra flag test, where
+> the row's spelling reads "no new lock acquisition"; contention
+> behavior, allocation and dispatch are exactly as frozen. Evidence:
+> `tests/seek_seam.rs` (13 end-to-end matrices),
 > crate-internal white-box protocol tests, loom L5–L7, and the
 > implementation mutation gate `specs/f5-seek-implementation/` (M1–M7,
 > 7/7 COUNTEREXAMPLE-WITNESSED — the Rust twins of the gate suite's TLA+

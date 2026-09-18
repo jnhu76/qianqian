@@ -272,8 +272,12 @@ struct GateInner {
     /// render leg observes. The pause flag and the seek-hold flag share
     /// one lock deliberately: the render loop's existing loop-top gate
     /// check gains the seek-park flag test at the same check site, so a
-    /// steady iteration pays one extra O(1) flag test on this lock and
-    /// nothing else (D14.5 realtime-cost boundary).
+    /// steady iteration pays two consecutive O(1) checks on this lock —
+    /// one extra UNCONTENDED mutex acquisition and one extra flag test
+    /// over the pre-F5 shape, no dispatch, no allocation (the frozen
+    /// one-acquisition spelling of the D14.5 realtime-cost row is
+    /// recorded as a representation differential in that section's
+    /// implementation note).
     intent: Mutex<GateIntent>,
     /// Once true, this gate can never park a leg again: the open-abort
     /// lifetime (a stream being torn down without ever becoming a
@@ -409,6 +413,15 @@ impl RenderGate {
         guard.seek_hold = false;
         drop(guard);
         self.inner.wake.notify_all();
+    }
+
+    /// Whether a routed seek release payload still awaits consumption.
+    /// Session bookkeeping for the post-commit duty (the one-seek slot
+    /// stays occupied until the leg has consumed the release, so no
+    /// later hold can wipe a committed rebase) — not a hot-path call.
+    pub fn seek_release_pending(&self) -> bool {
+        let guard = self.inner.intent.lock().expect("render gate lock");
+        guard.seek_release.is_some()
     }
 
     /// Close the gate permanently: the episode's render leg must never

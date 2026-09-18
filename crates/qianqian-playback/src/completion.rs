@@ -627,6 +627,16 @@ impl SessionCompletion {
     /// `edge.invalidate()` has already returned on the worker's path.
     /// Preconditions evaluated HERE under the lock: landing published,
     /// tail quiesced while the leg is parked, episode unsettled.
+    ///
+    /// The one-seek slot is NOT freed here, on either branch: a
+    /// committed release is part of the cut until the LEG has consumed
+    /// it (a later hold would wipe an unconsumed `Committed` and lose
+    /// the rebase — the seek matrices caught that exact pause-shaped
+    /// interleaving), so the worker keeps the slot occupied until it
+    /// observes `seek_release_pending() == false` and then frees it. On
+    /// the abort branch no free is needed at all: every abort condition
+    /// (stop intent, settled, teardown release) implies the episode is
+    /// ending, so the slot is never consulted again.
     pub(crate) fn commit_seek_cutover(&self, landing: Option<u64>) -> bool {
         let decision = {
             let mut guard = self.state.state.lock().expect("completion lock");
@@ -642,12 +652,6 @@ impl SessionCompletion {
             }
         };
         if decision {
-            // The protocol resolved: release the one-seek slot so a
-            // later seek is acceptable, then route the rebase release.
-            let mut slot = self.state.seek_slot.lock().expect("seek slot lock");
-            slot.in_flight = false;
-            slot.command = None;
-            drop(slot);
             self.state
                 .gate
                 .release_seek_hold(SeekParkRelease::Committed { landing });
@@ -655,6 +659,14 @@ impl SessionCompletion {
             self.state.gate.release_seek_hold(SeekParkRelease::Aborted);
         }
         decision
+    }
+
+    /// Whether the current cut's routed release still awaits the leg's
+    /// consumption. The worker polls this after a commit and frees the
+    /// one-seek slot only when it clears — see
+    /// [`SessionCompletion::commit_seek_cutover`].
+    pub(crate) fn seek_release_pending(&self) -> bool {
+        self.state.gate.seek_release_pending()
     }
 
     /// Release the render leg from a routed seek park with NO rebase
@@ -1266,10 +1278,14 @@ mod tests {
         );
 
         // The full conjunction commits; the payload reaches the leg
-        // exactly once and the slot frees.
+        // exactly once and the slot stays occupied through consumption.
         let completion = SessionCompletion::new();
         let core = completion.state.clone();
         completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        // Plant the seek like a real acceptance would, so the one-seek
+        // slot is genuinely occupied when the commit routes.
+        completion.request_seek(Duration::from_secs(1));
+        assert!(completion.seek_in_flight());
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
         publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
         completion.seek_landing_published(Some(123));
@@ -1278,7 +1294,17 @@ mod tests {
         assert!(!refused);
         assert!(committed);
         assert_eq!(landing, Some(Some(123)));
-        assert!(!completion.seek_in_flight());
+        assert!(
+            completion.seek_in_flight(),
+            "the slot stays occupied through the commit: the cut is not \
+             resolved until the leg has CONSUMED the routed release (a \
+             later seek's hold would wipe an unconsumed `Committed` and \
+             lose the rebase)"
+        );
+        assert!(
+            completion.seek_release_pending(),
+            "the routed payload awaits the leg's consumption"
+        );
         assert_eq!(
             completion.render_gate().park_while_seek_hold(|| false),
             SeekParkOutcome::Released(SeekParkRelease::Committed {
@@ -1291,6 +1317,12 @@ mod tests {
             SeekParkOutcome::NotParked,
             "the payload is consumed exactly once"
         );
+        // The worker's post-consumption duty (session.rs): once the
+        // release is consumed the resolved cut frees the slot for a
+        // later seek.
+        completion.clear_seek_in_flight();
+        assert!(!completion.seek_in_flight());
+        assert!(!completion.seek_release_pending());
 
         // An UNKNOWN landing commits too: the payload carries None, and
         // the projection's withdrawal is the leg's own discipline.

@@ -727,14 +727,18 @@ fn consume_loop(
             match release {
                 SeekParkRelease::Committed { landing } => {
                     handed_off = 0;
-                    match landing {
-                        Some(landing) => {
-                            basis = landing;
-                            publishing = true;
-                        }
-                        None => publishing = false,
+                    if landing.is_none() {
+                        publishing = false;
                     }
-                    position.rebase(landing);
+                    if let Some(landing) = landing.filter(|_| publishing) {
+                        basis = landing;
+                    }
+                    // A withdrawal is for the REST of the episode (D14.5
+                    // position rebase) — identical to the real leg's
+                    // wasapi.rs rebase arm: a later KNOWN landing after
+                    // an unknown one neither resurrects publication nor
+                    // un-withdraws the cell.
+                    position.rebase(if publishing { landing } else { None });
                 }
                 SeekParkRelease::Aborted => {}
             }

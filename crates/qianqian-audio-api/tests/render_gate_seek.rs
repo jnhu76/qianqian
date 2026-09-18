@@ -250,8 +250,13 @@ fn a_pause_parked_leg_consumes_a_committed_release_at_its_next_gate_check() {
 }
 
 /// Routing a NEW hold resets any release payload a previous cycle left
-/// unconsumed: one seek at a time, stale payloads are debris (the
-/// session's one-seek policy is what makes this sound).
+/// unconsumed. This is a DEBRIS GUARD, not the mechanism that keeps
+/// committed rebases safe: a routed `Committed` payload is part of its
+/// cut until the leg consumes it, so the SESSION must never route a new
+/// hold while one awaits — the one-seek slot stays occupied through
+/// consumption (pinned by the completion's white-box tests and the
+/// seek matrices' never-wiped-payload matrix). This gate-level wipe
+/// only bounds the damage if that session-side duty were ever skipped.
 #[test]
 fn a_new_hold_drops_a_stale_unconsumed_release() {
     let events = Events::default();

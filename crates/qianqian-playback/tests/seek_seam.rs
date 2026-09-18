@@ -401,26 +401,58 @@ fn a_beyond_duration_target_is_the_providers_decision() {
 /// the commit still happens (the content jumps — stale exclusion is
 /// independent of landing knowledge), production continues from the
 /// provider's own continuation, and the Position projection is
-/// withdrawn for the REST OF THE EPISODE — through production, EOF, and
-/// the terminal Fact. Unknown stays unknown; it never becomes zero and
-/// never becomes the requested target.
+/// withdrawn for the REST OF THE EPISODE — through production, a later
+/// committed cutover with a KNOWN landing, EOF, and the terminal Fact.
+/// Unknown stays unknown; it never becomes zero and never becomes the
+/// requested target.
 #[test]
 fn an_unknown_landing_withdraws_the_position_for_the_rest_of_the_episode() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
-        let (witnesses, handle, mut runtime) =
-            episode(vec![ProviderSeekOutcome::Applied { landing: None }]);
+        let later_landing = 6 * ONE_SECOND;
+        let (witnesses, handle, mut runtime) = episode(vec![
+            ProviderSeekOutcome::Applied { landing: None },
+            ProviderSeekOutcome::Applied {
+                landing: Some(later_landing),
+            },
+        ]);
         wait_for_position_past(&handle, HALF_A_SECOND);
         handle.request_seek(Duration::from_secs(5));
+        assert!(
+            wait_until(Duration::from_secs(5), || handle.observe().position.is_none()),
+            "the unknown landing withdraws the projection"
+        );
+        // A second committed cutover WITH a known landing must not
+        // resurrect the withdrawn projection: the withdrawal is for the
+        // rest of the episode (D14.5 position rebase). The request may
+        // race the worker's post-consumption slot free by a poll slice,
+        // so it is retried — exactly what a client would do — and the
+        // retry stops the moment the second cut is observable, so no
+        // extra legal seek fires past it.
+        let mut second_cut = false;
+        wait_until(Duration::from_secs(5), || {
+            second_cut = discontinuities(&content(&witnesses)).len() == 2;
+            if !second_cut {
+                handle.request_seek(Duration::from_secs(6));
+            }
+            second_cut
+        });
+        assert!(
+            second_cut,
+            "precondition: the second cutover must happen for this oracle"
+        );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         assert!(
             handle.observe().position.is_none(),
-            "an unknown landing withdraws the projection for the episode"
+            "the withdrawal survives a later known-landing cutover: {:?}",
+            handle.observe()
         );
-        // The mock's unknown-landing continuation produces from around
-        // the requested target: the cut still happened, at the
-        // provider's own continuation point.
-        assert_one_cut_to(&content(&witnesses), FIVE_SECONDS);
+        // Both cuts are in the content, at the two landings.
+        let values = content(&witnesses);
+        let breaks = discontinuities(&values);
+        assert_eq!(breaks.len(), 2);
+        assert_eq!(values[breaks[0]] as u64, FIVE_SECONDS);
+        assert_eq!(values[breaks[1]] as u64, later_landing);
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
@@ -589,6 +621,60 @@ fn a_second_seek_while_one_is_in_flight_is_inert() {
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         // Exactly one cut, to the FIRST seek's landing — a queueing or
         // latest-wins policy would show a second cut (to 6 s or 7 s).
+        assert_one_cut_to(&content(&witnesses), FIVE_SECONDS);
+        let snapshot = runtime.dispose();
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// The commit does not end a cut: its rebase payload is part of the cut
+/// until the leg CONSUMES it. A cut committed while the leg is held by
+/// PAUSE leaves the payload awaiting (pause slices stopped observing),
+/// and a seek fired in that window must be INERT — a new hold would
+/// wipe the awaiting `Committed` and the episode would keep its OLD
+/// position basis forever (the rebase lost). After resume the content
+/// cuts exactly once, at the FIRST seek's landing.
+#[test]
+fn a_committed_release_is_never_wiped_by_a_later_seek() {
+    let _lifecycle = common::lifecycle_lock();
+    within(Duration::from_secs(30), move || {
+        let (witnesses, handle, mut runtime) = episode(vec![
+            ProviderSeekOutcome::Applied {
+                landing: Some(FIVE_SECONDS),
+            },
+            ProviderSeekOutcome::Applied {
+                landing: Some(6 * ONE_SECOND),
+            },
+        ]);
+        wait_for_position_past(&handle, HALF_A_SECOND);
+        handle.request_pause();
+        assert!(
+            wait_until(Duration::from_secs(5), || handle.observe().paused()),
+            "precondition: the episode never established Paused"
+        );
+        handle.request_seek(Duration::from_secs(5));
+        // The cut commits through the pause engagement; its payload
+        // awaits the parked leg (pause slices are quiesced-and-blind).
+        std::thread::sleep(Duration::from_millis(200));
+        assert!(
+            handle.observe().paused(),
+            "precondition: the seek must not have resumed the episode"
+        );
+        // Fires while the first cut's payload provably still awaits.
+        handle.request_seek(Duration::from_secs(6));
+        std::thread::sleep(Duration::from_millis(100));
+        handle.request_resume();
+        assert!(
+            wait_until(Duration::from_secs(5), || handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= FIVE_SECONDS)),
+            "the projection must rebase to the FIRST seek's landing: {:?}",
+            handle.observe()
+        );
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        // Exactly one cut, at the first landing: the later seek never
+        // cut, and the committed rebase was never lost.
         assert_one_cut_to(&content(&witnesses), FIVE_SECONDS);
         let snapshot = runtime.dispose();
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
