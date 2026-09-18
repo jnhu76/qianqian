@@ -4,22 +4,26 @@ opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(4s)
 [qianqian-wasapi] render aborted: data plane stopped
 [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
 verdict=GREEN reason: O6 next episode position advancing (2/2)
-verdict=GREEN reason: O6 next → mp3-valid.mp3 settled_old=true
+verdict=GREEN reason: O6 next → mp3-valid.mp3 settled_old=true source_ok=true
 opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(4s)
 [qianqian-wasapi] render aborted: data plane stopped
 [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
 verdict=GREEN reason: O6 next episode position advancing (2/2)
-verdict=GREEN reason: O6 next → flac-valid.flac settled_old=true
+verdict=GREEN reason: O6 next → flac-valid.flac settled_old=true source_ok=true
 opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(4s)
 [qianqian-wasapi] render aborted: data plane stopped
 [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+verdict=GREEN reason: O6 previous episode position advancing (2/2)
+verdict=GREEN reason: O6 previous → mp3-valid.mp3 settled_old=true source_ok=true
 opened: probe facts 44100 Hz x 2 mask 0x3 duration Some(45s)
 [qianqian-wasapi] render aborted: data plane stopped
 [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+verdict=GREEN reason: O6 previous episode position advancing (2/2)
+verdict=GREEN reason: O6 previous → main45.mp3 settled_old=true source_ok=true
 [qianqian-wasapi] render aborted: data plane stopped
 verdict=GREEN reason: quit terminal Stopped
 verdict=GREEN reason: quit disposal quiet=true
-[mp3float @ 0000021c5e5b4100] Could not update timestamps for skipped samples.
-[mp3float @ 0000021c5e5b3b80] Could not update timestamps for skipped samples.
-[mp3float @ 0000021c5e5b3b80] Could not update timestamps for skipped samples.
-[mp3float @ 0000021c5e5b45c0] Could not update timestamps for skipped samples.
+[mp3float @ 000002d939fc4100] Could not update timestamps for skipped samples.
+[mp3float @ 000002d939fc44c0] Could not update timestamps for skipped samples.
+[mp3float @ 000002d939fc1200] Could not update timestamps for skipped samples.
+[mp3float @ 000002d939fe1fc0] Could not update timestamps for skipped samples.

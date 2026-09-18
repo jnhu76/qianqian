@@ -1,6 +1,6 @@
 run: 3
-date_utc: 2026-09-18T17:46:43Z
-repo_head_sha: b7f36e479aa1475f2aae11228cd54fa3218bbe9c
+date_utc: 2026-09-18T18:11:49Z
+repo_head_sha: 3c3c81b867849d9b7dcea7e6bac27646aa0543bc
 branch: feat/navigation-1
 harness_tree_status:
    M experiments/f6-open-smoke/evidence/ENV-RUN1.txt
@@ -20,8 +20,8 @@ harness_tree_status:
    M experiments/f6-open-smoke/evidence/logs/O3-run2.stderr
    D experiments/f6-open-smoke/evidence/logs/O3-run3.json
    D experiments/f6-open-smoke/evidence/logs/O3-run3.stderr
-   M experiments/f6-open-smoke/evidence/logs/O4-run1.json
    M experiments/f6-open-smoke/evidence/logs/O4-run1.stderr
+   M experiments/f6-open-smoke/evidence/logs/O4-run2.json
    M experiments/f6-open-smoke/evidence/logs/O4-run2.stderr
    D experiments/f6-open-smoke/evidence/logs/O4-run3.json
    D experiments/f6-open-smoke/evidence/logs/O4-run3.stderr
@@ -29,11 +29,11 @@ harness_tree_status:
    M experiments/f6-open-smoke/evidence/logs/O5-run2.stderr
    D experiments/f6-open-smoke/evidence/logs/O5-run3.json
    D experiments/f6-open-smoke/evidence/logs/O5-run3.stderr
-  ?? experiments/f6-open-smoke/evidence/logs/O6-run1.json
-  ?? experiments/f6-open-smoke/evidence/logs/O6-run1.stderr
-  ?? experiments/f6-open-smoke/evidence/logs/O6-run2.json
-  ?? experiments/f6-open-smoke/evidence/logs/O6-run2.stderr
-exe_sha256: 4e3da39332757ef4e49affd60aa788a681fab84b75e0a68079e36929cf57a7e4
+   M experiments/f6-open-smoke/evidence/logs/O6-run1.stderr
+   M experiments/f6-open-smoke/evidence/logs/O6-run2.stderr
+   D experiments/f6-open-smoke/evidence/logs/O6-run3.json
+   D experiments/f6-open-smoke/evidence/logs/O6-run3.stderr
+exe_sha256: 212193bc335664b8c190e1ce37b4a5a9bb85d386954d5b6ff539f618d04ae51c
 main45_sha256: e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e
 mp3_valid_sha256: feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058
 flac_valid_sha256: d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2

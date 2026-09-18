@@ -6,10 +6,11 @@ Campaign: QIANQIAN-F6-NAVIGATION-VOLUME-AUTONOMOUS-1, Stage C
 amendment). Branches: `feat/f6-open-1` then `feat/navigation-1`
 (per-run `repo_head_sha` in the ENV files). The current evidence set
 (O1–O6, three runs) was produced by ONE cross-build from the committed
-`feat/navigation-1` tree (exe sha 4e3da393…, identical across the
-three ENV files — the binding evidence, not per-run rebuilds); the
-earlier 15/15 set (exe 4754edc2…) was the Stage C matrix, superseded
-here by the re-run.
+`feat/navigation-1` review-fix tree (exe sha 212193bc…, identical
+across the three ENV files — the binding evidence, not per-run
+rebuilds); earlier sets (4754edc2… Stage C, 4e3da393… first Stage D
+run, whose O6 lacked the previous-direction witnesses) are superseded
+by this re-run.
 
 ## Verdict
 
@@ -44,8 +45,8 @@ Representative measured evidence (full JSON per scenario in
 
 - **O1 replacement**: old settles `Stopped` with stop intent recorded;
   new episode established (44100 Hz × 2, mask 0x3) and consuming;
-  replacement wall time 54/62/57 ms (run1/2/3 O1 JSONs); quit disposal
-  `Discharged`.
+  replacement wall time 52/51/51 ms (run1/2/3 O1 JSONs of the current
+  evidence set); quit disposal `Discharged`.
 - **O2 refusal-before-destruction** (the frozen product property):
   garbage candidate ⇒ `Refused` with the provider diagnostic;
   `post_refusal_stop_requested = false`; the old episode's position
@@ -63,10 +64,12 @@ Representative measured evidence (full JSON per scenario in
   (MP3 → FLAC → MP3) each settled the previous episode `Stopped` and
   committed the next; final quit `Stopped` + `Discharged`, quiet.
 - **O6 navigation (Stage D)**: a 3-file startup playlist walked with
-  next/previous through the SAME real replacement — every step
-  settled the previous episode `Stopped`, established and consumed
-  with the new one; the last-entry next was inert; previous at the
-  first entry was inert; final quit `Stopped` + `Discharged`, quiet.
+  next/previous through the SAME real replacement — every step in
+  BOTH directions witnessed the committed source equals the selected
+  entry (`source_ok`), the new episode consuming (position
+  publication advancing), and the previous episode settled `Stopped`;
+  the last-entry next was inert; previous at the first entry was
+  inert; final quit `Stopped` + `Discharged`, quiet.
   Commit-on-activation and the inert ends are pinned executably by
   the Stage D unit matrix; this run witnesses them on real devices.
 
