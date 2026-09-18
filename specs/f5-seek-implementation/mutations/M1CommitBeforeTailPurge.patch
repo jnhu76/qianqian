@@ -1,10 +1,10 @@
 diff --git a/crates/qianqian-playback/src/completion.rs b/crates/qianqian-playback/src/completion.rs
 --- a/crates/qianqian-playback/src/completion.rs
 +++ b/crates/qianqian-playback/src/completion.rs
-@@ -745,8 +745,7 @@
+@@ -748,8 +748,7 @@
+         let decision = {
              let mut guard = self.state.state.lock().expect("completion lock");
-             let episode_ending =
-                 guard.stop_requested || guard.outcome.is_some() || guard.teardown_released;
+             let episode_ending = episode_ending_evidence(&guard);
 -            let parked_and_quiesced = (guard.engaged && guard.tail_quiesced)
 -                || (guard.seek_engaged && guard.seek_tail_quiesced);
 +            let parked_and_quiesced = true;

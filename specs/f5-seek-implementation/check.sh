@@ -44,7 +44,9 @@
 #                                 the boundary permanently unsatisfiable)
 #                                  → caught by the forward-seek matrix
 #                                 (the commit never happens → the cut
-#                                 never lands → the matrix times out).
+#                                 never lands → the matrix's bounded
+#                                 landing wait times out on its own
+#                                 assert, not the harness bound).
 #   M6 RefusalDropsRemainder      the refusal discards the preserved
 #                                 unwritten tail (session.rs)
 #                                  → caught by the refusal zero-loss
@@ -124,6 +126,10 @@ restore() {
     cp "$SNAPSHOT/$f" "$f"
   done
 }
+# A mutation is applied to the working tree: an interrupt (or an
+# unexpected exit) must never leave one behind. The snapshot is the
+# pre-run state, so restoring on exit is exactly the intended end state.
+trap restore EXIT INT TERM
 
 fail=0
 
@@ -156,7 +162,10 @@ run_mutation() {
   fi
   local log
   log="$(mktemp)"
-  cargo test "$@" > "$log" 2>&1
+  # Bounded so a mutated run that DEADLOCKS (the liveness guardrail's own
+  # failure mode) fails closed as "not caught" instead of hanging the
+  # gate; the bound is far above the slowest targeted suite.
+  timeout 900 cargo test "$@" > "$log" 2>&1
   if grep -q "test result: FAILED" "$log"; then
     echo "RESULT $name COUNTEREXAMPLE-WITNESSED (guardrail caught)"
   else
