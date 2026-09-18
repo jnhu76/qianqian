@@ -1031,10 +1031,10 @@ fn run_scenario(
     // bounds the whole settle: wait_terminal is a pure wait with no
     // timeout, so a wedged episode would otherwise hang the runner
     // instead of surfacing as a failed run (evidence-robustness bound;
-    // 30 s is far beyond any observed settle).
-    // 30 s is far beyond any observed settle). The binding is kept so
-    // the thread's lifetime is explicit on the normal path; a fired
-    // watchdog exits the whole process with a distinctive code.
+    // 30 s is far beyond any observed settle). A fired watchdog exits
+    // the whole process with the distinctive code 42; on the normal
+    // path the binding is dropped (detaching the thread) and the
+    // process exits first.
     let _settle_watchdog = std::thread::Builder::new()
         .name("sprobe-settle-watchdog".into())
         .spawn(|| {
