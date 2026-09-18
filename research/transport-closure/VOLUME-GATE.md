@@ -318,8 +318,13 @@ V4  change application: repeated +/- presses, and changes while
     discontinuity (no click/pop beyond the gain step), no Position
     reset
 V5  failure path: SetAllVolumes under device invalidation / service
-    failure degrades to the mechanism diagnostic without wedging the
-    render leg
+    failure — assert the render leg does not wedge, AND the failure
+    routes consistently through the existing output/device-failure
+    policy (device/service loss may therefore lead D11 to settle
+    Failed; the volume command itself never establishes terminal
+    truth). A log-only implementation that keeps pretending the
+    stream is healthy FAILS this probe — "produces a diagnostic" is
+    not the oracle
 
 Reopen conditions: V1a cross-stream coupling within one audio session,
 or V2a/V2b either side writing the other's factor ⇒ the

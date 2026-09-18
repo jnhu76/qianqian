@@ -212,6 +212,8 @@ Round 4 (human, PR #155): VERDICT: CHANGES_REQUIRED
                           (1 MAJOR, 2 MINOR — fixed below)
 Round 5 (human, PR #155): VERDICT: CHANGES_REQUIRED
                           (1 MAJOR, 2 MINOR — fixed below)
+Round 6 (final review):   VERDICT: CHANGES_REQUIRED
+                          (0 MAJOR, 1 MINOR — fixed below)
 Final state: all findings resolved; READY_FOR_HUMAN_REVIEW
 ```
 
@@ -530,4 +532,31 @@ MINOR-2  "replacement commit = old disposal Discharged ∧ new
          forged" stated. The §4 ladder gained the no-root branch,
          NAVIGATION §3, DECISION-MATRIX §1 (replacement boundary +
          index commit) and §2 were synced.
+```
+
+### Round 6 — final review of PR #155
+
+Final review at `63518aa`: verdict `CHANGES_REQUIRED` with 0 MAJOR +
+1 MINOR; the full ADR alignment matrix passed every boundary
+(projection firewall, D11 sole terminal authority, F6 no-overlap,
+failure-clean fresh root, teardown fail-stop + root retention, D13,
+navigation ownership, P1–P5, probe evidence before authority, volume
+ownership, the IAudioStreamVolume stream-factor model, the
+SndVol/session-master distinction, device failure routed back to D11).
+
+```text
+MINOR-1  V-PROBE V5's acceptance wording still carried the old
+         "degrades to the mechanism diagnostic" oracle — weaker than
+         the §7 semantics corrective-4 had already frozen, and a real
+         oracle gap: a broken implementation that logs
+         AUDCLNT_E_DEVICE_INVALIDATED and keeps pretending the stream
+         is healthy would have passed. (The corrective-4 record above
+         said V5 was synced; the V5 line itself was missed — this
+         entry corrects that record.)
+         FIXED: V5 now asserts BOTH no render-leg wedge AND
+         consistent routing through the existing
+         output/device-failure policy (under which device/service
+         loss may settle D11 Failed), names the log-and-pretend
+         behavior as a probe failure, and restates that the volume
+         command itself never establishes terminal truth.
 ```
