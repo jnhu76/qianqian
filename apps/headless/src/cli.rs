@@ -91,6 +91,8 @@ commands:
   --help | -h            print this usage
   --version | -V         print the version
 
+in the reference-player shell: arrows seek, Space pauses/resumes, S
+  stops, O opens a source, N/P navigate the startup playlist, Q quits.
 in the machine transport, `stop` stops the episode, `pause` and
 `resume` pause and resume it, `seek <time>` requests a same-episode
 seek (`<time>` is a decimal seconds field, or MINUTES:SECONDS with a
@@ -329,12 +331,6 @@ mod tests {
                 ]
             }
         );
-    }
-
-    #[test]
-    fn play_still_requires_at_least_one_file() {
-        let err = parse_invocation(&argv(&["play"])).expect_err("play needs a file");
-        assert_eq!(err, InvocationError::WrongArity { command: "play" });
     }
 
     #[test]

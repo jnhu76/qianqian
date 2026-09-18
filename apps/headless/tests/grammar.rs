@@ -91,7 +91,7 @@ fn the_retired_positional_grammar_is_rejected_as_an_unknown_command() {
 }
 
 #[test]
-fn play_with_missing_or_extra_file_is_a_usage_error() {
+fn play_with_missing_file_is_a_usage_error() {
     let missing = invoke(&["play"]);
     assert_eq!(missing.code, 2);
     assert!(
@@ -101,9 +101,22 @@ fn play_with_missing_or_extra_file_is_a_usage_error() {
         "{}",
         missing.stderr
     );
+}
 
+/// Stage D (D14.6 navigation): `play` takes ONE OR MORE files — the
+/// first opens, all seed the startup playlist (open representation).
+/// The multi-file form therefore parses and runs; the binary here is
+/// built without the playback slice, so the honest observable is the
+/// feature-gate refusal (exit 2), NOT a grammar refusal.
+#[test]
+fn play_with_extra_files_parses_and_hits_the_feature_gate_without_playback() {
     let extra = invoke(&["play", "a.flac", "b.flac"]);
     assert_eq!(extra.code, 2);
+    assert!(
+        extra.stderr.contains("built without the playback slice"),
+        "the multi-file grammar parses; the no-playback build refuses at the feature gate: {}",
+        extra.stderr
+    );
 }
 
 #[cfg(not(feature = "playback"))]

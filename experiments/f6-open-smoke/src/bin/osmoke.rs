@@ -15,6 +15,9 @@
 //!                                   Stopped; B established and consuming
 //! O5  repeated A→B→C→D replacement  every old Stopped + Discharged, every
 //!                                   new established; quit reports Discharged
+//! O6  navigation (Stage D)          next/previous walk a 3-file startup
+//!                                   playlist through the real replacement;
+//!                                   both ends inert; cursor moves on commit
 //! ```
 //!
 //! The audible continuity property stays a human-ear item (F5/F6
@@ -555,8 +558,10 @@ fn o4(main: &Path, candidates: &[PathBuf]) -> Outcome {
 /// O6 — navigation (Stage D, D14.6 playlist closure): a startup
 /// playlist of three real files; next/previous walk it through the
 /// SAME real replacement; the far end is inert; the cursor only moves
-/// on commit. Mechanical witnesses per step: the new episode
-/// established + consuming, the previous one settled Stopped.
+/// on commit. Mechanical witnesses per step (both directions): the
+/// committed source is the selected entry, the new episode consumes
+/// (position publication advancing), and the previous one settled
+/// Stopped.
 fn o6(main: &Path, candidates: &[PathBuf]) -> Outcome {
     let mut reasons = Vec::new();
     let mut player = ReferencePlayerApp::new(RealSource);
@@ -593,12 +598,13 @@ fn o6(main: &Path, candidates: &[PathBuf]) -> Outcome {
             }
         }
         let settled = previous.observe().terminal_outcome == Some(EpisodeTerminalOutcome::Stopped);
+        let committed_source = player.active_source() == Some(expected.as_path());
         let live = player
             .active_handle()
             .is_some_and(|h| expect_liveness(h, 2, "O6 next episode", &mut reasons));
-        steps.push(settled && live);
+        steps.push(settled && live && committed_source);
         eprintln!(
-            "verdict=GREEN reason: O6 next → {} settled_old={settled}",
+            "verdict=GREEN reason: O6 next → {} settled_old={settled} source_ok={committed_source}",
             expected.display()
         );
         previous = player.active_handle().expect("committed").clone();
@@ -608,9 +614,10 @@ fn o6(main: &Path, candidates: &[PathBuf]) -> Outcome {
         reasons.push("O6: next at the last entry was not inert".into());
     }
 
-    // previous → entry 2, then entry 1; each through the same sequence.
+    // previous → entry 2, then entry 1 (back to the startup file);
+    // each through the same sequence, with the SAME witnesses as next.
     let mut prev_steps = Vec::new();
-    for _ in 0..2 {
+    for expected in [candidates[0].clone(), main.to_path_buf()] {
         match player.previous_track() {
             Some(OpenOutcome::Opened) => {}
             other => {
@@ -619,7 +626,15 @@ fn o6(main: &Path, candidates: &[PathBuf]) -> Outcome {
             }
         }
         let settled = previous.observe().terminal_outcome == Some(EpisodeTerminalOutcome::Stopped);
-        prev_steps.push(settled);
+        let committed_source = player.active_source() == Some(expected.as_path());
+        let live = player
+            .active_handle()
+            .is_some_and(|h| expect_liveness(h, 2, "O6 previous episode", &mut reasons));
+        prev_steps.push(settled && live && committed_source);
+        eprintln!(
+            "verdict=GREEN reason: O6 previous → {} settled_old={settled} source_ok={committed_source}",
+            expected.display()
+        );
         previous = player.active_handle().expect("committed").clone();
     }
     // previous at the first entry: inert.

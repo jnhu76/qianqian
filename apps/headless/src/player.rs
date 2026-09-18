@@ -227,10 +227,11 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// starts at 0 on commit evidence. Nothing else ever appends to
     /// the playlist — a direct Open REPLACES it.
     pub fn seed_startup_playlist(&mut self, entries: Vec<PathBuf>) {
-        debug_assert!(
-            !entries.is_empty(),
-            "startup playlist needs the opened file"
-        );
+        if entries.is_empty() {
+            // Total over the input: an empty seed leaves the navigation
+            // state untouched (there is no committed entry to point at).
+            return;
+        }
         self.playlist = entries;
         self.cursor = Some(0);
     }
