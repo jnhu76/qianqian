@@ -25,31 +25,31 @@
       17199
     ],
     [
-      600,
+      601,
       26019
     ],
     [
-      800,
+      801,
       34839
     ],
     [
-      1001,
+      1002,
       43659
     ],
     [
-      1201,
-      52479
+      1202,
+      52920
     ],
     [
       1402,
-      61299
+      61740
     ],
     [
       1602,
-      70119
+      70560
     ],
     [
-      1802,
+      1803,
       79380
     ],
     [
@@ -57,7 +57,7 @@
       88200
     ],
     [
-      2203,
+      2204,
       97020
     ],
     [
@@ -69,7 +69,7 @@
       114660
     ],
     [
-      2804,
+      2805,
       123480
     ],
     [
@@ -85,7 +85,7 @@
       149940
     ],
     [
-      3606,
+      3605,
       158760
     ],
     [
@@ -101,7 +101,7 @@
       185220
     ],
     [
-      4406,
+      4407,
       194040
     ],
     [
@@ -109,7 +109,7 @@
       202860
     ],
     [
-      4807,
+      4808,
       211680
     ],
     [
@@ -120,7 +120,7 @@
   "probes": [
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 684,
+      "elapsed_us": 741,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -131,11 +131,11 @@
       },
       "ok": true,
       "step": 0,
-      "t_ms": 1001
+      "t_ms": 1002
     },
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 470,
+      "elapsed_us": 365,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
@@ -145,7 +145,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 905,
+      "elapsed_us": 651,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -156,21 +156,21 @@
       },
       "ok": true,
       "step": 4,
-      "t_ms": 1802
+      "t_ms": 1803
     },
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 393,
+      "elapsed_us": 356,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
       "ok": true,
       "step": 6,
-      "t_ms": 2203
+      "t_ms": 2204
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 958,
+      "elapsed_us": 628,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -185,17 +185,17 @@
     },
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 582,
+      "elapsed_us": 412,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
       "ok": true,
       "step": 10,
-      "t_ms": 2804
+      "t_ms": 2805
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 890,
+      "elapsed_us": 651,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -210,17 +210,17 @@
     },
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 612,
+      "elapsed_us": 418,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
       "ok": true,
       "step": 14,
-      "t_ms": 3606
+      "t_ms": 3605
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 718,
+      "elapsed_us": 763,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -235,7 +235,7 @@
     },
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 421,
+      "elapsed_us": 410,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
@@ -249,7 +249,7 @@
   "scenario": "S9",
   "verdict": "GREEN",
   "window_ms": [
-    1001,
+    1002,
     4607
   ]
 }

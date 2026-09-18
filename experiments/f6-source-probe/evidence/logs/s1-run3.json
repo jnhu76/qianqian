@@ -45,20 +45,20 @@
       61299
     ],
     [
-      1601,
-      70119
+      1602,
+      70560
     ],
     [
-      1801,
-      78939
+      1802,
+      79380
     ],
     [
       2002,
-      87759
+      88200
     ],
     [
       2202,
-      96579
+      97020
     ],
     [
       2403,
@@ -85,31 +85,31 @@
       149940
     ],
     [
-      3604,
+      3605,
       158760
     ],
     [
-      3804,
+      3805,
       167580
     ],
     [
-      4005,
+      4006,
       176400
     ],
     [
-      4205,
+      4206,
       185220
     ],
     [
-      4405,
+      4406,
       194040
     ],
     [
-      4606,
+      4607,
       202860
     ],
     [
-      4806,
+      4807,
       211680
     ],
     [
@@ -120,7 +120,7 @@
   "probes": [
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 766,
+      "elapsed_us": 710,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -135,7 +135,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 1176,
+      "elapsed_us": 632,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -146,11 +146,11 @@
       },
       "ok": true,
       "step": 2,
-      "t_ms": 1801
+      "t_ms": 1802
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 641,
+      "elapsed_us": 867,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -165,7 +165,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 658,
+      "elapsed_us": 674,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -180,7 +180,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 543,
+      "elapsed_us": 751,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -191,11 +191,11 @@
       },
       "ok": true,
       "step": 8,
-      "t_ms": 3804
+      "t_ms": 3805
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 771,
+      "elapsed_us": 565,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -206,7 +206,7 @@
       },
       "ok": true,
       "step": 10,
-      "t_ms": 4606
+      "t_ms": 4607
     }
   ],
   "reasons": [],
@@ -215,6 +215,6 @@
   "verdict": "GREEN",
   "window_ms": [
     1001,
-    4606
+    4607
   ]
 }

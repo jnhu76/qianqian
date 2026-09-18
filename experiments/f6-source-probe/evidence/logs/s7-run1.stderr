@@ -1,0 +1,4 @@
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+[qianqian-wasapi] render aborted: data plane stopped
+S7: verdict=GREEN matched=true
+[mp3float @ 00000214c4b17540] Could not update timestamps for skipped samples.

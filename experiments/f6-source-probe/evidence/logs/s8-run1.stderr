@@ -1,0 +1,8 @@
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+[qianqian-wasapi] render aborted: data plane stopped
+S8: verdict=GREEN matched=true
+[mp3float @ 0000028c89727480] Could not update timestamps for skipped samples.
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0000028c89732d40] Protocol name not provided, cannot determine if input is local or a network protocol, buffers and access patterns cannot be configured optimally without knowing the protocol
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0000028c8972e980] Protocol name not provided, cannot determine if input is local or a network protocol, buffers and access patterns cannot be configured optimally without knowing the protocol
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0000028c8972e840] Protocol name not provided, cannot determine if input is local or a network protocol, buffers and access patterns cannot be configured optimally without knowing the protocol
+[mov,mp4,m4a,3gp,3g2,mj2 @ 0000028c8972e840] Protocol name not provided, cannot determine if input is local or a network protocol, buffers and access patterns cannot be configured optimally without knowing the protocol

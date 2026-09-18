@@ -18,109 +18,109 @@
     ],
     [
       200,
-      null
+      8379
     ],
     [
       400,
-      null
+      17199
     ],
     [
-      600,
-      null
+      601,
+      26019
     ],
     [
-      800,
-      0
+      801,
+      34839
     ],
     [
       1001,
-      8820
+      43659
     ],
     [
-      1201,
-      17640
+      1202,
+      52479
     ],
     [
-      1401,
-      26460
+      1402,
+      61299
     ],
     [
       1602,
-      35280
-    ],
-    [
-      1802,
-      44100
-    ],
-    [
-      2002,
-      52920
-    ],
-    [
-      2202,
-      61740
-    ],
-    [
-      2403,
       70560
     ],
     [
-      2603,
+      1802,
       79380
     ],
     [
-      2803,
+      2002,
       88200
     ],
     [
-      3003,
+      2203,
       97020
     ],
     [
-      3203,
+      2403,
       105840
     ],
     [
-      3404,
+      2603,
       114660
     ],
     [
-      3604,
+      2803,
       123480
     ],
     [
-      3804,
+      3004,
       132300
     ],
     [
-      4005,
+      3204,
       141120
     ],
     [
-      4205,
+      3404,
       149940
     ],
     [
-      4405,
+      3604,
       158760
     ],
     [
-      4606,
+      3805,
       167580
     ],
     [
-      4806,
+      4005,
       176400
     ],
     [
-      5006,
+      4206,
       185220
+    ],
+    [
+      4406,
+      194040
+    ],
+    [
+      4606,
+      202860
+    ],
+    [
+      4806,
+      211680
+    ],
+    [
+      5007,
+      220500
     ]
   ],
   "probes": [
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 716,
+      "elapsed_us": 650,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -135,7 +135,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 765,
+      "elapsed_us": 584,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -150,7 +150,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 704,
+      "elapsed_us": 774,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -165,7 +165,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 720,
+      "elapsed_us": 674,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -176,11 +176,11 @@
       },
       "ok": true,
       "step": 6,
-      "t_ms": 3203
+      "t_ms": 3204
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 801,
+      "elapsed_us": 763,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -191,11 +191,11 @@
       },
       "ok": true,
       "step": 8,
-      "t_ms": 3804
+      "t_ms": 3805
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 717,
+      "elapsed_us": 746,
       "error": null,
       "expect_valid": true,
       "facts": {

@@ -33,7 +33,7 @@
       34839
     ],
     [
-      1002,
+      1001,
       43659
     ],
     [
@@ -45,11 +45,11 @@
       61740
     ],
     [
-      1603,
+      1602,
       70560
     ],
     [
-      1803,
+      1802,
       79380
     ],
     [
@@ -97,7 +97,7 @@
       139032
     ],
     [
-      4207,
+      4206,
       147852
     ],
     [
@@ -105,18 +105,18 @@
       156672
     ],
     [
-      4608,
+      4607,
       165492
     ],
     [
-      4808,
+      4807,
       174312
     ]
   ],
   "probes": [
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 801,
+      "elapsed_us": 738,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -127,11 +127,11 @@
       },
       "ok": true,
       "step": 0,
-      "t_ms": 1002
+      "t_ms": 1001
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 739,
+      "elapsed_us": 521,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -146,7 +146,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 775,
+      "elapsed_us": 763,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -161,7 +161,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 686,
+      "elapsed_us": 688,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -176,7 +176,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 644,
+      "elapsed_us": 703,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -195,7 +195,7 @@
   "scenario": "S6",
   "verdict": "GREEN",
   "window_ms": [
-    1002,
+    1001,
     4407
   ]
 }

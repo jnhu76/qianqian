@@ -1,13 +1,59 @@
 run: 2
-date_utc: 2026-09-18T14:21:52Z
-repo_main_sha: 76c205a74ad2e4d1e00facd02259825ad2d648ca
+date_utc: 2026-09-18T14:43:53Z
+repo_main_sha: af53ab2cb007f1a0187e9963006133a19f55f371
 harness_tree_dirty_files:
-  ?? experiments/f6-source-probe/
-exe_sha256: d589f843701de94e8206a94ed7c0ee7368f9121bc04d1c8e5007898f14bc6ead
+   M experiments/f6-source-probe/evidence/ENV-RUN1.txt
+   M experiments/f6-source-probe/evidence/ENV-RUN2.txt
+   M experiments/f6-source-probe/evidence/logs/neg-run1.json
+   D experiments/f6-source-probe/evidence/logs/neg-run2.json
+   D experiments/f6-source-probe/evidence/logs/neg-run3.json
+   M experiments/f6-source-probe/evidence/logs/s1-run1.json
+   D experiments/f6-source-probe/evidence/logs/s1-run2.json
+   D experiments/f6-source-probe/evidence/logs/s1-run3.json
+   M experiments/f6-source-probe/evidence/logs/s10-run1.json
+   D experiments/f6-source-probe/evidence/logs/s10-run2.json
+   D experiments/f6-source-probe/evidence/logs/s10-run3.json
+   M experiments/f6-source-probe/evidence/logs/s2-run1.json
+   D experiments/f6-source-probe/evidence/logs/s2-run2.json
+   D experiments/f6-source-probe/evidence/logs/s2-run3.json
+   M experiments/f6-source-probe/evidence/logs/s3-run1.json
+   D experiments/f6-source-probe/evidence/logs/s3-run2.json
+   D experiments/f6-source-probe/evidence/logs/s3-run3.json
+   M experiments/f6-source-probe/evidence/logs/s4-run1.json
+   D experiments/f6-source-probe/evidence/logs/s4-run2.json
+   D experiments/f6-source-probe/evidence/logs/s4-run3.json
+   M experiments/f6-source-probe/evidence/logs/s5-run1.json
+   D experiments/f6-source-probe/evidence/logs/s5-run2.json
+   D experiments/f6-source-probe/evidence/logs/s5-run3.json
+   M experiments/f6-source-probe/evidence/logs/s6-run1.json
+   D experiments/f6-source-probe/evidence/logs/s6-run2.json
+   D experiments/f6-source-probe/evidence/logs/s6-run3.json
+   M experiments/f6-source-probe/evidence/logs/s7-run1.json
+   D experiments/f6-source-probe/evidence/logs/s7-run2.json
+   D experiments/f6-source-probe/evidence/logs/s7-run3.json
+   M experiments/f6-source-probe/evidence/logs/s8-run1.json
+   D experiments/f6-source-probe/evidence/logs/s8-run2.json
+   D experiments/f6-source-probe/evidence/logs/s8-run3.json
+   M experiments/f6-source-probe/evidence/logs/s9-run1.json
+   D experiments/f6-source-probe/evidence/logs/s9-run2.json
+   D experiments/f6-source-probe/evidence/logs/s9-run3.json
+  ?? experiments/f6-source-probe/evidence/host-probecheck.txt
+  ?? experiments/f6-source-probe/evidence/logs/neg-run1.stderr
+  ?? experiments/f6-source-probe/evidence/logs/s1-run1.stderr
+  ?? experiments/f6-source-probe/evidence/logs/s10-run1.stderr
+  ?? experiments/f6-source-probe/evidence/logs/s2-run1.stderr
+  ?? experiments/f6-source-probe/evidence/logs/s3-run1.stderr
+  ?? experiments/f6-source-probe/evidence/logs/s4-run1.stderr
+  ?? experiments/f6-source-probe/evidence/logs/s5-run1.stderr
+  ?? experiments/f6-source-probe/evidence/logs/s6-run1.stderr
+  ?? experiments/f6-source-probe/evidence/logs/s7-run1.stderr
+  ?? experiments/f6-source-probe/evidence/logs/s8-run1.stderr
+  ?? experiments/f6-source-probe/evidence/logs/s9-run1.stderr
+exe_sha256: f2f74bcecd820cd468620d1981bb0482920cbe1c93b4a8d450f5b54b5e162f0a
 main45_sha256: e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e
 mp3_valid_sha256: feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058
 flac_valid_sha256: d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2
 m4a_valid_sha256: 2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c
+windows_caption_raw: Microsoft Windows 11 ×¨Òµ°æ
 audio_device: Realtek High Definition Audio
 endpoint_note: default render endpoint (shared mode, event-driven), as opened by the harness log line
-windows: Microsoft Windows 11 Pro (zh-CN caption unrenderable in WSL capture) build 26200

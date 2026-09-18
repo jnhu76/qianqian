@@ -29,7 +29,7 @@
       26019
     ],
     [
-      800,
+      801,
       34839
     ],
     [
@@ -41,12 +41,12 @@
       52479
     ],
     [
-      1401,
-      61299
+      1402,
+      61740
     ],
     [
       1602,
-      70119
+      70560
     ],
     [
       1802,
@@ -61,7 +61,7 @@
       97020
     ],
     [
-      2403,
+      2404,
       105840
     ],
     [
@@ -73,11 +73,11 @@
       123480
     ],
     [
-      3005,
+      3004,
       132300
     ],
     [
-      3205,
+      3204,
       141120
     ],
     [
@@ -101,7 +101,7 @@
       185220
     ],
     [
-      4407,
+      4406,
       194040
     ],
     [
@@ -112,7 +112,7 @@
   "probes": [
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 850,
+      "elapsed_us": 741,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -127,7 +127,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 634,
+      "elapsed_us": 780,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -142,7 +142,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 1016,
+      "elapsed_us": 627,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -157,7 +157,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 655,
+      "elapsed_us": 574,
       "error": null,
       "expect_valid": true,
       "facts": {

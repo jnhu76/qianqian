@@ -25,7 +25,7 @@
       17199
     ],
     [
-      601,
+      600,
       26019
     ],
     [
@@ -41,23 +41,23 @@
       52479
     ],
     [
-      1402,
-      61740
+      1401,
+      61299
     ],
     [
-      1602,
-      70560
+      1601,
+      70119
     ],
     [
       1802,
       79380
     ],
     [
-      2003,
+      2002,
       50832
     ],
     [
-      2203,
+      2202,
       59652
     ],
     [
@@ -65,11 +65,11 @@
       68472
     ],
     [
-      2604,
+      2603,
       77292
     ],
     [
-      2804,
+      2803,
       86112
     ],
     [
@@ -77,27 +77,27 @@
       94932
     ],
     [
-      3205,
+      3204,
       103752
     ],
     [
-      3405,
+      3404,
       112572
     ],
     [
-      3605,
+      3604,
       121392
     ],
     [
-      3806,
+      3805,
       130212
     ],
     [
-      4006,
+      4005,
       139032
     ],
     [
-      4206,
+      4205,
       147852
     ],
     [
@@ -105,7 +105,7 @@
       156672
     ],
     [
-      4607,
+      4606,
       165492
     ],
     [
@@ -116,7 +116,7 @@
   "probes": [
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 870,
+      "elapsed_us": 787,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -131,7 +131,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 784,
+      "elapsed_us": 696,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -142,11 +142,11 @@
       },
       "ok": true,
       "step": 4,
-      "t_ms": 2003
+      "t_ms": 2002
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 698,
+      "elapsed_us": 662,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -157,11 +157,11 @@
       },
       "ok": true,
       "step": 6,
-      "t_ms": 2604
+      "t_ms": 2603
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 867,
+      "elapsed_us": 751,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -172,11 +172,11 @@
       },
       "ok": true,
       "step": 8,
-      "t_ms": 3205
+      "t_ms": 3204
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 742,
+      "elapsed_us": 729,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -187,7 +187,7 @@
       },
       "ok": true,
       "step": 10,
-      "t_ms": 3806
+      "t_ms": 3805
     }
   ],
   "reasons": [],

@@ -25,11 +25,11 @@
       17199
     ],
     [
-      600,
+      601,
       26019
     ],
     [
-      800,
+      801,
       34839
     ],
     [
@@ -37,11 +37,11 @@
       43659
     ],
     [
-      1201,
-      52479
+      1202,
+      52920
     ],
     [
-      1401,
+      1402,
       null
     ],
     [
@@ -53,7 +53,7 @@
       null
     ],
     [
-      2003,
+      2002,
       null
     ],
     [
@@ -69,7 +69,7 @@
       null
     ],
     [
-      2803,
+      2804,
       null
     ],
     [
@@ -77,11 +77,11 @@
       null
     ],
     [
-      3204,
+      3205,
       null
     ],
     [
-      3404,
+      3405,
       null
     ],
     [
@@ -92,7 +92,7 @@
   "probes": [
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 771,
+      "elapsed_us": 793,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -107,7 +107,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 827,
+      "elapsed_us": 609,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -122,7 +122,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 786,
+      "elapsed_us": 618,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -137,7 +137,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 644,
+      "elapsed_us": 673,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -148,17 +148,17 @@
       },
       "ok": true,
       "step": 7,
-      "t_ms": 3204
+      "t_ms": 3205
     }
   ],
   "reasons": [
-    "position absent in 10 playing-window samples (first at 1401 ms) — the episode was not live/rendering"
+    "position absent in 10 playing-window samples (first at 1402 ms) — the episode was not live/rendering"
   ],
   "sample_rate": 44100,
   "scenario": "NEG",
   "verdict": "RED",
   "window_ms": [
     1001,
-    3204
+    3205
   ]
 }

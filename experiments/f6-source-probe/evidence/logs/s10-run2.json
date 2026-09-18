@@ -41,7 +41,7 @@
       52479
     ],
     [
-      1402,
+      1401,
       61299
     ],
     [
@@ -53,7 +53,7 @@
       79380
     ],
     [
-      2003,
+      2002,
       88200
     ],
     [
@@ -61,11 +61,11 @@
       97020
     ],
     [
-      2404,
+      2403,
       105840
     ],
     [
-      2604,
+      2603,
       114660
     ],
     [
@@ -77,19 +77,19 @@
       132300
     ],
     [
-      3205,
+      3204,
       141120
     ],
     [
-      3405,
+      3404,
       149940
     ],
     [
-      3606,
+      3605,
       158760
     ],
     [
-      3806,
+      3805,
       167580
     ],
     [
@@ -97,11 +97,11 @@
       176400
     ],
     [
-      4207,
+      4206,
       185220
     ],
     [
-      4407,
+      4406,
       194040
     ],
     [
@@ -112,7 +112,7 @@
   "probes": [
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 715,
+      "elapsed_us": 561,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -127,7 +127,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 1395,
+      "elapsed_us": 623,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -138,11 +138,11 @@
       },
       "ok": true,
       "step": 4,
-      "t_ms": 2604
+      "t_ms": 2603
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 825,
+      "elapsed_us": 735,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -153,11 +153,11 @@
       },
       "ok": true,
       "step": 6,
-      "t_ms": 3405
+      "t_ms": 3404
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 810,
+      "elapsed_us": 660,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -168,7 +168,7 @@
       },
       "ok": true,
       "step": 9,
-      "t_ms": 4207
+      "t_ms": 4206
     }
   ],
   "reasons": [],
@@ -177,6 +177,6 @@
   "verdict": "GREEN",
   "window_ms": [
     1001,
-    4207
+    4206
   ]
 }

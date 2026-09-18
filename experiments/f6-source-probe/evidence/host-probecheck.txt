@@ -1,0 +1,8 @@
+# probecheck host sanity (committed evidence)
+source: af53ab2cb007f1a0187e9963006133a19f55f371 (af53ab2)
+date_utc: 2026-09-18T14:42:47Z
+command: target/release/probecheck <mp3 fixture> <flac fixture> <m4a fixture> — all expect-valid (default)
+exit: 0
+{"error":null,"facts":{"bits_per_sample":0,"channels":2,"duration_us":4000000,"sample_rate":44100},"matched":true,"path":"/home/hoo/Source/qianqian/native/experiments/songcore-equivalence/fixtures/mp3-cbr-id3v23.mp3","success":true}
+{"error":null,"facts":{"bits_per_sample":16,"channels":2,"duration_us":4000000,"sample_rate":44100},"matched":true,"path":"/home/hoo/Source/qianqian/native/experiments/songcore-equivalence/fixtures/flac-16-44-stereo.flac","success":true}
+{"error":null,"facts":{"bits_per_sample":24,"channels":2,"duration_us":6000000,"sample_rate":44100},"matched":true,"path":"/home/hoo/Source/qianqian/native/experiments/songcore-equivalence/fixtures/alac-long.m4a","success":true}

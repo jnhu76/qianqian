@@ -25,7 +25,7 @@
       17199
     ],
     [
-      601,
+      600,
       26019
     ],
     [
@@ -33,7 +33,7 @@
       34839
     ],
     [
-      1002,
+      1001,
       43659
     ],
     [
@@ -49,15 +49,15 @@
       70560
     ],
     [
-      1802,
+      1803,
       79380
     ],
     [
-      2002,
+      2003,
       88200
     ],
     [
-      2203,
+      2204,
       97020
     ],
     [
@@ -69,19 +69,19 @@
       114660
     ],
     [
-      2804,
+      2805,
       123480
     ],
     [
-      3006,
+      3005,
       132300
     ],
     [
-      3206,
+      3205,
       141120
     ],
     [
-      3406,
+      3405,
       149940
     ],
     [
@@ -89,11 +89,11 @@
       158760
     ],
     [
-      3807,
+      3806,
       167580
     ],
     [
-      4007,
+      4006,
       176400
     ],
     [
@@ -105,7 +105,7 @@
       194040
     ],
     [
-      4608,
+      4607,
       202860
     ],
     [
@@ -113,14 +113,14 @@
       211680
     ],
     [
-      5009,
+      5008,
       220500
     ]
   ],
   "probes": [
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 1105,
+      "elapsed_us": 630,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -131,11 +131,11 @@
       },
       "ok": true,
       "step": 0,
-      "t_ms": 1002
+      "t_ms": 1001
     },
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 855,
+      "elapsed_us": 821,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -146,11 +146,11 @@
       },
       "ok": true,
       "step": 2,
-      "t_ms": 1802
+      "t_ms": 1803
     },
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 1431,
+      "elapsed_us": 649,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -165,7 +165,7 @@
     },
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 1235,
+      "elapsed_us": 796,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -176,11 +176,11 @@
       },
       "ok": true,
       "step": 6,
-      "t_ms": 3206
+      "t_ms": 3205
     },
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 877,
+      "elapsed_us": 801,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -191,11 +191,11 @@
       },
       "ok": true,
       "step": 8,
-      "t_ms": 3807
+      "t_ms": 3806
     },
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 662,
+      "elapsed_us": 666,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -206,7 +206,7 @@
       },
       "ok": true,
       "step": 10,
-      "t_ms": 4608
+      "t_ms": 4607
     }
   ],
   "reasons": [],
@@ -214,7 +214,7 @@
   "scenario": "S2",
   "verdict": "GREEN",
   "window_ms": [
-    1002,
-    4608
+    1001,
+    4607
   ]
 }

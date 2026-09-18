@@ -37,11 +37,11 @@
       43659
     ],
     [
-      1201,
+      1202,
       52479
     ],
     [
-      1401,
+      1402,
       61299
     ],
     [
@@ -54,69 +54,69 @@
     ],
     [
       2003,
-      51273
+      50832
     ],
     [
       2203,
-      60093
+      59652
     ],
     [
-      2403,
-      68913
+      2404,
+      68472
     ],
     [
-      2603,
-      77733
+      2604,
+      77292
     ],
     [
       2804,
-      86553
+      86112
     ],
     [
       3004,
-      95373
+      94932
     ],
     [
-      3204,
-      104193
+      3205,
+      103752
     ],
     [
       3405,
-      113013
+      112572
     ],
     [
       3605,
-      121833
+      121392
     ],
     [
       3805,
-      130653
+      130212
     ],
     [
       4005,
-      139473
+      139032
     ],
     [
       4206,
-      148293
+      147852
     ],
     [
       4406,
-      157113
+      156672
     ],
     [
       4606,
-      165933
+      165492
     ],
     [
       4807,
-      174753
+      174312
     ]
   ],
   "probes": [
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 799,
+      "elapsed_us": 796,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -131,7 +131,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 740,
+      "elapsed_us": 792,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -146,7 +146,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 651,
+      "elapsed_us": 872,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -157,11 +157,11 @@
       },
       "ok": true,
       "step": 6,
-      "t_ms": 2603
+      "t_ms": 2604
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 1064,
+      "elapsed_us": 824,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -172,11 +172,11 @@
       },
       "ok": true,
       "step": 8,
-      "t_ms": 3204
+      "t_ms": 3205
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 784,
+      "elapsed_us": 642,
       "error": null,
       "expect_valid": true,
       "facts": {

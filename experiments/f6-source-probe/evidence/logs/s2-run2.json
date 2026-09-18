@@ -25,7 +25,7 @@
       17199
     ],
     [
-      601,
+      600,
       26019
     ],
     [
@@ -37,7 +37,7 @@
       43659
     ],
     [
-      1202,
+      1201,
       52479
     ],
     [
@@ -61,15 +61,15 @@
       97020
     ],
     [
-      2403,
+      2404,
       105840
     ],
     [
-      2603,
+      2604,
       114660
     ],
     [
-      2803,
+      2804,
       123480
     ],
     [
@@ -105,7 +105,7 @@
       194040
     ],
     [
-      4607,
+      4606,
       202860
     ],
     [
@@ -120,7 +120,7 @@
   "probes": [
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 1169,
+      "elapsed_us": 711,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -135,7 +135,7 @@
     },
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 794,
+      "elapsed_us": 645,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -150,7 +150,7 @@
     },
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 815,
+      "elapsed_us": 761,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -161,11 +161,11 @@
       },
       "ok": true,
       "step": 4,
-      "t_ms": 2403
+      "t_ms": 2404
     },
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 1273,
+      "elapsed_us": 626,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -180,7 +180,7 @@
     },
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 771,
+      "elapsed_us": 779,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -195,7 +195,7 @@
     },
     {
       "candidate": "flac-valid.flac",
-      "elapsed_us": 677,
+      "elapsed_us": 781,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -206,7 +206,7 @@
       },
       "ok": true,
       "step": 10,
-      "t_ms": 4607
+      "t_ms": 4606
     }
   ],
   "reasons": [],
@@ -215,6 +215,6 @@
   "verdict": "GREEN",
   "window_ms": [
     1001,
-    4607
+    4606
   ]
 }

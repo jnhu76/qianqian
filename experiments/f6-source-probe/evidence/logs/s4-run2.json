@@ -42,14 +42,14 @@
     ],
     [
       1402,
-      61299
+      61740
     ],
     [
       1602,
-      70119
+      70560
     ],
     [
-      1802,
+      1803,
       79380
     ],
     [
@@ -57,19 +57,19 @@
       88200
     ],
     [
-      2203,
+      2204,
       97020
     ],
     [
-      2403,
+      2404,
       105840
     ],
     [
-      2604,
+      2605,
       114660
     ],
     [
-      2804,
+      2805,
       123480
     ],
     [
@@ -77,11 +77,11 @@
       132300
     ],
     [
-      3205,
+      3206,
       141120
     ],
     [
-      3405,
+      3406,
       149940
     ],
     [
@@ -89,55 +89,55 @@
       158760
     ],
     [
-      3806,
+      3807,
       167580
     ],
     [
-      4006,
+      4007,
       176400
     ],
     [
-      4206,
+      4207,
       185220
     ],
     [
-      4407,
+      4408,
       194040
     ],
     [
-      4607,
+      4608,
       202860
     ],
     [
-      4807,
+      4808,
       211680
     ],
     [
-      5007,
+      5009,
       220500
     ],
     [
-      5208,
+      5209,
       229320
     ],
     [
-      5408,
+      5409,
       238140
     ],
     [
-      5608,
+      5609,
       246960
     ],
     [
-      5809,
+      5810,
       255780
     ],
     [
-      6009,
+      6010,
       264600
     ],
     [
-      6209,
+      6210,
       273420
     ],
     [
@@ -149,7 +149,7 @@
       291060
     ],
     [
-      6810,
+      6811,
       299880
     ],
     [
@@ -168,7 +168,7 @@
   "probes": [
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 1539,
+      "elapsed_us": 704,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -183,7 +183,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 795,
+      "elapsed_us": 758,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -194,11 +194,11 @@
       },
       "ok": true,
       "step": 2,
-      "t_ms": 1602
+      "t_ms": 1402
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 987,
+      "elapsed_us": 767,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -209,11 +209,11 @@
       },
       "ok": true,
       "step": 4,
-      "t_ms": 2003
+      "t_ms": 1803
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 251104,
+      "elapsed_us": 250699,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -224,11 +224,11 @@
       },
       "ok": true,
       "step": 5,
-      "t_ms": 2003
+      "t_ms": 1803
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 708,
+      "elapsed_us": 701,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -239,11 +239,11 @@
       },
       "ok": true,
       "step": 7,
-      "t_ms": 2604
+      "t_ms": 2605
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 588,
+      "elapsed_us": 775,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -258,7 +258,7 @@
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 767,
+      "elapsed_us": 787,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -269,11 +269,11 @@
       },
       "ok": true,
       "step": 11,
-      "t_ms": 3405
+      "t_ms": 3406
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 251006,
+      "elapsed_us": 251029,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -284,11 +284,11 @@
       },
       "ok": true,
       "step": 12,
-      "t_ms": 3405
+      "t_ms": 3406
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 674,
+      "elapsed_us": 656,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -299,11 +299,11 @@
       },
       "ok": true,
       "step": 14,
-      "t_ms": 4006
+      "t_ms": 4007
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 736,
+      "elapsed_us": 709,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -314,11 +314,11 @@
       },
       "ok": true,
       "step": 16,
-      "t_ms": 4407
+      "t_ms": 4408
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 721,
+      "elapsed_us": 685,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -329,11 +329,11 @@
       },
       "ok": true,
       "step": 18,
-      "t_ms": 4807
+      "t_ms": 4808
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 251093,
+      "elapsed_us": 250727,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -344,11 +344,11 @@
       },
       "ok": true,
       "step": 19,
-      "t_ms": 4807
+      "t_ms": 4808
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 759,
+      "elapsed_us": 737,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -359,11 +359,11 @@
       },
       "ok": true,
       "step": 21,
-      "t_ms": 5408
+      "t_ms": 5409
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 963,
+      "elapsed_us": 660,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -374,11 +374,11 @@
       },
       "ok": true,
       "step": 23,
-      "t_ms": 5809
+      "t_ms": 5810
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 813,
+      "elapsed_us": 730,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -389,11 +389,11 @@
       },
       "ok": true,
       "step": 25,
-      "t_ms": 6209
+      "t_ms": 6210
     },
     {
       "candidate": "mp3-valid.mp3",
-      "elapsed_us": 251325,
+      "elapsed_us": 250818,
       "error": null,
       "expect_valid": true,
       "facts": {
@@ -404,7 +404,7 @@
       },
       "ok": true,
       "step": 26,
-      "t_ms": 6209
+      "t_ms": 6210
     }
   ],
   "reasons": [],

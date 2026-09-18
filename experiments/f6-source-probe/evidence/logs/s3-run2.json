@@ -29,7 +29,7 @@
       26019
     ],
     [
-      801,
+      800,
       34839
     ],
     [
@@ -41,7 +41,7 @@
       52479
     ],
     [
-      1402,
+      1401,
       61299
     ],
     [
@@ -53,7 +53,7 @@
       79380
     ],
     [
-      2003,
+      2002,
       88200
     ],
     [
@@ -65,7 +65,7 @@
       105840
     ],
     [
-      2604,
+      2603,
       114660
     ],
     [
@@ -77,11 +77,11 @@
       132300
     ],
     [
-      3205,
+      3204,
       141120
     ],
     [
-      3405,
+      3404,
       149940
     ],
     [
@@ -105,22 +105,22 @@
       194040
     ],
     [
-      4607,
+      4606,
       202860
     ],
     [
-      4807,
+      4806,
       211680
     ],
     [
-      5008,
+      5007,
       220500
     ]
   ],
   "probes": [
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 734,
+      "elapsed_us": 352,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
@@ -130,7 +130,7 @@
     },
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 433,
+      "elapsed_us": 461,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
@@ -140,7 +140,7 @@
     },
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 493,
+      "elapsed_us": 477,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
@@ -150,17 +150,17 @@
     },
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 492,
+      "elapsed_us": 417,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
       "ok": true,
       "step": 6,
-      "t_ms": 3205
+      "t_ms": 3204
     },
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 415,
+      "elapsed_us": 368,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
@@ -170,13 +170,13 @@
     },
     {
       "candidate": "garbage.mp3",
-      "elapsed_us": 391,
+      "elapsed_us": 356,
       "error": "song_open refused 'garbage.mp3': status 104",
       "expect_valid": false,
       "facts": null,
       "ok": true,
       "step": 10,
-      "t_ms": 4607
+      "t_ms": 4606
     }
   ],
   "reasons": [],
@@ -185,6 +185,6 @@
   "verdict": "GREEN",
   "window_ms": [
     1001,
-    4607
+    4606
   ]
 }
