@@ -3,9 +3,11 @@
 Campaign: QIANQIAN-F6-NAVIGATION-VOLUME-AUTONOMOUS-1, Stage C
 (F6 Open implementation). Authority under test: ADR-PBK-002 D14.6
 (F6-AUTHORITY-PROMOTION-1). Branch: `feat/f6-open-1`, source commits
-f160cb1..HEAD (per-run `repo_head_sha` in the ENV files); the exe
-was rebuilt from the committed tree before every evidence run
-(exe sha recorded per run).
+f160cb1..HEAD (per-run `repo_head_sha` in the ENV files). The exe was
+cross-built ONCE from the committed tree (HEAD = b39ccae) before this
+evidence run set; all three runs therefore record the SAME
+`exe_sha256` (4754edc2…) — the binary was not rebuilt between runs,
+and the identical shas are the binding evidence, not per-run rebuilds.
 
 ## Verdict
 
@@ -38,7 +40,8 @@ Representative measured evidence (full JSON per scenario in
 
 - **O1 replacement**: old settles `Stopped` with stop intent recorded;
   new episode established (44100 Hz × 2, mask 0x3) and consuming;
-  replacement wall time ~51 ms; quit disposal `Discharged`.
+  replacement wall time 54/62/57 ms (run1/2/3 O1 JSONs); quit disposal
+  `Discharged`.
 - **O2 refusal-before-destruction** (the frozen product property):
   garbage candidate ⇒ `Refused` with the provider diagnostic;
   `post_refusal_stop_requested = false`; the old episode's position
@@ -67,7 +70,10 @@ Representative measured evidence (full JSON per scenario in
    takes ~0.5 s on this host from device open to its FIRST position
    publication; the liveness oracle sampled inside that gap and fired
    on healthy episodes (a4712a0's fix waits, bounded, for first
-   publication; traced advance = exactly source rate once started).
+   publication). The "advance at exactly source rate" observation
+   (11025 frames per 250 ms) came from an interactive `QN_OSMOKE_TRACE`
+   diagnostic run whose log is not committed; the committed evidence is
+   the 15 GREEN JSONs produced by the first-publication-waiting oracle.
 3. **The REAL binary never compiled with `--features playback`** —
    the default-feature test battery does not compile the gated
    main.rs; a windows-gnu playback-feature check caught the machine

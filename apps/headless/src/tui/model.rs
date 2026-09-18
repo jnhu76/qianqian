@@ -67,9 +67,26 @@ impl TuiModel {
     }
 
     /// Follow the player's committed episode: `Some(path)` after a
-    /// committed replacement, `None` after a clean-failed one.
+    /// committed replacement, `None` after a clean-failed one. `None`
+    /// also drops the last observation — the model holds no episode
+    /// truth at all then, so the retired episode's diagnostics must
+    /// not leak into the frame as if they described anything current.
     pub fn set_episode(&mut self, source: Option<String>) {
+        let episode_gone = source.is_none();
         self.source = source;
+        if episode_gone {
+            self.observation = PlaybackSessionObservation {
+                terminal_outcome: None,
+                failure_diagnostic: None,
+                stop_requested: false,
+                pause_requested: false,
+                source_format: None,
+                source_duration: None,
+                position: None,
+                pause_engagement: PauseEngagement::Disengaged,
+                activation_error: None,
+            };
+        }
     }
 
     /// The committed episode's source path, if one is live.
@@ -87,8 +104,9 @@ impl TuiModel {
         self.status.as_deref()
     }
 
-    /// Enter Open input mode (the O key). Idempotent: a second O while
-    /// editing restarts the line empty.
+    /// Enter Open input mode (the O key). While the line is active the
+    /// runtime routes keys INTO it (a second O types `o`); this method
+    /// is only reachable from the plain grammar.
     pub fn begin_open_input(&mut self) {
         self.open_input = Some(String::new());
     }
@@ -735,6 +753,26 @@ mod tests {
         assert_eq!(model.source(), Some("/media/b.flac"));
         model.set_episode(None);
         assert_eq!(model.source(), None, "no episode is a real F6 state");
+    }
+
+    /// A model that loses its episode drops the last observation with
+    /// it: the retired episode's diagnostics must not leak into the
+    /// frame as if they described anything current (review round-1
+    /// MINOR-3).
+    #[test]
+    fn a_no_episode_model_drops_the_retired_episode_diagnostics() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            failure_diagnostic: Some("decode: corrupt frame".to_owned()),
+            ..pending()
+        });
+        assert!(!model.diagnostics().is_empty());
+        model.set_episode(None);
+        assert!(
+            model.diagnostics().is_empty(),
+            "no episode, no episode diagnostics: {:?}",
+            model.diagnostics()
+        );
     }
 
     /// The status line is plain presentation: recorded, read, replaced.

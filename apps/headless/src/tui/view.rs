@@ -37,17 +37,35 @@ fn bold(title: &'static str) -> Span<'static> {
     Span::styled(title, Style::default().add_modifier(Modifier::BOLD))
 }
 
+/// The Open operation feedback (application composition feedback,
+/// never a playback semantic) and the Open input line while it is
+/// active. Shared by both panel shapes: the no-episode state is exactly
+/// where typing the next Open must be visible.
+fn open_lines(model: &TuiModel, lines: &mut Vec<Line<'_>>) {
+    if let Some(status) = model.status() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(status.to_owned()));
+    }
+    if let Some(input) = model.open_input() {
+        lines.push(Line::from(format!(
+            "Open: {input}▏  (Enter = open, Esc = cancel)"
+        )));
+    }
+}
+
 fn main_panel(model: &TuiModel) -> Paragraph<'_> {
     let Some(source) = model.source() else {
         // The no-episode panel (F6): after a clean-failed Open no
         // runtime remains, and the honest frame says exactly that
         // instead of fabricating labels for an episode that does not
-        // exist.
-        return Paragraph::new(vec![
+        // exist. The Open feedback and input line still render — this
+        // is the state the next Open starts from.
+        let mut lines = vec![
             Line::from(""),
             Line::from("no episode — press O to open a source"),
-        ])
-        .block(
+        ];
+        open_lines(model, &mut lines);
+        return Paragraph::new(lines).block(
             Block::bordered()
                 .title(bold(" Qianqian Reference Player "))
                 .title_style(Style::default()),
@@ -78,17 +96,7 @@ fn main_panel(model: &TuiModel) -> Paragraph<'_> {
         lines.push(Line::from(""));
         lines.push(Line::from(COMMITTED_HINT));
     }
-    // Open operation feedback (application composition feedback, never
-    // a playback semantic) and the Open input line while it is active.
-    if let Some(status) = model.status() {
-        lines.push(Line::from(""));
-        lines.push(Line::from(status.to_owned()));
-    }
-    if let Some(input) = model.open_input() {
-        lines.push(Line::from(format!(
-            "Open: {input}▏  (Enter = open, Esc = cancel)"
-        )));
-    }
+    open_lines(model, &mut lines);
     Paragraph::new(lines).block(
         Block::bordered()
             .title(bold(" Qianqian Reference Player "))
@@ -372,6 +380,38 @@ mod tests {
                 "{fabricated} must not render without an episode:\n{text}"
             );
         }
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
+    /// The no-episode panel is exactly where the next Open starts from:
+    /// the operation feedback AND the Open input line render there too,
+    /// while the episode labels stay suppressed (review round-1
+    /// REQUIRED-1).
+    #[test]
+    fn the_no_episode_panel_still_renders_open_feedback_and_the_input_line() {
+        let mut model = TuiModel::new("song.flac");
+        model.set_episode(None);
+        model.set_status(Some("open failed (clean): decode open failed".to_owned()));
+        let text = rendered(&model);
+        assert!(
+            text.contains("no episode — press O to open a source"),
+            "{text}"
+        );
+        assert!(
+            text.contains("open failed (clean): decode open failed"),
+            "the startup Open feedback must be visible: {text}"
+        );
+        for fabricated in ["Source:", "Format:", "Position:", "Terminal:"] {
+            assert!(!text.contains(fabricated), "{fabricated} in\n{text}");
+        }
+
+        model.begin_open_input();
+        for c in "/media/b.flac".chars() {
+            model.open_input_push(c);
+        }
+        let text = rendered(&model);
+        assert!(text.contains("Open: /media/b.flac"), "{text}");
+        assert!(text.contains("Enter = open"), "{text}");
         assert_eq!(forbidden_status_claim(&text), None, "{text}");
     }
 

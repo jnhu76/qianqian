@@ -302,8 +302,8 @@ fn machine_transport(mut episode: Episode) -> ExitCode {
         for warning in machine::disposal_warnings(&disposal.snapshot) {
             eprintln!("{warning}");
         }
-        if disposal.verdict == qianqian_composition::DisposeVerdict::TeardownViolated {
-            eprintln!("fail-stop: disposal reported a latched teardown violation");
+        if let Some(line) = machine::disposal_verdict_warning(&disposal.verdict) {
+            eprintln!("{line}");
         }
         return machine::episode_exit_code(None, disposal.snapshot.quiet);
     }
@@ -380,8 +380,8 @@ fn finish_episode(mut episode: Episode) -> ExitCode {
     for warning in machine::disposal_warnings(&disposal.snapshot) {
         eprintln!("{warning}");
     }
-    if disposal.verdict == qianqian_composition::DisposeVerdict::TeardownViolated {
-        eprintln!("warning: disposal verdict was TeardownViolated, not Discharged");
+    if let Some(line) = machine::disposal_verdict_warning(&disposal.verdict) {
+        eprintln!("{line}");
     }
     machine::episode_exit_code(Some(outcome), disposal.snapshot.quiet)
 }
