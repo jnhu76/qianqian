@@ -1,0 +1,52 @@
+run: TUI-RUN6
+date_utc: 2026-09-19T12:19:02Z
+branch: feat/166-playlist-usability-closure
+head_sha: 5a2246cdd759361f76f86b6e12a11acf6bea3a3c
+origin_main: 4d9a0e0b128611d11c58ee151f14ff6cbf513759
+worktree_status: 1 dirty entries
+build_command: QIANQIAN_NATIVE_DIR=<mingw staging> cargo build --release --target x86_64-pc-windows-gnu --features playback -p qianqian-headless
+target_triple: x86_64-pc-windows-gnu (GNU toolchain)
+features: playback profile: release
+headless_sha256: f2354f3d48b532dc161036de8bd5190785ad3c3fc4dbcf5d4c42a9b4a9de573c
+tuidriver_sha256: be35615fdc2f0f5acbf1f14665f1bd08fe9475acc6dee4d32d2fb54bf52d9ebd
+songcore_sha256: 17323291fc7b53997a36746e1ce7f86b8863a63f71be79389b9b196a05175a2a
+rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
+corpus_sha256:
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058      mp3cbr.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      synth45.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest01.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest02.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest03.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest04.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest05.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest06.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest07.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest08.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest09.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest10.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest11.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest12.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest13.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest14.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest15.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest16.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest17.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest18.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest19.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest20.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest21.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest22.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest23.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      vtest24.mp3
+  d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2      flac4.flac
+  d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2      qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac
+  5fb781ff2a9d7d6ab6aea70c28cf7c2883c9069659d2a0651239eeae3f62ab28      synth30.flac
+  d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2      千曲.flac
+  0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3      alac4.m4a
+  2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c      alac6.m4a
+  a6929077296eacee9c52768efa07ca184cb2bfbfff84fec47de6948293a720ae      garbage.bin
+  d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2      u1music/flac4.flac
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      u1music/synth45.mp3
+windows_caption: Microsoft Windows 11 רҵ��
+audio_device: Realtek High Definition Audio
+endpoint_note: default render endpoint, shared mode, event-driven (as opened by the wasapi stderr line in each transcript)

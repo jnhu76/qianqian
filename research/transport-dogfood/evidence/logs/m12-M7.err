@@ -1,3 +1,4 @@
 [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+ignored input: unknown command 'frobnicate'
 [qianqian-wasapi] render aborted: data plane stopped
-[mp3float @ 000002ab04407280] Could not update timestamps for skipped samples.
+[mp3float @ 000001e36fbb7280] Could not update timestamps for skipped samples.

@@ -11,18 +11,75 @@
 //! This module performs no I/O and holds no truth of its own; every
 //! label is derived from the last observation handed to
 //! [`TuiModel::update`].
+//!
+//! The playlist pane is the same shape of thing (Issue #166 §6): a
+//! presentation PROJECTION of the App's own navigation state — the rows
+//! it is handed are a snapshot of the temporary playlist's traversal
+//! order, and the two markers are the App's committed/selected cursors.
+//! No row, marker or count here is playback truth, and the shell never
+//! derives one from an episode observation.
+//!
+//! # Input mode precedence (Issue #166 §28)
+//!
+//! ```text
+//! Open input active   keys edit the Open line; Enter opens, Esc cancels
+//! GoTo input active   keys edit the seek target; Enter seeks, Esc cancels
+//! Help visible        ? / Esc close it; Q quits; everything else is noise
+//! Normal              the whole player grammar below
+//! ```
+//!
+//! The modes are a short precedence list rather than a state-machine
+//! framework, and NO key both edits and executes: a playback key can
+//! never fire while a modal or the help overlay owns the keyboard.
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use std::path::Path;
+use std::time::Duration;
+
+use crate::playlist::{PlaybackOrder, RepeatMode};
 use qianqian_playback::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,
 };
-use std::time::Duration;
+
+/// One playlist row as the shell presents it: the display label and the
+/// two INDEPENDENT markers. A projection of the App's navigation state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlaylistRow {
+    pub label: String,
+    /// This row is the committed (playing) position.
+    pub playing: bool,
+    /// This row is the UI selection.
+    pub selected: bool,
+}
+
+/// The row label for one source (Issue #166 §22): the file name when the
+/// path has one, the whole path otherwise. The filename IS the title for
+/// this campaign — no metadata is read, and no path is invented.
+pub fn row_label(path: &Path) -> String {
+    match path.file_name() {
+        Some(name) => name.to_string_lossy().into_owned(),
+        None => path.to_string_lossy().into_owned(),
+    }
+}
+
+/// The result of confirming the GoTo line (Issue #166 §27).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GotoConfirm {
+    /// The line read as a seek target; the line is closed.
+    Seek(Duration),
+    /// The line was empty: closed, and no command is sent.
+    Cancelled,
+    /// The line is not a readable time. The line STAYS OPEN for
+    /// correction and the shell shows the bounded diagnostic — a
+    /// malformed seek intent is never sent.
+    Unreadable(&'static str),
+}
 
 /// One frame's worth of presentation state: the episode the player has
-/// committed (source path + latest coherent observation), the Open
-/// input line while it is active, and the last Open operation's
-/// feedback. All of it is presentation: the shell keeps no playback
-/// truth of its own.
+/// committed (source path + latest coherent observation), the playlist
+/// rows, the Open/GoTo input lines while they are active, and the last
+/// operation's feedback. All of it is presentation: the shell keeps no
+/// playback truth of its own.
 pub struct TuiModel {
     /// The committed episode's source path. `None` is a real state
     /// (F6): no episode is live — a clean-failed Open leaves no
@@ -33,12 +90,22 @@ pub struct TuiModel {
     /// The Open input line (D14.6): shell representation of the Open
     /// input UX, which the ADR leaves open. `None` = not in input mode.
     open_input: Option<String>,
-    /// The last Open operation's feedback — application composition
-    /// feedback (D14.6), never a playback semantic.
+    /// The GoTo input line (Issue #166 §27): the exact-seek adapter.
+    /// `None` = not in input mode.
+    goto_input: Option<String>,
+    /// The last operation's feedback — application composition feedback
+    /// (D14.6), never a playback semantic.
     status: Option<String>,
     /// The player's navigation projection (1-based cursor, playlist
     /// length), refreshed with the episode.
     navigation_position: Option<(usize, usize)>,
+    /// The playlist pane's rows, rebuilt only when the App's playlist
+    /// revision moves (so a 5 000-row list costs nothing per frame).
+    playlist: Vec<PlaylistRow>,
+    playlist_revision: Option<u64>,
+    /// The App's traversal order / repeat preferences (labels only).
+    order: Option<PlaybackOrder>,
+    repeat: Option<RepeatMode>,
     /// The App's desired stream factor (D14.9 read side: exactly the
     /// configured value — never an acoustic level or mechanism
     /// readback).
@@ -67,8 +134,13 @@ impl TuiModel {
                 activation_error: None,
             },
             open_input: None,
+            goto_input: None,
             status: None,
             navigation_position: None,
+            playlist: Vec::new(),
+            playlist_revision: None,
+            order: None,
+            repeat: None,
             volume: None,
             help_visible: false,
         }
@@ -83,6 +155,43 @@ impl TuiModel {
     /// Record the player's navigation projection (D14.6).
     pub fn set_navigation(&mut self, position: Option<(usize, usize)>) {
         self.navigation_position = position;
+    }
+
+    /// Record the playlist pane's rows, keyed by the App's playlist
+    /// revision. A revision the model already holds does not even build
+    /// the rows: the caller may call this on every refresh, and an
+    /// unchanged (or huge) playlist costs nothing per frame.
+    pub fn set_playlist(&mut self, revision: u64, rows: impl FnOnce() -> Vec<PlaylistRow>) {
+        if self.playlist_revision == Some(revision) {
+            return;
+        }
+        self.playlist_revision = Some(revision);
+        self.playlist = rows();
+    }
+
+    /// The playlist pane's rows, in the App's traversal order.
+    pub fn playlist(&self) -> &[PlaylistRow] {
+        &self.playlist
+    }
+
+    /// Record the App's traversal order preference.
+    pub fn set_order(&mut self, order: PlaybackOrder) {
+        self.order = Some(order);
+    }
+
+    /// Record the App's repeat preference.
+    pub fn set_repeat(&mut self, repeat: RepeatMode) {
+        self.repeat = Some(repeat);
+    }
+
+    /// The order label (`Sequential` / `Shuffle`), once known.
+    pub fn order_label(&self) -> Option<&'static str> {
+        self.order.map(PlaybackOrder::label)
+    }
+
+    /// The repeat label (`Off` / `All` / `One`), once known.
+    pub fn repeat_label(&self) -> Option<&'static str> {
+        self.repeat.map(RepeatMode::label)
     }
 
     /// Record the player's desired stream factor (D14.9 read side).
@@ -185,6 +294,61 @@ impl TuiModel {
         self.open_input = None;
     }
 
+    /// Enter GoTo input mode (the G key, Issue #166 §27).
+    pub fn begin_goto_input(&mut self) {
+        self.goto_input = Some(String::new());
+    }
+
+    /// Whether the GoTo input line is active.
+    pub fn goto_input_active(&self) -> bool {
+        self.goto_input.is_some()
+    }
+
+    /// The line's current content, while editing.
+    pub fn goto_input(&self) -> Option<&str> {
+        self.goto_input.as_deref()
+    }
+
+    pub fn goto_input_push(&mut self, c: char) {
+        if let Some(line) = &mut self.goto_input {
+            line.push(c);
+        }
+    }
+
+    pub fn goto_input_backspace(&mut self) {
+        if let Some(line) = &mut self.goto_input {
+            line.pop();
+        }
+    }
+
+    /// Confirm the line. The token is read by the EXISTING
+    /// [`crate::cli::parse_seek_time`] reader — the shell's one time
+    /// grammar, shared with the scriptable transport, so no second seek
+    /// syntax exists. An empty line cancels; an unreadable token leaves
+    /// the line OPEN and reports a bounded diagnostic instead of sending
+    /// anything.
+    pub fn confirm_goto_input(&mut self) -> GotoConfirm {
+        let Some(line) = self.goto_input.clone() else {
+            return GotoConfirm::Cancelled;
+        };
+        if line.is_empty() {
+            self.goto_input = None;
+            return GotoConfirm::Cancelled;
+        }
+        match crate::cli::parse_seek_time(&line) {
+            Some(target) => {
+                self.goto_input = None;
+                GotoConfirm::Seek(target)
+            }
+            None => GotoConfirm::Unreadable("cannot read that time (try 95, 1:35 or 01:35.5)"),
+        }
+    }
+
+    /// Leave GoTo input mode without seeking.
+    pub fn cancel_goto_input(&mut self) {
+        self.goto_input = None;
+    }
+
     /// Toggle the keyboard-help overlay (the `?` key). Pure
     /// presentation state: open over anything, closed again by the
     /// same key or Esc.
@@ -245,6 +409,51 @@ impl TuiModel {
         crate::status::format_timeline(&self.observation)
     }
 
+    /// The read-only progress bar (Issue #166 §33):
+    /// `00:42 ━━━━━╸────────── 05:47`. `None` unless BOTH sides have
+    /// evidence: an unknown duration has no percentage to draw and an
+    /// unknown position is not a zero, so the bar simply does not
+    /// appear — it is never fabricated, and it is never an input
+    /// affordance (seeking stays keyboard-only).
+    ///
+    /// The fill is the position's fraction of the reported duration,
+    /// clamped into the bar. The duration is mechanism evidence and the
+    /// position an independent projection, so a position beyond the
+    /// reported duration is representable; it clamps to a full bar
+    /// rather than overflowing, which is the honest degradation of a
+    /// display that cannot show "more than all of it".
+    pub fn position_bar_label(&self) -> Option<String> {
+        let rate = u64::from(self.observation.source_format?.sample_rate);
+        if rate == 0 {
+            return None;
+        }
+        let position_frames = self.observation.position?;
+        let duration = self.observation.source_duration?;
+        let duration_secs = duration.as_secs();
+        let position_secs = position_frames / rate;
+
+        let filled = if duration_secs == 0 {
+            0
+        } else {
+            let width = BAR_WIDTH as u128;
+            let filled = u128::from(position_secs) * width / u128::from(duration_secs);
+            usize::try_from(filled.min(width)).unwrap_or(BAR_WIDTH)
+        };
+        let mut bar = String::with_capacity(BAR_WIDTH);
+        for cell in 0..BAR_WIDTH {
+            bar.push(match cell.cmp(&filled) {
+                std::cmp::Ordering::Less => '━',
+                std::cmp::Ordering::Equal => '╸',
+                std::cmp::Ordering::Greater => '─',
+            });
+        }
+        Some(format!(
+            "{} {bar} {}",
+            crate::status::format_clock(Duration::from_secs(position_secs)),
+            crate::status::format_clock(Duration::from_secs(duration_secs))
+        ))
+    }
+
     /// Diagnostics worth showing, in stable order. Both are
     /// presentation text supplied by the seam; their presence or
     /// wording is never part of the semantic outcome.
@@ -268,10 +477,12 @@ impl TuiModel {
 }
 
 /// What one key press means to the shell. `Stop`, `PauseResume` and the
-/// seek arrows are episode commands; `Open` and `Quit` are shell
-/// actions, not playback semantics — `Open` is owned by the runtime
-/// (it needs the player and the input-line state; [`apply_action`]
-/// routes episode commands only), `Quit` is loop control.
+/// seek keys are episode commands; `Open`, `GoTo`, `Help`, the playlist
+/// keys (selection / order / repeat / play-selected) and `Quit` are
+/// shell actions, not playback semantics — they are owned by the
+/// runtime (they need the player and the input-line state;
+/// [`apply_action`] routes EPISODE commands only), `Quit` is loop
+/// control.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Stop,
@@ -282,18 +493,38 @@ pub enum Action {
     SeekBackward,
     /// Right arrow: seek one [`SEEK_STEP`] later (D14.5).
     SeekForward,
+    /// Shift+Left: seek one [`LARGE_SEEK_STEP`] earlier (Issue #166
+    /// §26). The same command, a larger step — no new seek semantics.
+    SeekBackwardLarge,
+    /// Shift+Right: seek one [`LARGE_SEEK_STEP`] later.
+    SeekForwardLarge,
     /// O: begin the Open input line (D14.6). A shell action; the
     /// runtime performs the Open through the player.
     Open,
+    /// G: begin the exact-seek input line (Issue #166 §27). A shell
+    /// action; the runtime requests the parsed target through the SAME
+    /// frozen seek command the arrows use.
+    GoTo,
     /// `?`: toggle the keyboard-help overlay. A shell action; the
     /// runtime routes it to the model's presentation state.
     Help,
-    /// N: select the next playlist entry and Open it through the same
-    /// replacement (D14.6 navigation). A shell action like [`Action::Open`].
+    /// Down arrow: move the UI selection one row later. Presentation
+    /// only — it never plays (Issue #166 §18).
+    SelectNext,
+    /// Up arrow: move the UI selection one row earlier.
+    SelectPrevious,
+    /// Enter: play the SELECTED row through the same Open replacement
+    /// (Issue #166 §19).
+    PlaySelected,
+    /// N: the manual Next traversal step (Issue #166 §35). A shell
+    /// action like [`Action::Open`].
     Next,
-    /// P: select the previous playlist entry. A shell action like
-    /// [`Action::Open`].
+    /// P: the manual Previous traversal step (Issue #166 §34).
     Previous,
+    /// R: toggle Sequential ↔ Shuffle (Issue #166 §25).
+    ToggleOrder,
+    /// L: cycle Repeat Off → All → One → Off (Issue #166 §12).
+    CycleRepeat,
     /// '+'/'=': raise the App's desired stream factor by one step
     /// (D14.9: step 5). A shell action like [`Action::Open`].
     VolumeUp,
@@ -302,9 +533,17 @@ pub enum Action {
     Quit,
 }
 
-/// The fixed seek step the arrow keys request (D14.5). One product
+/// The fixed seek step the plain arrow keys request (D14.5). One product
 /// decision, one constant — deliberately not a configuration surface.
 pub const SEEK_STEP: Duration = Duration::from_secs(5);
+
+/// The large seek step Shift+arrow requests (Issue #166 §26). The same
+/// product decision at a larger scale: it routes the SAME seek command,
+/// and the episode's own clamp/refusal contract decides the landing.
+pub const LARGE_SEEK_STEP: Duration = Duration::from_secs(30);
+
+/// The read-only progress bar's width in cells (Issue #166 §33).
+pub const BAR_WIDTH: usize = 24;
 
 /// The seek target one arrow key requests, derived from ONE coherent
 /// observation of the episode: the position Projection (D14.8, source
@@ -315,7 +554,11 @@ pub const SEEK_STEP: Duration = Duration::from_secs(5);
 /// convert it) there is no target to compute, and a seek with no
 /// computable target is never SENT — no fabricated zero, no seek to the
 /// episode start, no command at all.
-pub fn seek_target(observation: &PlaybackSessionObservation, forward: bool) -> Option<Duration> {
+pub fn seek_target(
+    observation: &PlaybackSessionObservation,
+    step: Duration,
+    forward: bool,
+) -> Option<Duration> {
     let rate = u64::from(observation.source_format?.sample_rate);
     if rate == 0 {
         return None;
@@ -323,9 +566,9 @@ pub fn seek_target(observation: &PlaybackSessionObservation, forward: bool) -> O
     let position = observation.position?;
     let current = Duration::from_micros(position * 1_000_000 / rate);
     Some(if forward {
-        current.saturating_add(SEEK_STEP)
+        current.saturating_add(step)
     } else {
-        current.saturating_sub(SEEK_STEP)
+        current.saturating_sub(step)
     })
 }
 
@@ -336,34 +579,48 @@ pub enum Step {
     Exit,
 }
 
-/// The shell's whole keyboard grammar: Left/Right seek in fixed steps,
-/// Space toggles pause/resume, S stops, O opens the Open input line,
-/// `?` toggles the keyboard-help overlay, N/P select the next/previous
-/// playlist entry (D14.6 navigation), Q quits, Ctrl+C quits. Anything
-/// else is presentation noise (including key-release events, which
-/// Windows terminals emit).
+/// The shell's whole keyboard grammar (Issue #166 §30, frozen).
+///
+/// ```text
+/// Playlist     ↑ ↓ select   Enter play selected   N/P next/previous
+///              R order      L repeat
+/// Playback     Space pause/resume   ← → seek 5 s   Shift+← → seek 30 s
+///              G exact seek   + - volume   S stop
+/// Application  O open   ? help   Q / Ctrl+C quit   Esc cancel
+/// ```
+///
+/// Anything else is presentation noise (including key-release events,
+/// which Windows terminals emit). The plain and shift-keyed forms of a
+/// LETTER both act (terminals disagree about reporting SHIFT); the
+/// ARROWS are the one place where the two forms differ by design, so
+/// they are matched on their exact modifier set — a chorded arrow stays
+/// noise.
 pub fn action_for_key(key: KeyEvent) -> Option<Action> {
     if key.kind != KeyEventKind::Press {
         return None;
     }
-    // Letters and arrows act on their plain or shift-keyed form
-    // (terminals disagree about reporting SHIFT); chords stay noise
-    // except the conventional Ctrl+C quit — so Ctrl+S/Ctrl+Q and
-    // Ctrl+arrows never act by accident.
     let plain = key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT;
     match key.code {
         KeyCode::Char(' ') if plain => Some(Action::PauseResume),
         KeyCode::Char('s') | KeyCode::Char('S') if plain => Some(Action::Stop),
         KeyCode::Char('o') | KeyCode::Char('O') if plain => Some(Action::Open),
+        KeyCode::Char('g') | KeyCode::Char('G') if plain => Some(Action::GoTo),
         KeyCode::Char('?') if plain => Some(Action::Help),
         KeyCode::Char('n') | KeyCode::Char('N') if plain => Some(Action::Next),
         KeyCode::Char('p') | KeyCode::Char('P') if plain => Some(Action::Previous),
+        KeyCode::Char('r') | KeyCode::Char('R') if plain => Some(Action::ToggleOrder),
+        KeyCode::Char('l') | KeyCode::Char('L') if plain => Some(Action::CycleRepeat),
         KeyCode::Char('+') | KeyCode::Char('=') if plain => Some(Action::VolumeUp),
         KeyCode::Char('-') | KeyCode::Char('_') if plain => Some(Action::VolumeDown),
         KeyCode::Char('q') | KeyCode::Char('Q') if plain => Some(Action::Quit),
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(Action::Quit),
-        KeyCode::Left if plain => Some(Action::SeekBackward),
-        KeyCode::Right if plain => Some(Action::SeekForward),
+        KeyCode::Up if plain => Some(Action::SelectPrevious),
+        KeyCode::Down if plain => Some(Action::SelectNext),
+        KeyCode::Enter if plain => Some(Action::PlaySelected),
+        KeyCode::Left if key.modifiers.is_empty() => Some(Action::SeekBackward),
+        KeyCode::Right if key.modifiers.is_empty() => Some(Action::SeekForward),
+        KeyCode::Left if key.modifiers == KeyModifiers::SHIFT => Some(Action::SeekBackwardLarge),
+        KeyCode::Right if key.modifiers == KeyModifiers::SHIFT => Some(Action::SeekForwardLarge),
         _ => None,
     }
 }
@@ -373,13 +630,15 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
 /// testable without a terminal. Space routes to the pause/resume seams:
 /// which of the two commands is sent comes from a FRESH authoritative
 /// observation of the episode's pause-intent command state — the shell
-/// never keeps a local `paused` bool. The arrows route a fixed-step
-/// seek (D14.5): the target is derived from one fresh coherent
-/// observation, and an episode whose position is unknown gets NO
-/// command at all. S routes to `request_stop`; all of these are
-/// idempotent, valid before and after the terminal Fact. Q exits the
-/// loop without touching the episode. The Open action is routed by the
-/// runtime itself (input line + player) and must not arrive here.
+/// never keeps a local `paused` bool. The four seek actions route a
+/// fixed-step seek (D14.5 + Issue #166 §26: the same command at 5 s and
+/// 30 s): the target is derived from one fresh coherent observation, and
+/// an episode whose position is unknown gets NO command at all. S routes
+/// to `request_stop`; all of these are idempotent, valid before and
+/// after the terminal Fact. Q exits the loop without touching the
+/// episode. The shell actions are routed by the runtime itself (input
+/// lines, player navigation/policy, overlay state) and must not arrive
+/// here.
 pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
     match action {
         Action::Stop => {
@@ -395,18 +654,41 @@ pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
             Step::Continue
         }
         Action::SeekBackward | Action::SeekForward => {
-            if let Some(target) = seek_target(&handle.observe(), action == Action::SeekForward) {
+            let step = SEEK_STEP;
+            if let Some(target) =
+                seek_target(&handle.observe(), step, action == Action::SeekForward)
+            {
+                handle.request_seek(target);
+            }
+            Step::Continue
+        }
+        Action::SeekBackwardLarge | Action::SeekForwardLarge => {
+            let step = LARGE_SEEK_STEP;
+            if let Some(target) =
+                seek_target(&handle.observe(), step, action == Action::SeekForwardLarge)
+            {
                 handle.request_seek(target);
             }
             Step::Continue
         }
         // The shell actions never reach this wiring: the runtime routes
-        // Open to the input line, Help to the overlay state,
-        // Next/Previous to the player's navigation, and the volume keys
-        // to the player's desired level before any episode command is
-        // considered. These arms exist so the match stays exhaustive;
+        // Open/GoTo to the input lines, Help to the overlay state,
+        // PlaySelected/Next/Previous to the player's navigation, the
+        // selection keys to the playlist's presentation cursor, the
+        // order/repeat keys to the playlist's policy, and the volume
+        // keys to the player's desired level before any episode command
+        // is considered. These arms exist so the match stays exhaustive;
         // they must not touch the episode.
-        Action::Open | Action::Help | Action::Next | Action::Previous => Step::Continue,
+        Action::Open
+        | Action::GoTo
+        | Action::Help
+        | Action::SelectNext
+        | Action::SelectPrevious
+        | Action::PlaySelected
+        | Action::Next
+        | Action::Previous
+        | Action::ToggleOrder
+        | Action::CycleRepeat => Step::Continue,
         Action::VolumeUp | Action::VolumeDown => Step::Continue,
         Action::Quit => Step::Exit,
     }
@@ -579,9 +861,10 @@ mod tests {
             // never act by accident.
             KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
             KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL),
-            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
-            KeyEvent::new(KeyCode::Up, KeyModifiers::NONE),
-            KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('n'), KeyModifiers::ALT),
+            KeyEvent::new(KeyCode::Home, KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE),
         ] {
             assert_eq!(action_for_key(key), None, "{key:?} must be ignored");
         }
@@ -596,24 +879,33 @@ mod tests {
         );
     }
 
-    /// The F5 arrow grammar: Left and Right map to the two seek
-    /// directions, in their plain and shift-keyed forms (same terminal
-    /// posture as the letters), on press only — and chords (Ctrl+arrow)
-    /// stay noise.
+    /// The arrow grammar (F5 + Issue #166 §26): Left/Right seek one
+    /// small step, Shift+Left/Shift+Right one large step. This is the
+    /// ONE place where the shift-keyed form deliberately differs, so the
+    /// match is on the exact modifier set — a chorded arrow stays noise,
+    /// and a release event never acts.
     #[test]
-    fn arrows_map_to_the_fixed_step_seek_actions() {
-        for (key, action) in [
-            (KeyCode::Left, Action::SeekBackward),
-            (KeyCode::Right, Action::SeekForward),
+    fn arrows_map_to_the_small_and_large_seek_actions() {
+        for (key, small, large) in [
+            (
+                KeyCode::Left,
+                Action::SeekBackward,
+                Action::SeekBackwardLarge,
+            ),
+            (
+                KeyCode::Right,
+                Action::SeekForward,
+                Action::SeekForwardLarge,
+            ),
         ] {
             assert_eq!(
                 action_for_key(KeyEvent::new(key, KeyModifiers::NONE)),
-                Some(action)
+                Some(small)
             );
             assert_eq!(
                 action_for_key(KeyEvent::new(key, KeyModifiers::SHIFT)),
-                Some(action),
-                "shift-keyed arrows act like plain ones"
+                Some(large),
+                "the shift-keyed arrow is the LARGE step"
             );
             assert_eq!(
                 action_for_key(KeyEvent::new_with_kind(
@@ -624,12 +916,116 @@ mod tests {
                 None,
                 "release events never act"
             );
+            for modifiers in [KeyModifiers::CONTROL, KeyModifiers::ALT] {
+                assert_eq!(
+                    action_for_key(KeyEvent::new(key, modifiers)),
+                    None,
+                    "chorded arrows stay noise"
+                );
+            }
+        }
+    }
+
+    /// The playlist keys (Issue #166 §30): ↑/↓ move the selection,
+    /// Enter plays it, N/P navigate, R toggles the order, L cycles the
+    /// repeat mode — each mapped once, on press, in its plain and
+    /// shift-keyed letter form.
+    #[test]
+    fn the_playlist_keys_map_to_their_actions() {
+        for (key, action) in [
+            (KeyCode::Up, Action::SelectPrevious),
+            (KeyCode::Down, Action::SelectNext),
+            (KeyCode::Enter, Action::PlaySelected),
+        ] {
             assert_eq!(
-                action_for_key(KeyEvent::new(key, KeyModifiers::CONTROL)),
+                action_for_key(KeyEvent::new(key, KeyModifiers::NONE)),
+                Some(action)
+            );
+            assert_eq!(
+                action_for_key(KeyEvent::new(key, KeyModifiers::SHIFT)),
+                Some(action),
+                "a shift-keyed form of the same key acts too"
+            );
+            assert_eq!(
+                action_for_key(KeyEvent::new_with_kind(
+                    key,
+                    KeyModifiers::NONE,
+                    KeyEventKind::Release
+                )),
                 None,
-                "chorded arrows stay noise"
+                "release events never act"
             );
         }
+        for (key, action) in [
+            ('r', Action::ToggleOrder),
+            ('l', Action::CycleRepeat),
+            ('g', Action::GoTo),
+        ] {
+            for code in [KeyCode::Char(key), KeyCode::Char(key.to_ascii_uppercase())] {
+                assert_eq!(
+                    action_for_key(KeyEvent::new(code, KeyModifiers::NONE)),
+                    Some(action),
+                    "{code:?}"
+                );
+            }
+            assert_eq!(
+                action_for_key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::SHIFT)),
+                Some(action)
+            );
+        }
+    }
+
+    /// The three seek actions never touch the episode when its position
+    /// (or rate) is unknown, and the large step really is 30 s of media
+    /// time around the same observed position.
+    #[test]
+    fn the_large_seek_step_is_thirty_seconds_of_the_same_observation() {
+        let observation =
+            |position: Option<u64>, sample_rate: Option<u32>| PlaybackSessionObservation {
+                position,
+                source_format: sample_rate.map(|sample_rate| PcmFormat {
+                    sample_rate,
+                    channels: 2,
+                    channel_mask: 0x3,
+                }),
+                ..pending()
+            };
+        let at_42s = observation(Some(44_100 * 42), Some(44_100));
+        assert_eq!(
+            seek_target(&at_42s, LARGE_SEEK_STEP, true),
+            Some(Duration::from_secs(72))
+        );
+        assert_eq!(
+            seek_target(&at_42s, LARGE_SEEK_STEP, false),
+            Some(Duration::from_secs(12))
+        );
+        // Both steps are inert without evidence: no fabricated target.
+        let blind = observation(None, Some(44_100));
+        assert_eq!(seek_target(&blind, LARGE_SEEK_STEP, true), None);
+        assert_eq!(seek_target(&blind, SEEK_STEP, true), None);
+        // …and less than a large step from the start saturates at zero.
+        let at_5s = observation(Some(44_100 * 5), Some(44_100));
+        assert_eq!(
+            seek_target(&at_5s, LARGE_SEEK_STEP, false),
+            Some(Duration::ZERO)
+        );
+    }
+
+    /// Every large-seek key routes through the SAME request_seek seam as
+    /// the small ones — one seek command, two step sizes, and no
+    /// command at all without a computable target.
+    #[test]
+    fn the_large_seek_actions_route_through_the_same_request_seek_seam() {
+        let handle = PlaybackSessionHandle::new();
+        let before = handle.observe();
+        for action in [Action::SeekBackwardLarge, Action::SeekForwardLarge] {
+            assert_eq!(apply_action(action, &handle), Step::Continue);
+        }
+        assert_eq!(
+            handle.observe(),
+            before,
+            "no position evidence: no seek command is sent"
+        );
     }
 
     /// The seek target is a fixed step around the observed position,
@@ -651,21 +1047,27 @@ mod tests {
             };
         // Unknown position: inert in both directions.
         let no_position = observation_with(None, Some(44_100));
-        assert_eq!(seek_target(&no_position, true), None);
-        assert_eq!(seek_target(&no_position, false), None);
+        assert_eq!(seek_target(&no_position, SEEK_STEP, true), None);
+        assert_eq!(seek_target(&no_position, SEEK_STEP, false), None);
         // No published rate: no unit to convert with, inert.
         let no_format = observation_with(Some(100), None);
-        assert_eq!(seek_target(&no_format, true), None);
+        assert_eq!(seek_target(&no_format, SEEK_STEP, true), None);
 
         // 42 s at 44.1 kHz: the step is exactly five seconds of media
         // time, and the backward step saturates at zero (Duration is
         // non-negative by type).
         let at_42s = observation_with(Some(44_100 * 42), Some(44_100));
-        assert_eq!(seek_target(&at_42s, true), Some(Duration::from_secs(47)));
-        assert_eq!(seek_target(&at_42s, false), Some(Duration::from_secs(37)));
+        assert_eq!(
+            seek_target(&at_42s, SEEK_STEP, true),
+            Some(Duration::from_secs(47))
+        );
+        assert_eq!(
+            seek_target(&at_42s, SEEK_STEP, false),
+            Some(Duration::from_secs(37))
+        );
         let at_2s = observation_with(Some(2 * 44_100), Some(44_100));
         assert_eq!(
-            seek_target(&at_2s, false),
+            seek_target(&at_2s, SEEK_STEP, false),
             Some(Duration::from_secs(0)),
             "before zero the step saturates at the episode start"
         );
@@ -673,7 +1075,10 @@ mod tests {
         // The conversion uses the observation's own rate: 42 s at
         // 48 kHz is the same media time from different frames.
         let at_48k = observation_with(Some(48_000 * 42), Some(48_000));
-        assert_eq!(seek_target(&at_48k, true), Some(Duration::from_secs(47)));
+        assert_eq!(
+            seek_target(&at_48k, SEEK_STEP, true),
+            Some(Duration::from_secs(47))
+        );
     }
 
     /// An episode whose position is unknown gets NO seek command: the
@@ -879,6 +1284,237 @@ mod tests {
         model.toggle_help();
         model.close_help();
         assert!(!model.help_visible());
+    }
+
+    /// The GoTo line (Issue #166 §27): begin → edit → Enter returns the
+    /// parsed target and closes the line. The token reader is the
+    /// EXISTING shared `parse_seek_time`, so every spelling it accepts
+    /// is accepted here and nothing else is.
+    #[test]
+    fn the_goto_line_parses_with_the_shared_reader_and_closes() {
+        let mut model = TuiModel::new("song.flac");
+        assert!(!model.goto_input_active());
+        assert_eq!(model.goto_input(), None);
+
+        model.begin_goto_input();
+        assert!(model.goto_input_active());
+        for c in "01:35.5".chars() {
+            model.goto_input_push(c);
+        }
+        assert_eq!(model.goto_input(), Some("01:35.5"));
+        model.goto_input_backspace();
+        assert_eq!(model.goto_input(), Some("01:35."));
+        model.goto_input_push('5');
+        assert_eq!(
+            model.confirm_goto_input(),
+            GotoConfirm::Seek(Duration::from_millis(95_500)),
+            "the shared reader owns the time grammar"
+        );
+        assert!(!model.goto_input_active());
+
+        // Plain seconds and mm:ss read the same way.
+        for (text, expected) in [
+            ("95", Duration::from_secs(95)),
+            ("1:35", Duration::from_secs(95)),
+        ] {
+            let mut model = TuiModel::new("song.flac");
+            model.begin_goto_input();
+            for c in text.chars() {
+                model.goto_input_push(c);
+            }
+            assert_eq!(model.confirm_goto_input(), GotoConfirm::Seek(expected));
+        }
+
+        // An empty line is a cancel, and Esc leaves without a command.
+        let mut model = TuiModel::new("song.flac");
+        model.begin_goto_input();
+        assert_eq!(model.confirm_goto_input(), GotoConfirm::Cancelled);
+        assert!(!model.goto_input_active());
+        model.begin_goto_input();
+        model.goto_input_push('9');
+        model.cancel_goto_input();
+        assert_eq!(model.goto_input(), None);
+    }
+
+    /// An unreadable GoTo token never becomes a command: the line stays
+    /// OPEN for correction and the shell reports a bounded diagnostic
+    /// (Issue #166 §27).
+    #[test]
+    fn an_unreadable_goto_token_stays_open_and_sends_nothing() {
+        for bad in ["abc", "1:99", "-30", "nan", "inf", "1e400"] {
+            let mut model = TuiModel::new("song.flac");
+            model.begin_goto_input();
+            for c in bad.chars() {
+                model.goto_input_push(c);
+            }
+            let GotoConfirm::Unreadable(diagnostic) = model.confirm_goto_input() else {
+                panic!("{bad:?} must not parse into a seek target");
+            };
+            assert!(!diagnostic.is_empty());
+            assert!(
+                model.goto_input_active(),
+                "{bad:?}: the line stays open for correction"
+            );
+            // The shell may then cancel it, and no target was produced.
+            model.cancel_goto_input();
+            assert!(!model.goto_input_active());
+        }
+    }
+
+    /// The read-only progress bar (Issue #166 §33) appears only when
+    /// BOTH sides have evidence, and never fabricates a percentage for
+    /// an unknown duration or a zero for an unknown position.
+    #[test]
+    fn the_progress_bar_needs_both_sides_and_never_fabricates_one() {
+        let model_with = |position: Option<u64>, duration: Option<u64>| {
+            let mut model = TuiModel::new("song.flac");
+            model.update(PlaybackSessionObservation {
+                source_format: Some(PcmFormat {
+                    sample_rate: 44_100,
+                    channels: 2,
+                    channel_mask: 0x3,
+                }),
+                position,
+                source_duration: duration.map(Duration::from_secs),
+                ..pending()
+            });
+            model
+        };
+
+        // Unknown duration, and unknown position: no bar at all — the
+        // Position line keeps reporting the honest `--:--` side.
+        assert_eq!(
+            model_with(Some(44_100 * 42), None).position_bar_label(),
+            None
+        );
+        assert_eq!(model_with(None, Some(238)).position_bar_label(), None);
+        assert_eq!(model_with(None, None).position_bar_label(), None);
+        assert_eq!(
+            model_with(Some(44_100 * 42), Some(238)).timeline_label(),
+            "00:42 / 03:58"
+        );
+
+        // Both known: the bar carries both times and the fill is the
+        // position's fraction of the reported duration.
+        let bar = model_with(Some(44_100 * 42), Some(238))
+            .position_bar_label()
+            .expect("both sides known");
+        assert!(bar.starts_with("00:42 "), "{bar:?}");
+        assert!(bar.ends_with(" 03:58"), "{bar:?}");
+        assert_eq!(
+            bar.chars().filter(|c| *c == '━').count(),
+            (42 * BAR_WIDTH) / 238,
+            "the filled cells are the position's fraction: {bar:?}"
+        );
+        assert!(bar.contains('╸'), "a head marks the current position");
+
+        // At the start the bar is empty but still honest about both
+        // times (a real zero position, unlike an unknown one).
+        let start = model_with(Some(0), Some(238)).position_bar_label().unwrap();
+        assert!(start.starts_with("00:00 "), "{start:?}");
+        assert_eq!(start.chars().filter(|c| *c == '━').count(), 0);
+
+        // A position beyond the reported duration is representable (the
+        // two sides are independent evidence): it clamps to a full bar
+        // rather than overflowing or panicking.
+        let past_end = model_with(Some(44_100 * 999), Some(238))
+            .position_bar_label()
+            .unwrap();
+        assert_eq!(past_end.chars().filter(|c| *c == '━').count(), BAR_WIDTH);
+        assert!(!past_end.contains('─'));
+
+        // A zero reported duration cannot divide: the bar degrades to
+        // an empty one instead of panicking.
+        let zero = model_with(Some(44_100 * 3), Some(0))
+            .position_bar_label()
+            .unwrap();
+        assert_eq!(zero.chars().filter(|c| *c == '━').count(), 0);
+
+        // No published rate: no unit to convert the frames with, so the
+        // bar is absent exactly as the seek target is.
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            position: Some(44_100 * 42),
+            source_duration: Some(Duration::from_secs(238)),
+            ..pending()
+        });
+        assert_eq!(model.position_bar_label(), None);
+    }
+
+    /// The pane's row labels: the file name when the path has one (CJK
+    /// and spaces kept verbatim), the whole path otherwise (Issue #166
+    /// §22). No metadata is read — the filename IS the title.
+    #[test]
+    fn row_labels_use_the_file_name_and_keep_unicode() {
+        for (path, expected) in [
+            ("/media/01 Intro.flac", "01 Intro.flac"),
+            ("/media/夜曲 七里香.flac", "夜曲 七里香.flac"),
+            ("/media/a/b/c.mp3", "c.mp3"),
+            ("/", "/"),
+            ("..", ".."),
+        ] {
+            assert_eq!(row_label(Path::new(path)), expected, "{path}");
+        }
+    }
+
+    /// The Windows product paths are the ones the physical gate uses:
+    /// on the Windows build a drive path's label is its file name (the
+    /// separator is platform-owned, so this is pinned where it is true).
+    #[cfg(windows)]
+    #[test]
+    fn windows_drive_paths_label_by_their_file_name() {
+        for (path, expected) in [
+            (r"D:\Music\夜曲.flac", "夜曲.flac"),
+            (r"D:\Music\Album 2\01 Intro.flac", "01 Intro.flac"),
+        ] {
+            assert_eq!(row_label(Path::new(path)), expected, "{path}");
+        }
+    }
+
+    /// The playlist rows are revision-gated: a revision the model
+    /// already holds does not even build them, which is what keeps a
+    /// huge playlist off the per-frame path (Issue #166 §21).
+    #[test]
+    fn the_playlist_rows_rebuild_only_when_the_revision_moves() {
+        let mut model = TuiModel::new("song.flac");
+        assert_eq!(model.playlist_revision, None);
+        assert!(model.playlist().is_empty());
+
+        model.set_playlist(7, || {
+            vec![PlaylistRow {
+                label: "first.flac".to_owned(),
+                playing: true,
+                selected: true,
+            }]
+        });
+        assert_eq!(model.playlist_revision, Some(7));
+        assert_eq!(model.playlist().len(), 1);
+
+        // The same revision: the closure must not even run.
+        model.set_playlist(7, || {
+            panic!("an unchanged revision must not rebuild the rows")
+        });
+
+        model.set_playlist(8, Vec::new);
+        assert_eq!(model.playlist_revision, Some(8));
+        assert!(model.playlist().is_empty());
+    }
+
+    /// The order/repeat labels come from the App's own policy state and
+    /// are absent until the shell has been told them.
+    #[test]
+    fn the_order_and_repeat_labels_follow_the_app_state() {
+        let mut model = TuiModel::new("song.flac");
+        assert_eq!(model.order_label(), None);
+        assert_eq!(model.repeat_label(), None);
+        model.set_order(PlaybackOrder::Shuffle);
+        model.set_repeat(RepeatMode::One);
+        assert_eq!(model.order_label(), Some("Shuffle"));
+        assert_eq!(model.repeat_label(), Some("One"));
+        model.set_order(PlaybackOrder::Sequential);
+        model.set_repeat(RepeatMode::Off);
+        assert_eq!(model.order_label(), Some("Sequential"));
+        assert_eq!(model.repeat_label(), Some("Off"));
     }
 
     /// The Open input line lifecycle: begin → edit → confirm returns

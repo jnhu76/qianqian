@@ -19,12 +19,21 @@ honestly as synthetic dogfood media, not repository fixtures.
 | synth45.mp3 | SYNTHETIC (ffmpeg sine 440 Hz, 44.1 kHz stereo, 128k CBR) | MP3 CBR | 45 s | 44.1 kHz / 2 ch | lossy, long | seek/pause/volume/interaction scenarios, A19/A20 |
 | synth30.flac | SYNTHETIC (ffmpeg sine 330 Hz, 44.1 kHz stereo) | FLAC | 30 s | 44.1 kHz / 2 ch | lossless, long | Open replacement target, A17–A19 |
 | garbage.bin | 1024 random bytes | — | — | — | invalid candidate | A11 refusal, A15 nav refusal, A20 |
+| vtest01..vtest24.mp3 | SYNTHETIC — renamed copies of `synth45.mp3` (staged by `tools/run-tui.sh`) | MP3 CBR | 45 s each | 44.1 kHz / 2 ch | 24-entry list | U2-viewport (pane windowing + selection scroll) |
+| u2soak/soak01..20.mp3 | SYNTHETIC (ffmpeg sine 300+ n Hz, 44.1 kHz stereo, 128k CBR, staged by `tools/run-tui.sh`) | MP3 CBR | 100 s each | 44.1 kHz / 2 ch | 20-entry soak list | U2-soak (~33 min end-to-end playback) |
 
 Known seekability: all real fixtures are block-aligned CBR/lossless
 sources exercised by the SongCore ABI v1 equivalence corpus; synth45 /
 synth30 are block-aligned sines. Truncated/corrupt corpus members from
 the F4 duration study are deliberately NOT used here (the invalid Open
 class is represented by garbage.bin / a nonexistent path).
+
+The U2 (Issue #166) scenarios additionally use `flac4.flac` /
+`mp3cbr.mp3` / `alac4.m4a` / `alac6.m4a` / `synth30.flac` / `千曲.flac`
+for the EOF/transition cases; the EOF TRANSITION targets are deliberately
+non-MP3 where possible, because an MP3 open streams ffmpeg decoder
+warnings onto the pseudoconsole and can hold the feedback row polluted
+longer than a 4 s episode lasts.
 
 SHA256 of every staged file is recorded per-run in
 `evidence/ENV-TUI-RUN<N>.txt`.

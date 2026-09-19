@@ -232,7 +232,13 @@ Realtime Audio Runtime representation
 Closed by the same 2026-09-18 F6-AUTHORITY-PROMOTION-1 (D14.6/D14.9
 amendment): playlist/queue authority (application navigation state,
 commit-on-activation — no new authority) and next/previous policy
-(inert boundaries, no auto-next, Open replaces the playlist).
+(inert boundaries by default, Open replaces the playlist). The
+2026-09-19 U2 amendment in D14.6 supersedes that closure's Phase-F v1
+scope clauses only: ordering/repeat are App-owned product policy and a
+committed D11 `Completed` Fact triggers at most one automatic
+transition through the same Open replacement. No ownership moved, no
+PlaylistPlugin/navigation Fact was created, and failed-candidate
+auto-skip is still forbidden.
 
 ---
 
@@ -326,8 +332,10 @@ F6 Open                         AUTHORITY PROMOTED (architecture/
                                 rounds to 0/0/0/0)
 Next / Previous                 AUTHORITY CLOSED as application
                                 navigation state (commit-on-activation,
-                                inert boundaries, no auto-next; same
-                                amendment) — IMPLEMENTED (feat/
+                                inert boundaries by default; same
+                                amendment — its Phase-F v1 "no auto-next"
+                                scope clause is superseded by the U2
+                                amendment below) — IMPLEMENTED (feat/
                                 navigation-1, PR #160; Stage D matrix +
                                 O6 physical walk x3; 3 review rounds to
                                 0/0/0/0)
@@ -356,6 +364,41 @@ v1 closure                      integrated audit PASS_WITH_MINOR ->
                                 Verdict QIANQIAN_PHASE_F_TRANSPORT_V1_
                                 CLOSED is pending final human review —
                                 NOT yet written.
+U1 Windows TUI launch /         CLOSED (Issue #166 U1, PR #167, merged
+   folder input                  2026-09-19): canonical qianqian.exe
+                                product binary (qianqian-headless kept
+                                as the historical regression target), a
+                                truthful no-argument TUI (no fabricated
+                                episode), deterministic file/folder
+                                expansion into ONE ordered candidate
+                                list, commit-riding temporary-list
+                                seeding, bounded scan diagnostics, and
+                                corrected host/presentation exit
+                                semantics. Physical evidence:
+                                research/transport-dogfood/evidence/
+                                ENV-TUI-RUN4/RUN5 + U1-CORRECTIVE.
+U2 Playlist / order / repeat    AMENDED + IMPLEMENTED (Issue #166 U2,
+   / EOF policy / TUI controls  branch feat/166-playlist-usability-
+                                closure): D14.6's Phase-F v1 "no repeat /
+                                no shuffle / no EOF auto-next" clauses
+                                are reclassified as SCOPE freeze and
+                                superseded by one invariant — ordering
+                                and repeat policy belong to the App, the
+                                Playback Session establishes terminal
+                                Facts and nothing else. App-owned
+                                temporary playlist (order Sequential/
+                                Shuffle, repeat Off/All/One, stable
+                                per-cycle permutation, selection cursor,
+                                Completed-only exactly-once EOF reaction
+                                through the SAME Open replacement, no
+                                failed-candidate auto-skip), TUI playlist
+                                pane + frozen keymap, Shift+arrows ∓30 s
+                                and `G` exact seek over the SAME
+                                request_seek Command, `play --shuffle`
+                                startup grammar. Still forbidden: any
+                                playlist/navigation Plugin or Fact, and
+                                the persistence family (no playlist file,
+                                M3U, media DB, library, history).
 F8 Devices / Device switch      split; switch mechanism still OPEN
 ```
 

@@ -235,7 +235,7 @@ pub fn open_expanded<S: EpisodeStart>(
     let first = expanded.accepted.first()?;
     let outcome = player.open(first);
     if outcome == OpenOutcome::Opened {
-        player.seed_startup_playlist(expanded.accepted.clone());
+        player.establish_playlist(expanded.accepted.clone());
     }
     Some(outcome)
 }

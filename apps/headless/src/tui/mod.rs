@@ -32,7 +32,11 @@
 //! K0 snapshot types, FiberState, PcmEdge, decode/output mechanisms, or
 //! any realtime path, and it renders no playback semantic that F2/F3/F6
 //! have not earned (no Playing/Starting/Stopping — Paused is the one
-//! D14.7-earned projection; no volume, no playlist).
+//! D14.7-earned projection). What it DOES render beyond the raw
+//! observation is the player's own application state: the desired volume
+//! (D14.9) and the temporary playlist pane with its two navigation
+//! cursors (the 2026-09-19 U2 amendment in ADR-PBK-002 D14.6) — labels
+//! for decisions the App owns, never playback truth.
 
 mod model;
 mod runtime;

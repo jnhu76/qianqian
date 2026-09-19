@@ -119,8 +119,11 @@ pub fn format_timeline(observation: &PlaybackSessionObservation) -> String {
 
 /// `mm:ss` (minutes not zero-padded beyond two digits, so an hour-long
 /// track reads `63:20` rather than wrapping). Negative values cannot
-/// occur: both inputs are unsigned durations.
-fn format_clock(seconds: Duration) -> String {
+/// occur: the input is an unsigned duration.
+///
+/// Shared with the TUI shell's progress bar so the two read-side
+/// surfaces of the same evidence cannot format a time differently.
+pub(crate) fn format_clock(seconds: Duration) -> String {
     let seconds = seconds.as_secs();
     format!("{:02}:{:02}", seconds / 60, seconds % 60)
 }

@@ -93,6 +93,56 @@ DEV_EDGES = {
 BUILD_EDGES = {}  # no internal build edges are admitted for any crate
 
 # ---------------------------------------------------------------------------
+# The U2 (Issue #166 §49) architecture negative control, as one shared
+# list: the temporary-playlist policy and the whole TUI shell must not
+# name the composition kernel, a concrete provider/mechanism crate, the
+# PCM data plane or the K0 representation type. `wasapi` /
+# `qianqian_output_wasapi` / `qianqian_decode_songcore` / `songcore`
+# cover the backend and decode mechanisms; `PcmEdge` /
+# `DecodedPcmStream` / `RenderPcmInput` / `ComponentSpec` cover the data
+# plane and the K0 noun. Deliberately NOT a vocabulary denylist: prose
+# about "no Capability" / "no Fact" is legitimate in a module that
+# disclaims them, so only code-level dependency spellings are scanned.
+U2_SHELL_FORBIDDEN = [
+    "wasapi",
+    "Wasapi",
+    "WASAPI",
+    # The PCM data plane and the mechanism vocabulary around it. The set
+    # is deliberately wider than the spellings the campaign named: an
+    # import of any of these into the shell would be the same boundary
+    # violation whichever name it arrived under.
+    "PcmEdge",
+    "DecodedPcmStream",
+    "RenderPcmInput",
+    "RenderRequest",
+    "RenderStream",
+    "GateSlice",
+    "RenderGate",
+    "ParkOutcome",
+    "TailProbeOutcome",
+    "PcmDecode",
+    "AudioOutput",
+    "songcore",
+    "SongCore",
+    # K0 composition identity.
+    "ComponentSpec",
+    "qianqian_output_wasapi",
+    "qianqian_decode_songcore",
+    "qianqian_composition",
+    "qianqian_app",
+]
+
+U2_SHELL_AUTHORITY = (
+    "Issue #166 §49 architecture negative control + ADR-PBK-002 D14.6 as amended by the "
+    "2026-09-19 playlist/repeat/order product amendment — the temporary playlist module "
+    "and the TUI shell's model/view/runtime modules (the files listed above; tui/mod.rs "
+    "is a module index that only names these mechanisms to disclaim them) are ordinary "
+    "App-state policy and presentation: they own no K0 composition identity, hold no "
+    "Fact, and reach neither a provider mechanism nor the PCM data plane. Their only "
+    "domain vocabulary is the F2 episode seam's read side (qianqian_playback's "
+    "observation/handle types) and, in dev/test code, the shared PcmFormat contract"
+)
+
 # Export-surface rules. Two mechanisms, both source-class:
 #
 #   require / forbid        literal snippets in one lib.rs (decode keeps
@@ -205,6 +255,35 @@ EXPORT_RULES = {
         ],
         "authority": "ADR-PBK-002 D5/D7 as amended by ADR-PBK-003 §2/§3/§11 — the admitted public surface is exactly the STABLE Output Plugin constructor (the owned WASAPI Host Render Backend stays crate-private; consumers reach the mechanism only as the AudioOutput capability service; backend brand must not reappear in the composition identity)",
     },
+    # U2 (Issue #166) presentation/product-policy modules. A Cargo edge
+    # cannot express an intra-crate firewall, and these four modules are
+    # where the playlist policy and the shell live: they may speak the
+    # F2 episode seam vocabulary (qianqian_playback's read types) and
+    # nothing of the composition kernel, the providers or the PCM
+    # mechanism. The rule is a source scan because the property is
+    # module-local; the same strings are checked by the U2 negative
+    # controls below, which are what prove the scan is not vacuous.
+    "apps/headless/src/playlist.rs": {
+        "forbid": U2_SHELL_FORBIDDEN,
+        "authority": U2_SHELL_AUTHORITY,
+    },
+    "apps/headless/src/tui/model.rs": {
+        "forbid": U2_SHELL_FORBIDDEN,
+        "authority": U2_SHELL_AUTHORITY,
+    },
+    "apps/headless/src/tui/view.rs": {
+        "forbid": U2_SHELL_FORBIDDEN,
+        "authority": U2_SHELL_AUTHORITY,
+    },
+    "apps/headless/src/tui/runtime.rs": {
+        "forbid": U2_SHELL_FORBIDDEN,
+        "authority": U2_SHELL_AUTHORITY,
+    },
+    # `apps/headless/src/tui/mod.rs` is deliberately NOT scanned: it is a
+    # module-index document whose text NAMES these mechanisms only to
+    # disclaim them ("never sees … PcmEdge …"), and a substring rule
+    # cannot tell a disclaimer from a dependency. The three modules that
+    # hold the shell's actual code are covered.
 }
 
 # Human-facing rule prose for violation output (mission §21 format).
@@ -492,6 +571,10 @@ MUTABLE_FILES = [
     "crates/qianqian-decode-songcore/src/lib.rs",
     "crates/qianqian-output-wasapi/src/lib.rs",
     "apps/headless/Cargo.toml",
+    "apps/headless/src/playlist.rs",
+    "apps/headless/src/tui/model.rs",
+    "apps/headless/src/tui/view.rs",
+    "apps/headless/src/tui/runtime.rs",
     "Cargo.toml",
 ]
 
@@ -737,6 +820,57 @@ def run_negative_controls():
             "crates/qianqian-decode-songcore/src/boundary_probe_helper.rs": (
                 "pub struct BoundaryProbeMechanism;\n"
             ),
+        },
+    )
+    # M9 — the U2 presentation/product-policy firewall (Issue #166 §49):
+    # reaching for a concrete provider, the K0 representation type or the
+    # PCM data plane from the playlist or the shell must RED on the
+    # import spelling alone (a Cargo edge cannot express an intra-crate
+    # module boundary, which is exactly why this rule is a source scan).
+    expect_fail(
+        "M9-playlist provider-mechanism import",
+        "source: apps/headless/src/playlist.rs",
+        {
+            "apps/headless/src/playlist.rs": lambda t: t.replace(
+                "use std::path::{Path, PathBuf};",
+                "use std::path::{Path, PathBuf};\n"
+                "use qianqian_output_wasapi::wasapi::WasapiOutput;",
+                1,
+            )
+        },
+    )
+    expect_fail(
+        "M9-tui-model PCM data-plane import",
+        "source: apps/headless/src/tui/model.rs",
+        {
+            "apps/headless/src/tui/model.rs": lambda t: t.replace(
+                "use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};",
+                "use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};\n"
+                "use qianqian_audio_api::ports::DecodedPcmStream;",
+                1,
+            )
+        },
+    )
+    expect_fail(
+        "M9-tui-view K0-representation import",
+        "source: apps/headless/src/tui/view.rs",
+        {
+            "apps/headless/src/tui/view.rs": lambda t: t.replace(
+                "use ratatui::Frame;",
+                "use qianqian_composition::ComponentSpec;\nuse ratatui::Frame;",
+                1,
+            )
+        },
+    )
+    expect_fail(
+        "M9-tui-runtime PCM data-plane import",
+        "source: apps/headless/src/tui/runtime.rs",
+        {
+            "apps/headless/src/tui/runtime.rs": lambda t: t.replace(
+                "use ratatui::Terminal;",
+                "use qianqian_audio_api::ports::RenderRequest;\nuse ratatui::Terminal;",
+                1,
+            )
         },
     )
 

@@ -211,9 +211,33 @@ fn usage_documents_both_transports() {
         "the usage names the product binary: {}",
         run.stdout
     );
-    // U1 negative control: unshipped U2/U3 affordances must not be
-    // advertised before they exist.
-    for unearned in ["shuffle", "auto-next", "exact seek", "Up/Down"] {
+    // The playlist-usability surface IS shipped now (Issue #166), so the
+    // usage documents it; the U1-era negative control flips to the
+    // positive list plus the affordances that genuinely do not exist.
+    for earned in [
+        "play --shuffle",
+        "Up / Down",
+        "Enter        play the selected row",
+        "R            order: sequential / shuffle",
+        "L            repeat: off / all / one",
+        "seek 30 seconds",
+        "G            go to a time you type",
+    ] {
+        assert!(
+            run.stdout.contains(earned),
+            "{earned:?} is shipped and must be documented: {}",
+            run.stdout
+        );
+    }
+    for unearned in [
+        "mouse",
+        "M3U",
+        "library",
+        "favorites",
+        "auto-next",
+        "database",
+        "seek completion",
+    ] {
         assert!(
             !run.stdout.contains(unearned),
             "{unearned:?} is not shipped and must not be documented: {}",

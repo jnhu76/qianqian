@@ -18,13 +18,21 @@ pub enum Invocation {
     /// faked, no episode is constructed, and the Open input line (O)
     /// is how music gets loaded.
     Interactive,
-    /// `play <file> [files…]`: local media files and/or folders for the
-    /// interactive reference-player shell (TUI). The input expansion
-    /// ([`crate::input`]) turns files and folders into ONE ordered
-    /// candidate list; the FIRST accepted candidate is opened as the
-    /// startup episode and the WHOLE list seeds the startup playlist
-    /// (D14.6 navigation; open representation) on commit.
-    Play { files: Vec<PathBuf> },
+    /// `play [--shuffle] <file-or-folder> [more…]`: local media files
+    /// and/or folders for the interactive reference-player shell (TUI).
+    /// The input expansion ([`crate::input`]) turns files and folders
+    /// into ONE ordered candidate list; the FIRST accepted candidate is
+    /// opened as the startup episode and the WHOLE list establishes the
+    /// temporary playlist on commit (the AMENDED D14.6 playlist
+    /// authority).
+    ///
+    /// `--shuffle` selects the Shuffle traversal order from the start
+    /// (Issue #166 §24). It is the SAME order policy the `R` key
+    /// toggles, so the startup discipline is unchanged: the first
+    /// committed candidate is still the canonical first, and the shuffle
+    /// cycle is anchored on it — shuffle governs the SUBSEQUENT order,
+    /// never the safe first Open.
+    Play { files: Vec<PathBuf>, shuffle: bool },
     /// `--machine play <file>`: one FILE through the scriptable
     /// stdin/stdout transport. This is the automation contract; the
     /// flag is recognized in command position only, like every flag,
@@ -61,12 +69,7 @@ pub fn parse_invocation(args: &[String]) -> Result<Invocation, InvocationError> 
         return Ok(Invocation::Interactive);
     };
     match command.as_str() {
-        "play" => match args.len() {
-            n if n >= 2 => Ok(Invocation::Play {
-                files: args[1..].iter().map(PathBuf::from).collect(),
-            }),
-            _ => Err(InvocationError::WrongArity { command: "play" }),
-        },
+        "play" => parse_play(&args[1..]),
         "--machine" => match (args.get(1).map(String::as_str), args.get(2)) {
             (Some("play"), Some(file)) if args.len() == 3 => Ok(Invocation::MachinePlay {
                 file: PathBuf::from(file),
@@ -93,42 +96,72 @@ pub fn parse_invocation(args: &[String]) -> Result<Invocation, InvocationError> 
     }
 }
 
+/// The `play` grammar: `play [--shuffle] <file-or-folder> [more…]`. The
+/// flag is recognized only IMMEDIATELY after the subcommand, so a path
+/// token can never be silently swallowed by it; a file literally named
+/// `--shuffle` is still reachable as `play ./--shuffle`.
+fn parse_play(rest: &[String]) -> Result<Invocation, InvocationError> {
+    let (shuffle, paths) = match rest.first().map(String::as_str) {
+        Some("--shuffle") => (true, &rest[1..]),
+        _ => (false, rest),
+    };
+    if paths.is_empty() {
+        return Err(InvocationError::WrongArity { command: "play" });
+    }
+    Ok(Invocation::Play {
+        files: paths.iter().map(PathBuf::from).collect(),
+        shuffle,
+    })
+}
+
 /// The product-facing usage text, printed for `--help` (stdout, exit 0)
 /// and for every usage error (stderr, exit 2).
 ///
 /// Written for a normal user first (U1, Issue #166 §12): launch, play,
 /// and the player keys lead; the automation transport stays available
-/// under an advanced section. It documents ONLY shipped behavior — no
-/// auto-next, no shuffle, no list-row selection, no exact/large seek:
-/// those are later slices of Issue #166 and must not be advertised
-/// before they exist.
+/// under an advanced section. It documents ONLY shipped behavior — the
+/// temporary list, `--shuffle`, row selection, the order/repeat keys and
+/// the fixed/exact seek keys are all shipped (U2, Issue #166 §43) and
+/// the usage text must match the shipped keymap and nothing beyond it
+/// (the negative-vocabulary test below pins the boundary).
 pub fn usage() -> &'static str {
     "Qianqian — a lightweight local music player
 
 Usage:
   qianqian                                   listen (opens the player)
   qianqian play <file-or-folder> [more...]   play files or folders
+  qianqian play --shuffle <paths...>         start in shuffle order
   qianqian --help                            show this help
   qianqian --version                         show the version
 
-A folder is expanded recursively into a temporary track list; the
-first track starts, and N / P move through the list while it plays.
+A folder is expanded recursively into a temporary track list. The first
+track starts; the list plays on through the whole folder, and you can
+move around it or make it repeat.
 
 Examples:
   qianqian
   qianqian play song.flac
   qianqian play \"D:\\Music\"
-  qianqian play \"D:\\Music\" \"E:\\More Music\"
+  qianqian play --shuffle \"D:\\Music\" \"E:\\More Music\"
 
 Keys in the player:
+  Up / Down    select a row in the list (does not change what plays)
+  Enter        play the selected row
+  N / P        next / previous track
+  R            order: sequential / shuffle
+  L            repeat: off / all / one
   Space        pause / resume
   Left / Right seek 5 seconds back / forward
-  S            stop
-  N / P        next / previous track
+  Shift+Left / Shift+Right                    seek 30 seconds
+  G            go to a time you type (e.g. 1:35)
   + / -        volume up / down
+  S            stop
   O            open a file or folder
   ?            keyboard help
   Q or Ctrl+C  quit
+
+--shuffle starts the LIST in shuffle order: the first track still starts
+the same way, and the rest of the folder follows shuffled.
 
 Automation (advanced):
   qianqian --machine play <file>   scriptable single-episode transport
@@ -336,7 +369,8 @@ mod tests {
         assert_eq!(
             parsed,
             Invocation::Play {
-                files: vec![PathBuf::from("song.flac")]
+                files: vec![PathBuf::from("song.flac")],
+                shuffle: false,
             }
         );
     }
@@ -362,9 +396,110 @@ mod tests {
                     PathBuf::from("a.flac"),
                     PathBuf::from("b.flac"),
                     PathBuf::from("c.flac")
-                ]
+                ],
+                shuffle: false,
             }
         );
+    }
+
+    /// `play --shuffle <paths…>` is the ONE shuffle grammar (Issue #166
+    /// §24): the flag is recognized immediately after the subcommand, it
+    /// is part of `play`, and it never appears anywhere else in argv.
+    #[test]
+    fn play_accepts_shuffle_immediately_after_the_subcommand() {
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--shuffle", "D:\\Music"]))
+                .expect("the shuffle grammar"),
+            Invocation::Play {
+                files: vec![PathBuf::from("D:\\Music")],
+                shuffle: true,
+            }
+        );
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--shuffle", "a.flac", "b.flac", "c.flac"]))
+                .expect("shuffle with several roots"),
+            Invocation::Play {
+                files: vec![
+                    PathBuf::from("a.flac"),
+                    PathBuf::from("b.flac"),
+                    PathBuf::from("c.flac")
+                ],
+                shuffle: true,
+            }
+        );
+        // Without the flag the default is sequential.
+        assert_eq!(
+            parse_invocation(&argv(&["play", "a.flac"]))
+                .expect("the plain grammar")
+                .clone(),
+            Invocation::Play {
+                files: vec![PathBuf::from("a.flac")],
+                shuffle: false,
+            }
+        );
+    }
+
+    /// The shuffle flag keeps `play`'s arity contract: it selects an
+    /// order, it is not a source, so `play --shuffle` alone still fails
+    /// truthfully, and the flag is recognized ONLY in the position the
+    /// grammar names — a LATER `--shuffle` is an ordinary path token.
+    #[test]
+    fn the_shuffle_flag_never_widens_the_play_grammar() {
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--shuffle"])).expect_err("no source given"),
+            InvocationError::WrongArity { command: "play" }
+        );
+        assert_eq!(
+            parse_invocation(&argv(&["play", "a.flac", "--shuffle"]))
+                .expect("a later --shuffle is a path, not a flag"),
+            Invocation::Play {
+                files: vec![PathBuf::from("a.flac"), PathBuf::from("--shuffle")],
+                shuffle: false,
+            }
+        );
+        // The machine transport is NOT extended by it (Issue #166 §44).
+        assert_eq!(
+            parse_invocation(&argv(&["--machine", "play", "--shuffle", "a.flac"]))
+                .expect_err("--machine play takes exactly one file"),
+            InvocationError::WrongArity {
+                command: "--machine"
+            }
+        );
+        assert_eq!(
+            parse_invocation(&argv(&["--shuffle", "play", "a.flac"]))
+                .expect_err("--shuffle is not a command-position flag"),
+            InvocationError::UnknownCommand("--shuffle".to_string())
+        );
+    }
+
+    /// The usage text documents the shipped surface and ONLY it (Issue
+    /// #166 §43): the folder list, `--shuffle`, the playlist/repeat/seek
+    /// keys — and nothing about persistence, libraries or devices.
+    #[test]
+    fn the_usage_text_documents_the_shipped_surface_only() {
+        let usage = usage();
+        for earned in [
+            "qianqian play --shuffle",
+            "Up / Down",
+            "Enter        play the selected row",
+            "R            order: sequential / shuffle",
+            "L            repeat: off / all / one",
+            "seek 30 seconds",
+            "G            go to a time you type",
+            "temporary track list",
+        ] {
+            assert!(usage.contains(earned), "{earned:?} missing in:\n{usage}");
+        }
+        for unearned in [
+            "library",
+            "favorites",
+            "playlist file",
+            "M3U",
+            "history",
+            "database",
+        ] {
+            assert!(!usage.contains(unearned), "{unearned:?} in:\n{usage}");
+        }
     }
 
     #[test]
@@ -494,7 +629,8 @@ mod tests {
         assert_eq!(
             parsed,
             Invocation::Play {
-                files: vec![PathBuf::from("song.flac")]
+                files: vec![PathBuf::from("song.flac")],
+                shuffle: false,
             }
         );
     }

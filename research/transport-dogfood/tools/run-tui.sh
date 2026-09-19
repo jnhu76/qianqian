@@ -18,7 +18,13 @@ HARNESS="$REPO/research/transport-dogfood"
 STAGE_WSL="/mnt/c/Users/Public/qianqian-dogfood"
 LOGDIR="$HARNESS/evidence/logs"
 EXE="$HARNESS/target/x86_64-pc-windows-gnu/release/tuidriver.exe"
-HEADLESS="$REPO/target/x86_64-pc-windows-gnu/release/qianqian-headless.exe"
+# The exercised product binary. The default keeps the historical
+# regression target; QIANQIAN_TUI_BIN=qianqian.exe selects the
+# canonical product binary (U2 canonical product gate, PR #168). The
+# ConPTY driver is binary-agnostic (--exe); only this staging wrapper
+# names the executable, so the selection lives here.
+BIN="${QIANQIAN_TUI_BIN:-qianqian-headless.exe}"
+PRODUCT="$REPO/target/x86_64-pc-windows-gnu/release/$BIN"
 MEDIA="C:\\Users\\Public\\qianqian-dogfood"
 OUT="C:\\Users\\Public\\qianqian-dogfood\\evidence"
 
@@ -27,10 +33,11 @@ mkdir -p "$LOGDIR"
 # audio endpoint; clear them before staging (a warm restart immediately
 # after another run otherwise loses the device-open race).
 taskkill.exe /F /IM qianqian-headless.exe /T >/dev/null 2>&1 || true
+taskkill.exe /F /IM qianqian.exe /T >/dev/null 2>&1 || true
 taskkill.exe /F /IM tuidriver.exe /T >/dev/null 2>&1 || true
 sleep 1
 cp "$EXE" "$STAGE_WSL/tuidriver.exe"
-cp "$HEADLESS" "$STAGE_WSL/qianqian-headless.exe"
+cp "$PRODUCT" "$STAGE_WSL/$BIN"
 
 # Stage-C scenario fixtures (C11/C12): renamed copies of the committed
 # 4 s FLAC fixture — one very long filename (96 'a's), one CJK
@@ -50,6 +57,22 @@ mkdir -p "$STAGE_WSL/u1music"
 [ -f "$STAGE_WSL/u1music/flac4.flac" ] || cp "$STAGE_WSL/flac4.flac" "$STAGE_WSL/u1music/flac4.flac"
 [ -f "$STAGE_WSL/u1music/synth45.mp3" ] || cp "$STAGE_WSL/synth45.mp3" "$STAGE_WSL/u1music/synth45.mp3"
 
+# U2 scenario fixtures (Issue #166 §51). The 24-entry viewport list is
+# 24 renamed copies of the 45 s synthetic sine; the soak list is 20 x
+# 100 s synthetic tracks (~33 min of playback). Both are SYNTHETIC
+# media generated locally with ffmpeg, exactly like synth45/synth30 —
+# declared in CORPUS.md and SHA256-recorded per run below.
+for i in $(seq -w 1 24); do
+  [ -f "$STAGE_WSL/vtest$i.mp3" ] || cp "$STAGE_WSL/synth45.mp3" "$STAGE_WSL/vtest$i.mp3"
+done
+mkdir -p "$STAGE_WSL/u2soak"
+for i in $(seq -w 1 20); do
+  if [ ! -f "$STAGE_WSL/u2soak/soak$i.mp3" ]; then
+    ffmpeg -v error -f lavfi -i "sine=frequency=$((300 + 10#$i)):sample_rate=44100:duration=100" \
+        -ac 2 -b:a 128k -y "$STAGE_WSL/u2soak/soak$i.mp3"
+  fi
+done
+
 SCEN="$*"
 PS_SCEN=$(printf "'%s'," $SCEN | sed 's/,$//')
 
@@ -66,9 +89,10 @@ ENVFILE="$HARNESS/evidence/ENV-TUI-RUN${RUN}.txt"
   echo "build_command: QIANQIAN_NATIVE_DIR=<mingw staging> cargo build --release --target x86_64-pc-windows-gnu --features playback -p qianqian-headless"
   echo "target_triple: x86_64-pc-windows-gnu (GNU toolchain)"
   echo "features: playback profile: release"
-  echo "headless_sha256: $(sha256sum "$HEADLESS" | cut -d' ' -f1)"
+  echo "product_binary: $BIN"
+  echo "product_binary_sha256: $(sha256sum "$PRODUCT" | cut -d' ' -f1)"
   echo "tuidriver_sha256: $(sha256sum "$EXE" | cut -d' ' -f1)"
-  echo "songcore_sha256: $(sha256sum /tmp/qn-dogfood-stage/native/build/artifacts/libsongcore.a | cut -d' ' -f1)"
+  echo "songcore_sha256: $(sha256sum "${QIANQIAN_NATIVE_DIR:-/tmp/qn-dogfood-stage/native}/build/artifacts/libsongcore.a" | cut -d' ' -f1)"
   echo "rustc: $(rustc --version)"
   echo "corpus_sha256:"
   sha256sum "$STAGE_WSL"/*.mp3 "$STAGE_WSL"/*.flac "$STAGE_WSL"/*.m4a "$STAGE_WSL"/garbage.bin "$STAGE_WSL"/u1music/* 2>/dev/null | sed 's|/mnt/c/Users/Public/qianqian-dogfood/|    |;s/^/  /'
@@ -79,7 +103,7 @@ ENVFILE="$HARNESS/evidence/ENV-TUI-RUN${RUN}.txt"
 
 powershell.exe -NoProfile -Command "
     \$p = Start-Process -FilePath 'C:\\Users\\Public\\qianqian-dogfood\\tuidriver.exe' \`
-        -ArgumentList '--exe','C:\\Users\\Public\\qianqian-dogfood\\qianqian-headless.exe', \`
+        -ArgumentList '--exe','C:\\Users\\Public\\qianqian-dogfood\\$BIN', \`
             '--media','$MEDIA','--out','$OUT',$PS_SCEN \`
         -WorkingDirectory 'C:\\Users\\Public\\qianqian-dogfood' \`
         -WindowStyle Hidden -Wait -PassThru

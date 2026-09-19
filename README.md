@@ -139,8 +139,8 @@ The generic Composition Kernel (K0) is implemented. Current canonical vocabulary
 Build/test authority:
 
 ```bash
-cargo run -p qianqian-headless -- --help
-cargo run -p qianqian-headless --features playback -- play <music-file-or-folder>
+cargo run -p qianqian-headless --bin qianqian-headless -- --help
+cargo run -p qianqian-headless --bin qianqian-headless --features playback -- play <music-file-or-folder>
 cargo test --workspace
 ```
 
@@ -149,6 +149,20 @@ canonical product binary (a bare launch opens an interactive TUI with no
 music loaded; `play` accepts files and/or folders and expands them into
 a temporary track list) — and `qianqian-headless`, the historical
 regression target. On Windows the product binary is `qianqian.exe`.
+
+The temporary list carries the player's order and repeat preferences:
+`Up`/`Down` browse it, `Enter` plays the selected row, `N`/`P` move
+through it, `R` switches sequential/shuffle, and `L` cycles repeat
+off/all/one — a track that finishes naturally advances according to
+that policy (a `Stopped` or `Failed` track never does). `qianqian play
+--shuffle <paths...>` starts in shuffle order. Seeking is `Left`/`Right`
+(∓5 s), `Shift+Left`/`Shift+Right` (∓30 s) or `G` for a typed exact
+time. `?` lists every key. The list lives in the process only: nothing
+is written to disk, and there is no library, database or playlist file.
+
+```bash
+cargo run -p qianqian-headless --bin qianqian-headless --features playback -- play --shuffle "D:\Music"
+```
 
 ## Historical preservation
 

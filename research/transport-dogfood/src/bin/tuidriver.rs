@@ -56,6 +56,13 @@ pub const ESC: &str = "\u{1b}";
 pub const BACKSPACE: &str = "\u{7f}";
 pub const LEFT: &str = "\u{1b}[D";
 pub const RIGHT: &str = "\u{1b}[C";
+pub const UP: &str = "\u{1b}[A";
+pub const DOWN: &str = "\u{1b}[B";
+/// Shift+arrow in the xterm CSI `1;2` modifier form, which the
+/// pseudoconsole translates into the console record crossterm reads as
+/// the arrow key carrying SHIFT (the U2 ±30 s seek steps).
+pub const SHIFT_LEFT: &str = "\u{1b}[1;2D";
+pub const SHIFT_RIGHT: &str = "\u{1b}[1;2C";
 
 // ------------------------------------------------- VT grid emulation
 
@@ -857,12 +864,22 @@ fn run_scenario(
     let deadline = Instant::now() + watchdog;
     // U1 (Issue #166): an EMPTY file list means the no-argument launch
     // itself — the child is spawned with zero arguments. Any non-empty
-    // list keeps the frozen `play` grammar.
+    // list keeps the frozen `play` grammar. U2 adds ONE flag token (the
+    // `--shuffle` startup grammar, Issue #166 §24): an entry starting
+    // with `--` is passed through verbatim in argv order, every other
+    // entry is a staged media name. No staged corpus filename starts
+    // with `--`, so the split is unambiguous.
     let args: Vec<String> = if files.is_empty() {
         Vec::new()
     } else {
         std::iter::once("play".to_owned())
-            .chain(files.iter().map(|f| format!("{media_dir}\\{f}")))
+            .chain(files.iter().map(|f| {
+                if f.starts_with("--") {
+                    (*f).to_owned()
+                } else {
+                    format!("{media_dir}\\{f}")
+                }
+            }))
             .collect()
     };
     let mut session = match Session::spawn(headless, &args, 120, 40) {
@@ -1055,6 +1072,34 @@ fn run_scenario(
                         break 'steps;
                     }
                 }
+            }
+            Step::ExpectAfterMarkRepaint { text, within_ms } => {
+                let deadline = Instant::now() + Duration::from_millis(*within_ms);
+                loop {
+                    if session
+                        .wait_for(text, mark, Duration::from_millis(500))
+                        .is_ok()
+                    {
+                        step_log.push(format!("expect-after-mark(async) {text:?} OK"));
+                        break;
+                    }
+                    if Instant::now() >= deadline {
+                        outcome = Err(format!(
+                            "timeout waiting for {text:?} after offset {mark} (async transition, repainting)"
+                        ));
+                        break 'steps;
+                    }
+                    // Heal cells the app's stderr overwrote: a resize
+                    // makes ratatui repaint every cell.
+                    session.full_repaint();
+                }
+            }
+            Step::Repaint => {
+                // A forced full frame with no application-visible input:
+                // the honest basis for an absence witness over an idle
+                // window (an unchanged screen emits no diff frame).
+                session.full_repaint();
+                step_log.push("repaint".to_owned());
             }
             Step::Resize { cols, rows } => {
                 // One shot to the target size (never larger than the

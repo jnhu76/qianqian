@@ -14,6 +14,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Plugin/Fiber taxonomy + admission invariant + earned static playback composition | `adr/ADR-PBK-002.md` D1/D4/D5/D6/D12/D13 |
 | Output Plugin / host-audio backend boundary, cross-platform output work | `adr/ADR-PBK-003.md` — stable Output Plugin identity + backend-neutral Host Render Contract; concrete backend owned mechanism by default |
 | Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
+| Playlist ordering / repeat / EOF-navigation policy + TUI keymap (Issue #166 U2) | `adr/ADR-PBK-002.md` §20 D14.6 — the 2026-09-19 U2 amendment (App-owned product policy; the Playback Session establishes terminal Facts and nothing else). The shipped temporary playlist is a realization of that decision, not a second authority |
 | Terminal Fact commit-ownership boundary evidence（F2 seam 前置 formal campaign） | `../specs/f2-terminal-commit-boundary/` — campaign evidence only，**未裁决**；结论是 CURRENT_CONTRACT_UNDERSPECIFIED，等 ADR/code gap audit |
 | F5 seek 实现 guardrail 证据（M1–M11 生产突变 + fail-closed runner） | `../specs/f5-seek-implementation/` — executable evidence only；seek 语义权威 = `adr/ADR-PBK-002.md` §20 D14.5 |
 | Current architecture corrective basis | Issue #138 — design input only, **not authority** |

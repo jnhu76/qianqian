@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Stage A machine-mode regression (campaign §7): drives the REAL
-# `qianqian-headless.exe --machine play` transport over cmd.exe with
+# `<product-binary> --machine play` transport (qianqian-headless.exe by
+# default; QIANQIAN_MACHINE_BIN selects the canonical qianqian.exe)
+# over cmd.exe with
 # piped stdin, asserting the pinned observable contract (grammar,
 # truthful status projection, outcome lines, exit codes, disposal
 # quietness). Machine mode is the line-based automation transport; no
@@ -13,10 +15,13 @@ RUN="${1:?usage: run-machine.sh <run-number>}"
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 STAGE_WSL="/mnt/c/Users/Public/qianqian-dogfood"
 LOGDIR="$REPO/research/transport-dogfood/evidence/logs"
-HEADLESS="$REPO/target/x86_64-pc-windows-gnu/release/qianqian-headless.exe"
+# The exercised product binary (QIANQIAN_MACHINE_BIN=qianqian.exe
+# selects the canonical product binary, U2 canonical product gate).
+BIN="${QIANQIAN_MACHINE_BIN:-qianqian-headless.exe}"
+PRODUCT="$REPO/target/x86_64-pc-windows-gnu/release/$BIN"
 
 mkdir -p "$LOGDIR"
-cp "$HEADLESS" "$STAGE_WSL/qianqian-headless.exe"
+cp "$PRODUCT" "$STAGE_WSL/$BIN"
 
 PASS=0; FAIL=0
 note() { echo "M-$1: $2"; }
@@ -26,9 +31,9 @@ run() {
   local id="$1" media="$2" stdin_file="$3"
   local out="$STAGE_WSL/m-$id.out" err="$STAGE_WSL/m-$id.err"
   if [ "$stdin_file" = "NONE" ]; then
-    ( cd "$STAGE_WSL" && cmd.exe /c "qianqian-headless.exe --machine play $media" </dev/null >"$(basename "$out")" 2>"$(basename "$err")" )
+    ( cd "$STAGE_WSL" && cmd.exe /c "$BIN --machine play $media" </dev/null >"$(basename "$out")" 2>"$(basename "$err")" )
   else
-    ( cd "$STAGE_WSL" && cmd.exe /c "qianqian-headless.exe --machine play $media <$(basename "$stdin_file")" >"$(basename "$out")" 2>"$(basename "$err")" )
+    ( cd "$STAGE_WSL" && cmd.exe /c "$BIN --machine play $media <$(basename "$stdin_file")" >"$(basename "$out")" 2>"$(basename "$err")" )
   fi
   local rc=$?
   tr -d '\r' < "$out" > "$LOGDIR/m-$id.out" 2>/dev/null
@@ -88,7 +93,7 @@ check_rc 0 && assert "pause intent recorded" "$M_OUT" "pause_requested: true" \
 # episode so the scenario does not run to the 45 s natural EOF.
 M_ID=M4
 out="$STAGE_WSL/m-M4.out"; err="$STAGE_WSL/m-M4.err"
-( cd "$STAGE_WSL" && cmd.exe /c "qianqian-headless.exe --machine play synth45.mp3" \
+( cd "$STAGE_WSL" && cmd.exe /c "$BIN --machine play synth45.mp3" \
     < <( { printf 'seek 5\n'; sleep 2; printf 'status\n'; sleep 1; printf 'stop\n'; } ) \
     >"$(basename "$out")" 2>"$(basename "$err")" )
 rc=$?
@@ -128,5 +133,9 @@ check_rc 0 && assert "unknown reported" "$M_ERR" "ignored input" \
   && scenario_pass
 
 echo "machine regression run$RUN: PASS=$PASS FAIL=$FAIL"
-echo "machine run$RUN: PASS=$PASS FAIL=$FAIL" > "$LOGDIR/machine-run$RUN.summary"
+{
+  echo "binary: $BIN"
+  echo "binary_sha256: $(sha256sum "$STAGE_WSL/$BIN" | cut -d' ' -f1)"
+  echo "machine run$RUN: PASS=$PASS FAIL=$FAIL"
+} > "$LOGDIR/machine-run$RUN.summary"
 [ "$FAIL" = 0 ]
