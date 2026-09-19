@@ -147,12 +147,12 @@ fn handle_key<S: EpisodeStart>(
         }
         Action::VolumeUp => {
             let volume = player.change_volume(VOLUME_STEP);
-            model.set_status(Some(format!("volume {volume}/100")));
+            model.set_status(Some(format!("volume {volume}/100 (desired)")));
             Step::Continue
         }
         Action::VolumeDown => {
             let volume = player.change_volume(-VOLUME_STEP);
-            model.set_status(Some(format!("volume {volume}/100")));
+            model.set_status(Some(format!("volume {volume}/100 (desired)")));
             Step::Continue
         }
         // Episode commands route through the player's committed seam;

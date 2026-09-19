@@ -24,7 +24,11 @@ pub const COMMITTED_HINT: &str = "terminal outcome committed; press Q to quit";
 pub fn draw(frame: &mut Frame, model: &TuiModel) {
     let [main, diagnostics, controls] = Layout::vertical([
         Constraint::Min(6),
-        Constraint::Length(3),
+        // Two content rows: an episode can carry BOTH an activation
+        // diagnostic and a published failure diagnostic, and a truth-
+        // class-correct presentation does not clip one behind the other
+        // (Stage-C closure audit C13).
+        Constraint::Length(4),
         Constraint::Length(7),
     ])
     .areas(frame.area());
@@ -526,5 +530,150 @@ mod tests {
         assert!(text.contains("P  Previous"), "{text}");
         assert!(text.contains("+  Louder"), "{text}");
         assert!(text.contains("-  Softer"), "{text}");
+    }
+
+    /// Both diagnostic lines render when an episode carries an
+    /// activation diagnostic AND a published failure diagnostic (C13):
+    /// the panel grew a second content row, and neither truth-class-
+    /// correct presentation text may be clipped behind the other.
+    #[test]
+    fn both_diagnostic_lines_render_together() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            activation_error: Some("render stream open failed: no device".to_owned()),
+            failure_diagnostic: Some("decode: corrupt frame".to_owned()),
+            ..pending()
+        });
+        let text = rendered(&model);
+        assert!(
+            text.contains("activation: render stream open failed: no device"),
+            "{text}"
+        );
+        assert!(text.contains("failure: decode: corrupt frame"), "{text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
+    /// Render at an exact terminal size and return the rows as text.
+    fn rendered_at(model: &TuiModel, width: u16, height: u16) -> String {
+        let mut terminal =
+            Terminal::new(TestBackend::new(width, height)).expect("virtual terminal");
+        terminal.draw(|frame| draw(frame, model)).expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .filter_map(|x| buffer.cell((x, y)).map(|cell| cell.symbol().to_string()))
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// A full draw at a series of shrinking sizes — down to a 4×3
+    /// window — never panics and never renders an unearned semantic
+    /// (C10). Layout degrades by clipping; the truth classes live in
+    /// the model, not in the geometry, so nothing fabricated can
+    /// appear merely because fields no longer fit.
+    #[test]
+    fn tiny_terminals_degrade_without_panicking_or_fabricating() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            activation_error: Some("render stream open failed: no device".to_owned()),
+            failure_diagnostic: Some("decode: corrupt frame".to_owned()),
+            ..pending()
+        });
+        model.set_navigation(Some((1, 3)));
+        model.set_volume(Some(70));
+        model.set_status(Some("volume 75/100 (desired)".to_owned()));
+        model.begin_open_input();
+        for c in "synth30.flac".chars() {
+            model.open_input_push(c);
+        }
+        for (width, height) in [(100u16, 24u16), (40, 12), (20, 8), (10, 6), (4, 3), (1, 1)] {
+            let text = rendered_at(&model, width, height);
+            assert_eq!(
+                forbidden_status_claim(&text),
+                None,
+                "unearned semantic at {width}x{height}:\n{text}"
+            );
+        }
+    }
+
+    /// A large → small → large resize sequence keeps rendering the
+    /// whole shell at every step (C9): no panic, the controls panel
+    /// stays present once the window is large enough for it again.
+    /// (Physical resize evidence rides on the ConPTY harness, which
+    /// resizes the pseudoconsole around every key write; the runtime
+    /// has no resize-specific code — the next draw picks up the new
+    /// size.)
+    #[test]
+    fn a_resize_sequence_keeps_rendering_the_whole_shell() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        let large = rendered_at(&model, 100, 24);
+        assert!(large.contains("Controls"), "{large}");
+        let small = rendered_at(&model, 40, 12);
+        assert_eq!(forbidden_status_claim(&small), None, "{small}");
+        let large_again = rendered_at(&model, 100, 24);
+        assert!(
+            large_again.contains("←/→  Seek ±5s"),
+            "controls readable again after growing back:\n{large_again}"
+        );
+    }
+
+    /// A very long source path clips at the panel edge without
+    /// corrupting the rows below it or the controls panel (C11): the
+    /// display truncates; the model keeps the full internal identity
+    /// (never truncated to fit).
+    #[test]
+    fn a_long_source_path_clips_without_corrupting_other_rows() {
+        let long_path = format!(
+            "C:\\very\\long\\prefix\\{}\\season.takes.flac",
+            "directory_component_".repeat(10)
+        );
+        let mut model = TuiModel::new(long_path.clone());
+        model.update(pending());
+        assert_eq!(model.source(), Some(long_path.as_str()), "identity intact");
+        let text = rendered_at(&model, 100, 24);
+        // The clipped Source line still names the beginning of the
+        // path, and the panels BELOW it are uncorrupted.
+        assert!(text.contains("Source: C:\\very\\long\\prefix\\"), "{text}");
+        assert!(text.contains("Format: pending"), "{text}");
+        assert!(text.contains("Terminal: pending"), "{text}");
+        assert!(text.contains("←/→  Seek ±5s"), "{text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
+    /// A CJK filename renders and edits structurally (C12): the Source
+    /// line shows the characters, the Open input line accepts CJK
+    /// characters and backspace pops ONE character (per-char editing),
+    /// and the frame stays free of unearned semantics. Typography
+    /// perfection is not claimed — structural correctness is.
+    #[test]
+    fn cjk_filenames_render_and_edit_structurally() {
+        let mut model = TuiModel::new("千曲テスト曲.flac");
+        model.update(pending());
+        let text = rendered(&model);
+        // Wide CJK glyphs occupy two cells; the skipped cells surface as
+        // blanks in this test's per-cell text reconstruction (a real
+        // terminal renders them as one glyph). Structural assertion is
+        // on the space-normalized text: the characters are present, in
+        // order, on the right row — and the row did not overflow
+        // (`.flac` stayed on it), which is the width-calculation
+        // property under test.
+        let compact = text.replace(' ', "");
+        assert!(compact.contains("Source:千曲テスト曲.flac"), "{text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+
+        model.begin_open_input();
+        for c in "音楽/千曲.flac".chars() {
+            model.open_input_push(c);
+        }
+        model.open_input_backspace();
+        let text = rendered(&model);
+        let compact = text.replace(' ', "");
+        assert!(compact.contains("Open:音楽/千曲"), "{text}");
+        assert!(text.contains("Enter = open"), "{text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
     }
 }

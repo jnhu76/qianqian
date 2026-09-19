@@ -229,7 +229,8 @@ fn reference_player_transport(files: Vec<PathBuf>) -> ExitCode {
 
 /// The real host wiring of the F6 seams: the decode provider's
 /// stateless probe query, and the fresh-root start mounting the
-/// SongCore decode + WASAPI output plugins plus the playback session —
+/// SongCore decode Plugin, the Output Plugin (whose host-selected
+/// backend mechanism is WASAPI), and the playback session —
 /// the same desired composition as ever, one fresh root per episode.
 #[cfg(feature = "playback")]
 struct RealEpisodeSource;
