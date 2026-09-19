@@ -1,0 +1,36 @@
+run: U1 corrective physical rerun (PR #167 corrective, REQUIRED-1 oracle + regression sweep)
+date_utc: 2026-09-19T10:30Z
+branch: feat/166-windows-tui-usability-u1
+base_sha: bcd8eaa051ec54b5732c7deff8c04499564e1d49
+head_at_binary_build: 662642957f3f9ea2e373acd340cdb45228164e93 (corrective commit)
+origin_main: bcd8eaa051ec54b5732c7deff8c04499564e1d49
+build_command: QIANQIAN_NATIVE_DIR=<mingw staging: include/songcore.h + build/artifacts/{libsongcore,libqianqian_av}.a> cargo build --release --target x86_64-pc-windows-gnu --features playback -p qianqian-headless
+target_triple: x86_64-pc-windows-gnu (GNU toolchain)
+profile: release  features: playback
+binary_path: target/x86_64-pc-windows-gnu/release/qianqian.exe
+qianqian_exe_sha256: 0fc26a90fb4ee963b6b8c81c3325ede94259230c14b9c06357bf7e367b7b4045
+qianqian_headless_exe_sha256: dc575ed1e0fc4f3f4731d0f40c22ae8b6498433f6c9b0c6ad3128ac4edfca1d8
+tuidriver_sha256: 462be1bb909053103d7747644c4cbdfdbece93136cc2bb403d2e3ef6c680af3b
+songcore_artifact_sha256: 17323291fc7b53997a36746e1ce7f86b8863a63f71be79389b9b196a05175a2a (native/build/artifacts-mingw/libsongcore.a — SAME artifact as the U1 gate, SHA verified at staging)
+rustc: 1.97.1 (8bab26f4f 2026-07-14)
+corpus_sha256:
+  d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2      u1music/flac4.flac
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      u1music/synth45.mp3
+windows_caption: Microsoft Windows 11 Pro (Professional)
+audio_device: Realtek High Definition Audio
+endpoint_note: default render endpoint, shared mode, event-driven (per wasapi stderr line in the machine transcript)
+scenarios_run:
+  - U1-idle against qianqian.exe (ConPTY, detached): GREEN — truthful idle page
+    ("No music loaded." / "Press O to open a file or folder."), the corrective
+    oracle steps PASS (frames contain NEITHER "open refused" NOR "no audio
+    candidates" after the mark), Q exits 0, no teardown warnings.
+  - U1-folder-open against qianqian.exe: GREEN — "opened ...\u1music\flac4.flac
+    (2 candidates)" unchanged for a COMPLETE enumeration (no warning suffix),
+    Track 1/2 -> N -> 2/2 with fresh-position witnesses, exit 0, quiet disposal.
+  - U1-idle + U1-folder-open against qianqian-headless.exe (tui-run4, the
+    regression binary): both GREEN with the same oracles.
+  - --machine play u1music\flac4.flac via cmd.exe against qianqian.exe: exit 0,
+    "EOF: played out completely" — the machine transport contract is unchanged.
+evidence: U1-CORRECTIVE.summary (qianqian.exe run), tui-run4.summary (headless run), ENV-TUI-RUN4.txt (auto identity; its songcore_sha256 line is empty because the script points at a stale staging path — the real artifact SHA is recorded above and was verified when staging)
+not_run: audible human-ear witness (UNAVAILABLE, no ear witness this run); new partial-scan warning presentation on Windows physical (no unreadable directory was staged in the ConPTY corpus — the presentation is pinned by unit/view tests over real temp trees; the physical sweep proves no regression of the complete-enumeration path)
+acoustic_witness: UNAVAILABLE
