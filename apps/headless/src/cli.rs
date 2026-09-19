@@ -119,10 +119,11 @@ fn parse_play(rest: &[String]) -> Result<Invocation, InvocationError> {
 ///
 /// Written for a normal user first (U1, Issue #166 §12): launch, play,
 /// and the player keys lead; the automation transport stays available
-/// under an advanced section. It documents ONLY shipped behavior — no
-/// auto-next, no shuffle, no list-row selection, no exact/large seek:
-/// those are later slices of Issue #166 and must not be advertised
-/// before they exist.
+/// under an advanced section. It documents ONLY shipped behavior — the
+/// temporary list, `--shuffle`, row selection, the order/repeat keys and
+/// the fixed/exact seek keys are all shipped (U2, Issue #166 §43) and
+/// the usage text must match the shipped keymap and nothing beyond it
+/// (the negative-vocabulary test below pins the boundary).
 pub fn usage() -> &'static str {
     "Qianqian — a lightweight local music player
 

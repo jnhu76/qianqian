@@ -364,7 +364,13 @@ position/duration authority (D14.8 PROPOSED on the F4 gate branch:
 seek mechanism/authority
 open/session replacement representation
 playlist/queue authority
+    (CLOSED: application navigation state — the 2026-09-18
+     F6-AUTHORITY-PROMOTION-1 amendment in ADR-PBK-002 D14.6; no new
+     authority, no PlaylistPlugin/navigation Fact)
 next/previous
+    (CLOSED: application navigation through the same Open replacement;
+     ordering/repeat policy is App-owned product policy per the
+     2026-09-19 U2 amendment in ADR-PBK-002 D14.6)
 volume
 device switch
 Processing Plugin

@@ -17,7 +17,7 @@ It pins no production contract; it measures one.
 CORPUS.md                corpus census (repo fixtures + declared synthetic media)
 src/bin/tuidriver.rs     the ConPTY driver (spawn, key injection, VT grid capture,
                          scenario steps, resource checkpoints, JSON verdicts)
-src/scenarios.rs         the A1–A20 scenario matrix scripts
+src/scenarios.rs         the A1–A20 + U1/U2 scenario matrix scripts
 tools/run-tui.sh         cross-host runner (staging + detached launch + evidence)
 tools/run-machine.sh     the §7 machine-mode (`--machine play`) regression
 evidence/                ENV identity files + per-scenario JSON/transcripts/logs
@@ -34,8 +34,10 @@ evidence/                ENV identity files + per-scenario JSON/transcripts/logs
    endpoint identity — addendum §5) into
    `evidence/ENV-TUI-RUN<N>.txt`, and launches the driver DETACHED
    (see "ConPTY lessons" below).
-3. The driver spawns `qianqian-headless.exe play <files>` under a
-   120×40 pseudoconsole, sends scripted VT key events, emulates the
+3. The driver spawns `qianqian-headless.exe play [--shuffle] <files>`
+   under a 120×40 pseudoconsole (a `--`-prefixed entry in a scenario's
+   file list is passed through verbatim as an argv flag; every other
+   entry is a staged media name), sends scripted VT key events, emulates the
    terminal cell grid, appends every changed full frame to a frame
    history, and evaluates scenario steps against that history plus
    process exit codes and bounded child-resource measurements.
@@ -87,6 +89,23 @@ evidence/                ENV identity files + per-scenario JSON/transcripts/logs
    lines) interleaves with the TUI on the pseudoconsole and can
    pollute single rows; frames self-heal on the next repaint, and the
    raw stream keeps the mechanism evidence readable.
+9. That self-healing is why an ASYNCHRONOUS transition needs its own
+   step (`ExpectAfterMarkRepaint`, U2): the harness jiggles the width
+   after every KEY write, but an automatic EOF transition is not
+   triggered by a key — its feedback row is written while stderr is
+   live and, because ratatui's diff renderer believes those cells are
+   already correct, they stay polluted until something forces a
+   repaint. The step performs the same jiggle while it waits; the
+   witness (the text must really have been rendered after the mark) is
+   unchanged.
+10. An absence witness is only honest over frames that exist: with an
+   idle screen the diff renderer emits nothing, so a bare `sleep` +
+   `absent` can be vacuous. `Step::Repaint` forces one full frame (no
+   key, no state change) so "no auto-advance" claims are asserted over
+   real frames — and the absence needle must be a string ONLY the
+   forbidden behavior could produce (e.g. the transition line naming
+   the source a wrap would open), never a bare file name that the
+   Source line already contains.
 ```
 
 ## Instrumentation (added after run D)

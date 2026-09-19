@@ -139,8 +139,8 @@ The generic Composition Kernel (K0) is implemented. Current canonical vocabulary
 Build/test authority:
 
 ```bash
-cargo run -p qianqian-headless -- --help
-cargo run -p qianqian-headless --features playback -- play <music-file-or-folder>
+cargo run -p qianqian-headless --bin qianqian-headless -- --help
+cargo run -p qianqian-headless --bin qianqian-headless --features playback -- play <music-file-or-folder>
 cargo test --workspace
 ```
 
@@ -161,7 +161,7 @@ time. `?` lists every key. The list lives in the process only: nothing
 is written to disk, and there is no library, database or playlist file.
 
 ```bash
-cargo run -p qianqian-headless --features playback -- play --shuffle "D:\Music"
+cargo run -p qianqian-headless --bin qianqian-headless --features playback -- play --shuffle "D:\Music"
 ```
 
 ## Historical preservation

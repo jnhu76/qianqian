@@ -850,13 +850,30 @@ mod tests {
     fn no_key_fires_across_input_modes() {
         let tree = TempTree::new("modes");
         let file = tree.live_file("live-a.flac");
-        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let other = tree.live_file("live-b.flac");
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
         let handle = {
             assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
             player.active_handle().expect("committed").clone()
         };
+        // A TWO-entry playlist: with one entry, Enter/N behind the
+        // overlay would be inert for reasons that have nothing to do
+        // with mode precedence, and the test could not fail.
+        player.establish_playlist(vec![file.clone(), other.clone()]);
         let mut model = TuiModel::new(String::new());
         refresh(&mut model, &player);
+        let activations = || {
+            log.lock()
+                .expect("fixture log")
+                .iter()
+                .filter(|event| event.starts_with("activate "))
+                .count()
+        };
+        let settled_activations = activations();
+        assert_eq!(player.playlist_order(), PlaybackOrder::Sequential);
+        assert_eq!(player.playlist_repeat(), RepeatMode::Off);
 
         // Help owns the keyboard: Space, N, S and the arrows are noise.
         handle_key(key(KeyCode::Char('?')), &mut model, &mut player);
@@ -885,6 +902,26 @@ mod tests {
             "Space never reached it either"
         );
         assert_eq!(player.playlist_playing_position(), Some(0));
+        assert_eq!(
+            player.playlist_selected_position(),
+            Some(0),
+            "the selection did not move behind the overlay"
+        );
+        assert_eq!(
+            player.playlist_order(),
+            PlaybackOrder::Sequential,
+            "R did not toggle the order behind the overlay"
+        );
+        assert_eq!(
+            player.playlist_repeat(),
+            RepeatMode::Off,
+            "L did not cycle the repeat mode behind the overlay"
+        );
+        assert_eq!(
+            activations(),
+            settled_activations,
+            "no episode was composed behind the overlay"
+        );
         // `?` and Esc close it; Q quits.
         handle_key(key(KeyCode::Esc), &mut model, &mut player);
         assert!(!model.help_visible());
@@ -974,7 +1011,9 @@ mod tests {
     fn the_goto_line_requests_a_seek_and_fails_closed() {
         let tree = TempTree::new("goto");
         let file = tree.live_file("live-a.flac");
-        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
         let handle = {
             assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
             player.active_handle().expect("committed").clone()
@@ -993,11 +1032,22 @@ mod tests {
         );
         assert!(!model.goto_input_active());
         assert_eq!(model.status(), Some("seek requested: 01:35"));
-        // The request itself is deliberately NOT observable here: the F2
-        // read side has no seek-pending / seek-complete state at all, so
-        // the shell cannot own seek-completion truth (Issue #166 §0).
-        // What the episode's own D14.5 protocol does with the request is
-        // that protocol's business.
+        // The shell's claim is that the parsed target became the SAME
+        // D14.5 seek command the arrows issue. That is witnessed at the
+        // DECODER (the fixture logs every seek request it receives), not
+        // by the status line the same branch just wrote: the F2 read side
+        // has no seek-pending / seek-complete state at all, so the shell
+        // cannot own seek-completion truth (Issue #166 §0), and the
+        // frozen provider verdict for this fixture is `RefusedUnchanged`.
+        // The D14.5 seek is worker-owned and asynchronous by design, so
+        // the witness is a bounded wait for the request to REACH the
+        // decoder — not a sleep, and not the status line.
+        let requested = wait_for_seek(&log, "seek 95000ms", Duration::from_secs(5));
+        assert!(
+            requested,
+            "the typed 1:35 must become a 95 s provider seek request: {:?}",
+            seek_requests(&log)
+        );
         let observation = handle.observe();
         assert_eq!(observation.terminal_outcome, None);
         assert!(!observation.stop_requested && !observation.pause_requested);
@@ -1013,6 +1063,45 @@ mod tests {
         assert!(model.goto_input_active(), "the line stays open");
         assert!(model.status().unwrap().starts_with("cannot read that time"));
         assert_eq!(handle.observe(), before, "no malformed seek was sent");
+        // …and the unreadable line added nothing on top of the one
+        // legitimate request (a fully quiet window for a late arrival).
+        assert!(
+            !wait_for_seek(&log, "seek 0ms", Duration::from_millis(200)),
+            "no empty seek was sent"
+        );
+        assert_eq!(
+            seek_requests(&log),
+            vec!["seek 95000ms".to_owned()],
+            "the unreadable line added no seek request"
+        );
+    }
+
+    /// Wait, bounded, for one seek request to reach the decoder.
+    fn wait_for_seek(
+        log: &std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+        expected: &str,
+        within: Duration,
+    ) -> bool {
+        let deadline = std::time::Instant::now() + within;
+        loop {
+            if seek_requests(log).iter().any(|event| event == expected) {
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    /// The seek requests the episode's decoder actually received.
+    fn seek_requests(log: &std::sync::Arc<std::sync::Mutex<Vec<String>>>) -> Vec<String> {
+        log.lock()
+            .expect("fixture log")
+            .iter()
+            .filter(|event| event.starts_with("seek "))
+            .cloned()
+            .collect()
     }
 
     /// An automatic EOF transition is visible to the shell exactly as a

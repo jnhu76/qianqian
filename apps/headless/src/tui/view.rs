@@ -61,7 +61,10 @@ pub fn draw(frame: &mut Frame, model: &TuiModel) {
         // class-correct presentation does not clip one behind the other
         // (Stage-C closure audit C13).
         Constraint::Length(4),
-        Constraint::Length(6),
+        // Five content rows: the four keymap rows plus the cancel key
+        // (U2 review: `Esc` is part of the frozen keymap and the panel
+        // advertised the other four rows).
+        Constraint::Length(7),
     ])
     .areas(frame.area());
     frame.render_widget(playlist_panel(model, playlist), playlist);
@@ -115,8 +118,19 @@ fn viewport_offset(len: usize, selected: Option<usize>, height: usize) -> usize 
 
 /// One playlist row: the two markers, the traversal position and the
 /// file name.
-fn playlist_row_line(position: usize, row: &PlaylistRow) -> Line<'static> {
-    let playing = if row.playing { PLAYING_MARKER } else { " " };
+///
+/// `episode_live` is what keeps the committed marker HONEST: after a
+/// clean-failed Open (and on a launch that never opened anything) the
+/// App's cursor still names the last committed ENTRY — that is
+/// navigation state the authority sanctions — but no episode exists, so
+/// the row must not carry the play marker. The cursor is still visible
+/// as the `Track: n/N (navigation cursor)` line, which says what it is.
+fn playlist_row_line(position: usize, row: &PlaylistRow, episode_live: bool) -> Line<'static> {
+    let playing = if row.playing && episode_live {
+        PLAYING_MARKER
+    } else {
+        " "
+    };
     let selected = if row.selected { SELECTED_MARKER } else { " " };
     Line::from(format!(
         "{playing} {selected} {:>3}  {}",
@@ -127,6 +141,7 @@ fn playlist_row_line(position: usize, row: &PlaylistRow) -> Line<'static> {
 
 fn playlist_panel(model: &TuiModel, area: Rect) -> Paragraph<'static> {
     let rows = model.playlist();
+    let episode_live = model.source().is_some();
     let height = usize::from(area.height.saturating_sub(2));
     let selected = rows.iter().position(|row| row.selected);
     let offset = viewport_offset(rows.len(), selected, height);
@@ -135,12 +150,15 @@ fn playlist_panel(model: &TuiModel, area: Rect) -> Paragraph<'static> {
         .enumerate()
         .skip(offset)
         .take(height)
-        .map(|(position, row)| playlist_row_line(position, row))
+        .map(|(position, row)| playlist_row_line(position, row, episode_live))
         .collect();
     let mut block = Block::bordered().title(bold(" Playlist "));
     if !rows.is_empty() {
+        // The pane's title is the SELECTION ordinal (the committed
+        // position is the `Track: <committed>/<len>` line below it, so
+        // no reader has to guess which cursor an unlabelled number is).
         let cursor = selected.map(|position| position + 1).unwrap_or(0);
-        block = block.title(Line::from(format!(" {cursor}/{} ", rows.len())).right_aligned());
+        block = block.title(Line::from(format!(" sel {cursor}/{} ", rows.len())).right_aligned());
     }
     Paragraph::new(lines).block(block)
 }
@@ -301,6 +319,7 @@ fn controls_panel() -> Paragraph<'static> {
         Line::from(" ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to"),
         Line::from(" N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume"),
         Line::from(" O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit"),
+        Line::from(" Esc  Cancel"),
     ])
     .block(Block::bordered().title(bold(" Controls ")))
 }
@@ -552,6 +571,37 @@ mod tests {
         assert!(text.contains("(none)"), "{text}");
     }
 
+    /// The pane's committed marker is a PLAY claim, so it may only
+    /// appear while an episode is live. After a clean-failed Open the
+    /// App's cursor still names the last committed entry (navigation
+    /// state, which the D14.6 authority sanctions and the panel labels
+    /// as such) — but the row must not carry `▶`, because no episode
+    /// exists for it to be playing.
+    #[test]
+    fn the_pane_shows_no_playing_marker_when_no_episode_is_live() {
+        let mut model = TuiModel::new("song.flac");
+        model.set_playlist(1, || {
+            vec![
+                row("flac4.flac", true, true),
+                row("alac4.m4a", false, false),
+            ]
+        });
+        model.set_navigation(Some((1, 2)));
+        // A live episode: the committed row carries the marker.
+        let text = rendered(&model);
+        assert!(text.contains("▶ >   1  flac4.flac"), "{text}");
+
+        // The same navigation state with no live episode (a clean-failed
+        // Open): the cursor is still shown, the play marker is not.
+        model.set_episode(None);
+        let text = rendered(&model);
+        assert!(!text.contains(PLAYING_MARKER), "{text}");
+        assert!(text.contains("  >   1  flac4.flac"), "{text}");
+        assert!(text.contains("Track: 1/2 (navigation cursor)"), "{text}");
+        assert!(text.contains(NO_MUSIC_LINE), "{text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
     /// The no-episode frame (F6; the U1 idle page): a clean-failed Open
     /// leaves no runtime, and a no-argument launch never started one —
     /// the panel says "No music loaded." and fabricates nothing — no
@@ -744,6 +794,9 @@ mod tests {
             "?  Help",
             "S  Stop",
             "Q/Ctrl+C  Quit",
+            // The frozen keymap's cancellation key (U2 review: the
+            // panel advertised every other key of the frozen set).
+            "Esc  Cancel",
         ] {
             assert!(text.contains(earned), "{earned:?} missing in:\n{text}");
         }

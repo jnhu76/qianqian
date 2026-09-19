@@ -50,6 +50,22 @@ mkdir -p "$STAGE_WSL/u1music"
 [ -f "$STAGE_WSL/u1music/flac4.flac" ] || cp "$STAGE_WSL/flac4.flac" "$STAGE_WSL/u1music/flac4.flac"
 [ -f "$STAGE_WSL/u1music/synth45.mp3" ] || cp "$STAGE_WSL/synth45.mp3" "$STAGE_WSL/u1music/synth45.mp3"
 
+# U2 scenario fixtures (Issue #166 §51). The 24-entry viewport list is
+# 24 renamed copies of the 45 s synthetic sine; the soak list is 20 x
+# 100 s synthetic tracks (~33 min of playback). Both are SYNTHETIC
+# media generated locally with ffmpeg, exactly like synth45/synth30 —
+# declared in CORPUS.md and SHA256-recorded per run below.
+for i in $(seq -w 1 24); do
+  [ -f "$STAGE_WSL/vtest$i.mp3" ] || cp "$STAGE_WSL/synth45.mp3" "$STAGE_WSL/vtest$i.mp3"
+done
+mkdir -p "$STAGE_WSL/u2soak"
+for i in $(seq -w 1 20); do
+  if [ ! -f "$STAGE_WSL/u2soak/soak$i.mp3" ]; then
+    ffmpeg -v error -f lavfi -i "sine=frequency=$((300 + 10#$i)):sample_rate=44100:duration=100" \
+        -ac 2 -b:a 128k -y "$STAGE_WSL/u2soak/soak$i.mp3"
+  fi
+done
+
 SCEN="$*"
 PS_SCEN=$(printf "'%s'," $SCEN | sed 's/,$//')
 
@@ -68,7 +84,7 @@ ENVFILE="$HARNESS/evidence/ENV-TUI-RUN${RUN}.txt"
   echo "features: playback profile: release"
   echo "headless_sha256: $(sha256sum "$HEADLESS" | cut -d' ' -f1)"
   echo "tuidriver_sha256: $(sha256sum "$EXE" | cut -d' ' -f1)"
-  echo "songcore_sha256: $(sha256sum /tmp/qn-dogfood-stage/native/build/artifacts/libsongcore.a | cut -d' ' -f1)"
+  echo "songcore_sha256: $(sha256sum "${QIANQIAN_NATIVE_DIR:-/tmp/qn-dogfood-stage/native}/build/artifacts/libsongcore.a" | cut -d' ' -f1)"
   echo "rustc: $(rustc --version)"
   echo "corpus_sha256:"
   sha256sum "$STAGE_WSL"/*.mp3 "$STAGE_WSL"/*.flac "$STAGE_WSL"/*.m4a "$STAGE_WSL"/garbage.bin "$STAGE_WSL"/u1music/* 2>/dev/null | sed 's|/mnt/c/Users/Public/qianqian-dogfood/|    |;s/^/  /'

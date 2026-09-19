@@ -520,8 +520,15 @@ impl TemporaryPlaylist {
     /// selection follows the new playing row if and only if it was ON
     /// the old playing row; a user who was browsing elsewhere keeps
     /// their place (Issue #166 §40).
+    ///
+    /// "Keeps their place" is by ENTRY, never by traversal position: a
+    /// Repeat All wrap under Shuffle replaces the whole traversal, so a
+    /// browsed row's numeric position would name a different source
+    /// afterwards. The selection is re-anchored on the entry it was on,
+    /// exactly as a reorder does ([`Self::set_order`]).
     pub fn commit_eof(&mut self, step: EofStep) {
         let selection_followed = self.selected == self.playing;
+        let browsed = self.selected_entry();
         match step.commit {
             EofCommit::Position(position) => {
                 self.playing = Some(position);
@@ -534,6 +541,8 @@ impl TemporaryPlaylist {
                 self.playing = Some(0);
                 if selection_followed {
                     self.selected = Some(0);
+                } else {
+                    self.selected = browsed.and_then(|entry| self.position_of_entry(entry));
                 }
             }
         }
@@ -1248,6 +1257,49 @@ mod tests {
             let next = p.manual_step(true);
             assert_eq!(previous, position.checked_sub(1));
             assert_eq!(next, (position + 1 < order.len()).then_some(position + 1));
+        }
+    }
+
+    /// A Repeat All wrap under Shuffle replaces the WHOLE traversal, so a
+    /// browsing user's selection must be kept by ENTRY, not by traversal
+    /// position: keeping the number would silently move them to a
+    /// different source (the defect this test was written for).
+    #[test]
+    fn a_repeat_all_wrap_keeps_a_browsing_selection_on_its_entry() {
+        for seed in 1..40u64 {
+            let mut p = TemporaryPlaylist::new_seeded(seed);
+            p.set_order(PlaybackOrder::Shuffle);
+            while p.repeat() != RepeatMode::All {
+                p.cycle_repeat();
+            }
+            p.establish(entries(6), 0);
+            // Walk to the end of the cycle (the wrap precondition).
+            while p.playing_position() != Some(5) {
+                let target = p.manual_step(true).expect("walk to the last row");
+                p.commit_navigation(target);
+            }
+            // The user browses away from the playing row.
+            p.select_previous();
+            let browsed_entry = p.selected_entry().expect("a browsed row");
+            let browsed_position = p.selected_position().expect("a browsed row");
+            assert_ne!(browsed_entry, p.playing_entry().unwrap());
+
+            let step = p.eof_step().expect("Repeat All wraps");
+            assert!(matches!(step.commit, EofCommit::Cycle(_)));
+            p.commit_eof(step);
+
+            assert_eq!(
+                p.selected_entry(),
+                Some(browsed_entry),
+                "seed {seed}: the browsed ENTRY is kept across the new cycle"
+            );
+            let new_position = p.selected_position().expect("still selected");
+            assert_ne!(
+                new_position, browsed_position,
+                "seed {seed}: and the traversal really did move under it"
+            );
+            assert_eq!(p.playing_position(), Some(0), "seed {seed}");
+            assert!(p.invariants_hold(), "seed {seed}");
         }
     }
 

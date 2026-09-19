@@ -107,11 +107,24 @@ U2_SHELL_FORBIDDEN = [
     "wasapi",
     "Wasapi",
     "WASAPI",
+    # The PCM data plane and the mechanism vocabulary around it. The set
+    # is deliberately wider than the spellings the campaign named: an
+    # import of any of these into the shell would be the same boundary
+    # violation whichever name it arrived under.
     "PcmEdge",
     "DecodedPcmStream",
     "RenderPcmInput",
+    "RenderRequest",
+    "RenderStream",
+    "GateSlice",
+    "RenderGate",
+    "ParkOutcome",
+    "TailProbeOutcome",
+    "PcmDecode",
+    "AudioOutput",
     "songcore",
     "SongCore",
+    # K0 composition identity.
     "ComponentSpec",
     "qianqian_output_wasapi",
     "qianqian_decode_songcore",
@@ -121,12 +134,13 @@ U2_SHELL_FORBIDDEN = [
 
 U2_SHELL_AUTHORITY = (
     "Issue #166 §49 architecture negative control + ADR-PBK-002 D14.6 as amended by the "
-    "2026-09-19 playlist/repeat/order product amendment — the temporary playlist and the "
-    "TUI shell are ordinary App-state policy and presentation: they own no K0 composition "
-    "identity, hold no Fact, and reach neither a provider mechanism nor the PCM data "
-    "plane. Their only domain vocabulary is the F2 episode seam's read side "
-    "(qianqian_playback's observation/handle types) and, in dev/test code, the shared "
-    "PcmFormat contract"
+    "2026-09-19 playlist/repeat/order product amendment — the temporary playlist module "
+    "and the TUI shell's model/view/runtime modules (the files listed above; tui/mod.rs "
+    "is a module index that only names these mechanisms to disclaim them) are ordinary "
+    "App-state policy and presentation: they own no K0 composition identity, hold no "
+    "Fact, and reach neither a provider mechanism nor the PCM data plane. Their only "
+    "domain vocabulary is the F2 episode seam's read side (qianqian_playback's "
+    "observation/handle types) and, in dev/test code, the shared PcmFormat contract"
 )
 
 # Export-surface rules. Two mechanisms, both source-class:
@@ -265,6 +279,11 @@ EXPORT_RULES = {
         "forbid": U2_SHELL_FORBIDDEN,
         "authority": U2_SHELL_AUTHORITY,
     },
+    # `apps/headless/src/tui/mod.rs` is deliberately NOT scanned: it is a
+    # module-index document whose text NAMES these mechanisms only to
+    # disclaim them ("never sees … PcmEdge …"), and a substring rule
+    # cannot tell a disclaimer from a dependency. The three modules that
+    # hold the shell's actual code are covered.
 }
 
 # Human-facing rule prose for violation output (mission §21 format).
@@ -555,6 +574,7 @@ MUTABLE_FILES = [
     "apps/headless/src/playlist.rs",
     "apps/headless/src/tui/model.rs",
     "apps/headless/src/tui/view.rs",
+    "apps/headless/src/tui/runtime.rs",
     "Cargo.toml",
 ]
 
@@ -838,6 +858,17 @@ def run_negative_controls():
             "apps/headless/src/tui/view.rs": lambda t: t.replace(
                 "use ratatui::Frame;",
                 "use qianqian_composition::ComponentSpec;\nuse ratatui::Frame;",
+                1,
+            )
+        },
+    )
+    expect_fail(
+        "M9-tui-runtime PCM data-plane import",
+        "source: apps/headless/src/tui/runtime.rs",
+        {
+            "apps/headless/src/tui/runtime.rs": lambda t: t.replace(
+                "use ratatui::Terminal;",
+                "use qianqian_audio_api::ports::RenderRequest;\nuse ratatui::Terminal;",
                 1,
             )
         },

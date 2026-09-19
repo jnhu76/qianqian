@@ -399,8 +399,10 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// Next (D14.6 + Issue #166 §35): the traversal position the manual
     /// policy selects, invoked through the same Open replacement.
     /// `None` = inert (no committed entry, or the traversal boundary
-    /// with no wrap — no probe, no side effect, not even a status
-    /// change). The committed cursor moves only on replacement commit
+    /// with no wrap — no probe, no command, no navigation state moved).
+    /// The SHELL may still report the refusal as its own operation
+    /// feedback ("no next track"); that text is presentation, not
+    /// episode or navigation state. The committed cursor moves only on replacement commit
     /// evidence, and the selection follows it (Issue #166 §41).
     pub fn next_track(&mut self) -> Option<OpenOutcome> {
         self.navigate(true)
@@ -802,6 +804,12 @@ pub(crate) mod tests {
     /// paths serve 8 blocks then EOF; everything else is endless.
     struct FakePcmStream {
         remaining_blocks: usize,
+        /// The fixture's event log. The stream records the seek requests
+        /// that actually reach the decoder, so a test can witness that a
+        /// shell command became a D14.5 provider request WITHOUT
+        /// inventing a read-side seek state (the outcome below stays the
+        /// frozen `RefusedUnchanged`, which is a legal provider verdict).
+        log: Log,
     }
 
     impl DecodedPcmStream for FakePcmStream {
@@ -819,12 +827,15 @@ pub(crate) mod tests {
             let frames = (dst.len() / usize::from(FORMAT.channels)).min(1024);
             Ok(DecodeOutcome::Frames(frames))
         }
-        fn seek(&mut self, _target: Duration) -> ProviderSeekOutcome {
+        fn seek(&mut self, target: Duration) -> ProviderSeekOutcome {
+            log_event(&self.log, format!("seek {}ms", target.as_millis()));
             ProviderSeekOutcome::RefusedUnchanged
         }
     }
 
-    struct FakeDecode;
+    struct FakeDecode {
+        log: Log,
+    }
 
     impl PcmDecode for FakeDecode {
         fn open_media(&self, path: &Path) -> Result<Box<dyn DecodedPcmStream>, DecodeOpenError> {
@@ -840,6 +851,7 @@ pub(crate) mod tests {
             }
             Ok(Box::new(FakePcmStream {
                 remaining_blocks: if is_finite(path) { 8 } else { usize::MAX },
+                log: self.log.clone(),
             }))
         }
     }
@@ -875,7 +887,9 @@ pub(crate) mod tests {
             });
             match name {
                 "decode" => ctx
-                    .provide::<PcmDecodeCapability>(Rc::new(FakeDecode))
+                    .provide::<PcmDecodeCapability>(Rc::new(FakeDecode {
+                        log: activate_log.clone(),
+                    }))
                     .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}"))),
                 _ => ctx
                     .provide::<AudioOutputCapability>(Rc::new(FakeOutput))

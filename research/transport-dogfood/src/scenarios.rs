@@ -28,7 +28,49 @@
 
 use std::time::Duration;
 
-use crate::{BACKSPACE, ENTER, ESC, LEFT, RIGHT};
+use crate::{
+    BACKSPACE, DOWN, ENTER, ESC, LEFT, RIGHT, SHIFT_LEFT, SHIFT_RIGHT, UP,
+};
+
+/// The pane rows the U2 scenarios witness, in the renderer's own shape:
+/// the committed row carries `▶`, the selected row carries `>`, a row may
+/// carry both, then the 1-based traversal position and the file name
+/// (Issue #166 §20 — shapes, not colours; the pane is WYSIWYG, so a row
+/// sits at the position `N` would play next).
+///
+/// The markers are U+25B6 / ASCII `>` — one grid cell each, so the
+/// emulated capture reproduces them verbatim (U2 smoke transcript).
+fn pane_row(playing: bool, selected: bool, position: usize, label: &str) -> String {
+    let playing = if playing { "▶" } else { " " };
+    let selected = if selected { ">" } else { " " };
+    format!("{playing} {selected} {position:>3}  {label}")
+}
+
+/// The committed row when it is ALSO the selection — the state startup
+/// reaches and the state every selection-following navigation reaches.
+fn playing_selected_row(position: usize, label: &str) -> String {
+    pane_row(true, true, position, label)
+}
+
+/// The committed row with the selection browsing elsewhere.
+fn playing_only_row(position: usize, label: &str) -> String {
+    pane_row(true, false, position, label)
+}
+
+/// The browsed row with the committed cursor elsewhere (possibly
+/// scrolled out of the viewport).
+fn selected_only_row(position: usize, label: &str) -> String {
+    pane_row(false, true, position, label)
+}
+
+/// One pane row WITHOUT any marker — the needle for "this row left the
+/// viewport". Deliberately built from the position field, not the bare
+/// file name: the Source line carries the same file name, so a bare
+/// label would match a frame in which the row is long gone.
+fn pane_row_label(position: usize, label: &str) -> String {
+    format!("{position:>3}  {label}")
+}
+
 
 #[derive(Debug)]
 pub enum Step {
@@ -89,11 +131,63 @@ pub enum Step {
         cols: i16,
         rows: i16,
     },
+    /// Like [`Step::ExpectAfterMark`], but while waiting it forces a
+    /// full repaint every ~500 ms.
+    ///
+    /// This exists for ASYNCHRONOUS transitions (an automatic EOF
+    /// advance, which no key press triggers): the app's stderr
+    /// (ffmpeg/wasapi mechanism lines) interleaves with the TUI on the
+    /// pseudoconsole and can overwrite cells of the very row that just
+    /// changed — and because the application's own view of those cells
+    /// is still correct, its diff renderer never rewrites them, so the
+    /// pollution persists until a repaint happens. The witness is
+    /// UNCHANGED (the text must really have been rendered after the
+    /// mark); only the capture-side repaint the harness already applies
+    /// after every key write is applied here too.
+    ExpectAfterMarkRepaint {
+        text: String,
+        within_ms: u64,
+    },
+    /// Force one fresh full frame at the CURRENT size (the same
+    /// width-jiggle the harness already performs after every key write),
+    /// without sending a key or changing any application state.
+    ///
+    /// This exists for the honest negative oracle: an absence witness is
+    /// only meaningful over a window in which the screen was actually
+    /// re-rendered, and an idle episode's diff renderer legitimately
+    /// emits no new frame while nothing changes. Without a repaint the
+    /// window would be vacuous, so U2's "no auto-advance" claims repaint
+    /// first and then assert absence over real frames.
+    Repaint,
 }
 
 const SHORT_WAIT: u64 = 5_000;
 const OPEN_WAIT: u64 = 20_000;
 const EOF_WAIT: u64 = 30_000;
+
+/// The 24-entry viewport list (staged by tools/run-tui.sh as renamed
+/// copies of the 45 s synthetic sine, so every entry is long enough that
+/// the scenario's browsing and its single Enter stay inside one
+/// episode).
+const VVIEWPORT: [&str; 24] = [
+    "vtest01.mp3", "vtest02.mp3", "vtest03.mp3", "vtest04.mp3", "vtest05.mp3", "vtest06.mp3",
+    "vtest07.mp3", "vtest08.mp3", "vtest09.mp3", "vtest10.mp3", "vtest11.mp3", "vtest12.mp3",
+    "vtest13.mp3", "vtest14.mp3", "vtest15.mp3", "vtest16.mp3", "vtest17.mp3", "vtest18.mp3",
+    "vtest19.mp3", "vtest20.mp3", "vtest21.mp3", "vtest22.mp3", "vtest23.mp3", "vtest24.mp3",
+];
+
+/// The 20-entry soak list (staged by tools/run-tui.sh as locally
+/// generated 100 s synthetic sine tracks under `u2soak\`).
+const SOAK_LIST: [&str; 20] = [
+    "u2soak\\soak01.mp3", "u2soak\\soak02.mp3", "u2soak\\soak03.mp3", "u2soak\\soak04.mp3",
+    "u2soak\\soak05.mp3", "u2soak\\soak06.mp3", "u2soak\\soak07.mp3", "u2soak\\soak08.mp3",
+    "u2soak\\soak09.mp3", "u2soak\\soak10.mp3", "u2soak\\soak11.mp3", "u2soak\\soak12.mp3",
+    "u2soak\\soak13.mp3", "u2soak\\soak14.mp3", "u2soak\\soak15.mp3", "u2soak\\soak16.mp3",
+    "u2soak\\soak17.mp3", "u2soak\\soak18.mp3", "u2soak\\soak19.mp3", "u2soak\\soak20.mp3",
+];
+
+/// One 100 s soak track plus the replacement's own overhead.
+const SOAK_WAIT: u64 = 150_000;
 
 fn expect(text: impl Into<String>) -> Step {
     Step::Expect {
@@ -110,6 +204,22 @@ fn expect_format() -> Step {
 
 fn expect_within(text: impl Into<String>, within_ms: u64) -> Step {
     Step::Expect {
+        text: text.into(),
+        within_ms,
+    }
+}
+
+
+/// One forced full frame — see [`Step::Repaint`].
+fn repaint() -> Step {
+    Step::Repaint
+}
+
+/// A post-mark presence witness for an ASYNCHRONOUS transition, with
+/// capture-side repainting while it waits (see
+/// [`Step::ExpectAfterMarkRepaint`]).
+fn expect_after_mark_async(text: impl Into<String>, within_ms: u64) -> Step {
+    Step::ExpectAfterMarkRepaint {
         text: text.into(),
         within_ms,
     }
@@ -235,6 +345,13 @@ fn source_abs(media: &str, file: &str) -> String {
     format!("Source: {media}\\{file}")
 }
 
+/// The absolute staged path as the player renders it in OPERATION
+/// FEEDBACK (`play:` / `next:` / `auto-next:` echo the committed source
+/// path, unlike the O-line, which echoes what the user typed).
+fn abs_path(media: &str, file: &str) -> String {
+    format!("{media}\\{file}")
+}
+
 fn next_opened(media: &str, file: &str) -> String {
     format!("next: opened {media}\\{file}")
 }
@@ -265,6 +382,31 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         // driver spawns the child with zero arguments for an empty
         // list).
         "U1-idle" | "U1-folder-open" => &[],
+        // U2 (Issue #166 §51) playlist matrix. Three 4 s fixtures keep
+        // the cursor/navigation scenarios inside the watchdog; the
+        // EOF scenarios pick their own order because the LAST entry's
+        // completion is what "Repeat Off stays" observes.
+        "U2-pane" | "U2-select" | "U2-enter" | "U2-nav" | "U2-order"
+        | "U2-repeat-labels" => &["flac4.flac", "mp3cbr.mp3", "alac4.m4a"],
+        // The EOF scenarios keep their TRANSITION targets on non-MP3
+        // sources: an MP3 open streams ffmpeg decoder warnings onto the
+        // pseudoconsole and can hold the feedback row polluted for
+        // longer than a 4 s episode lasts (the harness repairs by
+        // repainting, but a stable episode gives it a quiet window).
+        "U2-eof-advance" => &["flac4.flac", "synth30.flac", "alac4.m4a"],
+        "U2-eof-all-wrap" | "U2-eof-one-replays" => &["flac4.flac", "alac4.m4a"],
+        // Entry 2 completes LAST here, which is where "Repeat Off
+        // stays" must be observed.
+        "U2-eof-stays" => &["alac4.m4a", "flac4.flac"],
+        "U2-stop-no-advance" => &["flac4.flac", "alac4.m4a"],
+        "U2-seek-30" | "U2-goto" | "U2-help" => &["synth45.mp3"],
+        // The ONE shuffle grammar (flag immediately after the
+        // subcommand).
+        "U2-shuffle-start" => &["--shuffle", "flac4.flac", "mp3cbr.mp3", "alac4.m4a"],
+        "U2-cjk" => &["千曲.flac", "flac4.flac"],
+        "U2-viewport" => &VVIEWPORT,
+        "U2-soak" => &SOAK_LIST,
+
         "A1-flac4" | "A16-drain-stop" => &["flac4.flac"],
         "A1-mp3cbr" => &["mp3cbr.mp3"],
         "A1-alac4" => &["alac4.m4a"],
@@ -283,7 +425,10 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         "C12-cjk" => &["千曲.flac"],
         _ => &["synth45.mp3"],
     };
-    let watchdog = if name == "A20" {
+    let watchdog = if name == "U2-soak" {
+        // 20 x 100 s of real playback plus transition overhead.
+        Duration::from_secs(2_400)
+    } else if name == "A20" {
         Duration::from_secs(300)
     } else if name == "A19" {
         Duration::from_secs(200)
@@ -966,12 +1111,13 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 },
                 // Mark BEFORE the stop: both post-stop checks must be
                 // witnessed by post-stop frames, not spawn-time ones
-                // ("N  Next" renders in the spawn controls panel too)
-                // (F3, review of Stage C).
+                // ("N/P  Next/Prev" renders in the spawn controls panel
+                // too) (F3, review of Stage C). The controls line is the
+                // U2 frozen keymap (Issue #166 §30).
                 Step::Mark,
                 keys("s"),
                 expect_mark_within("Terminal: Stopped", SHORT_WAIT),
-                expect_mark_within("N  Next", SHORT_WAIT),
+                expect_mark_within("N/P  Next/Prev", SHORT_WAIT),
                 Step::AbsentAfterMark("teardown violated".to_owned()),
             ];
             v.extend(quit_clean());
@@ -1018,6 +1164,509 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
             Step::AbsentAfterMark("teardown violated".to_owned()),
             Step::AbsentAfterMark("warning: disposal".to_owned()),
         ],
+
+        // U2 (Issue #166 §51) — the playlist / order / repeat / EOF /
+        // seek matrix on the real Windows host. Oracles are the shell's
+        // own truth-class-pinned projections (the App's navigation
+        // cursor, the order/repeat labels, the operation feedback), the
+        // pane's rendered rows, NEW published Position samples and
+        // clean-exit witnesses. Audibility is NOT claimed by any of
+        // them; the acoustic witness stays UNAVAILABLE.
+        // -----------------------------------------------------------
+
+        // U2-pane — the playlist pane renders the startup list with
+        // file-name labels, and the committed cursor is the FIRST
+        // accepted candidate (the startup discipline is untouched).
+        "U2-pane" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/3"),
+                expect("Order: Sequential"),
+                expect("Repeat: Off"),
+                // The pane lists all three staged sources by file name.
+                expect("flac4.flac"),
+                expect("mp3cbr.mp3"),
+                expect("alac4.m4a"),
+                expect(playing_selected_row(1, "flac4.flac")),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-select — browsing the pane NEVER changes playback: the
+        // committed cursor, the Source line and the playing row stay on
+        // entry 1 while the selection walks down and back up.
+        "U2-select" => {
+            let committed = source_abs(media, "flac4.flac");
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/3"),
+                Step::Mark,
+                keys(DOWN),
+                // Two INDEPENDENT markers on the real screen: the
+                // committed row keeps `▶` with no selection, the browsed
+                // row carries `>` with no play marker.
+                expect_after_mark_async(playing_only_row(1, "flac4.flac"), SHORT_WAIT),
+                expect_after_mark_async(selected_only_row(2, "mp3cbr.mp3"), SHORT_WAIT),
+                keys(DOWN),
+                keys(DOWN),
+                keys(UP),
+                keys(UP),
+                keys(UP),
+                // The episode and the committed cursor are untouched.
+                expect_after_mark_async(committed, SHORT_WAIT),
+                expect_after_mark_async("Track: 1/3".to_owned(), SHORT_WAIT),
+                expect_after_mark_async(playing_selected_row(1, "flac4.flac"), SHORT_WAIT),
+                // Browsing produced no playback transition of any kind:
+                // neither an automatic one nor a navigation one (both
+                // would name the source they opened).
+                Step::AbsentAfterMark(format!("auto-next: opened {}", abs_path(media, "flac4.flac"))),
+                Step::AbsentAfterMark(next_opened(media, "mp3cbr.mp3")),
+                Step::AbsentAfterMark(prev_opened(media, "alac4.m4a")),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-enter — Enter plays the SELECTED row through the same Open
+        // replacement (mp3cbr.mp3 is entry 2) and the committed cursor
+        // follows it.
+        "U2-enter" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/3"),
+                Step::Mark,
+                keys(DOWN),
+                keys(ENTER),
+                expect_after_mark_async(format!("play: opened {}", abs_path(media, "mp3cbr.mp3")), OPEN_WAIT),
+                expect_after_mark_async("Track: 2/3", OPEN_WAIT),
+                expect_after_mark_async(playing_selected_row(2, "mp3cbr.mp3"), OPEN_WAIT),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-nav — N/P walk the traversal, and at the boundary with
+        // Repeat Off the navigation is INERT (no probe, no command, no
+        // status change): the key reports nothing and nothing moves.
+        "U2-nav" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/3"),
+                Step::Mark,
+                keys("n"),
+                expect_after_mark_async("Track: 2/3", OPEN_WAIT),
+                keys("n"),
+                expect_after_mark_async("Track: 3/3", OPEN_WAIT),
+                expect_after_mark_async(playing_selected_row(3, "alac4.m4a"), OPEN_WAIT),
+                // At the last entry under Repeat Off: inert. The
+                // witness is a wrap-shaped transition's own feedback,
+                // which only a boundary bug could produce, over frames
+                // the key press and the repaint actually emitted.
+                Step::Mark,
+                keys("n"),
+                repaint(),
+                expect_after_mark_async("Track: 3/3".to_owned(), SHORT_WAIT),
+                expect_after_mark_async(playing_selected_row(3, "alac4.m4a"), SHORT_WAIT),
+                expect_after_mark_async(source_abs(media, "alac4.m4a"), SHORT_WAIT),
+                Step::AbsentAfterMark(next_opened(media, "flac4.flac")),
+                Step::AbsentAfterMark(next_opened(media, "mp3cbr.mp3")),
+                // P walks back one traversal position at a time.
+                keys("p"),
+                expect_after_mark_async("Track: 2/3", OPEN_WAIT),
+                expect_after_mark_async(playing_selected_row(2, "mp3cbr.mp3"), OPEN_WAIT),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-order — R toggles Sequential ↔ Shuffle: the committed entry
+        // never changes, the label says "Shuffle" (never "Random"), and
+        // toggling back restores the canonical order with the cursor
+        // still on the same entry.
+        "U2-order" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/3"),
+                Step::Mark,
+                keys("r"),
+                expect_after_mark_async("Order: Shuffle".to_owned(), SHORT_WAIT),
+                // The committed entry is unchanged by the reorder.
+                expect_after_mark_async("Track: 1/3".to_owned(), SHORT_WAIT),
+                expect_after_mark_async(source_abs(media, "flac4.flac"), SHORT_WAIT),
+                Step::AbsentAfterMark("Random".to_owned()),
+                keys("r"),
+                expect_after_mark_async("Order: Sequential", OPEN_WAIT),
+                expect_after_mark_async("Track: 1/3".to_owned(), SHORT_WAIT),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-repeat-labels — L cycles Off → All → One → Off and the
+        // traversal never moves.
+        "U2-repeat-labels" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Repeat: Off"),
+                Step::Mark,
+                keys("l"),
+                expect_after_mark_async("Repeat: All".to_owned(), SHORT_WAIT),
+                keys("l"),
+                expect_after_mark_async("Repeat: One".to_owned(), SHORT_WAIT),
+                keys("l"),
+                expect_after_mark_async("Repeat: Off".to_owned(), SHORT_WAIT),
+                expect_after_mark_async("Track: 1/3".to_owned(), SHORT_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-eof-advance — the natural-EOF policy on real media: with
+        // Repeat Off a completed entry advances the traversal exactly one
+        // position through the SAME Open replacement, and the committed
+        // cursor follows the opened source.
+        "U2-eof-advance" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/3"),
+                Step::Mark,
+                // The transition ITSELF is the witness (only the EOF
+                // policy prints `auto-next:`, and it names the entry it
+                // opened). The episode's own transient `Terminal:
+                // Completed` label is deliberately NOT awaited here: the
+                // replacement commits within a frame or two of it, so
+                // waiting for it would race the very thing under test.
+                expect_after_mark_async(
+                    format!("auto-next: opened {}", abs_path(media, "synth30.flac")),
+                    EOF_WAIT,
+                ),
+                expect_after_mark_async("Track: 2/3".to_owned(), SHORT_WAIT),
+                expect_after_mark_async(playing_selected_row(2, "synth30.flac"), SHORT_WAIT),
+                new_position(),
+            ];
+            v.extend(quit_clean_either_report());
+            v
+        }
+
+        // U2-eof-stays — at the END of the traversal with Repeat Off the
+        // completed entry STAYS completed: no further transition and no
+        // skip cascade. The absence window is proven non-vacuous by the
+        // forced repaint over it.
+        "U2-eof-stays" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/2"),
+                // Entry 1 completes and advances (the ordinary policy).
+                expect_after_mark_async(
+                    format!("auto-next: opened {}", abs_path(media, "flac4.flac")),
+                    EOF_WAIT,
+                ),
+                expect_after_mark_async("Track: 2/2".to_owned(), SHORT_WAIT),
+                // Entry 2 is the END of the traversal: its completion
+                // must stay put.
+                expect_within("Terminal: Completed", EOF_WAIT),
+                Step::Mark,
+                repaint(),
+                Step::SleepMs(6_000),
+                repaint(),
+                // A wrap (or any further transition) would have opened
+                // entry 1 and named it here.
+                Step::AbsentAfterMark(format!("auto-next: opened {}", abs_path(media, "alac4.m4a"))),
+                expect_after_mark_async("Track: 2/2".to_owned(), SHORT_WAIT),
+                expect_after_mark_async(source_abs(media, "flac4.flac"), SHORT_WAIT),
+                expect_after_mark_async(playing_selected_row(2, "flac4.flac"), SHORT_WAIT),
+            ];
+            v.extend(quit_clean_reporting("EOF: played out completely"));
+            v
+        }
+
+        // U2-eof-all-wrap — Repeat All wraps at the end of the traversal:
+        // each entry re-opens through the same replacement and the cursor
+        // returns to 1/2. (Two 4 s fixtures keep the wrap inside the
+        // watchdog.)
+        "U2-eof-all-wrap" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/2"),
+                keys("l"),
+                expect("Repeat: All"),
+                Step::Mark,
+                expect_after_mark_async(
+                    format!("auto-next: opened {}", abs_path(media, "alac4.m4a")),
+                    EOF_WAIT,
+                ),
+                expect_after_mark_async("Track: 2/2".to_owned(), SHORT_WAIT),
+                expect_after_mark_async(
+                    format!("auto-next: opened {}", abs_path(media, "flac4.flac")),
+                    EOF_WAIT,
+                ),
+                expect_after_mark_async("Track: 1/2".to_owned(), SHORT_WAIT),
+                expect_after_mark_async(playing_selected_row(1, "flac4.flac"), SHORT_WAIT),
+                new_position(),
+            ];
+            v.extend(quit_clean_either_report());
+            v
+        }
+
+        // U2-eof-one-replays — Repeat One re-opens the completed entry
+        // through the same replacement (the session is never taught to
+        // loop), and manual N still navigates: Repeat One never traps the
+        // user.
+        "U2-eof-one-replays" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/2"),
+                keys("l"),
+                keys("l"),
+                expect("Repeat: One"),
+                Step::Mark,
+                expect_after_mark_async(
+                    format!("auto-next: opened {}", abs_path(media, "flac4.flac")),
+                    EOF_WAIT,
+                ),
+                expect_after_mark_async("Track: 1/2".to_owned(), SHORT_WAIT),
+                // Manual N under Repeat One is an ordinary traversal step.
+                keys("n"),
+                expect_after_mark_async("Track: 2/2", OPEN_WAIT),
+                expect_after_mark_async(playing_selected_row(2, "alac4.m4a"), OPEN_WAIT),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-stop-no-advance — a Stopped episode NEVER auto-advances:
+        // S settles the episode, the cursor stays put, and no automatic
+        // transition appears in a window a cascade would have used (the
+        // 4 s fixtures complete well inside it, so a naive
+        // terminal-driven advance would be caught here).
+        "U2-stop-no-advance" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/2"),
+                Step::Mark,
+                keys("s"),
+                expect_after_mark_async("Terminal: Stopped".to_owned(), 10_000),
+                repaint(),
+                Step::SleepMs(6_000),
+                repaint(),
+                // A terminal-driven advance would have opened entry 2
+                // and named it; the 4 s fixtures complete well inside
+                // this window, so the absence is not vacuous.
+                Step::AbsentAfterMark(format!("auto-next: opened {}", abs_path(media, "alac4.m4a"))),
+                expect_after_mark_async("Track: 1/2".to_owned(), SHORT_WAIT),
+                expect_after_mark_async(source_abs(media, "flac4.flac"), SHORT_WAIT),
+                expect_after_mark_async(playing_selected_row(1, "flac4.flac"), SHORT_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-seek-30 — Shift+Right/Shift+Left are the ∓30 s steps of the
+        // SAME seek command: the published Position jumps far past what
+        // the 5 s step could reach and comes back, with liveness sampled
+        // at each stop (never an audibility claim).
+        "U2-seek-30" => {
+            let mut v = vec![
+                expect_format(),
+                Step::SleepMs(3_000),
+                Step::Mark,
+                Step::KeysEach(SHIFT_RIGHT, 1, 300),
+                // ~3 s in + 30 s forward: the published sample must be
+                // past 00:30.
+                expect_after_mark_async("Position: 00:3", OPEN_WAIT),
+                new_position(),
+                Step::KeysEach(SHIFT_LEFT, 1, 300),
+                expect_after_mark_async("Position: 00:0", OPEN_WAIT),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-goto — the exact-seek adapter: G opens the line, a typed
+        // time is parsed by the shared reader and issued as the same seek
+        // command; an unreadable token sends nothing and keeps the line
+        // open; Esc leaves without a command.
+        "U2-goto" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Go to"),
+                keys("g"),
+                expect("Go to:"),
+                Step::Typed("0:20".to_owned()),
+                keys(ENTER),
+                expect_after_mark_async("seek requested: 00:20", OPEN_WAIT),
+                expect_after_mark_async("Position: 00:2", OPEN_WAIT),
+                // A malformed target: the line stays open, nothing is
+                // sent, and the diagnostic is the shell's bounded one.
+                keys("g"),
+                Step::Typed("nonsense".to_owned()),
+                keys(ENTER),
+                expect_after_mark_async("Go to:".to_owned(), SHORT_WAIT),
+                keys(ESC),
+                Step::Mark,
+                repaint(),
+                Step::AbsentAfterMark("Go to:".to_owned()),
+                // Esc left the episode alone: playback continues.
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-help — the help overlay lists exactly the shipped keymap and
+        // closes again, leaving the episode untouched.
+        "U2-help" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Shift+←/→"),
+                Step::Mark,
+                keys("?"),
+                expect_after_mark_async("Qianqian keys", OPEN_WAIT),
+                expect_after_mark_async("select the previous / next row".to_owned(), SHORT_WAIT),
+                expect_after_mark_async("play the selected row".to_owned(), SHORT_WAIT),
+                expect_after_mark_async("repeat: off / all / one".to_owned(), SHORT_WAIT),
+                expect_after_mark_async("go to an exact position".to_owned(), SHORT_WAIT),
+                // Not shipped, not advertised.
+                Step::AbsentAfterMark("M3U".to_owned()),
+                Step::AbsentAfterMark("mouse".to_owned()),
+                Step::AbsentAfterMark("library".to_owned()),
+                keys(ESC),
+                Step::Mark,
+                repaint(),
+                Step::AbsentAfterMark("Qianqian keys".to_owned()),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-shuffle-start — `qianqian play --shuffle …` starts the list
+        // in shuffle order: the FIRST accepted candidate is still what
+        // opens (the safe start is untouched) and the shell says so.
+        "U2-shuffle-start" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Order: Shuffle"),
+                expect("Track: 1/3"),
+                expect(playing_selected_row(1, "flac4.flac")),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-cjk — a CJK file name renders structurally in the pane and
+        // the Source line (the label is the file name; no path is
+        // rewritten and no metadata is read).
+        "U2-cjk" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/2"),
+                // The captured grid renders a wide glyph followed by its
+                // skip cell (lesson 6/limitations: width-2 placements may
+                // be off by one column), so the CJK label is witnessed in
+                // its rendered form — the same convention C12-cjk uses.
+                expect(playing_selected_row(1, "千 曲 .flac")),
+                Step::Mark,
+                keys("n"),
+                expect_after_mark_async("Track: 2/2", OPEN_WAIT),
+                expect_after_mark_async(source_abs(media, "flac4.flac"), OPEN_WAIT),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-viewport — a 24-entry list is windowed: the pane keeps the
+        // SELECTED row visible while the user walks the whole list, the
+        // committed row is free to scroll away, and browsing stays inert
+        // (the committed episode does not move). Enter then commits the
+        // browsed row through the same Open path.
+        "U2-viewport" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/24"),
+                expect("vtest01.mp3"),
+                Step::Mark,
+                // 22 steps take the selection to the 24th row: the
+                // window follows it, so the first rows (and the
+                // committed row's own marker) scroll out of the pane.
+                Step::KeysEach(DOWN, 22, 40),
+                expect_after_mark_async(selected_only_row(23, "vtest23.mp3"), SHORT_WAIT),
+                // Re-mark AFTER the scroll settled: the intermediate
+                // frames of the walk legitimately still showed the first
+                // rows, so only the settled window may be scanned for
+                // their absence.
+                Step::Mark,
+                repaint(),
+                Step::AbsentAfterMark(pane_row_label(1, "vtest01.mp3")),
+                // Nothing played: the committed episode is still entry 1,
+                // whose marker row the viewport has scrolled away.
+                expect_after_mark_async("Track: 1/24".to_owned(), SHORT_WAIT),
+                expect_after_mark_async(source_abs(media, "vtest01.mp3"), SHORT_WAIT),
+                // Enter commits the browsed row through the Open path.
+                keys(ENTER),
+                expect_after_mark_async("Track: 23/24", OPEN_WAIT),
+                expect_after_mark_async(playing_selected_row(23, "vtest23.mp3"), OPEN_WAIT),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-soak — the light soak (Issue #166 §52): 20 synthetic 100 s
+        // tracks played END TO END through the natural-EOF policy with
+        // Repeat Off, i.e. ~33 minutes of continuous real playback on the
+        // real endpoint, with a published-Position liveness sample and a
+        // bounded child-resource checkpoint at every transition. The
+        // witness set is the shell's own: each transition names the
+        // source it opened and the cursor advance, and the run ends at
+        // the traversal end (Repeat Off stays) with a clean quit.
+        "U2-soak" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/20"),
+                Step::Mark,
+            ];
+            for n in 2..=20u32 {
+                v.push(expect_after_mark_async(
+                    format!("auto-next: opened {media}\\u2soak\\soak{n:02}.mp3"),
+                    SOAK_WAIT,
+                ));
+                v.push(expect_after_mark_async(format!("Track: {n}/20"), SHORT_WAIT));
+                v.push(Step::ExpectNewPosition {
+                    within_ms: SHORT_WAIT,
+                });
+                // A bounded resource checkpoint per transition: threads
+                // and working set may not grow without bound across 20
+                // replacement cycles (a tripwire, not a leak oracle).
+                v.push(Step::Resources {
+                    max_thread_delta: 6,
+                    max_ws_mb: 400,
+                });
+            }
+            // The traversal is over and Repeat Off leaves it over: mark,
+            // force a frame, and verify nothing advances.
+            v.push(expect_within("Terminal: Completed", SOAK_WAIT));
+            v.push(Step::Mark);
+            v.push(repaint());
+            v.push(Step::SleepMs(8_000));
+            v.push(repaint());
+            // Only a wrap could print another transition line.
+            v.push(Step::AbsentAfterMark(format!(
+                "auto-next: opened {media}\\u2soak\\soak01.mp3"
+            )));
+            v.push(expect_after_mark_async("Track: 20/20".to_owned(), SHORT_WAIT));
+            v.extend(quit_clean_reporting("EOF: played out completely"));
+            v
+        }
 
         other => panic!("unknown scenario {other}"),
     };
