@@ -1,0 +1,51 @@
+LR1-RUN3 — BLOCKED, NOT A GATE RUN (honest label)
+==================================================
+
+The RUN3 attempt (2026-09-19T17:07Z, same script `run-lr1.sh 3`,
+artifact zip 95be430b15a6b92ab01c2e2b94dd4c15983e48c667588cf16faf2f04
+9408d87 / exe 8e2d571c31b113fe2312b4a62e84e708dfdf6852099d06852966e5c
+9ae4b624f) is ENVIRONMENT-BLOCKED and must NOT be read as product or
+corrective regression:
+
+  The Windows host had NO ACTIVE DEFAULT RENDER ENDPOINT for the whole
+  run. Every playback-needing scenario failed the same way:
+
+    open failed (clean): render stream open failed:
+    no default render endpoint: 0x80070490 (ELEMENT_NOT_FOUND)
+
+  Endpoint state at the time (HKLM ...MMDevices\Audio\Render
+  DeviceState): 7 x UNPLUGGED (4), 9 x NOTPRESENT (8), 0 x ACTIVE.
+  The devices that ran RUN2 (Realtek default endpoint) were unplugged
+  by then — the same host had been used for real listening earlier
+  the same day (the field reports themselves).
+
+Failure shape (all consistent with the missing endpoint, nothing else):
+  - U1-idle / U2-help / C11 / C12 / U1-folder-open / LR1-all-corrupt
+    GREEN (they never require a live episode), U2-shuffle-start GREEN
+    early in core (endpoint still alive then), then every
+    episode-needing scenario RED with the endpoint error above;
+  - A15 lost its position samples mid-scenario (device lost during
+    playback); LR1-huge burned its 240 s watchdog (episode never
+    activated);
+  - LR1-large "1000 candidates" timeout: the scan itself is unaffected
+    by audio; the frame appeared only after the (blocked) open — the
+    scenario's needle window closed first under the blocked condition.
+  scenario_groups_green: 0/4.
+
+Incidental positive observation: with no endpoint, the product fails
+HONESTLY — a clean activation-failure diagnostic on the player pane,
+an idle shell, quiet disposal, no crash. That is the designed
+fail-closed path doing its job.
+
+Disposition:
+  - The U2 corrective (probesize bound + console quieting) is verified
+    by: the full workspace test suite, the Linux real-corpus A/B
+    (108 x 5MB budget-exhaustion warnings -> 0 warnings; probesize
+    1048576 under QIANQIAN_FFMPEG_LOG=1), and the package gates.
+  - RUN4 (the SAME script, RUN number 4) must be executed once the
+    host again has an active default render endpoint, and it — with
+    the new U2-cover-clean gate and the timestamped transcripts — is
+    the physical evidence of record for the corrective.
+  - The acoustic witness requirement is unchanged and also waits on
+    the same physical condition: an audio output must exist before
+    anyone can listen.

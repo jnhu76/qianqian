@@ -1,0 +1,8 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\dup" "C:\Users\Public\qn-lr1\media\dup"
+T+   0.013s       recv  16 bytes
+T+   0.023s       recv  133 bytes
+T+   0.042s       recv  8 bytes
+T+   0.042s       recv  219 bytes
+T+   0.064s       recv  3722 bytes
+T+   0.445s wait-begin  "Format: 44100 Hz" within 10s
+T+  10.457s wait-TIMEOUT  "Format: 44100 Hz" after offset 0

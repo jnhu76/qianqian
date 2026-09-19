@@ -1,0 +1,8 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\big5000"
+T+   0.014s       recv  16 bytes
+T+   0.023s       recv  137 bytes
+T+   0.440s wait-begin  "5000 candidates" within 240s
+T+   1.756s       recv  8 bytes
+T+   1.756s       recv  219 bytes
+T+   1.765s       recv  3722 bytes
+T+ 240.456s wait-TIMEOUT  "5000 candidates" after offset 0

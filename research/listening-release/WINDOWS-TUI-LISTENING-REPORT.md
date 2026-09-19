@@ -17,22 +17,24 @@ Status: **PACKAGE_READY_FOR_HUMAN_LISTENING** (engineering pass) —
 
 ```text
 source branch      feat/windows-tui-listening-release-1
-source commit      edb631bb8733d2e9981d0a1eccdfbdeb58b18628 (final
-                   product HEAD; the review-fix commit — argv lossy
-                   read + packaged-binary path remap — is the last
-                   product-code delta and is what the shipped exe was
-                   built from)
+source commit      e7f118d (docs/style HEAD; last PRODUCT-code delta is
+                   9995f6b — the U2 field corrective, §11. The
+                   originally packaged RUN2 build was edb631b.)
 base (origin/main) 8b1a739 (PR #168 merge)
 package            dist/qianqian-windows-x86_64.zip
-package sha256     2abe029c8ef0e51490e8f2a729ed4cfe53e2488011dbd6c215d9dcb749098c1f (zip)
-qianqian.exe       sha256 9909ce8df2ae82052f11c9f9facb4fa5cf9f13bbb7272dbe90a2672ba498c8f7 (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
-songcore (mingw)   17323291fc7b53997a36746e1ce7f86b8863a63f71be79389b9b196a05175a2a
+package sha256     95be430b15a6b92ab01c2e2b94dd4c15983e48c667588cf16faf2f0494408d87 (zip, U2-corrected build)
+qianqian.exe       sha256 8e2d571c31b113fe2312b4a62e84e708dfdf6852099d06852966e5c9ae4b624f (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
+                   (the superseded RUN2 artifact was zip 2abe029c… / exe 9909ce8d…)
+songcore (mingw)   05cbb12aaf33e44e5f0784deca0b410a0948f625d142bb4f7192fb61040fe7cc
                    (native/build/artifacts-mingw/libsongcore.a; FFmpeg
-                   n9.0.1 bf1b838f LGPL closure statically inside)
+                   n9.0.1 bf1b838f LGPL closure statically inside;
+                   RUN2's archive was 17323291…)
 rustc              1.97.1 (8bab26f4f 2026-07-14)
 target/profile     x86_64-pc-windows-gnu / release / features=playback
 host               Microsoft Windows 11 专业版, Realtek High Definition
                    Audio, default render endpoint (shared mode)
+                   (NOTE: at the RUN3 attempt the host had NO active
+                   render endpoint — see §11 / the RUN3 blocked note)
 reproducibility    packaged twice from one commit: same file set, same
                    manifest semantics, same dependency verdict; the exe
                    is NOT byte-stable across rebuilds (mingw toolchain),
@@ -227,7 +229,7 @@ PACKAGE:
 dist/qianqian-windows-x86_64.zip
 
 SHA256:
-2abe029c8ef0e51490e8f2a729ed4cfe53e2488011dbd6c215d9dcb749098c1f (zip) / extracted exe 7b48308240251f385ae5d3702bd42754425c665c8f5f7d054e53491171a18f62
+95be430b15a6b92ab01c2e2b94dd4c15983e48c667588cf16faf2f0494408d87 (zip) / extracted exe 8e2d571c31b113fe2312b4a62e84e708dfdf6852099d06852966e5c9ae4b624f
 
 EXTRACT AND RUN:
 qianqian.exe play --shuffle "D:\Music"
@@ -259,3 +261,68 @@ PLAYBACK AUTHORITY      none (D11/D14 untouched; playlist policy still
 PCM/BACKEND DELTA       none
 scan/dedup/reporting    App-layer host input preparation only
 ```
+
+## 11. Field reports and corrective (U2) — post-RUN2 human testing
+
+The user performed real listening on the RUN2 package against a real
+100-file MP3 corpus (embedded cover art on the tracks) and reported
+two defects:
+
+```text
+R1  TUI corruption: frames of "[mp3 @ ...] Could not find codec
+    parameters for stream 1 (Video: mjpeg, none)" interleaved with the
+    full-screen UI (200+ such lines during a folder scan).
+R2  Delay: folder open took seconds before the first sound; each
+    track switch left roughly 2 seconds of silence, with the timeline
+    only moving once audio arrived.
+```
+
+Root cause (one mechanism, two symptoms): every `song_open` ran
+`avformat_find_stream_info` with FFmpeg's DEFAULT 5 MB probesize, and
+the cover-art attached-picture stream carries codec parameters that no
+decoder in this trimmed LGPL build can resolve — so the parameter hunt
+ALWAYS burned the full 5 MB budget and logged its failure to stderr.
+Amplification: the folder scan probes every candidate (100 × 5 MB ≈
+500 MB of avoidable I/O ≈ the multi-second startup), and every track
+switch opens the candidate TWICE by design (the frozen D14.6
+probe-before-destruction sequence: pre-probe + activation open;
+2 × 5 MB ≈ the 2 s switch gap). Position truth was NEVER wrong — the
+render leg publishes handed-off-minus-padding only (D14.8); the
+"timeline moved while silent" reading was wall-clock silence during
+the opens.
+
+Corrective (commit 9995f6b; product-only delta over the RUN2 build):
+
+```text
+SongCore      AVFormatContext.probesize capped at 1 MiB (audio
+              parameters resolve from the first frames; only the
+              unresolvable-picture hunt is bounded); FFmpeg's default
+              logger replaced by a discarding callback by default
+              (QIANQIAN_FFMPEG_LOG=1 restores it).
+WASAPI crate  the per-episode mechanism diagnostics ([qianqian-wasapi]
+              opened / render aborted / volume note) are silent by
+              default (QIANQIAN_AUDIO_LOG=1 restores them); the
+              abort-path data-plane stop is unchanged. Any stderr
+              write corrupts a full-screen UI; failures still surface
+              through the session's typed activation/terminal
+              evidence.
+Tests         committed synthetic MP3 with an embedded mjpeg cover
+              (apps/headless/tests/fixtures/mp3-cbr-cover.mp3) stays
+              playable through the scan (input::real_probe); new
+              physical gate U2-cover-clean pins the clean console for
+              a full cover-art episode in the LR1 matrix.
+```
+
+Measured on the user's real corpus (Linux dev build, same C code):
+108 budget-exhaustion warnings at probesize (5000000) before the fix
+→ 0 warnings and probesize (1048576) under QIANQIAN_FFMPEG_LOG=1
+after; default-run stderr clean. The remaining physical gates (the
+RUN3 matrix with U2-cover-clean, and the X-realdir latency witness
+built for the user's directory) are recorded as BLOCKED, not failed:
+the host's audio endpoints were all UNPLUGGED/NOTPRESENT during the
+attempt (0 active; the activation path reported
+"no default render endpoint: 0x80070490" and the product failed
+honestly to an idle shell). See
+`evidence/ENV-LR1-RUN3-BLOCKED-NOTE.txt`. RUN4 (same script) is the
+physical evidence of record once an output device is connected again.
+

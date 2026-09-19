@@ -1,0 +1,12 @@
+LR1-huge: RED (240525ms, exit None)
+    FAILURE: timeout waiting for "5000 candidates" after offset 0; history tail:
+───────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+    CHILD: alive=true threads=Some(1)
