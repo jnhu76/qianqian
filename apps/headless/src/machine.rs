@@ -8,7 +8,10 @@
 //! behavior and the pinned contract cannot drift apart; the TUI
 //! transport settles episodes through the same settlement contract
 //! (outcome report, disposal warnings, exit code), which is what makes
-//! the two adapters interchangeable at the automation boundary.
+//! the two adapters interchangeable at the automation boundary. The
+//! reference-player transport's full exit decision is pinned here too
+//! ([`reference_exit_code`]) so both adapters' observable contracts
+//! live in one place.
 //!
 //! Truth-class discipline (D14.2): an episode that never activated has
 //! NO terminal Fact and none may be forged — the activation report is
@@ -149,6 +152,34 @@ pub fn episode_exit_code(
             }
         }
         Some(EpisodeTerminalOutcome::Failed) => ExitCode::from(1),
+    }
+}
+
+/// The reference-player transport's whole exit table (U1 corrective
+/// REQUIRED-3), pinned as pure data like the rest of this module so
+/// the binary renders through it and the table cannot drift. A failed
+/// shell — terminal setup, draw, or input I/O — is a HOST/PRESENTATION
+/// failure: it never exits successfully, whatever the session did
+/// afterward. It is never forged into a playback terminal outcome
+/// (D14.2: a broken terminal commits no Failed fact). With a working
+/// shell, an interactive launch that ends with no settled episode and
+/// a clean player is its normal end (the user opened the player and
+/// closed it), and everything else reports through the shared episode
+/// table.
+pub fn reference_exit_code(
+    shell_ok: bool,
+    interactive_startup: bool,
+    outcome: Option<EpisodeTerminalOutcome>,
+    fail_stopped: bool,
+    disposal_quiet: bool,
+) -> ExitCode {
+    if !shell_ok {
+        return ExitCode::from(1);
+    }
+    if interactive_startup && outcome.is_none() && !fail_stopped && disposal_quiet {
+        ExitCode::SUCCESS
+    } else {
+        episode_exit_code(outcome, disposal_quiet)
     }
 }
 
@@ -294,5 +325,60 @@ mod tests {
         );
         // No terminal Fact (never activated): no successful exit.
         assert_eq!(episode_exit_code(None, true), ExitCode::from(1));
+    }
+
+    #[test]
+    fn the_reference_exit_table_never_pays_success_for_a_failed_shell() {
+        // The interactive idle contract: no episode, clean player,
+        // working shell → the normal end of "opened and closed it".
+        assert_eq!(
+            reference_exit_code(true, true, None, false, true),
+            ExitCode::SUCCESS
+        );
+        // REQUIRED-3: the SAME session with a FAILED shell (terminal
+        // setup/draw/input I/O) is a host/presentation failure — it
+        // cannot become success, and no Failed fact is forged for it.
+        assert_eq!(
+            reference_exit_code(false, true, None, false, true),
+            ExitCode::from(1)
+        );
+        // Even a completed episode after a shell failure stays
+        // non-zero: the product UI did not run.
+        assert_eq!(
+            reference_exit_code(
+                false,
+                false,
+                Some(EpisodeTerminalOutcome::Completed),
+                false,
+                true
+            ),
+            ExitCode::from(1)
+        );
+        // With a working shell the old table is unchanged.
+        assert_eq!(
+            reference_exit_code(
+                true,
+                false,
+                Some(EpisodeTerminalOutcome::Completed),
+                false,
+                true
+            ),
+            ExitCode::SUCCESS
+        );
+        assert_eq!(
+            reference_exit_code(true, true, None, true, true),
+            ExitCode::from(1),
+            "a fail-stop latch is not a clean idle session"
+        );
+        assert_eq!(
+            reference_exit_code(true, true, None, false, false),
+            ExitCode::from(1),
+            "a latched disposal violation is not a clean idle session"
+        );
+        assert_eq!(
+            reference_exit_code(true, false, None, false, true),
+            ExitCode::from(1),
+            "an argv-driven start with no settled episode still fails"
+        );
     }
 }

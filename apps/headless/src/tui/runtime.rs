@@ -229,9 +229,11 @@ fn perform_navigation<S: EpisodeStart>(
 /// navigation state changed, diagnostic shown). A non-empty expansion
 /// opens its FIRST candidate through the existing frozen replacement
 /// and seeds the accepted list on commit — exactly the startup
-/// discipline. The recorded outcome is the status line's feedback —
+/// discipline. The recorded outcome is the status block's feedback —
 /// application composition feedback (D14.6), never a playback
-/// semantic.
+/// semantic; a partial traversal reports its bounded scan warnings
+/// right under the opened line (U1 corrective REQUIRED-2), so a
+/// partially unreadable folder never looks complete.
 fn perform_open<S: EpisodeStart>(
     model: &mut TuiModel,
     player: &mut ReferencePlayerApp<S>,
@@ -239,28 +241,14 @@ fn perform_open<S: EpisodeStart>(
 ) {
     let expansion = crate::input::expand_inputs([candidate]);
     let outcome = crate::input::open_expanded(player, &expansion);
-    let extra = expansion.accepted.len() > 1 || expansion.skipped > 0;
     let feedback = match outcome {
         None => format!("open refused: {}", expansion.refusal()),
-        Some(outcome) => match outcome {
-            OpenOutcome::Opened => {
-                let opened = expansion
-                    .accepted
-                    .first()
-                    .map(|path| format!("opened {}", path.display()))
-                    .unwrap_or_else(|| "opened".to_owned());
-                if extra {
-                    format!("{opened} ({})", expansion.summary())
-                } else {
-                    opened
-                }
-            }
-            OpenOutcome::Refused { diagnostic } => format!("open refused: {diagnostic}"),
-            OpenOutcome::ActivationFailedClean { diagnostic } => {
-                format!("open failed (clean): {diagnostic}")
-            }
-            OpenOutcome::FailStop { diagnostic } => format!("FAIL-STOP: {diagnostic}"),
-        },
+        Some(OpenOutcome::Opened) => expansion.opened_status(),
+        Some(OpenOutcome::Refused { diagnostic }) => format!("open refused: {diagnostic}"),
+        Some(OpenOutcome::ActivationFailedClean { diagnostic }) => {
+            format!("open failed (clean): {diagnostic}")
+        }
+        Some(OpenOutcome::FailStop { diagnostic }) => format!("FAIL-STOP: {diagnostic}"),
     };
     model.set_status(Some(feedback));
 }
@@ -581,6 +569,43 @@ mod tests {
             log.lock().unwrap().len(),
             log_len_after_setup,
             "the refusal preceded the probe"
+        );
+    }
+
+    /// U1 corrective REQUIRED-2: an O-open over a folder that only
+    /// PARTIALLY enumerated still opens its first candidate — and the
+    /// status block names the warnings instead of looking complete.
+    /// (Unix permission simulation; the equivalent partial-failure
+    /// presentation is pinned platform-free in the input module.)
+    #[cfg(unix)]
+    #[test]
+    fn an_o_open_over_a_partially_unreadable_folder_reports_the_warnings() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tree = TempTree::new("o-partial");
+        let file = tree.live_file("kept.flac");
+        let locked = tree.path().join("locked");
+        fs::create_dir_all(&locked).expect("locked dir");
+        fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).expect("lock");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+
+        open_via_keys(&mut model, &mut player, tree.path());
+        refresh(&mut model, &player);
+        // Restore FIRST so cleanup can remove the tree even on failure.
+        let _ = fs::set_permissions(&locked, fs::Permissions::from_mode(0o755));
+
+        assert_eq!(model.source(), Some(file.to_string_lossy().as_ref()));
+        let status = model.status().expect("a partial scan is reported");
+        assert!(status.contains("; 1 scan warning"), "{status}");
+        assert!(
+            status.contains("\nscan warning: cannot read "),
+            "the diagnostic itself is shown: {status}"
+        );
+        assert_eq!(
+            player.navigation_position(),
+            Some((1, 1)),
+            "the commit-riding seed holds the found candidates"
         );
     }
 

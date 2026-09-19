@@ -195,21 +195,25 @@ fn reference_player_transport(files: Vec<PathBuf>) -> ExitCode {
 
     // U1 input expansion: startup argv may name files AND folders. The
     // expansion is host input preparation — candidates, not playback
-    // truth. `open_expanded` runs the first candidate through the
+    // truth. `prepare_startup` runs the first candidate through the
     // EXISTING frozen replacement and seeds the accepted list ONLY on
     // replacement commit evidence, so an empty/unreadable expansion and
     // a refused/failed first candidate can never commit a misleading
-    // list (Issue #166 §9/§10).
-    let expansion = input::expand_inputs(&files);
-    let startup_open = input::open_expanded(&mut player, &expansion);
-    let initial_status = startup_feedback(&expansion, startup_open.as_ref());
-    if let Some(OpenOutcome::FailStop { diagnostic }) = &startup_open {
+    // list (Issue #166 §9/§10) — and an INTERACTIVE launch (no argv)
+    // prepares nothing at all: no Open attempted, no feedback
+    // fabricated (U1 corrective REQUIRED-1).
+    let preparation = input::prepare_startup(&files, &mut player);
+    if let Some(OpenOutcome::FailStop { diagnostic }) = &preparation.startup_open {
         // A latched §G.6 violation has no exit and earns no shell.
         eprintln!("fail-stop: {diagnostic}");
         return ExitCode::from(1);
     }
+    let expansion = preparation.expansion;
+    let startup_open = preparation.startup_open;
+    let initial_status = preparation.initial_status;
 
-    if let Err(error) = crate::tui::run(&mut player, initial_status) {
+    let shell = crate::tui::run(&mut player, initial_status);
+    if let Err(error) = &shell {
         eprintln!("reference-player shell failed: {error}");
     }
 
@@ -255,62 +259,25 @@ fn reference_player_transport(files: Vec<PathBuf>) -> ExitCode {
         eprintln!("fail-stop: {reason}");
     }
     let disposal_quiet = report.snapshot.as_ref().is_none_or(|s| s.quiet);
-    // The exit code describes the SESSION. An interactive launch was
-    // handed no episode by argv, so ending it without a settled
-    // episode is its NORMAL end (the user opened the player and closed
-    // it) — not the scriptable transport's "episode never activated"
-    // failure, which describes a transport that was HANDED an episode
-    // and failed to start it. The SUCCESS arm is therefore gated on a
-    // clean session: no fail-stop latch (checked above and here) and a
-    // quiet-or-absent disposal. Every argv-driven start reports through
-    // the ordinary table, whatever happened.
-    if interactive_startup
-        && report.terminal.is_none()
-        && !player.is_fail_stopped()
-        && disposal_quiet
-    {
-        ExitCode::SUCCESS
-    } else {
-        machine::episode_exit_code(report.terminal, disposal_quiet)
-    }
-}
-
-/// The shell's first status line: the expansion summary plus the
-/// startup Open's feedback. `None` on the quiet successful single-file
-/// start (the old-world behavior); a folder start summarizes what got
-/// seeded because that is the user's only view of the expansion.
-#[cfg(feature = "playback")]
-fn startup_feedback(
-    expansion: &crate::input::ExpandedInputs,
-    startup_open: Option<&OpenOutcome>,
-) -> Option<String> {
-    let opened = match startup_open {
-        None => {
-            // No candidate anywhere in the argv: an honest refusal, and
-            // the shell still runs so the user can open a valid source.
-            // Same operation vocabulary as the in-shell refusal.
-            return Some(format!("open refused: {}", expansion.refusal()));
-        }
-        Some(OpenOutcome::Opened) => None,
-        Some(OpenOutcome::Refused { diagnostic }) => Some(format!("open refused: {diagnostic}")),
-        Some(OpenOutcome::ActivationFailedClean { diagnostic }) => {
-            Some(format!("open failed (clean): {diagnostic}"))
-        }
-        Some(OpenOutcome::FailStop { .. }) => unreachable!("handled by the caller"),
-    };
-    // Beyond one accepted candidate (or any skip), say what was seeded.
-    let summary = expansion.accepted.len() > 1 || expansion.skipped > 0;
-    match (opened, summary) {
-        (None, false) => None,
-        (None, true) => Some(format!(
-            "opened {} ({})",
-            expansion.accepted[0].display(),
-            expansion.summary()
-        )),
-        // An `Opened` startup implies a non-empty accepted list (the
-        // first entry IS the committed episode).
-        (Some(feedback), _) => Some(format!("{feedback} ({})", expansion.summary())),
-    }
+    // The exit code describes the SESSION — plus, since the U1
+    // corrective (REQUIRED-3), the shell itself: a failed TUI (terminal
+    // setup/draw/input I/O) is a host/presentation failure that can
+    // never exit successfully, whatever the session did afterward, and
+    // it is never forged into a playback terminal outcome. The whole
+    // table is pinned in [`machine::reference_exit_code`]. An
+    // interactive launch was handed no episode by argv, so ending it
+    // without a settled episode is its NORMAL end (the user opened the
+    // player and closed it) — not the scriptable transport's "episode
+    // never activated" failure, which describes a transport that was
+    // HANDED an episode and failed to start it. Every argv-driven start
+    // reports through the ordinary table, whatever happened.
+    machine::reference_exit_code(
+        shell.is_ok(),
+        interactive_startup,
+        report.terminal,
+        player.is_fail_stopped(),
+        disposal_quiet,
+    )
 }
 
 /// The real host wiring of the F6 seams: the decode provider's

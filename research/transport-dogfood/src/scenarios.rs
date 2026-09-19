@@ -295,7 +295,10 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         // page renders truthfully (no fabricated Position/Paused/
         // Terminal labels for an episode that does not exist) and Q
         // exits the session cleanly with the idle exit contract
-        // (code 0, no outcome line, quiet disposal).
+        // (code 0, no outcome line, quiet disposal). U1 corrective
+        // REQUIRED-1: the frame also carries NO operation feedback —
+        // the false-refusal vocabulary for an Open that was never
+        // attempted is explicitly rejected.
         "U1-idle" => vec![
             expect_within("No music loaded.", 10_000),
             expect("Press O to open a file or folder"),
@@ -303,6 +306,8 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
             Step::AbsentAfterMark("Position:".to_owned()),
             Step::AbsentAfterMark("Paused:".to_owned()),
             Step::AbsentAfterMark("Terminal:".to_owned()),
+            Step::AbsentAfterMark("open refused".to_owned()),
+            Step::AbsentAfterMark("no audio candidates".to_owned()),
             keys("q"),
             Step::ExpectExit {
                 code: 0,

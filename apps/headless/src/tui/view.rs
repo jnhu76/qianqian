@@ -69,7 +69,12 @@ fn bold(title: &'static str) -> Span<'static> {
 fn open_lines(model: &TuiModel, lines: &mut Vec<Line<'_>>) {
     if let Some(status) = model.status() {
         lines.push(Line::from(""));
-        lines.push(Line::from(status.to_owned()));
+        // A status BLOCK may be multi-line (the bounded scan-warning
+        // detail rides under the opened line, U1 corrective
+        // REQUIRED-2); each line renders on its own row.
+        for line in status.lines() {
+            lines.push(Line::from(line.to_owned()));
+        }
     }
     if let Some(input) = model.open_input() {
         lines.push(Line::from(format!(
@@ -449,6 +454,43 @@ mod tests {
                 "{fabricated} must not render without an episode:\n{text}"
             );
         }
+        // U1 corrective REQUIRED-1: the bare launch's frame carries no
+        // operation feedback at all — no fabricated refusal for an
+        // Open that was never attempted.
+        for fabricated_feedback in ["open refused", "no audio candidates"] {
+            assert!(
+                !text.contains(fabricated_feedback),
+                "{fabricated_feedback:?} must not render for an operation never attempted:\n{text}"
+            );
+        }
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
+    /// The Open feedback block may be multi-line (U1 corrective
+    /// REQUIRED-2): the opened line counts the scan warnings and each
+    /// bounded detail line renders on its own row — a partial folder
+    /// scan is visible, never silently discarded. (Rendered at a
+    /// 26-row virtual terminal: a fully established episode panel plus
+    /// a two-line status block needs the extra row; smaller terminals
+    /// degrade by clipping, as everywhere else.)
+    #[test]
+    fn a_multi_line_status_block_renders_every_line() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        model.set_status(Some(
+            "opened /media (2 candidates, 1 skipped; 1 scan warning)\n\
+             scan warning: cannot read /media/album-c: access denied"
+                .to_owned(),
+        ));
+        let text = rendered_at(&model, 100, 26);
+        assert!(
+            text.contains("opened /media (2 candidates, 1 skipped; 1 scan warning)"),
+            "{text}"
+        );
+        assert!(
+            text.contains("scan warning: cannot read /media/album-c: access denied"),
+            "{text}"
+        );
         assert_eq!(forbidden_status_claim(&text), None, "{text}");
     }
 
