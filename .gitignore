@@ -15,3 +15,4 @@ experiments/f5-seek-discontinuity/target
 # experiment fails loudly instead of silently shipping its target/).
 experiments/f6-open-smoke/target
 experiments/v-probe/target
+/dist
