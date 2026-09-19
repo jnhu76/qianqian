@@ -11,7 +11,7 @@ Before changing code or long-lived documentation:
 3. Use `docs/README.md` to load only the minimum relevant authority.
 4. Read `docs/architecture/overview.md` before changing architecture boundaries.
 5. For generic composition work, read `docs/architecture/composition-kernel.md` and the K0 design/implementation authority.
-6. For playback/audio work, read `docs/adr/ADR-PBK-001.md` plus current vocabulary/static playback authority `docs/adr/ADR-PBK-002.md`.
+6. For playback/audio work, read `docs/adr/ADR-PBK-001.md` plus current vocabulary/static playback authority `docs/adr/ADR-PBK-002.md`; for Output/backend/platform work also read `docs/adr/ADR-PBK-003.md`.
 7. Inspect current repository reality before assuming a path, type, crate, test, TLA variable, or prior design is still authoritative.
 
 Do not recursively preload historical refs or external failure evidence.
@@ -27,6 +27,11 @@ Normative Playback Foundations constitution:
 Current vocabulary / Plugin-Fiber taxonomy / static playback composition:
     docs/adr/ADR-PBK-002.md        (ACCEPTED; current authority.
                                     Issue #138 records the corrective rationale/history)
+
+Host-render backend boundary:
+    docs/adr/ADR-PBK-003.md        (ACCEPTED; stable Output Plugin identity,
+                                    backend-neutral AudioOutput contract,
+                                    concrete backend owned mechanism by default)
 
 Do not treat as current architecture unless a new experiment re-earns them:
     MusicKernel
@@ -128,6 +133,8 @@ Output Plugin
 Playback Session Plugin (episode-scoped)
 ```
 
+A concrete host-audio backend (WASAPI / ALSA / PipeWire / CoreAudio / a CPAL-backed mechanism) is **not** a Plugin by default. PBK-003 freezes the Output Plugin as the stable K0 composition role; the concrete backend is an owned, replaceable mechanism behind the backend-neutral `AudioOutput` contract unless a future D13 review independently earns Plugin identity.
+
 Possible future `PlaylistPlugin`, `ProcessingPlugin`, UI adapter Plugins, etc. must still be earned by real composition/lifecycle pressure; feature names alone are insufficient.
 
 ---
@@ -155,9 +162,13 @@ Playback Session Plugin
     owns the episode-scoped lifetime / teardown responsibility for
     one episode's decoder endpoint / worker / PCM edge / render
     relation / completion
+
+Output Plugin
+    owns the selected host-render backend mechanism behind AudioOutput;
+    backend identity is not K0 desired-composition truth
 ```
 
-"Owns" here is lifecycle/teardown ownership, not allocation/implementation ownership: the Decode/Output provider Plugins still own the allocation mechanisms and internals behind those endpoints/streams (PBK-002 D6).
+"Owns" here is lifecycle/teardown ownership, not allocation/implementation ownership: the Decode/Output provider Plugins still own the allocation mechanisms and internals behind those endpoints/streams (PBK-002 D6). PBK-003 further separates Output Plugin composition identity from its concrete platform backend.
 
 PCM payload then flows through the already-bound data plane; K0 is not in the per-block path.
 
@@ -241,7 +252,7 @@ If implementation requires choosing among materially different semantics, author
 
 A coding agent may choose ordinary local representation details only when all observable semantics/ownership/lifetime obligations are already fixed and the choice does not create a new architectural noun or authority.
 
-For Phase-F playback, `ADR-PBK-002` D11/D14 is the implementation guard. Anything still explicitly OPEN there is out of scope until a narrow authority amendment earns it.
+For Phase-F playback, `ADR-PBK-002` D11/D14 is the implementation guard. For output/backend/platform boundaries, `ADR-PBK-003` is additionally binding. Anything still explicitly OPEN there is out of scope until a narrow authority amendment earns it.
 
 ---
 
@@ -355,6 +366,8 @@ Fresh-context reviewers for playback/architecture work should prioritize:
 
 ```text
 Plugin vs owned-resource confusion
+Output Plugin vs concrete host-backend identity leakage
+backend-specific API vocabulary promoted into a generic contract
 ComponentSpec representation accidentally becoming a second taxonomy
 feature-shaped Plugin over-fragmentation
 Context/event/PCM misuse
@@ -380,7 +393,7 @@ Green Cargo tests are regression evidence, not architecture acceptance. Verifica
 
 `docs/README.md` is the documentation router and truth-class index.
 
-Keep one current authority per durable fact. PBK-001 owns playback foundations; PBK-002 owns current vocabulary, Plugin/Fiber taxonomy, earned static playback composition and the D11 terminal-outcome authority designation.
+Keep one current authority per durable fact. PBK-001 owns playback foundations; PBK-002 owns current vocabulary, Plugin/Fiber taxonomy, earned static playback composition and the D11 terminal-outcome authority designation; PBK-003 owns the stable Output Plugin / pluggable Host Render Backend boundary and backend-neutral `AudioOutput` contract interpretation.
 
 `README.md`, `CONTEXT.md`, `docs/architecture/overview.md`, `docs/architecture/registry.yml`, website and diagrams are derived projections/routers; they may summarize, route and show status, but must not define or extend architecture semantics.
 

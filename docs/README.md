@@ -12,6 +12,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Generic Composition Kernel semantics | `architecture/composition-kernel.md` + `architecture/composition-kernel-0-design.md` + `architecture/composition-kernel-0-implementation-adr.md` |
 | Playback/audio foundations | `adr/ADR-PBK-001.md` — **ACCEPTED** |
 | Plugin/Fiber taxonomy + admission invariant + earned static playback composition | `adr/ADR-PBK-002.md` D1/D4/D5/D6/D12/D13 |
+| Output Plugin / host-audio backend boundary, cross-platform output work | `adr/ADR-PBK-003.md` — stable Output Plugin identity + backend-neutral Host Render Contract; concrete backend owned mechanism by default |
 | Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
 | Terminal Fact commit-ownership boundary evidence（F2 seam 前置 formal campaign） | `../specs/f2-terminal-commit-boundary/` — campaign evidence only，**未裁决**；结论是 CURRENT_CONTRACT_UNDERSPECIFIED，等 ADR/code gap audit |
 | F5 seek 实现 guardrail 证据（M1–M11 生产突变 + fail-closed runner） | `../specs/f5-seek-implementation/` — executable evidence only；seek 语义权威 = `adr/ADR-PBK-002.md` §20 D14.5 |
@@ -44,6 +45,11 @@ NORMATIVE AUTHORITY
   earned static playback composition + D11
       -> adr/ADR-PBK-002.md
 
+  Stable Output Plugin / pluggable Host Render Backend boundary
+      -> adr/ADR-PBK-003.md
+         backend-neutral AudioOutput obligations;
+         concrete host backend is an owned mechanism by default
+
   K0 semantic design
       -> architecture/composition-kernel-0-design.md
 
@@ -75,7 +81,7 @@ Issue #138 is an **architecture corrective basis / design-input record**. It may
 
 # Current canonical architecture mapping
 
-Current vocabulary is routed to PBK-002:
+Current vocabulary is routed to PBK-002, with the Output/backend refinement owned by PBK-003:
 
 ```text
 Composition Kernel (K0)
@@ -99,6 +105,11 @@ Service
 Plugin-owned domain resource
     subordinate endpoint/worker/edge/stream whose internals remain outside K0
 
+Host Render Backend
+    concrete platform mechanism owned by Output Plugin by default;
+    realizes the backend-neutral AudioOutput contract; not a Plugin merely
+    because it is platform-specific or replaceable
+
 PCM Data Plane
     pre-bound payload flow; not a Plugin and not routed through K0 per quantum
 ```
@@ -110,6 +121,8 @@ Decode Plugin
 Output Plugin
 Playback Session Plugin (episode-scoped)
 ```
+
+Concrete WASAPI / ALSA / PipeWire / CoreAudio / CPAL-backed host mechanisms are not additional Plugin roles by default; PBK-003 owns that boundary.
 
 Do not use the older `Component vs Plugin` taxonomy as current architecture. K0 design documents may use `component` as their formal/paper term; PBK-002 defines the Qianqian architecture mapping.
 
@@ -126,7 +139,7 @@ Fact
 Realtime Data
 ```
 
-PBK-002 maps current production onto them:
+PBK-002 maps current production onto them; PBK-003 further requires the Output Plugin's concrete host backend to remain below the stable composition identity:
 
 ```text
 Qianqian App
@@ -134,6 +147,8 @@ Qianqian App
 K0
     ↓ manages
 Decode Plugin + Output Plugin + Playback Session Plugin
+                  │
+                  └── owns selected Host Render Backend mechanism
     ↓ Playback Session binds/owns episode resources
 kernel-free PCM data plane
 ```
@@ -150,7 +165,7 @@ The designation attaches to the Playback Session semantic role for one playback 
 
 # Plugin / resource routing rule
 
-Use PBK-002 D4/D12 for current taxonomy and D13 for the admission invariant.
+Use PBK-002 D4/D12 for current taxonomy and D13 for the admission invariant. Use PBK-003 for the explicit Output Plugin / Host Render Backend application of that invariant.
 
 Do not infer:
 
@@ -159,11 +174,15 @@ feature == Plugin
 Capability provider == only kind of Plugin
 long-lived == required for Plugin
 resource/object == Plugin
+platform backend == Plugin
+replaceable mechanism == Plugin
 ```
 
 A Plugin may provide no Capability and may be episode-scoped.
 
 Subordinate resources stay resources unless they need independent K0 composition identity/lifecycle — if an existing Plugin can own the candidate without losing composition correctness or lifecycle ordering, it stays an owned resource/effect (D13). Domain resource ownership does not widen K0 kernel data: K0 still knows only its frozen Fiber/Capability/Effect/Discharge semantics.
+
+For host audio specifically, Output Plugin is the stable composition role; the selected host backend is an owned mechanism behind the backend-neutral `AudioOutput` contract unless a future D13 review earns independent Plugin identity.
 
 ---
 
@@ -179,7 +198,7 @@ Do not rewrite K0 semantics merely to rename `component`; do not resurrect a pee
 
 # Realtime / PCM policy
 
-Normative authority: PBK-001 §2.4 and §6; current static mapping: PBK-002 D8/D9.
+Normative authority: PBK-001 §2.4 and §6; current static mapping: PBK-002 D8/D9; host-render backend refinement: PBK-003.
 
 Per quantum PCM must not perform:
 
@@ -193,6 +212,8 @@ filesystem/network/UI round trip
 ```
 
 K0 composes owners on setup/control boundaries; already-bound domain resources carry PCM directly.
+
+Backend-specific mechanism evidence must refine the platform-neutral host-render obligations rather than redefine them. In particular, WASAPI `GetBuffer` / `GetCurrentPadding` / `padding` are the current Windows refinement, not generic architecture vocabulary.
 
 If a future feature creates overlapping old/new RT worlds whose release depends on reader quiescence, trigger PBK-001 P1–P5 and earn the minimum specialized mechanism. Do not pre-create Window/Generation because historical models had them.
 
@@ -239,6 +260,8 @@ optional source-scoped Mechanism Evidence whose unknown stays unknown)
 and implemented behind the same seam (PR #152) — pending human review;
 the remaining transport semantics stay OPEN
 (PBK-002 §14) pending their authority design.
+
+For host-render wording in those frozen mechanisms, PBK-003 is the interpretation boundary: platform-specific WASAPI counters/calls are current Windows realization/evidence, while another backend must refine the same platform-neutral obligation rather than clone the same API.
 
 ---
 
@@ -311,6 +334,6 @@ Inspect only when the task needs history.
 
 Create a new long-lived document only when a durable fact needs its own authority.
 
-Prefer rewriting current authority cleanly over growing amendment/supersession chains while the architecture is young.
+Prefer rewriting current authority cleanly over growing amendment/supersession chains while the architecture is young. PBK-003 is intentionally separate because the host-render backend boundary is a durable cross-platform authority in its own right rather than another Phase-F feature amendment; it narrows PBK-002's platform interpretation without duplicating playback semantics.
 
 When production and authority disagree: record the differential, decide which side is wrong, amend authority explicitly if needed, and only then treat the new shape as current architecture.
