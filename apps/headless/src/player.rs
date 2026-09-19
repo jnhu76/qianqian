@@ -53,21 +53,41 @@
 //!                      retaining the attempted root
 //! ```
 //!
-//! Playlist / navigation (D14.6, closed by the same amendment): the
-//! playlist and the current index are APPLICATION NAVIGATION STATE
-//! owned by this player (`Vec<PathBuf>` + `Option<usize>`); nothing
+//! Playlist / navigation (D14.6, AMENDED by the 2026-09-19
+//! post-Phase-F product amendment recorded in D14.6 — Issue #166
+//! `WINDOWS-TUI-USABILITY-CLOSURE-1`): the temporary playlist, its
+//! traversal order and the repeat policy are APPLICATION NAVIGATION
+//! STATE owned by this player (see [`crate::playlist`]); nothing
 //! outside the App ever reads them, and no PlaylistFact /
 //! CurrentTrackFact / PlaylistPlugin / NavigationPlugin exists. The
-//! index is commit-on-activation: it moves only on replacement commit
-//! evidence (a direct Open replaces the playlist to the single opened
-//! path at index 0; Next/Previous move it one entry, only on commit).
-//! Both navigation ends are inert (no wrap, no side effect); there is
-//! no repeat, no shuffle, no EOF auto-next, no failed-candidate
-//! auto-skip. A clean activation failure leaves the cursor at the old
-//! entry — which then names a track that no longer plays; honest,
-//! because the cursor is navigation state, not audible-source truth.
-//! A latched §G.6 violation permanently disables navigation too; no
-//! recovery path exists.
+//! committed cursor is commit-on-activation: it moves only on
+//! replacement commit evidence and is never playback truth. Next /
+//! Previous / Enter-on-selected select a candidate and invoke the same
+//! Open replacement; a probe refusal or a clean activation failure
+//! leaves the committed cursor exactly where it was.
+//!
+//! What THIS module adds on top of the playlist's pure policy is the
+//! one thing the playlist cannot own — the D11 observation:
+//!
+//! ```text
+//! Completed Fact (D11, the Playback Session's authority)
+//!     ↓ observed by the App (never forged, never inferred elsewhere)
+//! App EOF policy (playlist: order + repeat)
+//!     ↓
+//! the SAME existing Open replacement
+//! ```
+//!
+//! `Stopped` and `Failed` NEVER auto-advance (no silent failed-track
+//! skip: that belongs to the later file/media phase), and the App
+//! consumes a completed episode's EOF policy AT MOST ONCE
+//! ([`ReferencePlayerApp::poll_eof_policy`]): the consumed flag lives on
+//! the episode record, is set before the attempt, and dies with the
+//! episode — so a stale repeated observation cannot advance twice and a
+//! refused auto-next is never retried. The Playback Session stays
+//! playlist-blind: it establishes terminal Facts and nothing else.
+//!
+//! A latched §G.6 violation permanently disables every replacement
+//! (navigation, selection, EOF policy) too; no recovery path exists.
 //!
 //! The provider set behind [`EpisodeStart`] is the wiring's business
 //! (the real host mounts the SongCore decode Plugin and the Output
@@ -80,7 +100,20 @@ use std::path::{Path, PathBuf};
 
 use qianqian_app::QianqianApp;
 use qianqian_composition::{CompositionSnapshot, DisposeVerdict};
-use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionHandle};
+use qianqian_playback::{
+    EpisodeTerminalOutcome, PlaybackSessionHandle, PlaybackSessionObservation,
+};
+
+use crate::playlist::{PlaybackOrder, RepeatMode, Row, TemporaryPlaylist};
+
+/// The ONE observation the App's EOF policy reacts to: a committed D11
+/// `Completed` Fact. `Stopped`, `Failed` and "no terminal Fact yet" are
+/// all inert — the check is an EQUALITY against `Completed`, so no other
+/// outcome can advance the playlist however it arrived, and nothing here
+/// infers a terminal from mechanism evidence.
+fn completed_fact(observation: &PlaybackSessionObservation) -> bool {
+    observation.terminal_outcome == Some(EpisodeTerminalOutcome::Completed)
+}
 
 /// The two seams a host wires to mount one fresh episode composition:
 /// the D14.6 candidate probe and the D14.6 fresh-root start. Together
@@ -172,6 +205,13 @@ struct ActiveEpisode {
     runtime: QianqianApp,
     handle: PlaybackSessionHandle,
     source: PathBuf,
+    /// Whether this episode's EOF policy has been run. App bookkeeping,
+    /// not playback semantics: it lives ON the episode record, so it
+    /// starts fresh with each commit, dies with the episode it belongs
+    /// to, and makes "one episode + one Completed Fact ⇒ at most one
+    /// automatic transition attempt" structural — a stale observation of
+    /// a retired episode cannot reach a live flag (Issue #166 §16).
+    eof_consumed: bool,
 }
 
 /// A root whose disposal latched a §G.6 teardown violation. Retained
@@ -184,19 +224,19 @@ struct RetainedViolatedRoot {
 
 /// The reference player's composition state: at most one live episode,
 /// plus the fail-stop latch and any retained violated root — and the
-/// playlist / current-index APPLICATION NAVIGATION STATE (D14.6, the
-/// playlist-authority closure): `Vec<PathBuf>` + `Option<usize>`,
-/// owned here, read by nothing outside the App. The index is
-/// commit-on-activation: it moves only on F6 replacement commit
-/// evidence and is never playback truth — the read side stays the
-/// D14.2 observation.
+/// temporary playlist with its traversal order, repeat policy and two
+/// independent cursors (the AMENDED D14.6 playlist authority, Issue
+/// #166 §4/§5). The playlist ([`TemporaryPlaylist`]) owns the pure
+/// product policy; this struct owns the D11 observation the policy
+/// reacts to and the Open replacement it drives. The committed cursor
+/// moved only on F6 replacement commit evidence and is never playback
+/// truth — the read side stays the D14.2 observation.
 pub struct ReferencePlayerApp<S: EpisodeStart> {
     start: S,
     active: Option<ActiveEpisode>,
     violated: Option<RetainedViolatedRoot>,
     fail_stop: Option<String>,
-    playlist: Vec<PathBuf>,
-    cursor: Option<usize>,
+    playlist: TemporaryPlaylist,
     /// The App's desired stream factor, `0..=100` (D14.9: integer,
     /// clamped; the TUI steps it by 5). Application configuration —
     /// NOT a Fact, NOT mechanism evidence, never a readback. It
@@ -215,9 +255,18 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
             active: None,
             violated: None,
             fail_stop: None,
-            playlist: Vec::new(),
-            cursor: None,
+            playlist: TemporaryPlaylist::new(),
             desired_volume: 100,
+        }
+    }
+
+    /// A player whose shuffle mechanism is explicitly seeded — the
+    /// deterministic test seam for the shuffle-driven policy.
+    #[cfg(test)]
+    pub(crate) fn new_seeded(start: S, seed: u64) -> Self {
+        Self {
+            playlist: TemporaryPlaylist::new_seeded(seed),
+            ..Self::new(start)
         }
     }
 
@@ -231,20 +280,27 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
         Some(self.active.as_ref()?.source.as_path())
     }
 
-    /// Seed the STARTUP playlist (open representation per D14.6: the
-    /// startup-args grammar details are not frozen). The transport
-    /// calls this ONCE, right after the first Open committed:
-    /// `entries[0]` IS the committed first episode, so the cursor
-    /// starts at 0 on commit evidence. Nothing else ever appends to
-    /// the playlist — a direct Open REPLACES it.
-    pub fn seed_startup_playlist(&mut self, entries: Vec<PathBuf>) {
+    /// Establish the playlist that rides an Open commit: `entries` are
+    /// the accepted candidates in canonical order and `entries[0]` IS
+    /// the committed episode, so the traversal cursor starts on it. The
+    /// transport calls this ONCE, right after the first Open committed;
+    /// an empty list leaves the navigation state untouched (there is no
+    /// committed entry to point at). Nothing else ever appends to the
+    /// playlist — a direct Open REPLACES it.
+    pub fn establish_playlist(&mut self, entries: Vec<PathBuf>) {
         if entries.is_empty() {
-            // Total over the input: an empty seed leaves the navigation
-            // state untouched (there is no committed entry to point at).
             return;
         }
-        self.playlist = entries;
-        self.cursor = Some(0);
+        // The contract, made executable: establishment RIDES the Open
+        // commit, so entry 0 IS the episode that just committed. A list
+        // whose head is some other source would install a committed
+        // cursor naming a track that is not the live one.
+        debug_assert_eq!(
+            self.active.as_ref().map(|episode| episode.source.as_path()),
+            entries.first().map(PathBuf::as_path),
+            "the playlist is established on Open commit evidence: entry 0 IS the committed episode"
+        );
+        self.playlist.establish(entries, 0);
     }
 
     /// The App's desired stream factor (0..=100). The read side means
@@ -272,12 +328,46 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     }
 
     /// The navigation projection the shell renders: the 1-based
-    /// position of the cursor and the playlist length. Presentation of
-    /// application navigation state — never playback truth, never an
-    /// observable beyond this App's own shell (D14.6: no
-    /// PlaylistFact / CurrentTrackFact exists).
+    /// position of the COMMITTED entry and the playlist length.
+    /// Presentation of application navigation state — never playback
+    /// truth, never an observable beyond this App's own shell (D14.6:
+    /// no PlaylistFact / CurrentTrackFact exists).
     pub fn navigation_position(&self) -> Option<(usize, usize)> {
-        Some((self.cursor? + 1, self.playlist.len()))
+        self.playlist.playing_ordinal()
+    }
+
+    /// The temporary playlist's revision: bumped whenever its rows or
+    /// markers could differ. The shell rebuilds its row labels only when
+    /// this moves, so a huge playlist costs nothing per frame.
+    pub fn playlist_revision(&self) -> u64 {
+        self.playlist.revision()
+    }
+
+    /// The playlists's traversal order preference.
+    pub fn playlist_order(&self) -> PlaybackOrder {
+        self.playlist.order()
+    }
+
+    /// The playlist's repeat preference.
+    pub fn playlist_repeat(&self) -> RepeatMode {
+        self.playlist.repeat()
+    }
+
+    /// The committed entry's traversal position.
+    pub fn playlist_playing_position(&self) -> Option<usize> {
+        self.playlist.playing_position()
+    }
+
+    /// The UI selection's traversal position.
+    pub fn playlist_selected_position(&self) -> Option<usize> {
+        self.playlist.selected_position()
+    }
+
+    /// The playlist rows in traversal order, each carrying its two
+    /// independent markers (Issue #166 §20). Presentation of the App's
+    /// own navigation state.
+    pub fn playlist_rows(&self) -> impl Iterator<Item = Row<'_>> {
+        self.playlist.rows()
     }
 
     /// Whether the §G.6 fail-stop latch is set (no further Open runs).
@@ -294,50 +384,130 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// composition with one for `candidate`. Runs the frozen replacement
     /// sequence synchronously; see the module docs for the truth-class
     /// and failure-class contract. A DIRECT Open also replaces the
-    /// playlist with the single opened path and selects index 0 — ON
-    /// COMMIT only (D14.6 playlist closure): a refusal and a clean
+    /// playlist with the single opened path and commits its only entry —
+    /// ON COMMIT only (D14.6 playlist closure): a refusal and a clean
     /// activation failure leave the navigation state exactly as it was.
+    /// The ordering/repeat preferences survive (Issue #166 §23).
     pub fn open(&mut self, candidate: &Path) -> OpenOutcome {
         let outcome = self.replace_episode(candidate);
         if matches!(outcome, OpenOutcome::Opened) {
-            self.playlist = vec![candidate.to_owned()];
-            self.cursor = Some(0);
+            self.playlist.establish(vec![candidate.to_owned()], 0);
         }
         outcome
     }
 
-    /// Next (D14.6 playlist closure): select the candidate AFTER the
-    /// cursor and invoke the same Open replacement. `None` = inert
-    /// (no cursor, or the cursor already names the last entry — no
-    /// wrap, no side effect, not even a probe). The cursor moves only
-    /// on replacement commit evidence; a refusal or a clean activation
-    /// failure leaves it where it was (one keypress advances at most
-    /// one candidate).
+    /// Next (D14.6 + Issue #166 §35): the traversal position the manual
+    /// policy selects, invoked through the same Open replacement.
+    /// `None` = inert (no committed entry, or the traversal boundary
+    /// with no wrap — no probe, no side effect, not even a status
+    /// change). The committed cursor moves only on replacement commit
+    /// evidence, and the selection follows it (Issue #166 §41).
     pub fn next_track(&mut self) -> Option<OpenOutcome> {
-        let index = self
-            .cursor
-            .and_then(|cursor| cursor.checked_add(1))
-            .filter(|&index| index < self.playlist.len())?;
-        Some(self.navigate_to(index))
+        self.navigate(true)
     }
 
-    /// Previous (D14.6 playlist closure): the mirror of [`Self::next_track`].
-    /// `None` = inert (no cursor, or the cursor already names the first
-    /// entry — no wrap, no side effect).
+    /// Previous (Issue #166 §34): the mirror of [`Self::next_track`],
+    /// walking the SAME traversal order — under Shuffle that is the
+    /// previous entry of the current permutation, never a random
+    /// re-pick.
     pub fn previous_track(&mut self) -> Option<OpenOutcome> {
-        let index = self.cursor?.checked_sub(1)?;
-        Some(self.navigate_to(index))
+        self.navigate(false)
     }
 
-    /// One navigation replacement: the SAME frozen sequence as a direct
-    /// Open, with the cursor moved to the selected entry only on commit.
-    fn navigate_to(&mut self, index: usize) -> OpenOutcome {
-        let candidate = self.playlist[index].clone();
+    /// One manual navigation: choose the policy's candidate, Open it
+    /// through the frozen replacement, and commit the cursor only on
+    /// commit evidence.
+    fn navigate(&mut self, forward: bool) -> Option<OpenOutcome> {
+        let position = self.playlist.manual_step(forward)?;
+        let candidate = self.playlist.path_at(position)?.to_owned();
         let outcome = self.replace_episode(&candidate);
         if matches!(outcome, OpenOutcome::Opened) {
-            self.cursor = Some(index);
+            self.playlist.commit_navigation(position);
         }
-        outcome
+        Some(outcome)
+    }
+
+    /// `Enter`: play the SELECTED playlist entry through the SAME
+    /// Open/replacement path (Issue #166 §19). `None` = nothing is
+    /// selected (an empty playlist). Selection movement itself never
+    /// reaches here — browsing cannot play anything.
+    pub fn play_selected(&mut self) -> Option<OpenOutcome> {
+        let position = self.playlist.selected_position()?;
+        let candidate = self.playlist.path_at(position)?.to_owned();
+        let outcome = self.replace_episode(&candidate);
+        if matches!(outcome, OpenOutcome::Opened) {
+            // The committed cursor moves ON COMMIT; the selection is
+            // already on this row, so it simply stays there.
+            self.playlist.commit_navigation(position);
+        }
+        Some(outcome)
+    }
+
+    /// Move the UI selection one row later. Presentation only: it never
+    /// opens anything and never changes playback (Issue #166 §18).
+    pub fn select_next_track(&mut self) {
+        self.playlist.select_next();
+    }
+
+    /// Move the UI selection one row earlier. Presentation only.
+    pub fn select_previous_track(&mut self) {
+        self.playlist.select_previous();
+    }
+
+    /// The `R` key: toggle Sequential ↔ Shuffle. The committed entry is
+    /// re-anchored, never restarted and never re-opened (Issue #166 §9).
+    /// Returns the new order.
+    pub fn toggle_order(&mut self) -> PlaybackOrder {
+        self.playlist.toggle_order()
+    }
+
+    /// Set the traversal order (the `--shuffle` startup preference,
+    /// Issue #166 §24). Idempotent.
+    pub fn set_order(&mut self, order: PlaybackOrder) {
+        self.playlist.set_order(order);
+    }
+
+    /// The `L` key: cycle Repeat Off → All → One → Off. Returns the new
+    /// mode.
+    pub fn cycle_repeat(&mut self) -> RepeatMode {
+        self.playlist.cycle_repeat()
+    }
+
+    /// Run the App's natural-EOF policy for the live episode, if it is
+    /// due (Issue #166 §13/§16/§17).
+    ///
+    /// The policy fires for a COMMITTED `Completed` Fact and for nothing
+    /// else: `Stopped` and `Failed` never auto-advance, and no
+    /// failed-track skip exists in this phase. The episode's policy is
+    /// consumed BEFORE the attempt, so the ~150 ms refresh loop cannot
+    /// advance twice on one Completed Fact, and a refused auto-next is
+    /// not retried (no skip cascade — the failure is reported and the
+    /// traversal stays truthful).
+    ///
+    /// `None` = nothing was due (no episode, the policy already ran for
+    /// this episode, the terminal outcome is not Completed, or the
+    /// policy is inert at the end of the traversal).
+    pub fn poll_eof_policy(&mut self) -> Option<OpenOutcome> {
+        if self.fail_stop.is_some() {
+            return None;
+        }
+        let due = self.active.as_ref().is_some_and(|episode| {
+            !episode.eof_consumed && completed_fact(&episode.handle.observe())
+        });
+        if !due {
+            return None;
+        }
+        // Consume FIRST: at most one automatic transition attempt per
+        // completed episode, however many refreshes observe it.
+        if let Some(episode) = self.active.as_mut() {
+            episode.eof_consumed = true;
+        }
+        let step = self.playlist.eof_step()?;
+        let outcome = self.replace_episode(&step.candidate);
+        if matches!(outcome, OpenOutcome::Opened) {
+            self.playlist.commit_eof(step);
+        }
+        Some(outcome)
     }
 
     /// The frozen D14.6 replacement sequence itself (probe → old-side
@@ -383,6 +553,7 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
                 runtime: attempt.runtime,
                 handle: attempt.handle,
                 source: candidate.to_owned(),
+                eof_consumed: false,
             });
             OpenOutcome::Opened
         } else {
@@ -838,6 +1009,12 @@ pub(crate) mod tests {
         ReferencePlayerApp::new(source)
     }
 
+    /// A player whose shuffle permutation is seeded, so the Shuffle
+    /// policy's structural claims are reproducible (Issue #166 §11).
+    fn seeded_player(seed: u64) -> ReferencePlayerApp<FakeEpisodeSource> {
+        ReferencePlayerApp::new_seeded(FakeEpisodeSource::new(), seed)
+    }
+
     pub(crate) const A: &str = "/media/finite-a.flac";
     pub(crate) const B: &str = "/media/finite-b.flac";
     /// Endless sources keep the first episode live until the
@@ -1273,7 +1450,7 @@ pub(crate) mod tests {
         let source = FakeEpisodeSource::new();
         let mut player = player_with(source);
         assert!(opened(&player.open(Path::new(LIVE_A))));
-        player.seed_startup_playlist(vec![PathBuf::from(LIVE_A), PathBuf::from(B)]);
+        player.establish_playlist(vec![PathBuf::from(LIVE_A), PathBuf::from(B)]);
         assert_eq!(player.navigation_position(), Some((1, 2)));
 
         // A committed direct Open replaces the whole playlist.
@@ -1311,7 +1488,7 @@ pub(crate) mod tests {
         let events_handle = source.log.clone();
         let mut player = player_with(source);
         assert!(opened(&player.open(Path::new(LIVE_A))));
-        player.seed_startup_playlist(vec![
+        player.establish_playlist(vec![
             PathBuf::from(LIVE_A),
             PathBuf::from(LIVE_B),
             PathBuf::from(C),
@@ -1351,7 +1528,7 @@ pub(crate) mod tests {
         assert_eq!(player.previous_track(), None);
 
         assert!(opened(&player.open(Path::new(LIVE_A))));
-        player.seed_startup_playlist(vec![PathBuf::from(LIVE_A), PathBuf::from(LIVE_B)]);
+        player.establish_playlist(vec![PathBuf::from(LIVE_A), PathBuf::from(LIVE_B)]);
 
         // At the FIRST entry: previous is inert.
         assert_eq!(player.previous_track(), None);
@@ -1378,7 +1555,7 @@ pub(crate) mod tests {
         let events_handle = source.log.clone();
         let mut player = player_with(source);
         assert!(opened(&player.open(Path::new(LIVE_A))));
-        player.seed_startup_playlist(vec![
+        player.establish_playlist(vec![
             PathBuf::from(LIVE_A),
             PathBuf::from("/media/invalid-mid.flac"),
             PathBuf::from(C),
@@ -1418,7 +1595,7 @@ pub(crate) mod tests {
         let events_handle = source.log.clone();
         let mut player = player_with(source);
         assert!(opened(&player.open(Path::new(LIVE_A))));
-        player.seed_startup_playlist(vec![
+        player.establish_playlist(vec![
             PathBuf::from(LIVE_A),
             PathBuf::from("/media/failstart.flac"),
             PathBuf::from(C),
@@ -1455,7 +1632,7 @@ pub(crate) mod tests {
         source.violating_cleanup = true;
         let mut player = player_with(source);
         assert!(opened(&player.open(Path::new(LIVE_A))));
-        player.seed_startup_playlist(vec![PathBuf::from(LIVE_A), PathBuf::from(LIVE_B)]);
+        player.establish_playlist(vec![PathBuf::from(LIVE_A), PathBuf::from(LIVE_B)]);
 
         // The direct Open of the failing candidate retires the live
         // entry first; that disposal violates (the composer's flag), so
@@ -1484,7 +1661,7 @@ pub(crate) mod tests {
         let source = FakeEpisodeSource::new();
         let mut player = player_with(source);
         assert!(opened(&player.open(Path::new(A))));
-        player.seed_startup_playlist(vec![PathBuf::from(A), PathBuf::from(B)]);
+        player.establish_playlist(vec![PathBuf::from(A), PathBuf::from(B)]);
         let handle = player.active_handle().expect("committed").clone();
 
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
@@ -1563,6 +1740,615 @@ pub(crate) mod tests {
         assert_eq!(after.terminal_outcome, None);
         assert_eq!(after.stop_requested, before.stop_requested);
         assert_eq!(after.pause_requested, before.pause_requested);
+    }
+
+    // --- Stage G: the App's playlist policy (Issue #166) --------------
+
+    /// `n` FINITE sources: each reaches a genuine D11 `Completed` after
+    /// a few bounded blocks (the fake leg paces 1 ms per block).
+    fn finite(n: usize) -> Vec<PathBuf> {
+        (0..n)
+            .map(|i| PathBuf::from(format!("/media/finite-{i:02}.flac")))
+            .collect()
+    }
+
+    /// `n` endless sources: an episode over one keeps running until a
+    /// replacement stops it.
+    fn live(n: usize) -> Vec<PathBuf> {
+        (0..n)
+            .map(|i| PathBuf::from(format!("/media/live-{i:02}.flac")))
+            .collect()
+    }
+
+    fn event_count(log: &Log) -> usize {
+        log.lock().expect("ordering log").len()
+    }
+
+    /// The committed source and the playlist's `playing` marker name the
+    /// same row — the invariant the whole cursor discipline exists for.
+    fn cursor_names_active_source<S: EpisodeStart>(player: &ReferencePlayerApp<S>) -> bool {
+        player
+            .playlist_rows()
+            .any(|row| row.playing && Some(row.path) == player.active_source())
+    }
+
+    #[test]
+    fn the_playing_cursor_names_the_committed_source() {
+        let mut player = player_with(FakeEpisodeSource::new());
+        let files = live(3);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+        assert!(cursor_names_active_source(&player));
+
+        assert_eq!(player.next_track(), Some(OpenOutcome::Opened));
+        assert!(cursor_names_active_source(&player));
+        assert_eq!(player.active_source(), Some(files[1].as_path()));
+
+        assert_eq!(player.previous_track(), Some(OpenOutcome::Opened));
+        assert!(cursor_names_active_source(&player));
+        assert_eq!(player.active_source(), Some(files[0].as_path()));
+    }
+
+    /// Selection movement is presentation: it never probes, never opens,
+    /// and never moves the committed cursor (Issue #166 §18).
+    #[test]
+    fn selection_movement_never_touches_playback() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = player_with(source);
+        let files = live(4);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+        let before = event_count(&log);
+        let playing = player.playlist_playing_position();
+
+        for _ in 0..3 {
+            player.select_next_track();
+        }
+        assert_eq!(player.playlist_selected_position(), Some(3));
+        player.select_next_track();
+        assert_eq!(
+            player.playlist_selected_position(),
+            Some(3),
+            "the selection is inert at the last row"
+        );
+        for _ in 0..5 {
+            player.select_previous_track();
+        }
+        assert_eq!(player.playlist_selected_position(), Some(0));
+        assert_eq!(
+            player.playlist_playing_position(),
+            playing,
+            "browsing never moves the committed cursor"
+        );
+        assert_eq!(player.active_source(), Some(files[0].as_path()));
+        assert_eq!(
+            event_count(&log),
+            before,
+            "no probe, no open — selection is presentation only"
+        );
+    }
+
+    /// `Enter` plays the SELECTED row through the same replacement, and
+    /// the committed cursor moves only on commit evidence; a refusal
+    /// leaves both cursors where the user put them (Issue #166 §19).
+    #[test]
+    fn enter_plays_the_selection_and_commits_only_on_success() {
+        let mut player = player_with(FakeEpisodeSource::new());
+        let files = live(3);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+
+        player.select_next_track();
+        player.select_next_track();
+        assert_eq!(player.playlist_selected_position(), Some(2));
+        assert_eq!(
+            player.play_selected(),
+            Some(OpenOutcome::Opened),
+            "Enter opens the selected row"
+        );
+        assert_eq!(player.active_source(), Some(files[2].as_path()));
+        assert_eq!(player.playlist_playing_position(), Some(2));
+        assert_eq!(
+            player.playlist_selected_position(),
+            Some(2),
+            "the selection stays on the row it played"
+        );
+
+        // A REFUSED selection: the committed cursor must not move. The
+        // list is re-established with the committed source at entry 0
+        // (the one legal shape of the commit-riding seed).
+        let dud = PathBuf::from("/media/invalid-dud.flac");
+        player.establish_playlist(vec![files[2].clone(), dud, files[0].clone()]);
+        assert_eq!(player.playlist_playing_position(), Some(0));
+        assert!(cursor_names_active_source(&player));
+        player.select_next_track();
+        assert_eq!(player.playlist_selected_position(), Some(1));
+        assert!(matches!(
+            player.play_selected(),
+            Some(OpenOutcome::Refused { .. })
+        ));
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some(0),
+            "an attempted Open never moves the committed cursor"
+        );
+        assert_eq!(player.active_source(), Some(files[2].as_path()));
+        assert!(cursor_names_active_source(&player));
+    }
+
+    /// The manual Next/Previous policy: one entry per press, wrapping
+    /// only under Repeat All, and the selection follows the committed
+    /// cursor (Issue #166 §41).
+    #[test]
+    fn manual_navigation_walks_the_traversal_and_wraps_only_under_repeat_all() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = player_with(source);
+        let files = live(3);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+
+        // Repeat Off: inert at both ends.
+        assert_eq!(player.previous_track(), None);
+        assert_eq!(player.next_track(), Some(OpenOutcome::Opened));
+        assert_eq!(player.next_track(), Some(OpenOutcome::Opened));
+        assert_eq!(player.active_source(), Some(files[2].as_path()));
+        assert_eq!(player.playlist_selected_position(), Some(2));
+        let before = event_count(&log);
+        assert_eq!(player.next_track(), None, "no wrap under Repeat Off");
+        assert_eq!(
+            event_count(&log),
+            before,
+            "an inert navigation runs nothing, not even a probe"
+        );
+
+        // Repeat All: both ends wrap.
+        assert_eq!(player.cycle_repeat(), RepeatMode::All);
+        assert_eq!(player.next_track(), Some(OpenOutcome::Opened));
+        assert_eq!(player.active_source(), Some(files[0].as_path()));
+        assert_eq!(player.playlist_selected_position(), Some(0));
+        assert_eq!(player.previous_track(), Some(OpenOutcome::Opened));
+        assert_eq!(player.active_source(), Some(files[2].as_path()));
+
+        // Repeat One never traps manual navigation: it behaves like
+        // Repeat Off at the boundary.
+        assert_eq!(player.cycle_repeat(), RepeatMode::One);
+        assert_eq!(player.next_track(), None);
+        assert_eq!(player.previous_track(), Some(OpenOutcome::Opened));
+    }
+
+    /// `R` re-anchors the traversal and NOTHING else: no re-open, no
+    /// probe, no teardown, the committed episode untouched (Issue #166
+    /// §9/§10). `L` moves no traversal at all.
+    #[test]
+    fn order_and_repeat_keys_never_touch_the_episode() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = player_with(source);
+        let files = live(4);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+        // Walk off the anchored first entry so the re-anchor really has
+        // a non-zero traversal position to preserve.
+        assert_eq!(player.next_track(), Some(OpenOutcome::Opened));
+        assert_eq!(player.playlist_playing_position(), Some(1));
+        let live_handle = player.active_handle().expect("committed").clone();
+        let before = event_count(&log);
+
+        assert_eq!(player.toggle_order(), PlaybackOrder::Shuffle);
+        assert!(cursor_names_active_source(&player), "R keeps the track");
+        assert_eq!(player.cycle_repeat(), RepeatMode::All);
+        assert_eq!(player.cycle_repeat(), RepeatMode::One);
+        assert_eq!(player.cycle_repeat(), RepeatMode::Off);
+        assert_eq!(player.toggle_order(), PlaybackOrder::Sequential);
+        assert!(cursor_names_active_source(&player));
+
+        assert_eq!(
+            event_count(&log),
+            before,
+            "order/repeat are policy state: no probe, no teardown, no activation"
+        );
+        let observation = live_handle.observe();
+        assert_eq!(observation.terminal_outcome, None, "still playing");
+        assert!(!observation.stop_requested);
+    }
+
+    /// The exactly-once EOF property (Issue #166 §16/§48): ONE completed
+    /// episode drives at most ONE automatic transition attempt, however
+    /// many refreshes observe the same Completed Fact.
+    #[test]
+    fn one_completed_episode_drives_exactly_one_transition() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = player_with(source);
+        let files = vec![
+            PathBuf::from("/media/finite-00.flac"),
+            PathBuf::from("/media/live-01.flac"),
+            PathBuf::from("/media/live-02.flac"),
+        ];
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+
+        let completed = player.active_handle().expect("committed").clone();
+        assert_eq!(completed.wait_terminal(), EpisodeTerminalOutcome::Completed);
+
+        // The first observation of the Completed Fact advances exactly
+        // one entry.
+        assert_eq!(player.poll_eof_policy(), Some(OpenOutcome::Opened));
+        assert_eq!(player.active_source(), Some(files[1].as_path()));
+        assert_eq!(player.playlist_playing_position(), Some(1));
+
+        // 100 further refreshes observe the SAME fact (the retired
+        // episode's seam still publishes it) and must attempt NOTHING:
+        // the new episode is endless, so no legitimate transition can
+        // explain an event, and the count is the oracle.
+        let after = event_count(&log);
+        for _ in 0..100 {
+            assert_eq!(player.poll_eof_policy(), None);
+        }
+        assert_eq!(
+            event_count(&log),
+            after,
+            "one episode, one Completed Fact, one transition attempt"
+        );
+        assert_eq!(player.active_source(), Some(files[1].as_path()));
+        assert_eq!(
+            completed.observe().terminal_outcome,
+            Some(EpisodeTerminalOutcome::Completed),
+            "the retired episode keeps its own committed terminal"
+        );
+    }
+
+    /// A chain of finite episodes advances once per completed episode
+    /// and then stops at the traversal end under Repeat Off.
+    #[test]
+    fn a_finite_chain_advances_once_per_completed_episode() {
+        let mut player = player_with(FakeEpisodeSource::new());
+        let files = finite(3);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+
+        for (step, expected) in files.iter().enumerate().skip(1) {
+            let handle = player.active_handle().expect("committed").clone();
+            assert_eq!(
+                handle.wait_terminal(),
+                EpisodeTerminalOutcome::Completed,
+                "step {step}"
+            );
+            assert_eq!(player.poll_eof_policy(), Some(OpenOutcome::Opened));
+            assert_eq!(player.active_source(), Some(expected.as_path()));
+            assert!(cursor_names_active_source(&player));
+        }
+
+        // The LAST entry completes: Repeat Off means the traversal is
+        // over — no wrap, nothing to open, and the terminal stays.
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert_eq!(
+            player.poll_eof_policy(),
+            None,
+            "Repeat Off must not wrap the traversal"
+        );
+        assert_eq!(
+            player
+                .active_handle()
+                .expect("committed")
+                .observe()
+                .terminal_outcome,
+            Some(EpisodeTerminalOutcome::Completed),
+            "the completed episode stays committed and truthful"
+        );
+    }
+
+    /// Repeat All wraps the chain back to the first entry; Repeat One
+    /// replays the SAME source through the same re-open path.
+    #[test]
+    fn repeat_all_wraps_the_chain_and_repeat_one_replays_the_same_source() {
+        let mut player = player_with(FakeEpisodeSource::new());
+        let files = finite(3);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+        // Walk to the last entry so both wrap arms are exercised from
+        // the traversal boundary.
+        assert_eq!(player.next_track(), Some(OpenOutcome::Opened));
+        assert_eq!(player.next_track(), Some(OpenOutcome::Opened));
+        assert_eq!(player.playlist_playing_position(), Some(2));
+
+        // Repeat One: the same source is re-opened, not advanced.
+        assert_eq!(player.cycle_repeat(), RepeatMode::All);
+        assert_eq!(player.cycle_repeat(), RepeatMode::One);
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert_eq!(player.poll_eof_policy(), Some(OpenOutcome::Opened));
+        assert_eq!(
+            player.active_source(),
+            Some(files[2].as_path()),
+            "Repeat One re-opens the entry that completed"
+        );
+        assert_eq!(
+            player.playlist_playing_position(),
+            player.playlist_selected_position(),
+            "a replayed row keeps the selection on it"
+        );
+
+        // Repeat All from the LAST entry wraps to the first.
+        assert_eq!(player.cycle_repeat(), RepeatMode::Off);
+        assert_eq!(player.cycle_repeat(), RepeatMode::All);
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert_eq!(player.poll_eof_policy(), Some(OpenOutcome::Opened));
+        assert_eq!(player.active_source(), Some(files[0].as_path()));
+        assert_eq!(player.playlist_playing_position(), Some(0));
+    }
+
+    /// A REFUSED auto-next is reported and NOT retried — no skip
+    /// cascade, and the committed cursor stays on the completed entry
+    /// (Issue #166 §17/§48).
+    #[test]
+    fn a_refused_auto_next_is_reported_and_never_retried_or_skipped() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = player_with(source);
+        let files = vec![
+            PathBuf::from("/media/finite-00.flac"),
+            PathBuf::from("/media/invalid-next.flac"),
+            PathBuf::from("/media/live-02.flac"),
+        ];
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert!(matches!(
+            player.poll_eof_policy(),
+            Some(OpenOutcome::Refused { .. })
+        ));
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some(0),
+            "the refused step did not move the committed cursor"
+        );
+        assert_eq!(
+            player.active_source(),
+            Some(files[0].as_path()),
+            "the completed episode is still the committed one"
+        );
+        assert!(
+            log.lock()
+                .unwrap()
+                .iter()
+                .any(|event| event.contains("invalid-next")),
+            "the refusal really was the refused candidate"
+        );
+
+        // Repeated refreshes: no retry of the refused candidate, and
+        // certainly no skip to the third entry.
+        let after = event_count(&log);
+        for _ in 0..50 {
+            assert_eq!(player.poll_eof_policy(), None);
+        }
+        assert_eq!(
+            event_count(&log),
+            after,
+            "the policy for that episode is spent"
+        );
+        assert_eq!(player.active_source(), Some(files[0].as_path()));
+    }
+
+    /// A clean-failed auto-next leaves no episode and no cursor
+    /// movement, and the policy is still spent (no retry, no cascade).
+    #[test]
+    fn a_clean_failed_auto_next_leaves_no_episode_and_is_spent() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = player_with(source);
+        let files = vec![
+            PathBuf::from("/media/finite-00.flac"),
+            PathBuf::from("/media/failstart.flac"),
+            PathBuf::from("/media/live-02.flac"),
+        ];
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert!(matches!(
+            player.poll_eof_policy(),
+            Some(OpenOutcome::ActivationFailedClean { .. })
+        ));
+        assert!(player.active_handle().is_none(), "no runtime remains");
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some(0),
+            "the cursor still names the last committed entry"
+        );
+
+        let after = event_count(&log);
+        for _ in 0..50 {
+            assert_eq!(player.poll_eof_policy(), None);
+        }
+        assert_eq!(event_count(&log), after, "no retry, no cascade");
+    }
+
+    /// `Stopped` and `Failed` never auto-advance (Issue #166 §15). The
+    /// policy reacts to the D11 terminal outcome by EQUALITY with
+    /// `Completed`, so the two other outcomes are inert by construction
+    /// — the guard is exercised over all four observable states, and the
+    /// integration half drives a REAL episode to `Stopped`.
+    #[test]
+    fn stopped_and_failed_never_auto_advance() {
+        for outcome in [
+            None,
+            Some(EpisodeTerminalOutcome::Stopped),
+            Some(EpisodeTerminalOutcome::Failed),
+        ] {
+            let mut observation = PlaybackSessionHandle::new().observe();
+            observation.terminal_outcome = outcome;
+            assert!(
+                !completed_fact(&observation),
+                "{outcome:?} must not trigger the EOF policy"
+            );
+        }
+        let mut observation = PlaybackSessionHandle::new().observe();
+        observation.terminal_outcome = Some(EpisodeTerminalOutcome::Completed);
+        assert!(completed_fact(&observation));
+
+        // Integration: a Stopped episode stays exactly where it is.
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = player_with(source);
+        let files = live(3);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+        let handle = player.active_handle().expect("committed").clone();
+
+        let before = event_count(&log);
+        assert_eq!(player.poll_eof_policy(), None, "unsettled: nothing to do");
+
+        handle.request_stop();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        for _ in 0..50 {
+            assert_eq!(
+                player.poll_eof_policy(),
+                None,
+                "Stopped must never auto-advance"
+            );
+        }
+        assert_eq!(event_count(&log), before);
+        assert_eq!(player.active_source(), Some(files[0].as_path()));
+    }
+
+    /// The §G.6 latch disables the EOF policy as it disables every other
+    /// replacement: a fail-stopped player attempts nothing.
+    #[test]
+    fn fail_stop_disables_the_eof_policy() {
+        let mut source = FakeEpisodeSource::new();
+        source.violating_cleanup = true;
+        let log = source.log.clone();
+        let mut player = player_with(source);
+        let files = finite(2);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        // The auto-next retires the completed episode first; that
+        // disposal violates (the composer's flag) and latches §G.6.
+        assert!(matches!(
+            player.poll_eof_policy(),
+            Some(OpenOutcome::FailStop { .. })
+        ));
+        assert!(player.is_fail_stopped());
+        let after = event_count(&log);
+        assert_eq!(player.poll_eof_policy(), None);
+        assert_eq!(event_count(&log), after, "a latched player runs nothing");
+        // Navigation refuses through the same latch.
+        assert!(matches!(
+            player.next_track(),
+            Some(OpenOutcome::FailStop { .. })
+        ));
+        assert!(player.is_fail_stopped());
+    }
+
+    /// A committed Open REPLACES the playlist while the ordering and
+    /// repeat preferences survive (Issue #166 §23) — and under Shuffle
+    /// the fresh list is anchored on the committed entry.
+    #[test]
+    fn open_replaces_the_playlist_and_keeps_the_preferences() {
+        let mut player = player_with(FakeEpisodeSource::new());
+        let first = live(4);
+        assert!(opened(&player.open(&first[0])));
+        player.establish_playlist(first.clone());
+        assert_eq!(player.cycle_repeat(), RepeatMode::All);
+        assert_eq!(player.toggle_order(), PlaybackOrder::Shuffle);
+
+        let second = live(3);
+        assert!(opened(&player.open(&second[0])));
+        assert_eq!(
+            player.navigation_position(),
+            Some((1, 1)),
+            "a direct Open replaces the playlist with the single opened path"
+        );
+        assert_eq!(player.playlist_order(), PlaybackOrder::Shuffle);
+        assert_eq!(player.playlist_repeat(), RepeatMode::All);
+
+        // An expanded Open establishes the whole accepted list ON
+        // commit, anchored on the committed first candidate.
+        let expanded = vec![second[0].clone(), second[1].clone(), second[2].clone()];
+        player.establish_playlist(expanded);
+        assert_eq!(player.navigation_position(), Some((1, 3)));
+        assert!(cursor_names_active_source(&player));
+        let rows = player
+            .playlist_rows()
+            .map(|row| row.path.to_path_buf())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            rows[0], second[0],
+            "the cycle starts at the committed entry"
+        );
+    }
+
+    /// Shuffle walks the permutation for the pane, for manual navigation
+    /// and for natural EOF — one order, three readers — and no entry
+    /// appears twice in one cycle (Issue #166 §8/§47).
+    #[test]
+    fn shuffle_drives_the_pane_navigation_and_eof_from_one_permutation() {
+        let mut player = seeded_player(0xA11C_E5EE);
+        let files = live(5);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+        player.set_order(PlaybackOrder::Shuffle);
+
+        let pane: Vec<PathBuf> = player
+            .playlist_rows()
+            .map(|row| row.path.to_path_buf())
+            .collect();
+        assert_eq!(pane.len(), 5);
+        assert_eq!(pane[0], files[0], "the committed entry anchors the cycle");
+        let mut unique = pane.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), 5, "every entry exactly once: {pane:?}");
+
+        // Manual Next walks the pane order.
+        for expected in pane.iter().skip(1) {
+            assert_eq!(player.next_track(), Some(OpenOutcome::Opened));
+            assert_eq!(player.active_source(), Some(expected.as_path()));
+        }
+        assert_eq!(player.next_track(), None, "Repeat Off ends the traversal");
+
+        // …and Previous walks it backwards, deterministically.
+        for expected in pane.iter().rev().skip(1) {
+            assert_eq!(player.previous_track(), Some(OpenOutcome::Opened));
+            assert_eq!(player.active_source(), Some(expected.as_path()));
+        }
+    }
+
+    /// A transition into an episode that ends immediately cannot make the
+    /// policy re-enter itself: the flag belongs to the episode, and a
+    /// brand-new episode legitimately gets its own single shot.
+    #[test]
+    fn a_transition_into_a_completed_episode_advances_at_most_once_more() {
+        let mut player = player_with(FakeEpisodeSource::new());
+        let files = finite(2);
+        assert!(opened(&player.open(&files[0])));
+        player.establish_playlist(files.clone());
+
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert_eq!(player.poll_eof_policy(), Some(OpenOutcome::Opened));
+
+        // The second episode is finite too. Its own Completed Fact earns
+        // its own single attempt — and Repeat Off stops there.
+        let second = player.active_handle().expect("committed").clone();
+        assert_eq!(second.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert_eq!(
+            player.poll_eof_policy(),
+            None,
+            "the traversal is over; the last episode stays completed"
+        );
+        assert_eq!(player.active_source(), Some(files[1].as_path()));
     }
 
     /// C7-13: quit settles, disposes and reports — the live episode

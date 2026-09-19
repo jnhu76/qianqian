@@ -38,5 +38,6 @@ pub mod entry;
 pub mod input;
 pub mod machine;
 pub mod player;
+pub mod playlist;
 pub mod status;
 pub mod tui;

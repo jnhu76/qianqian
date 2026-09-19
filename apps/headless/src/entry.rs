@@ -59,9 +59,23 @@ pub fn run(bin_name: &str) -> ExitCode {
             println!("{} {}", bin_name, env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
-        Ok(Invocation::Interactive) => run_playback(Vec::new(), Shell::ReferencePlayer),
-        Ok(Invocation::Play { files }) => run_playback(files, Shell::ReferencePlayer),
-        Ok(Invocation::MachinePlay { file }) => run_playback(vec![file], Shell::Machine),
+        Ok(Invocation::Interactive) => run_playback(
+            Vec::new(),
+            OrderPreference::Sequential,
+            Shell::ReferencePlayer,
+        ),
+        Ok(Invocation::Play { files, shuffle }) => run_playback(
+            files,
+            if shuffle {
+                OrderPreference::Shuffle
+            } else {
+                OrderPreference::Sequential
+            },
+            Shell::ReferencePlayer,
+        ),
+        Ok(Invocation::MachinePlay { file }) => {
+            run_playback(vec![file], OrderPreference::Sequential, Shell::Machine)
+        }
         Err(error) => {
             eprintln!("error: {error}");
             eprint!("{}", cli::usage());
@@ -81,14 +95,24 @@ enum Shell {
     Machine,
 }
 
+/// The startup traversal-order preference the argv asked for. A product
+/// preference, not playback truth; the interactive player owns it from
+/// then on (the `R` key toggles the same policy).
 #[cfg(feature = "playback")]
-fn run_playback(files: Vec<PathBuf>, shell: Shell) -> ExitCode {
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OrderPreference {
+    Sequential,
+    Shuffle,
+}
+
+#[cfg(feature = "playback")]
+fn run_playback(files: Vec<PathBuf>, order: OrderPreference, shell: Shell) -> ExitCode {
     match shell {
         Shell::Machine => match start_episode(single_file(files)) {
             Ok(episode) => machine_transport(episode),
             Err(failure) => report_start_failure(failure),
         },
-        Shell::ReferencePlayer => reference_player_transport(files),
+        Shell::ReferencePlayer => reference_player_transport(files, order),
     }
 }
 
@@ -186,12 +210,22 @@ fn report_start_failure(failure: machine::StartFailure) -> ExitCode {
 /// with the SAME honest contract as the scriptable transport (outcome
 /// lines, disposal warnings, the exit-code table).
 #[cfg(feature = "playback")]
-fn reference_player_transport(files: Vec<PathBuf>) -> ExitCode {
+fn reference_player_transport(files: Vec<PathBuf>, order: OrderPreference) -> ExitCode {
     use crate::input;
     use crate::player::ReferencePlayerApp;
+    use crate::playlist::PlaybackOrder;
 
     let interactive_startup = files.is_empty();
     let mut player = ReferencePlayerApp::new(RealEpisodeSource);
+    // `--shuffle` selects the order policy BEFORE the startup Open, so
+    // the playlist that rides the commit is already the shuffled one.
+    // The start discipline is untouched: the expansion's first accepted
+    // candidate is still what opens (probe → old-side clear → fresh
+    // root), and the shuffle cycle simply anchors on it (Issue #166
+    // §24).
+    if order == OrderPreference::Shuffle {
+        player.set_order(PlaybackOrder::Shuffle);
+    }
 
     // U1 input expansion: startup argv may name files AND folders. The
     // expansion is host input preparation — candidates, not playback
@@ -459,8 +493,8 @@ fn finish_episode(mut episode: Episode) -> ExitCode {
 }
 
 #[cfg(not(feature = "playback"))]
-fn run_playback(files: Vec<std::path::PathBuf>, shell: Shell) -> ExitCode {
-    let _ = (files, shell);
+fn run_playback(files: Vec<std::path::PathBuf>, order: OrderPreference, shell: Shell) -> ExitCode {
+    let _ = (files, order, shell);
     eprintln!(
         "this binary was built without the playback slice; \
          rebuild with: cargo build --release --features playback"
@@ -477,7 +511,15 @@ fn desired(id: &str, component: &'static str) -> qianqian_composition::DesiredEn
     )
 }
 
-/// The shell enum is referenced by the no-playback stub signature too.
+/// The shell and order enums are referenced by the no-playback stub
+/// signature too.
+#[cfg(not(feature = "playback"))]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OrderPreference {
+    Sequential,
+    Shuffle,
+}
+
 #[cfg(not(feature = "playback"))]
 enum Shell {
     ReferencePlayer,
