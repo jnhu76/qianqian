@@ -18,7 +18,13 @@ HARNESS="$REPO/research/transport-dogfood"
 STAGE_WSL="/mnt/c/Users/Public/qianqian-dogfood"
 LOGDIR="$HARNESS/evidence/logs"
 EXE="$HARNESS/target/x86_64-pc-windows-gnu/release/tuidriver.exe"
-HEADLESS="$REPO/target/x86_64-pc-windows-gnu/release/qianqian-headless.exe"
+# The exercised product binary. The default keeps the historical
+# regression target; QIANQIAN_TUI_BIN=qianqian.exe selects the
+# canonical product binary (U2 canonical product gate, PR #168). The
+# ConPTY driver is binary-agnostic (--exe); only this staging wrapper
+# names the executable, so the selection lives here.
+BIN="${QIANQIAN_TUI_BIN:-qianqian-headless.exe}"
+PRODUCT="$REPO/target/x86_64-pc-windows-gnu/release/$BIN"
 MEDIA="C:\\Users\\Public\\qianqian-dogfood"
 OUT="C:\\Users\\Public\\qianqian-dogfood\\evidence"
 
@@ -27,10 +33,11 @@ mkdir -p "$LOGDIR"
 # audio endpoint; clear them before staging (a warm restart immediately
 # after another run otherwise loses the device-open race).
 taskkill.exe /F /IM qianqian-headless.exe /T >/dev/null 2>&1 || true
+taskkill.exe /F /IM qianqian.exe /T >/dev/null 2>&1 || true
 taskkill.exe /F /IM tuidriver.exe /T >/dev/null 2>&1 || true
 sleep 1
 cp "$EXE" "$STAGE_WSL/tuidriver.exe"
-cp "$HEADLESS" "$STAGE_WSL/qianqian-headless.exe"
+cp "$PRODUCT" "$STAGE_WSL/$BIN"
 
 # Stage-C scenario fixtures (C11/C12): renamed copies of the committed
 # 4 s FLAC fixture — one very long filename (96 'a's), one CJK
@@ -82,7 +89,8 @@ ENVFILE="$HARNESS/evidence/ENV-TUI-RUN${RUN}.txt"
   echo "build_command: QIANQIAN_NATIVE_DIR=<mingw staging> cargo build --release --target x86_64-pc-windows-gnu --features playback -p qianqian-headless"
   echo "target_triple: x86_64-pc-windows-gnu (GNU toolchain)"
   echo "features: playback profile: release"
-  echo "headless_sha256: $(sha256sum "$HEADLESS" | cut -d' ' -f1)"
+  echo "product_binary: $BIN"
+  echo "product_binary_sha256: $(sha256sum "$PRODUCT" | cut -d' ' -f1)"
   echo "tuidriver_sha256: $(sha256sum "$EXE" | cut -d' ' -f1)"
   echo "songcore_sha256: $(sha256sum "${QIANQIAN_NATIVE_DIR:-/tmp/qn-dogfood-stage/native}/build/artifacts/libsongcore.a" | cut -d' ' -f1)"
   echo "rustc: $(rustc --version)"
@@ -95,7 +103,7 @@ ENVFILE="$HARNESS/evidence/ENV-TUI-RUN${RUN}.txt"
 
 powershell.exe -NoProfile -Command "
     \$p = Start-Process -FilePath 'C:\\Users\\Public\\qianqian-dogfood\\tuidriver.exe' \`
-        -ArgumentList '--exe','C:\\Users\\Public\\qianqian-dogfood\\qianqian-headless.exe', \`
+        -ArgumentList '--exe','C:\\Users\\Public\\qianqian-dogfood\\$BIN', \`
             '--media','$MEDIA','--out','$OUT',$PS_SCEN \`
         -WorkingDirectory 'C:\\Users\\Public\\qianqian-dogfood' \`
         -WindowStyle Hidden -Wait -PassThru

@@ -1,0 +1,3 @@
+binary: qianqian.exe
+binary_sha256: 97af808b6d165de92381cc14f22450a08422e2639e84fb21e3f9e0df8a709f80
+machine run12: PASS=7 FAIL=0

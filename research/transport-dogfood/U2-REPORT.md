@@ -34,6 +34,40 @@ corpus              SHA256 per file in every ENV file; the U2 additions
 oracle below is a read-side projection, an operation-feedback line, a
 pane row, a published Position sample, an exit code or a resource bound.
 
+## 1a. Canonical product binary identity (this corrective)
+
+Runs 6–10 above exercised `qianqian-headless.exe`. The frozen U2
+campaign requires the canonical product binary, so this evidence
+corrective (PR #168) additionally built and executed `qianqian.exe`:
+
+```text
+source tree         73f4451 worktree (product tree identical to the
+                    frozen 5a2246c; worktree clean before the build;
+                    5a2246c→73f4451 touches evidence/report files only)
+build command       QIANQIAN_NATIVE_DIR=<mingw staging> cargo build
+                    --release --target x86_64-pc-windows-gnu
+                    --features playback -p qianqian-headless
+                    (the package's two [[bin]] targets — qianqian and
+                    qianqian-headless — build in this one invocation)
+qianqian.exe        97af808b6d165de92381cc14f22450a08422e2639e84fb21e3f9e0df8a709f80
+                    (RUN11, RUN12 and the canonical CLI checks below
+                    all executed this exact artifact; ENV-TUI-RUN11.txt
+                    records the same hash at run time)
+qianqian-headless   3e57d2b3959aec280af72bd59c5497f032d88ba2701c0681ce77a5ec3b6d1bfc
+(built alongside;  NOT the f2354f3d artifact of runs 6–10)
+toolchain           rustc 1.97.1, x86_64-pc-windows-gnu, release,
+                    playback features, the same SongCore mingw artifact
+                    (17323291…, the F6/U1/U2 staging)
+```
+
+The two binaries are the two `[[bin]]` wrappers of one package and
+share `entry::run` (they differ only in the name they report), but the
+canonical gate below does not rely on that equivalence: it executes
+`qianqian.exe` itself. Note on identity: rebuilds of this toolchain
+are not byte-stable (a content-identical rebuild yields different
+bytes), so binary identity is carried by the recorded SHA256 of the
+executed artifact, not by bit-reproducibility.
+
 ## 2. Runs
 
 ```text
@@ -43,6 +77,51 @@ RUN8  TUI regression        8/8  GREEN   evidence/logs/tui-run8.summary
 RUN9  machine regression    7/7  GREEN   evidence/logs/machine-run9.summary
 RUN10 light soak            see §4       evidence/logs/tui-run10.summary
 ```
+
+All five runs above executed `qianqian-headless.exe`
+(f2354f3d…): they are shared-implementation evidence, and are NOT
+canonical-product-binary runs.
+
+### Canonical product gate (this corrective; `qianqian.exe`)
+
+```text
+RUN11         U2 matrix           17/17 GREEN   evidence/logs/tui-run11.summary
+CANONICAL-CLI --version/--help/   all GREEN     evidence/logs/canonical-cli.txt
+              play --shuffle
+              <real folder>
+RUN12         machine regression   7/7  GREEN   evidence/logs/machine-run12.summary
+```
+
+- RUN11 re-runs the FULL U2 matrix of §3 (same 17 scenarios, same
+  oracles, same repaint/mark/liveness discipline — nothing weakened)
+  against `qianqian.exe` (97af808b…); the run identity is
+  `evidence/ENV-TUI-RUN11.txt` (same driver be35615f…, same SongCore
+  17323291…, same corpus hashes as runs 6–10).
+- The canonical CLI checks exercise the non-TUI surfaces of the
+  product executable: `--version` reports `qianqian 0.1.0` (the
+  canonical name), `--help` prints the shipped usage (including
+  `play --shuffle` and the folder-expansion text), and a detached
+  `qianqian.exe play --shuffle <real folder>` launch on `u1music`
+  expands the folder (`opened …\u1music\flac4.flac (2 candidates)`),
+  starts in `Order: Shuffle`, advances in-folder on natural EOF
+  (`auto-next: opened …\u1music\synth45.mp3`, Track 2/2) and opens the
+  real render endpoint twice (two `[qianqian-wasapi] opened:` stderr
+  lines) before the harness force-terminates it at the bounded window.
+  Those are mechanism/consumption witnesses; no audibility is claimed.
+- RUN12 re-runs the §7 machine regression unchanged against
+  `qianqian.exe`; `--machine play` stayed functional and the transport
+  contract held (grammar, truthful status projection, outcome lines,
+  exit codes). Per-scenario artifacts are `evidence/logs/m12-M*.{out,err}`
+  (renamed from the harness's `m-M*` names so the committed RUN9
+  artifacts stay RUN9's; the RUN12 stdout projections are byte-identical
+  to RUN9's because the machine transport carries no binary name).
+- Harness delta of this corrective (product code untouched): the two
+  staging wrappers gained a binary selector
+  (`QIANQIAN_TUI_BIN`/`QIANQIAN_MACHINE_BIN`, default
+  `qianqian-headless.exe` — semantics unchanged when unset) because the
+  ConPTY driver is binary-agnostic (`--exe`) but the wrappers named the
+  executable; the canonical matrix and machine runs above used this
+  final harness.
 
 Runs 7/8 are the U1 + Stage-C scenario set (idle launch, folder open,
 playback/seek/pause/volume, navigation, resize, long path, CJK, Ctrl+C,
@@ -128,6 +207,16 @@ Measured across the 20 checkpoints (retained in
 whole run — 20 replacement cycles with no unbounded growth. These are
 tripwires against unbounded growth, not a leak oracle.
 
+RUN10 was and stays a `qianqian-headless.exe` run; it is NOT relabelled
+as a canonical soak. The corrective did not repeat it, on this evidence
+argument: the product code under test in RUN10 was the 5a2246c tree,
+the current final PR product tree is that same product code (the
+post-5a2246c commits touch evidence/report files only), and the
+canonical and headless wrappers enter the same shared `entry`
+implementation — so the soak's subject (the shared playback
+implementation) is unchanged by the binary swap. RUN11 additionally
+exercises the canonical wrapper itself across all 17 U2 scenarios.
+
 ## 5. Oracle hygiene (what these scenarios deliberately do NOT do)
 
 ```text
@@ -166,4 +255,9 @@ per-run step-by-step summary (`logs/tui-run<N>.summary`,
   about mouse or about keys the shell does not ship.
 - The soak exercises one process for ~33 minutes; it is a light soak,
   not a leak oracle (the resource rows are tripwires).
+- Hosted CI evidence is unavailable: the repository's hosted jobs do
+  not start a runner at present, so no GitHub Actions result is claimed
+  for this corrective. Local gates were green before this slice; the
+  physical canonical Windows gate is this corrective's RUN11/RUN12/
+  CANONICAL-CLI record.
 ```

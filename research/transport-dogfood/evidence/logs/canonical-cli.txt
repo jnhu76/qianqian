@@ -1,0 +1,83 @@
+run: CANONICAL-CLI (U2 canonical product gate, PR #168 evidence corrective)
+date_utc: 2026-09-19T13:45:54Z
+branch: feat/166-playlist-usability-closure
+head_sha: 73f4451ba5da18d50d13154c0fb56425f1545c80
+product_binary: qianqian.exe
+product_binary_sha256: 97af808b6d165de92381cc14f22450a08422e2639e84fb21e3f9e0df8a709f80  (== ENV-TUI-RUN11 product_binary_sha256; same staged artifact)
+qianqian-headless.exe (also built by the same invocation): 35c885bdf944e2c42993141d8777e77bb9f676dc89375829807e69187252decd
+songcore_sha256: 17323291fc7b53997a36746e1ce7f86b8863a63f71be79389b9b196a05175a2a
+rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+=== 1. qianqian.exe --version (cmd.exe interop, staged binary) ===
+qianqian 0.1.0
+version exit: 0
+
+=== 2. qianqian.exe --help (cmd.exe interop, staged binary) ===
+Qianqian — a lightweight local music player
+
+Usage:
+  qianqian                                   listen (opens the player)
+  qianqian play <file-or-folder> [more...]   play files or folders
+  qianqian play --shuffle <paths...>         start in shuffle order
+  qianqian --help                            show this help
+  qianqian --version                         show the version
+
+A folder is expanded recursively into a temporary track list. The first
+track starts; the list plays on through the whole folder, and you can
+move around it or make it repeat.
+
+Examples:
+  qianqian
+  qianqian play song.flac
+  qianqian play "D:\Music"
+  qianqian play --shuffle "D:\Music" "E:\More Music"
+
+Keys in the player:
+  Up / Down    select a row in the list (does not change what plays)
+  Enter        play the selected row
+  N / P        next / previous track
+  R            order: sequential / shuffle
+  L            repeat: off / all / one
+  Space        pause / resume
+  Left / Right seek 5 seconds back / forward
+  Shift+Left / Shift+Right                    seek 30 seconds
+  G            go to a time you type (e.g. 1:35)
+  + / -        volume up / down
+  S            stop
+  O            open a file or folder
+  ?            keyboard help
+  Q or Ctrl+C  quit
+
+--shuffle starts the LIST in shuffle order: the first track still starts
+the same way, and the rest of the folder follows shuffled.
+
+Automation (advanced):
+  qianqian --machine play <file>   scriptable single-episode transport
+                                   over stdin/stdout; `stop`, `pause`,
+                                   `resume`, `seek <time>`, `status`
+                                   control it, and the exit code and
+                                   report lines are a pinned contract
+help exit: 0
+
+=== 3. qianqian.exe play --shuffle <real folder> (detached hidden-console launch) ===
+command: qianqian.exe play --shuffle C:\Users\Public\qianqian-dogfood\u1music
+folder: u1music (flac4.flac 4 s + synth45.mp3 45 s; the U1 fixture folder)
+method: Start-Process -WindowStyle Hidden, stdout/stderr redirected to files,
+        8 s bounded window, then force-terminated by the harness (no app exit code;
+        this is a launch smoke, not a scenario verdict)
+observed:
+  alive_after_8s: True   exit_state: RUNNING (no usage error, no activation failure)
+  stderr (canonical-shuffle.err, verbatim):
+    [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+    [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+  stdout VT stream (canonical-shuffle.out, 7374 bytes) carries:
+    - 'opened C:\Users\Public\qianqian-dogfood\u1music\flac4.flac (2 candidates)'
+      (folder argv accepted and expanded)
+    - 'Order: Shuffle' (the --shuffle grammar active from the start)
+    - 'auto-next: opened C:\Users\Public\qianqian-dogfood\u1music\synth45.mp3'
+      and 'Track: 2/2' after the first entry's natural EOF (in-folder advance)
+    - 'Repeat: Off'
+    - per-second Position cell updates ([14;16H<n> diff writes) for both episodes
+  endpoint witness: two '[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3,
+  buffer 970 frames (shared, event-driven)' stderr lines - one per episode open.
+  NOTE: these are mechanism/consumption witnesses; no audibility is claimed.
