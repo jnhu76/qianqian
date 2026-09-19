@@ -1,0 +1,35 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\flac4.flac"
+T+   0.016s       recv  16 bytes
+T+   0.065s       recv  110 bytes
+T+   0.066s       recv  18 bytes
+T+   0.087s       recv  6317 bytes
+T+   0.226s       recv  15 bytes
+T+   0.432s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.432s    wait-ok  Format: 44100 Hz
+T+   1.160s       recv  2 bytes
+T+   2.095s       recv  2 bytes
+T+   3.183s       recv  2 bytes
+T+   3.632s       send  1 bytes: "s"
+T+   3.633s       recv  6202 bytes
+T+   3.633s       recv  4 bytes
+T+   3.633s       recv  4 bytes
+T+   3.652s       recv  6259 bytes
+T+   3.668s       recv  59 bytes
+T+   3.712s wait-begin  "Terminal: Completed" within 8s
+T+   3.713s       recv  6301 bytes
+T+   3.713s       recv  4 bytes
+T+   3.730s       recv  6311 bytes
+T+  11.724s wait-TIMEOUT  "Terminal: Completed" after offset 0
+T+  11.724s wait-begin  "Terminal: Stopped" within 8s
+T+  11.724s    wait-ok  Terminal: Stopped
+T+  11.724s wait-begin  "terminal outcome committed" within 5s
+T+  11.724s    wait-ok  terminal outcome committed
+T+  11.724s       send  1 bytes: "q"
+T+  11.725s       recv  6191 bytes
+T+  11.725s       recv  8 bytes
+T+  11.737s       recv  274 bytes
+T+  11.805s       recv  280 bytes
+T+  12.205s wait-begin  "EOF: played out completely" within 5s
+T+  12.205s  wait-DEAD  child exited Some(0) awaiting "EOF: played out completely"
+T+  12.205s wait-begin  "stopped before completion" within 5s
+T+  12.205s    wait-ok  stopped before completion

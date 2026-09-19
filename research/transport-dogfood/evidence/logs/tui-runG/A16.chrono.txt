@@ -1,0 +1,37 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.015s       recv  16 bytes
+T+   0.067s       recv  110 bytes
+T+   0.067s       recv  35 bytes
+T+   0.079s       recv  6317 bytes
+T+   0.219s       recv  15 bytes
+T+   0.433s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.433s    wait-ok  Format: 44100 Hz
+T+   1.152s       recv  2 bytes
+T+   2.083s       recv  2 bytes
+T+   2.433s       send  1 bytes: "s"
+T+   2.433s       recv  6202 bytes
+T+   2.434s       recv  4 bytes
+T+   2.434s       recv  4 bytes
+T+   2.455s       recv  6259 bytes
+T+   2.471s       recv  59 bytes
+T+   2.513s wait-begin  "Terminal: Stopped" within 5s
+T+   2.514s       recv  6301 bytes
+T+   2.514s       recv  4 bytes
+T+   2.534s       recv  6311 bytes
+T+   2.554s    wait-ok  Terminal: Stopped
+T+   2.554s       send  1 bytes: "s"
+T+   2.555s       recv  6191 bytes
+T+   2.555s       recv  4 bytes
+T+   2.555s       recv  4 bytes
+T+   2.566s       recv  6259 bytes
+T+   2.635s wait-begin  "Terminal: Stopped" within 5s
+T+   2.635s    wait-ok  Terminal: Stopped
+T+   2.635s wait-begin  "terminal outcome committed" within 5s
+T+   2.635s    wait-ok  terminal outcome committed
+T+   2.635s       send  1 bytes: "q"
+T+   2.636s       recv  6259 bytes
+T+   2.637s       recv  8 bytes
+T+   2.646s       recv  291 bytes
+T+   2.716s       recv  297 bytes
+T+   3.116s wait-begin  "stopped before completion" within 5s
+T+   3.116s    wait-ok  stopped before completion
