@@ -341,6 +341,21 @@ F7 Volume                       owner/semantics PROMOTED (D14.9);
                                 App-owned desired 0..=100 step 5; O7
                                 physical row; narrow ADR grounding
                                 amendment carried)
+Transport v1 dogfood +          Stage A dogfood PASS (runs E/F/G:
+integrated audit + TUI          26/26 TUI + 7/7 machine), Stage B
+v1 closure                      integrated audit PASS_WITH_MINOR ->
+                                corrective landed (teardown-gate
+                                precondition oracle, ownership docs;
+                                A16 scope note; U-1 retained as
+                                NON-BLOCKING KNOWN ANOMALY), Stage C
+                                headless-TUI v1 closure code+scenarios
+                                LANDED (branch hardening/
+                                transport-dogfood-tui-v1-closure-1;
+                                final physical regression 31/31 TUI +
+                                7/7 machine at clean closure HEAD).
+                                Verdict QIANQIAN_PHASE_F_TRANSPORT_V1_
+                                CLOSED is pending final human review —
+                                NOT yet written.
 F8 Devices / Device switch      split; switch mechanism still OPEN
 ```
 
