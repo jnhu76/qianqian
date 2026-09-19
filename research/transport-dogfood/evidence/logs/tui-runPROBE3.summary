@@ -1,0 +1,37 @@
+C9-resize: RED (9336ms, exit None)
+    expect "Format: 44100 Hz" OK
+    resize 80x24
+    keys " "
+    expect "Pause requested: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    resize 120x40
+    keys "x"
+    FAILURE: timeout waiting for "Volume: 70/100 (desired)" after offset 0; history tail:
+──────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ←/→  Seek ±5s      Space  Pause/Resume                                                                               │
+│ S  Stop            Q  Quit    Ctrl+C  Quit                                                                           │
+│ O  Open source                                                                                                       │
+│ N  Next            P  Previous                                                                                       │
+│ +  Louder          -  Softer                                                                                         │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+    CHILD: alive=true threads=Some(6)
+C12-cjk: RED (20782ms, exit None)
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "o"
+    keys "千曲.flac"
+    keys "\r"
+    FAILURE: timeout waiting for "opened 千 曲 . f l a c" after offset 6470; history tail:
+──────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ←/→  Seek ±5s      Space  Pause/Resume                                                                               │
+│ S  Stop            Q  Quit    Ctrl+C  Quit                                                                           │
+│ O  Open source                                                                                                       │
+│ N  Next            P  Previous                                                                                       │
+│ +  Louder          -  Softer                                                                                         │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+    CHILD: alive=true threads=Some(5)

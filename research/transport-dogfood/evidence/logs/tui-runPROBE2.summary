@@ -1,0 +1,97 @@
+C9-resize: RED (8913ms, exit None)
+    expect "Format: 44100 Hz" OK
+    resize 40x12
+    keys " "
+    FAILURE: timeout waiting for "Pause requested: true" after offset 0; history tail:
+stics ─────────────────────────┐│(none)                                │└──────────────────────────────────────┘
+┌ Controls ────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/Resum│└──────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+┌ Qianqian Reference Player ───────────┐│                                      ││Source: C:\Users\Public\qianqian-dogfo│
+│Format: 44100 Hz, 2 channels, mask 0x3││Position: --:-- / 00:45               │└──────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────┐│(none)                                │└──────────────────────────────────────┘
+┌ Controls ────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/Resum│└──────────────────────────────────────┘
+           00 00
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    CHILD: alive=true threads=Some(6)
+C12-cjk: RED (10535ms, exit None)
+    FAILURE: timeout waiting for "Format: 44100 Hz" after offset 0; history tail:
+────────────────────────────────────────────────────────┘┌
+Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐│
+←/→  Seek ±5s      Space  Pause/Resume                                                                               ││
+S  Stop            Q  Quit    Ctrl+C  Quit                                                                           ││
+O  Open source                                                                                                       ││
+N  Next            P  Previous                                                                                       ││
++  Louder          -  Softer                                                                                         │└─
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+    CHILD: alive=true threads=Some(5)

@@ -1,0 +1,64 @@
+C6-open-cancel: GREEN (3028ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    mark
+    record-position None
+    keys "o"
+    keys "synth30"
+    keys "\u{7f}"
+    keys "99"
+    keys "\u{7f}"
+    keys "\u{7f}"
+    keys "\u{1b}"
+    sleep 500ms
+    absent-after-mark "opened " OK
+    keys "o"
+    keys "\r"
+    sleep 500ms
+    absent-after-mark "opened " OK
+    new-position (0, 0) OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+C9-resize: GREEN (1723ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    resize 80x24
+    keys " "
+    expect "Pause requested: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    resize 120x40
+    mark
+    keys "x"
+    expect-after-mark "Volume: 100/100 (desired)" OK
+    absent-after-mark "teardown violated" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+C11-longpath: GREEN (1340ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "o"
+    keys "qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac"
+    keys "\r"
+    expect-after-mark "opened qianqian-longpath" OK
+    expect-after-mark "Source: qianqian-longpath" OK
+    mark
+    keys "s"
+    expect-after-mark "Terminal: Stopped" OK
+    expect-after-mark "N  Next" OK
+    absent-after-mark "teardown violated" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK

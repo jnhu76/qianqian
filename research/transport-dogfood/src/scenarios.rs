@@ -78,6 +78,17 @@ pub enum Step {
         code: u32,
         within_ms: u64,
     },
+    /// Resize the pseudoconsole (Stage-C closure C9): the runtime has
+    /// no resize-specific code — the next draw picks up the new size —
+    /// so the scenario resizes, then presses a key (which triggers the
+    /// harness's full-repaint jiggle) before any expect. Post-shrink
+    /// expects must stay LEFT-ANCHORED: the captured grid keeps the
+    /// spawn width, so columns beyond a shrunk frame legitimately hold
+    /// stale content until the frame grows back.
+    Resize {
+        cols: i16,
+        rows: i16,
+    },
 }
 
 const SHORT_WAIT: u64 = 5_000;
@@ -108,6 +119,13 @@ fn expect_mark(text: impl Into<String>) -> Step {
     Step::ExpectAfterMark {
         text: text.into(),
         within_ms: OPEN_WAIT,
+    }
+}
+
+fn expect_mark_within(text: impl Into<String>, within_ms: u64) -> Step {
+    Step::ExpectAfterMark {
+        text: text.into(),
+        within_ms,
     }
 }
 
@@ -221,6 +239,13 @@ fn next_opened(media: &str, file: &str) -> String {
     format!("next: opened {media}\\{file}")
 }
 
+/// The captured grid renders a wide glyph followed by its skip cell
+/// (one blank); ASCII glyphs occupy one cell with no skip cell. So the
+/// typed CJK source `千曲.flac` appears on the grid as
+/// `千 曲 .flac` — blanks only after the wide glyphs, `.flac`
+/// contiguous. Needles below use that exact rendered form (calibrated
+/// against the run-PROBE3 transcript; H-11 grid model).
+
 fn prev_opened(media: &str, file: &str) -> String {
     format!("previous: opened {media}\\{file}")
 }
@@ -245,6 +270,12 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         "A14" => &["synth30.flac", "flac4.flac", "synth45.mp3"],
         // Soak: every occupied episode outlasts its script segment.
         "A20" => &["synth45.mp3", "synth30.flac", "mp3cbr.mp3"],
+        // Stage-C closure scenarios: a >112-char filename (the Source
+        // line clips at the 120-col grid) and a CJK filename.
+        "C11-longpath" => &[
+            "qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac",
+        ],
+        "C12-cjk" => &["千曲.flac"],
         _ => &["synth45.mp3"],
     };
     let watchdog = if name == "A20" {
@@ -771,14 +802,161 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
             v
         }
 
+        // C6 — Open input UX (Stage-C closure): editing (push +
+        // backspace), Esc cancel, and the empty-line Enter cancel are
+        // all INERT — no Open fires, the seeded episode keeps
+        // consuming (F6: cancel preserves the old episode) — and a
+        // real open still completes afterwards through the same line.
+        "C6-open-cancel" => {
+            let mut v = vec![
+                expect_format(),
+                Step::Mark,
+                keys("o"),
+                Step::Typed("synth30".to_owned()),
+                keys(BACKSPACE),              // synth3
+                Step::Typed("99".to_owned()), // synth399
+                keys(BACKSPACE),              // synth39
+                keys(BACKSPACE),              // synth3
+                keys(ESC),                    // cancel: inert, nothing opens
+                Step::SleepMs(500),
+                Step::AbsentAfterMark("opened ".to_owned()),
+                keys("o"),
+                keys(ENTER), // empty line confirms nothing
+                Step::SleepMs(500),
+                Step::AbsentAfterMark("opened ".to_owned()),
+                // Frozen-episode witness: baseline the newest position
+                // sample right here, then re-scope the window with a
+                // fresh mark and require a DIFFERENT sample inside it
+                // — a live episode's label advances; an episode frozen
+                // at its first sample only ever re-appends the stale
+                // value and cannot pass (F2, review of Stage C; the
+                // run-PROBE5/6 shapes showed both failure modes: a
+                // too-early baseline records nothing, and an unscoped
+                // wait matches the EARLY post-mark samples).
+                Step::RecordPosition,
+                Step::Mark,
+                new_position(),
+            ];
+            v.extend(open_candidate("synth30.flac"));
+            v.push(expect_mark(opened_feedback("synth30.flac")));
+            v.push(expect_mark(source_typed("synth30.flac")));
+            v.extend(quit_clean());
+            v
+        }
+
+        // C9 — terminal resize (Stage-C closure): shrink, interact,
+        // grow back. The runtime has no resize-specific code (the next
+        // draw picks up the new size); the scenario proves the shell
+        // stays interactive and truthful at 80x24 — every label still
+        // physically fits there — and after growing back. The extreme
+        // shrink sizes (down to 4x3) are pinned no-panic/no-fabrication
+        // by the view unit tests; at 40x12 the main panel clips to one
+        // row and the episode labels legitimately cannot render, so
+        // they are NOT valid oracles there (run-PROBE layout lesson).
+        "C9-resize" => {
+            let mut v = vec![
+                expect_format(),
+                Step::Resize { cols: 80, rows: 24 },
+                keys(" "), // pause — and the key press forces a full repaint at 80x24
+                expect_within("Pause requested: true", 8_000),
+                keys(" "), // resume
+                expect_within("Pause requested: false", 8_000),
+                Step::Resize {
+                    cols: 120,
+                    rows: 40,
+                },
+                // Mark AFTER the grow-back: the Volume needle must be
+                // witnessed by a post-grow-back frame, not a spawn-time
+                // frame (F3, review of Stage C).
+                Step::Mark,
+                keys("x"), // unbound noise key → full repaint at full width
+                expect_mark_within("Volume: 100/100 (desired)", 8_000),
+                Step::AbsentAfterMark("teardown violated".to_owned()),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // C11 — very long source path (Stage-C closure): the open
+        // succeeds end-to-end and the Source/feedback lines clip at
+        // the panel edge without corrupting the rows below or the
+        // controls panel. Needles are the STABLE PREFIXES of the
+        // clipped lines (the internal path identity is never truncated
+        // — pinned by the view unit tests); after the open, controls
+        // and episode commands still work.
+        "C11-longpath" => {
+            let mut v = vec![
+                expect_format(),
+                Step::Mark,
+                keys("o"),
+                Step::Typed(
+                    "qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac".to_owned(),
+                ),
+                keys(ENTER),
+                Step::ExpectAfterMark {
+                    text: "opened qianqian-longpath".to_owned(),
+                    within_ms: OPEN_WAIT,
+                },
+                Step::ExpectAfterMark {
+                    text: "Source: qianqian-longpath".to_owned(),
+                    within_ms: OPEN_WAIT,
+                },
+                // Mark BEFORE the stop: both post-stop checks must be
+                // witnessed by post-stop frames, not spawn-time ones
+                // ("N  Next" renders in the spawn controls panel too)
+                // (F3, review of Stage C).
+                Step::Mark,
+                keys("s"),
+                expect_mark_within("Terminal: Stopped", SHORT_WAIT),
+                expect_mark_within("N  Next", SHORT_WAIT),
+                Step::AbsentAfterMark("teardown violated".to_owned()),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // C12 — CJK filename (Stage-C closure): a real CJK-named
+        // fixture opens, renders, pauses/resumes, and quits cleanly.
+        // The needles are the H-11-calibrated captured form (wide
+        // glyphs interleaved with their skip blanks); the property
+        // under test is structural correctness, not typography.
+        "C12-cjk" => {
+            let mut v = vec![
+                expect_format(),
+                Step::Mark,
+                keys("o"),
+                Step::Typed("千曲.flac".to_owned()),
+                keys(ENTER),
+                expect_mark("opened 千 曲 .flac"),
+                keys(" "),
+                expect("Pause requested: true"),
+                keys(" "),
+                expect("Pause requested: false"),
+                expect_mark("Source: 千 曲 .flac"),
+                Step::AbsentAfterMark("teardown violated".to_owned()),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // C17 — Ctrl+C keeps its conventional quit meaning on the real
+        // terminal (raw mode delivers it as a key event, routed to the
+        // same Quit action as Q): bounded exit, honest quit report,
+        // quiet teardown.
+        "C17-ctrlc" => vec![
+            expect_format(),
+            Step::SleepMs(1_000),
+            keys("\x03"),
+            Step::ExpectExit {
+                code: 0,
+                within_ms: 15_000,
+            },
+            expect("stopped before completion"),
+            Step::AbsentAfterMark("teardown violated".to_owned()),
+            Step::AbsentAfterMark("warning: disposal".to_owned()),
+        ],
+
         other => panic!("unknown scenario {other}"),
     };
     (m.to_vec(), steps, watchdog)
-}
-
-// Kept for symmetry with the runtime imports: the O-input Esc/Backspace
-// affordances are exercised in Stage C quality passes, not A-matrix.
-#[allow(dead_code)]
-fn unused_keys() -> [&'static str; 2] {
-    [BACKSPACE, ESC]
 }

@@ -101,6 +101,30 @@ struct Grid {
     cy: usize,
 }
 
+/// Zero-dependency wide-glyph width. The campaign's wide fixtures are
+/// CJK; the ranges below are the common East Asian Wide/Fullwidth
+/// blocks. Harness approximation, documented in the README (H-11):
+/// ConPTY advances the real cursor by two columns for these glyphs and
+/// the grid must mirror that or every later diff frame of the screen
+/// corrupts.
+fn char_width(c: char) -> usize {
+    let cp = c as u32;
+    if (0x1100..=0x115F).contains(&cp)
+        || (0x2E80..=0xA4CF).contains(&cp)
+        || (0xAC00..=0xD7A3).contains(&cp)
+        || (0xF900..=0xFAFF).contains(&cp)
+        || (0xFE30..=0xFE4F).contains(&cp)
+        || (0xFF00..=0xFF60).contains(&cp)
+        || (0xFFE0..=0xFFE6).contains(&cp)
+        || (0x20000..=0x2FFFD).contains(&cp)
+        || (0x30000..=0x3FFFD).contains(&cp)
+    {
+        2
+    } else {
+        1
+    }
+}
+
 impl Grid {
     fn new(w: usize, h: usize) -> Grid {
         Grid {
@@ -125,7 +149,17 @@ impl Grid {
         }
         let idx = self.cy * self.w + self.cx;
         self.cells[idx] = c;
-        self.cx += 1;
+        let width = char_width(c);
+        // A wide glyph occupies TWO columns: the skip cell stays a
+        // blank and the cursor advances by the glyph width, exactly
+        // like the real terminal. Without this the parser's column
+        // model falls behind ConPTY's on every wide char and ALL
+        // subsequent diff frames of that screen corrupt (run-PROBE
+        // lesson, H-11).
+        if width == 2 && self.cx + 1 < self.w {
+            self.cells[idx + 1] = ' ';
+        }
+        self.cx += width;
     }
 
     fn advance_row(&mut self) {
@@ -1014,6 +1048,28 @@ fn run_scenario(
                         break 'steps;
                     }
                 }
+            }
+            Step::Resize { cols, rows } => {
+                // One shot to the target size (never larger than the
+                // captured grid, which the scenario discipline keeps
+                // true by only shrinking from the spawn size), then a
+                // settle sleep: the child's crossterm delivers the
+                // resize event and the NEXT draw lays out at the new
+                // size. The following key press triggers the harness's
+                // full-repaint jiggle, so subsequent expects see a
+                // coherent grid at the new width.
+                unsafe {
+                    let _ = ResizePseudoConsole(session.hpc, COORD { X: *cols, Y: *rows });
+                }
+                session.cols = *cols;
+                session.rows = *rows;
+                session
+                    .chrono
+                    .lock()
+                    .expect("chrono lock")
+                    .log("resize", &format!("pseudoconsole -> {cols}x{rows}"));
+                std::thread::sleep(Duration::from_millis(250));
+                step_log.push(format!("resize {}x{}", cols, rows));
             }
         }
     }

@@ -32,6 +32,15 @@ sleep 1
 cp "$EXE" "$STAGE_WSL/tuidriver.exe"
 cp "$HEADLESS" "$STAGE_WSL/qianqian-headless.exe"
 
+# Stage-C scenario fixtures (C11/C12): renamed copies of the committed
+# 4 s FLAC fixture — one very long filename (96 'a's), one CJK
+# filename. Idempotent; the sha256 line below records the staged corpus
+# either way.
+FIX="$REPO/native/experiments/songcore-equivalence/fixtures"
+LONGNAME="qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac"
+[ -f "$STAGE_WSL/千曲.flac" ] || cp "$FIX/flac-16-44-stereo.flac" "$STAGE_WSL/千曲.flac"
+[ -f "$STAGE_WSL/$LONGNAME" ] || cp "$FIX/flac-16-44-stereo.flac" "$STAGE_WSL/$LONGNAME"
+
 SCEN="$*"
 PS_SCEN=$(printf "'%s'," $SCEN | sed 's/,$//')
 
