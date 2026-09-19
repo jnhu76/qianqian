@@ -979,6 +979,15 @@ pub trait RenderStream: Send {
     /// Signal stop, wait for the render thread to exit, release the
     /// device. Consumes the stream: stop -> join -> release in one
     /// owner-local inverse, on the mechanism side.
+    ///
+    /// Ownership precondition (D14.7 teardown obligation): before this
+    /// call, the owning playback/session teardown path must already
+    /// have released every session-owned render-gate hold (pause
+    /// intent, seek hold) the render leg needs to reach its exit — a
+    /// leg parked at the gate is not inside its data-plane read, so a
+    /// data-plane stop alone cannot wake it and the join would never
+    /// return. The backend must not fabricate pause/seek release
+    /// intent; the gate belongs to the session.
     fn stop_and_join(self: Box<Self>);
 }
 

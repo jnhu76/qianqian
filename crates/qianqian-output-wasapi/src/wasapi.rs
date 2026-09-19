@@ -80,11 +80,15 @@ const OPEN_TIMEOUT: Duration = Duration::from_secs(10);
 const EVENT_TIMEOUT_MS: u32 = 100;
 const DRAIN_CAP: Duration = Duration::from_secs(5);
 
-/// The real output mechanism. Long-lived and stateless across opens.
-/// Crate-private (plugin-boundary hardening H1): the mechanism is not
-/// product API; composition roots admit this plugin through
-/// `wasapi_output_plugin` and consumers see the `AudioOutput` service
-/// trait. Built only by the crate-root `platform_provider`.
+/// The concrete Windows Host Render Backend mechanism (ADR-PBK-003
+/// §2/§3): the Output Plugin is the stable composition identity; this
+/// type is the backend mechanism it owns — never itself a Plugin.
+/// Long-lived and stateless across opens. Crate-private
+/// (plugin-boundary hardening H1): the mechanism is not product API;
+/// composition roots admit the Output Plugin through the crate-root
+/// `output_plugin()` and consumers see only the backend-neutral
+/// `AudioOutput` service trait. Built only by the crate-root
+/// `selected_backend()` factory.
 pub(crate) struct WasapiOutput;
 
 impl WasapiOutput {
@@ -174,6 +178,10 @@ impl RenderStream for WasapiStream {
     /// mechanism side. The data-plane stop wakes a render thread blocked
     /// reading an empty edge; the thread releases the device before
     /// exiting, so a completed join means the device is released.
+    ///
+    /// The caller owns the gate-release precondition (see the trait
+    /// contract): this mechanism manufactures no pause/seek release
+    /// intent of its own.
     fn stop_and_join(mut self: Box<Self>) {
         self.render_input.stop();
         if let Some(handle) = self.thread.take() {
@@ -332,11 +340,16 @@ impl Drop for EventHandle {
     }
 }
 
+/// Field order is teardown order (Rust drops fields in declaration
+/// order): the dependent COM/service interfaces — the render client
+/// and the volume service — are declared BEFORE the lower-level audio
+/// client and event handle they may still reference, so no internal
+/// reference outlives the device resources it sits on (Stage-B audit
+/// B-01). The historical release order (Stop → render → client →
+/// event) is preserved; the volume service joins the client side of
+/// it.
 struct DeviceSession {
     render: IAudioRenderClient,
-    client: IAudioClient,
-    event: EventHandle,
-    buffer_frames: u32,
     /// The episode's desired stream factor (D14.9 cell) and the
     /// mechanism handle that realizes it, plus the last value this leg
     /// APPLIED or ATTEMPTED (the loop-top compare; on a recoverable
@@ -344,6 +357,9 @@ struct DeviceSession {
     /// so it is not re-issued every iteration).
     level: OutputLevel,
     stream_volume: IAudioStreamVolume,
+    client: IAudioClient,
+    event: EventHandle,
+    buffer_frames: u32,
     channels: u32,
     applied_bits: std::cell::Cell<u32>,
     /// Per-episode latch for the recoverable-failure diagnostic (D14.9
@@ -356,10 +372,13 @@ impl Drop for DeviceSession {
         unsafe {
             let _ = self.client.Stop();
         }
-        // Fields drop in declaration order: render client, audio client,
-        // event handle — the required historical release order. The COM
-        // pointers release through their own smart-pointer Drop; the
-        // event closes through EventHandle's Drop.
+        // Fields drop in declaration order: render client, volume
+        // service, audio client, event handle — the historical release
+        // order (Stop → render → client → event), with the dependent
+        // COM/service interfaces ahead of the client and the event so
+        // no internal reference outlives them (B-01). The COM pointers
+        // release through their own smart-pointer Drop; the event
+        // closes through EventHandle's Drop.
     }
 }
 
