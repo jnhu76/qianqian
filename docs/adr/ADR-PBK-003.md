@@ -362,7 +362,7 @@ desired("output", "wasapi_output_plugin")
 
 That fusion was an explicit **architecture-conformance differential**. It did not invalidate the earned Windows transport semantics or physical evidence; it meant only that the representation exposed backend identity one layer too high.
 
-**Resolved by**: `HOST-RENDER-WINDOWS-CONFORMANCE-CORRECTIVE-1` (2026-09-19, campaign QIANQIAN-TRANSPORT-DOGFOOD-INTEGRATED-AUDIT-TUI-V1-CLOSURE-1, commit `104ffd4`).
+**Resolved by**: `HOST-RENDER-WINDOWS-CONFORMANCE-CORRECTIVE-1` (2026-09-19, campaign QIANQIAN-TRANSPORT-DOGFOOD-INTEGRATED-AUDIT-TUI-V1-CLOSURE-1; original commit `104ffd4`, reworded message-only to `57d60b5` — see `research/transport-dogfood/evidence/HISTORY-REWORD-MAP.md`).
 
 Current realization:
 

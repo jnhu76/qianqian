@@ -169,6 +169,13 @@ mod tests {
         }
     }
 
+    fn stopped() -> PlaybackSessionObservation {
+        PlaybackSessionObservation {
+            terminal_outcome: Some(EpisodeTerminalOutcome::Stopped),
+            ..pending()
+        }
+    }
+
     /// Render the model on a fixed-size virtual terminal and return
     /// the rows as plain text. Tall enough for the fully-established
     /// panel (source/format/position/terminal/two command lines/paused,
@@ -582,6 +589,10 @@ mod tests {
             failure_diagnostic: Some("decode: corrupt frame".to_owned()),
             ..pending()
         });
+        // A committed terminal outcome must also ride the shrink loop:
+        // the committed-hint line is one more content class that may
+        // only clip, never fabricate (closure review T8 note).
+        model.update(stopped());
         model.set_navigation(Some((1, 3)));
         model.set_volume(Some(70));
         model.set_status(Some("volume 75/100 (desired)".to_owned()));
