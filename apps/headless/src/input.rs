@@ -6,9 +6,11 @@
 //! ordinary application function of the composition root, NOT a Plugin
 //! (PBK-002 D13: an existing owner — the App's input preparation —
 //! expresses it completely; no independent composition identity is
-//! claimed), and it is NOT playback semantics. It knows the filesystem
-//! and nothing else: no decode capability, no probe, no PCM, no
-//! composition types.
+//! claimed), and it is NOT playback semantics. The ENUMERATION knows
+//! the filesystem and nothing else: no decode capability, no probe, no
+//! PCM, no composition types. (`open_expanded` and `prepare_startup`
+//! then hand the accepted candidates to the player's EXISTING Open
+//! path — they add no classification knowledge of their own.)
 //!
 //! Truth-class discipline:
 //!
@@ -322,7 +324,13 @@ fn startup_feedback(
         Some(OpenOutcome::ActivationFailedClean { diagnostic }) => {
             Some(format!("open failed (clean): {diagnostic}"))
         }
-        Some(OpenOutcome::FailStop { .. }) => unreachable!("handled by the caller"),
+        Some(OpenOutcome::FailStop { .. }) => {
+            // The transport checks the returned outcome as soon as this
+            // returns and never enters a shell over a §G.6 latch, so
+            // this feedback would never be shown: None, and the
+            // fail-stop report stays the transport's business.
+            None
+        }
     }
 }
 
