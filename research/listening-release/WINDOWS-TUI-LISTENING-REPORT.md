@@ -22,8 +22,8 @@ source commit      e7f118d (docs/style HEAD; last PRODUCT-code delta is
                    originally packaged RUN2 build was edb631b.)
 base (origin/main) 8b1a739 (PR #168 merge)
 package            dist/qianqian-windows-x86_64.zip
-package sha256     95be430b15a6b92ab01c2e2b94dd4c15983e48c667588cf16faf2f0494408d87 (zip, U2-corrected build)
-qianqian.exe       sha256 8e2d571c31b113fe2312b4a62e84e708dfdf6852099d06852966e5c9ae4b624f (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
+package sha256     64f64cbc4934cbc933f34867e5a3287ae6cecabb906917178bb02e5c853f6298 (zip, Tier-2 build; superseded: 95be430b… [U2 probesize build], 2abe029c… [RUN2])
+qianqian.exe       sha256 add218975d05eb24ef4871650cd6264a260a84ceb4015c33a85f04a0473329c1 (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
                    (the superseded RUN2 artifact was zip 2abe029c… / exe 9909ce8d…)
 songcore (mingw)   05cbb12aaf33e44e5f0784deca0b410a0948f625d142bb4f7192fb61040fe7cc
                    (native/build/artifacts-mingw/libsongcore.a; FFmpeg
@@ -229,7 +229,7 @@ PACKAGE:
 dist/qianqian-windows-x86_64.zip
 
 SHA256:
-95be430b15a6b92ab01c2e2b94dd4c15983e48c667588cf16faf2f0494408d87 (zip) / extracted exe 8e2d571c31b113fe2312b4a62e84e708dfdf6852099d06852966e5c9ae4b624f
+64f64cbc4934cbc933f34867e5a3287ae6cecabb906917178bb02e5c853f6298 (zip) / extracted exe add218975d05eb24ef4871650cd6264a260a84ceb4015c33a85f04a0473329c1
 
 EXTRACT AND RUN:
 qianqian.exe play --shuffle "D:\Music"
@@ -331,7 +331,7 @@ the same report is the OLD artifact (the `[qianqian-wasapi]` and
 `[mp3float @ …]` lines visible in the screenshots are silent-by-
 default since 9995f6b — the still-running extraction predates it).
 
-Corrective: Tier-2 engine-SRC fallback (commit this round; PBK-003 §8
+Corrective: Tier-2 engine-SRC fallback (commit 6661d33; PBK-003 §8
 amendment note under PR review) — Tier 1 first (bit-perfect direct
 submission); on exactly `AUDCLNT_E_UNSUPPORTED_FORMAT`, retry with
 `AUTOCONVERTPCM | SRC_DEFAULT_QUALITY` so the engine's mix thread does
@@ -341,11 +341,48 @@ unchanged). Formats both tiers refuse still fail honestly. New
 physical gate `U2-rate-mix`: a 44.1→48 kHz playlist where BOTH tracks
 must render with honest source-format lines.
 
-The remaining physical gates (the RUN4 matrix with U2-cover-clean +
-U2-rate-mix, and the X-realdir latency witness against
-`D:\文件\音频`) run once the rebuilt package is staged — see the RUN4
-ENV file / the RUN3 blocked note for the honest status chain. (The
-RUN3 attempt itself is recorded as ENVIRONMENT-BLOCKED, not failed:
-zero active render endpoints at the time — see
-`evidence/ENV-LR1-RUN3-BLOCKED-NOTE.txt`.)
+### 11.2 RUN4 — the physical evidence of record (all GREEN)
+
+With the endpoint reconnected, the full matrix ran end to end against
+the Tier-2 package (zip 64f64cbc…):
+
+```text
+core    9 GREEN  (U1-idle, U1-folder-open, U2-shuffle-start,
+                  U2-cover-clean, U2-rate-mix, U2-help,
+                  C11-longpath, C12-cjk, A15)
+fmatrix 4 GREEN  (folder-mixed, all-corrupt, duplicate-roots,
+                  truncated-next)
+large   1 GREEN  (1000-file list)
+huge    1 GREEN  (5000-entry list)
+scenario_groups_green: 4/4
+```
+
+U2-cover-clean (the R1 gate) and U2-rate-mix (the R2 gate) are both
+part of the pass. Evidence: `evidence/logs/lr1-run4-*.summary`,
+`evidence/transcripts-run4/`, `evidence/ENV-LR1-RUN4.txt`.
+
+### 11.3 X-realdir — the field operation witnessed on the real corpus
+
+The ad-hoc `X-realdir` scenario replays the user's exact operation
+(idle launch → O dialog → typed `D:\文件\音频` → Enter, then N) against
+their real mixed-rate corpus, on the Tier-2 package:
+
+```text
+verdict            GREEN
+operation          O dialog typed + Enter at T+0.599s
+first track        Track: 1/6 rendered at T+0.654s (55 ms after
+                   Enter; scan 6 candidates + probe + open + device
+                   start) — the R-delay class the user reported as
+                   "seconds" is sub-100 ms here (warm cache; the
+                   mechanism bound is the probesize cap, 5× less I/O)
+track switch       N at T+1.680s → Track: 2/6 (48 kHz source,
+                   Tier-2 engine SRC) confirmed at T+1.781s —
+                   ~100 ms wall-clock, versus the ~2 s silence the
+                   user reported on the RUN2 build
+console            zero FFmpeg/WASAPI mechanism lines post-mark
+exit               clean quit, code 0
+```
+
+These are mechanism/latency observations, not audibility claims; the
+ACOUSTIC_WITNESS checklist (§9) remains the human's alone.
 

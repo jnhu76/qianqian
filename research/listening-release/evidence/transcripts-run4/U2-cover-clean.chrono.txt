@@ -1,0 +1,13 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\cover.mp3"
+T+   0.015s       recv  16 bytes
+T+   0.025s       recv  139 bytes
+T+   0.071s       recv  8 bytes
+T+   0.071s       recv  219 bytes
+T+   0.093s       recv  3817 bytes
+T+   0.234s       recv  354 bytes
+T+   0.459s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.459s    wait-ok  Format: 44100 Hz
+T+   0.459s wait-begin  "Source: cover.mp3" within 5s
+T+   1.167s       recv  60 bytes
+T+   2.097s       recv  300 bytes
+T+   5.474s wait-TIMEOUT  "Source: cover.mp3" after offset 0

@@ -1,0 +1,10 @@
+{"scenario":"U2-cover-clean","verdict":"RED","exit_code":null,
+ "failure":"timeout waiting for \"Source: cover.mp3\" after offset 0; history tail:\n───────────────────────────────────────────────────┘\n┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐\n│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │\n│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │\n│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │\n│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │\n│ Esc  Cancel                                                                                                          │\n└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘\n",
+ "child_status_at_failure":"alive=true threads=Some(7)",
+ "steps":[
+    "mark",
+    "expect \"Format: 44100 Hz\" OK"
+],
+ "resources":[
+    {"label":"baseline","threads":6,"handles":184,"working_set_bytes":13070336}
+]}

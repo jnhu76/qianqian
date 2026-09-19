@@ -1759,7 +1759,7 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
             let mut v = vec![
                 Step::Mark,
                 expect_format(),
-                expect("Source: cover.mp3"),
+                expect(format!("Source: {media}\\cover.mp3")),
                 expect(playing_selected_row(1, "cover.mp3")),
                 // Repeat All keeps the 2 s cover fixture looping; the
                 // toggle waits for the startup Open to settle.
@@ -1815,14 +1815,16 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
             });
             let mut v = vec![
                 Step::Mark,
-                expect_format(),
+                // IDLE launch: no startup Open, so no Format line exists
+                // until the O dialog opens the first candidate — every
+                // needle here is post-open (or count-based).
                 keys("o"),
                 Step::Typed(dir),
                 keys(ENTER),
-                Step::ExpectAfterMark {
-                    text: "scanning".to_owned(),
-                    within_ms: 10_000,
-                },
+                // NOTE: the in-shell O-dialog flow reports the open with
+                // the "opened <path> (N candidates…)" feedback line — the
+                // bare "scanning ..." print belongs to the argv startup
+                // path only.
                 Step::ExpectAfterMark {
                     text: "Track: 1/".to_owned(),
                     within_ms: 60_000,

@@ -1,0 +1,56 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe
+T+   0.021s       recv  16 bytes
+T+   0.033s       recv  94 bytes
+T+   0.033s       recv  213 bytes
+T+   0.047s       recv  3577 bytes
+T+   0.455s wait-begin  "No music loaded." within 10s
+T+   0.455s    wait-ok  No music loaded.
+T+   0.456s       send  1 bytes: "o"
+T+   0.456s       recv  6672 bytes
+T+   0.456s       recv  4 bytes
+T+   0.456s       recv  4 bytes
+T+   0.468s       recv  6727 bytes
+T+   0.536s       send  36 bytes: "C:\\Users\\Public\\qn-lr1\\media\\u1music"
+T+   0.537s       recv  6727 bytes
+T+   0.547s       recv  53 bytes
+T+   0.563s       recv  64 bytes
+T+   0.616s       send  1 bytes: "\r"
+T+   0.617s       recv  6767 bytes
+T+   0.641s       recv  6727 bytes
+T+   0.657s       recv  518 bytes
+T+   0.671s       recv  477 bytes
+T+   0.696s wait-begin  "opened C:\\Users\\Public\\qn-lr1\\media\\u1music\\flac4.flac (2 candidates)" within 10s
+T+   0.697s    wait-ok  opened C:\Users\Public\qn-lr1\media\u1music\flac4.flac (2 candidates)
+T+   0.697s wait-begin  "Track: 1/2" within 5s
+T+   0.697s    wait-ok  Track: 1/2
+T+   0.697s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.697s    wait-ok  Format: 44100 Hz
+T+   0.697s wait-begin  new-position != None
+T+   0.697s       recv  6797 bytes
+T+   0.697s       recv  4 bytes
+T+   0.717s       recv  6813 bytes
+T+   0.717s    wait-ok  new-position (0, 0)
+T+   0.717s       send  1 bytes: "n"
+T+   0.733s       recv  6693 bytes
+T+   0.749s       recv  4 bytes
+T+   0.749s       recv  207 bytes
+T+   0.749s       recv  4 bytes
+T+   0.764s       recv  6709 bytes
+T+   0.798s wait-begin  "C:\\Users\\Public\\qn-lr1\\media\\u1music\\synth45.mp3" within 10s
+T+   0.798s       recv  6749 bytes
+T+   0.798s       recv  4 bytes
+T+   0.810s       recv  6813 bytes
+T+   0.818s    wait-ok  C:\Users\Public\qn-lr1\media\u1music\synth45.mp3
+T+   0.818s wait-begin  "Track: 2/2" within 5s
+T+   0.818s    wait-ok  Track: 2/2
+T+   0.818s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.818s    wait-ok  Format: 44100 Hz
+T+   0.818s wait-begin  new-position != Some((0, 0))
+T+   1.883s       recv  42 bytes
+T+   1.903s    wait-ok  new-position (0, 1)
+T+   1.903s       send  1 bytes: "q"
+T+   1.904s       recv  6701 bytes
+T+   1.914s       recv  238 bytes
+T+   1.984s       recv  244 bytes
+T+   2.384s wait-begin  "stopped before completion" within 5s
+T+   2.384s    wait-ok  stopped before completion
