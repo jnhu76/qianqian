@@ -8,10 +8,10 @@
 //! vocabulary are pinned without a real terminal.
 
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph};
+use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::model::TuiModel;
 
@@ -19,6 +19,11 @@ use super::model::TuiModel;
 /// stays up so the outcome can be inspected; only the quit command
 /// remains meaningful.
 pub const COMMITTED_HINT: &str = "terminal outcome committed; press Q to quit";
+
+/// The idle page's one honest claim: no episode exists (a fresh
+/// interactive launch, or a clean-failed Open), so nothing is playing
+/// and nothing is loaded. The panel fabricates no label beyond it.
+pub const NO_MUSIC_LINE: &str = "No music loaded.";
 
 /// Render one frame of the reference player.
 pub fn draw(frame: &mut Frame, model: &TuiModel) {
@@ -35,6 +40,22 @@ pub fn draw(frame: &mut Frame, model: &TuiModel) {
     frame.render_widget(main_panel(model), main);
     frame.render_widget(diagnostics_panel(model), diagnostics);
     frame.render_widget(controls_panel(), controls);
+    if model.help_visible() {
+        let [help] = Layout::vertical([Constraint::Length(12)]).areas(centered_area(frame.area()));
+        // Clear wipes what is underneath so the overlay reads as one
+        // panel, not as overprinted text.
+        frame.render_widget(Clear, help);
+        frame.render_widget(help_panel(), help);
+    }
+}
+
+/// A centered popup area, degraded honestly on tiny terminals.
+fn centered_area(area: Rect) -> Rect {
+    let width = area.width.min(64).saturating_sub(4).max(10);
+    let height = area.height.min(12);
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+    Rect::new(x, y, width, height)
 }
 
 fn bold(title: &'static str) -> Span<'static> {
@@ -59,14 +80,16 @@ fn open_lines(model: &TuiModel, lines: &mut Vec<Line<'_>>) {
 
 fn main_panel(model: &TuiModel) -> Paragraph<'_> {
     let Some(source) = model.source() else {
-        // The no-episode panel (F6): after a clean-failed Open no
-        // runtime remains, and the honest frame says exactly that
-        // instead of fabricating labels for an episode that does not
-        // exist. The Open feedback and input line still render — this
-        // is the state the next Open starts from.
+        // The no-episode panel (F6; the U1 idle page): after a
+        // clean-failed Open no runtime remains, and on a no-argument
+        // launch none was ever started — the honest frame says exactly
+        // that instead of fabricating labels for an episode that does
+        // not exist. The Open feedback and input line still render —
+        // this is the state the next Open starts from.
         let mut lines = vec![
             Line::from(""),
-            Line::from("no episode — press O to open a source"),
+            Line::from(NO_MUSIC_LINE),
+            Line::from("Press O to open a file or folder."),
         ];
         if let Some((position, total)) = model.navigation_position() {
             lines.push(Line::from(format!(
@@ -122,6 +145,26 @@ fn main_panel(model: &TuiModel) -> Paragraph<'_> {
     )
 }
 
+/// The keyboard-help overlay (the `?` key): the shipped keys and
+/// nothing beyond them. Every line here must stay in lockstep with the
+/// frozen grammar — no U2/U3 affordance (list-row selection, exact or
+/// large seek, auto-next, shuffle) may be advertised before it exists.
+fn help_panel() -> Paragraph<'static> {
+    Paragraph::new(vec![
+        Line::from(" Qianqian keys"),
+        Line::from(""),
+        Line::from(" Space        pause / resume"),
+        Line::from(" ← / →        seek 5 s back / forward"),
+        Line::from(" S            stop"),
+        Line::from(" N / P        next / previous track"),
+        Line::from(" + / -        volume up / down"),
+        Line::from(" O            open a file or folder"),
+        Line::from(" ?            close this help"),
+        Line::from(" Q / Ctrl+C   quit"),
+    ])
+    .block(Block::bordered().title(bold(" Help ")))
+}
+
 fn diagnostics_panel(model: &TuiModel) -> Paragraph<'_> {
     let mut lines: Vec<Line> = model.diagnostics().into_iter().map(Line::from).collect();
     if lines.is_empty() {
@@ -134,7 +177,7 @@ fn controls_panel() -> Paragraph<'static> {
     Paragraph::new(vec![
         Line::from(" ←/→  Seek ±5s      Space  Pause/Resume"),
         Line::from(" S  Stop            Q  Quit    Ctrl+C  Quit"),
-        Line::from(" O  Open source"),
+        Line::from(" O  Open file/folder          ?  Help"),
         Line::from(" N  Next            P  Previous"),
         Line::from(" +  Louder          -  Softer"),
     ])
@@ -388,19 +431,18 @@ mod tests {
         assert!(text.contains("(none)"), "{text}");
     }
 
-    /// The no-episode frame (F6): a clean-failed Open leaves no
-    /// runtime, and the panel says so — no Source/Format/Position/
-    /// Terminal labels may be fabricated for an episode that does not
-    /// exist.
+    /// The no-episode frame (F6; the U1 idle page): a clean-failed Open
+    /// leaves no runtime, and a no-argument launch never started one —
+    /// the panel says "No music loaded." and fabricates nothing — no
+    /// Source/Format/Position/Terminal labels may render for an episode
+    /// that does not exist.
     #[test]
     fn a_no_episode_frame_says_so_and_fabricates_nothing() {
         let mut model = TuiModel::new("song.flac");
         model.set_episode(None);
         let text = rendered(&model);
-        assert!(
-            text.contains("no episode — press O to open a source"),
-            "{text}"
-        );
+        assert!(text.contains(NO_MUSIC_LINE), "{text}");
+        assert!(text.contains("Press O to open a file or folder"), "{text}");
         for fabricated in ["Source:", "Format:", "Position:", "Terminal:", "Paused:"] {
             assert!(
                 !text.contains(fabricated),
@@ -420,10 +462,7 @@ mod tests {
         model.set_episode(None);
         model.set_status(Some("open failed (clean): decode open failed".to_owned()));
         let text = rendered(&model);
-        assert!(
-            text.contains("no episode — press O to open a source"),
-            "{text}"
-        );
+        assert!(text.contains(NO_MUSIC_LINE), "{text}");
         assert!(
             text.contains("open failed (clean): decode open failed"),
             "the startup Open feedback must be visible: {text}"
@@ -525,18 +564,94 @@ mod tests {
         assert_eq!(forbidden_status_claim(&text), None, "{text}");
     }
 
-    /// The controls panel documents the O key — and the panel grew one
-    /// row for it.
+    /// The controls panel documents the O key and the help overlay
+    /// without growing a row (the 24-row contract of the committed-hint
+    /// test stays intact).
     #[test]
     fn the_controls_panel_documents_the_open_key() {
         let mut model = TuiModel::new("song.flac");
         model.update(pending());
         let text = rendered(&model);
-        assert!(text.contains("O  Open source"), "{text}");
+        assert!(text.contains("O  Open file/folder"), "{text}");
+        assert!(text.contains("?  Help"), "{text}");
         assert!(text.contains("N  Next"), "{text}");
         assert!(text.contains("P  Previous"), "{text}");
         assert!(text.contains("+  Louder"), "{text}");
         assert!(text.contains("-  Softer"), "{text}");
+    }
+
+    /// The help overlay documents exactly the shipped keys — and never
+    /// an unearned affordance (U2/U3 vocabulary must not be advertised
+    /// before it exists) — then disappears when the model closes it.
+    #[test]
+    fn the_help_overlay_lists_only_shipped_keys_and_closes() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        assert!(
+            !rendered(&model).contains("Qianqian keys"),
+            "help hidden by default"
+        );
+        model.toggle_help();
+        let text = rendered(&model);
+        assert!(text.contains(" Help "), "{text}");
+        for earned in [
+            "pause / resume",
+            "seek 5 s back / forward",
+            "stop",
+            "next / previous track",
+            "volume up / down",
+            "open a file or folder",
+            "close this help",
+            "quit",
+        ] {
+            assert!(text.contains(earned), "{earned:?} missing in:\n{text}");
+        }
+        // U2/U3 affordances are not shipped; none may be advertised.
+        for unearned in [
+            "shuffle",
+            "Shuffle",
+            "auto-next",
+            "Up",
+            "Down",
+            "Enter",
+            "exact seek",
+            "+30",
+            "select",
+        ] {
+            assert!(!text.contains(unearned), "{unearned:?} in:\n{text}");
+        }
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+
+        model.toggle_help();
+        assert!(
+            !rendered(&model).contains("Qianqian keys"),
+            "the overlay closes again"
+        );
+    }
+
+    /// The help overlay renders over a LIVE episode without corrupting
+    /// it: underneath the popup the episode panel is unchanged, and at
+    /// tiny sizes the overlay degrades without panicking or fabricating
+    /// semantics.
+    #[test]
+    fn the_help_overlay_survives_live_episodes_and_tiny_terminals() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        model.set_navigation(Some((2, 3)));
+        model.set_volume(Some(75));
+        model.toggle_help();
+        let text = rendered(&model);
+        assert!(text.contains("Help"), "{text}");
+        assert!(text.contains("Source: song.flac"), "{text}");
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+        for (width, height) in [(40u16, 12u16), (20, 8), (10, 6), (4, 3), (1, 1)] {
+            let text = rendered_at(&model, width, height);
+            assert_eq!(
+                forbidden_status_claim(&text),
+                None,
+                "unearned semantic at {width}x{height}:\n{text}"
+            );
+        }
     }
 
     /// Both diagnostic lines render when an episode carries an

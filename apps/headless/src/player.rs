@@ -499,7 +499,7 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     //! The C7 unit matrix: the frozen D14.6 replacement semantics over
     //! the REAL composition kernel and the REAL playback session, with
     //! fake decode/output providers and a fake probe. The ordering log
@@ -507,6 +507,11 @@ mod tests {
     //! registered teardown effects, the probe call) — never by
     //! instrumenting the player — so the sequence assertions pin the
     //! player's actual call order.
+    //!
+    //! The fake episode source and the standard scenario paths are
+    //! `pub(crate)` so sibling modules' tests (input expansion, TUI
+    //! shell routing) can drive the same harness over the same kernel;
+    //! cfg(test) keeps all of it out of the product.
 
     use std::rc::Rc;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -721,8 +726,8 @@ mod tests {
     ///   `Violated`, so any disposal of a fresh root latches §G.6.
     /// - `refuse_composition`: the desired composition references an
     ///   unregistered component, so `revise_desired` refuses.
-    struct FakeEpisodeSource {
-        log: Log,
+    pub(crate) struct FakeEpisodeSource {
+        pub(crate) log: Log,
         generation: AtomicU64,
         attach_handle: bool,
         violating_cleanup: bool,
@@ -731,7 +736,7 @@ mod tests {
     }
 
     impl FakeEpisodeSource {
-        fn new() -> Self {
+        pub(crate) fn new() -> Self {
             Self {
                 log: Arc::new(Mutex::new(Vec::new())),
                 generation: AtomicU64::new(0),
@@ -833,12 +838,12 @@ mod tests {
         ReferencePlayerApp::new(source)
     }
 
-    const A: &str = "/media/finite-a.flac";
-    const B: &str = "/media/finite-b.flac";
+    pub(crate) const A: &str = "/media/finite-a.flac";
+    pub(crate) const B: &str = "/media/finite-b.flac";
     /// Endless sources keep the first episode live until the
     /// replacement stops it.
-    const LIVE_A: &str = "/media/live-a.flac";
-    const LIVE_B: &str = "/media/live-b.flac";
+    pub(crate) const LIVE_A: &str = "/media/live-a.flac";
+    pub(crate) const LIVE_B: &str = "/media/live-b.flac";
 
     fn opened(outcome: &OpenOutcome) -> bool {
         matches!(outcome, OpenOutcome::Opened)

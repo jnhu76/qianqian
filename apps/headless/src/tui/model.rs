@@ -43,6 +43,10 @@ pub struct TuiModel {
     /// configured value — never an acoustic level or mechanism
     /// readback).
     volume: Option<u8>,
+    /// Whether the keyboard-help overlay is shown. Presentation-local
+    /// state (Issue #166 §0 admits exactly this class); it carries no
+    /// playback truth and survives nothing.
+    help_visible: bool,
 }
 
 impl TuiModel {
@@ -66,6 +70,7 @@ impl TuiModel {
             status: None,
             navigation_position: None,
             volume: None,
+            help_visible: false,
         }
     }
 
@@ -180,6 +185,23 @@ impl TuiModel {
         self.open_input = None;
     }
 
+    /// Toggle the keyboard-help overlay (the `?` key). Pure
+    /// presentation state: open over anything, closed again by the
+    /// same key or Esc.
+    pub fn toggle_help(&mut self) {
+        self.help_visible = !self.help_visible;
+    }
+
+    /// Close the help overlay if it is open (the Esc key). Idempotent.
+    pub fn close_help(&mut self) {
+        self.help_visible = false;
+    }
+
+    /// Whether the keyboard-help overlay is shown.
+    pub fn help_visible(&self) -> bool {
+        self.help_visible
+    }
+
     pub fn observation(&self) -> &PlaybackSessionObservation {
         &self.observation
     }
@@ -263,6 +285,9 @@ pub enum Action {
     /// O: begin the Open input line (D14.6). A shell action; the
     /// runtime performs the Open through the player.
     Open,
+    /// `?`: toggle the keyboard-help overlay. A shell action; the
+    /// runtime routes it to the model's presentation state.
+    Help,
     /// N: select the next playlist entry and Open it through the same
     /// replacement (D14.6 navigation). A shell action like [`Action::Open`].
     Next,
@@ -313,9 +338,10 @@ pub enum Step {
 
 /// The shell's whole keyboard grammar: Left/Right seek in fixed steps,
 /// Space toggles pause/resume, S stops, O opens the Open input line,
-/// N/P select the next/previous playlist entry (D14.6 navigation),
-/// Q quits, Ctrl+C quits. Anything else is presentation noise
-/// (including key-release events, which Windows terminals emit).
+/// `?` toggles the keyboard-help overlay, N/P select the next/previous
+/// playlist entry (D14.6 navigation), Q quits, Ctrl+C quits. Anything
+/// else is presentation noise (including key-release events, which
+/// Windows terminals emit).
 pub fn action_for_key(key: KeyEvent) -> Option<Action> {
     if key.kind != KeyEventKind::Press {
         return None;
@@ -329,6 +355,7 @@ pub fn action_for_key(key: KeyEvent) -> Option<Action> {
         KeyCode::Char(' ') if plain => Some(Action::PauseResume),
         KeyCode::Char('s') | KeyCode::Char('S') if plain => Some(Action::Stop),
         KeyCode::Char('o') | KeyCode::Char('O') if plain => Some(Action::Open),
+        KeyCode::Char('?') if plain => Some(Action::Help),
         KeyCode::Char('n') | KeyCode::Char('N') if plain => Some(Action::Next),
         KeyCode::Char('p') | KeyCode::Char('P') if plain => Some(Action::Previous),
         KeyCode::Char('+') | KeyCode::Char('=') if plain => Some(Action::VolumeUp),
@@ -374,11 +401,12 @@ pub fn apply_action(action: Action, handle: &PlaybackSessionHandle) -> Step {
             Step::Continue
         }
         // The shell actions never reach this wiring: the runtime routes
-        // Open to the input line, Next/Previous to the player's
-        // navigation, and the volume keys to the player's desired level
-        // before any episode command is considered. These arms exist so
-        // the match stays exhaustive; they must not touch the episode.
-        Action::Open | Action::Next | Action::Previous => Step::Continue,
+        // Open to the input line, Help to the overlay state,
+        // Next/Previous to the player's navigation, and the volume keys
+        // to the player's desired level before any episode command is
+        // considered. These arms exist so the match stays exhaustive;
+        // they must not touch the episode.
+        Action::Open | Action::Help | Action::Next | Action::Previous => Step::Continue,
         Action::VolumeUp | Action::VolumeDown => Step::Continue,
         Action::Quit => Step::Exit,
     }
@@ -810,6 +838,47 @@ mod tests {
         assert_eq!(apply_action(Action::VolumeUp, &handle), Step::Continue);
         assert_eq!(apply_action(Action::VolumeDown, &handle), Step::Continue);
         assert_eq!(handle.observe(), before, "volume is not an episode command");
+    }
+
+    /// The `?` key maps to the help action (terminals deliver `?` with
+    /// SHIFT on most layouts; both postures act), apply_action never
+    /// lets it touch the episode, and the overlay state toggles and
+    /// closes idempotently.
+    #[test]
+    fn question_mark_maps_to_help_and_the_overlay_toggles() {
+        for modifiers in [KeyModifiers::NONE, KeyModifiers::SHIFT] {
+            assert_eq!(
+                action_for_key(KeyEvent::new(KeyCode::Char('?'), modifiers)),
+                Some(Action::Help)
+            );
+        }
+        // Release events never act, like every other key.
+        assert_eq!(
+            action_for_key(KeyEvent::new_with_kind(
+                KeyCode::Char('?'),
+                KeyModifiers::NONE,
+                KeyEventKind::Release
+            )),
+            None
+        );
+
+        let handle = PlaybackSessionHandle::new();
+        let before = handle.observe();
+        assert_eq!(apply_action(Action::Help, &handle), Step::Continue);
+        assert_eq!(handle.observe(), before, "help is not an episode command");
+
+        let mut model = TuiModel::new("song.flac");
+        assert!(!model.help_visible());
+        model.toggle_help();
+        assert!(model.help_visible());
+        model.toggle_help();
+        assert!(!model.help_visible());
+        // Esc-close is idempotent and independent of the input line.
+        model.close_help();
+        assert!(!model.help_visible());
+        model.toggle_help();
+        model.close_help();
+        assert!(!model.help_visible());
     }
 
     /// The Open input line lifecycle: begin → edit → confirm returns

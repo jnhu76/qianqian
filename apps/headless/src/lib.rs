@@ -23,8 +23,19 @@
 //! [`player`]: the application composition owner of Open/replacement
 //! (ADR-PBK-002 D14.6) — one process-level host sequentially owning
 //! non-overlapping composition roots, one per episode.
+//!
+//! Since U1 (Issue #166), [`input`] is the product launch's host input
+//! preparation: user-supplied files/folders expanded into ordered
+//! playable candidates that feed the SAME Open path. It is an
+//! application function, not a Plugin, and it witnesses nothing about
+//! playability — the decode preflight stays the witness. [`entry`] is
+//! the transports' wiring both binary targets execute: `qianqian`, the
+//! canonical product binary, and `qianqian-headless`, the historical
+//! regression target.
 
 pub mod cli;
+pub mod entry;
+pub mod input;
 pub mod machine;
 pub mod player;
 pub mod status;

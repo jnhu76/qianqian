@@ -3,6 +3,9 @@ name = "qianqian-headless"
 version.workspace = true
 edition.workspace = true
 description = "Headless bootstrap of Architecture v2: composition-only real playback entry"
+# Both binary targets are declared explicitly below; autodiscovery is
+# off so the target set is exactly these two.
+autobins = false
 
 [dependencies]
 qianqian-composition = { path = "../../crates/qianqian-composition" }
@@ -16,6 +19,21 @@ qianqian-output-wasapi = { path = "../../crates/qianqian-output-wasapi", optiona
 # internal edge), and they never cross the F2 episode seam.
 ratatui = "0.30"
 crossterm = "0.29"
+
+# The canonical product binary (U1, Issue #166). Windows users get
+# qianqian.exe. The wrapper is thin: all behavior lives in the
+# library's `entry` module, which the wrapper hands its own compiled
+# name (CARGO_BIN_NAME) so `--version` reports the invoked binary.
+[[bin]]
+name = "qianqian"
+path = "src/bin/qianqian.rs"
+
+# The historical qianqian-headless binary stays available for the
+# regression tooling that names it (grammar tests, physical-gate
+# scripts, transport dogfood).
+[[bin]]
+name = "qianqian-headless"
+path = "src/main.rs"
 
 [dev-dependencies]
 # Test admission only (plugin-boundary hardening H2A / audit H-b): the
