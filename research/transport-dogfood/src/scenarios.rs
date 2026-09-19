@@ -411,7 +411,8 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         "A1-mp3cbr" => &["mp3cbr.mp3"],
         "A1-alac4" => &["alac4.m4a"],
         "A1-alac6" => &["alac6.m4a"],
-        // Track 2 is the deliberately-invalid navigation candidate.
+        // Startup includes one deliberately-invalid explicit file; the
+        // Listening-Release scan rejects it before the playlist seeds.
         "A15" => &["synth45.mp3", "garbage.bin", "flac4.flac"],
         // Track durations cover the full navigation walk (~10 s).
         "A14" => &["synth30.flac", "flac4.flac", "synth45.mp3"],
@@ -734,8 +735,11 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 // The missing-path refusal wording is deterministic (os
                 // error 2), so the path-qualified diagnostic is a stable
                 // witness — and it cannot match the earlier garbage refusal
-                // still rendered on screen.
-                expect_mark("cannot open 'missing-file.flac'"),
+                // still rendered on screen. (Listening-Release note: the
+                // O-key expansion now refuses a missing path at the
+                // ENUMERATION step, so the needle reads `cannot read`,
+                // not the decode layer's `cannot open`.)
+                expect_mark("cannot read missing-file.flac"),
                 expect("Terminal: pending"),
             ])
             .chain(quit_clean())
@@ -813,23 +817,33 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         .chain(quit_clean())
         .collect(),
 
-        // A15 — navigation failure: a refused candidate (garbage.bin as
-        // track 2) moves nothing and never auto-skips; the playing
-        // episode keeps consuming. The navigation refusal's stable
-        // prefix is `next refused:` (run-E transcript: `next refused:
-        // SongCore refused '<abs path>': status 104`).
+        // A15 — startup hardening under the Listening-Release scan
+        // contract: an explicitly named invalid file is PROBE-REJECTED
+        // at scan time (never enters the playlist, reported boundedly
+        // under `not playable:`), the folder still opens its real
+        // tracks, and navigation walks the two surviving entries with
+        // inert boundaries. (The pre-campaign A15 pinned a refused
+        // candidate INSIDE the playlist; scan-time rejection now keeps
+        // it out — the runtime-failed-track-no-skip policy is pinned
+        // by the machine transport's failure scenarios instead.)
         "A15" => vec![
-            expect("Track: 1/3"),
+            expect("Track: 1/2"),
             expect_format(),
+            expect("not playable: garbage.bin"),
             Step::Mark,
-            keys("n"),
-            expect_mark("next refused"),
-            expect_mark("Track: 1/3"),
-            Step::SleepMs(1_200),
             new_position(),
             keys("n"),
-            expect_mark("next refused"),
-            expect_mark("Track: 1/3"),
+            expect_mark(next_opened(media, "flac4.flac")),
+            expect_mark("Track: 2/2"),
+            keys("n"),
+            expect_mark("no next track"),
+            expect_mark("Track: 2/2"),
+            keys("p"),
+            expect_mark(prev_opened(media, "synth45.mp3")),
+            expect_mark("Track: 1/2"),
+            keys("p"),
+            expect_mark("no previous track"),
+            expect_mark("Track: 1/2"),
         ]
         .into_iter()
         .chain(quit_clean())

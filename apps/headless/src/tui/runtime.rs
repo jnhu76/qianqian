@@ -386,8 +386,8 @@ fn perform_open<S: EpisodeStart>(
     player: &mut ReferencePlayerApp<S>,
     candidate: &Path,
 ) {
-    let expansion = crate::input::expand_inputs([candidate]);
-    let outcome = crate::input::open_expanded(player, &expansion);
+    let mut expansion = crate::input::expand_inputs([candidate]);
+    let outcome = crate::input::open_expanded(player, &mut expansion);
     let feedback = match outcome {
         None => format!("open refused: {}", expansion.refusal()),
         Some(OpenOutcome::Opened) => expansion.opened_status(),

@@ -236,6 +236,16 @@ fn reference_player_transport(files: Vec<PathBuf>, order: OrderPreference) -> Ex
     // list (Issue #166 §9/§10) — and an INTERACTIVE launch (no argv)
     // prepares nothing at all: no Open attempted, no feedback
     // fabricated (U1 corrective REQUIRED-1).
+    //
+    // A big folder scans (enumerate + probe every candidate)
+    // synchronously before the TUI appears — the documented
+    // synchronous-Open stall — so the user gets one honest line about
+    // what is happening instead of a blank console.
+    if let Some(first_root) = files.first() {
+        println!("scanning {} ...", first_root.display());
+        use std::io::Write;
+        let _ = std::io::stdout().flush();
+    }
     let preparation = input::prepare_startup(&files, &mut player);
     if let Some(OpenOutcome::FailStop { diagnostic }) = &preparation.startup_open {
         // A latched §G.6 violation has no exit and earns no shell.

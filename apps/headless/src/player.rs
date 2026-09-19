@@ -280,6 +280,17 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
         Some(self.active.as_ref()?.source.as_path())
     }
 
+    /// One scan-time media probe of a candidate, through the same
+    /// stateless decode-provider query the Open replacement's frozen
+    /// sequence uses (probe-before-destruction). Advisory preflight
+    /// evidence for input-expansion filtering: `Ok` never commits
+    /// anything and `Err` never touches the live episode — the
+    /// authoritative source evidence remains the episode activation's
+    /// own.
+    pub fn probe_candidate(&self, candidate: &Path) -> Result<(), String> {
+        self.start.probe(candidate)
+    }
+
     /// Establish the playlist that rides an Open commit: `entries` are
     /// the accepted candidates in canonical order and `entries[0]` IS
     /// the committed episode, so the traversal cursor starts on it. The
