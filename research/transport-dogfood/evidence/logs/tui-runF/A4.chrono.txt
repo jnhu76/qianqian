@@ -1,0 +1,50 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.017s       recv  16 bytes
+T+   0.074s       recv  110 bytes
+T+   0.075s       recv  19 bytes
+T+   0.090s       recv  6317 bytes
+T+   0.231s       recv  15 bytes
+T+   0.445s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.445s    wait-ok  Format: 44100 Hz
+T+   1.168s       recv  2 bytes
+T+   2.108s       recv  2 bytes
+T+   3.198s       recv  2 bytes
+T+   4.135s       recv  2 bytes
+T+   5.229s       recv  2 bytes
+T+   6.167s       recv  2 bytes
+T+   6.445s       send  3 bytes: "\u{1b}[D"
+T+   6.605s       recv  2 bytes
+T+   6.646s       recv  6202 bytes
+T+   6.646s       recv  4 bytes
+T+   6.646s       recv  4 bytes
+T+   6.667s       recv  6259 bytes
+T+   6.726s wait-begin  new-position != Some((0, 6))
+T+   6.726s    wait-ok  new-position (0, 1)
+T+   6.727s       recv  6299 bytes
+T+   6.727s       recv  4 bytes
+T+   6.745s       recv  6311 bytes
+T+   7.197s       recv  8 bytes
+T+   8.132s       recv  2 bytes
+T+   9.220s       recv  2 bytes
+T+   9.227s wait-begin  new-position != Some((0, 1))
+T+   9.227s    wait-ok  new-position (0, 2)
+T+   9.227s       send  3 bytes: "\u{1b}[D"
+T+   9.252s       recv  78 bytes
+T+   9.378s       recv  8 bytes
+T+   9.428s       recv  6171 bytes
+T+   9.428s       recv  4 bytes
+T+   9.428s       recv  4 bytes
+T+   9.440s       recv  6259 bytes
+T+   9.508s wait-begin  new-position != Some((0, 2))
+T+   9.508s    wait-ok  new-position (0, 1)
+T+   9.508s wait-begin  "Terminal: pending" within 5s
+T+   9.508s    wait-ok  Terminal: pending
+T+   9.508s       send  1 bytes: "q"
+T+   9.508s       recv  6299 bytes
+T+   9.509s       recv  6267 bytes
+T+   9.519s       recv  251 bytes
+T+   9.540s       recv  34 bytes
+T+   9.551s       recv  47 bytes
+T+   9.588s       recv  333 bytes
+T+   9.988s wait-begin  "stopped before completion" within 5s
+T+   9.988s    wait-ok  stopped before completion

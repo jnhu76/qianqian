@@ -1,0 +1,134 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.016s       recv  16 bytes
+T+   0.069s       recv  110 bytes
+T+   0.069s       recv  35 bytes
+T+   0.090s       recv  6317 bytes
+T+   0.231s       recv  15 bytes
+T+   0.433s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.433s    wait-ok  Format: 44100 Hz
+T+   0.433s wait-begin  "Volume: 100/100 (desired)" within 5s
+T+   0.433s    wait-ok  Volume: 100/100 (desired)
+T+   0.433s       send  1 bytes: "-"
+T+   0.433s       recv  51 bytes
+T+   0.533s       send  1 bytes: "-"
+T+   0.534s       recv  18 bytes
+T+   0.634s       send  1 bytes: "-"
+T+   0.634s       recv  19 bytes
+T+   0.734s       send  1 bytes: "-"
+T+   0.735s       recv  18 bytes
+T+   0.835s       recv  6202 bytes
+T+   0.835s       recv  4 bytes
+T+   0.835s       recv  4 bytes
+T+   0.857s       recv  6259 bytes
+T+   0.915s wait-begin  "Volume: 80/100 (desired)" within 5s
+T+   0.915s    wait-ok  Volume: 80/100 (desired)
+T+   0.915s       send  1 bytes: "-"
+T+   0.915s       recv  6299 bytes
+T+   0.915s       recv  4 bytes
+T+   0.935s       recv  6311 bytes
+T+   1.015s       send  1 bytes: "-"
+T+   1.016s       recv  18 bytes
+T+   1.115s       send  1 bytes: "-"
+T+   1.116s       recv  27 bytes
+T+   1.216s       send  1 bytes: "-"
+T+   1.217s       recv  18 bytes
+T+   1.316s       send  1 bytes: "-"
+T+   1.317s       recv  19 bytes
+T+   1.417s       send  1 bytes: "-"
+T+   1.417s       recv  18 bytes
+T+   1.517s       recv  6191 bytes
+T+   1.517s       recv  4 bytes
+T+   1.517s       recv  4 bytes
+T+   1.530s       recv  6259 bytes
+T+   1.597s wait-begin  "Volume: 50/100 (desired)" within 5s
+T+   1.597s    wait-ok  Volume: 50/100 (desired)
+T+   1.597s       send  1 bytes: "-"
+T+   1.597s       recv  6299 bytes
+T+   1.597s       recv  4 bytes
+T+   1.608s       recv  6311 bytes
+T+   1.697s       send  1 bytes: "-"
+T+   1.698s       recv  18 bytes
+T+   1.798s       send  1 bytes: "-"
+T+   1.798s       recv  19 bytes
+T+   1.898s       send  1 bytes: "-"
+T+   1.898s       recv  18 bytes
+T+   1.998s       send  1 bytes: "-"
+T+   1.999s       recv  19 bytes
+T+   2.098s       send  1 bytes: "-"
+T+   2.099s       recv  26 bytes
+T+   2.199s       recv  6191 bytes
+T+   2.200s       recv  4 bytes
+T+   2.200s       recv  4 bytes
+T+   2.214s       recv  6259 bytes
+T+   2.279s wait-begin  "Volume: 20/100 (desired)" within 5s
+T+   2.279s    wait-ok  Volume: 20/100 (desired)
+T+   2.279s       send  1 bytes: "-"
+T+   2.279s       recv  6299 bytes
+T+   2.280s       recv  4 bytes
+T+   2.292s       recv  6311 bytes
+T+   2.380s       send  1 bytes: "-"
+T+   2.380s       recv  18 bytes
+T+   2.480s       send  1 bytes: "-"
+T+   2.480s       recv  43 bytes
+T+   2.580s       send  1 bytes: "-"
+T+   2.581s       recv  17 bytes
+T+   2.682s       recv  6191 bytes
+T+   2.682s       recv  4 bytes
+T+   2.682s       recv  4 bytes
+T+   2.697s       recv  6259 bytes
+T+   2.762s wait-begin  "Volume: 0/100 (desired)" within 5s
+T+   2.762s    wait-ok  Volume: 0/100 (desired)
+T+   2.762s       recv  6299 bytes
+T+   2.762s       recv  4 bytes
+T+   2.776s       recv  6311 bytes
+T+   3.074s       recv  8 bytes
+T+   4.167s       recv  2 bytes
+T+   5.105s       recv  2 bytes
+T+   5.262s wait-begin  new-position != None
+T+   5.262s    wait-ok  new-position (0, 2)
+T+   5.262s wait-begin  "Terminal: pending" within 5s
+T+   5.262s    wait-ok  Terminal: pending
+T+   5.262s       send  1 bytes: "+"
+T+   5.276s       recv  17 bytes
+T+   5.362s       send  1 bytes: "+"
+T+   5.363s       recv  43 bytes
+T+   5.462s       send  1 bytes: "+"
+T+   5.463s       recv  18 bytes
+T+   5.563s       send  1 bytes: "+"
+T+   5.563s       recv  19 bytes
+T+   5.663s       send  1 bytes: "+"
+T+   5.664s       recv  18 bytes
+T+   5.764s       send  1 bytes: "+"
+T+   5.764s       recv  19 bytes
+T+   5.864s       send  1 bytes: "+"
+T+   5.865s       recv  18 bytes
+T+   5.964s       send  1 bytes: "+"
+T+   5.965s       recv  19 bytes
+T+   6.065s       send  1 bytes: "+"
+T+   6.065s       recv  18 bytes
+T+   6.165s       send  1 bytes: "+"
+T+   6.165s       recv  27 bytes
+T+   6.265s       send  1 bytes: "+"
+T+   6.266s       recv  18 bytes
+T+   6.366s       send  1 bytes: "+"
+T+   6.366s       recv  19 bytes
+T+   6.466s       send  1 bytes: "+"
+T+   6.467s       recv  18 bytes
+T+   6.566s       send  1 bytes: "+"
+T+   6.567s       recv  19 bytes
+T+   6.667s       recv  6191 bytes
+T+   6.667s       recv  4 bytes
+T+   6.667s       recv  4 bytes
+T+   6.687s       recv  6259 bytes
+T+   6.747s wait-begin  "Volume: 70/100 (desired)" within 5s
+T+   6.747s    wait-ok  Volume: 70/100 (desired)
+T+   6.747s wait-begin  "Terminal: pending" within 5s
+T+   6.747s    wait-ok  Terminal: pending
+T+   6.747s       send  1 bytes: "q"
+T+   6.747s       recv  6299 bytes
+T+   6.748s       recv  6267 bytes
+T+   6.765s       recv  266 bytes
+T+   6.781s       recv  81 bytes
+T+   6.828s       recv  349 bytes
+T+   7.228s wait-begin  "stopped before completion" within 5s
+T+   7.228s    wait-ok  stopped before completion

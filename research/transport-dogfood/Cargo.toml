@@ -1,0 +1,34 @@
+[package]
+name = "transport-dogfood"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Self-contained evidence crate: an empty [workspace] table keeps cargo
+# from walking up into the production workspace without touching the
+# root manifest (production delta stays zero).
+[workspace]
+
+# Workspace-excluded executable evidence for
+# QIANQIAN-TRANSPORT-DOGFOOD-INTEGRATED-AUDIT-TUI-V1-CLOSURE-1 (Stage A).
+# Nothing here may be imported by any qianqian-* crate. The driver
+# exercises the REAL qianqian-headless.exe TUI/machine transports on a
+# real Windows host; it holds no production code and pins no contract
+# beyond what the campaign report claims.
+
+[dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Console",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+] }
+
+[[bin]]
+name = "tuidriver"
+path = "src/bin/tuidriver.rs"

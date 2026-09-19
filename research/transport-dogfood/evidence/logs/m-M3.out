@@ -1,0 +1,15 @@
+source: 44100 Hz, 2 channels, mask 0x3
+playing synth45.mp3 ...
+outcome: pending
+format: 44100 Hz, 2 channels, mask 0x3
+position: --:-- / 00:45
+stop_requested: false
+pause_requested: true
+paused: false
+outcome: pending
+format: 44100 Hz, 2 channels, mask 0x3
+position: --:-- / 00:45
+stop_requested: false
+pause_requested: false
+paused: false
+EOF: played out completely

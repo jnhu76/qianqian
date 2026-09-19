@@ -1,0 +1,22 @@
+{"scenario":"A4","verdict":"GREEN","exit_code":0,
+ "failure":null,
+ "child_status_at_failure":null,
+ "steps":[
+    "expect \"Format: 44100 Hz\" OK",
+    "sleep 6000ms",
+    "record-position Some((0, 6))",
+    "mark",
+    "keys \"\\u{1b}[D\" x1",
+    "new-position (0, 1) OK",
+    "sleep 2500ms",
+    "new-position (0, 2) OK",
+    "keys \"\\u{1b}[D\" x1",
+    "new-position (0, 1) OK",
+    "expect \"Terminal: pending\" OK",
+    "keys \"q\"",
+    "exit 0 OK",
+    "expect \"stopped before completion\" OK"
+],
+ "resources":[
+    {"label":"baseline","threads":6,"handles":181,"working_set_bytes":13025280}
+]}

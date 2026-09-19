@@ -1,0 +1,28 @@
+{"scenario":"A7","verdict":"GREEN","exit_code":0,
+ "failure":null,
+ "child_status_at_failure":null,
+ "steps":[
+    "expect \"Format: 44100 Hz\" OK",
+    "expect \"Volume: 100/100 (desired)\" OK",
+    "keys \"-\" x4",
+    "expect \"Volume: 80/100 (desired)\" OK",
+    "keys \"-\" x6",
+    "expect \"Volume: 50/100 (desired)\" OK",
+    "keys \"-\" x6",
+    "expect \"Volume: 20/100 (desired)\" OK",
+    "keys \"-\" x4",
+    "expect \"Volume: 0/100 (desired)\" OK",
+    "mark",
+    "sleep 2500ms",
+    "new-position (0, 2) OK",
+    "expect \"Terminal: pending\" OK",
+    "keys \"+\" x14",
+    "expect \"Volume: 70/100 (desired)\" OK",
+    "expect \"Terminal: pending\" OK",
+    "keys \"q\"",
+    "exit 0 OK",
+    "expect \"stopped before completion\" OK"
+],
+ "resources":[
+    {"label":"baseline","threads":6,"handles":181,"working_set_bytes":13004800}
+]}

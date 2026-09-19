@@ -1,0 +1,81 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.016s       recv  16 bytes
+T+   0.067s       recv  110 bytes
+T+   0.067s       recv  35 bytes
+T+   0.086s       recv  6317 bytes
+T+   0.226s       recv  15 bytes
+T+   0.433s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.433s    wait-ok  Format: 44100 Hz
+T+   1.158s       recv  2 bytes
+T+   2.095s       recv  2 bytes
+T+   2.433s       send  1 bytes: " "
+T+   2.434s       recv  6202 bytes
+T+   2.434s       recv  4 bytes
+T+   2.434s       recv  4 bytes
+T+   2.451s       recv  6259 bytes
+T+   2.513s wait-begin  "Paused: true" within 3s
+T+   2.514s       recv  6299 bytes
+T+   2.514s       recv  4 bytes
+T+   2.529s       recv  6311 bytes
+T+   2.534s    wait-ok  Paused: true
+T+   2.534s       send  3 bytes: "\u{1b}[C"
+T+   2.686s       recv  8 bytes
+T+   2.734s       recv  6191 bytes
+T+   2.735s       recv  4 bytes
+T+   2.735s       recv  4 bytes
+T+   2.748s       recv  6259 bytes
+T+   2.814s wait-begin  new-position != None
+T+   2.815s    wait-ok  new-position (0, 7)
+T+   2.815s wait-begin  "Pause requested: true" within 20s
+T+   2.815s    wait-ok  Pause requested: true
+T+   2.815s       send  3 bytes: "\u{1b}[D"
+T+   2.815s       recv  6299 bytes
+T+   2.815s       recv  4 bytes
+T+   2.826s       recv  6311 bytes
+T+   2.981s       recv  8 bytes
+T+   3.015s       recv  6191 bytes
+T+   3.016s       recv  4 bytes
+T+   3.016s       recv  4 bytes
+T+   3.026s       recv  6259 bytes
+T+   3.095s wait-begin  new-position != Some((0, 7))
+T+   3.095s    wait-ok  new-position (0, 2)
+T+   3.095s wait-begin  "Paused: true" within 5s
+T+   3.095s    wait-ok  Paused: true
+T+   3.095s       send  1 bytes: " "
+T+   3.096s       recv  6299 bytes
+T+   3.105s       recv  6259 bytes
+T+   3.176s wait-begin  "Pause requested: false" within 5s
+T+   3.176s    wait-ok  Pause requested: false
+T+   3.176s       recv  6299 bytes
+T+   3.177s       recv  4 bytes
+T+   3.199s       recv  6311 bytes
+T+   3.805s       recv  8 bytes
+T+   4.676s wait-begin  new-position != Some((0, 2))
+T+   4.676s    wait-ok  new-position (0, 7)
+T+   4.677s       send  3 bytes: "\u{1b}[C"
+T+   4.777s       recv  6191 bytes
+T+   4.777s       recv  4 bytes
+T+   4.777s       recv  4 bytes
+T+   4.786s       recv  6259 bytes
+T+   4.857s       send  1 bytes: " "
+T+   4.857s       recv  6299 bytes
+T+   4.880s       recv  6259 bytes
+T+   4.937s wait-begin  "Pause requested: true" within 5s
+T+   4.937s    wait-ok  Pause requested: true
+T+   4.937s wait-begin  "Paused: true" within 4s
+T+   4.937s    wait-ok  Paused: true
+T+   4.937s       send  1 bytes: " "
+T+   4.938s       recv  6299 bytes
+T+   4.958s       recv  6259 bytes
+T+   5.018s wait-begin  "Pause requested: false" within 5s
+T+   5.018s    wait-ok  Pause requested: false
+T+   5.018s wait-begin  new-position != Some((0, 7))
+T+   5.018s    wait-ok  new-position (0, 2)
+T+   5.018s       send  1 bytes: "q"
+T+   5.018s       recv  6299 bytes
+T+   5.019s       recv  6267 bytes
+T+   5.035s       recv  266 bytes
+T+   5.050s       recv  81 bytes
+T+   5.099s       recv  349 bytes
+T+   5.499s wait-begin  "stopped before completion" within 5s
+T+   5.499s    wait-ok  stopped before completion

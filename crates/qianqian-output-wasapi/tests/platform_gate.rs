@@ -4,19 +4,17 @@
 
 use qianqian_app::QianqianApp;
 use qianqian_composition::{DesiredEntry, FiberState, Revision};
-use qianqian_output_wasapi::wasapi_output_plugin;
+use qianqian_output_wasapi::output_plugin;
 
 fn desired_plugin(id: &str) -> DesiredEntry {
-    DesiredEntry::enabled(id, "wasapi_output_plugin", Revision::new(1))
+    DesiredEntry::enabled(id, "output_plugin", Revision::new(1))
 }
 
 #[cfg(not(windows))]
 #[test]
 fn non_windows_activation_fails_loudly_without_ghost_provisions() {
     let mut runtime = QianqianApp::new();
-    runtime
-        .register_component(wasapi_output_plugin())
-        .expect("legal");
+    runtime.register_component(output_plugin()).expect("legal");
     runtime
         .revise_desired(vec![desired_plugin("output")])
         .expect("legal");
@@ -49,9 +47,7 @@ fn non_windows_activation_fails_loudly_without_ghost_provisions() {
 #[test]
 fn windows_activation_publishes_the_capability() {
     let mut runtime = QianqianApp::new();
-    runtime
-        .register_component(wasapi_output_plugin())
-        .expect("legal");
+    runtime.register_component(output_plugin()).expect("legal");
     runtime
         .revise_desired(vec![desired_plugin("output")])
         .expect("legal");

@@ -159,7 +159,7 @@ impl EpisodeStart for RealSource {
                 refused: Some(format!("decode plugin registration failed: {e:?}")),
             };
         }
-        if let Err(e) = runtime.register_component(qianqian_output_wasapi::wasapi_output_plugin()) {
+        if let Err(e) = runtime.register_component(qianqian_output_wasapi::output_plugin()) {
             return StartAttempt {
                 runtime,
                 handle,
@@ -178,7 +178,7 @@ impl EpisodeStart for RealSource {
         }
         let desired = vec![
             entry("decode", "songcore_decode_plugin"),
-            entry("output", "wasapi_output_plugin"),
+            entry("output", "output_plugin"),
             entry("session", "playback_session"),
         ];
         if let Err(errors) = runtime.revise_desired(desired) {

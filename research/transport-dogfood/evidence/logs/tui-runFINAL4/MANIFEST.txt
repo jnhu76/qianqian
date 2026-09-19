@@ -1,0 +1,54 @@
+# RUN FINAL4 raw evidence archive — the closure-definitive physical regression
+
+run:           TUI-RUNFINAL4 (+ machine runFINAL4)
+date_utc:      2026-09-19T06:17:04Z (archival time; run identity in ../ENV-TUI-RUNFINAL4.txt)
+head:          486b303771acf91060025c512cdf15113097aa99
+result:        TUI 31/31 GREEN (26 baseline + 5 Stage-C scenarios; denominator reported per directive)
+               machine M1-M7 7/7 PASS
+
+## Contents
+- A*.txt / C*.txt: the 31 per-scenario ConPTY transcripts (raw VT-derived
+  frame history + step verdicts), copied byte-for-byte from the Windows
+  stage C:\Users\Public\qianqian-dogfood\evidence\ before any later
+  invocation could overwrite them (the stage is single-buffered per
+  scenario name — learned when FINAL3's A3 transcript was overwritten by
+  the FINAL3B re-run; FINAL3's complete runner stdout is preserved at
+  ../tui-runFINAL3-stdout.txt).
+- ../tui-runFINAL4-driver-summary.txt: the driver's own stage summary.
+- ../ENV-TUI-RUNFINAL4.txt: full run identity (binary sha256s, corpus
+  sha256s, host/device, rustc).
+
+## FINAL3 A3 transient — classified, preserved (watch item A3-DEV-1)
+FINAL3 (same head, same binaries) was 30/31: A3 RED at 35.4s — the
+runner stdout (../tui-runFINAL3-stdout.txt) shows the episode
+progressing normally (format, seeks, position ticks (0,8)/(0,13)/(0,8))
+and then the timeout waiting for "Terminal: Completed" with the child
+alive. On the live stage the episode panel showed a failure diagnostic
+line; the transcript carrying it was overwritten by the FINAL3B re-run
+(this stage is single-buffered per scenario name), so per the campaign's
+own U-1 truth standard the specific failure attribution ("device") and
+any teardown-quietness claim for the RED itself CANNOT be honestly
+assigned from surviving primary evidence — the literal string and the
+quietness are runner observations not preserved in committed artifacts.
+What the committed evidence DOES prove: RED at FINAL3; GREEN at
+FINAL3B and at FINAL4 on byte-identical binaries (sha256 in the ENV
+headers) — i.e. a transient, not reproduced on identical identity.
+A3 was GREEN in committed runs F, G and FINAL (summaries lines 63).
+Distinct from U-1 (U-1 = total silence, no ticks). Non-blocking watch
+item; no bound was raised and no oracle was weakened (empty
+scenarios.rs diff across the corrective range).
+
+## worktree_status: 1 dirty entries (RUNFINAL2/3/4 and RUNG)
+Self-count artifact: tools/run-tui.sh creates the ENV file by shell
+redirection BEFORE the git-status snapshot inside the same block runs,
+so the ENV file counts itself. The product tree was clean.
+
+## B-03 provenance pointer
+B-03 (FOLLOW_UP_HARDENING, non-blocking, reachability NO) and the Stage-B
+reviewer verdicts are recorded in the reachable campaign commits
+3503f05 (fix(output): pin host-render teardown ownership ordering) and
+f2536d3 (docs(playback): close Stage-B audit minors), the Issue #119
+campaign checkpoint comment, and the Stage-B review record delivered to
+the maintainer. (An earlier revision of this manifest cited fc3acca /
+2924ab2 — filter-branch refs/original backup generations, unreachable
+and GC-prone.)

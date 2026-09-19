@@ -1,0 +1,34 @@
+C9-resize: GREEN (1795ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    resize 80x24
+    keys " "
+    expect "Pause requested: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    resize 120x40
+    keys "x"
+    expect "Volume: 100/100 (desired)" OK
+    absent-after-mark "teardown violated" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+C12-cjk: GREEN (1393ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "o"
+    keys "千曲.flac"
+    keys "\r"
+    expect-after-mark "opened 千 曲 .flac" OK
+    keys " "
+    expect "Pause requested: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    expect-after-mark "Source: 千 曲 .flac" OK
+    absent-after-mark "teardown violated" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK

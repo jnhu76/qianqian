@@ -1,0 +1,24 @@
+run: TUI-RUNF
+date_utc: 2026-09-19T01:49:26Z
+branch: hardening/transport-dogfood-tui-v1-closure-1
+head_sha: 210388230bf82b27bbb78df48e7a153cbba67ba5
+origin_main: ed240e377cef4c9ec902f2ce1b890b2166b1e3d0
+worktree_status: 20 dirty entries
+build_command: QIANQIAN_NATIVE_DIR=<mingw staging> cargo build --release --target x86_64-pc-windows-gnu --features playback -p qianqian-headless
+target_triple: x86_64-pc-windows-gnu (GNU toolchain)
+features: playback profile: release
+headless_sha256: cb29662a18fe040a266de333edb621dc576635e3f8ce32db83b5c46bb7fbe255
+tuidriver_sha256: 9d853719914379466f477a864b8997923805681f5906128a4d7e8375a5c9c0c8
+songcore_sha256: 17323291fc7b53997a36746e1ce7f86b8863a63f71be79389b9b196a05175a2a
+rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
+corpus_sha256:
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058      mp3cbr.mp3
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      synth45.mp3
+  d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2      flac4.flac
+  5fb781ff2a9d7d6ab6aea70c28cf7c2883c9069659d2a0651239eeae3f62ab28      synth30.flac
+  0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3      alac4.m4a
+  2d0bbae102dbdfd6236c3e43093303998df75872f5c6928f98649179fa00d52c      alac6.m4a
+  a6929077296eacee9c52768efa07ca184cb2bfbfff84fec47de6948293a720ae      garbage.bin
+windows_caption: Microsoft Windows 11 ×¨Òµ°æ
+audio_device: Realtek High Definition Audio
+endpoint_note: default render endpoint, shared mode, event-driven (as opened by the wasapi stderr line in each transcript)

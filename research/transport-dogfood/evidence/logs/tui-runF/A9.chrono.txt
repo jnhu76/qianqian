@@ -1,0 +1,71 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.015s       recv  16 bytes
+T+   0.067s       recv  110 bytes
+T+   0.067s       recv  19 bytes
+T+   0.078s       recv  6317 bytes
+T+   0.233s       recv  15 bytes
+T+   0.445s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.445s    wait-ok  Format: 44100 Hz
+T+   0.445s       send  1 bytes: "-"
+T+   0.445s       recv  6202 bytes
+T+   0.446s       recv  4 bytes
+T+   0.446s       recv  4 bytes
+T+   0.467s       recv  6259 bytes
+T+   0.525s wait-begin  "Volume: 95/100 (desired)" within 5s
+T+   0.526s       recv  6299 bytes
+T+   0.526s       recv  4 bytes
+T+   0.545s       recv  6311 bytes
+T+   0.546s    wait-ok  Volume: 95/100 (desired)
+T+   0.546s       send  3 bytes: "\u{1b}[C"
+T+   0.702s       recv  8 bytes
+T+   0.746s       recv  6191 bytes
+T+   0.746s       recv  4 bytes
+T+   0.747s       recv  4 bytes
+T+   0.764s       recv  6259 bytes
+T+   0.826s wait-begin  new-position != None
+T+   0.826s    wait-ok  new-position (0, 5)
+T+   0.826s wait-begin  "Volume: 95/100 (desired)" within 5s
+T+   0.826s    wait-ok  Volume: 95/100 (desired)
+T+   0.826s       send  1 bytes: "-"
+T+   0.827s       recv  6259 bytes
+T+   0.840s       recv  18 bytes
+T+   0.907s wait-begin  "Volume: 90/100 (desired)" within 5s
+T+   0.907s       recv  6299 bytes
+T+   0.907s       recv  4 bytes
+T+   0.917s       recv  6311 bytes
+T+   0.927s    wait-ok  Volume: 90/100 (desired)
+T+   0.927s       send  3 bytes: "\u{1b}[C"
+T+   1.089s       recv  9 bytes
+T+   1.128s       recv  6191 bytes
+T+   1.128s       recv  4 bytes
+T+   1.128s       recv  4 bytes
+T+   1.151s       recv  6259 bytes
+T+   1.208s wait-begin  new-position != Some((0, 5))
+T+   1.208s    wait-ok  new-position (0, 10)
+T+   1.208s       send  3 bytes: "\u{1b}[D"
+T+   1.208s       recv  6299 bytes
+T+   1.209s       recv  4 bytes
+T+   1.230s       recv  6311 bytes
+T+   1.369s       recv  9 bytes
+T+   1.409s       recv  6191 bytes
+T+   1.409s       recv  4 bytes
+T+   1.409s       recv  4 bytes
+T+   1.429s       recv  6259 bytes
+T+   1.489s wait-begin  new-position != Some((0, 10))
+T+   1.489s    wait-ok  new-position (0, 5)
+T+   1.489s       send  1 bytes: "+"
+T+   1.489s       recv  6299 bytes
+T+   1.507s       recv  6259 bytes
+T+   1.569s wait-begin  "Volume: 95/100 (desired)" within 5s
+T+   1.569s    wait-ok  Volume: 95/100 (desired)
+T+   1.569s wait-begin  "Terminal: pending" within 5s
+T+   1.569s    wait-ok  Terminal: pending
+T+   1.570s       send  1 bytes: "q"
+T+   1.570s       recv  6259 bytes
+T+   1.571s       recv  8 bytes
+T+   1.585s       recv  251 bytes
+T+   1.602s       recv  34 bytes
+T+   1.616s       recv  47 bytes
+T+   1.650s       recv  333 bytes
+T+   2.050s wait-begin  "stopped before completion" within 5s
+T+   2.050s    wait-ok  stopped before completion

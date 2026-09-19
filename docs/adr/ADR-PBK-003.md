@@ -23,14 +23,14 @@ Playback Session Plugin
 
 Playback Session consumes the typed `AudioOutputCapability`; it does not directly depend on WASAPI. That boundary is correct.
 
-However, the current Windows realization still fuses two different identities:
+However, the Windows realization fused two different identities (historical at acceptance; resolved — see §11):
 
 ```text
 stable composition role          concrete platform mechanism
         Output Plugin        ==      WASAPI backend
 ```
 
-Current production makes that fusion visible through spellings such as:
+Pre-correction production made that fusion visible through spellings such as:
 
 ```text
 qianqian-output-wasapi
@@ -351,36 +351,34 @@ Likewise, backend identity MUST NOT become product truth. The player does not be
 
 ---
 
-## 11. Current production differential
+## 11. Production differential — RESOLVED (conformance record)
 
-Current Windows production still fuses the stable Output Plugin role and the concrete WASAPI backend in the provider constructor/name:
+Historical conformance differential: production formerly fused the stable Output Plugin role and the concrete WASAPI backend in the provider constructor/name:
 
 ```text
 qianqian-output-wasapi::wasapi_output_plugin()
 desired("output", "wasapi_output_plugin")
 ```
 
-This is now an explicit **architecture-conformance differential**.
+That fusion was an explicit **architecture-conformance differential**. It did not invalidate the earned Windows transport semantics or physical evidence; it meant only that the representation exposed backend identity one layer too high.
 
-It does **not** invalidate the earned Windows transport semantics or physical evidence. It means only that the current representation exposes backend identity one layer too high.
+**Resolved by**: `HOST-RENDER-WINDOWS-CONFORMANCE-CORRECTIVE-1` (2026-09-19, campaign QIANQIAN-TRANSPORT-DOGFOOD-INTEGRATED-AUDIT-TUI-V1-CLOSURE-1; original commit `104ffd4`, reworded message-only to `57d60b5` — see `research/transport-dogfood/evidence/HISTORY-REWORD-MAP.md`).
 
-Required corrective direction:
+Current realization:
 
 ```text
-current:
-    WASAPI-specific Plugin constructor
-        → AudioOutputCapability
-
-corrective target:
-    stable Output Plugin
-        owns/injects
-    WASAPI Host Render Backend
-        implements/refines AudioOutput contract
+desired composition uses the stable "output_plugin" component
+    qianqian-output-wasapi::output_plugin()
+the Output Plugin owns/injects the backend selected by the host
+    assembly (crate-private selected_backend())
+WASAPI is the current Windows Host Render Backend mechanism
+    (pub(crate) WasapiOutput)
+the Playback Session consumes AudioOutputCapability only
 ```
 
-The corrective MUST preserve the existing playback semantics and output behavior. It is not permission to redesign F3/F4/F5/F6/Volume.
+Windows conformance grounding (a current-reality record under §12 — not a new architecture decision and not permanent semantic authority): the required before/after equivalence evidence was run on the real Windows/WASAPI path — **26/26 TUI scenarios GREEN and 7/7 machine-mode scenarios GREEN on the corrected tree** (run G; binary/corpus identity in `research/transport-dogfood/evidence/ENV-TUI-RUNG.txt`), demonstrating "architecture identity changed, playback semantics did not."
 
-Before claiming the output architecture backend-neutral — and before adding a Linux production backend — the Windows realization must pass a conformance slice demonstrating that separating Plugin identity from backend mechanism does not change the already-earned transport contract.
+The corrective preserved the existing playback semantics and output behavior throughout; it was not permission to redesign F3/F4/F5/F6/Volume. Before adding a Linux production backend, the §12 conformance gate remains the standing requirement.
 
 ---
 

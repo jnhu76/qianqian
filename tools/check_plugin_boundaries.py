@@ -201,9 +201,9 @@ EXPORT_RULES = {
     },
     "crates/qianqian-output-wasapi/src/lib.rs": {
         "allowed_root_public": [
-            "pub fn wasapi_output_plugin() -> ComponentSpec {",
+            "pub fn output_plugin() -> ComponentSpec {",
         ],
-        "authority": "ADR-PBK-002 D5/D7 — the admitted public surface is exactly the plugin constructor; consumers reach the mechanism only as the AudioOutput capability service",
+        "authority": "ADR-PBK-002 D5/D7 as amended by ADR-PBK-003 §2/§3/§11 — the admitted public surface is exactly the STABLE Output Plugin constructor (the owned WASAPI Host Render Backend stays crate-private; consumers reach the mechanism only as the AudioOutput capability service; backend brand must not reappear in the composition identity)",
     },
 }
 
@@ -214,7 +214,7 @@ EDGE_RULE_PROSE = {
     "qianqian-app": "the App abstraction may depend on composition only",
     "qianqian-playback": "playback may depend on audio-api and composition only",
     "qianqian-decode-songcore": "decode provider may depend on audio-api, composition and songcore-sys only",
-    "qianqian-output-wasapi": "output provider may depend on audio-api and composition only",
+    "qianqian-output-wasapi": "the stable Output Plugin provider may depend on audio-api and composition only (its Host Render Backend is an owned mechanism, ADR-PBK-003)",
     "qianqian-headless": "composition root admits app, composition, playback and explicitly admitted providers only",
     "qianqian-songcore-sys": "the sys binding crate depends on no qianqian crate",
 }
@@ -631,8 +631,8 @@ def run_negative_controls():
         "unexpected root public surface: 'pubusewasapi::WasapiOutput;'",
         {
             "crates/qianqian-output-wasapi/src/lib.rs": lambda t: t.replace(
-                "/// Build the platform's real output mechanism.",
-                "pub use wasapi::WasapiOutput;\n\n/// Build the platform's real output mechanism.",
+                "fn selected_backend() -> Result<Rc<dyn qianqian_audio_api::ports::AudioOutput>, String> {",
+                "pub use wasapi::WasapiOutput;\n\nfn selected_backend() -> Result<Rc<dyn qianqian_audio_api::ports::AudioOutput>, String> {",
                 1,
             )
         },

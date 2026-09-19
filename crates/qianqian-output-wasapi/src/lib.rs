@@ -1,16 +1,31 @@
-//! Real WASAPI Output capability provider.
+//! The stable Output Plugin (ADR-PBK-003).
 //!
-//! Mechanism provider only: it owns the WASAPI mechanism code (COM call
-//! sequences, format negotiation, the render loop) and publishes the
-//! `AudioOutput` capability through a kernel `ComponentSpec`. Per-episode
-//! state — one acquired render stream, including its render thread —
-//! belongs to the caller (the Playback Session)
-//! (first-audible-slice design §2, §5).
+//! Three identities, kept distinct (PBK-003 §2):
 //!
-//! Platform behavior (design §8): the WASAPI mechanism exists under
-//! `cfg(windows)`. On any other platform the plugin compiles, and its real
-//! activation reports the platform unsupported — loudly, never a fake
-//! success or a silent null output.
+//! ```text
+//! Output Plugin            this ComponentSpec: the stable K0
+//!                          composition identity ("output_plugin");
+//!                          it provides the AudioOutputCapability
+//!                          Host Render Backend          the owned
+//!                          mechanism it constructs on activation —
+//!                          the concrete platform implementation,
+//!                          never itself a Plugin (PBK-003 §4/D13)
+//!                          AudioOutput contract         the
+//!                          backend-neutral seam between them
+//!                          (qianqian-audio-api ports)
+//! ```
+//!
+//! A desired composition identifies the stable output role; no playback
+//! semantic may depend on which backend realizes it (PBK-003 §3/§10).
+//! Backend selection is host-assembly configuration (PBK-003 §9): this
+//! assembly's Windows selection is the owned WASAPI backend under
+//! `cfg(windows)`. Per-episode state — one acquired render stream,
+//! including its render thread — belongs to the caller (the Playback
+//! Session).
+//!
+//! On a platform with no selected backend the plugin compiles, and its
+//! real activation reports the platform unsupported — loudly, never a
+//! fake success or a silent null output.
 
 use std::rc::Rc;
 
@@ -40,28 +55,32 @@ mod render_order_oracle;
 #[cfg(all(test, windows))]
 mod event_handle_lifetime_tests;
 
-/// Build the platform's real output mechanism. On non-Windows this is the
-/// honest unsupported-platform report, surfaced as an activation failure.
+/// The Host Render Backend this host assembly selects (PBK-003 §9):
+/// the owned Windows backend mechanism. Selection is configuration of
+/// the assembly, not composition truth; a future platform backend
+/// replaces this factory body without touching the plugin identity.
 #[cfg(windows)]
-fn platform_provider() -> Result<Rc<dyn qianqian_audio_api::ports::AudioOutput>, String> {
+fn selected_backend() -> Result<Rc<dyn qianqian_audio_api::ports::AudioOutput>, String> {
     Ok(Rc::new(wasapi::WasapiOutput::new()?))
 }
 
 #[cfg(not(windows))]
-fn platform_provider() -> Result<Rc<dyn qianqian_audio_api::ports::AudioOutput>, String> {
+fn selected_backend() -> Result<Rc<dyn qianqian_audio_api::ports::AudioOutput>, String> {
     Err(
-        "WASAPI output requires Windows; this platform has no real output \
-         mechanism and the plugin refuses to fake one"
+        "no Host Render Backend is selected for this platform; the Output \
+         Plugin refuses to fake one"
             .to_owned(),
     )
 }
 
-/// The Output Plugin component definition: provides the `AudioOutput`
-/// capability backed by the real WASAPI mechanism (Windows only).
-pub fn wasapi_output_plugin() -> ComponentSpec {
-    ComponentSpec::new("wasapi_output_plugin")
+/// The stable Output Plugin component definition: provides the
+/// `AudioOutput` capability backed by the Host Render Backend this
+/// assembly selects (PBK-003 §2/§9). The identity composition observers
+/// see is this stable role — never a backend brand.
+pub fn output_plugin() -> ComponentSpec {
+    ComponentSpec::new("output_plugin")
         .provides::<AudioOutputCapability>()
-        .on_activate(|ctx| match platform_provider() {
+        .on_activate(|ctx| match selected_backend() {
             Ok(service) => ctx
                 .provide::<AudioOutputCapability>(service)
                 .map_err(|e| ActivationError::new(format!("provision refused: {e:?}"))),

@@ -1,0 +1,70 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.026s       recv  16 bytes
+T+   0.081s       recv  110 bytes
+T+   0.081s       recv  18 bytes
+T+   0.104s       recv  6317 bytes
+T+   0.462s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.462s    wait-ok  Format: 44100 Hz
+T+   1.179s       recv  8 bytes
+T+   1.963s       send  1 bytes: "o"
+T+   1.963s       recv  6206 bytes
+T+   1.963s       recv  4 bytes
+T+   1.973s       recv  6261 bytes
+T+   2.043s       send  12 bytes: "synth30.flac"
+T+   2.044s       recv  6301 bytes
+T+   2.066s       recv  6261 bytes
+T+   2.124s       send  1 bytes: "\r"
+T+   2.124s       recv  6301 bytes
+T+   2.144s       recv  6263 bytes
+T+   2.160s       recv  243 bytes
+T+   2.204s wait-begin  "opened synth30.flac" within 20s
+T+   2.204s    wait-ok  opened synth30.flac
+T+   2.204s wait-begin  "Source: synth30.flac" within 20s
+T+   2.204s       recv  6301 bytes
+T+   2.204s       recv  4 bytes
+T+   2.223s       recv  6311 bytes
+T+   2.224s    wait-ok  Source: synth30.flac
+T+   2.224s       send  1 bytes: "o"
+T+   2.225s       recv  6195 bytes
+T+   2.225s       recv  4 bytes
+T+   2.238s       recv  6261 bytes
+T+   2.305s       send  11 bytes: "synth45.mp3"
+T+   2.305s       recv  6261 bytes
+T+   2.316s       recv  51 bytes
+T+   2.385s       send  1 bytes: "\r"
+T+   2.385s       recv  6261 bytes
+T+   2.408s       recv  60 bytes
+T+   2.424s       recv  258 bytes
+T+   2.465s wait-begin  "opened synth45.mp3" within 20s
+T+   2.465s       recv  6301 bytes
+T+   2.465s       recv  4 bytes
+T+   2.485s    wait-ok  opened synth45.mp3
+T+   2.485s wait-begin  "Source: synth45.mp3" within 20s
+T+   2.485s    wait-ok  Source: synth45.mp3
+T+   2.486s       send  1 bytes: "o"
+T+   2.486s       recv  6195 bytes
+T+   2.486s       recv  4 bytes
+T+   2.487s       recv  207 bytes
+T+   2.503s       recv  2981 bytes
+T+   2.566s       send  12 bytes: "synth30.flac"
+T+   2.566s       recv  6301 bytes
+T+   2.580s       recv  6261 bytes
+T+   2.646s       send  1 bytes: "\r"
+T+   2.646s       recv  6261 bytes
+T+   2.657s       recv  60 bytes
+T+   2.677s       recv  28 bytes
+T+   2.689s       recv  205 bytes
+T+   2.726s wait-begin  "opened synth30.flac" within 20s
+T+   2.726s       recv  6299 bytes
+T+   2.727s       recv  4 bytes
+T+   2.735s       recv  6311 bytes
+T+   2.746s    wait-ok  opened synth30.flac
+T+   2.746s wait-begin  "Source: synth30.flac" within 20s
+T+   2.746s    wait-ok  Source: synth30.flac
+T+   2.747s       send  1 bytes: "q"
+T+   2.747s       recv  6199 bytes
+T+   2.749s       recv  249 bytes
+T+   2.765s       recv  81 bytes
+T+   2.827s       recv  332 bytes
+T+   3.227s wait-begin  "stopped before completion" within 5s
+T+   3.227s    wait-ok  stopped before completion

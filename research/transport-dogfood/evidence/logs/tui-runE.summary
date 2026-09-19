@@ -1,0 +1,32 @@
+A10: GREEN (3356ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 1500ms
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    mark
+    absent-after-mark "Source: C:\\Users\\Public\\qianqian-dogfood\\synth45.mp3" OK
+    mark
+    keys "o"
+    keys "synth45.mp3"
+    keys "\r"
+    expect-after-mark "opened synth45.mp3" OK
+    expect-after-mark "Source: synth45.mp3" OK
+    mark
+    absent-after-mark "Source: synth30.flac" OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    mark
+    absent-after-mark "Source: synth45.mp3" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK

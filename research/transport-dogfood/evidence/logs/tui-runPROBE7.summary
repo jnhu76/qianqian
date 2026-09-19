@@ -1,0 +1,30 @@
+C6-open-cancel: GREEN (3803ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "o"
+    keys "synth30"
+    keys "\u{7f}"
+    keys "99"
+    keys "\u{7f}"
+    keys "\u{7f}"
+    keys "\u{1b}"
+    sleep 500ms
+    absent-after-mark "opened " OK
+    keys "o"
+    keys "\r"
+    sleep 500ms
+    absent-after-mark "opened " OK
+    record-position Some((0, 1))
+    mark
+    new-position (0, 2) OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK

@@ -1,0 +1,190 @@
+C6-open-cancel: GREEN (3319ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "o"
+    keys "synth30"
+    keys "\u{7f}"
+    keys "99"
+    keys "\u{7f}"
+    keys "\u{7f}"
+    keys "\u{1b}"
+    sleep 500ms
+    absent-after-mark "opened " OK
+    keys "o"
+    keys "\r"
+    sleep 500ms
+    absent-after-mark "opened " OK
+    new-position (0, 0) OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+C9-resize: RED (8841ms, exit None)
+    expect "Format: 44100 Hz" OK
+    resize 40x12
+    keys " "
+    FAILURE: timeout waiting for "Pause requested: true" after offset 0; history tail:
+─────────────────────┐ │(none)                               │ └─────────────────────────────────────┘
+┌ Controls ───────────────────────────┐ │ ←/→  Seek ±5s      Space  Pause/Resu│ └─────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+┌ Qianqian Reference Player ───────────┐│                                      ││Source: C:\Users\Public\qianqian-dogfo│
+│Format: 44100 Hz, 2 channels, mask 0x3││Position: 00:00 / 00:45               │└──────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────┐│(none)                                │└──────────────────────────────────────┘
+┌ Controls ────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/Resum│└──────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    CHILD: alive=true threads=Some(6)
+C11-longpath: GREEN (1314ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "o"
+    keys "qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac"
+    keys "\r"
+    expect-after-mark "opened qianqian-longpath" OK
+    expect-after-mark "Source: qianqian-longpath" OK
+    keys "s"
+    expect "Terminal: Stopped" OK
+    expect "N  Next" OK
+    absent-after-mark "teardown violated" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+C12-cjk: RED (10532ms, exit None)
+    FAILURE: timeout waiting for "Format: 44100 Hz" after offset 0; history tail:
+────────────────────────────────────────────────────────┘┌
+Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐│
+←/→  Seek ±5s      Space  Pause/Resume                                                                               ││
+S  Stop            Q  Quit    Ctrl+C  Quit                                                                           ││
+O  Open source                                                                                                       ││
+N  Next            P  Previous                                                                                       ││
++  Louder          -  Softer                                                                                         │└─
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+    CHILD: alive=true threads=Some(5)
+C17-ctrlc: GREEN (1949ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 1000ms
+    keys "\u{3}"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK

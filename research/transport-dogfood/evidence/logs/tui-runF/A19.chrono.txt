@@ -1,0 +1,225 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.016s       recv  16 bytes
+T+   0.067s       recv  110 bytes
+T+   0.067s       recv  18 bytes
+T+   0.079s       recv  6317 bytes
+T+   0.445s wait-begin  "Format: 44100 Hz" within 5s
+T+   0.445s    wait-ok  Format: 44100 Hz
+T+   1.159s       recv  8 bytes
+T+   1.446s       send  1 bytes: "o"
+T+   1.446s       recv  6202 bytes
+T+   1.447s       recv  4 bytes
+T+   1.447s       recv  4 bytes
+T+   1.469s       recv  6261 bytes
+T+   1.526s       send  12 bytes: "synth30.flac"
+T+   1.526s       recv  6261 bytes
+T+   1.546s       recv  52 bytes
+T+   1.606s       send  1 bytes: "\r"
+T+   1.607s       recv  6301 bytes
+T+   1.624s       recv  6261 bytes
+T+   1.639s       recv  60 bytes
+T+   1.662s       recv  28 bytes
+T+   1.670s       recv  205 bytes
+T+   1.686s wait-begin  "opened synth30.flac" within 20s
+T+   1.687s       recv  6301 bytes
+T+   1.687s       recv  4 bytes
+T+   1.702s       recv  6311 bytes
+T+   1.707s    wait-ok  opened synth30.flac
+T+   1.707s       send  1 bytes: "o"
+T+   1.708s       recv  6195 bytes
+T+   1.708s       recv  4 bytes
+T+   1.717s       recv  6261 bytes
+T+   1.787s       send  11 bytes: "synth45.mp3"
+T+   1.788s       recv  6261 bytes
+T+   1.810s       recv  51 bytes
+T+   1.868s       send  1 bytes: "\r"
+T+   1.868s       recv  6261 bytes
+T+   1.905s       recv  60 bytes
+T+   1.926s       recv  28 bytes
+T+   1.936s       recv  285 bytes
+T+   1.948s wait-begin  "opened synth45.mp3" within 20s
+T+   1.948s       recv  6303 bytes
+T+   1.952s       recv  6311 bytes
+T+   1.968s    wait-ok  opened synth45.mp3
+T+   1.968s       send  1 bytes: "o"
+T+   1.969s       recv  6191 bytes
+T+   1.969s       recv  4 bytes
+T+   1.969s       recv  4 bytes
+T+   1.984s       recv  6261 bytes
+T+   2.049s       send  12 bytes: "synth30.flac"
+T+   2.049s       recv  6301 bytes
+T+   2.062s       recv  6261 bytes
+T+   2.129s       send  1 bytes: "\r"
+T+   2.129s       recv  6301 bytes
+T+   2.141s       recv  6261 bytes
+T+   2.161s       recv  42 bytes
+T+   2.171s       recv  18 bytes
+T+   2.193s       recv  28 bytes
+T+   2.202s       recv  205 bytes
+T+   2.209s wait-begin  "opened synth30.flac" within 20s
+T+   2.209s       recv  6303 bytes
+T+   2.218s       recv  6311 bytes
+T+   2.229s    wait-ok  opened synth30.flac
+T+   2.230s       send  1 bytes: "o"
+T+   2.230s       recv  6195 bytes
+T+   2.230s       recv  4 bytes
+T+   2.233s       recv  6261 bytes
+T+   2.310s       send  11 bytes: "synth45.mp3"
+T+   2.311s       recv  6261 bytes
+T+   2.326s       recv  51 bytes
+T+   2.390s       send  1 bytes: "\r"
+T+   2.391s       recv  6301 bytes
+T+   2.404s       recv  6261 bytes
+T+   2.419s       recv  60 bytes
+T+   2.452s       recv  28 bytes
+T+   2.466s       recv  285 bytes
+T+   2.471s wait-begin  "opened synth45.mp3" within 20s
+T+   2.471s       recv  6303 bytes
+T+   2.482s       recv  6311 bytes
+T+   2.491s    wait-ok  opened synth45.mp3
+T+   2.491s       send  1 bytes: "o"
+T+   2.492s       recv  6195 bytes
+T+   2.492s       recv  4 bytes
+T+   2.498s       recv  6261 bytes
+T+   2.571s       send  12 bytes: "synth30.flac"
+T+   2.572s       recv  6261 bytes
+T+   2.593s       recv  52 bytes
+T+   2.652s       send  1 bytes: "\r"
+T+   2.652s       recv  6301 bytes
+T+   2.671s       recv  6261 bytes
+T+   2.686s       recv  60 bytes
+T+   2.705s       recv  28 bytes
+T+   2.718s       recv  205 bytes
+T+   2.732s wait-begin  "opened synth30.flac" within 20s
+T+   2.733s       recv  6303 bytes
+T+   2.733s       recv  4706 bytes
+T+   2.748s       recv  1270 bytes
+T+   2.753s    wait-ok  opened synth30.flac
+T+   2.753s       send  1 bytes: "o"
+T+   2.753s       recv  6195 bytes
+T+   2.753s       recv  4 bytes
+T+   2.764s       recv  6261 bytes
+T+   2.833s       send  11 bytes: "synth45.mp3"
+T+   2.834s       recv  6261 bytes
+T+   2.856s       recv  51 bytes
+T+   2.914s       send  1 bytes: "\r"
+T+   2.914s       recv  6261 bytes
+T+   2.949s       recv  60 bytes
+T+   2.971s       recv  28 bytes
+T+   2.981s       recv  285 bytes
+T+   2.994s wait-begin  "opened synth45.mp3" within 20s
+T+   2.995s       recv  6303 bytes
+T+   2.996s       recv  6311 bytes
+T+   3.014s    wait-ok  opened synth45.mp3
+T+   3.015s       send  1 bytes: "o"
+T+   3.015s       recv  6191 bytes
+T+   3.015s       recv  4 bytes
+T+   3.015s       recv  4 bytes
+T+   3.029s       recv  6261 bytes
+T+   3.095s       send  12 bytes: "synth30.flac"
+T+   3.096s       recv  6261 bytes
+T+   3.106s       recv  52 bytes
+T+   3.176s       send  1 bytes: "\r"
+T+   3.176s       recv  6261 bytes
+T+   3.206s       recv  42 bytes
+T+   3.215s       recv  18 bytes
+T+   3.235s       recv  28 bytes
+T+   3.247s       recv  205 bytes
+T+   3.256s wait-begin  "opened synth30.flac" within 20s
+T+   3.257s       recv  6303 bytes
+T+   3.263s       recv  6311 bytes
+T+   3.277s    wait-ok  opened synth30.flac
+T+   3.277s       send  1 bytes: "o"
+T+   3.278s       recv  6195 bytes
+T+   3.278s       recv  4 bytes
+T+   3.279s       recv  6261 bytes
+T+   3.357s       send  11 bytes: "synth45.mp3"
+T+   3.357s       recv  6261 bytes
+T+   3.372s       recv  51 bytes
+T+   3.437s       send  1 bytes: "\r"
+T+   3.438s       recv  6261 bytes
+T+   3.470s       recv  42 bytes
+T+   3.481s       recv  18 bytes
+T+   3.498s       recv  28 bytes
+T+   3.513s       recv  283 bytes
+T+   3.517s wait-begin  "opened synth45.mp3" within 20s
+T+   3.518s       recv  6305 bytes
+T+   3.529s       recv  6311 bytes
+T+   3.538s    wait-ok  opened synth45.mp3
+T+   3.538s       send  1 bytes: "o"
+T+   3.539s       recv  6195 bytes
+T+   3.539s       recv  4 bytes
+T+   3.545s       recv  6261 bytes
+T+   3.618s       send  12 bytes: "synth30.flac"
+T+   3.618s       recv  6301 bytes
+T+   3.638s       recv  6261 bytes
+T+   3.699s       send  1 bytes: "\r"
+T+   3.699s       recv  6261 bytes
+T+   3.732s       recv  60 bytes
+T+   3.751s       recv  28 bytes
+T+   3.763s       recv  205 bytes
+T+   3.779s wait-begin  "opened synth30.flac" within 20s
+T+   3.780s       recv  6299 bytes
+T+   3.780s       recv  4 bytes
+T+   3.794s       recv  6311 bytes
+T+   3.800s    wait-ok  opened synth30.flac
+T+   3.800s       send  1 bytes: "o"
+T+   3.800s       recv  6195 bytes
+T+   3.800s       recv  4 bytes
+T+   3.810s       recv  6261 bytes
+T+   3.880s       send  11 bytes: "synth45.mp3"
+T+   3.880s       recv  6261 bytes
+T+   3.901s       recv  51 bytes
+T+   3.960s       send  1 bytes: "\r"
+T+   3.961s       recv  6261 bytes
+T+   3.994s       recv  60 bytes
+T+   4.014s       recv  28 bytes
+T+   4.026s       recv  283 bytes
+T+   4.040s wait-begin  "opened synth45.mp3" within 20s
+T+   4.041s       recv  6305 bytes
+T+   4.041s       recv  2543 bytes
+T+   4.057s       recv  2160 bytes
+T+   4.061s    wait-ok  opened synth45.mp3
+T+   4.061s       send  1 bytes: "o"
+T+   4.061s       recv  6195 bytes
+T+   4.061s       recv  4 bytes
+T+   4.073s       recv  6261 bytes
+T+   4.141s       send  12 bytes: "synth30.flac"
+T+   4.142s       recv  6261 bytes
+T+   4.150s       recv  52 bytes
+T+   4.221s       send  1 bytes: "\r"
+T+   4.222s       recv  6301 bytes
+T+   4.244s       recv  6261 bytes
+T+   4.260s       recv  60 bytes
+T+   4.277s       recv  28 bytes
+T+   4.292s       recv  205 bytes
+T+   4.302s wait-begin  "opened synth30.flac" within 20s
+T+   4.302s       recv  6303 bytes
+T+   4.308s       recv  6311 bytes
+T+   4.322s    wait-ok  opened synth30.flac
+T+   4.323s       send  1 bytes: "o"
+T+   4.323s       recv  6195 bytes
+T+   4.323s       recv  4 bytes
+T+   4.323s       recv  207 bytes
+T+   4.340s       recv  2983 bytes
+T+   4.403s       send  11 bytes: "synth45.mp3"
+T+   4.403s       recv  6261 bytes
+T+   4.418s       recv  51 bytes
+T+   4.483s       send  1 bytes: "\r"
+T+   4.484s       recv  6261 bytes
+T+   4.512s       recv  42 bytes
+T+   4.527s       recv  18 bytes
+T+   4.544s       recv  258 bytes
+T+   4.564s wait-begin  "opened synth45.mp3" within 20s
+T+   4.564s       recv  6301 bytes
+T+   4.565s       recv  4 bytes
+T+   4.577s       recv  6311 bytes
+T+   4.584s    wait-ok  opened synth45.mp3
+T+   4.617s       send  1 bytes: "q"
+T+   4.617s       recv  6191 bytes
+T+   4.617s       recv  8 bytes
+T+   4.637s       recv  249 bytes
+T+   4.652s       recv  81 bytes
+T+   4.698s       recv  332 bytes
+T+   5.098s wait-begin  "stopped before completion" within 5s
+T+   5.098s    wait-ok  stopped before completion

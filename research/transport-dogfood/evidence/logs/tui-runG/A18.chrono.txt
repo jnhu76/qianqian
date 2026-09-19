@@ -1,0 +1,49 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.016s       recv  16 bytes
+T+   0.068s       recv  110 bytes
+T+   0.068s       recv  19 bytes
+T+   0.087s       recv  6317 bytes
+T+   0.432s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.432s    wait-ok  Format: 44100 Hz
+T+   1.168s       recv  8 bytes
+T+   1.932s       send  1 bytes: "o"
+T+   1.933s       recv  6202 bytes
+T+   1.933s       recv  4 bytes
+T+   1.933s       recv  4 bytes
+T+   1.948s       recv  6261 bytes
+T+   2.013s       send  12 bytes: "synth30.flac"
+T+   2.013s       recv  6301 bytes
+T+   2.027s       recv  6261 bytes
+T+   2.093s       send  1 bytes: "\r"
+T+   2.094s       recv  6301 bytes
+T+   2.105s       recv  6261 bytes
+T+   2.123s       recv  41 bytes
+T+   2.136s       recv  18 bytes
+T+   2.155s       recv  28 bytes
+T+   2.167s       recv  222 bytes
+T+   2.174s wait-begin  "opened synth30.flac" within 20s
+T+   2.174s    wait-ok  opened synth30.flac
+T+   2.174s wait-begin  "Source: synth30.flac" within 20s
+T+   2.174s       recv  6305 bytes
+T+   2.183s       recv  6311 bytes
+T+   2.194s    wait-ok  Source: synth30.flac
+T+   2.194s wait-begin  new-position != None
+T+   3.274s       recv  8 bytes
+T+   3.274s    wait-ok  new-position (0, 1)
+T+   3.274s       send  1 bytes: "s"
+T+   3.275s       recv  6195 bytes
+T+   3.275s       recv  4 bytes
+T+   3.289s       recv  6259 bytes
+T+   3.300s       recv  71 bytes
+T+   3.304s       recv  8 bytes
+T+   3.355s wait-begin  "Terminal: Stopped" within 5s
+T+   3.355s       recv  5928 bytes
+T+   3.355s       recv  4 bytes
+T+   3.366s       recv  6311 bytes
+T+   3.375s    wait-ok  Terminal: Stopped
+T+   3.376s       send  1 bytes: "q"
+T+   3.376s       recv  6199 bytes
+T+   3.381s       recv  275 bytes
+T+   3.456s       recv  281 bytes
+T+   3.856s wait-begin  "stopped before completion" within 5s
+T+   3.856s    wait-ok  stopped before completion

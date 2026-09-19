@@ -70,7 +70,8 @@
 //! recovery path exists.
 //!
 //! The provider set behind [`EpisodeStart`] is the wiring's business
-//! (the real host mounts the SongCore decode + WASAPI output plugins;
+//! (the real host mounts the SongCore decode Plugin and the Output
+//! Plugin with its host-selected WASAPI backend;
 //! the unit matrix mounts fake providers over the REAL kernel and the
 //! REAL playback session). Nothing in this module knows PCM, devices
 //! or platform mechanisms.

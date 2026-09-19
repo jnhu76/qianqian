@@ -591,7 +591,7 @@ fn start_episode(file: &Path) -> Result<Episode, String> {
         .register_component(qianqian_decode_songcore::songcore_decode_plugin())
         .map_err(|e| format!("decode plugin registration failed: {e:?}"))?;
     runtime
-        .register_component(qianqian_output_wasapi::wasapi_output_plugin())
+        .register_component(qianqian_output_wasapi::output_plugin())
         .map_err(|e| format!("output plugin registration failed: {e:?}"))?;
     let handle = PlaybackSessionHandle::new();
     runtime
@@ -605,7 +605,7 @@ fn start_episode(file: &Path) -> Result<Episode, String> {
     runtime
         .revise_desired(vec![
             desired("decode", "songcore_decode_plugin"),
-            desired("output", "wasapi_output_plugin"),
+            desired("output", "output_plugin"),
             desired("session", "playback_session"),
         ])
         .map_err(|e| format!("composition refused: {e}"))?;

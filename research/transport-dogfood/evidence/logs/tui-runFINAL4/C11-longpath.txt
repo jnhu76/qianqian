@@ -1,0 +1,1160 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[qianqian-wasapi] opened:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: --:-- / 00:04                                                                                               │
+│                                                                                                                      │
+│Terminal: pending                                                                                                     │
+│Stop requested: false                                                                                                 │
+│Pause requested: false                                                                                                │
+│Paused: false                                                                                                         │
+│Track: 1/1                                                                                                            │
+│Volume: 100/100 (desired)                                                                                             │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ←/→  Seek ±5s      Space  Pause/Resume                                                                               │
+│ S  Stop            Q  Quit    Ctrl+C  Quit                                                                           │
+│ O  Open source                                                                                                       │
+│ N  Next            P  Previous                                                                                       │
+│ +  Louder          -  Softer                                                                                         │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:04                                                                                               │
+│                                                                                                                      │
+│Terminal: pending                                                                                                     │
+│Stop requested: false                                                                                                 │
+│Pause requested: false                                                                                                │
+│Paused: false                                                                                                         │
+│Track: 1/1                                                                                                            │
+│Volume: 100/100 (desired)                                                                                             │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ←/→  Seek ±5s      Space  Pause/Resume                                                                               │
+│ S  Stop            Q  Quit    Ctrl+C  Quit                                                                           │
+│ O  Open source                                                                                                       │
+│ N  Next            P  Previous                                                                                       │
+│ +  Louder          -  Softer                                                                                         │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────│
+                                                                                                                      │S
+ource: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                                │Pos
+ition: 00:00 / 00:04                                                                                               │
+                                                                                                                  │Termi
+nal: pending                                                                                                     │Stop r
+equested: false                                                                                                 │Pause r
+equested: false                                                                                                │Paused:
+false                                                                                                         │Track: 1/
+1                                                                                                            │Volume: 10
+0/100 (desired)                                                                                             │
+                                                                                                           │
+                                                                                                          │
+                                                                                                         │
+                                                                                                        │
+                                                                                                       │
+                                                                                                      │
+                                                                                                     │
+                                                                                                    │
+                                                                                                   │
+                                                                                                  │
+                                                                                                 │
+                                                                                                │
+                                                                                               │
+                                                                                              │
+                                                                                             │
+                                                                                            └───────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────┌ Diagnostics ───────────────
+──────────────────────────────────────────────────────────────────────────────────────────│(none)
+                                                                                         │
+                                                                                        └───────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────┌ Controls ──────────────────────
+──────────────────────────────────────────────────────────────────────────────────────│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                               │ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                           │ O  Open source
+                                                                                   │ N  Next            P  Previous
+                                                                                  │ +  Louder          -  Softer
+                                                                                 └──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: false                                                                                                ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││Open: ▏  (E
+nter = open, Esc = cancel)                                                                                ││
+                                                                                                         ││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: false                                                                                                ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││Open: ▏  (E
+nter = qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaa▏  (Enter = open, Esc = cancel)                          ││
+                                                                                                         ││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: false                                                                                                ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││Open: ▏  (E
+nter = qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa▏  (Enter = open, Esc = cancel)
+                                                                                                         ││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: false                                                                                                ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││Open: ▏  (E
+nter = qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa▏  (Ent
+                                                                                                         ││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: false                                                                                                ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││Open: ▏  (E
+nter = qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                                                                                                         ││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: false                                                                                                ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││Open: qianq
+ian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                         ││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: false                                                                                                ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││Open: qianq
+ian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││          [q
+ianqian-wasapi] render aborted:                                                                          ││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: false                                                                                                ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││Open: qianq
+ian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││          [q
+ianqian-wasapi] render aborted: data plane stopped                                                       ││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: C:\Users\Public\qianqian-dogfood\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: false                                                                                                ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││Open: qianq
+ian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││          [q
+ianqian-wasapi] render aborted: data plane stopped                                                       ││
+[qianqian-wasapi] opened:                                                                               ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: C:qianqian-longpath-qaaa-aaaaaaaaaaaaqaaa-aaaaaaahaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:0--/--0:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: false                                                                                                ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││Open: qianq
+i     ngpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││          [q
+iopened-qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa97
+0 frames (shared, event-driven)Hz, 2 channels, mask 0x3, buffer                                         ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:04                                                                                               │
+│                                                                                                                      │
+│Terminal: pending                                                                                                     │
+│Stop requested: false                                                                                                 │
+│Pause requested: false                                                                                                │
+│Paused: false                                                                                                         │
+│Track: 1/1                                                                                                            │
+│Volume: 100/100 (desired)                                                                                             │
+│                                                                                                                      │
+│opened qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ←/→  Seek ±5s      Space  Pause/Resume                                                                               │
+│ S  Stop            Q  Quit    Ctrl+C  Quit                                                                           │
+│ O  Open source                                                                                                       │
+│ N  Next            P  Previous                                                                                       │
+│ +  Louder          -  Softer                                                                                         │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────│
+                                                                                                                      │S
+ource: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                                │Pos
+ition: 00:00 / 00:04                                                                                               │
+                                                                                                                  │Termi
+nal: pending                                                                                                     │Stop r
+equested: false                                                                                                 │Pause r
+equested: false                                                                                                │Paused:
+false                                                                                                         │Track: 1/
+1                                                                                                            │Volume: 10
+0/100 (desired)                                                                                             │
+                                                                                                           │opened qianq
+ian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+                                                                                                         │
+                                                                                                        │
+                                                                                                       │
+                                                                                                      │
+                                                                                                     │
+                                                                                                    │
+                                                                                                   │
+                                                                                                  │
+                                                                                                 │
+                                                                                                │
+                                                                                               │
+                                                                                              │
+                                                                                             │
+                                                                                            └───────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────┌ Diagnostics ───────────────
+──────────────────────────────────────────────────────────────────────────────────────────│(none)
+                                                                                         │
+                                                                                        └───────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────┌ Controls ──────────────────────
+──────────────────────────────────────────────────────────────────────────────────────│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                               │ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                           │ O  Open source
+                                                                                   │ N  Next            P  Previous
+                                                                                  │ +  Louder          -  Softer
+                                                                                 └──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                                     ││S
+ource: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: true                                                                                                 ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││
+                                                                                                          ││opened qianq
+ian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+                                                                                                                     ││S
+ource: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: true                                                                                                 ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││
+                                                                                                          ││opened qianq
+ian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘                                      ┘[
+qianqian-wasapi] render aborted: data plane stopped
+ource: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                               ││Pos
+ition: 00:00 / 00:04                                                                                              ││
+                                                                                                                 ││Termi
+nal: pending                                                                                                    ││Stop r
+equested: true                                                                                                 ││Pause r
+equested: false                                                                                               ││Paused:
+false                                                                                                        ││Track: 1/
+1                                                                                                           ││Volume: 10
+0/100 (desired)                                                                                            ││
+                                                                                                          ││opened qianq
+ian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                        ││
+                                                                                                       ││
+                                                                                                      ││
+                                                                                                     ││
+                                                                                                    ││
+                                                                                                   ││
+                                                                                                  ││
+                                                                                                 ││
+                                                                                                ││
+                                                                                               ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                              ││ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                          ││ O  Open source
+                                                                                  ││ N  Next            P  Previous
+                                                                                 ││ +  Louder          -  Softer
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘                                      ┘[
+qianqian-wasapi] render aborted: data plane stopped
+
+│Source: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                               │
+│Position: 00:00 / 00:04                                                                                              │
+│                                                                                                                     │
+│Terminal: pending                                                                                                    │
+│Stop requested: true                                                                                                 │
+│Pause requested: false                                                                                               │
+│Paused: false                                                                                                        │
+│Track: 1/1                                                                                                           │
+│Volume: 100/100 (desired)                                                                                            │
+│                                                                                                                     │
+│opened qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                               │
+│                                                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ←/→  Seek ±5s      Space  Pause/Resume                                                                              │
+│ S  Stop            Q  Quit    Ctrl+C  Quit                                                                          │
+│ O  Open source                                                                                                      │
+│ N  Next            P  Previous                                                                                      │
+│ +  Louder          -  Softer                                                                                        │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[qianqian-wasapi] render aborted: data plane stopped
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: --:-- / 00:04                                                                                               │
+│                                                                                                                      │
+│Terminal: Stopped                                                                                                     │
+│Stop requested: true                                                                                                  │
+│Pause requested: false                                                                                                │
+│Paused: false                                                                                                         │
+│Track: 1/1                                                                                                            │
+│Volume: 100/100 (desired)                                                                                             │
+│                                                                                                                      │
+│terminal outcome committed; press Q to quit                                                                           │
+│                                                                                                                      │
+│opened qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ←/→  Seek ±5s      Space  Pause/Resume                                                                               │
+│ S  Stop            Q  Quit    Ctrl+C  Quit                                                                           │
+│ O  Open source                                                                                                       │
+│ N  Next            P  Previous                                                                                       │
+│ +  Louder          -  Softer                                                                                         │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────│
+                                                                                                                      │S
+ource: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│Fo
+rmat: 44100 Hz, 2 channels, mask 0x3                                                                                │Pos
+ition: --:-- / 00:04                                                                                               │
+                                                                                                                  │Termi
+nal: Stopped                                                                                                     │Stop r
+equested: true                                                                                                  │Pause r
+equested: false                                                                                                │Paused:
+false                                                                                                         │Track: 1/
+1                                                                                                            │Volume: 10
+0/100 (desired)                                                                                             │
+                                                                                                           │terminal out
+come committed; press Q to quit                                                                           │
+                                                                                                         │opened qianqia
+n-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+                                                                                                       │
+                                                                                                      │
+                                                                                                     │
+                                                                                                    │
+                                                                                                   │
+                                                                                                  │
+                                                                                                 │
+                                                                                                │
+                                                                                               │
+                                                                                              │
+                                                                                             │
+                                                                                            └───────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────┌ Diagnostics ───────────────
+──────────────────────────────────────────────────────────────────────────────────────────│(none)
+                                                                                         │
+                                                                                        └───────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────┌ Controls ──────────────────────
+──────────────────────────────────────────────────────────────────────────────────────│ ←/→  Seek ±5s      Space  Pause/
+Resume                                                                               │ S  Stop            Q  Quit    Ctr
+l+C  Quit                                                                           │ O  Open source
+                                                                                   │ N  Next            P  Previous
+                                                                                  │ +  Louder          -  Softer
+                                                                                 └──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[qianqian-wasapi] opened: 44100 Hz, 2stopped before completion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,53 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.016s       recv  16 bytes
+T+   0.067s       recv  110 bytes
+T+   0.067s       recv  18 bytes
+T+   0.081s       recv  6317 bytes
+T+   0.222s       recv  15 bytes
+T+   0.445s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.445s    wait-ok  Format: 44100 Hz
+T+   1.161s       recv  2 bytes
+T+   1.945s       send  1 bytes: "o"
+T+   1.946s       recv  6206 bytes
+T+   1.946s       recv  4 bytes
+T+   1.956s       recv  6261 bytes
+T+   2.026s       send  11 bytes: "garbage.bin"
+T+   2.026s       recv  6261 bytes
+T+   2.049s       recv  51 bytes
+T+   2.106s       send  1 bytes: "\r"
+T+   2.107s       recv  6261 bytes
+T+   2.127s       recv  158 bytes
+T+   2.187s wait-begin  "open refused" within 20s
+T+   2.187s    wait-ok  open refused
+T+   2.187s       recv  6299 bytes
+T+   2.187s       recv  4 bytes
+T+   2.204s       recv  6311 bytes
+T+   3.130s       recv  8 bytes
+T+   3.687s wait-begin  new-position != None
+T+   3.687s    wait-ok  new-position (0, 2)
+T+   3.687s       send  1 bytes: "o"
+T+   3.687s       recv  6191 bytes
+T+   3.688s       recv  4 bytes
+T+   3.688s       recv  4 bytes
+T+   3.710s       recv  6261 bytes
+T+   3.767s       send  17 bytes: "missing-file.flac"
+T+   3.768s       recv  6301 bytes
+T+   3.789s       recv  6261 bytes
+T+   3.848s       send  1 bytes: "\r"
+T+   3.848s       recv  6261 bytes
+T+   3.866s       recv  170 bytes
+T+   3.928s wait-begin  "cannot open 'missing-file.flac'" within 20s
+T+   3.928s       recv  6310 bytes
+T+   3.929s       recv  4 bytes
+T+   3.944s       recv  6322 bytes
+T+   3.949s    wait-ok  cannot open 'missing-file.flac'
+T+   3.949s wait-begin  "Terminal: pending" within 5s
+T+   3.949s    wait-ok  Terminal: pending
+T+   3.949s       send  1 bytes: "q"
+T+   3.950s       recv  6210 bytes
+T+   3.960s       recv  249 bytes
+T+   3.982s       recv  34 bytes
+T+   3.991s       recv  47 bytes
+T+   4.030s       recv  332 bytes
+T+   4.430s wait-begin  "stopped before completion" within 5s
+T+   4.430s    wait-ok  stopped before completion

@@ -1,0 +1,43 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3" "C:\Users\Public\qianqian-dogfood\garbage.bin" "C:\Users\Public\qianqian-dogfood\flac4.flac"
+T+   0.018s       recv  16 bytes
+T+   0.069s       recv  110 bytes
+T+   0.069s       recv  35 bytes
+T+   0.087s       recv  6317 bytes
+T+   0.226s       recv  15 bytes
+T+   0.433s wait-begin  "Track: 1/3" within 5s
+T+   0.433s    wait-ok  Track: 1/3
+T+   0.433s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.433s    wait-ok  Format: 44100 Hz
+T+   0.433s       send  1 bytes: "n"
+T+   0.433s       recv  6202 bytes
+T+   0.434s       recv  4 bytes
+T+   0.434s       recv  4 bytes
+T+   0.444s       recv  6259 bytes
+T+   0.513s wait-begin  "next refused" within 20s
+T+   0.513s    wait-ok  next refused
+T+   0.513s wait-begin  "Track: 1/3" within 20s
+T+   0.514s       recv  6299 bytes
+T+   0.514s       recv  4 bytes
+T+   0.534s    wait-ok  Track: 1/3
+T+   0.536s       recv  6311 bytes
+T+   1.142s       recv  8 bytes
+T+   1.734s wait-begin  new-position != None
+T+   1.734s    wait-ok  new-position (0, 0)
+T+   1.734s       send  1 bytes: "n"
+T+   1.734s       recv  6191 bytes
+T+   1.735s       recv  4 bytes
+T+   1.735s       recv  4 bytes
+T+   1.749s       recv  6259 bytes
+T+   1.814s wait-begin  "next refused" within 20s
+T+   1.814s    wait-ok  next refused
+T+   1.814s wait-begin  "Track: 1/3" within 20s
+T+   1.814s    wait-ok  Track: 1/3
+T+   1.814s       send  1 bytes: "q"
+T+   1.814s       recv  6299 bytes
+T+   1.815s       recv  6267 bytes
+T+   1.827s       recv  266 bytes
+T+   1.844s       recv  34 bytes
+T+   1.859s       recv  47 bytes
+T+   1.895s       recv  349 bytes
+T+   2.295s wait-begin  "stopped before completion" within 5s
+T+   2.295s    wait-ok  stopped before completion
