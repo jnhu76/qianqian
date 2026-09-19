@@ -1446,12 +1446,10 @@ mod tests {
         /// acceptance side over the committed synthetic fixture).
         #[test]
         fn an_mp3_with_embedded_cover_art_stays_playable() {
-            let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("tests/fixtures/mp3-cbr-cover.mp3");
-            let root = std::env::temp_dir().join(format!(
-                "qianqian-realprobe-cover-{}",
-                std::process::id()
-            ));
+            let source =
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mp3-cbr-cover.mp3");
+            let root = std::env::temp_dir()
+                .join(format!("qianqian-realprobe-cover-{}", std::process::id()));
             let _ = fs::remove_dir_all(&root);
             fs::create_dir_all(&root).expect("temp tree root");
             let candidate = root.join("01 cover song.mp3");
@@ -1481,7 +1479,8 @@ mod tests {
         /// its real track as a candidate, classifies the noise as quiet
         /// skips, and reports the corrupt file boundedly.
         #[test]
-        fn a_realistic_folder_keeps_the_real_track_and_reports_the_corrupt_one() {            let tree = RealTree::new("realistic", &["flac-16-44-stereo.flac"]);
+        fn a_realistic_folder_keeps_the_real_track_and_reports_the_corrupt_one() {
+            let tree = RealTree::new("realistic", &["flac-16-44-stereo.flac"]);
             tree.garbage("03 broken take.flac");
             tree.noise("cover.jpg");
             tree.noise("notes.txt");

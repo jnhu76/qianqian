@@ -635,9 +635,7 @@ fn steady_loop(
                     // per iteration; the next ROUTED change retries once.
                     Err(e) => {
                         session.applied_bits.set(routed_bits);
-                        if !session.volume_diagnosed.replace(true)
-                            && mechanism_log_enabled()
-                        {
+                        if !session.volume_diagnosed.replace(true) && mechanism_log_enabled() {
                             eprintln!(
                                 "[qianqian-wasapi] stream volume apply failed (recoverable; \
                                  holding the last applied level): {e}"
