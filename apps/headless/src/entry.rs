@@ -246,14 +246,24 @@ fn reference_player_transport(files: Vec<PathBuf>) -> ExitCode {
             eprintln!("{warning}");
         }
     }
+    // A §G.6 latch raised INSIDE the shell (O/N/P) has no quit report
+    // of its own: the latch's reason is made persistent here so the
+    // exit-1 line below always has a visible cause on stderr. (A
+    // STARTUP FailStop already returned above; a quit-time disposal
+    // violation printed its own warnings.)
+    if let Some(reason) = player.fail_stop_reason() {
+        eprintln!("fail-stop: {reason}");
+    }
     let disposal_quiet = report.snapshot.as_ref().is_none_or(|s| s.quiet);
-    // The interactive launch was handed NO episode by argv: quitting
-    // such a session without a settled episode is its NORMAL end (the
-    // user opened the player and closed it), not the scriptable
-    // transport's "episode never activated" failure — that contract
-    // describes a transport that was HANDED an episode and failed to
-    // start it. A fail-stop latch still fails, and any session where an
-    // episode went live reports through the ordinary table.
+    // The exit code describes the SESSION. An interactive launch was
+    // handed no episode by argv, so ending it without a settled
+    // episode is its NORMAL end (the user opened the player and closed
+    // it) — not the scriptable transport's "episode never activated"
+    // failure, which describes a transport that was HANDED an episode
+    // and failed to start it. The SUCCESS arm is therefore gated on a
+    // clean session: no fail-stop latch (checked above and here) and a
+    // quiet-or-absent disposal. Every argv-driven start reports through
+    // the ordinary table, whatever happened.
     if interactive_startup
         && report.terminal.is_none()
         && !player.is_fail_stopped()
@@ -297,10 +307,9 @@ fn startup_feedback(
             expansion.accepted[0].display(),
             expansion.summary()
         )),
-        (Some(feedback), _) => Some(match expansion.accepted.len() {
-            0 => feedback,
-            _ => format!("{feedback} ({})", expansion.summary()),
-        }),
+        // An `Opened` startup implies a non-empty accepted list (the
+        // first entry IS the committed episode).
+        (Some(feedback), _) => Some(format!("{feedback} ({})", expansion.summary())),
     }
 }
 

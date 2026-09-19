@@ -40,7 +40,10 @@
 //! directory order never becomes playlist order; roots are processed
 //! in the order the user typed them; Unicode/CJK/space paths are
 //! ordinary paths. Recursion depth is bounded by the filesystem's own
-//! path depth.
+//! path depth. Enumeration is synchronous and UNBOUNDED in entry count
+//! by design: it runs on the caller's thread inside the same
+//! documented synchronous-Open stall (see `tui::runtime`), never on
+//! any playback/realtime thread.
 
 use std::path::{Path, PathBuf};
 
@@ -89,11 +92,11 @@ impl ExpandedInputs {
             }
         } else if self.skipped > 0 {
             format!(
-                "no playable files; {skipped} entries skipped",
+                "no audio candidates; {skipped} entries skipped",
                 skipped = self.skipped
             )
         } else {
-            "no playable files".to_owned()
+            "no audio candidates".to_owned()
         }
     }
 
@@ -401,7 +404,7 @@ mod tests {
         assert!(expanded.accepted.is_empty());
         assert_eq!(expanded.skipped, 0);
         assert!(expanded.diagnostics.is_empty());
-        assert_eq!(expanded.refusal(), "no playable files");
+        assert_eq!(expanded.refusal(), "no audio candidates");
     }
 
     #[test]
