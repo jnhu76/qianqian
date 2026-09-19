@@ -156,6 +156,11 @@ ffmpeg -v error -f lavfi -i 'sine=frequency=440:sample_rate=44100:duration=45' \
     -ac 2 -b:a 128k -y "$M/synth45.mp3" || fail "synth45 generation"
 ffmpeg -v error -f lavfi -i 'sine=frequency=330:sample_rate=44100:duration=30' \
     -ac 2 -y "$M/synth30.flac" || fail "synth30 generation"
+# The U2-cover-clean fixture: a committed SYNTHETIC MP3 with an
+# embedded mjpeg cover art (the field-defect shape, U2 corrective).
+COVERFIX="$REPO/apps/headless/tests/fixtures/mp3-cbr-cover.mp3"
+[[ -f "$COVERFIX" ]] || fail "cover-art fixture missing: $COVERFIX"
+cp "$COVERFIX" "$M/cover.mp3"
 
 # F-matrix folder (WINDOWS-TUI-LISTENING-RELEASE-1 §37 shapes):
 # 5 accepted / 5 quiet skips / 2 probe rejections / 1 denied subfolder.
@@ -254,7 +259,7 @@ run_scenarios() {
 }
 
 ok=0
-run_scenarios core   U1-idle U1-folder-open U2-shuffle-start U2-help C11-longpath C12-cjk A15 \
+run_scenarios core   U1-idle U1-folder-open U2-shuffle-start U2-cover-clean U2-help C11-longpath C12-cjk A15 \
   && ok=$((ok+1)) || true
 run_scenarios fmatrix LR1-folder-mixed LR1-all-corrupt LR1-duplicate-roots LR1-truncated-next \
   && ok=$((ok+1)) || true

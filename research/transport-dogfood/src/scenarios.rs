@@ -413,6 +413,11 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         // The ONE shuffle grammar (flag immediately after the
         // subcommand).
         "U2-shuffle-start" => &["--shuffle", "flac4.flac", "mp3cbr.mp3", "alac4.m4a"],
+        // U2 corrective (field defect): an MP3 whose embedded cover art
+        // is an unresolvable attached-picture stream. The committed
+        // synthetic fixture (apps/headless/tests/fixtures) is staged as
+        // cover.mp3 by the campaign runner.
+        "U2-cover-clean" => &["cover.mp3"],
         "U2-cjk" => &["千曲.flac", "flac4.flac"],
         "U2-viewport" => &VVIEWPORT,
         "U2-soak" => &SOAK_LIST,
@@ -1721,6 +1726,39 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 expect("Order: Shuffle"),
                 expect("Track: 1/3"),
                 expect(playing_selected_row(1, "flac4.flac")),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-cover-clean — the field-defect gate (U2 corrective): an
+        // MP3 whose embedded cover art rides an attached-picture stream
+        // this trimmed FFmpeg build cannot resolve. Since the
+        // probe-cost fix, the open is bounded and SILENT: no FFmpeg
+        // mechanism chatter and no WASAPI mechanism diagnostic may
+        // reach the console for the whole session — startup open
+        // included (the Mark precedes the first frame). Repeat All
+        // keeps the 2 s fixture looping so the cleanliness window
+        // covers steady playback too. The playback oracles pin that
+        // the episode itself is untouched by the fix.
+        "U2-cover-clean" => {
+            let mut v = vec![
+                Step::Mark,
+                expect_format(),
+                expect("Source: cover.mp3"),
+                expect(playing_selected_row(1, "cover.mp3")),
+                // Repeat All keeps the 2 s cover fixture looping; the
+                // toggle waits for the startup Open to settle.
+                keys("L"),
+                expect("Repeat: All"),
+                Step::SleepMs(3_000),
+                // THE field-defect oracles: nothing but the product's
+                // own frame may reach the console after the mark.
+                Step::AbsentAfterMark("[mp3 @".to_owned()),
+                Step::AbsentAfterMark("Could not find codec parameters".to_owned()),
+                Step::AbsentAfterMark("Consider increasing the value".to_owned()),
+                Step::AbsentAfterMark("[qianqian-wasapi]".to_owned()),
                 new_position(),
             ];
             v.extend(quit_clean());
