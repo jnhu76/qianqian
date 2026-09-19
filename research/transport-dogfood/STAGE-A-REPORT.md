@@ -104,10 +104,12 @@ A15                          GREEN   refused candidate: "next refused: SongCore
                                      refused '<abs>': status 104"; no auto-skip
 A16 (+paused/after-seek)     GREEN   stop while active/paused/after-seek → Stopped,
                                      terminal immutable on repeat press
-A16-drain-stop               GREEN   late stop settles EXACTLY ONE truthful
-                                     terminal (run F: Stopped — the pressed
-                                     timing lands outside the decode-EOF drain
-                                     window; see findings F-4)
+A16-drain-stop               GREEN   near-EOF stop dogfood: late stop settles
+                                     EXACTLY ONE truthful terminal — Completed
+                                     OR Stopped by actual command timing
+                                     (run F observed Stopped). Does NOT
+                                     establish the drain-window boundary;
+                                     see the scope note below and §7
 A17/A18                      GREEN   stop→open and open→stop routing
 A19                          GREEN   12 open replacements; threads 7 vs base 6,
                                      ws 13MB (bounds 6 delta / 300MB)
@@ -119,6 +121,18 @@ Machine-mode regression (campaign §7) — `machine-runF2.summary`: M1–M7
 command state; seek rebase witnessed in a bounded window; invalid seek
 tokens inert; garbage candidate → activation report, exit 1, no forged
 terminal; unknown command = presentation noise).
+
+A16-drain-stop scope note (oracle honesty, not weakening): this
+scenario is a **near-EOF stop dogfood**. Its legitimate result is
+Completed OR Stopped, by actual command timing (run F observed
+Stopped — the pressed timing landed outside the decode-EOF drain
+window). This scenario does NOT establish the exact decode-EOF
+drain-window classification boundary. Exact D11 drain-window
+semantics are covered by the dedicated D11 conformance/regression
+suite (PR #144 shared truth table, exhaustive 48-tuple Rust/TLC
+byte-compare), not this wall-clock TUI dogfood case. The scenario
+name is retained for run-D/E/F/G evidence continuity only; no sleep
+was manufactured to force one outcome deterministically.
 
 ## 6. Findings by truth class (addendum §3 taxonomy)
 
@@ -180,16 +194,34 @@ TailQuiesced/stale-PCM weakening, no BackendManager/registry/live
 switching). Every A-scenario in §5 doubles as the BEFORE baseline for
 the corrective's semantic-equivalence rerun.
 
-U-1 — unreproduced anomaly, recorded honestly: in run D, six scenarios
-(A2/A3/A4/A7/A9/A11) showed the app emitting NO output after its first
-render (raw streams end; no position ticks at 1 Hz; no key feedback),
-while the process was presumptively alive. Run D's driver lacked
-chronology/liveness instrumentation, so no truth class can be honestly
-assigned. The anomaly did NOT reproduce: all six scenarios passed in
-run E under full instrumentation and again in run F; the production
-binary is byte-identical across D/E/F. Candidate causes (host timing,
-stderr/ConPTY races) are unprovable from run-D evidence. Instrumentation
-now in place will classify it immediately should it recur.
+U-1 — NON-BLOCKING KNOWN ANOMALY (preserved; NOT classified fixed):
+
+```text
+Observed:                     run D contained six total-silence
+                              scenarios (A2/A3/A4/A7/A9/A11): the app
+                              emitted NO output after its first render
+                              (raw streams end; no position ticks at
+                              1 Hz; no key feedback) while the process
+                              was presumptively alive.
+Reproduced after
+instrumentation:              NO — all six scenarios passed in run E
+                              under full instrumentation and again in
+                              run F.
+Binary identity difference:   NONE — the production binary is
+                              byte-identical across D/E/F.
+Known root cause:             NONE — run D's driver lacked
+                              chronology/liveness instrumentation, so
+                              no truth class can be honestly assigned;
+                              candidate causes (host timing,
+                              stderr/ConPTY races) are unprovable from
+                              run-D evidence.
+Subsequent instrumented runs: GREEN.
+Closure status:               NON-BLOCKING KNOWN ANOMALY — standing
+                              watch item for the audit reviewers and
+                              the final Windows regression; the
+                              instrumentation now in place will
+                              classify it immediately should it recur.
+```
 
 ## 7. Physical evidence boundary
 

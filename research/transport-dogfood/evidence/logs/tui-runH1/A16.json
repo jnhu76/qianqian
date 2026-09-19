@@ -1,0 +1,20 @@
+{"scenario":"A16","verdict":"GREEN","exit_code":0,
+ "failure":null,
+ "child_status_at_failure":null,
+ "steps":[
+    "expect \"Format: 44100 Hz\" OK",
+    "sleep 2000ms",
+    "keys \"s\"",
+    "expect \"Terminal: Stopped\" OK",
+    "keys \"s\"",
+    "expect \"Terminal: Stopped\" OK",
+    "expect \"terminal outcome committed\" OK",
+    "keys \"q\"",
+    "exit 0 OK",
+    "expect \"stopped before completion\" OK",
+    "absent-after-mark \"teardown violated\" OK",
+    "absent-after-mark \"warning: disposal\" OK"
+],
+ "resources":[
+    {"label":"baseline","threads":6,"handles":181,"working_set_bytes":13033472}
+]}
