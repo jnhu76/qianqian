@@ -1,0 +1,628 @@
+A1-flac4: GREEN (7622ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    new-position (0, 0) OK
+    expect "Terminal: Completed" OK
+    expect "terminal outcome committed" OK
+    keys "q"
+    exit 0 OK
+    expect "EOF: played out completely" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A1-mp3cbr: GREEN (6270ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    new-position (0, 0) OK
+    expect "Terminal: Completed" OK
+    expect "terminal outcome committed" OK
+    keys "q"
+    exit 0 OK
+    expect "EOF: played out completely" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A1-alac4: GREEN (6453ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    new-position (0, 0) OK
+    expect "Terminal: Completed" OK
+    expect "terminal outcome committed" OK
+    keys "q"
+    exit 0 OK
+    expect "EOF: played out completely" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A1-alac6: GREEN (8657ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    new-position (0, 0) OK
+    expect "Terminal: Completed" OK
+    expect "terminal outcome committed" OK
+    keys "q"
+    exit 0 OK
+    expect "EOF: played out completely" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A2: GREEN (3024ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    keys " "
+    expect "Pause requested: true" OK
+    expect "Paused: true" OK
+    keys " " x2
+    expect "Pause requested: true" OK
+    expect "Paused: true" OK
+    keys " " x2
+    expect "Pause requested: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    new-position (0, 0) OK
+    keys " "
+    expect "Pause requested: true" OK
+    expect "Paused: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    new-position (0, 1) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+A3: GREEN (5686ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 3000ms
+    mark
+    keys "\u{1b}[C" x1
+    new-position (0, 8) OK
+    keys "\u{1b}[C" x1
+    new-position (0, 13) OK
+    keys "\u{1b}[C" x7
+    new-position (0, 8) OK
+    expect "Terminal: Completed" OK
+    expect "terminal outcome committed" OK
+    keys "q"
+    exit 0 OK
+    expect "EOF: played out completely" OK
+A4: GREEN (10023ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 6000ms
+    record-position Some((0, 6))
+    mark
+    keys "\u{1b}[D" x1
+    new-position (0, 1) OK
+    sleep 2500ms
+    new-position (0, 2) OK
+    keys "\u{1b}[D" x1
+    new-position (0, 1) OK
+    expect "Terminal: pending" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+A5: GREEN (5928ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 2000ms
+    mark
+    keys "\u{1b}[C" x3
+    keys "\u{1b}[D" x2
+    keys "\u{1b}[C" x1
+    new-position (0, 7) OK
+    sleep 2000ms
+    new-position (0, 12) OK
+    expect "Terminal: pending" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+A6: GREEN (5543ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 2000ms
+    keys " "
+    expect "Paused: true" OK
+    mark
+    keys "\u{1b}[C" x1
+    new-position (0, 7) OK
+    expect-after-mark "Pause requested: true" OK
+    keys "\u{1b}[D" x1
+    new-position (0, 2) OK
+    expect "Paused: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    sleep 1500ms
+    new-position (0, 7) OK
+    keys "\u{1b}[C" x1
+    keys " "
+    expect "Pause requested: true" OK
+    expect "Paused: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    new-position (0, 2) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+A7: GREEN (7277ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Volume: 100/100 (desired)" OK
+    keys "-" x4
+    expect "Volume: 80/100 (desired)" OK
+    keys "-" x6
+    expect "Volume: 50/100 (desired)" OK
+    keys "-" x6
+    expect "Volume: 20/100 (desired)" OK
+    keys "-" x4
+    expect "Volume: 0/100 (desired)" OK
+    mark
+    sleep 2500ms
+    new-position (0, 2) OK
+    expect "Terminal: pending" OK
+    keys "+" x14
+    expect "Volume: 70/100 (desired)" OK
+    expect "Terminal: pending" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+A8: GREEN (1624ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    keys " "
+    expect "Paused: true" OK
+    keys "-" x4
+    expect "Volume: 80/100 (desired)" OK
+    expect "Paused: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+A9: GREEN (2094ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    keys "-"
+    expect "Volume: 95/100 (desired)" OK
+    mark
+    keys "\u{1b}[C" x1
+    new-position (0, 5) OK
+    expect "Volume: 95/100 (desired)" OK
+    keys "-"
+    expect "Volume: 90/100 (desired)" OK
+    keys "\u{1b}[C" x1
+    new-position (0, 10) OK
+    keys "\u{1b}[D" x1
+    new-position (0, 5) OK
+    keys "+"
+    expect "Volume: 95/100 (desired)" OK
+    expect "Terminal: pending" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+A10: GREEN (3268ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 1500ms
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    mark
+    absent-after-mark "Source: C:\\Users\\Public\\qianqian-dogfood\\synth45.mp3" OK
+    mark
+    keys "o"
+    keys "synth45.mp3"
+    keys "\r"
+    expect-after-mark "opened synth45.mp3" OK
+    expect-after-mark "Source: synth45.mp3" OK
+    mark
+    absent-after-mark "Source: synth30.flac" OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    mark
+    absent-after-mark "Source: synth45.mp3" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A11: GREEN (4469ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 1500ms
+    mark
+    keys "o"
+    keys "garbage.bin"
+    keys "\r"
+    expect-after-mark "open refused" OK
+    absent-after-mark "opened C:\\Users\\Public\\qianqian-dogfood\\" OK
+    mark
+    sleep 1500ms
+    new-position (0, 2) OK
+    mark
+    keys "o"
+    keys "missing-file.flac"
+    keys "\r"
+    expect-after-mark "cannot open 'missing-file.flac'" OK
+    expect "Terminal: pending" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A12: GREEN (2406ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    keys " "
+    expect "Paused: true" OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Pause requested: false" OK
+    expect-after-mark "Paused: false" OK
+    mark
+    new-position (0, 1) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A13: GREEN (4658ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 2000ms
+    keys "\u{1b}[C" x1
+    new-position (0, 0) OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    mark
+    new-position (0, 1) OK
+    resources threads=7 (base 6 + 6), handles=181, ws=12MB (bound 300MB)
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A14: GREEN (1565ms, exit Some(0))
+    expect "Track: 1/3" OK
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "n"
+    expect-after-mark "next: opened C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    expect-after-mark "Track: 2/3" OK
+    keys "n"
+    expect-after-mark "next: opened C:\\Users\\Public\\qianqian-dogfood\\synth45.mp3" OK
+    expect-after-mark "Track: 3/3" OK
+    keys "n"
+    expect-after-mark "no next track" OK
+    expect-after-mark "Track: 3/3" OK
+    keys "p"
+    expect-after-mark "previous: opened C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    expect-after-mark "Track: 2/3" OK
+    keys "p"
+    expect-after-mark "previous: opened C:\\Users\\Public\\qianqian-dogfood\\synth30.flac" OK
+    expect-after-mark "Track: 1/3" OK
+    keys "p"
+    expect-after-mark "no previous track" OK
+    expect-after-mark "Track: 1/3" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A15: GREEN (2352ms, exit Some(0))
+    expect "Track: 1/3" OK
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "n"
+    expect-after-mark "next refused" OK
+    expect-after-mark "Track: 1/3" OK
+    sleep 1200ms
+    new-position (0, 0) OK
+    keys "n"
+    expect-after-mark "next refused" OK
+    expect-after-mark "Track: 1/3" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A16: GREEN (3171ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 2000ms
+    keys "s"
+    expect "Terminal: Stopped" OK
+    keys "s"
+    expect "Terminal: Stopped" OK
+    expect "terminal outcome committed" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A16-after-seek: GREEN (2863ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 1500ms
+    mark
+    keys "\u{1b}[C" x1
+    new-position (0, 6) OK
+    keys "s"
+    expect "Terminal: Stopped" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A16-drain-stop: GREEN (12261ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 3200ms
+    keys "s"
+    expect-either "Terminal: Completed" | "Terminal: Stopped" OK
+    expect "terminal outcome committed" OK
+    keys "q"
+    exit 0 OK
+    expect-either "EOF: played out completely" | "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A16-paused: GREEN (1195ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    keys " "
+    expect "Paused: true" OK
+    keys "s"
+    expect "Terminal: Stopped" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A17: GREEN (2459ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    keys "s"
+    expect "Terminal: Stopped" OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    mark
+    new-position (0, 1) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A18: GREEN (3930ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 1500ms
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    mark
+    new-position (0, 1) OK
+    keys "s"
+    expect "Terminal: Stopped" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A19: GREEN (5159ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 1000ms
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    mark
+    keys "o"
+    keys "synth45.mp3"
+    keys "\r"
+    expect-after-mark "opened synth45.mp3" OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    mark
+    keys "o"
+    keys "synth45.mp3"
+    keys "\r"
+    expect-after-mark "opened synth45.mp3" OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    mark
+    keys "o"
+    keys "synth45.mp3"
+    keys "\r"
+    expect-after-mark "opened synth45.mp3" OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    mark
+    keys "o"
+    keys "synth45.mp3"
+    keys "\r"
+    expect-after-mark "opened synth45.mp3" OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    mark
+    keys "o"
+    keys "synth45.mp3"
+    keys "\r"
+    expect-after-mark "opened synth45.mp3" OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    mark
+    keys "o"
+    keys "synth45.mp3"
+    keys "\r"
+    expect-after-mark "opened synth45.mp3" OK
+    resources threads=7 (base 6 + 6), handles=181, ws=13MB (bound 300MB)
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A20: GREEN (9297ms, exit Some(0))
+    expect "Track: 1/3" OK
+    expect "Format: 44100 Hz" OK
+    sleep 1000ms
+    keys "n"
+    expect-after-mark "next: opened C:\\Users\\Public\\qianqian-dogfood\\synth30.flac" OK
+    expect-after-mark "Track: 2/3" OK
+    keys " "
+    expect "Paused: true" OK
+    sleep 800ms
+    keys " "
+    expect "Pause requested: false" OK
+    keys "\u{1b}[C" x1
+    new-position (0, 0) OK
+    keys "\u{1b}[D" x1
+    new-position (0, 1) OK
+    keys "-"
+    expect "Volume: 95/100 (desired)" OK
+    keys "+"
+    expect "Volume: 100/100 (desired)" OK
+    keys "n"
+    expect-after-mark "next: opened C:\\Users\\Public\\qianqian-dogfood\\mp3cbr.mp3" OK
+    expect-after-mark "Track: 3/3" OK
+    mark
+    keys "o"
+    keys "garbage.bin"
+    keys "\r"
+    expect-after-mark "open refused" OK
+    expect-after-mark "Track: 3/3" OK
+    keys "p"
+    expect-after-mark "previous: opened C:\\Users\\Public\\qianqian-dogfood\\synth30.flac" OK
+    expect-after-mark "Track: 2/3" OK
+    keys " "
+    expect "Paused: true" OK
+    keys "\u{1b}[C" x1
+    new-position (0, 0) OK
+    expect "Paused: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    sleep 1000ms
+    new-position (0, 5) OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    sleep 1000ms
+    keys "\u{1b}[C" x2
+    new-position (0, 0) OK
+    keys "s"
+    expect "Terminal: Stopped" OK
+    mark
+    keys "o"
+    keys "synth45.mp3"
+    keys "\r"
+    expect-after-mark "opened synth45.mp3" OK
+    sleep 1500ms
+    resources threads=7 (base 6 + 6), handles=181, ws=13MB (bound 300MB)
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+C6-open-cancel: GREEN (4028ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "o"
+    keys "synth30"
+    keys "\u{7f}"
+    keys "99"
+    keys "\u{7f}"
+    keys "\u{7f}"
+    keys "\u{1b}"
+    sleep 500ms
+    absent-after-mark "opened " OK
+    keys "o"
+    keys "\r"
+    sleep 500ms
+    absent-after-mark "opened " OK
+    record-position Some((0, 2))
+    mark
+    new-position (0, 3) OK
+    mark
+    keys "o"
+    keys "synth30.flac"
+    keys "\r"
+    expect-after-mark "opened synth30.flac" OK
+    expect-after-mark "Source: synth30.flac" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+C9-resize: GREEN (1739ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    resize 80x24
+    keys " "
+    expect "Pause requested: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    resize 120x40
+    mark
+    keys "x"
+    expect-after-mark "Volume: 100/100 (desired)" OK
+    absent-after-mark "teardown violated" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+C11-longpath: GREEN (1357ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "o"
+    keys "qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac"
+    keys "\r"
+    expect-after-mark "opened qianqian-longpath" OK
+    expect-after-mark "Source: qianqian-longpath" OK
+    mark
+    keys "s"
+    expect-after-mark "Terminal: Stopped" OK
+    expect-after-mark "N  Next" OK
+    absent-after-mark "teardown violated" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+C12-cjk: GREEN (1407ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    mark
+    keys "o"
+    keys "千曲.flac"
+    keys "\r"
+    expect-after-mark "opened 千 曲 .flac" OK
+    keys " "
+    expect "Pause requested: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    expect-after-mark "Source: 千 曲 .flac" OK
+    absent-after-mark "teardown violated" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+C17-ctrlc: GREEN (1966ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 1000ms
+    keys "\u{3}"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
