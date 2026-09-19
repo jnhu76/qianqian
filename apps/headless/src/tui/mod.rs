@@ -10,7 +10,8 @@
 //! view     ratatui rendering of the model (exercised on TestBackend)
 //! runtime  crossterm terminal session: raw mode / alternate screen
 //!          under a small RAII guard, a ~150 ms event loop, the
-//!          key → seam wiring, and the O key's Open input line
+//!          key → seam wiring, the O key's Open input line (file OR
+//!          folder since U1), and the `?` keyboard-help overlay
 //! ```
 //!
 //! The public surface is deliberately ONE item: [`run`], the session
@@ -21,7 +22,9 @@
 //! Boundary discipline (the reason this module is small): the TUI
 //! reads the episode only through `PlaybackSessionHandle::observe()`,
 //! acts on it only through the command seams, performs Open only
-//! through [`crate::player::ReferencePlayerApp::open`], and navigates
+//! through [`crate::player::ReferencePlayerApp::open`] — with U1 input
+//! expansion from [`crate::input`] preparing file/folder candidates
+//! before any destructive step — and navigates
 //! only through the player's `next_track`/`previous_track` (D14.6
 //! playlist closure; the Track line is presentation of the player's
 //! own navigation state) — whose outcomes are application composition

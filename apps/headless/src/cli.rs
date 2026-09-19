@@ -11,14 +11,25 @@ use std::path::PathBuf;
 /// the program path).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Invocation {
-    /// `play <file> [files…]`: local media files for the interactive
-    /// reference-player shell (TUI). The FIRST is opened as the startup
-    /// episode; ALL of them seed the startup playlist (D14.6 navigation;
-    /// the multi-file startup grammar is open representation).
+    /// No arguments at all: the interactive reference-player TUI with
+    /// NO active episode (U1 product launch, Issue #166). This is how
+    /// the canonical `qianqian` binary starts from Explorer or a bare
+    /// shell line. The shell begins truthfully idle — no media path is
+    /// faked, no episode is constructed, and the Open input line (O)
+    /// is how music gets loaded.
+    Interactive,
+    /// `play <file> [files…]`: local media files and/or folders for the
+    /// interactive reference-player shell (TUI). The input expansion
+    /// ([`crate::input`]) turns files and folders into ONE ordered
+    /// candidate list; the FIRST accepted candidate is opened as the
+    /// startup episode and the WHOLE list seeds the startup playlist
+    /// (D14.6 navigation; open representation) on commit.
     Play { files: Vec<PathBuf> },
-    /// `--machine play <file>`: the same episode through the scriptable
+    /// `--machine play <file>`: one FILE through the scriptable
     /// stdin/stdout transport. This is the automation contract; the
-    /// flag is recognized in command position only, like every flag.
+    /// flag is recognized in command position only, like every flag,
+    /// and the machine grammar is NOT extended by U1 (no folder
+    /// expansion, no interactive startup).
     MachinePlay { file: PathBuf },
     /// `--help` / `-h`: print the usage text.
     Help,
@@ -27,10 +38,14 @@ pub enum Invocation {
 }
 
 /// Why an argv did not parse as a product-facing invocation.
+///
+/// There is no "missing command" error: an empty argv IS the
+/// interactive invocation. Every remaining case is a token the user
+/// actually typed, and each one must keep failing truthfully — the
+/// no-argument change must never widen into "anything unparseable
+/// starts the player" (Issue #166 U1 §15).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InvocationError {
-    /// No command was given at all.
-    MissingCommand,
     /// The first argument is neither a known subcommand nor a known flag.
     UnknownCommand(String),
     /// A recognized command received the wrong number of arguments.
@@ -43,7 +58,7 @@ pub enum InvocationError {
 /// a file literally named `--help`, not a help request.
 pub fn parse_invocation(args: &[String]) -> Result<Invocation, InvocationError> {
     let Some(command) = args.first() else {
-        return Err(InvocationError::MissingCommand);
+        return Ok(Invocation::Interactive);
     };
     match command.as_str() {
         "play" => match args.len() {
@@ -80,34 +95,53 @@ pub fn parse_invocation(args: &[String]) -> Result<Invocation, InvocationError> 
 
 /// The product-facing usage text, printed for `--help` (stdout, exit 0)
 /// and for every usage error (stderr, exit 2).
+///
+/// Written for a normal user first (U1, Issue #166 §12): launch, play,
+/// and the player keys lead; the automation transport stays available
+/// under an advanced section. It documents ONLY shipped behavior — no
+/// auto-next, no shuffle, no list-row selection, no exact/large seek:
+/// those are later slices of Issue #166 and must not be advertised
+/// before they exist.
 pub fn usage() -> &'static str {
-    "usage: qianqian-headless <command> [args]
+    "Qianqian — a lightweight local music player
 
-commands:
-  play <file> [files…]   play local media files in the interactive
-                         reference-player terminal shell
-  --machine play <file>  the same episode through the scriptable
-                         stdin/stdout transport (automation)
-  --help | -h            print this usage
-  --version | -V         print the version
+Usage:
+  qianqian                                   listen (opens the player)
+  qianqian play <file-or-folder> [more...]   play files or folders
+  qianqian --help                            show this help
+  qianqian --version                         show the version
 
-in the reference-player shell: arrows seek, Space pauses/resumes, S
-  stops, O opens a source, N/P navigate the startup playlist, Q quits.
-in the machine transport, `stop` stops the episode, `pause` and
-`resume` pause and resume it, `seek <time>` requests a same-episode
-seek (`<time>` is a decimal seconds field, or MINUTES:SECONDS with a
-decimal seconds part, of source media time; an unreadable token sends
-nothing), and `status` prints its truthful state (other interactive
-commands are recognized but not wired yet); in the terminal shell,
-Space pauses/resumes, Left/Right seek in fixed steps, S stops and Q or
-Ctrl+C quits
+A folder is expanded recursively into a temporary track list; the
+first track starts, and N / P move through the list while it plays.
+
+Examples:
+  qianqian
+  qianqian play song.flac
+  qianqian play \"D:\\Music\"
+  qianqian play \"D:\\Music\" \"E:\\More Music\"
+
+Keys in the player:
+  Space        pause / resume
+  Left / Right seek 5 seconds back / forward
+  S            stop
+  N / P        next / previous track
+  + / -        volume up / down
+  O            open a file or folder
+  ?            keyboard help
+  Q or Ctrl+C  quit
+
+Automation (advanced):
+  qianqian --machine play <file>   scriptable single-episode transport
+                                   over stdin/stdout; `stop`, `pause`,
+                                   `resume`, `seek <time>`, `status`
+                                   control it, and the exit code and
+                                   report lines are a pinned contract
 "
 }
 
 impl std::fmt::Display for InvocationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InvocationError::MissingCommand => write!(f, "missing command"),
             InvocationError::UnknownCommand(token) => write!(f, "unknown command '{token}'"),
             InvocationError::WrongArity { command } => {
                 write!(f, "'{command}' received the wrong number of arguments")
@@ -364,12 +398,39 @@ mod tests {
         }
     }
 
+    /// U1 (Issue #166 §4/§15): an empty argv IS the interactive product
+    /// launch — the parser maps it to the explicit `Interactive`
+    /// invocation and to nothing else. This is the parse-level pin of
+    /// the no-argument TUI startup; the binary itself cannot be
+    /// smoke-launched argument-less from a test harness (it would open
+    /// a real terminal session), so the physical launch evidence lives
+    /// in the Windows ConPTY/physical gate.
     #[test]
-    fn empty_argv_reports_a_missing_command() {
+    fn empty_argv_is_the_interactive_invocation() {
         assert_eq!(
-            parse_invocation(&argv(&[])).expect_err("no command at all"),
-            InvocationError::MissingCommand
+            parse_invocation(&argv(&[])).expect("no arguments is a legal invocation"),
+            Invocation::Interactive
         );
+    }
+
+    /// The negative side of the no-argument change: the interactive
+    /// widening covers EXACTLY the empty argv, never a token the user
+    /// typed. A stray first token still fails as an unknown command.
+    #[test]
+    fn the_interactive_invocation_never_swallows_a_typed_token() {
+        for tokens in [
+            &["frobnicate"][..],
+            &["song.flac"][..],
+            &["--machine"][..],
+            &["--machine", "play"][..],
+            &["--machine", "play", "a.flac", "b.flac"][..],
+            &["play"][..],
+        ] {
+            assert!(
+                parse_invocation(&argv(tokens)).is_err(),
+                "{tokens:?} must keep failing, not start the player"
+            );
+        }
     }
 
     #[test]

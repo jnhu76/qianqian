@@ -41,6 +41,15 @@ LONGNAME="qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 [ -f "$STAGE_WSL/千曲.flac" ] || cp "$FIX/flac-16-44-stereo.flac" "$STAGE_WSL/千曲.flac"
 [ -f "$STAGE_WSL/$LONGNAME" ] || cp "$FIX/flac-16-44-stereo.flac" "$STAGE_WSL/$LONGNAME"
 
+# U1 scenario fixture (Issue #166 §17): the u1music FOLDER the
+# U1-folder-open scenario types into the O line — exactly two audio
+# candidates, flac4 sorting first and synth45 second (the path-sorted
+# expansion order the scenario's needles pin). Idempotent like the
+# rest; the sha256 line below records the folder contents too.
+mkdir -p "$STAGE_WSL/u1music"
+[ -f "$STAGE_WSL/u1music/flac4.flac" ] || cp "$STAGE_WSL/flac4.flac" "$STAGE_WSL/u1music/flac4.flac"
+[ -f "$STAGE_WSL/u1music/synth45.mp3" ] || cp "$STAGE_WSL/synth45.mp3" "$STAGE_WSL/u1music/synth45.mp3"
+
 SCEN="$*"
 PS_SCEN=$(printf "'%s'," $SCEN | sed 's/,$//')
 
@@ -62,7 +71,7 @@ ENVFILE="$HARNESS/evidence/ENV-TUI-RUN${RUN}.txt"
   echo "songcore_sha256: $(sha256sum /tmp/qn-dogfood-stage/native/build/artifacts/libsongcore.a | cut -d' ' -f1)"
   echo "rustc: $(rustc --version)"
   echo "corpus_sha256:"
-  sha256sum "$STAGE_WSL"/*.mp3 "$STAGE_WSL"/*.flac "$STAGE_WSL"/*.m4a "$STAGE_WSL"/garbage.bin 2>/dev/null | sed 's|/mnt/c/Users/Public/qianqian-dogfood/|    |;s/^/  /'
+  sha256sum "$STAGE_WSL"/*.mp3 "$STAGE_WSL"/*.flac "$STAGE_WSL"/*.m4a "$STAGE_WSL"/garbage.bin "$STAGE_WSL"/u1music/* 2>/dev/null | sed 's|/mnt/c/Users/Public/qianqian-dogfood/|    |;s/^/  /'
   echo "windows_caption: $(powershell.exe -NoProfile -Command '(Get-CimInstance Win32_OperatingSystem).Caption' | tr -d '\r')"
   echo "audio_device: $(powershell.exe -NoProfile -Command '(Get-CimInstance Win32_SoundDevice | Select-Object -First 1).Name' | tr -d '\r')"
   echo "endpoint_note: default render endpoint, shared mode, event-driven (as opened by the wasapi stderr line in each transcript)"

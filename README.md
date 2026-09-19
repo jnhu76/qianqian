@@ -140,9 +140,15 @@ Build/test authority:
 
 ```bash
 cargo run -p qianqian-headless -- --help
-cargo run -p qianqian-headless --features playback -- play <music-file>
+cargo run -p qianqian-headless --features playback -- play <music-file-or-folder>
 cargo test --workspace
 ```
+
+The workspace builds two binaries from the same entry: `qianqian` — the
+canonical product binary (a bare launch opens an interactive TUI with no
+music loaded; `play` accepts files and/or folders and expands them into
+a temporary track list) — and `qianqian-headless`, the historical
+regression target. On Windows the product binary is `qianqian.exe`.
 
 ## Historical preservation
 

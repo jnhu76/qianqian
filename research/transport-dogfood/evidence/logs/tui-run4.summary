@@ -1,0 +1,32 @@
+U1-idle: GREEN (1058ms, exit Some(0))
+    expect "No music loaded." OK
+    expect "Press O to open a file or folder" OK
+    mark
+    absent-after-mark "Position:" OK
+    absent-after-mark "Paused:" OK
+    absent-after-mark "Terminal:" OK
+    absent-after-mark "open refused" OK
+    absent-after-mark "no audio candidates" OK
+    keys "q"
+    exit 0 OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U1-folder-open: GREEN (3232ms, exit Some(0))
+    expect "No music loaded." OK
+    keys "o"
+    keys "C:\\Users\\Public\\qianqian-dogfood\\u1music"
+    keys "\r"
+    expect-after-mark "opened C:\\Users\\Public\\qianqian-dogfood\\u1music\\flac4.flac (2 candidates)" OK
+    expect "Track: 1/2" OK
+    expect "Format: 44100 Hz" OK
+    new-position (0, 0) OK
+    keys "n"
+    expect-after-mark "C:\\Users\\Public\\qianqian-dogfood\\u1music\\synth45.mp3" OK
+    expect "Track: 2/2" OK
+    expect "Format: 44100 Hz" OK
+    new-position (0, 1) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
