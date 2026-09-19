@@ -1436,13 +1436,52 @@ mod tests {
             }
         }
 
+        /// The field-corpus shape (U2): an MP3 whose embedded cover art
+        /// rides as an attached-picture stream this trimmed FFmpeg build
+        /// has no decoder for. The cover is not audio truth, so the file
+        /// must stay a playable candidate, keep its duration, and probe
+        /// cleanly — the stream-info hunt it triggers is bounded and
+        /// silent inside SongCore since the probe-cost fix (the physical
+        /// transcript gate pins the clean screen; this test pins the
+        /// acceptance side over the committed synthetic fixture).
+        #[test]
+        fn an_mp3_with_embedded_cover_art_stays_playable() {
+            let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/mp3-cbr-cover.mp3");
+            let root = std::env::temp_dir().join(format!(
+                "qianqian-realprobe-cover-{}",
+                std::process::id()
+            ));
+            let _ = fs::remove_dir_all(&root);
+            fs::create_dir_all(&root).expect("temp tree root");
+            let candidate = root.join("01 cover song.mp3");
+            fs::copy(&source, &candidate).expect("cover fixture exists");
+
+            let facts = qianqian_decode_songcore::probe_media(&candidate)
+                .expect("cover-art mp3 probes as playable");
+            assert_eq!(facts.format.sample_rate, 44100);
+            assert!(facts.duration.is_some(), "the cover hides no duration");
+
+            let player = ReferencePlayerApp::new(RealProbeOnly);
+            let mut expansion = expand_inputs([root.as_path()]);
+            validate_with_probe(&player, &mut expansion);
+            assert_eq!(
+                expansion.accepted,
+                vec![candidate],
+                "the cover-art mp3 is the one candidate"
+            );
+            assert_eq!(expansion.rejected, 0, "nothing to reject");
+            assert_eq!(expansion.skipped, 0);
+
+            let _ = fs::remove_dir_all(&root);
+        }
+
         /// F1+F3 together: a realistic music folder — real track,
         /// cover/notes noise, a renamed-garbage "track" — keeps exactly
         /// its real track as a candidate, classifies the noise as quiet
         /// skips, and reports the corrupt file boundedly.
         #[test]
-        fn a_realistic_folder_keeps_the_real_track_and_reports_the_corrupt_one() {
-            let tree = RealTree::new("realistic", &["flac-16-44-stereo.flac"]);
+        fn a_realistic_folder_keeps_the_real_track_and_reports_the_corrupt_one() {            let tree = RealTree::new("realistic", &["flac-16-44-stereo.flac"]);
             tree.garbage("03 broken take.flac");
             tree.noise("cover.jpg");
             tree.noise("notes.txt");

@@ -29,6 +29,37 @@
 
 #define SONG_AVIO_BUFFER_SIZE 32768
 
+/* Cap on how many bytes avformat_find_stream_info may read while hunting
+ * codec parameters (AVFormatContext.probesize). The FFmpeg default is 5MB,
+ * and for MP3s with an embedded cover the attached-picture stream carries
+ * codec parameters that no decoder in this trimmed build can resolve, so
+ * the hunt ALWAYS ran to the full budget — five megabytes of avoidable I/O
+ * per open (twice per track switch, once per scan candidate) and a stream
+ * of stderr warnings through the product's terminal UI. The audio stream's
+ * own parameters resolve from the first frames, so a 1MiB cap keeps every
+ * real open path exact; only the unresolvable-picture hunt is bounded. */
+#define SONG_PROBE_LIMIT (1u << 20)
+
+/* FFmpeg's default logger writes mechanism chatter straight to stderr.
+ * SongCore is the only FFmpeg user in the process and already surfaces
+ * every failure as a typed song_status diagnostic, so the chatter has no
+ * consumer — but it corrupts any full-screen terminal UI that shares the
+ * console. Silence it by default; QIANQIAN_FFMPEG_LOG=1 restores the
+ * default logger for mechanism debugging. Installed on every song_open
+ * (a benign same-value pointer store; opens are off any realtime path). */
+static void songcore_discard_av_log(void *avcl, int level, const char *fmt,
+                                    va_list vl) {
+    (void)avcl;
+    (void)level;
+    (void)fmt;
+    (void)vl;
+}
+
+static void songcore_quiet_ffmpeg_logging(void) {
+    if (getenv("QIANQIAN_FFMPEG_LOG") == NULL)
+        av_log_set_callback(songcore_discard_av_log);
+}
+
 /* -------------------------------------------------------------------------
  * Handle state
  * ---------------------------------------------------------------------- */
@@ -788,6 +819,8 @@ song_status song_open(const song_io *io, song_handle **out_handle) {
         return SONG_ERR_INVALID_ARGUMENT;
     *out_handle = NULL;
 
+    songcore_quiet_ffmpeg_logging();
+
     song_handle *h = (song_handle *)calloc(1, sizeof(*h));
     if (!h) return SONG_ERR_OUT_OF_MEMORY;
     h->io = *io;
@@ -812,6 +845,7 @@ song_status song_open(const song_io *io, song_handle **out_handle) {
         free(h);
         return SONG_ERR_OUT_OF_MEMORY;
     }
+    h->fmt->probesize = SONG_PROBE_LIMIT;
     h->fmt->pb = h->avio;
     h->fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
 

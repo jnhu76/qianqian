@@ -80,6 +80,16 @@ const OPEN_TIMEOUT: Duration = Duration::from_secs(10);
 const EVENT_TIMEOUT_MS: u32 = 100;
 const DRAIN_CAP: Duration = Duration::from_secs(5);
 
+/// Mechanism diagnostics (the per-episode open line and abort/volume
+/// notes — never steady-state output) are silent by default: any stderr
+/// write corrupts a full-screen terminal UI sharing the console, and a
+/// mechanism abort already surfaces through the session's typed
+/// activation/terminal evidence. QIANQIAN_AUDIO_LOG=1 restores them for
+/// mechanism debugging.
+fn mechanism_log_enabled() -> bool {
+    std::env::var_os("QIANQIAN_AUDIO_LOG").is_some_and(|v| v != "0")
+}
+
 /// The concrete Windows Host Render Backend mechanism (ADR-PBK-003
 /// §2/§3): the Output Plugin is the stable composition identity; this
 /// type is the backend mechanism it owns — never itself a Plugin.
@@ -236,7 +246,9 @@ fn run_render_thread(
     // One terminal diagnostic per episode — never steady-state output.
     match &outcome {
         LoopOutcome::Aborted { message } => {
-            eprintln!("[qianqian-wasapi] render aborted: {message}");
+            if mechanism_log_enabled() {
+                eprintln!("[qianqian-wasapi] render aborted: {message}");
+            }
             // The device leg is gone: stop the data plane so the decode
             // worker cannot wedge on a full edge against a dead consumer
             // (first-wins on the edge, so it is a no-op after natural EOF).
@@ -483,11 +495,14 @@ fn open_session(format: PcmFormat, level: &OutputLevel, slot: &OpenSlot) -> Opti
 
     publish(OpenVerdict::Opened { format });
     // One open diagnostic per episode — the real-sound gate's negotiated
-    // format evidence; never steady-state output.
-    eprintln!(
-        "[qianqian-wasapi] opened: {} Hz, {} channels, mask {:#x}, buffer {} frames (shared, event-driven)",
-        format.sample_rate, format.channels, format.channel_mask, buffer_frames
-    );
+    // format evidence; never steady-state output; silent unless
+    // mechanism logging is enabled (a product TUI shares this console).
+    if mechanism_log_enabled() {
+        eprintln!(
+            "[qianqian-wasapi] opened: {} Hz, {} channels, mask {:#x}, buffer {} frames (shared, event-driven)",
+            format.sample_rate, format.channels, format.channel_mask, buffer_frames
+        );
+    }
     Some(DeviceSession {
         render,
         client,
@@ -620,7 +635,9 @@ fn steady_loop(
                     // per iteration; the next ROUTED change retries once.
                     Err(e) => {
                         session.applied_bits.set(routed_bits);
-                        if !session.volume_diagnosed.replace(true) {
+                        if !session.volume_diagnosed.replace(true)
+                            && mechanism_log_enabled()
+                        {
                             eprintln!(
                                 "[qianqian-wasapi] stream volume apply failed (recoverable; \
                                  holding the last applied level): {e}"
