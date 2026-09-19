@@ -1,0 +1,20 @@
+run: U1 physical gate (Issue #166 §17) — idle launch + folder expansion
+date_utc: 2026-09-19T08:35:14Z
+branch: feat/166-windows-tui-usability-u1
+base_sha: bcd8eaa051ec54b5732c7deff8c04499564e1d49
+head_at_binary_build: d34897d (final review-fix commit)
+build_command: QIANQIAN_NATIVE_DIR=<mingw staging: include/songcore.h + artifacts-mingw/*.a> cargo build --release --target x86_64-pc-windows-gnu --features playback -p qianqian-headless
+target_triple: x86_64-pc-windows-gnu (GNU toolchain)
+profile: release  features: playback
+binary_path: target/x86_64-pc-windows-gnu/release/qianqian.exe
+qianqian_exe_sha256: 416b674a96116cea57ab4a86acac2d7d10d5a954def99c34f1ca06f5dda46b27
+songcore_artifact_sha256: 17323291fc7b53997a36746e1ce7f86b8863a63f71be79389b9b196a05175a2a (artifacts-mingw/libsongcore.a)
+corpus_sha256:
+  d80626686047762d2b3334ca27536799524b42d0e89aa004bd1bbe776551a4a2      u1music/flac4.flac
+  e25c876b2d1cad9cc0254c4c1c31fe2af7bf78d67f617b4208304fe7c641674e      u1music/synth45.mp3
+windows_caption: Microsoft Windows 11 Pro (Professional)
+audio_device: Realtek High Definition Audio
+endpoint_note: default render endpoint, shared mode, event-driven (per wasapi stderr line in transcripts)
+scenarios: U1-idle (W1), U1-folder-open (W3/W4 mechanics) x3 + final rerun at review-fix HEAD; A1-flac4 against qianqian.exe (W2 mechanics); --machine play flac4.flac via cmd.exe (machine transport regression)
+not_run: audible human-ear witness (UNAVAILABLE, no ear witness this run); W5 CJK/spaces FOLDER expansion on Windows (CJK covered by unit tests + prior C12 physical); W6 O-valid-folder-while-playing physical; W7 O-invalid-folder-while-playing physical (both covered by unit tests over the real kernel); Explorer double-click itself (W1 exercised the identical no-argv launch under ConPTY)
+acoustic_witness: UNAVAILABLE
