@@ -1,0 +1,38 @@
+run: U2 physical gate (Issue #166 §51) — playlist / order / repeat / EOF / seek / pane
+date_utc: 2026-09-19T11:52:00Z (runs 6-9); 2026-09-19T12:23:06Z (run 10, soak)
+branch: feat/166-playlist-usability-closure
+base_sha: 4d9a0e0b128611d11c58ee151f14ff6cbf513759 (origin/main at branch point)
+head_at_binary_build: 5a2246c (review-fix commit; no product source changed after it)
+build_command: QIANQIAN_NATIVE_DIR=<mingw staging: include/songcore.h + artifacts-mingw/*.a> cargo build --release --target x86_64-pc-windows-gnu --features playback -p qianqian-headless
+target_triple: x86_64-pc-windows-gnu (GNU toolchain)
+profile: release  features: playback
+binary_path: target/x86_64-pc-windows-gnu/release/qianqian-headless.exe
+qianqian_headless_sha256: f2354f3d48b532dc161036de8bd5190785ad3c3fc4dbcf5d4c42a9b4a9de573c (runs 6-10, identical)
+tuidriver_sha256: be35615fdc2f0f5acbf1f14665f1bd08fe9475acc6dee4d32d2fb54bf52d9ebd (runs 6-10, identical)
+songcore_artifact_sha256: 17323291fc7b53997a36746e1ce7f86b8863a63f71be79389b9b196a05175a2a (artifacts-mingw/libsongcore.a — same artifact as the F6/U1 gates)
+corpus_sha256: per file in evidence/ENV-TUI-RUN6/7/8/10.txt (U2 additions: vtest01..24 = renamed synth45; u2soak/soak01..20 = locally generated 100 s synthetic sine, declared in CORPUS.md)
+windows_caption: Microsoft Windows 11 Pro
+audio_device: Realtek High Definition Audio
+endpoint_note: default render endpoint, shared mode, event-driven (per wasapi stderr line in transcripts)
+scenarios:
+  RUN6  U2-pane, U2-select, U2-enter, U2-nav, U2-order, U2-repeat-labels,
+        U2-eof-advance, U2-eof-stays, U2-eof-all-wrap, U2-eof-one-replays,
+        U2-stop-no-advance, U2-seek-30, U2-goto, U2-help, U2-shuffle-start,
+        U2-cjk, U2-viewport  — 17/17 GREEN
+  RUN7  U1-idle, U1-folder-open, A1-flac4, A1-mp3cbr, A2, A3, A4, A14, A15,
+        A16-drain-stop — 10/10 GREEN
+  RUN8  C6-open-cancel, C9-resize, C11-longpath, C12-cjk, C17-ctrlc, A17,
+        A18, A19 — 8/8 GREEN (C11 updated to the frozen U2 controls line)
+  RUN9  machine-mode regression via cmd.exe — 7/7 PASS
+  RUN10 U2-soak: 20 x 100 s synthetic tracks end to end (2,011,770 ms ≈ 33.5 min),
+        every transition witnessed with its feedback line, the cursor advance,
+        a NEW published Position sample and a bounded resource checkpoint;
+        end-of-traversal stay (no wrap/cascade) and clean quit — GREEN
+not_run:
+  audible human-ear witness (UNAVAILABLE — no ear witness recorded; no scenario
+  claims audibility)
+  mouse/keyboard-hardware variety (the driver injects the frozen VT grammar only)
+  clean-machine package dogfood and portable ZIP (U3, not in this slice)
+  Linux/ARM hosts (out of scope for this campaign)
+acoustic_witness: UNAVAILABLE
+report: research/transport-dogfood/U2-REPORT.md

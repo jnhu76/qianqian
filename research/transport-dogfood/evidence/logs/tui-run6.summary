@@ -1,0 +1,305 @@
+U2-pane: GREEN (1033ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/3" OK
+    expect "Order: Sequential" OK
+    expect "Repeat: Off" OK
+    expect "flac4.flac" OK
+    expect "mp3cbr.mp3" OK
+    expect "alac4.m4a" OK
+    expect "▶ >   1  flac4.flac" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-select: GREEN (1448ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/3" OK
+    mark
+    keys "\u{1b}[B"
+    expect-after-mark(async) "▶     1  flac4.flac" OK
+    expect-after-mark(async) "  >   2  mp3cbr.mp3" OK
+    keys "\u{1b}[B"
+    keys "\u{1b}[B"
+    keys "\u{1b}[A"
+    keys "\u{1b}[A"
+    keys "\u{1b}[A"
+    expect-after-mark(async) "Source: C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    expect-after-mark(async) "Track: 1/3" OK
+    expect-after-mark(async) "▶ >   1  flac4.flac" OK
+    absent-after-mark "auto-next: opened C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    absent-after-mark "next: opened C:\\Users\\Public\\qianqian-dogfood\\mp3cbr.mp3" OK
+    absent-after-mark "previous: opened C:\\Users\\Public\\qianqian-dogfood\\alac4.m4a" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-enter: GREEN (1288ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/3" OK
+    mark
+    keys "\u{1b}[B"
+    keys "\r"
+    expect-after-mark(async) "play: opened C:\\Users\\Public\\qianqian-dogfood\\mp3cbr.mp3" OK
+    expect-after-mark(async) "Track: 2/3" OK
+    expect-after-mark(async) "▶ >   2  mp3cbr.mp3" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-nav: GREEN (1432ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/3" OK
+    mark
+    keys "n"
+    expect-after-mark(async) "Track: 2/3" OK
+    keys "n"
+    expect-after-mark(async) "Track: 3/3" OK
+    expect-after-mark(async) "▶ >   3  alac4.m4a" OK
+    mark
+    keys "n"
+    repaint
+    expect-after-mark(async) "Track: 3/3" OK
+    expect-after-mark(async) "▶ >   3  alac4.m4a" OK
+    expect-after-mark(async) "Source: C:\\Users\\Public\\qianqian-dogfood\\alac4.m4a" OK
+    absent-after-mark "next: opened C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    absent-after-mark "next: opened C:\\Users\\Public\\qianqian-dogfood\\mp3cbr.mp3" OK
+    keys "p"
+    expect-after-mark(async) "Track: 2/3" OK
+    expect-after-mark(async) "▶ >   2  mp3cbr.mp3" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-order: GREEN (1132ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/3" OK
+    mark
+    keys "r"
+    expect-after-mark(async) "Order: Shuffle" OK
+    expect-after-mark(async) "Track: 1/3" OK
+    expect-after-mark(async) "Source: C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    absent-after-mark "Random" OK
+    keys "r"
+    expect-after-mark(async) "Order: Sequential" OK
+    expect-after-mark(async) "Track: 1/3" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-repeat-labels: GREEN (1208ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Repeat: Off" OK
+    mark
+    keys "l"
+    expect-after-mark(async) "Repeat: All" OK
+    keys "l"
+    expect-after-mark(async) "Repeat: One" OK
+    keys "l"
+    expect-after-mark(async) "Repeat: Off" OK
+    expect-after-mark(async) "Track: 1/3" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-eof-advance: GREEN (5467ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/3" OK
+    mark
+    expect-after-mark(async) "auto-next: opened C:\\Users\\Public\\qianqian-dogfood\\synth30.flac" OK
+    expect-after-mark(async) "Track: 2/3" OK
+    expect-after-mark(async) "▶ >   2  synth30.flac" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect-either "EOF: played out completely" | "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-eof-stays: GREEN (14909ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/2" OK
+    expect-after-mark(async) "auto-next: opened C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    expect-after-mark(async) "Track: 2/2" OK
+    expect "Terminal: Completed" OK
+    mark
+    repaint
+    sleep 6000ms
+    repaint
+    absent-after-mark "auto-next: opened C:\\Users\\Public\\qianqian-dogfood\\alac4.m4a" OK
+    expect-after-mark(async) "Track: 2/2" OK
+    expect-after-mark(async) "Source: C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    expect-after-mark(async) "▶ >   2  flac4.flac" OK
+    keys "q"
+    exit 0 OK
+    expect "EOF: played out completely" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-eof-all-wrap: GREEN (8967ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/2" OK
+    keys "l"
+    expect "Repeat: All" OK
+    mark
+    expect-after-mark(async) "auto-next: opened C:\\Users\\Public\\qianqian-dogfood\\alac4.m4a" OK
+    expect-after-mark(async) "Track: 2/2" OK
+    expect-after-mark(async) "auto-next: opened C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    expect-after-mark(async) "Track: 1/2" OK
+    expect-after-mark(async) "▶ >   1  flac4.flac" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect-either "EOF: played out completely" | "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-eof-one-replays: GREEN (4968ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/2" OK
+    keys "l"
+    keys "l"
+    expect "Repeat: One" OK
+    mark
+    expect-after-mark(async) "auto-next: opened C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    expect-after-mark(async) "Track: 1/2" OK
+    keys "n"
+    expect-after-mark(async) "Track: 2/2" OK
+    expect-after-mark(async) "▶ >   2  alac4.m4a" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-stop-no-advance: GREEN (7236ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/2" OK
+    mark
+    keys "s"
+    expect-after-mark(async) "Terminal: Stopped" OK
+    repaint
+    sleep 6000ms
+    repaint
+    absent-after-mark "auto-next: opened C:\\Users\\Public\\qianqian-dogfood\\alac4.m4a" OK
+    expect-after-mark(async) "Track: 1/2" OK
+    expect-after-mark(async) "Source: C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    expect-after-mark(async) "▶ >   1  flac4.flac" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-seek-30: GREEN (4712ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    sleep 3000ms
+    mark
+    keys "\u{1b}[1;2C" x1
+    expect-after-mark(async) "Position: 00:3" OK
+    new-position (0, 33) OK
+    keys "\u{1b}[1;2D" x1
+    expect-after-mark(async) "Position: 00:0" OK
+    new-position (0, 3) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-goto: GREEN (1616ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Go to" OK
+    keys "g"
+    expect "Go to:" OK
+    keys "0:20"
+    keys "\r"
+    expect-after-mark(async) "seek requested: 00:20" OK
+    expect-after-mark(async) "Position: 00:2" OK
+    keys "g"
+    keys "nonsense"
+    keys "\r"
+    expect-after-mark(async) "Go to:" OK
+    keys "\u{1b}"
+    mark
+    repaint
+    absent-after-mark "Go to:" OK
+    new-position (0, 20) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-help: GREEN (1231ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Shift+←/→" OK
+    mark
+    keys "?"
+    expect-after-mark(async) "Qianqian keys" OK
+    expect-after-mark(async) "select the previous / next row" OK
+    expect-after-mark(async) "play the selected row" OK
+    expect-after-mark(async) "repeat: off / all / one" OK
+    expect-after-mark(async) "go to an exact position" OK
+    absent-after-mark "M3U" OK
+    absent-after-mark "mouse" OK
+    absent-after-mark "library" OK
+    keys "\u{1b}"
+    mark
+    repaint
+    absent-after-mark "Qianqian keys" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-shuffle-start: GREEN (961ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Order: Shuffle" OK
+    expect "Track: 1/3" OK
+    expect "▶ >   1  flac4.flac" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-cjk: GREEN (1063ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/2" OK
+    expect "▶ >   1  千 曲 .flac" OK
+    mark
+    keys "n"
+    expect-after-mark(async) "Track: 2/2" OK
+    expect-after-mark(async) "Source: C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" OK
+    new-position (0, 0) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+U2-viewport: GREEN (2107ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/24" OK
+    expect "vtest01.mp3" OK
+    mark
+    keys "\u{1b}[B" x22
+    expect-after-mark(async) "  >  23  vtest23.mp3" OK
+    mark
+    repaint
+    absent-after-mark "  1  vtest01.mp3" OK
+    expect-after-mark(async) "Track: 1/24" OK
+    expect-after-mark(async) "Source: C:\\Users\\Public\\qianqian-dogfood\\vtest01.mp3" OK
+    keys "\r"
+    expect-after-mark(async) "Track: 23/24" OK
+    expect-after-mark(async) "▶ >  23  vtest23.mp3" OK
+    new-position (0, 1) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
