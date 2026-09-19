@@ -1,0 +1,1 @@
+this binary was built without the playback slice; rebuild with: cargo build --release --features playback
