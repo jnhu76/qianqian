@@ -1,0 +1,30 @@
+{"scenario":"A15","verdict":"GREEN","exit_code":0,
+ "failure":null,
+ "child_status_at_failure":null,
+ "steps":[
+    "expect \"Track: 1/2\" OK",
+    "expect \"Format: 44100 Hz\" OK",
+    "expect \"not playable: garbage.bin\" OK",
+    "mark",
+    "new-position (0, 1) OK",
+    "keys \"n\"",
+    "expect-after-mark \"next: opened C:\\\\Users\\\\Public\\\\qn-lr1\\\\media\\\\flac4.flac\" OK",
+    "expect-after-mark \"Track: 2/2\" OK",
+    "keys \"n\"",
+    "expect-after-mark \"no next track\" OK",
+    "expect-after-mark \"Track: 2/2\" OK",
+    "keys \"p\"",
+    "expect-after-mark \"previous: opened C:\\\\Users\\\\Public\\\\qn-lr1\\\\media\\\\synth45.mp3\" OK",
+    "expect-after-mark \"Track: 1/2\" OK",
+    "keys \"p\"",
+    "expect-after-mark \"no previous track\" OK",
+    "expect-after-mark \"Track: 1/2\" OK",
+    "keys \"q\"",
+    "exit 0 OK",
+    "expect \"stopped before completion\" OK",
+    "absent-after-mark \"teardown violated\" OK",
+    "absent-after-mark \"warning: disposal\" OK"
+],
+ "resources":[
+    {"label":"baseline","threads":6,"handles":181,"working_set_bytes":13135872}
+]}

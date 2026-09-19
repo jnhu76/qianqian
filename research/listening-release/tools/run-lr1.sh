@@ -193,15 +193,18 @@ note "stage 4a: building the 1,000- and 5,000-entry lists"
 B1="$M/big1000"; mkdir -p "$B1"
 for i in $(seq -w 1 1000); do cp "$FIX/mp3-cbr-id3v23.mp3" "$B1/track-$i.mp3"; done
 B5="$M/big5000"; mkdir -p "$B5"
-cp "$FIX/mp3-cbr-id3v23.mp3" "$B5/seed.mp3"
+# NTFS caps hard links at 1023 per file, so the 5,000 entries share TEN
+# seed files (500 links each) — path-sorted order and byte-identity are
+# unaffected (track-NNNN names never collide across seeds).
+for s in $(seq 0 9); do cp "$FIX/mp3-cbr-id3v23.mp3" "$B5/seed$s.mp3"; done
 powershell.exe -NoProfile -Command "
-  \$seed = '$W_MEDIA\\big5000\\seed.mp3'
-  \$dir  = '$W_MEDIA\\big5000'
+  \$dir = '$W_MEDIA\\big5000'
   for (\$i = 1; \$i -le 5000; \$i++) {
+    \$seed = '{0}\\seed{1}.mp3' -f \$dir, ([int][math]::Floor((\$i - 1) / 500))
     New-Item -ItemType HardLink -Path ('{0}\\track-{1:d4}.mp3' -f \$dir, \$i) -Target \$seed | Out-Null
   }
 " || fail "hardlink staging failed"
-rm -f "$B5/seed.mp3"
+rm -f "$B5"/seed*.mp3
 echo "corpus_counts: big1000=$(ls "$B1" | wc -l) big5000=$(ls "$B5" | wc -l)" >> "$ENVFILE"
 
 {

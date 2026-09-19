@@ -1,0 +1,42 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\synth45.mp3"
+T+   0.012s       recv  16 bytes
+T+   0.022s       recv  141 bytes
+T+   0.068s       recv  26 bytes
+T+   0.069s       recv  19 bytes
+T+   0.082s       recv  6819 bytes
+T+   0.436s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.436s    wait-ok  Format: 44100 Hz
+T+   0.436s wait-begin  "Shift+←/→" within 5s
+T+   0.436s    wait-ok  Shift+←/→
+T+   0.436s       send  1 bytes: "?"
+T+   0.437s       recv  6704 bytes
+T+   0.437s       recv  4 bytes
+T+   0.437s       recv  4 bytes
+T+   0.455s       recv  6630 bytes
+T+   0.517s wait-begin  "Qianqian keys" within 500ms
+T+   0.517s    wait-ok  Qianqian keys
+T+   0.517s wait-begin  "select the previous / next row" within 500ms
+T+   0.517s    wait-ok  select the previous / next row
+T+   0.517s wait-begin  "play the selected row" within 500ms
+T+   0.517s    wait-ok  play the selected row
+T+   0.517s wait-begin  "repeat: off / all / one" within 500ms
+T+   0.517s    wait-ok  repeat: off / all / one
+T+   0.517s wait-begin  "go to an exact position" within 500ms
+T+   0.517s    wait-ok  go to an exact position
+T+   0.517s       send  1 bytes: "\u{1b}"
+T+   0.517s       recv  6670 bytes
+T+   0.532s       recv  6757 bytes
+T+   0.597s       recv  6757 bytes
+T+   0.677s wait-begin  new-position != None
+T+   0.678s       recv  6797 bytes
+T+   0.678s       recv  4 bytes
+T+   0.686s       recv  6813 bytes
+T+   0.698s    wait-ok  new-position (0, 0)
+T+   0.698s       send  1 bytes: "q"
+T+   0.698s       recv  6701 bytes
+T+   0.702s       recv  304 bytes
+T+   0.724s       recv  34 bytes
+T+   0.733s       recv  47 bytes
+T+   0.778s       recv  386 bytes
+T+   1.178s wait-begin  "stopped before completion" within 5s
+T+   1.178s    wait-ok  stopped before completion

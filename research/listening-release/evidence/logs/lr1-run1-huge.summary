@@ -1,0 +1,13 @@
+LR1-huge: GREEN (3850ms, exit Some(0))
+    expect-after-mark "5000 candidates" OK
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/5000" OK
+    mark
+    new-position (0, 1) OK
+    keys "\u{1b}[B" x3
+    expect-after-mark "sel 4/5000" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK

@@ -1,0 +1,20 @@
+{"scenario":"LR1-truncated-next","verdict":"GREEN","exit_code":1,
+ "failure":null,
+ "child_status_at_failure":null,
+ "steps":[
+    "expect \"Format: 44100 Hz\" OK",
+    "expect \"2 candidates\" OK",
+    "expect \"Track: 1/2\" OK",
+    "mark",
+    "new-position (0, 1) OK",
+    "keys \"n\"",
+    "expect-after-mark \"Track: 2/2\" OK",
+    "expect-either \"Terminal: Completed\" | \"Terminal: Failed\" OK",
+    "keys \"q\"",
+    "exit 1 OK (either 0/1)",
+    "expect-either \"EOF: played out completely\" | \"playback failed\" OK",
+    "absent-after-mark \"teardown violated\" OK"
+],
+ "resources":[
+    {"label":"baseline","threads":6,"handles":180,"working_set_bytes":12738560}
+]}
