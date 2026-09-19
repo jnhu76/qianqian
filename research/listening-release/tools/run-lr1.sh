@@ -156,6 +156,11 @@ ffmpeg -v error -f lavfi -i 'sine=frequency=440:sample_rate=44100:duration=45' \
     -ac 2 -b:a 128k -y "$M/synth45.mp3" || fail "synth45 generation"
 ffmpeg -v error -f lavfi -i 'sine=frequency=330:sample_rate=44100:duration=30' \
     -ac 2 -y "$M/synth30.flac" || fail "synth30 generation"
+# U2-rate-mix fixture: a 48 kHz synthetic track (the field-defect rate
+# against a 44.1 kHz mix format — Tier-2 engine-SRC gate). Declared
+# SYNTHETIC like the other synth* files.
+ffmpeg -v error -f lavfi -i 'sine=frequency=550:sample_rate=48000:duration=10' \
+    -ac 2 -b:a 128k -y "$M/synth10-48k.mp3" || fail "synth10-48k generation"
 # The U2-cover-clean fixture: a committed SYNTHETIC MP3 with an
 # embedded mjpeg cover art (the field-defect shape, U2 corrective).
 COVERFIX="$REPO/apps/headless/tests/fixtures/mp3-cbr-cover.mp3"
@@ -259,7 +264,7 @@ run_scenarios() {
 }
 
 ok=0
-run_scenarios core   U1-idle U1-folder-open U2-shuffle-start U2-cover-clean U2-help C11-longpath C12-cjk A15 \
+run_scenarios core   U1-idle U1-folder-open U2-shuffle-start U2-cover-clean U2-rate-mix U2-help C11-longpath C12-cjk A15 \
   && ok=$((ok+1)) || true
 run_scenarios fmatrix LR1-folder-mixed LR1-all-corrupt LR1-duplicate-roots LR1-truncated-next \
   && ok=$((ok+1)) || true

@@ -418,6 +418,12 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         // synthetic fixture (apps/headless/tests/fixtures) is staged as
         // cover.mp3 by the campaign runner.
         "U2-cover-clean" => &["cover.mp3"],
+        // U2 corrective (field defect, 48 kHz track refused): a
+        // mixed-rate playlist — 44.1 kHz then 48 kHz — both tracks must
+        // play. Whichever track differs from the host mix format
+        // exercises the Tier-2 engine-SRC fallback; the other exercises
+        // the Tier-1 direct path.
+        "U2-rate-mix" => &["mp3cbr.mp3", "synth10-48k.mp3"],
         // Ad-hoc (NOT part of the fixed groups): open a REAL user-named
         // directory end to end — idle launch, then the O dialog with
         // the typed path (exactly the user's field operation). The
@@ -1766,6 +1772,28 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 Step::AbsentAfterMark("Could not find codec parameters".to_owned()),
                 Step::AbsentAfterMark("Consider increasing the value".to_owned()),
                 Step::AbsentAfterMark("[qianqian-wasapi]".to_owned()),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-rate-mix — the field-defect gate (48 kHz track refused):
+        // track 1 opens on the direct path (44.1 kHz), then N must open
+        // track 2 (48 kHz source format) — through the Tier-2 engine-SRC
+        // fallback whenever the host mix format differs. The honest
+        // source-format line is the oracle: both rates must appear, the
+        // second with a live position, and a failure would surface as
+        // the "next failed" diagnostic instead.
+        "U2-rate-mix" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/2"),
+                expect("Format: 44100 Hz"),
+                new_position(),
+                keys("n"),
+                expect("Track: 2/2"),
+                expect("Format: 48000 Hz"),
                 new_position(),
             ];
             v.extend(quit_clean());

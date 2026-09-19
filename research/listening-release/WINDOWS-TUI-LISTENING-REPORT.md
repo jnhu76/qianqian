@@ -316,13 +316,36 @@ Tests         committed synthetic MP3 with an embedded mjpeg cover
 Measured on the user's real corpus (Linux dev build, same C code):
 108 budget-exhaustion warnings at probesize (5000000) before the fix
 → 0 warnings and probesize (1048576) under QIANQIAN_FFMPEG_LOG=1
-after; default-run stderr clean. The remaining physical gates (the
-RUN3 matrix with U2-cover-clean, and the X-realdir latency witness
-built for the user's directory) are recorded as BLOCKED, not failed:
-the host's audio endpoints were all UNPLUGGED/NOTPRESENT during the
-attempt (0 active; the activation path reported
-"no default render endpoint: 0x80070490" and the product failed
-honestly to an idle shell). See
-`evidence/ENV-LR1-RUN3-BLOCKED-NOTE.txt`. RUN4 (same script) is the
-physical evidence of record once an output device is connected again.
+after; default-run stderr clean.
+
+### 11.1 Second round: the 48 kHz refusal (field-earned Tier-2 SRC)
+
+With an output device reconnected, the user's next real corpus
+(`D:\文件\音频`, mixed 44.1/48 kHz) surfaced one more defect: track 1
+(44.1 kHz) played, `N` to a 48 kHz track failed the episode with
+`stream initialize failed: 0x88890008 (device refused the float32
+source format)` — the shared-mode mixer refuses a source rate that
+differs from the mix format, and the backend was Tier-1-only (the
+previously deferred OPEN mechanism choice). The screen corruption in
+the same report is the OLD artifact (the `[qianqian-wasapi]` and
+`[mp3float @ …]` lines visible in the screenshots are silent-by-
+default since 9995f6b — the still-running extraction predates it).
+
+Corrective: Tier-2 engine-SRC fallback (commit this round; PBK-003 §8
+amendment note under PR review) — Tier 1 first (bit-perfect direct
+submission); on exactly `AUDCLNT_E_UNSUPPORTED_FORMAT`, retry with
+`AUTOCONVERTPCM | SRC_DEFAULT_QUALITY` so the engine's mix thread does
+the conversion while the data plane still carries float32 at the
+source rate (edge, D14.8 accounting and the realtime firewall
+unchanged). Formats both tiers refuse still fail honestly. New
+physical gate `U2-rate-mix`: a 44.1→48 kHz playlist where BOTH tracks
+must render with honest source-format lines.
+
+The remaining physical gates (the RUN4 matrix with U2-cover-clean +
+U2-rate-mix, and the X-realdir latency witness against
+`D:\文件\音频`) run once the rebuilt package is staged — see the RUN4
+ENV file / the RUN3 blocked note for the honest status chain. (The
+RUN3 attempt itself is recorded as ENVIRONMENT-BLOCKED, not failed:
+zero active render endpoints at the time — see
+`evidence/ENV-LR1-RUN3-BLOCKED-NOTE.txt`.)
 
