@@ -1,10 +1,18 @@
 //! ConPTY driver for the reference-player TUI (Stage A dogfood
 //! evidence). Spawns the REAL `qianqian-headless.exe play …` under a
 //! Windows pseudoconsole, feeds a scripted key sequence, and checks
-//! each scenario step against the terminal output the real crossterm/
-//! ratatui stack produced. One JSON verdict per scenario; process exit
-//! 0 iff GREEN. A wedged step hits the scenario watchdog (the child is
+//! each scenario step against what the real crossterm/ratatui stack
+//! actually rendered. One JSON verdict per scenario; process exit 0 iff
+//! GREEN. A wedged step hits the scenario watchdog (the child is
 //! terminated and the run reports RED).
+//!
+//! Capture model: the driver emulates the terminal CELL GRID (cursor
+//! positioning, erase, alt-screen), and every time the rendered screen
+//! changes it appends the full frame's text to an append-only frame
+//! history. Step oracles match against that history — a plain VT-stream
+//! string strip is NOT sufficient, because ratatui's diff renderer
+//! never re-emits unchanged cells (spaces included), so label text is
+//! fragmented across cursor moves in the raw stream.
 //!
 //! The driver is presentation-adjacent tooling only: it asserts on the
 //! labels the shell is contractually allowed to render (truth classes
@@ -15,10 +23,12 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use windows::core::{PCWSTR, PWSTR};
-use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::Security::SECURITY_ATTRIBUTES;
 use windows::Win32::Storage::FileSystem::{ReadFile, WriteFile};
-use windows::Win32::System::Console::{ClosePseudoConsole, CreatePseudoConsole, COORD, HPCON};
+use windows::Win32::System::Console::{
+    ClosePseudoConsole, CreatePseudoConsole, ResizePseudoConsole, COORD, HPCON,
+};
 use windows::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Thread32First, Thread32Next, TH32CS_SNAPTHREAD, THREADENTRY32,
 };
@@ -47,12 +57,280 @@ pub const BACKSPACE: &str = "\u{7f}";
 pub const LEFT: &str = "\u{1b}[D";
 pub const RIGHT: &str = "\u{1b}[C";
 
-// ------------------------------------------------------------- session
+// ------------------------------------------------- VT grid emulation
 
-struct Screen {
-    text: String,
-    raw: Vec<u8>,
+/// One terminal cell grid plus the append-only frame history built
+/// from it. `history` only ever grows: a frame is appended when the
+/// rendered screen differs from the last appended frame.
+pub struct Capture {
+    grid: Grid,
+    last_frame: String,
+    pub history: String,
+    pub raw: Vec<u8>,
+    parser: VtParser,
 }
+
+impl Capture {
+    fn new(w: usize, h: usize) -> Capture {
+        Capture {
+            grid: Grid::new(w, h),
+            last_frame: String::new(),
+            history: String::new(),
+            raw: Vec::new(),
+            parser: VtParser::default(),
+        }
+    }
+
+    fn feed(&mut self, bytes: &[u8]) {
+        self.raw.extend_from_slice(bytes);
+        self.parser.feed(bytes, &mut self.grid);
+        let frame = self.grid.text();
+        if frame != self.last_frame {
+            self.history.push_str(&frame);
+            self.history.push('\n');
+            self.last_frame = frame;
+        }
+    }
+}
+
+struct Grid {
+    w: usize,
+    h: usize,
+    cells: Vec<char>,
+    cx: usize,
+    cy: usize,
+}
+
+impl Grid {
+    fn new(w: usize, h: usize) -> Grid {
+        Grid {
+            w,
+            h,
+            cells: vec![' '; w * h],
+            cx: 0,
+            cy: 0,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.cells.iter_mut().for_each(|c| *c = ' ');
+        self.cx = 0;
+        self.cy = 0;
+    }
+
+    fn put(&mut self, c: char) {
+        if self.cx >= self.w {
+            self.cx = 0;
+            self.advance_row();
+        }
+        let idx = self.cy * self.w + self.cx;
+        self.cells[idx] = c;
+        self.cx += 1;
+    }
+
+    fn advance_row(&mut self) {
+        self.cy += 1;
+        if self.cy >= self.h {
+            // Scroll: drop the first row, add a blank last row.
+            self.cells.drain(..self.w);
+            self.cells.resize(self.w * self.h, ' ');
+            self.cy = self.h - 1;
+        }
+    }
+
+    /// The rendered screen: rows with trailing whitespace stripped,
+    /// joined with newlines.
+    fn text(&self) -> String {
+        let mut rows = Vec::with_capacity(self.h);
+        for row in 0..self.h {
+            let line: String = self.cells[row * self.w..(row + 1) * self.w]
+                .iter()
+                .collect();
+            rows.push(line.trim_end().to_owned());
+        }
+        rows.join("\n")
+    }
+
+    fn erase_in_display(&mut self, mode: u32) {
+        match mode {
+            0 => {
+                let start = self.cy * self.w + self.cx.min(self.w - 1);
+                self.cells[start..].iter_mut().for_each(|c| *c = ' ');
+            }
+            1 => {
+                let end = (self.cy * self.w + self.cx.min(self.w - 1)).min(self.cells.len());
+                self.cells[..=end].iter_mut().for_each(|c| *c = ' ');
+            }
+            _ => self.clear(),
+        }
+    }
+
+    fn erase_in_line(&mut self, mode: u32) {
+        let row = self.cy * self.w;
+        match mode {
+            0 => {
+                let start = row + self.cx.min(self.w);
+                self.cells[start..row + self.w]
+                    .iter_mut()
+                    .for_each(|c| *c = ' ');
+            }
+            1 => {
+                let end = row + self.cx.min(self.w - 1);
+                self.cells[row..=end].iter_mut().for_each(|c| *c = ' ');
+            }
+            _ => self.cells[row..row + self.w]
+                .iter_mut()
+                .for_each(|c| *c = ' '),
+        }
+    }
+}
+
+/// Minimal VT input parser: just enough of ECMA-48/DEC to keep the cell
+/// grid honest for a ratatui/crossterm application (CUP, CUU/D/F/B,
+/// ED, EL, CHA, VPA, SGR-ignored, OSC-ignored, alt-screen enter).
+#[derive(Default)]
+struct VtParser {
+    state: VtState,
+    params: String,
+    utf8: Vec<u8>,
+}
+
+#[derive(Default, PartialEq)]
+enum VtState {
+    #[default]
+    Ground,
+    Esc,
+    Csi,
+    Osc,
+    OscEsc,
+}
+
+impl VtParser {
+    fn param1(&self, index: usize, default: u32) -> u32 {
+        self.params
+            .split(|c| c == ';' || c == ':')
+            .nth(index)
+            .and_then(|p| {
+                if p.is_empty() {
+                    None
+                } else {
+                    p.parse::<u32>().ok()
+                }
+            })
+            .filter(|v| *v > 0)
+            .unwrap_or(default)
+    }
+
+    fn apply_csi(&mut self, grid: &mut Grid, final_byte: u8) {
+        let private = self.params.starts_with('?');
+        let n = |i: usize| self.param1(i, 1) as usize;
+        match final_byte {
+            b'H' | b'f' if !private => {
+                grid.cy = (n(0) - 1).min(grid.h - 1);
+                grid.cx = (n(1) - 1).min(grid.w - 1);
+            }
+            b'A' => grid.cy = grid.cy.saturating_sub(n(0)),
+            b'B' => grid.cy = (grid.cy + n(0)).min(grid.h - 1),
+            b'C' => grid.cx = (grid.cx + n(0)).min(grid.w - 1),
+            b'D' => grid.cx = grid.cx.saturating_sub(n(0)),
+            b'G' => grid.cx = (n(0) - 1).min(grid.w - 1),
+            b'd' => grid.cy = (n(0) - 1).min(grid.h - 1),
+            b'J' if !private => {
+                let mode = self.param1(0, 0);
+                grid.erase_in_display(mode);
+            }
+            b'K' if !private => {
+                let mode = self.param1(0, 0);
+                grid.erase_in_line(mode);
+            }
+            b'h' | b'l' if private => {
+                // Alt-screen enter clears our grid; leave is ignored (the
+                // post-restore transcript stays in history anyway).
+                if final_byte == b'h'
+                    && (self.params.contains("1049") || self.params.contains("1047"))
+                {
+                    grid.clear();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn feed(&mut self, bytes: &[u8], grid: &mut Grid) {
+        for &b in bytes {
+            match self.state {
+                VtState::Ground => match b {
+                    0x1b => {
+                        self.state = VtState::Esc;
+                        self.params.clear();
+                    }
+                    b'\r' => grid.cx = 0,
+                    b'\n' => grid.advance_row(),
+                    0x08 => grid.cx = grid.cx.saturating_sub(1),
+                    0x20..=0x7e => grid.put(b as char),
+                    0x00..=0x1f | 0x7f => {}
+                    _ => {
+                        // UTF-8: assemble multibyte sequences so CJK /
+                        // Unicode path text lands as real chars.
+                        self.utf8.push(b);
+                        let expected = utf8_len(self.utf8[0]);
+                        if expected == 0 {
+                            self.utf8.clear();
+                        } else if self.utf8.len() == expected {
+                            if let Ok(s) = std::str::from_utf8(&self.utf8) {
+                                for c in s.chars() {
+                                    grid.put(c);
+                                }
+                            }
+                            self.utf8.clear();
+                        }
+                    }
+                },
+                VtState::Esc => match b {
+                    b'[' => self.state = VtState::Csi,
+                    b']' => self.state = VtState::Osc,
+                    0x1b => self.state = VtState::Esc,
+                    _ => self.state = VtState::Ground,
+                },
+                VtState::Csi => match b {
+                    b'0'..=b'9' | b';' | b':' | b'?' | b' ' => self.params.push(b as char),
+                    0x40..=0x7e => {
+                        let final_byte = b;
+                        let params = std::mem::take(&mut self.params);
+                        self.params = params;
+                        self.apply_csi(grid, final_byte);
+                        self.params.clear();
+                        self.state = VtState::Ground;
+                    }
+                    _ => {
+                        self.state = VtState::Ground;
+                        self.params.clear();
+                    }
+                },
+                VtState::Osc => match b {
+                    0x07 => self.state = VtState::Ground,
+                    0x1b => self.state = VtState::OscEsc,
+                    _ => {}
+                },
+                VtState::OscEsc => match b {
+                    b'\\' => self.state = VtState::Ground,
+                    _ => self.state = VtState::Osc,
+                },
+            }
+        }
+    }
+}
+
+fn utf8_len(lead: u8) -> usize {
+    match lead {
+        0xc0..=0xdf => 2,
+        0xe0..=0xef => 3,
+        0xf0..=0xf7 => 4,
+        _ => 0,
+    }
+}
+
+// ------------------------------------------------------------- session
 
 #[derive(Clone)]
 struct ResourceSample {
@@ -66,7 +344,10 @@ struct Session {
     hpc: HPCON,
     process: HANDLE,
     stdin_write: HANDLE,
-    screen: Arc<Mutex<Screen>>,
+    capture: Arc<Mutex<Capture>>,
+    chrono: ChronoHandle,
+    cols: i16,
+    rows: i16,
     base_threads: u32,
     base_handles: u32,
     base_ws: u64,
@@ -93,20 +374,13 @@ impl Session {
             lpSecurityDescriptor: std::ptr::null_mut(),
             bInheritHandle: true.into(),
         };
-        // Input pipe: ConPTY holds the READ end (it consumes our keys);
-        // we keep the write end.
         unsafe { CreatePipe(&mut in_read, &mut in_write, Some(&sa), 0) }
             .map_err(|e| format!("CreatePipe(in): {e}"))?;
-        // Output pipe: ConPTY holds the WRITE end; we keep the read end.
         unsafe { CreatePipe(&mut out_read, &mut out_write, Some(&sa), 0) }
             .map_err(|e| format!("CreatePipe(out): {e}"))?;
 
-        let hpc = unsafe {
-            CreatePseudoConsole(COORD { X: cols, Y: rows }, in_read, out_write, 0)
-        }
-        .map_err(|e| format!("CreatePseudoConsole: {e}"))?;
-        // (The ConPTY ends are closed after CreateProcessW, matching the
-        // documented sample order.)
+        let hpc = unsafe { CreatePseudoConsole(COORD { X: cols, Y: rows }, in_read, out_write, 0) }
+            .map_err(|e| format!("CreatePseudoConsole: {e}"))?;
 
         // Attribute list carrying the pseudoconsole into the child.
         let mut attr_size = 0usize;
@@ -139,6 +413,18 @@ impl Session {
         }
         let mut cmdline_wide = wide(&cmdline);
 
+        // The child's working directory is pinned to the program's own
+        // directory: relative O-dialog candidates must resolve against
+        // the staging dir regardless of how the detached driver itself
+        // was launched (Start-Process from a Linux-cwd shell otherwise
+        // lands the whole chain in C:\Windows\System32, and every open
+        // honestly fails with os error 2).
+        let child_cwd = program
+            .rsplit_once('\\')
+            .map(|(dir, _)| dir.to_owned())
+            .unwrap_or_else(|| ".".to_owned());
+        let cwd_wide = wide(&child_cwd);
+
         let mut si: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
         si.StartupInfo.cb = std::mem::size_of::<STARTUPINFOEXW>() as u32;
         // The EXW struct itself must carry the attribute list — without
@@ -155,42 +441,52 @@ impl Session {
                 false,
                 EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
                 None,
-                PCWSTR::null(),
+                PCWSTR(cwd_wide.as_ptr()),
                 &si as *const STARTUPINFOEXW as *const STARTUPINFOW,
                 &mut pi,
             )
         }
         .map_err(|e| format!("CreateProcessW: {e}"))?;
 
-        // The ConPTY holds duplicated ends now; drop ours.
+        // The ConPTY holds its ends; ours may go now.
         unsafe {
             let _ = CloseHandle(in_read);
             let _ = CloseHandle(out_write);
         }
-
         unsafe { DeleteProcThreadAttributeList(attr_list) };
 
-        let screen = Arc::new(Mutex::new(Screen {
-            text: String::new(),
-            raw: Vec::new(),
-        }));
+        let capture = Arc::new(Mutex::new(Capture::new(cols as usize, rows as usize)));
+        let chrono: ChronoHandle = Arc::new(Mutex::new(Chronology::new()));
+        chrono
+            .lock()
+            .expect("chrono lock")
+            .log("spawn", &format!("cwd={child_cwd} cmd={cmdline}"));
         {
-            let screen = Arc::clone(&screen);
+            let capture = Arc::clone(&capture);
+            let chrono = Arc::clone(&chrono);
             // HANDLE is a raw pointer (not Send); move the raw address.
             let read_end_addr = out_read.0 as usize;
             std::thread::spawn(move || {
                 let read_end = HANDLE(read_end_addr as *mut core::ffi::c_void);
-                let mut stripper = Stripper::default();
                 let mut buf = [0u8; 8192];
                 loop {
                     let mut n = 0u32;
                     let ok = unsafe { ReadFile(read_end, Some(&mut buf), Some(&mut n), None) };
                     if ok.is_err() || n == 0 {
+                        chrono
+                            .lock()
+                            .expect("chrono lock")
+                            .log("recv-eof", &format!("ok={:?} n={n}", ok.is_ok()));
                         break;
                     }
-                    let mut s = screen.lock().expect("screen lock");
-                    s.raw.extend_from_slice(&buf[..n as usize]);
-                    stripper.feed(&buf[..n as usize], &mut s.text);
+                    capture
+                        .lock()
+                        .expect("capture lock")
+                        .feed(&buf[..n as usize]);
+                    chrono
+                        .lock()
+                        .expect("chrono lock")
+                        .log("recv", &format!("{} bytes", n));
                 }
             });
         }
@@ -199,7 +495,10 @@ impl Session {
             hpc,
             process: pi.hProcess,
             stdin_write: in_write,
-            screen,
+            capture,
+            chrono,
+            cols,
+            rows,
             base_threads: 0,
             base_handles: 0,
             base_ws: 0,
@@ -220,19 +519,79 @@ impl Session {
         Ok(session)
     }
 
+    /// Force the app's next draws to be full repaints: the diff
+    /// renderer resends only cells it believes changed, so the
+    /// reconstructed grid can carry stale characters wherever new text
+    /// aligns over old text (a `[1C` cursor jump over an unchanged
+    /// cell) — substring oracles over such a grid are unsafe at diff
+    /// boundaries. A pseudoconsole resize makes ratatui repaint every
+    /// cell, restoring a coherent grid. Narrower-first so frames never
+    /// exceed the emulated grid width.
+    fn full_repaint(&self) {
+        unsafe {
+            let _ = ResizePseudoConsole(
+                self.hpc,
+                COORD {
+                    X: self.cols - 1,
+                    Y: self.rows,
+                },
+            );
+            std::thread::sleep(Duration::from_millis(80));
+            let _ = ResizePseudoConsole(
+                self.hpc,
+                COORD {
+                    X: self.cols,
+                    Y: self.rows,
+                },
+            );
+        }
+    }
+
     fn send_keys(&mut self, keys: &str) -> Result<(), String> {
         let bytes = keys.as_bytes();
         let mut written = 0usize;
         while written < bytes.len() {
             let mut n = 0u32;
-            unsafe { WriteFile(self.stdin_write, Some(&bytes[written..]), Some(&mut n), None) }
-                .map_err(|e| format!("WriteFile(keys): {e}"))?;
+            unsafe {
+                WriteFile(
+                    self.stdin_write,
+                    Some(&bytes[written..]),
+                    Some(&mut n),
+                    None,
+                )
+            }
+            .map_err(|e| format!("WriteFile(keys): {e}"))?;
             if n == 0 {
+                self.chrono
+                    .lock()
+                    .expect("chrono lock")
+                    .log("send-FAIL", "wrote nothing");
                 return Err("WriteFile(keys) wrote nothing".to_owned());
             }
             written += n as usize;
         }
+        self.chrono
+            .lock()
+            .expect("chrono lock")
+            .log("send", &format!("{} bytes: {keys:?}", bytes.len()));
         Ok(())
+    }
+
+    /// True while the child has not exited. Non-blocking.
+    fn is_alive(&self) -> bool {
+        matches!(
+            unsafe { WaitForSingleObject(self.process, 0) },
+            WAIT_TIMEOUT
+        )
+    }
+
+    /// The child's exit code; meaningful only after death (a live
+    /// process reports STILL_ACTIVE).
+    fn exit_code_now(&self) -> Option<u32> {
+        let mut ec = 0u32;
+        unsafe { GetExitCodeProcess(self.process, &mut ec) }
+            .ok()
+            .map(|_| ec)
     }
 
     /// Child resource measurement: threads via the Toolhelp snapshot,
@@ -277,29 +636,62 @@ impl Session {
         Ok((threads, handles, pmc.WorkingSetSize as u64))
     }
 
+    fn history(&self) -> String {
+        self.capture.lock().expect("capture lock").history.clone()
+    }
+
     fn wait_for(&self, needle: &str, since: usize, within: Duration) -> Result<(), String> {
+        self.chrono
+            .lock()
+            .expect("chrono lock")
+            .log("wait-begin", &format!("{needle:?} within {within:?}"));
         let deadline = Instant::now() + within;
         loop {
-            let text = self.screen.lock().expect("screen lock").text.clone();
-            if text[since.min(text.len())..].contains(needle) {
+            let history = self.history();
+            if history[since.min(history.len())..].contains(needle) {
+                self.chrono
+                    .lock()
+                    .expect("chrono lock")
+                    .log("wait-ok", needle);
                 return Ok(());
             }
-            if Instant::now() > deadline {
-                let tail_len = text.len().min(1500);
-                let tail = text[text.len() - tail_len..].to_owned();
+            // A dead child can never satisfy the wait — fail fast with
+            // its exit code instead of burning the window on a corpse.
+            if !self.is_alive() {
+                let code = self.exit_code_now();
+                self.chrono.lock().expect("chrono lock").log(
+                    "wait-DEAD",
+                    &format!("child exited {code:?} awaiting {needle:?}"),
+                );
                 return Err(format!(
-                    "timeout waiting for {needle:?} after offset {since}; text tail:\n{tail}"
+                    "child exited (code {code:?}) while waiting for {needle:?}"
+                ));
+            }
+            if Instant::now() > deadline {
+                // Char-boundary-safe tail: the history contains
+                // multi-byte glyphs (box drawing, CJK paths).
+                let mut start = history.len().saturating_sub(1500);
+                while start < history.len() && !history.is_char_boundary(start) {
+                    start += 1;
+                }
+                let tail = history[start..].to_owned();
+                self.chrono
+                    .lock()
+                    .expect("chrono lock")
+                    .log("wait-TIMEOUT", &format!("{needle:?} after offset {since}"));
+                return Err(format!(
+                    "timeout waiting for {needle:?} after offset {since}; history tail:\n{tail}"
                 ));
             }
             std::thread::sleep(Duration::from_millis(20));
         }
     }
 
-    /// Every `Position: MM:SS` label in the captured text after
+    /// Every `Position: MM:SS` label in the frame history after
     /// `since`, as (minutes, seconds) pairs.
     fn positions_after(&self, since: usize) -> Vec<(u64, u64)> {
-        let text = self.screen.lock().expect("screen lock").text.clone();
-        let hay = &text[since.min(text.len())..];
+        let history = self.history();
+        let hay = &history[since.min(history.len())..];
         let needle = "Position: ";
         let mut out = Vec::new();
         let mut rest = hay;
@@ -326,15 +718,37 @@ impl Session {
         previous: Option<(u64, u64)>,
         within: Duration,
     ) -> Result<(u64, u64), String> {
+        self.chrono
+            .lock()
+            .expect("chrono lock")
+            .log("wait-begin", &format!("new-position != {previous:?}"));
         let deadline = Instant::now() + within;
         loop {
             for pos in self.positions_after(since) {
                 if Some(pos) != previous {
+                    self.chrono
+                        .lock()
+                        .expect("chrono lock")
+                        .log("wait-ok", &format!("new-position {pos:?}"));
                     return Ok(pos);
                 }
             }
+            if !self.is_alive() {
+                let code = self.exit_code_now();
+                self.chrono.lock().expect("chrono lock").log(
+                    "wait-DEAD",
+                    &format!("child exited {code:?} awaiting position"),
+                );
+                return Err(format!(
+                    "child exited (code {code:?}) while waiting for a position sample"
+                ));
+            }
             if Instant::now() > deadline {
                 let seen = self.positions_after(since);
+                self.chrono
+                    .lock()
+                    .expect("chrono lock")
+                    .log("wait-TIMEOUT", &format!("new-position != {previous:?}"));
                 return Err(format!(
                     "timeout waiting for a position sample different from {previous:?}; \
                      post-mark samples: {seen:?}"
@@ -352,65 +766,37 @@ impl Session {
     }
 }
 
-// ------------------------------------------------------- ANSI stripping
+// ----------------------------------------------------------- execution
 
-/// Incremental stripper keeping printable text and dropping VT/CSI/OSC
-/// sequences, so step matching works on a stable plain-text projection.
-#[derive(Default)]
-struct Stripper {
-    state: StripState,
+/// Wall-clock chronology of one scenario: spawn, key writes, output
+/// chunks, wait outcomes, child death. This is the primary wedge
+/// classifier — a silent app with successful key writes and a live
+/// process is a different failure class than a dead child or a failed
+/// input write.
+struct Chronology {
+    t0: Instant,
+    lines: Vec<String>,
 }
 
-#[derive(Default, PartialEq)]
-enum StripState {
-    #[default]
-    Ground,
-    Esc,
-    Csi,
-    Osc,
-    OscEsc,
-}
+type ChronoHandle = Arc<Mutex<Chronology>>;
 
-impl Stripper {
-    fn feed(&mut self, bytes: &[u8], out: &mut String) {
-        for &b in bytes {
-            match self.state {
-                StripState::Ground => match b {
-                    0x1b => self.state = StripState::Esc,
-                    0x00..=0x09 | 0x0b | 0x0c => {}
-                    0x0a | 0x0d => {}
-                    0x20..=0x7e => out.push(b as char),
-                    // Other bytes (UTF-8 lead/continuation, box-drawing
-                    // runes) pass through so CJK/Unicode path evidence
-                    // (§21) stays in the transcript.
-                    _ => out.push(b as char),
-                },
-                StripState::Esc => match b {
-                    b'[' => self.state = StripState::Csi,
-                    b']' => self.state = StripState::Osc,
-                    0x1b => self.state = StripState::Esc,
-                    _ => self.state = StripState::Ground,
-                },
-                StripState::Csi => {
-                    if (0x40..=0x7e).contains(&b) {
-                        self.state = StripState::Ground;
-                    }
-                }
-                StripState::Osc => match b {
-                    0x07 => self.state = StripState::Ground,
-                    0x1b => self.state = StripState::OscEsc,
-                    _ => {}
-                },
-                StripState::OscEsc => match b {
-                    b'\\' => self.state = StripState::Ground,
-                    _ => self.state = StripState::Osc,
-                },
-            }
+impl Chronology {
+    fn new() -> Self {
+        Self {
+            t0: Instant::now(),
+            lines: Vec::new(),
         }
     }
-}
 
-// ----------------------------------------------------------- execution
+    fn log(&mut self, kind: &str, detail: &str) {
+        self.lines.push(format!(
+            "T+{:8.3}s {:>10}  {}",
+            self.t0.elapsed().as_secs_f64(),
+            kind,
+            detail
+        ));
+    }
+}
 
 struct ExecReport {
     verdict: &'static str,
@@ -418,7 +804,12 @@ struct ExecReport {
     steps: Vec<String>,
     resources: Vec<ResourceSample>,
     failure: Option<String>,
+    /// Child state at RED, captured BEFORE the cleanup TerminateProcess
+    /// (alive+threads, or the observed exit code).
+    child_status: Option<String>,
+    chronology: String,
     transcript: String,
+    raw: Vec<u8>,
 }
 
 fn run_scenario(
@@ -431,11 +822,7 @@ fn run_scenario(
     let mut step_log: Vec<String> = Vec::new();
     let deadline = Instant::now() + watchdog;
     let args: Vec<String> = std::iter::once("play".to_owned())
-        .chain(
-            files
-                .iter()
-                .map(|f| format!("{media_dir}\\{f}")),
-        )
+        .chain(files.iter().map(|f| format!("{media_dir}\\{f}")))
         .collect();
     let mut session = match Session::spawn(headless, &args, 120, 40) {
         Ok(s) => s,
@@ -446,7 +833,10 @@ fn run_scenario(
                 steps: vec![format!("spawn: {e}")],
                 resources: Vec::new(),
                 failure: Some(e),
+                child_status: None,
+                chronology: String::new(),
                 transcript: String::new(),
+                raw: Vec::new(),
             }
         }
     };
@@ -463,7 +853,7 @@ fn run_scenario(
         }
         match step {
             Step::Mark => {
-                mark = session.screen.lock().expect("screen lock").text.len();
+                mark = session.capture.lock().expect("capture lock").history.len();
                 step_log.push("mark".to_owned());
             }
             Step::Keys(keys) => {
@@ -471,7 +861,16 @@ fn run_scenario(
                     outcome = Err(format!("keys: {e}"));
                     break 'steps;
                 }
+                session.full_repaint();
                 step_log.push(format!("keys {:?}", keys));
+            }
+            Step::Typed(text) => {
+                if let Err(e) = session.send_keys(text) {
+                    outcome = Err(format!("keys: {e}"));
+                    break 'steps;
+                }
+                session.full_repaint();
+                step_log.push(format!("keys {text:?}"));
             }
             Step::KeysEach(keys, times, gap_ms) => {
                 for _ in 0..*times {
@@ -481,6 +880,7 @@ fn run_scenario(
                     }
                     std::thread::sleep(Duration::from_millis(*gap_ms));
                 }
+                session.full_repaint();
                 step_log.push(format!("keys {keys:?} x{times}"));
             }
             Step::SleepMs(ms) => {
@@ -499,6 +899,19 @@ fn run_scenario(
             Step::ExpectAfterMark { text, within_ms } => {
                 match session.wait_for(text, mark, Duration::from_millis(*within_ms)) {
                     Ok(()) => step_log.push(format!("expect-after-mark {text:?} OK")),
+                    Err(e) => {
+                        outcome = Err(e);
+                        break 'steps;
+                    }
+                }
+            }
+            Step::ExpectEither { a, b, within_ms } => {
+                let wait = Duration::from_millis(*within_ms);
+                match session
+                    .wait_for(a, 0, wait)
+                    .or_else(|_| session.wait_for(b, 0, wait))
+                {
+                    Ok(()) => step_log.push(format!("expect-either {a:?} | {b:?} OK")),
                     Err(e) => {
                         outcome = Err(e);
                         break 'steps;
@@ -528,8 +941,8 @@ fn run_scenario(
                 step_log.push(format!("record-position {last_position:?}"));
             }
             Step::AbsentAfterMark(text) => {
-                let t = session.screen.lock().expect("screen lock").text.clone();
-                if t[mark.min(t.len())..].contains(text) {
+                let history = session.history();
+                if history[mark.min(history.len())..].contains(text) {
                     outcome = Err(format!("forbidden text {text:?} appeared after mark"));
                     break 'steps;
                 }
@@ -605,7 +1018,21 @@ fn run_scenario(
         }
     }
 
-    // The child must not outlive the evidence run on a RED path.
+    // The child must not outlive the evidence run on a RED path — but
+    // its state AT failure is evidence, captured before the cleanup.
+    let child_status = if outcome.is_err() && exit_code.is_none() {
+        if session.is_alive() {
+            let threads = session.measure().map(|(t, _, _)| t).ok();
+            Some(format!("alive=true threads={threads:?}"))
+        } else {
+            Some(format!(
+                "alive=false exit_code={:?}",
+                session.exit_code_now()
+            ))
+        }
+    } else {
+        None
+    };
     if outcome.is_err() && exit_code.is_none() {
         unsafe {
             let _ = TerminateProcess(session.process, 42);
@@ -613,7 +1040,11 @@ fn run_scenario(
         }
     }
 
-    let transcript = session.screen.lock().expect("screen lock").text.clone();
+    let (transcript, raw) = {
+        let cap = session.capture.lock().expect("capture lock");
+        (cap.history.clone(), cap.raw.clone())
+    };
+    let chronology = session.chrono.lock().expect("chrono lock").lines.join("\n");
     let resources = std::mem::take(&mut session.samples);
     session.shutdown();
 
@@ -627,7 +1058,10 @@ fn run_scenario(
         steps: step_log,
         resources,
         failure,
+        child_status,
+        chronology,
         transcript,
+        raw,
     }
 }
 
@@ -654,7 +1088,7 @@ fn write_evidence(out_dir: &str, name: &str, report: &ExecReport) -> Result<(), 
     let steps = report
         .steps
         .iter()
-        .map(|s| format!("    \"{s}\""))
+        .map(|s| format!("    \"{}\"", json_escape(s)))
         .collect::<Vec<_>>()
         .join(",\n");
     let resources = report
@@ -674,11 +1108,17 @@ fn write_evidence(out_dir: &str, name: &str, report: &ExecReport) -> Result<(), 
     let failure = report
         .failure
         .as_deref()
-        .map(json_escape)
+        .map(|f| format!("\"{}\"", json_escape(f)))
+        .unwrap_or_else(|| "null".to_owned());
+    let child_status = report
+        .child_status
+        .as_deref()
+        .map(|c| format!("\"{}\"", json_escape(c)))
         .unwrap_or_else(|| "null".to_owned());
     let json = format!(
         "{{\"scenario\":\"{name}\",\"verdict\":\"{}\",\"exit_code\":{},\n \
-         \"failure\":{failure},\n \"steps\":[\n{steps}\n],\n \"resources\":[\n{resources}\n]}}\n",
+         \"failure\":{failure},\n \"child_status_at_failure\":{child_status},\n \
+         \"steps\":[\n{steps}\n],\n \"resources\":[\n{resources}\n]}}\n",
         report.verdict,
         report
             .exit_code
@@ -689,6 +1129,10 @@ fn write_evidence(out_dir: &str, name: &str, report: &ExecReport) -> Result<(), 
         .map_err(|e| format!("write json: {e}"))?;
     std::fs::write(format!("{out_dir}/{name}.txt"), &report.transcript)
         .map_err(|e| format!("write transcript: {e}"))?;
+    std::fs::write(format!("{out_dir}/{name}.raw.txt"), &report.raw)
+        .map_err(|e| format!("write raw: {e}"))?;
+    std::fs::write(format!("{out_dir}/{name}.chrono.txt"), &report.chronology)
+        .map_err(|e| format!("write chronology: {e}"))?;
     Ok(())
 }
 
@@ -711,6 +1155,17 @@ fn main() {
         std::process::exit(2);
     }
 
+    // Detached launches lose the hidden console's stderr; any panic
+    // must leave its evidence in the out directory.
+    let panic_path = format!("{out_dir}/panic.txt");
+    std::fs::create_dir_all(&out_dir).ok();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = std::fs::write(
+            &panic_path,
+            format!("panic: {info}\nbacktrace disabled (release)\n"),
+        );
+    }));
+
     if names.iter().any(|n| n == "--probe") {
         // Minimal attachment probe: spawn `cmd /c echo PROBE-OK` under
         // the ConPTY and dump whatever the pipe yields.
@@ -724,25 +1179,19 @@ fn main() {
         };
         std::thread::sleep(Duration::from_secs(3));
         {
-            let scr = s.screen.lock().unwrap();
+            let cap = s.capture.lock().unwrap();
             let report = format!(
-                "probe: text {} bytes {:?}\nprobe: raw {} bytes {:?}\n",
-                scr.text.len(),
-                scr.text,
-                scr.raw.len(),
-                String::from_utf8_lossy(&scr.raw[..scr.raw.len().min(400)])
+                "probe: history {} bytes\nprobe: raw {} bytes {:?}\n",
+                cap.history.len(),
+                cap.raw.len(),
+                String::from_utf8_lossy(&cap.raw[..cap.raw.len().min(400)])
             );
             eprintln!("{report}");
             let _ = std::fs::write(
-                concat!(
-                    "C:\\Users\\Public\\qianqian-dogfood\\",
-                    "probe-report.txt"
-                ),
+                "C:\\Users\\Public\\qianqian-dogfood\\probe-report.txt",
                 &report,
             );
         }
-        let (t, h, w) = s.measure().unwrap_or((0, 0, 0));
-        eprintln!("probe child resources: threads={t} handles={h} ws={w}");
         unsafe {
             let _ = TerminateProcess(s.process, 0);
         }
@@ -751,27 +1200,43 @@ fn main() {
     }
 
     let mut any_red = false;
+    let mut summary = String::new();
     for name in &names {
         let started = Instant::now();
-        let (files, steps, watchdog) = scenario(name);
+        let (files, steps, watchdog) = scenario(name, &media_dir);
         let report = run_scenario(&headless, &media_dir, &files, steps, watchdog);
         if let Err(e) = write_evidence(&out_dir, name, &report) {
             eprintln!("{name}: evidence write failed: {e}");
         }
-        println!(
+        let line = format!(
             "{}: {} ({}ms, exit {:?})",
             name,
             report.verdict,
             started.elapsed().as_millis(),
             report.exit_code
         );
+        println!("{line}");
+        summary.push_str(&line);
+        summary.push('\n');
         for step in &report.steps {
             println!("    {step}");
+            summary.push_str("    ");
+            summary.push_str(step);
+            summary.push('\n');
         }
         if let Some(failure) = &report.failure {
             println!("    FAILURE: {failure}");
+            summary.push_str(&format!("    FAILURE: {failure}\n"));
+        }
+        if let Some(child) = &report.child_status {
+            println!("    CHILD: {child}");
+            summary.push_str(&format!("    CHILD: {child}\n"));
         }
         any_red |= report.verdict == "RED";
     }
+    // The runner starts this process detached (a fresh console); its
+    // stdout is not captured, so the per-invocation summary also lands
+    // in the evidence directory for the runner to read.
+    let _ = std::fs::write(format!("{out_dir}/summary.txt"), &summary);
     std::process::exit(if any_red { 1 } else { 0 });
 }
