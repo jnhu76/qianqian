@@ -18,6 +18,11 @@ Status: **PACKAGE_READY_FOR_HUMAN_LISTENING** (engineering pass) —
 ```text
 source branch      feat/windows-tui-listening-release-1
 source commit      9a3cc5fb1d876e6589468aba206714f978b19669
+                   (the commit the packaged binary was built and every
+                   physical run below executed; the branch's later
+                   commits touch evidence/docs/README routing only —
+                   `git diff 9a3cc5f..HEAD -- apps crates tools` is
+                   empty, so this artifact IS the product-HEAD build)
 base (origin/main) 8b1a739 (PR #168 merge)
 package            dist/qianqian-windows-x86_64.zip
 package sha256     f5b09d256096d9a11512975fb95bdfd41ce98c885f420b62ee630ade8f2e7f43 (zip) / extracted exe 7b48308240251f385ae5d3702bd42754425c665c8f5f7d054e53491171a18f62
