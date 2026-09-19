@@ -68,13 +68,18 @@ pub const SHIFT_RIGHT: &str = "\u{1b}[1;2C";
 
 /// One terminal cell grid plus the append-only frame history built
 /// from it. `history` only ever grows: a frame is appended when the
-/// rendered screen differs from the last appended frame.
+/// rendered screen differs from the last appended frame. Each appended
+/// frame is preceded by its own `[+S.sss s]` wall-clock line (elapsed
+/// since the capture's creation ≈ child spawn) on a dedicated line, so
+/// frame deltas double as latency evidence; frame CONTENT is never
+/// altered, so substring oracles are unaffected.
 pub struct Capture {
     grid: Grid,
     last_frame: String,
     pub history: String,
     pub raw: Vec<u8>,
     parser: VtParser,
+    t0: std::time::Instant,
 }
 
 impl Capture {
@@ -85,6 +90,7 @@ impl Capture {
             history: String::new(),
             raw: Vec::new(),
             parser: VtParser::default(),
+            t0: std::time::Instant::now(),
         }
     }
 
@@ -93,6 +99,10 @@ impl Capture {
         self.parser.feed(bytes, &mut self.grid);
         let frame = self.grid.text();
         if frame != self.last_frame {
+            self.history.push_str(&format!(
+                "[+{:.3}s]\n",
+                self.t0.elapsed().as_secs_f64()
+            ));
             self.history.push_str(&frame);
             self.history.push('\n');
             self.last_frame = frame;

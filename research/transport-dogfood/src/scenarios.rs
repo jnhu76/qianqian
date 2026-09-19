@@ -418,6 +418,13 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         // synthetic fixture (apps/headless/tests/fixtures) is staged as
         // cover.mp3 by the campaign runner.
         "U2-cover-clean" => &["cover.mp3"],
+        // Ad-hoc (NOT part of the fixed groups): open a REAL user-named
+        // directory end to end — idle launch, then the O dialog with
+        // the typed path (exactly the user's field operation). The
+        // directory comes from the driver environment
+        // (QIANQIAN_DOGFOOD_REALDIR); the campaign runner never sets
+        // it, so fixed runs never see this scenario.
+        "X-realdir" => &[],
         "U2-cjk" => &["千曲.flac", "flac4.flac"],
         "U2-viewport" => &VVIEWPORT,
         "U2-soak" => &SOAK_LIST,
@@ -1758,6 +1765,50 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 Step::AbsentAfterMark("[mp3 @".to_owned()),
                 Step::AbsentAfterMark("Could not find codec parameters".to_owned()),
                 Step::AbsentAfterMark("Consider increasing the value".to_owned()),
+                Step::AbsentAfterMark("[qianqian-wasapi]".to_owned()),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // X-realdir — the field-latency witness (U2 corrective): open
+        // the real user corpus (QIANQIAN_DOGFOOD_REALDIR) through the
+        // O dialog — the exact field operation — witness the console
+        // staying clean across a 100+-file probe scan, and step to the
+        // next track. With the transcript's per-frame timestamps the
+        // frame gaps around "Track: 1/" and "Track: 2/" ARE the
+        // measured scan/open and switch latencies (mechanism evidence;
+        // never an audibility claim). Generic needles — no corpus-size
+        // or filename assumptions.
+        "X-realdir" => {
+            let dir = std::env::var("QIANQIAN_DOGFOOD_REALDIR").unwrap_or_else(|_| {
+                panic!("X-realdir requires QIANQIAN_DOGFOOD_REALDIR in the driver environment")
+            });
+            let mut v = vec![
+                Step::Mark,
+                expect_format(),
+                keys("o"),
+                Step::Typed(dir),
+                keys(ENTER),
+                Step::ExpectAfterMark {
+                    text: "scanning".to_owned(),
+                    within_ms: 10_000,
+                },
+                Step::ExpectAfterMark {
+                    text: "Track: 1/".to_owned(),
+                    within_ms: 60_000,
+                },
+                Step::AbsentAfterMark("[mp3 @".to_owned()),
+                Step::AbsentAfterMark("Could not find codec parameters".to_owned()),
+                Step::AbsentAfterMark("[qianqian-wasapi]".to_owned()),
+                Step::SleepMs(1_000),
+                keys("n"),
+                Step::ExpectAfterMark {
+                    text: "Track: 2/".to_owned(),
+                    within_ms: 30_000,
+                },
+                Step::AbsentAfterMark("[mp3 @".to_owned()),
                 Step::AbsentAfterMark("[qianqian-wasapi]".to_owned()),
                 new_position(),
             ];
