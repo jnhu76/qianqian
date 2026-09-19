@@ -120,6 +120,16 @@ pub enum Step {
         code: u32,
         within_ms: u64,
     },
+    /// Like [`Step::ExpectExit`], but either code satisfies: for a
+    /// damaged-input scenario whose terminal the authority may settle
+    /// EITHER way (an early-EOF Completed or a decode Failed), the
+    /// honest gate is "committed truthfully and reported", not one
+    /// specific outcome.
+    ExpectExitEither {
+        a: u32,
+        b: u32,
+        within_ms: u64,
+    },
     /// Resize the pseudoconsole (Stage-C closure C9): the runtime has
     /// no resize-specific code — the next draw picks up the new size —
     /// so the scenario resizes, then presses a key (which triggers the
@@ -416,6 +426,16 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         "A15" => &["synth45.mp3", "garbage.bin", "flac4.flac"],
         // Track durations cover the full navigation walk (~10 s).
         "A14" => &["synth30.flac", "flac4.flac", "synth45.mp3"],
+        // Listening-Release physical gates (LR1): the F-matrix /
+        // dedup / large-list folders staged by the campaign's runner
+        // under the media root (fixtures + declared synthetic files,
+        // shapes recorded in the run ENV file).
+        "LR1-folder-mixed" => &["fmatrix"],
+        "LR1-all-corrupt" => &["corrupt"],
+        "LR1-duplicate-roots" => &["dup", "dup"],
+        "LR1-truncated-next" => &["trunc"],
+        "LR1-large" => &["big1000"],
+        "LR1-huge" => &["big5000"],
         // Soak: every occupied episode outlasts its script segment.
         "A20" => &["synth45.mp3", "synth30.flac", "mp3cbr.mp3"],
         // Stage-C closure scenarios: a >112-char filename (the Source
@@ -433,6 +453,11 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         Duration::from_secs(300)
     } else if name == "A19" {
         Duration::from_secs(200)
+    } else if name == "LR1-huge" {
+        // 5,000-file scan (enumerate + probe each) plus playback start.
+        Duration::from_secs(300)
+    } else if name == "LR1-large" {
+        Duration::from_secs(180)
     } else {
         Duration::from_secs(120)
     };
@@ -844,6 +869,132 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
             keys("p"),
             expect_mark("no previous track"),
             expect_mark("Track: 1/2"),
+        ]
+        .into_iter()
+        .chain(quit_clean())
+        .collect(),
+
+        // LR1-folder-mixed — the F-matrix folder: real tracks (flat,
+        // nested, CJK, long-name), quiet non-audio noise, one renamed
+        // garbage "track", one zero-byte audio file, and one
+        // access-denied subfolder. The scan keeps the five real
+        // candidates, counts the noise, reports the two corrupt files
+        // boundedly, and the partial scan never presents as complete.
+        "LR1-folder-mixed" => vec![
+            expect("scanning"),
+            expect_format(),
+            expect("5 candidates, 5 skipped, 2 unplayable"),
+            expect("not playable: broken.flac"),
+            expect("not playable: zero.mp3"),
+            expect("scan warning: cannot read"),
+            expect("Track: 1/5"),
+            expect(playing_selected_row(1, "01-track.flac")),
+            Step::Mark,
+            new_position(),
+            keys(DOWN),
+            expect_mark("sel 2/5"),
+            expect_mark(selected_only_row(2, "02-track.m4a")),
+        ]
+        .into_iter()
+        .chain(quit_clean())
+        .collect(),
+
+        // LR1-all-corrupt — every audio-looking file in the folder
+        // fails the probe: the honest refusal, an idle-but-alive
+        // shell, and the argv-driven exit contract (visible refusal,
+        // exit 1).
+        "LR1-all-corrupt" => vec![
+            expect("open refused"),
+            expect("no playable audio files found; 2 unplayable"),
+            expect("No music loaded."),
+            keys("q"),
+            Step::ExpectExit {
+                code: 1,
+                within_ms: 15_000,
+            },
+            Step::AbsentAfterMark("teardown violated".to_owned()),
+        ],
+
+        // LR1-duplicate-roots — the same folder named twice on argv:
+        // every accepted path once (first occurrence order), the
+        // duplicates counted, playback and navigation normal.
+        "LR1-duplicate-roots" => vec![
+            expect_format(),
+            expect("2 candidates, 2 duplicates removed"),
+            expect("Track: 1/2"),
+            Step::Mark,
+            new_position(),
+            keys("n"),
+            expect_mark("Track: 2/2"),
+        ]
+        .into_iter()
+        .chain(quit_clean())
+        .collect(),
+
+        // LR1-truncated-next — a track whose container header parses
+        // (probe passes at scan time) but whose stream is cut roughly
+        // in half: navigation reaches it, the episode commits SOME
+        // truthful terminal (an early-EOF Completed or a decode
+        // Failed — both legal for damaged input), there is no panic,
+        // no auto-skip and no teardown violation. Which terminal the
+        // authority settles is recorded by the run, not assumed.
+        "LR1-truncated-next" => vec![
+            expect_format(),
+            expect("2 candidates"),
+            expect("Track: 1/2"),
+            Step::Mark,
+            new_position(),
+            keys("n"),
+            expect_mark("Track: 2/2"),
+            Step::ExpectEither {
+                a: "Terminal: Completed".to_owned(),
+                b: "Terminal: Failed".to_owned(),
+                within_ms: 30_000,
+            },
+            keys("q"),
+            Step::ExpectExitEither {
+                a: 0,
+                b: 1,
+                within_ms: 15_000,
+            },
+            Step::ExpectEither {
+                a: "EOF: played out completely".to_owned(),
+                b: "playback failed".to_owned(),
+                within_ms: SHORT_WAIT,
+            },
+            Step::AbsentAfterMark("teardown violated".to_owned()),
+        ],
+
+        // LR1-large / LR1-huge — 1,000- and 5,000-entry playlists:
+        // the scan completes in bounded practical time, the Track
+        // line carries the real count, the viewport windows around
+        // the selection, and browsing works (no 5,000-row redraw per
+        // frame is pinned by the unit suite; this is the physical
+        // usability witness). Wall-clock timing is recorded by the
+        // campaign runner around the whole run.
+        "LR1-large" => vec![
+            expect("1000 candidates"),
+            expect_format(),
+            expect("Track: 1/1000"),
+            Step::Mark,
+            new_position(),
+            Step::KeysEach(DOWN, 5, 100),
+            expect_mark("sel 6/1000"),
+            keys(UP),
+            expect_mark("sel 5/1000"),
+        ]
+        .into_iter()
+        .chain(quit_clean())
+        .collect(),
+
+        "LR1-huge" => vec![
+            expect_mark_within("5000 candidates", 240_000),
+            expect_format(),
+            expect("Track: 1/5000"),
+            Step::Mark,
+            new_position(),
+            Step::KeysEach(DOWN, 3, 100),
+            expect_mark("sel 4/5000"),
         ]
         .into_iter()
         .chain(quit_clean())

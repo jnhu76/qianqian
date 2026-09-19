@@ -1,0 +1,23 @@
+run: LR1-RUN1
+date_utc: 2026-09-19T14:44:37Z
+branch: feat/windows-tui-listening-release-1
+head_sha: bf73b01096246bf58245a8e5a640adebb90b18ab
+origin_main: 8b1a73997403c9d44c52da4e393da62aad6c0c9d
+worktree_status: 3 dirty entries
+dogfood_class: ISOLATED-PACKAGE DOGFOOD (same physical host; extracted-package launches, system-only PATH, no repo CWD, no QIANQIAN_NATIVE_DIR)
+package_zip_sha256: f5b09d256096d9a11512975fb95bdfd41ce98c885f420b62ee630ade8f2e7f43
+windows_caption: Microsoft Windows 11 ×¨Òµ°æ
+audio_device: Realtek High Definition Audio
+package_exe_sha256: 7b48308240251f385ae5d3702bd42754425c665c8f5f7d054e53491171a18f62
+extracted_locations: plain 'C:\Users\Public\qn-lr1\qianqian-windows-x86_64' | spaces 'C:\qn lr1 spaces\qianqian-windows-x86_64' | CJK 'C:\Users\Public\åƒåƒæ’­æ”¾å™¨\qianqian-windows-x86_64'
+
+non_tui_isolated_gates (cwd=C:\Windows\Temp; PATH system-only; no QIANQIAN_NATIVE_DIR):
+  [C:\Users\Public\qn-lr1\qianqian-windows-x86_64] qianqian.exe --version -> exit=0 first='qianqian 0.1.0'
+  [C:\Users\Public\qn-lr1\qianqian-windows-x86_64] qianqian.exe --help -> exit=0 first='Qianqian â€” a lightweight local music player'
+  [C:\qn lr1 spaces\qianqian-windows-x86_64] qianqian.exe --version -> exit=0 first='qianqian 0.1.0'
+  [C:\qn lr1 spaces\qianqian-windows-x86_64] qianqian.exe --help -> exit=0 first='Qianqian â€” a lightweight local music player'
+  [C:\Users\Public\åƒåƒæ’­æ”¾å™¨\qianqian-windows-x86_64] qianqian.exe --version -> exit=0 first='qianqian 0.1.0'
+  [C:\Users\Public\åƒåƒæ’­æ”¾å™¨\qianqian-windows-x86_64] qianqian.exe --help -> exit=0 first='Qianqian â€” a lightweight local music player'
+new_console_allocation_cjk_location: ALIVE_4S
+f5_deny_icacls: ÒÑ³É¹¦´¦Àí 1 ¸öÎÄ¼ş; ´¦Àí 0 ¸öÎÄ¼şÊ±Ê§°Ü
+trunc_fixture_bytes: 60000 of 146237
