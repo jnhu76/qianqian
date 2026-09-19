@@ -34,3 +34,8 @@ scenarios_run:
 evidence: U1-CORRECTIVE.summary (qianqian.exe run), tui-run4.summary (headless run), ENV-TUI-RUN4.txt (auto identity; its songcore_sha256 line is empty because the script points at a stale staging path — the real artifact SHA is recorded above and was verified when staging)
 not_run: audible human-ear witness (UNAVAILABLE, no ear witness this run); new partial-scan warning presentation on Windows physical (no unreadable directory was staged in the ConPTY corpus — the presentation is pinned by unit/view tests over real temp trees; the physical sweep proves no regression of the complete-enumeration path)
 acoustic_witness: UNAVAILABLE
+final_head_rerun:
+  head_sha: fb506246fbe1759a13f2f3c0dd5e6f6af1af75cc (review-MINOR fixes; behavior-identical on all exercised paths)
+  qianqian_exe_sha256: 5130b820604663151c0a02ae9b204b880cdcbf626ba714ad33b41a5d0439c5ac
+  U1-idle + U1-folder-open against qianqian.exe: GREEN (same oracles incl. the corrective negatives)
+  U1-idle + U1-folder-open against qianqian-headless.exe (tui-run5): GREEN

@@ -1,4 +1,4 @@
-U1-idle: GREEN (1031ms, exit Some(0))
+U1-idle: GREEN (1034ms, exit Some(0))
     expect "No music loaded." OK
     expect "Press O to open a file or folder" OK
     mark
@@ -11,7 +11,7 @@ U1-idle: GREEN (1031ms, exit Some(0))
     exit 0 OK
     absent-after-mark "teardown violated" OK
     absent-after-mark "warning: disposal" OK
-U1-folder-open: GREEN (2387ms, exit Some(0))
+U1-folder-open: GREEN (3352ms, exit Some(0))
     expect "No music loaded." OK
     keys "o"
     keys "C:\\Users\\Public\\qianqian-dogfood\\u1music"
