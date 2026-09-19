@@ -260,6 +260,11 @@ fn prev_opened(media: &str, file: &str) -> String {
 /// expectation).
 pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Duration) {
     let m: &[&str] = match name {
+        // U1 (Issue #166) idle-launch scenarios: NO argv at all — the
+        // no-argument product startup is itself the scenario (the
+        // driver spawns the child with zero arguments for an empty
+        // list).
+        "U1-idle" | "U1-folder-open" => &[],
         "A1-flac4" | "A16-drain-stop" => &["flac4.flac"],
         "A1-mp3cbr" => &["mp3cbr.mp3"],
         "A1-alac4" => &["alac4.m4a"],
@@ -286,6 +291,59 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         Duration::from_secs(120)
     };
     let steps = match name {
+        // U1-idle — the no-argument launch (Windows gate W1): the idle
+        // page renders truthfully (no fabricated Position/Paused/
+        // Terminal labels for an episode that does not exist) and Q
+        // exits the session cleanly with the idle exit contract
+        // (code 0, no outcome line, quiet disposal).
+        "U1-idle" => vec![
+            expect_within("No music loaded.", 10_000),
+            expect("Press O to open a file or folder"),
+            Step::Mark,
+            Step::AbsentAfterMark("Position:".to_owned()),
+            Step::AbsentAfterMark("Paused:".to_owned()),
+            Step::AbsentAfterMark("Terminal:".to_owned()),
+            keys("q"),
+            Step::ExpectExit {
+                code: 0,
+                within_ms: 15_000,
+            },
+            Step::AbsentAfterMark("teardown violated".to_owned()),
+            Step::AbsentAfterMark("warning: disposal".to_owned()),
+        ],
+
+        // U1-folder-open — folder expansion from the idle page (Windows
+        // gate W3/W4 mechanics on real media, position witnesses not
+        // audibility): type a FOLDER path into the O line, the
+        // expansion commits the first candidate and seeds both, N walks
+        // the seeded list through the same replacement.
+        "U1-folder-open" => {
+            let folder = format!("{media}\\u1music");
+            let mut v = vec![
+                expect_within("No music loaded.", 10_000),
+                keys("o"),
+                Step::Typed(folder.clone()),
+                keys(ENTER),
+                // The expansion commits: first candidate opened, both
+                // candidates seeded, format published, PCM consumed.
+                expect_mark_within(
+                    format!("opened {folder}\\flac4.flac (2 candidates)"),
+                    10_000,
+                ),
+                expect("Track: 1/2"),
+                expect_format(),
+                new_position(),
+                // N walks the seeded list through the SAME replacement.
+                keys("n"),
+                expect_mark_within(format!("{folder}\\synth45.mp3"), 10_000),
+                expect("Track: 2/2"),
+                expect_format(),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
         // A1 — baseline playback: open, natural EOF, quit, quiet exit.
         "A1-flac4" | "A1-mp3cbr" | "A1-alac4" | "A1-alac6" => {
             let mut v = vec![expect_format(), new_position()];

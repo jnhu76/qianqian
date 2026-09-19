@@ -855,9 +855,16 @@ fn run_scenario(
 ) -> ExecReport {
     let mut step_log: Vec<String> = Vec::new();
     let deadline = Instant::now() + watchdog;
-    let args: Vec<String> = std::iter::once("play".to_owned())
-        .chain(files.iter().map(|f| format!("{media_dir}\\{f}")))
-        .collect();
+    // U1 (Issue #166): an EMPTY file list means the no-argument launch
+    // itself — the child is spawned with zero arguments. Any non-empty
+    // list keeps the frozen `play` grammar.
+    let args: Vec<String> = if files.is_empty() {
+        Vec::new()
+    } else {
+        std::iter::once("play".to_owned())
+            .chain(files.iter().map(|f| format!("{media_dir}\\{f}")))
+            .collect()
+    };
     let mut session = match Session::spawn(headless, &args, 120, 40) {
         Ok(s) => s,
         Err(e) => {
