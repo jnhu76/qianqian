@@ -1,0 +1,27 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\alac6.m4a"
+T+   0.015s       recv  16 bytes
+T+   0.025s       recv  135 bytes
+T+   0.042s       recv  410 bytes
+T+   0.071s       recv  26 bytes
+T+   0.071s       recv  19 bytes
+T+   0.088s       recv  6317 bytes
+T+   0.436s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.436s    wait-ok  Format: 44100 Hz
+T+   0.436s wait-begin  new-position != None
+T+   0.436s    wait-ok  new-position (0, 0)
+T+   0.436s wait-begin  "Terminal: Completed" within 30s
+T+   1.159s       recv  8 bytes
+T+   2.091s       recv  2 bytes
+T+   3.185s       recv  2 bytes
+T+   4.121s       recv  2 bytes
+T+   5.214s       recv  2 bytes
+T+   6.149s       recv  99 bytes
+T+   6.167s    wait-ok  Terminal: Completed
+T+   6.167s wait-begin  "terminal outcome committed" within 5s
+T+   6.167s    wait-ok  terminal outcome committed
+T+   6.167s       send  1 bytes: "q"
+T+   6.168s       recv  6210 bytes
+T+   6.181s       recv  726 bytes
+T+   6.248s       recv  732 bytes
+T+   6.648s wait-begin  "EOF: played out completely" within 5s
+T+   6.648s    wait-ok  EOF: played out completely

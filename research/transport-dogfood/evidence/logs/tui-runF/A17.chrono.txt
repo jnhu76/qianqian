@@ -1,0 +1,47 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.016s       recv  16 bytes
+T+   0.066s       recv  110 bytes
+T+   0.066s       recv  18 bytes
+T+   0.082s       recv  6317 bytes
+T+   0.222s       recv  15 bytes
+T+   0.445s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.445s    wait-ok  Format: 44100 Hz
+T+   0.445s       send  1 bytes: "s"
+T+   0.446s       recv  6202 bytes
+T+   0.446s       recv  4 bytes
+T+   0.446s       recv  4 bytes
+T+   0.457s       recv  6259 bytes
+T+   0.473s       recv  59 bytes
+T+   0.526s wait-begin  "Terminal: Stopped" within 5s
+T+   0.526s       recv  6301 bytes
+T+   0.526s       recv  4 bytes
+T+   0.535s       recv  6311 bytes
+T+   0.546s    wait-ok  Terminal: Stopped
+T+   0.546s       send  1 bytes: "o"
+T+   0.547s       recv  6195 bytes
+T+   0.547s       recv  4 bytes
+T+   0.551s       recv  6261 bytes
+T+   0.627s       send  12 bytes: "synth30.flac"
+T+   0.627s       recv  6261 bytes
+T+   0.645s       recv  52 bytes
+T+   0.708s       send  1 bytes: "\r"
+T+   0.708s       recv  6261 bytes
+T+   0.739s       recv  243 bytes
+T+   0.788s wait-begin  "opened synth30.flac" within 20s
+T+   0.788s    wait-ok  opened synth30.flac
+T+   0.788s wait-begin  "Source: synth30.flac" within 20s
+T+   0.788s       recv  6301 bytes
+T+   0.788s       recv  4 bytes
+T+   0.801s       recv  6311 bytes
+T+   0.808s    wait-ok  Source: synth30.flac
+T+   0.808s wait-begin  new-position != None
+T+   1.879s       recv  8 bytes
+T+   1.888s    wait-ok  new-position (0, 1)
+T+   1.888s       send  1 bytes: "q"
+T+   1.889s       recv  6199 bytes
+T+   1.894s       recv  249 bytes
+T+   1.914s       recv  34 bytes
+T+   1.925s       recv  47 bytes
+T+   1.969s       recv  332 bytes
+T+   2.369s wait-begin  "stopped before completion" within 5s
+T+   2.369s    wait-ok  stopped before completion

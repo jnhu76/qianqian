@@ -1,0 +1,213 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3" "C:\Users\Public\qianqian-dogfood\synth30.flac" "C:\Users\Public\qianqian-dogfood\mp3cbr.mp3"
+T+   0.016s       recv  16 bytes
+T+   0.067s       recv  110 bytes
+T+   0.067s       recv  19 bytes
+T+   0.081s       recv  6317 bytes
+T+   0.446s wait-begin  "Track: 1/3" within 5s
+T+   0.446s    wait-ok  Track: 1/3
+T+   0.446s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.446s    wait-ok  Format: 44100 Hz
+T+   1.156s       recv  8 bytes
+T+   1.446s       send  1 bytes: "n"
+T+   1.447s       recv  6202 bytes
+T+   1.447s       recv  4 bytes
+T+   1.447s       recv  4 bytes
+T+   1.467s       recv  6259 bytes
+T+   1.472s       recv  71 bytes
+T+   1.483s       recv  8 bytes
+T+   1.500s       recv  27 bytes
+T+   1.514s       recv  197 bytes
+T+   1.526s wait-begin  "next: opened C:\\Users\\Public\\qianqian-dogfood\\synth30.flac" within 20s
+T+   1.526s    wait-ok  next: opened C:\Users\Public\qianqian-dogfood\synth30.flac
+T+   1.526s wait-begin  "Track: 2/3" within 20s
+T+   1.527s       recv  5988 bytes
+T+   1.530s       recv  6311 bytes
+T+   1.546s    wait-ok  Track: 2/3
+T+   1.546s       send  1 bytes: " "
+T+   1.547s       recv  6191 bytes
+T+   1.547s       recv  4 bytes
+T+   1.547s       recv  4 bytes
+T+   1.560s       recv  6259 bytes
+T+   1.627s wait-begin  "Paused: true" within 3s
+T+   1.627s       recv  6299 bytes
+T+   1.627s       recv  4 bytes
+T+   1.638s       recv  6311 bytes
+T+   1.647s    wait-ok  Paused: true
+T+   2.447s       send  1 bytes: " "
+T+   2.448s       recv  6191 bytes
+T+   2.448s       recv  4 bytes
+T+   2.448s       recv  4 bytes
+T+   2.466s       recv  6259 bytes
+T+   2.528s wait-begin  "Pause requested: false" within 5s
+T+   2.528s    wait-ok  Pause requested: false
+T+   2.528s       send  3 bytes: "\u{1b}[C"
+T+   2.528s       recv  6299 bytes
+T+   2.528s       recv  4 bytes
+T+   2.545s       recv  6311 bytes
+T+   2.688s       recv  8 bytes
+T+   2.728s       recv  6191 bytes
+T+   2.729s       recv  4 bytes
+T+   2.729s       recv  4 bytes
+T+   2.749s       recv  6259 bytes
+T+   2.808s wait-begin  new-position != None
+T+   2.808s    wait-ok  new-position (0, 0)
+T+   2.808s       send  3 bytes: "\u{1b}[D"
+T+   2.809s       recv  6299 bytes
+T+   2.809s       recv  4 bytes
+T+   2.828s       recv  6311 bytes
+T+   2.971s       recv  8 bytes
+T+   3.009s       recv  6191 bytes
+T+   3.009s       recv  4 bytes
+T+   3.009s       recv  4 bytes
+T+   3.018s       recv  6259 bytes
+T+   3.089s wait-begin  new-position != Some((0, 0))
+T+   3.089s    wait-ok  new-position (0, 1)
+T+   3.089s       send  1 bytes: "-"
+T+   3.089s       recv  6299 bytes
+T+   3.111s       recv  6259 bytes
+T+   3.169s wait-begin  "Volume: 95/100 (desired)" within 5s
+T+   3.170s       recv  6299 bytes
+T+   3.170s       recv  4 bytes
+T+   3.188s       recv  6311 bytes
+T+   3.190s    wait-ok  Volume: 95/100 (desired)
+T+   3.190s       send  1 bytes: "+"
+T+   3.190s       recv  6195 bytes
+T+   3.190s       recv  4 bytes
+T+   3.204s       recv  6259 bytes
+T+   3.270s wait-begin  "Volume: 100/100 (desired)" within 5s
+T+   3.270s    wait-ok  Volume: 100/100 (desired)
+T+   3.270s       send  1 bytes: "n"
+T+   3.271s       recv  6299 bytes
+T+   3.282s       recv  6259 bytes
+T+   3.295s       recv  71 bytes
+T+   3.297s       recv  8 bytes
+T+   3.324s       recv  27 bytes
+T+   3.324s       recv  89 bytes
+T+   3.344s       recv  187 bytes
+T+   3.350s wait-begin  "next: opened C:\\Users\\Public\\qianqian-dogfood\\mp3cbr.mp3" within 20s
+T+   3.351s    wait-ok  next: opened C:\Users\Public\qianqian-dogfood\mp3cbr.mp3
+T+   3.351s wait-begin  "Track: 3/3" within 20s
+T+   3.351s       recv  5950 bytes
+T+   3.360s       recv  6311 bytes
+T+   3.371s    wait-ok  Track: 3/3
+T+   3.371s       send  1 bytes: "o"
+T+   3.371s       recv  6195 bytes
+T+   3.371s       recv  4 bytes
+T+   3.375s       recv  6261 bytes
+T+   3.451s       send  11 bytes: "garbage.bin"
+T+   3.452s       recv  6301 bytes
+T+   3.469s       recv  6261 bytes
+T+   3.532s       send  1 bytes: "\r"
+T+   3.533s       recv  6301 bytes
+T+   3.547s       recv  6259 bytes
+T+   3.613s wait-begin  "open refused" within 20s
+T+   3.613s    wait-ok  open refused
+T+   3.613s wait-begin  "Track: 3/3" within 20s
+T+   3.613s    wait-ok  Track: 3/3
+T+   3.613s       send  1 bytes: "p"
+T+   3.613s       recv  6299 bytes
+T+   3.624s       recv  6259 bytes
+T+   3.640s       recv  60 bytes
+T+   3.671s       recv  28 bytes
+T+   3.685s       recv  203 bytes
+T+   3.693s wait-begin  "previous: opened C:\\Users\\Public\\qianqian-dogfood\\synth30.flac" within 20s
+T+   3.693s       recv  6299 bytes
+T+   3.702s       recv  6311 bytes
+T+   3.713s    wait-ok  previous: opened C:\Users\Public\qianqian-dogfood\synth30.flac
+T+   3.713s wait-begin  "Track: 2/3" within 20s
+T+   3.713s    wait-ok  Track: 2/3
+T+   3.713s       send  1 bytes: " "
+T+   3.714s       recv  6195 bytes
+T+   3.714s       recv  4 bytes
+T+   3.717s       recv  6259 bytes
+T+   3.794s wait-begin  "Paused: true" within 3s
+T+   3.794s    wait-ok  Paused: true
+T+   3.794s       send  3 bytes: "\u{1b}[C"
+T+   3.794s       recv  6299 bytes
+T+   3.794s       recv  4 bytes
+T+   3.811s       recv  6311 bytes
+T+   3.953s       recv  8 bytes
+T+   3.994s       recv  6191 bytes
+T+   3.995s       recv  4 bytes
+T+   3.995s       recv  4 bytes
+T+   4.015s       recv  6259 bytes
+T+   4.075s wait-begin  new-position != Some((0, 1))
+T+   4.075s    wait-ok  new-position (0, 0)
+T+   4.075s wait-begin  "Paused: true" within 5s
+T+   4.075s    wait-ok  Paused: true
+T+   4.075s       send  1 bytes: " "
+T+   4.075s       recv  6299 bytes
+T+   4.094s       recv  6259 bytes
+T+   4.156s wait-begin  "Pause requested: false" within 5s
+T+   4.156s    wait-ok  Pause requested: false
+T+   4.156s       recv  6299 bytes
+T+   4.156s       recv  4 bytes
+T+   4.170s       recv  6311 bytes
+T+   5.095s       recv  8 bytes
+T+   5.156s wait-begin  new-position != Some((0, 0))
+T+   5.157s    wait-ok  new-position (0, 5)
+T+   5.157s       send  1 bytes: "o"
+T+   5.157s       recv  6191 bytes
+T+   5.157s       recv  4 bytes
+T+   5.157s       recv  4 bytes
+T+   5.173s       recv  6261 bytes
+T+   5.237s       send  12 bytes: "synth30.flac"
+T+   5.237s       recv  6261 bytes
+T+   5.250s       recv  52 bytes
+T+   5.317s       send  1 bytes: "\r"
+T+   5.317s       recv  6301 bytes
+T+   5.328s       recv  6261 bytes
+T+   5.345s       recv  42 bytes
+T+   5.359s       recv  18 bytes
+T+   5.375s       recv  28 bytes
+T+   5.390s       recv  238 bytes
+T+   5.397s wait-begin  "opened synth30.flac" within 20s
+T+   5.398s       recv  6303 bytes
+T+   5.405s       recv  6311 bytes
+T+   5.418s    wait-ok  opened synth30.flac
+T+   6.418s       send  3 bytes: "\u{1b}[C"
+T+   6.419s       recv  8 bytes
+T+   6.579s       recv  2 bytes
+T+   6.618s       send  3 bytes: "\u{1b}[C"
+T+   6.782s       recv  9 bytes
+T+   6.819s       recv  6191 bytes
+T+   6.819s       recv  4 bytes
+T+   6.819s       recv  4 bytes
+T+   6.829s       recv  6259 bytes
+T+   6.899s wait-begin  new-position != Some((0, 5))
+T+   6.899s    wait-ok  new-position (0, 6)
+T+   6.899s       send  1 bytes: "s"
+T+   6.900s       recv  6299 bytes
+T+   6.922s       recv  6259 bytes
+T+   6.938s       recv  59 bytes
+T+   6.980s wait-begin  "Terminal: Stopped" within 5s
+T+   6.980s       recv  6301 bytes
+T+   6.980s       recv  4 bytes
+T+   7.001s       recv  6311 bytes
+T+   7.021s    wait-ok  Terminal: Stopped
+T+   7.021s       send  1 bytes: "o"
+T+   7.022s       recv  6191 bytes
+T+   7.022s       recv  4 bytes
+T+   7.022s       recv  4 bytes
+T+   7.032s       recv  6261 bytes
+T+   7.101s       send  11 bytes: "synth45.mp3"
+T+   7.102s       recv  6261 bytes
+T+   7.111s       recv  51 bytes
+T+   7.182s       send  1 bytes: "\r"
+T+   7.182s       recv  6301 bytes
+T+   7.204s       recv  6261 bytes
+T+   7.220s       recv  336 bytes
+T+   7.262s wait-begin  "opened synth45.mp3" within 20s
+T+   7.262s    wait-ok  opened synth45.mp3
+T+   7.262s       recv  6297 bytes
+T+   7.262s       recv  4 bytes
+T+   7.282s       recv  6311 bytes
+T+   8.369s       recv  8 bytes
+T+   8.807s       send  1 bytes: "q"
+T+   8.807s       recv  6191 bytes
+T+   8.807s       recv  8 bytes
+T+   8.822s       recv  251 bytes
+T+   8.838s       recv  81 bytes
+T+   8.887s       recv  333 bytes
+T+   9.287s wait-begin  "stopped before completion" within 5s
+T+   9.287s    wait-ok  stopped before completion

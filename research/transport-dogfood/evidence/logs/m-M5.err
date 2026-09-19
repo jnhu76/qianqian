@@ -1,0 +1,6 @@
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+ignored input: cannot read seek time "nan"
+ignored input: cannot read seek time "1e400"
+ignored input: cannot read seek time "-5"
+[qianqian-wasapi] render aborted: data plane stopped
+[mp3float @ 00000260d6477c00] Could not update timestamps for skipped samples.

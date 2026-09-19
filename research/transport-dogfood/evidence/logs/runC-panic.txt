@@ -1,0 +1,3 @@
+panic: panicked at src/bin/tuidriver.rs:556:35:
+start byte index 182468 is not a char boundary; it is inside '─' (bytes 182467..182470 of string)
+backtrace disabled (release)

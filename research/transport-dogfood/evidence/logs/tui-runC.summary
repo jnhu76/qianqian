@@ -1,0 +1,42 @@
+A1-alac4: GREEN (4940ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    new-position (0, 0) OK
+    expect "Terminal: Completed" OK
+    expect "terminal outcome committed" OK
+    keys "q"
+    exit 0 OK
+    expect "EOF: played out completely" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A1-alac6: GREEN (6649ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    new-position (0, 0) OK
+    expect "Terminal: Completed" OK
+    expect "terminal outcome committed" OK
+    keys "q"
+    exit 0 OK
+    expect "EOF: played out completely" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+A2: GREEN (1897ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    keys " "
+    expect "Pause requested: true" OK
+    expect "Paused: true" OK
+    keys " " x2
+    expect "Pause requested: true" OK
+    expect "Paused: true" OK
+    keys " " x2
+    expect "Pause requested: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    new-position (0, 0) OK
+    keys " "
+    expect "Pause requested: true" OK
+    expect "Paused: true" OK
+    keys " "
+    expect "Pause requested: false" OK
+    new-position (0, 1) OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK

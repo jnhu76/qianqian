@@ -1,0 +1,97 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth30.flac" "C:\Users\Public\qianqian-dogfood\flac4.flac" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.016s       recv  16 bytes
+T+   0.066s       recv  110 bytes
+T+   0.066s       recv  35 bytes
+T+   0.089s       recv  6317 bytes
+T+   0.446s wait-begin  "Track: 1/3" within 5s
+T+   0.446s    wait-ok  Track: 1/3
+T+   0.446s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.446s    wait-ok  Format: 44100 Hz
+T+   0.446s       send  1 bytes: "n"
+T+   0.446s       recv  6202 bytes
+T+   0.447s       recv  4 bytes
+T+   0.447s       recv  4 bytes
+T+   0.467s       recv  6259 bytes
+T+   0.471s       recv  71 bytes
+T+   0.482s       recv  8 bytes
+T+   0.501s       recv  27 bytes
+T+   0.514s       recv  197 bytes
+T+   0.526s wait-begin  "next: opened C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" within 20s
+T+   0.526s    wait-ok  next: opened C:\Users\Public\qianqian-dogfood\flac4.flac
+T+   0.526s wait-begin  "Track: 2/3" within 20s
+T+   0.527s       recv  5988 bytes
+T+   0.530s       recv  6311 bytes
+T+   0.547s    wait-ok  Track: 2/3
+T+   0.547s       send  1 bytes: "n"
+T+   0.547s       recv  6191 bytes
+T+   0.576s       recv  10 bytes
+T+   0.576s       recv  49 bytes
+T+   0.576s       recv  26 bytes
+T+   0.592s       recv  8 bytes
+T+   0.607s       recv  36 bytes
+T+   0.607s       recv  245 bytes
+T+   0.607s       recv  317 bytes
+T+   0.608s       recv  851 bytes
+T+   0.608s       recv  2240 bytes
+T+   0.623s       recv  8 bytes
+T+   0.627s wait-begin  "next: opened C:\\Users\\Public\\qianqian-dogfood\\synth45.mp3" within 20s
+T+   0.627s    wait-ok  next: opened C:\Users\Public\qianqian-dogfood\synth45.mp3
+T+   0.627s wait-begin  "Track: 3/3" within 20s
+T+   0.628s       recv  5825 bytes
+T+   0.639s       recv  6311 bytes
+T+   0.648s    wait-ok  Track: 3/3
+T+   0.648s       send  1 bytes: "n"
+T+   0.648s       recv  6195 bytes
+T+   0.649s       recv  4 bytes
+T+   0.655s       recv  6259 bytes
+T+   0.728s wait-begin  "no next track" within 20s
+T+   0.728s       recv  6299 bytes
+T+   0.728s       recv  4 bytes
+T+   0.748s    wait-ok  no next track
+T+   0.748s wait-begin  "Track: 3/3" within 20s
+T+   0.748s    wait-ok  Track: 3/3
+T+   0.748s       send  1 bytes: "p"
+T+   0.750s       recv  6191 bytes
+T+   0.773s       recv  10 bytes
+T+   0.773s       recv  49 bytes
+T+   0.773s       recv  26 bytes
+T+   0.781s       recv  8 bytes
+T+   0.801s       recv  27 bytes
+T+   0.801s       recv  15 bytes
+T+   0.802s       recv  262 bytes
+T+   0.802s       recv  304 bytes
+T+   0.812s       recv  3002 bytes
+T+   0.829s wait-begin  "previous: opened C:\\Users\\Public\\qianqian-dogfood\\flac4.flac" within 20s
+T+   0.829s    wait-ok  previous: opened C:\Users\Public\qianqian-dogfood\flac4.flac
+T+   0.829s wait-begin  "Track: 2/3" within 20s
+T+   0.829s    wait-ok  Track: 2/3
+T+   0.829s       send  1 bytes: "p"
+T+   0.829s       recv  6299 bytes
+T+   0.844s       recv  6259 bytes
+T+   0.859s       recv  59 bytes
+T+   0.885s       recv  28 bytes
+T+   0.907s       recv  147 bytes
+T+   0.910s wait-begin  "previous: opened C:\\Users\\Public\\qianqian-dogfood\\synth30.flac" within 20s
+T+   0.910s       recv  6305 bytes
+T+   0.923s       recv  6311 bytes
+T+   0.930s    wait-ok  previous: opened C:\Users\Public\qianqian-dogfood\synth30.flac
+T+   0.930s wait-begin  "Track: 1/3" within 20s
+T+   0.930s    wait-ok  Track: 1/3
+T+   0.930s       send  1 bytes: "p"
+T+   0.931s       recv  6195 bytes
+T+   0.931s       recv  4 bytes
+T+   0.938s       recv  6259 bytes
+T+   1.010s wait-begin  "no previous track" within 20s
+T+   1.011s       recv  6299 bytes
+T+   1.011s       recv  4 bytes
+T+   1.030s    wait-ok  no previous track
+T+   1.031s wait-begin  "Track: 1/3" within 20s
+T+   1.031s    wait-ok  Track: 1/3
+T+   1.031s       send  1 bytes: "q"
+T+   1.031s       recv  6199 bytes
+T+   1.034s       recv  266 bytes
+T+   1.061s       recv  34 bytes
+T+   1.080s       recv  47 bytes
+T+   1.111s       recv  349 bytes
+T+   1.511s wait-begin  "stopped before completion" within 5s
+T+   1.511s    wait-ok  stopped before completion

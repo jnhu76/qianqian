@@ -1,0 +1,67 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qianqian-dogfood cmd=C:\Users\Public\qianqian-dogfood\qianqian-headless.exe "play" "C:\Users\Public\qianqian-dogfood\synth45.mp3"
+T+   0.015s       recv  16 bytes
+T+   0.066s       recv  110 bytes
+T+   0.066s       recv  18 bytes
+T+   0.080s       recv  6317 bytes
+T+   0.218s       recv  15 bytes
+T+   0.451s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.451s    wait-ok  Format: 44100 Hz
+T+   1.156s       recv  2 bytes
+T+   2.094s       recv  2 bytes
+T+   3.184s       recv  2 bytes
+T+   3.452s       send  3 bytes: "\u{1b}[C"
+T+   3.605s       recv  2 bytes
+T+   3.653s       recv  6202 bytes
+T+   3.653s       recv  4 bytes
+T+   3.653s       recv  4 bytes
+T+   3.668s       recv  6259 bytes
+T+   3.733s wait-begin  new-position != None
+T+   3.733s    wait-ok  new-position (0, 8)
+T+   3.733s       send  3 bytes: "\u{1b}[C"
+T+   3.733s       recv  6299 bytes
+T+   3.733s       recv  4 bytes
+T+   3.746s       recv  6311 bytes
+T+   3.888s       recv  9 bytes
+T+   3.933s       recv  6191 bytes
+T+   3.934s       recv  4 bytes
+T+   3.934s       recv  4 bytes
+T+   3.950s       recv  6259 bytes
+T+   4.013s wait-begin  new-position != Some((0, 8))
+T+   4.013s    wait-ok  new-position (0, 13)
+T+   4.013s       send  3 bytes: "\u{1b}[C"
+T+   4.013s       recv  6299 bytes
+T+   4.013s       recv  4 bytes
+T+   4.027s       recv  6311 bytes
+T+   4.163s       send  3 bytes: "\u{1b}[C"
+T+   4.164s       recv  8 bytes
+T+   4.314s       send  3 bytes: "\u{1b}[C"
+T+   4.314s       recv  9 bytes
+T+   4.464s       send  3 bytes: "\u{1b}[C"
+T+   4.464s       recv  2 bytes
+T+   4.614s       send  3 bytes: "\u{1b}[C"
+T+   4.614s       recv  9 bytes
+T+   4.764s       send  3 bytes: "\u{1b}[C"
+T+   4.764s       recv  2 bytes
+T+   4.914s       send  3 bytes: "\u{1b}[C"
+T+   4.915s       recv  9 bytes
+T+   4.964s       recv  30 bytes
+T+   4.975s       recv  50 bytes
+T+   5.065s       recv  6173 bytes
+T+   5.065s       recv  4 bytes
+T+   5.065s       recv  4 bytes
+T+   5.084s       recv  6259 bytes
+T+   5.145s wait-begin  new-position != Some((0, 13))
+T+   5.145s    wait-ok  new-position (0, 8)
+T+   5.145s wait-begin  "Terminal: Completed" within 30s
+T+   5.145s       recv  6299 bytes
+T+   5.146s       recv  4 bytes
+T+   5.162s       recv  6311 bytes
+T+   5.166s    wait-ok  Terminal: Completed
+T+   5.166s wait-begin  "terminal outcome committed" within 5s
+T+   5.166s    wait-ok  terminal outcome committed
+T+   5.166s       send  1 bytes: "q"
+T+   5.166s       recv  6199 bytes
+T+   5.177s       recv  275 bytes
+T+   5.246s       recv  281 bytes
+T+   5.646s wait-begin  "EOF: played out completely" within 5s
+T+   5.646s    wait-ok  EOF: played out completely
