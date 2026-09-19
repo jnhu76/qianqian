@@ -65,14 +65,31 @@ HEADER_SHA="$(sha256 "$REPO_ROOT/$SONGCORE_HEADER")"
 
 # --- 2. build the release product binaries ---------------------------
 note "building $TARGET/$PROFILE (features: $FEATURES)"
+# Remap every build-host path (rustup/cargo/repo all live under $HOME)
+# out of the binary's panic-location metadata: a shipped player must
+# not carry the developer's home layout inside it. The env RUSTFLAGS
+# REPLACES the target rustflags in .cargo/config.toml, so the mingw
+# rustc bcrypt link arg is repeated here (rustc's windows-gnu runtime
+# references BCrypt*; the cross linker does not pick it up by default).
 ( cd "$REPO_ROOT" \
     && QIANQIAN_NATIVE_DIR="$NATIVE_STAGE" \
+       RUSTFLAGS="--remap-path-prefix=$HOME/=/qianqian-build/ -Clink-arg=-lbcrypt" \
        cargo build --release --target "$TARGET" --features "$FEATURES" \
             -p qianqian-headless )
 EXE="$REPO_ROOT/target/$TARGET/$PROFILE/qianqian.exe"
 [[ -f "$EXE" ]] || fail "build produced no qianqian.exe"
 EXE_SHA="$(sha256 "$EXE")"
 EXE_SIZE="$(stat -c%s "$EXE")"
+
+# The remap must be complete: any surviving build-host path in the
+# binary fails the package (fail-closed, like every other gate here).
+if command -v strings >/dev/null 2>&1; then
+    if strings "$EXE" | grep -qF "$HOME"; then
+        fail "qianqian.exe embeds build-host paths under $HOME — \
+the --remap-path-prefix above did not cover everything"
+    fi
+    note "  build-host path remap verified (no $HOME strings in the exe)"
+fi
 
 # --- 3. runtime self-containment audit (fail closed) -----------------
 note "auditing qianqian.exe DLL imports"

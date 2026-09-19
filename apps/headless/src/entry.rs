@@ -49,7 +49,16 @@ use crate::player::OpenOutcome;
 /// compiled name (`CARGO_BIN_NAME` at the wrapper) — the only way the
 /// two product binaries differ, and the only thing `--version` prints.
 pub fn run(bin_name: &str) -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    // args_os, never args(): Windows command lines are UTF-16, and a
+    // non-Unicode argument (e.g. a pasted corrupted filename) must land
+    // in the ordinary unknown-command refusal, not panic the product
+    // before the parser ever sees it. Lossy display is fine here: the
+    // grammar decides on text, and a path that cannot be represented
+    // cleanly is simply not found by the expansion.
+    let args: Vec<String> = std::env::args_os()
+        .skip(1)
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect();
     match cli::parse_invocation(&args) {
         Ok(Invocation::Help) => {
             print!("{}", cli::usage());
