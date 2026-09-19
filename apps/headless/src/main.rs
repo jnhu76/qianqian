@@ -115,7 +115,7 @@ fn start_episode(file: PathBuf) -> Result<Episode, StartFailure> {
             message: format!("decode plugin registration failed: {e:?}"),
         });
     }
-    if let Err(e) = runtime.register_component(qianqian_output_wasapi::wasapi_output_plugin()) {
+    if let Err(e) = runtime.register_component(qianqian_output_wasapi::output_plugin()) {
         return Err(StartFailure::Registration {
             message: format!("output plugin registration failed: {e:?}"),
         });
@@ -130,7 +130,7 @@ fn start_episode(file: PathBuf) -> Result<Episode, StartFailure> {
 
     if let Err(errors) = runtime.revise_desired(vec![
         desired("decode", "songcore_decode_plugin"),
-        desired("output", "wasapi_output_plugin"),
+        desired("output", "output_plugin"),
         desired("session", "playback_session"),
     ]) {
         return Err(StartFailure::CompositionRefused {
@@ -268,7 +268,7 @@ impl qianqian_headless::player::EpisodeStart for RealEpisodeSource {
                 refused: Some(format!("decode plugin registration failed: {e:?}")),
             };
         }
-        if let Err(e) = runtime.register_component(qianqian_output_wasapi::wasapi_output_plugin()) {
+        if let Err(e) = runtime.register_component(qianqian_output_wasapi::output_plugin()) {
             return StartAttempt {
                 runtime,
                 handle,
@@ -287,7 +287,7 @@ impl qianqian_headless::player::EpisodeStart for RealEpisodeSource {
         }
         if let Err(errors) = runtime.revise_desired(vec![
             desired("decode", "songcore_decode_plugin"),
-            desired("output", "wasapi_output_plugin"),
+            desired("output", "output_plugin"),
             desired("session", "playback_session"),
         ]) {
             return StartAttempt {

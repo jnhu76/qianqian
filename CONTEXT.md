@@ -520,7 +520,8 @@ Current production facts important to the post-#139 architecture:
 
 ```text
 songcore_decode_plugin() -> ComponentSpec
-wasapi_output_plugin()   -> ComponentSpec
+output_plugin()          -> ComponentSpec   (owns the WASAPI Host Render
+                                             Backend; ADR-PBK-003)
 playback_session_spec()  -> ComponentSpec
 
 all are mounted by K0 as Fibers

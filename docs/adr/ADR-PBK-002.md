@@ -584,7 +584,8 @@ Concrete reality:
 
 ```text
 songcore_decode_plugin()  -> ComponentSpec
-wasapi_output_plugin()    -> ComponentSpec
+output_plugin()           -> ComponentSpec   (owns the WASAPI Host
+                                              Render Backend; ADR-PBK-003)
 playback_session_spec()   -> ComponentSpec
 
 K0 mounts desired entries as Fibers.
