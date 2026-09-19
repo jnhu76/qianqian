@@ -17,16 +17,15 @@ Status: **PACKAGE_READY_FOR_HUMAN_LISTENING** (engineering pass) —
 
 ```text
 source branch      feat/windows-tui-listening-release-1
-source commit      9a3cc5fb1d876e6589468aba206714f978b19669
-                   (the commit the packaged binary was built and every
-                   physical run below executed; the branch's later
-                   commits touch evidence/docs/README routing only —
-                   `git diff 9a3cc5f..HEAD -- apps crates tools` is
-                   empty, so this artifact IS the product-HEAD build)
+source commit      edb631bb8733d2e9981d0a1eccdfbdeb58b18628 (final
+                   product HEAD; the review-fix commit — argv lossy
+                   read + packaged-binary path remap — is the last
+                   product-code delta and is what the shipped exe was
+                   built from)
 base (origin/main) 8b1a739 (PR #168 merge)
 package            dist/qianqian-windows-x86_64.zip
-package sha256     f5b09d256096d9a11512975fb95bdfd41ce98c885f420b62ee630ade8f2e7f43 (zip) / extracted exe 7b48308240251f385ae5d3702bd42754425c665c8f5f7d054e53491171a18f62
-qianqian.exe       sha256 7b48308240251f385ae5d3702bd42754425c665c8f5f7d054e53491171a18f62  (the extracted, executed artifact)
+package sha256     2abe029c8ef0e51490e8f2a729ed4cfe53e2488011dbd6c215d9dcb749098c1f (zip)
+qianqian.exe       sha256 9909ce8df2ae82052f11c9f9facb4fa5cf9f13bbb7272dbe90a2672ba498c8f7 (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
 songcore (mingw)   17323291fc7b53997a36746e1ce7f86b8863a63f71be79389b9b196a05175a2a
                    (native/build/artifacts-mingw/libsongcore.a; FFmpeg
                    n9.0.1 bf1b838f LGPL closure statically inside)
@@ -76,8 +75,11 @@ below used ONLY the extracted ZIP: system-only PATH
 (`C:\Windows\System32;C:\Windows`), `cwd=C:\Windows\Temp` for CLI
 gates, no repository in the picture, no `QIANQIAN_NATIVE_DIR`.
 Runner: `research/listening-release/tools/run-lr1.sh`; environment
-record `evidence/ENV-LR1-RUN1.txt`; per-scenario transcripts
-`evidence/transcripts-run1/`.
+record `evidence/ENV-LR1-RUN2.txt`; per-scenario transcripts
+`evidence/transcripts-run2/`. (RUN1 in the same tree is the earlier
+run of the SAME scenario set against the pre-review-fix artifact; the
+three review minors were fixed in between, so RUN2 is the evidence of
+the delivered package.)
 
 ### 3.1 Extraction at three locations
 
@@ -174,7 +176,18 @@ QUICKSTART.md ↔ `--help` ↔ TUI `?` overlay pinned by tests
 `tui::view::tests::the_help_overlay_advertises_every_quickstart_key`):
 same key set, same order/repeat/open/seek/quit semantics.
 
-## 6. Standard engineering gates (local, final product HEAD)
+## 6. Fresh adversarial engineering review (§49)
+
+Independent fresh-context reviewer, 24-point gate: **0 Critical /
+0 Required / 0 Major / 3 Minor**, 24/24 PASS. All three minors fixed
+on this branch and the physical evidence re-run (see
+`ADVERSARIAL-REVIEW-1.md` for the full verdict table, the fixes, and
+the recorded observations): non-Unicode argv no longer panics the
+product startup; the shipped exe carries no build-host paths
+(remap + fail-closed gate); the packaged manifest cites a commit
+reachable from the delivered history.
+
+## 7. Standard engineering gates (local, final product HEAD)
 
 ```text
 cargo fmt --all --check                         PASS
@@ -192,7 +205,7 @@ commit-convention (8b1a739..HEAD)               PASS
 HOSTED_CI                                       UNAVAILABLE for this local run (branch not yet pushed during the gates); the repository workflows (architecture-vocabulary, plugin-boundary-gate, verification-rust-gate, windows-compile-gate, commit-convention, docs) run hosted on PR — to be confirmed on the PR, never locally claimed PASS
 ```
 
-## 7. Acoustic status — ACOUSTIC_WITNESS = UNAVAILABLE (at packaging)
+## 8. Acoustic status — ACOUSTIC_WITNESS = UNAVAILABLE (at packaging)
 
 The packaged build has NOT been heard by a human yet. No audibility is
 claimed anywhere in this report; every automated oracle above is a
@@ -207,14 +220,14 @@ PACKAGE_READY_FOR_HUMAN_LISTENING
 `WINDOWS_TUI_LISTENING_RELEASE_PASS` requires the human listening
 session (§8 checklist) to be performed and reported.
 
-## 8. Human listening handoff
+## 9. Human listening handoff
 
 ```text
 PACKAGE:
 dist/qianqian-windows-x86_64.zip
 
 SHA256:
-f5b09d256096d9a11512975fb95bdfd41ce98c885f420b62ee630ade8f2e7f43 (zip) / extracted exe 7b48308240251f385ae5d3702bd42754425c665c8f5f7d054e53491171a18f62
+2abe029c8ef0e51490e8f2a729ed4cfe53e2488011dbd6c215d9dcb749098c1f (zip) / extracted exe 7b48308240251f385ae5d3702bd42754425c665c8f5f7d054e53491171a18f62
 
 EXTRACT AND RUN:
 qianqian.exe play --shuffle "D:\Music"
@@ -236,7 +249,7 @@ Checklist (each line needs a human YES):
 [ ] I listened for at least 30 minutes
 ```
 
-## 9. Architecture delta
+## 10. Architecture delta
 
 ```text
 PLUGIN DELTA            none (no new ComponentSpec; input preparation

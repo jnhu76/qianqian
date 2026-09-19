@@ -1,0 +1,16 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe
+T+   0.012s       recv  16 bytes
+T+   0.021s       recv  94 bytes
+T+   0.021s       recv  213 bytes
+T+   0.037s       recv  3577 bytes
+T+   0.432s wait-begin  "No music loaded." within 10s
+T+   0.432s    wait-ok  No music loaded.
+T+   0.432s wait-begin  "Press O to open a file or folder" within 5s
+T+   0.432s    wait-ok  Press O to open a file or folder
+T+   0.432s       send  1 bytes: "q"
+T+   0.433s       recv  6672 bytes
+T+   0.433s       recv  4 bytes
+T+   0.433s       recv  4 bytes
+T+   0.434s       recv  6733 bytes
+T+   0.443s       recv  210 bytes
+T+   0.513s       recv  213 bytes
