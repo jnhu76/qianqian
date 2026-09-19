@@ -909,6 +909,79 @@ mod tests {
         assert_eq!(forbidden_status_claim(&text), None, "{text}");
     }
 
+    /// QUICKSTART ↔ `?` overlay consistency (Listening Release): every
+    /// key the shipped help file documents must be advertised by the
+    /// on-screen overlay, and nothing beyond the shipped set. The
+    /// usage-text side of the same agreement lives in
+    /// `tests/quickstart_usage.rs`; this test renders the ACTUAL
+    /// overlay and reads the ACTUAL QUICKSTART.md, so the two surfaces
+    /// cannot drift apart silently.
+    #[test]
+    fn the_help_overlay_advertises_every_quickstart_key() {
+        let quickstart_path =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../QUICKSTART.md");
+        let quickstart = std::fs::read_to_string(&quickstart_path)
+            .unwrap_or_else(|e| panic!("QUICKSTART.md readable: {e}"));
+        // The overlay's spelling of each QUICKSTART key row.
+        let overlay_needles = [
+            ("↑ / ↓", "↑ / ↓"),
+            ("Enter", "Enter"),
+            ("N / P", "N / P"),
+            ("R", "R              order"),
+            ("L", "L              repeat"),
+            ("Space", "Space"),
+            ("← / →", "← / →"),
+            ("Shift+← / Shift+→", "Shift+← / →"),
+            ("G", "G              go to"),
+            ("+ / -", "+ / -"),
+            ("S", "S              stop"),
+            ("O", "O              open"),
+            ("?", "?              close"),
+            ("Esc", "Esc"),
+            ("Q", "Q / Ctrl+C"),
+            ("Ctrl+C", "Ctrl+C"),
+        ];
+        let mut in_key_section = false;
+        let mut documented = Vec::new();
+        for line in quickstart.lines() {
+            if line.starts_with("## ") {
+                in_key_section = line.trim() == "## Keys";
+                continue;
+            }
+            if !in_key_section || !line.starts_with('|') || line.contains("----") {
+                continue;
+            }
+            let first = line.split('|').nth(1).unwrap_or("").trim();
+            if first.is_empty() || first.starts_with("Key") {
+                continue;
+            }
+            documented.push(first.trim_matches('`').to_owned());
+        }
+        assert_eq!(
+            documented.len(),
+            overlay_needles.len(),
+            "QUICKSTART key table has {documented:?}; keep it in lockstep with \
+             the overlay and this test"
+        );
+
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        model.toggle_help();
+        let text = rendered(&model);
+        for (quickstart_key, overlay_needle) in overlay_needles {
+            assert!(
+                documented.iter().any(|key| key == quickstart_key),
+                "{quickstart_key:?} missing from QUICKSTART's key table"
+            );
+            assert!(
+                text.contains(overlay_needle),
+                "the overlay does not advertise {quickstart_key:?} \
+                 (expected {overlay_needle:?}):\n{text}"
+            );
+        }
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
     fn row(label: &str, playing: bool, selected: bool) -> PlaylistRow {
         PlaylistRow {
             label: label.to_owned(),
