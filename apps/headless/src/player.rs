@@ -2440,4 +2440,172 @@ pub(crate) mod tests {
         assert_eq!(report.snapshot, None);
         assert!(player.is_fail_stopped());
     }
+
+    // --- Navigation-burst count matrix (research/navigation-burst-
+    // boundary-0). This pins the PLAYER API contract — one manual-step
+    // call is one complete D14.6 replacement — which is exactly the
+    // substrate a burst of raw shell keys replays once per key today.
+    // It does NOT pin any shell/interaction behavior: a future
+    // coalescing policy lives ABOVE `next_track`/`previous_track` and
+    // leaves these counts untouched. The counts below are derived from
+    // the kernel-mediated event log, not from assumptions.
+
+    /// Eight-track burst playlist (no wrap under Repeat Off; both
+    /// directions have room from the committed start position 3).
+    const BURST_TRACKS: [&str; 8] = [
+        "/media/burst-0.flac",
+        "/media/burst-1.flac",
+        "/media/burst-2.flac",
+        "/media/burst-3.flac",
+        "/media/burst-4.flac",
+        "/media/burst-5.flac",
+        "/media/burst-6.flac",
+        "/media/burst-7.flac",
+    ];
+
+    /// Count one episode root's activation / teardown lines.
+    fn count_events(events: &[String], prefix: &str) -> usize {
+        events.iter().filter(|e| e.starts_with(prefix)).count()
+    }
+
+    /// The policy expectation, derived from the frozen U2 traversal
+    /// rule (Sequential, Repeat Off: inert at both ends), applied
+    /// independently of the player under test.
+    fn expected_final_position(start: usize, keys: &[bool]) -> usize {
+        let mut pos = start;
+        for &forward in keys {
+            let next = if forward {
+                Some(pos + 1)
+            } else {
+                pos.checked_sub(1)
+            };
+            if let Some(p) = next.filter(|p| *p < BURST_TRACKS.len()) {
+                pos = p;
+            }
+        }
+        pos
+    }
+
+    #[test]
+    fn burst_matrix_one_full_replacement_per_raw_manual_step() {
+        // (name, keys; true = Next, false = Previous)
+        let sequences: [(&str, Vec<bool>); 12] = [
+            ("R1 N", vec![true]),
+            ("R2 NN", vec![true, true]),
+            ("R3 NNN", vec![true, true, true]),
+            ("R4 NNNNN", vec![true; 5]),
+            ("R5 P", vec![false]),
+            ("R6 PPPP", vec![false; 4]),
+            ("R7 NNPP", vec![true, true, false, false]),
+            (
+                "R8 NNNPPNNP",
+                vec![true, true, true, false, false, true, true, false],
+            ),
+            ("R9 NPNPNP", vec![true, false, true, false, true, false]),
+            ("R10 NP", vec![true, false]),
+            ("R11 NNP", vec![true, true, false]),
+            (
+                "R12 NNPPNNPP",
+                vec![true, true, false, false, true, true, false, false],
+            ),
+        ];
+        const START: usize = 3;
+
+        println!("BURST_MATRIX (player API; one call per raw key)");
+        println!("input       keys opened probes starts retires final_pos wall_ms");
+        for (name, keys) in sequences {
+            let source = FakeEpisodeSource::new();
+            let events_handle = source.log.clone();
+            let mut player = player_with(source);
+            assert!(opened(&player.open(Path::new(BURST_TRACKS[0]))));
+            player.establish_playlist(BURST_TRACKS.iter().map(PathBuf::from).collect::<Vec<_>>());
+            // Walk to the middle so every sequence has room in BOTH
+            // directions (Repeat Off: the ends are inert); the baseline
+            // snapshot below excludes this setup from the counts.
+            for _ in 0..START {
+                assert!(matches!(player.next_track(), Some(OpenOutcome::Opened)));
+            }
+            let baseline_probes = count_events(&events_handle.lock().unwrap(), "probe ");
+            let baseline_starts = count_events(&events_handle.lock().unwrap(), "activate ");
+            let baseline_retires = count_events(&events_handle.lock().unwrap(), "teardown ");
+
+            let t0 = std::time::Instant::now();
+            let mut opened_count = 0usize;
+            for &forward in &keys {
+                let outcome = if forward {
+                    player.next_track()
+                } else {
+                    player.previous_track()
+                };
+                if matches!(outcome, Some(OpenOutcome::Opened)) {
+                    opened_count += 1;
+                }
+            }
+            let wall = t0.elapsed();
+
+            let events = events_handle.lock().unwrap().clone();
+            let probes = count_events(&events, "probe ") - baseline_probes;
+            // Each fresh root emits two activation lines (decode +
+            // output); activations/2 = episode starts.
+            let starts = (count_events(&events, "activate ") - baseline_starts) / 2;
+            // Retirements: each retired root emits two teardown lines
+            // (decode + output), same convention as the starts above.
+            let retires = (count_events(&events, "teardown ") - baseline_retires) / 2;
+
+            assert_eq!(
+                probes, opened_count,
+                "{name}: every non-inert manual step probes exactly once\n{events:?}"
+            );
+            assert_eq!(
+                starts, opened_count,
+                "{name}: every non-inert manual step starts exactly one fresh episode\n{events:?}"
+            );
+            assert_eq!(
+                retires, opened_count,
+                "{name}: every replacement retires exactly one old episode\n{events:?}"
+            );
+            assert_eq!(
+                player.navigation_position(),
+                Some((
+                    // navigation_position is 1-based (the shell's
+                    // "Track: n/len" line); the simulation is 0-based.
+                    expected_final_position(START, &keys) + 1,
+                    BURST_TRACKS.len()
+                )),
+                "{name}: final committed position follows the traversal policy"
+            );
+            assert_eq!(
+                player.active_source(),
+                Some(Path::new(
+                    BURST_TRACKS[expected_final_position(START, &keys)]
+                )),
+                "{name}: the committed source is the final policy target"
+            );
+
+            println!(
+                "{name:<11} {:>4} {:>6} {:>6} {:>6} {:>7} {:>9} {:>7.1}",
+                keys.len(),
+                opened_count,
+                probes,
+                starts,
+                retires,
+                player
+                    .navigation_position()
+                    .map(|(p, _)| p)
+                    .unwrap_or_default(),
+                wall.as_secs_f64() * 1000.0,
+            );
+        }
+
+        // The queueing dimension (§10) is NOT observable at this layer:
+        // each call here is already a consumed key. A call that arrives
+        // while a replacement runs cannot exist in-process — callers are
+        // serialized by &mut self. What queues between replacements is
+        // the OS/terminal input queue upstream of the shell loop,
+        // measured on the real host in the campaign's Windows leg.
+        //
+        // NP shows the absence of any zero-Open collapse today: the net
+        // target equals the committed track, yet BOTH keys ran a full
+        // replacement (asserted above via R10's counts: 2 and 2).
+    }
 }

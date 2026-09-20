@@ -1,0 +1,114 @@
+B-single-N: GREEN (2666ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/8" OK
+    sleep 1500ms
+    mark
+    keys "n"
+    expect-after-mark(async) "next: opened C:\\Users\\Public\\qianqian-dogfood\\vtest02.mp3" OK
+    expect-after-mark(async) "Track: 2/8" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+B-nnnnn-10ms: GREEN (3193ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/8" OK
+    sleep 1500ms
+    mark
+    keys "n" x5
+    expect-after-mark(async) "Track: 6/8" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+B-nnnnn-50ms: GREEN (2823ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/8" OK
+    sleep 1500ms
+    mark
+    keys "n" x5
+    expect-after-mark(async) "Track: 6/8" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+B-nnnnn-150ms: GREEN (3305ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/8" OK
+    sleep 1500ms
+    mark
+    keys "n" x5
+    expect-after-mark(async) "Track: 6/8" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+B-nnnnn-250ms: GREEN (3798ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/8" OK
+    sleep 1500ms
+    mark
+    keys "n" x5
+    expect-after-mark(async) "Track: 6/8" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+B-pppp-10ms: GREEN (3891ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/8" OK
+    keys "n" x4
+    expect "Track: 5/8" OK
+    sleep 1500ms
+    mark
+    keys "p" x4
+    expect-after-mark(async) "Track: 1/8" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+B-nnnppnnp-10ms: GREEN (2950ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/8" OK
+    sleep 1500ms
+    mark
+    keys "n" x3
+    keys "p" x2
+    keys "n" x2
+    keys "p"
+    expect-after-mark(async) "Track: 3/8" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+B-eof-natural: GREEN (5703ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/2" OK
+    mark
+    expect-after-mark(async) "auto-next: opened" OK
+    expect-after-mark(async) "Track: 2/2" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+B-manual-short: GREEN (1876ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "Track: 1/2" OK
+    sleep 800ms
+    mark
+    keys "n"
+    expect-after-mark(async) "Track: 2/2" OK
+    expect-after-mark(async) "next: opened" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK

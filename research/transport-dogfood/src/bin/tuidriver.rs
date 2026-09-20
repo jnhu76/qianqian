@@ -80,6 +80,13 @@ pub struct Capture {
     pub raw: Vec<u8>,
     parser: VtParser,
     t0: std::time::Instant,
+    /// Navigation-burst campaign: timestamped MARKER log. Two sources:
+    /// every fed chunk is scanned for completed `[qianqian-wasapi]`
+    /// mechanism lines (one `opened:` line per episode output open), and
+    /// every key injection is noted explicitly. One line each:
+    /// `[+S.sss] <marker>` on the same clock as the frame history.
+    pub markers: String,
+    line_buf: String,
 }
 
 impl Capture {
@@ -91,11 +98,40 @@ impl Capture {
             raw: Vec::new(),
             parser: VtParser::default(),
             t0: std::time::Instant::now(),
+            markers: String::new(),
+            line_buf: String::new(),
         }
+    }
+
+    /// Record a marker with the capture's elapsed timestamp.
+    fn note(&mut self, text: &str) {
+        self.markers.push_str(&format!(
+            "[+{:.3}] {}\n",
+            self.t0.elapsed().as_secs_f64(),
+            text
+        ));
     }
 
     fn feed(&mut self, bytes: &[u8]) {
         self.raw.extend_from_slice(bytes);
+        // Marker scan: assemble completed lines across chunk boundaries
+        // and keep the mechanism lines (one `opened:` per output open).
+        // The line buffer holds lossy-decoded text; the bytes themselves
+        // are untouched for the raw transcript.
+        self.line_buf.push_str(&String::from_utf8_lossy(bytes));
+        while let Some(pos) = self.line_buf.find('\n') {
+            let line: String = self.line_buf.drain(..=pos).collect();
+            let line = line.trim_end();
+            if line.contains("[qianqian-wasapi]") {
+                let stamp = format!("[+{:.3}]", self.t0.elapsed().as_secs_f64());
+                self.markers.push_str(&format!("{stamp} {line}\n"));
+            }
+        }
+        if self.line_buf.len() > 4096 {
+            // A mechanism line can never be this long; drop the tail so a
+            // binary/VT burst cannot grow the buffer unbounded.
+            self.line_buf.clear();
+        }
         self.parser.feed(bytes, &mut self.grid);
         let frame = self.grid.text();
         if frame != self.last_frame {
@@ -607,6 +643,15 @@ impl Session {
         }
     }
 
+    /// Record a timestamped marker on the capture's clock (the same
+    /// clock as the frame history and the wasapi mechanism lines).
+    fn note(&self, text: &str) {
+        self.capture
+            .lock()
+            .expect("capture lock")
+            .note(text);
+    }
+
     fn send_keys(&mut self, keys: &str) -> Result<(), String> {
         let bytes = keys.as_bytes();
         let mut written = 0usize;
@@ -870,6 +915,8 @@ struct ExecReport {
     chronology: String,
     transcript: String,
     raw: Vec<u8>,
+    /// Timestamped mechanism/key markers (navigation-burst campaign).
+    markers: String,
 }
 
 fn run_scenario(
@@ -917,6 +964,7 @@ fn run_scenario(
                 chronology: String::new(),
                 transcript: String::new(),
                 raw: Vec::new(),
+                markers: String::new(),
             }
         }
     };
@@ -937,6 +985,7 @@ fn run_scenario(
                 step_log.push("mark".to_owned());
             }
             Step::Keys(keys) => {
+                session.note(&format!("KEY {keys:?}"));
                 if let Err(e) = session.send_keys(keys) {
                     outcome = Err(format!("keys: {e}"));
                     break 'steps;
@@ -945,6 +994,7 @@ fn run_scenario(
                 step_log.push(format!("keys {:?}", keys));
             }
             Step::Typed(text) => {
+                session.note(&format!("KEY typed {text:?}"));
                 if let Err(e) = session.send_keys(text) {
                     outcome = Err(format!("keys: {e}"));
                     break 'steps;
@@ -953,7 +1003,8 @@ fn run_scenario(
                 step_log.push(format!("keys {text:?}"));
             }
             Step::KeysEach(keys, times, gap_ms) => {
-                for _ in 0..*times {
+                for i in 0..*times {
+                    session.note(&format!("KEY {keys:?} #{} of {times}", i + 1));
                     if let Err(e) = session.send_keys(keys) {
                         outcome = Err(format!("keys: {e}"));
                         break 'steps;
@@ -1202,9 +1253,9 @@ fn run_scenario(
         }
     }
 
-    let (transcript, raw) = {
+    let (transcript, raw, markers) = {
         let cap = session.capture.lock().expect("capture lock");
-        (cap.history.clone(), cap.raw.clone())
+        (cap.history.clone(), cap.raw.clone(), cap.markers.clone())
     };
     let chronology = session.chrono.lock().expect("chrono lock").lines.join("\n");
     let resources = std::mem::take(&mut session.samples);
@@ -1224,6 +1275,7 @@ fn run_scenario(
         chronology,
         transcript,
         raw,
+        markers,
     }
 }
 
@@ -1291,6 +1343,8 @@ fn write_evidence(out_dir: &str, name: &str, report: &ExecReport) -> Result<(), 
         .map_err(|e| format!("write json: {e}"))?;
     std::fs::write(format!("{out_dir}/{name}.txt"), &report.transcript)
         .map_err(|e| format!("write transcript: {e}"))?;
+    std::fs::write(format!("{out_dir}/{name}.markers.txt"), &report.markers)
+        .map_err(|e| format!("write markers: {e}"))?;
     std::fs::write(format!("{out_dir}/{name}.raw.txt"), &report.raw)
         .map_err(|e| format!("write raw: {e}"))?;
     std::fs::write(format!("{out_dir}/{name}.chrono.txt"), &report.chronology)

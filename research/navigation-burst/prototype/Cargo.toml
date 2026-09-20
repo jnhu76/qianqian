@@ -1,0 +1,15 @@
+[package]
+name = "navigation-burst-prototype"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Quiet-window navigation coalescing prototype (research/navigation-burst-boundary-0); never a production path"
+
+[dependencies]
+qianqian-headless = { path = "../../../apps/headless" }
+qianqian-app = { path = "../../../crates/qianqian-app" }
+qianqian-audio-api = { path = "../../../crates/qianqian-audio-api" }
+qianqian-composition = { path = "../../../crates/qianqian-composition" }
+qianqian-playback = { path = "../../../crates/qianqian-playback" }
+
+[workspace]

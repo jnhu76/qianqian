@@ -1,0 +1,4 @@
+WATERFALL probe/open+close (synthetic provider): 0.0002 ms/op  (n=1000)
+WATERFALL manual_stop/empty_edge: activate 0.126 ms | first_submit 0.273 ms | first_position 0.001 ms | stop_settle 0.033 ms | dispose 0.021 ms  (medians, n=15)
+WATERFALL manual_stop/full_edge: activate 0.200 ms | first_submit 0.279 ms | first_position 0.001 ms | stop_settle 20.008 ms | dispose 0.057 ms  (medians, n=15)
+WATERFALL natural_eof: activate 0.218 ms | first_submit 0.280 ms | produce_to_eof 322.248 ms | drain_to_Completed 4.945 ms  (medians, n=15)

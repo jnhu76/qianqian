@@ -188,6 +188,15 @@ pub fn scenario_size(name: &str) -> (i16, i16) {
     }
 }
 
+/// The navigation-burst eight-track list (staged by tools/run-tui.sh
+/// as vtest01..08, 45 s synthetic sines): long enough that no burst
+/// scenario meets a natural EOF, ordered so Sequential traversal from
+/// Track 1 has room for every scripted sequence.
+const VTEST8: [&str; 8] = [
+    "vtest01.mp3", "vtest02.mp3", "vtest03.mp3", "vtest04.mp3",
+    "vtest05.mp3", "vtest06.mp3", "vtest07.mp3", "vtest08.mp3",
+];
+
 /// The 24-entry viewport list (staged by tools/run-tui.sh as renamed
 /// copies of the 45 s synthetic sine, so every entry is long enough that
 /// the scenario's browsing and its single Enter stay inside one
@@ -450,6 +459,18 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         "U2-cjk" => &["千曲.flac", "flac4.flac"],
         "U2-viewport" => &VVIEWPORT,
         "U2-soak" => &SOAK_LIST,
+
+        // Navigation-burst campaign (research/navigation-burst-
+        // boundary-0): eight long tracks, so only a sequence that
+        // deliberately walks to an end reaches the inert boundary and
+        // every burst lands on a committed, steadily playing episode.
+        "B-single-N" | "B-nnnnn-10ms" | "B-nnnnn-50ms" | "B-nnnnn-150ms"
+        | "B-nnnnn-250ms" | "B-pppp-10ms" | "B-nnnppnnp-10ms" => &VTEST8,
+        // The manual-vs-natural pair: a SHORT first track so natural EOF
+        // arrives quickly, and one long follower so the auto-next target
+        // is unique. synth5.mp3 is staged by the burst runner (ffmpeg
+        // sine, 5 s), declared in the run ENV file.
+        "B-eof-natural" | "B-manual-short" => &["synth5.mp3", "synth45.mp3"],
 
         "A1-flac4" | "A16-drain-stop" => &["flac4.flac"],
         "A1-mp3cbr" => &["mp3cbr.mp3"],
@@ -2022,6 +2043,113 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
             )));
             v.push(expect_after_mark_async("Track: 20/20".to_owned(), SHORT_WAIT));
             v.extend(quit_clean_reporting("EOF: played out completely"));
+            v
+        }
+
+        // --- Navigation-burst campaign scenarios (research/
+        // navigation-burst-boundary-0). The burst is injected at the
+        // cadence in the scenario name; the scenario itself asserts the
+        // FINAL committed track only. The count/latency evidence is the
+        // scenario's .markers.txt — one `KEY` marker per injection and
+        // one `[qianqian-wasapi] opened:` marker per episode output
+        // open, all on the capture clock — plus the frame-history
+        // timestamps of the status/Track lines.
+        "B-single-N" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/8"),
+                Step::SleepMs(1_500),
+                Step::Mark,
+                keys("n"),
+                expect_after_mark_async(next_opened(media, "vtest02.mp3"), OPEN_WAIT),
+                expect_after_mark_async("Track: 2/8".to_owned(), SHORT_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+        "B-nnnnn-10ms" | "B-nnnnn-50ms" | "B-nnnnn-150ms" | "B-nnnnn-250ms" => {
+            let gap = match name {
+                "B-nnnnn-10ms" => 10,
+                "B-nnnnn-50ms" => 50,
+                "B-nnnnn-150ms" => 150,
+                _ => 250,
+            };
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/8"),
+                Step::SleepMs(1_500),
+                Step::Mark,
+                // Five raw keys from Track 1: every key opens (no
+                // boundary in reach); the committed final target is
+                // entry 6.
+                Step::KeysEach("n", 5, gap),
+                expect_after_mark_async("Track: 6/8".to_owned(), OPEN_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+        "B-pppp-10ms" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/8"),
+                // Walk forward first so the burst has room backward.
+                Step::KeysEach("n", 4, 150),
+                expect_within("Track: 5/8".to_owned(), OPEN_WAIT),
+                Step::SleepMs(1_500),
+                Step::Mark,
+                // From Track 5: p opens 4,3,2,1; the FOURTH p at Track 1
+                // is inert (Repeat Off, no wrap). Final target: entry 1.
+                Step::KeysEach("p", 4, 10),
+                expect_after_mark_async("Track: 1/8".to_owned(), OPEN_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+        "B-nnnppnnp-10ms" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/8"),
+                Step::SleepMs(1_500),
+                Step::Mark,
+                // 1 → n,n,n → 4 → p,p → 2 → n,n → 4 → p → 3. All eight
+                // keys non-inert; the committed final target is entry 3.
+                Step::KeysEach("n", 3, 10),
+                Step::KeysEach("p", 2, 10),
+                Step::KeysEach("n", 2, 10),
+                keys("p"),
+                expect_after_mark_async("Track: 3/8".to_owned(), OPEN_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+        "B-eof-natural" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/2"),
+                Step::Mark,
+                // Natural EOF on the 5 s first track: Completed drains
+                // the whole output tail BEFORE the auto-next Open runs
+                // (the Linux primitive waterfall pins the mechanism; the
+                // marker timestamps here carry the real-host cost).
+                expect_after_mark_async("auto-next: opened".to_owned(), EOF_WAIT),
+                expect_after_mark_async("Track: 2/2".to_owned(), SHORT_WAIT),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+        "B-manual-short" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/2"),
+                Step::SleepMs(800),
+                Step::Mark,
+                // ONE manual N on the same corpus, same seam: the
+                // manual-vs-natural comparison baseline.
+                keys("n"),
+                expect_after_mark_async("Track: 2/2".to_owned(), OPEN_WAIT),
+                expect_after_mark_async("next: opened".to_owned(), SHORT_WAIT),
+            ];
+            v.extend(quit_clean());
             v
         }
 

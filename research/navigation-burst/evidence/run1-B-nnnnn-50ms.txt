@@ -1,0 +1,1148 @@
+[+0.018s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.028s]
+scanning C:\Users\Public\qianqian-dogfood\vtest01.mp3 ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.084s]
+scanning C:\Users\Public\qianqian-dogfood\vtest01.mp3 ...
+[qianqian-wasapi] opened:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.084s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.104s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/8 ┐
+│▶ >   1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+│      2  vtest02.mp3                                                                                                  │
+│      3  vtest03.mp3                                                                                                  │
+│      4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│      6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest01.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:45                                                                                               │
+│00:00 ╸─────────────────────── 00:45                                                                                  │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│opened C:\Users\Public\qianqian-dogfood\vtest01.mp3 (8 candidates)                                                    │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+1.171s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/8 ┐
+│▶ >   1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+│      2  vtest02.mp3                                                                                                  │
+│      3  vtest03.mp3                                                                                                  │
+│      4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│      6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest01.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:01 / 00:45                                                                                               │
+│00:01 ╸─────────────────────── 00:45                                                                                  │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│opened C:\Users\Public\qianqian-dogfood\vtest01.mp3 (8 candidates)                                                    │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+1.989s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/8 ┐
+│▶ >   1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+│      2  vtest02.mp3                                                                                                  │
+│      3  vtest03.mp3                                                                                                  │
+│      4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│      6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest01.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:01 / 00:45                                                                                               │
+│00:01[qianqian-wasapi] render aborted:                                                                                │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│opened C:\Users\Public\qianqian-dogfood\vtest01.mp3 (8 candidates)                                                    │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.007s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/8 ┐
+│▶ >   1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+│      2  vtest02.mp3                                                                                                  │
+│      3  vtest03.mp3                                                                                                  │
+│      4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│      6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest01.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:01 / 00:45                                                                                               │
+│00:01[qianqian-wasapi] render aborted: data plane stopped                                                             │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│opened C:\Users\Public\qianqian-dogfood\vtest01.mp3 (8 candidates)                                                    │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.030s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/8 ┐
+│▶ >   1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+│      2  vtest02.mp3                                                                                                  │
+│      3  vtest03.mp3                                                                                                  │
+│      4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│      6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest01.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:01 / 00:45                                                                                               │
+│00:01[qianqian-wasapi] render aborted: data plane stopped                                                             │
+[qianqian-wasapi] opened: requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│opened C:\Users\Public\qianqian-dogfood\vtest01.mp3 (8 candidates)                                                    │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.053s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 2/8 ┐
+│      1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+│▶ >   2  vtest02.mp3                                                                                                  │
+│      3  vtest03.mp3                                                                                                  │
+│      4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│      6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest02.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:45                                                                                               │
+│00:00[qianqian-wasapi] render aborted: data plane stopped                                                             │
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask quested: false   Paused: false                                    │
+│Track: 2/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│next: opened C:\Users\Public\qianqian-dogfood\vtest02.mp3         0x3, buffer 970 frames (shared, event-driven)       │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.069s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 2/8 ┐
+│      1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+│▶ >   2  vtest02.mp3                                                                                                  │
+│      3  vtest03.mp3                                                                                                  │
+│      4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│      6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest02.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:45                                                                                               │
+│00:00[qianqian-wasapi] render aborted: data plane stopped                                                             │
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask quested: false   Paused: false                                    │
+│Track: 2/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│next: opened C:\Users\Public\qianqian-dogfood\vtest02.mp3         0x3, buffer 970 frames (shared, event-driven)       │
+[qianqian-wasapi] render aborted: data plane stopped                                                                   │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.091s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 2/8 ┐
+│      1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+│▶ >   2  vtest02.mp3                                                                                                  │
+│      3  vtest03.mp3                                                                                                  │
+│      4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│      6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest02.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:45                                                                                               │
+│00:00[qianqian-wasapi] render aborted: data plane stopped                                                             │
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask quested: false   Paused: false                                    │
+│Track: 2/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│next: opened C:\Users\Public\qianqian-dogfood\vtest02.mp3         0x3, buffer 970 frames (shared, event-driven)       │
+[qianqian-wasapi] render aborted: data plane stopped                                                                   │
+[qianqian-wasapi] opened:                                                                                              │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.101s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 3/8 ┐
+│      1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+│      2  vtest02.mp3                                                                                                  │
+│▶ >   3  vtest03.mp3                                                                                                  │
+│      4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│      6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest03.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:45                                                                                               │
+│00:00[qianqian-wasapi] render aborted: data plane stopped                                                             │
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask quested: false   Paused: false                                    │
+│Track: 3/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│next: opened C:\Users\Public\qianqian-dogfood\vtest033, buffer 970 frames (shared, event-driven), event-driven)       │
+[qianqian-wasapi] render aborted: data plane stopped                                                                   │
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.164s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 4/8 ┐
+│      1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+│      2  vtest02.mp3                                                                                                  │
+│      3  vtest03.mp3                                                                                                  │
+│▶ >   4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│      6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest04.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:45                                                                                               │
+│00:00[qianqian-wasapi] render aborted: data plane stopped                                                             │
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask quested: false   Paused: false                                    │
+│Track: 4/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│next: opened C:\Users\Public\qianqian-dogfood\vtest04, buffer 970 frames (shared, event-driven)), event-driven)       │
+[qianqian-wasapi] render aborted: data plane stopped                                                                   │
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3                                                               │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.210s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 4/8 │
+      1  vtest01.mp3                 channels, mask 0x3, buffer 970 frames (shared, event-driven)                     │
+     2  vtest02.mp3                                                                                                  │
+    3  vtest03.mp3                                                                                                  │▶ >
+   4  vtest04.mp3                                                                                                  │
+  5  vtest05.mp3                                                                                                  │
+ 6  vtest06.mp3                                                                                                  │
+7  vtest07.mp3                                                                                                  │      8
+  vtest08.mp3                                                                                                  │
+                                                                                                              │
+                                                                                                             │
+                                                                                                            │
+                                                                                                           │
+                                                                                                          └─────────────
+─────────────────────────────────────────────────────────────────────────────────────────────────────────┌ Qianqian Refe
+rence Player ───────────────────────────────────────────────────────────────────────────────────────────│
+                                                                                                       │Source: C:\Users
+\Public\qianqian-dogfood\vtest04.mp3                                                                  │Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                                │Position: 00:00 /
+00:45                                                                                               │00:00[qianqian-wasa
+pi] render aborted: data plane stopped
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask quested: false   Paused: false                                    │
+Track: 4/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+                                                                                                                     │ne
+xt: opened C:\Users\Public\qianqian-dogfood\vtest04, buffer 970 frames (shared, event-driven)), event-driven)          │
+[qianqian-wasapi] render aborted: data plane stopped
+[qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x3                                                               │
+                                                                                                                      └─
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┌ D
+iagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────│(no
+ne)                                                                                                                │
+                                                                                                                  └─────
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────┌ Contr
+ols ────────────────────────────────────────────────────────────────────────────────────────────────────────────│ ↑/↓  S
+elect      Enter  Play       Space  Pause/Resume                                                               │ ←/→  Se
+ek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │ N/P  Nex
+t/Prev   R  Order      L  Repeat    +/-  Volume                                                              │ O  Open
+        ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │ Esc  Cance
+l                                                                                                          └────────────
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.211s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+2.227s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 5/8 ┐│
+      1  vtest01.mp3                                                                                                 ││
+     2  vtest02.mp3                                                                                                 ││
+    3  vtest03.mp3                                                                                                 ││
+   4  vtest04.mp3                                                                                                 ││▶ >
+  5  vtest05.mp3                                                                                                 ││
+ 6  vtest06.mp3                                                                                                 ││
+7  vtest07.mp3                                                                                                 ││      8
+  vtest08.mp3                                                                                                 ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+──────────────────────────────────────────────, buffer ──────────────────────────────────────────────────┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qianqian-dogfood\vtest05.mp3                                                                 ││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:45                                                                                              ││00:00 ╸────────────
+─────────── 00:45                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused:                                         ││Track: 5/8   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││
+                                                                                               ││next: opened C:\Users\P
+ublic\qianqian-dogfood\vtest05.mp3                                                            ││
+                                                                                             ││
+          2 channels, mask 0x3                                                              ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────── frames (sh│(none)vent-driven──────────┐
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go                                                                    ││oN/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+[+2.245s]
+      1  vtest01.mp3                                                                                                 ││
+     2  vtest02.mp3                                                                                                 ││
+    3  vtest03.mp3                                                                                                 ││
+   4  vtest04.mp3                                                                                                 ││▶ >
+  5  vtest05.mp3                                                                                                 ││
+ 6  vtest06.mp3                                                                                                 ││
+7  vtest07.mp3                                                                                                 ││      8
+  vtest08.mp3                                                                                                 ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+──────────────────────────────────────────────, buffer ──────────────────────────────────────────────────┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qianqian-dogfood\vtest05.mp3                                                                 ││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:45                                                                                              ││00:00 ╸────────────
+─────────── 00:45                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused:                                         ││Track: 5/8   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││
+                                                                                               ││next: opened C:\Users\P
+ublic\qianqian-dogfood\vtest05.mp3                                                            ││
+                                                                                             ││
+          2 channels, mask 0x3                                                              ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────── frames (sh│(none)vent-driven──────────┐
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go                                                                    ││oN/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘                                      ┘[
+qianqian-wasapi] render aborted:
+[+2.245s]
+      1  vtest01.mp3                                                                                                 ││
+     2  vtest02.mp3                                                                                                 ││
+    3  vtest03.mp3                                                                                                 ││
+   4  vtest04.mp3                                                                                                 ││▶ >
+  5  vtest05.mp3                                                                                                 ││
+ 6  vtest06.mp3                                                                                                 ││
+7  vtest07.mp3                                                                                                 ││      8
+  vtest08.mp3                                                                                                 ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+──────────────────────────────────────────────, buffer ──────────────────────────────────────────────────┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qianqian-dogfood\vtest05.mp3                                                                 ││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:45                                                                                              ││00:00 ╸────────────
+─────────── 00:45                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused:                                         ││Track: 5/8   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││
+                                                                                               ││next: opened C:\Users\P
+ublic\qianqian-dogfood\vtest05.mp3                                                            ││
+                                                                                             ││
+          2 channels, mask 0x3                                                              ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────── frames (sh│(none)vent-driven──────────┐
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go                                                                    ││oN/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘                                      ┘[
+qianqian-wasapi] render aborted:  data plane stopped
+[+2.257s]
+     2  vtest02.mp3                                                                                                 ││
+    3  vtest03.mp3                                                                                                 ││
+   4  vtest04.mp3                                                                                                 ││▶ >
+  5  vtest05.mp3                                                                                                 ││
+ 6  vtest06.mp3                                                                                                 ││
+7  vtest07.mp3                                                                                                 ││      8
+  vtest08.mp3                                                                                                 ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+──────────────────────────────────────────────, buffer ──────────────────────────────────────────────────┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qianqian-dogfood\vtest05.mp3                                                                 ││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:45                                                                                              ││00:00 ╸────────────
+─────────── 00:45                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused:                                         ││Track: 5/8   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││
+                                                                                               ││next: opened C:\Users\P
+ublic\qianqian-dogfood\vtest05.mp3                                                            ││
+                                                                                             ││
+          2 channels, mask 0x3                                                              ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────── frames (sh│(none)vent-driven──────────┐
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go                                                                    ││oN/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘                                      ┘[
+qianqian-wasapi] render aborted:  data plane stopped
+
+[+2.278s]
+     2  vtest02.mp3                                                                                                 ││
+    3  vtest03.mp3                                                                                                 ││
+   4  vtest04.mp3                                                                                                 ││▶ >
+  5  vtest05.mp3                                                                                                 ││
+ 6  vtest06.mp3                                                                                                 ││
+7  vtest07.mp3                                                                                                 ││      8
+  vtest08.mp3                                                                                                 ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+──────────────────────────────────────────────, buffer ──────────────────────────────────────────────────┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qianqian-dogfood\vtest05.mp3                                                                 ││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:45                                                                                              ││00:00 ╸────────────
+─────────── 00:45                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused:                                         ││Track: 5/8   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││
+                                                                                               ││next: opened C:\Users\P
+ublic\qianqian-dogfood\vtest05.mp3                                                            ││
+                                                                                             ││
+          2 channels, mask 0x3                                                              ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────── frames (sh│(none)vent-driven──────────┐
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go                                                                    ││oN/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘                                      ┘[
+qianqian-wasapi] render aborted:  data plane stopped
+[qianqian-wasapi] opened:
+[+2.288s]
+     2  vtest02.mp3                                                                                               6 ││
+    3  vtest03.mp3                                                                                                 ││
+   4  vtest04.mp3                                                                                                 ││▶ >
+  5  vtest05.mp3                                                                                                 ││
+ 6  vtest06.mp3                                                                                                 ││
+7   test07.mp3                                                                                                 ││      8
+ ▶v>est08.mp3                                                                                                 ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+──────────────────────────────────────────────, buffer ──────────────────────────────────────────────────┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qianqian-dogfood\vtest05.mp3                                                                 ││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:45                                           6                                                  ││00:00 ╸────────────
+─────────── 00:45                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused:                                         ││Track: 5/8   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││
+                                                                                               ││next: opened C:\Users\P
+ublic\qi6nqian-dogfood\vtest05.mp3                                                            ││
+                                                                                             ││
+          2 channels, mask 0x3                       6 channels, mask 0x3, buffer 970 frames (shared, event-driven)
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────── frames (sh│(none)vent-driven──────────┐
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go                                                                    ││oN/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘                                      ┘[
+qianqian-wasapi] render aborted:  data plane stopped
+[qianqian-wasapi] opened: 44100 Hz, 2
+[+2.290s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+2.303s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 6/8 ┐
+│      1  vtest01.mp3                                                                                                  │
+│      2  vtest02.mp3                                                                                                  │
+│      3  vtest03.mp3                                                                                                  │
+│      4  vtest04.mp3                                                                                                  │
+│      5  vtest05.mp3                                                                                                  │
+│▶ >   6  vtest06.mp3                                                                                                  │
+│      7  vtest07.mp3                                                                                                  │
+│      8  vtest08.mp3                                                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qianqian-dogfood\vtest06.mp3                                                                  │
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:45                                                                                               │
+│00:00 ╸─────────────────────── 00:45                                                                                  │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 6/8   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│next: opened C:\Users\Public\qianqian-dogfood\vtest06.mp3                                                             │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.310s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 6/8 │
+      1  vtest01.mp3                                                                                                  │
+     2  vtest02.mp3                                                                                                  │
+    3  vtest03.mp3                                                                                                  │
+   4  vtest04.mp3                                                                                                  │
+  5  vtest05.mp3                                                                                                  │▶ >
+ 6  vtest06.mp3                                                                                                  │
+7  vtest07.mp3                                                                                                  │      8
+  vtest08.mp3                                                                                                  │
+                                                                                                              │
+                                                                                                             │
+                                                                                                            │
+                                                                                                           │
+                                                                                                          └─────────────
+─────────────────────────────────────────────────────────────────────────────────────────────────────────┌ Qianqian Refe
+rence Player ───────────────────────────────────────────────────────────────────────────────────────────│
+                                                                                                       │Source: C:\Users
+\Public\qianqian-dogfood\vtest06.mp3                                                                  │Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                                │Position: 00:00 /
+00:45                                                                                               │00:00 ╸────────────
+─────────── 00:45                                                                                  │Terminal: pending
+Stop requested: false   Pause requested: false   Paused: false                                    │Track: 6/8   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+                                                                                                │next: opened C:\Users\P
+ublic\qianqian-dogfood\vtest06.mp3                                                             │
+                                                                                              │
+                                                                                             │
+                                                                                            └───────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────┌ Diagnostics ───────────────
+──────────────────────────────────────────────────────────────────────────────────────────│(none)
+                                                                                         │
+                                                                                        └───────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────┌ Controls ──────────────────────
+──────────────────────────────────────────────────────────────────────────────────────│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                               │ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                  │ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                              │ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                             │ Esc  Cancel
+                                                                                 └──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+2.319s]
+scanning C:\Users\Public\qianqian-dogfood\vtest01.mp3 ...
+[qianqian-wasapi] opened: 44100 Hz, 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+2.343s]
+scanning C:\Users\Public\qianqian-dogfood\vtest01.mp3 ...
+[qianqian-wasapi] opened: 44100 Hz, 2[qianqian-wasapi] render aborted:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+2.366s]
+scanning C:\Users\Public\qianqian-dogfood\vtest01.mp3 ...
+[qianqian-wasapi] opened: 44100 Hz, 2[qianqian-wasapi] render aborted: data plane stopped
+stopped before completion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

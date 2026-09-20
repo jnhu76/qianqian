@@ -1,0 +1,17 @@
+BURST_MATRIX (player API; one call per raw key)
+input       keys opened probes starts retires final_pos wall_ms
+R1 N           1      1      1      1       1         5     0.3
+R2 NN          2      2      2      2       2         6     0.6
+R3 NNN         3      3      3      3       3         7     0.7
+R4 NNNNN       5      4      4      4       4         8     0.9
+R5 P           1      1      1      1       1         3     0.3
+R6 PPPP        4      3      3      3       3         1     0.6
+R7 NNPP        4      4      4      4       4         4     0.9
+R8 NNNPPNNP    8      8      8      8       8         6     1.8
+R9 NPNPNP      6      6      6      6       6         4     1.3
+R10 NP         2      2      2      2       2         4     0.4
+R11 NNP        3      3      3      3       3         5     0.7
+R12 NNPPNNPP    8      8      8      8       8         4     2.4
+test player::tests::burst_matrix_one_full_replacement_per_raw_manual_step ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 204 filtered out; finished in 0.02s

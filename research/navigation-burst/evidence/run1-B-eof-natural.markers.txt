@@ -1,0 +1,5 @@
+[+5.138] [39;119H[qianqian-wasapi] opened:[95C[40;26H44100[2J[H[K
+[+5.187] KEY "q"
+[+5.208] [qianqian-wasapi] opened: 44100 Hz,[K
+[+5.224] [K[2;37H[?25h[qianqian-wasapi] render aborted: data plane stopped
+[+5.267] [qianqian-wasapi] opened: 44100 Hz, [qianqian-wasapi] render aborted: data plane stopped[K
