@@ -136,12 +136,25 @@ The pending target is interaction/UI-App control state. It is NOT a
 CurrentTrack/Navigation Fact, NOT episode identity, NOT activation
 truth; the read side stays the D14.2 observation; until the Open
 commits, the old episode remains the committed playback episode.
-Presentation: during a burst the pending target MAY move the existing
-`>` selection cursor (▶ stays on the committed row) — reusing
-selection, adding no third marker; the selection-follows-commit rule
-(U2 §41) already restores `>` onto `▶` at commit. If a future GUI
-wants a distinct "pending" affordance it may render it, but the STATE
-is one pending target, not a new cursor.
+
+`playing`, `selected`, and `pending` remain THREE distinct concepts:
+
+```text
+playing   = committed App navigation state; moves only on Open commit
+selected  = presentation browsing state; moving it never changes playback
+pending   = uncommitted relative-navigation intent during the quiet window
+```
+
+A burst MUST NOT mutate the existing `selected` cursor merely to render
+its pending target. Doing so would collapse browsing state into
+uncommitted playback intent and would make the existing `>` marker mean
+two different things. The App therefore keeps pending state separately.
+A shell MAY project the pending target with transient status text or a
+future dedicated affordance, but that projection must not reuse or
+redefine `selected`. On commit, the existing U2 rule remains unchanged:
+manual navigation commit moves `playing` and then makes `selected`
+follow the committed row. No new playback Fact or third playlist cursor
+is introduced by this research decision.
 
 ## 8. Quiet window: value and mechanism (§20/§46/§47/§48)
 
@@ -166,7 +179,7 @@ is one pending target, not a new cursor.
 ## 9. Boundary table (§38)
 
 | Concern | Recommended owner | Plugin? | Reason |
-|---|---|---|---|
+|---|---|---:|---|
 | TUI key mapping | TUI adapter (runtime/model) | No | presentation/input |
 | Navigation burst policy (pending + quiet window) | ReferencePlayerApp (App state + methods) | **No** | D13: no independent lifecycle/resource; owns nothing |
 | UI-neutral intent vocabulary (RelativeNavigation ±1 / explicit target) | adapter→App seam (plain method calls suffice today; a type only when a second adapter with different transport earns it) | No | explanatory vocabulary, not architecture (AGENTS razor) |
