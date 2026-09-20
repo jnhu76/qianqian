@@ -17,15 +17,14 @@ Status: **PACKAGE_READY_FOR_HUMAN_LISTENING** (engineering pass) —
 
 ```text
 source branch      feat/windows-tui-listening-release-1
-source commit      4498dec (fix(tui): inert Enter on the live row,
-                   content-driven panel budget — the field-round-3
-                   corrective, §11.4)
+source commit      4498dec… (fix(tui) R3) + the VOLUME-TAPER-1 commit
+                   (field round 4, §11.6)
 base (origin/main) 8b1a739 (PR #168 merge)
 package            dist/qianqian-windows-x86_64.zip
-package sha256     d28c0084ea6afbc28b68d537783da3c8ffddf1414be9d98c5e335b043a1dbff3 (zip, R3 build)
-                   (superseded: 64f64cbc… [Tier-2 build], 95be430b… [U2 probesize build], 2abe029c… [RUN2])
-qianqian.exe       sha256 4122a04e4fed8b91afab0819d423271d4d1e7c6e3969b833869b2df6f42598c3 (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
-                   (superseded: add21897… [Tier-2], 9909ce8d… [RUN2])
+package sha256     3f39c22566d2e08d9b1f925fc281ce1c7781d451d6720cba4c572cd2b90aaeb1 (zip, R4 taper build)
+                   (superseded: d28c0084… [R3 keyboard fixes], 64f64cbc… [Tier-2 build], 95be430b… [U2 probesize build], 2abe029c… [RUN2])
+qianqian.exe       sha256 2d479f55ca04c4ca67d4353de2a34376b16be1769bac199d784417a96c169ab8 (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
+                   (superseded: 4122a04e… [R3], add21897… [Tier-2], 9909ce8d… [RUN2])
 songcore (mingw)   05cbb12aaf33e44e5f0784deca0b410a0948f625d142bb4f7192fb61040fe7cc
                    (native/build/artifacts-mingw/libsongcore.a; FFmpeg
                    n9.0.1 bf1b838f LGPL closure statically inside;
@@ -230,7 +229,7 @@ PACKAGE:
 dist/qianqian-windows-x86_64.zip
 
 SHA256:
-d28c0084ea6afbc28b68d537783da3c8ffddf1414be9d98c5e335b043a1dbff3 (zip) / extracted exe 4122a04e4fed8b91afab0819d423271d4d1e7c6e3969b833869b2df6f42598c3
+3f39c22566d2e08d9b1f925fc281ce1c7781d451d6720cba4c572cd2b90aaeb1 (zip) / extracted exe 2d479f55ca04c4ca67d4353de2a34376b16be1769bac199d784417a96c169ab8
 
 EXTRACT AND RUN:
 qianqian.exe play --shuffle "D:\Music"
@@ -466,4 +465,58 @@ Stopped"; clean exit 0. X-realdir re-run on the same package: GREEN
 (first track ~240 ms after the O-dialog Enter; N to track 2 ~120 ms;
 console clean; clean exit). Evidence: `evidence/logs/lr1-run5-*.summary`,
 `evidence/transcripts-run5/` (incl. X-realdir), `evidence/ENV-LR1-RUN5.txt`.
+
+### 11.6 Fourth round: the volume control did not feel linear (R4)
+
+Everything from R3 held in real listening; one report remained: the
++/- volume control "feels non-linear". The plumbing was honest — the
+TUI's ±5 steps land in the App's desired level, the read side shows
+exactly that — but the session's FACTOR realization was the literal
+division `level/100.0`: linear amplitude. Human loudness perception
+is roughly logarithmic in amplitude, so the linear control put all of
+its audible travel into the bottom quarter: presses above ~70 were
+inaudible, and the same 5-step press meant −0.45 dB at 95 but −6 dB
+at 25. (The D14.9 text never promised a linear curve — "no dB curve
+promise; 50 makes no half-perceived-loudness claim" — the linear
+parenthetical was the recorded realization, and the field evidence is
+that it does not feel like a volume control.)
+
+Corrective (commit on this branch; PBK-002 D14.9 dated amendment
+VOLUME-TAPER-1): the session-owned routing seam now realizes the
+desired level as a perceptual taper —
+
+```text
+100 → exactly 1.0   (unity preserved; Tier-1 bit-transparent
+                     submission untouched at the top of the control)
+  0 → exactly 0.0   (true silence)
+else → 10^(−0.03·(100−level))  (−60 dB control range;
+                     exactly 3 dB per 5-step press)
+```
+
+so 50 is −30 dB and every press feels alike near the top and near the
+bottom. NO D14.9 proposition changed: owner, truth class (desired
+control position, never an acoustic level or readback), apply points,
+zero/mute ruling and terminal inertness are untouched; the volume
+labels, the ±5 step and the 0–100 range are unchanged. Pinned
+executably (`handle::desired_level_tests`: exact endpoints, 3 dB per
+5-step property, monotonicity; the volume-seam conformance suite
+re-anchored). Whether the control now FEELS even is the human ear's
+verdict (ACOUSTIC_WITNESS) — the mechanism claim is only the mapping.
+
+### 11.7 RUN6 — the physical evidence of record (all GREEN)
+
+Against the R4 package (zip 3f39c225…, exe 2d479f55…):
+
+```text
+core   10 GREEN  (…incl. U3-keys-field at 120x30)
+fmatrix 4 GREEN / large 1 GREEN / huge 1 GREEN — groups 4/4
+X-realdir on the real corpus: GREEN (first track ~0.24 s after the
+O-dialog Enter, N to track 2 ~0.11 s, console clean, clean exit)
+```
+
+The volume taper is not ConPTY-witnessable (amplitude is not on
+screen; audibility is never claimed by this harness) — its executable
+evidence is the unit pin above, and its acceptance item is the human
+listening checklist (§9). Evidence: `evidence/logs/lr1-run6-*.summary`,
+`evidence/transcripts-run6/` (incl. X-realdir), `evidence/ENV-LR1-RUN6.txt`.
 

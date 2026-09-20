@@ -1,0 +1,20 @@
+{"scenario":"LR1-huge","verdict":"GREEN","exit_code":0,
+ "failure":null,
+ "child_status_at_failure":null,
+ "steps":[
+    "expect-after-mark \"5000 candidates\" OK",
+    "expect \"Format: 44100 Hz\" OK",
+    "expect \"Track: 1/5000\" OK",
+    "mark",
+    "new-position (0, 1) OK",
+    "keys \"\\u{1b}[B\" x3",
+    "expect-after-mark \"sel 4/5000\" OK",
+    "keys \"q\"",
+    "exit 0 OK",
+    "expect \"stopped before completion\" OK",
+    "absent-after-mark \"teardown violated\" OK",
+    "absent-after-mark \"warning: disposal\" OK"
+],
+ "resources":[
+    {"label":"baseline","threads":4,"handles":108,"working_set_bytes":9596928}
+]}

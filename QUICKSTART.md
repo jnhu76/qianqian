@@ -170,6 +170,8 @@ claim is made beyond the list above.
 ## Volume
 
 `+` and `-` change Qianqian's own volume in steps of 5 (0–100). The
+scale is perceptual: each step is about 3 dB, so a press feels alike
+near the top and near the bottom (100 is full, 0 is silence). The
 `Volume: 75/100 (desired)` line is the player's setting — Windows'
 own mixer and output device still apply on top of it.
 

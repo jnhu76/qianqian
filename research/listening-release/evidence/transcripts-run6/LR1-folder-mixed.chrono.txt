@@ -1,0 +1,43 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\fmatrix"
+T+   0.016s       recv  16 bytes
+T+   0.027s       recv  137 bytes
+T+   0.088s       recv  8 bytes
+T+   0.088s       recv  219 bytes
+T+   0.104s       recv  4517 bytes
+T+   0.444s wait-begin  "scanning" within 5s
+T+   0.444s    wait-ok  scanning
+T+   0.444s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.444s    wait-ok  Format: 44100 Hz
+T+   0.444s wait-begin  "5 candidates, 5 skipped, 2 unplayable" within 5s
+T+   0.444s    wait-ok  5 candidates, 5 skipped, 2 unplayable
+T+   0.444s wait-begin  "not playable: broken.flac" within 5s
+T+   0.444s    wait-ok  not playable: broken.flac
+T+   0.444s wait-begin  "not playable: zero.mp3" within 5s
+T+   0.444s    wait-ok  not playable: zero.mp3
+T+   0.444s wait-begin  "scan warning: cannot read" within 5s
+T+   0.444s    wait-ok  scan warning: cannot read
+T+   0.444s wait-begin  "Track: 1/5" within 5s
+T+   0.444s    wait-ok  Track: 1/5
+T+   0.444s wait-begin  "▶ >   1  01-track.flac" within 5s
+T+   0.444s    wait-ok  ▶ >   1  01-track.flac
+T+   0.444s wait-begin  new-position != None
+T+   1.181s       recv  42 bytes
+T+   1.193s    wait-ok  new-position (0, 1)
+T+   1.193s       send  3 bytes: "\u{1b}[B"
+T+   1.194s       recv  6715 bytes
+T+   1.194s       recv  4 bytes
+T+   1.197s       recv  6764 bytes
+T+   1.274s wait-begin  "sel 2/5" within 20s
+T+   1.274s    wait-ok  sel 2/5
+T+   1.274s wait-begin  "  >   2  02-track.m4a" within 20s
+T+   1.274s       recv  6804 bytes
+T+   1.274s       recv  4 bytes
+T+   1.291s       recv  6820 bytes
+T+   1.294s    wait-ok    >   2  02-track.m4a
+T+   1.294s       send  1 bytes: "q"
+T+   1.294s       recv  6708 bytes
+T+   1.306s       recv  262 bytes
+T+   1.323s       recv  27 bytes
+T+   1.375s       recv  293 bytes
+T+   1.774s wait-begin  "stopped before completion" within 5s
+T+   1.774s    wait-ok  stopped before completion
