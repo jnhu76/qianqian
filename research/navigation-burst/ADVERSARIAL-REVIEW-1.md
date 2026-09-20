@@ -33,8 +33,10 @@ All twenty questions PASS. Highlights of the verified evidence:
 10. NP zero-Open outcome achieved (w > gap strictly; boundary noted).
 11. Manual-pending vs EOF precedence specified; grounded in the
     existing exactly-once eof_consumed discipline; D11 untouched.
-12. Pending state kept out of playback Facts (interaction/UI state;
-    presentation reuses `>`).
+12. Pending state kept out of playback Facts and kept distinct from
+    both committed `playing` and presentation-only `selected`; any UI
+    indication of a pending target is a separate projection/affordance,
+    not a reinterpretation of the existing `>` selection marker.
 13–14. D13 applied per-candidate (existing owner / lifecycle /
     correctness-lost questions); NO Plugin earned.
 15–16. No async/cancellation machinery; the App thread stays the
