@@ -1,0 +1,45 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\fmatrix"
+T+   0.013s       recv  16 bytes
+T+   0.023s       recv  137 bytes
+T+   0.034s       recv  232 bytes
+T+   0.079s       recv  26 bytes
+T+   0.079s       recv  19 bytes
+T+   0.096s       recv  6826 bytes
+T+   0.436s wait-begin  "scanning" within 5s
+T+   0.436s    wait-ok  scanning
+T+   0.436s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.436s    wait-ok  Format: 44100 Hz
+T+   0.436s wait-begin  "5 candidates, 5 skipped, 2 unplayable" within 5s
+T+   0.436s    wait-ok  5 candidates, 5 skipped, 2 unplayable
+T+   0.436s wait-begin  "not playable: broken.flac" within 5s
+T+   0.436s    wait-ok  not playable: broken.flac
+T+   0.436s wait-begin  "not playable: zero.mp3" within 5s
+T+   0.436s    wait-ok  not playable: zero.mp3
+T+   0.436s wait-begin  "scan warning: cannot read" within 5s
+T+   0.436s    wait-ok  scan warning: cannot read
+T+   0.436s wait-begin  "Track: 1/5" within 5s
+T+   0.436s    wait-ok  Track: 1/5
+T+   0.436s wait-begin  "▶ >   1  01-track.flac" within 5s
+T+   0.436s    wait-ok  ▶ >   1  01-track.flac
+T+   0.436s wait-begin  new-position != None
+T+   1.168s       recv  42 bytes
+T+   1.186s    wait-ok  new-position (0, 1)
+T+   1.186s       send  3 bytes: "\u{1b}[B"
+T+   1.187s       recv  6715 bytes
+T+   1.187s       recv  4 bytes
+T+   1.199s       recv  6764 bytes
+T+   1.266s wait-begin  "sel 2/5" within 20s
+T+   1.266s    wait-ok  sel 2/5
+T+   1.266s wait-begin  "  >   2  02-track.m4a" within 20s
+T+   1.267s       recv  6804 bytes
+T+   1.267s       recv  4 bytes
+T+   1.276s       recv  6820 bytes
+T+   1.287s    wait-ok    >   2  02-track.m4a
+T+   1.287s       send  1 bytes: "q"
+T+   1.287s       recv  6708 bytes
+T+   1.291s       recv  525 bytes
+T+   1.314s       recv  34 bytes
+T+   1.338s       recv  47 bytes
+T+   1.367s       recv  607 bytes
+T+   1.767s wait-begin  "stopped before completion" within 5s
+T+   1.767s    wait-ok  stopped before completion

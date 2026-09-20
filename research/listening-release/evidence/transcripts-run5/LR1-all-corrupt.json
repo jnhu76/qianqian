@@ -1,0 +1,14 @@
+{"scenario":"LR1-all-corrupt","verdict":"GREEN","exit_code":1,
+ "failure":null,
+ "child_status_at_failure":null,
+ "steps":[
+    "expect \"open refused\" OK",
+    "expect \"no playable audio files found; 2 unplayable\" OK",
+    "expect \"No music loaded.\" OK",
+    "keys \"q\"",
+    "exit 1 OK",
+    "absent-after-mark \"teardown violated\" OK"
+],
+ "resources":[
+    {"label":"baseline","threads":4,"handles":109,"working_set_bytes":8527872}
+]}

@@ -1,0 +1,68 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\synth45.mp3"
+T+   0.017s       recv  16 bytes
+T+   0.027s       recv  141 bytes
+T+   0.077s       recv  8 bytes
+T+   0.077s       recv  169 bytes
+T+   0.096s       recv  3824 bytes
+T+   0.448s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.448s    wait-ok  Format: 44100 Hz
+T+   0.448s wait-begin  "Track: 1/1" within 5s
+T+   0.448s    wait-ok  Track: 1/1
+T+   1.163s       recv  17 bytes
+T+   2.095s       recv  27 bytes
+T+   2.448s       send  1 bytes: "\r"
+T+   2.449s       recv  5494 bytes
+T+   2.449s       recv  4 bytes
+T+   2.449s       recv  4 bytes
+T+   2.469s       recv  5527 bytes
+T+   2.529s wait-begin  "already playing the selected track" within 500ms
+T+   2.529s       recv  5557 bytes
+T+   2.529s       recv  4 bytes
+T+   2.548s       recv  5573 bytes
+T+   2.549s    wait-ok  already playing the selected track
+T+   2.549s wait-begin  new-position != None
+T+   2.549s    wait-ok  new-position (0, 2)
+T+   2.549s       send  1 bytes: "g"
+T+   2.550s       recv  5487 bytes
+T+   2.550s       recv  4 bytes
+T+   2.563s       recv  5527 bytes
+T+   2.630s wait-begin  "Go to: [" within 5s
+T+   2.630s    wait-ok  Go to: [
+T+   2.630s       send  4 bytes: "0:10"
+T+   2.630s       recv  5557 bytes
+T+   2.641s       recv  5527 bytes
+T+   2.710s       send  1 bytes: "\r"
+T+   2.710s       recv  5557 bytes
+T+   2.734s       recv  5527 bytes
+T+   2.790s wait-begin  "seek requested: 00:10" within 500ms
+T+   2.791s       recv  5557 bytes
+T+   2.791s       recv  4 bytes
+T+   2.811s    wait-ok  seek requested: 00:10
+T+   2.811s wait-begin  new-position != Some((0, 2))
+T+   2.812s       recv  5573 bytes
+T+   2.831s    wait-ok  new-position (0, 10)
+T+   2.831s       send  1 bytes: "\u{1b}"
+T+   2.832s       recv  5483 bytes
+T+   2.832s       recv  4 bytes
+T+   2.832s       recv  4 bytes
+T+   2.843s       recv  5527 bytes
+T+   2.912s       recv  5527 bytes
+T+   2.992s       send  1 bytes: "l"
+T+   2.993s       recv  5557 bytes
+T+   3.016s       recv  5527 bytes
+T+   3.073s wait-begin  "Repeat: All" within 500ms
+T+   3.073s    wait-ok  Repeat: All
+T+   3.073s       send  1 bytes: "s"
+T+   3.073s       recv  5557 bytes
+T+   3.094s       recv  5527 bytes
+T+   3.153s wait-begin  "Terminal: Stopped" within 500ms
+T+   3.154s       recv  5557 bytes
+T+   3.154s       recv  4 bytes
+T+   3.173s       recv  5525 bytes
+T+   3.174s    wait-ok  Terminal: Stopped
+T+   3.174s       send  1 bytes: "q"
+T+   3.174s       recv  5443 bytes
+T+   3.189s       recv  241 bytes
+T+   3.255s       recv  247 bytes
+T+   3.655s wait-begin  "stopped before completion" within 5s
+T+   3.655s    wait-ok  stopped before completion

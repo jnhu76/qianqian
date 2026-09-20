@@ -1,0 +1,35 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\cover.mp3"
+T+   0.016s       recv  16 bytes
+T+   0.025s       recv  139 bytes
+T+   0.087s       recv  8 bytes
+T+   0.087s       recv  219 bytes
+T+   0.102s       recv  3906 bytes
+T+   0.441s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.441s    wait-ok  Format: 44100 Hz
+T+   0.441s wait-begin  "Source: C:\\Users\\Public\\qn-lr1\\media\\cover.mp3" within 5s
+T+   0.441s    wait-ok  Source: C:\Users\Public\qn-lr1\media\cover.mp3
+T+   0.441s wait-begin  "▶ >   1  cover.mp3" within 5s
+T+   0.441s    wait-ok  ▶ >   1  cover.mp3
+T+   0.441s       send  1 bytes: "L"
+T+   0.442s       recv  6704 bytes
+T+   0.442s       recv  4 bytes
+T+   0.442s       recv  4 bytes
+T+   0.459s       recv  6757 bytes
+T+   0.522s wait-begin  "Repeat: All" within 5s
+T+   0.522s    wait-ok  Repeat: All
+T+   0.522s       recv  6797 bytes
+T+   0.522s       recv  4 bytes
+T+   0.535s       recv  6813 bytes
+T+   1.141s       recv  60 bytes
+T+   2.268s       recv  392 bytes
+T+   2.425s       recv  455 bytes
+T+   3.355s       recv  60 bytes
+T+   3.522s wait-begin  new-position != None
+T+   3.522s    wait-ok  new-position (0, 0)
+T+   3.522s       send  1 bytes: "q"
+T+   3.523s       recv  6701 bytes
+T+   3.527s       recv  264 bytes
+T+   3.552s       recv  27 bytes
+T+   3.603s       recv  295 bytes
+T+   4.003s wait-begin  "stopped before completion" within 5s
+T+   4.003s    wait-ok  stopped before completion

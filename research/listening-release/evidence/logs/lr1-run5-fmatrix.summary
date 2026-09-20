@@ -1,0 +1,52 @@
+LR1-folder-mixed: GREEN (1809ms, exit Some(0))
+    expect "scanning" OK
+    expect "Format: 44100 Hz" OK
+    expect "5 candidates, 5 skipped, 2 unplayable" OK
+    expect "not playable: broken.flac" OK
+    expect "not playable: zero.mp3" OK
+    expect "scan warning: cannot read" OK
+    expect "Track: 1/5" OK
+    expect "▶ >   1  01-track.flac" OK
+    mark
+    new-position (0, 1) OK
+    keys "\u{1b}[B"
+    expect-after-mark "sel 2/5" OK
+    expect-after-mark "  >   2  02-track.m4a" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+LR1-all-corrupt: GREEN (955ms, exit Some(1))
+    expect "open refused" OK
+    expect "no playable audio files found; 2 unplayable" OK
+    expect "No music loaded." OK
+    keys "q"
+    exit 1 OK
+    absent-after-mark "teardown violated" OK
+LR1-duplicate-roots: GREEN (1785ms, exit Some(0))
+    expect "Format: 44100 Hz" OK
+    expect "2 candidates, 2 duplicates removed" OK
+    expect "Track: 1/2" OK
+    mark
+    new-position (0, 1) OK
+    keys "n"
+    expect-after-mark "Track: 2/2" OK
+    keys "q"
+    exit 0 OK
+    expect "stopped before completion" OK
+    absent-after-mark "teardown violated" OK
+    absent-after-mark "warning: disposal" OK
+LR1-truncated-next: GREEN (31803ms, exit Some(1))
+    expect "Format: 44100 Hz" OK
+    expect "2 candidates" OK
+    expect "Track: 1/2" OK
+    mark
+    new-position (0, 1) OK
+    keys "n"
+    expect-after-mark "Track: 2/2" OK
+    expect-either "Terminal: Completed" | "Terminal: Failed" OK
+    keys "q"
+    exit 1 OK (either 0/1)
+    expect-either "EOF: played out completely" | "playback failed" OK
+    absent-after-mark "teardown violated" OK

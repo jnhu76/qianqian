@@ -1,0 +1,36 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\big5000"
+T+   0.013s       recv  16 bytes
+T+   0.023s       recv  137 bytes
+T+   0.437s wait-begin  "5000 candidates" within 240s
+T+   1.857s       recv  26 bytes
+T+   1.858s       recv  181 bytes
+T+   1.873s       recv  6816 bytes
+T+   1.884s    wait-ok  5000 candidates
+T+   1.884s wait-begin  "Format: 44100 Hz" within 10s
+T+   1.884s    wait-ok  Format: 44100 Hz
+T+   1.884s wait-begin  "Track: 1/5000" within 5s
+T+   1.884s    wait-ok  Track: 1/5000
+T+   1.884s wait-begin  new-position != None
+T+   2.952s       recv  42 bytes
+T+   2.958s    wait-ok  new-position (0, 1)
+T+   2.958s       send  3 bytes: "\u{1b}[B"
+T+   2.967s       recv  23 bytes
+T+   3.058s       send  3 bytes: "\u{1b}[B"
+T+   3.059s       recv  23 bytes
+T+   3.158s       send  3 bytes: "\u{1b}[B"
+T+   3.160s       recv  23 bytes
+T+   3.259s       recv  6698 bytes
+T+   3.259s       recv  4 bytes
+T+   3.259s       recv  4 bytes
+T+   3.275s       recv  6751 bytes
+T+   3.339s wait-begin  "sel 4/5000" within 20s
+T+   3.339s    wait-ok  sel 4/5000
+T+   3.339s       send  1 bytes: "q"
+T+   3.339s       recv  6791 bytes
+T+   3.340s       recv  6759 bytes
+T+   3.352s       recv  460 bytes
+T+   3.372s       recv  34 bytes
+T+   3.383s       recv  47 bytes
+T+   3.419s       recv  543 bytes
+T+   3.819s wait-begin  "stopped before completion" within 5s
+T+   3.819s    wait-ok  stopped before completion

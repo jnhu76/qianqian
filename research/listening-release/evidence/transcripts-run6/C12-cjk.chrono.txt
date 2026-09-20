@@ -1,0 +1,44 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\千曲.flac"
+T+   0.019s       recv  16 bytes
+T+   0.031s       recv  141 bytes
+T+   0.087s       recv  8 bytes
+T+   0.087s       recv  219 bytes
+T+   0.110s       recv  3945 bytes
+T+   0.456s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.456s    wait-ok  Format: 44100 Hz
+T+   0.456s       send  1 bytes: "o"
+T+   0.457s       recv  6708 bytes
+T+   0.457s       recv  4 bytes
+T+   0.457s       recv  4 bytes
+T+   0.470s       recv  6763 bytes
+T+   0.537s       send  11 bytes: "千曲.flac"
+T+   0.537s       recv  6763 bytes
+T+   0.548s       recv  51 bytes
+T+   0.617s       send  1 bytes: "\r"
+T+   0.618s       recv  6765 bytes
+T+   0.693s       recv  399 bytes
+T+   0.697s wait-begin  "opened 千 曲 .flac" within 20s
+T+   0.698s       recv  6807 bytes
+T+   0.705s       recv  6819 bytes
+T+   0.718s    wait-ok  opened 千 曲 .flac
+T+   0.718s       send  1 bytes: " "
+T+   0.718s       recv  6703 bytes
+T+   0.718s       recv  4 bytes
+T+   0.720s       recv  6763 bytes
+T+   0.798s wait-begin  "Pause requested: true" within 5s
+T+   0.798s    wait-ok  Pause requested: true
+T+   0.798s       send  1 bytes: " "
+T+   0.799s       recv  6763 bytes
+T+   0.815s       recv  31 bytes
+T+   0.879s wait-begin  "Pause requested: false" within 5s
+T+   0.879s    wait-ok  Pause requested: false
+T+   0.879s wait-begin  "Source: 千 曲 .flac" within 20s
+T+   0.879s    wait-ok  Source: 千 曲 .flac
+T+   0.879s       send  1 bytes: "q"
+T+   0.879s       recv  6803 bytes
+T+   0.880s       recv  6771 bytes
+T+   0.894s       recv  266 bytes
+T+   0.909s       recv  27 bytes
+T+   0.959s       recv  297 bytes
+T+   1.359s wait-begin  "stopped before completion" within 5s
+T+   1.359s    wait-ok  stopped before completion

@@ -1,0 +1,18 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\corrupt"
+T+   0.012s       recv  16 bytes
+T+   0.020s       recv  137 bytes
+T+   0.021s       recv  8 bytes
+T+   0.038s       recv  6787 bytes
+T+   0.432s wait-begin  "open refused" within 5s
+T+   0.432s    wait-ok  open refused
+T+   0.432s wait-begin  "no playable audio files found; 2 unplayable" within 5s
+T+   0.432s    wait-ok  no playable audio files found; 2 unplayable
+T+   0.433s wait-begin  "No music loaded." within 5s
+T+   0.433s    wait-ok  No music loaded.
+T+   0.433s       send  1 bytes: "q"
+T+   0.433s       recv  6672 bytes
+T+   0.433s       recv  4 bytes
+T+   0.433s       recv  4 bytes
+T+   0.435s       recv  6733 bytes
+T+   0.444s       recv  319 bytes
+T+   0.513s       recv  325 bytes

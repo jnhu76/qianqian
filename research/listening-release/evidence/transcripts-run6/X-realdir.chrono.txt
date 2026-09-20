@@ -1,0 +1,36 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe
+T+   0.014s       recv  16 bytes
+T+   0.023s       recv  94 bytes
+T+   0.023s       recv  213 bytes
+T+   0.037s       recv  3577 bytes
+T+   0.437s       send  1 bytes: "o"
+T+   0.438s       recv  6672 bytes
+T+   0.438s       recv  4 bytes
+T+   0.438s       recv  4 bytes
+T+   0.461s       recv  6727 bytes
+T+   0.518s       send  16 bytes: "D:\\文件\\音频"
+T+   0.519s       recv  6727 bytes
+T+   0.540s       recv  56 bytes
+T+   0.598s       send  1 bytes: "\r"
+T+   0.599s       recv  6731 bytes
+T+   0.646s       recv  670 bytes
+T+   0.679s wait-begin  "Track: 1/" within 60s
+T+   0.679s    wait-ok  Track: 1/
+T+   0.679s       recv  6757 bytes
+T+   0.680s       recv  4 bytes
+T+   0.694s       recv  6773 bytes
+T+   1.679s       send  1 bytes: "n"
+T+   1.680s       recv  6653 bytes
+T+   1.759s wait-begin  "Track: 2/" within 30s
+T+   1.760s       recv  6693 bytes
+T+   1.776s       recv  527 bytes
+T+   1.780s    wait-ok  Track: 2/
+T+   1.780s wait-begin  new-position != None
+T+   1.780s    wait-ok  new-position (0, 0)
+T+   1.780s       send  1 bytes: "q"
+T+   1.781s       recv  6709 bytes
+T+   1.791s       recv  210 bytes
+T+   1.806s       recv  27 bytes
+T+   1.861s       recv  244 bytes
+T+   2.261s wait-begin  "stopped before completion" within 5s
+T+   2.261s    wait-ok  stopped before completion

@@ -1,0 +1,12 @@
+{"scenario":"A15","verdict":"RED","exit_code":null,
+ "failure":"timeout waiting for a position sample different from None; post-mark samples: []",
+ "child_status_at_failure":"alive=true threads=Some(8)",
+ "steps":[
+    "expect \"Track: 1/2\" OK",
+    "expect \"Format: 44100 Hz\" OK",
+    "expect \"not playable: garbage.bin\" OK",
+    "mark"
+],
+ "resources":[
+    {"label":"baseline","threads":6,"handles":181,"working_set_bytes":13099008}
+]}

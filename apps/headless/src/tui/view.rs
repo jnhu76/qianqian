@@ -51,11 +51,20 @@ const SELECTED_MARKER: &str = ">";
 
 /// Render one frame of the reference player.
 pub fn draw(frame: &mut Frame, model: &TuiModel) {
+    // The now-playing budget is its own content (see
+    // [`now_playing_lines`]): two border rows on top of every line the
+    // panel may show this frame, so the operation feedback and the
+    // active input lines are never clipped below the fold on a short
+    // terminal. The playlist pane absorbs the rest and degrades by
+    // clipping rows — its documented degradation, and the honest trade:
+    // a hidden modal line is a keyboard black hole, a scrolled playlist
+    // is still a playlist.
+    let now_playing_min = now_playing_lines(model).len() + 2;
     let [playlist, now_playing, diagnostics, controls] = Layout::vertical([
         // The pane grows with the terminal; below its floor it degrades
         // by clipping rows (never by drawing the whole list).
         Constraint::Min(3),
-        Constraint::Min(10),
+        Constraint::Min(now_playing_min as u16),
         // Two content rows: an episode can carry BOTH an activation
         // diagnostic and a published failure diagnostic, and a truth-
         // class-correct presentation does not clip one behind the other
@@ -212,8 +221,16 @@ fn preference_line(model: &TuiModel) -> Option<String> {
     Some(facts.join("   "))
 }
 
-fn now_playing_panel(model: &TuiModel) -> Paragraph<'_> {
-    let mut lines: Vec<Line<'_>> = Vec::new();
+/// Every line the now-playing panel can show, including the operation
+/// feedback and input lines. The layout budget in [`draw`] is derived
+/// from this exact builder (field round 3: the panel used to be pinned
+/// at `Min(10)`, so on a ~30-row terminal a live episode filled the
+/// panel completely and the status block and the ACTIVE Open/GoTo input
+/// lines rendered below the fold — an invisible modal that swallowed
+/// every subsequent keypress). One builder, two readers: the panel
+/// cannot claim fewer rows than its own content.
+fn now_playing_lines(model: &TuiModel) -> Vec<Line<'static>> {
+    let mut lines: Vec<Line<'static>> = Vec::new();
     match model.source() {
         // The no-episode panel (F6; the U1 idle page): after a
         // clean-failed Open no runtime remains, and on a no-argument
@@ -264,7 +281,11 @@ fn now_playing_panel(model: &TuiModel) -> Paragraph<'_> {
         }
     }
     open_lines(model, &mut lines);
-    Paragraph::new(lines).block(
+    lines
+}
+
+fn now_playing_panel(model: &TuiModel) -> Paragraph<'static> {
+    Paragraph::new(now_playing_lines(model)).block(
         Block::bordered()
             .title(bold(" Qianqian Reference Player "))
             .title_style(Style::default()),
@@ -378,6 +399,115 @@ mod tests {
             .join("\n")
     }
 
+    /// Field round 3, problem 2: the operation feedback block and the
+    /// ACTIVE input lines render inside the panel on a short terminal.
+    /// The panel used to be pinned at `Min(10)`, so with a live episode
+    /// on a ~30-row terminal it was exactly full and an activated
+    /// Open/GoTo line rendered below the fold — an invisible modal that
+    /// swallowed every subsequent keypress (the field "keyboard is
+    /// dead" report). Pinned at the dogfood size AND at the field
+    /// size, over the FULL live panel (preference line included).
+    #[test]
+    fn the_active_input_lines_and_status_stay_visible_on_a_short_terminal() {
+        for (cols, rows) in [(120u16, 30u16), (120, 40)] {
+            for (modal, expected) in [
+                ("goto", "Go to: ["),
+                ("open", "Open: "),
+            ] {
+                let mut model = TuiModel::new("song.flac");
+                model.set_episode(Some("D:\\media\\song.flac".to_owned()));
+                model.update(PlaybackSessionObservation {
+                    source_format: Some(PcmFormat {
+                        sample_rate: 44100,
+                        channels: 2,
+                        channel_mask: 0x3,
+                    }),
+                    position: Some(44_100 * 86),
+                    source_duration: Some(Duration::from_secs(383)),
+                    ..pending()
+                });
+                model.set_navigation(Some((1, 6)));
+                model.set_volume(Some(100));
+                model.set_order(crate::playlist::PlaybackOrder::Sequential);
+                model.set_repeat(crate::playlist::RepeatMode::Off);
+                model.set_playlist(1, || {
+                    vec![PlaylistRow {
+                        label: "song.flac".to_owned(),
+                        playing: true,
+                        selected: true,
+                    }]
+                });
+                model.set_status(Some("opened D:\\media (6 candidates…)".to_owned()));
+                match modal {
+                    "goto" => model.begin_goto_input(),
+                    "open" => model.begin_open_input(),
+                    other => unreachable!("{other}"),
+                }
+                let mut terminal =
+                    Terminal::new(TestBackend::new(cols, rows)).expect("virtual terminal");
+                terminal.draw(|frame| draw(frame, &model)).expect("draw");
+                let buffer = terminal.backend().buffer().clone();
+                let text = (0..buffer.area.height)
+                    .map(|y| {
+                        (0..buffer.area.width)
+                            .filter_map(|x| {
+                                buffer.cell((x, y)).map(|c| c.symbol().to_string())
+                            })
+                            .collect::<String>()
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                assert!(
+                    text.contains(expected),
+                    "{modal} line clipped at {cols}x{rows}:\n{text}"
+                );
+                assert!(
+                    text.contains("opened D:\\media (6 candidates…)"),
+                    "status block clipped at {cols}x{rows}:\n{text}"
+                );
+                assert!(
+                    text.contains("Track: 1/6"),
+                    "preference line lost at {cols}x{rows}:\n{text}"
+                );
+            }
+        }
+    }
+
+    /// Field round 5, the layout invariant under the pending-start
+    /// policy: the now-playing panel renders the SAME number of rows
+    /// with the position sample pending as it does mid-play. A panel
+    /// that shrinks during the switch transient lets the layout grow
+    /// the playlist pane by a row — the field saw that as a blank line
+    /// appearing after the last track on every `N` press.
+    #[test]
+    fn the_panel_row_count_is_stable_across_the_switch_transient() {
+        let base = |position: Option<u64>| {
+            let mut model = TuiModel::new("song.flac");
+            model.set_episode(Some("D:\\media\\song.flac".to_owned()));
+            model.update(PlaybackSessionObservation {
+                source_format: Some(PcmFormat {
+                    sample_rate: 44100,
+                    channels: 2,
+                    channel_mask: 0x3,
+                }),
+                position,
+                source_duration: Some(Duration::from_secs(238)),
+                ..pending()
+            });
+            model.set_navigation(Some((2, 6)));
+            model.set_volume(Some(100));
+            model.set_order(crate::playlist::PlaybackOrder::Sequential);
+            model.set_repeat(crate::playlist::RepeatMode::Off);
+            model.set_status(Some("next: opened D:\\media\\song.flac".to_owned()));
+            model
+        };
+        assert_eq!(
+            now_playing_lines(&base(Some(44_100 * 42))).len(),
+            now_playing_lines(&base(None)).len(),
+            "the pending-start frame must render exactly as many panel rows as a mid-play frame"
+        );
+    }
+
     #[test]
     fn a_fresh_episode_renders_pending_without_inventing_state() {
         let mut model = TuiModel::new("song.flac");
@@ -414,9 +544,9 @@ mod tests {
             (
                 None,
                 Some(Duration::from_secs(238)),
-                "Position: --:-- / 03:58",
+                "Position: 00:00 / 03:58",
             ),
-            (None, None, "Position: --:-- / --:--"),
+            (None, None, "Position: 00:00 / --:--"),
         ] {
             let mut model = TuiModel::new("song.flac");
             model.update(PlaybackSessionObservation {
@@ -909,6 +1039,79 @@ mod tests {
         assert_eq!(forbidden_status_claim(&text), None, "{text}");
     }
 
+    /// QUICKSTART ↔ `?` overlay consistency (Listening Release): every
+    /// key the shipped help file documents must be advertised by the
+    /// on-screen overlay, and nothing beyond the shipped set. The
+    /// usage-text side of the same agreement lives in
+    /// `tests/quickstart_usage.rs`; this test renders the ACTUAL
+    /// overlay and reads the ACTUAL QUICKSTART.md, so the two surfaces
+    /// cannot drift apart silently.
+    #[test]
+    fn the_help_overlay_advertises_every_quickstart_key() {
+        let quickstart_path =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../QUICKSTART.md");
+        let quickstart = std::fs::read_to_string(&quickstart_path)
+            .unwrap_or_else(|e| panic!("QUICKSTART.md readable: {e}"));
+        // The overlay's spelling of each QUICKSTART key row.
+        let overlay_needles = [
+            ("↑ / ↓", "↑ / ↓"),
+            ("Enter", "Enter"),
+            ("N / P", "N / P"),
+            ("R", "R              order"),
+            ("L", "L              repeat"),
+            ("Space", "Space"),
+            ("← / →", "← / →"),
+            ("Shift+← / Shift+→", "Shift+← / →"),
+            ("G", "G              go to"),
+            ("+ / -", "+ / -"),
+            ("S", "S              stop"),
+            ("O", "O              open"),
+            ("?", "?              close"),
+            ("Esc", "Esc"),
+            ("Q", "Q / Ctrl+C"),
+            ("Ctrl+C", "Ctrl+C"),
+        ];
+        let mut in_key_section = false;
+        let mut documented = Vec::new();
+        for line in quickstart.lines() {
+            if line.starts_with("## ") {
+                in_key_section = line.trim() == "## Keys";
+                continue;
+            }
+            if !in_key_section || !line.starts_with('|') || line.contains("----") {
+                continue;
+            }
+            let first = line.split('|').nth(1).unwrap_or("").trim();
+            if first.is_empty() || first.starts_with("Key") {
+                continue;
+            }
+            documented.push(first.trim_matches('`').to_owned());
+        }
+        assert_eq!(
+            documented.len(),
+            overlay_needles.len(),
+            "QUICKSTART key table has {documented:?}; keep it in lockstep with \
+             the overlay and this test"
+        );
+
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        model.toggle_help();
+        let text = rendered(&model);
+        for (quickstart_key, overlay_needle) in overlay_needles {
+            assert!(
+                documented.iter().any(|key| key == quickstart_key),
+                "{quickstart_key:?} missing from QUICKSTART's key table"
+            );
+            assert!(
+                text.contains(overlay_needle),
+                "the overlay does not advertise {quickstart_key:?} \
+                 (expected {overlay_needle:?}):\n{text}"
+            );
+        }
+        assert_eq!(forbidden_status_claim(&text), None, "{text}");
+    }
+
     fn row(label: &str, playing: bool, selected: bool) -> PlaylistRow {
         PlaylistRow {
             label: label.to_owned(),
@@ -1079,6 +1282,34 @@ mod tests {
         assert_eq!(forbidden_status_claim(&text), None, "{text}");
     }
 
+    /// The live pre-first-sample window renders at the START (field
+    /// round 5, the switch-transient layout fix); the negative control
+    /// is the SETTLED episode, which keeps the honest dashes — a dead
+    /// timeline has no start, and nothing is fabricated there.
+    #[test]
+    fn the_timeline_keeps_the_dashes_once_settled_without_evidence() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            source_duration: Some(Duration::from_secs(238)),
+            terminal_outcome: Some(EpisodeTerminalOutcome::Stopped),
+            ..pending()
+        });
+        let text = rendered(&model);
+        assert!(
+            text.contains("Position: --:-- / 03:58"),
+            "a settled episode fabricates no start:\n{text}"
+        );
+        assert!(
+            !text.contains('━') && !text.contains('╸'),
+            "a settled episode renders no bar:\n{text}"
+        );
+    }
+
     /// The read-only progress bar renders as its own line exactly when
     /// both sides have evidence, and the Position line keeps reporting
     /// the honest `--:--` side otherwise (Issue #166 §33).
@@ -1124,7 +1355,9 @@ mod tests {
             "no bar without a known duration: {text}"
         );
 
-        // Unknown position: same rule from the other side.
+        // Unknown position on a LIVE episode: the pre-first-sample
+        // window (field round 5) — the bar renders at its START, empty
+        // but present, so the row never vanishes mid-playback.
         model.update(PlaybackSessionObservation {
             source_format: Some(PcmFormat {
                 sample_rate: 44100,
@@ -1135,8 +1368,12 @@ mod tests {
             ..pending()
         });
         let text = rendered(&model);
-        assert!(text.contains("Position: --:-- / 03:58"), "{text}");
-        assert!(!text.contains('━'), "{text}");
+        assert!(text.contains("Position: 00:00 / 03:58"), "{text}");
+        assert!(
+            !text.contains('━'),
+            "the start bar carries no filled cells: {text}"
+        );
+        assert!(text.contains('╸'), "the bar frame is present: {text}");
     }
 
     /// The order and repeat labels render exactly the frozen vocabulary

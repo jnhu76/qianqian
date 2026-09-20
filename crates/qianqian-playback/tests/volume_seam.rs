@@ -168,16 +168,20 @@ fn volume_command_reaches_the_mechanism_cell_and_never_settles() {
 
     handle.request_output_level(40);
     // Give the (none) mechanism a moment; the CELL is the contract and
-    // it reads back the routed factor deterministically.
+    // it reads back the routed factor deterministically. The factor is
+    // the perceptual taper's realization of 40 (10^(-0.03*60), −36 dB)
+    // — the mapping itself is pinned by `desired_level_tests` in the
+    // handle module; this test owns the ROUTING.
     let level = captured
         .lock()
         .expect("captured")
         .as_ref()
         .expect("the mechanism received the level cell")
         .load();
+    let expect = 10f32.powf(-0.03 * 60.0);
     assert!(
-        (level - 0.4).abs() <= 0.01,
-        "routed 40 ⇒ factor 0.4, got {level}"
+        (level - expect).abs() <= 0.01,
+        "routed 40 ⇒ taper factor {expect}, got {level}"
     );
 
     // Non-terminal by frozen definition: no stop intent, no Fact.
@@ -251,8 +255,8 @@ fn a_volume_command_after_the_terminal_fact_is_inert_history() {
         Some(EpisodeTerminalOutcome::Stopped)
     );
     assert!(
-        (cell.load() - 0.7).abs() <= 0.01,
-        "the pre-settle route holds in the cell"
+        (cell.load() - 10f32.powf(-0.9)).abs() <= 0.01,
+        "the pre-settle route holds in the cell (70 ⇒ −27 dB taper factor)"
     );
 
     // Late volume: the cell still routes (inert history the mechanism
@@ -260,8 +264,8 @@ fn a_volume_command_after_the_terminal_fact_is_inert_history() {
     // the whole observation is identical to the settled one.
     handle.request_output_level(10);
     assert!(
-        (cell.load() - 0.1).abs() <= 0.01,
-        "the late route lands in the cell"
+        (cell.load() - 10f32.powf(-2.7)).abs() <= 0.01,
+        "the late route lands in the cell (10 ⇒ −81 dB taper factor)"
     );
     let after = handle.observe();
     assert_eq!(after, settled, "a late volume command changes no truth");

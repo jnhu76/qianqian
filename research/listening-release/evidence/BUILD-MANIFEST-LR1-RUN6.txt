@@ -1,0 +1,47 @@
+qianqian-windows-x86_64 — build manifest
+========================================
+package:            qianqian-windows-x86_64
+built_utc:          2026-09-20T00:49:30Z
+product:            qianqian.exe (the canonical product binary;
+                    qianqian-headless.exe is a development/
+                    regression target and is NOT shipped)
+
+source
+  commit:           c67d41af5f60fb646b961b08a935dc8a561728cb
+  status:           dirty worktree — the binary may not match the commit
+  build command:    QIANQIAN_NATIVE_DIR=<staged native tree> \
+                    cargo build --release \
+                    --target x86_64-pc-windows-gnu \
+                    --features playback -p qianqian-headless
+
+toolchain
+  rustc:            rustc 1.97.1 (8bab26f4f 2026-07-14)
+  target triple:    x86_64-pc-windows-gnu (GNU/mingw)
+  profile:          release
+  features:         playback
+
+native decode artifact
+  songcore archive: libsongcore.a (mingw) sha256 05cbb12aaf33e44e5f0784deca0b410a0948f625d142bb4f7192fb61040fe7cc
+  songcore header:  songcore.h sha256 cf509a5c044735e4813642ac6683691242146e642342a8ac356e98fbd8e78536
+  substrate:        FFmpeg n9.0.1 (bf1b838f), LGPL-2.1-or-later,
+                    trimmed closure — see THIRD_PARTY_NOTICES.md
+
+shipped files
+  qianqian.exe           5447264 bytes  sha256 2d479f55ca04c4ca67d4353de2a34376b16be1769bac199d784417a96c169ab8
+  QUICKSTART.md          8504 bytes  sha256 07c5801a1dd5129ba483e00cd5c91e83807b88dc4420158b0e6b97924253e54b
+  LICENSE                540 bytes  sha256 3d44f3d49c8ec26d8a17184e7e352d80c2553b5811f93a0f5cc0b7449438d675
+  LICENSE-MIT            1067 bytes  sha256 e31ce84df1ec2f133ce740b58935fca19cf6bdafa59454d56678e99bcaa5ace0
+  LICENSE-APACHE         10847 bytes  sha256 a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2
+  THIRD_PARTY_NOTICES.md 4886 bytes  sha256 1f86743968493390d732b9760da0d29b0970ff9dc5581dd2b461d06578c577a1
+  BUILD-MANIFEST.txt     1939 bytes  sha256 51f753db4b3e15fda6fd1bcb0b228bab85a246c40533ae33bd1c2f98b402fad4
+
+runtime dependency audit
+  DLL imports:      api-ms-win-core-synch-l1-2-0.dll api-ms-win-core-winrt-error-l1-1-0.dll bcrypt.dll bcryptprimitives.dll combase.dll kernel32.dll msvcrt.dll ntdll.dll ole32.dll oleaut32.dll propsys.dll rpcrt4.dll USER32.dll USERENV.dll WS2_32.dll 
+  verdict:          all imports are Windows system DLLs;
+                    no runtime files beyond qianqian.exe are
+                    required (decode stack statically linked)
+
+reproducibility
+  note:             rebuilds of this toolchain are not byte-
+                    stable; identity of the delivered artifact
+                    is the sha256 above, recorded per build

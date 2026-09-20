@@ -1,0 +1,94 @@
+run: LR1-RUN6
+date_utc: 2026-09-20T00:49:43Z
+branch: feat/windows-tui-listening-release-1
+head_sha: c67d41af5f60fb646b961b08a935dc8a561728cb
+origin_main: 8b1a73997403c9d44c52da4e393da62aad6c0c9d
+worktree_status: 5 dirty entries
+dogfood_class: ISOLATED-PACKAGE DOGFOOD (same physical host; extracted-package launches, system-only PATH, no repo CWD, no QIANQIAN_NATIVE_DIR)
+package_zip_sha256: 3f39c22566d2e08d9b1f925fc281ce1c7781d451d6720cba4c572cd2b90aaeb1
+windows_caption: Microsoft Windows 11 ×¨Òµ°æ
+audio_device: Realtek High Definition Audio
+package_exe_sha256: 2d479f55ca04c4ca67d4353de2a34376b16be1769bac199d784417a96c169ab8
+extracted_locations: plain 'C:\Users\Public\qn-lr1\qianqian-windows-x86_64' | spaces 'C:\qn lr1 spaces\qianqian-windows-x86_64' | CJK 'C:\Users\Public\åƒåƒæ’­æ”¾å™¨\qianqian-windows-x86_64'
+
+non_tui_isolated_gates (cwd=C:\Windows\Temp; PATH system-only; no QIANQIAN_NATIVE_DIR):
+  [C:\Users\Public\qn-lr1\qianqian-windows-x86_64] qianqian.exe --version -> exit=0 first='qianqian 0.1.0'
+  [C:\Users\Public\qn-lr1\qianqian-windows-x86_64] qianqian.exe --help -> exit=0 first='Qianqian â€” a lightweight local music player'
+  [C:\qn lr1 spaces\qianqian-windows-x86_64] qianqian.exe --version -> exit=0 first='qianqian 0.1.0'
+  [C:\qn lr1 spaces\qianqian-windows-x86_64] qianqian.exe --help -> exit=0 first='Qianqian â€” a lightweight local music player'
+  [C:\Users\Public\åƒåƒæ’­æ”¾å™¨\qianqian-windows-x86_64] qianqian.exe --version -> exit=0 first='qianqian 0.1.0'
+  [C:\Users\Public\åƒåƒæ’­æ”¾å™¨\qianqian-windows-x86_64] qianqian.exe --help -> exit=0 first='Qianqian â€” a lightweight local music player'
+new_console_allocation_cjk_location: ALIVE_4S
+f5_deny_icacls: ÒÑ³É¹¦´¦Àí 1 ¸öÎÄ¼þ; ´¦Àí 0 ¸öÎÄ¼þÊ±Ê§°Ü
+trunc_fixture_bytes: 60000 of 146237
+corpus_counts: big1000=1000 big5000=5000
+corpus_sha256 (fixtures are committed repo media; synth* are locally
+  generated sine tracks â€” declared SYNTHETIC; noise/garbage/trunc
+  are deliberate failure shapes, not media):
+  0ac59af02a8f80d309ce84050adc07c8180b0886be25f975672fa46501c448e3    /alac4.m4a
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0001.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0002.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0003.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0004.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0005.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0006.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0007.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0008.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0009.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0010.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0011.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0012.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0013.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0014.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0015.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0016.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0017.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0018.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0019.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0020.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0021.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0022.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0023.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0024.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0025.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0026.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0027.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0028.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0029.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0030.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0031.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0032.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0033.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0034.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0035.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0036.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0037.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0038.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0039.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0040.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0041.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0042.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0043.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0044.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0045.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0046.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0047.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0048.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0049.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0050.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0051.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0052.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0053.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0054.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0055.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0056.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0057.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0058.mp3
+  feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058    /big1000/track-0059.mp3
+  (big1000/big5000 entries are byte-identical copies/hardlinks of mp3cbr.mp3 â€” one hash represents them)
+  mp3cbr.mp3 again: feb57f60b7e1dfe9b233152b531e3df7e36cf645699fd1c2f86062cc8fc4c058
+wall_seconds_core: 21 (scenarios: U1-idle U1-folder-open U2-shuffle-start U2-cover-clean U2-rate-mix U2-help U3-keys-field C11-longpath C12-cjk A15)
+wall_seconds_fmatrix: 38 (scenarios: LR1-folder-mixed LR1-all-corrupt LR1-duplicate-roots LR1-truncated-next)
+wall_seconds_large: 3 (scenarios: LR1-large)
+wall_seconds_huge: 5 (scenarios: LR1-huge)
+scenario_groups_green: 4/4

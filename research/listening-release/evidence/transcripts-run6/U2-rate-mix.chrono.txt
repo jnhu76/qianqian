@@ -1,0 +1,36 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\mp3cbr.mp3" "C:\Users\Public\qn-lr1\media\synth10-48k.mp3"
+T+   0.016s       recv  16 bytes
+T+   0.026s       recv  140 bytes
+T+   0.078s       recv  8 bytes
+T+   0.078s       recv  219 bytes
+T+   0.101s       recv  3999 bytes
+T+   0.447s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.447s    wait-ok  Format: 44100 Hz
+T+   0.447s wait-begin  "Track: 1/2" within 5s
+T+   0.447s    wait-ok  Track: 1/2
+T+   0.447s wait-begin  "Format: 44100 Hz" within 5s
+T+   0.447s    wait-ok  Format: 44100 Hz
+T+   0.447s wait-begin  new-position != None
+T+   0.447s    wait-ok  new-position (0, 0)
+T+   0.447s       send  1 bytes: "n"
+T+   0.448s       recv  6704 bytes
+T+   0.448s       recv  4 bytes
+T+   0.448s       recv  4 bytes
+T+   0.461s       recv  6757 bytes
+T+   0.518s       recv  489 bytes
+T+   0.528s wait-begin  "Track: 2/2" within 5s
+T+   0.528s       recv  6753 bytes
+T+   0.538s       recv  6813 bytes
+T+   0.548s    wait-ok  Track: 2/2
+T+   0.548s wait-begin  "Format: 48000 Hz" within 5s
+T+   0.548s    wait-ok  Format: 48000 Hz
+T+   0.548s wait-begin  new-position != Some((0, 0))
+T+   1.622s       recv  30 bytes
+T+   1.625s    wait-ok  new-position (0, 1)
+T+   1.625s       send  1 bytes: "q"
+T+   1.625s       recv  6701 bytes
+T+   1.637s       recv  265 bytes
+T+   1.654s       recv  27 bytes
+T+   1.705s       recv  296 bytes
+T+   2.106s wait-begin  "stopped before completion" within 5s
+T+   2.106s    wait-ok  stopped before completion

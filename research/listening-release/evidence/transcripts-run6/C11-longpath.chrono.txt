@@ -1,0 +1,47 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac"
+T+   0.018s       recv  16 bytes
+T+   0.029s       recv  249 bytes
+T+   0.082s       recv  8 bytes
+T+   0.082s       recv  219 bytes
+T+   0.094s       recv  4102 bytes
+T+   0.467s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.467s    wait-ok  Format: 44100 Hz
+T+   0.467s       send  1 bytes: "o"
+T+   0.468s       recv  6704 bytes
+T+   0.468s       recv  4 bytes
+T+   0.468s       recv  4 bytes
+T+   0.487s       recv  6759 bytes
+T+   0.547s       send  119 bytes: "qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac"
+T+   0.548s       recv  6759 bytes
+T+   0.566s       recv  64 bytes
+T+   0.582s       recv  63 bytes
+T+   0.597s       recv  63 bytes
+T+   0.613s       recv  53 bytes
+T+   0.628s       send  1 bytes: "\r"
+T+   0.628s       recv  6759 bytes
+T+   0.644s       recv  19 bytes
+T+   0.708s wait-begin  "opened qianqian-longpath" within 20s
+T+   0.708s       recv  6797 bytes
+T+   0.709s       recv  4 bytes
+T+   0.724s       recv  6813 bytes
+T+   0.728s    wait-ok  opened qianqian-longpath
+T+   0.728s wait-begin  "Source: qianqian-longpath" within 20s
+T+   0.728s    wait-ok  Source: qianqian-longpath
+T+   0.728s       send  1 bytes: "s"
+T+   0.729s       recv  6697 bytes
+T+   0.729s       recv  4 bytes
+T+   0.739s       recv  6757 bytes
+T+   0.809s wait-begin  "Terminal: Stopped" within 5s
+T+   0.809s       recv  6797 bytes
+T+   0.809s       recv  4 bytes
+T+   0.832s       recv  6765 bytes
+T+   0.849s    wait-ok  Terminal: Stopped
+T+   0.849s wait-begin  "N/P  Next/Prev" within 5s
+T+   0.849s    wait-ok  N/P  Next/Prev
+T+   0.849s       send  1 bytes: "q"
+T+   0.850s       recv  6645 bytes
+T+   0.850s       recv  8 bytes
+T+   0.864s       recv  394 bytes
+T+   0.930s       recv  400 bytes
+T+   1.330s wait-begin  "stopped before completion" within 5s
+T+   1.330s    wait-ok  stopped before completion

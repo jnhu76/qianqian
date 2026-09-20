@@ -15,20 +15,34 @@
 //! Truth-class discipline:
 //!
 //! ```text
-//! accepted     enumeration candidates in deterministic order. An
-//!              accepted path is a CANDIDATE, never playback truth:
-//!              whether any file is actually playable is witnessed by
-//!              the existing decode/media preflight (the F6 Open
-//!              probe), exactly as before. The extension prefilter
-//!              below only reduces useless probe calls for enumerated
-//!              directory contents; extension alone is never treated
-//!              as proof of playability, and an EXPLICITLY named file
-//!              bypasses the prefilter entirely so the probe keeps the
-//!              final word.
+//! accepted     scan candidates in deterministic order that the
+//!              scan-time media probe ACCEPTED. An accepted path is
+//!              still a CANDIDATE, never playback truth: the probe is
+//!              the decode provider's advisory preflight evidence
+//!              (open → facts → close, no PCM) and the episode
+//!              activation's own evidence stays authoritative — a file
+//!              can pass here and still fail later (or vanish), which
+//!              is exactly why the runtime `Failed` terminal stays
+//!              possible and is never auto-skipped. The extension
+//!              prefilter below only reduces useless probe calls for
+//!              enumerated directory contents; extension alone is never
+//!              treated as proof of playability, and an EXPLICITLY named
+//!              file bypasses the prefilter entirely so the probe keeps
+//!              the final word.
 //! skipped      enumerated entries classified as not-audio-candidate
 //!              (wrong/absent extension, symlinks/junctions, anything
 //!              that is not a regular file). Bounded counts, not
 //!              verdicts.
+//! duplicates   the SAME accepted path reached twice by input
+//!              expansion (the same root named twice, or overlapping
+//!              roots) is kept ONCE, first occurrence order. Lexical
+//!              identity only — see [`dedup_key`]. No content
+//!              fingerprint, no inode authority.
+//! rejected     candidates the scan-time media probe refused (corrupt
+//!              files, zero-byte audio extensions, renamed garbage).
+//!              They never enter the playlist; bounded counts and
+//!              bounded name detail, never verdicts about WHY beyond
+//!              the probe's own diagnostic.
 //! diagnostics  bounded filesystem errors (unreadable paths, listing
 //!              failures). Never panics; never unbounded.
 //! ```
@@ -54,13 +68,27 @@ use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 /// The result of expanding user input roots into playable candidates.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ExpandedInputs {
-    /// Enumeration candidates, in the deterministic order they should
-    /// be presented/opened. Candidates, not playability verdicts —
-    /// the Open probe stays the witness.
+    /// Scan candidates the media probe accepted, in the deterministic
+    /// order they should be presented/opened (see the module docs for
+    /// the truth class: probe-accepted candidates, never playback
+    /// truth).
     pub accepted: Vec<PathBuf>,
     /// Enumerated entries classified as non-candidates (unsupported
     /// extension, symlinks/junctions, non-regular files).
     pub skipped: usize,
+    /// Exact-duplicate accepted paths removed while keeping the first
+    /// occurrence (Issue: duplicate input roots / repeated explicit
+    /// files). Lexical rule only — see [`dedup_key`].
+    pub duplicates: usize,
+    /// Candidates the scan-time media probe refused (corrupt or
+    /// unplayable files that passed the extension prefilter).
+    pub rejected: usize,
+    /// Bounded file names of probe-rejected candidates, in encounter
+    /// order.
+    rejected_names: Vec<String>,
+    /// How many further rejected names were suppressed by
+    /// [`MAX_DIAGNOSTICS`]. Presentation counts, never semantics.
+    suppressed_rejected: usize,
     /// Bounded filesystem diagnostics, in encounter order.
     pub diagnostics: Vec<String>,
     /// How many further diagnostics were suppressed by
@@ -81,10 +109,28 @@ impl ExpandedInputs {
         }
     }
 
+    /// Record one probe-rejected candidate: the bounded name detail
+    /// and the count. The name shown is the FILE name (the row-label
+    /// vocabulary); the full path stays in the caller's context.
+    fn push_rejected(&mut self, path: &Path) {
+        self.rejected += 1;
+        let name = match path.file_name() {
+            Some(name) => name.to_string_lossy().into_owned(),
+            None => path.to_string_lossy().into_owned(),
+        };
+        if self.rejected_names.len() < MAX_DIAGNOSTICS {
+            self.rejected_names.push(name);
+        } else {
+            self.suppressed_rejected += 1;
+        }
+    }
+
     /// Why there is nothing to open. Used only when [`Self::accepted`]
-    /// is empty: the first diagnostic if the filesystem reported one
+    /// is empty: the first filesystem diagnostic if one was reported
     /// (with the suppressed count when present), otherwise the honest
-    /// classification summary.
+    /// classification summary — including the all-candidates-rejected
+    /// shape of a folder whose every audio-looking file failed the
+    /// media probe.
     pub fn refusal(&self) -> String {
         if let Some(first) = self.diagnostics.first() {
             if self.suppressed_diagnostics > 0 {
@@ -92,6 +138,15 @@ impl ExpandedInputs {
             } else {
                 first.clone()
             }
+        } else if self.rejected > 0 {
+            let mut refusal = format!(
+                "no playable audio files found; {rejected} unplayable",
+                rejected = self.rejected
+            );
+            if self.suppressed_rejected > 0 {
+                refusal.push_str(&format!(" (+{} more)", self.suppressed_rejected));
+            }
+            refusal
         } else if self.skipped > 0 {
             format!(
                 "no audio candidates; {skipped} entries skipped",
@@ -103,12 +158,13 @@ impl ExpandedInputs {
     }
 
     /// One-line presentation summary of a non-empty expansion
-    /// ("2 candidates, 1 skipped"), extended with the bounded
-    /// scan-warning count when the traversal was PARTIAL
-    /// ("...; 2 scan warnings (+3 more)") — a partially unreadable
-    /// folder must never present as completely loaded (U1 corrective
-    /// REQUIRED-2). "Candidates" is the honest noun: playability is
-    /// witnessed downstream, not here.
+    /// ("2 candidates, 1 skipped"), extended with the duplicate and
+    /// unplayable counts when present and with the bounded scan-warning
+    /// count when the traversal was PARTIAL ("...; 2 scan warnings
+    /// (+3 more)") — a partially unreadable folder must never present
+    /// as completely loaded (U1 corrective REQUIRED-2). "Candidates" is
+    /// the honest noun: playability is witnessed by the probe and the
+    /// episode activation, not by this summary.
     pub fn summary(&self) -> String {
         let mut summary = format!(
             "{} candidate{}",
@@ -117,6 +173,19 @@ impl ExpandedInputs {
         );
         if self.skipped > 0 {
             summary.push_str(&format!(", {} skipped", self.skipped));
+        }
+        if self.duplicates > 0 {
+            summary.push_str(&format!(
+                ", {duplicates} duplicate{plural} removed",
+                duplicates = self.duplicates,
+                plural = if self.duplicates == 1 { "" } else { "s" }
+            ));
+        }
+        if self.rejected > 0 {
+            summary.push_str(&format!(
+                ", {rejected} unplayable",
+                rejected = self.rejected
+            ));
         }
         if !self.accepted.is_empty() && !self.diagnostics.is_empty() {
             summary.push_str(&format!(
@@ -131,22 +200,23 @@ impl ExpandedInputs {
         summary
     }
 
-    /// The bounded scan-warning detail lines for an expansion that
-    /// FOUND candidates but also hit filesystem errors — a partial
-    /// traversal. Every diagnostic becomes one `scan warning: ...`
-    /// line; a suppressed tail is counted on a final `(+N more)` line,
-    /// so the block stays bounded however pathological the tree.
+    /// The bounded scan-finding detail lines for an expansion that
+    /// FOUND candidates but also hit filesystem errors or probe
+    /// rejections. Every filesystem diagnostic becomes one
+    /// `scan warning: ...` line, every rejected candidate one
+    /// `not playable: <name>` line; each suppressed tail is counted on
+    /// a final `(+N more)` line, so the block stays bounded however
+    /// pathological the tree.
     ///
-    /// Empty when there is nothing to warn about: a complete
-    /// enumeration (no diagnostics), or a refused expansion (no
-    /// candidates — [`Self::refusal`] carries the diagnostics
-    /// instead).
+    /// Empty when there is nothing to report: a complete enumeration
+    /// (no diagnostics, no rejections), or a refused expansion (no
+    /// candidates — [`Self::refusal`] carries the story instead).
     ///
-    /// Truth class: application/host diagnostics about the
-    /// ENUMERATION. Never playback Facts, never terminal outcomes,
-    /// never activation failures.
+    /// Truth class: application/host diagnostics about the SCAN.
+    /// Never playback Facts, never terminal outcomes, never activation
+    /// failures.
     pub fn scan_warnings(&self) -> Vec<String> {
-        if self.accepted.is_empty() || self.diagnostics.is_empty() {
+        if self.accepted.is_empty() {
             return Vec::new();
         }
         let mut lines: Vec<String> = self
@@ -156,6 +226,14 @@ impl ExpandedInputs {
             .collect();
         if self.suppressed_diagnostics > 0 {
             lines.push(format!("(+{} more)", self.suppressed_diagnostics));
+        }
+        lines.extend(
+            self.rejected_names
+                .iter()
+                .map(|name| format!("not playable: {name}")),
+        );
+        if self.suppressed_rejected > 0 {
+            lines.push(format!("(+{} more)", self.suppressed_rejected));
         }
         lines
     }
@@ -171,8 +249,11 @@ impl ExpandedInputs {
             Some(first) => format!("opened {}", first.display()),
             None => "opened".to_owned(),
         };
-        let worth_summarizing =
-            self.accepted.len() > 1 || self.skipped > 0 || !self.diagnostics.is_empty();
+        let worth_summarizing = self.accepted.len() > 1
+            || self.skipped > 0
+            || self.duplicates > 0
+            || self.rejected > 0
+            || !self.diagnostics.is_empty();
         if !worth_summarizing {
             return opened;
         }
@@ -185,8 +266,24 @@ impl ExpandedInputs {
     }
 }
 
+/// The lexical duplicate-identity key (the precise normalization rule,
+/// recorded because Windows path spelling makes it matter): the path
+/// text exactly as enumerated, with Windows folding case and forward
+/// slashes (the filesystem is case-insensitive there, and `D:/Music`
+/// and `D:\Music` name the same tree). No content identity, no
+/// file-ID authority — only "the same path reached twice".
+fn dedup_key(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    if cfg!(windows) {
+        text.to_lowercase().replace('/', "\\")
+    } else {
+        text.into_owned()
+    }
+}
+
 /// Expand user-supplied input roots (files and/or directories) into
-/// one candidate list. See the module docs for the traversal and
+/// one candidate list, removing exact duplicate paths while keeping
+/// first-occurrence order. See the module docs for the traversal and
 /// truth-class contract.
 pub fn expand_inputs<I>(roots: I) -> ExpandedInputs
 where
@@ -194,6 +291,7 @@ where
     I::Item: AsRef<Path>,
 {
     let mut expanded = ExpandedInputs::default();
+    let mut seen = std::collections::HashSet::new();
     for root in roots {
         let root = root.as_ref();
         // symlink_metadata never follows the root link, so a symlinked
@@ -203,12 +301,13 @@ where
             Err(error) => {
                 expanded.push_diagnostic(format!("cannot read {}: {error}", root.display()))
             }
-            Ok(meta) if meta.file_type().is_dir() => walk_directory(root, &mut expanded),
+            Ok(meta) if meta.file_type().is_dir() => walk_directory(root, &mut expanded, &mut seen),
             Ok(meta) if meta.file_type().is_file() => {
                 // An explicitly named file bypasses the extension
                 // prefilter: the decode probe, not the extension, is
-                // the playability witness (Issue #166 §5).
-                expanded.accepted.push(root.to_path_buf());
+                // the playability witness (the same root spelled twice
+                // is still one candidate).
+                remember_candidate(&mut expanded, &mut seen, root.to_path_buf());
             }
             Ok(meta) if meta.file_type().is_symlink() => {
                 expanded.push_diagnostic(format!("skipped symbolic link {}", root.display()))
@@ -219,21 +318,61 @@ where
     expanded
 }
 
-/// Open the expansion's FIRST candidate through the existing F6 Open
-/// replacement, and ON COMMIT seed the player's navigation list with
-/// the whole accepted candidate list (entry 0 IS the committed episode
-/// — the same discipline as the argv startup seed). `None` = the
-/// expansion produced no candidate, so the player was not touched at
-/// all: no episode destroyed, no navigation state changed. A refused
-/// or clean-failed first candidate commits no list either — the
-/// misleading-list hazard of Issue #166 §10 cannot arise, because the
-/// seed rides the same commit evidence as the episode itself.
+/// Accept one enumerated/explicit candidate unless the exact same path
+/// was already accepted: the FIRST occurrence keeps its place, a later
+/// duplicate is counted and dropped.
+fn remember_candidate(
+    expanded: &mut ExpandedInputs,
+    seen: &mut std::collections::HashSet<String>,
+    path: PathBuf,
+) {
+    if seen.insert(dedup_key(&path)) {
+        expanded.accepted.push(path);
+    } else {
+        expanded.duplicates += 1;
+    }
+}
+
+/// Filter the expansion's candidates through the decode provider's
+/// media probe (the playability pipeline's existing witness — no
+/// parallel format detector is created here): a refused candidate
+/// never enters the playlist and is counted/reported boundedly, and
+/// the first SURVIVING candidate is what an Open should start from.
+/// Advisory preflight evidence only — the episode activation's own
+/// evidence stays authoritative, so a runtime `Failed` remains
+/// possible and is never auto-skipped.
+fn validate_with_probe<S: EpisodeStart>(
+    player: &ReferencePlayerApp<S>,
+    expanded: &mut ExpandedInputs,
+) {
+    let candidates = std::mem::take(&mut expanded.accepted);
+    let mut kept = Vec::with_capacity(candidates.len());
+    for candidate in candidates {
+        match player.probe_candidate(&candidate) {
+            Ok(()) => kept.push(candidate),
+            Err(_) => expanded.push_rejected(&candidate),
+        }
+    }
+    expanded.accepted = kept;
+}
+
+/// Open the expansion's FIRST probe-accepted candidate through the
+/// existing F6 Open replacement, and ON COMMIT seed the player's
+/// navigation list with the whole accepted candidate list (entry 0 IS
+/// the committed episode — the same discipline as the argv startup
+/// seed). `None` = the expansion produced no playable candidate, so
+/// the player was not touched at all: no episode destroyed, no
+/// navigation state changed. A refused or clean-failed first candidate
+/// commits no list either — the misleading-list hazard cannot arise,
+/// because the seed rides the same commit evidence as the episode
+/// itself.
 pub fn open_expanded<S: EpisodeStart>(
     player: &mut ReferencePlayerApp<S>,
-    expanded: &ExpandedInputs,
+    expanded: &mut ExpandedInputs,
 ) -> Option<OpenOutcome> {
-    let first = expanded.accepted.first()?;
-    let outcome = player.open(first);
+    validate_with_probe(player, expanded);
+    let first = expanded.accepted.first()?.clone();
+    let outcome = player.open(&first);
     if outcome == OpenOutcome::Opened {
         player.establish_playlist(expanded.accepted.clone());
     }
@@ -279,8 +418,8 @@ pub fn prepare_startup<S: EpisodeStart>(
             initial_status: None,
         };
     }
-    let expansion = expand_inputs(files);
-    let startup_open = open_expanded(player, &expansion);
+    let mut expansion = expand_inputs(files);
+    let startup_open = open_expanded(player, &mut expansion);
     let initial_status = startup_feedback(&expansion, startup_open.as_ref());
     StartupPreparation {
         expansion,
@@ -293,7 +432,8 @@ pub fn prepare_startup<S: EpisodeStart>(
 /// expansion summary plus the startup Open's outcome. `None` on the
 /// quiet successful single-file start (the old-world behavior); a
 /// folder start summarizes what got seeded because that is the user's
-/// only view of the expansion; a partial scan always speaks.
+/// only view of the expansion; a partial scan, duplicate removal or
+/// probe rejection always speaks.
 fn startup_feedback(
     expansion: &ExpandedInputs,
     startup_open: Option<&OpenOutcome>,
@@ -308,11 +448,14 @@ fn startup_feedback(
         }
         Some(OpenOutcome::Opened) => {
             // The old-world quiet start: exactly one accepted
-            // candidate, nothing skipped, complete enumeration — no
-            // feedback line at all. Anything else reports (a folder
-            // start's seed summary, a partial scan's warnings).
+            // candidate, nothing skipped, removed or rejected, complete
+            // enumeration — no feedback line at all. Anything else
+            // reports (a folder start's seed summary, a partial scan's
+            // warnings, unplayable files).
             let complete_single_file = expansion.accepted.len() == 1
                 && expansion.skipped == 0
+                && expansion.duplicates == 0
+                && expansion.rejected == 0
                 && expansion.diagnostics.is_empty();
             if complete_single_file {
                 None
@@ -357,7 +500,13 @@ fn is_audio_candidate(path: &Path) -> bool {
 /// across runs and machines. `DirEntry::file_type` never follows
 /// symlinks, so directory symlinks/junctions are classified (skipped),
 /// never traversed — traversal cycles are impossible by construction.
-fn walk_directory(dir: &Path, expanded: &mut ExpandedInputs) {
+/// Duplicate paths met through overlapping roots are removed by
+/// [`remember_candidate`] on first-occurrence order.
+fn walk_directory(
+    dir: &Path,
+    expanded: &mut ExpandedInputs,
+    seen: &mut std::collections::HashSet<String>,
+) {
     let read_dir = match std::fs::read_dir(dir) {
         Ok(read_dir) => read_dir,
         Err(error) => {
@@ -381,10 +530,10 @@ fn walk_directory(dir: &Path, expanded: &mut ExpandedInputs) {
             Err(error) => {
                 expanded.push_diagnostic(format!("cannot inspect {}: {error}", path.display()))
             }
-            Ok(kind) if kind.is_dir() => walk_directory(&path, expanded),
+            Ok(kind) if kind.is_dir() => walk_directory(&path, expanded, seen),
             Ok(kind) if kind.is_file() => {
                 if is_audio_candidate(&path) {
-                    expanded.accepted.push(path);
+                    remember_candidate(expanded, seen, path);
                 } else {
                     expanded.skipped += 1;
                 }
@@ -699,9 +848,7 @@ mod tests {
     fn summary_counts_candidates_and_skips() {
         let expanded = ExpandedInputs {
             accepted: vec![PathBuf::from("a.flac"), PathBuf::from("b.flac")],
-            skipped: 0,
-            diagnostics: Vec::new(),
-            suppressed_diagnostics: 0,
+            ..ExpandedInputs::default()
         };
         assert_eq!(expanded.summary(), "2 candidates");
         let expanded = ExpandedInputs {
@@ -737,7 +884,60 @@ mod tests {
         );
     }
 
+    /// The summary extends with the duplicate and unplayable counts
+    /// when present (duplicate inputs and probe rejections are part of
+    /// what the user needs to see about a scan).
+    #[test]
+    fn summary_counts_duplicates_and_unplayable_files() {
+        let expanded = ExpandedInputs {
+            accepted: vec![PathBuf::from("a.flac")],
+            duplicates: 2,
+            rejected: 3,
+            ..ExpandedInputs::default()
+        };
+        assert_eq!(
+            expanded.summary(),
+            "1 candidate, 2 duplicates removed, 3 unplayable"
+        );
+        let single = ExpandedInputs {
+            duplicates: 1,
+            ..expanded
+        };
+        assert_eq!(
+            single.summary(),
+            "1 candidate, 1 duplicate removed, 3 unplayable"
+        );
+        // The quiet complete single-file start vocabulary is unchanged
+        // when nothing was deduped or rejected.
+        let quiet = ExpandedInputs {
+            duplicates: 0,
+            rejected: 0,
+            ..single
+        };
+        assert_eq!(quiet.summary(), "1 candidate");
+    }
+
     // --- opened_status: the successful Open's presentation block -----
+
+    /// A complete enumeration keeps the old compact shapes: a single
+    /// file reads plainly, a multi-candidate folder keeps its count.
+    #[test]
+    fn a_complete_expansion_keeps_the_compact_opened_lines() {
+        let single = ExpandedInputs {
+            accepted: vec![PathBuf::from("only.flac")],
+            ..ExpandedInputs::default()
+        };
+        assert_eq!(single.opened_status(), "opened only.flac");
+        let folder = ExpandedInputs {
+            accepted: vec![PathBuf::from("a.flac"), PathBuf::from("b.flac")],
+            skipped: 1,
+            ..ExpandedInputs::default()
+        };
+        assert_eq!(
+            folder.opened_status(),
+            "opened a.flac (2 candidates, 1 skipped)"
+        );
+    }
 
     /// U1 corrective REQUIRED-2: candidates exist AND the scan was
     /// partial — the opened line counts the warnings and the bounded
@@ -769,24 +969,41 @@ mod tests {
         );
     }
 
-    /// A complete enumeration keeps the old compact shapes: a single
-    /// file reads plainly, a multi-candidate folder keeps its count.
+    /// Probe rejections ride the same bounded detail block under the
+    /// `not playable:` vocabulary, so a folder with corrupt files is
+    /// visible without being a failure storm.
     #[test]
-    fn a_complete_expansion_keeps_the_compact_opened_lines() {
-        let single = ExpandedInputs {
-            accepted: vec![PathBuf::from("only.flac")],
+    fn rejected_candidates_render_bounded_not_playable_lines() {
+        let names: Vec<String> = (0..MAX_DIAGNOSTICS + 1)
+            .map(|n| format!("broken-{n:02}.flac"))
+            .collect();
+        // The cap-consistent state: MAX_DIAGNOSTICS listed names, one
+        // suppressed beyond them.
+        let expanded = ExpandedInputs {
+            accepted: vec![PathBuf::from("kept.flac")],
+            rejected: names.len(),
+            rejected_names: names[..MAX_DIAGNOSTICS].to_vec(),
+            suppressed_rejected: 1,
             ..ExpandedInputs::default()
         };
-        assert_eq!(single.opened_status(), "opened only.flac");
-        let folder = ExpandedInputs {
-            accepted: vec![PathBuf::from("a.flac"), PathBuf::from("b.flac")],
-            skipped: 1,
-            ..ExpandedInputs::default()
-        };
-        assert_eq!(
-            folder.opened_status(),
-            "opened a.flac (2 candidates, 1 skipped)"
+        let status = expanded.opened_status();
+        assert!(
+            status.contains(&format!("1 candidate, {} unplayable", names.len())),
+            "{status}"
         );
+        assert!(
+            status.contains(&format!("\nnot playable: {}", names[0])),
+            "{status}"
+        );
+        assert!(
+            status.contains(&format!("not playable: {}", names[MAX_DIAGNOSTICS - 1])),
+            "the last name INSIDE the cap is listed: {status}"
+        );
+        assert!(
+            !status.contains(&format!("not playable: {}", names[MAX_DIAGNOSTICS])),
+            "the capped name is not listed: {status}"
+        );
+        assert!(status.contains("(+1 more)"), "{status}");
     }
 
     /// The warning block stays bounded under a pathological tree: the
@@ -919,29 +1136,93 @@ mod tests {
         assert_eq!(player.active_source(), Some(file.as_path()));
     }
 
-    // --- open_expanded: first-candidate Open + commit-riding seed -----
+    // --- open_expanded: scan-time probe validation + commit-riding seed -
 
     use crate::player::tests::{FakeEpisodeSource, LIVE_A, LIVE_B};
 
-    /// The first candidate opens through the frozen replacement and the
-    /// whole candidate list is seeded ON COMMIT (cursor at entry 0).
+    /// The first PROBE-ACCEPTED candidate opens through the frozen
+    /// replacement and the whole accepted candidate list is seeded ON
+    /// COMMIT (cursor at entry 0).
     #[test]
     fn open_expanded_opens_the_first_candidate_and_seeds_on_commit() {
         let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
-        let expanded = ExpandedInputs {
+        let mut expanded = ExpandedInputs {
             accepted: vec![PathBuf::from(LIVE_A), PathBuf::from(LIVE_B)],
             skipped: 2,
-            diagnostics: Vec::new(),
-            suppressed_diagnostics: 0,
+            ..ExpandedInputs::default()
         };
 
-        let outcome = open_expanded(&mut player, &expanded).expect("a candidate existed");
+        let outcome = open_expanded(&mut player, &mut expanded).expect("a candidate existed");
         assert_eq!(outcome, OpenOutcome::Opened);
         assert_eq!(player.active_source(), Some(Path::new(LIVE_A)));
         assert_eq!(
             player.navigation_position(),
             Some((1, 2)),
             "the accepted list is the navigation state, cursor on the committed entry"
+        );
+    }
+
+    /// A probe-REFUSED candidate is dropped at scan time (counted and
+    /// reported boundedly) and the folder still opens its next good
+    /// candidate — one corrupt first file must not refuse the whole
+    /// folder.
+    #[test]
+    fn a_probe_refused_candidate_is_dropped_and_the_next_opens() {
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut expanded = ExpandedInputs {
+            accepted: vec![
+                PathBuf::from("/media/invalid-x.flac"),
+                PathBuf::from(LIVE_B),
+            ],
+            ..ExpandedInputs::default()
+        };
+
+        let outcome = open_expanded(&mut player, &mut expanded).expect("a playable candidate");
+        assert_eq!(outcome, OpenOutcome::Opened);
+        assert_eq!(player.active_source(), Some(Path::new(LIVE_B)));
+        assert_eq!(player.navigation_position(), Some((1, 1)));
+        assert_eq!(expanded.rejected, 1, "the corrupt candidate is counted");
+        assert_eq!(
+            expanded.rejected_names,
+            vec!["invalid-x.flac".to_owned()],
+            "the bounded name detail names it"
+        );
+        assert!(
+            expanded
+                .opened_status()
+                .contains("not playable: invalid-x.flac"),
+            "{}",
+            expanded.opened_status()
+        );
+    }
+
+    /// When EVERY candidate fails the probe the player is not touched
+    /// at all: no episode, no playlist, no Open attempted — the honest
+    /// all-corrupt refusal.
+    #[test]
+    fn an_all_corrupt_expansion_refuses_without_touching_the_player() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        let mut expanded = ExpandedInputs {
+            accepted: vec![PathBuf::from("/media/invalid-a.flac")],
+            ..ExpandedInputs::default()
+        };
+
+        assert_eq!(
+            open_expanded(&mut player, &mut expanded),
+            None,
+            "no playable candidate: nothing to open, nothing touched"
+        );
+        assert!(player.active_handle().is_none());
+        assert_eq!(
+            log.lock().unwrap().len(),
+            1,
+            "exactly the one scan-time probe ran, no Open attempt"
+        );
+        assert_eq!(
+            expanded.refusal(),
+            "no playable audio files found; 1 unplayable"
         );
     }
 
@@ -954,7 +1235,7 @@ mod tests {
         let log = source.log.clone();
         let mut player = ReferencePlayerApp::new(source);
         assert_eq!(
-            open_expanded(&mut player, &ExpandedInputs::default()),
+            open_expanded(&mut player, &mut ExpandedInputs::default()),
             None,
             "no candidates: nothing to open, nothing touched"
         );
@@ -962,32 +1243,316 @@ mod tests {
         assert!(log.lock().unwrap().is_empty(), "not even a probe ran");
     }
 
-    /// A refused FIRST candidate commits no list: the navigation state
-    /// keeps exactly what it had (no misleading new list).
+    // --- duplicate inputs (Listening Release: exact-path dedup) ----
+
+    /// The same root named twice yields each accepted path ONCE, in
+    /// first-occurrence order; the duplicates are counted.
     #[test]
-    fn a_refused_first_candidate_commits_no_list() {
-        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+    fn a_root_named_twice_deduplicates_exact_paths() {
+        let tree = TempTree::new("dup-root");
+        let first = tree.file("a first.flac");
+        let second = tree.file("b second.flac");
+
+        let expanded = expand_inputs([tree.path(), tree.path()]);
         assert_eq!(
-            open_expanded(
-                &mut player,
-                &ExpandedInputs {
-                    accepted: vec![
-                        PathBuf::from("/media/invalid-x.flac"),
-                        PathBuf::from(LIVE_B)
-                    ],
-                    skipped: 0,
-                    diagnostics: Vec::new(),
-                    suppressed_diagnostics: 0,
+            expanded.accepted,
+            vec![first, second],
+            "each path once, first-occurrence order"
+        );
+        assert_eq!(expanded.duplicates, 2);
+        assert_eq!(expanded.summary(), "2 candidates, 2 duplicates removed");
+    }
+
+    /// The same explicit file passed twice is one candidate; two
+    /// different files stay two.
+    #[test]
+    fn an_explicit_file_passed_twice_is_one_candidate() {
+        let tree = TempTree::new("dup-file");
+        let a = tree.file("a.flac");
+        let b = tree.file("b.flac");
+
+        let expanded = expand_inputs([&a, &b, &a]);
+        assert_eq!(expanded.accepted, vec![a, b]);
+        assert_eq!(expanded.duplicates, 1);
+    }
+
+    /// Overlapping roots meet exactly once per path: the shared child
+    /// keeps its FIRST-occurrence place and is not re-accepted when
+    /// the second root walks over it again.
+    #[test]
+    fn overlapping_roots_deduplicate_shared_children() {
+        let tree = TempTree::new("dup-overlap");
+        let shared = tree.file("sub/shared.flac");
+        let outer_only = tree.file("outer.flac");
+
+        let expanded = expand_inputs([tree.path(), tree.path().join("sub").as_path()]);
+        assert_eq!(
+            expanded.accepted,
+            vec![outer_only, shared],
+            "outer first (first root's order), shared once"
+        );
+        assert_eq!(expanded.duplicates, 1);
+    }
+
+    /// The dedup key's precise lexical rule: exact path text on
+    /// case-sensitive filesystems; case- and slash-folded on Windows
+    /// (`D:/Music` and `D:\Music` name the same tree there). Pure
+    /// string behavior, pinned on every host.
+    #[test]
+    fn the_dedup_key_folds_case_and_slashes_only_for_windows() {
+        // The fold rule itself, exercised directly.
+        assert_eq!(
+            dedup_key(Path::new("D:\\Music\\A.FLAC")),
+            if cfg!(windows) {
+                "d:\\music\\a.flac".to_owned()
+            } else {
+                "D:\\Music\\A.FLAC".to_owned()
+            }
+        );
+        // And the Windows-fold predicate as text: two spellings of the
+        // same tree collapse only under the Windows rule.
+        let left = "D:/Music/song.flac";
+        let right = "D:\\MUSIC\\song.flac";
+        let fold = |text: &str| text.to_lowercase().replace('/', "\\");
+        assert_eq!(fold(left), fold(right));
+    }
+
+    /// A large real tree enumerates completely and stays ordered —
+    /// the 1,000-entry playlist reality this campaign pins (structural
+    /// claim only; timing belongs to the physical dogfood evidence).
+    #[test]
+    fn a_thousand_file_tree_enumerates_completely() {
+        let tree = TempTree::new("thousand");
+        for n in 0..1_000 {
+            tree.file(&format!("album-{n:03}/track.flac"));
+        }
+        let expanded = expand_inputs([tree.path()]);
+        assert_eq!(expanded.accepted.len(), 1_000);
+        assert_eq!(expanded.duplicates, 0);
+        // Path-sorted preorder: the first candidate is album-000's
+        // Path-sorted preorder: the first candidate is album-000's
+        // track and the last is album-999's.
+        assert!(expanded.accepted[0].ends_with("album-000/track.flac"));
+        assert!(expanded.accepted[999].ends_with("album-999/track.flac"));
+    }
+
+    /// The REAL SongCore media probe against the repository's
+    /// committed fixtures and real corrupt-file shapes — the F2/F3
+    /// classes of the physical failure matrix, exercised wherever the
+    /// native decode artifact exists (the Linux dev host and the
+    /// Windows build both qualify; plain CI hosts without the artifact
+    /// never compile this module).
+    #[cfg(all(test, feature = "playback"))]
+    mod real_probe {
+        use std::fs;
+        use std::path::{Path, PathBuf};
+
+        use super::super::{ExpandedInputs, expand_inputs, validate_with_probe};
+        use crate::player::{EpisodeStart, ReferencePlayerApp};
+
+        /// The real probe wiring (the same query `entry`'s
+        /// RealEpisodeSource uses). These tests never START an
+        /// episode — activation needs a real output device, which a
+        /// scan test must not depend on — they witness the SCAN side:
+        /// what the expansion keeps, counts and refuses.
+        struct RealProbeOnly;
+
+        impl EpisodeStart for RealProbeOnly {
+            fn probe(&self, candidate: &Path) -> Result<(), String> {
+                qianqian_decode_songcore::probe_media(candidate)
+                    .map(|_facts| ())
+                    .map_err(|e| e.message)
+            }
+            fn start(&self, _source: &Path, _level: u8) -> crate::player::StartAttempt {
+                unreachable!("scan-hardening tests never start an episode")
+            }
+        }
+
+        fn validated(tree: &Path) -> (ReferencePlayerApp<RealProbeOnly>, ExpandedInputs) {
+            let player = ReferencePlayerApp::new(RealProbeOnly);
+            let mut expansion = expand_inputs([tree]);
+            validate_with_probe(&player, &mut expansion);
+            (player, expansion)
+        }
+
+        /// A temp tree seeded with the repository's committed fixtures
+        /// plus real corrupt-file shapes.
+        struct RealTree(PathBuf);
+
+        impl RealTree {
+            fn new(name: &str, fixtures: &[&str]) -> Self {
+                let root = std::env::temp_dir().join(format!(
+                    "qianqian-realprobe-{}-{}-{name}",
+                    std::process::id(),
+                    fixtures.len()
+                ));
+                let _ = fs::remove_dir_all(&root);
+                fs::create_dir_all(&root).expect("temp tree root");
+                let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../native/experiments");
+                for fixture in fixtures {
+                    fs::copy(
+                        repo.join("songcore-equivalence/fixtures").join(fixture),
+                        root.join(fixture),
+                    )
+                    .expect("committed fixture exists");
                 }
-            ),
-            Some(OpenOutcome::Refused {
-                diagnostic: "unsupported container: /media/invalid-x.flac".to_owned()
-            })
-        );
-        assert_eq!(
-            player.navigation_position(),
-            None,
-            "no playlist was committed behind the refusal"
-        );
+                Self(root)
+            }
+
+            fn path(&self) -> &Path {
+                &self.0
+            }
+
+            /// A garbage file with an audio-looking name (renamed
+            /// non-audio bytes — the F3 class).
+            fn garbage(&self, name: &str) -> PathBuf {
+                let path = self.0.join(name);
+                fs::write(
+                    &path,
+                    b"this is definitely not a flac stream, just text bytes",
+                )
+                .expect("garbage file");
+                path
+            }
+
+            /// A zero-byte file with an audio extension (the F2 class).
+            fn zero_byte(&self, name: &str) -> PathBuf {
+                let path = self.0.join(name);
+                fs::write(&path, b"").expect("zero-byte file");
+                path
+            }
+
+            /// A quiet non-audio file (the F1 class: covers, notes).
+            fn noise(&self, name: &str) -> PathBuf {
+                let path = self.0.join(name);
+                fs::write(&path, b"not audio at all").expect("noise file");
+                path
+            }
+        }
+
+        impl Drop for RealTree {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.0);
+            }
+        }
+
+        /// The field-corpus shape (U2): an MP3 whose embedded cover art
+        /// rides as an attached-picture stream this trimmed FFmpeg build
+        /// has no decoder for. The cover is not audio truth, so the file
+        /// must stay a playable candidate, keep its duration, and probe
+        /// cleanly — the stream-info hunt it triggers is bounded and
+        /// silent inside SongCore since the probe-cost fix (the physical
+        /// transcript gate pins the clean screen; this test pins the
+        /// acceptance side over the committed synthetic fixture).
+        #[test]
+        fn an_mp3_with_embedded_cover_art_stays_playable() {
+            let source =
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mp3-cbr-cover.mp3");
+            let root = std::env::temp_dir()
+                .join(format!("qianqian-realprobe-cover-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&root);
+            fs::create_dir_all(&root).expect("temp tree root");
+            let candidate = root.join("01 cover song.mp3");
+            fs::copy(&source, &candidate).expect("cover fixture exists");
+
+            let facts = qianqian_decode_songcore::probe_media(&candidate)
+                .expect("cover-art mp3 probes as playable");
+            assert_eq!(facts.format.sample_rate, 44100);
+            assert!(facts.duration.is_some(), "the cover hides no duration");
+
+            let player = ReferencePlayerApp::new(RealProbeOnly);
+            let mut expansion = expand_inputs([root.as_path()]);
+            validate_with_probe(&player, &mut expansion);
+            assert_eq!(
+                expansion.accepted,
+                vec![candidate],
+                "the cover-art mp3 is the one candidate"
+            );
+            assert_eq!(expansion.rejected, 0, "nothing to reject");
+            assert_eq!(expansion.skipped, 0);
+
+            let _ = fs::remove_dir_all(&root);
+        }
+
+        /// F1+F3 together: a realistic music folder — real track,
+        /// cover/notes noise, a renamed-garbage "track" — keeps exactly
+        /// its real track as a candidate, classifies the noise as quiet
+        /// skips, and reports the corrupt file boundedly.
+        #[test]
+        fn a_realistic_folder_keeps_the_real_track_and_reports_the_corrupt_one() {
+            let tree = RealTree::new("realistic", &["flac-16-44-stereo.flac"]);
+            tree.garbage("03 broken take.flac");
+            tree.noise("cover.jpg");
+            tree.noise("notes.txt");
+            tree.noise("lyric.lrc");
+
+            let (_player, expansion) = validated(tree.path());
+
+            assert_eq!(
+                expansion.accepted,
+                vec![tree.path().join("flac-16-44-stereo.flac")],
+                "the real track is the one candidate"
+            );
+            assert_eq!(expansion.skipped, 3, "cover/notes/lrc are quiet skips");
+            assert_eq!(expansion.rejected, 1, "the renamed garbage is rejected");
+            let status = expansion.opened_status();
+            assert!(
+                status.contains("not playable: 03 broken take.flac"),
+                "{status}"
+            );
+            assert!(!status.contains("cover.jpg"), "noise stays quiet: {status}");
+        }
+
+        /// F2: a zero-byte .mp3 never reaches the candidate list; the
+        /// real MP3 beside it does.
+        #[test]
+        fn a_zero_byte_audio_file_is_rejected_not_listed() {
+            let tree = RealTree::new("zerobyte", &["mp3-cbr-id3v23.mp3"]);
+            tree.zero_byte("00 empty.mp3");
+
+            let (_player, expansion) = validated(tree.path());
+
+            assert_eq!(
+                expansion.accepted,
+                vec![tree.path().join("mp3-cbr-id3v23.mp3")]
+            );
+            assert_eq!(expansion.rejected, 1);
+            assert_eq!(expansion.rejected_names, vec!["00 empty.mp3".to_owned()]);
+        }
+
+        /// The all-corrupt folder: an honest refusal with nothing
+        /// playable claimed.
+        #[test]
+        fn an_all_corrupt_folder_refuses_honestly() {
+            let tree = RealTree::new("allcorrupt", &[]);
+            tree.garbage("a.flac");
+            tree.garbage("b.mp3");
+
+            let (_player, expansion) = validated(tree.path());
+
+            assert!(expansion.accepted.is_empty());
+            assert_eq!(
+                expansion.refusal(),
+                "no playable audio files found; 2 unplayable"
+            );
+        }
+
+        /// A corrupt file that SORTS FIRST must not refuse the folder:
+        /// after validation the first surviving candidate is the real
+        /// track, so the startup Open has a playable first candidate.
+        #[test]
+        fn a_corrupt_first_file_does_not_block_the_real_track() {
+            let tree = RealTree::new("corruptfirst", &["flac-16-44-stereo.flac"]);
+            tree.garbage("00 broken.flac");
+
+            let (_player, expansion) = validated(tree.path());
+
+            assert_eq!(
+                expansion.accepted.first().map(PathBuf::as_path),
+                Some(tree.path().join("flac-16-44-stereo.flac").as_path()),
+                "the real track is the first surviving candidate"
+            );
+            assert_eq!(expansion.rejected, 1);
+        }
     }
 }

@@ -1,0 +1,57 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\synth45.mp3" "C:\Users\Public\qn-lr1\media\garbage.bin" "C:\Users\Public\qn-lr1\media\flac4.flac"
+T+   0.017s       recv  16 bytes
+T+   0.028s       recv  141 bytes
+T+   0.086s       recv  8 bytes
+T+   0.087s       recv  219 bytes
+T+   0.108s       recv  4124 bytes
+T+   0.450s wait-begin  "Track: 1/2" within 5s
+T+   0.450s    wait-ok  Track: 1/2
+T+   0.450s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.450s    wait-ok  Format: 44100 Hz
+T+   0.450s wait-begin  "not playable: garbage.bin" within 5s
+T+   0.450s    wait-ok  not playable: garbage.bin
+T+   0.450s wait-begin  new-position != None
+T+   1.182s       recv  17 bytes
+T+   1.197s    wait-ok  new-position (0, 1)
+T+   1.197s       send  1 bytes: "n"
+T+   1.198s       recv  6704 bytes
+T+   1.265s       recv  4 bytes
+T+   1.266s       recv  207 bytes
+T+   1.266s       recv  4 bytes
+T+   1.276s       recv  6757 bytes
+T+   1.277s wait-begin  "next: opened C:\\Users\\Public\\qn-lr1\\media\\flac4.flac" within 20s
+T+   1.278s       recv  6801 bytes
+T+   1.291s       recv  6813 bytes
+T+   1.298s    wait-ok  next: opened C:\Users\Public\qn-lr1\media\flac4.flac
+T+   1.298s wait-begin  "Track: 2/2" within 20s
+T+   1.298s    wait-ok  Track: 2/2
+T+   1.298s       send  1 bytes: "n"
+T+   1.298s       recv  6697 bytes
+T+   1.299s       recv  4 bytes
+T+   1.307s       recv  6757 bytes
+T+   1.378s wait-begin  "no next track" within 20s
+T+   1.378s    wait-ok  no next track
+T+   1.378s wait-begin  "Track: 2/2" within 20s
+T+   1.378s    wait-ok  Track: 2/2
+T+   1.378s       send  1 bytes: "p"
+T+   1.379s       recv  6797 bytes
+T+   1.402s       recv  6757 bytes
+T+   1.445s       recv  458 bytes
+T+   1.459s wait-begin  "previous: opened C:\\Users\\Public\\qn-lr1\\media\\synth45.mp3" within 20s
+T+   1.459s    wait-ok  previous: opened C:\Users\Public\qn-lr1\media\synth45.mp3
+T+   1.459s wait-begin  "Track: 1/2" within 20s
+T+   1.459s    wait-ok  Track: 1/2
+T+   1.459s       send  1 bytes: "p"
+T+   1.464s       recv  6757 bytes
+T+   1.540s wait-begin  "no previous track" within 20s
+T+   1.540s    wait-ok  no previous track
+T+   1.540s wait-begin  "Track: 1/2" within 20s
+T+   1.540s    wait-ok  Track: 1/2
+T+   1.540s       send  1 bytes: "q"
+T+   1.540s       recv  6757 bytes
+T+   1.541s       recv  8 bytes
+T+   1.559s       recv  266 bytes
+T+   1.574s       recv  27 bytes
+T+   1.620s       recv  297 bytes
+T+   2.020s wait-begin  "stopped before completion" within 5s
+T+   2.020s    wait-ok  stopped before completion

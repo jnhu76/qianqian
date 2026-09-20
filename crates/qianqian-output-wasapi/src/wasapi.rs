@@ -23,10 +23,16 @@
 //! credited only AFTER `ReleaseBuffer` succeeds. This adds no device
 //! call, no lock and no allocation to the render path.
 //!
-//! Format negotiation is Tier 1 only (design §7): the float32 source
-//! format is submitted directly; shared-mode WASAPI mixes it to the
-//! device mix format itself. A device that refuses the source format
-//! fails the open honestly (Tier-2 SRC fallback is OPEN-1, not faked).
+//! Format negotiation is Tier 1, then Tier 2 on the one refusal class
+//! real collections hit (field-earned, 2026-09-20): Tier 1 submits the
+//! float32 source format directly — bit-perfect whenever it matches the
+//! device mix format; when shared-mode WASAPI refuses exactly that
+//! format (AUDCLNT_E_UNSUPPORTED_FORMAT — e.g. a 48 kHz track on a
+//! 44.1 kHz mix format), Tier 2 retries with the engine's own SRC
+//! (AUTOCONVERTPCM + SRC_DEFAULT_QUALITY), so the conversion runs on
+//! the engine's mix thread while the data plane still carries float32
+//! at the source rate. A format both tiers refuse fails the open
+//! honestly.
 //!
 //! Safety: all Win32/COM calls sit in explicit `unsafe` blocks at their
 //! call sites; the private functions themselves are safe. Three RAII owners
@@ -75,10 +81,25 @@ const KSDATAFORMAT_SUBTYPE_IEEE_FLOAT: GUID = GUID::from_values(
 const EXTENSIBLE_CB_SIZE: u16 = 22;
 const IEEE_FLOAT_BITS: u16 = 32;
 const IEEE_FLOAT_BYTES: u32 = 4;
+/// Frozen WASAPI ABI values for the Tier-2 engine-SRC retry, defined
+/// locally with the same posture as the constants above (never depend
+/// on which constants a given Windows SDK happens to export).
+const AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM: u32 = 0x8000_0000;
+const AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY: u32 = 0x0800_0000;
 
 const OPEN_TIMEOUT: Duration = Duration::from_secs(10);
 const EVENT_TIMEOUT_MS: u32 = 100;
 const DRAIN_CAP: Duration = Duration::from_secs(5);
+
+/// Mechanism diagnostics (the per-episode open line and abort/volume
+/// notes — never steady-state output) are silent by default: any stderr
+/// write corrupts a full-screen terminal UI sharing the console, and a
+/// mechanism abort already surfaces through the session's typed
+/// activation/terminal evidence. QIANQIAN_AUDIO_LOG=1 restores them for
+/// mechanism debugging.
+fn mechanism_log_enabled() -> bool {
+    std::env::var_os("QIANQIAN_AUDIO_LOG").is_some_and(|v| v != "0")
+}
 
 /// The concrete Windows Host Render Backend mechanism (ADR-PBK-003
 /// §2/§3): the Output Plugin is the stable composition identity; this
@@ -236,7 +257,9 @@ fn run_render_thread(
     // One terminal diagnostic per episode — never steady-state output.
     match &outcome {
         LoopOutcome::Aborted { message } => {
-            eprintln!("[qianqian-wasapi] render aborted: {message}");
+            if mechanism_log_enabled() {
+                eprintln!("[qianqian-wasapi] render aborted: {message}");
+            }
             // The device leg is gone: stop the data plane so the decode
             // worker cannot wedge on a full edge against a dead consumer
             // (first-wins on the edge, so it is a no-op after natural EOF).
@@ -427,6 +450,16 @@ fn open_session(format: PcmFormat, level: &OutputLevel, slot: &OpenSlot) -> Opti
     wfx.dwChannelMask = u32::try_from(format.channel_mask).unwrap_or(0);
     wfx.SubFormat = KSDATAFORMAT_SUBTYPE_IEEE_FLOAT;
 
+    // Tier 1 then Tier 2 (field-earned, 2026-09-20): shared-mode WASAPI
+    // refuses a source format whose rate/channel shape differs from the
+    // mix format (AUDCLNT_E_UNSUPPORTED_FORMAT — a 48 kHz track on a
+    // 44.1 kHz mix format was a real-collection field defect). Tier 2
+    // retries with the engine's own SRC: the conversion runs on the
+    // engine's mix thread, the data plane still carries float32 at the
+    // source rate (so the edge, the D14.8 accounting and the whole
+    // mechanism contract are unchanged), and any format BOTH tiers
+    // refuse still fails the open honestly.
+    let mut engine_src = false;
     if let Err(e) = unsafe {
         client.Initialize(
             AUDCLNT_SHAREMODE_SHARED,
@@ -437,12 +470,29 @@ fn open_session(format: PcmFormat, level: &OutputLevel, slot: &OpenSlot) -> Opti
             None,
         )
     } {
-        let hint = if e.code() == AUDCLNT_E_UNSUPPORTED_FORMAT {
-            " (device refused the float32 source format; Tier-2 SRC fallback is deferred)"
-        } else {
-            ""
-        };
-        return fail(format!("stream initialize failed: {e}{hint}"));
+        if e.code() != AUDCLNT_E_UNSUPPORTED_FORMAT {
+            return fail(format!("stream initialize failed: {e}"));
+        }
+        engine_src = true;
+        if let Err(e) = unsafe {
+            client.Initialize(
+                AUDCLNT_SHAREMODE_SHARED,
+                AUDCLNT_STREAMFLAGS_EVENTCALLBACK
+                    | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM
+                    | AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY,
+                0,
+                0,
+                std::ptr::addr_of!(wfx.Format),
+                None,
+            )
+        } {
+            let hint = if e.code() == AUDCLNT_E_UNSUPPORTED_FORMAT {
+                " (device refused the float32 source format even with engine SRC)"
+            } else {
+                ""
+            };
+            return fail(format!("stream initialize failed: {e}{hint}"));
+        }
     }
 
     let event = match unsafe { CreateEventW(None, false, false, None) } {
@@ -483,11 +533,18 @@ fn open_session(format: PcmFormat, level: &OutputLevel, slot: &OpenSlot) -> Opti
 
     publish(OpenVerdict::Opened { format });
     // One open diagnostic per episode — the real-sound gate's negotiated
-    // format evidence; never steady-state output.
-    eprintln!(
-        "[qianqian-wasapi] opened: {} Hz, {} channels, mask {:#x}, buffer {} frames (shared, event-driven)",
-        format.sample_rate, format.channels, format.channel_mask, buffer_frames
-    );
+    // format evidence; never steady-state output; silent unless
+    // mechanism logging is enabled (a product TUI shares this console).
+    if mechanism_log_enabled() {
+        eprintln!(
+            "[qianqian-wasapi] opened: {} Hz, {} channels, mask {:#x}, buffer {} frames (shared, event-driven{})",
+            format.sample_rate,
+            format.channels,
+            format.channel_mask,
+            buffer_frames,
+            if engine_src { ", engine SRC" } else { "" }
+        );
+    }
     Some(DeviceSession {
         render,
         client,
@@ -620,7 +677,7 @@ fn steady_loop(
                     // per iteration; the next ROUTED change retries once.
                     Err(e) => {
                         session.applied_bits.set(routed_bits);
-                        if !session.volume_diagnosed.replace(true) {
+                        if !session.volume_diagnosed.replace(true) && mechanism_log_enabled() {
                             eprintln!(
                                 "[qianqian-wasapi] stream volume apply failed (recoverable; \
                                  holding the last applied level): {e}"

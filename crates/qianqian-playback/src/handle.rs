@@ -302,14 +302,16 @@ impl PlaybackSessionHandle {
     /// or settles terminal truth — no PCM topology cut, no edge flush,
     /// no position reset, no discontinuity. A volume command after the
     /// terminal Fact is inert command history, like late stop intent.
-    /// The value means exactly the App's desired stream factor — never
+    /// The value means exactly the App's desired level — never
     /// the effective acoustic level, the Windows session master, or any
-    /// mechanism readback.
+    /// mechanism readback. The FACTOR realization of that level is the
+    /// perceptual taper [`desired_level_to_factor`] (field round 4:
+    /// the former linear division put all the audible travel in the
+    /// bottom quarter of the control).
     pub fn request_output_level(&self, level: u8) {
-        let level = level.min(100);
         self.completion
             .output_level()
-            .route(f32::from(level) / 100.0);
+            .route(desired_level_to_factor(level));
     }
 
     /// One coherent observation of the episode. Pure read: no resolve,
@@ -328,5 +330,88 @@ impl PlaybackSessionHandle {
     pub fn wait_terminal(&self) -> EpisodeTerminalOutcome {
         let outcome: SessionOutcome = self.completion.wait_terminal();
         outcome.split().0
+    }
+}
+
+/// The App's desired level (0..=100, the shell's ±5 steps) realized as
+/// the stream factor the mechanism applies. A PERCEPTUAL taper, not a
+/// linear division (field round 4: `level/100.0` made every press
+/// above ~70 inaudible and crammed all the audible travel into the
+/// bottom quarter — loudness perception is roughly logarithmic in
+/// amplitude, which D14.9 explicitly declines to promise away: "no dB
+/// curve promise" cuts both ways, and the listening release is the
+/// evidence that the linear realization does not feel like a volume
+/// control).
+///
+/// The frozen endpoints and step feel:
+///
+/// ```text
+/// 100 → exactly 1.0  (unity: no attenuation at full, and the
+///                      Tier-1 bit-transparent submission path is
+///                      untouched at the top of the control)
+///   0 → exactly 0.0  (true silence, not -inf dB arithmetic)
+/// 1..=99 → 10^(-0.03 * (100 - level)): a −60 dB control range with
+///          EXACTLY 3 dB per 5-step press — right at the just-
+///          noticeable loudness difference, so a press feels alike
+///          near the top and near the bottom
+/// ```
+///
+/// 50 is therefore −30 dB, NOT half amplitude — and that is honest:
+/// the displayed value is the App's desired CONTROL position (D14.9
+/// forbids reading it as an acoustic level), and this mapping is what
+/// makes equal control steps feel equal.
+fn desired_level_to_factor(level: u8) -> f32 {
+    match level.min(100) {
+        0 => 0.0,
+        100 => 1.0,
+        l => 10f32.powf(-0.03 * f32::from(100 - l)),
+    }
+}
+
+#[cfg(test)]
+mod desired_level_tests {
+    use super::desired_level_to_factor as factor;
+
+    /// The frozen endpoints: unity at the top (the Tier-1 path stays
+    /// bit-transparent at 100), true silence at the bottom.
+    #[test]
+    fn the_endpoints_are_exact() {
+        assert_eq!(factor(100), 1.0);
+        assert_eq!(factor(0), 0.0);
+        assert_eq!(factor(255), 1.0, "values above 100 clamp to unity");
+    }
+
+    /// Exactly 3 dB per 5-step press across the whole control: the
+    /// ratio of two factors 5 steps apart is 10^(∓3/20), everywhere
+    /// (f32-relative tolerance — the exponent arithmetic wobbles ~1e-4).
+    #[test]
+    fn every_five_step_press_is_three_db() {
+        let step_down = 10f32.powf(-3.0 / 20.0);
+        for l in (5..=95).step_by(5) {
+            let ratio = factor(l) / factor(l + 5);
+            assert!(
+                (ratio - step_down).abs() / step_down < 1e-3,
+                "level {l}: ratio {ratio} != {step_down}"
+            );
+        }
+    }
+
+    /// Monotone and strictly decreasing below unity; the anchor points
+    /// match the −60 dB range table (50 ≈ −30 dB).
+    #[test]
+    fn monotone_with_the_documented_anchors() {
+        let mut prev = factor(100);
+        assert_eq!(prev, 1.0);
+        for l in (0..100).rev() {
+            let f = factor(l);
+            assert!(f <= prev, "factor rose at level {l}");
+            prev = f;
+        }
+        let half = factor(50);
+        let expect = 10f32.powf(-1.5); // −30 dB
+        assert!(
+            (half - expect).abs() < 1e-6,
+            "level 50 factor {half} != {expect}"
+        );
     }
 }

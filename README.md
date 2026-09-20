@@ -184,6 +184,7 @@ The playback reference is a behavioral oracle, not a source-layout template.
 
 ## Repository entry points
 
+- `QUICKSTART.md` — the end-user help shipped inside the Windows package (user documentation, not architecture).
 - `AGENTS.md` — repository-wide agent governance and hard rules.
 - `CONTEXT.md` — stable vocabulary and mental model.
 - `docs/README.md` — task-oriented documentation router.

@@ -44,7 +44,7 @@ use windows::Win32::System::Threading::{
 
 #[path = "../scenarios.rs"]
 mod scenarios;
-use scenarios::{scenario, Step};
+use scenarios::{scenario, scenario_size, Step};
 
 // ---------------------------------------------------------------- keys
 
@@ -68,13 +68,18 @@ pub const SHIFT_RIGHT: &str = "\u{1b}[1;2C";
 
 /// One terminal cell grid plus the append-only frame history built
 /// from it. `history` only ever grows: a frame is appended when the
-/// rendered screen differs from the last appended frame.
+/// rendered screen differs from the last appended frame. Each appended
+/// frame is preceded by its own `[+S.sss s]` wall-clock line (elapsed
+/// since the capture's creation ≈ child spawn) on a dedicated line, so
+/// frame deltas double as latency evidence; frame CONTENT is never
+/// altered, so substring oracles are unaffected.
 pub struct Capture {
     grid: Grid,
     last_frame: String,
     pub history: String,
     pub raw: Vec<u8>,
     parser: VtParser,
+    t0: std::time::Instant,
 }
 
 impl Capture {
@@ -85,6 +90,7 @@ impl Capture {
             history: String::new(),
             raw: Vec::new(),
             parser: VtParser::default(),
+            t0: std::time::Instant::now(),
         }
     }
 
@@ -93,6 +99,10 @@ impl Capture {
         self.parser.feed(bytes, &mut self.grid);
         let frame = self.grid.text();
         if frame != self.last_frame {
+            self.history.push_str(&format!(
+                "[+{:.3}s]\n",
+                self.t0.elapsed().as_secs_f64()
+            ));
             self.history.push_str(&frame);
             self.history.push('\n');
             self.last_frame = frame;
@@ -404,7 +414,13 @@ fn wide(s: &str) -> Vec<u16> {
 }
 
 impl Session {
-    fn spawn(program: &str, args: &[String], cols: i16, rows: i16) -> Result<Session, String> {
+    fn spawn(
+        program: &str,
+        args: &[String],
+        cols: i16,
+        rows: i16,
+        cwd_override: Option<&str>,
+    ) -> Result<Session, String> {
         let mut in_read = HANDLE::default();
         let mut in_write = HANDLE::default();
         let mut out_read = HANDLE::default();
@@ -454,16 +470,19 @@ impl Session {
         }
         let mut cmdline_wide = wide(&cmdline);
 
-        // The child's working directory is pinned to the program's own
-        // directory: relative O-dialog candidates must resolve against
+        // The child's working directory defaults to the program's own
+        // directory (relative O-dialog candidates must resolve against
         // the staging dir regardless of how the detached driver itself
-        // was launched (Start-Process from a Linux-cwd shell otherwise
-        // lands the whole chain in C:\Windows\System32, and every open
-        // honestly fails with os error 2).
-        let child_cwd = program
-            .rsplit_once('\\')
-            .map(|(dir, _)| dir.to_owned())
-            .unwrap_or_else(|| ".".to_owned());
+        // was launched), and `--cwd` overrides it — the Listening
+        // Release runs the EXTRACTED package exe from its own folder
+        // while the media corpus lives elsewhere.
+        let child_cwd = match cwd_override {
+            Some(dir) => dir.to_owned(),
+            None => program
+                .rsplit_once('\\')
+                .map(|(dir, _)| dir.to_owned())
+                .unwrap_or_else(|| ".".to_owned()),
+        };
         let cwd_wide = wide(&child_cwd);
 
         let mut si: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
@@ -859,6 +878,9 @@ fn run_scenario(
     files: &[&str],
     steps: Vec<Step>,
     watchdog: Duration,
+    cols: i16,
+    rows: i16,
+    cwd_override: Option<&str>,
 ) -> ExecReport {
     let mut step_log: Vec<String> = Vec::new();
     let deadline = Instant::now() + watchdog;
@@ -882,7 +904,7 @@ fn run_scenario(
             }))
             .collect()
     };
-    let mut session = match Session::spawn(headless, &args, 120, 40) {
+    let mut session = match Session::spawn(headless, &args, cols, rows, cwd_override) {
         Ok(s) => s,
         Err(e) => {
             return ExecReport {
@@ -1073,6 +1095,38 @@ fn run_scenario(
                     }
                 }
             }
+            Step::ExpectExitEither {
+                a,
+                b,
+                within_ms,
+            } => {
+                let exit_deadline = Instant::now() + Duration::from_millis(*within_ms);
+                let mut got: Option<u32> = None;
+                while Instant::now() < exit_deadline {
+                    if unsafe { WaitForSingleObject(session.process, 100) } == WAIT_OBJECT_0 {
+                        let mut ec = 0u32;
+                        if unsafe { GetExitCodeProcess(session.process, &mut ec) }.is_ok() {
+                            got = Some(ec);
+                            break;
+                        }
+                    }
+                }
+                match got {
+                    Some(ec) if ec == *a || ec == *b => {
+                        step_log.push(format!("exit {ec} OK (either {a}/{b})"));
+                        exit_code = Some(ec);
+                        std::thread::sleep(Duration::from_millis(400));
+                    }
+                    Some(ec) => {
+                        outcome = Err(format!("exit code {ec}, expected either {a} or {b}"));
+                        break 'steps;
+                    }
+                    None => {
+                        outcome = Err(format!("process did not exit within {within_ms}ms"));
+                        break 'steps;
+                    }
+                }
+            }
             Step::ExpectAfterMarkRepaint { text, within_ms } => {
                 let deadline = Instant::now() + Duration::from_millis(*within_ms);
                 loop {
@@ -1248,6 +1302,7 @@ fn main() {
     let mut headless = String::from("qianqian-headless.exe");
     let mut media_dir = String::from(".");
     let mut out_dir = String::from("evidence/logs");
+    let mut cwd_override: Option<String> = None;
     let mut names: Vec<String> = Vec::new();
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -1255,11 +1310,14 @@ fn main() {
             "--exe" => headless = args.next().expect("--exe value"),
             "--media" => media_dir = args.next().expect("--media value"),
             "--out" => out_dir = args.next().expect("--out value"),
+            "--cwd" => cwd_override = Some(args.next().expect("--cwd value")),
             other => names.push(other.to_owned()),
         }
     }
     if names.is_empty() {
-        eprintln!("usage: tuidriver --exe <headless.exe> --media <dir> --out <dir> SCENARIO...");
+        eprintln!(
+            "usage: tuidriver --exe <headless.exe> --media <dir> --out <dir>              [--cwd <child-cwd>] SCENARIO..."
+        );
         std::process::exit(2);
     }
 
@@ -1278,7 +1336,7 @@ fn main() {
         // Minimal attachment probe: spawn `cmd /c echo PROBE-OK` under
         // the ConPTY and dump whatever the pipe yields.
         let probe_args = vec!["/c echo PROBE-OK && ver".to_owned()];
-        let mut s = match Session::spawn("cmd.exe", &probe_args, 80, 25) {
+        let mut s = match Session::spawn("cmd.exe", &probe_args, 80, 25, None) {
             Ok(s) => s,
             Err(e) => {
                 eprintln!("probe spawn failed: {e}");
@@ -1312,7 +1370,17 @@ fn main() {
     for name in &names {
         let started = Instant::now();
         let (files, steps, watchdog) = scenario(name, &media_dir);
-        let report = run_scenario(&headless, &media_dir, &files, steps, watchdog);
+        let (cols, rows) = scenario_size(name);
+        let report = run_scenario(
+            &headless,
+            &media_dir,
+            &files,
+            steps,
+            watchdog,
+            cols,
+            rows,
+            cwd_override.as_deref(),
+        );
         if let Err(e) = write_evidence(&out_dir, name, &report) {
             eprintln!("{name}: evidence write failed: {e}");
         }

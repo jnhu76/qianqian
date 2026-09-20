@@ -49,7 +49,16 @@ use crate::player::OpenOutcome;
 /// compiled name (`CARGO_BIN_NAME` at the wrapper) — the only way the
 /// two product binaries differ, and the only thing `--version` prints.
 pub fn run(bin_name: &str) -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    // args_os, never args(): Windows command lines are UTF-16, and a
+    // non-Unicode argument (e.g. a pasted corrupted filename) must land
+    // in the ordinary unknown-command refusal, not panic the product
+    // before the parser ever sees it. Lossy display is fine here: the
+    // grammar decides on text, and a path that cannot be represented
+    // cleanly is simply not found by the expansion.
+    let args: Vec<String> = std::env::args_os()
+        .skip(1)
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect();
     match cli::parse_invocation(&args) {
         Ok(Invocation::Help) => {
             print!("{}", cli::usage());
@@ -236,6 +245,16 @@ fn reference_player_transport(files: Vec<PathBuf>, order: OrderPreference) -> Ex
     // list (Issue #166 §9/§10) — and an INTERACTIVE launch (no argv)
     // prepares nothing at all: no Open attempted, no feedback
     // fabricated (U1 corrective REQUIRED-1).
+    //
+    // A big folder scans (enumerate + probe every candidate)
+    // synchronously before the TUI appears — the documented
+    // synchronous-Open stall — so the user gets one honest line about
+    // what is happening instead of a blank console.
+    if let Some(first_root) = files.first() {
+        println!("scanning {} ...", first_root.display());
+        use std::io::Write;
+        let _ = std::io::stdout().flush();
+    }
     let preparation = input::prepare_startup(&files, &mut player);
     if let Some(OpenOutcome::FailStop { diagnostic }) = &preparation.startup_open {
         // A latched §G.6 violation has no exit and earns no shell.

@@ -1,0 +1,48 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\千曲.flac"
+T+   0.013s       recv  16 bytes
+T+   0.022s       recv  141 bytes
+T+   0.070s       recv  26 bytes
+T+   0.071s       recv  19 bytes
+T+   0.084s       recv  6823 bytes
+T+   0.440s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.440s    wait-ok  Format: 44100 Hz
+T+   0.440s       send  1 bytes: "o"
+T+   0.440s       recv  6708 bytes
+T+   0.440s       recv  4 bytes
+T+   0.440s       recv  4 bytes
+T+   0.456s       recv  6763 bytes
+T+   0.520s       send  11 bytes: "千曲.flac"
+T+   0.521s       recv  6763 bytes
+T+   0.533s       recv  51 bytes
+T+   0.600s       send  1 bytes: "\r"
+T+   0.601s       recv  6805 bytes
+T+   0.612s       recv  6765 bytes
+T+   0.627s       recv  60 bytes
+T+   0.657s       recv  28 bytes
+T+   0.673s       recv  479 bytes
+T+   0.681s wait-begin  "opened 千 曲 .flac" within 20s
+T+   0.681s       recv  6759 bytes
+T+   0.689s       recv  6819 bytes
+T+   0.701s    wait-ok  opened 千 曲 .flac
+T+   0.701s       send  1 bytes: " "
+T+   0.702s       recv  6703 bytes
+T+   0.702s       recv  4 bytes
+T+   0.704s       recv  6763 bytes
+T+   0.781s wait-begin  "Pause requested: true" within 5s
+T+   0.782s    wait-ok  Pause requested: true
+T+   0.782s       send  1 bytes: " "
+T+   0.782s       recv  6803 bytes
+T+   0.797s       recv  6763 bytes
+T+   0.862s wait-begin  "Pause requested: false" within 5s
+T+   0.862s    wait-ok  Pause requested: false
+T+   0.862s wait-begin  "Source: 千 曲 .flac" within 20s
+T+   0.862s    wait-ok  Source: 千 曲 .flac
+T+   0.862s       send  1 bytes: "q"
+T+   0.862s       recv  6803 bytes
+T+   0.863s       recv  6771 bytes
+T+   0.872s       recv  304 bytes
+T+   0.892s       recv  34 bytes
+T+   0.903s       recv  47 bytes
+T+   0.943s       recv  386 bytes
+T+   1.343s wait-begin  "stopped before completion" within 5s
+T+   1.343s    wait-ok  stopped before completion

@@ -105,7 +105,10 @@ unsafe extern "C" fn file_size(ud: *mut c_void) -> i64 {
 
 fn status_open_error(path: &Path, status: u32) -> DecodeOpenError {
     DecodeOpenError {
-        message: format!("SongCore refused '{}': status {status}", path.display()),
+        message: format!(
+            "cannot decode this file: {} (decoder status {status})",
+            path.display()
+        ),
     }
 }
 
@@ -154,7 +157,7 @@ impl SongcoreDecodeStream {
     fn open(path: &Path) -> Result<Box<dyn DecodedPcmStream>, DecodeOpenError> {
         let file = File::open(path)
             .map_err(|e| DecodeOpenError {
-                message: format!("cannot open '{}': {e}", path.display()),
+                message: format!("cannot open this file: {}: {e}", path.display()),
             })?
             .into();
         let io = sys::song_io {
@@ -176,7 +179,7 @@ impl SongcoreDecodeStream {
             unsafe { drop(Box::from_raw(io.userdata as *mut File)) };
             return Err(DecodeOpenError {
                 message: format!(
-                    "SongCore opened '{}' with SONG_OK but a null handle",
+                    "decoder error: opened {} successfully but it returned no handle",
                     path.display()
                 ),
             });
@@ -190,7 +193,7 @@ impl SongcoreDecodeStream {
             }
             return Err(DecodeOpenError {
                 message: format!(
-                    "SongCore probe failed for '{}': status {status}",
+                    "cannot read this file's audio: {} (decoder status {status})",
                     path.display()
                 ),
             });

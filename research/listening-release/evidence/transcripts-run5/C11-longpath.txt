@@ -1,0 +1,984 @@
+[+0.016s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.026s]
+scanning C:\Users\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac ...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.082s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.101s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐
+│▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: C:\Users\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:04                                                                                               │
+│00:00 ╸─────────────────────── 00:04                                                                                  │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/1   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+0.447s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 │
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+                                                                                                                     │
+                                                                                                                    │
+                                                                                                                   │
+                                                                                                                  │
+                                                                                                                 │
+                                                                                                                │
+                                                                                                               │
+                                                                                                              │
+                                                                                                             │
+                                                                                                            │
+                                                                                                           │
+                                                                                                          └─────────────
+─────────────────────────────────────────────────────────────────────────────────────────────────────────┌ Qianqian Refe
+rence Player ───────────────────────────────────────────────────────────────────────────────────────────│
+                                                                                                       │Source: C:\Users
+\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                                │Position: 00:00 /
+00:04                                                                                               │00:00 ╸────────────
+─────────── 00:04                                                                                  │Terminal: pending
+Stop requested: false   Pause requested: false   Paused: false                                    │Track: 1/1   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+                                                                                                │
+                                                                                               │
+                                                                                              │
+                                                                                             │
+                                                                                            └───────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────┌ Diagnostics ───────────────
+──────────────────────────────────────────────────────────────────────────────────────────│(none)
+                                                                                         │
+                                                                                        └───────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────┌ Controls ──────────────────────
+──────────────────────────────────────────────────────────────────────────────────────│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                               │ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                  │ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                              │ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                             │ Esc  Cancel
+                                                                                 └──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+0.448s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.460s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐│
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                                    ││
+                                                                                                                   ││
+                                                                                                                  ││
+                                                                                                                 ││
+                                                                                                                ││
+                                                                                                               ││
+                                                                                                              ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+────────────────────────────────────────────────────────────────────────────────────────────────────────┘┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:04                                                                                              ││00:00 ╸────────────
+─────────── 00:04                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused: false                                   ││Track: 1/1   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││Open: ▏  (Enter = open
+, Esc = cancel)                                                                                ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                 ││ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+[+0.528s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐
+│▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                     │
+│Source: C:\Users\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                               │
+│Position: 00:00 / 00:04                                                                                              │
+│00:00 ╸─────────────────────── 00:04                                                                                 │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                   │
+│Track: 1/1   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                             │
+│Open: ▏  (Enter = open, Esc = cancel)                                                                                │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                               │
+│                                                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                              │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                 │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                             │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                            │
+│ Esc  Cancel                                                                                                         │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+0.551s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐│
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                                    ││
+                                                                                                                   ││
+                                                                                                                  ││
+                                                                                                                 ││
+                                                                                                                ││
+                                                                                                               ││
+                                                                                                              ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+────────────────────────────────────────────────────────────────────────────────────────────────────────┘┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:04                                                                                              ││00:00 ╸────────────
+─────────── 00:04                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused: false                                   ││Track: 1/1   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││Open: qianqian-longpat
+h-aaaaaaaaaaaa▏  (Enter = open, Esc = cancel)                                                  ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                 ││ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘──────────────────────────────────────┘
+[+0.566s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐│
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                                    ││
+                                                                                                                   ││
+                                                                                                                  ││
+                                                                                                                 ││
+                                                                                                                ││
+                                                                                                               ││
+                                                                                                              ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+────────────────────────────────────────────────────────────────────────────────────────────────────────┘┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:04                                                                                              ││00:00 ╸────────────
+─────────── 00:04                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused: false                                   ││Track: 1/1   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││Open: qianqian-longpat
+h-aaaaaaaaaaaa▏  (Enter = open, Esc =aaaaaaaaaaaaaaaaa▏  (Enter = open, Esc = cancel)          ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                 ││ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘──────────────────────────────────────┘
+[+0.582s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐│
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                                    ││
+                                                                                                                   ││
+                                                                                                                  ││
+                                                                                                                 ││
+                                                                                                                ││
+                                                                                                               ││
+                                                                                                              ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+────────────────────────────────────────────────────────────────────────────────────────────────────────┘┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:04                                                                                              ││00:00 ╸────────────
+─────────── 00:04                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused: false                                   ││Track: 1/1   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││Open: qianqian-longpat
+h-aaaaaaaaaaaa▏  (Enter = open, Esc =aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa▏  (Enter = open, Esc = cancel)
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                 ││ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘──────────────────────────────────────┘
+[+0.597s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐│
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                                    ││
+                                                                                                                   ││
+                                                                                                                  ││
+                                                                                                                 ││
+                                                                                                                ││
+                                                                                                               ││
+                                                                                                              ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+────────────────────────────────────────────────────────────────────────────────────────────────────────┘┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:04                                                                                              ││00:00 ╸────────────
+─────────── 00:04                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused: false                                   ││Track: 1/1   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││Open: qianqian-longpat
+h-aaaaaaaaaaaa▏  (Enter = open, Esc =aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa▏  (Enter = open, Esc =
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                 ││ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘──────────────────────────────────────┘
+[+0.612s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐│
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                                    ││
+                                                                                                                   ││
+                                                                                                                  ││
+                                                                                                                 ││
+                                                                                                                ││
+                                                                                                               ││
+                                                                                                              ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+────────────────────────────────────────────────────────────────────────────────────────────────────────┘┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:04                                                                                              ││00:00 ╸────────────
+─────────── 00:04                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused: false                                   ││Track: 1/1   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││Open: qianqian-longpat
+h-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa▏  ││
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                 ││ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘──────────────────────────────────────┘
+[+0.627s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐│
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                                    ││
+                                                                                                                   ││
+                                                                                                                  ││
+                                                                                                                 ││
+                                                                                                                ││
+                                                                                                               ││
+                                                                                                              ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+────────────────────────────────────────────────────────────────────────────────────────────────────────┘┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:04                                                                                              ││00:00 ╸────────────
+─────────── 00:04                                                                                 ││Terminal: pending
+Stop requested: false   Pause requested: false   Paused: false                                   ││Track: 1/1   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││Open: qianqian-longpat
+h-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa▏  ││                  aaa
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                 ││ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘──────────────────────────────────────┘
+[+0.684s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐│
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                                    ││
+                                                                                                                   ││
+                                                                                                                  ││
+                                                                                                                 ││
+                                                                                                                ││
+                                                                                                               ││
+                                                                                                              ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+────────────────────────────────────────────────────────────────────────────────────────────────────────┘┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: C:\Users
+\Public\qqianqian-longpath-aaaaaaaaataaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:04      -- --                                                                                   ││00:00 ╸────────────
+─Terminal: pending   Stop requested: false   Pause requested: false   Paused: false               ││Terminal: pending
+Strack: 1/1   Volume: 100/100 (desired)   Order: Sequential  eRepeat: Off                        ││Track: 1/1   Volume:
+1          sir       r       quential   Re      Off                                             ││Open: qianqian-longpat
+hoaaaed qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa▏  ││                  aaa
+                                                                                              ││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                 ││ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘──────────────────────────────────────┘
+[+0.688s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.706s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐
+│▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: 00:00 / 00:04                                                                                               │
+│00:00 ╸─────────────────────── 00:04                                                                                  │
+│Terminal: pending   Stop requested: false   Pause requested: false   Paused: false                                    │
+│Track: 1/1   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│                                                                                                                      │
+│opened qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+0.709s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.722s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐│
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                                                    ││
+                                                                                                                   ││
+                                                                                                                  ││
+                                                                                                                 ││
+                                                                                                                ││
+                                                                                                               ││
+                                                                                                              ││
+                                                                                                             ││
+                                                                                                            ││
+                                                                                                           ││
+                                                                                                          ││
+                                                                                                         │└─────────────
+────────────────────────────────────────────────────────────────────────────────────────────────────────┘┌ Qianqian Refe
+rence Player ──────────────────────────────────────────────────────────────────────────────────────────┐│
+                                                                                                      ││Source: qianqian
+-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                               ││Position: 00:00 /
+00:04                                                                                              ││00:00 ╸────────────
+─────────── 00:04                                                                                 ││Terminal: pending
+Stop requested: true   Pause requested: false   Paused: false                                    ││Track: 1/1   Volume:
+100/100 (desired)   Order: Sequential   Repeat: Off                                             ││
+                                                                                               ││opened qianqian-longpat
+h-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa││
+                                                                                             ││
+                                                                                            ││
+                                                                                           │└───────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────────┘┌ Diagnostics ───────────────
+─────────────────────────────────────────────────────────────────────────────────────────┐│(none)
+                                                                                        ││
+                                                                                       │└───────────────────────────────
+──────────────────────────────────────────────────────────────────────────────────────┘┌ Controls ──────────────────────
+─────────────────────────────────────────────────────────────────────────────────────┐│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                              ││ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                 ││ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                             ││ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                            ││ Esc  Cancel
+                                                                                │└──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────┘
+[+0.789s]
+┌ Playlist ────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐
+│▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ──────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                     │
+│Source: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                               │
+│Position: 00:00 / 00:04                                                                                              │
+│00:00 ╸─────────────────────── 00:04                                                                                 │
+│Terminal: pending   Stop requested: true   Pause requested: false   Paused: false                                    │
+│Track: 1/1   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                             │
+│                                                                                                                     │
+│opened qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                     │
+│                                                                                                                     │
+│                                                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                               │
+│                                                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                              │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                 │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                             │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                            │
+│ Esc  Cancel                                                                                                         │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+0.789s]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[+0.799s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 ┐
+│▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Qianqian Reference Player ───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                      │
+│Source: qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│Format: 44100 Hz, 2 channels, mask 0x3                                                                                │
+│Position: --:-- / 00:04                                                                                               │
+│Terminal: Stopped   Stop requested: true   Pause requested: false   Paused: false                                     │
+│Track: 1/1   Volume: 100/100 (desired)   Order: Sequential   Repeat: Off                                              │
+│terminal outcome committed                                                                                            │
+│                                                                                                                      │
+│opened qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Diagnostics ─────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│(none)                                                                                                                │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+0.809s]
+┌ Playlist ─────────────────────────────────────────────────────────────────────────────────────────────────── sel 1/1 │
+▶ >   1  qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+                                                                                                                     │
+                                                                                                                    │
+                                                                                                                   │
+                                                                                                                  │
+                                                                                                                 │
+                                                                                                                │
+                                                                                                               │
+                                                                                                              │
+                                                                                                             │
+                                                                                                            │
+                                                                                                           │
+                                                                                                          └─────────────
+─────────────────────────────────────────────────────────────────────────────────────────────────────────┌ Qianqian Refe
+rence Player ───────────────────────────────────────────────────────────────────────────────────────────│
+                                                                                                       │Source: qianqian
+-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│Format: 44100 Hz,
+ 2 channels, mask 0x3                                                                                │Position: --:-- /
+00:04                                                                                               │Terminal: Stopped
+ Stop requested: true   Pause requested: false   Paused: false                                     │Track: 1/1   Volume:
+ 100/100 (desired)   Order: Sequential   Repeat: Off                                              │terminal outcome comm
+itted                                                                                            │
+                                                                                                │opened qianqian-longpat
+h-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa│
+                                                                                              │
+                                                                                             │
+                                                                                            └───────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────┌ Diagnostics ───────────────
+──────────────────────────────────────────────────────────────────────────────────────────│(none)
+                                                                                         │
+                                                                                        └───────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────┌ Controls ──────────────────────
+──────────────────────────────────────────────────────────────────────────────────────│ ↑/↓  Select      Enter  Play
+   Space  Pause/Resume                                                               │ ←/→  Seek ±5s    Shift+←/→  Seek
+±30s      G  Go to                                                                  │ N/P  Next/Prev   R  Order      L
+Repeat    +/-  Volume                                                              │ O  Open          ?  Help       S  S
+top    Q/Ctrl+C  Quit                                                             │ Esc  Cancel
+                                                                                 └──────────────────────────────────────
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+[+0.814s]
+scanning C:\Users\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac ...
+stopped before completion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

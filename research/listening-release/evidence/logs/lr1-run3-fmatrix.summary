@@ -1,0 +1,44 @@
+LR1-folder-mixed: RED (10552ms, exit None)
+    expect "scanning" OK
+    FAILURE: timeout waiting for "Format: 44100 Hz" after offset 0; history tail:
+───────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+    CHILD: alive=true threads=Some(4)
+LR1-all-corrupt: GREEN (959ms, exit Some(1))
+    expect "open refused" OK
+    expect "no playable audio files found; 2 unplayable" OK
+    expect "No music loaded." OK
+    keys "q"
+    exit 1 OK
+    absent-after-mark "teardown violated" OK
+LR1-duplicate-roots: RED (10537ms, exit None)
+    FAILURE: timeout waiting for "Format: 44100 Hz" after offset 0; history tail:
+───────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+    CHILD: alive=true threads=Some(4)
+LR1-truncated-next: RED (10527ms, exit None)
+    FAILURE: timeout waiting for "Format: 44100 Hz" after offset 0; history tail:
+───────────────────────────────────────────────────┘
+┌ Controls ────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ↑/↓  Select      Enter  Play       Space  Pause/Resume                                                               │
+│ ←/→  Seek ±5s    Shift+←/→  Seek ±30s      G  Go to                                                                  │
+│ N/P  Next/Prev   R  Order      L  Repeat    +/-  Volume                                                              │
+│ O  Open          ?  Help       S  Stop    Q/Ctrl+C  Quit                                                             │
+│ Esc  Cancel                                                                                                          │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+    CHILD: alive=true threads=Some(4)

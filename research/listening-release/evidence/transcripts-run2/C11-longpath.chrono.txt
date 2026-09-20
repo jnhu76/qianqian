@@ -1,0 +1,54 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac"
+T+   0.013s       recv  16 bytes
+T+   0.023s       recv  249 bytes
+T+   0.073s       recv  26 bytes
+T+   0.073s       recv  19 bytes
+T+   0.097s       recv  6771 bytes
+T+   0.239s       recv  354 bytes
+T+   0.434s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.434s    wait-ok  Format: 44100 Hz
+T+   0.434s       send  1 bytes: "o"
+T+   0.435s       recv  6704 bytes
+T+   0.435s       recv  4 bytes
+T+   0.435s       recv  4 bytes
+T+   0.457s       recv  6759 bytes
+T+   0.514s       send  119 bytes: "qianqian-longpath-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.flac"
+T+   0.515s       recv  6759 bytes
+T+   0.535s       recv  72 bytes
+T+   0.551s       recv  67 bytes
+T+   0.566s       recv  63 bytes
+T+   0.581s       recv  39 bytes
+T+   0.595s       send  1 bytes: "\r"
+T+   0.598s       recv  6757 bytes
+T+   0.629s       recv  43 bytes
+T+   0.644s       recv  18 bytes
+T+   0.661s       recv  28 bytes
+T+   0.675s wait-begin  "opened qianqian-longpath" within 20s
+T+   0.675s       recv  482 bytes
+T+   0.676s       recv  6751 bytes
+T+   0.691s       recv  6813 bytes
+T+   0.695s    wait-ok  opened qianqian-longpath
+T+   0.696s wait-begin  "Source: qianqian-longpath" within 20s
+T+   0.696s    wait-ok  Source: qianqian-longpath
+T+   0.696s       send  1 bytes: "s"
+T+   0.696s       recv  6697 bytes
+T+   0.696s       recv  4 bytes
+T+   0.706s       recv  6757 bytes
+T+   0.726s       recv  52 bytes
+T+   0.726s       recv  26 bytes
+T+   0.739s       recv  8 bytes
+T+   0.776s wait-begin  "Terminal: Stopped" within 5s
+T+   0.776s       recv  6408 bytes
+T+   0.776s       recv  4 bytes
+T+   0.786s       recv  6765 bytes
+T+   0.797s    wait-ok  Terminal: Stopped
+T+   0.797s wait-begin  "N/P  Next/Prev" within 5s
+T+   0.797s    wait-ok  N/P  Next/Prev
+T+   0.797s       send  1 bytes: "q"
+T+   0.797s       recv  6649 bytes
+T+   0.797s       recv  4 bytes
+T+   0.798s       recv  6717 bytes
+T+   0.802s       recv  431 bytes
+T+   0.877s       recv  437 bytes
+T+   1.277s wait-begin  "stopped before completion" within 5s
+T+   1.277s    wait-ok  stopped before completion

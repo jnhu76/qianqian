@@ -259,6 +259,22 @@ This ADR does not promote Position into a Fact and does not change the frozen se
 
 The current WASAPI implementation is one refinement of the generic contract, not the definition of it.
 
+> **Amendment (2026-09-20, field-earned; under review on PR #169).** Format
+> negotiation on the current backend is Tier 1 then Tier 2: Tier 1 submits the
+> float32 source format directly (bit-perfect whenever it matches the device mix
+> format); when shared-mode WASAPI refuses exactly that source format
+> (`AUDCLNT_E_UNSUPPORTED_FORMAT` — e.g. a 48 kHz track on a 44.1 kHz mix
+> format, reported as a real-collection field defect), Tier 2 retries with the
+> engine's own SRC (`AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM` +
+> `AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY`). The conversion runs on the
+> engine's mix thread; the data plane still carries float32 at the source rate,
+> so the backend-neutral contract, the D14.8 position accounting and the
+> realtime firewall are unchanged. A format both tiers refuse fails the open
+> honestly. This was previously deferred as an OPEN mechanism choice; the field
+> defect earns the minimum mechanism, inside the owned backend — no new
+> Plugin, no new composition identity, no resampling stage in the Qianqian
+> data plane.
+
 For the current Windows backend:
 
 ```text

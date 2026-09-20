@@ -1,0 +1,45 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\trunc"
+T+   0.012s       recv  16 bytes
+T+   0.021s       recv  135 bytes
+T+   0.070s       recv  26 bytes
+T+   0.071s       recv  18 bytes
+T+   0.087s       recv  6819 bytes
+T+   0.434s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.434s    wait-ok  Format: 44100 Hz
+T+   0.434s wait-begin  "2 candidates" within 5s
+T+   0.434s    wait-ok  2 candidates
+T+   0.434s wait-begin  "Track: 1/2" within 5s
+T+   0.434s    wait-ok  Track: 1/2
+T+   0.434s wait-begin  new-position != None
+T+   1.159s       recv  42 bytes
+T+   1.164s    wait-ok  new-position (0, 1)
+T+   1.164s       send  1 bytes: "n"
+T+   1.175s       recv  6704 bytes
+T+   1.196s       recv  42 bytes
+T+   1.205s       recv  18 bytes
+T+   1.227s       recv  28 bytes
+T+   1.227s       recv  14 bytes
+T+   1.227s       recv  4 bytes
+T+   1.236s       recv  6757 bytes
+T+   1.244s wait-begin  "Track: 2/2" within 20s
+T+   1.244s    wait-ok  Track: 2/2
+T+   1.244s wait-begin  "Terminal: Completed" within 30s
+T+   1.245s       recv  6801 bytes
+T+   1.252s       recv  6813 bytes
+T+   2.341s       recv  42 bytes
+T+   2.490s       recv  26 bytes
+T+   2.498s       recv  65 bytes
+T+   2.514s       recv  342 bytes
+T+   2.530s       recv  52 bytes
+T+  31.257s wait-TIMEOUT  "Terminal: Completed" after offset 0
+T+  31.257s wait-begin  "Terminal: Failed" within 30s
+T+  31.257s    wait-ok  Terminal: Failed
+T+  31.257s       send  1 bytes: "q"
+T+  31.258s       recv  6538 bytes
+T+  31.258s       recv  8 bytes
+T+  31.274s       recv  333 bytes
+T+  31.338s       recv  339 bytes
+T+  31.738s wait-begin  "EOF: played out completely" within 5s
+T+  31.738s  wait-DEAD  child exited Some(1) awaiting "EOF: played out completely"
+T+  31.738s wait-begin  "playback failed" within 5s
+T+  31.738s    wait-ok  playback failed

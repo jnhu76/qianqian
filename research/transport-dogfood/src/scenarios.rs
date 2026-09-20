@@ -120,6 +120,16 @@ pub enum Step {
         code: u32,
         within_ms: u64,
     },
+    /// Like [`Step::ExpectExit`], but either code satisfies: for a
+    /// damaged-input scenario whose terminal the authority may settle
+    /// EITHER way (an early-EOF Completed or a decode Failed), the
+    /// honest gate is "committed truthfully and reported", not one
+    /// specific outcome.
+    ExpectExitEither {
+        a: u32,
+        b: u32,
+        within_ms: u64,
+    },
     /// Resize the pseudoconsole (Stage-C closure C9): the runtime has
     /// no resize-specific code — the next draw picks up the new size —
     /// so the scenario resizes, then presses a key (which triggers the
@@ -164,6 +174,19 @@ pub enum Step {
 const SHORT_WAIT: u64 = 5_000;
 const OPEN_WAIT: u64 = 20_000;
 const EOF_WAIT: u64 = 30_000;
+
+/// The pseudoconsole size a scenario runs at. The harness default is
+/// 120x40; `U3-keys-field` runs at the FIELD size 120x30 because the
+/// defect it gates is height-dependent — the modal/status lines
+/// clipped below the now-playing fold at ~30 rows while the taller
+/// harness console rendered them fine, which is exactly why the
+/// earlier runs never caught it.
+pub fn scenario_size(name: &str) -> (i16, i16) {
+    match name {
+        "U3-keys-field" => (120, 30),
+        _ => (120, 40),
+    }
+}
 
 /// The 24-entry viewport list (staged by tools/run-tui.sh as renamed
 /// copies of the 45 s synthetic sine, so every entry is long enough that
@@ -403,6 +426,27 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         // The ONE shuffle grammar (flag immediately after the
         // subcommand).
         "U2-shuffle-start" => &["--shuffle", "flac4.flac", "mp3cbr.mp3", "alac4.m4a"],
+        // U2 corrective (field defect): an MP3 whose embedded cover art
+        // is an unresolvable attached-picture stream. The committed
+        // synthetic fixture (apps/headless/tests/fixtures) is staged as
+        // cover.mp3 by the campaign runner.
+        "U2-cover-clean" => &["cover.mp3"],
+        // U2 corrective (field defect, 48 kHz track refused): a
+        // mixed-rate playlist — 44.1 kHz then 48 kHz — both tracks must
+        // play. Whichever track differs from the host mix format
+        // exercises the Tier-2 engine-SRC fallback; the other exercises
+        // the Tier-1 direct path.
+        "U2-rate-mix" => &["mp3cbr.mp3", "synth10-48k.mp3"],
+        // U3-keys-field runs its whole key-grammar dance inside ONE
+        // long episode (see the steps arm).
+        "U3-keys-field" => &["synth45.mp3"],
+        // Ad-hoc (NOT part of the fixed groups): open a REAL user-named
+        // directory end to end — idle launch, then the O dialog with
+        // the typed path (exactly the user's field operation). The
+        // directory comes from the driver environment
+        // (QIANQIAN_DOGFOOD_REALDIR); the campaign runner never sets
+        // it, so fixed runs never see this scenario.
+        "X-realdir" => &[],
         "U2-cjk" => &["千曲.flac", "flac4.flac"],
         "U2-viewport" => &VVIEWPORT,
         "U2-soak" => &SOAK_LIST,
@@ -411,10 +455,21 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         "A1-mp3cbr" => &["mp3cbr.mp3"],
         "A1-alac4" => &["alac4.m4a"],
         "A1-alac6" => &["alac6.m4a"],
-        // Track 2 is the deliberately-invalid navigation candidate.
+        // Startup includes one deliberately-invalid explicit file; the
+        // Listening-Release scan rejects it before the playlist seeds.
         "A15" => &["synth45.mp3", "garbage.bin", "flac4.flac"],
         // Track durations cover the full navigation walk (~10 s).
         "A14" => &["synth30.flac", "flac4.flac", "synth45.mp3"],
+        // Listening-Release physical gates (LR1): the F-matrix /
+        // dedup / large-list folders staged by the campaign's runner
+        // under the media root (fixtures + declared synthetic files,
+        // shapes recorded in the run ENV file).
+        "LR1-folder-mixed" => &["fmatrix"],
+        "LR1-all-corrupt" => &["corrupt"],
+        "LR1-duplicate-roots" => &["dup", "dup"],
+        "LR1-truncated-next" => &["trunc"],
+        "LR1-large" => &["big1000"],
+        "LR1-huge" => &["big5000"],
         // Soak: every occupied episode outlasts its script segment.
         "A20" => &["synth45.mp3", "synth30.flac", "mp3cbr.mp3"],
         // Stage-C closure scenarios: a >112-char filename (the Source
@@ -432,6 +487,11 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         Duration::from_secs(300)
     } else if name == "A19" {
         Duration::from_secs(200)
+    } else if name == "LR1-huge" {
+        // 5,000-file scan (enumerate + probe each) plus playback start.
+        Duration::from_secs(300)
+    } else if name == "LR1-large" {
+        Duration::from_secs(180)
     } else {
         Duration::from_secs(120)
     };
@@ -734,8 +794,11 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 // The missing-path refusal wording is deterministic (os
                 // error 2), so the path-qualified diagnostic is a stable
                 // witness — and it cannot match the earlier garbage refusal
-                // still rendered on screen.
-                expect_mark("cannot open 'missing-file.flac'"),
+                // still rendered on screen. (Listening-Release note: the
+                // O-key expansion now refuses a missing path at the
+                // ENUMERATION step, so the needle reads `cannot read`,
+                // not the decode layer's `cannot open`.)
+                expect_mark("cannot read missing-file.flac"),
                 expect("Terminal: pending"),
             ])
             .chain(quit_clean())
@@ -813,23 +876,159 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         .chain(quit_clean())
         .collect(),
 
-        // A15 — navigation failure: a refused candidate (garbage.bin as
-        // track 2) moves nothing and never auto-skips; the playing
-        // episode keeps consuming. The navigation refusal's stable
-        // prefix is `next refused:` (run-E transcript: `next refused:
-        // SongCore refused '<abs path>': status 104`).
+        // A15 — startup hardening under the Listening-Release scan
+        // contract: an explicitly named invalid file is PROBE-REJECTED
+        // at scan time (never enters the playlist, reported boundedly
+        // under `not playable:`), the folder still opens its real
+        // tracks, and navigation walks the two surviving entries with
+        // inert boundaries. (The pre-campaign A15 pinned a refused
+        // candidate INSIDE the playlist; scan-time rejection now keeps
+        // it out — the runtime-failed-track-no-skip policy is pinned
+        // by the machine transport's failure scenarios instead.)
         "A15" => vec![
-            expect("Track: 1/3"),
+            expect("Track: 1/2"),
             expect_format(),
+            expect("not playable: garbage.bin"),
             Step::Mark,
-            keys("n"),
-            expect_mark("next refused"),
-            expect_mark("Track: 1/3"),
-            Step::SleepMs(1_200),
             new_position(),
             keys("n"),
-            expect_mark("next refused"),
-            expect_mark("Track: 1/3"),
+            expect_mark(next_opened(media, "flac4.flac")),
+            expect_mark("Track: 2/2"),
+            keys("n"),
+            expect_mark("no next track"),
+            expect_mark("Track: 2/2"),
+            keys("p"),
+            expect_mark(prev_opened(media, "synth45.mp3")),
+            expect_mark("Track: 1/2"),
+            keys("p"),
+            expect_mark("no previous track"),
+            expect_mark("Track: 1/2"),
+        ]
+        .into_iter()
+        .chain(quit_clean())
+        .collect(),
+
+        // LR1-folder-mixed — the F-matrix folder: real tracks (flat,
+        // nested, CJK, long-name), quiet non-audio noise, one renamed
+        // garbage "track", one zero-byte audio file, and one
+        // access-denied subfolder. The scan keeps the five real
+        // candidates, counts the noise, reports the two corrupt files
+        // boundedly, and the partial scan never presents as complete.
+        "LR1-folder-mixed" => vec![
+            expect("scanning"),
+            expect_format(),
+            expect("5 candidates, 5 skipped, 2 unplayable"),
+            expect("not playable: broken.flac"),
+            expect("not playable: zero.mp3"),
+            expect("scan warning: cannot read"),
+            expect("Track: 1/5"),
+            expect(playing_selected_row(1, "01-track.flac")),
+            Step::Mark,
+            new_position(),
+            keys(DOWN),
+            expect_mark("sel 2/5"),
+            expect_mark(selected_only_row(2, "02-track.m4a")),
+        ]
+        .into_iter()
+        .chain(quit_clean())
+        .collect(),
+
+        // LR1-all-corrupt — every audio-looking file in the folder
+        // fails the probe: the honest refusal, an idle-but-alive
+        // shell, and the argv-driven exit contract (visible refusal,
+        // exit 1).
+        "LR1-all-corrupt" => vec![
+            expect("open refused"),
+            expect("no playable audio files found; 2 unplayable"),
+            expect("No music loaded."),
+            keys("q"),
+            Step::ExpectExit {
+                code: 1,
+                within_ms: 15_000,
+            },
+            Step::AbsentAfterMark("teardown violated".to_owned()),
+        ],
+
+        // LR1-duplicate-roots — the same folder named twice on argv:
+        // every accepted path once (first occurrence order), the
+        // duplicates counted, playback and navigation normal.
+        "LR1-duplicate-roots" => vec![
+            expect_format(),
+            expect("2 candidates, 2 duplicates removed"),
+            expect("Track: 1/2"),
+            Step::Mark,
+            new_position(),
+            keys("n"),
+            expect_mark("Track: 2/2"),
+        ]
+        .into_iter()
+        .chain(quit_clean())
+        .collect(),
+
+        // LR1-truncated-next — a track whose container header parses
+        // (probe passes at scan time) but whose stream is cut roughly
+        // in half: navigation reaches it, the episode commits SOME
+        // truthful terminal (an early-EOF Completed or a decode
+        // Failed — both legal for damaged input), there is no panic,
+        // no auto-skip and no teardown violation. Which terminal the
+        // authority settles is recorded by the run, not assumed.
+        "LR1-truncated-next" => vec![
+            expect_format(),
+            expect("2 candidates"),
+            expect("Track: 1/2"),
+            Step::Mark,
+            new_position(),
+            keys("n"),
+            expect_mark("Track: 2/2"),
+            Step::ExpectEither {
+                a: "Terminal: Completed".to_owned(),
+                b: "Terminal: Failed".to_owned(),
+                within_ms: 30_000,
+            },
+            keys("q"),
+            Step::ExpectExitEither {
+                a: 0,
+                b: 1,
+                within_ms: 15_000,
+            },
+            Step::ExpectEither {
+                a: "EOF: played out completely".to_owned(),
+                b: "playback failed".to_owned(),
+                within_ms: SHORT_WAIT,
+            },
+            Step::AbsentAfterMark("teardown violated".to_owned()),
+        ],
+
+        // LR1-large / LR1-huge — 1,000- and 5,000-entry playlists:
+        // the scan completes in bounded practical time, the Track
+        // line carries the real count, the viewport windows around
+        // the selection, and browsing works (no 5,000-row redraw per
+        // frame is pinned by the unit suite; this is the physical
+        // usability witness). Wall-clock timing is recorded by the
+        // campaign runner around the whole run.
+        "LR1-large" => vec![
+            expect("1000 candidates"),
+            expect_format(),
+            expect("Track: 1/1000"),
+            Step::Mark,
+            new_position(),
+            Step::KeysEach(DOWN, 5, 100),
+            expect_mark("sel 6/1000"),
+            keys(UP),
+            expect_mark("sel 5/1000"),
+        ]
+        .into_iter()
+        .chain(quit_clean())
+        .collect(),
+
+        "LR1-huge" => vec![
+            expect_mark_within("5000 candidates", 240_000),
+            expect_format(),
+            expect("Track: 1/5000"),
+            Step::Mark,
+            new_position(),
+            Step::KeysEach(DOWN, 3, 100),
+            expect_mark("sel 4/5000"),
         ]
         .into_iter()
         .chain(quit_clean())
@@ -1556,6 +1755,164 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 expect("Order: Shuffle"),
                 expect("Track: 1/3"),
                 expect(playing_selected_row(1, "flac4.flac")),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U3-keys-field — the field-defect gate (field round 3), run at
+        // the FIELD terminal size 120x30 (see scenario_size), NOT the
+        // harness default: with a live episode the now-playing panel
+        // was exactly full, and before the content-driven layout the
+        // status block and the ACTIVE Open/GoTo input lines rendered
+        // below the fold — pressing G opened an INVISIBLE modal that
+        // swallowed every subsequent key (the field "keyboard is dead"
+        // report), and Enter on the playing row re-opened the track
+        // from its head. The whole frozen grammar must stay visible
+        // and live at the size the field actually runs. The one 45 s
+        // fixture keeps the whole dance inside a single episode.
+        "U3-keys-field" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/1"),
+                Step::SleepMs(2_000),
+                // Enter on the live selected row: INERT by rule — the
+                // shell says so in a VISIBLE status line, nothing
+                // re-opens, and playback continues.
+                Step::Mark,
+                keys(ENTER),
+                expect_after_mark_async("already playing the selected track", SHORT_WAIT),
+                Step::AbsentAfterMark("play: opened".to_owned()),
+                new_position(),
+                // G opens the line and the line is VISIBLE at 120x30
+                // (before the fix it opened below the fold).
+                keys("g"),
+                expect_mark_within("Go to: [", SHORT_WAIT),
+                Step::Typed("0:10".to_owned()),
+                keys(ENTER),
+                expect_after_mark_async("seek requested: 00:10", OPEN_WAIT),
+                new_position(),
+                keys(ESC),
+                Step::Mark,
+                repaint(),
+                Step::AbsentAfterMark("Go to:".to_owned()),
+                // The policy keys answer with their own visible labels.
+                keys("l"),
+                expect_after_mark_async("Repeat: All", SHORT_WAIT),
+                // S stops the episode: the keyboard is alive end to end.
+                keys("s"),
+                expect_after_mark_async("Terminal: Stopped", 10_000),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-cover-clean — the field-defect gate (U2 corrective): an
+        // MP3 whose embedded cover art rides an attached-picture stream
+        // this trimmed FFmpeg build cannot resolve. Since the
+        // probe-cost fix, the open is bounded and SILENT: no FFmpeg
+        // mechanism chatter and no WASAPI mechanism diagnostic may
+        // reach the console for the whole session — startup open
+        // included (the Mark precedes the first frame). Repeat All
+        // keeps the 2 s fixture looping so the cleanliness window
+        // covers steady playback too. The playback oracles pin that
+        // the episode itself is untouched by the fix.
+        "U2-cover-clean" => {
+            let mut v = vec![
+                Step::Mark,
+                expect_format(),
+                expect(format!("Source: {media}\\cover.mp3")),
+                expect(playing_selected_row(1, "cover.mp3")),
+                // Repeat All keeps the 2 s cover fixture looping; the
+                // toggle waits for the startup Open to settle.
+                keys("L"),
+                expect("Repeat: All"),
+                Step::SleepMs(3_000),
+                // THE field-defect oracles: nothing but the product's
+                // own frame may reach the console after the mark.
+                Step::AbsentAfterMark("[mp3 @".to_owned()),
+                Step::AbsentAfterMark("Could not find codec parameters".to_owned()),
+                Step::AbsentAfterMark("Consider increasing the value".to_owned()),
+                Step::AbsentAfterMark("[qianqian-wasapi]".to_owned()),
+                new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U2-rate-mix — the field-defect gate (48 kHz track refused):
+        // track 1 opens on the direct path (44.1 kHz), then N must open
+        // track 2 (48 kHz source format) — through the Tier-2 engine-SRC
+        // fallback whenever the host mix format differs. The honest
+        // source-format line is the oracle: both rates must appear, the
+        // second with a live position, and a failure would surface as
+        // the "next failed" diagnostic instead.
+        "U2-rate-mix" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/2"),
+                expect("Format: 44100 Hz"),
+                new_position(),
+                keys("n"),
+                expect("Track: 2/2"),
+                expect("Format: 48000 Hz"),
+                new_position(),
+                // Field round 5 tripwire: after the switch, no frame may
+                // render the collapsed `--:--` timeline — the
+                // pending-start policy keeps the timeline/bar row
+                // present through the first-sampling window (the exact
+                // pin is the unit suite; this catches a regression on
+                // the real path).
+                Step::AbsentAfterMark("Position: --:--".to_owned()),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // X-realdir — the field-latency witness (U2 corrective): open
+        // the real user corpus (QIANQIAN_DOGFOOD_REALDIR) through the
+        // O dialog — the exact field operation — witness the console
+        // staying clean across a 100+-file probe scan, and step to the
+        // next track. With the transcript's per-frame timestamps the
+        // frame gaps around "Track: 1/" and "Track: 2/" ARE the
+        // measured scan/open and switch latencies (mechanism evidence;
+        // never an audibility claim). Generic needles — no corpus-size
+        // or filename assumptions.
+        "X-realdir" => {
+            let dir = std::env::var("QIANQIAN_DOGFOOD_REALDIR").unwrap_or_else(|_| {
+                panic!("X-realdir requires QIANQIAN_DOGFOOD_REALDIR in the driver environment")
+            });
+            let mut v = vec![
+                Step::Mark,
+                // IDLE launch: no startup Open, so no Format line exists
+                // until the O dialog opens the first candidate — every
+                // needle here is post-open (or count-based).
+                keys("o"),
+                Step::Typed(dir),
+                keys(ENTER),
+                // NOTE: the in-shell O-dialog flow reports the open with
+                // the "opened <path> (N candidates…)" feedback line — the
+                // bare "scanning ..." print belongs to the argv startup
+                // path only.
+                Step::ExpectAfterMark {
+                    text: "Track: 1/".to_owned(),
+                    within_ms: 60_000,
+                },
+                Step::AbsentAfterMark("[mp3 @".to_owned()),
+                Step::AbsentAfterMark("Could not find codec parameters".to_owned()),
+                Step::AbsentAfterMark("[qianqian-wasapi]".to_owned()),
+                Step::SleepMs(1_000),
+                keys("n"),
+                Step::ExpectAfterMark {
+                    text: "Track: 2/".to_owned(),
+                    within_ms: 30_000,
+                },
+                Step::AbsentAfterMark("[mp3 @".to_owned()),
+                Step::AbsentAfterMark("[qianqian-wasapi]".to_owned()),
+                // Field round 5 tripwire: the timeline never collapses
+                // to `--:--` on the switch transient (see U2-rate-mix).
+                Step::AbsentAfterMark("Position: --:--".to_owned()),
                 new_position(),
             ];
             v.extend(quit_clean());

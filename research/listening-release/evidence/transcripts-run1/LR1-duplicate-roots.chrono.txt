@@ -1,0 +1,37 @@
+T+   0.000s      spawn  cwd=C:\Users\Public\qn-lr1\media cmd=C:\Users\Public\qn-lr1\qianqian-windows-x86_64\qianqian.exe "play" "C:\Users\Public\qn-lr1\media\dup" "C:\Users\Public\qn-lr1\media\dup"
+T+   0.013s       recv  16 bytes
+T+   0.022s       recv  133 bytes
+T+   0.073s       recv  26 bytes
+T+   0.073s       recv  19 bytes
+T+   0.094s       recv  6819 bytes
+T+   0.436s wait-begin  "Format: 44100 Hz" within 10s
+T+   0.436s    wait-ok  Format: 44100 Hz
+T+   0.436s wait-begin  "2 candidates, 2 duplicates removed" within 5s
+T+   0.436s    wait-ok  2 candidates, 2 duplicates removed
+T+   0.436s wait-begin  "Track: 1/2" within 5s
+T+   0.436s    wait-ok  Track: 1/2
+T+   0.436s wait-begin  new-position != None
+T+   1.172s       recv  42 bytes
+T+   1.186s    wait-ok  new-position (0, 1)
+T+   1.186s       send  1 bytes: "n"
+T+   1.187s       recv  6708 bytes
+T+   1.187s       recv  4 bytes
+T+   1.188s       recv  6757 bytes
+T+   1.218s       recv  52 bytes
+T+   1.218s       recv  26 bytes
+T+   1.234s       recv  8 bytes
+T+   1.251s       recv  27 bytes
+T+   1.252s       recv  123 bytes
+T+   1.266s wait-begin  "Track: 2/2" within 20s
+T+   1.266s       recv  600 bytes
+T+   1.267s       recv  6079 bytes
+T+   1.281s       recv  6813 bytes
+T+   1.287s    wait-ok  Track: 2/2
+T+   1.287s       send  1 bytes: "q"
+T+   1.287s       recv  6701 bytes
+T+   1.296s       recv  296 bytes
+T+   1.316s       recv  34 bytes
+T+   1.326s       recv  47 bytes
+T+   1.367s       recv  378 bytes
+T+   1.767s wait-begin  "stopped before completion" within 5s
+T+   1.767s    wait-ok  stopped before completion

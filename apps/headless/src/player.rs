@@ -280,6 +280,17 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
         Some(self.active.as_ref()?.source.as_path())
     }
 
+    /// One scan-time media probe of a candidate, through the same
+    /// stateless decode-provider query the Open replacement's frozen
+    /// sequence uses (probe-before-destruction). Advisory preflight
+    /// evidence for input-expansion filtering: `Ok` never commits
+    /// anything and `Err` never touches the live episode — the
+    /// authoritative source evidence remains the episode activation's
+    /// own.
+    pub fn probe_candidate(&self, candidate: &Path) -> Result<(), String> {
+        self.start.probe(candidate)
+    }
+
     /// Establish the playlist that rides an Open commit: `entries` are
     /// the accepted candidates in canonical order and `entries[0]` IS
     /// the committed episode, so the traversal cursor starts on it. The
@@ -443,6 +454,24 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
             self.playlist.commit_navigation(position);
         }
         Some(outcome)
+    }
+
+    /// Whether the SELECTED row IS the committed episode's row while
+    /// that episode is still unsettled. App truth over the two cursors
+    /// plus the D11 read side — the shell's Enter rule reads this
+    /// instead of re-deriving it: re-playing the live row would be a
+    /// replacement (a restart), which is never what the Enter-on-
+    /// selected-row affordance means while it is already playing. A
+    /// settled episode (Completed/Stopped/Failed) is NOT live: Enter
+    /// legitimately replays the row.
+    pub fn selected_is_live_episode(&self) -> bool {
+        let Some(episode) = self.active.as_ref() else {
+            return false;
+        };
+        if episode.handle.observe().terminal_outcome.is_some() {
+            return false;
+        }
+        self.playlist.selected_position() == self.playlist.playing_position()
     }
 
     /// Move the UI selection one row later. Presentation only: it never

@@ -1,0 +1,20 @@
+{"scenario":"U1-idle","verdict":"GREEN","exit_code":0,
+ "failure":null,
+ "child_status_at_failure":null,
+ "steps":[
+    "expect \"No music loaded.\" OK",
+    "expect \"Press O to open a file or folder\" OK",
+    "mark",
+    "absent-after-mark \"Position:\" OK",
+    "absent-after-mark \"Paused:\" OK",
+    "absent-after-mark \"Terminal:\" OK",
+    "absent-after-mark \"open refused\" OK",
+    "absent-after-mark \"no audio candidates\" OK",
+    "keys \"q\"",
+    "exit 0 OK",
+    "absent-after-mark \"teardown violated\" OK",
+    "absent-after-mark \"warning: disposal\" OK"
+],
+ "resources":[
+    {"label":"baseline","threads":4,"handles":108,"working_set_bytes":8065024}
+]}
