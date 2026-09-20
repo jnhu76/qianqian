@@ -17,14 +17,15 @@ Status: **PACKAGE_READY_FOR_HUMAN_LISTENING** (engineering pass) —
 
 ```text
 source branch      feat/windows-tui-listening-release-1
-source commit      e7f118d (docs/style HEAD; last PRODUCT-code delta is
-                   9995f6b — the U2 field corrective, §11. The
-                   originally packaged RUN2 build was edb631b.)
+source commit      4498dec (fix(tui): inert Enter on the live row,
+                   content-driven panel budget — the field-round-3
+                   corrective, §11.4)
 base (origin/main) 8b1a739 (PR #168 merge)
 package            dist/qianqian-windows-x86_64.zip
-package sha256     64f64cbc4934cbc933f34867e5a3287ae6cecabb906917178bb02e5c853f6298 (zip, Tier-2 build; superseded: 95be430b… [U2 probesize build], 2abe029c… [RUN2])
-qianqian.exe       sha256 add218975d05eb24ef4871650cd6264a260a84ceb4015c33a85f04a0473329c1 (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
-                   (the superseded RUN2 artifact was zip 2abe029c… / exe 9909ce8d…)
+package sha256     d28c0084ea6afbc28b68d537783da3c8ffddf1414be9d98c5e335b043a1dbff3 (zip, R3 build)
+                   (superseded: 64f64cbc… [Tier-2 build], 95be430b… [U2 probesize build], 2abe029c… [RUN2])
+qianqian.exe       sha256 4122a04e4fed8b91afab0819d423271d4d1e7c6e3969b833869b2df6f42598c3 (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
+                   (superseded: add21897… [Tier-2], 9909ce8d… [RUN2])
 songcore (mingw)   05cbb12aaf33e44e5f0784deca0b410a0948f625d142bb4f7192fb61040fe7cc
                    (native/build/artifacts-mingw/libsongcore.a; FFmpeg
                    n9.0.1 bf1b838f LGPL closure statically inside;
@@ -229,7 +230,7 @@ PACKAGE:
 dist/qianqian-windows-x86_64.zip
 
 SHA256:
-64f64cbc4934cbc933f34867e5a3287ae6cecabb906917178bb02e5c853f6298 (zip) / extracted exe add218975d05eb24ef4871650cd6264a260a84ceb4015c33a85f04a0473329c1
+d28c0084ea6afbc28b68d537783da3c8ffddf1414be9d98c5e335b043a1dbff3 (zip) / extracted exe 4122a04e4fed8b91afab0819d423271d4d1e7c6e3969b833869b2df6f42598c3
 
 EXTRACT AND RUN:
 qianqian.exe play --shuffle "D:\Music"
@@ -385,4 +386,84 @@ exit               clean quit, code 0
 
 These are mechanism/latency observations, not audibility claims; the
 ACOUSTIC_WITNESS checklist (§9) remains the human's alone.
+
+### 11.4 Third round: Enter restarts the track; the keyboard "dies" (R3)
+
+Playing the real corpus, the user reported (with a full-screen
+screenshot, Order/Repeat/Track all still at their startup values):
+
+1. **Enter mid-play restarted the track from its head.** In the common
+   state the selected row IS the committed episode's row (selection
+   follows every commit), and `Enter` ran the whole frozen Open
+   replacement for it — a restart by construction. There was no
+   same-track inert rule in the grammar.
+
+2. **Then every key "stopped working"** — N/P, R, L, +/-, O, ?, S, Q,
+   G all dead while playback and the position line stayed visibly
+   alive, and G "had nowhere to type into". Root cause (proven on a
+   ratatui `TestBackend` probe, not inferred): the now-playing panel
+   was pinned at `Min(10)` and the vertical layout handed all leftover
+   rows to the playlist pane, so at the field's ~30-row console a live
+   episode filled the panel EXACTLY (blank + Source + Format +
+   Position + bar + Terminal + Track = 8 content rows). The status
+   block (2 rows) and the ACTIVE Open/GoTo input line (1 row) rendered
+   below the fold — invisible. Pressing G activated a modal the user
+   could not see; the modal precedence (Issue #166 §28) then swallowed
+   every later keypress into the invisible line. The keyboard was not
+   dead — it was typing into a black hole. The earlier physical runs
+   could not catch this: the harness console is 120x40, where both
+   lines were visible (probe: goto visible from ~34 rows up).
+
+   The frozen-loop alternative was ruled out by the same screenshot:
+   mid-replacement the App's `active` is already taken, so any hang
+   inside the Open replacement renders the IDLE panel ("No music
+   loaded.") — the screenshot shows a fully populated live episode
+   instead.
+
+Corrective (commit 4498dec, App-layer only):
+
+- **Enter inert rule**: one App truth predicate — selected cursor ==
+  committed cursor AND the episode's D11 terminal not yet committed —
+  and the shell refuses to re-invoke the replacement, saying so in the
+  status line ("already playing the selected track"). A settled
+  episode (Completed/Stopped/Failed) still replays; Enter on a
+  DIFFERENT browsed row still plays it (unchanged, U2-enter).
+- **Content-driven panel budget**: the now-playing layout constraint
+  is derived from the same line builder the panel renders (one
+  builder, two readers), so the operation feedback and the active
+  input lines always fit; the playlist absorbs the difference by
+  clipping rows — its documented degradation. A hidden modal was a
+  keyboard black hole; a scrolled playlist is still a playlist.
+
+New physical gate `U3-keys-field`, run at the FIELD terminal size
+120x30 through a new per-scenario pseudoconsole size (harness default
+unchanged): Enter on the live row is inert and VISIBLE, G opens a
+VISIBLE line at 30 rows, the typed seek routes, L labels, S stops.
+Plus unit pins: the runtime Enter-inert/replay tests and a 120x30
+visibility test over the full live panel.
+
+### 11.5 RUN5 — the physical evidence of record (all GREEN)
+
+Against the R3 package (zip d28c0084…, exe 4122a04e…, HEAD 4498dec):
+
+```text
+core   10 GREEN  (U1-idle, U1-folder-open, U2-shuffle-start,
+                  U2-cover-clean, U2-rate-mix, U2-help,
+                  U3-keys-field [NEW, at 120x30], C11-longpath,
+                  C12-cjk, A15)
+fmatrix 4 GREEN  (folder-mixed, all-corrupt, duplicate-roots,
+                  truncated-next)
+large   1 GREEN  (1000-file list)
+huge    1 GREEN  (5000-entry list)
+scenario_groups_green: 4/4
+```
+
+U3-keys-field witness: Enter mid-play → "already playing the selected
+track" rendered, no `play: opened` re-open, position kept advancing;
+G → the `Go to: [` line rendered at 120x30; typed `0:10` → seek
+requested, new position sample; L → "Repeat: All"; S → "Terminal:
+Stopped"; clean exit 0. X-realdir re-run on the same package: GREEN
+(first track ~240 ms after the O-dialog Enter; N to track 2 ~120 ms;
+console clean; clean exit). Evidence: `evidence/logs/lr1-run5-*.summary`,
+`evidence/transcripts-run5/` (incl. X-realdir), `evidence/ENV-LR1-RUN5.txt`.
 
