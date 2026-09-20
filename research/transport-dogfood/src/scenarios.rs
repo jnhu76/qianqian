@@ -175,6 +175,19 @@ const SHORT_WAIT: u64 = 5_000;
 const OPEN_WAIT: u64 = 20_000;
 const EOF_WAIT: u64 = 30_000;
 
+/// The pseudoconsole size a scenario runs at. The harness default is
+/// 120x40; `U3-keys-field` runs at the FIELD size 120x30 because the
+/// defect it gates is height-dependent — the modal/status lines
+/// clipped below the now-playing fold at ~30 rows while the taller
+/// harness console rendered them fine, which is exactly why the
+/// earlier runs never caught it.
+pub fn scenario_size(name: &str) -> (i16, i16) {
+    match name {
+        "U3-keys-field" => (120, 30),
+        _ => (120, 40),
+    }
+}
+
 /// The 24-entry viewport list (staged by tools/run-tui.sh as renamed
 /// copies of the 45 s synthetic sine, so every entry is long enough that
 /// the scenario's browsing and its single Enter stay inside one
@@ -424,6 +437,9 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
         // exercises the Tier-2 engine-SRC fallback; the other exercises
         // the Tier-1 direct path.
         "U2-rate-mix" => &["mp3cbr.mp3", "synth10-48k.mp3"],
+        // U3-keys-field runs its whole key-grammar dance inside ONE
+        // long episode (see the steps arm).
+        "U3-keys-field" => &["synth45.mp3"],
         // Ad-hoc (NOT part of the fixed groups): open a REAL user-named
         // directory end to end — idle launch, then the O dialog with
         // the typed path (exactly the user's field operation). The
@@ -1740,6 +1756,53 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 expect("Track: 1/3"),
                 expect(playing_selected_row(1, "flac4.flac")),
                 new_position(),
+            ];
+            v.extend(quit_clean());
+            v
+        }
+
+        // U3-keys-field — the field-defect gate (field round 3), run at
+        // the FIELD terminal size 120x30 (see scenario_size), NOT the
+        // harness default: with a live episode the now-playing panel
+        // was exactly full, and before the content-driven layout the
+        // status block and the ACTIVE Open/GoTo input lines rendered
+        // below the fold — pressing G opened an INVISIBLE modal that
+        // swallowed every subsequent key (the field "keyboard is dead"
+        // report), and Enter on the playing row re-opened the track
+        // from its head. The whole frozen grammar must stay visible
+        // and live at the size the field actually runs. The one 45 s
+        // fixture keeps the whole dance inside a single episode.
+        "U3-keys-field" => {
+            let mut v = vec![
+                expect_format(),
+                expect("Track: 1/1"),
+                Step::SleepMs(2_000),
+                // Enter on the live selected row: INERT by rule — the
+                // shell says so in a VISIBLE status line, nothing
+                // re-opens, and playback continues.
+                Step::Mark,
+                keys(ENTER),
+                expect_after_mark_async("already playing the selected track", SHORT_WAIT),
+                Step::AbsentAfterMark("play: opened".to_owned()),
+                new_position(),
+                // G opens the line and the line is VISIBLE at 120x30
+                // (before the fix it opened below the fold).
+                keys("g"),
+                expect_mark_within("Go to: [", SHORT_WAIT),
+                Step::Typed("0:10".to_owned()),
+                keys(ENTER),
+                expect_after_mark_async("seek requested: 00:10", OPEN_WAIT),
+                new_position(),
+                keys(ESC),
+                Step::Mark,
+                repaint(),
+                Step::AbsentAfterMark("Go to:".to_owned()),
+                // The policy keys answer with their own visible labels.
+                keys("l"),
+                expect_after_mark_async("Repeat: All", SHORT_WAIT),
+                // S stops the episode: the keyboard is alive end to end.
+                keys("s"),
+                expect_after_mark_async("Terminal: Stopped", 10_000),
             ];
             v.extend(quit_clean());
             v

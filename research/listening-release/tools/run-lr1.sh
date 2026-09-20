@@ -264,7 +264,7 @@ run_scenarios() {
 }
 
 ok=0
-run_scenarios core   U1-idle U1-folder-open U2-shuffle-start U2-cover-clean U2-rate-mix U2-help C11-longpath C12-cjk A15 \
+run_scenarios core   U1-idle U1-folder-open U2-shuffle-start U2-cover-clean U2-rate-mix U2-help U3-keys-field C11-longpath C12-cjk A15 \
   && ok=$((ok+1)) || true
 run_scenarios fmatrix LR1-folder-mixed LR1-all-corrupt LR1-duplicate-roots LR1-truncated-next \
   && ok=$((ok+1)) || true

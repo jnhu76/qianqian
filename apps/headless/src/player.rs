@@ -456,6 +456,24 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
         Some(outcome)
     }
 
+    /// Whether the SELECTED row IS the committed episode's row while
+    /// that episode is still unsettled. App truth over the two cursors
+    /// plus the D11 read side — the shell's Enter rule reads this
+    /// instead of re-deriving it: re-playing the live row would be a
+    /// replacement (a restart), which is never what the Enter-on-
+    /// selected-row affordance means while it is already playing. A
+    /// settled episode (Completed/Stopped/Failed) is NOT live: Enter
+    /// legitimately replays the row.
+    pub fn selected_is_live_episode(&self) -> bool {
+        let Some(episode) = self.active.as_ref() else {
+            return false;
+        };
+        if episode.handle.observe().terminal_outcome.is_some() {
+            return false;
+        }
+        self.playlist.selected_position() == self.playlist.playing_position()
+    }
+
     /// Move the UI selection one row later. Presentation only: it never
     /// opens anything and never changes playback (Issue #166 §18).
     pub fn select_next_track(&mut self) {

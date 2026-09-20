@@ -44,7 +44,7 @@ use windows::Win32::System::Threading::{
 
 #[path = "../scenarios.rs"]
 mod scenarios;
-use scenarios::{scenario, Step};
+use scenarios::{scenario, scenario_size, Step};
 
 // ---------------------------------------------------------------- keys
 
@@ -878,6 +878,8 @@ fn run_scenario(
     files: &[&str],
     steps: Vec<Step>,
     watchdog: Duration,
+    cols: i16,
+    rows: i16,
     cwd_override: Option<&str>,
 ) -> ExecReport {
     let mut step_log: Vec<String> = Vec::new();
@@ -902,7 +904,7 @@ fn run_scenario(
             }))
             .collect()
     };
-    let mut session = match Session::spawn(headless, &args, 120, 40, cwd_override) {
+    let mut session = match Session::spawn(headless, &args, cols, rows, cwd_override) {
         Ok(s) => s,
         Err(e) => {
             return ExecReport {
@@ -1368,8 +1370,17 @@ fn main() {
     for name in &names {
         let started = Instant::now();
         let (files, steps, watchdog) = scenario(name, &media_dir);
-        let report =
-            run_scenario(&headless, &media_dir, &files, steps, watchdog, cwd_override.as_deref());
+        let (cols, rows) = scenario_size(name);
+        let report = run_scenario(
+            &headless,
+            &media_dir,
+            &files,
+            steps,
+            watchdog,
+            cols,
+            rows,
+            cwd_override.as_deref(),
+        );
         if let Err(e) = write_evidence(&out_dir, name, &report) {
             eprintln!("{name}: evidence write failed: {e}");
         }

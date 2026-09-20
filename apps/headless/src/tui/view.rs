@@ -51,11 +51,20 @@ const SELECTED_MARKER: &str = ">";
 
 /// Render one frame of the reference player.
 pub fn draw(frame: &mut Frame, model: &TuiModel) {
+    // The now-playing budget is its own content (see
+    // [`now_playing_lines`]): two border rows on top of every line the
+    // panel may show this frame, so the operation feedback and the
+    // active input lines are never clipped below the fold on a short
+    // terminal. The playlist pane absorbs the rest and degrades by
+    // clipping rows — its documented degradation, and the honest trade:
+    // a hidden modal line is a keyboard black hole, a scrolled playlist
+    // is still a playlist.
+    let now_playing_min = now_playing_lines(model).len() + 2;
     let [playlist, now_playing, diagnostics, controls] = Layout::vertical([
         // The pane grows with the terminal; below its floor it degrades
         // by clipping rows (never by drawing the whole list).
         Constraint::Min(3),
-        Constraint::Min(10),
+        Constraint::Min(now_playing_min as u16),
         // Two content rows: an episode can carry BOTH an activation
         // diagnostic and a published failure diagnostic, and a truth-
         // class-correct presentation does not clip one behind the other
@@ -212,8 +221,16 @@ fn preference_line(model: &TuiModel) -> Option<String> {
     Some(facts.join("   "))
 }
 
-fn now_playing_panel(model: &TuiModel) -> Paragraph<'_> {
-    let mut lines: Vec<Line<'_>> = Vec::new();
+/// Every line the now-playing panel can show, including the operation
+/// feedback and input lines. The layout budget in [`draw`] is derived
+/// from this exact builder (field round 3: the panel used to be pinned
+/// at `Min(10)`, so on a ~30-row terminal a live episode filled the
+/// panel completely and the status block and the ACTIVE Open/GoTo input
+/// lines rendered below the fold — an invisible modal that swallowed
+/// every subsequent keypress). One builder, two readers: the panel
+/// cannot claim fewer rows than its own content.
+fn now_playing_lines(model: &TuiModel) -> Vec<Line<'static>> {
+    let mut lines: Vec<Line<'static>> = Vec::new();
     match model.source() {
         // The no-episode panel (F6; the U1 idle page): after a
         // clean-failed Open no runtime remains, and on a no-argument
@@ -264,7 +281,11 @@ fn now_playing_panel(model: &TuiModel) -> Paragraph<'_> {
         }
     }
     open_lines(model, &mut lines);
-    Paragraph::new(lines).block(
+    lines
+}
+
+fn now_playing_panel(model: &TuiModel) -> Paragraph<'static> {
+    Paragraph::new(now_playing_lines(model)).block(
         Block::bordered()
             .title(bold(" Qianqian Reference Player "))
             .title_style(Style::default()),
@@ -376,6 +397,80 @@ mod tests {
             })
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    /// Field round 3, problem 2: the operation feedback block and the
+    /// ACTIVE input lines render inside the panel on a short terminal.
+    /// The panel used to be pinned at `Min(10)`, so with a live episode
+    /// on a ~30-row terminal it was exactly full and an activated
+    /// Open/GoTo line rendered below the fold — an invisible modal that
+    /// swallowed every subsequent keypress (the field "keyboard is
+    /// dead" report). Pinned at the dogfood size AND at the field
+    /// size, over the FULL live panel (preference line included).
+    #[test]
+    fn the_active_input_lines_and_status_stay_visible_on_a_short_terminal() {
+        for (cols, rows) in [(120u16, 30u16), (120, 40)] {
+            for (modal, expected) in [
+                ("goto", "Go to: ["),
+                ("open", "Open: "),
+            ] {
+                let mut model = TuiModel::new("song.flac");
+                model.set_episode(Some("D:\\media\\song.flac".to_owned()));
+                model.update(PlaybackSessionObservation {
+                    source_format: Some(PcmFormat {
+                        sample_rate: 44100,
+                        channels: 2,
+                        channel_mask: 0x3,
+                    }),
+                    position: Some(44_100 * 86),
+                    source_duration: Some(Duration::from_secs(383)),
+                    ..pending()
+                });
+                model.set_navigation(Some((1, 6)));
+                model.set_volume(Some(100));
+                model.set_order(crate::playlist::PlaybackOrder::Sequential);
+                model.set_repeat(crate::playlist::RepeatMode::Off);
+                model.set_playlist(1, || {
+                    vec![PlaylistRow {
+                        label: "song.flac".to_owned(),
+                        playing: true,
+                        selected: true,
+                    }]
+                });
+                model.set_status(Some("opened D:\\media (6 candidates…)".to_owned()));
+                match modal {
+                    "goto" => model.begin_goto_input(),
+                    "open" => model.begin_open_input(),
+                    other => unreachable!("{other}"),
+                }
+                let mut terminal =
+                    Terminal::new(TestBackend::new(cols, rows)).expect("virtual terminal");
+                terminal.draw(|frame| draw(frame, &model)).expect("draw");
+                let buffer = terminal.backend().buffer().clone();
+                let text = (0..buffer.area.height)
+                    .map(|y| {
+                        (0..buffer.area.width)
+                            .filter_map(|x| {
+                                buffer.cell((x, y)).map(|c| c.symbol().to_string())
+                            })
+                            .collect::<String>()
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                assert!(
+                    text.contains(expected),
+                    "{modal} line clipped at {cols}x{rows}:\n{text}"
+                );
+                assert!(
+                    text.contains("opened D:\\media (6 candidates…)"),
+                    "status block clipped at {cols}x{rows}:\n{text}"
+                );
+                assert!(
+                    text.contains("Track: 1/6"),
+                    "preference line lost at {cols}x{rows}:\n{text}"
+                );
+            }
+        }
     }
 
     #[test]

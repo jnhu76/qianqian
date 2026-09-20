@@ -349,11 +349,19 @@ fn perform_navigation<S: EpisodeStart>(
 /// Play the SELECTED playlist row through the same Open replacement
 /// (Issue #166 §19). The selection is presentation state the user
 /// already moved; this key is the only thing that turns it into
-/// playback, and only on commit evidence.
+/// playback, and only on commit evidence. One inert rule (field
+/// round 3): Enter on the row that IS the unsettled live episode is
+/// not a replay request — the frozen replacement would restart the
+/// track from its head, so the shell refuses to re-invoke it and says
+/// so instead (no probe, no teardown, nothing moves).
 fn perform_play_selected<S: EpisodeStart>(
     model: &mut TuiModel,
     player: &mut ReferencePlayerApp<S>,
 ) {
+    if player.selected_is_live_episode() {
+        model.set_status(Some("already playing the selected track".to_owned()));
+        return;
+    }
     let feedback = match player.play_selected() {
         None => "nothing selected".to_owned(),
         Some(OpenOutcome::Opened) => match player.active_source() {
@@ -768,6 +776,109 @@ mod tests {
             player.navigation_position(),
             Some((1, 1)),
             "the commit-riding seed holds the found candidates"
+        );
+    }
+
+    /// Field round 3, problem 1: Enter on the row that IS the
+    /// unsettled live episode is INERT — no probe, no replacement, no
+    /// restart from the head of the track, and the shell says so. The
+    /// frozen replacement is a restart by construction; the shell must
+    /// not re-invoke it for the row already playing.
+    #[test]
+    fn enter_on_the_live_selected_track_is_inert() {
+        let tree = TempTree::new("enter-inert");
+        let file = tree.live_file("live.flac");
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        let mut model = TuiModel::new(String::new());
+        open_via_keys(&mut model, &mut player, &file);
+        refresh(&mut model, &player);
+        assert!(player.selected_is_live_episode(), "the committed row is live");
+        let activations = || {
+            log.lock()
+                .expect("fixture log")
+                .iter()
+                .filter(|event| event.starts_with("activate "))
+                .count()
+        };
+        let before = activations();
+        let observation = player.active_handle().expect("committed").observe();
+
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        refresh(&mut model, &player);
+
+        assert_eq!(
+            model.status(),
+            Some("already playing the selected track"),
+            "{:?}",
+            model.status()
+        );
+        assert_eq!(
+            activations(),
+            before,
+            "Enter must not re-open the live track"
+        );
+        assert_eq!(
+            player
+                .active_handle()
+                .expect("still live")
+                .observe()
+                .terminal_outcome,
+            observation.terminal_outcome,
+            "the live episode was never disturbed"
+        );
+    }
+
+    /// The inert rule ends where the episode settles: after the D11
+    /// terminal is committed, the same Enter replays the row through
+    /// the frozen replacement (a replay of a finished track is what
+    /// Enter on it means).
+    #[test]
+    fn enter_on_a_settled_selected_track_replays() {
+        let tree = TempTree::new("enter-replay");
+        let file = tree.live_file("finite-00.flac");
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        let mut model = TuiModel::new(String::new());
+        open_via_keys(&mut model, &mut player, &file);
+        refresh(&mut model, &player);
+        let handle = player.active_handle().expect("committed").clone();
+        assert_eq!(
+            handle.wait_terminal(),
+            qianqian_playback::EpisodeTerminalOutcome::Completed
+        );
+        assert!(
+            !player.selected_is_live_episode(),
+            "a settled episode is not live: Enter replays it"
+        );
+        let activations = || {
+            log.lock()
+                .expect("fixture log")
+                .iter()
+                .filter(|event| event.starts_with("activate "))
+                .count()
+        };
+        let before = activations();
+
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        refresh(&mut model, &player);
+
+        assert!(
+            activations() > before,
+            "the settled row was re-opened through the frozen replacement"
+        );
+        assert!(
+            model.status().unwrap().starts_with("play: opened "),
+            "{:?}",
+            model.status()
         );
     }
 
