@@ -17,14 +17,14 @@ Status: **PACKAGE_READY_FOR_HUMAN_LISTENING** (engineering pass) —
 
 ```text
 source branch      feat/windows-tui-listening-release-1
-source commit      4498dec… (fix(tui) R3) + the VOLUME-TAPER-1 commit
-                   (field round 4, §11.6)
+source commit      4498dec… (fix(tui) R3) + VOLUME-TAPER-1 (R4, §11.6)
+                   + c7efdbe (fix(tui) R5 switch transient, §11.8)
 base (origin/main) 8b1a739 (PR #168 merge)
 package            dist/qianqian-windows-x86_64.zip
-package sha256     3f39c22566d2e08d9b1f925fc281ce1c7781d451d6720cba4c572cd2b90aaeb1 (zip, R4 taper build)
-                   (superseded: d28c0084… [R3 keyboard fixes], 64f64cbc… [Tier-2 build], 95be430b… [U2 probesize build], 2abe029c… [RUN2])
-qianqian.exe       sha256 2d479f55ca04c4ca67d4353de2a34376b16be1769bac199d784417a96c169ab8 (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
-                   (superseded: 4122a04e… [R3], add21897… [Tier-2], 9909ce8d… [RUN2])
+package sha256     ebb8d9d5c3260ee8a29f881094185be26751a997c60958f7ea1ad994bdbb5680 (zip, R5 build)
+                   (superseded: 3f39c225… [R4 taper], d28c0084… [R3 keyboard fixes], 64f64cbc… [Tier-2 build], 95be430b… [U2 probesize build], 2abe029c… [RUN2])
+qianqian.exe       sha256 218b995d2ed5f25fe5ebdce9c527566086d3f40f5b405a5e28c98054c0dddc72 (the extracted, executed artifact; built with --remap-path-prefix — no build-host paths inside)
+                   (superseded: 2d479f55… [R4], 4122a04e… [R3], add21897… [Tier-2], 9909ce8d… [RUN2])
 songcore (mingw)   05cbb12aaf33e44e5f0784deca0b410a0948f625d142bb4f7192fb61040fe7cc
                    (native/build/artifacts-mingw/libsongcore.a; FFmpeg
                    n9.0.1 bf1b838f LGPL closure statically inside;
@@ -229,7 +229,7 @@ PACKAGE:
 dist/qianqian-windows-x86_64.zip
 
 SHA256:
-3f39c22566d2e08d9b1f925fc281ce1c7781d451d6720cba4c572cd2b90aaeb1 (zip) / extracted exe 2d479f55ca04c4ca67d4353de2a34376b16be1769bac199d784417a96c169ab8
+ebb8d9d5c3260ee8a29f881094185be26751a997c60958f7ea1ad994bdbb5680 (zip) / extracted exe 218b995d2ed5f25fe5ebdce9c527566086d3f40f5b405a5e28c98054c0dddc72
 
 EXTRACT AND RUN:
 qianqian.exe play --shuffle "D:\Music"
@@ -519,4 +519,46 @@ screen; audibility is never claimed by this harness) — its executable
 evidence is the unit pin above, and its acceptance item is the human
 listening checklist (§9). Evidence: `evidence/logs/lr1-run6-*.summary`,
 `evidence/transcripts-run6/` (incl. X-realdir), `evidence/ENV-LR1-RUN6.txt`.
+
+### 11.8 Fifth round: a blank playlist row flashed on every switch (R5)
+
+With the R3/R4 fixes holding, the user observed (with a screenshot):
+pressing `N` made the playlist pane gain a blank row after the last
+track and the whole frame "stretch" — and correctly diagnosed the
+cause themselves: the now-playing panel's timeline disappears during
+the switch. Mechanism: the progress bar and the timeline rendered
+only when BOTH evidence sides existed, and a freshly committed
+episode has no position sample yet (~1 Hz publication), so for the
+first sampling window after every switch the panel lost its bar row;
+the content-driven layout budget (§11.4 fix) shrank with it and the
+freed row went to the playlist pane.
+
+Corrective (commit c7efdbe), implementing the field's own suggestion
+("like other players — show the timeline as 0 while switching"): a
+LIVE episode whose position evidence has not arrived yet renders the
+timeline at its start (`00:00 / <total>`) with the bar present and
+empty; without a known total the bar renders against `--:--`. A
+SETTLED episode without position evidence keeps the honest dashes
+and no bar — a dead timeline has no start, and the no-evidence state
+grows no fabricated zero (negative control pinned). The scriptable
+transport's raw `--:--` evidence shapes are untouched: the policy
+lives in the TUI model only. The panel row count is now invariant
+across the transient (pinned: `the_panel_row_count_is_stable_across_
+the_switch_transient`), and dogfood tripwires assert no post-switch
+`--:--` frame renders (U2-rate-mix, X-realdir).
+
+### 11.9 RUN7 — the physical evidence of record (all GREEN)
+
+Against the R5 package (zip ebb8d9d5…, exe 218b995d…, HEAD c7efdbe):
+
+```text
+core   10 GREEN  (…incl. U3-keys-field at 120x30 and the new
+                  switch-transient tripwire in U2-rate-mix)
+fmatrix 4 GREEN / large 1 GREEN / huge 1 GREEN — groups 4/4
+X-realdir on the real corpus: GREEN (clean switch, no collapsed
+timeline frame, console clean, clean exit)
+```
+
+Evidence: `evidence/logs/lr1-run7-*.summary`,
+`evidence/transcripts-run7/` (incl. X-realdir), `evidence/ENV-LR1-RUN7.txt`.
 
