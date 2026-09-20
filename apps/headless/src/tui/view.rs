@@ -473,6 +473,41 @@ mod tests {
         }
     }
 
+    /// Field round 5, the layout invariant under the pending-start
+    /// policy: the now-playing panel renders the SAME number of rows
+    /// with the position sample pending as it does mid-play. A panel
+    /// that shrinks during the switch transient lets the layout grow
+    /// the playlist pane by a row — the field saw that as a blank line
+    /// appearing after the last track on every `N` press.
+    #[test]
+    fn the_panel_row_count_is_stable_across_the_switch_transient() {
+        let base = |position: Option<u64>| {
+            let mut model = TuiModel::new("song.flac");
+            model.set_episode(Some("D:\\media\\song.flac".to_owned()));
+            model.update(PlaybackSessionObservation {
+                source_format: Some(PcmFormat {
+                    sample_rate: 44100,
+                    channels: 2,
+                    channel_mask: 0x3,
+                }),
+                position,
+                source_duration: Some(Duration::from_secs(238)),
+                ..pending()
+            });
+            model.set_navigation(Some((2, 6)));
+            model.set_volume(Some(100));
+            model.set_order(crate::playlist::PlaybackOrder::Sequential);
+            model.set_repeat(crate::playlist::RepeatMode::Off);
+            model.set_status(Some("next: opened D:\\media\\song.flac".to_owned()));
+            model
+        };
+        assert_eq!(
+            now_playing_lines(&base(Some(44_100 * 42))).len(),
+            now_playing_lines(&base(None)).len(),
+            "the pending-start frame must render exactly as many panel rows as a mid-play frame"
+        );
+    }
+
     #[test]
     fn a_fresh_episode_renders_pending_without_inventing_state() {
         let mut model = TuiModel::new("song.flac");
@@ -509,9 +544,9 @@ mod tests {
             (
                 None,
                 Some(Duration::from_secs(238)),
-                "Position: --:-- / 03:58",
+                "Position: 00:00 / 03:58",
             ),
-            (None, None, "Position: --:-- / --:--"),
+            (None, None, "Position: 00:00 / --:--"),
         ] {
             let mut model = TuiModel::new("song.flac");
             model.update(PlaybackSessionObservation {
@@ -1247,6 +1282,34 @@ mod tests {
         assert_eq!(forbidden_status_claim(&text), None, "{text}");
     }
 
+    /// The live pre-first-sample window renders at the START (field
+    /// round 5, the switch-transient layout fix); the negative control
+    /// is the SETTLED episode, which keeps the honest dashes — a dead
+    /// timeline has no start, and nothing is fabricated there.
+    #[test]
+    fn the_timeline_keeps_the_dashes_once_settled_without_evidence() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            source_duration: Some(Duration::from_secs(238)),
+            terminal_outcome: Some(EpisodeTerminalOutcome::Stopped),
+            ..pending()
+        });
+        let text = rendered(&model);
+        assert!(
+            text.contains("Position: --:-- / 03:58"),
+            "a settled episode fabricates no start:\n{text}"
+        );
+        assert!(
+            !text.contains('━') && !text.contains('╸'),
+            "a settled episode renders no bar:\n{text}"
+        );
+    }
+
     /// The read-only progress bar renders as its own line exactly when
     /// both sides have evidence, and the Position line keeps reporting
     /// the honest `--:--` side otherwise (Issue #166 §33).
@@ -1292,7 +1355,9 @@ mod tests {
             "no bar without a known duration: {text}"
         );
 
-        // Unknown position: same rule from the other side.
+        // Unknown position on a LIVE episode: the pre-first-sample
+        // window (field round 5) — the bar renders at its START, empty
+        // but present, so the row never vanishes mid-playback.
         model.update(PlaybackSessionObservation {
             source_format: Some(PcmFormat {
                 sample_rate: 44100,
@@ -1303,8 +1368,12 @@ mod tests {
             ..pending()
         });
         let text = rendered(&model);
-        assert!(text.contains("Position: --:-- / 03:58"), "{text}");
-        assert!(!text.contains('━'), "{text}");
+        assert!(text.contains("Position: 00:00 / 03:58"), "{text}");
+        assert!(
+            !text.contains('━'),
+            "the start bar carries no filled cells: {text}"
+        );
+        assert!(text.contains('╸'), "the bar frame is present: {text}");
     }
 
     /// The order and repeat labels render exactly the frozen vocabulary

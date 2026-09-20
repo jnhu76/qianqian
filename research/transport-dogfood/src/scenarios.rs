@@ -1858,6 +1858,13 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 expect("Track: 2/2"),
                 expect("Format: 48000 Hz"),
                 new_position(),
+                // Field round 5 tripwire: after the switch, no frame may
+                // render the collapsed `--:--` timeline — the
+                // pending-start policy keeps the timeline/bar row
+                // present through the first-sampling window (the exact
+                // pin is the unit suite; this catches a regression on
+                // the real path).
+                Step::AbsentAfterMark("Position: --:--".to_owned()),
             ];
             v.extend(quit_clean());
             v
@@ -1903,6 +1910,9 @@ pub fn scenario(name: &str, media: &str) -> (Vec<&'static str>, Vec<Step>, Durat
                 },
                 Step::AbsentAfterMark("[mp3 @".to_owned()),
                 Step::AbsentAfterMark("[qianqian-wasapi]".to_owned()),
+                // Field round 5 tripwire: the timeline never collapses
+                // to `--:--` on the switch transient (see U2-rate-mix).
+                Step::AbsentAfterMark("Position: --:--".to_owned()),
                 new_position(),
             ];
             v.extend(quit_clean());

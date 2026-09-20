@@ -405,8 +405,32 @@ impl TuiModel {
     /// by the same projection helper the scriptable status text uses, so
     /// the two read-side surfaces cannot disagree; the model keeps no
     /// position of its own (no `last_position`, no local playback truth).
+    ///
+    /// One presentation policy on top (field round 5): while the episode
+    /// is LIVE and its position evidence simply has not arrived yet —
+    /// the first sampling window after every Open replacement — the
+    /// timeline renders at the START (`00:00 / …`) instead of
+    /// collapsing to `--:--`. The episode has consumed nothing (the
+    /// render leg publishes from zero), and a collapsing timeline
+    /// flexed the panel height on every track switch. A SETTLED
+    /// episode keeps the dashes: a dead timeline has no start, and the
+    /// no-evidence state must not grow a fabricated zero.
     pub fn timeline_label(&self) -> String {
+        if self.pending_start_window() {
+            let mut pending = self.observation.clone();
+            pending.position = Some(0);
+            return crate::status::format_timeline(&pending);
+        }
         crate::status::format_timeline(&self.observation)
+    }
+
+    /// Whether this frame is in the live pre-first-sample window: an
+    /// unsettled episode with no activation failure whose position
+    /// projection has not published yet.
+    fn pending_start_window(&self) -> bool {
+        self.observation.position.is_none()
+            && self.observation.terminal_outcome.is_none()
+            && self.observation.activation_error.is_none()
     }
 
     /// The read-only progress bar (Issue #166 §33):
@@ -416,28 +440,43 @@ impl TuiModel {
     /// appear — it is never fabricated, and it is never an input
     /// affordance (seeking stays keyboard-only).
     ///
-    /// The fill is the position's fraction of the reported duration,
-    /// clamped into the bar. The duration is mechanism evidence and the
-    /// position an independent projection, so a position beyond the
-    /// reported duration is representable; it clamps to a full bar
-    /// rather than overflowing, which is the honest degradation of a
-    /// display that cannot show "more than all of it".
+    /// The one exception is the same live pre-first-sample window as
+    /// [`Self::timeline_label`] (field round 5): a LIVE episode with no
+    /// position sample yet renders the bar at its START (empty fill),
+    /// with `--:--` as the total if the duration is not known either —
+    /// the row stays put instead of vanishing and flexing the layout
+    /// for the first second of every track. The fill is the position's
+    /// fraction of the reported duration, clamped into the bar. The
+    /// duration is mechanism evidence and the position an independent
+    /// projection, so a position beyond the reported duration is
+    /// representable; it clamps to a full bar rather than overflowing,
+    /// which is the honest degradation of a display that cannot show
+    /// "more than all of it".
     pub fn position_bar_label(&self) -> Option<String> {
         let rate = u64::from(self.observation.source_format?.sample_rate);
         if rate == 0 {
             return None;
         }
-        let position_frames = self.observation.position?;
-        let duration = self.observation.source_duration?;
-        let duration_secs = duration.as_secs();
+        let live_pending = self.pending_start_window();
+        let position_frames = match self.observation.position {
+            Some(frames) => frames,
+            None if live_pending => 0,
+            None => return None,
+        };
         let position_secs = position_frames / rate;
+        let duration_secs = match self.observation.source_duration {
+            Some(duration) => Some(duration.as_secs()),
+            None if live_pending => None,
+            None => return None,
+        };
 
-        let filled = if duration_secs == 0 {
-            0
-        } else {
-            let width = BAR_WIDTH as u128;
-            let filled = u128::from(position_secs) * width / u128::from(duration_secs);
-            usize::try_from(filled.min(width)).unwrap_or(BAR_WIDTH)
+        let filled = match duration_secs {
+            Some(d) if d > 0 => {
+                let width = BAR_WIDTH as u128;
+                let filled = u128::from(position_secs) * width / u128::from(d);
+                usize::try_from(filled.min(width)).unwrap_or(BAR_WIDTH)
+            }
+            _ => 0,
         };
         let mut bar = String::with_capacity(BAR_WIDTH);
         for cell in 0..BAR_WIDTH {
@@ -447,10 +486,13 @@ impl TuiModel {
                 std::cmp::Ordering::Greater => '─',
             });
         }
+        let total = duration_secs
+            .map(|d| crate::status::format_clock(Duration::from_secs(d)))
+            .unwrap_or_else(|| "--:--".to_owned());
         Some(format!(
             "{} {bar} {}",
             crate::status::format_clock(Duration::from_secs(position_secs)),
-            crate::status::format_clock(Duration::from_secs(duration_secs))
+            total
         ))
     }
 
@@ -1381,14 +1423,71 @@ mod tests {
             model
         };
 
-        // Unknown duration, and unknown position: no bar at all — the
-        // Position line keeps reporting the honest `--:--` side.
+        // Unknown duration with a known position: no bar — a percentage
+        // of an unknown total is not drawable (unchanged).
         assert_eq!(
             model_with(Some(44_100 * 42), None).position_bar_label(),
             None
         );
-        assert_eq!(model_with(None, Some(238)).position_bar_label(), None);
-        assert_eq!(model_with(None, None).position_bar_label(), None);
+
+        // Field round 5: an unknown POSITION on a LIVE episode is the
+        // pre-first-sample window after every Open replacement — the
+        // bar renders at its START instead of vanishing (a vanishing
+        // bar flexed the panel height and visibly bumped the playlist
+        // on every track switch). With a known total it is an empty
+        // bar under that total; with no total either, an empty bar
+        // against `--:--`.
+        let live_start = model_with(None, Some(238))
+            .position_bar_label()
+            .expect("the live pending-start bar renders");
+        assert!(live_start.starts_with("00:00 "), "{live_start:?}");
+        assert!(live_start.ends_with(" 03:58"), "{live_start:?}");
+        assert_eq!(
+            live_start.chars().filter(|c| *c == '━').count(),
+            0,
+            "the start bar is empty: {live_start:?}"
+        );
+        let live_start_unknown_total = model_with(None, None)
+            .position_bar_label()
+            .expect("the live pending-start bar renders without a total");
+        assert!(
+            live_start_unknown_total.ends_with(" --:--"),
+            "{live_start_unknown_total:?}"
+        );
+
+        // The negative control: a SETTLED episode without position
+        // evidence keeps the honest no-bar state — a dead timeline has
+        // no start, and the no-evidence state must not grow a zero.
+        let model_settled = |position: Option<u64>, duration: Option<u64>| {
+            let mut model = TuiModel::new("song.flac");
+            model.update(PlaybackSessionObservation {
+                source_format: Some(PcmFormat {
+                    sample_rate: 44_100,
+                    channels: 2,
+                    channel_mask: 0x3,
+                }),
+                position,
+                source_duration: duration.map(Duration::from_secs),
+                terminal_outcome: Some(qianqian_playback::EpisodeTerminalOutcome::Stopped),
+                ..pending()
+            });
+            model
+        };
+        assert_eq!(
+            model_settled(None, Some(238)).position_bar_label(),
+            None,
+            "a settled episode fabricates no start"
+        );
+        assert_eq!(
+            model_settled(None, None).timeline_label(),
+            "--:-- / --:--",
+            "a settled episode keeps the dashes"
+        );
+        assert_eq!(
+            model_with(None, Some(238)).timeline_label(),
+            "00:00 / 03:58",
+            "the live pending-start timeline reads 00:00"
+        );
         assert_eq!(
             model_with(Some(44_100 * 42), Some(238)).timeline_label(),
             "00:42 / 03:58"
