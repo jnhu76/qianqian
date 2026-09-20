@@ -1,0 +1,7 @@
+[+1.955] KEY "n"
+[+2.021] [21;7H[qianqian-wasapi] render aborted: data plane stopped
+[+2.021] [qianqian-wasapi] opened: 44100 Hz, 2[2J[H[K
+[+2.056] KEY "q"
+[+2.063] [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x[K
+[+2.108] [K[2;56H[?25h[qianqian-wasapi] render aborted: data plane stopped
+[+2.136] [qianqian-wasapi] opened: 44100 Hz, 2 channels, mask 0x[qianqian-wasapi] render aborted: data plane stopped[K

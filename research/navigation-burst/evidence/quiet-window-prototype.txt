@@ -1,0 +1,38 @@
+   Compiling navigation-burst-prototype v0.1.0 (/home/hoo/Source/qianqian/research/navigation-burst/prototype)
+    Finished `release` profile [optimized] target(s) in 0.64s
+     Running `target/release/navigation-burst-prototype`
+QUIET-WINDOW PROTOTYPE (virtual-clock policy; real Open commands)
+prototype warm replacement R_proto = 0.2 ms (device-free; Windows warm R ~= 60-90 ms)
+
+sequence  keys g_ms | w0_opns w50 w75 w100 w125 w150 w200   (opens per burst; collapse% for NNNNN@10; ok=final target)
+N            1   10 |    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+N            1   50 |    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+N            1  100 |    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+N            1  150 |    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+N            1  250 |    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+
+NNNNN        5   10 |    4 ok    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+NNNNN        5   50 |    4 ok    4 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+NNNNN        5  100 |    4 ok    4 ok    4 ok    4 ok    1 ok    1 ok    1 ok
+NNNNN        5  150 |    4 ok    4 ok    4 ok    4 ok    4 ok    4 ok    1 ok
+NNNNN        5  250 |    4 ok    4 ok    4 ok    4 ok    4 ok    4 ok    4 ok
+
+PPPP         4   10 |    3 ok    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+PPPP         4   50 |    3 ok    3 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+PPPP         4  100 |    3 ok    3 ok    3 ok    3 ok    1 ok    1 ok    1 ok
+PPPP         4  150 |    3 ok    3 ok    3 ok    3 ok    3 ok    3 ok    1 ok
+PPPP         4  250 |    3 ok    3 ok    3 ok    3 ok    3 ok    3 ok    3 ok
+
+NP           2   10 |    2 ok    0 ok    0 ok    0 ok    0 ok    0 ok    0 ok
+NP           2   50 |    2 ok    2 ok    0 ok    0 ok    0 ok    0 ok    0 ok
+NP           2  100 |    2 ok    2 ok    2 ok    2 ok    0 ok    0 ok    0 ok
+NP           2  150 |    2 ok    2 ok    2 ok    2 ok    2 ok    2 ok    0 ok
+NP           2  250 |    2 ok    2 ok    2 ok    2 ok    2 ok    2 ok    2 ok
+
+NNNPPNNP     8   10 |    8 ok    1 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+NNNPPNNP     8   50 |    8 ok    8 ok    1 ok    1 ok    1 ok    1 ok    1 ok
+NNNPPNNP     8  100 |    8 ok    8 ok    8 ok    8 ok    1 ok    1 ok    1 ok
+NNNPPNNP     8  150 |    8 ok    8 ok    8 ok    8 ok    8 ok    8 ok    1 ok
+NNNPPNNP     8  250 |    8 ok    8 ok    8 ok    8 ok    8 ok    8 ok    8 ok
+
+final quit: disposal Some(Discharged)

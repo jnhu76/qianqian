@@ -1,0 +1,18 @@
+run: BURST-RUN1
+campaign: research/navigation-burst-boundary-0
+date_utc: 2026-09-20T03:09:11Z
+branch: research/navigation-burst-boundary-0
+head_sha: ad4e09dc9064077b97cc6f26dd9139d81dae6e99
+origin_main: ad4e09dc9064077b97cc6f26dd9139d81dae6e99
+worktree_status: 6 dirty entries
+build_command: QIANQIAN_NATIVE_DIR=<mingw staging> cargo build --release --target x86_64-pc-windows-gnu --features playback -p qianqian-headless
+target_triple: x86_64-pc-windows-gnu (GNU toolchain)
+features: playback profile: release
+product_binary: qianqian-headless.exe
+product_binary_sha256: 912e293694a3c92913725f0408c46f99b869eddeaba32047959957987b7ea70b
+tuidriver_sha256: ed4b87c1fc922c1e9386242c164218dd45a42a0ae1e4b754f9ef35e494007621
+driver_env: QIANQIAN_AUDIO_LOG=1 (inherited by the child; the off-by-default per-episode mechanism lines)
+synth5_sha256: ca028a20b5c72cb7230680982897c3f8f4c28cdba81dcb5473a2ad732992b24e
+rustc: rustc 1.97.1 (8bab26f4f 2026-07-14)
+windows_caption: Microsoft Windows 11 ×¨Òµ°æ
+audio_device: Realtek High Definition Audio

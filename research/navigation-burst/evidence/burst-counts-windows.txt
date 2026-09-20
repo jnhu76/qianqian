@@ -1,0 +1,12 @@
+== run2 ==
+scenario           repls  exp  T_burst0  T_final  total_ms  commit_periods_ms
+B-single-N             1    1     1.943    2.028      85.0  []
+B-nnnnn-10ms           5    5     1.958    2.275     317.0  [63 42 62]
+B-nnnnn-50ms           5    5     1.949    2.277     328.0  [63 64 80]
+B-nnnnn-150ms          5    5     1.964    2.625     661.0  [158 144 155]
+B-nnnnn-250ms          5    5     1.977    3.043    1066.0  [252 258 248]
+B-pppp-10ms            8    8     2.633    2.880     247.0  [155 146 1750 61 48 61]
+B-nnnppnnp-10ms        8    8     1.955    2.092     137.0  [62 114 13 78 78 24]
+B-eof-natural          1    1     0.000    5.140    5140.0  []
+B-manual-short         1    1     1.261    1.353      92.0  []
+ALL REPLACEMENT-COUNT EXPECTATIONS MET
