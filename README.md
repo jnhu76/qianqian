@@ -2,6 +2,15 @@
 
 Qianqian is a local-first, lightweight, cross-platform music player and a testbed for Rust composability/runtime architecture.
 
+At the top level, the repository contains two distinct product/component boundaries:
+
+```text
+SongCore  = independently versioned/released media-to-PCM component
+Qianqian  = player product that consumes SongCore
+```
+
+SongCore owns media probing/metadata/artwork/stream selection/decode/seek and produces source-rate/source-layout Float32 PCM through its stable C ABI. Qianqian owns player behavior above that boundary: application/UI, playback/session policy, playlist/navigation, output backends/devices, and other product semantics. SongCore is therefore a reusable component, not merely an internal decoder implementation of Qianqian. See [`docs/architecture/overview.md`](docs/architecture/overview.md) for the system boundary and [`docs/architecture/songcore-binding-architecture.md`](docs/architecture/songcore-binding-architecture.md) for SongCore's cross-platform binding authority.
+
 The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the implementation is being rebuilt boundary-first on a small generic Composition Kernel; the playback-specific foundation is **accepted** in `ADR-PBK-001` (plane-boundary constitution — production playback semantics remain open until real Audio Runtime experiments earn them).
 
 ## Architecture in 30 seconds
@@ -188,7 +197,8 @@ The playback reference is a behavioral oracle, not a source-layout template.
 - `AGENTS.md` — repository-wide agent governance and hard rules.
 - `CONTEXT.md` — stable vocabulary and mental model.
 - `docs/README.md` — task-oriented documentation router.
-- `docs/architecture/overview.md` — current Architecture v2 overview.
+- `docs/architecture/overview.md` — current Architecture v2 overview, including the top-level SongCore/Qianqian system boundary.
+- `docs/architecture/songcore-binding-architecture.md` — SongCore one-core/many-bindings authority and cross-platform binding rules.
 - `docs/adr/ADR-PBK-001.md` — Playback Foundations constitution (ACCEPTED).
 - `docs/adr/ADR-PBK-002.md` — current vocabulary, Plugin/Fiber taxonomy, static playback composition and D11 terminal-outcome authority.
 - `docs/architecture/composition-kernel.md` — generic composition guardrails (derived summary; K0 authority: `composition-kernel-0-design.md`).
