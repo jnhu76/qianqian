@@ -10,6 +10,8 @@ Current vocabulary / Plugin-Fiber taxonomy /
 static playback composition -> docs/adr/ADR-PBK-002.md
 K0 semantics                -> docs/architecture/composition-kernel-0-design.md
 K0 representation           -> docs/architecture/composition-kernel-0-implementation-adr.md
+SongCore binding architecture -> docs/architecture/songcore-binding-architecture.md
+                             (canonical C ABI description: native/include/songcore.h)
 ```
 
 Current execution roadmap:

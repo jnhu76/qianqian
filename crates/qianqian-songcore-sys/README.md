@@ -2,6 +2,12 @@
 
 Raw Rust bindings to the Qianqian SongCore C ABI v1.
 
+Classification (normative: `docs/architecture/songcore-binding-architecture.md`
+§6): this crate is the **raw binding** layer — a mechanical ABI projection,
+not an independent API authority. Only representation-level transformations
+are allowed here; semantic policy belongs to the ergonomic/product adapter
+above it.
+
 This crate mirrors `native/include/songcore.h` exactly: opaque handle, status
 constants, channel masks, callback types, all crossing structs in `repr(C)`,
 and the 15 exported `song_*` symbols. It adds nothing else:
