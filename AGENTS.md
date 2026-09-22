@@ -12,7 +12,8 @@ Before changing code or long-lived documentation:
 4. Read `docs/architecture/overview.md` before changing architecture boundaries.
 5. For generic composition work, read `docs/architecture/composition-kernel.md` and the K0 design/implementation authority.
 6. For playback/audio work, read `docs/adr/ADR-PBK-001.md` plus current vocabulary/static playback authority `docs/adr/ADR-PBK-002.md`; for Output/backend/platform work also read `docs/adr/ADR-PBK-003.md`.
-7. Inspect current repository reality before assuming a path, type, crate, test, TLA variable, or prior design is still authoritative.
+7. For SongCore cross-language binding/FFI work, read `docs/architecture/songcore-binding-architecture.md`; the canonical ABI description is `native/include/songcore.h`.
+8. Inspect current repository reality before assuming a path, type, crate, test, TLA variable, or prior design is still authoritative.
 
 Do not recursively preload historical refs or external failure evidence.
 
@@ -396,6 +397,8 @@ Green Cargo tests are regression evidence, not architecture acceptance. Verifica
 Keep one current authority per durable fact. PBK-001 owns playback foundations; PBK-002 owns current vocabulary, Plugin/Fiber taxonomy, earned static playback composition and the D11 terminal-outcome authority designation; PBK-003 owns the stable Output Plugin / pluggable Host Render Backend boundary and backend-neutral `AudioOutput` contract interpretation.
 
 `README.md`, `CONTEXT.md`, `docs/architecture/overview.md`, `docs/architecture/registry.yml`, website and diagrams are derived projections/routers; they may summarize, route and show status, but must not define or extend architecture semantics.
+
+For SongCore portability work, `docs/architecture/songcore-binding-architecture.md` owns the one-core/many-bindings authority hierarchy, binding-class boundaries, target support maturity vocabulary and binding parity (Issue #173); the canonical SongCore ABI description remains `native/include/songcore.h`, and #172 owns target build/FFmpeg closure/artifact/provenance/packaging/release.
 
 Historical evidence may retain historical terminology. Do not rewrite history for grep cleanliness.
 

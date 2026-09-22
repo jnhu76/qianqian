@@ -17,7 +17,10 @@ integration here.
   fail-closed target identity gate), `songcore.lua` (static/shared
   artifacts).
 - `include/songcore.h` — public ABI v1 (15 exports; no FFmpeg type crosses
-  it).
+  it). This header is the canonical cross-platform ABI description; the
+  binding architecture that may project it (authority hierarchy, raw vs
+  ergonomic binding boundary, maturity vocabulary, parity oracle) is
+  `../docs/architecture/songcore-binding-architecture.md`.
 - `src/songcore_ffmpeg.c` — mechanism implementation.
 - `ffmpeg/` — pinned dependency intent: `pin.json`,
   `profiles/codec-base.json` (the shipping closure),
