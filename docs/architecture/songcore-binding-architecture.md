@@ -13,6 +13,51 @@
 
 ---
 
+## System context: SongCore component vs Qianqian product
+
+SongCore and Qianqian are two distinct top-level product/component
+boundaries. They should not be collapsed into one software layer stack or
+read as "Qianqian plus an internal decoder implementation."
+
+```text
+┌───────────────────────────────────────────────┐
+│                  Qianqian                     │
+│                                               │
+│ App / UI / K0 / Playback Session / Playlist  │
+│ Output backends / devices / product policy    │
+└──────────────────────┬────────────────────────┘
+                       │
+                 Decode contract
+                       │
+┌──────────────────────▼────────────────────────┐
+│                  SongCore                     │
+│                                               │
+│ probe / streams / metadata / artwork / seek  │
+│ decode                                        │
+│                     ↓                         │
+│ source-rate / source-layout Float32 PCM       │
+└───────────────────────────────────────────────┘
+```
+
+The ownership waterline is:
+
+> **SongCore owns media-to-PCM semantics. Qianqian owns
+> PCM-to-player-product semantics.**
+
+SongCore is independently versioned and released and may be consumed by
+hosts other than Qianqian. Qianqian is one product consumer. Within
+Qianqian, the Decode Plugin / decode adapter projects SongCore into the
+Qianqian capability/composition model; that does not make SongCore itself
+a K0 Plugin or move Qianqian product semantics into SongCore.
+
+This document governs the lower component's cross-platform API/binding
+architecture. Qianqian playback, navigation, output/device, UI and other
+product semantics remain governed by Qianqian's product/ADR authorities.
+The repository-level projection of this boundary is
+[`overview.md`](overview.md).
+
+---
+
 ## 1. Scope
 
 This document freezes the libVLC-style architecture before Android/Apple
