@@ -1,12 +1,53 @@
 # Architecture overview
 
-> **Derived projection/router only.** Normative Playback Foundations: [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md). Current vocabulary / Plugin-Fiber taxonomy / static playback composition: [`../adr/ADR-PBK-002.md`](../adr/ADR-PBK-002.md). K0 semantics: [`composition-kernel-0-design.md`](composition-kernel-0-design.md); representation: [`composition-kernel-0-implementation-adr.md`](composition-kernel-0-implementation-adr.md).
+> **Derived projection/router only.** Normative Playback Foundations: [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md). Current vocabulary / Plugin-Fiber taxonomy / static playback composition: [`../adr/ADR-PBK-002.md`](../adr/ADR-PBK-002.md). K0 semantics: [`composition-kernel-0-design.md`](composition-kernel-0-design.md); representation: [`composition-kernel-0-implementation-adr.md`](composition-kernel-0-implementation-adr.md). SongCore cross-language binding authority: [`songcore-binding-architecture.md`](songcore-binding-architecture.md).
 
 Qianqian Architecture v2 is a composable Plugin/Fiber runtime with a strict firewall between composition/control and realtime PCM payload flow.
 
 ---
 
-# Current architecture at a glance
+# Top-level system boundary: SongCore and Qianqian
+
+The repository contains two distinct top-level product/component boundaries, not one product with an incidental decoder module:
+
+```text
+┌───────────────────────────────────────────────┐
+│                  Qianqian                     │
+│                                               │
+│ App / UI / K0 / Playback Session / Playlist  │
+│ Output backends / devices / product policy    │
+└──────────────────────┬────────────────────────┘
+                       │
+                 Decode contract
+                       │
+┌──────────────────────▼────────────────────────┐
+│                  SongCore                     │
+│                                               │
+│ probe / streams / metadata / artwork / seek  │
+│ decode                                        │
+│                     ↓                         │
+│ source-rate / source-layout Float32 PCM       │
+└───────────────────────────────────────────────┘
+```
+
+The ownership waterline is:
+
+> **SongCore owns media-to-PCM semantics. Qianqian owns PCM-to-player-product semantics.**
+
+Concretely:
+
+```text
+"What is this media and how is it decoded to PCM?"  → SongCore
+"How does that PCM become a player experience?"     → Qianqian
+```
+
+SongCore is independently versioned/released and may be consumed by hosts other than Qianqian. Its canonical cross-platform binary/API authority is `native/include/songcore.h`; target artifacts and bindings follow [`songcore-binding-architecture.md`](songcore-binding-architecture.md). Qianqian consumes SongCore through its Decode capability/provider path and remains authoritative for application, playback/session, navigation, output/device, UI and other product semantics.
+
+This top-level boundary is separate from the internal Qianqian Plugin/Fiber architecture below. SongCore is not made a K0 peer merely because Qianqian consumes it; the current Decode Plugin owns/adapts the SongCore mechanism into Qianqian's composition model.
+
+---
+
+# Current Qianqian architecture at a glance
 
 ```text
                          Qianqian App
