@@ -388,6 +388,51 @@ Report what was actually verified. Never mark an unrun device/platform/audio che
 
 Green Cargo tests are regression evidence, not architecture acceptance. Verification reports must state target, tool, assumptions/bounds and result class.
 
+## Real-path testing and reproducible evidence
+
+Verification should be chosen from the failure being investigated, not from a preferred testing technology.
+
+Before implementing a playback, lifetime, realtime, FFI, backend or portability mechanism whose intended behavior is known, enumerate the concrete ways it can fail and identify the independent observation that would expose each important failure. Do not implement a mechanism first and then add unit tests that merely encode its private state layout or call sequence. A regression test added after a real defect is found is valid when it independently reproduces that failure.
+
+For cross-layer behavior, prefer the real execution path appropriate to the claim, for example:
+
+```text
+SongCore
+→ language binding / ABI
+→ decode
+→ PCM/data plane
+→ Output Plugin
+→ concrete host backend
+```
+
+Do not require every property to be E2E. Realtime races, publication/reclamation, ownership collisions and temporal behavior may be better established with Loom, Kani, Miri, TLA+/TLC, controlled stress tests or deterministic local tests. Use the verification mechanism closest to the property being established.
+
+Mock-only evidence cannot establish that a real host audio backend, FFI boundary or platform integration works. A mock may isolate an upstream contract, but platform success requires evidence from the relevant real boundary.
+
+A portability claim is target-specific. Successful compilation for one target does not prove another target, and successful cross-compilation does not prove runtime behavior. Never report Windows, macOS, Linux, Android or iOS runtime support as PASS unless that target's required validation was actually executed.
+
+For real-path playback and portability checks, retain a repeatable evidence artifact where practical. Depending on the target, record:
+
+```text
+repository commit
+target triple / platform version
+build configuration
+SongCore ABI/version identity
+input media hash
+decoder and backend identity
+decoded frame/sample counts
+deterministic PCM hash or reference output where applicable
+runtime log / trace
+host-backend smoke result
+device or simulator identity
+exact build/run command
+generated target artifact identity
+```
+
+For nondeterministic physical audio output, distinguish deterministic pipeline evidence from device/audible smoke evidence rather than pretending one proves the other.
+
+During development, run the smallest relevant Rust/native/binding/target test loop. At a release, portability, playback-foundation or architecture gate, run the complete required target/configuration matrix. A green generic Cargo test suite is regression evidence only; it must not substitute for the specific realtime, backend, FFI or target claim under review.
+
 ---
 
 # Documentation
