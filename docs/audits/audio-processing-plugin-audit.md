@@ -20,7 +20,7 @@
 | External reference clone | DeepSeek Harness clone 至仓库之外 `/home/hoo/Source/deepseek-harness`（`deepseek-ai/deepseek-harness`，shallow；其 `vendor/README.md` 确认 vendored cordis 4.0.0-rc.7，upstream `cordiverse/cordis`） |
 | Evidence base | 三份 ADR 全文 + K0 设计/实现 ADR + CONTEXT/AGENTS/overview/PCM 契约与 Phase B/C 证据记录 + `docs/audits/plugin-boundary-conformance-audit.md` + 生产代码探查（两个独立 file:line 级探查：composition/app 组装面、PCM 路径/episode 生命周期面） |
 | Truth class | EVIDENCE — audit record, not authority |
-| Review outcome | Independent adversarial review：第一轮（单轮 agent 独立审计，adversarial posture，H1–H8 全部执行）判定 **CHANGE_REQUIRED**（过度冻结 representation + closure 过度主张）；corrective pass 已在 PR #176 应用（P1-1/P1-2/P2-1/P2-2 + 有状态探针门 + freeze scope 收窄 + closure scoped claim）。**Human adversarial review：本记录不作主张。** corrective 本身尚未经独立复审——复审前不得作为实现授权 |
+| Review outcome | 独立对抗复审历史（全部为独立 agent 审计；**Human adversarial review：本记录不作主张**）：<br>① **Independent adversarial review #1 — CHANGE_REQUIRED**（单轮 agent 独立审计，adversarial posture，H1–H8 全部执行；findings：representation 过度冻结、closure 过度主张等）→ Corrective pass #1 已应用（P1-1/P1-2/P2-1/P2-2 + 有状态探针门 + freeze scope 收窄 + closure scoped claim，commit `42cc993`）。<br>② **Independent adversarial review #2 — CHANGE_REQUIRED**（architecture model 本身 **PASS**；residuals：stale PR body、通用参数生效时机过度冻结、残留 in-place/reset 表示措辞、CI 状态未解决）→ Corrective pass #2（本 pass，PR #176）逐项关闭上述 residuals。<br>③ **merge 前仍需第三轮独立复审**——复审前本记录不得作为实现授权 |
 
 ---
 
@@ -190,7 +190,9 @@ Compressor Plugin ──┘
         ▼
         REPRESENTATION OPEN —— exact Rust trait / trait 可见性 /
         crate 位置（含是否放入 `qianqian-audio-api`）/ factory 表示 /
-        动静态派发 / 是否存在 trait，全部开放。
+        动静态派发 / 是否存在 trait / 处理缓冲表示（in-place /
+        out-of-place / scratch / SIMD 布局 / 缓冲所有权），全部开放。
+        冻结的只有：解码后 source-format PCM 在进入 PcmEdge 前被变换。
         首个 Gain 实现 MAY 保持 crate-private 于 `qianqian-playback`。
         promote 进 `qianqian-audio-api`（contracts crate，D7）仅在
         出现多个 owner/provider/实现 crate 或其他真实共享契约
@@ -221,7 +223,7 @@ Compressor Plugin ──┘
 
 | 候选位置 | 评估 | 裁决 |
 |---|---|---|
-| **decode worker staging loop** | 离 RT 线程；worker 已拥有格式与 1024-frame 稳定块；`Applied` 臂即 cut 发生点（staging 丢弃 + `edge.invalidate()`），处理历史失效语义可在该控制流位置满足——确切调用形态属 representation（§10 seek/reset 行）；失败走既有 D11 `Failed` 终局类（诊断归属不得伪装成 decode failure，见 §10 failure 行）；backpressure 预算 8192-frame edge（≈185ms）；position 核算在 render leg 完全不受影响；**PcmEdge/RenderRequest/PBK-003 契约零改动** | **SELECTED** |
+| **decode worker staging loop** | 离 RT 线程；worker 已拥有格式与 1024-frame 稳定块；`Applied` 臂即 cut 发生点（staging 丢弃 + `edge.invalidate()`），处理历史失效语义可在该控制流位置满足——确切调用形态属 representation（§10 seek/状态失效行）；失败走既有 D11 `Failed` 终局类（诊断归属不得伪装成 decode failure，见 §10 failure 行）；backpressure 预算 8192-frame edge（≈185ms）；position 核算在 render leg 完全不受影响；**PcmEdge/RenderRequest/PBK-003 契约零改动** | **SELECTED** |
 | RenderPcmInput decorator / PcmEdge 内 | 落在 WASAPI render 线程（RT 关键路径）；与 park/quiescence/position 证据逻辑纠缠；D14.9 已以"永久 per-sample RT 税"为由否决软件 PCM 乘法做 volume——同一论证 | REJECTED |
 | Output Plugin / backend 内 | 违反 PBK-003（backend 是平台 mechanism；DSP 语义不是 backend 语义；可移植性丢失）；假设 H4 被权威直接反驳 | REJECTED |
 | native songcore C 层 | DSP 离开 Rust oracle 体系、ABI churn、native 库耦合 episode DSP 状态 | REJECTED |
@@ -231,8 +233,8 @@ Compressor Plugin ──┘
 ## 9. Realtime contract
 
 - **RT render thread 的冻结 firewall 行不变**——本设计使其完全不被触碰。
-- **worker 稳态处理路径**（每 staging block）禁止新增：K0 任何操作、Capability resolution、registry lookup、图变更、plugin discovery、通用 event fan-out、文件/网络/UI I/O、无界分配/阻塞、无界锁。允许：对预绑定 staging buffer 的原位数学、预分配状态、块边界处的一次性参数读取（标量 Gain 可采用 OutputLevel 式 load+compare；这是 Gain 场景的可用先例，不是通用机制的冻结，见下）。
-- 控制面/数据面分离：**配置 = control-plane**（App → episode 构造参数 → worker 块边界生效；运行期更新入口若某 effect 需要，属下方 OPEN 机制，不在此冻结形状内）；**处理 = data-plane**。参数变更永不触发 composition mutation（PBK-001 §7 冻结条款）；链成员/顺序变更仅下一 episode 生效。
+- **worker 稳态处理路径**（每 staging block）禁止新增：K0 任何操作、Capability resolution、registry lookup、图变更、plugin discovery、通用 event fan-out、文件/网络/UI I/O、无界分配/阻塞、无界锁。允许：对预绑定 staging buffer 的有界样本数学（**缓冲表示 OPEN**——in-place/out-of-place/scratch buffer/所有权布局均不在此冻结，见 §10 process 行）、预分配状态、预绑定配置。参数读取的时机与方式不是本行的冻结项（见下方 冻结 vs OPEN 划分；标量 Gain 可采用 OutputLevel 式 load+compare，这是 Gain 场景的可用先例，不是通用机制的冻结）。
+- 控制面/数据面分离：**配置 = control-plane**（App → episode 构造参数；运行期更新入口若某 effect 需要，属下方 OPEN 机制，不在此冻结形状内）；**处理 = data-plane**。参数变更永不触发 composition mutation（PBK-001 §7 冻结条款）；链成员/顺序变更仅下一 episode 生效。
 - 不发明比现有证据更严的约束：worker 现状本就有 2ms 有界等待与 seek-slot try_lock；本契约只要求"不新增"。
 
 **参数 publication：冻结 vs OPEN（P1-2 corrective）**
@@ -244,10 +246,16 @@ Compressor Plugin ──┘
     - 处理发生在 PcmEdge 之前的 decode worker staging 路径
     - 控制面活动不得造成每 PCM 块的 K0 工作
     - 提交性 seek 不连续必须先失效全部 pre-cut 处理历史，
-      再处理任何 post-cut PCM（§10 seek/reset 行）
+      再处理任何 post-cut PCM（§10 seek/状态失效行）
 
 保持 OPEN 的机制（本审计不冻结）:
-    - 通用的 mid-episode 多参数 update/publication 机制。
+    - 通用的 mid-episode 多参数 update/publication 机制——含其
+      **可见性/生效时机**（block 边界、sample 边界或其它）、ramp/
+      平滑过渡、snapshot 表示与 coherence 机制，全部 OPEN
+      （corrective R2：不得把"块边界生效"冻结为通用契约；未来
+      有状态 DSP 可能需要 coherent snapshot / 参数平滑 /
+      sample-ramped transition / epoch/snapshot 边界或其它被
+      挣得的机制，任何一种都不被本审计预先排除或预定）。
       标量 Gain 可容纳于一个 cell/原子量；有状态 EQ/compressor
       需要一致的多字段配置（frequency/Q/gain/enabled；
       attack/release/threshold/ratio）——独立读取各字段可产生
@@ -256,10 +264,13 @@ Compressor Plugin ──┘
       证据挣得，也不由 D14.11 冻结。
     - Gain MAY 使用：A. episode-fixed 配置；或 B. Gain-specific
       标量 publication。两者都不挣得、也不冻结通用 DSP 参数
-      publication 模型。
+      publication 模型。**首个 Gain 架构探针完全不需要 live 参数
+      更新（最小机制优先）**；若日后实现 live 标量 Gain 控制，
+      该 Gain-specific 契约必须单独挣得，且 MUST NOT 被推广为
+      通用 DSP 参数模型。
     - 不冻结：generic AudioProcessorConfig cell / ArcSwap /
       原子 snapshot / mutex / RCU / lock-free parameter block /
-      event-update bus。
+      event-update bus / 任何特定生效时机或 coherence 机制。
 ```
 
 ## 10. Lifecycle contract
@@ -267,10 +278,10 @@ Compressor Plugin ──┘
 | 阶段 | 冻结的最小语义 |
 |---|---|
 | create | session 激活内、`format()` 已知后构造；**一个 instance 绑定一个 PcmFormat**（native 中流格式变更已 fail-closed，episode 失败） |
-| process | 每 staging block 原位处理；稳态零分配 |
-| parameter update | 控制面活动不产生每 PCM 块的 K0 工作；参数变更在块边界生效；**publication 机制 OPEN**（§9 冻结/OPEN 划分）；参数变化永不重置状态（除非语义明示） |
-| seek/reset | **语义义务（冻结）**：对 `Applied` seek 不连续，全部由 pre-cut PCM 派生的处理状态必须先失效，再处理任何 post-cut PCM；`RefusedUnchanged` 路径不得因 seek 被尝试而使处理状态发生可观察变化（D14.5 零内容损失不变量）。**表示（OPEN）**：`reset()` 调用、实例重建、状态交换等确切 Rust API 由实现决定。不需要 `flush()`——**v1 禁止 look-ahead 类加延迟处理器**（其 flush/drain 语义是新权威） |
-| pause/resume | 零交互（edge 满则 worker 自然阻塞）；pause **不得**重置链状态 |
+| process | 每 staging block 执行处理；稳态零分配。**缓冲表示 OPEN**：in-place/out-of-place/scratch buffer/SIMD 布局/缓冲所有权均不冻结——冻结的只是"解码后 source-format PCM 在进入 PcmEdge 前被变换"（§8 PCM placement） |
+| parameter update | **唯一冻结的通用契约**：控制面活动不得产生每 PCM 块的 K0 / Capability resolution / composition mutation 工作；live-update 可见性/生效时机（block/sample 边界或其它）、ramp/平滑、snapshot/coherence 机制全部 **OPEN**（§9 冻结/OPEN 划分）；参数变化本身不构成处理状态失效事件（除非该 effect 语义明示） |
+| seek/状态失效 | **语义义务（冻结）**：对 `Applied` seek 不连续，全部由 pre-cut PCM 派生的处理状态必须先失效，再处理任何 post-cut PCM；`RefusedUnchanged` 路径不得因 seek 被尝试而使处理状态发生可观察变化（D14.5 零内容损失不变量）。**表示（OPEN）**：`reset()` 调用、实例重建、状态替换、epoch/状态交换等确切 Rust API 由实现决定（"fresh-instance observational equivalence" 是验收语义，不是某个调用名）。不需要 `flush()`——**v1 禁止 look-ahead 类加延迟处理器**（其 flush/drain 语义是新权威） |
+| pause/resume | 零交互（edge 满则 worker 自然阻塞）；pause **不得**使链处理状态失效 |
 | stop/EOF | 链随 worker closure 丢弃；LIFO teardown 顺序不变；EOF 尾块不得注入静音（frame conservation MUST，pcm-contract-a0） |
 | failure | **语义（冻结）**：使继续处理不可信的处理器失败 ⇒ 既有 D11 `Failed` 终局类；**不发明新 public 终局变体**。DSP/处理失败**不得**仅仅因为其执行在 decode worker 线程就被诊断归类为 decode failure——终局语义类可以相同，机制诊断阶段必须如实区分（现有内部诊断槽名为 `decode_failure`/`decode_failed`，`completion.rs:408`；D14.5 已把 seek `MutatedThenFailed` 权威性地冻结为走 ordinary decode-failure route——那是 seek 的权威决定，不构成 DSP 失败默认复用同一诊断来源的理由；内部表示 OPEN：worker_failure / processing_failure / 内部携带 stage/category 等均可，本审计不选型）。**bypass-降级模式未授权**（类比 D14.5 "不可证明即破坏性"：失败处理器的输出不可信；恢复语义 = authority gap，除非未来权威显式挣得 bypass/recovery 语义） |
 | teardown/replacement | episode-scoped；配置替换 = D14.6 whole-episode replacement |
@@ -304,7 +315,8 @@ enable/disable = 配置语义；mid-episode 重排 = 不授权。
        lifetime:             processor 状态属于 episode 与 source PCM 格式
        seek/discontinuity:   Applied seek 在处理任何 post-cut PCM 前
                              失效全部 pre-cut 处理历史；
-                             RefusedUnchanged 不因 seek 被尝试而重置
+                             RefusedUnchanged 不因 seek 被尝试而使
+                             处理状态发生可观察变化（机制表示不冻结）
        realtime firewall:    每 PCM 块零 K0 / Capability resolution /
                              composition mutation / 通用 dispatch
        failure semantic:     不可恢复的处理器失败映射到既有 D11 Failed，
@@ -319,8 +331,12 @@ enable/disable = 配置语义；mid-episode 重排 = 不授权。
 D14.11 明确不冻结:
     public AudioProcessor trait / qianqian-audio-api 放置 /
     factory trait / 动静态派发 / crate topology /
-    通用参数 update 表示（ArcSwap / 原子 snapshot / mutex / RCU 选择）/
-    确切 reset() API / 确切 failure 诊断 struct /
+    处理缓冲表示（in-place/out-of-place/scratch/SIMD 布局/所有权）/
+    通用参数 update 表示与生效时机（ArcSwap / 原子 snapshot /
+    mutex / RCU 选择；block/sample 边界可见性 / ramp / coherence
+    机制）/
+    确切状态失效机制 API（reset() / 实例重建 / 状态替换 /
+    epoch/状态交换）/ 确切 failure 诊断 struct /
     未来 registry / 未来 Processing Plugin / 未来 AudioProcessingCapability
 不变:         D11 终局权威、F3/F4/F5/F6、D14.9 volume 机制、P1–P5、
               K0 五原语与预算、PCM firewall（全部行）、D6 所有权二分、
@@ -382,14 +398,15 @@ StatefulProbe:  y[n] = x[n] + k * y[n-1]
 
 ```text
 1. processor 拥有跨 block 历史
-2. 提交性 seek 失效旧历史
+2. 提交性 seek 使 pre-cut 派生旧历史失效
 3. 同一 post-seek PCM 下，seek 后输出 == 全新 processor 实例的输出
-4. RefusedUnchanged seek 不重置处理状态
-5. pause/resume 不重置状态
+   （fresh-instance observational equivalence）
+4. RefusedUnchanged seek 不使处理状态发生可观察变化
+5. pause/resume 不使处理状态失效
 6. stop/teardown 正常销毁实例
 ```
 
-其中 2/3 对应 §10 seek/reset 行已冻结的**语义义务**（pre-cut 派生状态先失效、再处理 post-cut PCM）；探针验证的是该义务的实现，而不是把某个具体调用形态（如 `reset()`）升格为契约。EQ 的其余附加关注（参数更新 zipper 一致性、多通道状态数组、坏系数 NaN/Inf 传播的 fail 行为）仍归 EQ 自己的 gate（对应 §14 H8）。
+其中 2/3 对应 §10 seek/状态失效行已冻结的**语义义务**（pre-cut 派生状态先失效、再处理 post-cut PCM）；探针验证的是该义务的实现，而不是把某个具体调用形态（如 `reset()`、实例重建、状态替换或 epoch/状态交换中的某一种）升格为契约。EQ 的其余附加关注（参数更新 zipper 一致性、多通道状态数组、坏系数 NaN/Inf 传播的 fail 行为）仍归 EQ 自己的 gate（对应 §14 H8）。
 
 **PARAMETER-COHERENCE 门（在通用多参数 live update 机制被授权之前必须存在）：** 必须先证明一个多字段配置的一致更新/读取方案（无撕裂语义配置，§9 OPEN 块），才允许把任何具体参数机制推广为通用 DSP 参数 publication 模型。Gain 的标量 case 不能替代该门。
 
@@ -405,8 +422,8 @@ StatefulProbe:  y[n] = x[n] + k * y[n-1]
 | H4 | "DSP 应放进 Output（样本在此被消费）" | **FALSE** | PBK-003（backend = 平台 mechanism，DSP 语义不是 backend 语义；可移植性）+ per-sample 数学落 RT render 线程（D14.9 已以 RT 税为由否决同类做法） |
 | H5 | "DSP 顺序可沿 K0 组合顺序" | **FALSE（权威明文）** | PBK-001 §5（dependency topology != realtime processing topology；顺序禁止来自 mount/registration/迭代顺序）+ K0 §H.4/§H.6（DSP 被点名非交换；顺序属于显式有序拓扑，归显式 owner） |
 | H6 | "动态参数变更需要 K0 操作" | **FALSE** | PBK-001 §7（cheap realtime-safe parameter update 不得强制走 composition mutation）+ OutputLevel cell 先例（relaxed load+compare） |
-| H7 | "processor instance 可跨 seek 原样存活" | **FALSE（反例成立）** | biquad IIR 延迟态、compressor 包络、limiter 历史、reverb delay line 均为有状态记忆；提交性 seek 后必须 reset（stale-DSP-state 是 D14.5 stale-PCM 不变量的推广）；refusal 路径禁止 reset |
-| H8 | "Gain 通过即证明 EQ 架构" | **FALSE** | Gain 是无记忆变换；EQ 首次暴露：format-bound 有状态滤波器、reset 正确性（错误时可听：滤波瞬态/咔哒声）、参数更新 zipper 语义、多通道状态、坏系数 NaN 传播。EQ 需要 §13 的独立有状态门 |
+| H7 | "processor instance 可跨 seek 原样存活" | **FALSE（反例成立）** | biquad IIR 延迟态、compressor 包络、limiter 历史、reverb delay line 均为有状态记忆；提交性 seek 后必须先失效全部 pre-cut 派生处理状态，再处理任何 post-cut PCM（stale-DSP-state 是 D14.5 stale-PCM 不变量的推广）；refusal 路径不得使处理状态发生可观察变化。确切机制（`reset()` 调用 / 实例重建 / 状态替换 / epoch/状态交换）属 representation（§10 seek/状态失效行） |
+| H8 | "Gain 通过即证明 EQ 架构" | **FALSE** | Gain 是无记忆变换；EQ 首次暴露：format-bound 有状态滤波器、seek 后状态失效的正确性（fresh-instance observational equivalence；违反时可听：滤波瞬态/咔哒声）、参数更新 zipper 语义、多通道状态、坏系数 NaN 传播。EQ 需要 §13 的独立有状态门 |
 
 ## 15. Non-UI Core Closure matrix
 
@@ -447,10 +464,11 @@ architecture:  family Processing Plugin/Capability 是否终有一日被挣得�
                已留增量提升路径）; mid-stream format switch（现为 fail-closed）
                与未来 look-ahead 处理器的 flush 语义（新权威）;
                device-switch 与 chain 的交互（后者不改变前者仍 OPEN 的事实）。
-implementation: SIMD/FTZ/denormal 策略; 参数平滑（新状态 → reset 契约要覆盖）;
+implementation: SIMD/FTZ/denormal 策略; 参数平滑（若引入，构成新的
+               状态失效/过渡语义，须由那时权威覆盖）;
                低端机 CPU 预算; worker 侧处理耗时挤占 1024-frame 产出节奏的
                极端情形。
-physical/audio: reset 不完全时的可听瞬态; ReplayGain 元数据准确度;
+physical/audio: 状态失效不完全时的可听瞬态; ReplayGain 元数据准确度;
                未来 look-ahead 延迟的可听性。
 （physical 未知项不得以软件断言冒充——AGENTS.md "Verification" 条款适用。）
 ```
