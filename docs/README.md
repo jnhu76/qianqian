@@ -26,7 +26,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Retired pre-reset playback models/harness | Git history / PR records — historical evidence only; removed from main by the post-#139 spec reset (still-current races are covered by today's specs/tests, see `../specs/README.md`) |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
 | Plugin boundary conformance audit (post-#145 headless path) | `audits/plugin-boundary-conformance-audit.md` — audit evidence record; hardening plan accepted, **not yet implemented** |
-| Audio Processing Plugin architecture audit (post-`ba545ee`) | `audits/audio-processing-plugin-audit.md` — audit evidence record; verdict GO_WITH_CORRECTIVES; **D13 negative ruling: no Processing Plugin/Capability today**; authority freeze (D14.11 candidate) required before any DSP implementation |
+| Audio Processing Plugin architecture audit (post-`ba545ee`) | `audits/audio-processing-plugin-audit.md` — audit evidence record; verdict GO_WITH_CORRECTIVES (corrective pass applied in PR #176: semantic freeze only, processor representation OPEN); **D13 negative ruling: no Processing Plugin/Capability today**; authority freeze (D14.11 candidate) required before any DSP implementation |
 | Product/repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | External failure evidence | `../evidence/README.md` — opt-in only |
