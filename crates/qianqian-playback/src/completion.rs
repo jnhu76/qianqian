@@ -101,6 +101,20 @@ struct CompletionState {
     /// Terminal the decode worker observed on the edge at its exit.
     worker_terminal: Option<EdgeTerminal>,
     decode_failure: Option<String>,
+    /// An AUDIO PROCESSING failure published by the decode worker
+    /// (ADR-PBK-002 D14.11): the same D11 `Failed` terminal class as
+    /// `decode_failure`, with its own evidence slot so the internal
+    /// diagnosis stays truthful about the failure's origin — a
+    /// processing failure must not masquerade as a decode failure merely
+    /// because the current execution placement shares the decode worker.
+    /// The stage spelling of the settled diagnostic ("processing: ...")
+    /// carries the distinction; the terminal vocabulary does not.
+    /// I0 scope: only the disposable Gain probe can produce a processing
+    /// failure, so the whole route is compiled in this crate's test
+    /// build only; production Gain (Issue #177 I1) earns the production
+    /// route with its first real consumer.
+    #[cfg(all(test, not(loom)))]
+    processing_failure: Option<String>,
     /// The drain verdict, mirrored into the state by the session-owned
     /// observer installed on the DrainSignal (first wins). Mirroring
     /// keeps the resolver a pure function of the one lock-protected
@@ -317,6 +331,8 @@ impl SessionCompletion {
                         outcome: None,
                         worker_terminal: None,
                         decode_failure: None,
+                        #[cfg(all(test, not(loom)))]
+                        processing_failure: None,
                         drain_verdict: None,
                         source_format: None,
                         source_duration: None,
@@ -409,6 +425,27 @@ impl SessionCompletion {
         self.publish(|state| {
             if state.decode_failure.is_none() {
                 state.decode_failure = Some(message.to_owned());
+            }
+        });
+    }
+
+    /// The decode worker reports an AUDIO PROCESSING failure
+    /// (ADR-PBK-002 D14.11): the same D11 `Failed` terminal class, via
+    /// its own publication so the internal diagnosis stays truthful
+    /// about the processing origin instead of borrowing the decode
+    /// label. First failure wins against the decode slot — worker-leg
+    /// failure publications are sequential on the one worker thread, so
+    /// the arbitration is defensive only. No bypass, no partial result:
+    /// a failed processor's output is not trustworthy.
+    ///
+    /// I0 scope: compiled in this crate's test build only — the
+    /// disposable Gain probe is the only publisher; production Gain
+    /// (Issue #177 I1) earns the production route.
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn processing_failed(&self, message: &str) {
+        self.publish(|state| {
+            if state.decode_failure.is_none() && state.processing_failure.is_none() {
+                state.processing_failure = Some(message.to_owned());
             }
         });
     }
@@ -1151,11 +1188,21 @@ fn publish_evidence(core: &CompletionArc, evidence: impl FnOnce(&mut CompletionS
 /// with recorded stop intent disambiguating an aborted drain. Called
 /// only from [`publish_evidence`], so `outcome` is still `None` here.
 fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
-    // Decode failure is authoritative over everything downstream: the
-    // failure was published before the edge was failed.
+    // Worker-side failure is authoritative over everything downstream:
+    // the failure was published before the edge was failed. The stage
+    // spelling keeps the origin truthful (D14.11): a decode failure and
+    // (where the processing route is compiled, see CompletionState) an
+    // audio-processing failure settle the same `Failed` terminal class
+    // through their own evidence slots.
     if let Some(message) = &state.decode_failure {
         return Some(SessionOutcome::Failed {
             stage: format!("decode: {message}"),
+        });
+    }
+    #[cfg(all(test, not(loom)))]
+    if let Some(message) = &state.processing_failure {
+        return Some(SessionOutcome::Failed {
+            stage: format!("processing: {message}"),
         });
     }
     if state.worker_terminal == Some(EdgeTerminal::Failed) {
