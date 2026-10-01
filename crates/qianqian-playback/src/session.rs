@@ -7,6 +7,8 @@
 //! resolve Decode capability once
 //! resolve Output capability once
 //! open decode endpoint            (RAII: rides with the decode worker)
+//! compile the applied processing  (D14.11: binds the episode's source
+//!                                  format; acquires nothing, no inverse)
 //! build bounded edge
 //! open render stream              -> inverse: stop_and_join stream
 //! spawn decode worker             -> inverse: stop edge + join worker
@@ -63,7 +65,10 @@ pub fn playback_session_spec(file: PathBuf, handle: PlaybackSessionHandle) -> Co
 /// applied snapshot from it at activation, and the snapshot is
 /// episode-fixed (no live updates — a changed desired configuration
 /// takes effect at the NEXT episode). An invalid configuration fails
-/// the activation cleanly before any resource is acquired.
+/// the activation cleanly with no terminal Fact and no resource left
+/// behind; because the EQ stage's coefficients depend on the source
+/// rate, the final compile runs once the decode endpoint is open, and
+/// an invalid configuration unwinds that endpoint through RAII.
 pub fn playback_session_spec_with_processing(
     file: PathBuf,
     handle: PlaybackSessionHandle,

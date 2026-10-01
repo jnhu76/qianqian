@@ -1097,7 +1097,10 @@ fn eq_stage_cost_is_bounded_and_allocation_free() {
         "EQ 44.1 kHz stereo, 1024-frame staging, all bands: median {median:?}, p95 {p95:?}, p99 {p99:?}, allocations {allocations}"
     );
 
-    // 48 kHz: same per-sample work, different coefficients.
+    // 48 kHz: same per-sample work, different coefficients — measured
+    // with the same statistic discipline as the 44.1 kHz leg (I3 review:
+    // per-sample medians, not one window mean, and the allocation
+    // assertion run for both).
     let config_48 = EqConfig::new([6.0; 10], 1.0);
     let format_48 = PcmFormat {
         sample_rate: 48000,
@@ -1106,12 +1109,26 @@ fn eq_stage_cost_is_bounded_and_allocation_free() {
     };
     let mut stage_48 = EqStage::new(&config_48, &format_48).expect("compiles");
     let mut block = vec![0.25f32; 1024 * 2];
-    let start = Instant::now();
+    stage_48.stage(&mut block);
+    let (_, allocations_48) =
+        crate::edge_lifecycle_tests::counting_allocator::run_counting_allocations(|| {
+            for _ in 0..2_000 {
+                stage_48.stage(&mut block);
+            }
+        });
+    assert_eq!(allocations_48, 0, "48 kHz staging allocates nothing too");
+    let mut samples_48 = Vec::with_capacity(2_000);
     for _ in 0..2_000 {
+        let start = Instant::now();
         stage_48.stage(&mut block);
+        samples_48.push(start.elapsed());
     }
-    let median_48 = start.elapsed() / 2_000;
-    println!("EQ 48 kHz stereo, 1024-frame staging, all bands: mean {median_48:?}");
+    samples_48.sort();
+    let median_48 = samples_48[1_000];
+    let p99_48 = samples_48[1_980];
+    println!(
+        "EQ 48 kHz stereo, 1024-frame staging, all bands: median {median_48:?}, p99 {p99_48:?}, allocations {allocations_48}"
+    );
     assert!(
         median_48 < Duration::from_millis(5),
         "48 kHz staging cost {median_48:?} exceeds the bound"

@@ -573,7 +573,10 @@ fn bypass_ignores_the_gain_field_and_passes_the_source_through() {
 /// the EPISODE ESTABLISHMENT cleanly: the activation raises with a
 /// truthful diagnostic, `activation_error` carries it, and NO terminal
 /// Fact is forged — an episode that never started has no terminal
-/// outcome (D11 activation firewall).
+/// outcome (D11 activation firewall). Since I3's format-bound compile,
+/// the source-format evidence is published BEFORE the compile can fail
+/// (the endpoint opens first, then unwinds) — truthful mechanism
+/// evidence on a failed activation, not a defect.
 #[test]
 fn an_invalid_processing_config_fails_establishment_without_a_terminal_fact() {
     let _lifecycle = test_common::lifecycle_lock();

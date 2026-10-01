@@ -38,7 +38,7 @@ mod session;
 pub use handle::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,
 };
-pub use processing::AudioProcessingConfig;
+pub use processing::{AudioProcessingConfig, EqConfig};
 pub use session::{playback_session_spec, playback_session_spec_with_processing};
 
 // Test doubles shared by the integration tests and the crate-internal
