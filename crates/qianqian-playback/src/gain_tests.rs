@@ -415,7 +415,8 @@ fn negative_control_the_gain_oracle_rejects_the_double_applied_signature() {
 #[test]
 fn steady_state_processing_allocates_zero() {
     let mut processing =
-        EpisodeProcessing::new(&AudioProcessingConfig::gain(0.5)).expect("valid config");
+        EpisodeProcessing::new(&AudioProcessingConfig::gain(0.5), &test_common::TEST_FORMAT)
+            .expect("valid config");
     let mut block = vec![0.25f32; 1024 * 2];
     // Warm the path once outside the window (first-touch page faults and
     // any one-time lazy state are not steady-state processing).
@@ -552,6 +553,7 @@ fn bypass_ignores_the_gain_field_and_passes_the_source_through() {
             AudioProcessingConfig {
                 enabled: false,
                 gain: 0.5,
+                eq: None,
             },
             Vec::new(),
         );

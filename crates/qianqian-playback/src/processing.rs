@@ -1,5 +1,6 @@
 //! Episode Audio Processing (ADR-PBK-002 D14.11, Issue #177 Stage 2
-//! I1/I2). Two types, one frozen seam:
+//! I1-I3). The desired/applied pair and, since I3, the first stateful
+//! production processor (a 10-band biquad EQ cascade):
 //!
 //! ```text
 //! AudioProcessingConfig    the DESIRED product configuration, owned by
@@ -24,14 +25,16 @@
 //! NOT a Plugin, NOT a Capability, NOT a processor framework (D13
 //! negative ruling): one enum with the states the current product
 //! configuration can express, private to this crate. New processors
-//! (stateful EQ, I3) join by evidence under the same rules — the
-//! representation re-earns itself there, not here.
+//! join by evidence under the same rules — the representation re-earns
+//! itself there, not here.
 //!
 //! Configuration is EPISODE-FIXED (the D14.11 four-way model, case B):
 //! the applied snapshot is built once at activation and never updated
 //! live. A changed desired configuration takes effect at the next
 //! episode's establishment. Live parameter update remains OPEN and
 //! unearned.
+
+use qianqian_audio_api::ports::PcmFormat;
 
 /// The desired Audio Processing configuration (D14.11: application /
 /// product-control layer owns it; this type is only its transport into
@@ -66,7 +69,19 @@ pub struct AudioProcessingConfig {
     /// behavior (D14.9 Volume is a separate, distinct mechanism — the
     /// device/output-stream realization — and neither implements nor
     /// writes the other). Gain semantics are documented, never silent.
+    ///
+    /// Product order (I3, frozen by the runtime shape): this Gain stage
+    /// is the PREAMP and runs FIRST, the EQ stage (if configured) runs
+    /// second — an explicit fixed order, never a registration or
+    /// iteration order. No automatic headroom compensation exists
+    /// between them; the internal Float32 range covers positive EQ
+    /// sums, unclipped and unlimitied.
     pub gain: f32,
+    /// The EQ stage (I3): a fixed 10-band biquad cascade. `None` runs
+    /// no EQ; `Some` config is PRODUCT DATA (band trims in dB + the
+    /// peaking-band Q), validated and compiled against the episode's
+    /// source format at establishment. Inert under bypass.
+    pub eq: Option<EqConfig>,
 }
 
 impl AudioProcessingConfig {
@@ -74,6 +89,7 @@ impl AudioProcessingConfig {
     pub const BYPASS: Self = Self {
         enabled: false,
         gain: 1.0,
+        eq: None,
     };
 
     /// An enabled configuration applying the linear gain `factor`.
@@ -81,21 +97,105 @@ impl AudioProcessingConfig {
         Self {
             enabled: true,
             gain: factor,
+            eq: None,
         }
     }
 
-    /// Establish-time validation. A well-formed configuration is total:
-    /// the gain must be finite and non-negative regardless of `enabled`
-    /// (a NaN/Inf/negative gain is an invalid configuration, not an
-    /// inert one — product configuration that cannot mean anything
-    /// fails loudly instead of silently meaning nothing). Polarity
-    /// inversion is not an authorized product semantic for this slice.
+    /// An enabled configuration with a neutral preamp and the given EQ
+    /// stage.
+    pub fn eq(eq: EqConfig) -> Self {
+        Self {
+            enabled: true,
+            gain: 1.0,
+            eq: Some(eq),
+        }
+    }
+
+    /// Establish-time validation (the intrinsic half). A well-formed
+    /// configuration is total: the gain must be finite and non-negative
+    /// and the EQ bands representable — product configuration that
+    /// cannot mean anything fails loudly instead of silently meaning
+    /// nothing. Polarity inversion is not an authorized product
+    /// semantic for this slice. The format-dependent half (band
+    /// frequency vs the source's Nyquist frequency) runs when the EQ
+    /// compiles against the episode's source format.
     pub fn validate(&self) -> Result<(), String> {
         if !self.gain.is_finite() {
             return Err(format!("gain must be finite, got {}", self.gain));
         }
         if self.gain < 0.0 {
             return Err(format!("gain must be non-negative, got {}", self.gain));
+        }
+        if let Some(eq) = &self.eq {
+            eq.validate()?;
+        }
+        Ok(())
+    }
+}
+
+/// The fixed 10-band product EQ set, in Hz (Issue #177 I3). PRODUCT
+/// CONFIGURATION, not architecture authority: the conventional
+/// graphic-EQ centers. Band 0 is a LOW SHELF, bands 1–8 are PEAKING,
+/// band 9 is a HIGH SHELF — the kind mapping is part of this product
+/// table, not a registry or a plugin taxonomy. The table is fixed for
+/// the slice; band KINDS and centers are never semantic authority.
+pub(crate) const EQ_BAND_FREQUENCY_HZ: [f32; 10] = [
+    31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0,
+];
+
+/// The product bound on per-band trim. A product tuning decision (what
+/// a graphic EQ exposes), documented here because I3.6 requires the
+/// headroom posture to be explicit: +18 dB on every band stays finite
+/// in internal Float32 (pinned by an oracle), the device owns
+/// out-of-range samples, and no limiter or clip exists.
+pub(crate) const EQ_MAX_BAND_GAIN_DB: f32 = 18.0;
+
+/// The desired EQ configuration: per-band trims in dB for the fixed
+/// product band table plus the peaking bands' Q. Pure DATA — not a
+/// processor, not a plugin, not per-band objects with independent
+/// lifecycle (Issue #177 I4's preset taxonomy applies to this too:
+/// presets are configuration data over this same struct).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EqConfig {
+    /// Trim in dB for each band of [`EQ_BAND_FREQUENCY_HZ`], in band
+    /// order. 0.0 = neutral band.
+    pub band_gain_db: [f32; 10],
+    /// Q of the peaking bands (the two shelves use the cookbook's S = 1
+    /// slope, which has no separate Q). Product tuning.
+    pub q: f32,
+}
+
+impl EqConfig {
+    /// The neutral EQ: every band 0 dB (observationally the identity —
+    /// pinned BIT-EXACT by an oracle, the strongest product oracle).
+    pub const FLAT: Self = Self {
+        band_gain_db: [0.0; 10],
+        q: 1.0,
+    };
+
+    /// An EQ configuration from band trims and the peaking Q.
+    pub fn new(band_gain_db: [f32; 10], q: f32) -> Self {
+        Self { band_gain_db, q }
+    }
+
+    /// Intrinsic validation (format-independent). Runs at establishment;
+    /// the format-dependent part (band frequency vs Nyquist) runs when
+    /// the stage compiles against the episode's source format.
+    pub(crate) fn validate(&self) -> Result<(), String> {
+        if !self.q.is_finite() || self.q <= 0.0 {
+            return Err(format!("EQ q must be finite and positive, got {}", self.q));
+        }
+        for (band, gain_db) in self.band_gain_db.iter().enumerate() {
+            if !gain_db.is_finite() {
+                return Err(format!("EQ band {band} gain must be finite, got {gain_db}"));
+            }
+            if gain_db.abs() > EQ_MAX_BAND_GAIN_DB {
+                return Err(format!(
+                    "EQ band {band} gain {} dB exceeds the product bound \
+                     ±{EQ_MAX_BAND_GAIN_DB} dB",
+                    gain_db
+                ));
+            }
         }
         Ok(())
     }
@@ -106,6 +206,208 @@ impl AudioProcessingConfig {
 /// failure.
 #[cfg(all(test, not(loom)))]
 type TestStage = Box<dyn FnMut(&mut [f32]) -> Result<(), String> + Send>;
+
+/// One compiled biquad band: normalized coefficients (a0 = 1) plus the
+/// per-channel Transposed Direct Form II state. Episode-owned; retired
+/// with the episode.
+#[derive(Debug)]
+struct BiquadBand {
+    b0: f32,
+    b1: f32,
+    b2: f32,
+    a1: f32,
+    a2: f32,
+    s1: Vec<f32>,
+    s2: Vec<f32>,
+}
+
+/// The compiled EQ stage: the fixed band cascade in explicit fixed
+/// order (band 0 → 9), one independent state per source channel.
+/// Steady-state posture: in place, allocation-free, per-sample work
+/// independent of block boundaries (the fragmentation invariance the
+/// I2 probe proved for the transport is inherited by construction —
+/// same per-sample op sequence).
+#[derive(Debug)]
+pub(crate) struct EqStage {
+    bands: Vec<BiquadBand>,
+    channels: usize,
+}
+
+impl EqStage {
+    /// Compile the cascade against the episode's source format. Runs
+    /// the config's intrinsic validation itself (defense in depth),
+    /// then the format-DEPENDENT half of EQ validation (I3.5): a band
+    /// at or above this source's Nyquist frequency fails establishment
+    /// instead of compiling coefficients that would poison the
+    /// recursion. `pub(crate)` for the in-crate DSP oracles; product
+    /// code reaches the stage only through [`EpisodeProcessing::new`].
+    pub(crate) fn new(config: &EqConfig, format: &PcmFormat) -> Result<Self, String> {
+        config.validate()?;
+        if format.sample_rate == 0 {
+            return Err("sample rate must be positive".to_owned());
+        }
+        let channels = usize::from(format.channels);
+        if channels == 0 {
+            return Err("a source without channels cannot be processed".to_owned());
+        }
+        let fs = format.sample_rate as f32;
+        let nyquist = fs / 2.0;
+        let mut bands = Vec::with_capacity(EQ_BAND_FREQUENCY_HZ.len());
+        for (index, &f0) in EQ_BAND_FREQUENCY_HZ.iter().enumerate() {
+            if f0 >= nyquist {
+                return Err(format!(
+                    "EQ band {index} ({} Hz) is at or above this source's \
+                     Nyquist frequency ({nyquist} Hz at {} Hz source rate)",
+                    f0, format.sample_rate
+                ));
+            }
+            bands.push(BiquadBand::compiled(
+                index,
+                f0,
+                config.band_gain_db[index],
+                config.q,
+                fs,
+                channels,
+            )?);
+        }
+        Ok(Self { bands, channels })
+    }
+
+    /// The cascade, in place, in explicit fixed band order. Frame-count
+    /// and layout preserving by construction: every sample passes every
+    /// band, channel states stay independent.
+    pub(crate) fn stage(&mut self, block: &mut [f32]) {
+        for frame in block.chunks_exact_mut(self.channels) {
+            for (c, sample) in frame.iter_mut().enumerate() {
+                let mut x = *sample;
+                for band in &mut self.bands {
+                    x = band.step(x, c);
+                }
+                *sample = x;
+            }
+        }
+    }
+
+    /// The Applied-seek invalidation target (D14.11): the coefficients
+    /// are format-derived constants and stay; the per-channel state
+    /// returns to its episode-start rest. "Fresh-instance observational
+    /// equivalence" — a reset stage behaves exactly like a newly
+    /// compiled one (pinned by an oracle).
+    fn reset(&mut self) {
+        for band in &mut self.bands {
+            for s in band.s1.iter_mut() {
+                *s = 0.0;
+            }
+            for s in band.s2.iter_mut() {
+                *s = 0.0;
+            }
+        }
+    }
+}
+
+impl BiquadBand {
+    /// Compile one band. Coefficient formulas: RBJ Audio EQ Cookbook
+    /// (Robert Bristow-Johnson, "Audio EQ Cookbook",
+    /// https://www.w3.org/2011/audio/audio-eq-cookbook.html — the
+    /// standard published peaking/shelving biquad recipes), realized in
+    /// Transposed Direct Form II with a0 normalized to 1. Dependent
+    /// quantities, pinned here explicitly: `w0 = 2π·f0/fs` carries the
+    /// SOURCE-RATE dependence; the peaking bands use the configured Q;
+    /// the shelves use the cookbook's S = 1 slope; `A = 10^(dB/40)` is
+    /// the gain mapping. Design targets that fall out of the algebra:
+    /// the peaking band's response at its center frequency and both
+    /// shelves' asymptotic gains equal `A²` — the full configured dB
+    /// (`20·log10(A²) = dB`). For valid parameters (f0 < Nyquist,
+    /// q > 0, finite gain) the recipe's poles lie inside the unit
+    /// circle, so the output is bounded and finite; compilation refuses
+    /// anything the f32 arithmetic degraded (non-finite or unstable)
+    /// rather than poisoning the recursion (I3.5).
+    fn compiled(
+        index: usize,
+        f0: f32,
+        gain_db: f32,
+        q: f32,
+        fs: f32,
+        channels: usize,
+    ) -> Result<Self, String> {
+        let a = 10f32.powf(gain_db / 40.0);
+        let w0 = std::f32::consts::TAU * f0 / fs;
+        let cos_w0 = w0.cos();
+        let sin_w0 = w0.sin();
+        let (b0, b1, b2, a0, a1, a2) = if index == 0 {
+            // Low shelf (S = 1: (A + 1/A)(1/S - 1) vanishes, so
+            // alpha = sin(w0)/2 * sqrt(2)).
+            let alpha = (sin_w0 / 2.0) * std::f32::consts::SQRT_2;
+            let term = 2.0 * a.sqrt() * alpha;
+            (
+                a * ((a + 1.0) - (a - 1.0) * cos_w0 + term),
+                2.0 * a * ((a - 1.0) - (a + 1.0) * cos_w0),
+                a * ((a + 1.0) - (a - 1.0) * cos_w0 - term),
+                (a + 1.0) + (a - 1.0) * cos_w0 + term,
+                -2.0 * ((a - 1.0) + (a + 1.0) * cos_w0),
+                (a + 1.0) + (a - 1.0) * cos_w0 - term,
+            )
+        } else if index == EQ_BAND_FREQUENCY_HZ.len() - 1 {
+            // High shelf (same S = 1 alpha as the low shelf).
+            let alpha = (sin_w0 / 2.0) * std::f32::consts::SQRT_2;
+            let term = 2.0 * a.sqrt() * alpha;
+            (
+                a * ((a + 1.0) + (a - 1.0) * cos_w0 + term),
+                -2.0 * a * ((a - 1.0) + (a + 1.0) * cos_w0),
+                a * ((a + 1.0) + (a - 1.0) * cos_w0 - term),
+                (a + 1.0) - (a - 1.0) * cos_w0 + term,
+                2.0 * ((a - 1.0) - (a + 1.0) * cos_w0),
+                (a + 1.0) - (a - 1.0) * cos_w0 - term,
+            )
+        } else {
+            // Peaking EQ.
+            let alpha = sin_w0 / (2.0 * q);
+            (
+                1.0 + alpha * a,
+                -2.0 * cos_w0,
+                1.0 - alpha * a,
+                1.0 + alpha / a,
+                -2.0 * cos_w0,
+                1.0 - alpha / a,
+            )
+        };
+        let (b0, b1, b2, a1, a2) = (b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0);
+        for coefficient in [b0, b1, b2, a1, a2] {
+            if !coefficient.is_finite() {
+                return Err(format!(
+                    "EQ band {index} compiled to a non-finite coefficient"
+                ));
+            }
+        }
+        // Monic-quadratic pole test (Jury): the recursion is bounded
+        // iff |a2| < 1 and |a1| < 1 + a2.
+        if !(a2.abs() < 1.0 && a1.abs() < 1.0 + a2) {
+            return Err(format!("EQ band {index} compiled to an unstable recursion"));
+        }
+        Ok(Self {
+            b0,
+            b1,
+            b2,
+            a1,
+            a2,
+            s1: vec![0.0; channels],
+            s2: vec![0.0; channels],
+        })
+    }
+
+    /// One Transposed Direct Form II step for channel `c`:
+    ///
+    /// ```text
+    /// y[n] = b0·x[n] + s1        s1' = b1·x[n] − a1·y[n] + s2
+    ///                               s2' = b2·x[n] − a2·y[n]
+    /// ```
+    fn step(&mut self, x: f32, c: usize) -> f32 {
+        let y = self.b0 * x + self.s1[c];
+        self.s1[c] = self.b1 * x - self.a1 * y + self.s2[c];
+        self.s2[c] = self.b2 * x - self.a2 * y;
+        y
+    }
+}
 
 /// The episode-owned processing runtime: the applied snapshot compiled
 /// at activation, carried by the decode worker for the episode's whole
@@ -123,6 +425,13 @@ pub(crate) enum EpisodeProcessing {
     /// linear factor once, in place. Stateless: no signal-derived
     /// history, so history invalidation is a no-op.
     Gain { factor: f32 },
+    /// Gain (preamp) THEN the EQ cascade — the explicit fixed product
+    /// order (I3.8), pinned by the variant's shape and an oracle, never
+    /// by registration or iteration. The EQ carries the episode's
+    /// signal-derived history: this is the state the Applied-seek
+    /// invalidation returns to rest, the pause preserves, and the
+    /// refusal must not disturb (D14.11, proven by the I2 probe).
+    GainThenEq { factor: f32, eq: EqStage },
     /// Test-only processor injection (never shipped): the stage and the
     /// history invalidation are arbitrary closures, so the in-crate
     /// oracles can drive the REAL composition with a deliberate
@@ -144,6 +453,11 @@ impl std::fmt::Debug for EpisodeProcessing {
                 .debug_struct("EpisodeProcessing::Gain")
                 .field("factor", factor)
                 .finish(),
+            Self::GainThenEq { factor, eq } => f
+                .debug_struct("EpisodeProcessing::GainThenEq")
+                .field("factor", factor)
+                .field("eq", eq)
+                .finish(),
             #[cfg(all(test, not(loom)))]
             Self::TestDriven { .. } => f.write_str("EpisodeProcessing::TestDriven(..)"),
         }
@@ -151,19 +465,30 @@ impl std::fmt::Debug for EpisodeProcessing {
 }
 
 impl EpisodeProcessing {
-    /// Compile the applied snapshot from the desired configuration.
-    /// Called exactly once per episode, at activation, on the session's
-    /// establishment path; `Err` fails the activation before any
-    /// resource is acquired.
-    pub(crate) fn new(config: &AudioProcessingConfig) -> Result<Self, String> {
+    /// Compile the applied snapshot from the desired configuration,
+    /// bound to the EPISODE's source format (D14.11: processing state
+    /// whose semantics depend on the source PCM format is bound to that
+    /// episode's format). Called exactly once per episode, at
+    /// activation, after the decode endpoint is open — the EQ stage's
+    /// coefficients are a function of the source sample rate, so the
+    /// compile cannot run before the format is known; a failure here
+    /// (invalid configuration, or a band at/above this source's
+    /// Nyquist frequency) raises the activation and unwinds the open
+    /// endpoint through the ordinary RAII.
+    pub(crate) fn new(config: &AudioProcessingConfig, format: &PcmFormat) -> Result<Self, String> {
         config.validate()?;
-        Ok(if config.enabled {
-            Self::Gain {
+        if !config.enabled {
+            return Ok(Self::Bypass);
+        }
+        match &config.eq {
+            None => Ok(Self::Gain {
                 factor: config.gain,
-            }
-        } else {
-            Self::Bypass
-        })
+            }),
+            Some(eq_config) => Ok(Self::GainThenEq {
+                factor: config.gain,
+                eq: EqStage::new(eq_config, format)?,
+            }),
+        }
     }
 
     /// The test-only processor injection (see the variant doc). Crate-
@@ -195,6 +520,14 @@ impl EpisodeProcessing {
                 }
                 Ok(())
             }
+            Self::GainThenEq { factor, eq } => {
+                let factor = *factor;
+                for sample in block.iter_mut() {
+                    *sample *= factor;
+                }
+                eq.stage(block);
+                Ok(())
+            }
             #[cfg(all(test, not(loom)))]
             Self::TestDriven { stage, .. } => stage(block),
         }
@@ -217,6 +550,7 @@ impl EpisodeProcessing {
     pub(crate) fn invalidate_signal_history(&mut self) {
         match self {
             Self::Bypass | Self::Gain { .. } => {}
+            Self::GainThenEq { eq, .. } => eq.reset(),
             #[cfg(all(test, not(loom)))]
             Self::TestDriven { invalidate, .. } => invalidate(),
         }
@@ -227,11 +561,21 @@ impl EpisodeProcessing {
 mod tests {
     use super::*;
 
+    /// The format the unit tests compile against.
+    fn test_format() -> PcmFormat {
+        PcmFormat {
+            sample_rate: 44100,
+            channels: 2,
+            channel_mask: 0x3,
+        }
+    }
+
     /// A well-formed enabled config compiles to the Gain state.
     #[test]
     fn an_enabled_config_compiles_to_scalar_gain() {
-        let mut processing = EpisodeProcessing::new(&AudioProcessingConfig::gain(0.5))
-            .expect("valid config establishes");
+        let mut processing =
+            EpisodeProcessing::new(&AudioProcessingConfig::gain(0.5), &test_format())
+                .expect("valid config establishes");
         let mut block = [2.0f32, 4.0];
         processing.stage(&mut block).expect("gain stage succeeds");
         assert_eq!(block, [1.0, 2.0]);
@@ -240,8 +584,8 @@ mod tests {
     /// Bypass is transparent bit-for-bit: the block is untouched.
     #[test]
     fn bypass_passes_the_block_through_untouched() {
-        let mut processing =
-            EpisodeProcessing::new(&AudioProcessingConfig::BYPASS).expect("bypass establishes");
+        let mut processing = EpisodeProcessing::new(&AudioProcessingConfig::BYPASS, &test_format())
+            .expect("bypass establishes");
         let mut block = [0.5f32, -0.25, 7.0];
         processing.stage(&mut block).expect("bypass stage succeeds");
         assert_eq!(block, [0.5, -0.25, 7.0]);
@@ -253,7 +597,8 @@ mod tests {
     #[test]
     fn positive_gain_is_not_clipped_by_the_stage() {
         let mut processing =
-            EpisodeProcessing::new(&AudioProcessingConfig::gain(2.0)).expect("valid config");
+            EpisodeProcessing::new(&AudioProcessingConfig::gain(2.0), &test_format())
+                .expect("valid config");
         let mut block = [0.6f32, -0.6];
         processing.stage(&mut block).expect("gain stage succeeds");
         assert_eq!(block, [1.2, -1.2]);
@@ -265,11 +610,62 @@ mod tests {
     #[test]
     fn invalid_gains_fail_establishment() {
         for gain in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.5] {
-            let err = EpisodeProcessing::new(&AudioProcessingConfig::gain(gain))
+            let err = EpisodeProcessing::new(&AudioProcessingConfig::gain(gain), &test_format())
                 .expect_err("invalid gain must fail establishment");
             assert!(!err.is_empty(), "gain {gain}: a diagnostic is carried");
         }
         // Bypass with a valid gain value still establishes.
-        EpisodeProcessing::new(&AudioProcessingConfig::BYPASS).expect("bypass establishes");
+        EpisodeProcessing::new(&AudioProcessingConfig::BYPASS, &test_format())
+            .expect("bypass establishes");
+    }
+
+    /// A neutral EQ compiles and is the identity on this block; an
+    /// EQ-carrying config compiles to the GainThenEq state (I3).
+    #[test]
+    fn an_eq_config_compiles_to_the_gain_then_eq_state() {
+        let config = AudioProcessingConfig::eq(EqConfig::FLAT);
+        let mut processing = EpisodeProcessing::new(&config, &test_format()).expect("compiles");
+        let mut block = [1.0f32, -2.0, 3.5, -4.25];
+        processing.stage(&mut block).expect("stage succeeds");
+        assert_eq!(
+            block,
+            [1.0, -2.0, 3.5, -4.25],
+            "a flat EQ stage is the identity bit-exactly"
+        );
+    }
+
+    /// Per-band stability across the product parameter grid: every
+    /// compilable (band, gain, Q, source rate) combination yields
+    /// FINITE coefficients satisfying the monic-quadratic pole bound
+    /// (|a2| < 1, |a1| < 1 + a2) — bounded output by construction; every
+    /// combination with the band at/above Nyquist is refused.
+    #[test]
+    fn the_band_stability_grid_holds_across_product_parameters() {
+        for (band, &f0_f32) in EQ_BAND_FREQUENCY_HZ.iter().enumerate() {
+            let f0 = f64::from(f0_f32);
+            for gain_db in [-18.0f32, -12.0, -6.0, 0.0, 6.0, 12.0, 18.0] {
+                for q in [0.5f32, 1.0, 2.0, 4.0] {
+                    for fs in [8000u32, 22050, 44100, 48000, 96000, 192000] {
+                        let nyquist = f64::from(fs) / 2.0;
+                        match BiquadBand::compiled(band, f0_f32, gain_db, q, fs as f32, 2) {
+                            Ok(compiled) => {
+                                assert!(f0 < nyquist);
+                                assert!(
+                                    compiled.a2.abs() < 1.0
+                                        && compiled.a1.abs() < 1.0 + compiled.a2,
+                                    "band {band} unstable at {fs} Hz \
+                                     (gain {gain_db}, q {q})"
+                                );
+                            }
+                            Err(_) => assert!(
+                                f0 >= nyquist,
+                                "band {band} refused at {fs} Hz without a \
+                                 Nyquist conflict (gain {gain_db}, q {q})"
+                            ),
+                        }
+                    }
+                }
+            }
+        }
     }
 }
