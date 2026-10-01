@@ -401,8 +401,7 @@ lefthook run pre-push --all-files
 The gate runs checks only — it never formats, auto-fixes, stages, commits, or touches the network:
 
 ```text
-always:                 git diff --check
-                        python3 tools/check_architecture_vocabulary.py
+always:                 python3 tools/check_architecture_vocabulary.py
 Rust paths changed:     plugin boundary gate, cargo fmt --check,
                         cargo clippy --workspace --all-targets -- -D warnings,
                         cargo test --workspace
