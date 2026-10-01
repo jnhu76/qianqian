@@ -33,6 +33,7 @@ use qianqian_composition::{ActivationError, ComponentSpec, Discharge};
 use crate::completion::{CutoverDecision, SessionCompletion};
 use crate::edge::PcmEdge;
 use crate::handle::PlaybackSessionHandle;
+use crate::processing::{AudioProcessingConfig, EpisodeProcessing};
 
 /// Frames of PCM the edge buffers (~185 ms at 44.1 kHz stereo). Chosen
 /// from the measured decode tail (p99 ~0.2 ms per 1024-frame block,
@@ -46,23 +47,42 @@ const STAGING_FRAMES: usize = 1024;
 
 /// The Playback Session component definition. The App captures the file
 /// and the episode handle it will observe; desired entries need no
-/// config payload for the first slice.
+/// config payload for the first slice. Audio Processing runs in the
+/// transparent BYPASS configuration (D14.11: an episode established
+/// without a processing request processes nothing).
 pub fn playback_session_spec(file: PathBuf, handle: PlaybackSessionHandle) -> ComponentSpec {
+    playback_session_spec_with_processing(file, handle, AudioProcessingConfig::BYPASS)
+}
+
+/// [`playback_session_spec`] with the application's desired Audio
+/// Processing configuration (ADR-PBK-002 D14.11). This constructor call
+/// IS the D14.11 handoff representation: the desired configuration is
+/// an argument of episode establishment, the session binds ONE coherent
+/// applied snapshot from it at activation, and the snapshot is
+/// episode-fixed (no live updates — a changed desired configuration
+/// takes effect at the NEXT episode). An invalid configuration fails
+/// the activation cleanly before any resource is acquired.
+pub fn playback_session_spec_with_processing(
+    file: PathBuf,
+    handle: PlaybackSessionHandle,
+    processing: AudioProcessingConfig,
+) -> ComponentSpec {
     ComponentSpec::new("playback_session")
         .requires::<PcmDecodeCapability>()
         .requires::<AudioOutputCapability>()
-        .on_activate(move |ctx| activate(&file, &handle.completion, ctx))
+        .on_activate(move |ctx| activate(&file, &handle.completion, &processing, ctx))
 }
 
 fn activate(
     file: &Path,
     completion: &SessionCompletion,
+    processing: &AudioProcessingConfig,
     ctx: &mut qianqian_composition::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
     // The kernel's diagnostic surface carries the FAILED verdict but not
     // the domain message; the session publishes its own activation
     // failure so the App can show why an episode never started.
-    let result = activate_inner(file, completion, ctx);
+    let result = activate_inner(file, completion, processing, ctx);
     if let Err(e) = &result {
         completion.activation_failed(&e.message);
     }
@@ -72,8 +92,17 @@ fn activate(
 fn activate_inner(
     file: &Path,
     completion: &SessionCompletion,
+    processing: &AudioProcessingConfig,
     ctx: &mut qianqian_composition::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
+    // Establish the episode's APPLIED processing snapshot first (D14.11
+    // configuration model, case B): it is plain data derived from the
+    // desired configuration, so an invalid desired configuration fails
+    // here, before any capability resolve or resource acquisition.
+    let processing = EpisodeProcessing::new(processing).map_err(|e| {
+        ActivationError::new(format!("audio processing configuration invalid: {e}"))
+    })?;
+
     // Control plane: capability resolution happens exactly once, here.
     let decode = ctx.resolve::<PcmDecodeCapability>().map_err(|e| {
         ActivationError::new(format!(
@@ -164,6 +193,7 @@ fn activate_inner(
                 worker_edge,
                 worker_completion,
                 STAGING_FRAMES,
+                processing,
             )
         })
         .map_err(|e| ActivationError::new(format!("decode worker spawn failed: {e}")))?;
@@ -229,11 +259,15 @@ enum WriteStep {
 ///             data plane's own terminal) ends it without a rebase.
 ///             Then resume post-cut production.
 /// ```
-fn decode_worker(
+/// `pub(crate)` so the white-box processing-failure oracle
+/// (gain_tests.rs) can drive the real worker directly over the
+/// mechanism doubles; product code reaches it only through activation.
+pub(crate) fn decode_worker(
     mut decode_stream: Box<dyn DecodedPcmStream>,
     edge: Arc<PcmEdge>,
     completion: SessionCompletion,
     staging_frames: usize,
+    mut processing: EpisodeProcessing,
 ) {
     let channels = usize::from(decode_stream.format().channels);
     let catch = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -441,16 +475,16 @@ fn decode_worker(
                 }
                 Ok(DecodeOutcome::Frames(n)) => {
                     let total = n * channels;
-                    // I0 Gain disposable probe (Issue #177 Stage 2 / I0;
-                    // ADR-PBK-002 D14.11): the experiment-only processing
-                    // seam, exercised at the frozen decode-worker staging
+                    // Production Audio Processing (ADR-PBK-002 D14.11;
+                    // Issue #177 I1): the episode's applied processing
+                    // snapshot runs at the frozen decode-worker staging
                     // placement — the whole staging block is processed
                     // BEFORE any of it can reach the edge, so a partially
                     // accepted block leaves already-PROCESSED PCM in the
-                    // preserved remainder. Compiled only in this crate's
-                    // test build; deleted with the I0 evidence.
-                    #[cfg(all(test, not(loom)))]
-                    if let Err(message) = crate::gain_probe::probe_stage(&mut staging[..total]) {
+                    // preserved remainder (the D14.5 seek obligations
+                    // extend to it). One in-place stage per block: no
+                    // per-block K0 work, no allocation, no dispatch.
+                    if let Err(message) = processing.stage(&mut staging[..total]) {
                         // D14.11 failure semantics: the unrecoverable
                         // processing failure settles through the existing
                         // D11 `Failed` class via the processing publication

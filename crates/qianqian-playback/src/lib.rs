@@ -26,17 +26,20 @@
 mod completion;
 mod edge;
 mod handle;
+mod processing;
 mod session;
 
 // The episode mechanism internals (PcmEdge / EdgeTerminal) are
 // crate-private: they are session-owned runtime resources, not
 // product API. The application-facing surface is exactly the public
 // seam below; composition roots reach the episode only through
-// `playback_session_spec` + `PlaybackSessionHandle`.
+// `playback_session_spec` (+ its processing-configuration variant)
+// and `PlaybackSessionHandle`.
 pub use handle::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,
 };
-pub use session::playback_session_spec;
+pub use processing::AudioProcessingConfig;
+pub use session::{playback_session_spec, playback_session_spec_with_processing};
 
 // Test doubles shared by the integration tests and the crate-internal
 // white-box settlement tests (one copy of the mechanism harness).
@@ -56,15 +59,13 @@ mod decision_table_oracle;
 #[cfg(all(test, not(loom)))]
 mod settlement_contract_tests;
 
-// I0 Gain disposable probe (Issue #177 Stage 2 / I0; ADR-PBK-002
-// D14.11): experiment-only evidence seam for the decode-worker staging
-// processing placement, compiled only in this crate's own test build.
-// Never shipped; the module and its one worker call site are deleted
-// with the I0 evidence.
+// Episode Audio Processing (ADR-PBK-002 D14.11; Issue #177 Stage 2):
+// the production processing module and its in-crate oracles — the
+// production Gain slice (I1) with the D14.11 seam/discontinuity/failure
+// obligations pinned through the real session composition and the real
+// decode worker.
 #[cfg(all(test, not(loom)))]
-mod gain_probe;
-#[cfg(all(test, not(loom)))]
-mod gain_probe_tests;
+mod gain_tests;
 
 // Edge mechanism tests: they exercise PcmEdge directly, so they moved
 // inside the crate boundary rather than keeping the mechanism `pub`
