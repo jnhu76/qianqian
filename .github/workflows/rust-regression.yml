@@ -27,6 +27,10 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      # toolchain/lint config: a future file must not silently miss the gate
+      - "rust-toolchain.toml"
+      - "rustfmt.toml"
+      - "clippy.toml"
       - ".cargo/**"
       - "crates/**"
       - "apps/**"
@@ -36,6 +40,9 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "rustfmt.toml"
+      - "clippy.toml"
       - ".cargo/**"
       - "crates/**"
       - "apps/**"

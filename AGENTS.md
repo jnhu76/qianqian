@@ -406,7 +406,8 @@ always:                 git diff --check
 Rust paths changed:     plugin boundary gate, cargo fmt --check,
                         cargo clippy --workspace --all-targets -- -D warnings,
                         cargo test --workspace
-docs/website changed:   website docs:verify (needs `cd website && npm ci` once)
+docs/website changed:   website verify (node scripts/verify.mjs;
+                        needs `cd website && npm ci` once)
 ```
 
 What it proves / does not prove:

@@ -48,6 +48,10 @@ pre-push:
       glob:
         - "Cargo.toml"
         - "Cargo.lock"
+        # toolchain/lint config a future file would silently miss:
+        - "rust-toolchain.toml"
+        - "rustfmt.toml"
+        - "clippy.toml"
         - ".cargo/**"
         - "crates/**"
         - "apps/**"
@@ -58,6 +62,9 @@ pre-push:
       glob:
         - "Cargo.toml"
         - "Cargo.lock"
+        - "rust-toolchain.toml"
+        - "rustfmt.toml"
+        - "clippy.toml"
         - ".cargo/**"
         - "crates/**"
         - "apps/**"
@@ -68,6 +75,9 @@ pre-push:
       glob:
         - "Cargo.toml"
         - "Cargo.lock"
+        - "rust-toolchain.toml"
+        - "rustfmt.toml"
+        - "clippy.toml"
         - ".cargo/**"
         - "crates/**"
         - "apps/**"
@@ -78,6 +88,9 @@ pre-push:
       glob:
         - "Cargo.toml"
         - "Cargo.lock"
+        - "rust-toolchain.toml"
+        - "rustfmt.toml"
+        - "clippy.toml"
         - ".cargo/**"
         - "crates/**"
         - "apps/**"
