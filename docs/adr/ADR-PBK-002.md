@@ -2030,7 +2030,7 @@ Playlist/queue selection authority was CLOSED by the 2026-09-18 F6-AUTHORITY-PRO
 
 ### D14.7 Pause / Resume — same-episode non-terminal control; mechanism + establishment frozen
 
-> **2026-09-16 amendment (F3-GATE; mechanism evidence:
+> 2026-09-16 amendment (F3-GATE; mechanism evidence:
 > `experiments/f3-pause-mechanism/` — synchronization-shape scenario
 > suite + physical WASAPI probe; roadmap: Issue #119 checkpoint). It
 > replaces the previous "semantic direction fixed, implementation still
