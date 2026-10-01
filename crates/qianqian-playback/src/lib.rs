@@ -56,6 +56,16 @@ mod decision_table_oracle;
 #[cfg(all(test, not(loom)))]
 mod settlement_contract_tests;
 
+// I0 Gain disposable probe (Issue #177 Stage 2 / I0; ADR-PBK-002
+// D14.11): experiment-only evidence seam for the decode-worker staging
+// processing placement, compiled only in this crate's own test build.
+// Never shipped; the module and its one worker call site are deleted
+// with the I0 evidence.
+#[cfg(all(test, not(loom)))]
+mod gain_probe;
+#[cfg(all(test, not(loom)))]
+mod gain_probe_tests;
+
 // Edge mechanism tests: they exercise PcmEdge directly, so they moved
 // inside the crate boundary rather than keeping the mechanism `pub`
 // just for tests. loom_edge explores the REAL edge synchronization

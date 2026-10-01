@@ -441,6 +441,27 @@ fn decode_worker(
                 }
                 Ok(DecodeOutcome::Frames(n)) => {
                     let total = n * channels;
+                    // I0 Gain disposable probe (Issue #177 Stage 2 / I0;
+                    // ADR-PBK-002 D14.11): the experiment-only processing
+                    // seam, exercised at the frozen decode-worker staging
+                    // placement — the whole staging block is processed
+                    // BEFORE any of it can reach the edge, so a partially
+                    // accepted block leaves already-PROCESSED PCM in the
+                    // preserved remainder. Compiled only in this crate's
+                    // test build; deleted with the I0 evidence.
+                    #[cfg(all(test, not(loom)))]
+                    if let Err(message) = crate::gain_probe::probe_stage(&mut staging[..total]) {
+                        // D14.11 failure semantics: the unrecoverable
+                        // processing failure settles through the existing
+                        // D11 `Failed` class via the processing publication
+                        // route, whose stage keeps the internal diagnosis
+                        // truthful about the origin (never a decode label,
+                        // never a new public terminal variant). No bypass,
+                        // no partial result.
+                        completion.processing_failed(&message);
+                        edge.fail();
+                        return;
+                    }
                     match write_observing_seek(
                         &edge,
                         &completion,

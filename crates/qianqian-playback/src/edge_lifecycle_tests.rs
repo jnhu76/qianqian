@@ -3,7 +3,7 @@
 //! terminals always unblock both endpoints (first-audible-slice design §4).
 
 #[path = "counting_allocator.rs"]
-mod counting_allocator;
+pub(crate) mod counting_allocator;
 
 use std::sync::Arc;
 use std::thread;

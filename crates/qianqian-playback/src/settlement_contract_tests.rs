@@ -884,6 +884,49 @@ fn completion_reports_decode_failure_before_any_drain() {
     );
 }
 
+/// ADR-PBK-002 D14.11: an audio-processing failure settles the SAME D11
+/// `Failed` terminal class through its own evidence slot, and the stage
+/// spelling keeps the internal diagnosis truthful about the origin —
+/// never a decode label, never a new public terminal variant.
+#[test]
+fn completion_reports_processing_failure_with_the_truthful_stage() {
+    let completion = SessionCompletion::new();
+    completion.processing_failed("processor state unusable");
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Failed {
+            stage: "processing: processor state unusable".to_owned()
+        }),
+        "a processing failure must not masquerade as a decode failure"
+    );
+}
+
+/// First worker failure wins across the two failure slots, whichever
+/// class publishes first — the worker leg's failure publications are
+/// sequential, so this is the defensive arbitration contract.
+#[test]
+fn the_first_worker_failure_wins_across_failure_slots() {
+    let completion = SessionCompletion::new();
+    completion.decode_failed("decode broke first");
+    completion.processing_failed("processing broke second");
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Failed {
+            stage: "decode: decode broke first".to_owned()
+        })
+    );
+
+    let completion = SessionCompletion::new();
+    completion.processing_failed("processing broke first");
+    completion.decode_failed("decode broke second");
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Failed {
+            stage: "processing: processing broke first".to_owned()
+        })
+    );
+}
+
 #[test]
 fn completion_reports_device_abort_as_failure() {
     let completion = SessionCompletion::new();
