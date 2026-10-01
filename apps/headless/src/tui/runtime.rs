@@ -794,7 +794,10 @@ mod tests {
         let mut model = TuiModel::new(String::new());
         open_via_keys(&mut model, &mut player, &file);
         refresh(&mut model, &player);
-        assert!(player.selected_is_live_episode(), "the committed row is live");
+        assert!(
+            player.selected_is_live_episode(),
+            "the committed row is live"
+        );
         let activations = || {
             log.lock()
                 .expect("fixture log")
