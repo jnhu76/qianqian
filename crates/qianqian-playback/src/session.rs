@@ -38,8 +38,10 @@ use crate::processing::{AudioProcessingConfig, EpisodeProcessing};
 /// Frames of PCM the edge buffers (~185 ms at 44.1 kHz stereo). Chosen
 /// from the measured decode tail (p99 ~0.2 ms per 1024-frame block,
 /// decode-cost-model.md §5) plus scheduling margin — a latency bound, not
-/// a throughput parameter.
-const EDGE_CAPACITY_FRAMES: usize = 8192;
+/// a throughput parameter. `pub(crate)` so the in-crate processing
+/// oracles can pin geometry against the same bound (a blocked write at a
+/// full edge is what forces a mid-block cut with a non-empty remainder).
+pub(crate) const EDGE_CAPACITY_FRAMES: usize = 8192;
 
 /// Frames per decode staging refill. Matches the block size the decode
 /// baselines were measured at.
@@ -82,7 +84,9 @@ pub fn playback_session_spec_with_processing(
 /// mechanism. Never shipped (`cfg(all(test, not(loom)))`), never public
 /// (the session module is private), never a product seam: the
 /// application reaches processing only through the configuration
-/// constructors above.
+/// constructors above. Single-mount by construction: the deliberate
+/// runtime is a one-shot value handed out on the first activation, and
+/// a second activation of the same spec is a test bug (loud tripwire).
 #[cfg(all(test, not(loom)))]
 pub(crate) fn playback_session_spec_with_test_processor(
     file: PathBuf,
@@ -302,6 +306,7 @@ enum WriteStep {
 ///         MutatedThenFailed → never resume old-cursor production;
 ///             ordinary decode-failure evidence → D11 Failed
 ///         Applied → discard the staging (incl. the preserved tail),
+///             invalidate the episode processing history (D14.11),
 ///             edge.invalidate() — THE one purge, on this path —
 ///             publish the actual landing, hold production, and let
 ///             the session's commit decision (tail quiesced ∧ parked ∧

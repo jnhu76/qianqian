@@ -215,8 +215,29 @@ pub(crate) fn episode_with_test_processor(
     processing: EpisodeProcessing,
     seeks: Vec<ProviderSeekOutcome>,
 ) -> (Witnesses, PlaybackSessionHandle, QianqianApp) {
-    let witnesses = Witnesses::new();
     let handle = PlaybackSessionHandle::new();
+    let (witnesses, runtime) = episode_with_test_processor_and_handle(
+        source_frames,
+        output,
+        processing,
+        seeks,
+        handle.clone(),
+    );
+    (witnesses, handle, runtime)
+}
+
+/// [`episode_with_test_processor`] with the CALLER owning the handle,
+/// so an in-crate oracle can read crate-internal diagnostics through it
+/// (`completion.buffered_frames()` — the edge-occupancy witness that
+/// pins seek geometry).
+pub(crate) fn episode_with_test_processor_and_handle(
+    source_frames: usize,
+    output: OutputBehavior,
+    processing: EpisodeProcessing,
+    seeks: Vec<ProviderSeekOutcome>,
+    handle: PlaybackSessionHandle,
+) -> (Witnesses, QianqianApp) {
+    let witnesses = Witnesses::new();
     let mut runtime = registered_runtime_with_test_processor(
         TestDecode {
             behavior: SourceBehavior::EofAfter(source_frames),
@@ -235,7 +256,7 @@ pub(crate) fn episode_with_test_processor(
             desired("session", "playback_session"),
         ])
         .expect("composition is legal");
-    (witnesses, handle, runtime)
+    (witnesses, runtime)
 }
 
 /// Bounded poll for an asynchronously-published observation.

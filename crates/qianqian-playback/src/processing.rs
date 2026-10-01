@@ -1,5 +1,5 @@
 //! Episode Audio Processing (ADR-PBK-002 D14.11, Issue #177 Stage 2
-//! I1). Two types, one frozen seam:
+//! I1/I2). Two types, one frozen seam:
 //!
 //! ```text
 //! AudioProcessingConfig    the DESIRED product configuration, owned by

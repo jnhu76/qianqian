@@ -39,7 +39,8 @@ use qianqian_audio_api::ports::ProviderSeekOutcome;
 use crate::handle::EpisodeTerminalOutcome;
 use crate::processing::EpisodeProcessing;
 use crate::processing_support::{
-    EIGHT_SECONDS, TEST_RATE, episode_with_test_processor, rejects, wait_until,
+    EIGHT_SECONDS, TEST_RATE, episode_with_test_processor, episode_with_test_processor_and_handle,
+    rejects, wait_until,
 };
 use crate::test_common::{self, OutputBehavior};
 
@@ -281,8 +282,20 @@ fn the_probe_recurrence_is_invariant_under_staging_fragmentation() {
 /// stream equals the no-seek control BIT-EXACT, both channels. A reset
 /// at the refusal, a reprocessed remainder or a double-advanced state
 /// would all break the equality (see the negative controls below).
+///
+/// The mid-block geometry is DETERMINISTIC here, not probabilistic
+/// (I2 review P2-2): the episode pauses BEFORE the seek, so the
+/// pause-parked leg drains nothing, the edge fills to capacity, and the
+/// decode worker is provably blocked inside its interruptible write
+/// (the full-edge witness below) when the seek is requested — the cut
+/// must fire from WITHIN that write, with an already-processed
+/// non-empty remainder, because a blocked write cannot complete to
+/// reach a between-blocks loop top. This also exercises the D14.11
+/// pause/seek row in one construction: pause intent survives the
+/// refused seek, and the pause itself invalidates no history.
 #[test]
 fn a_refused_seek_preserves_the_stateful_continuation_of_the_no_seek_control() {
+    use crate::session::EDGE_CAPACITY_FRAMES;
     let _lifecycle = test_common::lifecycle_lock();
     test_common::within(Duration::from_secs(60), move || {
         let (control_w, control_handle, mut control_runtime) = episode_with_test_processor(
@@ -295,31 +308,58 @@ fn a_refused_seek_preserves_the_stateful_continuation_of_the_no_seek_control() {
             control_handle.wait_terminal(),
             EpisodeTerminalOutcome::Completed
         );
+        let control_values = control_w.content();
 
-        let (seeked_w, seeked_handle, mut seeked_runtime) = episode_with_test_processor(
+        let handle = crate::handle::PlaybackSessionHandle::new();
+        let (seeked_w, mut seeked_runtime) = episode_with_test_processor_and_handle(
             EIGHT_SECONDS,
             OutputBehavior::SlowConsume {
                 per_read: Duration::from_millis(1),
             },
             probe_processor(Mutation::None),
             vec![ProviderSeekOutcome::RefusedUnchanged],
+            handle.clone(),
         );
         wait_until(Duration::from_secs(5), || {
-            seeked_handle
-                .observe()
-                .position
-                .is_some_and(|p| p >= 22_050)
+            handle.observe().position.is_some_and(|p| p >= 22_050)
         })
         .then_some(())
         .expect("the episode never reached half a second");
-        seeked_handle.request_seek(Duration::from_secs(5));
+        handle.request_pause();
+        assert!(
+            wait_until(Duration::from_secs(5), || handle.observe().paused()),
+            "the Paused projection never established: {:?}",
+            handle.observe()
+        );
+        // Full-edge witness: with the leg parked and nothing draining,
+        // the worker fills the edge to capacity and blocks inside its
+        // write — the cut is now provably mid-block.
+        assert!(
+            wait_until(Duration::from_secs(5), || handle
+                .completion
+                .buffered_frames()
+                == Some(EDGE_CAPACITY_FRAMES)),
+            "the edge never filled while paused: {:?}",
+            handle.completion.buffered_frames()
+        );
+        handle.request_seek(Duration::from_secs(5));
+        // The refusal releases the seek hold; the leg remains
+        // pause-parked (pause intent survives the seek), and the
+        // worker's remainder finish needs edge space, so it progresses
+        // only once production resumes below.
+        assert!(
+            handle.observe().pause_requested,
+            "pause intent must survive the refused seek: {:?}",
+            handle.observe()
+        );
+        handle.request_resume();
         assert_eq!(
-            seeked_handle.wait_terminal(),
+            handle.wait_terminal(),
             EpisodeTerminalOutcome::Completed,
             "a refusal is not a failure and not a cut"
         );
 
-        assert_streams_equal(&seeked_w.content(), &control_w.content(), "channel 0");
+        assert_streams_equal(&seeked_w.content(), &control_values, "channel 0");
         assert_streams_equal(
             &seeked_w.content_ch1(),
             &control_w.content_ch1(),
@@ -412,6 +452,13 @@ fn the_refusal_oracle_rejects_the_reprocessed_remainder_and_reset_signatures() {
 /// production equals a FRESH probe instance fed the exact post-landing
 /// tags — BIT-EXACT, both channels. The pre-cut stretch equals the
 /// no-seek control's prefix.
+///
+/// Division of labor (I2 review P3-3): this oracle pins the processing
+/// HISTORY invalidation only. It would not catch a missing EDGE purge —
+/// stale pre-cut frames extend the control-identical prefix, shifting
+/// the detected cut while every equality here still holds — because the
+/// purge is pinned by the F5-era multi-cut oracles in
+/// tests/seek_seam.rs.
 #[test]
 fn an_applied_seek_resumes_with_fresh_state_at_the_landing() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -529,9 +576,15 @@ fn a_probe_that_preserves_history_across_an_applied_seek_is_rejected() {
         );
         let control_values = control_w.content();
 
+        // SlowConsume like the honest twin (I2 review P2-1): an instant
+        // consumer can finish the episode inside one position-poll
+        // slice, which would withdraw the projection before the seek is
+        // ever requested and fail the oracle falsely.
         let (seeked_w, seeked_handle, mut seeked_runtime) = episode_with_test_processor(
             EIGHT_SECONDS,
-            OutputBehavior::Consume,
+            OutputBehavior::SlowConsume {
+                per_read: Duration::from_millis(1),
+            },
             probe_processor(Mutation::PreserveAcrossApplied),
             Vec::new(),
         );

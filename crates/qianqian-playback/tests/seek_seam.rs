@@ -427,21 +427,26 @@ fn an_unknown_landing_withdraws_the_position_for_the_rest_of_the_episode() {
         );
         // A second committed cutover WITH a known landing must not
         // resurrect the withdrawn projection: the withdrawal is for the
-        // rest of the episode (D14.5 position rebase). The request may
-        // race the worker's post-consumption slot free by a poll slice,
-        // so it is retried — exactly what a client would do — and the
-        // retry stops the moment the second cut is observable, so no
-        // extra legal seek fires past it.
-        let mut second_cut = false;
-        wait_until(Duration::from_secs(5), || {
-            second_cut = discontinuities(&content(&witnesses)).len() == 2;
-            if !second_cut {
-                handle.request_seek(Duration::from_secs(6));
-            }
-            second_cut
-        });
+        // rest of the episode (D14.5 position rebase). The withdrawal
+        // becomes observable when the parked leg consumes cut #1's
+        // release payload, but the one-seek slot frees only when the
+        // decode worker's next bounded poll observes that consumption —
+        // up to one worker wait slice (2 ms nominal), and Windows timer
+        // granularity can inflate that slice. A retry LOOP that fires a
+        // fresh request every poll is wrong here in both directions: a
+        // request landing inside the window is inert, but one landing
+        // AFTER cut #2's own slot-free yet before its content became
+        // observable is legal and accepted — a THIRD cutover the oracle
+        // rightly rejects (observed once on a slow Windows runner). The
+        // settle sleep closes the window deterministically (the same
+        // linearization-sleep idiom this suite already uses before the
+        // second mid-pause seek), so ONE request is issued and accepted.
+        std::thread::sleep(Duration::from_millis(200));
+        handle.request_seek(Duration::from_secs(6));
         assert!(
-            second_cut,
+            wait_until(Duration::from_secs(5), || {
+                discontinuities(&content(&witnesses)).len() == 2
+            }),
             "precondition: the second cutover must happen for this oracle"
         );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
