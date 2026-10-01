@@ -20,220 +20,17 @@
 //! of a finite non-negative value is exactly +0.0. Both channels are
 //! witnessed, so a seam that misapplies processing per channel fails.
 
-use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use qianqian_app::QianqianApp;
-use qianqian_audio_api::ports::{PcmDecode, ProviderSeekOutcome};
-use qianqian_composition::{DesiredEntry, Revision};
+use qianqian_audio_api::ports::ProviderSeekOutcome;
 
-use crate::completion::SessionCompletion;
-use crate::edge::PcmEdge;
-use crate::handle::{EpisodeTerminalOutcome, PlaybackSessionHandle};
+use crate::handle::EpisodeTerminalOutcome;
 use crate::processing::{AudioProcessingConfig, EpisodeProcessing};
-use crate::session::decode_worker;
-use crate::test_common::{self, OutputBehavior, SourceBehavior, TestDecode, TestOutput, within};
-
-const DUMMY_PATH: &str = "test://gain-probe";
-
-/// The test format's sample rate (frames of source per second).
-const TEST_RATE: usize = 44_100;
-
-/// An 8-second source — the F5 seek-matrix shape: long enough that a
-/// seek fired in the first second is decisively mid-stream (the bounded
-/// edge is full and the worker sits inside its interruptible write), and
-/// the slow mock consumer still finishes it in seconds.
-const EIGHT_SECONDS: usize = TEST_RATE * 8;
-
-struct Witnesses {
-    consumed: Arc<AtomicUsize>,
-    consumed_values: Arc<Mutex<Vec<f32>>>,
-    consumed_values_ch1: Arc<Mutex<Vec<f32>>>,
-}
-
-impl Witnesses {
-    fn new() -> Self {
-        Self {
-            consumed: Arc::new(AtomicUsize::new(0)),
-            consumed_values: Arc::new(Mutex::new(Vec::new())),
-            consumed_values_ch1: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-
-    /// The consumed channel-0 content, snapped once: the value of every
-    /// frame the render leg submitted, in submission order.
-    fn content(&self) -> Vec<f32> {
-        self.consumed_values.lock().unwrap().clone()
-    }
-
-    /// The consumed channel-1 content (tag + 0.5 per the decode double's
-    /// channel-distinct tagging) — the second observable axis (I1 review
-    /// P2-1): per-channel processing misapplication fails here even when
-    /// channel 0 looks right.
-    fn content_ch1(&self) -> Vec<f32> {
-        self.consumed_values_ch1.lock().unwrap().clone()
-    }
-}
-
-fn desired(id: &str, component: &'static str) -> DesiredEntry {
-    DesiredEntry::enabled(id, component, Revision::new(1))
-}
-
-/// Register the standard probe episode: a decode double, an output
-/// double sharing the caller's witnesses, and the real session carrying
-/// the caller's desired Audio Processing configuration.
-fn registered_runtime(
-    decode: TestDecode,
-    output: OutputBehavior,
-    processing: AudioProcessingConfig,
-    witnesses: &Witnesses,
-    handle: PlaybackSessionHandle,
-) -> QianqianApp {
-    let consumed = witnesses.consumed.clone();
-    let consumed_values = witnesses.consumed_values.clone();
-    let consumed_values_ch1 = witnesses.consumed_values_ch1.clone();
-    let mut runtime = QianqianApp::new();
-
-    runtime
-        .register_component({
-            qianqian_composition::ComponentSpec::new("test_decode_plugin")
-                .provides::<qianqian_audio_api::ports::PcmDecodeCapability>()
-                .on_activate(move |ctx| {
-                    ctx.provide::<qianqian_audio_api::ports::PcmDecodeCapability>(
-                        std::rc::Rc::new(decode.clone()),
-                    )
-                    .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
-                    Ok(())
-                })
-        })
-        .expect("decode provider registers");
-
-    runtime
-        .register_component({
-            qianqian_composition::ComponentSpec::new("test_output_plugin")
-                .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
-                .on_activate(move |ctx| {
-                    ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
-                        std::rc::Rc::new(TestOutput::observed_with_stereo_content(
-                            output,
-                            consumed.clone(),
-                            consumed_values.clone(),
-                            consumed_values_ch1.clone(),
-                            test_common::DeviceTail::default(),
-                        )),
-                    )
-                    .map_err(|e| qianqian_composition::ActivationError::new(format!("{e:?}")))?;
-                    Ok(())
-                })
-        })
-        .expect("output provider registers");
-
-    runtime
-        .register_component(crate::playback_session_spec_with_processing(
-            std::path::PathBuf::from(DUMMY_PATH),
-            handle,
-            processing,
-        ))
-        .expect("session registers");
-    runtime
-}
-
-/// The standard episode: a position-tagged source of `source_frames`
-/// frames played by the given output double, with the standard witness
-/// set and the given desired Audio Processing configuration.
-fn episode(
-    source_frames: usize,
-    output: OutputBehavior,
-    processing: AudioProcessingConfig,
-    seeks: Vec<ProviderSeekOutcome>,
-) -> (Witnesses, PlaybackSessionHandle, QianqianApp) {
-    let witnesses = Witnesses::new();
-    let handle = PlaybackSessionHandle::new();
-    let mut runtime = registered_runtime(
-        TestDecode {
-            behavior: SourceBehavior::EofAfter(source_frames),
-            duration: None,
-            seeks,
-        },
-        output,
-        processing,
-        &witnesses,
-        handle.clone(),
-    );
-    runtime
-        .revise_desired(vec![
-            desired("decode", "test_decode_plugin"),
-            desired("output", "test_output_plugin"),
-            desired("session", "playback_session"),
-        ])
-        .expect("composition is legal");
-    (witnesses, handle, runtime)
-}
-
-/// Bounded poll for an asynchronously-published observation.
-fn wait_until(limit: Duration, mut predicate: impl FnMut() -> bool) -> bool {
-    let deadline = Instant::now() + limit;
-    loop {
-        if predicate() {
-            return true;
-        }
-        if Instant::now() >= deadline {
-            return false;
-        }
-        std::thread::sleep(Duration::from_millis(5));
-    }
-}
-
-/// The exact processed-content oracle for one channel: one output frame
-/// per source frame (frame conservation — no insertion, no drop, no EOF
-/// tail), each exactly `(frame_index + tag_offset) × factor` (see the
-/// module-doc exactness argument; no float tolerance is needed or
-/// allowed here). Channel 0's tag offset is 0; channel 1's is 0.5.
-fn assert_processed_exactly_at(
-    values: &[f32],
-    tag_offset: f32,
-    factor: f32,
-    source_frames: usize,
-    channel: &'static str,
-) {
-    assert_eq!(
-        values.len(),
-        source_frames,
-        "frame conservation ({channel}): N decoded frames in, N consumed \
-         frames out (an EOF tail or a dropped/duplicated frame breaks this)"
-    );
-    for (i, value) in values.iter().enumerate() {
-        assert_eq!(
-            *value,
-            (i as f32 + tag_offset) * factor,
-            "frame {i} of {channel} must be exactly (frame index + \
-             {tag_offset}) × {factor}"
-        );
-    }
-}
-
-/// The stereo oracle: both witnessed channels must carry the exact
-/// processed content. A seam that applied processing to only one channel
-/// of each frame fails here.
-fn assert_stereo_processed_exactly(ch0: &[f32], ch1: &[f32], factor: f32, source_frames: usize) {
-    assert_processed_exactly_at(ch0, 0.0, factor, source_frames, "channel 0");
-    assert_processed_exactly_at(ch1, 0.5, factor, source_frames, "channel 1");
-}
-
-/// Indices where the scaled position-tagged sequence does not continue
-/// the previous frame index (`b != a + factor`; scaled frame indices
-/// stay far below the f32-exact range). Works for either channel: the
-/// tag offset shifts both neighbors equally.
-fn discontinuities(values: &[f32], factor: f32) -> Vec<usize> {
-    values
-        .iter()
-        .zip(values.iter().skip(1))
-        .enumerate()
-        .filter_map(|(i, (a, b))| (*b != *a + factor).then_some(i + 1))
-        .collect()
-}
+use crate::processing_support::{
+    EIGHT_SECONDS, TEST_RATE, assert_processed_exactly_at, assert_stereo_processed_exactly,
+    discontinuities, episode, episode_with_test_processor, rejects, wait_until,
+};
+use crate::test_common::{self, OutputBehavior};
 
 // --- seek / discontinuity oracles (D14.5 extended to processed PCM) ------
 
@@ -247,7 +44,7 @@ fn discontinuities(values: &[f32], factor: f32) -> Vec<usize> {
 #[test]
 fn a_refused_seek_finishes_its_processed_remainder_exactly_once() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         let (witnesses, handle, mut runtime) = episode(
             EIGHT_SECONDS,
             OutputBehavior::SlowConsume {
@@ -298,7 +95,7 @@ fn a_refused_seek_finishes_its_processed_remainder_exactly_once() {
 #[test]
 fn an_applied_seek_discards_the_processed_remainder_and_cuts_cleanly() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         let five_seconds = 5 * TEST_RATE;
         let (witnesses, handle, mut runtime) = episode(
             EIGHT_SECONDS,
@@ -392,7 +189,7 @@ fn an_applied_seek_discards_the_processed_remainder_and_cuts_cleanly() {
 #[test]
 fn a_pause_resume_cycle_preserves_the_processed_stream() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         let source_frames = TEST_RATE * 4;
         let (witnesses, handle, mut runtime) = episode(
             source_frames,
@@ -444,73 +241,74 @@ fn a_pause_resume_cycle_preserves_the_processed_stream() {
 /// that stays truthful about its processing origin: it names the
 /// processing stage and never masquerades as a decode failure merely
 /// because both run on the decode worker. The route driven here is the
-/// production route end-to-end: the real `decode_worker`, the real
-/// completion publication, the real settlement.
-///
-/// The failing processor is the test-only `EpisodeProcessing::TestFailing`
-/// state: Scalar Gain itself cannot fail, so no product configuration can
-/// reach the failure, and the cfg(test) variant exists precisely so the
-/// production ROUTE stays exercised (it never ships). The white-box
-/// construction (worker spawned directly over the mechanism doubles)
-/// changes nothing the route depends on: worker code, publication
-/// discipline and settlement are the production paths. Everything AFTER
-/// the edge failure (the render leg's aborted-drain settlement,
-/// teardown, no-resume) is machinery byte-shared with the decode-failure
-/// route — covered by the decode-failure integration tests and the
-/// decision table — so what this oracle pins is exactly the
-/// processing-specific delta: the truthful publication label.
+/// production route end-to-end through the REAL composition: the real
+/// activation, decode worker, completion publication and settlement,
+/// with the failing processor injected as the test-only `TestDriven`
+/// state (Scalar Gain itself cannot fail, so no product configuration
+/// can reach the failure; the injection exists precisely so the ROUTE
+/// stays exercised and never ships). The failed episode never resumes
+/// production, the position projection is withdrawn with the terminal
+/// Fact, and teardown stays quiet.
 #[test]
 fn a_processing_failure_takes_the_d11_failed_route_with_a_truthful_diagnostic() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
-        let decode = TestDecode {
-            behavior: SourceBehavior::EofAfter(EIGHT_SECONDS),
-            duration: None,
-            seeks: Vec::new(),
-        };
-        let stream = decode
-            .open_media(std::path::Path::new(DUMMY_PATH))
-            .expect("decode double opens");
-        let edge = Arc::new(PcmEdge::new(2, 8192));
-        let completion = SessionCompletion::new();
+    test_common::within(Duration::from_secs(30), move || {
         // Three staging blocks are processed honestly, then the
         // processor reports the synthetic unrecoverable failure — the
         // steady-path failure shape, not a first-block edge case.
-        let processing = EpisodeProcessing::TestFailing {
-            fail_after_block: 3,
-            seen: 0,
-        };
-        let worker = {
-            let edge = edge.clone();
-            let completion = completion.clone();
-            std::thread::Builder::new()
-                .name("qianqian-decode".into())
-                .spawn(move || decode_worker(stream, edge, completion, 1024, processing))
-                .expect("worker spawns")
-        };
-
-        assert_eq!(
-            completion.wait_terminal(),
-            crate::completion::SessionOutcome::Failed {
-                stage: "processing: synthetic processing failure at staging block 3".to_owned()
-            },
-            "an unrecoverable processing failure is the existing D11 Failed, \
-             with a diagnostic that names the processing origin"
+        let blocks_seen = std::cell::Cell::new(0u64);
+        let stage_blocks = blocks_seen.clone();
+        let processing = EpisodeProcessing::test_driven(
+            Box::new(move |_block| {
+                let index = stage_blocks.get();
+                stage_blocks.set(index + 1);
+                if index >= 3 {
+                    return Err(format!(
+                        "synthetic processing failure at staging block {index}"
+                    ));
+                }
+                Ok(())
+            }),
+            Box::new(|| {}),
         );
-        worker.join().expect("the worker exits after the failure");
-        assert_eq!(
-            edge.terminal(),
-            crate::edge::EdgeTerminal::Failed,
-            "the data plane is failed: no leg can consume past a failed \
-             processor"
+        let (witnesses, handle, mut runtime) = episode_with_test_processor(
+            EIGHT_SECONDS,
+            OutputBehavior::Consume,
+            processing,
+            Vec::new(),
         );
-        // The public terminal vocabulary is unchanged: the crate-internal
-        // observation splits the settled outcome into the stable semantic
-        // triple.
         assert_eq!(
-            completion.observe_snapshot().terminal_outcome,
-            Some(EpisodeTerminalOutcome::Failed)
+            handle.wait_terminal(),
+            EpisodeTerminalOutcome::Failed,
+            "an unrecoverable processing failure is the existing D11 Failed"
         );
+        let observation = handle.observe();
+        let diagnostic = observation
+            .failure_diagnostic
+            .as_deref()
+            .expect("a failed episode carries its presentation diagnostic");
+        assert_eq!(
+            diagnostic, "processing: synthetic processing failure at staging block 3",
+            "the diagnostic's stage must name the processing origin: {diagnostic}"
+        );
+        assert!(
+            !diagnostic.contains("decode"),
+            "a processing failure must not masquerade as a decode failure: {diagnostic}"
+        );
+        // The failed episode never resumes production.
+        let stopped_at = witnesses.consumed();
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(
+            witnesses.consumed(),
+            stopped_at,
+            "a failed episode must never resume production"
+        );
+        assert!(
+            handle.observe().position.is_none(),
+            "the terminal Fact withdraws the projection"
+        );
+        let snapshot = runtime.dispose().snapshot;
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
 
@@ -524,7 +322,7 @@ fn a_processing_failure_takes_the_d11_failed_route_with_a_truthful_diagnostic() 
 #[test]
 fn negative_control_the_half_gain_oracle_rejects_a_skipped_seam() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         let source_frames = 20_000;
         let (witnesses, handle, mut runtime) = episode(
             source_frames,
@@ -539,10 +337,9 @@ fn negative_control_the_half_gain_oracle_rejects_a_skipped_seam() {
         );
         let values = witnesses.content();
         let values_ch1 = witnesses.content_ch1();
-        let rejected = catch_unwind(AssertUnwindSafe(|| {
+        let rejected = rejects(|| {
             assert_stereo_processed_exactly(&values, &values_ch1, 0.5, source_frames);
-        }))
-        .is_err();
+        });
         assert!(
             rejected,
             "the half-gain oracle must REJECT unprocessed audio — \
@@ -571,7 +368,7 @@ fn negative_control_the_half_gain_oracle_rejects_a_skipped_seam() {
 #[test]
 fn negative_control_the_gain_oracle_rejects_the_double_applied_signature() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         let source_frames = 20_000;
         let (witnesses, handle, mut runtime) = episode(
             source_frames,
@@ -594,10 +391,9 @@ fn negative_control_the_gain_oracle_rejects_the_double_applied_signature() {
             values_ch1[1], 0.375,
             "precondition: channel-1 content is ×0.25 of its tag"
         );
-        let rejected = catch_unwind(AssertUnwindSafe(|| {
+        let rejected = rejects(|| {
             assert_stereo_processed_exactly(&values, &values_ch1, 0.5, source_frames);
-        }))
-        .is_err();
+        });
         assert!(
             rejected,
             "the half-gain oracle must REJECT the double-applied \
@@ -646,7 +442,7 @@ fn steady_state_processing_allocates_zero() {
 #[test]
 fn unity_gain_preserves_samples_bit_exact() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         let source_frames = 20_000;
         let (witnesses, handle, mut runtime) = episode(
             source_frames,
@@ -672,7 +468,7 @@ fn unity_gain_preserves_samples_bit_exact() {
 #[test]
 fn zero_gain_is_silence_with_frame_conservation() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         let source_frames = 20_000;
         let (witnesses, handle, mut runtime) = episode(
             source_frames,
@@ -707,7 +503,7 @@ fn zero_gain_is_silence_with_frame_conservation() {
 #[test]
 fn half_gain_processes_the_real_staging_seam() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         let source_frames = TEST_RATE * 2;
         let (witnesses, handle, mut runtime) = episode(
             source_frames,
@@ -748,7 +544,7 @@ fn half_gain_processes_the_real_staging_seam() {
 #[test]
 fn bypass_ignores_the_gain_field_and_passes_the_source_through() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         let source_frames = 20_000;
         let (witnesses, handle, mut runtime) = episode(
             source_frames,
@@ -779,7 +575,7 @@ fn bypass_ignores_the_gain_field_and_passes_the_source_through() {
 #[test]
 fn an_invalid_processing_config_fails_establishment_without_a_terminal_fact() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         for gain in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.5] {
             let (witnesses, handle, mut runtime) = episode(
                 20_000,
@@ -803,7 +599,7 @@ fn an_invalid_processing_config_fails_establishment_without_a_terminal_fact() {
                  terminal Fact"
             );
             assert!(
-                witnesses.consumed.load(Ordering::SeqCst) == 0,
+                witnesses.consumed() == 0,
                 "gain {gain}: a failed establishment never produces audio"
             );
             let snapshot = runtime.dispose().snapshot;
@@ -820,7 +616,7 @@ fn an_invalid_processing_config_fails_establishment_without_a_terminal_fact() {
 #[test]
 fn positive_gain_above_unity_is_not_clipped() {
     let _lifecycle = test_common::lifecycle_lock();
-    within(Duration::from_secs(30), move || {
+    test_common::within(Duration::from_secs(30), move || {
         let source_frames = 20_000;
         let (witnesses, handle, mut runtime) = episode(
             source_frames,

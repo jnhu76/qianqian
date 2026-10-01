@@ -38,8 +38,10 @@ use crate::processing::{AudioProcessingConfig, EpisodeProcessing};
 /// Frames of PCM the edge buffers (~185 ms at 44.1 kHz stereo). Chosen
 /// from the measured decode tail (p99 ~0.2 ms per 1024-frame block,
 /// decode-cost-model.md §5) plus scheduling margin — a latency bound, not
-/// a throughput parameter.
-const EDGE_CAPACITY_FRAMES: usize = 8192;
+/// a throughput parameter. `pub(crate)` so the in-crate processing
+/// oracles can pin geometry against the same bound (a blocked write at a
+/// full edge is what forces a mid-block cut with a non-empty remainder).
+pub(crate) const EDGE_CAPACITY_FRAMES: usize = 8192;
 
 /// Frames per decode staging refill. Matches the block size the decode
 /// baselines were measured at.
@@ -73,6 +75,47 @@ pub fn playback_session_spec_with_processing(
         .on_activate(move |ctx| activate(&file, &handle.completion, &processing, ctx))
 }
 
+/// Test-only establishment with a DELIBERATE episode processing runtime
+/// (Issue #177 I2; ADR-PBK-002 D14.11): the white-box oracles drive the
+/// REAL composition — real capability resolve, edge, render stream,
+/// worker, seek/pause protocol — with the StatefulProbe or the
+/// failure-route injection in place of a config-compiled snapshot, so
+/// the stateful transport semantics are proven against the actual
+/// mechanism. Never shipped (`cfg(all(test, not(loom)))`), never public
+/// (the session module is private), never a product seam: the
+/// application reaches processing only through the configuration
+/// constructors above. Single-mount by construction: the deliberate
+/// runtime is a one-shot value handed out on the first activation, and
+/// a second activation of the same spec is a test bug (loud tripwire).
+#[cfg(all(test, not(loom)))]
+pub(crate) fn playback_session_spec_with_test_processor(
+    file: PathBuf,
+    handle: PlaybackSessionHandle,
+    processing: EpisodeProcessing,
+) -> ComponentSpec {
+    // `on_activate` is Fn (the kernel may re-run activation across
+    // mount cycles), but the deliberate runtime is a one-shot value:
+    // hand it out exactly once, loudly.
+    let processing = std::cell::RefCell::new(Some(processing));
+    ComponentSpec::new("playback_session")
+        .requires::<PcmDecodeCapability>()
+        .requires::<AudioOutputCapability>()
+        .on_activate(move |ctx| {
+            let processing = processing
+                .borrow_mut()
+                .take()
+                .expect("the test processor was activated twice");
+            // The same activation-failure publication discipline as the
+            // product constructors: a raising establishment leaves the
+            // diagnostic on the episode seam, never a forged terminal.
+            let result = activate_established(&file, &handle.completion, processing, ctx);
+            if let Err(e) = &result {
+                handle.completion.activation_failed(&e.message);
+            }
+            result
+        })
+}
+
 fn activate(
     file: &Path,
     completion: &SessionCompletion,
@@ -102,7 +145,21 @@ fn activate_inner(
     let processing = EpisodeProcessing::new(processing).map_err(|e| {
         ActivationError::new(format!("audio processing configuration invalid: {e}"))
     })?;
+    activate_established(file, completion, processing, ctx)
+}
 
+/// The activation continuation with the applied processing runtime
+/// already compiled. Crate-internal so the white-box oracles can drive
+/// the REAL composition with a deliberate test-only processor (the I2
+/// StatefulProbe and the failure-route injection) through the same
+/// establishment path; product code reaches it only through the config
+/// constructors above.
+fn activate_established(
+    file: &Path,
+    completion: &SessionCompletion,
+    processing: EpisodeProcessing,
+    ctx: &mut qianqian_composition::ActivationCtx<'_>,
+) -> Result<(), ActivationError> {
     // Control plane: capability resolution happens exactly once, here.
     let decode = ctx.resolve::<PcmDecodeCapability>().map_err(|e| {
         ActivationError::new(format!(
@@ -249,6 +306,7 @@ enum WriteStep {
 ///         MutatedThenFailed → never resume old-cursor production;
 ///             ordinary decode-failure evidence → D11 Failed
 ///         Applied → discard the staging (incl. the preserved tail),
+///             invalidate the episode processing history (D14.11),
 ///             edge.invalidate() — THE one purge, on this path —
 ///             publish the actual landing, hold production, and let
 ///             the session's commit decision (tail quiesced ∧ parked ∧
@@ -259,10 +317,7 @@ enum WriteStep {
 ///             data plane's own terminal) ends it without a rebase.
 ///             Then resume post-cut production.
 /// ```
-/// `pub(crate)` so the white-box processing-failure oracle
-/// (gain_tests.rs) can drive the real worker directly over the
-/// mechanism doubles; product code reaches it only through activation.
-pub(crate) fn decode_worker(
+fn decode_worker(
     mut decode_stream: Box<dyn DecodedPcmStream>,
     edge: Arc<PcmEdge>,
     completion: SessionCompletion,
@@ -343,13 +398,21 @@ pub(crate) fn decode_worker(
                                 return;
                             }
                             qianqian_audio_api::ports::ProviderSeekOutcome::Applied { landing } => {
-                                // Success: staging discard (including any
-                                // preserved remainder — it belongs to the
-                                // pre-cut world), then the ONE purge on
-                                // this path, then landing evidence, then
-                                // the production hold until the session's
-                                // commit decision routes the release.
+                                // Success: the D14.11 Applied obligations
+                                // run in the frozen order — the staging
+                                // discard (including any preserved
+                                // remainder, which belongs to the pre-cut
+                                // world), the invalidation of ALL pre-cut
+                                // signal-derived processing history, then
+                                // the ONE purge on this path — then
+                                // landing evidence, then the production
+                                // hold until the session's commit decision
+                                // routes the release. Post-cut production
+                                // therefore processes through FRESH
+                                // episode-local processing state under the
+                                // SAME applied configuration.
                                 remainder = None;
+                                processing.invalidate_signal_history();
                                 edge.invalidate();
                                 completion.seek_landing_published(landing);
                                 // The cut is irrevocable from here: the old

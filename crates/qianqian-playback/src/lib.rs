@@ -62,10 +62,20 @@ mod settlement_contract_tests;
 // Episode Audio Processing (ADR-PBK-002 D14.11; Issue #177 Stage 2):
 // the production processing module and its in-crate oracles — the
 // production Gain slice (I1) with the D14.11 seam/discontinuity/failure
-// obligations pinned through the real session composition and the real
-// decode worker.
+// obligations pinned through the real session composition, and the I2
+// StatefulProbe: deliberate stateful test processors proving the same
+// seam carries DSP history through fragmentation, partial writes, seek
+// discontinuities, pause and episode replacement.
 #[cfg(all(test, not(loom)))]
 mod gain_tests;
+#[cfg(all(test, not(loom)))]
+mod stateful_probe_tests;
+
+// Shared harness for the processing oracles (episode builders over the
+// mechanism doubles + the exact-content oracles), one copy for the
+// gain and stateful-probe suites.
+#[cfg(all(test, not(loom)))]
+mod processing_support;
 
 // Edge mechanism tests: they exercise PcmEdge directly, so they moved
 // inside the crate boundary rather than keeping the mechanism `pub`
