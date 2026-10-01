@@ -38,7 +38,7 @@ mod session;
 pub use handle::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,
 };
-pub use processing::AudioProcessingConfig;
+pub use processing::{AudioProcessingConfig, EqConfig};
 pub use session::{playback_session_spec, playback_session_spec_with_processing};
 
 // Test doubles shared by the integration tests and the crate-internal
@@ -70,6 +70,11 @@ mod settlement_contract_tests;
 mod gain_tests;
 #[cfg(all(test, not(loom)))]
 mod stateful_probe_tests;
+// The I3 production EQ oracles: stage-level DSP mathematics (independent
+// f64 recipe re-derivation, analytic frequency responses, stability
+// grid) and the composition-level stateful lifecycle matrix.
+#[cfg(all(test, not(loom)))]
+mod eq_tests;
 
 // Shared harness for the processing oracles (episode builders over the
 // mechanism doubles + the exact-content oracles), one copy for the

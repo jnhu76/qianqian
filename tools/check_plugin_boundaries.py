@@ -176,7 +176,7 @@ EXPORT_RULES = {
         "allowed_root_public": [
             "pub use handle::{\n    EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,\n};",
             "pub use session::{playback_session_spec, playback_session_spec_with_processing};",
-            "pub use processing::AudioProcessingConfig;",
+            "pub use processing::{AudioProcessingConfig, EqConfig};",
         ],
         "authority": "ADR-PBK-002 D6/D14.2/D14.3/D14.7 — the admitted public surface is exactly the F2 episode seam (extended by the D14.7 F3 pause fields/commands, whose spelling is representation); the episode mechanism is session-owned, not product API. Extended 2026-10-02 (Issue #177 I1, D14.11): the desired Audio Processing configuration's establishment handoff — the `AudioProcessingConfig` payload and the `playback_session_spec_with_processing` constructor — is the application/product-control owner's one product seam for it; the processing runtime itself stays session-owned and crate-private",
     },
@@ -189,19 +189,35 @@ EXPORT_RULES = {
     # to `pub` REDs this rule.
     "crates/qianqian-playback/src/processing.rs": {
         "label": "audio-processing-config",
+        # Raw-text requires: the canonicalizer truncates `;`-containing
+        # declarations at the array's `;`, so the band-table ARITY and the
+        # constructor's parameter list are pinned here as literal text.
+        "require": [
+            "pub band_gain_db: [f32; 10],",
+            "pub fn new(band_gain_db: [f32; 10], q: f32) -> Self {",
+        ],
         "allowed_root_public": [
             "pub struct AudioProcessingConfig {",
             "pub enabled: bool,",
             "pub gain: f32,",
+            "pub eq: Option<EqConfig>,",
             "pub const BYPASS: Self = Self {",
             "pub fn gain(factor: f32) -> Self {",
+            "pub fn eq(eq: EqConfig) -> Self {",
+            "pub struct EqConfig {",
+            # The array's `;` and the multi-parameter signature cut at
+            # their deterministic terminators (see root_public_declarations).
+            "pub band_gain_db: [f32;",
+            "pub q: f32,",
+            "pub const FLAT: Self = Self {",
+            "pub fn new(band_gain_db: [f32;",
             # Canonical cut: the generic comma in `Result<(), String>` sits
             # at paren depth 0 (the empty tuple closed before it), so the
             # declaration canonicalizes truncated there — any signature
             # change still produces a NEW canonical and REDs.
             "pub fn validate(&self) -> Result<(),",
         ],
-        "authority": "ADR-PBK-002 D14.11 (Issue #177 I1) — the application/product-control "
+        "authority": "ADR-PBK-002 D14.11 (Issue #177 I1-I3) — the application/product-control "
         "layer owns the DESIRED Audio Processing configuration and hands ONE coherent "
         "snapshot to the episode at establishment (config model case B; live parameter "
         "update stays OPEN and unearned, so no update accessor may appear on this "

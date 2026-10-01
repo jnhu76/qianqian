@@ -7,6 +7,8 @@
 //! resolve Decode capability once
 //! resolve Output capability once
 //! open decode endpoint            (RAII: rides with the decode worker)
+//! compile the applied processing  (D14.11: binds the episode's source
+//!                                  format; acquires nothing, no inverse)
 //! build bounded edge
 //! open render stream              -> inverse: stop_and_join stream
 //! spawn decode worker             -> inverse: stop edge + join worker
@@ -26,7 +28,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use qianqian_audio_api::ports::{
-    AudioOutputCapability, DecodeOutcome, DecodedPcmStream, PcmDecodeCapability,
+    AudioOutputCapability, DecodeOutcome, DecodedPcmStream, PcmDecodeCapability, PcmFormat,
 };
 use qianqian_composition::{ActivationError, ComponentSpec, Discharge};
 
@@ -63,7 +65,10 @@ pub fn playback_session_spec(file: PathBuf, handle: PlaybackSessionHandle) -> Co
 /// applied snapshot from it at activation, and the snapshot is
 /// episode-fixed (no live updates — a changed desired configuration
 /// takes effect at the NEXT episode). An invalid configuration fails
-/// the activation cleanly before any resource is acquired.
+/// the activation cleanly with no terminal Fact and no resource left
+/// behind; because the EQ stage's coefficients depend on the source
+/// rate, the final compile runs once the decode endpoint is open, and
+/// an invalid configuration unwinds that endpoint through RAII.
 pub fn playback_session_spec_with_processing(
     file: PathBuf,
     handle: PlaybackSessionHandle,
@@ -108,7 +113,7 @@ pub(crate) fn playback_session_spec_with_test_processor(
             // The same activation-failure publication discipline as the
             // product constructors: a raising establishment leaves the
             // diagnostic on the episode seam, never a forged terminal.
-            let result = activate_established(&file, &handle.completion, processing, ctx);
+            let result = activate_established(&file, &handle.completion, |_| Ok(processing), ctx);
             if let Err(e) = &result {
                 handle.completion.activation_failed(&e.message);
             }
@@ -138,26 +143,30 @@ fn activate_inner(
     processing: &AudioProcessingConfig,
     ctx: &mut qianqian_composition::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
-    // Establish the episode's APPLIED processing snapshot first (D14.11
-    // configuration model, case B): it is plain data derived from the
-    // desired configuration, so an invalid desired configuration fails
-    // here, before any capability resolve or resource acquisition.
-    let processing = EpisodeProcessing::new(processing).map_err(|e| {
-        ActivationError::new(format!("audio processing configuration invalid: {e}"))
-    })?;
-    activate_established(file, completion, processing, ctx)
+    activate_established(
+        file,
+        completion,
+        |format| EpisodeProcessing::new(processing, format),
+        ctx,
+    )
 }
 
-/// The activation continuation with the applied processing runtime
-/// already compiled. Crate-internal so the white-box oracles can drive
-/// the REAL composition with a deliberate test-only processor (the I2
+/// The activation continuation parameterized by the one step that needs
+/// the SOURCE FORMAT: the applied processing snapshot's final compile.
+/// The EQ stage's coefficients are a function of the source sample
+/// rate (I3), so the compile runs after the decode endpoint is open —
+/// D14.11 binds format-dependent processing state to the episode's
+/// format — and a failure unwinds the open endpoint through the
+/// ordinary RAII. The closure runs exactly once, on this path.
+/// Crate-internal so the white-box oracles can drive the REAL
+/// composition with a deliberate test-only processor (the I2
 /// StatefulProbe and the failure-route injection) through the same
 /// establishment path; product code reaches it only through the config
 /// constructors above.
 fn activate_established(
     file: &Path,
     completion: &SessionCompletion,
-    processing: EpisodeProcessing,
+    compile_processing: impl FnOnce(&PcmFormat) -> Result<EpisodeProcessing, String>,
     ctx: &mut qianqian_composition::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
     // Control plane: capability resolution happens exactly once, here.
@@ -183,6 +192,15 @@ fn activate_established(
         .map_err(|e| ActivationError::new(format!("decode open failed: {}", e.message)))?;
     let format = decode_stream.format();
     completion.set_source_format(format);
+    // The applied processing snapshot completes HERE, bound to this
+    // episode's source format (D14.11): intrinsic configuration
+    // problems and format-dependent problems (an EQ band at/above this
+    // source's Nyquist frequency) both fail the establishment cleanly —
+    // the open endpoint drops with the raise, no terminal Fact is
+    // forged, no resource is left behind.
+    let processing = compile_processing(&format).map_err(|e| {
+        ActivationError::new(format!("audio processing configuration invalid: {e}"))
+    })?;
     // Duration evidence (D14.8), relayed once at activation from the
     // same decode probe that produced the format. A provider that
     // reported none leaves the evidence unset — unknown stays unknown,
