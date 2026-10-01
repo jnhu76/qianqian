@@ -18,9 +18,12 @@ name: Rust Regression
 # gates and are untouched.
 #
 # `git diff --check` (whitespace lint of UNCOMMITTED changes) is
-# intentionally not reproduced here: after a fresh CI checkout the
-# working tree is always clean and the check cannot fail. That check
-# lives in the local pre-push gate, where an uncommitted tree exists.
+# intentionally not reproduced anywhere: after a fresh CI checkout the
+# working tree is always clean and the check cannot fail, and at push
+# timing an uncommitted tree is never what a push carries (the local
+# pre-push gate removed it for the same reason). Committed Rust
+# whitespace stays covered by `cargo fmt --check`; committed docs
+# whitespace is intentionally unchecked.
 
 on:
   pull_request:
