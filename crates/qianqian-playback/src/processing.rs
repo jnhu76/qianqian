@@ -380,7 +380,13 @@ impl BiquadBand {
             }
         }
         // Monic-quadratic pole test (Jury): the recursion is bounded
-        // iff |a2| < 1 and |a1| < 1 + a2.
+        // iff |a2| < 1 and |a1| < 1 + a2. SCOPE: this is a per-band
+        // coefficient sanity check, NOT the Nyquist contract — the
+        // band-frequency-vs-Nyquist gate lives in EqStage::new, before
+        // any compilation. (Near the f32 boundary — w0 within ~2e-4 rad
+        // of π — cos(w0) collapses and this check can refuse a merely
+        // degenerate band; unreachable at any standard rate with the
+        // fixed product table, and a safe fail-closed either way.)
         if !(a2.abs() < 1.0 && a1.abs() < 1.0 + a2) {
             return Err(format!("EQ band {index} compiled to an unstable recursion"));
         }

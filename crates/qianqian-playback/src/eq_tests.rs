@@ -16,11 +16,15 @@
 //! signal-derived EQ state — the state the I2 probe proved the seam
 //! carries.
 //!
-//! Tolerances are justified, not guessed: the f64 reference uses the
-//! same RECIPE but an independent derivation, so the pipeline-vs-
-//! reference difference is bounded by f32 coefficient rounding
-//! (~1e-7 relative) contracted by the recursion (|poles| < 1), giving
-//! orders of magnitude of margin at 1e-3 relative. The FLAT equality
+//! Tolerances are justified, not guessed: the f64 reference is
+//! independent of the pipeline in PRECISION (f64) and RECURRENCE
+//! STRUCTURE (DF1 vs TDF2), so the pipeline-vs-reference difference is
+//! bounded by f32 coefficient rounding (~1e-7 relative) contracted by
+//! the recursion (|poles| < 1), giving orders of magnitude of margin
+//! at 1e-3 relative. The transcription's own fidelity is closed
+//! separately: by the external cookbook comparison and by the
+//! recipe-free design-target assertions (a band-center sine measures
+//! the configured dB; a shelf's DC measures the configured dB). The FLAT equality
 //! needs no tolerance at all: with every band at 0 dB the normalized
 //! numerator and denominator coefficients coincide exactly, the state
 //! stays at rest, and the cascade is the identity BIT-EXACTLY — the
@@ -60,9 +64,11 @@ fn eq_config_all(gain_db: f32) -> EqConfig {
 
 // --- the independent f64 oracle ------------------------------------------
 
-/// The RBJ Audio EQ Cookbook recipes, re-derived independently in f64
-/// (the oracle's own source, deliberately separate from the production
-/// f32 compilation). Returns the normalized `[b0, b1, b2, a1, a2]`.
+/// The RBJ Audio EQ Cookbook recipes transcribed in f64 (separate from
+/// the production f32 compilation in precision and expression; the
+/// transcription's fidelity to the PUBLISHED cookbook is additionally
+/// witnessed by the recipe-free design-target assertions below).
+/// Returns the normalized `[b0, b1, b2, a1, a2]`.
 fn reference_coefficients(index: usize, f0: f64, gain_db: f64, q: f64, fs: f64) -> [f64; 5] {
     let a = 10f64.powf(gain_db / 40.0);
     let w0 = std::f64::consts::TAU * f0 / fs;
@@ -177,7 +183,7 @@ fn settled_amplitude(signal: &[f64]) -> f64 {
 fn flat_eq_is_bit_exact_pass_through() {
     let mut stage = EqStage::new(&EqConfig::FLAT, &test_format()).expect("flat compiles");
     // Non-trivial content: the position-tag ramp past f32-exact small
-    // integers, negative values, subnormals-adjacent magnitudes.
+    // integers, negative values, and sub-unity magnitudes.
     let mut block: Vec<f32> = (0..4096)
         .map(|i| {
             let x = i as f32;
@@ -238,8 +244,8 @@ fn impulse_response_matches_the_independent_difference_equation() {
 /// A sine at a boosted band's center emerges at the configured gain;
 /// sines well below and well above pass near unity — measured
 /// steady-state amplitudes against the ANALYTIC response of the
-/// independent f64 coefficients (±0.5 dB; the analytic value itself is
-/// the recipe's design target |H(e^{jw0})| = A). Channel independence
+/// independent f64 coefficients (±0.5 dB; the design target at the
+/// band center is |H(e^{jw0})| = A² — the FULL configured dB). Channel independence
 /// rides on the same run: the two channels carry different probe
 /// frequencies and each matches its own analytic response.
 #[test]
@@ -273,6 +279,14 @@ fn sine_responses_match_the_analytic_frequency_response() {
         (measured_center - analytic_center).abs() < 0.5,
         "band-center sine: measured {measured_center:.3} dB vs analytic \
          {analytic_center:.3} dB"
+    );
+    // Recipe-free anchor (the design target is A² = the FULL configured
+    // dB, not half of it): the measured center response must equal the
+    // configured trim without consulting the reference transcription.
+    assert!(
+        (measured_center - f64::from(configured_db)).abs() < 0.5,
+        "band-center sine: measured {measured_center:.3} dB vs the \
+         configured {configured_db} dB"
     );
 
     // Far below the band: near unity.
