@@ -182,8 +182,14 @@ impl DecodedPcmStream for TestDecodeStream {
         let channels = usize::from(self.format.channels);
         for f in 0..n {
             let value = (self.cursor + f as u64) as f32;
-            for s in dst[f * channels..(f + 1) * channels].iter_mut() {
-                *s = value;
+            for (c, s) in dst[f * channels..(f + 1) * channels].iter_mut().enumerate() {
+                // Channel-distinct position tagging (I1 review P2-1): the
+                // frame index tags channel 0; every other channel carries
+                // the tag + 0.5, so a seam that misapplies processing per
+                // channel is observable. Exact for the tags used here
+                // (indices < 2^23 keep `i + 0.5` representable, and the
+                // ×0.5/×0.25/×2.0/×0.0 factors stay exponent-exact).
+                *s = if c == 0 { value } else { value + 0.5 };
             }
         }
         self.cursor += n as u64;
@@ -369,6 +375,12 @@ pub struct TestOutput {
     /// sequence, so a committed cutover must appear as exactly one
     /// discontinuity `K → landing` and a refusal as none.
     pub consumed_values: Arc<Mutex<Vec<f32>>>,
+    /// The channel-1 content witness (I1 review P2-1): the channel-1
+    /// sample value of every submitted frame (tag + 0.5 per the decode
+    /// double's channel-distinct tagging), so per-channel processing
+    /// misapplication is observable. Empty unless the constructor was
+    /// given a witness for it.
+    pub consumed_values_ch1: Arc<Mutex<Vec<f32>>>,
     /// The mock device's output-tail occupancy (frames already consumed
     /// but still queued to "play"), observed by the render gate's
     /// tail-quiescence check and by the leg's position accounting
@@ -402,6 +414,28 @@ impl TestOutput {
         TestOutput::observed_with_tail(behavior, consumed, DeviceTail::default())
     }
 
+    /// [`TestOutput::observed_with_content`] plus the caller owning the
+    /// channel-1 content witness, so a processing test can pin BOTH
+    /// channels of the stereo stream (the channel-distinct decode
+    /// tagging makes channel 1 a distinct observable axis).
+    pub fn observed_with_stereo_content(
+        behavior: OutputBehavior,
+        consumed: Arc<std::sync::atomic::AtomicUsize>,
+        consumed_values: Arc<Mutex<Vec<f32>>>,
+        consumed_values_ch1: Arc<Mutex<Vec<f32>>>,
+        device_tail: DeviceTail,
+    ) -> TestOutput {
+        TestOutput {
+            behavior,
+            consumed,
+            consumed_values,
+            consumed_values_ch1,
+            device_tail,
+            tail_probe: TailProbe::default(),
+            open_abort_engaged: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        }
+    }
+
     /// [`TestOutput::observed`] with the caller owning the mock device's
     /// output tail, so a pause test can model a real device whose
     /// already-submitted frames are still queued to play, and a
@@ -429,14 +463,13 @@ impl TestOutput {
         consumed_values: Arc<Mutex<Vec<f32>>>,
         device_tail: DeviceTail,
     ) -> TestOutput {
-        TestOutput {
+        TestOutput::observed_with_stereo_content(
             behavior,
             consumed,
             consumed_values,
+            Arc::new(Mutex::new(Vec::new())),
             device_tail,
-            tail_probe: TailProbe::default(),
-            open_abort_engaged: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-        }
+        )
     }
 
     /// [`TestOutput::observed_with_tail`] plus the caller-owned
@@ -452,6 +485,7 @@ impl TestOutput {
             behavior: OutputBehavior::OpenTimeoutAbort,
             consumed,
             consumed_values: Arc::new(Mutex::new(Vec::new())),
+            consumed_values_ch1: Arc::new(Mutex::new(Vec::new())),
             device_tail,
             tail_probe,
             open_abort_engaged,
@@ -555,6 +589,7 @@ fn spawn_test_leg(
 ) -> std::io::Result<std::thread::JoinHandle<()>> {
     let consumed = output.consumed.clone();
     let consumed_values = output.consumed_values.clone();
+    let consumed_values_ch1 = output.consumed_values_ch1.clone();
     let device_tail = output.device_tail.clone();
     let tail_probe = output.tail_probe.clone();
     std::thread::Builder::new()
@@ -572,6 +607,7 @@ fn spawn_test_leg(
                         tail_probe: &tail_probe,
                         consumed: &consumed,
                         consumed_values: &consumed_values,
+                        consumed_values_ch1: &consumed_values_ch1,
                     },
                 )
             }))
@@ -685,6 +721,7 @@ struct MockDevice<'a> {
     tail_probe: &'a TailProbe,
     consumed: &'a std::sync::atomic::AtomicUsize,
     consumed_values: &'a Mutex<Vec<f32>>,
+    consumed_values_ch1: &'a Mutex<Vec<f32>>,
 }
 
 /// The mock stand-in for the leg's `publish_consumed` helper (wasapi.rs):
@@ -792,12 +829,22 @@ fn consume_loop(
             PcmPull::Frames(n) => {
                 device.consumed.fetch_add(n, Ordering::SeqCst);
                 reads += 1;
-                // The content witness: the channel-0 value of every
-                // submitted frame, in order.
+                // The content witnesses: the channel-0 and channel-1
+                // values of every submitted frame, in order (the
+                // channel-distinct decode tagging makes the two
+                // channels distinct observables — I1 review P2-1).
                 {
-                    let mut values = device.consumed_values.lock().unwrap();
                     let channels = usize::from(TEST_FORMAT.channels);
+                    let mut values = device.consumed_values.lock().unwrap();
                     values.extend(dst[..n * channels].iter().step_by(channels).copied());
+                    let mut values_ch1 = device.consumed_values_ch1.lock().unwrap();
+                    values_ch1.extend(
+                        dst[..n * channels]
+                            .iter()
+                            .skip(1)
+                            .step_by(channels)
+                            .copied(),
+                    );
                 }
                 // The mock's ReleaseBuffer(n): the device took the block,
                 // so only now does it earn handed-off accounting.

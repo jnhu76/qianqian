@@ -12,11 +12,13 @@
 //! with a truthful processing-origin diagnostic.
 //!
 //! The exactness argument for `==` oracles (no float tolerance): the
-//! decode double tags frame `i` with `i as f32` — exact for
-//! `i < 2^24`, and every source here is far below that — and for the
-//! required factors IEEE-754 f32 multiplication is exact: ×1.0 is the
-//! identity, ×0.5 is an exponent decrement (no mantissa change for
-//! normal numbers), ×0.0 of a finite non-negative value is exactly +0.0.
+//! decode double tags frame `i` of channel 0 with `i as f32` and every
+//! other channel with `i as f32 + 0.5` — exact for `i < 2^23`, and
+//! every source here is far below that — and for the required factors
+//! IEEE-754 f32 multiplication is exact: ×1.0 is the identity, ×0.5 is
+//! an exponent decrement (no mantissa change for normal numbers), ×0.0
+//! of a finite non-negative value is exactly +0.0. Both channels are
+//! witnessed, so a seam that misapplies processing per channel fails.
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -48,6 +50,7 @@ const EIGHT_SECONDS: usize = TEST_RATE * 8;
 struct Witnesses {
     consumed: Arc<AtomicUsize>,
     consumed_values: Arc<Mutex<Vec<f32>>>,
+    consumed_values_ch1: Arc<Mutex<Vec<f32>>>,
 }
 
 impl Witnesses {
@@ -55,13 +58,22 @@ impl Witnesses {
         Self {
             consumed: Arc::new(AtomicUsize::new(0)),
             consumed_values: Arc::new(Mutex::new(Vec::new())),
+            consumed_values_ch1: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    /// The consumed content, snapped once: the channel-0 value of every
+    /// The consumed channel-0 content, snapped once: the value of every
     /// frame the render leg submitted, in submission order.
     fn content(&self) -> Vec<f32> {
         self.consumed_values.lock().unwrap().clone()
+    }
+
+    /// The consumed channel-1 content (tag + 0.5 per the decode double's
+    /// channel-distinct tagging) — the second observable axis (I1 review
+    /// P2-1): per-channel processing misapplication fails here even when
+    /// channel 0 looks right.
+    fn content_ch1(&self) -> Vec<f32> {
+        self.consumed_values_ch1.lock().unwrap().clone()
     }
 }
 
@@ -81,6 +93,7 @@ fn registered_runtime(
 ) -> QianqianApp {
     let consumed = witnesses.consumed.clone();
     let consumed_values = witnesses.consumed_values.clone();
+    let consumed_values_ch1 = witnesses.consumed_values_ch1.clone();
     let mut runtime = QianqianApp::new();
 
     runtime
@@ -103,10 +116,11 @@ fn registered_runtime(
                 .provides::<qianqian_audio_api::ports::AudioOutputCapability>()
                 .on_activate(move |ctx| {
                     ctx.provide::<qianqian_audio_api::ports::AudioOutputCapability>(
-                        std::rc::Rc::new(TestOutput::observed_with_content(
+                        std::rc::Rc::new(TestOutput::observed_with_stereo_content(
                             output,
                             consumed.clone(),
                             consumed_values.clone(),
+                            consumed_values_ch1.clone(),
                             test_common::DeviceTail::default(),
                         )),
                     )
@@ -172,29 +186,46 @@ fn wait_until(limit: Duration, mut predicate: impl FnMut() -> bool) -> bool {
     }
 }
 
-/// The exact processed-content oracle: one output frame per source frame
-/// (frame conservation — no insertion, no drop, no EOF tail), each
-/// exactly `frame_index × factor` (see the module-doc exactness
-/// argument; no float tolerance is needed or allowed here).
-fn assert_processed_exactly(values: &[f32], factor: f32, source_frames: usize) {
+/// The exact processed-content oracle for one channel: one output frame
+/// per source frame (frame conservation — no insertion, no drop, no EOF
+/// tail), each exactly `(frame_index + tag_offset) × factor` (see the
+/// module-doc exactness argument; no float tolerance is needed or
+/// allowed here). Channel 0's tag offset is 0; channel 1's is 0.5.
+fn assert_processed_exactly_at(
+    values: &[f32],
+    tag_offset: f32,
+    factor: f32,
+    source_frames: usize,
+    channel: &'static str,
+) {
     assert_eq!(
         values.len(),
         source_frames,
-        "frame conservation: N decoded frames in, N consumed frames out \
-         (an EOF tail or a dropped/duplicated frame breaks this)"
+        "frame conservation ({channel}): N decoded frames in, N consumed \
+         frames out (an EOF tail or a dropped/duplicated frame breaks this)"
     );
     for (i, value) in values.iter().enumerate() {
         assert_eq!(
             *value,
-            i as f32 * factor,
-            "frame {i} must be exactly (frame index) × {factor}"
+            (i as f32 + tag_offset) * factor,
+            "frame {i} of {channel} must be exactly (frame index + \
+             {tag_offset}) × {factor}"
         );
     }
 }
 
+/// The stereo oracle: both witnessed channels must carry the exact
+/// processed content. A seam that applied processing to only one channel
+/// of each frame fails here.
+fn assert_stereo_processed_exactly(ch0: &[f32], ch1: &[f32], factor: f32, source_frames: usize) {
+    assert_processed_exactly_at(ch0, 0.0, factor, source_frames, "channel 0");
+    assert_processed_exactly_at(ch1, 0.5, factor, source_frames, "channel 1");
+}
+
 /// Indices where the scaled position-tagged sequence does not continue
 /// the previous frame index (`b != a + factor`; scaled frame indices
-/// stay far below the f32-exact range).
+/// stay far below the f32-exact range). Works for either channel: the
+/// tag offset shifts both neighbors equally.
 fn discontinuities(values: &[f32], factor: f32) -> Vec<usize> {
     values
         .iter()
@@ -237,6 +268,7 @@ fn a_refused_seek_finishes_its_processed_remainder_exactly_once() {
             "a refusal is not a failure and not a cut"
         );
         let values = witnesses.content();
+        let values_ch1 = witnesses.content_ch1();
         let breaks = discontinuities(&values, 0.5);
         assert!(
             breaks.is_empty(),
@@ -245,7 +277,11 @@ fn a_refused_seek_finishes_its_processed_remainder_exactly_once() {
             &breaks[..breaks.len().min(8)],
             values.len()
         );
-        assert_processed_exactly(&values, 0.5, EIGHT_SECONDS);
+        assert!(
+            discontinuities(&values_ch1, 0.5).is_empty(),
+            "channel 1 must be content-indistinguishable from no seek too"
+        );
+        assert_stereo_processed_exactly(&values, &values_ch1, 0.5, EIGHT_SECONDS);
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
@@ -256,7 +292,9 @@ fn a_refused_seek_finishes_its_processed_remainder_exactly_once() {
 /// existing D14.5 mechanism, and post-cut production continues from the
 /// provider's landing — still processed. The consumed stream shows
 /// exactly ONE discontinuity, landing exactly where the provider
-/// reported, with both stretches exactly `frame_index × 0.5`.
+/// reported, with both stretches exactly `frame_index × 0.5`, and the
+/// post-cut stretch conserves its frame count exactly (no dropped or
+/// duplicated tail after the cutover).
 #[test]
 fn an_applied_seek_discards_the_processed_remainder_and_cuts_cleanly() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -290,6 +328,7 @@ fn an_applied_seek_discards_the_processed_remainder_and_cuts_cleanly() {
             "the seek must not disturb the episode's ordinary EOF course"
         );
         let values = witnesses.content();
+        let values_ch1 = witnesses.content_ch1();
         let breaks = discontinuities(&values, 0.5);
         assert_eq!(
             breaks.len(),
@@ -300,6 +339,11 @@ fn an_applied_seek_discards_the_processed_remainder_and_cuts_cleanly() {
             values.len()
         );
         assert_eq!(
+            discontinuities(&values_ch1, 0.5).len(),
+            1,
+            "channel 1 must show the same single cutover"
+        );
+        assert_eq!(
             values[breaks[0]],
             five_seconds as f32 * 0.5,
             "the cut must land exactly at the provider's ACTUAL landing \
@@ -308,15 +352,28 @@ fn an_applied_seek_discards_the_processed_remainder_and_cuts_cleanly() {
         // Both stretches are exactly the source scaled by the episode's
         // gain: the pre-cut stretch from source frame 0, the post-cut
         // stretch from the landing (the skipped stretch between them is
-        // what a seek IS).
-        assert_processed_exactly(&values[..breaks[0]], 0.5, breaks[0]);
-        let after = &values[breaks[0]..];
-        for (offset, value) in after.iter().enumerate() {
-            assert_eq!(
-                *value,
-                (five_seconds + offset) as f32 * 0.5,
-                "post-cut frame {offset} must be exactly its source index × 0.5"
-            );
+        // what a seek IS). The post-cut frame count is pinned exactly:
+        // pre-cut consumed + (source total − landing) frames, no tail
+        // anomaly.
+        assert_eq!(
+            values.len(),
+            breaks[0] + (EIGHT_SECONDS - five_seconds),
+            "the post-cut stretch must conserve its frame count exactly"
+        );
+        assert_processed_exactly_at(&values[..breaks[0]], 0.0, 0.5, breaks[0], "channel 0");
+        assert_processed_exactly_at(&values_ch1[..breaks[0]], 0.5, 0.5, breaks[0], "channel 1");
+        for (tag_offset, channel, values) in
+            [(0.0, "channel 0", &values), (0.5, "channel 1", &values_ch1)]
+        {
+            let after = &values[breaks[0]..];
+            for (offset, value) in after.iter().enumerate() {
+                assert_eq!(
+                    *value,
+                    ((five_seconds + offset) as f32 + tag_offset) * 0.5,
+                    "post-cut frame {offset} of {channel} must be exactly \
+                     (its source index + {tag_offset}) × 0.5"
+                );
+            }
         }
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
@@ -369,7 +426,12 @@ fn a_pause_resume_cycle_preserves_the_processed_stream() {
             EpisodeTerminalOutcome::Completed,
             "the pause cycle must not disturb the episode's ordinary course"
         );
-        assert_processed_exactly(&witnesses.content(), 0.5, source_frames);
+        assert_stereo_processed_exactly(
+            &witnesses.content(),
+            &witnesses.content_ch1(),
+            0.5,
+            source_frames,
+        );
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
@@ -391,7 +453,12 @@ fn a_pause_resume_cycle_preserves_the_processed_stream() {
 /// production ROUTE stays exercised (it never ships). The white-box
 /// construction (worker spawned directly over the mechanism doubles)
 /// changes nothing the route depends on: worker code, publication
-/// discipline and settlement are the production paths.
+/// discipline and settlement are the production paths. Everything AFTER
+/// the edge failure (the render leg's aborted-drain settlement,
+/// teardown, no-resume) is machinery byte-shared with the decode-failure
+/// route — covered by the decode-failure integration tests and the
+/// decision table — so what this oracle pins is exactly the
+/// processing-specific delta: the truthful publication label.
 #[test]
 fn a_processing_failure_takes_the_d11_failed_route_with_a_truthful_diagnostic() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -451,9 +518,9 @@ fn a_processing_failure_takes_the_d11_failed_route_with_a_truthful_diagnostic() 
 
 /// Negative control, omission class: with the episode configured BYPASS
 /// (the transparent pass-through — the same observable shape as "skip
-/// Gain entirely"), the half-gain oracle MUST reject the stream. A green
-/// suite whose oracle cannot fail here would prove nothing about the
-/// seam.
+/// Gain entirely"), the half-gain oracle MUST reject the stream — on
+/// both witnessed channels. A green suite whose oracle cannot fail here
+/// would prove nothing about the seam.
 #[test]
 fn negative_control_the_half_gain_oracle_rejects_a_skipped_seam() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -471,8 +538,9 @@ fn negative_control_the_half_gain_oracle_rejects_a_skipped_seam() {
             "precondition: the unprocessed episode itself completes"
         );
         let values = witnesses.content();
+        let values_ch1 = witnesses.content_ch1();
         let rejected = catch_unwind(AssertUnwindSafe(|| {
-            assert_processed_exactly(&values, 0.5, source_frames);
+            assert_stereo_processed_exactly(&values, &values_ch1, 0.5, source_frames);
         }))
         .is_err();
         assert!(
@@ -494,11 +562,12 @@ fn negative_control_the_half_gain_oracle_rejects_a_skipped_seam() {
 /// position tagging and both factors are IEEE-exact, so a seam that
 /// applied 0.5 twice would emit EXACTLY `i × 0.25`). The episode below
 /// drives the real production seam with gain 0.25 — producing that
-/// exact signature through the identical worker/staging/edge path —
-/// and the oracle must reject it. Together with the positive oracles
-/// (which pin `i × 0.5` through the same path), exactly-once is
-/// established: a double-applied seam cannot pass, and the signature is
-/// proven detectable rather than vacuously tolerated.
+/// exact signature through the identical worker/staging/edge path on
+/// both witnessed channels — and the oracle must reject it. Together
+/// with the positive oracles (which pin `i × 0.5` through the same
+/// path), exactly-once is established: a double-applied seam cannot
+/// pass, and the signature is proven detectable rather than vacuously
+/// tolerated.
 #[test]
 fn negative_control_the_gain_oracle_rejects_the_double_applied_signature() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -516,11 +585,17 @@ fn negative_control_the_gain_oracle_rejects_the_double_applied_signature() {
             "precondition: the ×factor²-signature episode itself completes"
         );
         let values = witnesses.content();
-        // The witness of the signature: frame 1 is exactly 1 × 0.25 —
-        // the value a double-applied 0.5 seam would have produced.
+        let values_ch1 = witnesses.content_ch1();
+        // The witness of the signature: frame 1 is exactly 1 × 0.25
+        // (channel 0) and (1 + 0.5) × 0.25 = 0.375 (channel 1) — the
+        // values a double-applied 0.5 seam would have produced.
         assert_eq!(values[1], 0.25, "precondition: content is ×0.25");
+        assert_eq!(
+            values_ch1[1], 0.375,
+            "precondition: channel-1 content is ×0.25 of its tag"
+        );
         let rejected = catch_unwind(AssertUnwindSafe(|| {
-            assert_processed_exactly(&values, 0.5, source_frames);
+            assert_stereo_processed_exactly(&values, &values_ch1, 0.5, source_frames);
         }))
         .is_err();
         assert!(
@@ -566,7 +641,8 @@ fn steady_state_processing_allocates_zero() {
 // --- conservation oracles ------------------------------------------------
 
 /// Unity is bit-exact: `×1.0` is the IEEE-754 identity, so the consumed
-/// stream must equal the raw position-tagged source frame for frame.
+/// stream must equal the raw position-tagged source frame for frame, on
+/// both channels.
 #[test]
 fn unity_gain_preserves_samples_bit_exact() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -579,7 +655,12 @@ fn unity_gain_preserves_samples_bit_exact() {
             Vec::new(),
         );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
-        assert_processed_exactly(&witnesses.content(), 1.0, source_frames);
+        assert_stereo_processed_exactly(
+            &witnesses.content(),
+            &witnesses.content_ch1(),
+            1.0,
+            source_frames,
+        );
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
@@ -587,7 +668,7 @@ fn unity_gain_preserves_samples_bit_exact() {
 
 /// Zero gain is true silence that conserves the stream's shape: every
 /// frame arrives exactly +0.0, with the frame count untouched (gain
-/// mutes samples, never frames).
+/// mutes samples, never frames), on both channels.
 #[test]
 fn zero_gain_is_silence_with_frame_conservation() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -600,7 +681,12 @@ fn zero_gain_is_silence_with_frame_conservation() {
             Vec::new(),
         );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
-        assert_processed_exactly(&witnesses.content(), 0.0, source_frames);
+        assert_stereo_processed_exactly(
+            &witnesses.content(),
+            &witnesses.content_ch1(),
+            0.0,
+            source_frames,
+        );
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
@@ -614,9 +700,10 @@ fn zero_gain_is_silence_with_frame_conservation() {
 /// producer runs its bounded-slice write loop against a full edge:
 /// partial edge acceptance of already-processed blocks is structural
 /// here, not incidental. The exact oracle leaves no room for a wrong
-/// seam: any skipped, doubled, dropped or reprocessed staging content
-/// fails the frame-index check. Format conservation is pinned on the
-/// same episode: processing must not disturb the source format.
+/// seam: any skipped, doubled, dropped, reprocessed or channel-blind
+/// staging content fails the frame-index check. Format conservation is
+/// pinned on the same episode: processing must not disturb the source
+/// format.
 #[test]
 fn half_gain_processes_the_real_staging_seam() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -635,7 +722,12 @@ fn half_gain_processes_the_real_staging_seam() {
             EpisodeTerminalOutcome::Completed,
             "gain must not disturb the episode's ordinary EOF course"
         );
-        assert_processed_exactly(&witnesses.content(), 0.5, source_frames);
+        assert_stereo_processed_exactly(
+            &witnesses.content(),
+            &witnesses.content_ch1(),
+            0.5,
+            source_frames,
+        );
         let observation = handle.observe();
         assert_eq!(
             observation.source_format,
@@ -652,7 +744,7 @@ fn half_gain_processes_the_real_staging_seam() {
 /// BYPASS is transparent bit-for-bit through the full composition: an
 /// episode established with `enabled: false` and an INERT non-unity
 /// gain delivers the raw source untouched (bypass is a configuration,
-/// not a processor that runs and does nothing).
+/// not a processor that runs and does nothing), on both channels.
 #[test]
 fn bypass_ignores_the_gain_field_and_passes_the_source_through() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -668,7 +760,12 @@ fn bypass_ignores_the_gain_field_and_passes_the_source_through() {
             Vec::new(),
         );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
-        assert_processed_exactly(&witnesses.content(), 1.0, source_frames);
+        assert_stereo_processed_exactly(
+            &witnesses.content(),
+            &witnesses.content_ch1(),
+            1.0,
+            source_frames,
+        );
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
@@ -732,7 +829,12 @@ fn positive_gain_above_unity_is_not_clipped() {
             Vec::new(),
         );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
-        assert_processed_exactly(&witnesses.content(), 2.0, source_frames);
+        assert_stereo_processed_exactly(
+            &witnesses.content(),
+            &witnesses.content_ch1(),
+            2.0,
+            source_frames,
+        );
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });

@@ -136,6 +136,14 @@ fn classify(outcome: Option<SessionOutcome>) -> &'static str {
 /// bound, so `request_stop` only records intent.
 fn production_class(
     stop_intent: bool,
+    // Model variable (TLA artifact spelling unchanged): stands for "the
+    // FIRST worker-side failure publication, of EITHER origin" since the
+    // I1 WorkerFailure unification — a decode failure and an audio-
+    // processing failure are the same D11 settlement class with the same
+    // precedence; the origin differs only in the diagnostic's stage
+    // spelling, which this decision table does not model (verification
+    // authority boundary: the model abstracts, the oracles in
+    // settlement_contract_tests pin the origin spellings).
     decode_failure: bool,
     worker_terminal: Option<EdgeTerminal>,
     drain_verdict: Option<DrainVerdict>,

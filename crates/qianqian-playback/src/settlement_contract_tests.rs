@@ -927,6 +927,41 @@ fn the_first_worker_failure_wins_across_failure_slots() {
     );
 }
 
+/// The processing failure origin shares the decode origin's
+/// stop-precedence mechanism exactly: a stop cannot relabel a committed
+/// processing failure, in either linearization order (the I1 review's
+/// processing-side twin of `a_stop_cannot_downgrade_a_decode_failure`).
+#[test]
+fn a_stop_cannot_downgrade_a_processing_failure() {
+    // Stop first, processing failure second: the failure evidence
+    // settles inline.
+    let completion = SessionCompletion::new();
+    completion.request_stop();
+    completion.processing_failed("processor state unusable");
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Failed {
+            stage: "processing: processor state unusable".to_owned()
+        }),
+        "a committed processing failure is not relabelled by stop intent"
+    );
+    assert!(
+        completion.observe_snapshot().stop_requested,
+        "the command was recorded; it simply did not win"
+    );
+
+    // Processing failure first, stop second: same answer.
+    let completion = SessionCompletion::new();
+    completion.processing_failed("processor state unusable");
+    completion.request_stop();
+    assert_eq!(
+        completion.committed(),
+        Some(SessionOutcome::Failed {
+            stage: "processing: processor state unusable".to_owned()
+        })
+    );
+}
+
 #[test]
 fn completion_reports_device_abort_as_failure() {
     let completion = SessionCompletion::new();
