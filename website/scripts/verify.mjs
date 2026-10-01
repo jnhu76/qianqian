@@ -19,9 +19,20 @@
  */
 
 import { readFileSync, existsSync } from 'fs'
-import { parse as parseYaml } from 'yaml'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
+
+// Fail with a prerequisite instruction when website dependencies are
+// missing (fresh clone / local pre-push gate) instead of a raw module
+// resolution error. CI always runs after `npm ci` and never sees this.
+let parseYaml
+try {
+  parseYaml = (await import('yaml')).parse
+} catch {
+  console.error('docs:verify prerequisite missing: website dependencies are not installed.')
+  console.error('Run once:  cd website && npm ci')
+  process.exit(1)
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, '../..')
