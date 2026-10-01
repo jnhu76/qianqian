@@ -1,0 +1,69 @@
+name: Rust Regression
+
+# Fast full-workspace Linux regression: fmt / check / test / clippy.
+#
+# Consolidated from Observatory CI (docs.yml), where this suite ran
+# under a docs/website path trigger. That trigger was structurally
+# miscoped: docs-only changes cannot affect Rust compilation (no
+# workspace crate includes docs/ or website/ content and no workspace
+# crate has a build.rs), so docs-only pushes paid full Rust regression
+# while Rust-only pushes paid none. This workflow keeps the server-side
+# regression authority and scopes it to the paths that can affect the
+# workspace — the same changed-path contract as the local Lefthook
+# pre-push gate (see AGENTS.md / lefthook.yml).
+#
+# This is the FAST regression layer. Platform coverage (Windows
+# compile gate), formal evidence (Formal Semantic Gate), Miri/Loom and
+# mutation evidence (Verification Rust Gate) remain in their dedicated
+# gates and are untouched.
+#
+# `git diff --check` (whitespace lint of UNCOMMITTED changes) is
+# intentionally not reproduced here: after a fresh CI checkout the
+# working tree is always clean and the check cannot fail. That check
+# lives in the local pre-push gate, where an uncommitted tree exists.
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".cargo/**"
+      - "crates/**"
+      - "apps/**"
+      - ".github/workflows/rust-regression.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".cargo/**"
+      - "crates/**"
+      - "apps/**"
+      - ".github/workflows/rust-regression.yml"
+
+concurrency:
+  group: rust-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-regression:
+    name: fmt + check + test + clippy (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Workspace check
+        run: cargo check --workspace
+
+      - name: Workspace tests
+        run: cargo test --workspace
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings

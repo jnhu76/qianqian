@@ -34,27 +34,9 @@ jobs:
       - name: Build VitePress
         run: npx vitepress build
 
-  rust-regression:
-    name: Rust Regression
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Format check
-        run: cargo fmt --check
-
-      - name: Workspace check
-        run: cargo check --workspace
-
-      - name: Workspace tests
-        run: cargo test --workspace
-
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-      - name: Git diff check
-        run: git diff --check
+# The former `rust-regression` job (fmt/check/test/clippy under the
+# docs/website path trigger) moved to rust-regression.yml: docs-only
+# changes cannot affect Rust compilation (no workspace crate includes
+# docs/ or website/ content and no workspace crate has a build.rs), so
+# that trigger was structurally miscoped — docs-only pushes paid full
+# Rust regression while Rust-only pushes paid none.
