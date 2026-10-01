@@ -352,7 +352,9 @@ FUTURE REOPEN —— 不在当前最小切片内、各自需要新权威：
 本审计可主张冻结的语义（架构层）:
     - episode 内处理拓扑/顺序稳定（v1）
     - processor 实例 episode-scoped、format-bound
-    - 处理发生在 PcmEdge 之前的 decode worker staging 路径
+    - 处理（当前最小切片，§8）发生在 PcmEdge 之前的 decode worker
+      staging 路径（**当前最小执行位置**——可证伪执行选择，
+      scoping 同 §6/§12）
     - 控制面活动不得造成每 PCM 块的 K0 工作
     - 提交性 seek 不连续必须先失效全部 pre-cut 处理历史，
       再处理任何 post-cut PCM（§10 seek/状态失效行）
