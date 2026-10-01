@@ -2030,7 +2030,7 @@ Playlist/queue selection authority was CLOSED by the 2026-09-18 F6-AUTHORITY-PRO
 
 ### D14.7 Pause / Resume — same-episode non-terminal control; mechanism + establishment frozen
 
-> 2026-09-16 amendment (F3-GATE; mechanism evidence:
+> **2026-09-16 amendment (F3-GATE; mechanism evidence:
 > `experiments/f3-pause-mechanism/` — synchronization-shape scenario
 > suite + physical WASAPI probe; roadmap: Issue #119 checkpoint). It
 > replaces the previous "semantic direction fixed, implementation still
@@ -2819,10 +2819,16 @@ NOT                         a second playback lifecycle beside
 there is no separate processing provider Plugin whose allocation
 mechanism could be confused with it). No Rust struct/type name for a
 processing chain is frozen here — the authority must survive
-representation replacement. Processor instances are episode-scoped and
-bound to the episode's source PCM format (current reality: an
-in-episode stream-format change already fails the episode fail-closed;
-D14.11 adds no format-switch semantics).
+representation replacement. **Episode-specific mutable or
+signal-derived processing state, plus episode-bound runtime resources,
+are scoped to and retired with the Playback Session episode.** State
+whose semantics depend on the source PCM format is bound to that
+episode's source format (current reality: an in-episode stream-format
+change already fails the episode fail-closed; D14.11 adds no
+format-switch semantics). The **physical object / instance topology
+stays OPEN**: shared immutable tables, stateless implementation objects
+or other representation that does not carry episode-specific mutable
+truth is neither required nor forbidden by this ownership rule.
 
 **Desired configuration ownership (frozen).**
 
@@ -2840,9 +2846,11 @@ NOT    "the QianqianApp kernel/composition root stores DSP product
         state"
 ```
 
-The Playback Session receives/binds the applied episode configuration
-through the same constructor-argument class as the D14.6 file/handle
-handoff. The exact transport/constructor representation stays OPEN.
+At episode establishment, Playback Session binds one **coherent applied
+configuration snapshot** derived from the application/product-control
+owner. The exact handoff / constructor / payload representation stays
+OPEN; D14.11 does **not** import D14.6's file/handle constructor
+realization as a processing-configuration requirement.
 
 **D13 admission ruling (current, negative).**
 
@@ -2874,9 +2882,10 @@ so a K0 `AudioProcessingCapability` is not earned.
 
 **Re-admission criterion (falsifiable).**
 
-`AudioProcessingPlugin` — and potentially
-`AudioProcessingCapability` — becomes a serious admission candidate
-only under evidence of this shape:
+General re-admission remains governed **exclusively by D13's three
+conjunctive conditions**; D14.11 adds no fourth admission condition.
+A concrete sufficient counterexample that would force this current
+negative ruling to be reopened is evidence of this shape:
 
 ```text
 an independently withdrawable DSP provider D exists;
@@ -2887,6 +2896,13 @@ those consumers before provider resources can be released;
 hiding D inside any one existing Plugin would lose a real
 dependency or force the App to manually reproduce K0 ordering.
 ```
+
+That example is **sufficient, not exhaustive**. A single-consumer
+candidate may also earn Plugin identity if and only if it satisfies
+D13's same three conditions — independent desired-composition truth,
+independent K0 lifecycle/dependency ordering, and correctness loss if
+collapsed into an existing Plugin. Multiple consumers are therefore a
+strong falsifying example, **not a new D13 requirement**.
 
 None of the following, alone, constitutes promotion evidence:
 
@@ -3002,9 +3018,13 @@ generic Fact/Event fan-out carrying PCM
 
 Canonical reading: K0 composes the owner; the Playback Session
 binds/owns the runtime resources; PCM flows through already-bound
-episode resources. Worker steady-state processing adds no new
-per-block allocation, locking or dispatch discipline beyond the
-existing data-plane contract (D8 / PBK-001 §2.4).
+episode resources. Processing inherits PBK-001 §2.4: no per-block K0
+or generic dispatch, no filesystem/network/control round-trip, and no
+**unbounded** allocation or blocking. D14.11 does **not** freeze a
+stronger zero-allocation or zero-synchronization rule for the worker;
+any such steady-state bound must be earned by the I0 probe / later
+implementation evidence. Existing bounded synchronization in the data
+plane therefore remains legal unless a later gate narrows it.
 
 **Ordering semantics (frozen minimum).**
 
