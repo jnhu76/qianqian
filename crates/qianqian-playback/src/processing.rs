@@ -101,27 +101,53 @@ impl AudioProcessingConfig {
     }
 }
 
+/// The stage-closure shape of the test-only processor injection: one
+/// staging block in place, `Err` is the unrecoverable processing
+/// failure.
+#[cfg(all(test, not(loom)))]
+type TestStage = Box<dyn FnMut(&mut [f32]) -> Result<(), String> + Send>;
+
 /// The episode-owned processing runtime: the applied snapshot compiled
 /// at activation, carried by the decode worker for the episode's whole
 /// lifetime, and retired with it (Open/replacement: the old episode's
 /// processing state dies with the episode; the next episode compiles a
 /// fresh snapshot from its own desired configuration).
-#[derive(Debug)]
+///
+/// `Debug` is hand-written because the test-only variant carries boxed
+/// closures (a derived impl cannot print them; the derived shape would
+/// otherwise be the only reason to restrict the variant).
 pub(crate) enum EpisodeProcessing {
     /// Transparent bypass: the stage passes the block through untouched.
     Bypass,
     /// Scalar Gain: every sample of the staging block is scaled by the
-    /// linear factor once, in place.
+    /// linear factor once, in place. Stateless: no signal-derived
+    /// history, so history invalidation is a no-op.
     Gain { factor: f32 },
-    /// Test-only failing processor (never shipped): reports the
-    /// synthetic unrecoverable processing failure from staging block
-    /// `fail_after_block` on, so the production failure ROUTE (worker →
-    /// `processing_failed` → D11 `Failed` with a truthful origin) can
-    /// be exercised end-to-end through the real worker and completion.
-    /// Scalar Gain itself cannot fail, so no valid product configuration
-    /// reaches this state.
+    /// Test-only processor injection (never shipped): the stage and the
+    /// history invalidation are arbitrary closures, so the in-crate
+    /// oracles can drive the REAL composition with a deliberate
+    /// processor — the I1/I2 failure route, the I2 StatefulProbe and its
+    /// mutation knobs — without any product seam for test doubles. No
+    /// product configuration reaches this state.
     #[cfg(all(test, not(loom)))]
-    TestFailing { fail_after_block: u64, seen: u64 },
+    TestDriven {
+        stage: TestStage,
+        invalidate: Box<dyn FnMut() + Send>,
+    },
+}
+
+impl std::fmt::Debug for EpisodeProcessing {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Bypass => f.write_str("EpisodeProcessing::Bypass"),
+            Self::Gain { factor } => f
+                .debug_struct("EpisodeProcessing::Gain")
+                .field("factor", factor)
+                .finish(),
+            #[cfg(all(test, not(loom)))]
+            Self::TestDriven { .. } => f.write_str("EpisodeProcessing::TestDriven(..)"),
+        }
+    }
 }
 
 impl EpisodeProcessing {
@@ -138,6 +164,14 @@ impl EpisodeProcessing {
         } else {
             Self::Bypass
         })
+    }
+
+    /// The test-only processor injection (see the variant doc). Crate-
+    /// internal: reached by the white-box oracles through the cfg(test)
+    /// session constructor; no product path constructs it.
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn test_driven(stage: TestStage, invalidate: Box<dyn FnMut() + Send>) -> Self {
+        Self::TestDriven { stage, invalidate }
     }
 
     /// The D14.11 processing stage, executed once per whole staging
@@ -162,19 +196,29 @@ impl EpisodeProcessing {
                 Ok(())
             }
             #[cfg(all(test, not(loom)))]
-            Self::TestFailing {
-                fail_after_block,
-                seen,
-            } => {
-                let index = *seen;
-                *seen += 1;
-                if index >= *fail_after_block {
-                    return Err(format!(
-                        "synthetic processing failure at staging block {index}"
-                    ));
-                }
-                Ok(())
-            }
+            Self::TestDriven { stage, .. } => stage(block),
+        }
+    }
+
+    /// The D14.11 Applied-seek obligation: invalidate ALL pre-cut
+    /// signal-derived processing history, before any post-cut PCM is
+    /// processed. The worker calls this exactly once per APPLIED cut,
+    /// beside the staging discard and the edge purge; a refused seek
+    /// NEVER reaches it (RefusedUnchanged preserves history), pause
+    /// never reaches it (pause preserves history), and Open/replacement
+    /// retires the whole runtime with the episode (fresh state is
+    /// structural). The acceptance semantics are D14.11's "fresh-
+    /// instance observational equivalence", not this method's name —
+    /// the realization (reset call / rebuild / state swap) stays open
+    /// representation.
+    ///
+    /// Stateless processors (Bypass, Gain) have no signal-derived
+    /// history, so their invalidation is a no-op.
+    pub(crate) fn invalidate_signal_history(&mut self) {
+        match self {
+            Self::Bypass | Self::Gain { .. } => {}
+            #[cfg(all(test, not(loom)))]
+            Self::TestDriven { invalidate, .. } => invalidate(),
         }
     }
 }
