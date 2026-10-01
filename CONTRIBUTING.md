@@ -217,6 +217,34 @@ They could be redesigned as the Composition Kernel (K0) implementation (PR #71) 
 
 Verification must match the phase.
 
+### Local pre-push gate (Lefthook)
+
+Lefthook is the repository Git hook orchestrator. Its `pre-push` gate is the fast local rejection layer: it proves the working tree passes fast deterministic checks. It is developer-side policy, not repository authority — GitHub Actions remains the authority for platform, formal (TLA+), Miri/Loom, mutation, Windows and release evidence.
+
+Install once per clone (Lefthook 2.1.16 or newer; binary only, no root Node package):
+
+```bash
+# 1. install the lefthook binary:
+#    Linux:   https://github.com/evilmartians/lefthook/releases
+#             (standalone binary; or the Cloudsmith apt repo)
+#    macOS:   brew install lefthook
+#    Arch:    yay -S lefthook-bin
+#    Windows: download the Windows binary from the releases page
+#             (python3 must also be on PATH for the python checks)
+lefthook install
+
+# 2. only needed once, and only for docs/website pushes:
+cd website && npm ci && cd ..
+```
+
+Before every push (this is the canonical manual entrypoint for humans and coding agents):
+
+```bash
+lefthook run pre-push --all-files
+```
+
+The gate is checks-only: no formatting, no auto-fixing, no staging, no commits, no network. A failed pre-push leaves the working tree unchanged. What stays CI-only: `specs/check.sh current|rust`, the Windows compile gate, the VitePress build, commit/PR convention enforcement, OpenCodeReview.
+
 ### Boundary-design work
 
 Evidence is architectural analysis, matrices, graphs, adversarial cases and explicit unresolved blockers—not green Cargo tests.

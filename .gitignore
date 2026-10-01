@@ -16,3 +16,6 @@ experiments/f5-seek-discontinuity/target
 experiments/f6-open-smoke/target
 experiments/v-probe/target
 /dist
+
+# Lefthook per-contributor local override (never commit)
+lefthook-local.yml

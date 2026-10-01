@@ -388,6 +388,39 @@ Report what was actually verified. Never mark an unrun device/platform/audio che
 
 Green Cargo tests are regression evidence, not architecture acceptance. Verification reports must state target, tool, assumptions/bounds and result class.
 
+## Local pre-push gate (Lefthook)
+
+Lefthook is the repository's Git hook orchestrator. The `pre-push` gate is the fast local rejection layer; GitHub Actions remains the authority for platform, formal, concurrency, mutation, Windows and release evidence.
+
+Every coding agent must run, before proposing or pushing code:
+
+```bash
+lefthook run pre-push --all-files
+```
+
+The gate runs checks only — it never formats, auto-fixes, stages, commits, or touches the network:
+
+```text
+always:                 python3 tools/check_architecture_vocabulary.py
+Rust paths changed:     plugin boundary gate, cargo fmt --check,
+                        cargo clippy --workspace --all-targets -- -D warnings,
+                        cargo test --workspace
+docs/website changed:   website verify (node scripts/verify.mjs;
+                        needs `cd website && npm ci` once)
+```
+
+What it proves / does not prove:
+
+```text
+proves:       the current WORKING TREE passes the fast deterministic local
+              checks (the manual --all-files run executes the complete gate)
+does not      Windows / cfg(windows) compilation, TLA+/TLC formal suites,
+prove:        Miri, Loom, mutation negatives, WASAPI/device evidence,
+              VitePress build, commit/PR convention enforcement
+```
+
+On a real `git push`, commands with `glob` are narrowed to the pushed changeset (Lefthook's native push-file detection; it can only narrow on a real, known delta and never silently skips a real change). The manual `--all-files` run is always the complete gate. Install and prerequisites: `CONTRIBUTING.md`.
+
 ## Real-path testing and reproducible evidence
 
 Verification should be chosen from the failure being investigated, not from a preferred testing technology.
