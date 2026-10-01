@@ -99,7 +99,7 @@ impl StatefulProbe {
         if self.mutation == Mutation::ResetEachCall {
             self.y = [0.0; CHANNELS];
         }
-        for chunk in block.chunks_exact_mut(CHANNELS) {
+        for chunk in block.as_chunks_mut::<CHANNELS>().0 {
             for (c, sample) in chunk.iter_mut().enumerate() {
                 let x = *sample;
                 // Under DoubleAdvance the input is (wrongly) applied to
@@ -246,7 +246,7 @@ fn the_probe_recurrence_is_invariant_under_staging_fragmentation() {
     let (ref_ch0, ref_ch1) = reference_stereo(0, frames);
     let mut deinterleaved_whole_ch0 = Vec::with_capacity(frames);
     let mut deinterleaved_whole_ch1 = Vec::with_capacity(frames);
-    for pair in whole.chunks_exact(CHANNELS) {
+    for pair in whole.as_chunks::<CHANNELS>().0 {
         deinterleaved_whole_ch0.push(pair[0]);
         deinterleaved_whole_ch1.push(pair[1]);
     }
