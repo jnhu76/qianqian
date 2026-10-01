@@ -682,6 +682,18 @@ fn a_paused_episode_can_seek_again_after_its_committed_cut() {
             handle.observe()
         );
         assert!(handle.observe().paused(), "still paused after cut #1");
+        // Linearization window before firing cut #2 (protocol order,
+        // session.rs): the rebase becomes observable when the parked LEG
+        // consumes the routed release, but the one-seek slot frees only
+        // when the decode worker's next bounded poll observes that
+        // consumption — up to one worker wait slice (2 ms nominal)
+        // later, and Windows timer granularity can inflate that slice
+        // by an order of magnitude. A request landing inside the window
+        // is inert under the frozen one-seek policy (no queueing, no
+        // retry), so the slot must be given that slice before this test
+        // can pin "seekable AGAIN" — the same linearization-sleep idiom
+        // this suite already uses for the in-flight window above.
+        std::thread::sleep(Duration::from_millis(200));
         // The slot has been freed by the resolved cut, so this second
         // request is accepted and commits through the same pause
         // attribution.
