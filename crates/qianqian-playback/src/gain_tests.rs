@@ -1,16 +1,15 @@
-//! I0 Gain probe oracles (Issue #177 Stage 2 / I0; ADR-PBK-002 D14.11).
-//! These tests ground the frozen processing seam — decode-worker
-//! staging, between `read_frames` and the PcmEdge write — with the
-//! disposable scalar-Gain probe of [`crate::gain_probe`], through the
-//! REAL Playback Session composition over the mechanism doubles.
-//!
-//! What these tests prove is the seam, not a DSP framework: the probe is
-//! experiment-only evidence (deleted with I0), and every oracle here is
-//! a D14.11 semantic requirement — unity/half/zero exactness, frame and
-//! format conservation, EOF tail-freedom, partial edge acceptance of
-//! processed blocks, seek RefusedUnchanged/Applied obligations on
-//! processed staging and processed remainder, pause continuity, and the
-//! D11 failure route with a truthful processing-origin diagnostic.
+//! Episode Audio Processing oracles — production Gain (Issue #177
+//! Stage 2 / I1; ADR-PBK-002 D14.11). These tests preserve the I0 probe
+//! oracles in production form: the config-carrying
+//! `playback_session_spec_with_processing` composition arms the REAL
+//! episode-owned processing runtime (no test-global arming, no
+//! experiment scaffolding), and every oracle remains a D14.11 semantic
+//! requirement — unity/half/zero exactness, frame and format
+//! conservation, EOF tail-freedom, partial edge acceptance of processed
+//! blocks, seek RefusedUnchanged/Applied obligations on processed
+//! staging and processed remainder, pause continuity, bypass
+//! transparency, configuration establishment, and the D11 failure route
+//! with a truthful processing-origin diagnostic.
 //!
 //! The exactness argument for `==` oracles (no float tolerance): the
 //! decode double tags frame `i` with `i as f32` — exact for
@@ -25,11 +24,14 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use qianqian_app::QianqianApp;
-use qianqian_audio_api::ports::ProviderSeekOutcome;
+use qianqian_audio_api::ports::{PcmDecode, ProviderSeekOutcome};
 use qianqian_composition::{DesiredEntry, Revision};
 
-use crate::gain_probe;
+use crate::completion::SessionCompletion;
+use crate::edge::PcmEdge;
 use crate::handle::{EpisodeTerminalOutcome, PlaybackSessionHandle};
+use crate::processing::{AudioProcessingConfig, EpisodeProcessing};
+use crate::session::decode_worker;
 use crate::test_common::{self, OutputBehavior, SourceBehavior, TestDecode, TestOutput, within};
 
 const DUMMY_PATH: &str = "test://gain-probe";
@@ -68,10 +70,12 @@ fn desired(id: &str, component: &'static str) -> DesiredEntry {
 }
 
 /// Register the standard probe episode: a decode double, an output
-/// double sharing the caller's witnesses, and the real session.
+/// double sharing the caller's witnesses, and the real session carrying
+/// the caller's desired Audio Processing configuration.
 fn registered_runtime(
     decode: TestDecode,
     output: OutputBehavior,
+    processing: AudioProcessingConfig,
     witnesses: &Witnesses,
     handle: PlaybackSessionHandle,
 ) -> QianqianApp {
@@ -113,9 +117,10 @@ fn registered_runtime(
         .expect("output provider registers");
 
     runtime
-        .register_component(crate::playback_session_spec(
+        .register_component(crate::playback_session_spec_with_processing(
             std::path::PathBuf::from(DUMMY_PATH),
             handle,
+            processing,
         ))
         .expect("session registers");
     runtime
@@ -123,11 +128,11 @@ fn registered_runtime(
 
 /// The standard episode: a position-tagged source of `source_frames`
 /// frames played by the given output double, with the standard witness
-/// set. Arm the probe BEFORE calling this (the worker starts on
-/// activation).
+/// set and the given desired Audio Processing configuration.
 fn episode(
     source_frames: usize,
     output: OutputBehavior,
+    processing: AudioProcessingConfig,
     seeks: Vec<ProviderSeekOutcome>,
 ) -> (Witnesses, PlaybackSessionHandle, QianqianApp) {
     let witnesses = Witnesses::new();
@@ -139,6 +144,7 @@ fn episode(
             seeks,
         },
         output,
+        processing,
         &witnesses,
         handle.clone(),
     );
@@ -201,22 +207,22 @@ fn discontinuities(values: &[f32], factor: f32) -> Vec<usize> {
 // --- seek / discontinuity oracles (D14.5 extended to processed PCM) ------
 
 /// RefusedUnchanged with processed PCM in flight: the preserved remainder
-/// of the interrupted staging block is already PROCESSED (the probe runs
-/// before the edge write), and the refusal must finish it exactly once —
-/// the consumed stream is indistinguishable from the no-seek control,
-/// frame for frame. A reprocessed remainder would show a ×0.25 stretch
-/// (an extra discontinuity and wrong values); a dropped one would shift
-/// every later frame; both fail the exact oracle.
+/// of the interrupted staging block is already PROCESSED (the production
+/// stage runs before the edge write), and the refusal must finish it
+/// exactly once — the consumed stream is indistinguishable from the
+/// no-seek control, frame for frame. A reprocessed remainder would show
+/// a ×0.25 stretch (an extra discontinuity and wrong values); a dropped
+/// one would shift every later frame; both fail the exact oracle.
 #[test]
 fn a_refused_seek_finishes_its_processed_remainder_exactly_once() {
     let _lifecycle = test_common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
-        let _probe = gain_probe::arm(0.5);
         let (witnesses, handle, mut runtime) = episode(
             EIGHT_SECONDS,
             OutputBehavior::SlowConsume {
                 per_read: Duration::from_millis(1),
             },
+            AudioProcessingConfig::gain(0.5),
             vec![ProviderSeekOutcome::RefusedUnchanged],
         );
         wait_until(Duration::from_secs(5), || {
@@ -255,13 +261,13 @@ fn a_refused_seek_finishes_its_processed_remainder_exactly_once() {
 fn an_applied_seek_discards_the_processed_remainder_and_cuts_cleanly() {
     let _lifecycle = test_common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
-        let _probe = gain_probe::arm(0.5);
         let five_seconds = 5 * TEST_RATE;
         let (witnesses, handle, mut runtime) = episode(
             EIGHT_SECONDS,
             OutputBehavior::SlowConsume {
                 per_read: Duration::from_millis(1),
             },
+            AudioProcessingConfig::gain(0.5),
             Vec::new(),
         );
         wait_until(Duration::from_secs(5), || {
@@ -299,10 +305,10 @@ fn an_applied_seek_discards_the_processed_remainder_and_cuts_cleanly() {
             "the cut must land exactly at the provider's ACTUAL landing \
              (the landing's first processed sample)"
         );
-        // Both stretches are exactly the source scaled by the probe: the
-        // pre-cut stretch from source frame 0, the post-cut stretch from
-        // the landing (the skipped stretch between them is what a seek
-        // IS).
+        // Both stretches are exactly the source scaled by the episode's
+        // gain: the pre-cut stretch from source frame 0, the post-cut
+        // stretch from the landing (the skipped stretch between them is
+        // what a seek IS).
         assert_processed_exactly(&values[..breaks[0]], 0.5, breaks[0]);
         let after = &values[breaks[0]..];
         for (offset, value) in after.iter().enumerate() {
@@ -322,20 +328,21 @@ fn an_applied_seek_discards_the_processed_remainder_and_cuts_cleanly() {
 /// Pause/resume through the real gate with processed PCM in flight: the
 /// Paused projection establishes from the current engagement's tail
 /// quiescence, resume releases it, and the consumed stream after the
-/// cycle is still exactly the source scaled by the probe — no reset, no
-/// duplicated stretch, no gap. (The probe is stateless, so the oracle
-/// pins the pipeline continuity pause must not disturb.)
+/// cycle is still exactly the source scaled by the episode's gain — no
+/// reset, no duplicated stretch, no gap. (Gain is stateless, so the
+/// oracle pins the pipeline continuity pause must not disturb; the
+/// stateful counterpart is I2's StatefulProbe.)
 #[test]
 fn a_pause_resume_cycle_preserves_the_processed_stream() {
     let _lifecycle = test_common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
-        let _probe = gain_probe::arm(0.5);
         let source_frames = TEST_RATE * 4;
         let (witnesses, handle, mut runtime) = episode(
             source_frames,
             OutputBehavior::SlowConsume {
                 per_read: Duration::from_millis(1),
             },
+            AudioProcessingConfig::gain(0.5),
             Vec::new(),
         );
         wait_until(Duration::from_secs(5), || {
@@ -370,68 +377,94 @@ fn a_pause_resume_cycle_preserves_the_processed_stream() {
 
 // --- failure semantics (D14.11: D11 Failed, truthful origin) ------------
 
-/// The synthetic unrecoverable processing failure settles through the
-/// EXISTING D11 `Failed` terminal class — no new public variant — with a
-/// diagnostic that stays truthful about its processing origin: it names
-/// the processing stage and never masquerades as a decode failure merely
-/// because both run on the decode worker. The episode stops producing
-/// for good and the terminal withdraws the position projection.
+/// The unrecoverable processing failure settles through the EXISTING D11
+/// `Failed` terminal class — no new public variant — with a diagnostic
+/// that stays truthful about its processing origin: it names the
+/// processing stage and never masquerades as a decode failure merely
+/// because both run on the decode worker. The route driven here is the
+/// production route end-to-end: the real `decode_worker`, the real
+/// completion publication, the real settlement.
+///
+/// The failing processor is the test-only `EpisodeProcessing::TestFailing`
+/// state: Scalar Gain itself cannot fail, so no product configuration can
+/// reach the failure, and the cfg(test) variant exists precisely so the
+/// production ROUTE stays exercised (it never ships). The white-box
+/// construction (worker spawned directly over the mechanism doubles)
+/// changes nothing the route depends on: worker code, publication
+/// discipline and settlement are the production paths.
 #[test]
 fn a_processing_failure_takes_the_d11_failed_route_with_a_truthful_diagnostic() {
     let _lifecycle = test_common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
-        let _probe = gain_probe::arm_failure_after_block(0.5, 3);
-        let (witnesses, handle, mut runtime) =
-            episode(EIGHT_SECONDS, OutputBehavior::Consume, Vec::new());
+        let decode = TestDecode {
+            behavior: SourceBehavior::EofAfter(EIGHT_SECONDS),
+            duration: None,
+            seeks: Vec::new(),
+        };
+        let stream = decode
+            .open_media(std::path::Path::new(DUMMY_PATH))
+            .expect("decode double opens");
+        let edge = Arc::new(PcmEdge::new(2, 8192));
+        let completion = SessionCompletion::new();
+        // Three staging blocks are processed honestly, then the
+        // processor reports the synthetic unrecoverable failure — the
+        // steady-path failure shape, not a first-block edge case.
+        let processing = EpisodeProcessing::TestFailing {
+            fail_after_block: 3,
+            seen: 0,
+        };
+        let worker = {
+            let edge = edge.clone();
+            let completion = completion.clone();
+            std::thread::Builder::new()
+                .name("qianqian-decode".into())
+                .spawn(move || decode_worker(stream, edge, completion, 1024, processing))
+                .expect("worker spawns")
+        };
+
         assert_eq!(
-            handle.wait_terminal(),
-            EpisodeTerminalOutcome::Failed,
-            "an unrecoverable processing failure is the existing D11 Failed"
+            completion.wait_terminal(),
+            crate::completion::SessionOutcome::Failed {
+                stage: "processing: synthetic processing failure at staging block 3".to_owned()
+            },
+            "an unrecoverable processing failure is the existing D11 Failed, \
+             with a diagnostic that names the processing origin"
         );
-        let observation = handle.observe();
-        let diagnostic = observation
-            .failure_diagnostic
-            .as_deref()
-            .expect("a failed episode carries its presentation diagnostic");
-        assert!(
-            diagnostic.starts_with("processing: "),
-            "the diagnostic's stage must name the processing origin: {diagnostic}"
-        );
-        assert!(
-            !diagnostic.contains("decode"),
-            "a processing failure must not masquerade as a decode failure: {diagnostic}"
-        );
-        // The failed episode never resumes production.
-        let stopped_at = witnesses.consumed.load(Ordering::SeqCst);
-        std::thread::sleep(Duration::from_millis(300));
+        worker.join().expect("the worker exits after the failure");
         assert_eq!(
-            witnesses.consumed.load(Ordering::SeqCst),
-            stopped_at,
-            "a failed episode must never resume production"
+            edge.terminal(),
+            crate::edge::EdgeTerminal::Failed,
+            "the data plane is failed: no leg can consume past a failed \
+             processor"
         );
-        assert!(
-            handle.observe().position.is_none(),
-            "the terminal Fact withdraws the projection"
+        // The public terminal vocabulary is unchanged: the crate-internal
+        // observation splits the settled outcome into the stable semantic
+        // triple.
+        assert_eq!(
+            completion.observe_snapshot().terminal_outcome,
+            Some(EpisodeTerminalOutcome::Failed)
         );
-        let snapshot = runtime.dispose().snapshot;
-        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
 }
 
 // --- negative controls (the oracles must be able to FAIL) ---------------
 
-/// Negative control, omission class: with the seam producing unprocessed
-/// audio (probe disarmed — the same shape as "skip Gain entirely"), the
-/// half-gain oracle MUST reject the stream. A green suite whose oracle
-/// cannot fail here would prove nothing about the seam.
+/// Negative control, omission class: with the episode configured BYPASS
+/// (the transparent pass-through — the same observable shape as "skip
+/// Gain entirely"), the half-gain oracle MUST reject the stream. A green
+/// suite whose oracle cannot fail here would prove nothing about the
+/// seam.
 #[test]
 fn negative_control_the_half_gain_oracle_rejects_a_skipped_seam() {
     let _lifecycle = test_common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
-        // No arm(): the staging blocks reach the edge unprocessed.
         let source_frames = 20_000;
-        let (witnesses, handle, mut runtime) =
-            episode(source_frames, OutputBehavior::Consume, Vec::new());
+        let (witnesses, handle, mut runtime) = episode(
+            source_frames,
+            OutputBehavior::Consume,
+            AudioProcessingConfig::BYPASS,
+            Vec::new(),
+        );
         assert_eq!(
             handle.wait_terminal(),
             EpisodeTerminalOutcome::Completed,
@@ -452,36 +485,49 @@ fn negative_control_the_half_gain_oracle_rejects_a_skipped_seam() {
     });
 }
 
-/// Negative control, double-application class: a seam that scales every
-/// staging block twice (content ×0.25) MUST be rejected by the same
-/// half-gain oracle. Processing must happen exactly once per block.
+/// Negative control, double-application class: content carrying the
+/// ×factor² signature MUST be rejected by the half-gain oracle.
+///
+/// The double-application failure mode of THIS seam is "the staging
+/// block is processed more than once", and its exact signature through
+/// the real pipeline is `frame_index × factor²` (the decode double's
+/// position tagging and both factors are IEEE-exact, so a seam that
+/// applied 0.5 twice would emit EXACTLY `i × 0.25`). The episode below
+/// drives the real production seam with gain 0.25 — producing that
+/// exact signature through the identical worker/staging/edge path —
+/// and the oracle must reject it. Together with the positive oracles
+/// (which pin `i × 0.5` through the same path), exactly-once is
+/// established: a double-applied seam cannot pass, and the signature is
+/// proven detectable rather than vacuously tolerated.
 #[test]
-fn negative_control_the_half_gain_oracle_rejects_double_applied_gain() {
+fn negative_control_the_gain_oracle_rejects_the_double_applied_signature() {
     let _lifecycle = test_common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
-        let _probe = gain_probe::arm_double_apply(0.5);
         let source_frames = 20_000;
-        let (witnesses, handle, mut runtime) =
-            episode(source_frames, OutputBehavior::Consume, Vec::new());
+        let (witnesses, handle, mut runtime) = episode(
+            source_frames,
+            OutputBehavior::Consume,
+            AudioProcessingConfig::gain(0.25),
+            Vec::new(),
+        );
         assert_eq!(
             handle.wait_terminal(),
             EpisodeTerminalOutcome::Completed,
-            "precondition: the double-applied episode itself completes"
+            "precondition: the ×factor²-signature episode itself completes"
         );
         let values = witnesses.content();
+        // The witness of the signature: frame 1 is exactly 1 × 0.25 —
+        // the value a double-applied 0.5 seam would have produced.
+        assert_eq!(values[1], 0.25, "precondition: content is ×0.25");
         let rejected = catch_unwind(AssertUnwindSafe(|| {
             assert_processed_exactly(&values, 0.5, source_frames);
         }))
         .is_err();
         assert!(
             rejected,
-            "the half-gain oracle must REJECT double-applied processing — \
-             exactly-once is part of the seam contract"
+            "the half-gain oracle must REJECT the double-applied \
+             signature — exactly-once is part of the seam contract"
         );
-        // The witness of HOW it failed: the content is ×0.25, i.e. the
-        // mutation really ran (not an accidental pass through unprocessed
-        // audio, which the omission control already covers).
-        assert_eq!(values[1], 0.25, "precondition: content is ×0.25");
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });
@@ -489,27 +535,26 @@ fn negative_control_the_half_gain_oracle_rejects_double_applied_gain() {
 
 // --- realtime posture of the exercised path -----------------------------
 
-/// I0.7: the exercised Gain path performs zero steady-state allocation —
+/// I1: the production Gain stage performs zero steady-state allocation —
 /// measured, not claimed, with the crate's counting allocator over the
 /// staging-sized block the worker feeds (the in-place multiply touches
-/// only the caller's buffer and the probe's atomics). The other firewall
-/// rows are structural, not measurable: no capability/context resolve,
-/// no dispatch, no K0 work, no I/O exist anywhere in `probe_stage`.
+/// only the caller's buffer). The other firewall rows are structural,
+/// not measurable: no capability/context resolve, no dispatch, no K0
+/// work, no I/O exist anywhere in `EpisodeProcessing::stage`.
 #[test]
 fn steady_state_processing_allocates_zero() {
-    // The probe state is process-global: every armed window — including
-    // this direct measurement, which never spawns an episode — holds the
-    // lifecycle lock so no other armed test's worker can observe it.
-    let _lifecycle = test_common::lifecycle_lock();
-    let _probe = gain_probe::arm(0.5);
+    let mut processing =
+        EpisodeProcessing::new(&AudioProcessingConfig::gain(0.5)).expect("valid config");
     let mut block = vec![0.25f32; 1024 * 2];
     // Warm the path once outside the window (first-touch page faults and
     // any one-time lazy state are not steady-state processing).
-    gain_probe::probe_stage(&mut block).expect("warm-up stage succeeds");
+    processing
+        .stage(&mut block)
+        .expect("warm-up stage succeeds");
     let (_, allocations) =
         crate::edge_lifecycle_tests::counting_allocator::run_counting_allocations(|| {
             for _ in 0..10_000 {
-                gain_probe::probe_stage(&mut block).expect("stage succeeds");
+                processing.stage(&mut block).expect("stage succeeds");
             }
         });
     assert_eq!(
@@ -526,10 +571,13 @@ fn steady_state_processing_allocates_zero() {
 fn unity_gain_preserves_samples_bit_exact() {
     let _lifecycle = test_common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
-        let _probe = gain_probe::arm(1.0);
         let source_frames = 20_000;
-        let (witnesses, handle, mut runtime) =
-            episode(source_frames, OutputBehavior::Consume, Vec::new());
+        let (witnesses, handle, mut runtime) = episode(
+            source_frames,
+            OutputBehavior::Consume,
+            AudioProcessingConfig::gain(1.0),
+            Vec::new(),
+        );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         assert_processed_exactly(&witnesses.content(), 1.0, source_frames);
         let snapshot = runtime.dispose().snapshot;
@@ -544,10 +592,13 @@ fn unity_gain_preserves_samples_bit_exact() {
 fn zero_gain_is_silence_with_frame_conservation() {
     let _lifecycle = test_common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
-        let _probe = gain_probe::arm(0.0);
         let source_frames = 20_000;
-        let (witnesses, handle, mut runtime) =
-            episode(source_frames, OutputBehavior::Consume, Vec::new());
+        let (witnesses, handle, mut runtime) = episode(
+            source_frames,
+            OutputBehavior::Consume,
+            AudioProcessingConfig::gain(0.0),
+            Vec::new(),
+        );
         assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
         assert_processed_exactly(&witnesses.content(), 0.0, source_frames);
         let snapshot = runtime.dispose().snapshot;
@@ -557,24 +608,26 @@ fn zero_gain_is_silence_with_frame_conservation() {
 
 // --- the seam tracer -----------------------------------------------------
 
-/// The I0 tracer bullet: half gain through the REAL decode-worker
-/// staging seam. Two seconds of source — far past the 8192-frame edge
-/// capacity — with a slow consumer, so the producer runs its bounded-
-/// slice write loop against a full edge: partial edge acceptance of
-/// already-processed blocks is structural here, not incidental. The
-/// exact oracle leaves no room for a wrong seam: any skipped, doubled,
-/// dropped or reprocessed staging content fails the frame-index check.
+/// The I1 tracer bullet: half gain through the REAL decode-worker
+/// staging seam of the production composition. Two seconds of source —
+/// far past the 8192-frame edge capacity — with a slow consumer, so the
+/// producer runs its bounded-slice write loop against a full edge:
+/// partial edge acceptance of already-processed blocks is structural
+/// here, not incidental. The exact oracle leaves no room for a wrong
+/// seam: any skipped, doubled, dropped or reprocessed staging content
+/// fails the frame-index check. Format conservation is pinned on the
+/// same episode: processing must not disturb the source format.
 #[test]
 fn half_gain_processes_the_real_staging_seam() {
     let _lifecycle = test_common::lifecycle_lock();
     within(Duration::from_secs(30), move || {
-        let _probe = gain_probe::arm(0.5);
         let source_frames = TEST_RATE * 2;
         let (witnesses, handle, mut runtime) = episode(
             source_frames,
             OutputBehavior::SlowConsume {
                 per_read: Duration::from_millis(1),
             },
+            AudioProcessingConfig::gain(0.5),
             Vec::new(),
         );
         assert_eq!(
@@ -589,6 +642,97 @@ fn half_gain_processes_the_real_staging_seam() {
             Some(test_common::TEST_FORMAT),
             "format conservation: processing must not disturb the source format"
         );
+        let snapshot = runtime.dispose().snapshot;
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+// --- configuration establishment ----------------------------------------
+
+/// BYPASS is transparent bit-for-bit through the full composition: an
+/// episode established with `enabled: false` and an INERT non-unity
+/// gain delivers the raw source untouched (bypass is a configuration,
+/// not a processor that runs and does nothing).
+#[test]
+fn bypass_ignores_the_gain_field_and_passes_the_source_through() {
+    let _lifecycle = test_common::lifecycle_lock();
+    within(Duration::from_secs(30), move || {
+        let source_frames = 20_000;
+        let (witnesses, handle, mut runtime) = episode(
+            source_frames,
+            OutputBehavior::Consume,
+            AudioProcessingConfig {
+                enabled: false,
+                gain: 0.5,
+            },
+            Vec::new(),
+        );
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert_processed_exactly(&witnesses.content(), 1.0, source_frames);
+        let snapshot = runtime.dispose().snapshot;
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// An invalid desired configuration (NaN / ±Inf / negative gain) fails
+/// the EPISODE ESTABLISHMENT cleanly: the activation raises with a
+/// truthful diagnostic, `activation_error` carries it, and NO terminal
+/// Fact is forged — an episode that never started has no terminal
+/// outcome (D11 activation firewall).
+#[test]
+fn an_invalid_processing_config_fails_establishment_without_a_terminal_fact() {
+    let _lifecycle = test_common::lifecycle_lock();
+    within(Duration::from_secs(30), move || {
+        for gain in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.5] {
+            let (witnesses, handle, mut runtime) = episode(
+                20_000,
+                OutputBehavior::Consume,
+                AudioProcessingConfig::gain(gain),
+                Vec::new(),
+            );
+            let observation = handle.observe();
+            let error = observation
+                .activation_error
+                .as_deref()
+                .unwrap_or_else(|| panic!("gain {gain}: the activation must raise"));
+            assert!(
+                error.contains("audio processing configuration invalid"),
+                "gain {gain}: the diagnostic must name the establishment \
+                 failure: {error}"
+            );
+            assert_eq!(
+                observation.terminal_outcome, None,
+                "gain {gain}: a never-started episode must not forge a \
+                 terminal Fact"
+            );
+            assert!(
+                witnesses.consumed.load(Ordering::SeqCst) == 0,
+                "gain {gain}: a failed establishment never produces audio"
+            );
+            let snapshot = runtime.dispose().snapshot;
+            assert!(snapshot.quiet, "gain {gain}: teardown must stay quiet");
+        }
+    });
+}
+
+/// Positive gain above unity is documented, not clipped, end-to-end:
+/// with gain 2.0 the consumed stream is exactly `frame_index × 2.0` —
+/// values ABOVE ±1.0 travel the whole pipeline (the processing stage
+/// does not clip or limit; the device owns out-of-range behavior, which
+/// the mechanism doubles do not model).
+#[test]
+fn positive_gain_above_unity_is_not_clipped() {
+    let _lifecycle = test_common::lifecycle_lock();
+    within(Duration::from_secs(30), move || {
+        let source_frames = 20_000;
+        let (witnesses, handle, mut runtime) = episode(
+            source_frames,
+            OutputBehavior::Consume,
+            AudioProcessingConfig::gain(2.0),
+            Vec::new(),
+        );
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert_processed_exactly(&witnesses.content(), 2.0, source_frames);
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
     });

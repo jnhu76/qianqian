@@ -175,9 +175,10 @@ EXPORT_RULES = {
     "crates/qianqian-playback/src/lib.rs": {
         "allowed_root_public": [
             "pub use handle::{\n    EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,\n};",
-            "pub use session::playback_session_spec;",
+            "pub use session::{playback_session_spec, playback_session_spec_with_processing};",
+            "pub use processing::AudioProcessingConfig;",
         ],
-        "authority": "ADR-PBK-002 D6/D14.2/D14.3/D14.7 — the admitted public surface is exactly the F2 episode seam (extended by the D14.7 F3 pause fields/commands, whose spelling is representation); the episode mechanism is session-owned, not product API",
+        "authority": "ADR-PBK-002 D6/D14.2/D14.3/D14.7 — the admitted public surface is exactly the F2 episode seam (extended by the D14.7 F3 pause fields/commands, whose spelling is representation); the episode mechanism is session-owned, not product API. Extended 2026-10-02 (Issue #177 I1, D14.11): the desired Audio Processing configuration's establishment handoff — the `AudioProcessingConfig` payload and the `playback_session_spec_with_processing` constructor — is the application/product-control owner's one product seam for it; the processing runtime itself stays session-owned and crate-private",
     },
     # The rights freeze behind the lib.rs re-exports (review round 3):
     # an exported type's pub methods/fields live here, not in lib.rs, so

@@ -47,11 +47,12 @@
 //! the outcome memoizes on first settlement, so do not re-use a
 //! completion across a retried or restarted episode.
 //!
-//! Outcome precedence, stated once here: a published decode failure
-//! dominates everything (it is checked first and is not relabelled by
-//! stop intent); otherwise the drain verdict plus the worker's exit
-//! terminal decide, with recorded stop intent disambiguating an aborted
-//! drain between a user stop and a device failure.
+//! Outcome precedence, stated once here: a published worker-side failure
+//! (decode or audio processing, first publication wins) dominates
+//! everything (it is checked first and is not relabelled by stop intent);
+//! otherwise the drain verdict plus the worker's exit terminal decide,
+//! with recorded stop intent disambiguating an aborted drain between a
+//! user stop and a device failure.
 
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
@@ -96,25 +97,55 @@ impl SessionOutcome {
     }
 }
 
+/// Which worker-side leg published the first unrecoverable failure
+/// (ADR-PBK-002 D14.11: the internal diagnosis must stay truthful about
+/// the failure's origin — a processing failure must not masquerade as a
+/// decode failure merely because the current execution placement shares
+/// the decode worker thread). Crate-internal diagnostic vocabulary:
+/// never a semantic terminal variant, never public surface.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum WorkerFailureOrigin {
+    /// The decode endpoint/worker itself failed (D14.5's
+    /// MutatedThenFailed route included).
+    Decode,
+    /// The AUDIO PROCESSING stage failed (D14.11).
+    Processing,
+}
+
+/// One worker-side failure record: the FIRST unrecoverable failure
+/// publication on the worker leg — origin and diagnostic together.
+/// First-wins is the whole arbitration contract (the worker leg's
+/// failure publications are sequential on the one worker thread, so the
+/// guard is defensive only): the first publication determines the
+/// diagnostic origin, and later worker-side failure publications cannot
+/// alter it. The public terminal stays the single D11 `Failed` class;
+/// only the stage spelling of the presentation diagnostic carries the
+/// origin.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct WorkerFailure {
+    origin: WorkerFailureOrigin,
+    diagnostic: String,
+}
+
+impl WorkerFailure {
+    /// The failure stage of the settled diagnostic — the truth-class
+    /// boundary presentation form (D14.2): `decode: …` or `processing:
+    /// …`, never a new public variant.
+    fn stage(&self) -> String {
+        match self.origin {
+            WorkerFailureOrigin::Decode => format!("decode: {}", self.diagnostic),
+            WorkerFailureOrigin::Processing => format!("processing: {}", self.diagnostic),
+        }
+    }
+}
+
 struct CompletionState {
     outcome: Option<SessionOutcome>,
     /// Terminal the decode worker observed on the edge at its exit.
     worker_terminal: Option<EdgeTerminal>,
-    decode_failure: Option<String>,
-    /// An AUDIO PROCESSING failure published by the decode worker
-    /// (ADR-PBK-002 D14.11): the same D11 `Failed` terminal class as
-    /// `decode_failure`, with its own evidence slot so the internal
-    /// diagnosis stays truthful about the failure's origin — a
-    /// processing failure must not masquerade as a decode failure merely
-    /// because the current execution placement shares the decode worker.
-    /// The stage spelling of the settled diagnostic ("processing: ...")
-    /// carries the distinction; the terminal vocabulary does not.
-    /// I0 scope: only the disposable Gain probe can produce a processing
-    /// failure, so the whole route is compiled in this crate's test
-    /// build only; production Gain (Issue #177 I1) earns the production
-    /// route with its first real consumer.
-    #[cfg(all(test, not(loom)))]
-    processing_failure: Option<String>,
+    /// The first worker-side unrecoverable failure (decode or audio
+    /// processing), if any. See [`WorkerFailure`].
+    worker_failure: Option<WorkerFailure>,
     /// The drain verdict, mirrored into the state by the session-owned
     /// observer installed on the DrainSignal (first wins). Mirroring
     /// keeps the resolver a pure function of the one lock-protected
@@ -330,9 +361,7 @@ impl SessionCompletion {
                     state: Mutex::new(CompletionState {
                         outcome: None,
                         worker_terminal: None,
-                        decode_failure: None,
-                        #[cfg(all(test, not(loom)))]
-                        processing_failure: None,
+                        worker_failure: None,
                         drain_verdict: None,
                         source_format: None,
                         source_duration: None,
@@ -419,33 +448,36 @@ impl SessionCompletion {
     }
 
     /// The decode worker (or its panic guard) reports a decode failure.
-    /// First failure wins; later calls are no-ops. The publication and
-    /// the settlement step run under one lock hold, inside this call.
+    /// The first worker-side failure publication — decode or processing
+    /// — wins ([`WorkerFailure`]); later calls are no-ops. The
+    /// publication and the settlement step run under one lock hold,
+    /// inside this call.
     pub(crate) fn decode_failed(&self, message: &str) {
-        self.publish(|state| {
-            if state.decode_failure.is_none() {
-                state.decode_failure = Some(message.to_owned());
-            }
-        });
+        self.publish_worker_failure(WorkerFailureOrigin::Decode, message);
     }
 
     /// The decode worker reports an AUDIO PROCESSING failure
     /// (ADR-PBK-002 D14.11): the same D11 `Failed` terminal class, via
-    /// its own publication so the internal diagnosis stays truthful
-    /// about the processing origin instead of borrowing the decode
-    /// label. First failure wins against the decode slot — worker-leg
-    /// failure publications are sequential on the one worker thread, so
-    /// the arbitration is defensive only. No bypass, no partial result:
-    /// a failed processor's output is not trustworthy.
-    ///
-    /// I0 scope: compiled in this crate's test build only — the
-    /// disposable Gain probe is the only publisher; production Gain
-    /// (Issue #177 I1) earns the production route.
-    #[cfg(all(test, not(loom)))]
+    /// the one worker-failure record with the processing origin, so the
+    /// internal diagnosis stays truthful instead of borrowing the decode
+    /// label. First worker-side failure publication wins — see
+    /// [`WorkerFailure`]. Production route (Issue #177 I1): the
+    /// episode-owned processing runtime's `stage` is the only publisher;
+    /// the worker routes the failure here and fails the edge. No
+    /// bypass, no partial result: a failed processor's output is not
+    /// trustworthy.
     pub(crate) fn processing_failed(&self, message: &str) {
+        self.publish_worker_failure(WorkerFailureOrigin::Processing, message);
+    }
+
+    /// The one worker-failure publication path (first wins).
+    fn publish_worker_failure(&self, origin: WorkerFailureOrigin, message: &str) {
         self.publish(|state| {
-            if state.decode_failure.is_none() && state.processing_failure.is_none() {
-                state.processing_failure = Some(message.to_owned());
+            if state.worker_failure.is_none() {
+                state.worker_failure = Some(WorkerFailure {
+                    origin,
+                    diagnostic: message.to_owned(),
+                });
             }
         });
     }
@@ -1191,18 +1223,12 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
     // Worker-side failure is authoritative over everything downstream:
     // the failure was published before the edge was failed. The stage
     // spelling keeps the origin truthful (D14.11): a decode failure and
-    // (where the processing route is compiled, see CompletionState) an
-    // audio-processing failure settle the same `Failed` terminal class
-    // through their own evidence slots.
-    if let Some(message) = &state.decode_failure {
+    // an audio-processing failure settle the same `Failed` terminal
+    // class through the one worker-failure record, each with its own
+    // origin spelling.
+    if let Some(failure) = &state.worker_failure {
         return Some(SessionOutcome::Failed {
-            stage: format!("decode: {message}"),
-        });
-    }
-    #[cfg(all(test, not(loom)))]
-    if let Some(message) = &state.processing_failure {
-        return Some(SessionOutcome::Failed {
-            stage: format!("processing: {message}"),
+            stage: failure.stage(),
         });
     }
     if state.worker_terminal == Some(EdgeTerminal::Failed) {
