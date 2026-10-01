@@ -410,10 +410,7 @@ mod tests {
     #[test]
     fn the_active_input_lines_and_status_stay_visible_on_a_short_terminal() {
         for (cols, rows) in [(120u16, 30u16), (120, 40)] {
-            for (modal, expected) in [
-                ("goto", "Go to: ["),
-                ("open", "Open: "),
-            ] {
+            for (modal, expected) in [("goto", "Go to: ["), ("open", "Open: ")] {
                 let mut model = TuiModel::new("song.flac");
                 model.set_episode(Some("D:\\media\\song.flac".to_owned()));
                 model.update(PlaybackSessionObservation {
@@ -450,9 +447,7 @@ mod tests {
                 let text = (0..buffer.area.height)
                     .map(|y| {
                         (0..buffer.area.width)
-                            .filter_map(|x| {
-                                buffer.cell((x, y)).map(|c| c.symbol().to_string())
-                            })
+                            .filter_map(|x| buffer.cell((x, y)).map(|c| c.symbol().to_string()))
                             .collect::<String>()
                     })
                     .collect::<Vec<_>>()
