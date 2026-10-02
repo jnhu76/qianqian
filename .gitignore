@@ -19,3 +19,8 @@ experiments/v-probe/target
 
 # Lefthook per-contributor local override (never commit)
 lefthook-local.yml
+
+# Python bytecode from the verification tooling (I5 review P2: a tracked
+# compiled artifact can silently diverge from its .py source)
+__pycache__/
+*.pyc
