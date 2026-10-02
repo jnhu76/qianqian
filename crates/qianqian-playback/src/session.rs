@@ -381,6 +381,11 @@ const WORKER_WAIT_SLICE: Duration = Duration::from_millis(2);
 /// implementations exist: [`EpisodeProcessing`] (production, D14.11
 /// case B) and, under cfg(test), the disposable live-transition probe
 /// (`live_probe::LiveProbeEngine`, campaign #190 D3).
+///
+/// NON-FREEZE: the trait's existence, the poll placement and this
+/// contract's wording are probe scaffold for the D3 campaign — they are
+/// NOT the frozen D14.11 live-update mechanism representation, which
+/// stays OPEN and is decided by the D4 production implementation.
 pub(crate) trait ProcessingRuntime: Send {
     /// The staging transform (D14.11): in place, frame-count
     /// preserving; `Err` is the unrecoverable processing failure
@@ -673,11 +678,14 @@ fn decode_worker<P: ProcessingRuntime>(
             }
 
             // --- live-update pickup (fresh-staging-block boundary) ---
-            // Reached only with the remainder flushed and no seek in
-            // flight, so an accepted transition can start on exactly one
-            // whole staging block that has not yet been DSP-processed —
-            // the apply boundary the live authority freezes (campaign
-            // #190 D3). Production processing never reports anything
+            // Reached only with the remainder flushed and no seek past
+            // the serialization point (an actionable/accepted cut or a
+            // resolved refusal; a merely observed, not-yet-actionable
+            // command does not block the pickup — the same D14.5
+            // production-continues principle), so an accepted transition
+            // starts on exactly one whole staging block that has not yet
+            // been DSP-processed — the apply boundary the live authority
+            // freezes (campaign #190 D3). Production processing never reports anything
             // here (poll_update's default); the cfg(test) live probe is
             // the only reporter. Some(Err) is a processing failure and
             // takes the ordinary D11 route; refusals are the probe's

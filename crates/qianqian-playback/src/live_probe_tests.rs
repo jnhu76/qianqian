@@ -162,7 +162,38 @@ fn expected_content(
     initial: &AudioProcessingConfig,
     transitions: &[(usize, AudioProcessingConfig, AudioProcessingConfig)],
 ) -> Vec<f32> {
-    let mut expected = vec![0.0f32; source_frames];
+    expected_interleaved(source_frames, transition_frames, initial, transitions)
+        .iter()
+        .step_by(2)
+        .copied()
+        .collect()
+}
+
+/// The channel-1 view of the same reference (the +0.5-tagged stream) —
+/// per-channel processing misapplication through a live transition fails
+/// here even when channel 0 looks right.
+fn expected_content_ch1(
+    source_frames: usize,
+    transition_frames: usize,
+    initial: &AudioProcessingConfig,
+    transitions: &[(usize, AudioProcessingConfig, AudioProcessingConfig)],
+) -> Vec<f32> {
+    expected_interleaved(source_frames, transition_frames, initial, transitions)
+        .into_iter()
+        .skip(1)
+        .step_by(2)
+        .collect()
+}
+
+/// The full expected INTERLEAVED content of a live episode, both
+/// channels independently carried through the same blend law.
+fn expected_interleaved(
+    source_frames: usize,
+    transition_frames: usize,
+    initial: &AudioProcessingConfig,
+    transitions: &[(usize, AudioProcessingConfig, AudioProcessingConfig)],
+) -> Vec<f32> {
+    let mut expected = vec![0.0f32; source_frames * 2];
     let mut prev_start = 0usize;
     let mut prev_total = 0usize;
     for &(start, ref old, ref new) in transitions.iter() {
@@ -180,8 +211,9 @@ fn expected_content(
             } else {
                 prev_total.min(start - prev_start)
             };
-            for (i, value) in warm.chunks(2).enumerate().skip(skip) {
-                expected[prev_start + i] = value[0];
+            for (i, frame) in warm.chunks(2).enumerate().skip(skip) {
+                expected[(prev_start + i) * 2] = frame[0];
+                expected[(prev_start + i) * 2 + 1] = frame[1];
             }
         }
         let mut old_tail = source_input(source_frames - start, start);
@@ -196,13 +228,16 @@ fn expected_content(
         let total = transition_frames;
         for i in start..(start + total).min(source_frames) {
             let w = blend_weight(i, start, total);
-            let a = old_tail[(i - start) * 2];
-            let b = new_tail[(i - start) * 2];
-            expected[i] = w.mul_add(a, (1.0 - w).mul_add(b, 0.0));
+            for c in 0..2 {
+                let a = old_tail[(i - start) * 2 + c];
+                let b = new_tail[(i - start) * 2 + c];
+                expected[i * 2 + c] = w.mul_add(a, (1.0 - w).mul_add(b, 0.0));
+            }
         }
         // Beyond the blend the new side IS the continuation.
         for i in (start + total).min(source_frames)..source_frames {
-            expected[i] = new_tail[(i - start) * 2];
+            expected[i * 2] = new_tail[(i - start) * 2];
+            expected[i * 2 + 1] = new_tail[(i - start) * 2 + 1];
         }
         prev_start = start;
         prev_total = transition_frames;
@@ -213,8 +248,9 @@ fn expected_content(
         let mut processor = EpisodeProcessing::new(initial, &format()).expect("compiles");
         let mut input = source_input(source_frames, 0);
         processor.stage(&mut input).expect("stages");
-        for (i, value) in input.chunks(2).enumerate() {
-            expected[i] = value[0];
+        for (i, frame) in input.chunks(2).enumerate() {
+            expected[i * 2] = frame[0];
+            expected[i * 2 + 1] = frame[1];
         }
     }
     expected
@@ -317,21 +353,44 @@ fn a_live_preset_switch_is_coherent_whole_block_and_bounded() {
             "pre-transition content must be bit-exactly the old \
                  configuration's continuation"
         );
-        // Transition + settle: the exact blend reference (f32
-        // rounding tolerance only).
-        for (i, (got, want)) in values[start..]
+        // Transition stretch: the exact blend reference (f32 rounding
+        // tolerance only — the blend arithmetic itself is the engine's).
+        let total = TEST_RATE / 10;
+        let blend_end = (start + total).min(EIGHT_SECONDS);
+        for (i, (got, want)) in values[start..blend_end]
             .iter()
-            .zip(expected[start..].iter())
+            .zip(expected[start..blend_end].iter())
             .enumerate()
         {
             let tolerance = 1e-4 * want.abs().max(1.0);
             assert!(
                 (got - want).abs() <= tolerance,
-                "frame {} (transition+{}): {got} vs expected blend {want}",
-                i + start,
-                i
+                "frame {} (transition+{i}): {got} vs expected blend {want}",
+                i + start
             );
         }
+        // Settled stretch: BIT-EXACTLY the fresh accepted configuration
+        // (the to-side kept at settle is exactly that instance —
+        // tolerance here could mask a weight or coefficient defect).
+        assert_eq!(
+            &values[blend_end..],
+            &expected[blend_end..],
+            "post-settle content must be bit-exactly the accepted \
+             configuration's continuation"
+        );
+        // Channel 1 rode the same law: compare its full content against
+        // the channel-1 reference view.
+        let expected_ch1 = expected_content_ch1(
+            EIGHT_SECONDS,
+            TEST_RATE / 10,
+            &initial,
+            &[(start, initial, desired)],
+        );
+        assert_eq!(
+            witnesses.content_ch1(),
+            expected_ch1,
+            "channel 1 must carry the identical transition law"
+        );
         let _ = runtime.dispose();
     });
 }
@@ -415,6 +474,19 @@ fn a_live_gain_transition_blends_exactly_on_both_channels() {
                 "frame {i}: {got} vs expected {want}"
             );
         }
+        // Channel 1: the same interpolated-gain law on the +0.5-tagged
+        // stream, independently.
+        let expected_ch1 = expected_content_ch1(
+            EIGHT_SECONDS,
+            TEST_RATE / 10,
+            &initial,
+            &[(start1, initial, down), (start2, down, initial)],
+        );
+        assert_eq!(
+            witnesses.content_ch1(),
+            expected_ch1,
+            "channel 1 must carry the identical interpolated-gain law"
+        );
         let _ = runtime.dispose();
     });
 }

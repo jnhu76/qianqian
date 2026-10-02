@@ -449,9 +449,12 @@ Settled         only the accepted configuration contributes; the settled
   fallback to a different sound.
 - *Apply boundary.* An accepted update takes effect at the next WHOLE
   staging block that has not yet been DSP-processed (the worker pickups
-  run after any preserved remainder is flushed and with no seek in
-  flight). The pre-boundary stream stays bit-exactly the old
-  configuration's continuation.
+  run after any preserved remainder is flushed and with no seek past the
+  serialization point — "in flight" means an actionable/accepted cut or
+  a resolved refusal; a merely observed, not-yet-actionable seek command
+  does not block the pickup, per the same D14.5
+  production-continues principle). The pre-boundary stream stays
+  bit-exactly the old configuration's continuation.
 - *Processed-remainder rule (non-negotiable).* Already-processed
   remainder PCM is written exactly as processed; an update MUST NOT
   reprocess it, mutate it, or retroactively re-sound it. The transition
@@ -464,10 +467,12 @@ Settled         only the accepted configuration contributes; the settled
   configuration started at the transition start. Gain changes are
   exactly the interpolated gain on the same input. Evaluated and
   rejected: instant switching (Model A — clicks at preset-scale jumps,
-  pinned by a negative control), per-sample parameter smoothing
-  (Model B — zipper risk at control-period boundaries and no exactness
-  oracle), state transformation (Model D — no robust standard recipe for
-  biquad state mapping between arbitrary configs). Transition durations
+  pinned by a negative control), parameter smoothing (Model B — its
+  intermediate parameter states correspond to no compiled
+  configuration, so the settled stream can never equal a fresh instance
+  of the accepted configuration and no exactness oracle exists),
+  state transformation (Model D — no robust standard recipe for biquad
+  state mapping between arbitrary configs). Transition durations
   are product tuning recorded with evidence, not authority.
 - *Rapid updates.* Deterministic policy: complete-in-flight,
   latest-wins pending slot of depth one. An accepted transition always
