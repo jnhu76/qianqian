@@ -2370,18 +2370,21 @@ fn an_update_near_completion_is_never_half_applied() {
 ///   post-landing tags (the frozen D14.5 order);
 /// - cut before the pickup: the landing restarts the source under the
 ///   fresh-applied OLD configuration (the pre-cut stretch is the pure
-///   tag stream), and the update's transition arms on a whole post-cut
-///   staging block: the Model C blend of that fresh old side against
-///   the new configuration from rest, anchored at the landing plus a
-///   whole number of 1024-frame staging blocks.
+///   tag ramp), and the update's transition arms on a whole post-cut
+///   staging block wherever the command commit landed — the Model C
+///   blend of that fresh old side against the new configuration from
+///   rest, verified as its own single-transition episode from the
+///   landing; an anchor at or past the consumed end is the inaudible
+///   (pure tag) member of the same family.
 ///
 /// Which of these occurs is decided by CONTENT against exact references,
 /// never by trusting the probe's transition-start frame as a consumed
-/// index: that frame is a PROCESSED-frames witness that can lead the
-/// consumed index by the one in-flight frame this geometry allows
-/// (pre-cut blocks are one paced frame and the edge is otherwise empty),
-/// so consumed-space references are verified over their small legal
-/// anchor candidate sets.
+/// index: that frame is a PROCESSED-frames witness. Outside a blend the
+/// applied configuration is the bit-exact identity here, so each
+/// reference's consumed blend anchor is DERIVED — one frame before the
+/// first index where the stream stops being the pure tag ramp — and no
+/// legal anchor (fast-region block, paced-region frame, or
+/// armed-but-inaudible) is assumed or enumerated.
 ///
 /// The landing is scripted to frame 0 (below the mock's total, so no
 /// clamping is involved), which makes a cut an UNAMBIGUOUS downward
@@ -2446,25 +2449,40 @@ fn a_merely_observed_seek_does_not_block_the_update_pickup() {
             "the accepted update is not a refusal"
         );
         // The consumed stream decides which legal ending occurred, and is
-        // verified as a MEMBER of the exact reference families those
-        // endings can legally produce. The engine's probe events are
-        // consistency evidence, not the classifier (see the module doc
-        // above for the anchor-candidate reasoning).
+        // verified against exact references whose consumed blend anchor
+        // is DERIVED FROM THE CONTENT (see the module doc above): the cut
+        // index is found first, the pre-cut stretch's blend onset second
+        // (the applied configuration outside a blend is the bit-exact
+        // identity, and a blend's first frame is the pure old side, so
+        // the anchor is one frame before the first index that stops
+        // being the pure tag ramp), and each ending's reference is built
+        // anchored there.
         let values = w.content();
         let invalidated = probe
             .events()
             .iter()
             .any(|e| matches!(e, LiveEvent::InvalidationDroppedTransition));
         const CUT_DROP_FLOOR: f32 = 1000.0;
-        // The processed-vs-consumed lead bound at the apply boundary in
-        // this geometry: pre-cut blocks are one paced frame and the edge
-        // is otherwise empty, so at most one staged frame is still
-        // in flight.
-        const MAX_INFLIGHT_LEAD: usize = 1;
-        // Post-cut staging blocks are whole 1024-frame reads in the
-        // landing's fast region.
-        const FAST_BLOCK: usize = 1024;
-        match (1..values.len()).find(|&i| values[i] < values[i - 1] - CUT_DROP_FLOOR) {
+        // Identity-prefix deviation threshold: the identity stretch is
+        // bit-exact, and the first blended frame already deviates by
+        // orders of magnitude more than this in both tag spaces (the
+        // pre-cut ramp sits near frame 5512, the post-cut ramp restarts
+        // at 0, where the fresh EQ's second sample is already 0.4 off).
+        const BLEND_ONSET_EPS: f32 = 1e-3;
+        let cut = (1..values.len()).find(|&i| values[i] < values[i - 1] - CUT_DROP_FLOOR);
+        let pre_scope = cut.unwrap_or(values.len());
+        let pre_onset = (1..pre_scope).find(|&i| (values[i] - i as f32).abs() > BLEND_ONSET_EPS);
+        let pre_anchor = match pre_onset {
+            Some(d) => d - 1,
+            None => pre_scope,
+        };
+        let continuation = expected_content(
+            values.len(),
+            64,
+            &initial,
+            &[(pre_anchor, initial, desired)],
+        );
+        match cut {
             None => {
                 // No audible cut: either no cut happened, or the stop
                 // consumed nothing past the landing. Both leave exactly
@@ -2472,75 +2490,60 @@ fn a_merely_observed_seek_does_not_block_the_update_pickup() {
                 // the stop found it — the discarded tail is invisible
                 // either way, so the invalidation event distinguishes
                 // nothing here.
-                let anchored = (start.saturating_sub(MAX_INFLIGHT_LEAD)..=start).any(|a| {
-                    values == expected_content(values.len(), 64, &initial, &[(a, initial, desired)])
-                });
-                assert!(
-                    anchored,
+                assert_eq!(
+                    values, continuation,
                     "no audible cut: the stream is not the ordinary \
-                         single-transition continuation at any legal \
-                         consumed anchor"
+                         single-transition continuation anchored at its \
+                         own content-derived blend onset"
                 );
             }
             Some(j) => {
-                let tail = values.len() - j;
                 // The fresh accepted configuration over the exact
-                // post-landing tags (used by BOTH cut families).
+                // post-landing tags (the cut landed the cursor at frame
+                // 0): the post-cut stretch of BOTH cut-at/after-pickup
+                // careers.
                 let mut fresh = EpisodeProcessing::new(&desired, &format()).expect("compiles");
-                let mut fresh_in = source_input(tail, 0);
+                let mut fresh_in = source_input(values.len() - j, 0);
                 fresh.stage(&mut fresh_in).expect("stages");
                 let fresh_landing: Vec<f32> = fresh_in.chunks(2).map(|f| f[0]).collect();
-                // The fresh-applied OLD configuration over the same tags
-                // (the cut invalidated all pre-cut signal-derived
-                // history): the gap before the pickup and the blend's
-                // from-side in the cut-before-pickup family.
-                let mut old_side = EpisodeProcessing::new(&initial, &format()).expect("compiles");
-                let mut old_tail = source_input(tail, 0);
-                old_side.stage(&mut old_tail).expect("stages");
-                let mut new_side = EpisodeProcessing::new(&desired, &format()).expect("compiles");
-                let mut new_tail = source_input(tail, 0);
-                new_side.stage(&mut new_tail).expect("stages");
 
                 // Cut at/after the pickup: the pickup ran before the cut
-                // became audible content (whether the cut then dropped an
-                // in-flight transition or landed after it had already
-                // settled). Pre-cut is the run's own transitioned
-                // continuation; the landing is a FRESH instance of the
-                // ACCEPTED configuration, bit-exactly (the frozen D14.5
-                // order).
-                let cut_after_pickup = (start.saturating_sub(MAX_INFLIGHT_LEAD)..=start).any(|a| {
-                    values[..j]
-                        == expected_content(values.len(), 64, &initial, &[(a, initial, desired)])
-                            [..j]
-                }) && values[j..] == fresh_landing.as_slice()[..];
+                // became audible content — whether the cut then dropped
+                // the in-flight transition or landed after it had already
+                // settled inside one staging block. Pre-cut is the run's
+                // own transitioned continuation (the blend anchored at
+                // the derived onset, possibly not yet onset within the
+                // consumed prefix); the landing is a FRESH instance of
+                // the ACCEPTED configuration, bit-exactly (the frozen
+                // D14.5 order).
+                let cut_after_pickup =
+                    values[..j] == continuation[..j] && values[j..] == fresh_landing.as_slice()[..];
 
                 // Cut before the pickup: the landing restarts the source
-                // under the fresh-applied OLD configuration (identity
-                // here — the pre-cut stretch is the pure tag stream), and
-                // the update's transition arms on a whole post-cut
-                // staging block. The pickup normally runs in the cut's
-                // own iteration (the poll sits at the fresh-block
-                // boundary, session.rs); a command commit delayed past
-                // the cutover wait can only let whole fresh-old blocks
-                // precede it.
-                let cut_before_pickup = (0..=(tail / FAST_BLOCK).min(4)).any(|m| {
-                    let anchor = j + m * FAST_BLOCK;
-                    values[j..].iter().enumerate().all(|(k, got)| {
-                        let i = j + k;
-                        let want = if i < anchor {
-                            old_tail[k * 2]
-                        } else if i < anchor + 64 {
-                            let wgt = blend_weight(i, anchor, 64);
-                            wgt.mul_add(old_tail[k * 2], (1.0 - wgt).mul_add(new_tail[k * 2], 0.0))
-                        } else {
-                            new_tail[k * 2]
-                        };
-                        (got - want).abs() <= 1e-4 * want.abs().max(1.0)
-                    })
-                }) && values[..j]
+                // under the fresh-applied OLD configuration (identity —
+                // the pre-cut stretch is the pure tag ramp), and the
+                // update's transition arms on a whole post-cut staging
+                // block wherever the command commit landed (the landing's
+                // fast region stages 1024-frame blocks, the paced region
+                // 1-frame blocks, and a pickup at or past the consumed
+                // end is inaudible). The post-cut stretch is verified as
+                // its own single-transition episode, anchored at its own
+                // content-derived blend onset — the from-rest-at-the-
+                // pickup law the reference helper implements.
+                let post = &values[j..];
+                let post_onset =
+                    (1..post.len()).find(|&i| (post[i] - i as f32).abs() > BLEND_ONSET_EPS);
+                let post_anchor = match post_onset {
+                    Some(d) => d - 1,
+                    None => post.len(),
+                };
+                let post_reference =
+                    expected_content(post.len(), 64, &initial, &[(post_anchor, initial, desired)]);
+                let cut_before_pickup = values[..j]
                     .iter()
                     .enumerate()
-                    .all(|(i, got)| *got == i as f32);
+                    .all(|(i, got)| *got == i as f32)
+                    && post == post_reference.as_slice();
                 if cut_before_pickup {
                     // The pickup ran after the cut, so no transition was
                     // in flight at the invalidation.
