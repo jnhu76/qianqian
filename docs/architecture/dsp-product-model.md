@@ -504,6 +504,41 @@ optional/mandatory final protection and listening defaults remain product
 policy to be decided with quantitative/native/listening evidence. They are not
 frozen here.
 
+### 9.1 Estimated steady-state EQ headroom guidance (HEADROOM_POLICY,
+### accepted 2026-10-02, Issue #190 D2)
+
+The smallest product improvement over a bare manual preamp is a
+**non-binding advisory**, not a protection mechanism:
+
+```text
+HEADROOM_POLICY              manual preamp + truthful advisory metadata
+HEADROOM_GUARANTEE_DOMAIN    the EQ cascade's steady-state
+                             frequency-response gain, grid-sampled
+                             (estimate), rate-aware (§2.1 active bands)
+FINAL_LIMITER                NOT_EARNED (no limiter, no soft clipper,
+                             no auto-headroom)
+```
+
+The advisory (`estimated_eq_headroom_guidance`) is a deterministic pure
+function of the desired EQ data and the source rate. Its frozen semantics:
+
+- it reports the attenuation (dB ≤ 0) that would place the available-band
+  cascade's largest grid-sampled steady-state gain at unity, plus the peak
+  location as presentation diagnostic;
+- it is an ESTIMATE on a dense log-frequency grid — never a closed-form
+  supremum and never a true-peak, arbitrary-signal or acoustic-loudness
+  guarantee (inter-sample peaks, transients and signal level itself are
+  outside its domain; the in-crate probe witnesses content that exceeds
+  unity under the advice);
+- the manual Preamp is NOT an input: the advice sits beside the user's own
+  headroom control and never silently mutates the desired configuration;
+- the D14.9 Output Volume structurally cannot enter the calculation;
+- `None` refuses to advise where the recipes cannot mean anything (zero
+  rate, non-finite data) instead of fabricating an answer;
+- desired configuration, applied configuration and advice remain three
+  distinct product concepts; applying the advice is always an explicit
+  product/user act on the preamp.
+
 ---
 
 ## 10. Persistence and compatibility — conditional authority
