@@ -275,12 +275,17 @@ EXPORT_RULES = {
             "pub position: Option<u64>,",
             "pub pause_engagement: PauseEngagement,",
             "pub activation_error: Option<String>,",
+            "pub last_processing_refusal: Option<String>,",
             "pub fn new() -> Self {",
             "pub fn request_stop(&self) {",
             "pub fn request_pause(&self) {",
             "pub fn request_resume(&self) {",
             "pub fn request_seek(&self, target: Duration) {",
             "pub fn request_output_level(&self, level: u8) {",
+            "pub fn set_processing_enabled(&self, enabled: bool) -> Result<(),",
+            "pub fn set_preamp(&self, factor: f32) -> Result<(),",
+            "pub fn set_eq_config(&self, eq: EqConfig) -> Result<(),",
+            "pub fn set_eq_preset(&self, preset: EqPreset) -> Result<(),",
             "pub fn observe(&self) -> PlaybackSessionObservation {",
             "pub fn wait_terminal(&self) -> EpisodeTerminalOutcome {",
             "pub fn paused(&self) -> bool {",
@@ -309,7 +314,16 @@ EXPORT_RULES = {
         "V-PROBE) adds exactly one command: `request_output_level(0..=100)` — the App's "
         "desired stream factor as an idempotent, non-terminal Command (clamped at the "
         "seam; routed into the session-owned OutputLevel cell; never a Fact, never a "
-        "mechanism readback — no volume getter may appear on this surface). A further new "
+        "mechanism readback — no volume getter may appear on this surface). The 2026-10-02 "
+        "live-admission amendment (Issue #190 D3/D4; dsp-product-model.md §7.3 + the "
+        "D14.11 LIVE-1/LIVE-2 notes) adds exactly the four typed live commands "
+        "set_processing_enabled/set_preamp/set_eq_config/set_eq_preset — each a WHOLE "
+        "typed desired-configuration Command under §7.3 coherent acceptance (no generic "
+        "parameter addressing; no ProcessorId/ParameterId/DspCommand may appear on this "
+        "surface) — plus exactly one observation field, `last_processing_refusal` "
+        "(mechanism evidence/diagnostic, the same truth class as failure_diagnostic; "
+        "never a Fact, never a correctness basis; the typed desired/applied read model "
+        "is D5's decision). A further new "
         "public right must first earn an explicit D14/phase-authority amendment, then "
         "update this allowlist on purpose",
     },

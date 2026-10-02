@@ -506,9 +506,20 @@ Settled         only the accepted configuration contributes; the settled
   same-thread, same-owner, episode-bounded state inside one worker —
   there is no cross-thread execution view to retire, so PBK-001 P1–P5
   are NOT triggered. This record does not authorize RCU, epochs, ArcSwap,
-  generic snapshots or a parameter bus; the production mechanism
-  representation stays OPEN (D14.11) and lands with the production
-  implementation.
+  generic snapshots or a parameter bus.
+- *Landed representation (2026-10-02, Issue #190 D4 — a record, not new
+  authority).* The production mechanism is exactly what this subsection
+  freezes, no more: one mutex-guarded product-control cell per episode
+  (desired whole configuration + depth-1 latest-wins pending slot + last
+  refusal diagnostic as mechanism evidence) reached through the handle's
+  four typed `set_*` commands (no generic parameter addressing), and one
+  episode-owned dual-processor runtime behind the existing
+  static-dispatch staging seam — the pickup reads the cell once per
+  whole staging block, compiles the accepted configuration against the
+  episode format there, and runs the Model C crossfade. Steady state
+  (no pending update) adds one uncontended lock per block and nothing
+  else; measured evidence lives in the D4 phase report. The transition
+  length is product tuning recorded with evidence, not authority.
 
 ---
 

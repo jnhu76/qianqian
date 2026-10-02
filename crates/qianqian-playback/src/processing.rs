@@ -6,7 +6,7 @@
 //! AudioProcessingConfig    the DESIRED product configuration, owned by
 //!                          the application/product-control layer and
 //!                          handed to the episode at establishment
-//! EpisodeProcessing        the APPLIED episode-fixed snapshot, owned by
+//! EpisodeProcessing        the APPLIED episode snapshot, owned by
 //!                          the Playback Session as a subordinate
 //!                          episode resource (the same D6 class as the
 //!                          decode endpoint / worker / PcmEdge)
@@ -28,23 +28,31 @@
 //! join by evidence under the same rules — the representation re-earns
 //! itself there, not here.
 //!
-//! Configuration is EPISODE-FIXED (the D14.11 four-way model, case B):
-//! the applied snapshot is built once at activation and never updated
-//! live. A changed desired configuration takes effect at the next
-//! episode's establishment. Live parameter update remains OPEN and
-//! unearned.
+//! Configuration binding (D14.11 as extended by the 2026-10-02
+//! live-admission amendment, dsp-product-model.md §7.3): the applied
+//! snapshot is compiled ONCE at activation from product-control's
+//! desired configuration, and the four §7.3 live-authorized operation
+//! classes (scalar preamp, 10-band GEQ band gains, factory-preset
+//! switch, processing enabled/bypass toggle) may then be applied live
+//! through the handle's typed `set_*` commands ([`crate::live`]: the
+//! depth-1 latest-wins pending cell and the Model C dual-processor
+//! crossfade). Everything else stays episode-fixed until separately
+//! earned.
 
 use qianqian_audio_api::ports::PcmFormat;
 
 /// The desired Audio Processing configuration (D14.11: application /
-/// product-control layer owns it; this type is only its transport into
-/// episode establishment — never K0 state, never a Capability payload,
-/// never SongCore, never an Output-backend concern).
+/// product-control layer owns it; this type is its transport into
+/// episode establishment and into the live `set_*` commands — never K0
+/// state, never a Capability payload, never SongCore, never an
+/// Output-backend concern).
 ///
-/// Validation happens at episode establishment: an invalid desired
-/// configuration fails the activation cleanly (`activation_error`) —
-/// it never silently clamps, substitutes defaults, or produces NaN
-/// audio (fail-closed, the same conservative posture as D14.11's
+/// Validation happens before acceptance: an invalid desired
+/// configuration fails the activation cleanly (`activation_error`) at
+/// establishment, and a live `set_*` command is REFUSED with an honest
+/// diagnostic (the old configuration keeps running bit-exactly) — it
+/// never silently clamps, substitutes defaults, or produces NaN audio
+/// (fail-closed, the same conservative posture as D14.11's
 /// "bypass/recovery not authorized").
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AudioProcessingConfig {

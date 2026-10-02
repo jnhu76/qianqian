@@ -1,9 +1,12 @@
-//! D3 live-transition oracles (campaign #190; ADR-PBK-002 D14.11
-//! live-update = OPEN until these probes earn it). Every test here
-//! drives the REAL Playback Session composition — the real decode
+//! Live Audio Processing oracles (campaign #190 D3 + D4). Every test
+//! here drives the REAL Playback Session composition — the real decode
 //! worker loop, staging placement, PcmEdge partial writes, seek/pause
-//! protocol and terminal settlement — with the disposable
-//! [`crate::live_probe::LiveProbeEngine`] at the processing seam.
+//! protocol and terminal settlement — with the PRODUCTION live
+//! mechanism ([`crate::live::LiveProcessing`] + [`ProcessingControl`])
+//! at the processing seam. The D3 oracles were retargeted from the
+//! disposable probe to this mechanism (the probe is deleted); the D4
+//! oracles add the typed application API, the production-path
+//! collisions and the performance/allocation evidence.
 //!
 //! Oracle style: the consumed content is compared against references
 //! computed from the position-tagged source (sample = frame index), so
@@ -20,12 +23,13 @@ use std::time::Duration;
 
 use qianqian_audio_api::ports::ProviderSeekOutcome;
 
-use crate::live_probe::{LiveProbeControl, ProbeEvent, probe_control};
+use crate::live::ProcessingControl;
+use crate::live::tap::{LiveEvent, LiveTap};
 use crate::presets::EqPreset;
 use crate::processing::AudioProcessingConfig;
 use crate::processing::EpisodeProcessing;
 use crate::processing_support::{DUMMY_PATH, EIGHT_SECONDS, TEST_RATE, Witnesses, wait_until};
-use crate::session::{EDGE_CAPACITY_FRAMES, STAGING_FRAMES, playback_session_spec_with_live_probe};
+use crate::session::{EDGE_CAPACITY_FRAMES, STAGING_FRAMES, playback_session_spec_with_live_tap};
 use crate::test_common::{self, OutputBehavior, SourceBehavior, TestDecode, TestOutput};
 
 fn preset_config(preset: EqPreset) -> AudioProcessingConfig {
@@ -40,8 +44,48 @@ fn format() -> qianqian_audio_api::ports::PcmFormat {
     test_common::TEST_FORMAT
 }
 
-/// A live-probe episode: the standard doubles + the real session
-/// carrying the [`crate::live_probe::LiveProbeEngine`] at the seam.
+/// The oracle harness over the production mechanism: the shared
+/// product-control cell (the same one the handle's typed `set_*`
+/// commands route into) plus the engine's instrumentation tap. The
+/// whole-config `request_update` below goes through the SAME coherent
+/// acceptance the typed commands use — one validation point, one
+/// latest-wins pending slot, one engine.
+struct LiveHarness {
+    control: Arc<ProcessingControl>,
+    tap: LiveTap,
+}
+
+impl LiveHarness {
+    /// Route a whole desired configuration exactly as a typed `set_*`
+    /// command does (coherent acceptance included).
+    fn request_update(&self, desired: AudioProcessingConfig) {
+        self.control
+            .route_whole(desired)
+            .expect("the oracle's update is intrinsically valid");
+    }
+
+    fn pending(&self) -> Option<AudioProcessingConfig> {
+        self.control.pending()
+    }
+
+    fn processed_frames(&self) -> usize {
+        self.tap.processed_frames()
+    }
+
+    fn events(&self) -> Vec<LiveEvent> {
+        self.tap.events()
+    }
+
+    /// The D3/D4 deliberate-defect knobs; the two newer D4 mutants are
+    /// armed explicitly by their own oracles.
+    fn arm_mutations(&self, keep_transition_on_invalidate: bool, wallclock_ramp: bool) {
+        self.tap
+            .arm(keep_transition_on_invalidate, wallclock_ramp, false);
+    }
+}
+
+/// A live episode: the standard doubles + the real session carrying the
+/// PRODUCTION live mechanism at the seam, with the oracle tap attached.
 #[allow(clippy::too_many_arguments)]
 fn live_episode(
     source_frames: usize,
@@ -52,16 +96,40 @@ fn live_episode(
 ) -> (
     Witnesses,
     crate::handle::PlaybackSessionHandle,
-    LiveProbeControl,
+    LiveHarness,
     qianqian_app::QianqianApp,
 ) {
-    let control = probe_control();
+    live_episode_source(
+        SourceBehavior::EofAfter(source_frames),
+        output,
+        initial,
+        transition_frames,
+        seeks,
+    )
+}
+
+/// [`live_episode`] with the caller choosing the decode source behavior
+/// (the pacing/fragmentation oracles).
+#[allow(clippy::too_many_arguments)]
+fn live_episode_source(
+    source: SourceBehavior,
+    output: OutputBehavior,
+    initial: AudioProcessingConfig,
+    transition_frames: usize,
+    seeks: Vec<ProviderSeekOutcome>,
+) -> (
+    Witnesses,
+    crate::handle::PlaybackSessionHandle,
+    LiveHarness,
+    qianqian_app::QianqianApp,
+) {
+    let tap = LiveTap::disarmed();
     let witnesses = Witnesses::new();
     let handle = crate::handle::PlaybackSessionHandle::new();
     let mut runtime = qianqian_app::QianqianApp::new();
 
     let decode = TestDecode {
-        behavior: SourceBehavior::EofAfter(source_frames),
+        behavior: source,
         duration: None,
         seeks,
     };
@@ -104,12 +172,12 @@ fn live_episode(
         .expect("output provider registers");
 
     runtime
-        .register_component(playback_session_spec_with_live_probe(
+        .register_component(playback_session_spec_with_live_tap(
             std::path::PathBuf::from(DUMMY_PATH),
             handle.clone(),
             initial,
             transition_frames,
-            control.clone(),
+            tap.clone(),
         ))
         .expect("session registers");
 
@@ -121,7 +189,11 @@ fn live_episode(
         ])
         .expect("composition is legal");
 
-    (witnesses, handle, control, runtime)
+    let harness = LiveHarness {
+        control: handle.completion.processing(),
+        tap,
+    };
+    (witnesses, handle, harness, runtime)
 }
 
 /// The source input stream, interleaved stereo, position-tagged exactly
@@ -260,21 +332,21 @@ const HALF_A_SECOND: u64 = 22_050;
 
 /// Wait until the probe reports its first transition started, and
 /// return the (start_frame, block) it recorded.
-fn wait_transition_started(control: &LiveProbeControl, limit: Duration) -> (usize, usize) {
+fn wait_transition_started(control: &LiveHarness, limit: Duration) -> (usize, usize) {
     assert!(
         wait_until(limit, || control
             .events()
             .iter()
-            .any(|e| matches!(e, ProbeEvent::TransitionStarted { .. }))),
+            .any(|e| matches!(e, LiveEvent::TransitionStarted { .. }))),
         "no transition ever started"
     );
     match control
         .events()
         .into_iter()
-        .find(|e| matches!(e, ProbeEvent::TransitionStarted { .. }))
+        .find(|e| matches!(e, LiveEvent::TransitionStarted { .. }))
         .expect("checked")
     {
-        ProbeEvent::TransitionStarted { at_frame, block } => (at_frame, block),
+        LiveEvent::TransitionStarted { at_frame, block } => (at_frame, block),
         _ => unreachable!("filtered"),
     }
 }
@@ -428,7 +500,7 @@ fn a_live_gain_transition_blends_exactly_on_both_channels() {
             wait_until(Duration::from_secs(5), || control
                 .events()
                 .iter()
-                .any(|e| matches!(e, ProbeEvent::TransitionCompleted { .. }))),
+                .any(|e| matches!(e, LiveEvent::TransitionCompleted { .. }))),
             "the first transition never settled"
         );
         control.request_update(initial);
@@ -437,7 +509,7 @@ fn a_live_gain_transition_blends_exactly_on_both_channels() {
                 control
                     .events()
                     .iter()
-                    .filter(|e| matches!(e, ProbeEvent::TransitionStarted { .. }))
+                    .filter(|e| matches!(e, LiveEvent::TransitionStarted { .. }))
                     .count()
                     >= 2
             }),
@@ -446,11 +518,11 @@ fn a_live_gain_transition_blends_exactly_on_both_channels() {
         let start2 = match control
             .events()
             .into_iter()
-            .filter(|e| matches!(e, ProbeEvent::TransitionStarted { .. }))
+            .filter(|e| matches!(e, LiveEvent::TransitionStarted { .. }))
             .nth(1)
             .expect("checked")
         {
-            ProbeEvent::TransitionStarted { at_frame, .. } => at_frame,
+            LiveEvent::TransitionStarted { at_frame, .. } => at_frame,
             _ => unreachable!(),
         };
         let _ = start1;
@@ -661,7 +733,7 @@ fn an_applied_seek_during_a_transition_lands_fresh_under_the_accepted_config() {
             probe
                 .events()
                 .iter()
-                .any(|e| matches!(e, ProbeEvent::InvalidationDroppedTransition { .. })),
+                .any(|e| matches!(e, LiveEvent::InvalidationDroppedTransition)),
             "the Applied cut must drop the in-flight transition"
         );
 
@@ -792,16 +864,17 @@ fn a_pause_during_a_transition_advances_only_on_processed_samples() {
 
 // --- refusals, rapid updates, replacement, failure ------------------------
 
-/// An invalid desired update is REFUSED, honestly: the old configuration
-/// continues bit-exactly, the refusal is reported through the probe's
-/// diagnostic sink (never a processing failure, never a terminal).
+/// An invalid desired update is REFUSED, honestly, at the command
+/// boundary (D4: coherent acceptance validates the WHOLE candidate
+/// before anything moves): the typed setter reports the refusal, the
+/// observation carries the diagnostic as mechanism evidence, and the old
+/// configuration continues bit-exactly — never a processing failure,
+/// never a terminal, never a partial config.
 #[test]
 fn an_invalid_update_is_refused_and_the_old_config_continues() {
     let _lifecycle = test_common::lifecycle_lock();
     test_common::within(Duration::from_secs(60), move || {
         let initial = preset_config(EqPreset::Flat);
-        let mut invalid = preset_config(EqPreset::Rock);
-        invalid.gain = f32::NAN;
 
         let (witnesses, handle, probe, mut runtime) = live_episode(
             EIGHT_SECONDS,
@@ -818,14 +891,39 @@ fn an_invalid_update_is_refused_and_the_old_config_continues() {
         })
         .then_some(())
         .expect("never started");
-        probe.request_update(invalid);
+
+        // The typed command path: a NaN preamp is refused at the
+        // command boundary with an honest diagnostic.
+        let refusal = handle
+            .set_preamp(f32::NAN)
+            .expect_err("a NaN preamp must be refused");
         assert!(
-            wait_until(Duration::from_secs(5), || !probe.take_refusals().is_empty()),
-            "the invalid update must be refused through the sink"
+            refusal.contains("finite"),
+            "the refusal names the invalidity: {refusal}"
+        );
+        // And an out-of-band EQ trim is refused the same way.
+        let mut wild = crate::processing::EqConfig::FLAT.band_gain_db;
+        wild[3] = 99.0;
+        let refusal = handle
+            .set_eq_config(crate::processing::EqConfig::new(wild, 1.0))
+            .expect_err("an out-of-band trim must be refused");
+        assert!(
+            refusal.contains("product bound"),
+            "the refusal names the invalidity: {refusal}"
+        );
+        // The observation carries the last refusal as mechanism
+        // evidence, for a client that did not capture the return value.
+        assert!(
+            wait_until(Duration::from_secs(5), || handle
+                .observe()
+                .last_processing_refusal
+                .is_some()),
+            "the refusal must be observable through the episode seam"
         );
         assert_eq!(
             handle.wait_terminal(),
-            crate::handle::EpisodeTerminalOutcome::Completed
+            crate::handle::EpisodeTerminalOutcome::Completed,
+            "a refusal is not a failure and not a terminal"
         );
 
         // No transition ever started; the content is the pure old
@@ -834,8 +932,12 @@ fn an_invalid_update_is_refused_and_the_old_config_continues() {
             !probe
                 .events()
                 .iter()
-                .any(|e| matches!(e, ProbeEvent::TransitionStarted { .. })),
+                .any(|e| matches!(e, LiveEvent::TransitionStarted { .. })),
             "a refused update must not start a transition"
+        );
+        assert!(
+            probe.pending().is_none(),
+            "a refused update must not occupy the pending slot"
         );
         let mut old_ref = EpisodeProcessing::new(&initial, &format()).expect("compiles");
         let mut input = source_input(EIGHT_SECONDS, 0);
@@ -894,7 +996,7 @@ fn rapid_updates_coalesce_to_the_latest_desired() {
             .events()
             .into_iter()
             .filter_map(|e| match e {
-                ProbeEvent::TransitionStarted { at_frame, .. } => Some(at_frame),
+                LiveEvent::TransitionStarted { at_frame, .. } => Some(at_frame),
                 _ => None,
             })
             .collect();
@@ -1041,37 +1143,38 @@ fn a_failure_during_a_transition_settles_failed_through_d11() {
 
         // The engine's INITIAL side is a deliberate processor that
         // fails once the transition begins (armed by the flag below).
-        let control = probe_control();
+        let tap = LiveTap::disarmed();
+        let control = handle.completion.processing();
         let fail_after_transition = Arc::new(AtomicUsize::new(0));
         let fail_counter = fail_after_transition.clone();
         let control_for_engine = control.clone();
+        let tap_for_engine = tap.clone();
         let build_engine = move |format: &qianqian_audio_api::ports::PcmFormat| {
             let initial_side = EpisodeProcessing::test_driven(
                 Box::new(move |block: &mut [f32]| {
                     if fail_counter.load(Ordering::SeqCst) > 0 {
                         let _ = block;
-                        return Err("probe transition-side failure".to_owned());
+                        return Err("live transition-side failure".to_owned());
                     }
                     Ok(())
                 }),
                 Box::new(|| {}),
             );
-            crate::live_probe::LiveProbeEngine::with_initial_processor(
+            crate::live::LiveProcessing::with_initial_processor(
                 initial_side,
                 preset_config(EqPreset::Flat),
                 format,
                 TEST_RATE,
                 control_for_engine,
+                tap_for_engine,
             )
         };
         runtime
-            .register_component(
-                crate::session::playback_session_spec_with_live_probe_engine(
-                    std::path::PathBuf::from(DUMMY_PATH),
-                    handle.clone(),
-                    build_engine,
-                ),
-            )
+            .register_component(crate::session::playback_session_spec_with_live_engine(
+                std::path::PathBuf::from(DUMMY_PATH),
+                handle.clone(),
+                build_engine,
+            ))
             .expect("session registers");
         runtime
             .revise_desired(vec![
@@ -1093,7 +1196,8 @@ fn a_failure_during_a_transition_settles_failed_through_d11() {
         // succeeds (the update is valid), the transition starts, and
         // the OLD side then fails inside its crossfade stage.
         fail_after_transition.store(1, Ordering::SeqCst);
-        control.request_update(preset_config(EqPreset::Rock));
+        let harness = LiveHarness { control, tap };
+        harness.request_update(preset_config(EqPreset::Rock));
 
         assert_eq!(
             handle.wait_terminal(),
@@ -1106,7 +1210,7 @@ fn a_failure_during_a_transition_settles_failed_through_d11() {
             .failure_diagnostic
             .expect("a failed episode carries its diagnostic");
         assert!(
-            diagnostic.contains("probe transition-side failure"),
+            diagnostic.contains("live transition-side failure"),
             "the diagnostic stays truthful about the processing origin: \
                  {diagnostic}"
         );
@@ -1124,7 +1228,7 @@ fn a_failure_during_a_transition_settles_failed_through_d11() {
 /// rejects it.
 #[test]
 fn n1_the_remainder_oracle_catches_a_reprocessed_remainder() {
-    use crate::live_probe::mutant_remainder_reprocessed;
+    use crate::live::mutant_remainder_reprocessed;
     let _lifecycle = test_common::lifecycle_lock();
     test_common::within(Duration::from_secs(60), move || {
         // A real remainder world: process a staging block under the
@@ -1164,7 +1268,7 @@ fn n1_the_remainder_oracle_catches_a_reprocessed_remainder() {
 /// output, which is a coherent render of the WRONG configuration.
 #[test]
 fn n2_the_coherence_oracle_catches_a_half_published_config() {
-    use crate::live_probe::mutant_mixed_config;
+    use crate::live::mutant_mixed_config;
     let _lifecycle = test_common::lifecycle_lock();
     test_common::within(Duration::from_secs(60), move || {
         let initial = preset_config(EqPreset::Flat);
@@ -1243,7 +1347,7 @@ fn n3_the_landing_oracle_catches_a_transition_that_survives_the_cut() {
             !probe
                 .events()
                 .iter()
-                .any(|e| matches!(e, ProbeEvent::InvalidationDroppedTransition { .. })),
+                .any(|e| matches!(e, LiveEvent::InvalidationDroppedTransition)),
             "the mutant must exhibit the missing invalidation"
         );
 
@@ -1416,4 +1520,926 @@ fn n5_the_continuity_oracle_rejects_an_instant_preset_switch() {
             );
         }));
     });
+}
+
+// --- D4: the product-control boundary (ProcessingControl) -----------------
+
+mod control_boundary {
+    use super::*;
+
+    /// Establishment binds the desired configuration and leaves the
+    /// pending slot EMPTY: the slot exists for live updates only, and a
+    /// leftover pending update from an earlier episode on this handle
+    /// must never survive into a new episode as a phantom first
+    /// transition (Open/replacement, §7.3).
+    #[test]
+    fn establishment_binds_desired_and_leaves_no_pending_update() {
+        let control = ProcessingControl::new(bypass_config());
+        control.establish(preset_config(EqPreset::Rock));
+        assert_eq!(control.desired(), preset_config(EqPreset::Rock));
+        assert!(
+            control.pending().is_none(),
+            "establishment must clear the pending slot"
+        );
+        // Even a stale pending planted by a defective caller cannot
+        // survive a re-establishment.
+        control.plant_pending(preset_config(EqPreset::Bass));
+        control.establish(preset_config(EqPreset::Jazz));
+        assert!(
+            control.pending().is_none(),
+            "re-establishment must clear a stale pending update"
+        );
+        assert_eq!(control.desired(), preset_config(EqPreset::Jazz));
+    }
+
+    /// A valid update moves desired AND pending as ONE whole
+    /// configuration; a refused update moves NOTHING (desired, pending)
+    /// and records its honest diagnostic.
+    #[test]
+    fn a_valid_update_moves_desired_and_pending_a_refusal_moves_nothing() {
+        let control = ProcessingControl::new(preset_config(EqPreset::Flat));
+
+        control
+            .route_whole(preset_config(EqPreset::Rock))
+            .expect("a preset is valid");
+        assert_eq!(control.pending(), Some(preset_config(EqPreset::Rock)));
+        assert_eq!(control.last_refusal(), None);
+
+        // A refusal leaves desired and pending exactly where they were.
+        let mut invalid = preset_config(EqPreset::Jazz);
+        invalid.gain = -1.0;
+        let diagnostic = control
+            .route_whole(invalid)
+            .expect_err("a negative gain must be refused");
+        assert!(
+            diagnostic.contains("non-negative"),
+            "the refusal names the invalidity: {diagnostic}"
+        );
+        assert_eq!(control.desired(), preset_config(EqPreset::Rock));
+        assert_eq!(control.pending(), Some(preset_config(EqPreset::Rock)));
+        assert!(
+            control.last_refusal().is_some(),
+            "the refusal diagnostic is recorded as mechanism evidence"
+        );
+
+        // The next accepted update clears it.
+        control
+            .route_whole(preset_config(EqPreset::Jazz))
+            .expect("valid");
+        assert_eq!(control.last_refusal(), None);
+    }
+
+    /// The typed setters compose the WHOLE desired configuration
+    /// field-wise: a field operation never silently changes an unrelated
+    /// field (bypass keeps gain/EQ; an EQ edit keeps the preamp), while
+    /// a preset switch installs the preset's whole recorded
+    /// configuration.
+    #[test]
+    fn the_typed_setters_compose_the_whole_desired_configuration() {
+        let control = ProcessingControl::new(preset_config(EqPreset::Rock));
+
+        control.set_preamp(0.5).expect("finite factor");
+        let desired = control.desired();
+        assert_eq!(desired.gain, 0.5, "the preamp moved");
+        assert_eq!(
+            desired.eq,
+            preset_config(EqPreset::Rock).eq,
+            "the EQ field did not move"
+        );
+        assert!(desired.enabled, "enabled did not move");
+
+        control.set_enabled(false).expect("toggle");
+        let desired = control.desired();
+        assert!(!desired.enabled, "bypass is a configuration flag");
+        assert_eq!(desired.gain, 0.5, "bypass keeps the gain field");
+        assert_eq!(
+            desired.eq,
+            preset_config(EqPreset::Rock).eq,
+            "bypass keeps the EQ field"
+        );
+
+        let mut custom = crate::processing::EqConfig::FLAT.band_gain_db;
+        custom[0] = 6.0;
+        control
+            .set_eq_config(crate::processing::EqConfig::new(custom, 1.5))
+            .expect("valid trim");
+        let desired = control.desired();
+        assert_eq!(desired.eq.unwrap().band_gain_db[0], 6.0);
+        assert_eq!(desired.eq.unwrap().q, 1.5);
+        assert_eq!(desired.gain, 0.5, "an EQ edit keeps the preamp");
+
+        control.set_eq_preset(EqPreset::Bass).expect("valid");
+        assert_eq!(
+            control.desired(),
+            preset_config(EqPreset::Bass),
+            "a preset installs its WHOLE recorded configuration (unity \
+             preamp included)"
+        );
+    }
+}
+
+// --- D4: the product path (typed commands through the REAL seam) ----------
+
+/// The production transition length at the test rate — the geometry the
+/// product-path oracles build their references from.
+fn production_transition_frames() -> usize {
+    crate::live::live_transition_frames(TEST_RATE as u32)
+}
+
+/// The first index where `values` leaves `reference` (bit-exact), i.e.
+/// the OBSERVED first divergence from the old continuation.
+fn first_divergence(values: &[f32], reference: &[f32]) -> usize {
+    values
+        .iter()
+        .zip(reference.iter())
+        .position(|(a, b)| a != b)
+        .unwrap_or(values.len())
+}
+
+/// The apply boundary inferred from an observed divergence: the
+/// staging-block boundary at or before it. The blend's earliest frames
+/// (w → 1) can be numerically indistinguishable from the old
+/// continuation, so the OBSERVED divergence may lag the true boundary by
+/// a few frames — never past the boundary block (by the block's end the
+/// new side contributes ~46%, far above an ulp). Callers assert the lag.
+fn boundary_at_or_before(observed: usize) -> usize {
+    observed - (observed % STAGING_FRAMES)
+}
+
+/// A typed preset switch on the PRODUCT path (no tap, production
+/// transition geometry): the apply boundary is a whole staging block
+/// after the command, the pre-boundary stretch is bit-exactly the old
+/// continuation, the transition stretch is the exact blend, the settled
+/// stretch is bit-exactly a fresh instance of the accepted preset, no
+/// refusal was recorded, and the frame count is conserved.
+#[test]
+fn a_typed_preset_switch_on_the_product_path_blends_exactly_and_settles_fresh() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(60), move || {
+        let initial = preset_config(EqPreset::Flat);
+        let total = production_transition_frames();
+        let (witnesses, handle, mut runtime) = crate::processing_support::episode(
+            EIGHT_SECONDS,
+            OutputBehavior::SlowConsume {
+                per_read: Duration::from_millis(1),
+            },
+            initial,
+            Vec::new(),
+        );
+        wait_until(Duration::from_secs(5), || {
+            handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= HALF_A_SECOND / 4)
+        })
+        .then_some(())
+        .expect("never started");
+        let requested_at = handle.observe().position.expect("live");
+        handle
+            .set_eq_preset(EqPreset::Rock)
+            .expect("a preset update is valid");
+
+        assert_eq!(
+            handle.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Completed
+        );
+
+        let values = witnesses.content();
+        // Flat is the bit-exact identity, so the old continuation is the
+        // raw source; the first divergence locates the apply boundary.
+        let raw: Vec<f32> = (0..EIGHT_SECONDS).map(|i| i as f32).collect();
+        let observed = first_divergence(&values, &raw);
+        assert!(
+            observed < values.len(),
+            "an accepted update must become audible"
+        );
+        assert!(
+            observed > requested_at as usize,
+            "the update applies after the command"
+        );
+        let start = boundary_at_or_before(observed);
+        assert!(
+            observed - start < STAGING_FRAMES,
+            "the observed divergence must lie inside the boundary block"
+        );
+        assert!(
+            handle.observe().last_processing_refusal.is_none(),
+            "an accepted update records no refusal"
+        );
+
+        let desired = preset_config(EqPreset::Rock);
+        let expected =
+            expected_content(EIGHT_SECONDS, total, &initial, &[(start, initial, desired)]);
+        assert_eq!(
+            values.len(),
+            EIGHT_SECONDS,
+            "frame conservation across the live transition"
+        );
+        assert_eq!(
+            &values[..start],
+            &raw[..start],
+            "pre-boundary: old continuation"
+        );
+        for (i, (got, want)) in values[start..]
+            .iter()
+            .zip(expected[start..].iter())
+            .enumerate()
+        {
+            let tolerance = 1e-4 * want.abs().max(1.0);
+            assert!(
+                (got - want).abs() <= tolerance,
+                "frame {} (transition+{}): {got} vs expected blend {want}",
+                i + start,
+                i
+            );
+        }
+        let _ = runtime.dispose();
+    });
+}
+
+/// The typed gain endpoints ride the same blend law, bit-exactly where
+/// the factors are exact in f32: unity → quarter, quarter → silence,
+/// silence → unity, both channels, with the settled stretches exactly
+/// the scaled continuations and the silence stretch exactly +0.0.
+#[test]
+fn typed_gain_endpoints_ride_the_same_blend_law() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(120), move || {
+        let total = production_transition_frames();
+        let (witnesses, handle, mut runtime) = crate::processing_support::episode(
+            EIGHT_SECONDS,
+            OutputBehavior::SlowConsume {
+                per_read: Duration::from_millis(1),
+            },
+            AudioProcessingConfig::gain(1.0),
+            Vec::new(),
+        );
+        // One command per second of source time; each settled stretch is
+        // longer than the transition, so the boundaries are separable.
+        wait_until(Duration::from_secs(5), || {
+            handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= TEST_RATE as u64)
+        })
+        .then_some(())
+        .expect("never reached 1s");
+        handle.set_preamp(0.25).expect("valid");
+        wait_until(Duration::from_secs(5), || {
+            handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= 2 * TEST_RATE as u64)
+        })
+        .then_some(())
+        .expect("never reached 2s");
+        handle.set_preamp(0.0).expect("valid");
+        wait_until(Duration::from_secs(5), || {
+            handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= 4 * TEST_RATE as u64)
+        })
+        .then_some(())
+        .expect("never reached 4s");
+        handle.set_preamp(1.0).expect("valid");
+        assert_eq!(
+            handle.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Completed
+        );
+
+        let values = witnesses.content();
+        assert_eq!(values.len(), EIGHT_SECONDS, "frame conservation");
+        let raw: Vec<f32> = (0..EIGHT_SECONDS).map(|i| i as f32).collect();
+
+        // Locate each apply boundary by leaving the previous settled
+        // continuation (all references here are exact in f32); the
+        // boundary is the block boundary at or before the observed
+        // divergence (the earliest blend frames can round back onto the
+        // continuation).
+        let quarter = |i: usize| 0.25 * raw[i];
+        let observed1 = (0..2 * TEST_RATE)
+            .find(|&i| values[i] != raw[i])
+            .expect("the unity->quarter transition must appear");
+        let start1 = boundary_at_or_before(observed1);
+        let observed2 = (start1 + total..4 * TEST_RATE)
+            .find(|&i| values[i] != quarter(i))
+            .expect("the quarter->silence transition must appear");
+        let start2 = boundary_at_or_before(observed2);
+        let observed3 = (start2 + total..6 * TEST_RATE)
+            .find(|&i| values[i] != 0.0)
+            .expect("the silence->unity transition must appear");
+        let start3 = boundary_at_or_before(observed3);
+        assert!(observed1 - start1 < STAGING_FRAMES);
+        assert!(observed2 - start2 < STAGING_FRAMES);
+        assert!(observed3 - start3 < STAGING_FRAMES);
+
+        // Settled stretches, exactly.
+        for (i, &got) in values[start1 + total..start2].iter().enumerate() {
+            assert_eq!(
+                got,
+                quarter(start1 + total + i),
+                "the settled quarter stretch is exactly 0.25x at {}",
+                start1 + total + i
+            );
+        }
+        for (i, &got) in values[start2 + total..start3].iter().enumerate() {
+            assert_eq!(
+                got,
+                0.0,
+                "the settled silence stretch is +0.0 at {}",
+                start2 + total + i
+            );
+        }
+        for (i, &got) in values[start3 + total..].iter().enumerate() {
+            assert_eq!(
+                got,
+                raw[start3 + total + i],
+                "the settled unity stretch is bit-exactly the source at {}",
+                start3 + total + i
+            );
+        }
+
+        // Each transition stretch is the interpolated gain on the same
+        // input (the U2 degenerate form of the same crossfade).
+        let transitions = [
+            (start1, 1.0f32, 0.25f32),
+            (start2, 0.25, 0.0),
+            (start3, 0.0, 1.0),
+        ];
+        for (start, from, to) in transitions {
+            for (k, i) in (start..start + total).enumerate() {
+                let w = (1.0 - (k as f64 / total as f64)) as f32 + 0.0;
+                let x = raw[i];
+                let want = w.mul_add(from * x, (1.0 - w).mul_add(to * x, 0.0));
+                assert!(
+                    (values[i] - want).abs() <= 1e-4 * want.abs().max(1.0),
+                    "frame {i} of the {from}->{to} transition: {} vs {want}",
+                    values[i]
+                );
+            }
+        }
+        let _ = runtime.dispose();
+    });
+}
+
+/// Custom EQ and the Flat preset on the product path: a custom
+/// configuration's settled stretch is bit-exactly a fresh instance of
+/// itself from its transition start, and the Flat preset settles
+/// bit-exactly back to the untouched source.
+#[test]
+fn custom_eq_and_flat_settle_bit_exact() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(90), move || {
+        let total = production_transition_frames();
+        let mut custom_bands = crate::processing::EqConfig::FLAT.band_gain_db;
+        custom_bands[0] = 7.0;
+        custom_bands[1] = -3.0;
+        let custom = crate::processing::EqConfig::new(custom_bands, 1.2);
+
+        let (witnesses, handle, mut runtime) = crate::processing_support::episode(
+            EIGHT_SECONDS,
+            OutputBehavior::SlowConsume {
+                per_read: Duration::from_millis(1),
+            },
+            preset_config(EqPreset::Flat),
+            Vec::new(),
+        );
+        wait_until(Duration::from_secs(5), || {
+            handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= TEST_RATE as u64)
+        })
+        .then_some(())
+        .expect("never reached 1s");
+        handle.set_eq_config(custom).expect("valid");
+        wait_until(Duration::from_secs(5), || {
+            handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= 3 * TEST_RATE as u64)
+        })
+        .then_some(())
+        .expect("never reached 3s");
+        handle.set_eq_preset(EqPreset::Flat).expect("valid");
+        assert_eq!(
+            handle.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Completed
+        );
+
+        let values = witnesses.content();
+        assert_eq!(values.len(), EIGHT_SECONDS, "frame conservation");
+        let raw: Vec<f32> = (0..EIGHT_SECONDS).map(|i| i as f32).collect();
+
+        // Transition 1: Flat → custom. Boundary = the block boundary at
+        // or before the first divergence from the raw source.
+        let observed1 = (TEST_RATE..3 * TEST_RATE)
+            .find(|&i| values[i] != raw[i])
+            .expect("the custom EQ must diverge from Flat");
+        let start1 = boundary_at_or_before(observed1);
+        assert!(observed1 - start1 < STAGING_FRAMES);
+        // Settled custom stretch: bit-exactly a fresh custom instance
+        // started at the transition start.
+        let settled1_end = 3 * TEST_RATE;
+        let settled1_start = start1 + total;
+        assert!(settled1_start <= settled1_end);
+        // The engine's new side is fed frames from the TRANSITION START,
+        // so the fresh reference instance starts there too (a stateful
+        // EQ's output depends on its whole fed history).
+        let mut fresh_custom =
+            EpisodeProcessing::new(&AudioProcessingConfig::eq(custom), &format())
+                .expect("compiles");
+        let mut input = source_input(EIGHT_SECONDS - start1, start1);
+        fresh_custom.stage(&mut input).expect("stages");
+        let expected_custom: Vec<f32> = input.chunks(2).map(|f| f[0]).collect();
+        assert_eq!(
+            &values[settled1_start..settled1_end],
+            &expected_custom[settled1_start - start1..settled1_end - start1],
+            "the settled custom stretch is a fresh custom continuation"
+        );
+
+        // Transition 2: custom → Flat. Boundary = the block boundary at
+        // or before the first divergence from the custom continuation.
+        let observed2 = (settled1_end..EIGHT_SECONDS)
+            .find(|&i| values[i] != expected_custom[i - start1])
+            .expect("the Flat switch must diverge from the custom continuation");
+        let start2 = boundary_at_or_before(observed2);
+        assert!(observed2 - start2 < STAGING_FRAMES);
+        for (i, &got) in values[start2 + total..].iter().enumerate() {
+            let at = start2 + total + i;
+            assert_eq!(
+                got, raw[at],
+                "the settled Flat stretch is bit-exactly the source at {at}"
+            );
+        }
+        let _ = runtime.dispose();
+    });
+}
+
+/// An update requested near completion is either applied (its truncated
+/// transition follows the same blend law) or inert history — in BOTH
+/// worlds the frame count is conserved, the episode completes, and the
+/// content is exactly one of the two legal references. Nothing may
+/// half-apply.
+#[test]
+fn an_update_near_completion_is_never_half_applied() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(90), move || {
+        let initial = preset_config(EqPreset::Flat);
+        let total = production_transition_frames();
+        let (witnesses, handle, mut runtime) = crate::processing_support::episode(
+            EIGHT_SECONDS,
+            OutputBehavior::SlowConsume {
+                per_read: Duration::from_millis(1),
+            },
+            initial,
+            Vec::new(),
+        );
+        // Request while the transition can still be truncated by EOF.
+        let late = (EIGHT_SECONDS - total - 4 * STAGING_FRAMES) as u64;
+        wait_until(Duration::from_secs(5), || {
+            handle.observe().position.is_some_and(|p| p >= late)
+        })
+        .then_some(())
+        .expect("never reached the late window");
+        handle
+            .set_eq_preset(EqPreset::Rock)
+            .expect("a preset update is valid");
+        assert_eq!(
+            handle.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Completed,
+            "an update near completion is not a failure"
+        );
+        assert!(
+            handle.observe().last_processing_refusal.is_none(),
+            "a valid update records no refusal even near EOF"
+        );
+
+        let values = witnesses.content();
+        assert_eq!(values.len(), EIGHT_SECONDS, "frame conservation");
+        let raw: Vec<f32> = (0..EIGHT_SECONDS).map(|i| i as f32).collect();
+        let desired = preset_config(EqPreset::Rock);
+        let observed = first_divergence(&values, &raw);
+        if observed == values.len() {
+            // Legal world: the update never reached an apply boundary
+            // before EOF — inert command history.
+            assert_eq!(values, raw, "the inert world is the pure continuation");
+        } else {
+            // Legal world: the truncated transition follows the law.
+            let start = boundary_at_or_before(observed);
+            assert!(observed - start < STAGING_FRAMES);
+            let expected =
+                expected_content(EIGHT_SECONDS, total, &initial, &[(start, initial, desired)]);
+            assert_eq!(&values[..start], &raw[..start]);
+            for (i, (got, want)) in values[start..]
+                .iter()
+                .zip(expected[start..].iter())
+                .enumerate()
+            {
+                let tolerance = 1e-4 * want.abs().max(1.0);
+                assert!(
+                    (got - want).abs() <= tolerance,
+                    "frame {}: {got} vs {want}",
+                    i + start
+                );
+            }
+        }
+        let _ = runtime.dispose();
+    });
+}
+
+/// The observed-seek × accepted-update interleaving (carried D3 debt):
+/// a seek command that is observed but NOT yet actionable does not block
+/// the fresh-block pickup — the accepted update starts its transition
+/// while the seek pends, and a cut that never becomes actionable is
+/// inert history at the episode's end.
+#[test]
+fn a_merely_observed_seek_does_not_block_the_update_pickup() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(90), move || {
+        let initial = preset_config(EqPreset::Flat);
+        let desired = preset_config(EqPreset::Rock);
+
+        // A slow paced source: after the fast prefix the decode produces
+        // one frame per 5 ms (200 frames/s — far below any consumption
+        // rate), so the edge stays empty, the render leg never parks at
+        // a full edge, and the seek stays unactionable for the whole
+        // observation window. The transition is short (64 frames) so it
+        // completes quickly at the producer's pace.
+        let (w, handle, probe, mut runtime) = live_episode_source(
+            SourceBehavior::Paced {
+                after: 4200,
+                delay: Duration::from_millis(5),
+            },
+            OutputBehavior::Consume,
+            initial,
+            64,
+            vec![ProviderSeekOutcome::Applied {
+                landing: Some(TEST_RATE as u64),
+            }],
+        );
+        wait_until(Duration::from_secs(30), || {
+            handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= HALF_A_SECOND / 4)
+        })
+        .then_some(())
+        .expect("never started");
+        // Observed seek FIRST (pends, unactionable), accepted update
+        // SECOND: the pickup must proceed.
+        handle.request_seek(Duration::from_secs(1));
+        probe.request_update(desired);
+        let (start, _) = wait_transition_started(&probe, Duration::from_secs(30));
+        assert!(
+            start > HALF_A_SECOND as usize / 4,
+            "the transition started after the commands, not before them"
+        );
+        handle.request_stop();
+        assert_eq!(
+            handle.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Stopped,
+            "the pended seek never became actionable; the episode ends \
+                 by stop"
+        );
+        assert!(
+            !probe
+                .events()
+                .iter()
+                .any(|e| matches!(e, LiveEvent::InvalidationDroppedTransition)),
+            "a seek that never became actionable performs no cut"
+        );
+        let values = w.content();
+        let raw: Vec<f32> = (0..values.len()).map(|i| i as f32).collect();
+        let expected = expected_content(
+            values.len(),
+            TEST_RATE / 5,
+            &initial,
+            &[(start, initial, desired)],
+        );
+        assert_eq!(
+            &values[..start],
+            &raw[..start],
+            "pre-transition: old continuation"
+        );
+        for (i, (got, want)) in values[start..]
+            .iter()
+            .zip(expected[start..].iter())
+            .enumerate()
+        {
+            let tolerance = 1e-4 * want.abs().max(1.0);
+            assert!(
+                (got - want).abs() <= tolerance,
+                "frame {}: {got} vs {want}",
+                i + start
+            );
+        }
+        let _ = runtime.dispose();
+    });
+}
+
+// --- D4 negative controls (the new mutants) -------------------------------
+
+/// N6 — a refused seek that RESETS the processing history (instead of
+/// preserving it) is caught by the refusal oracle: with a STATEFUL old
+/// configuration, the run's own warmed continuation differs from any
+/// reset world, bit-exactly.
+#[test]
+fn n6_the_refusal_oracle_catches_a_history_reset_on_refused_seek() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(90), move || {
+        use crate::live::mutant_reset_history;
+        let initial = preset_config(EqPreset::Bass);
+        let desired = preset_config(EqPreset::Treble);
+
+        let (w, handle, probe, mut runtime) = live_episode(
+            EIGHT_SECONDS,
+            OutputBehavior::SlowConsume {
+                per_read: Duration::from_millis(1),
+            },
+            initial,
+            TEST_RATE / 5,
+            vec![ProviderSeekOutcome::RefusedUnchanged],
+        );
+        wait_until(Duration::from_secs(5), || {
+            handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= HALF_A_SECOND / 4)
+        })
+        .then_some(())
+        .expect("never started");
+        probe.request_update(desired);
+        let (start, _) = wait_transition_started(&probe, Duration::from_secs(5));
+        handle.request_seek(Duration::from_secs(5));
+        assert_eq!(
+            handle.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Completed
+        );
+
+        let values = w.content();
+        let reference = expected_content(
+            EIGHT_SECONDS,
+            TEST_RATE / 5,
+            &initial,
+            &[(start, initial, desired)],
+        );
+        // Positive: the honest run equals its warmed continuation.
+        assert_eq!(
+            values, reference,
+            "history is preserved through the refusal"
+        );
+
+        // Negative: a world where the history was reset at ANY point r
+        // after the transition start must be rejected by the SAME
+        // predicate. r is chosen mid-stretch; the predicate's bit-exact
+        // equality is insensitive to which r.
+        let r = start + TEST_RATE / 10;
+        let mut reset_world = reference[..r].to_vec();
+        reset_world.extend(mutant_reset_history(
+            &source_input(EIGHT_SECONDS - r, r),
+            &initial,
+            &format(),
+        ));
+        assert_ne!(values, reset_world, "a reset is observably different");
+        assert!(crate::processing_support::rejects(|| {
+            assert_eq!(values, reset_world, "the shipped refusal predicate");
+        }));
+        let _ = runtime.dispose();
+    });
+}
+
+/// N7 — a bypass transition realized as an INSTANT dry switch (the
+/// authorized crossfade's frames dropped) is caught by the bypass
+/// oracle's blend law.
+#[test]
+fn n7_the_bypass_oracle_catches_an_instant_dry_switch() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(90), move || {
+        let initial = preset_config(EqPreset::Rock);
+
+        let (w, handle, probe, mut runtime) = live_episode(
+            EIGHT_SECONDS,
+            OutputBehavior::SlowConsume {
+                per_read: Duration::from_millis(1),
+            },
+            initial,
+            TEST_RATE / 5,
+            Vec::new(),
+        );
+        probe.tap.arm(false, false, true);
+        wait_until(Duration::from_secs(5), || {
+            handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= HALF_A_SECOND / 4)
+        })
+        .then_some(())
+        .expect("never started");
+        handle.set_processing_enabled(false).expect("valid");
+        assert_eq!(
+            handle.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Completed
+        );
+
+        let values = w.content();
+        let raw: Vec<f32> = (0..EIGHT_SECONDS).map(|i| i as f32).collect();
+        let start = first_divergence(&values, &raw);
+        assert!(
+            start < EIGHT_SECONDS,
+            "the processed→dry switch must be observable"
+        );
+        // The shipped bypass oracle — the transition stretch must be the
+        // bounded blend of processed and dry — must REJECT the mutant's
+        // instant-dry world (its blend frames were dropped).
+        let blend_reference = expected_content(
+            EIGHT_SECONDS,
+            TEST_RATE / 5,
+            &initial,
+            &[(
+                start,
+                initial,
+                crate::processing::AudioProcessingConfig::BYPASS,
+            )],
+        );
+        assert_ne!(
+            values, blend_reference,
+            "the instant-dry world must be observably different from the \
+                 honest blend"
+        );
+        assert!(crate::processing_support::rejects(|| {
+            assert_eq!(values, blend_reference, "the bypass blend law");
+        }));
+        let _ = runtime.dispose();
+    });
+}
+
+/// N8 — a stale pending update from a previous episode leaking into a
+/// replacement episode is caught: establishment clears the slot (pinned
+/// directly), and the replacement freshness predicate distinguishes the
+/// fresh world from the stale-config world.
+#[test]
+fn n8_the_replacement_oracle_catches_a_stale_pending_leak() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(120), move || {
+        let stale = preset_config(EqPreset::Bass);
+        let own = preset_config(EqPreset::Rock);
+
+        // Episode one: live-update, complete.
+        let (_, handle_one, probe_one, mut runtime_one) = live_episode(
+            EIGHT_SECONDS,
+            OutputBehavior::Consume,
+            preset_config(EqPreset::Flat),
+            TEST_RATE / 10,
+            Vec::new(),
+        );
+        wait_until(Duration::from_secs(5), || {
+            handle_one
+                .observe()
+                .position
+                .is_some_and(|p| p >= HALF_A_SECOND / 4)
+        })
+        .then_some(())
+        .expect("never started");
+        probe_one.request_update(stale);
+        assert_eq!(
+            handle_one.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Completed
+        );
+        let _ = runtime_one.dispose();
+
+        // The replacement's control: plant a STALE pending update after
+        // establishment — exactly what a leaky establishment would leave
+        // behind. The honest mechanism clears it at establishment, and
+        // re-establishment clears anything planted before it.
+        let handle_two = crate::handle::PlaybackSessionHandle::new();
+        handle_two.completion.processing().establish(own);
+        handle_two.completion.processing().plant_pending(stale);
+        // The honest re-establishment (the spec constructor's act):
+        handle_two.completion.processing().establish(own);
+        assert!(
+            handle_two.completion.processing().pending().is_none(),
+            "establishment must clear a stale pending update"
+        );
+
+        // Sensitivity: the freshness predicate distinguishes the
+        // episode's OWN world from the stale world.
+        let mut fresh_own = EpisodeProcessing::new(&own, &format()).expect("compiles");
+        let mut own_input = source_input(1024, 0);
+        fresh_own.stage(&mut own_input).expect("stages");
+        let mut fresh_stale = EpisodeProcessing::new(&stale, &format()).expect("compiles");
+        let mut stale_input = source_input(1024, 0);
+        fresh_stale.stage(&mut stale_input).expect("stages");
+        assert_ne!(
+            own_input, stale_input,
+            "the worlds are observably different"
+        );
+        assert!(crate::processing_support::rejects(|| {
+            assert_eq!(own_input, stale_input, "the replacement freshness oracle");
+        }));
+    });
+}
+
+// --- D4 performance and allocation evidence -------------------------------
+
+/// The live mechanism's costs, measured at the engine level at both
+/// release rates (44.1 kHz / 48 kHz stereo, 1024-frame blocks):
+///
+/// - steady state allocates NOTHING per block (the counting allocator
+///   witnesses the honest engine, not a self-report);
+/// - a transition's allocation is bounded (one scratch growth, once);
+/// - the transition multiplier over the steady path is recorded and
+///   bounded far below the decode-worker block budget (a 1024-frame
+///   block is ~23 ms of source time; the whole measurement runs
+///   thousands of blocks in well under a second).
+#[test]
+fn the_live_mechanism_costs_are_bounded_and_recorded() {
+    use crate::edge_lifecycle_tests::counting_allocator::run_counting_allocations;
+    use crate::session::ProcessingRuntime;
+
+    let _lifecycle = test_common::lifecycle_lock();
+    for rate in [44_100u32, 48_000] {
+        let mut format = format();
+        format.sample_rate = rate;
+        let control = Arc::new(ProcessingControl::new(preset_config(EqPreset::Bass)));
+        let mut engine = crate::live::LiveProcessing::new(
+            preset_config(EqPreset::Bass),
+            &format,
+            control.clone(),
+        )
+        .expect("compiles");
+        let mut block = vec![0.25f32; STAGING_FRAMES * usize::from(format.channels)];
+
+        // Scratch allocated ONCE outside every counted window, so the
+        // allocation counts measure the engine only.
+        let mut samples: Vec<f64> = Vec::with_capacity(1024);
+        let time_blocks = |engine: &mut crate::live::LiveProcessing,
+                           block: &mut [f32],
+                           samples: &mut Vec<f64>,
+                           n: usize| {
+            samples.clear();
+            for _ in 0..n {
+                let t0 = std::time::Instant::now();
+                engine.stage(block).expect("stages");
+                samples.push(t0.elapsed().as_secs_f64());
+            }
+            samples.sort_by(|a, b| a.total_cmp(b));
+            (samples[n / 2], samples[(n * 99) / 100])
+        };
+
+        // Warm-up (scratch/allocator steady state), then steady evidence.
+        for _ in 0..64 {
+            engine.stage(&mut block).expect("stages");
+        }
+        let n = 400;
+        let ((steady_median, steady_p99), steady_allocs) =
+            run_counting_allocations(|| time_blocks(&mut engine, &mut block, &mut samples, n));
+        assert_eq!(
+            steady_allocs, 0,
+            "the no-update steady path must allocate nothing per block"
+        );
+
+        // Start a transition (the sharpest authorized jump: Bass →
+        // Treble) and measure its whole length.
+        control.set_eq_preset(EqPreset::Treble).expect("valid");
+        assert!(
+            engine.poll_update().is_some(),
+            "the pickup accepts the pending update"
+        );
+        let transition_blocks =
+            crate::live::live_transition_frames(rate).div_ceil(STAGING_FRAMES) + 2;
+        let ((trans_median, trans_p99), trans_allocs) = run_counting_allocations(|| {
+            time_blocks(&mut engine, &mut block, &mut samples, transition_blocks)
+        });
+        assert!(
+            trans_allocs <= 1,
+            "a transition allocates at most its one scratch growth, got {trans_allocs}"
+        );
+
+        // Back to steady state: settled, still allocation-free.
+        let ((post_median, _), post_allocs) =
+            run_counting_allocations(|| time_blocks(&mut engine, &mut block, &mut samples, n));
+        assert_eq!(post_allocs, 0, "settled state allocates nothing");
+
+        let multiplier = trans_median / steady_median;
+        assert!(
+            multiplier < 8.0,
+            "the transition multiplier {multiplier:.2}x must stay far \
+                 below the block budget"
+        );
+        println!(
+            "live-mechanism costs @ {rate} Hz stereo, {}-frame blocks: \
+             steady median {:.2?} (p99 {:.2?}), transition median {:.2?} \
+             (p99 {:.2?}), multiplier {multiplier:.2}x, settled median \
+             {:.2?}; allocations: steady {steady_allocs}, transition \
+             {trans_allocs}, settled {post_allocs}",
+            STAGING_FRAMES,
+            Duration::from_secs_f64(steady_median),
+            Duration::from_secs_f64(steady_p99),
+            Duration::from_secs_f64(trans_median),
+            Duration::from_secs_f64(trans_p99),
+            Duration::from_secs_f64(post_median),
+        );
+    }
 }

@@ -27,6 +27,7 @@ mod completion;
 mod edge;
 mod handle;
 mod headroom;
+mod live;
 mod presets;
 mod processing;
 mod session;
@@ -94,14 +95,15 @@ mod processing_support;
 #[cfg(all(test, not(loom)))]
 mod edge_lifecycle_tests;
 
-// The D3 disposable live-transition probe (campaign #190): engine +
-// control for the live-update oracles through the REAL staging seam.
-// Test-only; never shipped; the live-update authority it probes is
-// earned separately (dsp-product-model.md §7).
+// Live Audio Processing (campaign #190 D4): the production live
+// mechanism (ProcessingControl + LiveProcessing) ships in `live`; the
+// live-update oracles run through the REAL staging seam with the
+// cfg(test) instrumentation tap (engine events, block/frame
+// bookkeeping, the deliberate-defect knobs the negative controls must
+// catch). The D3 disposable probe was replaced by this mechanism; its
+// oracles were retargeted to it.
 #[cfg(all(test, not(loom)))]
-mod live_probe;
-#[cfg(all(test, not(loom)))]
-mod live_probe_tests;
+mod live_tests;
 
 #[cfg(all(test, loom))]
 mod loom_edge_tests;
