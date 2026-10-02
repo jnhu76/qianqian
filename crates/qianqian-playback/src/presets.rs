@@ -2,18 +2,20 @@
 //! ADR-PBK-002 D14.11). Presets are DATA — pure product configuration
 //! over [`crate::AudioProcessingConfig`]/[`crate::EqConfig`] — not
 //! Plugins, not processor types, not classes with independent
-//! lifecycle, not new effects (the Issue #177 preset taxonomy, frozen:
-//! "Preset = configuration data"). Selecting a preset constructs an
-//! ordinary desired configuration; the episode binds it exactly like
-//! any Custom configuration (episode-fixed applied snapshot, case B of
-//! the D14.11 model; a preset change takes effect at the NEXT episode).
+//! lifecycle, not new effects (D14.11 freezes the desired-configuration
+//! ownership: the application/product-control layer owns selection, and
+//! non-promotion of configuration data to runtime/Plugin identity is
+//! the frozen rule). Selecting a preset constructs an ordinary desired
+//! configuration; the episode binds it exactly like any Custom
+//! configuration (episode-fixed applied snapshot, case B of the D14.11
+//! model; a preset change takes effect at the NEXT episode).
 //!
 //! The curves below are Qianqian PRODUCT TUNING — chosen for this
 //! player's reference listening, deliberately NOT presented as
 //! scientifically universal or canonical. The exact values are recorded
 //! here (preamp: unity for every preset; band mapping: the fixed
-//! [`crate::processing`-owned product table] 31 Hz low shelf, 8 peaking
-//! bands, 16 kHz high shelf, in band order).
+//! product band table owned by `crate::processing` — 31 Hz low shelf,
+//! 8 peaking bands, 16 kHz high shelf, in band order).
 
 use crate::processing::{AudioProcessingConfig, EqConfig};
 
@@ -28,11 +30,11 @@ pub enum EqPreset {
     Jazz,
     /// Recessed lows, forward presence for vocals.
     Vocal,
-    /// Warm lows and highs, slightly eased upper mids.
+    /// Warm lows and highs, gently eased low mids.
     Blues,
     /// The classic rock smile: firm lows and highs, eased mids.
     Rock,
-    /// Gentle extremes, protected midrange for acoustic material.
+    /// Gentle extremes, eased upper-mid glare for acoustic material.
     Classical,
     /// Low-frequency emphasis.
     Bass,
@@ -60,8 +62,10 @@ impl EqPreset {
     /// UNITY preamp (recorded product decision — the presets shape tone,
     /// not headroom; the volume and preamp remain separate controls) and
     /// the preset's band trims over the fixed product band table with
-    /// the product Q. Deterministic: the same preset always resolves to
-    /// the same configuration.
+    /// the presets' Q (1.0 — the same neutral value as
+    /// [`EqConfig::FLAT`]; there is no separately frozen product-Q
+    /// constant). Deterministic: the same preset always resolves to the
+    /// same configuration.
     pub fn to_config(self) -> AudioProcessingConfig {
         AudioProcessingConfig {
             enabled: true,

@@ -1200,6 +1200,7 @@ fn a_preset_change_applies_at_the_next_episodes_establishment() {
             EpisodeTerminalOutcome::Completed
         );
         let first_values = first_w.content();
+        let first_values_ch1 = first_w.content_ch1();
         let snapshot = first_runtime.dispose().snapshot;
         assert!(snapshot.quiet, "first episode teardown must stay quiet");
 
@@ -1214,13 +1215,22 @@ fn a_preset_change_applies_at_the_next_episodes_establishment() {
             EpisodeTerminalOutcome::Completed
         );
         let second_values = second_w.content();
+        let second_values_ch1 = second_w.content_ch1();
 
         let expected_first = fresh_stage_reference(&EqPreset::Bass.to_config(), source_frames);
         let expected_second = fresh_stage_reference(&EqPreset::Treble.to_config(), source_frames);
         assert_eq!(first_values, expected_first[0], "episode 1: its own preset");
         assert_eq!(
+            first_values_ch1, expected_first[1],
+            "episode 1: its own preset, channel 1"
+        );
+        assert_eq!(
             second_values, expected_second[0],
             "episode 2: its own preset"
+        );
+        assert_eq!(
+            second_values_ch1, expected_second[1],
+            "episode 2: its own preset, channel 1"
         );
         assert_ne!(
             first_values, second_values,
