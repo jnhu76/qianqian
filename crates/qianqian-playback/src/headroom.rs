@@ -50,7 +50,9 @@ use crate::processing::{EQ_BAND_FREQUENCY_HZ, EqConfig, band_participates};
 const GRID_POINTS_PER_OCTAVE: f64 = 96.0;
 
 /// The lowest frequency the grid visits. The product band table starts
-/// at 31 Hz; responses below 10 Hz are flat for every recipe here.
+/// at 31 Hz; below 10 Hz every recipe here is within ~0.4 dB of its DC
+/// asymptote (the +18 dB low shelf at 31 Hz is the worst case), well
+/// inside what the frozen grid-sampled-estimate semantics absorb.
 const GRID_MIN_HZ: f64 = 10.0;
 
 /// The estimated steady-state EQ headroom guidance for one desired EQ
@@ -72,12 +74,21 @@ pub struct HeadroomGuidance {
     /// HEADROOM GUIDANCE — not a clipping guarantee (module doc).
     pub guidance_db: f32,
     /// The frequency (Hz) of the largest steady-state cascade gain —
-    /// the peak the guidance would tame. Diagnostic only.
+    /// the peak the guidance would tame. 0.0 when no amplifying peak
+    /// exists (a cutting-only cascade) or the cascade is empty at this
+    /// rate. Diagnostic only.
     pub peak_hz: f32,
 }
 
 /// The estimated steady-state EQ headroom guidance, or `None` where no
 /// honest advice exists (see [`HeadroomGuidance`]).
+///
+/// Refusal domain: a zero rate, or configuration data outside the
+/// product's intrinsic validity — the SAME domain
+/// [`EqConfig`]'s establishment validation refuses (non-finite or
+/// non-positive Q, non-finite or out-of-bound trims). A recipe that
+/// cannot mean anything gets no advice; garbage must never be answered
+/// with a plausible-sounding "no attenuation advised".
 ///
 /// Rate-aware: only bands available at `sample_rate_hz` (the
 /// active-band profile, §2.1) participate — an unavailable band cannot
@@ -89,7 +100,11 @@ pub fn estimated_eq_headroom_guidance(
     if sample_rate_hz == 0 {
         return None;
     }
-    if !eq.q.is_finite() || eq.band_gain_db.iter().any(|g| !g.is_finite()) {
+    // The intrinsic-validity refusal: exactly `EqConfig::validate`'s
+    // domain, restated here so the advisory cannot fabricate an answer
+    // for data that fails establishment (defense in depth — callers
+    // may legitimately seek advice before establishment runs).
+    if eq.validate().is_err() {
         return None;
     }
     let fs = f64::from(sample_rate_hz);
@@ -143,8 +158,8 @@ pub fn estimated_eq_headroom_guidance(
     Some(HeadroomGuidance {
         // Advice never rounds up into a boost: the estimate only ever
         // attenuates, and a cascade that amplifies nowhere advises 0.
-        guidance_db: (-peak_gain_db.max(0.0)) as f32,
-        peak_hz: peak_hz as f32,
+        guidance_db: -peak_gain_db.max(0.0) as f32 + 0.0,
+        peak_hz: peak_hz as f32 + 0.0,
     })
 }
 
@@ -308,20 +323,64 @@ mod tests {
     }
 
     /// No honest advice exists where the recipes cannot mean anything:
-    /// a zero rate, or non-finite trims/Q return None instead of a
-    /// NaN advisory.
+    /// a zero rate, or data outside the product's intrinsic validity —
+    /// the SAME domain `EqConfig::validate` refuses — returns None
+    /// instead of a fabricated advisory. Finite garbage is the sharp
+    /// case: a non-positive Q or an out-of-bound trim is FINITE, would
+    /// compile to NaN/division-garbage coefficients, and must be
+    /// answered with refusal, never with a plausible "no attenuation
+    /// advised".
     #[test]
     fn invalid_inputs_refuse_to_advise() {
         let mut nan_trim = [0.0f32; 10];
         nan_trim[3] = f32::NAN;
         assert_eq!(
             estimated_eq_headroom_guidance(&EqConfig::new(nan_trim, 1.0), 44_100),
-            None
+            None,
+            "non-finite trim"
         );
         let mut nan_q = EqConfig::FLAT;
         nan_q.q = f32::NAN;
         assert_eq!(estimated_eq_headroom_guidance(&nan_q, 44_100), None);
+        // Finite-but-invalid: the fabrication traps.
+        assert_eq!(
+            estimated_eq_headroom_guidance(&EqConfig::new([0.0; 10], 0.0), 44_100),
+            None,
+            "q = 0 divides by zero in the recipes"
+        );
+        assert_eq!(
+            estimated_eq_headroom_guidance(&EqConfig::new([0.0; 10], -1.0), 44_100),
+            None,
+            "negative Q is invalid data, not a valid recipe"
+        );
+        let mut huge = [0.0f32; 10];
+        huge[3] = crate::processing::EQ_MAX_BAND_GAIN_DB + 0.5;
+        assert_eq!(
+            estimated_eq_headroom_guidance(&EqConfig::new(huge, 1.0), 44_100),
+            None,
+            "out-of-bound trim is invalid data even though finite"
+        );
         assert_eq!(estimated_eq_headroom_guidance(&EqConfig::FLAT, 0), None);
+    }
+
+    /// The advice only ever attenuates: across every preset and the
+    /// product rate matrix, guidance_db is <= 0.0 — the sign pin of the
+    /// never-round-up-into-a-boost contract.
+    #[test]
+    fn the_advice_never_advises_a_boost() {
+        for preset in EqPreset::all() {
+            let eq = preset.to_config().eq.expect("preset carries an EQ");
+            for fs in [8000u32, 22050, 44_100, 48_000, 96_000] {
+                let guidance = estimated_eq_headroom_guidance(&eq, fs)
+                    .unwrap_or_else(|| panic!("{preset:?} at {fs} advises"));
+                assert!(
+                    guidance.guidance_db <= 0.0,
+                    "{preset:?} at {fs}: advice must never be a boost ({})",
+                    guidance.guidance_db
+                );
+                assert!(guidance.peak_hz >= 0.0);
+            }
+        }
     }
 
     /// Rate-awareness (§2.1): the estimate covers the AVAILABLE bands
@@ -346,46 +405,135 @@ mod tests {
         );
     }
 
-    /// Negative control: the guidance oracle must be able to fail. A
-    /// deliberately wrong advisor that (a) includes the preamp in the
-    /// estimate or (b) reports attenuation where the cascade only cuts
-    /// is distinguishable from the real one by the pins above — proved
-    /// here by replaying wrong answers through the same assertion
-    /// shapes.
+    /// Negative controls with REAL mutant machinery: deliberately wrong
+    /// advisors built from the module's own recipes and grid are run
+    /// through the same pins the real advisor passed, and each must be
+    /// REJECTED — the suite can tell the accepted advisor from its
+    /// defects.
     #[test]
     fn the_advice_oracles_reject_deliberately_wrong_advisors() {
         use crate::processing_support::rejects;
+
+        // MUTANT (a) — availability-ignoring advisor: the module's own
+        // f64 recipes over ALL bands, §2.1 be damned.
+        let ignore_availability =
+            |eq: &EqConfig, sample_rate_hz: u32| -> Option<HeadroomGuidance> {
+                guidance_over_rule(eq, sample_rate_hz, |_, _| true)
+            };
+        let mut high_only = [0.0f32; 10];
+        high_only[9] = 12.0;
+        let eq_high = EqConfig::new(high_only, 1.0);
+        let mutant_low_rate = ignore_availability(&eq_high, 8_000).expect("mutant advises");
+        assert!(rejects(|| {
+            // The rate-awareness pin, fed the MUTANT's answer: the
+            // unavailable 16 kHz band must not enter the 8 kHz estimate,
+            // and the mutant lets it — the pin rejects that world.
+            assert_eq!(mutant_low_rate.guidance_db, 0.0);
+        }));
+
+        // MUTANT (b) — preamp-including advisor: folds a manual preamp
+        // into the cascade gain.
+        let with_preamp =
+            |eq: &EqConfig, sample_rate_hz: u32, preamp_db: f64| -> Option<HeadroomGuidance> {
+                guidance_over_rule(eq, sample_rate_hz, |f0, fs| {
+                    crate::processing::band_participates(f0 as f32, fs)
+                })
+                .map(|mut g| {
+                    g.guidance_db -= preamp_db as f32;
+                    g
+                })
+            };
         let eq = EqPreset::Rock.to_config().eq.expect("EQ");
         let real = estimated_eq_headroom_guidance(&eq, 44_100).expect("advises");
-
-        // (a) A preamp-including advisor would answer differently for
-        // the same EQ under two preamps — the independence pin rejects
-        // that world.
-        let preamp_including_world = HeadroomGuidance {
-            guidance_db: real.guidance_db - 6.0,
-            peak_hz: real.peak_hz,
-        };
+        let mutant_preamp = with_preamp(&eq, 44_100, 6.0).expect("mutant advises");
         assert!(rejects(|| {
-            let without = real;
-            let with = preamp_including_world;
-            assert_eq!(without, with, "preamp must not enter the EQ estimate");
+            // The independence pin, fed the MUTANT's answer: a preamp
+            // must not enter the estimate — the mutant's +6 dB preamp
+            // moved it, so the pin rejects that world.
+            assert_eq!(real, mutant_preamp, "preamp must not enter the EQ estimate");
         }));
 
-        // (b) A risk-fabricating advisor reports attenuation for a
-        // cutting-only cascade — the negative-only pin rejects it.
+        // MUTANT (c) — risk-fabricating advisor: drops the
+        // never-round-up clamp, so a cutting-only cascade reports
+        // attenuation.
         let mut cuts = [0.0f32; 10];
         cuts[5] = -6.0;
+        let eq_cuts = EqConfig::new(cuts, 1.0);
+        let mutant_always = guidance_over_rule(&eq_cuts, 44_100, |f0, fs| {
+            crate::processing::band_participates(f0 as f32, fs)
+        })
+        .map(|mut g| {
+            g.guidance_db = g.guidance_db.min(-0.5); // fabricates a risk
+            g
+        })
+        .expect("mutant advises");
         assert!(rejects(|| {
-            let fabricated = HeadroomGuidance {
-                guidance_db: -3.0,
-                peak_hz: 1000.0,
-            };
-            assert_eq!(
-                fabricated.guidance_db, 0.0,
-                "a cutting cascade advises nothing"
-            );
-            let _ = estimated_eq_headroom_guidance(&EqConfig::new(cuts, 1.0), 44_100);
+            // The negative-only pin, fed the MUTANT's answer: a cutting
+            // cascade advises nothing — the mutant fabricates, the pin
+            // rejects that world.
+            assert_eq!(mutant_always.guidance_db, 0.0);
         }));
+        // And the REAL advisor on the same config is what the pin
+        // accepts.
+        let real_cuts = estimated_eq_headroom_guidance(&eq_cuts, 44_100).expect("advises");
+        assert_eq!(real_cuts.guidance_db, 0.0);
+    }
+
+    /// Test-local grid advisor over an ARBITRARY availability rule —
+    /// the machinery mutants are built from THIS, so a rejected mutant
+    /// is a rejected real implementation shape, not a hardcoded
+    /// constant.
+    fn guidance_over_rule(
+        eq: &EqConfig,
+        sample_rate_hz: u32,
+        rule: impl Fn(f64, u32) -> bool,
+    ) -> Option<HeadroomGuidance> {
+        if sample_rate_hz == 0 || eq.validate().is_err() {
+            return None;
+        }
+        let fs = f64::from(sample_rate_hz);
+        let nyquist = fs / 2.0;
+        let active: Vec<[f64; 5]> = EQ_BAND_FREQUENCY_HZ
+            .iter()
+            .enumerate()
+            .filter(|&(_, &f0)| rule(f64::from(f0), sample_rate_hz))
+            .map(|(index, &f0)| {
+                band_coefficients(
+                    index,
+                    f64::from(f0),
+                    f64::from(eq.band_gain_db[index]),
+                    f64::from(eq.q),
+                    fs,
+                )
+            })
+            .collect();
+        let mut max_gain = 1.0f64;
+        let mut peak_hz = 0.0f64;
+        let mut f = GRID_MIN_HZ;
+        while f < nyquist {
+            let w = std::f64::consts::TAU * f / fs;
+            let (sin_w, cos_w) = (w.sin(), w.cos());
+            let (sin_2w, cos_2w) = ((2.0 * w).sin(), (2.0 * w).cos());
+            let mut gain = 1.0f64;
+            for c in &active {
+                let [b0, b1, b2, a1, a2] = *c;
+                let nr = b0 + b1 * cos_w + b2 * cos_2w;
+                let ni = -(b1 * sin_w + b2 * sin_2w);
+                let dr = 1.0 + a1 * cos_w + a2 * cos_2w;
+                let di = -(a1 * sin_w + a2 * sin_2w);
+                gain *= (nr * nr + ni * ni).sqrt() / (dr * dr + di * di).sqrt();
+            }
+            if gain > max_gain {
+                max_gain = gain;
+                peak_hz = f;
+            }
+            f *= 2.0f64.powf(1.0 / GRID_POINTS_PER_OCTAVE);
+        }
+        let peak_gain_db = 20.0 * max_gain.log10();
+        Some(HeadroomGuidance {
+            guidance_db: (-peak_gain_db.max(0.0)) as f32 + 0.0,
+            peak_hz: peak_hz as f32 + 0.0,
+        })
     }
 
     // --- the D2.1 evidence probe -----------------------------------------
@@ -415,7 +563,9 @@ mod tests {
                  {advised_boost:.2} dB boost"
             );
         }
-        // Shelf anchors: the asymptote carries the full configured dB.
+        // Shelf anchors: the asymptote carries the full configured dB,
+        // and the shelf f0 carries the HALF-dB midpoint (measured, not
+        // just documented).
         for (band, gain_db, measure_hz) in [(0usize, 12.0f32, 10.0f64), (9, 9.0, 0.99 * 22_050.0)] {
             let mut bands = [0.0f32; 10];
             bands[band] = gain_db;
@@ -428,6 +578,16 @@ mod tests {
                 (measured_db - advised_boost).abs() / magnitude < 0.2,
                 "shelf band {band}: measured {measured_db:.2} dB at the \
                  asymptote vs advised {advised_boost:.2} dB boost"
+            );
+            // The midpoint: at the shelf center the S = 1 response is
+            // A (half the dB) — measured through the REAL stage.
+            let f0 = f64::from(crate::processing::EQ_BAND_FREQUENCY_HZ[band]);
+            let midpoint_db = measured_boost_db_at(&eq, f0, 44_100);
+            assert!(
+                (midpoint_db - f64::from(gain_db) / 2.0).abs() < 0.35,
+                "shelf band {band}: at f0 the response should be the \
+                 half-dB midpoint (expected ~{}, measured {midpoint_db:.2})",
+                f64::from(gain_db) / 2.0
             );
         }
     }

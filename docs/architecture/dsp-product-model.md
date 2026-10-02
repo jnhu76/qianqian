@@ -502,13 +502,17 @@ Normative boundary:
 Manual ranges, recommended preset attenuation values, automatic headroom,
 optional/mandatory final protection and listening defaults remain product
 policy to be decided with quantitative/native/listening evidence. They are not
-frozen here.
+frozen here — except for the single advisory slice §9.1 now accepts.
 
-### 9.1 Estimated steady-state EQ headroom guidance (HEADROOM_POLICY,
-### accepted 2026-10-02, Issue #190 D2)
+### 9.1 Estimated steady-state EQ headroom guidance (accepted 2026-10-02, Issue #190 D2)
 
-The smallest product improvement over a bare manual preamp is a
-**non-binding advisory**, not a protection mechanism:
+Differential, explicit: this subsection supersedes §9's "not frozen here"
+clause for exactly ONE slice — the non-binding estimated steady-state EQ
+headroom advisory defined below. Automatic headroom, final protection,
+preset default attenuation values and listening defaults remain unfrozen.
+This subsection does NOT amend ADR-PBK-002 D14.11: the advisory is pure
+analysis over desired configuration data, not a processor, not a
+live-update right, and not a session-runtime change.
 
 ```text
 HEADROOM_POLICY              manual preamp + truthful advisory metadata
@@ -520,7 +524,9 @@ FINAL_LIMITER                NOT_EARNED (no limiter, no soft clipper,
 ```
 
 The advisory (`estimated_eq_headroom_guidance`) is a deterministic pure
-function of the desired EQ data and the source rate. Its frozen semantics:
+function of the desired EQ data and the source rate (deterministic within
+a process/platform; no cross-platform bit-determinism is claimed). Its
+frozen semantics:
 
 - it reports the attenuation (dB ≤ 0) that would place the available-band
   cascade's largest grid-sampled steady-state gain at unity, plus the peak
@@ -533,8 +539,10 @@ function of the desired EQ data and the source rate. Its frozen semantics:
 - the manual Preamp is NOT an input: the advice sits beside the user's own
   headroom control and never silently mutates the desired configuration;
 - the D14.9 Output Volume structurally cannot enter the calculation;
-- `None` refuses to advise where the recipes cannot mean anything (zero
-  rate, non-finite data) instead of fabricating an answer;
+- `None` refuses to advise rather than fabricating: a zero rate, or data
+  outside the product's intrinsic validity — the same domain establishment
+  validation refuses (invalid trims or Q), finite or not. Garbage is never
+  answered with a plausible "no attenuation advised";
 - desired configuration, applied configuration and advice remain three
   distinct product concepts; applying the advice is always an explicit
   product/user act on the preamp.
