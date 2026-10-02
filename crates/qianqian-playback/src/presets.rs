@@ -7,8 +7,10 @@
 //! non-promotion of configuration data to runtime/Plugin identity is
 //! the frozen rule). Selecting a preset constructs an ordinary desired
 //! configuration; the episode binds it exactly like any Custom
-//! configuration (episode-fixed applied snapshot, case B of the D14.11
-//! model; a preset change takes effect at the NEXT episode).
+//! configuration — at establishment, or live through the handle's
+//! `set_eq_preset` command (one of the four §7.3 live-authorized
+//! operation classes; the same [`EqPreset::to_config`] resolution both
+//! ways, so a preset never becomes a second configuration identity).
 //!
 //! The curves below are Qianqian PRODUCT TUNING — chosen for this
 //! player's reference listening, deliberately NOT presented as

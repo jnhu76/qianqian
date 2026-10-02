@@ -68,6 +68,8 @@ use std::time::Duration;
 use qianqian_audio_api::ports::PcmFormat;
 
 use crate::completion::{SessionCompletion, SessionOutcome};
+use crate::presets::EqPreset;
+use crate::processing::EqConfig;
 
 /// The stable semantic terminal outcome of one playback episode
 /// (ADR-PBK-002 D14.2): exactly these three variants and nothing else.
@@ -200,6 +202,18 @@ pub struct PlaybackSessionObservation {
     /// never started has no terminal Fact and must not be forged into
     /// `Failed`.
     pub activation_error: Option<String>,
+    /// The most recent Audio Processing update refusal diagnostic
+    /// (campaign #190 D4), or `None` while no update has been refused.
+    ///
+    /// Truth class: **mechanism evidence / diagnostic** — the same class
+    /// as `failure_diagnostic`: presentation text, never part of the
+    /// semantic contract, never a Fact, and never a correctness basis.
+    /// It reports WHY the most recent refused `set_*` command left the
+    /// old configuration running (invalid data, compile refusal); it is
+    /// cleared by the next accepted update. Like `position`, it is read
+    /// from its own cell rather than the single observation lock, so it
+    /// carries no freshness bound relative to the other fields.
+    pub last_processing_refusal: Option<String>,
 }
 
 impl PlaybackSessionObservation {
@@ -312,6 +326,69 @@ impl PlaybackSessionHandle {
         self.completion
             .output_level()
             .route(desired_level_to_factor(level));
+    }
+
+    /// Set the desired Audio Processing configuration's enabled state
+    /// (campaign #190 D4; `dsp-product-model.md` §7.3 processing
+    /// enabled/bypass toggle). A typed, idempotent Command — never
+    /// `set_dsp_parameter(name, value)`: the four live-authorized
+    /// operations each have their own typed entry point, and no
+    /// parameter addressing exists.
+    ///
+    /// The desired configuration is a WHOLE typed value; each `set_*`
+    /// changes exactly the field(s) its name denotes (bypass keeps the
+    /// gain/EQ fields in the desired configuration, inert) and the
+    /// pending update is the resulting whole configuration, depth one,
+    /// latest wins. The command boundary validates the candidate
+    /// intrinsically: an invalid candidate is refused HERE with an
+    /// honest diagnostic (returned and also observable through
+    /// [`PlaybackSessionObservation::last_processing_refusal`]), and the
+    /// old configuration keeps running bit-exactly.
+    ///
+    /// The three stages stay distinct (§7.3 vocabulary): an `Ok` here is
+    /// a coherent DESIRED update (intrinsic validation only); the
+    /// semantic ACCEPTANCE is the worker's pickup-time compile against
+    /// the episode format; APPLY is the next whole staging block that
+    /// has not yet been DSP-processed, through the authorized bounded
+    /// crossfade — already-processed PCM is never reprocessed. The
+    /// command is intent, not a claim that the sound has changed.
+    /// Commands recorded after the terminal Fact are inert command
+    /// history, like late stop intent.
+    pub fn set_processing_enabled(&self, enabled: bool) -> Result<(), String> {
+        self.completion.processing().set_enabled(enabled)
+    }
+
+    /// Set the desired preamp: the linear gain factor of the processing
+    /// stage, in the same unit the frozen
+    /// [`crate::processing::AudioProcessingConfig::gain`] field documents (`1.0` unity,
+    /// `<1.0` attenuation, `0.0` true silence, `>1.0` positive gain —
+    /// never clipped or limited here; presentation layers may display
+    /// dB). Refused when the factor is not finite or negative.
+    /// See [`PlaybackSessionHandle::set_processing_enabled`] for the
+    /// command/acceptance/apply contract these setters share.
+    pub fn set_preamp(&self, factor: f32) -> Result<(), String> {
+        self.completion.processing().set_preamp(factor)
+    }
+
+    /// Set the desired custom EQ configuration (the 10-band product
+    /// trims + peaking Q, [`EqConfig`]). Replaces the EQ field only; it
+    /// does not implicitly toggle `enabled`, and it leaves the preamp
+    /// as-is. See
+    /// [`PlaybackSessionHandle::set_processing_enabled`] for the shared
+    /// command/acceptance/apply contract.
+    pub fn set_eq_config(&self, eq: EqConfig) -> Result<(), String> {
+        self.completion.processing().set_eq_config(eq)
+    }
+
+    /// Select a factory preset as the desired configuration
+    /// ([`EqPreset`]). A preset is a WHOLE recorded desired
+    /// configuration ([`EqPreset::to_config`], its unity preamp
+    /// included — exactly the resolution the establishment path uses),
+    /// not a processor and not a partial patch. See
+    /// [`PlaybackSessionHandle::set_processing_enabled`] for the shared
+    /// command/acceptance/apply contract.
+    pub fn set_eq_preset(&self, preset: EqPreset) -> Result<(), String> {
+        self.completion.processing().set_eq_preset(preset)
     }
 
     /// One coherent observation of the episode. Pure read: no resolve,

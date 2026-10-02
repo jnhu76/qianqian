@@ -1463,7 +1463,7 @@ fn a_named_preset_processes_through_the_real_seam() {
 }
 
 /// A preset CHANGE applies at the NEXT episode's establishment (the
-/// D14.11 episode-fixed applied snapshot, case B): episode 1 runs Bass;
+/// D14.11 episode binding): episode 1 runs Bass;
 /// episode 2 — a fresh establishment in the same process — runs Treble.
 /// Each episode's consumed stream equals its OWN fresh-stage reference
 /// bit-exactly, and the two differ (the change really applied at the

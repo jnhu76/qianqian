@@ -132,6 +132,7 @@ impl TuiModel {
                 position: None,
                 pause_engagement: PauseEngagement::Disengaged,
                 activation_error: None,
+                last_processing_refusal: None,
             },
             open_input: None,
             goto_input: None,
@@ -223,6 +224,7 @@ impl TuiModel {
                 position: None,
                 pause_engagement: PauseEngagement::Disengaged,
                 activation_error: None,
+                last_processing_refusal: None,
             };
         }
     }
@@ -753,6 +755,7 @@ mod tests {
             position: None,
             pause_engagement: PauseEngagement::Disengaged,
             activation_error: None,
+            last_processing_refusal: None,
         }
     }
 

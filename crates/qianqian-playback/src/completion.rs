@@ -64,6 +64,7 @@ use qianqian_audio_api::ports::{
 
 use crate::edge::{EdgeTerminal, PcmEdge};
 use crate::handle::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
+use crate::live::ProcessingControl;
 
 /// How one playback episode ended. Crate-internal realization: the
 /// public semantic contract is only the stable
@@ -312,6 +313,16 @@ struct CompletionArc {
     /// configuration in transit, never a Fact and never settlement
     /// input.
     output_level: OutputLevel,
+    /// Product-control's Audio Processing state (campaign #190 D4): the
+    /// desired whole configuration, the depth-1 latest-wins pending
+    /// slot, and the last refusal diagnostic. Created with the
+    /// completion so the application seam can route typed `set_*`
+    /// commands from the moment a handle exists; the decode worker
+    /// holds the same `Arc` and picks pending updates up once per whole
+    /// staging block at the fresh-block boundary. Command state in
+    /// transit — never a Fact, never settlement input, never read on
+    /// the per-block PCM path.
+    processing: Arc<ProcessingControl>,
 }
 
 impl Default for SessionCompletion {
@@ -403,6 +414,14 @@ impl SessionCompletion {
                     seek_slot: Mutex::new(SeekSlot::default()),
                     position: PositionEvidence::new(),
                     output_level: OutputLevel::new(),
+                    // The establishment default is the transparent
+                    // BYPASS configuration, exactly the D14.11 default
+                    // of `playback_session_spec`; the spec constructors
+                    // bind the application's desired configuration
+                    // through `processing().establish(..)`.
+                    processing: Arc::new(ProcessingControl::new(
+                        crate::processing::AudioProcessingConfig::BYPASS,
+                    )),
                 }
             }),
         }
@@ -951,6 +970,13 @@ impl SessionCompletion {
         self.state.output_level.clone()
     }
 
+    /// Product-control's Audio Processing state (campaign #190 D4): the
+    /// application seam routes typed processing commands through it, and
+    /// the decode worker's live runtime holds the same `Arc`.
+    pub(crate) fn processing(&self) -> Arc<ProcessingControl> {
+        self.state.processing.clone()
+    }
+
     /// Frames currently buffered on the session's edge, once bound.
     /// Test/verifier diagnostic only (F2 ruling, D14.3): mechanism
     /// evidence, NOT application observation and NOT UI contract. It
@@ -1089,6 +1115,7 @@ impl SessionCompletion {
                 (true, false) => PauseEngagement::Engaged,
                 (false, _) => PauseEngagement::Disengaged,
             },
+            last_processing_refusal: self.state.processing.last_refusal(),
         }
     }
 

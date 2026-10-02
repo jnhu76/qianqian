@@ -35,6 +35,7 @@ use qianqian_composition::{ActivationError, ComponentSpec, Discharge};
 use crate::completion::{CutoverDecision, SessionCompletion};
 use crate::edge::PcmEdge;
 use crate::handle::PlaybackSessionHandle;
+use crate::live::LiveProcessing;
 use crate::processing::{AudioProcessingConfig, EpisodeProcessing};
 
 /// Frames of PCM the edge buffers (~185 ms at 44.1 kHz stereo). Chosen
@@ -62,23 +63,27 @@ pub fn playback_session_spec(file: PathBuf, handle: PlaybackSessionHandle) -> Co
 /// [`playback_session_spec`] with the application's desired Audio
 /// Processing configuration (ADR-PBK-002 D14.11). This constructor call
 /// IS the D14.11 handoff representation: the desired configuration is
-/// an argument of episode establishment, the session binds ONE coherent
-/// applied snapshot from it at activation, and the snapshot is
-/// episode-fixed (no live updates — a changed desired configuration
-/// takes effect at the NEXT episode). An invalid configuration fails
-/// the activation cleanly with no terminal Fact and no resource left
-/// behind; because the EQ stage's coefficients depend on the source
-/// rate, the final compile runs once the decode endpoint is open, and
-/// an invalid configuration unwinds that endpoint through RAII.
+/// bound to the episode here, the session compiles ONE coherent applied
+/// snapshot from it at activation, and since campaign #190 D4 a changed
+/// desired configuration can also be applied LIVE through the handle's
+/// typed `set_*` commands under the §7.3 live-update admission
+/// contract. The establishment binding itself is unchanged — it seeds
+/// the product-control desired state the episode starts from. An
+/// invalid configuration fails the activation cleanly with no terminal
+/// Fact and no resource left behind; because the EQ stage's coefficients
+/// depend on the source rate, the final compile runs once the decode
+/// endpoint is open, and an invalid configuration unwinds that endpoint
+/// through RAII.
 pub fn playback_session_spec_with_processing(
     file: PathBuf,
     handle: PlaybackSessionHandle,
     processing: AudioProcessingConfig,
 ) -> ComponentSpec {
+    handle.completion.processing().establish(processing);
     ComponentSpec::new("playback_session")
         .requires::<PcmDecodeCapability>()
         .requires::<AudioOutputCapability>()
-        .on_activate(move |ctx| activate(&file, &handle.completion, &processing, ctx))
+        .on_activate(move |ctx| activate(&file, &handle.completion, ctx))
 }
 
 /// Test-only establishment with a DELIBERATE episode processing runtime
@@ -122,49 +127,56 @@ pub(crate) fn playback_session_spec_with_test_processor(
         })
 }
 
-/// Test-only establishment with the D3 DISPOSABLE LIVE-TRANSITION PROBE
-/// (campaign #190): the real composition — real capability resolve,
+/// Test-only establishment with the live mechanism's INSTRUMENTATION TAP
+/// (campaign #190 D4): the real composition — real capability resolve,
 /// edge, render stream, worker, seek/pause/terminal protocol — with the
-/// probe engine in place of the episode-fixed snapshot, so the live
-/// oracles exercise the actual staging seam, remainder flush, pickup
-/// boundary and invalidation path. Never shipped, never public, never a
-/// product seam: the live-update authority is earned by these probes
-/// under the campaign's own gate, and D4 replaces this with the
-/// smallest production mechanism.
+/// production [`LiveProcessing`] engine plus the cfg(test) tap, so the
+/// live oracles exercise the actual staging seam, remainder flush,
+/// pickup boundary and invalidation path, and can read the engine's
+/// block/frame/event bookkeeping. Never shipped, never public, never a
+/// product seam. The transition length is a parameter here (the
+/// production constant is derived from the format) so an oracle can pin
+/// geometry deterministically.
 #[cfg(all(test, not(loom)))]
-pub(crate) fn playback_session_spec_with_live_probe(
+pub(crate) fn playback_session_spec_with_live_tap(
     file: PathBuf,
     handle: PlaybackSessionHandle,
     initial: AudioProcessingConfig,
     transition_frames: usize,
-    control: crate::live_probe::LiveProbeControl,
+    tap: crate::live::tap::LiveTap,
 ) -> ComponentSpec {
-    let initial = std::cell::RefCell::new(Some(initial));
-    let control = std::cell::RefCell::new(Some(control));
+    // The establishment binding happens at CONSTRUCTION time — the
+    // product constructor's exact shape — so an oracle can issue a
+    // typed command into the establishment→activation window and pin
+    // the same linearization the product path runs.
+    handle.completion.processing().establish(initial);
+    let tap = std::cell::RefCell::new(Some(tap));
     ComponentSpec::new("playback_session")
         .requires::<PcmDecodeCapability>()
         .requires::<AudioOutputCapability>()
         .on_activate(move |ctx| {
-            let initial = initial
+            let tap = tap
                 .borrow_mut()
                 .take()
-                .expect("the live probe was activated twice");
-            let control = control
-                .borrow_mut()
-                .take()
-                .expect("the live probe was activated twice");
-            let result = activate_established(
+                .expect("the live tap spec was activated twice");
+            // The SAME live-engine activation path the product
+            // constructor uses (one bind spelling), with the tap-carrying
+            // engine constructor — so a `set_*` between this constructor
+            // and activation is honored identically: it folds into the
+            // initial applied configuration.
+            let result = activate_live_engine(
                 &file,
                 &handle.completion,
-                |format| {
-                    crate::live_probe::LiveProbeEngine::new(
-                        initial,
+                ctx,
+                |desired, format, control| {
+                    crate::live::LiveProcessing::with_tap(
+                        desired,
                         format,
                         transition_frames,
                         control,
+                        tap,
                     )
                 },
-                ctx,
             );
             if let Err(e) = &result {
                 handle.completion.activation_failed(&e.message);
@@ -173,16 +185,16 @@ pub(crate) fn playback_session_spec_with_live_probe(
         })
 }
 
-/// The engine-builder variant of the live-probe establishment (campaign
-/// #190 D3 failure-injection route): the test constructs the probe
-/// engine itself — e.g. with a deliberate failing processor as the
-/// initial side — through the same activation path. One-shot, like the
-/// other test-only constructors.
+/// The engine-builder variant of the live establishment (campaign #190
+/// D3/D4 failure-injection route): the test constructs the engine itself
+/// — e.g. with a deliberate failing processor as the initial side —
+/// through the same activation path. One-shot, like the other test-only
+/// constructors.
 #[cfg(all(test, not(loom)))]
-pub(crate) fn playback_session_spec_with_live_probe_engine(
+pub(crate) fn playback_session_spec_with_live_engine(
     file: PathBuf,
     handle: PlaybackSessionHandle,
-    build_engine: impl FnOnce(&PcmFormat) -> Result<crate::live_probe::LiveProbeEngine, String>
+    build_engine: impl FnOnce(&PcmFormat) -> Result<crate::live::LiveProcessing, String>
     + Send
     + 'static,
 ) -> ComponentSpec {
@@ -194,7 +206,7 @@ pub(crate) fn playback_session_spec_with_live_probe_engine(
             let build_engine = build_engine
                 .borrow_mut()
                 .take()
-                .expect("the live probe was activated twice");
+                .expect("the live engine spec was activated twice");
             let result = activate_established(&file, &handle.completion, build_engine, ctx);
             if let Err(e) = &result {
                 handle.completion.activation_failed(&e.message);
@@ -206,13 +218,12 @@ pub(crate) fn playback_session_spec_with_live_probe_engine(
 fn activate(
     file: &Path,
     completion: &SessionCompletion,
-    processing: &AudioProcessingConfig,
     ctx: &mut qianqian_composition::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
     // The kernel's diagnostic surface carries the FAILED verdict but not
     // the domain message; the session publishes its own activation
     // failure so the App can show why an episode never started.
-    let result = activate_inner(file, completion, processing, ctx);
+    let result = activate_inner(file, completion, ctx);
     if let Err(e) = &result {
         completion.activation_failed(&e.message);
     }
@@ -222,13 +233,37 @@ fn activate(
 fn activate_inner(
     file: &Path,
     completion: &SessionCompletion,
-    processing: &AudioProcessingConfig,
     ctx: &mut qianqian_composition::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
+    activate_live_engine(file, completion, ctx, |desired, format, control| {
+        LiveProcessing::new(desired, format, control)
+    })
+}
+
+/// The ONE live-engine activation path — the product constructor and the
+/// tap-carrying oracle spec both construct through it, so the
+/// linearization has exactly one spelling. It reads product-control
+/// through the ACTIVATION BIND: the bind consumes any pending update in
+/// the same lock hold it reads the desired state, so a `set_*` between
+/// spec construction and activation folds into the initial applied
+/// configuration (no phantom initial→same transition), and a `set_*`
+/// after the bind lands in the pending slot and reaches the worker's
+/// fresh-block pickup as an ordinary §7.3 live update.
+fn activate_live_engine(
+    file: &Path,
+    completion: &SessionCompletion,
+    ctx: &mut qianqian_composition::ActivationCtx<'_>,
+    engine: impl FnOnce(
+        AudioProcessingConfig,
+        &PcmFormat,
+        std::sync::Arc<crate::live::ProcessingControl>,
+    ) -> Result<LiveProcessing, String>,
+) -> Result<(), ActivationError> {
+    let control = completion.processing();
     activate_established(
         file,
         completion,
-        |format| EpisodeProcessing::new(processing, format),
+        |format| engine(control.bind_for_activation(), format, control.clone()),
         ctx,
     )
 }
@@ -378,14 +413,10 @@ const WORKER_WAIT_SLICE: Duration = Duration::from_millis(2);
 /// this trait and monomorphized at spawn, so the per-block work is a
 /// direct call — no per-block lookup, no dynamic dispatch, no
 /// capability/context resolution (the D14.11 realtime firewall). Two
-/// implementations exist: [`EpisodeProcessing`] (production, D14.11
-/// case B) and, under cfg(test), the disposable live-transition probe
-/// (`live_probe::LiveProbeEngine`, campaign #190 D3).
-///
-/// NON-FREEZE: the trait's existence, the poll placement and this
-/// contract's wording are probe scaffold for the D3 campaign — they are
-/// NOT the frozen D14.11 live-update mechanism representation, which
-/// stays OPEN and is decided by the D4 production implementation.
+/// implementations exist: [`LiveProcessing`] (the production live
+/// mechanism, campaign #190 D4) and [`EpisodeProcessing`] (the
+/// stateful-transport oracle's deliberate processor through the
+/// cfg(test) injection constructors).
 pub(crate) trait ProcessingRuntime: Send {
     /// The staging transform (D14.11): in place, frame-count
     /// preserving; `Err` is the unrecoverable processing failure
@@ -401,11 +432,11 @@ pub(crate) trait ProcessingRuntime: Send {
     /// FRESH-STAGING-BLOCK boundary (after a preserved remainder is
     /// flushed, before the next decode, with no seek in flight). `None`
     /// = nothing to do; `Some(Ok(()))` = handled (an accepted transition
-    /// started, or a desired update was refused — refusals are reported
-    /// through the probe's own sink, never as processing failures);
-    /// `Some(Err(_))` = an unrecoverable processing failure routing
-    /// through D11 `Failed`. Production processing has no updates (the
-    /// D14.11 episode-fixed minimum) and never returns anything.
+    /// started, or a desired update was refused — a refusal is recorded
+    /// as product-control's own mechanism evidence, never a processing
+    /// failure); `Some(Err(_))` = an unrecoverable processing failure
+    /// routing through D11 `Failed`. The deliberate test processors keep
+    /// the default: nothing to pick up.
     fn poll_update(&mut self) -> Option<Result<(), String>> {
         None
     }
@@ -419,8 +450,7 @@ impl ProcessingRuntime for EpisodeProcessing {
     fn invalidate_signal_history(&mut self) {
         EpisodeProcessing::invalidate_signal_history(self)
     }
-    // poll_update: the production default — no live updates (D14.11
-    // case B; live authorization is earned separately, campaign #190).
+    // poll_update: the deliberate test processors have no live updates.
 }
 
 /// How one bounded write advanced, from the decode worker's
@@ -685,11 +715,12 @@ fn decode_worker<P: ProcessingRuntime>(
             // production-continues principle), so an accepted transition
             // starts on exactly one whole staging block that has not yet
             // been DSP-processed — the apply boundary the live authority
-            // freezes (campaign #190 D3). Production processing never reports anything
-            // here (poll_update's default); the cfg(test) live probe is
-            // the only reporter. Some(Err) is a processing failure and
-            // takes the ordinary D11 route; refusals are the probe's
-            // own sink, never a failure.
+            // freezes (dsp-product-model.md §7.3, campaign #190 D3/D4).
+            // The production live runtime reads product-control's
+            // pending cell here; the deliberate test processors keep the
+            // no-update default. Some(Err) is a processing failure and
+            // takes the ordinary D11 route; a refusal is product
+            // control's own recorded diagnostic, never a failure.
             if let Some(Err(message)) = processing.poll_update() {
                 completion.processing_failed(&message);
                 edge.fail();

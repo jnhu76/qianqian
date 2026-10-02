@@ -33,6 +33,7 @@ fn pending_observation() -> PlaybackSessionObservation {
         position: None,
         pause_engagement: PauseEngagement::Disengaged,
         activation_error: None,
+        last_processing_refusal: None,
     }
 }
 
@@ -130,6 +131,7 @@ fn each_terminal_fact_projects_its_own_line() {
             position: None,
             pause_engagement: PauseEngagement::Disengaged,
             activation_error: None,
+            last_processing_refusal: None,
             failure_diagnostic: None,
         };
         let text = format_status(&observation);

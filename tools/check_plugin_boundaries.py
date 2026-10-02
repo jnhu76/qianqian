@@ -185,8 +185,9 @@ EXPORT_RULES = {
     # The processing-config freeze behind the lib.rs re-export (I1 review):
     # the desired-configuration payload's public rights are frozen here so
     # they cannot grow silently (a `pub preset` field or a live-update
-    # accessor would otherwise RED nothing — live parameter update is
-    # OPEN/unearned under D14.11). The episode-owned runtime
+    # accessor would otherwise RED nothing — live update is earned under
+    # D14.11 LIVE-1 only as typed commands on the episode handle, never
+    # as accessors on this payload). The episode-owned runtime
     # (EpisodeProcessing) is pub(crate) and is NOT admitted: promoting it
     # to `pub` REDs this rule.
     "crates/qianqian-playback/src/processing.rs": {
@@ -221,19 +222,20 @@ EXPORT_RULES = {
         ],
         "authority": "ADR-PBK-002 D14.11 (Issue #177 I1-I3) — the application/product-control "
         "layer owns the DESIRED Audio Processing configuration and hands ONE coherent "
-        "snapshot to the episode at establishment (config model case B; live parameter "
-        "update stays OPEN and unearned, so no update accessor may appear on this "
-        "surface; presets are I4 configuration DATA and join only as data, never as "
-        "processors). The applied snapshot and the processing runtime are session-owned "
-        "subordinate resources and stay crate-private. A new public right here must "
-        "first earn its narrow authority, then update this allowlist on purpose",
+        "snapshot to the episode at establishment (config model case B; live update is "
+        "earned under D14.11 LIVE-1 as typed commands on the episode handle, so no "
+        "update accessor may appear on THIS surface; presets are I4 configuration DATA "
+        "and join only as data, never as processors). The applied snapshot and the "
+        "processing runtime are session-owned subordinate resources and stay "
+        "crate-private. A new public right here must first earn its narrow authority, "
+        "then update this allowlist on purpose",
     },
     # The rights freeze behind the lib.rs re-export (I4 review): the
     # preset vocabulary is configuration DATA (D14.11), and its public
     # rights are frozen here so a future `pub fn apply_live(...)`-shaped
-    # accessor — live parameter update is OPEN/unearned — or any
-    # processor/registry vocabulary cannot grow silently. A new public
-    # right here REDs until it earns narrow authority.
+    # accessor — live update lives only on the episode handle (LIVE-1) —
+    # or any processor/registry vocabulary cannot grow silently. A new
+    # public right here REDs until it earns narrow authority.
     "crates/qianqian-playback/src/presets.rs": {
         "label": "eq-preset-data",
         # The `;`-containing array signatures cut at their deterministic
@@ -250,9 +252,10 @@ EXPORT_RULES = {
         "authority": "ADR-PBK-002 D14.11 (Issue #177 I4) — named EQ presets are pure "
         "product CONFIGURATION DATA over AudioProcessingConfig/EqConfig: record, "
         "resolve deterministically (case B desired configuration), and parse by "
-        "name. No processor, Plugin, registry, or live-update identity may appear "
-        "on this surface; a preset change reaching a live episode is unearned and "
-        "must RED here until a narrow authority amendment says otherwise",
+        "name. No processor, Plugin, registry, or live-update accessor may appear "
+        "on this surface; live preset changes travel only as typed episode-handle "
+        "commands (D14.11 LIVE-1), and a live-update accessor HERE must RED until "
+        "a narrow authority amendment says otherwise",
     },
     # The rights freeze behind the lib.rs re-exports (review round 3):
     # an exported type's pub methods/fields live here, not in lib.rs, so
@@ -275,12 +278,17 @@ EXPORT_RULES = {
             "pub position: Option<u64>,",
             "pub pause_engagement: PauseEngagement,",
             "pub activation_error: Option<String>,",
+            "pub last_processing_refusal: Option<String>,",
             "pub fn new() -> Self {",
             "pub fn request_stop(&self) {",
             "pub fn request_pause(&self) {",
             "pub fn request_resume(&self) {",
             "pub fn request_seek(&self, target: Duration) {",
             "pub fn request_output_level(&self, level: u8) {",
+            "pub fn set_processing_enabled(&self, enabled: bool) -> Result<(),",
+            "pub fn set_preamp(&self, factor: f32) -> Result<(),",
+            "pub fn set_eq_config(&self, eq: EqConfig) -> Result<(),",
+            "pub fn set_eq_preset(&self, preset: EqPreset) -> Result<(),",
             "pub fn observe(&self) -> PlaybackSessionObservation {",
             "pub fn wait_terminal(&self) -> EpisodeTerminalOutcome {",
             "pub fn paused(&self) -> bool {",
@@ -309,7 +317,16 @@ EXPORT_RULES = {
         "V-PROBE) adds exactly one command: `request_output_level(0..=100)` — the App's "
         "desired stream factor as an idempotent, non-terminal Command (clamped at the "
         "seam; routed into the session-owned OutputLevel cell; never a Fact, never a "
-        "mechanism readback — no volume getter may appear on this surface). A further new "
+        "mechanism readback — no volume getter may appear on this surface). The 2026-10-02 "
+        "live-admission amendment (Issue #190 D3/D4; dsp-product-model.md §7.3 + the "
+        "D14.11 LIVE-1/LIVE-2 notes) adds exactly the four typed live commands "
+        "set_processing_enabled/set_preamp/set_eq_config/set_eq_preset — each a WHOLE "
+        "typed desired-configuration Command under §7.3 coherent acceptance (no generic "
+        "parameter addressing; no ProcessorId/ParameterId/DspCommand may appear on this "
+        "surface) — plus exactly one observation field, `last_processing_refusal` "
+        "(mechanism evidence/diagnostic, the same truth class as failure_diagnostic; "
+        "never a Fact, never a correctness basis; the typed desired/applied read model "
+        "is D5's decision). A further new "
         "public right must first earn an explicit D14/phase-authority amendment, then "
         "update this allowlist on purpose",
     },
