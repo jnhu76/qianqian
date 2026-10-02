@@ -194,10 +194,11 @@ fn activate_established(
     completion.set_source_format(format);
     // The applied processing snapshot completes HERE, bound to this
     // episode's source format (D14.11): intrinsic configuration
-    // problems and format-dependent problems (an EQ band at/above this
-    // source's Nyquist frequency) both fail the establishment cleanly —
-    // the open endpoint drops with the raise, no terminal Fact is
-    // forged, no resource is left behind.
+    // problems fail the establishment cleanly — the open endpoint drops
+    // with the raise, no terminal Fact is forged, no resource is left
+    // behind. Source-rate band availability is NOT a failure mode: the
+    // rate-aware active-band profile (dsp-product-model.md §2.1)
+    // compiles whatever participates.
     let processing = compile_processing(&format).map_err(|e| {
         ActivationError::new(format!("audio processing configuration invalid: {e}"))
     })?;

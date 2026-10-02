@@ -113,12 +113,54 @@ Current EQ remains source-rate/source-layout/frame-count preserving and
 causal under D14.11. Current implementation has no implicit clipper, limiter,
 auto-headroom, mandatory EOF drain, SRC or channel remap.
 
-A current product limitation is that all enabled 10-band EQ configurations
-require every fixed center frequency to remain strictly below Nyquist; with
-the 16 kHz band present this means source rate must be **> 32 kHz**. `Flat`
-still compiles the same profile and is not equivalent to Processing Off for
-this purpose. This is a real release/product debt, not a reason to weaken the
-processing contract silently.
+### 2.1 Rate availability of the fixed band table (LOW_RATE_EQ_POLICY, accepted 2026-10-02, Issue #190 D1)
+
+The historical product limitation — every enabled 10-band EQ configuration
+required every fixed center to remain strictly below Nyquist, so the 16 kHz
+band refused all sources at **≤ 32 kHz** (Flat failing where Processing Off
+succeeded) — is superseded by the **rate-aware active-band profile**:
+
+```text
+A fixed product band participates in an episode's compiled cascade
+iff its center frequency is strictly below that episode's source
+Nyquist frequency.
+```
+
+Frozen semantics:
+
+- an **available** band compiles normally; its configured trim shapes the
+  episode;
+- an **unavailable** band (center ≥ Nyquist) is **inert for that episode**:
+  it is not compiled (at or above Nyquist the band's normalized frequency
+  degenerates and no source content exists there to shape); its configured
+  trim STAYS in the desired configuration and becomes active again on an
+  episode whose source domain includes the band;
+- availability **never refuses activation** and never changes the processing
+  class of §6.1 (still source-rate/layout/frame preserving, bounded causal,
+  no mandatory pending output at EOF — the profile varies, the R0 contract
+  does not);
+- invalid band **data** (non-finite or out-of-bound trims, non-positive Q)
+  remains an activation failure at every rate, on available and unavailable
+  bands alike — intrinsic validity is rate-independent and is not rendered
+  harmless by a band being unavailable;
+- `Flat` (all bands neutral) remains observationally identical to bypass at
+  **every** source rate;
+- strictness at the Nyquist boundary is load-bearing: at exactly Nyquist
+  the band's recursion degenerates, so the boundary band belongs to the
+  unavailable side;
+- honest exposure: product read models MUST be able to observe which bands
+  are active for the current episode (the desired configuration still
+  carries ten trims; the applied profile is the available subset). A
+  presentation surface that shows a trim of an unavailable band as
+  shaping sound would be lying; the observation plane / TUI work (#187,
+  #188) consumes this distinction, it does not redefine it.
+
+Alternatives evaluated and rejected: retaining the hard refusal (Policy A —
+dishonest: a neutral configuration refused where bypass succeeds); a
+rate-specific band table (Policy C — changes product identity: preset and
+custom-config meaning would drift per rate). This decision is product
+semantics under this document; it does not amend ADR-PBK-002 D14.11, whose
+processing-minimum class is unchanged.
 
 ---
 

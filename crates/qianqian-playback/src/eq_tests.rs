@@ -42,7 +42,7 @@ use crate::processing::{
     EqStage,
 };
 use crate::processing_support::{
-    EIGHT_SECONDS, TEST_RATE, assert_processed_exactly_at, episode, wait_until,
+    EIGHT_SECONDS, TEST_RATE, assert_processed_exactly_at, episode, rejects, wait_until,
 };
 use crate::test_common::{self, OutputBehavior, TEST_FORMAT};
 
@@ -450,9 +450,10 @@ fn maximum_settings_produce_finite_output() {
 }
 
 /// Invalid configurations fail compilation (I3.5): non-positive/NaN Q,
-/// non-finite or out-of-bound band gains, a zero sample rate, and —
-/// the format-DEPENDENT half — any band at or above the source's
-/// Nyquist frequency. Nothing is clamped; nothing poisons the state.
+/// non-finite or out-of-bound band gains, a zero sample rate — at any
+/// source rate. Rate availability is NOT invalidity (the rate-aware
+/// active-band profile makes unavailable bands inert instead); invalid
+/// DATA still refuses. Nothing is clamped; nothing poisons the state.
 #[test]
 fn invalid_eq_configurations_fail_compilation() {
     // Non-positive Q.
@@ -478,47 +479,330 @@ fn invalid_eq_configurations_fail_compilation() {
         )
         .is_err()
     );
-    // Format-dependent: an 8 kHz source has a 4 kHz Nyquist, so the
-    // 4/8/16 kHz product bands cannot compile for it.
+    // Format-dependent INVALIDITY is data, not rate availability: at a
+    // low source rate the unavailable bands are inert (the rate-aware
+    // active-band profile, dsp-product-model.md §2.1), but NaN/out-of-bound
+    // band DATA still fails compilation exactly as at any other rate —
+    // on an AVAILABLE band and on an UNAVAILABLE band alike (intrinsic
+    // validation is rate-independent; invalid data is not rendered
+    // harmless by the band being unavailable).
+    let mut low_rate_nan = [0.0f32; 10];
+    low_rate_nan[2] = f32::NAN;
     let low_rate = PcmFormat {
         sample_rate: 8000,
         channels: 2,
         channel_mask: 0x3,
     };
-    let err = EqStage::new(&EqConfig::FLAT, &low_rate)
-        .expect_err("bands at/above Nyquist must fail compilation");
     assert!(
-        err.contains("Nyquist"),
-        "the diagnostic must name the Nyquist conflict: {err}"
+        EqStage::new(&EqConfig::new(low_rate_nan, 1.0), &low_rate).is_err(),
+        "invalid band data on an available band fails at a low rate too"
+    );
+    let mut unavailable_nan = [0.0f32; 10];
+    unavailable_nan[9] = f32::NAN; // the 16 kHz band, unavailable at 8 kHz
+    assert!(
+        EqStage::new(&EqConfig::new(unavailable_nan, 1.0), &low_rate).is_err(),
+        "invalid band data stays invalid on an unavailable band"
     );
 }
 
-/// The stage compiles against a source format as a WHOLE: at and above
-/// 32 kHz every product band sits below Nyquist and the stage compiles;
-/// below, the first band at/above Nyquist refuses the establishment
-/// with a truthful diagnostic (the per-band stability grid itself lives
-/// in processing.rs, where the compiled coefficients are inspectable).
-#[test]
-fn the_stage_refuses_sources_whose_nyquist_cuts_the_band_table() {
-    for fs in [8000u32, 16000, 22050, 32000] {
-        let format = PcmFormat {
-            sample_rate: fs,
-            channels: 2,
-            channel_mask: 0x3,
-        };
-        let err = EqStage::new(&EqConfig::FLAT, &format)
-            .expect_err("a source rate at/below 32 kHz cuts the 16 kHz band");
-        assert!(err.contains("Nyquist"), "{fs}: {err}");
+// --- D1: the rate-aware active-band profile (dsp-product-model.md §2.1) ---
+
+/// A stereo source format at an arbitrary product rate.
+fn format_at(sample_rate: u32) -> PcmFormat {
+    PcmFormat {
+        sample_rate,
+        channels: 2,
+        channel_mask: 0x3,
     }
-    for fs in [44100u32, 48000, 96000, 192000] {
-        let format = PcmFormat {
-            sample_rate: fs,
-            channels: 2,
-            channel_mask: 0x3,
-        };
+}
+
+/// The accepted availability rule, stated independently: a fixed product
+/// band participates in an episode's cascade iff its center is strictly
+/// below that source's Nyquist frequency. The oracles derive the
+/// expected active set from THIS function, never from the production
+/// code path under test.
+fn participates(center_hz: f64, sample_rate_hz: f64) -> bool {
+    center_hz < sample_rate_hz / 2.0
+}
+
+/// The expected active-band index set at a source rate, per the
+/// accepted rule.
+fn expected_active_bands(sample_rate: u32) -> Vec<usize> {
+    EQ_BAND_FREQUENCY_HZ
+        .iter()
+        .enumerate()
+        .filter(|&(_, &f0)| participates(f64::from(f0), f64::from(sample_rate)))
+        .map(|(index, _)| index)
+        .collect()
+}
+
+/// The f64 reference cascade over an ARBITRARY availability rule (the
+/// generalizer the negative controls use to represent wrong-rule worlds;
+/// the accepted-rule cascade is the `accepted_rule` specialization).
+fn reference_cascade_under(
+    input: &[f64],
+    config: &EqConfig,
+    fs: f64,
+    rule: impl Fn(f64, f64) -> bool,
+) -> Vec<f64> {
+    let mut signal = input.to_vec();
+    for (index, &f0) in EQ_BAND_FREQUENCY_HZ.iter().enumerate() {
+        if !rule(f64::from(f0), fs) {
+            continue;
+        }
+        let coefficients = reference_coefficients(
+            index,
+            f64::from(f0),
+            f64::from(config.band_gain_db[index]),
+            f64::from(config.q),
+            fs,
+        );
+        signal = reference_df1(&signal, &coefficients);
+    }
+    signal
+}
+
+/// The accepted-rule reference cascade: the oracle the production stage
+/// is compared against at every rate.
+fn reference_cascade_active(input: &[f64], config: &EqConfig, fs: f64) -> Vec<f64> {
+    reference_cascade_under(input, config, fs, participates)
+}
+
+/// The stage compiles the RATE-AWARE ACTIVE-BAND PROFILE: at every
+/// product rate the cascade carries exactly the bands strictly below
+/// that source's Nyquist frequency — never the old whole-EQ refusal
+/// (which made Flat fail where Processing Off succeeded), never an
+/// inclusive rule that would compile a degenerate exactly-Nyquist band.
+#[test]
+fn the_stage_compiles_the_rate_active_band_profile_at_every_product_rate() {
+    for fs in [8000u32, 16000, 22050, 32000, 44100, 48000, 96000] {
+        let stage = EqStage::new(&EqConfig::FLAT, &format_at(fs))
+            .unwrap_or_else(|e| panic!("{fs} Hz: a flat EQ must establish: {e}"));
+        assert_eq!(
+            stage.active_band_indices(),
+            expected_active_bands(fs),
+            "{fs} Hz: the active band set must be exactly the bands below Nyquist"
+        );
+    }
+    // The documented anchors of the product table, as exact index sets:
+    // 8 kHz keeps the 31 Hz–2 kHz bands, 22.05 kHz adds the 4/8 kHz
+    // bands, the 16 kHz band stays excluded at exactly 32 kHz
+    // (Nyquist = 16 kHz, strict rule) and first participates above it,
+    // and every rate above 32 kHz carries all ten.
+    assert_eq!(expected_active_bands(8000), vec![0, 1, 2, 3, 4, 5, 6]);
+    assert_eq!(expected_active_bands(16000), vec![0, 1, 2, 3, 4, 5, 6, 7]);
+    assert_eq!(
+        expected_active_bands(22050),
+        vec![0, 1, 2, 3, 4, 5, 6, 7, 8]
+    );
+    assert_eq!(
+        expected_active_bands(32000),
+        vec![0, 1, 2, 3, 4, 5, 6, 7, 8]
+    );
+    assert_eq!(
+        expected_active_bands(44100),
+        vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    );
+}
+
+/// Flat means Processing Off at EVERY source rate: the neutral config
+/// compiles its active bands and remains the identity BIT-EXACTLY (the
+/// all-neutral coefficients coincide at any rate; the old policy made
+/// Flat refuse below 32 kHz instead).
+#[test]
+fn flat_eq_is_bit_exact_identity_at_every_product_rate() {
+    let mut block: Vec<f32> = (0..4096)
+        .map(|i| {
+            let x = i as f32;
+            if i % 3 == 0 {
+                -x
+            } else if i % 5 == 0 {
+                x * 0.001
+            } else {
+                x
+            }
+        })
+        .collect();
+    let expected = block.clone();
+    for fs in [8000u32, 16000, 22050, 32000, 44100, 48000, 96000] {
+        let mut stage = EqStage::new(&EqConfig::FLAT, &format_at(fs))
+            .unwrap_or_else(|e| panic!("{fs} Hz: flat must establish: {e}"));
+        stage.stage(&mut block);
+        assert_eq!(
+            block, expected,
+            "{fs} Hz: a flat EQ must be the identity filter bit-exactly"
+        );
+    }
+}
+
+/// At a low source rate the cascade matches the independent f64
+/// reference over the ACTIVE bands only, and a trim on an UNAVAILABLE
+/// band is inert: it changes nothing bit-exactly (the stored trim stays
+/// in the desired configuration and re-becomes active on a higher-rate
+/// source — it must not silently shape this episode).
+#[test]
+fn at_low_rates_only_active_bands_shape_and_unavailable_trims_are_inert() {
+    // Shape an ACTIVE band (125 Hz, +12 dB) and trim an UNAVAILABLE one
+    // (16 kHz, +18 dB — invalid as data nowhere, unavailable at 8 kHz).
+    let mut shaped = [0.0f32; 10];
+    shaped[2] = 12.0;
+    shaped[9] = 18.0;
+    let shaped_config = EqConfig::new(shaped, 1.0);
+    let mut inert = [0.0f32; 10];
+    inert[2] = 12.0;
+    let inert_config = EqConfig::new(inert, 1.0);
+
+    let fs = 8000u32;
+    let mut stage = EqStage::new(&shaped_config, &format_at(fs)).expect("low-rate EQ establishes");
+    assert_eq!(
+        stage.active_band_indices(),
+        vec![0, 1, 2, 3, 4, 5, 6],
+        "8 kHz carries the 31 Hz–2 kHz bands"
+    );
+
+    let frames = 512;
+    let mut input = vec![0.0f32; frames * 2];
+    input[0] = 1.0;
+    input[1] = 1.5;
+    let mut same_input = input.clone();
+    stage.stage(&mut input);
+
+    // The unavailable trim is inert BIT-EXACTLY: same active bands, same
+    // coefficients, same output.
+    let mut inert_stage = EqStage::new(&inert_config, &format_at(fs)).expect("establishes");
+    inert_stage.stage(&mut same_input);
+    assert_eq!(
+        input, same_input,
+        "a trim on an unavailable band must not shape this episode"
+    );
+
+    // And the shaped output matches the independent f64 reference over
+    // exactly the active bands (the +18 dB at 16 kHz appears in the
+    // desired config but NOT in the reference — inertness, both sides).
+    for (channel, amplitude) in [(0usize, 1.0f64), (1usize, 1.5f64)] {
+        let mut impulse = vec![0.0f64; frames];
+        impulse[0] = amplitude;
+        let expected = reference_cascade_active(&impulse, &shaped_config, f64::from(fs));
+        let frames_i = 2;
+        for (i, &y) in expected.iter().enumerate() {
+            let produced = input[i * 2 + channel];
+            let magnitude = y.abs().max(1.0);
+            assert!(
+                (f64::from(produced) - y).abs() / magnitude < 1e-3,
+                "channel {channel} sample {i} (every {frames_i}): {produced} vs reference {y}"
+            );
+        }
+    }
+}
+
+/// Frame-count and layout are conserved at every product rate: the
+/// stage transforms the buffer in place, one output frame per input
+/// frame, interleaved layout untouched, and the output stays finite
+/// (no NaN/Inf) even at a boosted preset over the smallest active
+/// profiles.
+#[test]
+fn frame_count_layout_and_finiteness_hold_across_the_rate_matrix() {
+    let rock = EqPreset::Rock.to_config();
+    let rock_eq = rock.eq.expect("rock carries an EQ config");
+    let block: Vec<f32> = (0..2048)
+        .map(|i| ((i as f32) * 0.125 - 128.0).mul_add(0.01, ((i % 7) as f32) * 0.05))
+        .collect();
+    let original_len = block.len();
+    for fs in [8000u32, 16000, 22050, 32000, 44100, 48000, 96000] {
+        let mut stage = EqStage::new(&rock_eq, &format_at(fs))
+            .unwrap_or_else(|e| panic!("{fs} Hz: the Rock preset must establish: {e}"));
+        let mut copy = block.clone();
+        stage.stage(&mut copy);
+        assert_eq!(copy.len(), original_len, "{fs} Hz: frame count conserved");
         assert!(
-            EqStage::new(&EqConfig::FLAT, &format).is_ok(),
-            "{fs} Hz carries the full product band table"
+            copy.iter().all(|s| s.is_finite()),
+            "{fs} Hz: every output sample finite (no NaN/Inf)"
+        );
+        // Layout: the interleaved stereo stream must stay a stream of
+        // frames — the stage is an in-place per-sample transform, so the
+        // buffer length in FRAMES is unchanged by construction; the
+        // per-channel independence is witnessed by the channel-distinct
+        // impulse oracles elsewhere in this suite.
+    }
+}
+
+/// D1 negative controls for the rate policy. Honesty about mechanism:
+/// control (b) is the machinery-level sensitivity proof — it builds the
+/// wrong-rule world out of real signal machinery (the generalized f64
+/// reference cascade) and proves the impulse-response oracle
+/// distinguishes it from the accepted world. Controls (a) and (c) pin
+/// the WRONG WORLDS' observable establishment outcomes as executable
+/// documentation (what the old refusal / an inclusive rule would
+/// produce, replayed through the same assertion shape the positive
+/// oracles use); the suite's RED sensitivity to those policies is
+/// mutation-witnessed — re-applying the old refusal to the production
+/// path turns four tests RED, the too-aggressive predicate two, the
+/// inclusive predicate four (campaign issue #190, D1 evidence).
+#[test]
+fn the_rate_policy_oracles_reject_the_old_and_deliberately_wrong_rules() {
+    let frames = 256;
+    let mut impulse = vec![0.0f64; frames];
+    impulse[0] = 1.0;
+
+    // (a) The OLD policy: every enabled EQ refuses at ≤32 kHz. Its
+    // observable establishment outcome at a low rate is an Err; the
+    // accepted world is an Ok profile — the same assertion shape the
+    // positive oracles use distinguishes the two worlds.
+    let old_policy_establishment: Result<Vec<usize>, String> =
+        Err("EQ band 9 (16000 Hz) is at or above this source's Nyquist \
+         frequency (11025 Hz at 22050 Hz source rate)"
+            .to_owned());
+    assert!(
+        rejects(|| {
+            let active = old_policy_establishment
+                .clone()
+                .expect("flat must establish at every product rate");
+            assert_eq!(active, expected_active_bands(22050));
+        }),
+        "the establishment assertion shape must distinguish the old \
+         whole-EQ refusal world from the accepted one"
+    );
+
+    // (b) A TOO-AGGRESSIVE rule (requires the center below fs/4)
+    // silently drops the 16 kHz band at 44.1 kHz — distinguishable
+    // exactly when the dropped band carries a nonzero trim.
+    let high_band = eq_config_one_band(9, 12.0);
+    let accepted = reference_cascade_active(&impulse, &high_band, TEST_FS);
+    let too_aggressive =
+        reference_cascade_under(&impulse, &high_band, TEST_FS, |f0, fs| f0 * 4.0 < fs);
+    assert!(
+        rejects(|| {
+            for (a, b) in accepted.iter().zip(too_aggressive.iter()) {
+                let magnitude = a.abs().max(1.0);
+                assert!(
+                    (a - b).abs() / magnitude < 1e-3,
+                    "impulse responses must match the accepted-rule reference"
+                );
+            }
+        }),
+        "the reference oracle must distinguish the too-aggressive availability rule"
+    );
+
+    // (c) The INCLUSIVE rule (f0 ≤ Nyquist) admits the degenerate
+    // exactly-Nyquist band at 32 kHz (w0 = π). Its observable
+    // establishment outcome differs from the accepted world either way
+    // the f32 arithmetic lands: the per-band stability check refuses
+    // the w0 = π shelf's recursion (|a1| ≥ 1 + a2 up to rounding —
+    // observed in practice, see the mutation evidence) → an
+    // establishment error; or, were a rounding ever to compile it, the
+    // profile would carry 10 bands where the accepted rule says 9.
+    // Both wrong worlds are replayed through the same assertion shape.
+    for inclusive_world in [
+        Err::<Vec<usize>, String>("EQ band 9 compiled to an unstable recursion".to_owned()),
+        Ok(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
+    ] {
+        assert!(
+            rejects(|| {
+                let active = inclusive_world.expect("the accepted profile establishes");
+                assert_eq!(active, expected_active_bands(32000));
+            }),
+            "the establishment assertion shape must distinguish the \
+             inclusive (degenerate-band) world from the accepted one"
         );
     }
 }

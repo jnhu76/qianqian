@@ -116,9 +116,11 @@ impl AudioProcessingConfig {
     /// and the EQ bands representable — product configuration that
     /// cannot mean anything fails loudly instead of silently meaning
     /// nothing. Polarity inversion is not an authorized product
-    /// semantic for this slice. The format-dependent half (band
-    /// frequency vs the source's Nyquist frequency) runs when the EQ
-    /// compiles against the episode's source format.
+    /// semantic for this slice. The format-dependent half — which
+    /// bands are AVAILABLE at the episode's source rate — is not an
+    /// invalidity and never refuses: it decides participation when the
+    /// EQ compiles against the episode's source format (the rate-aware
+    /// active-band profile, [`band_participates`]).
     pub fn validate(&self) -> Result<(), String> {
         if !self.gain.is_finite() {
             return Err(format!("gain must be finite, got {}", self.gain));
@@ -150,6 +152,37 @@ pub(crate) const EQ_BAND_FREQUENCY_HZ: [f32; 10] = [
 /// out-of-range samples, and no limiter or clip exists.
 pub(crate) const EQ_MAX_BAND_GAIN_DB: f32 = 18.0;
 
+/// The rate-aware AVAILABILITY rule of the 10-band product EQ
+/// (dsp-product-model.md §2.1, the accepted LOW_RATE_EQ_POLICY =
+/// rate-aware active-band profile): a fixed band participates in an
+/// episode's cascade iff its center is strictly below that source's
+/// Nyquist frequency.
+///
+/// Semantics, frozen by the product authority:
+///
+/// ```text
+/// available band      compiled normally; its trim shapes the episode
+/// unavailable band    INERT for this episode (not compiled — at or
+///                     above Nyquist the band's w0 degenerates and no
+///                     source content exists there to shape); its
+///                     configured trim STAYS in the desired
+///                     configuration and becomes active again on an
+///                     episode whose source domain includes the band
+/// never a refusal     availability never fails establishment and
+///                     never changes the processing class (still
+///                     source-rate/layout/frame preserving, bounded
+///                     causal, no EOF drain)
+/// ```
+///
+/// Strictness is load-bearing: at exactly Nyquist (w0 = π) the f32
+/// trigonometry collapses toward the degenerate recursion the per-band
+/// stability check would then have to refuse, so the boundary band
+/// belongs to the unavailable side. [`EqStage::new`] is the only caller
+/// in production; the crate oracles restate the rule independently.
+pub(crate) fn band_participates(center_hz: f32, sample_rate_hz: u32) -> bool {
+    center_hz * 2.0 < sample_rate_hz as f32
+}
+
 /// The desired EQ configuration: per-band trims in dB for the fixed
 /// product band table plus the peaking bands' Q. Pure DATA — not a
 /// processor, not a plugin, not per-band objects with independent
@@ -179,8 +212,9 @@ impl EqConfig {
     }
 
     /// Intrinsic validation (format-independent). Runs at establishment;
-    /// the format-dependent part (band frequency vs Nyquist) runs when
-    /// the stage compiles against the episode's source format.
+    /// the format-dependent part (which bands are available at this
+    /// source rate) is decided by the availability rule when the stage
+    /// compiles — availability is not invalidity.
     pub(crate) fn validate(&self) -> Result<(), String> {
         if !self.q.is_finite() || self.q <= 0.0 {
             return Err(format!("EQ q must be finite and positive, got {}", self.q));
@@ -207,11 +241,15 @@ impl EqConfig {
 #[cfg(all(test, not(loom)))]
 type TestStage = Box<dyn FnMut(&mut [f32]) -> Result<(), String> + Send>;
 
-/// One compiled biquad band: normalized coefficients (a0 = 1) plus the
-/// per-channel Transposed Direct Form II state. Episode-owned; retired
-/// with the episode.
+/// One compiled biquad band: its fixed-table index, the normalized
+/// coefficients (a0 = 1) and the per-channel Transposed Direct Form II
+/// state. Episode-owned; retired with the episode.
 #[derive(Debug)]
 struct BiquadBand {
+    // Read only by the test-gated active-band observation; dead in the
+    // shipped and loom builds.
+    #[cfg_attr(not(all(test, not(loom))), allow(dead_code))]
+    index: usize,
     b0: f32,
     b1: f32,
     b2: f32,
@@ -221,12 +259,13 @@ struct BiquadBand {
     s2: Vec<f32>,
 }
 
-/// The compiled EQ stage: the fixed band cascade in explicit fixed
-/// order (band 0 → 9), one independent state per source channel.
-/// Steady-state posture: in place, allocation-free, per-sample work
-/// independent of block boundaries (the fragmentation invariance the
-/// I2 probe proved for the transport is inherited by construction —
-/// same per-sample op sequence).
+/// The compiled EQ stage: the episode's ACTIVE band cascade in explicit
+/// fixed product order (available bands of band 0 → 9, lowest first),
+/// one independent state per source channel. Steady-state posture: in
+/// place, allocation-free, per-sample work independent of block
+/// boundaries (the fragmentation invariance the I2 probe proved for the
+/// transport is inherited by construction — same per-sample op
+/// sequence).
 #[derive(Debug)]
 pub(crate) struct EqStage {
     bands: Vec<BiquadBand>,
@@ -236,11 +275,13 @@ pub(crate) struct EqStage {
 impl EqStage {
     /// Compile the cascade against the episode's source format. Runs
     /// the config's intrinsic validation itself (defense in depth),
-    /// then the format-DEPENDENT half of EQ validation (I3.5): a band
-    /// at or above this source's Nyquist frequency fails establishment
-    /// instead of compiling coefficients that would poison the
-    /// recursion. `pub(crate)` for the in-crate DSP oracles; product
-    /// code reaches the stage only through [`EpisodeProcessing::new`].
+    /// then applies the rate-aware ACTIVE-BAND profile
+    /// (dsp-product-model.md §2.1): a fixed product band participates
+    /// in this episode's cascade iff its center is strictly below the
+    /// source's Nyquist frequency ([`band_participates`]); the rest are
+    /// unavailable in this source's domain and are not compiled. `pub`
+    /// (crate) for the in-crate DSP oracles; product code reaches the
+    /// stage only through [`EpisodeProcessing::new`].
     pub(crate) fn new(config: &EqConfig, format: &PcmFormat) -> Result<Self, String> {
         config.validate()?;
         if format.sample_rate == 0 {
@@ -251,15 +292,10 @@ impl EqStage {
             return Err("a source without channels cannot be processed".to_owned());
         }
         let fs = format.sample_rate as f32;
-        let nyquist = fs / 2.0;
         let mut bands = Vec::with_capacity(EQ_BAND_FREQUENCY_HZ.len());
         for (index, &f0) in EQ_BAND_FREQUENCY_HZ.iter().enumerate() {
-            if f0 >= nyquist {
-                return Err(format!(
-                    "EQ band {index} ({} Hz) is at or above this source's \
-                     Nyquist frequency ({nyquist} Hz at {} Hz source rate)",
-                    f0, format.sample_rate
-                ));
+            if !band_participates(f0, format.sample_rate) {
+                continue;
             }
             bands.push(BiquadBand::compiled(
                 index,
@@ -271,6 +307,17 @@ impl EqStage {
             )?);
         }
         Ok(Self { bands, channels })
+    }
+
+    /// The episode's ACTIVE band indices — which fixed product bands
+    /// participate in this cascade under the rate-aware availability
+    /// rule, in cascade order. Test-gated: the crate-internal honesty
+    /// observation for the oracles (pinning the exact SET, not just a
+    /// count); the product-facing read model is a separate product
+    /// decision (dsp-product-model.md §2.1, D5).
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn active_band_indices(&self) -> Vec<usize> {
+        self.bands.iter().map(|band| band.index).collect()
     }
 
     /// The cascade, in place, in explicit fixed band order. Frame-count
@@ -381,16 +428,18 @@ impl BiquadBand {
         }
         // Monic-quadratic pole test (Jury): the recursion is bounded
         // iff |a2| < 1 and |a1| < 1 + a2. SCOPE: this is a per-band
-        // coefficient sanity check, NOT the Nyquist contract — the
-        // band-frequency-vs-Nyquist gate lives in EqStage::new, before
-        // any compilation. (Near the f32 boundary — w0 within ~2e-4 rad
-        // of π — cos(w0) collapses and this check can refuse a merely
-        // degenerate band; unreachable at any standard rate with the
-        // fixed product table, and a safe fail-closed either way.)
+        // coefficient sanity check, NOT the availability policy — which
+        // bands participate lives in the rate-aware rule EqStage::new
+        // applies before any compilation. (Near the f32 boundary — w0
+        // within ~2e-4 rad of π — cos(w0) collapses and this check can
+        // refuse a merely degenerate band; unreachable at any standard
+        // rate with the fixed product table, and a safe fail-closed
+        // either way.)
         if !(a2.abs() < 1.0 && a1.abs() < 1.0 + a2) {
             return Err(format!("EQ band {index} compiled to an unstable recursion"));
         }
         Ok(Self {
+            index,
             b0,
             b1,
             b2,
@@ -478,9 +527,11 @@ impl EpisodeProcessing {
     /// activation, after the decode endpoint is open — the EQ stage's
     /// coefficients are a function of the source sample rate, so the
     /// compile cannot run before the format is known; a failure here
-    /// (invalid configuration, or a band at/above this source's
-    /// Nyquist frequency) raises the activation and unwinds the open
-    /// endpoint through the ordinary RAII.
+    /// (invalid configuration) raises the activation and unwinds the
+    /// open endpoint through the ordinary RAII. Source-rate
+    /// availability of the fixed bands is not a failure mode: the
+    /// rate-aware active-band profile compiles whatever participates
+    /// ([`band_participates`]).
     pub(crate) fn new(config: &AudioProcessingConfig, format: &PcmFormat) -> Result<Self, String> {
         config.validate()?;
         if !config.enabled {
@@ -651,7 +702,12 @@ mod tests {
             let f0 = f64::from(f0_f32);
             for gain_db in [-18.0f32, -12.0, -6.0, 0.0, 6.0, 12.0, 18.0] {
                 for q in [0.5f32, 1.0, 2.0, 4.0] {
-                    for fs in [8000u32, 22050, 44100, 48000, 96000, 192000] {
+                    // 16000/32000 put the 8/16 kHz bands EXACTLY at
+                    // Nyquist: the in-tree witness that the boundary
+                    // recursion degenerates and the per-band check
+                    // refuses it (the load-bearing strictness of the
+                    // rate-aware availability rule, §2.1).
+                    for fs in [8000u32, 16000, 22050, 32000, 44100, 48000, 96000, 192000] {
                         let nyquist = f64::from(fs) / 2.0;
                         match BiquadBand::compiled(band, f0_f32, gain_db, q, fs as f32, 2) {
                             Ok(compiled) => {
