@@ -2351,19 +2351,46 @@ fn an_update_near_completion_is_never_half_applied() {
 /// the fresh-block pickup — the accepted update starts its transition
 /// while the seek pends.
 ///
-/// The seek's later career is deliberately NOT pinned here. Whether it
-/// stays unactionable to the end, or a starved render leg's parked
-/// evidence makes it actionable (the frozen D14.5 cut), is
-/// schedule-dependent under load — and every legal ending is already
-/// pinned by its own deterministic oracle (the applied cut lands fresh
-/// under the accepted configuration; a refusal preserves the
-/// continuation bit-exactly). What THIS oracle owns is the
-/// pickup-availability contract: the transition starts, after the
-/// commands, while the seek is still pending; the consumed prefix up to
-/// the transition is the pure old configuration in EVERY legal ending
-/// (in the cut world the pickup precedes the first post-cut staging, so
-/// the transition start coincides with the landing); the update was
-/// accepted, never refused; the episode still ends by stop.
+/// The seek's later career is deliberately NOT pinned to one schedule:
+/// under load the parked-evidence gate can make the seek actionable at
+/// any write observation, so which legal ending occurs is
+/// schedule-dependent. The oracle is premise-free: it verifies the
+/// ENTIRE consumed stream as a member of the exact reference families
+/// the legal endings can produce —
+///
+/// - no AUDIBLE cut — either no cut at all, or a cut whose landing the
+///   stop never consumed: the whole stream is the ordinary
+///   single-transition continuation, bit-exactly, truncated only where
+///   the stop found it;
+/// - cut at/after the pickup — whether the cut dropped an in-flight
+///   transition or landed after the 64-frame transition had already
+///   settled inside one staging block: the pre-cut stretch is the run's
+///   own transitioned continuation and the post-cut stretch is
+///   bit-exactly a FRESH instance of the accepted configuration fed the
+///   post-landing tags (the frozen D14.5 order);
+/// - cut before the pickup: the landing restarts the source under the
+///   fresh-applied OLD configuration (the pre-cut stretch is the pure
+///   tag stream), and the update's transition arms on a whole post-cut
+///   staging block: the Model C blend of that fresh old side against
+///   the new configuration from rest, anchored at the landing plus a
+///   whole number of 1024-frame staging blocks.
+///
+/// Which of these occurs is decided by CONTENT against exact references,
+/// never by trusting the probe's transition-start frame as a consumed
+/// index: that frame is a PROCESSED-frames witness that can lead the
+/// consumed index by the one in-flight frame this geometry allows
+/// (pre-cut blocks are one paced frame and the edge is otherwise empty),
+/// so consumed-space references are verified over their small legal
+/// anchor candidate sets.
+///
+/// The landing is scripted to frame 0 (below the mock's total, so no
+/// clamping is involved), which makes a cut an UNAMBIGUOUS downward
+/// discontinuity in the tagged stream: every no-cut stretch strictly
+/// increases, by at most the blend's weight step over this ramp (well
+/// under 200), while the step at a cut exceeds 5000 — the pre-cut stream
+/// is already past frame 5512 when the commands even exist, and the
+/// landing restarts near 0. The 1000-floor classifier therefore cannot
+/// fire without a cut, and every audible cut steps below it.
 #[test]
 fn a_merely_observed_seek_does_not_block_the_update_pickup() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -2373,10 +2400,9 @@ fn a_merely_observed_seek_does_not_block_the_update_pickup() {
 
         // A slow paced source: after the fast prefix the decode produces
         // one frame per 5 ms (200 frames/s — far below any consumption
-        // rate), so the edge stays empty and the seek pends for the
-        // whole observation window under normal scheduling. The
-        // transition is short (64 frames) so it completes quickly at the
-        // producer's pace.
+        // rate), so the edge stays empty and the consumed stream grows
+        // slowly and boundedly. The transition is short (64 frames) so
+        // it completes quickly at the producer's pace.
         let (w, handle, probe, mut runtime) = live_episode_source(
             SourceBehavior::Paced {
                 after: 4200,
@@ -2385,9 +2411,7 @@ fn a_merely_observed_seek_does_not_block_the_update_pickup() {
             OutputBehavior::Consume,
             initial,
             64,
-            vec![ProviderSeekOutcome::Applied {
-                landing: Some(TEST_RATE as u64),
-            }],
+            vec![ProviderSeekOutcome::Applied { landing: Some(0) }],
         );
         wait_until(Duration::from_secs(30), || {
             handle
@@ -2402,8 +2426,12 @@ fn a_merely_observed_seek_does_not_block_the_update_pickup() {
         handle.request_seek(Duration::from_secs(1));
         probe.request_update(desired);
         let (start, _) = wait_transition_started(&probe, Duration::from_secs(30));
+        // The transition cannot start before the commands — they were
+        // only issued once position had already reached the trigger —
+        // and a pickup at exactly the trigger boundary is legal (hence
+        // `>=`, not `>`).
         assert!(
-            start > HALF_A_SECOND as usize / 4,
+            start >= HALF_A_SECOND as usize / 4,
             "the transition started after the commands, not before them"
         );
         handle.request_stop();
@@ -2417,78 +2445,116 @@ fn a_merely_observed_seek_does_not_block_the_update_pickup() {
             handle.observe().last_processing_refusal.is_none(),
             "the accepted update is not a refusal"
         );
-        // The consumed stream decides which legal ending occurred, and
-        // each is verified against its own exact reference.
+        // The consumed stream decides which legal ending occurred, and is
+        // verified as a MEMBER of the exact reference families those
+        // endings can legally produce. The engine's probe events are
+        // consistency evidence, not the classifier (see the module doc
+        // above for the anchor-candidate reasoning).
         let values = w.content();
-        let raw: Vec<f32> = (0..values.len()).map(|i| i as f32).collect();
-        // A post-landing frame carries the landing tag (1 s); every
-        // pre-cut frame carries a tag below the consumed length.
-        match values.iter().position(|&v| v >= TEST_RATE as f32) {
+        let invalidated = probe
+            .events()
+            .iter()
+            .any(|e| matches!(e, LiveEvent::InvalidationDroppedTransition));
+        const CUT_DROP_FLOOR: f32 = 1000.0;
+        // The processed-vs-consumed lead bound at the apply boundary in
+        // this geometry: pre-cut blocks are one paced frame and the edge
+        // is otherwise empty, so at most one staged frame is still
+        // in flight.
+        const MAX_INFLIGHT_LEAD: usize = 1;
+        // Post-cut staging blocks are whole 1024-frame reads in the
+        // landing's fast region.
+        const FAST_BLOCK: usize = 1024;
+        match (1..values.len()).find(|&i| values[i] < values[i - 1] - CUT_DROP_FLOOR) {
             None => {
-                // No cut became audible. The consumed prefix up to the
-                // transition start is the pure old continuation in every
-                // no-cut ending; what lies beyond it is, at most, the
-                // w→1 head of the blend (bit-equal to the continuation —
-                // the blend law itself is pinned by the slow-consume
-                // oracles).
-                let prefix = start.min(values.len());
-                assert_eq!(
-                    &values[..prefix],
-                    &raw[..prefix],
-                    "the consumed prefix before the transition is the pure \
-                         old continuation"
+                // No audible cut: either no cut happened, or the stop
+                // consumed nothing past the landing. Both leave exactly
+                // the ordinary single-transition stream, truncated where
+                // the stop found it — the discarded tail is invisible
+                // either way, so the invalidation event distinguishes
+                // nothing here.
+                let anchored = (start.saturating_sub(MAX_INFLIGHT_LEAD)..=start).any(|a| {
+                    values == expected_content(values.len(), 64, &initial, &[(a, initial, desired)])
+                });
+                assert!(
+                    anchored,
+                    "no audible cut: the stream is not the ordinary \
+                         single-transition continuation at any legal \
+                         consumed anchor"
                 );
             }
             Some(j) => {
-                let reference =
-                    expected_content(values.len(), 64, &initial, &[(start, initial, desired)]);
-                // World B first: the transition rode pre-cut and the
-                // actionable cut dropped it (the frozen D14.5 order), so
-                // the landing must be a FRESH instance of the ACCEPTED
-                // configuration fed the exact post-landing tags,
-                // bit-exactly.
+                let tail = values.len() - j;
+                // The fresh accepted configuration over the exact
+                // post-landing tags (used by BOTH cut families).
                 let mut fresh = EpisodeProcessing::new(&desired, &format()).expect("compiles");
-                let mut post = source_input(values.len() - j, TEST_RATE);
-                fresh.stage(&mut post).expect("stages");
-                let fresh_landing: Vec<f32> = post.chunks(2).map(|f| f[0]).collect();
-                if values[j..] == fresh_landing.as_slice()[..] {
-                    assert_eq!(
-                        &values[..j],
-                        &reference[..j],
-                        "pre-cut: the run's own no-cut continuation, \
-                             transition included"
-                    );
-                } else {
-                    // World C: the cut preceded the pickup, so the update
-                    // applied AT the landing — the post-landing stretch
-                    // is the Model C blend (the fresh-applied old side —
-                    // the cut invalidated pre-cut history — against the
-                    // new configuration from rest) settling into the
-                    // accepted configuration.
-                    assert_eq!(&values[..j], &raw[..j], "pre-cut: pure old continuation");
-                    let tail = values.len() - j;
-                    let mut old_side =
-                        EpisodeProcessing::new(&initial, &format()).expect("compiles");
-                    let mut old_tail = source_input(tail, TEST_RATE);
-                    old_side.stage(&mut old_tail).expect("stages");
-                    let mut new_side =
-                        EpisodeProcessing::new(&desired, &format()).expect("compiles");
-                    let mut new_tail = source_input(tail, TEST_RATE);
-                    new_side.stage(&mut new_tail).expect("stages");
-                    for (k, got) in values[j..].iter().enumerate() {
-                        let want = if k < 64 {
-                            let wgt = blend_weight(k + j, j, 64);
+                let mut fresh_in = source_input(tail, 0);
+                fresh.stage(&mut fresh_in).expect("stages");
+                let fresh_landing: Vec<f32> = fresh_in.chunks(2).map(|f| f[0]).collect();
+                // The fresh-applied OLD configuration over the same tags
+                // (the cut invalidated all pre-cut signal-derived
+                // history): the gap before the pickup and the blend's
+                // from-side in the cut-before-pickup family.
+                let mut old_side = EpisodeProcessing::new(&initial, &format()).expect("compiles");
+                let mut old_tail = source_input(tail, 0);
+                old_side.stage(&mut old_tail).expect("stages");
+                let mut new_side = EpisodeProcessing::new(&desired, &format()).expect("compiles");
+                let mut new_tail = source_input(tail, 0);
+                new_side.stage(&mut new_tail).expect("stages");
+
+                // Cut at/after the pickup: the pickup ran before the cut
+                // became audible content (whether the cut then dropped an
+                // in-flight transition or landed after it had already
+                // settled). Pre-cut is the run's own transitioned
+                // continuation; the landing is a FRESH instance of the
+                // ACCEPTED configuration, bit-exactly (the frozen D14.5
+                // order).
+                let cut_after_pickup = (start.saturating_sub(MAX_INFLIGHT_LEAD)..=start).any(|a| {
+                    values[..j]
+                        == expected_content(values.len(), 64, &initial, &[(a, initial, desired)])
+                            [..j]
+                }) && values[j..] == fresh_landing.as_slice()[..];
+
+                // Cut before the pickup: the landing restarts the source
+                // under the fresh-applied OLD configuration (identity
+                // here — the pre-cut stretch is the pure tag stream), and
+                // the update's transition arms on a whole post-cut
+                // staging block. The pickup normally runs in the cut's
+                // own iteration (the poll sits at the fresh-block
+                // boundary, session.rs); a command commit delayed past
+                // the cutover wait can only let whole fresh-old blocks
+                // precede it.
+                let cut_before_pickup = (0..=(tail / FAST_BLOCK).min(4)).any(|m| {
+                    let anchor = j + m * FAST_BLOCK;
+                    values[j..].iter().enumerate().all(|(k, got)| {
+                        let i = j + k;
+                        let want = if i < anchor {
+                            old_tail[k * 2]
+                        } else if i < anchor + 64 {
+                            let wgt = blend_weight(i, anchor, 64);
                             wgt.mul_add(old_tail[k * 2], (1.0 - wgt).mul_add(new_tail[k * 2], 0.0))
                         } else {
                             new_tail[k * 2]
                         };
-                        let tolerance = 1e-4 * want.abs().max(1.0);
-                        assert!(
-                            (got - want).abs() <= tolerance,
-                            "frame {}: {got} vs {want}",
-                            j + k
-                        );
-                    }
+                        (got - want).abs() <= 1e-4 * want.abs().max(1.0)
+                    })
+                }) && values[..j]
+                    .iter()
+                    .enumerate()
+                    .all(|(i, got)| *got == i as f32);
+                if cut_before_pickup {
+                    // The pickup ran after the cut, so no transition was
+                    // in flight at the invalidation.
+                    assert!(
+                        !invalidated,
+                        "the engine recorded a dropped transition but the \
+                             pickup ran after the cut"
+                    );
+                } else {
+                    assert!(
+                        cut_after_pickup,
+                        "the consumed stream matches no legal ending of \
+                             the pended seek"
+                    );
                 }
             }
         }

@@ -185,8 +185,9 @@ EXPORT_RULES = {
     # The processing-config freeze behind the lib.rs re-export (I1 review):
     # the desired-configuration payload's public rights are frozen here so
     # they cannot grow silently (a `pub preset` field or a live-update
-    # accessor would otherwise RED nothing — live parameter update is
-    # OPEN/unearned under D14.11). The episode-owned runtime
+    # accessor would otherwise RED nothing — live update is earned under
+    # D14.11 LIVE-1 only as typed commands on the episode handle, never
+    # as accessors on this payload). The episode-owned runtime
     # (EpisodeProcessing) is pub(crate) and is NOT admitted: promoting it
     # to `pub` REDs this rule.
     "crates/qianqian-playback/src/processing.rs": {
@@ -221,19 +222,20 @@ EXPORT_RULES = {
         ],
         "authority": "ADR-PBK-002 D14.11 (Issue #177 I1-I3) — the application/product-control "
         "layer owns the DESIRED Audio Processing configuration and hands ONE coherent "
-        "snapshot to the episode at establishment (config model case B; live parameter "
-        "update stays OPEN and unearned, so no update accessor may appear on this "
-        "surface; presets are I4 configuration DATA and join only as data, never as "
-        "processors). The applied snapshot and the processing runtime are session-owned "
-        "subordinate resources and stay crate-private. A new public right here must "
-        "first earn its narrow authority, then update this allowlist on purpose",
+        "snapshot to the episode at establishment (config model case B; live update is "
+        "earned under D14.11 LIVE-1 as typed commands on the episode handle, so no "
+        "update accessor may appear on THIS surface; presets are I4 configuration DATA "
+        "and join only as data, never as processors). The applied snapshot and the "
+        "processing runtime are session-owned subordinate resources and stay "
+        "crate-private. A new public right here must first earn its narrow authority, "
+        "then update this allowlist on purpose",
     },
     # The rights freeze behind the lib.rs re-export (I4 review): the
     # preset vocabulary is configuration DATA (D14.11), and its public
     # rights are frozen here so a future `pub fn apply_live(...)`-shaped
-    # accessor — live parameter update is OPEN/unearned — or any
-    # processor/registry vocabulary cannot grow silently. A new public
-    # right here REDs until it earns narrow authority.
+    # accessor — live update lives only on the episode handle (LIVE-1) —
+    # or any processor/registry vocabulary cannot grow silently. A new
+    # public right here REDs until it earns narrow authority.
     "crates/qianqian-playback/src/presets.rs": {
         "label": "eq-preset-data",
         # The `;`-containing array signatures cut at their deterministic
@@ -250,9 +252,10 @@ EXPORT_RULES = {
         "authority": "ADR-PBK-002 D14.11 (Issue #177 I4) — named EQ presets are pure "
         "product CONFIGURATION DATA over AudioProcessingConfig/EqConfig: record, "
         "resolve deterministically (case B desired configuration), and parse by "
-        "name. No processor, Plugin, registry, or live-update identity may appear "
-        "on this surface; a preset change reaching a live episode is unearned and "
-        "must RED here until a narrow authority amendment says otherwise",
+        "name. No processor, Plugin, registry, or live-update accessor may appear "
+        "on this surface; live preset changes travel only as typed episode-handle "
+        "commands (D14.11 LIVE-1), and a live-update accessor HERE must RED until "
+        "a narrow authority amendment says otherwise",
     },
     # The rights freeze behind the lib.rs re-exports (review round 3):
     # an exported type's pub methods/fields live here, not in lib.rs, so
