@@ -94,5 +94,14 @@ mod processing_support;
 #[cfg(all(test, not(loom)))]
 mod edge_lifecycle_tests;
 
+// The D3 disposable live-transition probe (campaign #190): engine +
+// control for the live-update oracles through the REAL staging seam.
+// Test-only; never shipped; the live-update authority it probes is
+// earned separately (dsp-product-model.md §7).
+#[cfg(all(test, not(loom)))]
+mod live_probe;
+#[cfg(all(test, not(loom)))]
+mod live_probe_tests;
+
 #[cfg(all(test, loom))]
 mod loom_edge_tests;

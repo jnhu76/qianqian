@@ -44,6 +44,19 @@ impl Witnesses {
         }
     }
 
+    /// The shared arcs, for test-local registrations that need the same
+    /// witness plumbing without the standard builder (the D3 live-probe
+    /// episodes).
+    pub(crate) fn consumed_arc(&self) -> Arc<AtomicUsize> {
+        self.consumed.clone()
+    }
+    pub(crate) fn values_arc(&self) -> Arc<Mutex<Vec<f32>>> {
+        self.consumed_values.clone()
+    }
+    pub(crate) fn values_ch1_arc(&self) -> Arc<Mutex<Vec<f32>>> {
+        self.consumed_values_ch1.clone()
+    }
+
     /// The consumed channel-0 content, snapped once: the value of every
     /// frame the render leg submitted, in submission order.
     pub(crate) fn content(&self) -> Vec<f32> {
