@@ -607,7 +607,9 @@ fn a_refused_seek_during_a_transition_preserves_the_no_seek_continuation() {
 
 /// Applied seek during an in-flight transition: the cut discards the
 /// transition entirely, the pre-cut stretch stays content-identical to
-/// the no-seek control, and the post-cut stretch is BIT-EXACTLY a fresh
+/// the run's own deterministic no-seek continuation (reference-built
+/// from the run's own transition start, so the check does not depend on
+/// timing across runs), and the post-cut stretch is BIT-EXACTLY a fresh
 /// instance of the ACCEPTED configuration fed the exact post-landing
 /// tags — no pre-cut contribution, no old-transition audio.
 #[test]
@@ -618,30 +620,6 @@ fn an_applied_seek_during_a_transition_lands_fresh_under_the_accepted_config() {
         let desired = preset_config(EqPreset::Rock);
         let five_seconds = 5 * TEST_RATE;
         let landing_frames = EIGHT_SECONDS - five_seconds;
-
-        // The no-seek control: the same live transition.
-        let (control_w, control_handle, control_probe, mut control_runtime) = live_episode(
-            EIGHT_SECONDS,
-            OutputBehavior::Consume,
-            initial,
-            TEST_RATE / 5,
-            Vec::new(),
-        );
-        wait_until(Duration::from_secs(5), || {
-            control_handle
-                .observe()
-                .position
-                .is_some_and(|p| p >= HALF_A_SECOND / 4)
-        })
-        .then_some(())
-        .expect("control never started");
-        control_probe.request_update(desired);
-        let _ = wait_transition_started(&control_probe, Duration::from_secs(5));
-        assert_eq!(
-            control_handle.wait_terminal(),
-            crate::handle::EpisodeTerminalOutcome::Completed
-        );
-        let control_values = control_w.content();
 
         // The seeked run.
         let (w, handle, probe, mut runtime) = live_episode(
@@ -664,7 +642,7 @@ fn an_applied_seek_during_a_transition_lands_fresh_under_the_accepted_config() {
         .then_some(())
         .expect("never started");
         probe.request_update(desired);
-        let _ = wait_transition_started(&probe, Duration::from_secs(5));
+        let (start, _) = wait_transition_started(&probe, Duration::from_secs(5));
         handle.request_seek(Duration::from_secs(5));
         assert!(
             wait_until(Duration::from_secs(5), || handle
@@ -688,16 +666,25 @@ fn an_applied_seek_during_a_transition_lands_fresh_under_the_accepted_config() {
         );
 
         let values = w.content();
+        // The run's own no-seek continuation (built from ITS transition
+        // start): the pre-cut stretch must be bit-identical to it, and
+        // the cut is exactly where the landing diverges.
+        let reference = expected_content(
+            EIGHT_SECONDS,
+            TEST_RATE / 5,
+            &initial,
+            &[(start, initial, desired)],
+        );
         let cut = values
             .iter()
-            .zip(control_values.iter())
+            .zip(reference.iter())
             .position(|(a, c)| a != c)
-            .expect("the applied cut must appear as a divergence from the control");
+            .expect("the applied cut must appear as a divergence from the run's own continuation");
         assert_eq!(
             &values[..cut],
-            &control_values[..cut],
+            &reference[..cut],
             "the pre-cut stretch must be content-identical to the \
-                 no-seek control"
+             run's own no-seek continuation, transition included"
         );
         assert_eq!(
             values.len(),
@@ -716,7 +703,6 @@ fn an_applied_seek_during_a_transition_lands_fresh_under_the_accepted_config() {
             "post-cut content must equal a fresh instance of the \
                  ACCEPTED configuration, bit-exactly"
         );
-        let _ = control_runtime.dispose();
         let _ = runtime.dispose();
     });
 }
@@ -1245,7 +1231,7 @@ fn n3_the_landing_oracle_catches_a_transition_that_survives_the_cut() {
         .then_some(())
         .expect("never started");
         probe.request_update(desired);
-        let _ = wait_transition_started(&probe, Duration::from_secs(5));
+        let (start, _) = wait_transition_started(&probe, Duration::from_secs(5));
         handle.request_seek(Duration::from_secs(5));
         assert_eq!(
             handle.wait_terminal(),
@@ -1261,20 +1247,36 @@ fn n3_the_landing_oracle_catches_a_transition_that_survives_the_cut() {
             "the mutant must exhibit the missing invalidation"
         );
 
-        // The landing oracle: post-cut == fresh accepted config.
+        // The landing oracle: post-cut == fresh accepted config. The
+        // cut is located the same way the production oracle locates it
+        // (divergence from the run's own no-seek continuation), so the
+        // mutant is judged by the shipped predicate, not a weaker one.
         let mut fresh = EpisodeProcessing::new(&desired, &format()).expect("compiles");
         let mut post_input = source_input(landing_frames, five_seconds);
         fresh.stage(&mut post_input).expect("stages");
         let expected: Vec<f32> = post_input.chunks(2).map(|f| f[0]).collect();
         let values = w.content();
+        let reference = expected_content(
+            EIGHT_SECONDS,
+            TEST_RATE / 5,
+            &initial,
+            &[(start, initial, desired)],
+        );
+        let cut = values
+            .iter()
+            .zip(reference.iter())
+            .position(|(a, c)| a != c)
+            .expect("the Applied cut must still land as a divergence");
         assert_ne!(
-            values, expected,
+            &values[cut..],
+            expected.as_slice(),
             "the mutant world must observably differ from the fresh \
                  landing"
         );
         assert!(crate::processing_support::rejects(|| {
             assert_eq!(
-                values, expected,
+                &values[cut..],
+                expected.as_slice(),
                 "post-cut content must equal a fresh instance of the \
                      ACCEPTED configuration — old transition audio after \
                      the cut fails here"
