@@ -49,6 +49,11 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
 /// premise-free oracle can be shown to hold under the pressure that
 /// used to false-RED its timing-based predecessor. No correctness
 /// conclusion may rest on the spinners' timing.
+///
+/// Panic-safe (audit corrective): `f` runs under `catch_unwind` and the
+/// spinners are stopped and joined before the panic is resumed, so a
+/// failing assertion inside `f` cannot leave process-wide CPU burners
+/// alive to distort the scheduling of every later test in the binary.
 pub fn under_cpu_load<R>(threads: usize, f: impl FnOnce() -> R) -> R {
     let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let mut spinners = Vec::new();
@@ -65,12 +70,15 @@ pub fn under_cpu_load<R>(threads: usize, f: impl FnOnce() -> R) -> R {
                 .expect("load spinner spawns"),
         );
     }
-    let result = f();
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
     stop.store(true, std::sync::atomic::Ordering::Relaxed);
     for spinner in spinners {
         let _ = spinner.join();
     }
-    result
+    match result {
+        Ok(value) => value,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
 }
 
 use qianqian_audio_api::ports::{
