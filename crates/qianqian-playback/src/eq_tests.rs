@@ -36,6 +36,7 @@ use qianqian_audio_api::ports::PcmFormat;
 use qianqian_audio_api::ports::ProviderSeekOutcome;
 
 use crate::handle::EpisodeTerminalOutcome;
+use crate::presets::EqPreset;
 use crate::processing::{
     AudioProcessingConfig, EQ_BAND_FREQUENCY_HZ, EQ_MAX_BAND_GAIN_DB, EpisodeProcessing, EqConfig,
     EqStage,
@@ -1147,4 +1148,99 @@ fn eq_stage_cost_is_bounded_and_allocation_free() {
         median_48 < Duration::from_millis(5),
         "48 kHz staging cost {median_48:?} exceeds the bound"
     );
+}
+
+// --- I4: presets are configuration data through the real path ------------
+
+/// A NAMED PRESET through the REAL composition: `EqPreset::Bass`
+/// resolves to an ordinary AudioProcessingConfig, and the consumed
+/// stream equals a freshly compiled stage over the same source —
+/// BIT-EXACT, both channels. Presets are data, not processors: nothing
+/// about the pipeline changes for a named selection.
+#[test]
+fn a_named_preset_processes_through_the_real_seam() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(30), move || {
+        let source_frames = TEST_RATE * 2;
+        let (witnesses, handle, mut runtime) = episode(
+            source_frames,
+            OutputBehavior::Consume,
+            EqPreset::Bass.to_config(),
+            Vec::new(),
+        );
+        assert_eq!(handle.wait_terminal(), EpisodeTerminalOutcome::Completed);
+
+        let expected = fresh_stage_reference(&EqPreset::Bass.to_config(), source_frames);
+        assert_eq!(witnesses.content(), expected[0], "channel 0");
+        assert_eq!(witnesses.content_ch1(), expected[1], "channel 1");
+        let snapshot = runtime.dispose().snapshot;
+        assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+    });
+}
+
+/// A preset CHANGE applies at the NEXT episode's establishment (the
+/// D14.11 episode-fixed applied snapshot, case B): episode 1 runs Bass;
+/// episode 2 — a fresh establishment in the same process — runs Treble.
+/// Each episode's consumed stream equals its OWN fresh-stage reference
+/// bit-exactly, and the two differ (the change really applied at the
+/// new establishment; no live update, no cross-episode state).
+#[test]
+fn a_preset_change_applies_at_the_next_episodes_establishment() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(30), move || {
+        let source_frames = TEST_RATE * 3;
+        let (first_w, first_handle, mut first_runtime) = episode(
+            source_frames,
+            OutputBehavior::Consume,
+            EqPreset::Bass.to_config(),
+            Vec::new(),
+        );
+        assert_eq!(
+            first_handle.wait_terminal(),
+            EpisodeTerminalOutcome::Completed
+        );
+        let first_values = first_w.content();
+        let snapshot = first_runtime.dispose().snapshot;
+        assert!(snapshot.quiet, "first episode teardown must stay quiet");
+
+        let (second_w, second_handle, mut second_runtime) = episode(
+            source_frames,
+            OutputBehavior::Consume,
+            EqPreset::Treble.to_config(),
+            Vec::new(),
+        );
+        assert_eq!(
+            second_handle.wait_terminal(),
+            EpisodeTerminalOutcome::Completed
+        );
+        let second_values = second_w.content();
+
+        let expected_first = fresh_stage_reference(&EqPreset::Bass.to_config(), source_frames);
+        let expected_second = fresh_stage_reference(&EqPreset::Treble.to_config(), source_frames);
+        assert_eq!(first_values, expected_first[0], "episode 1: its own preset");
+        assert_eq!(
+            second_values, expected_second[0],
+            "episode 2: its own preset"
+        );
+        assert_ne!(
+            first_values, second_values,
+            "the preset change must really apply at the new establishment"
+        );
+        let snapshot = second_runtime.dispose().snapshot;
+        assert!(snapshot.quiet, "second episode teardown must stay quiet");
+    });
+}
+
+/// The fresh-stage content reference for a desired configuration: the
+/// same compiled runtime driven over the position-tagged source.
+fn fresh_stage_reference(config: &AudioProcessingConfig, source_frames: usize) -> Vec<Vec<f32>> {
+    let mut reference =
+        EpisodeProcessing::new(config, &test_common::TEST_FORMAT).expect("compiles");
+    let mut input: Vec<f32> = (0..source_frames)
+        .flat_map(|i| vec![i as f32, i as f32 + 0.5])
+        .collect();
+    reference.stage(&mut input).expect("stage succeeds");
+    (0..2)
+        .map(|c| input[c..].chunks(2).map(|f| f[0]).collect())
+        .collect()
 }
