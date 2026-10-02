@@ -339,17 +339,19 @@ impl PlaybackSessionHandle {
     /// changes exactly the field(s) its name denotes (bypass keeps the
     /// gain/EQ fields in the desired configuration, inert) and the
     /// pending update is the resulting whole configuration, depth one,
-    /// latest wins. Acceptance is coherent: an invalid candidate is
-    /// refused here with an honest diagnostic (returned and also
-    /// observable through
+    /// latest wins. The command boundary validates the candidate
+    /// intrinsically: an invalid candidate is refused HERE with an
+    /// honest diagnostic (returned and also observable through
     /// [`PlaybackSessionObservation::last_processing_refusal`]), and the
     /// old configuration keeps running bit-exactly.
     ///
-    /// An accepted update applies at the next whole staging block that
+    /// The three stages stay distinct (§7.3 vocabulary): an `Ok` here is
+    /// a coherent DESIRED update (intrinsic validation only); the
+    /// semantic ACCEPTANCE is the worker's pickup-time compile against
+    /// the episode format; APPLY is the next whole staging block that
     /// has not yet been DSP-processed, through the authorized bounded
-    /// crossfade; already-processed PCM is never reprocessed. The
-    /// command is intent, not a claim that the sound has changed —
-    /// desired, accepted and applied stay distinct (§7.3 visibility).
+    /// crossfade — already-processed PCM is never reprocessed. The
+    /// command is intent, not a claim that the sound has changed.
     /// Commands recorded after the terminal Fact are inert command
     /// history, like late stop intent.
     pub fn set_processing_enabled(&self, enabled: bool) -> Result<(), String> {

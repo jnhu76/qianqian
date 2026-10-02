@@ -47,9 +47,9 @@ fn format() -> qianqian_audio_api::ports::PcmFormat {
 /// The oracle harness over the production mechanism: the shared
 /// product-control cell (the same one the handle's typed `set_*`
 /// commands route into) plus the engine's instrumentation tap. The
-/// whole-config `request_update` below goes through the SAME coherent
-/// acceptance the typed commands use — one validation point, one
-/// latest-wins pending slot, one engine.
+/// whole-config `request_update` below goes through the SAME command
+/// boundary the typed commands use — one intrinsic-validation point,
+/// one latest-wins pending slot, one engine.
 struct LiveHarness {
     control: Arc<ProcessingControl>,
     tap: LiveTap,
@@ -57,7 +57,8 @@ struct LiveHarness {
 
 impl LiveHarness {
     /// Route a whole desired configuration exactly as a typed `set_*`
-    /// command does (coherent acceptance included).
+    /// command does (intrinsic validation, desired+pending commit
+    /// included).
     fn request_update(&self, desired: AudioProcessingConfig) {
         self.control
             .route_whole(desired)
@@ -112,6 +113,30 @@ fn live_episode(
 /// (the pacing/fragmentation oracles).
 #[allow(clippy::too_many_arguments)]
 fn live_episode_source(
+    source: SourceBehavior,
+    output: OutputBehavior,
+    initial: AudioProcessingConfig,
+    transition_frames: usize,
+    seeks: Vec<ProviderSeekOutcome>,
+) -> (
+    Witnesses,
+    crate::handle::PlaybackSessionHandle,
+    LiveHarness,
+    qianqian_app::QianqianApp,
+) {
+    let (witnesses, handle, harness, mut runtime) =
+        live_episode_parts(source, output, initial, transition_frames, seeks);
+    revise_composition(&mut runtime);
+    (witnesses, handle, harness, runtime)
+}
+
+/// [`live_episode_source`] WITHOUT the activation: every component is
+/// registered but the composition is not yet revised, so an oracle can
+/// slip a typed command into the establishment→activation window — the
+/// product constructor's exact shape (establishment at construction,
+/// activation when the composition runs).
+#[allow(clippy::too_many_arguments)]
+fn live_episode_parts(
     source: SourceBehavior,
     output: OutputBehavior,
     initial: AudioProcessingConfig,
@@ -181,6 +206,17 @@ fn live_episode_source(
         ))
         .expect("session registers");
 
+    let harness = LiveHarness {
+        control: handle.completion.processing(),
+        tap,
+    };
+    (witnesses, handle, harness, runtime)
+}
+
+/// Revise (activate) a [`live_episode_parts`] composition — the step an
+/// oracle deliberately DEFERS when it needs the establishment→activation
+/// window.
+fn revise_composition(runtime: &mut qianqian_app::QianqianApp) {
     runtime
         .revise_desired(vec![
             crate::processing_support::desired("decode", "test_decode_plugin"),
@@ -188,12 +224,6 @@ fn live_episode_source(
             crate::processing_support::desired("session", "playback_session"),
         ])
         .expect("composition is legal");
-
-    let harness = LiveHarness {
-        control: handle.completion.processing(),
-        tap,
-    };
-    (witnesses, handle, harness, runtime)
 }
 
 /// The source input stream, interleaved stereo, position-tagged exactly
@@ -269,47 +299,51 @@ fn expected_interleaved(
     let mut prev_start = 0usize;
     let mut prev_total = 0usize;
     for &(start, ref old, ref new) in transitions.iter() {
+        // A transition start is a PROCESSED-frame witness; the reference
+        // models CONSUMED audio only (a stopped episode can end while the
+        // edge still holds processed-but-unconsumed frames), so a start
+        // at or beyond the consumed length produced no audible
+        // transition at all.
+        let audible_start = start.min(source_frames);
         // The OLD side: warmed from the previous segment boundary by
-        // staging the running configuration up to `start`, then
-        // continued across the whole tail with the SAME instance. The
-        // warm-up writes only the PURE stretch — the previous
+        // staging the running configuration up to the audible start,
+        // then continued across the whole tail with the SAME instance.
+        // The warm-up writes only the PURE stretch — the previous
         // transition's blend stretch stays what that blend computed.
         let mut old_processor = EpisodeProcessing::new(old, &format()).expect("compiles");
-        if start > prev_start {
-            let mut warm = source_input(start - prev_start, prev_start);
+        if audible_start > prev_start {
+            let mut warm = source_input(audible_start - prev_start, prev_start);
             old_processor.stage(&mut warm).expect("stages");
-            let skip = if prev_start == 0 {
-                0
-            } else {
-                prev_total.min(start - prev_start)
-            };
+            let skip = prev_total.min(audible_start - prev_start);
             for (i, frame) in warm.chunks(2).enumerate().skip(skip) {
                 expected[(prev_start + i) * 2] = frame[0];
                 expected[(prev_start + i) * 2 + 1] = frame[1];
             }
         }
-        let mut old_tail = source_input(source_frames - start, start);
-        old_processor.stage(&mut old_tail).expect("stages");
+        if start < source_frames {
+            let mut old_tail = source_input(source_frames - start, start);
+            old_processor.stage(&mut old_tail).expect("stages");
 
-        // The NEW side: a fresh instance at the transition start.
-        let mut new_processor = EpisodeProcessing::new(new, &format()).expect("compiles");
-        let mut new_tail = source_input(source_frames - start, start);
-        new_processor.stage(&mut new_tail).expect("stages");
+            // The NEW side: a fresh instance at the transition start.
+            let mut new_processor = EpisodeProcessing::new(new, &format()).expect("compiles");
+            let mut new_tail = source_input(source_frames - start, start);
+            new_processor.stage(&mut new_tail).expect("stages");
 
-        // The blend stretch overwrites the old side's tail prefix.
-        let total = transition_frames;
-        for i in start..(start + total).min(source_frames) {
-            let w = blend_weight(i, start, total);
-            for c in 0..2 {
-                let a = old_tail[(i - start) * 2 + c];
-                let b = new_tail[(i - start) * 2 + c];
-                expected[i * 2 + c] = w.mul_add(a, (1.0 - w).mul_add(b, 0.0));
+            // The blend stretch overwrites the old side's tail prefix.
+            let total = transition_frames;
+            for i in start..(start + total).min(source_frames) {
+                let w = blend_weight(i, start, total);
+                for c in 0..2 {
+                    let a = old_tail[(i - start) * 2 + c];
+                    let b = new_tail[(i - start) * 2 + c];
+                    expected[i * 2 + c] = w.mul_add(a, (1.0 - w).mul_add(b, 0.0));
+                }
             }
-        }
-        // Beyond the blend the new side IS the continuation.
-        for i in (start + total).min(source_frames)..source_frames {
-            expected[i * 2] = new_tail[(i - start) * 2];
-            expected[i * 2 + 1] = new_tail[(i - start) * 2 + 1];
+            // Beyond the blend the new side IS the continuation.
+            for i in (start + total).min(source_frames)..source_frames {
+                expected[i * 2] = new_tail[(i - start) * 2];
+                expected[i * 2 + 1] = new_tail[(i - start) * 2 + 1];
+            }
         }
         prev_start = start;
         prev_total = transition_frames;
@@ -955,7 +989,11 @@ fn an_invalid_update_is_refused_and_the_old_config_continues() {
 /// Rapid successive updates follow the deterministic policy:
 /// complete-in-flight, latest-wins pending (depth-1 slot). Two requests
 /// landing before the first pickup coalesce into ONE accepted
-/// transition to the LATEST desired configuration.
+/// transition to the LATEST desired configuration. The precondition
+/// ("before the first pickup") is established deterministically: with
+/// the edge full and the leg parked, the worker cannot reach the
+/// fresh-block pickup, so both commands land in the slot before any
+/// pickup runs — the race is scripted out, not probabilistic.
 #[test]
 fn rapid_updates_coalesce_to_the_latest_desired() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -979,6 +1017,25 @@ fn rapid_updates_coalesce_to_the_latest_desired() {
         })
         .then_some(())
         .expect("never started");
+        handle.request_pause();
+        assert!(
+            wait_until(Duration::from_secs(5), || handle.observe().paused()),
+            "the Paused projection never established"
+        );
+        assert!(
+            wait_until(Duration::from_secs(5), || handle
+                .completion
+                .buffered_frames()
+                == Some(EDGE_CAPACITY_FRAMES)),
+            "the edge never filled while paused"
+        );
+        let parked_at = probe.processed_frames();
+        std::thread::sleep(Duration::from_millis(150));
+        assert_eq!(
+            parked_at,
+            probe.processed_frames(),
+            "parked: the worker stages nothing, so no pickup can run"
+        );
         probe.request_update(rock);
         probe.request_update(jazz);
         assert_eq!(
@@ -986,6 +1043,7 @@ fn rapid_updates_coalesce_to_the_latest_desired() {
             Some(&jazz),
             "the slot is depth-1, latest wins"
         );
+        handle.request_resume();
         let (start, _) = wait_transition_started(&probe, Duration::from_secs(5));
         assert_eq!(
             handle.wait_terminal(),
@@ -1636,6 +1694,122 @@ mod control_boundary {
              preamp included)"
         );
     }
+
+    /// Two typed field commands on DIFFERENT fields, issued
+    /// concurrently, must compose: whatever the interleaving, the final
+    /// desired configuration carries the LAST command's gain AND the
+    /// LAST command's EQ. A read-modify-write split across two lock
+    /// acquisitions cannot guarantee this (MUTANT N9: the second command
+    /// composes from a stale snapshot and silently rolls the first
+    /// command's field back); the production path composes and commits
+    /// under ONE lock hold, so the invariant holds for every schedule.
+    #[test]
+    fn concurrent_field_commands_on_different_fields_compose_without_losing_updates() {
+        let custom_bands = |front: f32| {
+            let mut bands = crate::processing::EqConfig::FLAT.band_gain_db;
+            bands[0] = front;
+            bands
+        };
+        let control = Arc::new(ProcessingControl::new(preset_config(EqPreset::Flat)));
+        for i in 0..64 {
+            let gain = if i % 2 == 0 { 0.5 } else { 0.25 };
+            let front = if i % 2 == 0 { 1.0 } else { 2.0 };
+
+            let gain_control = Arc::clone(&control);
+            let eq_control = Arc::clone(&control);
+            let gain_thread =
+                std::thread::spawn(move || gain_control.set_preamp(gain).expect("valid"));
+            let eq_thread = std::thread::spawn(move || {
+                eq_control
+                    .set_eq_config(crate::processing::EqConfig::new(custom_bands(front), 1.0))
+                    .expect("valid")
+            });
+            gain_thread.join().expect("gain thread");
+            eq_thread.join().expect("eq thread");
+
+            let desired = control.desired();
+            assert_eq!(
+                desired.gain, gain,
+                "round {i}: the last gain command survives"
+            );
+            assert_eq!(
+                desired.eq.map(|eq| eq.band_gain_db[0]),
+                Some(front),
+                "round {i}: the last EQ command survives"
+            );
+            assert_eq!(
+                control.pending().as_ref(),
+                Some(&desired),
+                "round {i}: the committed whole update occupies the slot"
+            );
+        }
+    }
+
+    /// N9 — the split-lock read-modify-write the typed commands must
+    /// never express: composing from a STALE desired snapshot and
+    /// committing the whole after an unrelated field command loses that
+    /// command's field change. The atomic world (the production
+    /// `update_desired` path) composes from the CURRENT desired state in
+    /// the same lock hold it commits in, so both fields survive there;
+    /// the scripted mutant world demonstrably rolls the gain back, and
+    /// the oracle catches it.
+    #[test]
+    fn n9_the_lost_update_oracle_catches_the_split_lock_rmw() {
+        let custom = || {
+            let mut bands = crate::processing::EqConfig::FLAT.band_gain_db;
+            bands[0] = 6.0;
+            crate::processing::EqConfig::new(bands, 1.0)
+        };
+
+        // The atomic world: an EQ command composed AFTER a committed
+        // gain command keeps the gain.
+        let atomic = ProcessingControl::new(preset_config(EqPreset::Rock));
+        atomic.set_preamp(0.5).expect("valid");
+        atomic
+            .update_desired(|candidate| candidate.eq = Some(custom()))
+            .expect("valid");
+        let desired = atomic.desired();
+        assert_eq!(desired.gain, 0.5, "the earlier field command survives");
+        assert_eq!(
+            desired.eq,
+            Some(custom()),
+            "the later field command applied"
+        );
+
+        // The mutant world: the stale-snapshot interleaving, scripted
+        // deterministically (the "concurrent" command runs between the
+        // read lock and the commit lock).
+        let split = Arc::new(ProcessingControl::new(preset_config(EqPreset::Rock)));
+        let in_world = Arc::clone(&split);
+        let between = Arc::clone(&split);
+        let caught = crate::processing_support::rejects(move || {
+            crate::live::mutant_stale_snapshot_rmw(
+                &in_world,
+                || {
+                    between.set_preamp(0.5).expect("valid");
+                },
+                |stale| stale.eq = Some(custom()),
+            )
+            .expect("the mutant's commit is intrinsically valid");
+            let desired = in_world.desired();
+            assert_eq!(
+                desired.gain, 0.5,
+                "a field command must survive a concurrent unrelated command"
+            );
+            assert_eq!(desired.eq, Some(custom()));
+        });
+        assert!(
+            caught,
+            "the split-lock world must lose the update — the oracle must catch N9"
+        );
+        // And the loss is visible in the mutant world's final state.
+        let rolled_back = split.desired();
+        assert_eq!(
+            rolled_back.gain, 1.0,
+            "the mutant world demonstrably rolled the gain back to the stale snapshot"
+        );
+        assert_eq!(rolled_back.eq, Some(custom()));
+    }
 }
 
 // --- D4: the product path (typed commands through the REAL seam) ----------
@@ -1664,6 +1838,129 @@ fn first_divergence(values: &[f32], reference: &[f32]) -> usize {
 /// new side contributes ~46%, far above an ulp). Callers assert the lag.
 fn boundary_at_or_before(observed: usize) -> usize {
     observed - (observed % STAGING_FRAMES)
+}
+
+/// A typed command issued in the establishment→activation window folds
+/// into the INITIAL applied configuration: the activation bind consumes
+/// the pending slot in the same lock hold it reads the desired state, so
+/// the episode starts directly under the commanded configuration —
+/// bit-exactly a fresh instance of it from frame 0 — and NO phantom
+/// initial→same transition ever starts. (Clearing the slot only at
+/// establishment left exactly that phantom: a pre-activation command
+/// planted a pending update equal to the configuration activation was
+/// about to compile.)
+#[test]
+fn a_command_before_activation_folds_into_the_initial_configuration() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(60), move || {
+        let initial = preset_config(EqPreset::Flat);
+        let (witnesses, handle, probe, mut runtime) = live_episode_parts(
+            SourceBehavior::EofAfter(EIGHT_SECONDS),
+            OutputBehavior::Consume,
+            initial,
+            production_transition_frames(),
+            Vec::new(),
+        );
+        // The window: establishment bound (the constructor ran),
+        // activation has not.
+        handle.set_eq_preset(EqPreset::Rock).expect("valid command");
+        assert_eq!(
+            probe.pending().as_ref(),
+            Some(&preset_config(EqPreset::Rock)),
+            "the command is recorded as a pending desired update"
+        );
+        revise_composition(&mut runtime);
+        assert_eq!(
+            handle.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Completed
+        );
+
+        assert!(
+            !probe
+                .events()
+                .iter()
+                .any(|e| matches!(e, LiveEvent::TransitionStarted { .. })),
+            "a command that folded into the initial configuration must not \
+             start a phantom initial→same live transition"
+        );
+        // The whole stream is a fresh instance of the COMMANDED
+        // configuration from frame 0, bit-exactly (a phantom blend is
+        // not bit-exact).
+        let mut reference =
+            EpisodeProcessing::new(&preset_config(EqPreset::Rock), &format()).expect("compiles");
+        let mut input = source_input(EIGHT_SECONDS, 0);
+        reference.stage(&mut input).expect("stages");
+        let expected: Vec<f32> = input.chunks(2).map(|f| f[0]).collect();
+        assert_eq!(
+            witnesses.content(),
+            expected,
+            "the episode runs the commanded configuration from frame 0"
+        );
+        let _ = runtime.dispose();
+    });
+}
+
+/// The pair: a typed command issued AFTER the activation bind takes the
+/// ordinary §7.3 live path — exactly ONE live transition to the
+/// commanded configuration, and the settled stretch bit-exactly a fresh
+/// instance of it.
+#[test]
+fn a_command_after_activation_takes_the_ordinary_live_transition() {
+    let _lifecycle = test_common::lifecycle_lock();
+    test_common::within(Duration::from_secs(60), move || {
+        let initial = preset_config(EqPreset::Flat);
+        let total = production_transition_frames();
+        let (witnesses, handle, probe, mut runtime) = live_episode(
+            EIGHT_SECONDS,
+            OutputBehavior::Consume,
+            initial,
+            total,
+            Vec::new(),
+        );
+        wait_until(Duration::from_secs(5), || {
+            handle
+                .observe()
+                .position
+                .is_some_and(|p| p >= HALF_A_SECOND / 4)
+        })
+        .then_some(())
+        .expect("never started");
+        handle.set_eq_preset(EqPreset::Rock).expect("valid command");
+        let (start, _) = wait_transition_started(&probe, Duration::from_secs(5));
+        assert_eq!(
+            handle.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Completed
+        );
+
+        let started: Vec<usize> = probe
+            .events()
+            .into_iter()
+            .filter_map(|e| match e {
+                LiveEvent::TransitionStarted { at_frame, .. } => Some(at_frame),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            started,
+            vec![start],
+            "a post-activation command must start exactly ONE live transition"
+        );
+        let expected = expected_content(
+            EIGHT_SECONDS,
+            total,
+            &initial,
+            &[(start, initial, preset_config(EqPreset::Rock))],
+        );
+        let values = witnesses.content();
+        for (i, (got, want)) in values.iter().zip(expected.iter()).enumerate() {
+            let tolerance = 1e-4 * want.abs().max(1.0);
+            assert!(
+                (got - want).abs() <= tolerance,
+                "frame {i}: {got} vs expected blend {want}"
+            );
+        }
+        let _ = runtime.dispose();
+    });
 }
 
 /// A typed preset switch on the PRODUCT path (no tap, production
@@ -2052,8 +2349,21 @@ fn an_update_near_completion_is_never_half_applied() {
 /// The observed-seek × accepted-update interleaving (carried D3 debt):
 /// a seek command that is observed but NOT yet actionable does not block
 /// the fresh-block pickup — the accepted update starts its transition
-/// while the seek pends, and a cut that never becomes actionable is
-/// inert history at the episode's end.
+/// while the seek pends.
+///
+/// The seek's later career is deliberately NOT pinned here. Whether it
+/// stays unactionable to the end, or a starved render leg's parked
+/// evidence makes it actionable (the frozen D14.5 cut), is
+/// schedule-dependent under load — and every legal ending is already
+/// pinned by its own deterministic oracle (the applied cut lands fresh
+/// under the accepted configuration; a refusal preserves the
+/// continuation bit-exactly). What THIS oracle owns is the
+/// pickup-availability contract: the transition starts, after the
+/// commands, while the seek is still pending; the consumed prefix up to
+/// the transition is the pure old configuration in EVERY legal ending
+/// (in the cut world the pickup precedes the first post-cut staging, so
+/// the transition start coincides with the landing); the update was
+/// accepted, never refused; the episode still ends by stop.
 #[test]
 fn a_merely_observed_seek_does_not_block_the_update_pickup() {
     let _lifecycle = test_common::lifecycle_lock();
@@ -2063,10 +2373,10 @@ fn a_merely_observed_seek_does_not_block_the_update_pickup() {
 
         // A slow paced source: after the fast prefix the decode produces
         // one frame per 5 ms (200 frames/s — far below any consumption
-        // rate), so the edge stays empty, the render leg never parks at
-        // a full edge, and the seek stays unactionable for the whole
-        // observation window. The transition is short (64 frames) so it
-        // completes quickly at the producer's pace.
+        // rate), so the edge stays empty and the seek pends for the
+        // whole observation window under normal scheduling. The
+        // transition is short (64 frames) so it completes quickly at the
+        // producer's pace.
         let (w, handle, probe, mut runtime) = live_episode_source(
             SourceBehavior::Paced {
                 after: 4200,
@@ -2087,8 +2397,8 @@ fn a_merely_observed_seek_does_not_block_the_update_pickup() {
         })
         .then_some(())
         .expect("never started");
-        // Observed seek FIRST (pends, unactionable), accepted update
-        // SECOND: the pickup must proceed.
+        // Observed seek FIRST (pends), accepted update SECOND: the
+        // pickup must proceed — THE contract under test.
         handle.request_seek(Duration::from_secs(1));
         probe.request_update(desired);
         let (start, _) = wait_transition_started(&probe, Duration::from_secs(30));
@@ -2100,40 +2410,87 @@ fn a_merely_observed_seek_does_not_block_the_update_pickup() {
         assert_eq!(
             handle.wait_terminal(),
             crate::handle::EpisodeTerminalOutcome::Stopped,
-            "the pended seek never became actionable; the episode ends \
-                 by stop"
+            "the episode ends by stop in every legal ending of the pended \
+                 seek"
         );
         assert!(
-            !probe
-                .events()
-                .iter()
-                .any(|e| matches!(e, LiveEvent::InvalidationDroppedTransition)),
-            "a seek that never became actionable performs no cut"
+            handle.observe().last_processing_refusal.is_none(),
+            "the accepted update is not a refusal"
         );
+        // The consumed stream decides which legal ending occurred, and
+        // each is verified against its own exact reference.
         let values = w.content();
         let raw: Vec<f32> = (0..values.len()).map(|i| i as f32).collect();
-        let expected = expected_content(
-            values.len(),
-            TEST_RATE / 5,
-            &initial,
-            &[(start, initial, desired)],
-        );
-        assert_eq!(
-            &values[..start],
-            &raw[..start],
-            "pre-transition: old continuation"
-        );
-        for (i, (got, want)) in values[start..]
-            .iter()
-            .zip(expected[start..].iter())
-            .enumerate()
-        {
-            let tolerance = 1e-4 * want.abs().max(1.0);
-            assert!(
-                (got - want).abs() <= tolerance,
-                "frame {}: {got} vs {want}",
-                i + start
-            );
+        // A post-landing frame carries the landing tag (1 s); every
+        // pre-cut frame carries a tag below the consumed length.
+        match values.iter().position(|&v| v >= TEST_RATE as f32) {
+            None => {
+                // No cut became audible. The consumed prefix up to the
+                // transition start is the pure old continuation in every
+                // no-cut ending; what lies beyond it is, at most, the
+                // w→1 head of the blend (bit-equal to the continuation —
+                // the blend law itself is pinned by the slow-consume
+                // oracles).
+                let prefix = start.min(values.len());
+                assert_eq!(
+                    &values[..prefix],
+                    &raw[..prefix],
+                    "the consumed prefix before the transition is the pure \
+                         old continuation"
+                );
+            }
+            Some(j) => {
+                let reference =
+                    expected_content(values.len(), 64, &initial, &[(start, initial, desired)]);
+                // World B first: the transition rode pre-cut and the
+                // actionable cut dropped it (the frozen D14.5 order), so
+                // the landing must be a FRESH instance of the ACCEPTED
+                // configuration fed the exact post-landing tags,
+                // bit-exactly.
+                let mut fresh = EpisodeProcessing::new(&desired, &format()).expect("compiles");
+                let mut post = source_input(values.len() - j, TEST_RATE);
+                fresh.stage(&mut post).expect("stages");
+                let fresh_landing: Vec<f32> = post.chunks(2).map(|f| f[0]).collect();
+                if values[j..] == fresh_landing.as_slice()[..] {
+                    assert_eq!(
+                        &values[..j],
+                        &reference[..j],
+                        "pre-cut: the run's own no-cut continuation, \
+                             transition included"
+                    );
+                } else {
+                    // World C: the cut preceded the pickup, so the update
+                    // applied AT the landing — the post-landing stretch
+                    // is the Model C blend (the fresh-applied old side —
+                    // the cut invalidated pre-cut history — against the
+                    // new configuration from rest) settling into the
+                    // accepted configuration.
+                    assert_eq!(&values[..j], &raw[..j], "pre-cut: pure old continuation");
+                    let tail = values.len() - j;
+                    let mut old_side =
+                        EpisodeProcessing::new(&initial, &format()).expect("compiles");
+                    let mut old_tail = source_input(tail, TEST_RATE);
+                    old_side.stage(&mut old_tail).expect("stages");
+                    let mut new_side =
+                        EpisodeProcessing::new(&desired, &format()).expect("compiles");
+                    let mut new_tail = source_input(tail, TEST_RATE);
+                    new_side.stage(&mut new_tail).expect("stages");
+                    for (k, got) in values[j..].iter().enumerate() {
+                        let want = if k < 64 {
+                            let wgt = blend_weight(k + j, j, 64);
+                            wgt.mul_add(old_tail[k * 2], (1.0 - wgt).mul_add(new_tail[k * 2], 0.0))
+                        } else {
+                            new_tail[k * 2]
+                        };
+                        let tolerance = 1e-4 * want.abs().max(1.0);
+                        assert!(
+                            (got - want).abs() <= tolerance,
+                            "frame {}: {got} vs {want}",
+                            j + k
+                        );
+                    }
+                }
+            }
         }
         let _ = runtime.dispose();
     });

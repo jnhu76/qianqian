@@ -464,8 +464,14 @@ Settled         only the accepted configuration contributes; the settled
   dual-processor crossfade (Model C): the old side carries its live
   signal state, the new side starts from rest at the transition start,
   so the settled stream is EXACTLY a fresh instance of the accepted
-  configuration started at the transition start. Gain changes are
-  exactly the interpolated gain on the same input. Evaluated and
+  configuration started at the transition start. For a gain-only change
+  between stateless configurations the transition stretch is exactly the
+  interpolated gain on the same input; with a live EQ on either side the
+  stretch is the same Model C blend of the two real processors (the
+  new side's EQ starts from rest inside the crossfade) — the
+  correctness-bearing exactness claim is the settled stream, and the
+  transition-continuity oracles pin the blend law in both forms.
+  Evaluated and
   rejected: instant switching (Model A — clicks at preset-scale jumps,
   pinned by a negative control), parameter smoothing (Model B — its
   intermediate parameter states correspond to no compiled
@@ -520,6 +526,23 @@ Settled         only the accepted configuration contributes; the settled
   (no pending update) adds one uncontended lock per block and nothing
   else; measured evidence lives in the D4 phase report. The transition
   length is product tuning recorded with evidence, not authority.
+  Truthful stage vocabulary in this realization: a command's `Ok` is a
+  coherent DESIRED update recorded after intrinsic validation; the
+  semantic ACCEPTANCE is the pickup-time compile against the episode
+  format; APPLY is the fresh staging block. The typed commands compose
+  and commit under one lock hold (a stale-snapshot read-modify-write
+  that could lose an unrelated concurrent field change is a named
+  mutant, N9, with a pinned negative control), and activation reads the
+  desired state through a bind that consumes the pending slot in the
+  same lock hold, so a command issued between establishment and
+  activation folds into the initial applied configuration instead of
+  starting a phantom initial→same transition. The cell's lock is
+  bounded on both sides — the worker takes one `Option` per fresh
+  block; a command's critical section is one fixed-size
+  compose+validate+commit over `Copy` data (only a refusal allocates
+  its diagnostic, on the command path) — the bounded-blocking reading
+  of the per-block firewall, which bans UNBOUNDED blocking; no
+  condvar, no waiter, no I/O inside the lock.
 
 ---
 

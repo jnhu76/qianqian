@@ -40,7 +40,12 @@
 //! bus: one mutex-guarded product-control cell and one episode-owned
 //! runtime behind the existing [`crate::session::ProcessingRuntime`]
 //! staging seam. The overlap is same-thread, same-owner and
-//! episode-bounded, so PBK-001 P1–P5 are not triggered.
+//! episode-bounded, so PBK-001 P1–P5 are not triggered. The cell's lock
+//! is bounded on both sides — the worker touches it exactly once per
+//! fresh block (one `Option::take`), and a command's critical section
+//! is one fixed-size compose+validate+commit over `Copy` data (only a
+//! REFUSED command allocates its diagnostic) — so the per-block
+//! firewall's ban on unbounded blocking holds.
 
 use std::sync::{Arc, Mutex};
 
@@ -103,8 +108,11 @@ impl ProcessingControl {
         }
     }
 
-    /// The currently desired configuration (product-control state; the
-    /// D5 read model is a separate product decision).
+    /// The currently desired configuration. Test-only read: production
+    /// reads the desired state through [`Self::bind_for_activation`] (the
+    /// one linearization point); the D5 read model is a separate product
+    /// decision.
+    #[cfg(all(test, not(loom)))]
     pub(crate) fn desired(&self) -> AudioProcessingConfig {
         self.state.lock().unwrap().desired
     }
@@ -128,45 +136,86 @@ impl ProcessingControl {
         state.pending = None;
     }
 
+    /// The activation linearization point: return the desired
+    /// configuration the episode's initial processor must compile, and
+    /// consume any pending update in the SAME lock hold. A `set_*`
+    /// between establishment and activation therefore folds into the
+    /// INITIAL applied configuration — the engine compiles exactly that
+    /// configuration and no phantom initial→same transition starts; a
+    /// `set_*` after this bind lands in the pending slot and reaches the
+    /// worker's pickup as an ordinary §7.3 live update.
+    pub(crate) fn bind_for_activation(&self) -> AudioProcessingConfig {
+        let mut state = self.state.lock().unwrap();
+        state.pending = None;
+        state.desired
+    }
+
     /// Scalar preamp change: the linear gain factor of the whole desired
     /// configuration (the same unit the frozen configuration field
     /// documents; presentation layers may display dB).
     pub(crate) fn set_preamp(&self, factor: f32) -> Result<(), String> {
-        let mut desired = self.desired();
-        desired.gain = factor;
-        self.route(desired)
+        self.update_desired(|desired| desired.gain = factor)
     }
 
     /// 10-band GEQ band-gain change: replace the desired EQ
     /// configuration. Does not implicitly toggle `enabled` — a field
     /// operation never silently changes an unrelated field.
     pub(crate) fn set_eq_config(&self, eq: EqConfig) -> Result<(), String> {
-        let mut desired = self.desired();
-        desired.eq = Some(eq);
-        self.route(desired)
+        self.update_desired(|desired| desired.eq = Some(eq))
     }
 
     /// Factory-preset switch: install the preset's whole recorded
     /// desired configuration ([`EqPreset::to_config`] — its unity
     /// preamp included, exactly as the establishment path resolves it).
     pub(crate) fn set_eq_preset(&self, preset: EqPreset) -> Result<(), String> {
-        self.route(preset.to_config())
+        self.update_desired(|desired| *desired = preset.to_config())
     }
 
     /// Processing enabled/bypass toggle. Bypass is a configuration, not
     /// a processor: the gain/EQ fields stay in the desired
     /// configuration and are inert until processing is enabled again.
     pub(crate) fn set_enabled(&self, enabled: bool) -> Result<(), String> {
-        let mut desired = self.desired();
-        desired.enabled = enabled;
-        self.route(desired)
+        self.update_desired(|desired| desired.enabled = enabled)
     }
 
-    /// Coherent acceptance at the command boundary: validate the WHOLE
-    /// candidate configuration first; a refusal records the honest
-    /// diagnostic and leaves the desired/pending state untouched (the
-    /// old configuration keeps running bit-exactly — never a partial
-    /// config, never a silent fallback to a different sound).
+    /// The typed commands' one write path: compose the candidate from
+    /// the CURRENT desired configuration and commit it under ONE lock
+    /// hold — compose, intrinsic validation, and the desired+pending
+    /// move are atomic, so two racing field commands can never compose
+    /// from the same stale snapshot and silently lose one command's
+    /// field change (MUTANT N9 pins the defective split-lock shape).
+    ///
+    /// Vocabulary (truthful, per §7.3): an `Ok` here is a coherent
+    /// DESIRED update recorded after intrinsic validation — NOT yet the
+    /// semantic Acceptance, which is the pickup-time compile against the
+    /// episode format, and NOT yet Applied, which is the fresh-block
+    /// boundary.
+    pub(crate) fn update_desired(
+        &self,
+        compose: impl FnOnce(&mut AudioProcessingConfig),
+    ) -> Result<(), String> {
+        let mut state = self.state.lock().unwrap();
+        let mut candidate = state.desired;
+        compose(&mut candidate);
+        if let Err(diagnostic) = candidate.validate() {
+            state.last_refusal = Some(diagnostic.clone());
+            return Err(diagnostic);
+        }
+        commit_desired(&mut state, candidate);
+        Ok(())
+    }
+
+    /// Record a whole desired update at the command boundary: intrinsic
+    /// validation of the WHOLE candidate first; a refusal records the
+    /// honest diagnostic and leaves the desired/pending state untouched
+    /// (the old configuration keeps running bit-exactly — never a
+    /// partial config, never a silent fallback to a different sound).
+    /// The semantic ACCEPTANCE (the format-dependent compile) happens at
+    /// the worker's pickup; the APPLY happens at the fresh-block
+    /// boundary. Test-only: the typed commands compose through
+    /// [`Self::update_desired`]; this whole-config entry survives for
+    /// the oracle harness and the N9 mutant world.
+    #[cfg(all(test, not(loom)))]
     fn route(&self, candidate: AudioProcessingConfig) -> Result<(), String> {
         if let Err(diagnostic) = candidate.validate() {
             let mut state = self.state.lock().unwrap();
@@ -174,9 +223,7 @@ impl ProcessingControl {
             return Err(diagnostic);
         }
         let mut state = self.state.lock().unwrap();
-        state.desired = candidate;
-        state.pending = Some(candidate);
-        state.last_refusal = None;
+        commit_desired(&mut state, candidate);
         Ok(())
     }
 
@@ -222,6 +269,21 @@ impl ProcessingControl {
     }
 }
 
+/// The commit half of both command paths (caller holds the lock): the
+/// coherent desired update moves desired and pending together, as ONE
+/// whole configuration. Re-issuing the configuration that is ALREADY
+/// desired is a no-op — an identical re-command must not plant a
+/// self-crossfade between two identical processors, and the pending slot
+/// (which always carries the latest recorded update) is left to the
+/// pickup exactly as it was.
+fn commit_desired(state: &mut ProcessingControlState, candidate: AudioProcessingConfig) {
+    if candidate != state.desired {
+        state.desired = candidate;
+        state.pending = Some(candidate);
+    }
+    state.last_refusal = None;
+}
+
 /// The crossfade state. Both sides are REAL episode processors: `from`
 /// carries the pre-update signal history, `to` starts from rest at the
 /// transition start (so the settled continuation is exactly a fresh
@@ -231,9 +293,10 @@ struct Transition {
     to: EpisodeProcessing,
     elapsed_frames: usize,
     total_frames: usize,
-    /// Reused across the transition (and every later transition):
-    /// capacity grows once to the largest block seen, so the transition
-    /// path allocates nothing in steady state.
+    /// Grown at most once PER TRANSITION to the largest block seen (the
+    /// transition owns the buffer and settle drops it with the
+    /// transition), so each transition's allocation cost is bounded by
+    /// that one growth — the steady path stays allocation-free.
     scratch_in: Vec<f32>,
     /// The wall-clock witness of the previous stage call — used ONLY by
     /// the N4 mutation (a ramp advanced by wall time, the defect the
@@ -301,10 +364,13 @@ impl LiveProcessing {
         })
     }
 
-    /// The acceptance step at the fresh-block pickup: compile the desired
-    /// update against the episode format. A refusal is recorded as
-    /// mechanism evidence and the old configuration continues — NEVER a
-    /// processing failure, never a silent fallback to a different sound.
+    /// The semantic ACCEPTANCE step at the fresh-block pickup: compile
+    /// the desired update against the episode format. (Vocabulary: the
+    /// command boundary's `Ok` is intrinsic validation of the desired
+    /// update; THIS compile is what Accepts it; the staging boundary
+    /// Applies it.) A refusal is recorded as mechanism evidence and the
+    /// old configuration continues — NEVER a processing failure, never a
+    /// silent fallback to a different sound.
     fn accept(&mut self, desired: AudioProcessingConfig) {
         let compiled = EpisodeProcessing::new(&desired, &self.format);
         match compiled {
@@ -672,4 +738,26 @@ pub(crate) fn mutant_reset_history(
     let mut fresh = EpisodeProcessing::new(applied, format).expect("mutant compiles");
     fresh.stage(&mut data).expect("mutant stages");
     data
+}
+
+/// MUTANT N9 (D4 review F1, "split-lock read-modify-write loses an
+/// unrelated concurrent field update") — the defective command shape the
+/// typed `set_*` commands must never express: read the desired
+/// configuration under one lock, let an unrelated command commit IN
+/// BETWEEN, then commit the STALE snapshot with only one field changed —
+/// the intermediate command's field change is silently rolled back. The
+/// production path ([`ProcessingControl::update_desired`]) composes and
+/// commits under ONE lock hold, so this interleaving is inexpressible
+/// there; the scripted world exists so the lost-update oracle can prove
+/// its own sensitivity deterministically.
+#[cfg(all(test, not(loom)))]
+pub(crate) fn mutant_stale_snapshot_rmw(
+    control: &ProcessingControl,
+    between_locks: impl FnOnce(),
+    compose: impl FnOnce(&mut AudioProcessingConfig),
+) -> Result<(), String> {
+    let mut stale = control.desired();
+    between_locks();
+    compose(&mut stale);
+    control.route(stale)
 }

@@ -145,41 +145,38 @@ pub(crate) fn playback_session_spec_with_live_tap(
     transition_frames: usize,
     tap: crate::live::tap::LiveTap,
 ) -> ComponentSpec {
-    let initial = std::cell::RefCell::new(Some(initial));
+    // The establishment binding happens at CONSTRUCTION time — the
+    // product constructor's exact shape — so an oracle can issue a
+    // typed command into the establishment→activation window and pin
+    // the same linearization the product path runs.
+    handle.completion.processing().establish(initial);
     let tap = std::cell::RefCell::new(Some(tap));
     ComponentSpec::new("playback_session")
         .requires::<PcmDecodeCapability>()
         .requires::<AudioOutputCapability>()
         .on_activate(move |ctx| {
-            let initial = initial
-                .borrow_mut()
-                .take()
-                .expect("the live tap spec was activated twice");
             let tap = tap
                 .borrow_mut()
                 .take()
                 .expect("the live tap spec was activated twice");
-            // The establishment binding: the same product-control state
-            // the handle routes into, seeded with the initial desired
-            // configuration exactly like the product constructor — and
-            // the activation reads `control.desired()` exactly like the
-            // product path, so a `set_*` between establishment and
-            // activation is honored identically here.
-            handle.completion.processing().establish(initial);
-            let control = handle.completion.processing();
-            let result = activate_established(
+            // The SAME live-engine activation path the product
+            // constructor uses (one bind spelling), with the tap-carrying
+            // engine constructor — so a `set_*` between this constructor
+            // and activation is honored identically: it folds into the
+            // initial applied configuration.
+            let result = activate_live_engine(
                 &file,
                 &handle.completion,
-                |format| {
+                ctx,
+                |desired, format, control| {
                     crate::live::LiveProcessing::with_tap(
-                        control.desired(),
+                        desired,
                         format,
                         transition_frames,
-                        control.clone(),
+                        control,
                         tap,
                     )
                 },
-                ctx,
             );
             if let Err(e) = &result {
                 handle.completion.activation_failed(&e.message);
@@ -238,19 +235,35 @@ fn activate_inner(
     completion: &SessionCompletion,
     ctx: &mut qianqian_composition::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
-    // The production live mechanism (campaign #190 D4): the applied
-    // snapshot compiles from product-control's CURRENT desired
-    // configuration, and the engine keeps the same control `Arc` so the
-    // handle's typed `set_*` commands reach the worker's fresh-block
-    // pickup. A `set_*` between spec construction and activation is
-    // therefore honored: establishment binds the desired configuration
-    // as of activation, which is the only configuration that was ever
-    // requested for this episode.
+    activate_live_engine(file, completion, ctx, |desired, format, control| {
+        LiveProcessing::new(desired, format, control)
+    })
+}
+
+/// The ONE live-engine activation path — the product constructor and the
+/// tap-carrying oracle spec both construct through it, so the
+/// linearization has exactly one spelling. It reads product-control
+/// through the ACTIVATION BIND: the bind consumes any pending update in
+/// the same lock hold it reads the desired state, so a `set_*` between
+/// spec construction and activation folds into the initial applied
+/// configuration (no phantom initial→same transition), and a `set_*`
+/// after the bind lands in the pending slot and reaches the worker's
+/// fresh-block pickup as an ordinary §7.3 live update.
+fn activate_live_engine(
+    file: &Path,
+    completion: &SessionCompletion,
+    ctx: &mut qianqian_composition::ActivationCtx<'_>,
+    engine: impl FnOnce(
+        AudioProcessingConfig,
+        &PcmFormat,
+        std::sync::Arc<crate::live::ProcessingControl>,
+    ) -> Result<LiveProcessing, String>,
+) -> Result<(), ActivationError> {
     let control = completion.processing();
     activate_established(
         file,
         completion,
-        |format| LiveProcessing::new(control.desired(), format, control.clone()),
+        |format| engine(control.bind_for_activation(), format, control.clone()),
         ctx,
     )
 }
