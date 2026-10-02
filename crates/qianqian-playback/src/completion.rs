@@ -1932,4 +1932,210 @@ mod tests {
             "nothing was routed"
         );
     }
+    // --- TEMPORAL-MODEL-0 campaign S0 provenance probes (issue #195) ----
+    //
+    // Research evidence for the load-sensitive-flake campaign: they pin,
+    // deterministically and without any scheduler premise, WHICH evidence
+    // class can ground the pended-seek actionability precondition and
+    // what can — and cannot — satisfy a new seek cycle. They drive the
+    // real publication boundary (apply_gate_event / leg_parked_evidence /
+    // seek_cutover_decision) exactly as the leg and worker do; no
+    // product surface is involved. Like every white-box probe here, each
+    // test releases or consumes whatever intent it routed before it
+    // drops the completion — no routed-state debris outlives a probe.
+
+    /// The #195 scenario's provenance: with no pause intent routed, the
+    /// ONLY park evidence a pended seek can act on is its own cut park
+    /// (SeekEngaged). The "observed but not yet actionable" phase is
+    /// real but its length is a scheduling fact — the precondition flips
+    /// at the leg's next loop-top, not at any protocol state.
+    #[test]
+    fn s0_a_pended_seeks_actionability_is_its_own_cut_park_absent_pause_intent() {
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        let core = completion.state.clone();
+
+        completion.request_seek(Duration::from_secs(1));
+        assert!(
+            completion.seek_in_flight(),
+            "precondition: the seek planted (unsettled, Open plane, live worker)"
+        );
+        assert!(
+            !completion.leg_parked_evidence(),
+            "before the leg's next loop-top the seek is observed but NOT              actionable — the window whose length the historical flake              premised on"
+        );
+
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekEngaged));
+        let guard = core.state.lock().expect("completion lock");
+        assert!(
+            guard.seek_engaged && !guard.engaged && !guard.pause_requested,
+            "provenance: the park evidence is cut-attributed (SeekEngaged); \
+             no pause engagement exists in this scenario to misattribute"
+        );
+        drop(guard);
+        assert!(
+            completion.leg_parked_evidence(),
+            "the same physical latch the worker's write-path predicate reads"
+        );
+
+        // Leave no routed intent behind (the pended seek resolves as an
+        // aborted cut, exactly as a stop would have released it).
+        completion.release_seek_without_commit();
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Aborted),
+        );
+        assert_eq!(consume_release(&completion.render_gate()), None);
+    }
+
+    /// Starvation is not park evidence: an intent-free loop-top parks
+    /// nothing and publishes nothing (a data-starved leg waits inside
+    /// its read, after the gate). And the dual attribution is by design:
+    /// a paused episode's engagement IS the physical park class the
+    /// precondition accepts (the frozen paused-seek reuse, D14.5).
+    #[test]
+    fn s0_starvation_produces_no_park_evidence_and_pause_attribution_is_the_frozen_reuse() {
+        // (a) intent-free loop-top: no park, no evidence.
+        {
+            let completion = SessionCompletion::new();
+            completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+            completion.render_gate().park_loop_top(|slice| match slice {
+                GateSlice::TailProbe => TailProbeOutcome::Quiesced,
+                GateSlice::SeekRelease(_) => TailProbeOutcome::Pending,
+            });
+            let guard = completion.state.state.lock().expect("completion lock");
+            assert!(
+                !guard.engaged && !guard.seek_engaged && !guard.pause_requested,
+                "an intent-free loop-top fabricated no park evidence"
+            );
+        }
+        // (b) pause attribution: engagement grounds the precondition,
+        // provenance distinguishable in the evidence stream.
+        {
+            let completion = SessionCompletion::new();
+            completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+            let core = completion.state.clone();
+            completion.request_pause();
+            publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+            let guard = core.state.lock().expect("completion lock");
+            assert!(
+                guard.engaged && !guard.seek_engaged,
+                "provenance: pause-attributed engagement, not a seek park"
+            );
+            drop(guard);
+            assert!(
+                completion.leg_parked_evidence(),
+                "a paused episode's seek reuses the pause park (the frozen \
+                 dual attribution)"
+            );
+            // Release the pause intent; the leg's Disengaged acknowledgment
+            // clears the engagement latch.
+            completion.request_resume();
+            publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
+        }
+    }
+
+    /// Cycle attribution without identity: operation evidence (landing,
+    /// commit) cannot cross seek cycles — acceptance resets it and only
+    /// the new cycle's own publications can satisfy its commit boundary —
+    /// and a CLEARED park cannot ground a new cycle either. The cut
+    /// discipline is carried by the evidence lifecycle, not by a token.
+    #[test]
+    fn s0_operation_evidence_cannot_cross_cycles_and_cleared_parks_ground_nothing() {
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        let core = completion.state.clone();
+
+        // Cycle 1 parks, quiesces, lands, and commits lawfully.
+        completion.request_seek(Duration::from_secs(1));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekEngaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekTailQuiesced));
+        completion.seek_landing_published(Some(42));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(42)),
+            CutoverDecision::Committed,
+            "precondition: cycle 1 commits on its own evidence"
+        );
+
+        // The leg leaves the park (release consumed; SeekDisengaged
+        // published on the leg's thread before the slot can free).
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekDisengaged));
+        completion.clear_seek_in_flight();
+
+        // Cycle 2: acceptance resets the per-cycle operation evidence,
+        // and cycle 1's cleared park grounds nothing.
+        completion.request_seek(Duration::from_secs(2));
+        {
+            let guard = core.state.lock().expect("completion lock");
+            assert_eq!(guard.seek_landing, None, "landing cannot cross cycles");
+            assert!(!guard.cut_committed, "a commit cannot cross cycles");
+            assert!(!guard.seek_engaged, "the prior park was disengaged");
+        }
+        assert!(
+            !completion.leg_parked_evidence(),
+            "stale park evidence cannot ground a new cycle"
+        );
+        assert_eq!(
+            completion.seek_cutover_decision(Some(43)),
+            CutoverDecision::Pending,
+            "a fresh landing alone does not commit: the cycle needs ITS OWN \
+             current park"
+        );
+
+        // Cycle 2's OWN park + quiescence + its own landing commit.
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekEngaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::SeekTailQuiesced));
+        completion.seek_landing_published(Some(43));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(43)),
+            CutoverDecision::Committed,
+            "the second seek's own evidence satisfies the second cycle \
+             (the corrective-1 attribution discipline)"
+        );
+        // The second commit's release payload is consumed by the leg.
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Committed { landing: Some(43) }),
+        );
+        assert_eq!(consume_release(&completion.render_gate()), None);
+    }
+
+    /// The paused-cut route: pause engagement + ITS quiescence satisfy
+    /// the commit boundary for a seek accepted while parked (D14.5:
+    /// "a paused episode's already-quiesced tail satisfies the
+    /// output-cut precondition") — the conjunction is attribution-blind
+    /// BY CONTRACT because both classes prove the same physical fact.
+    #[test]
+    fn s0_a_paused_episodes_quiesced_park_commits_the_cut() {
+        let completion = SessionCompletion::new();
+        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+        let core = completion.state.clone();
+
+        completion.request_pause();
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
+        completion.request_seek(Duration::from_secs(1));
+        assert!(
+            completion.leg_parked_evidence(),
+            "the pause park grounds the precondition instantly (leg already parked)"
+        );
+        completion.seek_landing_published(Some(7));
+        assert_eq!(
+            completion.seek_cutover_decision(Some(7)),
+            CutoverDecision::Committed,
+            "the paused episode's seek cuts on the pause-attributed park pair"
+        );
+        // Release the pause intent FIRST: a consume_release while the
+        // pause is still routed would legitimately park forever (the
+        // D14.7 park waits for a release only a resume routes, and this
+        // probe's tail probe never quiesces).
+        completion.request_resume();
+        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
+        // The committed release is consumed by the leg; no routed debris.
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Committed { landing: Some(7) }),
+        );
+        assert_eq!(consume_release(&completion.render_gate()), None);
+    }
 }
