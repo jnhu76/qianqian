@@ -26,6 +26,7 @@
 mod completion;
 mod edge;
 mod handle;
+mod presets;
 mod processing;
 mod session;
 
@@ -38,6 +39,7 @@ mod session;
 pub use handle::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,
 };
+pub use presets::EqPreset;
 pub use processing::{AudioProcessingConfig, EqConfig};
 pub use session::{playback_session_spec, playback_session_spec_with_processing};
 

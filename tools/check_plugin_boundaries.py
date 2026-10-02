@@ -176,9 +176,10 @@ EXPORT_RULES = {
         "allowed_root_public": [
             "pub use handle::{\n    EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,\n};",
             "pub use session::{playback_session_spec, playback_session_spec_with_processing};",
+            "pub use presets::EqPreset;",
             "pub use processing::{AudioProcessingConfig, EqConfig};",
         ],
-        "authority": "ADR-PBK-002 D6/D14.2/D14.3/D14.7 — the admitted public surface is exactly the F2 episode seam (extended by the D14.7 F3 pause fields/commands, whose spelling is representation); the episode mechanism is session-owned, not product API. Extended 2026-10-02 (Issue #177 I1, D14.11): the desired Audio Processing configuration's establishment handoff — the `AudioProcessingConfig` payload and the `playback_session_spec_with_processing` constructor — is the application/product-control owner's one product seam for it; the processing runtime itself stays session-owned and crate-private",
+        "authority": "ADR-PBK-002 D6/D14.2/D14.3/D14.7 — the admitted public surface is exactly the F2 episode seam (extended by the D14.7 F3 pause fields/commands, whose spelling is representation); the episode mechanism is session-owned, not product API. Extended 2026-10-02 (Issue #177 I1, D14.11): the desired Audio Processing configuration's establishment handoff — the `AudioProcessingConfig` payload and the `playback_session_spec_with_processing` constructor — is the application/product-control owner's one product seam for it; the processing runtime itself stays session-owned and crate-private. Extended 2026-10-02 (Issue #177 I4, D14.11): `presets::EqPreset` joins as pure configuration DATA (the application must be able to name a desired configuration); it carries no processor/Plugin identity and no live-update right",
     },
     # The processing-config freeze behind the lib.rs re-export (I1 review):
     # the desired-configuration payload's public rights are frozen here so
@@ -225,6 +226,32 @@ EXPORT_RULES = {
         "processors). The applied snapshot and the processing runtime are session-owned "
         "subordinate resources and stay crate-private. A new public right here must "
         "first earn its narrow authority, then update this allowlist on purpose",
+    },
+    # The rights freeze behind the lib.rs re-export (I4 review): the
+    # preset vocabulary is configuration DATA (D14.11), and its public
+    # rights are frozen here so a future `pub fn apply_live(...)`-shaped
+    # accessor — live parameter update is OPEN/unearned — or any
+    # processor/registry vocabulary cannot grow silently. A new public
+    # right here REDs until it earns narrow authority.
+    "crates/qianqian-playback/src/presets.rs": {
+        "label": "eq-preset-data",
+        # The `;`-containing array signatures cut at their deterministic
+        # `;` (see root_public_declarations), exactly like the processing
+        # rule's raw-text requires.
+        "allowed_root_public": [
+            "pub enum EqPreset {",
+            "pub fn band_gain_db(self) -> [f32;",
+            "pub fn to_config(self) -> AudioProcessingConfig {",
+            "pub fn from_name(name: &str) -> Option<Self> {",
+            "pub fn name(self) -> &'static str {",
+            "pub fn all() -> [Self;",
+        ],
+        "authority": "ADR-PBK-002 D14.11 (Issue #177 I4) — named EQ presets are pure "
+        "product CONFIGURATION DATA over AudioProcessingConfig/EqConfig: record, "
+        "resolve deterministically (case B desired configuration), and parse by "
+        "name. No processor, Plugin, registry, or live-update identity may appear "
+        "on this surface; a preset change reaching a live episode is unearned and "
+        "must RED here until a narrow authority amendment says otherwise",
     },
     # The rights freeze behind the lib.rs re-exports (review round 3):
     # an exported type's pub methods/fields live here, not in lib.rs, so

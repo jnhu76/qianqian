@@ -1,9 +1,15 @@
 //! Product-facing CLI grammar.
 //!
 //! The parser is a pure vocabulary layer: argv (or one interactive line)
-//! in, a typed intent out. It performs no I/O, touches no composition or
-//! audio types, and attaches no playback semantics — wiring a parsed
-//! intent to a control seam is later Phase-F work.
+//! in, a typed intent out. It performs no I/O, attaches no playback
+//! semantics, and wires nothing to a control seam. Since I4 (Issue
+//! #177), the parser carries ONE piece of the playback crate's product
+//! vocabulary as DATA — `EqPreset`, resolved by name so an unknown
+//! preset is refused at the grammar, not at composition — but it
+//! touches no composition, session, or audio mechanism; wiring a parsed
+//! intent to a control seam stays downstream ([`crate::entry`]).
+
+use qianqian_playback::EqPreset;
 
 use std::path::PathBuf;
 
@@ -18,13 +24,13 @@ pub enum Invocation {
     /// faked, no episode is constructed, and the Open input line (O)
     /// is how music gets loaded.
     Interactive,
-    /// `play [--shuffle] <file-or-folder> [more…]`: local media files
-    /// and/or folders for the interactive reference-player shell (TUI).
-    /// The input expansion ([`crate::input`]) turns files and folders
-    /// into ONE ordered candidate list; the FIRST accepted candidate is
-    /// opened as the startup episode and the WHOLE list establishes the
-    /// temporary playlist on commit (the AMENDED D14.6 playlist
-    /// authority).
+    /// `play [--shuffle] [--eq <name>] <file-or-folder> [more…]`: local
+    /// media files and/or folders for the interactive reference-player
+    /// shell (TUI). The input expansion ([`crate::input`]) turns files
+    /// and folders into ONE ordered candidate list; the FIRST accepted
+    /// candidate is opened as the startup episode and the WHOLE list
+    /// establishes the temporary playlist on commit (the AMENDED D14.6
+    /// playlist authority).
     ///
     /// `--shuffle` selects the Shuffle traversal order from the start
     /// (Issue #166 §24). It is the SAME order policy the `R` key
@@ -32,7 +38,15 @@ pub enum Invocation {
     /// committed candidate is still the canonical first, and the shuffle
     /// cycle is anchored on it — shuffle governs the SUBSEQUENT order,
     /// never the safe first Open.
-    Play { files: Vec<PathBuf>, shuffle: bool },
+    Play {
+        files: Vec<PathBuf>,
+        shuffle: bool,
+        /// The startup EQ preset selection (`--eq <name>`), `None` when
+        /// the flag is absent — the transparent bypass (I4). Data, not a
+        /// processor: the resolved configuration rides into episode
+        /// establishment like any other desired configuration.
+        eq: Option<EqPreset>,
+    },
     /// `--machine play <file>`: one FILE through the scriptable
     /// stdin/stdout transport. This is the automation contract; the
     /// flag is recognized in command position only, like every flag,
@@ -58,6 +72,8 @@ pub enum InvocationError {
     UnknownCommand(String),
     /// A recognized command received the wrong number of arguments.
     WrongArity { command: &'static str },
+    /// `--eq` was given a name that is not a product preset.
+    UnknownEqPreset { name: String },
 }
 
 /// Parse argv (excluding the program path) into one typed invocation.
@@ -96,21 +112,53 @@ pub fn parse_invocation(args: &[String]) -> Result<Invocation, InvocationError> 
     }
 }
 
-/// The `play` grammar: `play [--shuffle] <file-or-folder> [more…]`. The
-/// flag is recognized only IMMEDIATELY after the subcommand, so a path
-/// token can never be silently swallowed by it; a file literally named
-/// `--shuffle` is still reachable as `play ./--shuffle`.
+/// The `play` grammar:
+/// `play [--shuffle] [--eq <name>] <file-or-folder> [more…]`.
+///
+/// Flag-position discipline: BOTH flags are recognized only in the
+/// LEADING flag block — order-free among themselves and repeatable
+/// (the last `--eq` wins; a repeated `--shuffle` is idempotent). After
+/// the FIRST non-flag token, everything is an ordinary path, so a path
+/// token can never be silently swallowed by a flag, and a file literally
+/// named `--shuffle` is still reachable as `play ./--shuffle`.
+///
+/// `--eq` value grammar: the next token is ALWAYS the preset name
+/// (consumed even if it looks like a path — an unknown name is refused
+/// with the shipped vocabulary, never silently treated as a source);
+/// a missing name is an arity error naming `--eq`.
 fn parse_play(rest: &[String]) -> Result<Invocation, InvocationError> {
-    let (shuffle, paths) = match rest.first().map(String::as_str) {
-        Some("--shuffle") => (true, &rest[1..]),
-        _ => (false, rest),
-    };
+    // Flag-position discipline (see above): flags live only in the
+    // leading flag block.
+    let mut rest_iter = rest;
+    let mut shuffle = false;
+    let mut eq: Option<EqPreset> = None;
+    loop {
+        match rest_iter.first().map(String::as_str) {
+            Some("--shuffle") => {
+                shuffle = true;
+                rest_iter = &rest_iter[1..];
+            }
+            Some("--eq") => {
+                let Some(name) = rest_iter.get(1) else {
+                    return Err(InvocationError::WrongArity { command: "--eq" });
+                };
+                let Some(preset) = EqPreset::from_name(name) else {
+                    return Err(InvocationError::UnknownEqPreset { name: name.clone() });
+                };
+                eq = Some(preset);
+                rest_iter = &rest_iter[2..];
+            }
+            _ => break,
+        }
+    }
+    let paths = rest_iter;
     if paths.is_empty() {
         return Err(InvocationError::WrongArity { command: "play" });
     }
     Ok(Invocation::Play {
         files: paths.iter().map(PathBuf::from).collect(),
         shuffle,
+        eq,
     })
 }
 
@@ -131,6 +179,7 @@ Usage:
   qianqian                                   listen (opens the player)
   qianqian play <file-or-folder> [more...]   play files or folders
   qianqian play --shuffle <paths...>         start in shuffle order
+  qianqian play --eq <preset> <paths...>     start with an EQ preset
   qianqian --help                            show this help
   qianqian --version                         show the version
 
@@ -143,6 +192,7 @@ Examples:
   qianqian play song.flac
   qianqian play \"D:\\Music\"
   qianqian play --shuffle \"D:\\Music\" \"E:\\More Music\"
+  qianqian play --eq rock \"D:\\Music\"
 
 Keys in the player:
   Up / Down    select a row in the list (does not change what plays)
@@ -164,6 +214,12 @@ Keys in the player:
 --shuffle starts the LIST in shuffle order: the first track still starts
 the same way, and the rest of the folder follows shuffled.
 
+--eq picks a tonal balance for this listening session: flat, jazz, vocal,
+blues, rock, classical, bass, or treble. It applies to everything this
+launch plays and lasts until you quit. The EQ works on sources above
+32 kHz sample rate; a lower-rate file is refused (not played) while an
+EQ preset is set.
+
 Automation (advanced):
   qianqian --machine play <file>   scriptable single-episode transport
                                    over stdin/stdout; `stop`, `pause`,
@@ -179,6 +235,14 @@ impl std::fmt::Display for InvocationError {
             InvocationError::UnknownCommand(token) => write!(f, "unknown command '{token}'"),
             InvocationError::WrongArity { command } => {
                 write!(f, "'{command}' received the wrong number of arguments")
+            }
+            InvocationError::UnknownEqPreset { name } => {
+                let vocabulary: Vec<&str> = EqPreset::all().iter().map(|p| p.name()).collect();
+                write!(
+                    f,
+                    "unknown EQ preset '{name}' (presets: {})",
+                    vocabulary.join(", ")
+                )
             }
         }
     }
@@ -372,6 +436,7 @@ mod tests {
             Invocation::Play {
                 files: vec![PathBuf::from("song.flac")],
                 shuffle: false,
+                eq: None,
             }
         );
     }
@@ -399,6 +464,7 @@ mod tests {
                     PathBuf::from("c.flac")
                 ],
                 shuffle: false,
+                eq: None,
             }
         );
     }
@@ -414,6 +480,7 @@ mod tests {
             Invocation::Play {
                 files: vec![PathBuf::from("D:\\Music")],
                 shuffle: true,
+                eq: None,
             }
         );
         assert_eq!(
@@ -426,6 +493,7 @@ mod tests {
                     PathBuf::from("c.flac")
                 ],
                 shuffle: true,
+                eq: None,
             }
         );
         // Without the flag the default is sequential.
@@ -436,6 +504,7 @@ mod tests {
             Invocation::Play {
                 files: vec![PathBuf::from("a.flac")],
                 shuffle: false,
+                eq: None,
             }
         );
     }
@@ -456,6 +525,7 @@ mod tests {
             Invocation::Play {
                 files: vec![PathBuf::from("a.flac"), PathBuf::from("--shuffle")],
                 shuffle: false,
+                eq: None,
             }
         );
         // The machine transport is NOT extended by it (Issue #166 §44).
@@ -481,6 +551,10 @@ mod tests {
         let usage = usage();
         for earned in [
             "qianqian play --shuffle",
+            "qianqian play --eq <preset>",
+            // The low-rate refusal disclosure (I4 review): the usage
+            // text must tell the user the EQ's sample-rate condition.
+            "a lower-rate file is refused",
             "Up / Down",
             "Enter        play the selected row",
             "R            order: sequential / shuffle",
@@ -501,6 +575,136 @@ mod tests {
         ] {
             assert!(!usage.contains(unearned), "{unearned:?} in:\n{usage}");
         }
+    }
+
+    /// `play --eq <preset> <paths…>` is the startup EQ grammar (D14.11
+    /// option B): the App owns the desired configuration, the flag is
+    /// recognized only in command position (next to `--shuffle`), and a
+    /// selection applies to everything this launch plays.
+    #[test]
+    fn play_accepts_an_eq_preset_in_command_position() {
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--eq", "rock", "D:\\Music"]))
+                .expect("the --eq grammar"),
+            Invocation::Play {
+                files: vec![PathBuf::from("D:\\Music")],
+                shuffle: false,
+                eq: Some(EqPreset::Rock),
+            }
+        );
+        // Flags compose, order-free among themselves.
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--eq", "bass", "--shuffle", "a.flac"]))
+                .expect("both flags"),
+            Invocation::Play {
+                files: vec![PathBuf::from("a.flac")],
+                shuffle: true,
+                eq: Some(EqPreset::Bass),
+            }
+        );
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--shuffle", "--eq", "flat", "a.flac"]))
+                .expect("both flags, other order"),
+            Invocation::Play {
+                files: vec![PathBuf::from("a.flac")],
+                shuffle: true,
+                eq: Some(EqPreset::Flat),
+            }
+        );
+        // Every shipped preset name parses.
+        for preset in EqPreset::all() {
+            let name = preset.name();
+            let parsed = parse_invocation(&argv(&["play", "--eq", name, "a.flac"]))
+                .unwrap_or_else(|e| panic!("{name} must parse: {e}"));
+            assert_eq!(
+                parsed,
+                Invocation::Play {
+                    files: vec![PathBuf::from("a.flac")],
+                    shuffle: false,
+                    eq: Some(preset),
+                },
+                "preset {name} parses to its own variant"
+            );
+        }
+    }
+
+    /// The EQ flag keeps `play`'s flag-position discipline: a later
+    /// `--eq` is an ordinary path token, `--eq` without a name is an
+    /// arity error, and an unknown name is refused with the shipped
+    /// vocabulary — never silently accepted as a path.
+    #[test]
+    fn the_eq_flag_never_widens_the_play_grammar() {
+        // A later --eq (out of command position) is an ordinary path.
+        assert_eq!(
+            parse_invocation(&argv(&["play", "a.flac", "--eq"]))
+                .expect("a later --eq is a path, not a flag"),
+            Invocation::Play {
+                files: vec![PathBuf::from("a.flac"), PathBuf::from("--eq")],
+                shuffle: false,
+                eq: None,
+            }
+        );
+        // Missing name: arity error naming --eq.
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--eq"])).expect_err("--eq needs a name"),
+            InvocationError::WrongArity { command: "--eq" }
+        );
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--eq", "a.flac"]))
+                .expect_err("--eq consumes the next token as the preset name"),
+            InvocationError::UnknownEqPreset {
+                name: "a.flac".to_string()
+            }
+        );
+        // Unknown name: refused with the shipped vocabulary.
+        let err = parse_invocation(&argv(&["play", "--eq", "loudness", "a.flac"]))
+            .expect_err("loudness is not a shipped preset");
+        assert_eq!(
+            err,
+            InvocationError::UnknownEqPreset {
+                name: "loudness".to_string()
+            }
+        );
+        let message = err.to_string();
+        for preset in EqPreset::all() {
+            assert!(
+                message.contains(preset.name()),
+                "refusal must name the shipped preset {:?}: {message}",
+                preset.name()
+            );
+        }
+        // `play --eq` alone is still an arity error (no source).
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--eq", "rock"])).expect_err("no source given"),
+            InvocationError::WrongArity { command: "play" }
+        );
+    }
+
+    /// The leading flag block is repeatable and last-wins (pinned,
+    /// deliberately: `--eq a --eq b` resolves to b rather than smuggling
+    /// a second source; a repeated `--shuffle` is idempotent). The
+    /// escape hatch is unchanged: after the first path token, a flag
+    /// spelling is an ordinary path.
+    #[test]
+    fn repeated_flags_in_the_leading_block_are_last_wins() {
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--eq", "jazz", "--eq", "rock", "a.flac"]))
+                .expect("last --eq wins"),
+            Invocation::Play {
+                files: vec![PathBuf::from("a.flac")],
+                shuffle: false,
+                eq: Some(EqPreset::Rock),
+            }
+        );
+        assert_eq!(
+            parse_invocation(&argv(&["play", "--shuffle", "--shuffle", "a.flac"]))
+                .expect("repeated --shuffle is idempotent"),
+            Invocation::Play {
+                files: vec![PathBuf::from("a.flac")],
+                shuffle: true,
+                eq: None,
+            }
+        );
     }
 
     #[test]
@@ -632,6 +836,7 @@ mod tests {
             Invocation::Play {
                 files: vec![PathBuf::from("song.flac")],
                 shuffle: false,
+                eq: None,
             }
         );
     }

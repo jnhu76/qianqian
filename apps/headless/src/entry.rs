@@ -35,8 +35,14 @@ use std::process::ExitCode;
 use std::path::{Path, PathBuf};
 
 use crate::cli::{self, Invocation};
-// Presentation/report contract of the transports; every use site is
-// playback wiring, so the imports follow the same gate.
+// Presentation/report contract of the transports. `EqPreset` is part of
+// the transport signature in BOTH builds (the no-playback stub accepts
+// and drops it, like the stub `OrderPreference`/`Shell` enums);
+// `AudioProcessingConfig` is used only by playback wiring.
+#[cfg(feature = "playback")]
+use qianqian_playback::AudioProcessingConfig;
+use qianqian_playback::EqPreset;
+
 #[cfg(feature = "playback")]
 use crate::machine;
 #[cfg(feature = "playback")]
@@ -71,20 +77,27 @@ pub fn run(bin_name: &str) -> ExitCode {
         Ok(Invocation::Interactive) => run_playback(
             Vec::new(),
             OrderPreference::Sequential,
+            None,
             Shell::ReferencePlayer,
         ),
-        Ok(Invocation::Play { files, shuffle }) => run_playback(
+        Ok(Invocation::Play { files, shuffle, eq }) => run_playback(
             files,
             if shuffle {
                 OrderPreference::Shuffle
             } else {
                 OrderPreference::Sequential
             },
+            eq,
             Shell::ReferencePlayer,
         ),
-        Ok(Invocation::MachinePlay { file }) => {
-            run_playback(vec![file], OrderPreference::Sequential, Shell::Machine)
-        }
+        Ok(Invocation::MachinePlay { file }) => run_playback(
+            vec![file],
+            OrderPreference::Sequential,
+            // The machine transport's grammar has no EQ selection: the
+            // scriptable single-episode transport runs bypass (I4).
+            None,
+            Shell::Machine,
+        ),
         Err(error) => {
             eprintln!("error: {error}");
             eprint!("{}", cli::usage());
@@ -115,13 +128,23 @@ enum OrderPreference {
 }
 
 #[cfg(feature = "playback")]
-fn run_playback(files: Vec<PathBuf>, order: OrderPreference, shell: Shell) -> ExitCode {
+fn run_playback(
+    files: Vec<PathBuf>,
+    order: OrderPreference,
+    eq: Option<EqPreset>,
+    shell: Shell,
+) -> ExitCode {
+    // The desired Audio Processing configuration (D14.11): the App owns
+    // it; each episode establishment binds its own applied snapshot, so
+    // a selection made at startup applies to every track this shell
+    // starts. The machine transport selects nothing (bypass).
+    let processing = eq.map(EqPreset::to_config);
     match shell {
         Shell::Machine => match start_episode(single_file(files)) {
             Ok(episode) => machine_transport(episode),
             Err(failure) => report_start_failure(failure),
         },
-        Shell::ReferencePlayer => reference_player_transport(files, order),
+        Shell::ReferencePlayer => reference_player_transport(files, order, processing),
     }
 }
 
@@ -219,13 +242,22 @@ fn report_start_failure(failure: machine::StartFailure) -> ExitCode {
 /// with the SAME honest contract as the scriptable transport (outcome
 /// lines, disposal warnings, the exit-code table).
 #[cfg(feature = "playback")]
-fn reference_player_transport(files: Vec<PathBuf>, order: OrderPreference) -> ExitCode {
+fn reference_player_transport(
+    files: Vec<PathBuf>,
+    order: OrderPreference,
+    processing: Option<AudioProcessingConfig>,
+) -> ExitCode {
     use crate::input;
     use crate::player::ReferencePlayerApp;
     use crate::playlist::PlaybackOrder;
 
     let interactive_startup = files.is_empty();
-    let mut player = ReferencePlayerApp::new(RealEpisodeSource);
+    let mut player = ReferencePlayerApp::new(RealEpisodeSource {
+        // The shell's desired Audio Processing configuration (D14.11):
+        // every episode this source starts binds this same snapshot at
+        // its own establishment. No selection is the transparent BYPASS.
+        processing: processing.unwrap_or(AudioProcessingConfig::BYPASS),
+    });
     // `--shuffle` selects the order policy BEFORE the startup Open, so
     // the playlist that rides the commit is already the shuffled one.
     // The start discipline is untouched: the expansion's first accepted
@@ -337,9 +369,13 @@ fn reference_player_transport(files: Vec<PathBuf>, order: OrderPreference) -> Ex
 /// stateless probe query, and the fresh-root start mounting the
 /// SongCore decode Plugin, the Output Plugin (whose host-selected
 /// backend mechanism is WASAPI), and the playback session —
-/// the same desired composition as ever, one fresh root per episode.
+/// the same desired composition as ever, one fresh root per episode,
+/// with the shell's desired Audio Processing configuration (D14.11)
+/// handed to each establishment.
 #[cfg(feature = "playback")]
-struct RealEpisodeSource;
+struct RealEpisodeSource {
+    processing: AudioProcessingConfig,
+}
 
 #[cfg(feature = "playback")]
 impl crate::player::EpisodeStart for RealEpisodeSource {
@@ -378,10 +414,13 @@ impl crate::player::EpisodeStart for RealEpisodeSource {
                 refused: Some(format!("output plugin registration failed: {e:?}")),
             };
         }
-        if let Err(e) = runtime.register_component(qianqian_playback::playback_session_spec(
-            source.to_path_buf(),
-            handle.clone(),
-        )) {
+        if let Err(e) =
+            runtime.register_component(qianqian_playback::playback_session_spec_with_processing(
+                source.to_path_buf(),
+                handle.clone(),
+                self.processing,
+            ))
+        {
             return StartAttempt {
                 runtime,
                 handle,
@@ -512,8 +551,13 @@ fn finish_episode(mut episode: Episode) -> ExitCode {
 }
 
 #[cfg(not(feature = "playback"))]
-fn run_playback(files: Vec<std::path::PathBuf>, order: OrderPreference, shell: Shell) -> ExitCode {
-    let _ = (files, order, shell);
+fn run_playback(
+    files: Vec<std::path::PathBuf>,
+    order: OrderPreference,
+    eq: Option<EqPreset>,
+    shell: Shell,
+) -> ExitCode {
+    let _ = (files, order, eq, shell);
     eprintln!(
         "this binary was built without the playback slice; \
          rebuild with: cargo build --release --features playback"
