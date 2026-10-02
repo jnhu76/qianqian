@@ -46,8 +46,9 @@ use crate::processing::{AudioProcessingConfig, EpisodeProcessing};
 pub(crate) const EDGE_CAPACITY_FRAMES: usize = 8192;
 
 /// Frames per decode staging refill. Matches the block size the decode
-/// baselines were measured at.
-const STAGING_FRAMES: usize = 1024;
+/// baselines were measured at. `pub(crate)` so the live-probe oracles
+/// pin the apply boundary against the same constant (campaign #190 D3).
+pub(crate) const STAGING_FRAMES: usize = 1024;
 
 /// The Playback Session component definition. The App captures the file
 /// and the episode handle it will observe; desired entries need no
@@ -121,6 +122,87 @@ pub(crate) fn playback_session_spec_with_test_processor(
         })
 }
 
+/// Test-only establishment with the D3 DISPOSABLE LIVE-TRANSITION PROBE
+/// (campaign #190): the real composition — real capability resolve,
+/// edge, render stream, worker, seek/pause/terminal protocol — with the
+/// probe engine in place of the episode-fixed snapshot, so the live
+/// oracles exercise the actual staging seam, remainder flush, pickup
+/// boundary and invalidation path. Never shipped, never public, never a
+/// product seam: the live-update authority is earned by these probes
+/// under the campaign's own gate, and D4 replaces this with the
+/// smallest production mechanism.
+#[cfg(all(test, not(loom)))]
+pub(crate) fn playback_session_spec_with_live_probe(
+    file: PathBuf,
+    handle: PlaybackSessionHandle,
+    initial: AudioProcessingConfig,
+    transition_frames: usize,
+    control: crate::live_probe::LiveProbeControl,
+) -> ComponentSpec {
+    let initial = std::cell::RefCell::new(Some(initial));
+    let control = std::cell::RefCell::new(Some(control));
+    ComponentSpec::new("playback_session")
+        .requires::<PcmDecodeCapability>()
+        .requires::<AudioOutputCapability>()
+        .on_activate(move |ctx| {
+            let initial = initial
+                .borrow_mut()
+                .take()
+                .expect("the live probe was activated twice");
+            let control = control
+                .borrow_mut()
+                .take()
+                .expect("the live probe was activated twice");
+            let result = activate_established(
+                &file,
+                &handle.completion,
+                |format| {
+                    crate::live_probe::LiveProbeEngine::new(
+                        initial,
+                        format,
+                        transition_frames,
+                        control,
+                    )
+                },
+                ctx,
+            );
+            if let Err(e) = &result {
+                handle.completion.activation_failed(&e.message);
+            }
+            result
+        })
+}
+
+/// The engine-builder variant of the live-probe establishment (campaign
+/// #190 D3 failure-injection route): the test constructs the probe
+/// engine itself — e.g. with a deliberate failing processor as the
+/// initial side — through the same activation path. One-shot, like the
+/// other test-only constructors.
+#[cfg(all(test, not(loom)))]
+pub(crate) fn playback_session_spec_with_live_probe_engine(
+    file: PathBuf,
+    handle: PlaybackSessionHandle,
+    build_engine: impl FnOnce(&PcmFormat) -> Result<crate::live_probe::LiveProbeEngine, String>
+    + Send
+    + 'static,
+) -> ComponentSpec {
+    let build_engine = std::cell::RefCell::new(Some(build_engine));
+    ComponentSpec::new("playback_session")
+        .requires::<PcmDecodeCapability>()
+        .requires::<AudioOutputCapability>()
+        .on_activate(move |ctx| {
+            let build_engine = build_engine
+                .borrow_mut()
+                .take()
+                .expect("the live probe was activated twice");
+            let result = activate_established(&file, &handle.completion, build_engine, ctx);
+            if let Err(e) = &result {
+                handle.completion.activation_failed(&e.message);
+            }
+            result
+        })
+}
+
 fn activate(
     file: &Path,
     completion: &SessionCompletion,
@@ -163,10 +245,10 @@ fn activate_inner(
 /// StatefulProbe and the failure-route injection) through the same
 /// establishment path; product code reaches it only through the config
 /// constructors above.
-fn activate_established(
+fn activate_established<P: ProcessingRuntime + 'static>(
     file: &Path,
     completion: &SessionCompletion,
-    compile_processing: impl FnOnce(&PcmFormat) -> Result<EpisodeProcessing, String>,
+    compile_processing: impl FnOnce(&PcmFormat) -> Result<P, String>,
     ctx: &mut qianqian_composition::ActivationCtx<'_>,
 ) -> Result<(), ActivationError> {
     // Control plane: capability resolution happens exactly once, here.
@@ -291,6 +373,51 @@ fn activate_established(
 /// never correctness.
 const WORKER_WAIT_SLICE: Duration = Duration::from_millis(2);
 
+/// The processing runtime the decode worker drives at the frozen
+/// staging placement. Static dispatch only: the worker is generic over
+/// this trait and monomorphized at spawn, so the per-block work is a
+/// direct call — no per-block lookup, no dynamic dispatch, no
+/// capability/context resolution (the D14.11 realtime firewall). Two
+/// implementations exist: [`EpisodeProcessing`] (production, D14.11
+/// case B) and, under cfg(test), the disposable live-transition probe
+/// (`live_probe::LiveProbeEngine`, campaign #190 D3).
+pub(crate) trait ProcessingRuntime: Send {
+    /// The staging transform (D14.11): in place, frame-count
+    /// preserving; `Err` is the unrecoverable processing failure
+    /// routing through D11 `Failed`.
+    fn stage(&mut self, block: &mut [f32]) -> Result<(), String>;
+
+    /// The D14.11 Applied-seek obligation: invalidate ALL pre-cut
+    /// signal-derived processing history before any post-cut PCM is
+    /// processed.
+    fn invalidate_signal_history(&mut self);
+
+    /// The live-update pickup, called by the worker exactly at the
+    /// FRESH-STAGING-BLOCK boundary (after a preserved remainder is
+    /// flushed, before the next decode, with no seek in flight). `None`
+    /// = nothing to do; `Some(Ok(()))` = handled (an accepted transition
+    /// started, or a desired update was refused — refusals are reported
+    /// through the probe's own sink, never as processing failures);
+    /// `Some(Err(_))` = an unrecoverable processing failure routing
+    /// through D11 `Failed`. Production processing has no updates (the
+    /// D14.11 episode-fixed minimum) and never returns anything.
+    fn poll_update(&mut self) -> Option<Result<(), String>> {
+        None
+    }
+}
+
+impl ProcessingRuntime for EpisodeProcessing {
+    fn stage(&mut self, block: &mut [f32]) -> Result<(), String> {
+        EpisodeProcessing::stage(self, block)
+    }
+
+    fn invalidate_signal_history(&mut self) {
+        EpisodeProcessing::invalidate_signal_history(self)
+    }
+    // poll_update: the production default — no live updates (D14.11
+    // case B; live authorization is earned separately, campaign #190).
+}
+
 /// How one bounded write advanced, from the decode worker's
 /// interruptible write loop.
 enum WriteStep {
@@ -336,12 +463,12 @@ enum WriteStep {
 ///             data plane's own terminal) ends it without a rebase.
 ///             Then resume post-cut production.
 /// ```
-fn decode_worker(
+fn decode_worker<P: ProcessingRuntime>(
     mut decode_stream: Box<dyn DecodedPcmStream>,
     edge: Arc<PcmEdge>,
     completion: SessionCompletion,
     staging_frames: usize,
-    mut processing: EpisodeProcessing,
+    mut processing: P,
 ) {
     let channels = usize::from(decode_stream.format().channels);
     let catch = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -543,6 +670,22 @@ fn decode_worker(
                     return;
                 }
                 completion.clear_seek_in_flight();
+            }
+
+            // --- live-update pickup (fresh-staging-block boundary) ---
+            // Reached only with the remainder flushed and no seek in
+            // flight, so an accepted transition can start on exactly one
+            // whole staging block that has not yet been DSP-processed —
+            // the apply boundary the live authority freezes (campaign
+            // #190 D3). Production processing never reports anything
+            // here (poll_update's default); the cfg(test) live probe is
+            // the only reporter. Some(Err) is a processing failure and
+            // takes the ordinary D11 route; refusals are the probe's
+            // own sink, never a failure.
+            if let Some(Err(message)) = processing.poll_update() {
+                completion.processing_failed(&message);
+                edge.fail();
+                return;
             }
 
             // Decode one staging block.

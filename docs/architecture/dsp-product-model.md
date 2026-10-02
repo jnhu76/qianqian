@@ -10,9 +10,10 @@
 > [`ADR-PBK-002`](../adr/ADR-PBK-002.md), or Output/backend authority in
 > [`ADR-PBK-003`](../adr/ADR-PBK-003.md).
 >
-> D14.11 remains the authority for the currently authorized processing
-> minimum, episode ownership, current decode-worker placement, and the fact
-> that live parameter update is still OPEN.
+> D14.11 remains the authority for the processing minimum, episode
+> ownership and current decode-worker placement; live parameter update was
+> narrowly admitted 2026-10-02 under §7.3 (four operation classes, one
+> frozen transition contract).
 
 ---
 
@@ -364,20 +365,21 @@ introduced, is not Playback Session state.
 
 ### 7.1 Current binding model
 
-CURRENT authority remains D14.11:
+CURRENT authority remains D14.11, as narrowly extended by the 2026-10-02
+live-admission amendment (§7.3):
 
 ```text
-U0 = episode-fixed applied snapshot
+U0 = episode-fixed applied snapshot            (the established baseline)
+U2/U3 = the four live-authorized operation     (narrowly earned, §7.3)
+        classes of the current slice
 ```
 
-Desired changes bind on a later episode establishment under the current
-minimum. This is a statement about **current** semantics, not a promise that
-vNext must remain non-live.
+A desired configuration still binds at episode establishment; live
+application exists ONLY for the operation classes §7.3 authorizes, under
+exactly the contract it freezes. Everything not named there remains
+episode-fixed (U0) until separately earned.
 
-### 7.2 Future update requirements
-
-If live processing is entered later, the operation must earn the required
-transition semantics. Useful vocabulary:
+### 7.2 Update-class vocabulary
 
 | Class | Meaning |
 |---|---|
@@ -391,24 +393,117 @@ transition semantics. Useful vocabulary:
 `U2` and `U3` may both be obligations of one live transition. `U4` is not a
 shortcut for every parameter change.
 
-Live update remains OPEN. Neither this document nor #188 grants live rights.
-If a future product slice enters live Gain/EQ, it must independently define:
+The live-authorized operations of §7.3 carry these classes: scalar
+Preamp/Gain change = `U2` (the crossfade degenerates to the interpolated
+gain); 10-band GEQ band-gain change and factory-preset switch = `U3`
+(dual-processor crossfade, old state live, new state from rest); processing
+enabled/bypass toggle = `U3` (processed/dry crossfade — bypass is NOT
+`gain = 0`).
+
+### 7.3 Live-update admission contract (LIVE_DSP_MINIMUM, accepted 2026-10-02, Issue #190 D3)
+
+Differential, explicit: this subsection is the narrow live-admission
+authority the D14.11 amendment records; it does not reopen any other OPEN
+item. The transition evidence is the disposable probe through the REAL
+Playback Session staging seam (real worker loop, partial PcmEdge writes,
+seek/pause/terminal protocol).
+
+**Live-authorized operations — exactly these four:**
 
 ```text
-coherent prepare/validation
-atomic acceptance of one executable config
-apply boundary
-sample/presentation-time basis for smoothing
-state preserve/transform/reset/crossfade
-seek/stop/replacement collision
-accepted vs applied vs audible visibility
-failure behavior
-resource retirement where real overlap exists
+scalar Preamp/Gain change
+10-band GEQ band-gain change
+factory-preset switch (one desired configuration to another)
+processing enabled/bypass toggle
 ```
 
-PBK-001 P1–P5 apply only when an actual old/new execution-view lifetime
-overlap exists; this document does not pre-authorize RCU, epochs, ArcSwap,
-generic snapshots or a parameter bus.
+Everything else stays OUT of live scope: PEQ topology changes, Q changes
+(beyond what a preset/custom switch compiles as a whole), ReplayGain,
+compressor, limiter, crossfeed, convolution/IR replacement, SRC, channel
+remap, algorithm replacement, chain reordering, and any per-parameter
+addressing beyond the whole-configuration update.
+
+**Semantic states (semantic vocabulary first; public enum variants only if
+an implementation needs them):**
+
+```text
+Desired         a pending update held by the product-control side
+Accepted        validated and compiled against the episode format; the
+                engine holds live-old and fresh-new processors and the
+                applied-target identity
+Applied         the update has reached the apply boundary below
+Transitioning   old/new contributions coexist ONLY through the
+                authorized bounded crossfade
+Settled         only the accepted configuration contributes; the settled
+                stream equals a fresh instance of the accepted
+                configuration started at the transition start
+```
+
+**Frozen propositions:**
+
+- *Coherent acceptance.* An update is accepted only as ONE whole valid
+  configuration — validate + compile against the episode format BEFORE
+  acceptance. A refusal (invalid data, compile failure) reports a
+  diagnostic and leaves the old configuration running bit-exactly:
+  never a processing failure, never a partial config, never a silent
+  fallback to a different sound.
+- *Apply boundary.* An accepted update takes effect at the next WHOLE
+  staging block that has not yet been DSP-processed (the worker pickups
+  run after any preserved remainder is flushed and with no seek in
+  flight). The pre-boundary stream stays bit-exactly the old
+  configuration's continuation.
+- *Processed-remainder rule (non-negotiable).* Already-processed
+  remainder PCM is written exactly as processed; an update MUST NOT
+  reprocess it, mutate it, or retroactively re-sound it. The transition
+  starts only at the accepted new-block boundary.
+- *Transition time domain.* Sample-driven, never wall-clock: the
+  crossfade advances on processed frames only. The realized model is the
+  dual-processor crossfade (Model C): the old side carries its live
+  signal state, the new side starts from rest at the transition start,
+  so the settled stream is EXACTLY a fresh instance of the accepted
+  configuration started at the transition start. Gain changes are
+  exactly the interpolated gain on the same input. Evaluated and
+  rejected: instant switching (Model A — clicks at preset-scale jumps,
+  pinned by a negative control), per-sample parameter smoothing
+  (Model B — zipper risk at control-period boundaries and no exactness
+  oracle), state transformation (Model D — no robust standard recipe for
+  biquad state mapping between arbitrary configs). Transition durations
+  are product tuning recorded with evidence, not authority.
+- *Rapid updates.* Deterministic policy: complete-in-flight,
+  latest-wins pending slot of depth one. An accepted transition always
+  completes; the newest desired update replaces any pending one and is
+  accepted at the first fresh-block pickup after settle. Intermediate
+  desired states may legitimately never be applied.
+- *Seek collisions (extends D14.5).* `RefusedUnchanged` preserves the
+  in-flight transition and all signal state; the continuation equals
+  the no-seek path bit-exactly. `Applied` discards the transition and
+  invalidates ALL pre-cut signal-derived history (old side, new side,
+  ramp) before post-cut PCM; the post-cut stream equals a fresh instance
+  of the ACCEPTED configuration fed the exact post-landing tags.
+  `MutatedThenFailed` follows the ordinary D11 failure path.
+- *Pause (extends D14.7).* Pause gates rendering only; bounded prefetch
+  may keep processing real future PCM (the ramp advances on those
+  processed samples — honestly, since they are real processed frames).
+  When the edge is full and the leg parked, no PCM is processed and the
+  ramp does not advance. D14.8 Position never advances because DSP
+  processed future PCM. Wall-clock time alone MUST NOT advance a
+  transition (negative control pinned).
+- *Failure.* Before acceptance: refusal (above). After acceptance, an
+  unrecoverable processing failure during the transition settles through
+  the existing D11 `Failed` class with a truthful processing-origin
+  diagnostic; no partial-world resurrection.
+- *Open/replacement.* A new episode compiles fresh under its own
+  snapshot; no live state leaks across episodes.
+- *Visibility.* Desired (pending), accepted (applied target) and applied
+  (realized) remain distinct; a UI must never be forced to claim that a
+  control change is already audible. The read model is D5's decision.
+- *Realtime publication.* The old/new processor overlap here is
+  same-thread, same-owner, episode-bounded state inside one worker —
+  there is no cross-thread execution view to retire, so PBK-001 P1–P5
+  are NOT triggered. This record does not authorize RCU, epochs, ArcSwap,
+  generic snapshots or a parameter bus; the production mechanism
+  representation stays OPEN (D14.11) and lands with the production
+  implementation.
 
 ---
 
@@ -425,8 +520,9 @@ The durable DSP product rule is:
 
 Therefore:
 
-- `RefusedUnchanged` preserves applied config, already-processed remainder and
-  signal history; continuation remains equivalent to the no-seek control;
+- `RefusedUnchanged` preserves applied config, already-processed remainder,
+  signal history AND any in-flight live transition (§7.3); continuation
+  remains equivalent to the no-seek control;
 - `Applied` discards old processed remainder and invalidates pre-cut
   signal-derived state before post-cut PCM is processed;
 - `MutatedThenFailed` does not reconstruct an old continuation and follows the
