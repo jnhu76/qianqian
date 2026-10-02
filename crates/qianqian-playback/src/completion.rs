@@ -1943,6 +1943,10 @@ mod tests {
     // product surface is involved. Like every white-box probe here, each
     // test releases or consumes whatever intent it routed before it
     // drops the completion — no routed-state debris outlives a probe.
+    //
+    // Partitioned out of loom builds (audit corrective): the probes drive
+    // the verification-only readers (`seek_in_flight`, `consume_release`)
+    // and the gate slice vocabulary, which exist only outside loom.
 
     /// The #195 scenario's provenance: with no pause intent routed, the
     /// ONLY park evidence a pended seek can act on is its own cut park
@@ -1950,6 +1954,7 @@ mod tests {
     /// real but its length is a scheduling fact — the precondition flips
     /// at the leg's next loop-top, not at any protocol state.
     #[test]
+    #[cfg(not(loom))]
     fn s0_a_pended_seeks_actionability_is_its_own_cut_park_absent_pause_intent() {
         let completion = SessionCompletion::new();
         completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
@@ -1994,6 +1999,7 @@ mod tests {
     /// a paused episode's engagement IS the physical park class the
     /// precondition accepts (the frozen paused-seek reuse, D14.5).
     #[test]
+    #[cfg(not(loom))]
     fn s0_starvation_produces_no_park_evidence_and_pause_attribution_is_the_frozen_reuse() {
         // (a) intent-free loop-top: no park, no evidence.
         {
@@ -2041,6 +2047,7 @@ mod tests {
     /// and a CLEARED park cannot ground a new cycle either. The cut
     /// discipline is carried by the evidence lifecycle, not by a token.
     #[test]
+    #[cfg(not(loom))]
     fn s0_operation_evidence_cannot_cross_cycles_and_cleared_parks_ground_nothing() {
         let completion = SessionCompletion::new();
         completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
@@ -2106,6 +2113,7 @@ mod tests {
     /// output-cut precondition") — the conjunction is attribution-blind
     /// BY CONTRACT because both classes prove the same physical fact.
     #[test]
+    #[cfg(not(loom))]
     fn s0_a_paused_episodes_quiesced_park_commits_the_cut() {
         let completion = SessionCompletion::new();
         completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
