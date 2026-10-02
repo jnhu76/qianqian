@@ -139,6 +139,10 @@ Frozen semantics:
   class of §6.1 (still source-rate/layout/frame preserving, bounded causal,
   no mandatory pending output at EOF — the profile varies, the R0 contract
   does not);
+- invalid band **data** (non-finite or out-of-bound trims, non-positive Q)
+  remains an activation failure at every rate, on available and unavailable
+  bands alike — intrinsic validity is rate-independent and is not rendered
+  harmless by a band being unavailable;
 - `Flat` (all bands neutral) remains observationally identical to bypass at
   **every** source rate;
 - strictness at the Nyquist boundary is load-bearing: at exactly Nyquist

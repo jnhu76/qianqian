@@ -481,8 +481,11 @@ fn invalid_eq_configurations_fail_compilation() {
     );
     // Format-dependent INVALIDITY is data, not rate availability: at a
     // low source rate the unavailable bands are inert (the rate-aware
-    // active-band profile, dsp-product-model.md §2), but NaN/out-of-bound
-    // band DATA still fails compilation exactly as at any other rate.
+    // active-band profile, dsp-product-model.md §2.1), but NaN/out-of-bound
+    // band DATA still fails compilation exactly as at any other rate —
+    // on an AVAILABLE band and on an UNAVAILABLE band alike (intrinsic
+    // validation is rate-independent; invalid data is not rendered
+    // harmless by the band being unavailable).
     let mut low_rate_nan = [0.0f32; 10];
     low_rate_nan[2] = f32::NAN;
     let low_rate = PcmFormat {
@@ -492,11 +495,17 @@ fn invalid_eq_configurations_fail_compilation() {
     };
     assert!(
         EqStage::new(&EqConfig::new(low_rate_nan, 1.0), &low_rate).is_err(),
-        "invalid band data fails at a low rate too"
+        "invalid band data on an available band fails at a low rate too"
+    );
+    let mut unavailable_nan = [0.0f32; 10];
+    unavailable_nan[9] = f32::NAN; // the 16 kHz band, unavailable at 8 kHz
+    assert!(
+        EqStage::new(&EqConfig::new(unavailable_nan, 1.0), &low_rate).is_err(),
+        "invalid band data stays invalid on an unavailable band"
     );
 }
 
-// --- D1: the rate-aware active-band profile (dsp-product-model.md §2) ----
+// --- D1: the rate-aware active-band profile (dsp-product-model.md §2.1) ---
 
 /// A stereo source format at an arbitrary product rate.
 fn format_at(sample_rate: u32) -> PcmFormat {
@@ -516,12 +525,15 @@ fn participates(center_hz: f64, sample_rate_hz: f64) -> bool {
     center_hz < sample_rate_hz / 2.0
 }
 
-/// The expected active-band count at a source rate, per the accepted rule.
-fn expected_active_bands(sample_rate: u32) -> usize {
+/// The expected active-band index set at a source rate, per the
+/// accepted rule.
+fn expected_active_bands(sample_rate: u32) -> Vec<usize> {
     EQ_BAND_FREQUENCY_HZ
         .iter()
-        .filter(|&&f0| participates(f64::from(f0), f64::from(sample_rate)))
-        .count()
+        .enumerate()
+        .filter(|&(_, &f0)| participates(f64::from(f0), f64::from(sample_rate)))
+        .map(|(index, _)| index)
+        .collect()
 }
 
 /// The f64 reference cascade over an ARBITRARY availability rule (the
@@ -567,21 +579,30 @@ fn the_stage_compiles_the_rate_active_band_profile_at_every_product_rate() {
         let stage = EqStage::new(&EqConfig::FLAT, &format_at(fs))
             .unwrap_or_else(|e| panic!("{fs} Hz: a flat EQ must establish: {e}"));
         assert_eq!(
-            stage.active_bands(),
+            stage.active_band_indices(),
             expected_active_bands(fs),
             "{fs} Hz: the active band set must be exactly the bands below Nyquist"
         );
     }
-    // The documented anchors of the product table: 8 kHz keeps the
-    // 31 Hz–2 kHz bands (7), 22.05 kHz adds the 4/8 kHz bands (9), the
-    // 16 kHz band stays excluded at exactly 32 kHz (Nyquist = 16 kHz,
-    // strict rule) and first participates above it, and every rate
-    // above 32 kHz carries all ten.
-    assert_eq!(expected_active_bands(8000), 7);
-    assert_eq!(expected_active_bands(16000), 8);
-    assert_eq!(expected_active_bands(22050), 9);
-    assert_eq!(expected_active_bands(32000), 9);
-    assert_eq!(expected_active_bands(44100), 10);
+    // The documented anchors of the product table, as exact index sets:
+    // 8 kHz keeps the 31 Hz–2 kHz bands, 22.05 kHz adds the 4/8 kHz
+    // bands, the 16 kHz band stays excluded at exactly 32 kHz
+    // (Nyquist = 16 kHz, strict rule) and first participates above it,
+    // and every rate above 32 kHz carries all ten.
+    assert_eq!(expected_active_bands(8000), vec![0, 1, 2, 3, 4, 5, 6]);
+    assert_eq!(expected_active_bands(16000), vec![0, 1, 2, 3, 4, 5, 6, 7]);
+    assert_eq!(
+        expected_active_bands(22050),
+        vec![0, 1, 2, 3, 4, 5, 6, 7, 8]
+    );
+    assert_eq!(
+        expected_active_bands(32000),
+        vec![0, 1, 2, 3, 4, 5, 6, 7, 8]
+    );
+    assert_eq!(
+        expected_active_bands(44100),
+        vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    );
 }
 
 /// Flat means Processing Off at EVERY source rate: the neutral config
@@ -633,7 +654,11 @@ fn at_low_rates_only_active_bands_shape_and_unavailable_trims_are_inert() {
 
     let fs = 8000u32;
     let mut stage = EqStage::new(&shaped_config, &format_at(fs)).expect("low-rate EQ establishes");
-    assert_eq!(stage.active_bands(), 7, "8 kHz carries the 31–2 kHz bands");
+    assert_eq!(
+        stage.active_band_indices(),
+        vec![0, 1, 2, 3, 4, 5, 6],
+        "8 kHz carries the 31 Hz–2 kHz bands"
+    );
 
     let frames = 512;
     let mut input = vec![0.0f32; frames * 2];
@@ -701,21 +726,29 @@ fn frame_count_layout_and_finiteness_hold_across_the_rate_matrix() {
     }
 }
 
-/// D1 negative controls: the rate-policy oracles demonstrably reject the
-/// OLD whole-EQ refusal policy and deliberately wrong availability
-/// rules. Each control builds the wrong-rule world locally (via the
-/// generalized f64 reference) and proves the SAME oracle machinery that
-/// accepts the production stage would fail against it.
+/// D1 negative controls for the rate policy. Honesty about mechanism:
+/// control (b) is the machinery-level sensitivity proof — it builds the
+/// wrong-rule world out of real signal machinery (the generalized f64
+/// reference cascade) and proves the impulse-response oracle
+/// distinguishes it from the accepted world. Controls (a) and (c) pin
+/// the WRONG WORLDS' observable establishment outcomes as executable
+/// documentation (what the old refusal / an inclusive rule would
+/// produce, replayed through the same assertion shape the positive
+/// oracles use); the suite's RED sensitivity to those policies is
+/// mutation-witnessed — re-applying the old refusal to the production
+/// path turns four tests RED, the too-aggressive predicate two, the
+/// inclusive predicate four (campaign issue #190, D1 evidence).
 #[test]
 fn the_rate_policy_oracles_reject_the_old_and_deliberately_wrong_rules() {
     let frames = 256;
     let mut impulse = vec![0.0f64; frames];
     impulse[0] = 1.0;
 
-    // (a) The OLD policy: every enabled EQ refuses at ≤32 kHz. The
-    // establishment oracle requires Ok — replaying the old world's
-    // establishment result through the same oracle fails.
-    let old_policy_establishment: Result<usize, String> =
+    // (a) The OLD policy: every enabled EQ refuses at ≤32 kHz. Its
+    // observable establishment outcome at a low rate is an Err; the
+    // accepted world is an Ok profile — the same assertion shape the
+    // positive oracles use distinguishes the two worlds.
+    let old_policy_establishment: Result<Vec<usize>, String> =
         Err("EQ band 9 (16000 Hz) is at or above this source's Nyquist \
          frequency (11025 Hz at 22050 Hz source rate)"
             .to_owned());
@@ -726,7 +759,8 @@ fn the_rate_policy_oracles_reject_the_old_and_deliberately_wrong_rules() {
                 .expect("flat must establish at every product rate");
             assert_eq!(active, expected_active_bands(22050));
         }),
-        "the establishment oracle must catch the old whole-EQ refusal policy"
+        "the establishment assertion shape must distinguish the old \
+         whole-EQ refusal world from the accepted one"
     );
 
     // (b) A TOO-AGGRESSIVE rule (requires the center below fs/4)
@@ -753,20 +787,22 @@ fn the_rate_policy_oracles_reject_the_old_and_deliberately_wrong_rules() {
     // exactly-Nyquist band at 32 kHz (w0 = π). Its observable
     // establishment outcome differs from the accepted world either way
     // the f32 arithmetic lands: the per-band stability check refuses
-    // the w0 = π shelf's recursion (|a1| ≥ 1 + a2 up to rounding) →
-    // an establishment error; or, were it ever to compile, the profile
-    // would carry 10 bands where the accepted rule says 9. Both wrong
-    // worlds are rejected by the same establishment oracle.
+    // the w0 = π shelf's recursion (|a1| ≥ 1 + a2 up to rounding —
+    // observed in practice, see the mutation evidence) → an
+    // establishment error; or, were a rounding ever to compile it, the
+    // profile would carry 10 bands where the accepted rule says 9.
+    // Both wrong worlds are replayed through the same assertion shape.
     for inclusive_world in [
-        Err::<usize, String>("EQ band 9 compiled to an unstable recursion".to_owned()),
-        Ok(10),
+        Err::<Vec<usize>, String>("EQ band 9 compiled to an unstable recursion".to_owned()),
+        Ok(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
     ] {
         assert!(
             rejects(|| {
                 let active = inclusive_world.expect("the accepted profile establishes");
                 assert_eq!(active, expected_active_bands(32000));
             }),
-            "the establishment oracle must catch the inclusive (degenerate-band) rule"
+            "the establishment assertion shape must distinguish the \
+             inclusive (degenerate-band) world from the accepted one"
         );
     }
 }

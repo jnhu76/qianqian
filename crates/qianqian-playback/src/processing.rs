@@ -153,7 +153,7 @@ pub(crate) const EQ_BAND_FREQUENCY_HZ: [f32; 10] = [
 pub(crate) const EQ_MAX_BAND_GAIN_DB: f32 = 18.0;
 
 /// The rate-aware AVAILABILITY rule of the 10-band product EQ
-/// (dsp-product-model.md §2, the accepted LOW_RATE_EQ_POLICY =
+/// (dsp-product-model.md §2.1, the accepted LOW_RATE_EQ_POLICY =
 /// rate-aware active-band profile): a fixed band participates in an
 /// episode's cascade iff its center is strictly below that source's
 /// Nyquist frequency.
@@ -241,11 +241,15 @@ impl EqConfig {
 #[cfg(all(test, not(loom)))]
 type TestStage = Box<dyn FnMut(&mut [f32]) -> Result<(), String> + Send>;
 
-/// One compiled biquad band: normalized coefficients (a0 = 1) plus the
-/// per-channel Transposed Direct Form II state. Episode-owned; retired
-/// with the episode.
+/// One compiled biquad band: its fixed-table index, the normalized
+/// coefficients (a0 = 1) and the per-channel Transposed Direct Form II
+/// state. Episode-owned; retired with the episode.
 #[derive(Debug)]
 struct BiquadBand {
+    // Read only by the test-gated active-band observation; dead in the
+    // shipped and loom builds.
+    #[cfg_attr(not(all(test, not(loom))), allow(dead_code))]
+    index: usize,
     b0: f32,
     b1: f32,
     b2: f32,
@@ -305,14 +309,15 @@ impl EqStage {
         Ok(Self { bands, channels })
     }
 
-    /// The episode's ACTIVE band count — how many fixed product bands
+    /// The episode's ACTIVE band indices — which fixed product bands
     /// participate in this cascade under the rate-aware availability
-    /// rule. Test-gated: the crate-internal honesty observation for the
-    /// oracles; the product-facing read model is a separate product
+    /// rule, in cascade order. Test-gated: the crate-internal honesty
+    /// observation for the oracles (pinning the exact SET, not just a
+    /// count); the product-facing read model is a separate product
     /// decision (dsp-product-model.md §2.1, D5).
     #[cfg(all(test, not(loom)))]
-    pub(crate) fn active_bands(&self) -> usize {
-        self.bands.len()
+    pub(crate) fn active_band_indices(&self) -> Vec<usize> {
+        self.bands.iter().map(|band| band.index).collect()
     }
 
     /// The cascade, in place, in explicit fixed band order. Frame-count
@@ -434,6 +439,7 @@ impl BiquadBand {
             return Err(format!("EQ band {index} compiled to an unstable recursion"));
         }
         Ok(Self {
+            index,
             b0,
             b1,
             b2,
@@ -696,7 +702,12 @@ mod tests {
             let f0 = f64::from(f0_f32);
             for gain_db in [-18.0f32, -12.0, -6.0, 0.0, 6.0, 12.0, 18.0] {
                 for q in [0.5f32, 1.0, 2.0, 4.0] {
-                    for fs in [8000u32, 22050, 44100, 48000, 96000, 192000] {
+                    // 16000/32000 put the 8/16 kHz bands EXACTLY at
+                    // Nyquist: the in-tree witness that the boundary
+                    // recursion degenerates and the per-band check
+                    // refuses it (the load-bearing strictness of the
+                    // rate-aware availability rule, §2.1).
+                    for fs in [8000u32, 16000, 22050, 32000, 44100, 48000, 96000, 192000] {
                         let nyquist = f64::from(fs) / 2.0;
                         match BiquadBand::compiled(band, f0_f32, gain_db, q, fs as f32, 2) {
                             Ok(compiled) => {
