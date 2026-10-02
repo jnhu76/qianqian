@@ -26,7 +26,9 @@ Load only the documentation needed for the current task. Git history and externa
 | Retired pre-reset playback models/harness | Git history / PR records — historical evidence only; removed from main by the post-#139 spec reset (still-current races are covered by today's specs/tests, see `../specs/README.md`) |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
 | Plugin boundary conformance audit (post-#145 headless path) | `audits/plugin-boundary-conformance-audit.md` — audit evidence record; hardening plan accepted, **not yet implemented** |
-| Audio Processing Plugin architecture audit (post-`ba545ee`) | `audits/audio-processing-plugin-audit.md` — audit evidence record; verdict GO_WITH_CORRECTIVES (corrective pass applied in PR #176: semantic freeze only, processor representation OPEN); **D13 negative ruling: no Processing Plugin/Capability today**; authority freeze (D14.11 candidate) required before any DSP implementation |
+| Audio Processing Plugin architecture audit (post-`ba545ee`) | `audits/audio-processing-plugin-audit.md` — historical/evidence audit record; D13 negative ruling remains current, while the bounded production minimum is now accepted in `adr/ADR-PBK-002.md` D14.11 |
+| DSP product semantics / heterogeneous algorithm contract / ordering / compatibility / downstream PCM consumer boundary | `architecture/dsp-product-model.md` — **NORMATIVE AUTHORITY** for DSP product semantics; D14.11 remains authoritative for the current processing minimum, episode lifecycle/ownership, placement, and live-update admission |
+| Audio Observation Plane / visualizer PCM-consumer contract (#187) | `architecture/audio-observation-plane.md` — **DRAFT design input only**; observation point/representation remain OPEN and #187 is not closed |
 | Product/repository entry | `../README.md` |
 | Contribution workflow | `../CONTRIBUTING.md` |
 | External failure evidence | `../evidence/README.md` — opt-in only |
@@ -60,6 +62,13 @@ NORMATIVE AUTHORITY
          (canonical SongCore ABI description:
           ../native/include/songcore.h)
 
+  DSP product semantics
+      -> architecture/dsp-product-model.md
+         typed product configuration, heterogeneous algorithm contracts,
+         explicit ordering constraints, compatibility boundaries,
+         downstream PCM-consumer handoff;
+         D14.11 still owns the current processing minimum/lifecycle/placement
+
   K0 semantic design
       -> architecture/composition-kernel-0-design.md
 
@@ -75,6 +84,7 @@ EVIDENCE
      direct-pcm-flow.md, realtime-view-publication.md,
      realtime-publication-lifetime-decision.md,
      component-boundary-a0.md, first-audible-slice.md) /
+     draft design input (architecture/audio-observation-plane.md) /
      audit records (audits/plugin-boundary-conformance-audit.md,
      audits/audio-processing-plugin-audit.md) /
      historical refs
