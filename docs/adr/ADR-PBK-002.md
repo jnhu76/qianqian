@@ -653,6 +653,8 @@ ADR-PBK-002 is authoritative for current vocabulary, Plugin/Fiber taxonomy, the 
 > 2026-09-15 settlement corrective: formal campaign PR #142 proved the previous text underspecified **who/when triggers semantic commit**. This amendment resolves that authority gap without importing the verifier's A/B/B′ representation as production taxonomy.
 >
 > D12 taxonomy corrective does not change this fact contract. It changes only the **current composition realization** of the designated semantic role.
+>
+> Cross-reference (routing, not a second authority): the cross-cutting temporal reading model — command → acceptance → evidence → commit → observation — and the evidence-class vocabulary live in `docs/architecture/playback-temporal-semantics.md`. This section remains the terminal-outcome authority.
 
 ### Decision
 
@@ -996,6 +998,8 @@ Output Plugin     YES           YES            NO                YES       mecha
 > 2026-09-15 amendment. Inputs: Issue #141 post-#139/post-#140 reality audit, PR #142 terminal-commit formal evidence, current production code, and D11 settlement corrective above.
 >
 > Purpose: remove coding-agent discretion from Phase-F semantic boundaries **without** inventing a second playback lifecycle or a generic playback runtime. This section freezes the smallest implementation shape that current evidence has earned and explicitly blocks everything else.
+>
+> Cross-reference (routing, not a second authority): the cross-cutting temporal reading model over these protocols — acceptance/linearization, world-state vs operation evidence, commit boundaries, correctness carriers — lives in `docs/architecture/playback-temporal-semantics.md`. Each D14.x subsection below remains the authority for its own protocol's exact predicates.
 
 ### D14.1 Current model: no second playback lifecycle
 

@@ -700,14 +700,15 @@ impl SessionCompletion {
                 slot.in_flight = true;
                 slot.command = Some(target);
             }
-            // A NEW cut cycle owns fresh evidence: the previous cycle's
-            // landing/refusal/commit latches must never satisfy THIS
-            // cycle's commit boundary (the same current-engagement
-            // attribution discipline D14.7 freezes for pause). Safe
-            // against the worker's in-flight protocol: the one-seek slot
-            // only frees after the previous protocol fully resolved,
-            // and the worker's next-cycle publications serialize after
-            // this hold through this same lock.
+            // A NEW cut cycle owns its own OPERATION evidence: the
+            // previous cycle's landing/refusal/commit latches are reset
+            // here, at acceptance, and must never satisfy THIS cycle's
+            // commit boundary (the same current-engagement attribution
+            // discipline D14.7 freezes for pause). Safe against the
+            // worker's in-flight protocol: the one-seek slot only frees
+            // after the previous protocol fully resolved, and the
+            // worker's next-cycle publications serialize after this
+            // hold through this same lock.
             guard.seek_landing = None;
             guard.seek_refused = false;
             guard.cut_committed = false;
@@ -1176,11 +1177,15 @@ fn episode_ending_evidence(state: &CompletionState) -> bool {
 /// attribution the leg performs.
 ///
 /// Attribution stays structurally separate per park kind: pause events
-/// maintain the pause latches, seek events maintain the seek latches. A
-/// cut-attributed seek park therefore can never satisfy the Paused
-/// establishment (which reads only the pause pair), and a pause park can
-/// never satisfy the seek commit (which reads only the paired seek — or
-/// paired pause — engagement+quiescence conjunction).
+/// maintain the pause latches, seek events maintain the seek latches, so
+/// a cut-attributed seek park can never satisfy the Paused
+/// establishment (which reads only the pause pair). The converse is
+/// deliberately NOT separate: the D14.5 seek commit reads the physical
+/// parked-and-quiesced conjunction under EITHER attribution — the seek
+/// pair or the pause pair — because a paused episode's already-quiesced
+/// tail satisfies the output-cut precondition (the frozen D14.5 pause
+/// interaction). Seek events never touch the pause latches, so a cut
+/// park can never fabricate `Paused` truth.
 fn apply_gate_event(state: &mut CompletionState, event: GateEvent) {
     match event {
         // Engagement is the current-engagement fence: events on one

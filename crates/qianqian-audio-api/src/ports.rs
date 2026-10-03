@@ -278,8 +278,12 @@ pub enum GateSlice {
 /// engagement / tail quiescence / disengagement back to the owner as
 /// mechanism events — pause-attributed and cut-attributed (seek) events
 /// kept structurally separate, so an internal seek park can never
-/// fabricate `Paused` evidence and a pause park never satisfies a seek
-/// commit.
+/// fabricate `Paused` evidence. The separation is one-directional by
+/// design: the D14.5 seek commit deliberately reads the physical
+/// parked-and-quiesced conjunction under EITHER attribution, so a paused
+/// episode's already-quiesced tail satisfies the output-cut
+/// precondition (the frozen D14.5 pause interaction — a paused episode
+/// is seekable and the seek never implicitly resumes).
 ///
 /// Ownership mirrors [`DrainSignal`]: the session creates the gate (with
 /// its observer, before any mechanism can see it) and hands it to the
