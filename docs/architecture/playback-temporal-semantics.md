@@ -262,9 +262,10 @@ Current protocol state
 Commit predicate                 (§2.5 — the owning authority's boundary)
    │
    ▼
-Committed semantic fact          (the ONLY kind: D11 terminal outcome;
-   │                              plus commit-scoped state such as the
-   │                              recorded seek cutover)
+Committed semantic fact          the ONLY Fact kind in this subsystem
+   │                            is the D11 terminal outcome. The
+   │                            recorded seek cutover is commit-scoped
+   │                            PROTOCOL state, not a Fact.
    ▼
 Observation / projection         (§2.7 — pure reads; no authority)
 ```
@@ -287,25 +288,28 @@ change, name which carriers your change relies on or removes.
 LOCK_LINEARIZATION   the one completion mutex linearizes commands,
                      evidence publication, and settlement; the
                      command routers take gate intent under it
-                     (one-directional nesting — completion → slot →
-                     gate intent; no cycle is reachable)
+                     (two one-directional nestings — completion →
+                     slot, and completion → gate intent; no cycle is
+                     reachable)
 PROGRAM_ORDER        each actor is single-threaded over its own duties:
                      the decode worker is the ONLY producer and the
                      only protocol runner; the render leg is the ONLY
                      submitter; same-leg event ordering is what makes
                      Engaged the current-engagement fence
 SINGLE_WRITER        each published cell has exactly one writer
-                     (position cell; worker-failure record; edge
-                     terminal)
+                     (position cell; worker-failure record)
 ONE_IN_FLIGHT        the seek slot holds at most one operation; a
                      second request is inert, not queued or coalesced
 EVIDENCE_RESET       operation evidence is reset at acceptance;
                      engagement-scoped evidence is reset at engagement
                      AND disengagement
 WORLD_STATE_FENCE    engagement events fence prior-cycle evidence out
-                     of the current engagement; commit boundaries read
-                     a CURRENT physical conjunction, never a stale
-                     latch
+                     of the current engagement; commit boundaries
+                     re-read the park conjunction under the owning
+                     lock. A latch can be microseconds stale
+                     (disengagement publication is asynchronous with
+                     the physical park exit); that staleness is real
+                     but never load-bearing — §5
 ATOMIC_COMMIT        the seek cutover decision is ONE three-valued
                      sample; the terminal resolve+commit runs in ONE
                      lock hold (no second sample for an evidence gap
@@ -360,11 +364,15 @@ Stale **operation** evidence (a previous cycle's landing) can never
 ground a later commit — acceptance resets it, and the slot keeps cycles
 serialized. Continuously-true **world** evidence grounding a later
 commit is correct by definition: it asserts something about the world
-NOW. What would break the argument is a latch outliving its physical
-state — which the disengagement fences prevent (the gate publishes
-SeekDisengaged on the leg's own thread on every park exit, including a
-failed tail probe, and every new park re-derives quiescence from a fresh
-probe).
+NOW. Two boundaries keep world evidence honest: the disengagement fence
+(the gate publishes SeekDisengaged on the leg's own thread on every
+park exit, including a failed tail probe, and every new park re-derives
+quiescence from a fresh probe), and the commit boundary's re-read under
+the owning lock. A latch CAN be microseconds stale — disengagement
+publication is asynchronous with the physical park exit — but that
+staleness is never load-bearing: safety rests on the worker program
+order (the §4 call-out) and the D14.7 park invariant (a parked leg
+submits nothing, so the tail cannot refill), never on latch freshness.
 
 ---
 
@@ -479,7 +487,10 @@ Paused seek is legal (frozen D14.5 pause interaction):
 ```text
 mechanism evidence
     (worker failure · worker terminal ·
-     drain verdict · stop intent)
+     drain verdict)
+stop intent — COMMAND state, read by
+    resolve() as the Stopped/Failed
+    discriminator
         ↓
 resolve()   — pure function of the one
 lock-protected record; publication and
