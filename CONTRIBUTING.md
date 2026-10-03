@@ -243,7 +243,7 @@ Before every push (this is the canonical manual entrypoint for humans and coding
 lefthook run pre-push --all-files
 ```
 
-The gate is checks-only: no formatting, no auto-fixing, no staging, no commits, no network. A failed pre-push leaves the working tree unchanged. What stays CI-only: `specs/check.sh current|rust`, the Windows compile gate, the VitePress build, OpenCodeReview.
+The gate is checks-only: no formatting, no auto-fixing, no staging, no commits, no network. A failed pre-push leaves the working tree unchanged. What stays CI-only: `specs/check.sh current|rust`, the Windows compile gate, OpenCodeReview.
 
 ### Boundary-design work
 

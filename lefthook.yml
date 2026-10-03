@@ -114,9 +114,26 @@ pre-push:
 
     docs-verify:
       # priority 0 = runs last; for a docs-only push the Cargo commands
-      # above are skipped, so this still completes in about a second.
+      # above are skipped, so this still completes in well under a
+      # minute. The full Observatory treatment the former docs.yml CI
+      # job ran: verify.mjs (registry / truth-class / provenance
+      # checks) plus the real VitePress build, which catches config and
+      # dead-link errors verify.mjs cannot see. Both are deterministic
+      # and offline once dependencies exist; the one-time networked
+      # prerequisite stays outside this gate:
+      #   cd website && npm ci
+      # Build output (website/.vitepress/dist) is gitignored — the gate
+      # leaves the working tree unchanged.
       priority: 0
       glob:
         - "docs/**"
         - "website/**"
-      run: cd website && node scripts/verify.mjs
+      run: |
+        cd website
+        node scripts/verify.mjs
+        if [ ! -d node_modules ]; then
+          echo "docs:build prerequisite missing: website dependencies not installed."
+          echo "Run once:  cd website && npm ci"
+          exit 1
+        fi
+        npx vitepress build
