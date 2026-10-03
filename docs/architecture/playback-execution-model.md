@@ -143,15 +143,24 @@ decide whether a host needs terminal waiting or resource retirement (PBK-001
 **Proposed host representation family**, without prescribing a new API:
 
 ```text
-ESTABLISHED                 = the existing D14.6 Activated result
-NOT_ESTABLISHED(reason)      = this fresh attempt did not reach that result
+ESTABLISHED
+
+NOT_ESTABLISHED {
+    diagnostic: optional
+}
 ```
 
 This represents the existing D14.6 meaning; it is not a new establishment
-definition. The assembly boundary must carry the authoritative completed attempt
-result for the whole fresh composition to its host. Failure reason may identify
-admission, provider, dependency or Session activation failure. The disposition
-of attempted resources remains separately governed by authoritative disposal;
+definition: `ESTABLISHED` represents D14.6 `Activated`; `NOT_ESTABLISHED` represents
+an attempt that did not reach that result. The assembly boundary must carry the
+authoritative completed attempt classification for the whole fresh composition
+to its host. An optional diagnostic may identify admission, provider, dependency
+or Session activation failure, but is non-authoritative presentation text.
+Classification is independent of diagnostic presence: `NOT_ESTABLISHED` without
+a diagnostic is valid, and absence of a diagnostic cannot imply `ESTABLISHED`.
+The current [machine presentation][machine] `activation_failure_report` already
+accepts `None`. The disposition of attempted resources remains separately
+governed by authoritative disposal;
 `NOT_ESTABLISHED` never implies they have already discharged. Activation failure
 is not an episode `Failed` Fact.
 
@@ -163,7 +172,7 @@ unestablished. There is no required “currently playing” interval.
 
 **Machine and reference hosts must consume the same whole-attempt result.**
 Machine: established → wait terminal, dispose, settle invocation; unestablished
-→ dispose the attempted composition, report activation failure, settle without
+→ dispose the attempted composition, seal/report activation failure without
 waiting for a nonexistent terminal authority. Reference: probe first; old-side
 clearance uses absent root or `Discharged`; only then create/establish fresh
 world. On success install that episode; on failure perform D14.6 failure-clean
@@ -183,8 +192,9 @@ defect is asserted by this comparison.
 
 Authority source: #198/#201/#202 assign host-input responsibility and require a
 deterministic settlement boundary; PBK-002 D11 owns episode truth. Code evidence:
-[entry][entry] `machine_transport`, `finish_episode`, and the named
-`qianqian-stdin` thread. Semantic scope: **one machine invocation's host result**,
+[entry][entry] `machine_transport`, `finish_episode`, the named `qianqian-stdin`
+thread, and [machine][machine]'s pinned observable reports/exit-code contract.
+Semantic scope: **one machine invocation's host result and reader admission**,
 not a general shutdown authority or new Session terminal kind.
 
 | Input event | Proposed responsibility and consequence |
@@ -194,11 +204,16 @@ not a general shutdown authority or new Session terminal kind.
 | Read failure | Reader reports host infrastructure failure before its failure response/exit; not EOF |
 | Reader thread panic | Host infrastructure failure when an unwind panic is caught/reported at the reader boundary; detaching an unobserved panicking thread is insufficient |
 
-**Machine host failure is not `EpisodeTerminalOutcome::Failed`.** A host failure
-may request the existing Stop command to finish an unsettled episode, then use
-the ordinary terminal/disposal path. Session alone decides Completed/Stopped/
-Failed under D11. Host failure never manufactures decoder/render evidence or
-relabels a committed outcome.
+**Machine host failure is not `EpisodeTerminalOutcome::Failed`.** For a stdin
+infrastructure failure admitted before seal, the host **must first record the
+failure, then route the existing `request_stop()` to an established, unsettled
+episode**, and consume the real D11 terminal outcome and authoritative disposal
+verdict. A terminal race may make this idempotent Stop inert; it cannot relabel
+the outcome. An unestablished attempt is disposed without terminal waiting.
+This response is mandatory, so losing the command-producing reader does not
+leave the host relying only on natural completion. It adds no timeout or new
+terminal predicate. Session alone decides Completed/Stopped/Failed under D11;
+host failure never manufactures decoder/render evidence.
 
 ### 4.1 HOST_RESULT_SETTLEMENT_BOUNDARY
 
@@ -212,11 +227,19 @@ flush, reader exit nor process exit is that event.
 
 Failure recording and this seal must serialize on one ordinary invocation-local
 record operation. Before seal, the first recorded stdin infrastructure failure
-is retained (FIRST-WINS); further failures need not accumulate. At seal:
+is retained (FIRST-WINS); further failures need not accumulate. The same ordering
+must cover reader command dispatch, status/diagnostic output, and the mandatory
+failure response: an admitted operation finishes before the seal, or loses
+admission and performs none of those effects. A pre-seal check followed by
+post-seal dispatch/output is forbidden. Recording an admitted failure precedes
+its Stop response, and that response finishes before seal. Blocking OS stdin
+reads remain outside this ordering; they need not return for the owner to seal.
+At seal:
 
 ```text
 activation/disposal/episode result remains independently classified
 recorded stdin host failure adds a non-success host result
+reader command / failure-report / status-output admission closes
 sealed result cannot subsequently change
 ```
 
@@ -229,28 +252,37 @@ but whose report loses that ordering race is excluded: this is a recorded-failur
 cut, not a claim to observe every real-time occurrence. Spawn failure reporting
 is synchronous on the invocation owner, so cannot be deferred past its seal.
 
-Failures reported after settlement cannot reopen or change this invocation's
-result. They may be discarded or exposed only as best-effort post-settlement
-diagnostics; they are not another terminal Fact. Panic-abort/process death and
+After settlement, no reader command, failure report, status or diagnostic output
+is accepted. A late failure is discarded locally, without reporting or output;
+it cannot reopen or change this invocation's result. Panic-abort/process death and
 failures of unrelated host code are outside this recoverable reader policy.
 No Stage-1 claim is made that production currently enforces these rules.
 
 ### 4.2 Detached reader and deterministic exit
 
 The reader may remain blocked in stdin after settlement; there is no unconditional
-join. If it later runs, it may finish/abandon unread input, release its local
-resources, read the retained old handle, issue commands whose terminal-history
-semantics are inert, and perform best-effort status/diagnostic I/O. It may not
-establish another world, relabel an episode, or mutate the sealed host result.
-It has no reference to a successor episode. Post-settlement output completion
-and input consumption are not promised. Returning the host result does not wait
-for those effects. Process termination may abandon them.
+join. On its next wake/run after seal, it **only exits and releases reader-local
+resources**. Returned input or read errors are discarded; it does not dispatch
+old-handle commands, format status, report failure, emit diagnostics, or start
+another read. An otherwise valid old-handle command is still refused by this
+closed host-input boundary. Generic retained-handle semantics in D4 remain
+separate from machine reader admission.
 
-This policy obtains a deterministic **result cut**, not deterministic scheduling,
-output order or a global deadline: the owner combines authoritative episode/
-disposal results with the pre-seal recorded failure, seals, then returns that
-fixed result independently of a blocked reader. No global ledger service, new
-playback lifecycle, or command-debt abstraction is needed. “Host-result ledger”
+Only the invocation owner emits the final settlement reports after seal, using
+the sealed result and captured diagnostics. This preserves an observable cut:
+reader commands and reader-owned output cannot cross into final reporting.
+Completing an admitted pre-seal output operation can delay seal if output blocks;
+no deadline is promised. Output here means the producer's output/flush operation,
+not a guarantee that an external pipe consumer has received the bytes. Reader
+termination itself remains unacknowledged without a join, and process termination
+may abandon the blocked read.
+
+This policy obtains a deterministic **result and reader-admission cut**, not
+deterministic scheduling or a global deadline: the owner combines authoritative
+episode/disposal results with the pre-seal recorded failure, closes reader
+admission and seals, then reports/returns independently of a blocked stdin read.
+No global ledger service, new playback lifecycle, or command-debt abstraction is
+needed. “Host-result ledger”
 is explanatory language for an invocation-local result record, not a new runtime
 subsystem. C2 must realize this ordering and failure reporting; representation
 is deliberately unimplemented here.
@@ -259,7 +291,8 @@ Current realization: spawn's `Result<JoinHandle<_>>` is retained only as `_contr
 read errors break like EOF, panic is unobserved, and `finish_episode` has no input
 failure record/seal. This is the known **C2/F2 differential**. The later C2 oracle
 must distinguish pre-seal versus post-seal recording, including each terminal
-race; it must not assert “every reader failure ever produces nonzero”.
+race, verify record-before-Stop responsibility, and forbid reader dispatch/output
+after seal; it must not assert “every reader failure ever produces nonzero”.
 
 ## 5. D4 — Outstanding work fate
 
@@ -280,7 +313,7 @@ conditions; it is not a second episode lifecycle enum.
 | Active DSP transition | Worker creates accepted target transition, starts Applied on a whole staging block | One transition; complete-in-flight before another pickup during continuing processing; sample-driven progression | Normal newer Desired does not preempt it. Applied Seek invalidates/rebuilds accepted target fresh; Refused Seek preserves it. Ending/EOF may drop an incomplete transition; current R0 has no artificial output-tail duty | DSP §7.3; PBK-002 D14.11; live `stage`, `invalidate_signal_history` |
 | PCM buffered frames | Producer writes bounded edge FIFO; render pulls | Prefix write until capacity, **BLOCK** by producer wait/retry on full, not latest-wins | EOF preserves buffered drain; stopped/failed edge refuses reads before buffer drain, so frames may be abandoned. With the leg parked, provider Applied precedes history/edge purge; production then waits for the cut's tail-quiescence/commit and release consumption. Tail-quiescence is a commit condition, not a pre-purge condition. Refused Seek preserves frames exactly | PBK-002 D14.5; PBK-003 §5; [edge][edge] `write_some`, `read_frames`, `invalidate` |
 | Late retained-handle commands | Same episode's retained core/control cells | Existing protocol methods only, no new attachment | Stop/Pause/Resume history inert for terminal semantics; Seek refuses. DSP/level histories may still mutate; no resurrection or successor binding. Terminal alone does not prove all worker code has stopped; joins do | PBK-002 D14.2/D14.4/D14.7/D14.9/D14.11; [handle][handle], completion/live |
-| Stdin unread input | OS stdin/line reader, no playback record until parsed command dispatched | Reader's local line order only; not a universal mailbox; no bounded input admission promised | EOF closes normally; unread input may be abandoned on host return/process exit. Post-settlement old-handle/status effects limited by D3; no duty to consume every line. Pre-seal infrastructure failures must enter host result | D3 candidate; [entry][entry] `machine_transport` |
+| Stdin unread input | OS stdin/line reader, no playback record until parsed command dispatched | Reader's local line order only; not a universal mailbox; no bounded input admission promised. D3 seal closes command/failure-report/status-output admission | EOF closes normally; unread input may be abandoned. After seal, the reader only exits/releases local resources on wake, without dispatch or output; no duty to consume every line. Infrastructure failures recorded before the seal enter the host result and require record-then-Stop for an established unsettled episode | D3 candidate; [entry][entry] `machine_transport` |
 
 Refusal and abort are different from a successful semantic result. In particular,
 an accepted seek awaiting device-tail quiescence can remain pending indefinitely
@@ -305,7 +338,7 @@ The host-result milestone is D3's proposal.
 | Render joined | Backend relation / stream `stop_and_join` | Render thread returned; backend-owned resources released on the exercised path | Physical acoustic silence on every device, reader exit, successful episode outcome |
 | K0 relation obligations discharged | Composition / K0 records inverse and teardown verdicts | Registered obligations discharged in lifecycle order; no provider final release past violated dependents | Universal thread discovery, stdin termination, correctness of an untested backend's discharge claim |
 | Root disposed | Whole attempted composition / App calls K0 | **Only `DisposeVerdict::Discharged`** supports clean disposal; `TeardownViolated` retains violated world and fail-stops replacement | Clean exit from a mere `dispose()` call or quiet snapshot; host/process quiescence |
-| Host result settled | Invocation result / machine host | D3 pre-seal failure cut and final classification fixed | Reader ended, output drained, process-wide quiescence |
+| Host result settled | Invocation result / machine host | D3 pre-seal recorded-failure cut and final classification fixed; reader command/failure-report/status-output admission closed | Reader ended, final owner reports delivered, process-wide quiescence |
 | Host function returned | Invocation caller boundary / host | Control returned with the sealed result (candidate D3) | Detached reader ended, all process threads joined |
 | Stdin reader ended | Host-input worker / reader, acknowledgement if owned/observed | No further reader work after actual return; observed join would acknowledge it | Episode completion, all host tasks ended; production currently has no such observation |
 | Process exited | Process / entrypoint + OS | Process execution ceased; OS reclaims process resources | Graceful protocol discharge, successful joins, delivery of final output |
@@ -313,9 +346,12 @@ The host-result milestone is D3's proposal.
 **Episode quiescence ≠ host quiescence ≠ process quiescence.** For the current
 established episode, an episode-quiescence claim requires decode and render
 termination acknowledgements/joins and their resource release, plus discharged
-Session relations and terminal settlement when decisive. D1 prevents a retained
-core being attached again. Stop or terminal alone is insufficient. Retained
-handles may keep command/history cells and even the bound stopped edge allocated;
+Session relations and terminal settlement when decisive. Claims about supported
+playback are conditional on D1's proposed domain precondition becoming accepted:
+reattachment is outside supported behavior under that precondition, but current
+runtime does not structurally prevent it. D1 is not a structural quiescence proof.
+Stop or terminal alone is insufficient. Retained handles may keep command/history
+cells and even the bound stopped edge allocated;
 quiescence does not mean every allocation has been reclaimed.
 
 Current relation ordering: register render inverse first, decode inverse last;
@@ -486,10 +522,10 @@ not executed by this documentation audit.
 | --- | --- |
 | Identity; lifetime; lifetime owner | Named `qianqian-stdin` thread per machine transport; host creates it, currently may detach; retained handle fixes its episode scope |
 | Execution context; state; writers | Reader thread owns stdin lock/line iterator/current line; host currently ignores spawn/join result. D3 proposes reader reporting and owner sealing one local result record |
-| Inputs; outputs | Stdin lines → old-handle commands/status/diagnostics; EOF normal closure; spawn/read/panic host failures must report per D3 |
-| Waiting seams; serialization | Blocking stdin and stdout I/O, local line order; no unconditional join, no global input bound; proposed failure record versus seal order |
-| Semantic authority; failure responsibility | Host infrastructure/result only; no D11 authority. Reader reports read/caught-panic; spawning host reports spawn failure |
-| Stop/cancellation; termination ack; resources | EOF/failure/return ends reader; host settlement does not cancel blocked stdin. Actual return/join would acknowledge end; retained handles/stdin lock may survive host return |
+| Inputs; outputs | Before seal, stdin lines → commands/status/diagnostics; EOF normal closure; admitted spawn/read/caught-panic failures recorded then Stop routed if established/unsettled. After seal, no reader dispatch/report/output |
+| Waiting seams; serialization | Blocking stdin and output I/O, local line order; no unconditional join or global input bound. D3 orders seal against admitted dispatch/output/failure response; OS stdin read is outside that ordering |
+| Semantic authority; failure responsibility | Host infrastructure/result only; no D11 authority. Reader reports read/caught-panic before seal; spawning host records spawn failure synchronously; late failures discarded without output |
+| Stop/cancellation; termination ack; resources | EOF/failure/return ends reader; seal closes admission but does not cancel blocked stdin. Next post-seal wake only exits/releases local resources. Actual return/join would acknowledge end; retained handles/stdin lock may survive host return |
 
 Evidence: entry `machine_transport`; current missing failure ownership/settlement
 is C2, not an implemented guarantee.
@@ -521,7 +557,7 @@ promise that private representation remains frozen.
 | EA-A01 — execution identity | D1 candidate; PBK-002 D11/D14.6 | handle `new`/Clone; session `playback_session_spec*`; entry `RealEpisodeSource::start`; kernel `activate_fiber` | Fresh episode core, shared clones; repeat attachment unsupported, not structurally forbidden |
 | EA-B01 — mutable state and writers | D1/D4/§8; protocol owners | completion state; live control/engine; edge cursors; wasapi render locals | Named writer/lock/thread ownership; no inferred global state owner |
 | EA-B02 — owner versus serializer versus authority | PBK-002 D6/D11; DSP §7.3; §8 | session inverses; completion `publish_evidence`; live `stage` | Session lifetime ownership, locks/program order serialization, designated semantic authority kept distinct |
-| EA-C01 — command admission and ending fate | PBK-002 D14.4/.5/.7; DSP §7.3; D3/D4 | completion `request_*`; live setters/`poll_update`; entry reader | Protocol-specific table complete; D3 input settlement proposed/C2 pending |
+| EA-C01 — command admission and ending fate | PBK-002 D14.4/.5/.7; DSP §7.3; D3/D4 | completion `request_*`; live setters/`poll_update`; entry reader | Protocol-specific table complete; D3 seal closes reader admission/output, realization C2 pending |
 | EA-D01 — communication model | PBK-002 D8/D14.5; PBK-003 §5; D6 | edge; ports gate/drain; completion seek slot; live pending | Typed FIFO/cells/callbacks, no generic mailbox or PCM event bus |
 | EA-E01 — local serialization | Temporal §3/§6; protocol owners; §8 | completion lock holds; live control lock; session worker; wasapi loop | Local serial points identified; no universal command order |
 | EA-E02 — acceptance/linearization | PBK-002 D14.5/.7; DSP §7.3; D2/D3 | completion `request_seek`/pause/stop; live setters/`accept`; player `replace_episode` | Setter record distinct from DSP Accepted; host establishment/settlement representation remains C1/C2 |
@@ -531,7 +567,7 @@ promise that private representation remains frozen.
 | EA-H02 — evidence/commit/visibility stages | Temporal §2–6; DSP §7.3 | completion evidence/observe; ports callbacks; live setter/pickup/stage | Fact lens preserved; no new Fact predicates or acceptance shortcut |
 | EA-I01 — projection firewall | PBK-001 §2.3; PBK-002 D14.6/.8 | entry `start_episode`; handle `observe`; completion position gate | Known C1 snapshot differential remains; D2 candidate consumption cannot use Fiber projection |
 | EA-J01 — lifecycle relation | K0 §F–G; PBK-002 D6/D14.1; D1/D5 | kernel activate/unwind; session relations; completion core | One K0 lifecycle plus terminal Fact/ordinary resources; no second episode enum |
-| EA-K01 — failure responsibility | PBK-002 D11/D14.6; PBK-003 §5; D3 | completion failure methods; session catch-unwind; wasapi/open-abort; entry reader | Decode/render versus activation versus host failure separated; C2 reader reporting pending |
+| EA-K01 — failure responsibility | PBK-002 D11/D14.6; PBK-003 §5; D3 | completion failure methods; session catch-unwind; wasapi/open-abort; entry reader | Failure domains separated; D3 requires record then existing Stop if established/unsettled, without forging Failed; C2 pending |
 | EA-K02 — failure domains | Same owners; D2/D3/D5 | player `failure_clean_start`/fail-stop; completion first failure; entry `finish_episode` | Host failure cannot forge Failed; violation retains composition; no invented recovery |
 | EA-O01 — boundedness | D6; DSP §7.3; protocol owners | session constants/staging/remainder; edge ring; live slots/transition; completion fields | Logical local bounds inventoried; diagnostic/native/host bytes not globally budgeted |
 | EA-O02 — backpressure/busy policy | PBK-002 D14.5; DSP §7.3; D4/D6 | edge `write_some`/wait; completion seek refuse; live latest pending | BLOCK/REFUSE/LATEST-WINS/FIRST-WINS/DROP/INERT scoped to actual structures |
@@ -555,10 +591,10 @@ promise that private representation remains frozen.
 | NON-GUARANTEE | No global fixed-memory budget or global operation deadline; local bounds/slices are narrower | D6 |
 | NON-GUARANTEE | Terminal Fact implies neither resource quiescence nor worker joins; Discharged implies neither host nor process quiescence | D5; D11/K0 scopes |
 | NON-GUARANTEE | Projection is not semantic authority; source/position/diagnostic observations have no universal atomicity/freshness/acoustic guarantee | PBK-001; PBK-002 D14.8; temporal |
-| NON-GUARANTEE | No unconditional blocked-stdin join or post-settlement input/output delivery promise | D3 candidate |
+| NON-GUARANTEE | No unconditional blocked-stdin join or external output-delivery deadline; reader dispatch/report/output is forbidden after seal | D3 candidate |
 | OPEN / CANDIDATE DECISION | D1 attachment clarification; optional structural enforcement unchosen | D1; no behavior change |
 | OPEN / CANDIDATE DECISION | D2 common host representation and consumption of existing Activated; C1 implementation unstarted | D2; #201 sequencing |
-| OPEN / CANDIDATE DECISION | D3 first recorded failure versus result seal; post-settlement effects; C2 implementation unstarted | D3; #202 scope |
+| OPEN / CANDIDATE DECISION | D3 recorded-failure cut, mandatory record-then-Stop and closed post-seal reader admission/output; policy specified for review, C2 implementation unstarted | D3; #202 scope |
 | OPEN / CANDIDATE DECISION | D4–D6 cross-protocol fate, quiescence and bounds scopes await independent review/freeze; inherited rules already retain their authority | This candidate |
 
 No new runtime gap or accepted-authority contradiction is claimed by this audit.
@@ -600,6 +636,7 @@ campaign or weaken its gate. Validation after freeze precedes resuming dependent
 [dsp]: dsp-product-model.md
 [app]: ../../crates/qianqian-app/src/lib.rs
 [entry]: ../../apps/headless/src/entry.rs
+[machine]: ../../apps/headless/src/machine.rs
 [player]: ../../apps/headless/src/player.rs
 [handle]: ../../crates/qianqian-playback/src/handle.rs
 [session]: ../../crates/qianqian-playback/src/session.rs
