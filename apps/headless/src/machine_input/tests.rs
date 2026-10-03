@@ -190,12 +190,10 @@ fn outer_reader_panic_boundary_records_failure_without_join() {
         input.clone(),
         handle.clone(),
         move |task| {
-            std::thread::spawn(move || {
+            Ok(std::thread::spawn(move || {
                 task();
                 finished.send(()).unwrap();
-            });
-            // The OS seam must return a handle; this one is also safely detached.
-            Ok(std::thread::spawn(|| {}))
+            }))
         },
         || std::panic::resume_unwind(Box::new("boundary panic")),
     );
@@ -454,4 +452,178 @@ fn finite_episode_returns_while_stdin_blocked_and_late_wake_is_inert() {
         assert!(!handle.observe().stop_requested);
         assert_eq!(input.seal(), None);
     }
+}
+
+#[test]
+fn final_owner_reports_preserve_terminal_and_distinct_failure_domains() {
+    for (source, paused, terminal) in [
+        (
+            SourceBehavior::EofAfter(16),
+            false,
+            EpisodeTerminalOutcome::Completed,
+        ),
+        (
+            SourceBehavior::FailAfter(0),
+            false,
+            EpisodeTerminalOutcome::Failed,
+        ),
+        (
+            SourceBehavior::EofAfter(100_000),
+            true,
+            EpisodeTerminalOutcome::Stopped,
+        ),
+    ] {
+        let (assembled, disposed) = episode(source, paused, None);
+        let handle = assembled.start.handle.clone();
+        if !paused {
+            assert_eq!(handle.wait_terminal(), terminal);
+        }
+        let host = RefCell::new(None::<HostInput>);
+        let mut reports = Vec::new();
+        let exit = crate::entry::run_machine_reports_for_test(
+            assembled,
+            |input, handle| {
+                *host.borrow_mut() = Some(input.clone());
+                read_error(&input, &handle);
+            },
+            |stream, line| {
+                let host = host.borrow();
+                let state = host
+                    .as_ref()
+                    .unwrap()
+                    .shared
+                    .state
+                    .try_lock()
+                    .expect("no host lock across final output");
+                assert!(
+                    state.admission_closed && !state.operation_active,
+                    "final output after seal"
+                );
+                reports.push((stream, line.to_owned()));
+            },
+        );
+        assert_eq!(exit, std::process::ExitCode::from(1));
+        assert_eq!(handle.wait_terminal(), terminal);
+        assert!(disposed.get());
+        assert_eq!(reports.len(), 2);
+        assert_eq!(
+            reports[0],
+            (ReportStream::Stderr, HostFailure::Read.report().into())
+        );
+        let diagnostic = handle.observe().failure_diagnostic;
+        assert_eq!(
+            &reports[1..],
+            crate::machine::outcome_report(terminal, diagnostic.as_deref())
+        );
+    }
+}
+
+/// A subprocess isolates the process hook from parallel tests and captures its
+/// actual stderr. This helper is inert in the normal test invocation.
+#[test]
+fn reader_panic_hook_subprocess_probe() {
+    let Ok(phase) = std::env::var("QIANQIAN_C2_PANIC_PROBE") else {
+        return;
+    };
+    std::panic::set_hook(Box::new(|info| eprintln!("previous-hook: {info}")));
+    install_reader_panic_hook();
+    install_reader_panic_hook(); // repeated host setup must not wrap again
+    if phase == "unrelated" {
+        assert!(
+            std::thread::Builder::new()
+                .name("unrelated-reader".into())
+                .spawn(|| panic!("unrelated-runtime-panic"))
+                .unwrap()
+                .join()
+                .is_err()
+        );
+        return;
+    }
+    let input = HostInput::default();
+    let handle = PlaybackSessionHandle::new();
+    let (entered, started) = mpsc::channel();
+    let (release, resume) = mpsc::channel();
+    let (finished, ended) = mpsc::channel();
+    let reader_input = input.clone();
+    let reader_handle = handle.clone();
+    start_reader(
+        input.clone(),
+        handle.clone(),
+        move |task| {
+            std::thread::Builder::new()
+                .name(READER_THREAD_NAME.into())
+                .spawn(move || {
+                    task();
+                    finished.send(()).unwrap();
+                })
+        },
+        move || {
+            read_input(
+                &reader_input,
+                &reader_handle,
+                |_| {
+                    entered.send(()).unwrap();
+                    resume.recv_timeout(Duration::from_secs(5)).unwrap();
+                    panic!("owned-reader-real-panic");
+                },
+                no_output,
+            );
+        },
+    );
+    started.recv_timeout(Duration::from_secs(5)).unwrap();
+    if phase == "postseal" {
+        assert_eq!(input.seal(), None);
+    }
+    release.send(()).unwrap();
+    ended.recv_timeout(Duration::from_secs(5)).unwrap();
+    let failure = input.seal();
+    if phase == "preseal" {
+        assert_eq!(failure, Some(HostFailure::Panic));
+        assert!(handle.observe().stop_requested);
+        eprintln!("{}", failure.unwrap().report());
+    } else {
+        assert_eq!(failure, None);
+        assert!(!handle.observe().stop_requested);
+    }
+}
+
+#[test]
+fn real_reader_panic_hook_is_silent_after_seal_and_other_hooks_preserved() {
+    for phase in ["preseal", "postseal", "unrelated"] {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "machine_input::tests::reader_panic_hook_subprocess_probe",
+                "--nocapture",
+            ])
+            .env("QIANQIAN_C2_PANIC_PROBE", phase)
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(output.status.success(), "probe {phase}: {stderr}");
+        match phase {
+            "preseal" => assert_eq!(stderr.trim(), HostFailure::Panic.report()),
+            "postseal" => assert!(
+                stderr.is_empty(),
+                "late panic output crossed seal: {stderr}"
+            ),
+            _ => {
+                assert!(stderr.contains("unrelated-runtime-panic"));
+                assert_eq!(stderr.matches("previous-hook:").count(), 1);
+            }
+        }
+    }
+}
+
+#[test]
+fn read_error_records_and_stops_before_terminal_wait() {
+    let input = HostInput::default();
+    let handle = PlaybackSessionHandle::new();
+    read_error(&input, &handle);
+    assert_eq!(input.seal(), Some(HostFailure::Read));
+    assert!(handle.observe().stop_requested);
+    assert!(
+        handle.observe().terminal_outcome.is_none(),
+        "host cannot forge terminal"
+    );
 }

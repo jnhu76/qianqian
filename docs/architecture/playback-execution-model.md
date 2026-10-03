@@ -372,8 +372,15 @@ joined. On wake, command/report/failure admission is rejected after closure.
 The command/output panic catcher runs **inside** its admitted operation so
 unwinding cannot acknowledge before the panic record/Stop response. The outer
 reader boundary also catches startup/read unwinds. Panic-abort remains outside
-this recovery policy; Rust's process panic hook runs before unwind recovery
-and is not the machine transport's admitted report mechanism.
+this recovery policy. Before spawning, the process host configures Rust's panic
+hook once: suppress automatic hook diagnostics only on its uniquely owned
+`qianqian-stdin` thread, whose catchers explicitly record the host failure;
+delegate the prior hook unchanged for all other threads. This ordinary runtime
+diagnostic filter carries no invocation ledger, playback handle or semantic
+authority and holds no host bookkeeping lock. It remains installed for process
+lifetime because detached readers may outlive the invocation. Subprocess oracles
+use real `panic!` and capture stderr before/after seal and from an unrelated
+thread; merely bypassing the hook with `resume_unwind` is insufficient.
 
 [Entry][entry] obtains the real terminal and disposal results before sealing,
 then emits final owner reports and calls `machine_exit_code`. Pre-seal host

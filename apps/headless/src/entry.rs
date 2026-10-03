@@ -358,13 +358,18 @@ impl crate::player::EpisodeStart for RealEpisodeSource {
 /// none may be forged (D14.2).
 #[cfg(any(feature = "playback", test))]
 fn machine_transport(episode: Episode) -> ExitCode {
-    machine_transport_with_reader(episode, crate::machine_input::spawn_reader)
+    machine_transport_with_reader(
+        episode,
+        crate::machine_input::spawn_reader,
+        emit_machine_report,
+    )
 }
 
 #[cfg(any(feature = "playback", test))]
 fn machine_transport_with_reader(
     mut episode: Episode,
     start_reader: impl FnOnce(crate::machine_input::HostInput, qianqian_playback::PlaybackSessionHandle),
+    report: impl FnMut(machine::ReportStream, &str),
 ) -> ExitCode {
     if let qianqian_playback::EstablishmentResult::NotEstablished { diagnostic } =
         &episode.establishment
@@ -397,7 +402,7 @@ fn machine_transport_with_reader(
 
     let input = crate::machine_input::HostInput::default();
     start_reader(input.clone(), episode.handle.clone());
-    finish_episode(episode, input)
+    finish_episode(episode, input, report)
 }
 
 /// Wait for the committed terminal Fact, dispose, and report. The
@@ -405,7 +410,11 @@ fn machine_transport_with_reader(
 /// lines → disposal report) and the exit-code contract stay identical;
 /// the observable contract itself lives in [`machine`].
 #[cfg(any(feature = "playback", test))]
-fn finish_episode(mut episode: Episode, input: crate::machine_input::HostInput) -> ExitCode {
+fn finish_episode(
+    mut episode: Episode,
+    input: crate::machine_input::HostInput,
+    mut report: impl FnMut(machine::ReportStream, &str),
+) -> ExitCode {
     let outcome = episode.handle.wait_terminal();
     let disposal = episode.runtime.dispose();
     // The failure diagnostic is read separately from the settled
@@ -414,27 +423,32 @@ fn finish_episode(mut episode: Episode, input: crate::machine_input::HostInput) 
     let observation = episode.handle.observe();
     let host_failure = input.seal();
     if let Some(failure) = host_failure {
-        eprintln!("{}", failure.report());
+        report(machine::ReportStream::Stderr, failure.report());
     }
     for (stream, line) in
         machine::outcome_report(outcome, observation.failure_diagnostic.as_deref())
     {
-        match stream {
-            machine::ReportStream::Stdout => println!("{line}"),
-            machine::ReportStream::Stderr => eprintln!("{line}"),
-        }
+        report(stream, &line);
     }
     for warning in machine::disposal_warnings(&disposal.snapshot) {
-        eprintln!("{warning}");
+        report(machine::ReportStream::Stderr, &warning);
     }
     if let Some(line) = machine::disposal_verdict_warning(&disposal.verdict) {
-        eprintln!("{line}");
+        report(machine::ReportStream::Stderr, &line);
     }
     machine::machine_exit_code(
         Some(outcome),
         disposal.snapshot.quiet,
         host_failure.is_some(),
     )
+}
+
+#[cfg(any(feature = "playback", test))]
+fn emit_machine_report(stream: machine::ReportStream, line: &str) {
+    match stream {
+        machine::ReportStream::Stdout => println!("{line}"),
+        machine::ReportStream::Stderr => eprintln!("{line}"),
+    }
 }
 
 #[cfg(not(feature = "playback"))]
@@ -498,5 +512,19 @@ pub(crate) fn run_machine_reader_for_test(
     machine_transport_with_reader(
         machine_episode("test://host-input".into(), assembled),
         start_reader,
+        emit_machine_report,
+    )
+}
+
+#[cfg(test)]
+pub(crate) fn run_machine_reports_for_test(
+    assembled: crate::assembly::AssemblyOutcome,
+    start_reader: impl FnOnce(crate::machine_input::HostInput, qianqian_playback::PlaybackSessionHandle),
+    report: impl FnMut(machine::ReportStream, &str),
+) -> ExitCode {
+    machine_transport_with_reader(
+        machine_episode("test://host-input".into(), assembled),
+        start_reader,
+        report,
     )
 }

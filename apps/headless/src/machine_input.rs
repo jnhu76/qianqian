@@ -3,7 +3,7 @@
 
 use std::io;
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, Once};
 use std::thread::JoinHandle;
 
 use qianqian_playback::PlaybackSessionHandle;
@@ -173,13 +173,36 @@ impl Drop for Operation<'_> {
     }
 }
 
+// This private module is the only production creator of this named thread.
+// The process host owns the name; it is a diagnostic filter, never an identity
+// used to route commands or grant semantic authority.
+const READER_THREAD_NAME: &str = "qianqian-stdin";
+
+fn install_reader_panic_hook() {
+    static INSTALL: Once = Once::new();
+    INSTALL.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            // Hooks run BEFORE catch_unwind. The explicit reader catchers own
+            // its invocation report, including post-seal silence. The hook has
+            // no handle, ledger, admission check or bookkeeping synchronization.
+            if std::thread::current().name() != Some(READER_THREAD_NAME) {
+                previous(info);
+            }
+        }));
+    });
+    // Keep this process diagnostic configuration after host return: restoring
+    // the hook could let a detached reader print a late panic after seal.
+}
+
 pub(crate) fn spawn_reader(input: HostInput, handle: PlaybackSessionHandle) {
+    install_reader_panic_hook();
     start_reader(
         input.clone(),
         handle.clone(),
         |task| {
             std::thread::Builder::new()
-                .name("qianqian-stdin".into())
+                .name(READER_THREAD_NAME.into())
                 .spawn(task)
         },
         move || {
