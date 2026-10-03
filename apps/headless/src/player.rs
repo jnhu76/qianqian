@@ -29,8 +29,8 @@
 //!                evidence for this decision, never episode truth
 //! Activated      the WHOLE fresh composition established the episode,
 //!                read from the authority that ran the operation — the
-//!                session's own published evidence (format published ∧
-//!                no published activation failure). NEVER a
+//!                Session activation return carried by the paired attempt.
+//!                Source/diagnostic observations never decide it. NEVER a
 //!                CompositionSnapshot read (PBK-001 §2.3: snapshots are
 //!                read-side diagnostics, and the kernel's structural
 //!                view of a fiber is not the episode's activation truth)
@@ -137,9 +137,8 @@ pub trait EpisodeStart {
     fn start(&self, source: &Path, initial_output_level: u8) -> StartAttempt;
 }
 
-/// One fresh-root start attempt. The start operation itself never
-/// classifies establishment — that judgment is the replacement's
-/// (below), read from the episode seam's authoritative evidence.
+/// One fresh-root start attempt carrying the D14.6 operation result.
+/// Replacement consumes it after authoritative old-side clearance.
 pub struct StartAttempt {
     /// The fresh root. The caller must either commit it or
     /// authoritatively dispose it; dropping it without `dispose` runs
@@ -147,14 +146,11 @@ pub struct StartAttempt {
     pub runtime: QianqianApp,
     /// The episode seam of the mounted session. May reference no live
     /// session (e.g. the composition was refused before activation);
-    /// its observation then publishes nothing — which is exactly the
-    /// honest "not established" evidence.
+    /// establishment remains independent of its read-side observations.
     pub handle: PlaybackSessionHandle,
-    /// Why the start operation refused before any episode activation
-    /// was attempted (component registration, composition refusal).
-    /// `None` means the control sequence completed and the activation
-    /// evidence on `handle` decides establishment.
-    pub refused: Option<String>,
+    /// The completed whole fresh-assembly result, never inferred from
+    /// source evidence, diagnostics, Fiber state or terminal settlement.
+    pub establishment: qianqian_playback::EstablishmentResult,
 }
 
 /// The result of one Open operation: application composition feedback
@@ -542,7 +538,7 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     }
 
     /// The frozen D14.6 replacement sequence itself (probe → old-side
-    /// clear → fresh root → authority-evidence commit), owning no
+    /// clear → fresh root → authority-result commit), owning no
     /// navigation state.
     fn replace_episode(&mut self, candidate: &Path) -> OpenOutcome {
         // The §G.6 latch has no exit: once set, no further Open runs in
@@ -568,32 +564,25 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
 
         // 3. Fresh start, then the replacement commit condition: the
         //    old-side clear (the arm above) AND the authoritative
-        //    activation evidence.
+        //    whole fresh-assembly result.
         let attempt = self.start.start(candidate, self.desired_volume);
-        if let Some(refusal) = attempt.refused {
-            return self.failure_clean_start(attempt.runtime, refusal);
-        }
-        // `Activated` over the whole fresh composition — the session's
-        // own published evidence, never a snapshot read.
-        let established = {
-            let observation = attempt.handle.observe();
-            observation.source_format.is_some() && observation.activation_error.is_none()
-        };
-        if established {
-            self.active = Some(ActiveEpisode {
-                runtime: attempt.runtime,
-                handle: attempt.handle,
-                source: candidate.to_owned(),
-                eof_consumed: false,
-            });
-            OpenOutcome::Opened
-        } else {
-            let diagnostic = attempt
-                .handle
-                .observe()
-                .activation_error
-                .unwrap_or_else(|| "activation did not establish a playback session".to_owned());
-            self.failure_clean_start(attempt.runtime, diagnostic)
+        match attempt.establishment {
+            qianqian_playback::EstablishmentResult::Established => {
+                self.active = Some(ActiveEpisode {
+                    runtime: attempt.runtime,
+                    handle: attempt.handle,
+                    source: candidate.to_owned(),
+                    eof_consumed: false,
+                });
+                OpenOutcome::Opened
+            }
+            qianqian_playback::EstablishmentResult::NotEstablished { diagnostic } => self
+                .failure_clean_start(
+                    attempt.runtime,
+                    diagnostic.unwrap_or_else(|| {
+                        "activation did not establish a playback session".to_owned()
+                    }),
+                ),
         }
     }
 
@@ -728,7 +717,6 @@ pub(crate) mod tests {
         RenderRequest, RenderStream, TailProbeOutcome,
     };
     use qianqian_composition::{ComponentSpec, DesiredEntry, Discharge, Revision};
-    use qianqian_playback::playback_session_spec;
 
     use super::*;
 
@@ -931,11 +919,9 @@ pub(crate) mod tests {
     /// REAL playback session over the REAL kernel, with an event log
     /// and a generation counter. Scenario flags:
     ///
-    /// - `attach_handle == false`: the returned seam handle is NOT the
-    ///   handle the session was mounted with — the kernel snapshot
-    ///   would report an Active session while the episode seam
-    ///   publishes nothing. This is the §2.3 divergence scenario that
-    ///   pins the authority-evidence rule.
+    /// - `run_session_activation == false`: a deliberate no-op activation
+    ///   returns Ok and becomes Active without producing the paired Session
+    ///   result. This pins snapshot/diagnostic independence.
     /// - `violating_cleanup`: the fresh roots' provider effects return
     ///   `Violated`, so any disposal of a fresh root latches §G.6.
     /// - `refuse_composition`: the desired composition references an
@@ -943,7 +929,7 @@ pub(crate) mod tests {
     pub(crate) struct FakeEpisodeSource {
         pub(crate) log: Log,
         generation: AtomicU64,
-        attach_handle: bool,
+        run_session_activation: bool,
         violating_cleanup: bool,
         refuse_composition: bool,
         start_levels: Arc<Mutex<Vec<u8>>>,
@@ -954,15 +940,15 @@ pub(crate) mod tests {
             Self {
                 log: Arc::new(Mutex::new(Vec::new())),
                 generation: AtomicU64::new(0),
-                attach_handle: true,
+                run_session_activation: true,
                 violating_cleanup: false,
                 refuse_composition: false,
                 start_levels: Arc::new(Mutex::new(Vec::new())),
             }
         }
 
-        fn without_handle_attachment(mut self) -> Self {
-            self.attach_handle = false;
+        fn without_session_activation(mut self) -> Self {
+            self.run_session_activation = false;
             self
         }
     }
@@ -1009,8 +995,20 @@ pub(crate) mod tests {
                 .push(initial_output_level);
             let mounted = PlaybackSessionHandle::new();
             mounted.request_output_level(initial_output_level);
+            let (spec, attempt) = qianqian_playback::playback_session_spec_with_establishment(
+                source.to_path_buf(),
+                mounted.clone(),
+                qianqian_playback::AudioProcessingConfig::BYPASS,
+            );
+            // Deliberate false-positive projection: an Active no-op Session
+            // cannot produce the paired real Session activation result.
+            let spec = if self.run_session_activation {
+                spec
+            } else {
+                spec.on_activate(|_| Ok(()))
+            };
             runtime
-                .register_component(playback_session_spec(source.to_path_buf(), mounted.clone()))
+                .register_component(spec)
                 .expect("fresh root admits the playback session definition");
 
             let mut desired = vec![
@@ -1025,25 +1023,17 @@ pub(crate) mod tests {
                     Revision::new(1),
                 ));
             }
-            if let Err(errors) = runtime.revise_desired(desired) {
-                return StartAttempt {
-                    runtime,
-                    handle: mounted,
-                    refused: Some(format!("{errors}")),
-                };
-            }
-            let handle = if self.attach_handle {
-                mounted
-            } else {
-                // The divergence scenario: the mounted session runs on
-                // `mounted`; the seam the player sees is an unattached
-                // handle that publishes nothing.
-                PlaybackSessionHandle::new()
-            };
+            let establishment = crate::assembly::establish(&mut runtime, attempt, desired)
+                .unwrap_or_else(
+                    |errors| qianqian_playback::EstablishmentResult::NotEstablished {
+                        diagnostic: Some(format!("{errors}")),
+                    },
+                );
+            let handle = mounted;
             StartAttempt {
                 runtime,
                 handle,
-                refused: None,
+                establishment,
             }
         }
     }
@@ -1410,15 +1400,11 @@ pub(crate) mod tests {
         assert!(player.is_fail_stopped());
     }
 
-    /// C7-11 (the §2.3 negative control): activation truth comes from
-    /// the episode seam's published evidence, NEVER from the kernel
-    /// snapshot. Here the mounted session is genuinely Active in kernel
-    /// truth while the seam the player sees publishes nothing — a
-    /// snapshot-reading implementation would commit; the authority-
-    /// evidence implementation must fail clean and dispose the attempt.
+    /// C1 negative control: K0 Active and no diagnostic cannot substitute
+    /// for the required Session's authority-owned completed-attempt result.
     #[test]
-    fn activation_truth_comes_from_the_episode_seam_never_from_the_snapshot() {
-        let source = FakeEpisodeSource::new().without_handle_attachment();
+    fn active_projection_and_no_diagnostic_cannot_establish_a_session() {
+        let source = FakeEpisodeSource::new().without_session_activation();
         let events_handle = source.log.clone();
         let mut player = player_with(source);
 

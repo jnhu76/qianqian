@@ -34,6 +34,7 @@ use qianqian_composition::{ActivationError, ComponentSpec, Discharge};
 
 use crate::completion::{CutoverDecision, SessionCompletion};
 use crate::edge::PcmEdge;
+use crate::establishment::{EstablishmentAttempt, EstablishmentResult};
 use crate::handle::PlaybackSessionHandle;
 use crate::live::LiveProcessing;
 use crate::processing::{AudioProcessingConfig, EpisodeProcessing};
@@ -79,11 +80,34 @@ pub fn playback_session_spec_with_processing(
     handle: PlaybackSessionHandle,
     processing: AudioProcessingConfig,
 ) -> ComponentSpec {
+    playback_session_spec_with_establishment(file, handle, processing).0
+}
+
+/// Fresh-assembly variant carrying the D14.6 operation result independently of
+/// observations. For the supported Decode/Output/Session wiring, reaching the
+/// successful continuation proves provider activation and required bindings;
+/// it then owns all Session acquisition steps and their inverse registration.
+/// The caller consumes the paired attempt after synchronous assembly returns.
+pub fn playback_session_spec_with_establishment(
+    file: PathBuf,
+    handle: PlaybackSessionHandle,
+    processing: AudioProcessingConfig,
+) -> (ComponentSpec, EstablishmentAttempt) {
     handle.completion.processing().establish(processing);
-    ComponentSpec::new("playback_session")
+    let attempt = EstablishmentAttempt::new();
+    let result_slot = attempt.0.clone();
+    let spec = ComponentSpec::new("playback_session")
         .requires::<PcmDecodeCapability>()
         .requires::<AudioOutputCapability>()
-        .on_activate(move |ctx| activate(&file, &handle.completion, ctx))
+        .on_activate(move |ctx| {
+            let result = activate(&file, &handle.completion, ctx);
+            // This is the producing operation's return path, not a reconstruction
+            // from its diagnostic/source/terminal publications. No fallible step
+            // remains after successful activation and inverse registration.
+            record_establishment(&result_slot, &result);
+            result
+        });
+    (spec, attempt)
 }
 
 /// Test-only establishment with a DELIBERATE episode processing runtime
@@ -215,6 +239,22 @@ pub(crate) fn playback_session_spec_with_live_engine(
         })
 }
 
+fn record_establishment(
+    slot: &std::cell::RefCell<EstablishmentResult>,
+    result: &Result<(), ActivationError>,
+) {
+    *slot.borrow_mut() = match result {
+        Ok(()) => EstablishmentResult::Established,
+        Err(error) => EstablishmentResult::NotEstablished {
+            diagnostic: Some(error.message.clone()),
+        },
+    };
+}
+
+#[cfg(all(test, not(loom)))]
+#[path = "establishment_tests.rs"]
+mod establishment_tests;
+
 fn activate(
     file: &Path,
     completion: &SessionCompletion,
@@ -285,6 +325,23 @@ fn activate_established<P: ProcessingRuntime + 'static>(
     completion: &SessionCompletion,
     compile_processing: impl FnOnce(&PcmFormat) -> Result<P, String>,
     ctx: &mut qianqian_composition::ActivationCtx<'_>,
+) -> Result<(), ActivationError> {
+    activate_established_with_spawn(file, completion, compile_processing, ctx, spawn_worker)
+}
+
+// Ordinary private operation seam: production uses Builder::spawn, while the
+// deterministic oracle can return its error without platform resource exhaustion.
+fn activate_established_with_spawn<P: ProcessingRuntime + 'static>(
+    file: &Path,
+    completion: &SessionCompletion,
+    compile_processing: impl FnOnce(&PcmFormat) -> Result<P, String>,
+    ctx: &mut qianqian_composition::ActivationCtx<'_>,
+    spawn: impl FnOnce(
+        Box<dyn DecodedPcmStream>,
+        Arc<PcmEdge>,
+        SessionCompletion,
+        P,
+    ) -> Result<std::thread::JoinHandle<()>, ActivationError>,
 ) -> Result<(), ActivationError> {
     // Control plane: capability resolution happens exactly once, here.
     let decode = ctx.resolve::<PcmDecodeCapability>().map_err(|e| {
@@ -378,18 +435,7 @@ fn activate_established<P: ProcessingRuntime + 'static>(
 
     let worker_edge = edge.clone();
     let worker_completion = completion.clone();
-    let worker = std::thread::Builder::new()
-        .name("qianqian-decode".into())
-        .spawn(move || {
-            decode_worker(
-                decode_stream,
-                worker_edge,
-                worker_completion,
-                STAGING_FRAMES,
-                processing,
-            )
-        })
-        .map_err(|e| ActivationError::new(format!("decode worker spawn failed: {e}")))?;
+    let worker = spawn(decode_stream, worker_edge, worker_completion, processing)?;
     // Registered last, so it unwinds first: stop the edge (unblocking
     // both legs), then join the producer. Relation-bearing toward the
     // decode provider (the data edge it feeds).
@@ -400,6 +446,18 @@ fn activate_established<P: ProcessingRuntime + 'static>(
     });
 
     Ok(())
+}
+
+fn spawn_worker<P: ProcessingRuntime + 'static>(
+    decode_stream: Box<dyn DecodedPcmStream>,
+    edge: Arc<PcmEdge>,
+    completion: SessionCompletion,
+    processing: P,
+) -> Result<std::thread::JoinHandle<()>, ActivationError> {
+    std::thread::Builder::new()
+        .name("qianqian-decode".into())
+        .spawn(move || decode_worker(decode_stream, edge, completion, STAGING_FRAMES, processing))
+        .map_err(|e| ActivationError::new(format!("decode worker spawn failed: {e}")))
 }
 
 /// Bounded wait slice for the decode worker's seek-protocol waits (the

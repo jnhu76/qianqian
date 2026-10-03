@@ -175,12 +175,22 @@ EXPORT_RULES = {
     "crates/qianqian-playback/src/lib.rs": {
         "allowed_root_public": [
             "pub use handle::{\n    EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,\n};",
-            "pub use session::{playback_session_spec, playback_session_spec_with_processing};",
+            "pub use session::{\n    playback_session_spec, playback_session_spec_with_establishment,\n    playback_session_spec_with_processing,\n};",
+            "pub use establishment::{EstablishmentAttempt, EstablishmentResult};",
             "pub use presets::EqPreset;",
             "pub use processing::{AudioProcessingConfig, EqConfig};",
             "pub use headroom::{HeadroomGuidance, estimated_eq_headroom_guidance};",
         ],
-        "authority": "ADR-PBK-002 D6/D14.2/D14.3/D14.7 — the admitted public surface is exactly the F2 episode seam (extended by the D14.7 F3 pause fields/commands, whose spelling is representation); the episode mechanism is session-owned, not product API. Extended 2026-10-02 (Issue #177 I1, D14.11): the desired Audio Processing configuration's establishment handoff — the `AudioProcessingConfig` payload and the `playback_session_spec_with_processing` constructor — is the application/product-control owner's one product seam for it; the processing runtime itself stays session-owned and crate-private. Extended 2026-10-02 (Issue #177 I4, D14.11): `presets::EqPreset` joins as pure configuration DATA (the application must be able to name a desired configuration); it carries no processor/Plugin identity and no live-update right. Extended 2026-10-02 (Issue #190 D2, dsp-product-model.md §9.1): `headroom::{HeadroomGuidance, estimated_eq_headroom_guidance}` joins as the NON-BINDING headroom advisory — a deterministic pure analysis over the desired EQ data and the source rate (estimated steady-state cascade guidance, never a clipping guarantee); it grants no live-update right, carries no processor/Plugin identity, and never mutates the desired configuration",
+        "authority": "ADR-PBK-002 D6/D14.2/D14.3/D14.7 — the admitted public surface is exactly the F2 episode seam (extended by the D14.7 F3 pause fields/commands, whose spelling is representation); the episode mechanism is session-owned, not product API. Extended 2026-10-02 (Issue #177 I1, D14.11): the desired Audio Processing configuration's establishment handoff — the `AudioProcessingConfig` payload and the `playback_session_spec_with_processing` constructor — is the application/product-control owner's one product seam for it; the processing runtime itself stays session-owned and crate-private. Extended 2026-10-02 (Issue #177 I4, D14.11): `presets::EqPreset` joins as pure configuration DATA (the application must be able to name a desired configuration); it carries no processor/Plugin identity and no live-update right. Extended 2026-10-02 (Issue #190 D2, dsp-product-model.md §9.1): `headroom::{HeadroomGuidance, estimated_eq_headroom_guidance}` joins as the NON-BINDING headroom advisory — a deterministic pure analysis over the desired EQ data and the source rate (estimated steady-state cascade guidance, never a clipping guarantee); it grants no live-update right, carries no processor/Plugin identity, and never mutates the desired configuration. Extended by Issue #204 C1 (PBK-002 D14.6): the paired Session activation attempt carries the fresh-assembly result; it is separate from the observation handle and grants no terminal/worker mutator",
+    },
+    "crates/qianqian-playback/src/establishment.rs": {
+        "label": "establishment-result",
+        "allowed_root_public": [
+            "pub enum EstablishmentResult {",
+            "pub struct EstablishmentAttempt(pub(crate) Rc<RefCell<EstablishmentResult>>);",
+            "pub fn finish(self) -> EstablishmentResult {",
+        ],
+        "authority": "Issue #204 C1; ADR-PBK-002 D14.6 — representation of the completed fresh-assembly operation, not an observation or a new Fact. Only consuming the attempt is public; its writer and storage remain private to playback",
     },
     # The processing-config freeze behind the lib.rs re-export (I1 review):
     # the desired-configuration payload's public rights are frozen here so

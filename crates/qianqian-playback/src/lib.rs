@@ -25,6 +25,7 @@
 
 mod completion;
 mod edge;
+mod establishment;
 mod handle;
 mod headroom;
 mod live;
@@ -36,15 +37,20 @@ mod session;
 // crate-private: they are session-owned runtime resources, not
 // product API. The application-facing surface is exactly the public
 // seam below; composition roots reach the episode only through
-// `playback_session_spec` (+ its processing-configuration variant)
-// and `PlaybackSessionHandle`.
+// `playback_session_spec` (+ its configuration/establishment variants)
+// and `PlaybackSessionHandle`. The paired establishment attempt is a
+// composition-operation result, separate from the observation seam.
+pub use establishment::{EstablishmentAttempt, EstablishmentResult};
 pub use handle::{
     EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionHandle, PlaybackSessionObservation,
 };
 pub use headroom::{HeadroomGuidance, estimated_eq_headroom_guidance};
 pub use presets::EqPreset;
 pub use processing::{AudioProcessingConfig, EqConfig};
-pub use session::{playback_session_spec, playback_session_spec_with_processing};
+pub use session::{
+    playback_session_spec, playback_session_spec_with_establishment,
+    playback_session_spec_with_processing,
+};
 
 // Test doubles shared by the integration tests and the crate-internal
 // white-box settlement tests (one copy of the mechanism harness).

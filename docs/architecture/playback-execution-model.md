@@ -4,18 +4,19 @@
 STATUS = CANDIDATE / NOT FROZEN
 OWNER = #198
 IMPLEMENTATION_UMBRELLA = #201
-STAGE = #202
-LIVE_MAIN_SHA = 0377305c76476594d72a00ad8214c2892dd39ed9
-PRODUCTION_BEHAVIOR_CHANGE = NONE
-C1_STARTED = NO
+STAGE = #204 (C1 implementation; Stage-1 candidate #202/#203)
+LIVE_MAIN_SHA = eb7993f82aa366764dcb4d0c62431e928af2892f
+PRODUCTION_BEHAVIOR_CHANGE = C1_ONLY (#204)
+C1_STARTED = YES
 C2_STARTED = NO
 ```
 
 This is the candidate cross-protocol execution architecture authority and
 reading entry point. [#198][198] owns the diagnosis and gaps, [#201][201]
-owns sequencing and freeze gates, and [#202][202] owns this Stage-1 task.
-The audited `main` matches the campaign baseline above; there is no intervening
-execution change. Code evidence below refers to that revision.
+owns sequencing and freeze gates. [#202][202] supplied the Stage-1 candidate,
+merged by #203; #204 implements only C1 against the main SHA above. The original
+Stage-1 audit targeted `0377305c76476594d72a00ad8214c2892dd39ed9`;
+its execution-relevant baseline was unchanged by the documentation merge.
 
 **D1–D6 are proposed decisions for review, not accepted architecture.**
 Statements marked inherited keep the force and scope of their linked accepted
@@ -178,15 +179,44 @@ clearance uses absent root or `Discharged`; only then create/establish fresh
 world. On success install that episode; on failure perform D14.6 failure-clean
 disposal or retain the violated root and fail-stop. Neither host derives the
 choice from a read-side snapshot. Representation and placement are for C1;
-this candidate adds no result API.
+the candidate does not itself prescribe an API spelling.
 
-Current realization/evidence: [entry][entry] `start_episode` computes `activated`
-from Session Fiber Active; this is the known **C1/F1 differential**. [player][player]
-`StartAttempt`/`replace_episode` uses refusal plus source-format/activation-error
-evidence from synchronous reference assembly. That conjunction is realization
-evidence, not permanent authority or a second establishment definition. C1 must
-expose/consume D14.6's whole result in both assemblies. No additional runtime
+Stage-1 baseline evidence: [entry][entry] `start_episode` computed `activated`
+from Session Fiber Active; this was the **C1/F1 differential**, corrected below. [player][player]
+`StartAttempt`/`replace_episode` used refusal plus source-format/activation-error
+evidence from synchronous reference assembly. That conjunction was realization
+evidence, not permanent authority or a second establishment definition. C1 below
+exposes/consumes D14.6's whole result in both assemblies. No additional runtime
 defect is asserted by this comparison.
+
+### C1 production representation (#204; no semantic amendment)
+
+Machine and reference now call the same headless `assembly::establish` helper.
+It drives the fresh Decode/Output/Session desired composition synchronously,
+then consumes the `EstablishmentAttempt` paired with
+`playback_session_spec_with_establishment`. `EstablishmentResult::Established`
+represents the existing D14.6 `Activated`; `NotEstablished { diagnostic }`
+represents its absence. Representation != semantics; Projection != authority.
+
+The Session activation operation alone writes that return slot, after all its
+acquisition steps and inverse registrations succeed. In this supported fresh
+wiring, K0 can enter Session activation only after both required providers have
+activated and committed bindings. Provider failure or unresolved dependency
+therefore leaves the attempt `NotEstablished { diagnostic: None }`; Session
+failure records `NotEstablished` with presentation text. Source publication,
+render open, generic admission success and terminal timing cannot produce or
+revoke `Established`. Assembly admission refusal is handled separately as an
+unsuccessful attempt. The root still requires authoritative disposal on failure.
+
+Placement comparison: a generic K0 result would unnecessarily widen the kernel;
+a handle observation would repeat the forbidden read-side reconstruction; an
+app-local result cannot receive the private Session activation return without a
+cross-crate seam. The paired constructor/consume-only attempt is that minimal
+seam. It certifies the required episode in the current three-Plugin wiring, not
+arbitrary extra Plugins. Fresh-core/single-attempt remains a precondition; no
+reattachment enforcement, second lifecycle or terminal rule is added. The result
+survives immediate D11 settlement and disposal. C2 remains unimplemented and the
+overall execution architecture remains CANDIDATE / NOT FROZEN.
 
 ## 4. D3 — Machine input and host-result settlement (PROPOSED)
 
@@ -569,12 +599,12 @@ promise that private representation remains frozen.
 | EA-C01 — command admission and ending fate | PBK-002 D14.4/.5/.7; DSP §7.3; D3/D4 | completion `request_*`; live setters/`poll_update`; entry reader | Protocol-specific table complete; D3 seal closes reader admission/output, realization C2 pending |
 | EA-D01 — communication model | PBK-002 D8/D14.5; PBK-003 §5; D6 | edge; ports gate/drain; completion seek slot; live pending | Typed FIFO/cells/callbacks, no generic mailbox or PCM event bus |
 | EA-E01 — local serialization | Temporal §3/§6; protocol owners; §8 | completion lock holds; live control lock; session worker; wasapi loop | Local serial points identified; no universal command order |
-| EA-E02 — acceptance/linearization | PBK-002 D14.5/.7; DSP §7.3; D2/D3 | completion `request_seek`/pause/stop; live setters/`accept`; player `replace_episode` | Setter record distinct from DSP Accepted; host establishment/settlement representation remains C1/C2 |
+| EA-E02 — acceptance/linearization | PBK-002 D14.5/.7; DSP §7.3; D2/D3 | completion `request_seek`/pause/stop; live setters/`accept`; player `replace_episode` | Setter record distinct from DSP Accepted; host establishment uses C1 result; host settlement remains C2 |
 | EA-E04 — in-flight ownership and debt | PBK-002 D14.5; DSP §7.3; D4 | seek slot/pending/release; live `Transition`; session remainder | Fate differs per protocol; no universal successful-application debt |
 | EA-F01 — ordering | Temporal §3/§6; PBK-002 D14.5/.6; DSP §7.3 | session seek→invalidate→commit→release; player retirement; kernel unwind | Program/lock/FIFO/acknowledgement orders explicit; no global clock/order |
-| EA-H01 — commit authority | PBK-001 §2.3; PBK-002 D11/D14.6 | completion `publish_evidence`/`resolve`; player replacement | Session commits terminal; App owns replacement; C1 must carry whole-attempt Activated |
+| EA-H01 — commit authority | PBK-001 §2.3; PBK-002 D11/D14.6 | completion `publish_evidence`/`resolve`; player replacement | Session commits terminal; App owns replacement; C1 carries whole-attempt Activated |
 | EA-H02 — evidence/commit/visibility stages | Temporal §2–6; DSP §7.3 | completion evidence/observe; ports callbacks; live setter/pickup/stage | Fact lens preserved; no new Fact predicates or acceptance shortcut |
-| EA-I01 — projection firewall | PBK-001 §2.3; PBK-002 D14.6/.8 | entry `start_episode`; handle `observe`; completion position gate | Known C1 snapshot differential remains; D2 candidate consumption cannot use Fiber projection |
+| EA-I01 — projection firewall | PBK-001 §2.3; PBK-002 D14.6/.8 | entry `start_episode`; handle `observe`; completion position gate | C1 consumes the Session activation attempt result; Fiber projection cannot classify establishment |
 | EA-J01 — lifecycle relation | K0 §F–G; PBK-002 D6/D14.1; D1/D5 | kernel activate/unwind; session relations; completion core | One K0 lifecycle plus terminal Fact/ordinary resources; no second episode enum |
 | EA-K01 — failure responsibility | PBK-002 D11/D14.6; PBK-003 §5; D3 | completion failure methods; session catch-unwind; wasapi/open-abort; entry reader | Failure domains separated; D3 requires record then existing Stop if established/unsettled, without forging Failed; C2 pending |
 | EA-K02 — failure domains | Same owners; D2/D3/D5 | player `failure_clean_start`/fail-stop; completion first failure; entry `finish_episode` | Host failure cannot forge Failed; violation retains composition; no invented recovery |
@@ -602,12 +632,13 @@ promise that private representation remains frozen.
 | NON-GUARANTEE | Projection is not semantic authority; source/position/diagnostic observations have no universal atomicity/freshness/acoustic guarantee | PBK-001; PBK-002 D14.8; temporal |
 | NON-GUARANTEE | No unconditional blocked-stdin join or external output-delivery deadline; reader dispatch/report/output is forbidden after seal | D3 candidate |
 | OPEN / CANDIDATE DECISION | D1 attachment clarification; optional structural enforcement unchosen | D1; no behavior change |
-| OPEN / CANDIDATE DECISION | D2 common host representation and consumption of existing Activated; C1 implementation unstarted | D2; #201 sequencing |
+| OPEN / CANDIDATE DECISION | D2 common host representation and consumption of existing Activated; C1 implementation in #204 (pending owner review) | D2; #201 sequencing |
 | OPEN / CANDIDATE DECISION | D3 recorded-failure cut, mandatory record-then-Stop and closed post-seal reader admission/output; policy specified for review, C2 implementation unstarted | D3; #202 scope |
 | OPEN / CANDIDATE DECISION | D4–D6 cross-protocol fate, quiescence and bounds scopes await independent review/freeze; inherited rules already retain their authority | This candidate |
 
 No new runtime gap or accepted-authority contradiction is claimed by this audit.
-The two campaign runtime differentials remain C1/F1 and C2/F2. A concrete
+The campaign differentials are C1/F1 (corrected by #204 pending owner review)
+and C2/F2 (still unimplemented). A concrete
 counterexample must be classified as model/spec mismatch, implementation defect,
 authority gap, or refinement/oracle gap before changing production or authority.
 Generic K0 capability is not evidence of supported playback-core reattachment;
@@ -620,8 +651,8 @@ already-owned D14.6 or DSP §7.3 semantics.
 Stage 1 supplies a candidate only. Independent review must answer identity,
 reattachment, whole-result consumption, host settlement, work fate, quiescence,
 bounds and all 20 trace questions from this document and linked repository
-evidence. C1 and C2 remain unstarted. Next is Stage-1 correction/review, then
-Stage 2 C1 when this candidate is ready for that corrective; no architecture
+evidence. C1 is implemented by #204 pending owner review; C2 remains unstarted.
+Further candidate review and campaign sequencing remain owned by #198/#201; no architecture
 freeze is implied by a documentation build or Cargo regression suite.
 
 **Before Stage 7 architecture freeze begins, a separate execution-validation
