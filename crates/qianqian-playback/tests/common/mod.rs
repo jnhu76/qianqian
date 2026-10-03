@@ -42,6 +42,45 @@ pub fn lifecycle_lock() -> std::sync::MutexGuard<'static, ()> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
+/// TEMPORAL-MODEL-0 campaign helper: run `f` under artificial CPU
+/// contention (full-suite-like scheduling pressure). The spinner threads
+/// are diagnostic load only — they exist to compress the scheduling
+/// windows the historical load-sensitive flakes premised on, so that a
+/// premise-free oracle can be shown to hold under the pressure that
+/// used to false-RED its timing-based predecessor. No correctness
+/// conclusion may rest on the spinners' timing.
+///
+/// Panic-safe (audit corrective): `f` runs under `catch_unwind` and the
+/// spinners are stopped and joined before the panic is resumed, so a
+/// failing assertion inside `f` cannot leave process-wide CPU burners
+/// alive to distort the scheduling of every later test in the binary.
+pub fn under_cpu_load<R>(threads: usize, f: impl FnOnce() -> R) -> R {
+    let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut spinners = Vec::new();
+    for i in 0..threads {
+        let stop = stop.clone();
+        spinners.push(
+            std::thread::Builder::new()
+                .name(format!("qianqian-s0-load-{i}"))
+                .spawn(move || {
+                    while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                        std::hint::spin_loop();
+                    }
+                })
+                .expect("load spinner spawns"),
+        );
+    }
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    for spinner in spinners {
+        let _ = spinner.join();
+    }
+    match result {
+        Ok(value) => value,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
+}
+
 use qianqian_audio_api::ports::{
     AudioOutput, DecodeError, DecodeOpenError, DecodeOutcome, DecodedPcmStream, DrainSignal,
     DrainVerdict, GateSlice, OutputError, ParkOutcome, PcmDecode, PcmFormat, PcmPull,

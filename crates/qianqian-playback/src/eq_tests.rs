@@ -44,6 +44,7 @@ use crate::processing::{
 use crate::processing_support::{
     EIGHT_SECONDS, TEST_RATE, assert_processed_exactly_at, episode, rejects, wait_until,
 };
+use crate::session::EDGE_CAPACITY_FRAMES;
 use crate::test_common::{self, OutputBehavior, TEST_FORMAT};
 
 const TEST_FS: f64 = 44_100.0;
@@ -1328,11 +1329,19 @@ fn a_mutated_then_failed_seek_never_reconstructs_eq_continuation() {
             "the pre-failure stretch must equal the control's prefix"
         );
         let stopped_at = failed_w.consumed();
-        std::thread::sleep(Duration::from_millis(300));
-        assert_eq!(
-            failed_w.consumed(),
-            stopped_at,
-            "no post-failure production"
+        // "No post-failure production" is a PRODUCER-side claim; the
+        // consumer may still legally drain the PCM already buffered in
+        // the bounded edge when the failure published (the render leg
+        // exits on the first read after the edge failed, so the drain is
+        // capped by the edge's capacity). A fixed sleep wagered that the
+        // drain finished inside 300 ms — under load it can not, false-
+        // REDing a correct engine (the #190 D6 recorded debt). The
+        // protocol bound below is schedule-free: whatever the drain is
+        // still doing, consumption can never exceed the failure-time
+        // sample plus one full edge capacity.
+        assert!(
+            failed_w.consumed() <= stopped_at + EDGE_CAPACITY_FRAMES,
+            "no post-failure production beyond the bounded drain"
         );
         let snapshot_control = control_runtime.dispose().snapshot;
         assert!(snapshot_control.quiet);
@@ -1537,4 +1546,94 @@ fn fresh_stage_reference(config: &AudioProcessingConfig, source_frames: usize) -
     (0..2)
         .map(|c| input[c..].chunks(2).map(|f| f[0]).collect())
         .collect()
+}
+
+// --- TEMPORAL-MODEL-0 campaign replay (issue #190 D6 recorded debt) ----
+//
+// The recorded P3 debt: `a_mutated_then_failed_seek_never_reconstructs_eq_
+// continuation` wagers a fixed 300 ms sleep that the render leg's LEGAL
+// post-failure drain of already-submitted PCM finishes inside the window.
+// Under full-suite load the leg can still be draining buffered, correctly
+// produced frames when the sleep expires — a false RED over a correct
+// engine. The replay below keeps the scenario and replaces the wager
+// with protocol facts: the leg's exit is an explicit acknowledgement
+// (dispose() joins it), `consumed` is STRUCTURALLY final after the join,
+// and the final consumed content must be exactly the control's prefix —
+// any post-failure new-cursor content that ever reached the device
+// breaks that at a deterministic index instead of a wagered deadline.
+
+#[test]
+fn s0_replay_mutated_then_failed_prefix_law_needs_no_drain_slack_wager() {
+    let _lifecycle = test_common::lifecycle_lock();
+    let (control_w, control_handle, mut control_runtime) = episode(
+        EIGHT_SECONDS,
+        OutputBehavior::Consume,
+        boosted_eq_config(),
+        Vec::new(),
+    );
+    assert_eq!(
+        control_handle.wait_terminal(),
+        EpisodeTerminalOutcome::Completed
+    );
+    let control_values = control_w.content();
+    let _ = control_runtime.dispose();
+
+    test_common::under_cpu_load(4, move || {
+        test_common::within(Duration::from_secs(60), move || {
+            let (failed_w, failed_handle, mut failed_runtime) = episode(
+                EIGHT_SECONDS,
+                OutputBehavior::SlowConsume {
+                    per_read: Duration::from_millis(1),
+                },
+                boosted_eq_config(),
+                vec![ProviderSeekOutcome::MutatedThenFailed {
+                    diagnostic: "test destructive seek".to_owned(),
+                }],
+            );
+            wait_until(Duration::from_secs(5), || {
+                failed_handle
+                    .observe()
+                    .position
+                    .is_some_and(|p| p >= 22_050)
+            })
+            .then_some(())
+            .expect("the episode never reached half a second");
+            failed_handle.request_seek(Duration::from_secs(5));
+            assert_eq!(
+                failed_handle.wait_terminal(),
+                EpisodeTerminalOutcome::Failed
+            );
+            let diagnostic = failed_handle
+                .observe()
+                .failure_diagnostic
+                .expect("a failed episode carries its diagnostic");
+            assert!(diagnostic.starts_with("decode: seek failed:"));
+
+            // No sleep: the join IS the quiescence acknowledgement.
+            let consumed_before_join = failed_w.consumed();
+            let snapshot = failed_runtime.dispose().snapshot;
+            let consumed_final = failed_w.consumed();
+
+            let values = failed_w.content();
+            assert_eq!(
+                &values[..],
+                &control_values[..values.len()],
+                "the FINAL consumed content must be exactly the control's \
+                 prefix — new-cursor production that reached the device \
+                 would break this at a deterministic index"
+            );
+            assert!(values.len() <= control_values.len());
+            assert_eq!(
+                values.len(),
+                consumed_final,
+                "the witness and the consumed counter agree at the join"
+            );
+            println!(
+                "s0 eq replay: consumed at Failed fact = {consumed_before_join}, \
+                 final after join = {consumed_final} (the delta is the \
+                 legal post-failure drain of already-submitted PCM)"
+            );
+            assert!(snapshot.quiet);
+        });
+    });
 }

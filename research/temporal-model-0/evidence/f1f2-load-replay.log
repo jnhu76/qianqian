@@ -1,0 +1,16 @@
+# F1/F2 premise-free oracle load replay (T2 evidence)
+# date: 2026-10-03T03:31:45+08:00
+# head: c63cb754033cd44cc7c4213abe53c160db72adbd (+ uncommitted test-only changes; see 'git diff --stat' below)
+# method: 8 external spinner processes (bash busy-loops, timeout 200s) + cargo test
+# command: for i in $(seq 1 8); do nohup timeout 200 bash -c 'while :; do :; done' & done; sleep 1; cargo test -p qianqian-playback --lib -- an_applied_seek_during_a_transition_lands_fresh a_merely_observed_seek_does_not_block
+
+ crates/qianqian-playback/src/completion.rs   | 206 +++++++++++++++++++++++++++
+ crates/qianqian-playback/src/eq_tests.rs     | 109 +++++++++++++-
+ crates/qianqian-playback/src/live_tests.rs   | 109 ++++++++++++++
+ crates/qianqian-playback/tests/common/mod.rs |  31 ++++
+ 4 files changed, 450 insertions(+), 5 deletions(-)
+
+--- run output ---
+test live_tests::a_merely_observed_seek_does_not_block_the_update_pickup ... ok
+test live_tests::an_applied_seek_during_a_transition_lands_fresh_under_the_accepted_config ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 157 filtered out; finished in 8.00s

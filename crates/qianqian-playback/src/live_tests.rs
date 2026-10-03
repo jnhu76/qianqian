@@ -2869,3 +2869,112 @@ fn the_live_mechanism_costs_are_bounded_and_recorded() {
         );
     }
 }
+
+// --- TEMPORAL-MODEL-0 campaign replay (issue #195) ----------------------
+//
+// The historical false-RED premised a SCHEDULING WINDOW on a semantic
+// state: "a pended seek never becomes actionable before the stop". The
+// premise-free replay below asserts only what the contract freezes —
+// the race has exactly two legal endings, both decided by CONTENT, and
+// the episode ends Stopped either way. It runs the race under artificial
+// CPU load (the pressure class that used to flip the ending) and
+// additionally records the observed distribution as diagnostic output.
+
+/// One seek × stop race iteration. The seek is accepted into a starved
+/// plane (paced source); the stop follows one scheduling beat later. No
+/// premise about when — or whether — the seek's own cut park arrives.
+fn s0_run_seek_stop_race(
+    initial: AudioProcessingConfig,
+    seeks: Vec<ProviderSeekOutcome>,
+) -> (&'static str, usize) {
+    test_common::within(Duration::from_secs(60), move || {
+        let (w, handle, _probe, mut runtime) = live_episode_source(
+            SourceBehavior::Paced {
+                after: 1000,
+                delay: Duration::from_millis(1),
+            },
+            OutputBehavior::Consume,
+            initial,
+            64,
+            seeks,
+        );
+        wait_until(Duration::from_secs(30), || {
+            handle.observe().position.is_some_and(|p| p >= 2000)
+        })
+        .then_some(())
+        .expect("never reached the race window");
+        handle.request_seek(Duration::from_secs(1));
+        handle.request_stop();
+        assert_eq!(
+            handle.wait_terminal(),
+            crate::handle::EpisodeTerminalOutcome::Stopped,
+            "the episode ends by stop in every legal ending of the pended seek"
+        );
+        let values = w.content();
+        const RAMP_STEP_FLOOR: f32 = 1000.0;
+        // The landing restarts the cursor at frame 0 under the same
+        // identity (Flat) configuration, so EVERY legal stream is a
+        // concatenation of exact tag ramps: one ramp when the stop won
+        // the race, two ramps joined by one large downward step when the
+        // seek's own cut park grounded actionability first. Membership,
+        // never a schedule.
+        fn assert_ramp(values: &[f32], what: &str) {
+            for (i, v) in values.iter().enumerate() {
+                assert!(
+                    (v - i as f32).abs() <= 1e-3 * (i as f32).max(1.0),
+                    "{what}: frame {i} = {v} is not the exact tag ramp"
+                );
+            }
+        }
+        let ending = match (1..values.len()).find(|&i| values[i] < values[i - 1] - RAMP_STEP_FLOOR)
+        {
+            None => {
+                assert_ramp(&values, "no-cut ending");
+                "no-cut"
+            }
+            Some(j) => {
+                assert_ramp(&values[..j], "pre-cut stretch");
+                assert_ramp(&values[j..], "post-cut stretch");
+                "cut"
+            }
+        };
+        let _ = runtime.dispose();
+        (ending, values.len())
+    })
+}
+
+#[test]
+fn s0_replay_the_seek_stop_race_admits_only_legal_endings_under_load() {
+    let _lifecycle = test_common::lifecycle_lock();
+    let initial = preset_config(EqPreset::Flat);
+    let seeks = || vec![ProviderSeekOutcome::Applied { landing: Some(0) }];
+
+    // Unloaded contrast: where the historical premise held most runs.
+    let mut unloaded = (0u32, 0u32);
+    for _ in 0..3 {
+        let (ending, _) = s0_run_seek_stop_race(initial, seeks());
+        match ending {
+            "no-cut" => unloaded.0 += 1,
+            _ => unloaded.1 += 1,
+        }
+    }
+
+    // Under full-suite-like contention: the premise-free oracle must
+    // hold in EVERY run, whichever legal ending the scheduler picks.
+    let loaded = test_common::under_cpu_load(4, || {
+        let mut counts = (0u32, 0u32);
+        for _ in 0..12 {
+            let (ending, _) = s0_run_seek_stop_race(initial, seeks());
+            match ending {
+                "no-cut" => counts.0 += 1,
+                _ => counts.1 += 1,
+            }
+        }
+        counts
+    });
+    println!(
+        "s0 seek×stop race endings — unloaded (no-cut, cut): {unloaded:?}; \
+         under load: {loaded:?} (both endings contract-conforming; \
+         the oracle pins membership, not schedule)"
+    );
+}
