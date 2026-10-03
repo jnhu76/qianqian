@@ -122,11 +122,29 @@ def git_subjects(base: str, head: str) -> list[tuple[str, str]]:
 
 
 def check_range(base: str, head: str, config: dict) -> int:
-    failed = False
-    subjects = git_subjects(base, head)
-    if not subjects:
-        print(f"ERROR: no commits found in range {base}..{head}", file=sys.stderr)
+    try:
+        subjects = git_subjects(base, head)
+    except subprocess.CalledProcessError as e:
+        detail = (e.stderr or "").strip()
+        print(
+            f"ERROR: cannot resolve commit range {base}..{head}"
+            + (f": {detail}" if detail else ""),
+            file=sys.stderr,
+        )
+        print(
+            "       (the base ref must exist locally; run `git fetch origin` first)",
+            file=sys.stderr,
+        )
         return 1
+    if not subjects:
+        # The local gate validates exactly the commits ahead of the push
+        # base; an empty range means there is nothing local to validate
+        # (the manual --all-files run on a fully pushed branch, or a
+        # no-op push). CI's PR path never reaches this branch: its
+        # commit list always contains the PR's commits.
+        print(f"PASS: no commits in range {base}..{head}; nothing to validate")
+        return 0
+    failed = False
     for sha, subject in subjects:
         failed = bool(check_message(subject, f"commit {sha[:12]}", config)) or failed
     return 1 if failed else 0

@@ -35,12 +35,26 @@ min_version: 2.1.16
 pre-push:
   piped: true
   commands:
-    vocabulary:
+    commit-convention:
+      # Commit headers, not files: no glob, runs on every gate pass.
+      # Validates the checker itself, then exactly the commits ahead of
+      # the push base (origin/main..HEAD) — the set a push from this ref
+      # would carry. An empty range passes (nothing local to validate).
+      # Replaces the former commit-convention.yml CI job; that job's
+      # PR-title half has no local equivalent (a PR title does not exist
+      # locally), so PR titles are author-checked against the same
+      # header rule (docs/development/commit-convention.md).
       priority: 1
+      run: |
+        python3 tools/check_commit_convention.py --self-test &&
+        python3 tools/check_commit_convention.py --range origin/main HEAD
+
+    vocabulary:
+      priority: 2
       run: python3 tools/check_architecture_vocabulary.py
 
     plugin-boundary:
-      priority: 2
+      priority: 3
       glob:
         - "Cargo.toml"
         - "Cargo.lock"
@@ -53,10 +67,14 @@ pre-push:
         - "apps/**"
         # the checker itself is part of its own gate:
         - "tools/check_plugin_boundaries.py"
-      run: python3 tools/check_plugin_boundaries.py
+      run: |
+        # the gate plus its negative controls (non-vacuity) — the same
+        # two steps the CI plugin-boundary job runs
+        python3 tools/check_plugin_boundaries.py &&
+        python3 tools/check_plugin_boundaries.py --negative-controls
 
     rust-fmt:
-      priority: 3
+      priority: 4
       glob:
         - "Cargo.toml"
         - "Cargo.lock"
@@ -69,7 +87,7 @@ pre-push:
       run: cargo fmt --check
 
     rust-clippy:
-      priority: 4
+      priority: 5
       glob:
         - "Cargo.toml"
         - "Cargo.lock"
@@ -82,7 +100,7 @@ pre-push:
       run: cargo clippy --workspace --all-targets -- -D warnings
 
     rust-test:
-      priority: 5
+      priority: 6
       glob:
         - "Cargo.toml"
         - "Cargo.lock"

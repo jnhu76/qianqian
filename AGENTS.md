@@ -402,7 +402,11 @@ The gate runs checks only — it never formats, auto-fixes, stages, commits, or 
 
 ```text
 always:                 python3 tools/check_architecture_vocabulary.py
-Rust paths changed:     plugin boundary gate, cargo fmt --check,
+                        python3 tools/check_commit_convention.py
+                        (self-test + the commits ahead of origin/main;
+                        an empty range passes)
+Rust paths changed:     plugin boundary gate (incl. its negative
+                        controls), cargo fmt --check,
                         cargo clippy --workspace --all-targets -- -D warnings,
                         cargo test --workspace
 docs/website changed:   website verify (node scripts/verify.mjs;
@@ -413,10 +417,13 @@ What it proves / does not prove:
 
 ```text
 proves:       the current WORKING TREE passes the fast deterministic local
-              checks (the manual --all-files run executes the complete gate)
+              checks, and the commits ahead of the push base satisfy the
+              commit-header convention (the manual --all-files run
+              executes the complete gate)
 does not      Windows / cfg(windows) compilation, TLA+/TLC formal suites,
 prove:        Miri, Loom, mutation negatives, WASAPI/device evidence,
-              VitePress build, commit/PR convention enforcement
+              VitePress build, PR-title convention (a PR title has no
+              local existence; derive it from the commit header)
 ```
 
 On a real `git push`, commands with `glob` are narrowed to the pushed changeset (Lefthook's native push-file detection; it can only narrow on a real, known delta and never silently skips a real change). The manual `--all-files` run is always the complete gate. Install and prerequisites: `CONTRIBUTING.md`.
