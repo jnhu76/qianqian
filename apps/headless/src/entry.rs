@@ -357,7 +357,15 @@ impl crate::player::EpisodeStart for RealEpisodeSource {
 /// no episode exists, so there is no terminal Fact to wait for and
 /// none may be forged (D14.2).
 #[cfg(any(feature = "playback", test))]
-fn machine_transport(mut episode: Episode) -> ExitCode {
+fn machine_transport(episode: Episode) -> ExitCode {
+    machine_transport_with_reader(episode, crate::machine_input::spawn_reader)
+}
+
+#[cfg(any(feature = "playback", test))]
+fn machine_transport_with_reader(
+    mut episode: Episode,
+    start_reader: impl FnOnce(crate::machine_input::HostInput, qianqian_playback::PlaybackSessionHandle),
+) -> ExitCode {
     if let qianqian_playback::EstablishmentResult::NotEstablished { diagnostic } =
         &episode.establishment
     {
@@ -387,45 +395,9 @@ fn machine_transport(mut episode: Episode) -> ExitCode {
     }
     println!("playing {} ...", episode.file.display());
 
-    let control_handle = episode.handle.clone();
-    let _control = std::thread::Builder::new()
-        .name("qianqian-stdin".into())
-        .spawn(move || {
-            use std::io::BufRead;
-            for line in std::io::stdin().lock().lines() {
-                let Ok(line) = line else { break };
-                match cli::parse_interactive_line(&line) {
-                    Ok(cli::InteractiveCommand::Stop) => control_handle.request_stop(),
-                    Ok(cli::InteractiveCommand::Pause) => control_handle.request_pause(),
-                    Ok(cli::InteractiveCommand::Resume) => control_handle.request_resume(),
-                    Ok(cli::InteractiveCommand::Seek { time }) => {
-                        match cli::parse_seek_time(&time) {
-                            Some(target) => control_handle.request_seek(target),
-                            None => {
-                                eprintln!("ignored input: cannot read seek time {time:?}")
-                            }
-                        }
-                    }
-                    Ok(cli::InteractiveCommand::Status) => {
-                        print!(
-                            "{}",
-                            crate::status::format_status(&control_handle.observe())
-                        );
-                        use std::io::Write;
-                        let _ = std::io::stdout().flush();
-                    }
-                    Ok(_) => {
-                        eprintln!(
-                            "not wired yet: only 'stop', 'pause', 'resume', 'seek' and \
-                             'status' control playback"
-                        )
-                    }
-                    Err(error) => eprintln!("ignored input: {error}"),
-                }
-            }
-        });
-
-    finish_episode(episode)
+    let input = crate::machine_input::HostInput::default();
+    start_reader(input.clone(), episode.handle.clone());
+    finish_episode(episode, input)
 }
 
 /// Wait for the committed terminal Fact, dispose, and report. The
@@ -433,13 +405,17 @@ fn machine_transport(mut episode: Episode) -> ExitCode {
 /// lines → disposal report) and the exit-code contract stay identical;
 /// the observable contract itself lives in [`machine`].
 #[cfg(any(feature = "playback", test))]
-fn finish_episode(mut episode: Episode) -> ExitCode {
+fn finish_episode(mut episode: Episode, input: crate::machine_input::HostInput) -> ExitCode {
     let outcome = episode.handle.wait_terminal();
     let disposal = episode.runtime.dispose();
     // The failure diagnostic is read separately from the settled
     // observation: it is presentation text, not part of the semantic
     // outcome (D14.2).
     let observation = episode.handle.observe();
+    let host_failure = input.seal();
+    if let Some(failure) = host_failure {
+        eprintln!("{}", failure.report());
+    }
     for (stream, line) in
         machine::outcome_report(outcome, observation.failure_diagnostic.as_deref())
     {
@@ -454,7 +430,11 @@ fn finish_episode(mut episode: Episode) -> ExitCode {
     if let Some(line) = machine::disposal_verdict_warning(&disposal.verdict) {
         eprintln!("{line}");
     }
-    machine::episode_exit_code(Some(outcome), disposal.snapshot.quiet)
+    machine::machine_exit_code(
+        Some(outcome),
+        disposal.snapshot.quiet,
+        host_failure.is_some(),
+    )
 }
 
 #[cfg(not(feature = "playback"))]
@@ -508,4 +488,15 @@ pub(crate) fn run_machine_assembly_for_test(
     assembled: crate::assembly::AssemblyOutcome,
 ) -> ExitCode {
     machine_transport(machine_episode("test://attempt".into(), assembled))
+}
+
+#[cfg(test)]
+pub(crate) fn run_machine_reader_for_test(
+    assembled: crate::assembly::AssemblyOutcome,
+    start_reader: impl FnOnce(crate::machine_input::HostInput, qianqian_playback::PlaybackSessionHandle),
+) -> ExitCode {
+    machine_transport_with_reader(
+        machine_episode("test://host-input".into(), assembled),
+        start_reader,
+    )
 }

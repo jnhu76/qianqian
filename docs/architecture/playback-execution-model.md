@@ -4,17 +4,18 @@
 STATUS = CANDIDATE / NOT FROZEN
 OWNER = #198
 IMPLEMENTATION_UMBRELLA = #201
-STAGE = #204 (C1 implementation; Stage-1 candidate #202/#203)
-LIVE_MAIN_SHA = eb7993f82aa366764dcb4d0c62431e928af2892f
-PRODUCTION_BEHAVIOR_CHANGE = C1_ONLY (#204)
+STAGE = #206 (C2 implementation; C1 #204/#205; Stage-1 candidate #202/#203)
+LIVE_MAIN_SHA = 029b0a4d7587ec39ef3eb768466ab0d2ce6ca16f
+PRODUCTION_BEHAVIOR_CHANGE = C2_HOST_INPUT_ONLY (#206)
 C1_STARTED = YES
-C2_STARTED = NO
+C2_STARTED = YES
 ```
 
 This is the candidate cross-protocol execution architecture authority and
 reading entry point. [#198][198] owns the diagnosis and gaps, [#201][201]
 owns sequencing and freeze gates. [#202][202] supplied the Stage-1 candidate,
-merged by #203; #204 implements only C1 against the main SHA above. The original
+merged by #203; C1 was merged by #205. #206 realizes only the D3/D5
+machine-host corrective against the main SHA above. The original
 Stage-1 audit targeted `0377305c76476594d72a00ad8214c2892dd39ed9`;
 its execution-relevant baseline was unchanged by the documentation merge.
 
@@ -22,7 +23,7 @@ its execution-relevant baseline was unchanged by the documentation merge.
 Statements marked inherited keep the force and scope of their linked accepted
 authority. Statements marked current realization describe production evidence,
 not an additional protocol definition. In particular, D2 inherits an existing
-meaning; D3 proposes host-result policy that production does not yet implement.
+meaning; D3 remains candidate policy, now realized by C2 without freezing it.
 
 The direction is state-machine owners, resource-confined workers, typed bounded
 communication seams, local serialization/program order, explicit semantic
@@ -230,8 +231,9 @@ cross-crate seam. The paired constructor/consume-only attempt is that minimal
 seam. The application factory structurally fixes the whole composition to the
 canonical three-Plugin wiring. Fresh-core/single-attempt remains a precondition; no
 reattachment enforcement, second lifecycle or terminal rule is added. The result
-survives immediate D11 settlement and disposal. C2 remains unimplemented and the
-overall execution architecture remains CANDIDATE / NOT FROZEN.
+survives immediate D11 settlement and disposal. C2 adds only the machine-host
+settlement realization below; the overall execution architecture remains
+CANDIDATE / NOT FROZEN.
 
 ## 4. D3 — Machine input and host-result settlement (PROPOSED)
 
@@ -310,7 +312,7 @@ After settlement, no reader command, failure report, status or diagnostic output
 is accepted. A late failure is discarded locally, without reporting or output;
 it cannot reopen or change this invocation's result. Panic-abort/process death and
 failures of unrelated host code are outside this recoverable reader policy.
-No Stage-1 claim is made that production currently enforces these rules.
+Stage 1 did not implement these rules; C2 realization is described below.
 
 ### 4.2 Detached reader and deterministic exit
 
@@ -338,15 +340,51 @@ admission and seals, then reports/returns independently of a blocked stdin read.
 No global ledger service, new playback lifecycle, or command-debt abstraction is
 needed. “Host-result ledger”
 is explanatory language for an invocation-local result record, not a new runtime
-subsystem. C2 must realize this ordering and failure reporting; representation
-is deliberately unimplemented here.
+subsystem.
 
-Current realization: spawn's `Result<JoinHandle<_>>` is retained only as `_control`,
-read errors break like EOF, panic is unobserved, and `finish_episode` has no input
-failure record/seal. This is the known **C2/F2 differential**. The later C2 oracle
-must distinguish pre-seal versus post-seal recording, including each terminal
-race, verify record-before-Stop responsibility, and forbid reader dispatch/output
-after seal; it must not assert “every reader failure ever produces nonzero”.
+### C2 production realization (#206; D3/D5 still CANDIDATE)
+
+[Machine input][machine-input] keeps an ordinary invocation-local `HostInput`:
+one admission-closed bit, one active-operation bit, and one optional fixed-size
+`HostFailure::{Spawn, Read, Panic}`. There is one reader. The spawning host
+records spawn failure synchronously when no reader exists. EOF returns normally.
+Read errors and unwind panics enter the same host failure path; neither publishes
+playback evidence or an episode outcome. The first admitted failure is retained;
+static presentation text is rendered by the invocation owner after seal.
+
+The concrete ordering points are:
+
+| Point | Production realization |
+| --- | --- |
+| Reader-operation admission | `HostInput::admit` sets `operation_active` under the invocation mutex, only while admission is open |
+| Failure recording | `Operation::fail_with_response` installs the first failure under that mutex; then releases it before checking the D11 terminal Fact and routing existing Stop if unsettled |
+| Completion acknowledgement | `Operation::drop` clears the active bit and notifies the completion condition variable; the operation carries an obligation, never a mutex guard |
+| Admission closure | After terminal wait and root disposal, `HostInput::seal` closes admission under the mutex; an already-admitted operation retains its right to record/finish |
+| Final result seal | After the active operation acknowledges, `seal` reads the immutable first failure under the same mutex; this is the result linearization point |
+
+Closing admission before draining prevents fresh operations from overtaking the
+acknowledgement wait. No new failure or operation can enter during this drain;
+an already-admitted operation may still record its failure before final seal.
+The condition-variable wait releases the mutex. No host bookkeeping mutex spans
+Stop, terminal wait, disposal, stdin reads, status formatting or output/flush.
+A physically blocked OS read holds no active-operation obligation and is not
+joined. On wake, command/report/failure admission is rejected after closure.
+The command/output panic catcher runs **inside** its admitted operation so
+unwinding cannot acknowledge before the panic record/Stop response. The outer
+reader boundary also catches startup/read unwinds. Panic-abort remains outside
+this recovery policy; Rust's process panic hook runs before unwind recovery
+and is not the machine transport's admitted report mechanism.
+
+[Entry][entry] obtains the real terminal and disposal results before sealing,
+then emits final owner reports and calls `machine_exit_code`. Pre-seal host
+failure contributes exit 1 independently of Completed/Stopped/Failed. Natural
+Completed and runtime Failed retain their D11 truth and independent diagnostics;
+post-seal failure cannot relabel the result. C1 establishment and other playback
+protocols are unchanged. [Deterministic oracles][machine-input-tests] exercise
+real Session/PCM/terminal/disposal paths with test Decode/Output mechanisms,
+pre/post-admission cuts, acknowledgement waits and a physically blocked reader
+thread. This is host-boundary evidence, not physical-device or process-quiescence
+evidence. D3/D5 and the overall execution architecture remain CANDIDATE / NOT FROZEN.
 
 ## 5. D4 — Outstanding work fate
 
@@ -575,14 +613,15 @@ not executed by this documentation audit.
 | Attribute | Current realization / candidate obligation |
 | --- | --- |
 | Identity; lifetime; lifetime owner | Named `qianqian-stdin` thread per machine transport; host creates it, currently may detach; retained handle fixes its episode scope |
-| Execution context; state; writers | Reader thread owns stdin lock/line iterator/current line; host currently ignores spawn/join result. D3 proposes reader reporting and owner sealing one local result record |
+| Execution context; state; writers | Reader thread owns stdin lock/current line; host observes spawn failure; reader and owner share bounded first-failure bookkeeping and owner seal (C2) |
 | Inputs; outputs | Before seal, stdin lines → commands/status/diagnostics; EOF normal closure; admitted spawn/read/caught-panic failures recorded then Stop routed if established/unsettled. After seal, no reader dispatch/report/output |
 | Waiting seams; serialization | Blocking stdin and output I/O, local line order; no unconditional join or global input bound. D3 orders seal against admitted dispatch/output/failure response; OS stdin read is outside that ordering |
 | Semantic authority; failure responsibility | Host infrastructure/result only; no D11 authority. Reader reports read/caught-panic before seal; spawning host records spawn failure synchronously; late failures discarded without output |
 | Stop/cancellation; termination ack; resources | EOF/failure/return ends reader; seal closes admission but does not cancel blocked stdin. Next post-seal wake only exits/releases local resources. Actual return/join would acknowledge end; retained handles/stdin lock may survive host return |
 
-Evidence: entry `machine_transport`; current missing failure ownership/settlement
-is C2, not an implemented guarantee.
+Evidence: entry `machine_transport`/`finish_episode`; [machine input][machine-input]
+admission, failure and acknowledgement operations; [oracles][machine-input-tests].
+C2 realizes candidate D3/D5; it does not freeze the execution architecture.
 
 ### 8.9 Observation / read-side consumers
 
@@ -611,21 +650,21 @@ promise that private representation remains frozen.
 | EA-A01 — execution identity | D1 candidate; PBK-002 D11/D14.6 | handle `new`/Clone; session `playback_session_spec*`; entry `RealEpisodeSource::start`; kernel `activate_fiber` | Fresh episode core, shared clones; repeat attachment unsupported, not structurally forbidden |
 | EA-B01 — mutable state and writers | D1/D4/§8; protocol owners | completion state; live control/engine; edge cursors; wasapi render locals | Named writer/lock/thread ownership; no inferred global state owner |
 | EA-B02 — owner versus serializer versus authority | PBK-002 D6/D11; DSP §7.3; §8 | session inverses; completion `publish_evidence`; live `stage` | Session lifetime ownership, locks/program order serialization, designated semantic authority kept distinct |
-| EA-C01 — command admission and ending fate | PBK-002 D14.4/.5/.7; DSP §7.3; D3/D4 | completion `request_*`; live setters/`poll_update`; entry reader | Protocol-specific table complete; D3 seal closes reader admission/output, realization C2 pending |
+| EA-C01 — command admission and ending fate | PBK-002 D14.4/.5/.7; DSP §7.3; D3/D4 | completion `request_*`; live setters/`poll_update`; entry reader | Protocol-specific table complete; D3 seal closes reader admission/output, realization C2 |
 | EA-D01 — communication model | PBK-002 D8/D14.5; PBK-003 §5; D6 | edge; ports gate/drain; completion seek slot; live pending | Typed FIFO/cells/callbacks, no generic mailbox or PCM event bus |
 | EA-E01 — local serialization | Temporal §3/§6; protocol owners; §8 | completion lock holds; live control lock; session worker; wasapi loop | Local serial points identified; no universal command order |
-| EA-E02 — acceptance/linearization | PBK-002 D14.5/.7; DSP §7.3; D2/D3 | completion `request_seek`/pause/stop; live setters/`accept`; player `replace_episode` | Setter record distinct from DSP Accepted; host establishment uses C1 result; host settlement remains C2 |
+| EA-E02 — acceptance/linearization | PBK-002 D14.5/.7; DSP §7.3; D2/D3 | completion `request_seek`/pause/stop; live setters/`accept`; player `replace_episode` | Setter record distinct from DSP Accepted; host establishment uses C1 result; host settlement uses C2 admission/ack/seal |
 | EA-E04 — in-flight ownership and debt | PBK-002 D14.5; DSP §7.3; D4 | seek slot/pending/release; live `Transition`; session remainder | Fate differs per protocol; no universal successful-application debt |
 | EA-F01 — ordering | Temporal §3/§6; PBK-002 D14.5/.6; DSP §7.3 | session seek→invalidate→commit→release; player retirement; kernel unwind | Program/lock/FIFO/acknowledgement orders explicit; no global clock/order |
 | EA-H01 — commit authority | PBK-001 §2.3; PBK-002 D11/D14.6 | completion `publish_evidence`/`resolve`; player replacement | Session commits terminal; App owns replacement; C1 carries whole-attempt Activated |
 | EA-H02 — evidence/commit/visibility stages | Temporal §2–6; DSP §7.3 | completion evidence/observe; ports callbacks; live setter/pickup/stage | Fact lens preserved; no new Fact predicates or acceptance shortcut |
 | EA-I01 — projection firewall | PBK-001 §2.3; PBK-002 D14.6/.8 | entry `start_episode`; handle `observe`; completion position gate | C1 consumes the Session activation attempt result; Fiber projection cannot classify establishment |
 | EA-J01 — lifecycle relation | K0 §F–G; PBK-002 D6/D14.1; D1/D5 | kernel activate/unwind; session relations; completion core | One K0 lifecycle plus terminal Fact/ordinary resources; no second episode enum |
-| EA-K01 — failure responsibility | PBK-002 D11/D14.6; PBK-003 §5; D3 | completion failure methods; session catch-unwind; wasapi/open-abort; entry reader | Failure domains separated; D3 requires record then existing Stop if established/unsettled, without forging Failed; C2 pending |
+| EA-K01 — failure responsibility | PBK-002 D11/D14.6; PBK-003 §5; D3 | completion failure methods; session catch-unwind; wasapi/open-abort; entry reader | Failure domains separated; D3 requires record then existing Stop if established/unsettled, without forging Failed; C2 realization |
 | EA-K02 — failure domains | Same owners; D2/D3/D5 | player `failure_clean_start`/fail-stop; completion first failure; entry `finish_episode` | Host failure cannot forge Failed; violation retains composition; no invented recovery |
 | EA-O01 — boundedness | D6; DSP §7.3; protocol owners | session constants/staging/remainder; edge ring; live slots/transition; completion fields | Logical local bounds inventoried; diagnostic/native/host bytes not globally budgeted |
 | EA-O02 — backpressure/busy policy | PBK-002 D14.5; DSP §7.3; D4/D6 | edge `write_some`/wait; completion seek refuse; live latest pending | BLOCK/REFUSE/LATEST-WINS/FIRST-WINS/DROP/INERT scoped to actual structures |
-| EA-Q01 — shutdown order | K0 §G.6; PBK-002 D6/D14.6; PBK-003 §5; D5 | session inverse registration; kernel `run_unwind`; player retirement; open-abort | Episode relation ordering explicit; host seal proposed, detached reader separately scoped |
+| EA-Q01 — shutdown order | K0 §G.6; PBK-002 D6/D14.6; PBK-003 §5; D5 | session inverse registration; kernel `run_unwind`; player retirement; open-abort | Episode relation ordering explicit; C2 realizes candidate host seal; detached reader separately scoped |
 | EA-Q02 — quiescence proof | Same owners; D5 | decode/render JoinHandles; dispose verdict; completion terminal | Terminal ≠ joins; Discharged ≠ stdin end; host result ≠ process quiescence |
 | EA-R01 — resource lifetime | PBK-002 D6; PBK-003 §5; D1/D5/§8 | session endpoint/stream effects; wasapi RAII; core retained Arcs; App roots | Allocation versus relation ownership explicit; retained history/storage can outlive execution |
 
@@ -648,12 +687,12 @@ promise that private representation remains frozen.
 | NON-GUARANTEE | No unconditional blocked-stdin join or external output-delivery deadline; reader dispatch/report/output is forbidden after seal | D3 candidate |
 | OPEN / CANDIDATE DECISION | D1 attachment clarification; optional structural enforcement unchosen | D1; no behavior change |
 | OPEN / CANDIDATE DECISION | D2 common host representation and consumption of existing Activated; C1 implementation in #204 (pending owner review) | D2; #201 sequencing |
-| OPEN / CANDIDATE DECISION | D3 recorded-failure cut, mandatory record-then-Stop and closed post-seal reader admission/output; policy specified for review, C2 implementation unstarted | D3; #202 scope |
+| OPEN / CANDIDATE DECISION | D3 recorded-failure cut, mandatory record-then-Stop and closed post-seal reader admission/output; C2 realization; decision remains candidate for architecture review | D3; #202 scope |
 | OPEN / CANDIDATE DECISION | D4–D6 cross-protocol fate, quiescence and bounds scopes await independent review/freeze; inherited rules already retain their authority | This candidate |
 
 No new runtime gap or accepted-authority contradiction is claimed by this audit.
 The campaign differentials are C1/F1 (corrected by #204 pending owner review)
-and C2/F2 (still unimplemented). A concrete
+and C2/F2 (realized by #206, pending review). A concrete
 counterexample must be classified as model/spec mismatch, implementation defect,
 authority gap, or refinement/oracle gap before changing production or authority.
 Generic K0 capability is not evidence of supported playback-core reattachment;
@@ -666,7 +705,7 @@ already-owned D14.6 or DSP §7.3 semantics.
 Stage 1 supplies a candidate only. Independent review must answer identity,
 reattachment, whole-result consumption, host settlement, work fate, quiescence,
 bounds and all 20 trace questions from this document and linked repository
-evidence. C1 is implemented by #204 pending owner review; C2 remains unstarted.
+evidence. C1 is merged by #205; #206 realizes C2 under the candidate contract.
 Further candidate review and campaign sequencing remain owned by #198/#201; no architecture
 freeze is implied by a documentation build or Cargo regression suite.
 
@@ -702,3 +741,6 @@ campaign or weaken its gate. Validation after freeze precedes resuming dependent
 [kernel]: ../../crates/qianqian-composition/src/kernel.rs
 [wasapi]: ../../crates/qianqian-output-wasapi/src/wasapi.rs
 [open-abort]: ../../crates/qianqian-output-wasapi/src/open_abort.rs
+
+[machine-input]: ../../apps/headless/src/machine_input.rs
+[machine-input-tests]: ../../apps/headless/src/machine_input/tests.rs
