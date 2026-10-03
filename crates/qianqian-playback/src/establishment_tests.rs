@@ -258,11 +258,57 @@ fn completed_before_result_consumption_remains_established_without_a_fiber() {
     });
 }
 
+// Test-only release makes “later runtime failure” an ordered event, independent
+// of thread scheduling. Dropping the sender also releases a panicking test.
+struct HeldFailureDecode(std::cell::RefCell<Option<std::sync::mpsc::Receiver<()>>>);
+struct HeldFailureEndpoint(std::sync::mpsc::Receiver<()>);
+impl qianqian_audio_api::ports::PcmDecode for HeldFailureDecode {
+    fn open_media(
+        &self,
+        _: &Path,
+    ) -> Result<Box<dyn DecodedPcmStream>, qianqian_audio_api::ports::DecodeOpenError> {
+        Ok(Box::new(HeldFailureEndpoint(
+            self.0.borrow_mut().take().unwrap(),
+        )))
+    }
+}
+impl DecodedPcmStream for HeldFailureEndpoint {
+    fn format(&self) -> PcmFormat {
+        TEST_FORMAT
+    }
+    fn source_duration(&self) -> Option<Duration> {
+        None
+    }
+    fn read_frames(
+        &mut self,
+        _: &mut [f32],
+    ) -> Result<DecodeOutcome, qianqian_audio_api::ports::DecodeError> {
+        let _ = self.0.recv();
+        Err(qianqian_audio_api::ports::DecodeError {
+            message: "controlled later runtime failure".into(),
+        })
+    }
+    fn seek(&mut self, _: Duration) -> qianqian_audio_api::ports::ProviderSeekOutcome {
+        qianqian_audio_api::ports::ProviderSeekOutcome::RefusedUnchanged
+    }
+}
+
 #[test]
 fn runtime_failure_remains_distinct_from_establishment() {
     crate::test_common::within(Duration::from_secs(5), || {
         let handle = PlaybackSessionHandle::new();
-        let mut root = providers(SourceBehavior::FailAfter(0), OutputBehavior::Consume);
+        let mut root = providers(SourceBehavior::EofAfter(0), OutputBehavior::Consume);
+        let (release, held) = std::sync::mpsc::channel();
+        let service = Rc::new(HeldFailureDecode(std::cell::RefCell::new(Some(held))));
+        root.register_component(
+            ComponentSpec::new("held_decode")
+                .provides::<PcmDecodeCapability>()
+                .on_activate(move |ctx| {
+                    ctx.provide::<PcmDecodeCapability>(service.clone()).unwrap();
+                    Ok(())
+                }),
+        )
+        .unwrap();
         let (spec, attempt) = playback_session_spec_with_establishment(
             "test://decode-failure".into(),
             handle.clone(),
@@ -270,13 +316,15 @@ fn runtime_failure_remains_distinct_from_establishment() {
         );
         root.register_component(spec).unwrap();
         root.revise_desired(vec![
-            desired("decode"),
+            desired("held_decode"),
             desired("output"),
             DesiredEntry::enabled("session", "playback_session", Revision::new(1)),
         ])
         .unwrap();
         let result = attempt.finish();
         assert_eq!(result, EstablishmentResult::Established);
+        assert_eq!(handle.observe().terminal_outcome, None);
+        release.send(()).unwrap();
         assert_eq!(
             handle.wait_terminal(),
             crate::EpisodeTerminalOutcome::Failed
