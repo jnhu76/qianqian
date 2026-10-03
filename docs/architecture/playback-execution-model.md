@@ -234,6 +234,15 @@ admission and performs none of those effects. A pre-seal check followed by
 post-seal dispatch/output is forbidden. Recording an admitted failure precedes
 its Stop response, and that response finishes before seal. Blocking OS stdin
 reads remain outside this ordering; they need not return for the owner to seal.
+
+The synchronization that decides reader admission, records host failure, and
+seals the host result may protect only invocation-local bookkeeping. It **MUST
+NOT remain held** while invoking playback `request_stop()`, `wait_terminal()`,
+root `dispose()`, or potentially blocking reader/output I/O; release it before
+those calls. An admitted operation's completion must be acknowledged separately
+before seal. The seal waits for that acknowledgement, not for a mutex held
+across domain/blocking calls.
+
 At seal:
 
 ```text
