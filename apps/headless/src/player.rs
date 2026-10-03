@@ -709,14 +709,13 @@ pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
-    use qianqian_app::QianqianApp;
     use qianqian_audio_api::ports::{
         AudioOutput, AudioOutputCapability, DecodeError, DecodeOpenError, DecodeOutcome,
         DecodedPcmStream, DrainSignal, DrainVerdict, GateSlice, OutputError, ParkOutcome,
         PcmDecode, PcmDecodeCapability, PcmFormat, PcmPull, ProviderSeekOutcome, RenderGate,
         RenderRequest, RenderStream, TailProbeOutcome,
     };
-    use qianqian_composition::{ComponentSpec, DesiredEntry, Discharge, Revision};
+    use qianqian_composition::{ComponentSpec, Discharge};
 
     use super::*;
 
@@ -924,8 +923,8 @@ pub(crate) mod tests {
     ///   result. This pins snapshot/diagnostic independence.
     /// - `violating_cleanup`: the fresh roots' provider effects return
     ///   `Violated`, so any disposal of a fresh root latches §G.6.
-    /// - `refuse_composition`: the desired composition references an
-    ///   unregistered component, so `revise_desired` refuses.
+    /// - `refuse_composition`: both canonical providers declare Output,
+    ///   so required-single ambiguity refuses the plan before activation.
     pub(crate) struct FakeEpisodeSource {
         pub(crate) log: Log,
         generation: AtomicU64,
@@ -964,31 +963,26 @@ pub(crate) mod tests {
 
         fn start(&self, source: &Path, initial_output_level: u8) -> StartAttempt {
             let root = self.generation.fetch_add(1, Ordering::Relaxed) + 1;
-            let mut runtime = QianqianApp::new();
-            runtime
-                .register_component(
-                    ComponentSpec::new("fake_decode_plugin")
-                        .provides::<PcmDecodeCapability>()
-                        .on_activate(fake_provider(
-                            "decode",
-                            self.log.clone(),
-                            root,
-                            self.violating_cleanup,
-                        )),
-                )
-                .expect("fresh root admits the fake decode definition");
-            runtime
-                .register_component(
-                    ComponentSpec::new("fake_output_plugin")
-                        .provides::<AudioOutputCapability>()
-                        .on_activate(fake_provider(
-                            "output",
-                            self.log.clone(),
-                            root,
-                            self.violating_cleanup,
-                        )),
-                )
-                .expect("fresh root admits the fake output definition");
+            let mut decode = ComponentSpec::new("fake_decode_plugin")
+                .provides::<PcmDecodeCapability>()
+                .on_activate(fake_provider(
+                    "decode",
+                    self.log.clone(),
+                    root,
+                    self.violating_cleanup,
+                ));
+            // A genuine plan refusal inside the canonical three-role scope.
+            if self.refuse_composition {
+                decode = decode.provides::<AudioOutputCapability>();
+            }
+            let output = ComponentSpec::new("fake_output_plugin")
+                .provides::<AudioOutputCapability>()
+                .on_activate(fake_provider(
+                    "output",
+                    self.log.clone(),
+                    root,
+                    self.violating_cleanup,
+                ));
             self.start_levels
                 .lock()
                 .expect("start levels")
@@ -1007,34 +1001,7 @@ pub(crate) mod tests {
             } else {
                 spec.on_activate(|_| Ok(()))
             };
-            runtime
-                .register_component(spec)
-                .expect("fresh root admits the playback session definition");
-
-            let mut desired = vec![
-                DesiredEntry::enabled("decode", "fake_decode_plugin", Revision::new(1)),
-                DesiredEntry::enabled("output", "fake_output_plugin", Revision::new(1)),
-                DesiredEntry::enabled("session", "playback_session", Revision::new(1)),
-            ];
-            if self.refuse_composition {
-                desired.push(DesiredEntry::enabled(
-                    "ghost",
-                    "ghost_plugin",
-                    Revision::new(1),
-                ));
-            }
-            let establishment = crate::assembly::establish(&mut runtime, attempt, desired)
-                .unwrap_or_else(
-                    |errors| qianqian_playback::EstablishmentResult::NotEstablished {
-                        diagnostic: Some(format!("{errors}")),
-                    },
-                );
-            let handle = mounted;
-            StartAttempt {
-                runtime,
-                handle,
-                establishment,
-            }
+            crate::assembly::establish_specs_for_test(decode, output, spec, attempt, mounted).start
         }
     }
 

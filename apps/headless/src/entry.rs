@@ -48,8 +48,6 @@ use qianqian_playback::EqPreset;
 #[cfg(any(feature = "playback", test))]
 use crate::machine;
 #[cfg(feature = "playback")]
-use crate::machine::StartFailure;
-#[cfg(feature = "playback")]
 use crate::player::OpenOutcome;
 
 /// One product invocation of either binary target: parse argv, route
@@ -142,10 +140,7 @@ fn run_playback(
     // starts. The machine transport selects nothing (bypass).
     let processing = eq.map(EqPreset::to_config);
     match shell {
-        Shell::Machine => match start_episode(single_file(files)) {
-            Ok(episode) => machine_transport(episode),
-            Err(failure) => report_start_failure(failure),
-        },
+        Shell::Machine => machine_transport(start_episode(single_file(files))),
         Shell::ReferencePlayer => reference_player_transport(files, order, processing),
     }
 }
@@ -167,66 +162,26 @@ struct Episode {
     file: PathBuf,
     /// Completed fresh-assembly result (D14.6), independent of D11 terminal.
     establishment: qianqian_playback::EstablishmentResult,
+    /// Transport-specific admission report; never an establishment predicate.
+    admission_failure: Option<machine::StartFailure>,
 }
 
-// Why the episode wiring never reached a running session. The enum and
-// its report/exit contract live in [`crate::machine`]; the
-// wiring here only constructs it.
-
-/// Install the components for one episode over one local file. The
-/// scriptable transport's single-episode wiring, unchanged since F5.
+/// Install the canonical fresh composition for one machine episode.
 #[cfg(feature = "playback")]
-fn start_episode(file: PathBuf) -> Result<Episode, StartFailure> {
-    use qianqian_playback::{PlaybackSessionHandle, playback_session_spec_with_establishment};
+fn start_episode(file: PathBuf) -> Episode {
+    let assembled = crate::assembly::establish(file.clone(), AudioProcessingConfig::BYPASS, 100);
+    machine_episode(file, assembled)
+}
 
-    let mut runtime = qianqian_app::QianqianApp::new();
-    if let Err(e) = runtime.register_component(qianqian_decode_songcore::songcore_decode_plugin()) {
-        return Err(StartFailure::Registration {
-            message: format!("decode plugin registration failed: {e:?}"),
-        });
-    }
-    if let Err(e) = runtime.register_component(qianqian_output_wasapi::output_plugin()) {
-        return Err(StartFailure::Registration {
-            message: format!("output plugin registration failed: {e:?}"),
-        });
-    }
-    let handle = PlaybackSessionHandle::new();
-    let (spec, attempt) = playback_session_spec_with_establishment(
-        file.clone(),
-        handle.clone(),
-        AudioProcessingConfig::BYPASS,
-    );
-    if let Err(e) = runtime.register_component(spec) {
-        return Err(StartFailure::Registration {
-            message: format!("session registration failed: {e:?}"),
-        });
-    }
-
-    let establishment = crate::assembly::establish(
-        &mut runtime,
-        attempt,
-        vec![
-            desired("decode", "songcore_decode_plugin"),
-            desired("output", "output_plugin"),
-            desired("session", "playback_session"),
-        ],
-    )
-    .map_err(|errors| StartFailure::CompositionRefused {
-        errors: format!("{errors}"),
-    })?;
-
-    Ok(Episode {
-        runtime,
-        handle,
+#[cfg(any(feature = "playback", test))]
+fn machine_episode(file: PathBuf, assembled: crate::assembly::AssemblyOutcome) -> Episode {
+    Episode {
+        runtime: assembled.start.runtime,
+        handle: assembled.start.handle,
         file,
-        establishment,
-    })
-}
-
-#[cfg(feature = "playback")]
-fn report_start_failure(failure: machine::StartFailure) -> ExitCode {
-    eprintln!("{}", failure.report());
-    failure.exit_code()
+        establishment: assembled.start.establishment,
+        admission_failure: assembled.admission_failure,
+    }
 }
 
 /// The reference-player transport (F6, ADR-PBK-002 D14.6). With argv
@@ -388,67 +343,8 @@ impl crate::player::EpisodeStart for RealEpisodeSource {
     }
 
     fn start(&self, source: &Path, initial_output_level: u8) -> crate::player::StartAttempt {
-        use crate::player::StartAttempt;
-        use qianqian_playback::PlaybackSessionHandle;
-
-        let mut runtime = qianqian_app::QianqianApp::new();
-        let handle = PlaybackSessionHandle::new();
-        // The App's desired stream factor (D14.9) routes BEFORE
-        // activation, so the mechanism applies it at stream open.
-        handle.request_output_level(initial_output_level);
-        if let Err(e) =
-            runtime.register_component(qianqian_decode_songcore::songcore_decode_plugin())
-        {
-            return StartAttempt {
-                runtime,
-                handle,
-                establishment: qianqian_playback::EstablishmentResult::NotEstablished {
-                    diagnostic: Some(format!("decode plugin registration failed: {e:?}")),
-                },
-            };
-        }
-        if let Err(e) = runtime.register_component(qianqian_output_wasapi::output_plugin()) {
-            return StartAttempt {
-                runtime,
-                handle,
-                establishment: qianqian_playback::EstablishmentResult::NotEstablished {
-                    diagnostic: Some(format!("output plugin registration failed: {e:?}")),
-                },
-            };
-        }
-        let (spec, attempt) = qianqian_playback::playback_session_spec_with_establishment(
-            source.to_path_buf(),
-            handle.clone(),
-            self.processing,
-        );
-        if let Err(e) = runtime.register_component(spec) {
-            return StartAttempt {
-                runtime,
-                handle,
-                establishment: qianqian_playback::EstablishmentResult::NotEstablished {
-                    diagnostic: Some(format!("session registration failed: {e:?}")),
-                },
-            };
-        }
-        let establishment = crate::assembly::establish(
-            &mut runtime,
-            attempt,
-            vec![
-                desired("decode", "songcore_decode_plugin"),
-                desired("output", "output_plugin"),
-                desired("session", "playback_session"),
-            ],
-        )
-        .unwrap_or_else(
-            |errors| qianqian_playback::EstablishmentResult::NotEstablished {
-                diagnostic: Some(format!("{errors}")),
-            },
-        );
-        StartAttempt {
-            runtime,
-            handle,
-            establishment,
-        }
+        crate::assembly::establish(source.to_path_buf(), self.processing, initial_output_level)
+            .start
     }
 }
 
@@ -465,10 +361,11 @@ fn machine_transport(mut episode: Episode) -> ExitCode {
     if let qianqian_playback::EstablishmentResult::NotEstablished { diagnostic } =
         &episode.establishment
     {
-        eprintln!(
-            "{}",
-            machine::activation_failure_report(diagnostic.as_deref())
-        );
+        let report = match &episode.admission_failure {
+            Some(presentation) => presentation.report(),
+            None => machine::activation_failure_report(diagnostic.as_deref()),
+        };
+        eprintln!("{report}");
         let disposal = episode.runtime.dispose();
         for warning in machine::disposal_warnings(&disposal.snapshot) {
             eprintln!("{warning}");
@@ -476,7 +373,10 @@ fn machine_transport(mut episode: Episode) -> ExitCode {
         if let Some(line) = machine::disposal_verdict_warning(&disposal.verdict) {
             eprintln!("{line}");
         }
-        return machine::episode_exit_code(None, disposal.snapshot.quiet);
+        return match &episode.admission_failure {
+            Some(presentation) if disposal.snapshot.quiet => presentation.exit_code(),
+            _ => machine::episode_exit_code(None, disposal.snapshot.quiet),
+        };
     }
 
     if let Some(format) = episode.handle.observe().source_format {
@@ -572,15 +472,6 @@ fn run_playback(
     ExitCode::from(2)
 }
 
-#[cfg(feature = "playback")]
-fn desired(id: &str, component: &'static str) -> qianqian_composition::DesiredEntry {
-    qianqian_composition::DesiredEntry::enabled(
-        id,
-        component,
-        qianqian_composition::Revision::new(1),
-    )
-}
-
 /// The shell and order enums are referenced by the no-playback stub
 /// signature too.
 #[cfg(not(feature = "playback"))]
@@ -602,10 +493,19 @@ pub(crate) fn run_machine_attempt_for_test(
     handle: qianqian_playback::PlaybackSessionHandle,
     establishment: qianqian_playback::EstablishmentResult,
 ) -> ExitCode {
-    machine_transport(Episode {
-        runtime,
-        handle,
-        establishment,
-        file: "test://attempt".into(),
+    run_machine_assembly_for_test(crate::assembly::AssemblyOutcome {
+        start: crate::player::StartAttempt {
+            runtime,
+            handle,
+            establishment,
+        },
+        admission_failure: None,
     })
+}
+
+#[cfg(test)]
+pub(crate) fn run_machine_assembly_for_test(
+    assembled: crate::assembly::AssemblyOutcome,
+) -> ExitCode {
+    machine_transport(machine_episode("test://attempt".into(), assembled))
 }

@@ -191,12 +191,23 @@ defect is asserted by this comparison.
 
 ### C1 production representation (#204; no semantic amendment)
 
-Machine and reference now call the same headless `assembly::establish` helper.
-It drives the fresh Decode/Output/Session desired composition synchronously,
-then consumes the `EstablishmentAttempt` paired with
-`playback_session_spec_with_establishment`. `EstablishmentResult::Established`
-represents the existing D14.6 `Activated`; `NotEstablished { diagnostic }`
-represents its absence. Representation != semantics; Projection != authority.
+Machine and reference now call the same headless `assembly::establish` factory.
+It owns fresh-root creation, selection/registration of the canonical Decode and
+Output providers, Session construction, and the fixed three-member desired
+composition. Its inputs are only the source, processing configuration and
+initial output level: callers cannot supply a root, Plugin spec or desired list.
+The private assembly routine constructs exactly the Decode/Output/Session
+entries. Topology expansion requires review of this authority boundary rather
+than silently extending what the Session result certifies. The deterministic
+scope oracle reproduces an extra failing desired Plugin under generic K0, then
+asserts exact membership of the canonical assembly; the projection appears only
+in that test oracle, never in production classification.
+
+The factory drives that entire composition synchronously, then consumes the
+`EstablishmentAttempt` paired with `playback_session_spec_with_establishment`.
+`EstablishmentResult::Established` represents the existing D14.6 `Activated`;
+`NotEstablished { diagnostic }` represents its absence. Representation !=
+semantics; Projection != authority.
 
 The Session activation operation alone writes that return slot, after all its
 acquisition steps and inverse registrations succeed. In this supported fresh
@@ -205,15 +216,19 @@ activated and committed bindings. Provider failure or unresolved dependency
 therefore leaves the attempt `NotEstablished { diagnostic: None }`; Session
 failure records `NotEstablished` with presentation text. Source publication,
 render open, generic admission success and terminal timing cannot produce or
-revoke `Established`. Assembly admission refusal is handled separately as an
-unsuccessful attempt. The root still requires authoritative disposal on failure.
+revoke `Established`. Registration or desired-admission refusal produces the
+same `NotEstablished` classification for both hosts, before Session activation.
+The machine's admission report/exit class travels separately as presentation
+metadata; it cannot select establishment or terminal waiting. Optional diagnostic
+text is non-authoritative. The root still requires authoritative disposal on
+failure, including admission refusal.
 
 Placement comparison: a generic K0 result would unnecessarily widen the kernel;
 a handle observation would repeat the forbidden read-side reconstruction; an
 app-local result cannot receive the private Session activation return without a
 cross-crate seam. The paired constructor/consume-only attempt is that minimal
-seam. It certifies the required episode in the current three-Plugin wiring, not
-arbitrary extra Plugins. Fresh-core/single-attempt remains a precondition; no
+seam. The application factory structurally fixes the whole composition to the
+canonical three-Plugin wiring. Fresh-core/single-attempt remains a precondition; no
 reattachment enforcement, second lifecycle or terminal rule is added. The result
 survives immediate D11 settlement and disposal. C2 remains unimplemented and the
 overall execution architecture remains CANDIDATE / NOT FROZEN.

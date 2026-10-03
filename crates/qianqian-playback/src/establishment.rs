@@ -4,8 +4,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-/// D14.6 `Activated` for the required Session in a fresh Decode/Output/Session
-/// composition. Establishment remains true even if D11 settles immediately.
+/// D14.6 `Activated` in the canonical fresh Decode/Output/Session assembly.
+/// Establishment remains true even if D11 settles immediately.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EstablishmentResult {
     Established,
@@ -20,7 +20,9 @@ pub enum EstablishmentResult {
 /// Keeping the result on the observation handle would invite a second read-side
 /// definition. This slot adds no lifecycle, retry, terminal or kernel semantics.
 /// Attach the paired spec once to a fresh root, then consume after synchronous
-/// `revise_desired` returns. It does not certify arbitrary additional Plugins.
+/// `revise_desired` returns. The application owns and structurally fixes the
+/// canonical three-Plugin assembly scope; it does not accept extra desired
+/// entries or a caller-prepopulated root.
 pub struct EstablishmentAttempt(pub(crate) Rc<RefCell<EstablishmentResult>>);
 
 impl EstablishmentAttempt {
