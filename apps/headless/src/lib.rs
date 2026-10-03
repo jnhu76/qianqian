@@ -33,6 +33,8 @@
 //! canonical product binary, and `qianqian-headless`, the historical
 //! regression target.
 
+#[cfg(any(feature = "playback", test))]
+mod assembly;
 pub mod cli;
 pub mod entry;
 pub mod input;
