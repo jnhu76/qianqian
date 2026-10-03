@@ -39,6 +39,8 @@ pub mod cli;
 pub mod entry;
 pub mod input;
 pub mod machine;
+#[cfg(any(feature = "playback", test))]
+mod machine_input;
 pub mod player;
 pub mod playlist;
 pub mod status;

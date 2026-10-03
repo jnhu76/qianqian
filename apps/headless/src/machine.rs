@@ -155,6 +155,20 @@ pub fn episode_exit_code(
     }
 }
 
+/// Machine invocation result: host infrastructure failure contributes failure
+/// independently of the genuine episode outcome and disposal evidence.
+pub fn machine_exit_code(
+    outcome: Option<EpisodeTerminalOutcome>,
+    disposal_quiet: bool,
+    host_failed: bool,
+) -> ExitCode {
+    if host_failed {
+        ExitCode::from(1)
+    } else {
+        episode_exit_code(outcome, disposal_quiet)
+    }
+}
+
 /// The reference-player transport's whole exit table (U1 corrective
 /// REQUIRED-3), pinned as pure data like the rest of this module so
 /// the binary renders through it and the table cannot drift. A failed
