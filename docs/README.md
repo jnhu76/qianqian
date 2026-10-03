@@ -15,6 +15,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Output Plugin / host-audio backend boundary, cross-platform output work | `adr/ADR-PBK-003.md` — stable Output Plugin identity + backend-neutral Host Render Contract; concrete backend owned mechanism by default |
 | SongCore one-core/many-bindings architecture, raw vs ergonomic binding boundary, binding parity oracle, target support maturity (BUILD…RELEASE) | `architecture/songcore-binding-architecture.md` — binding-architecture authority (Issue #173); the canonical ABI description itself is `../native/include/songcore.h` |
 | Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
+| Playback temporal semantics — how commands are accepted, what establishes ordering, evidence classes (world-state vs operation), commit boundaries, observation vs truth (timing/order/causality questions) | `architecture/playback-temporal-semantics.md` — cross-cutting temporal vocabulary + reading model over existing mechanisms; protocol predicates stay with their owners (D11 / D14.5 / D14.7 / D14.8 / D14.11) |
 | Playlist ordering / repeat / EOF-navigation policy + TUI keymap (Issue #166 U2) | `adr/ADR-PBK-002.md` §20 D14.6 — the 2026-09-19 U2 amendment (App-owned product policy; the Playback Session establishes terminal Facts and nothing else). The shipped temporary playlist is a realization of that decision, not a second authority |
 | Terminal Fact commit-ownership boundary evidence（F2 seam 前置 formal campaign） | `../specs/f2-terminal-commit-boundary/` — campaign evidence only，**未裁决**；结论是 CURRENT_CONTRACT_UNDERSPECIFIED，等 ADR/code gap audit |
 | F5 seek 实现 guardrail 证据（M1–M11 生产突变 + fail-closed runner） | `../specs/f5-seek-implementation/` — executable evidence only；seek 语义权威 = `adr/ADR-PBK-002.md` §20 D14.5 |
@@ -49,6 +50,14 @@ NORMATIVE AUTHORITY
   Current vocabulary + Plugin/Fiber taxonomy +
   earned static playback composition + D11
       -> adr/ADR-PBK-002.md
+
+  Playback temporal semantics (cross-cutting vocabulary: command,
+  acceptance, evidence classes, commit boundary, acknowledgement,
+  observation; correctness carriers)
+      -> architecture/playback-temporal-semantics.md
+         a reading model over existing mechanisms — it defines no
+         runtime noun and owns no protocol predicate; D11 and
+         D14.5/D14.7/D14.8/D14.11 remain the per-protocol authorities
 
   Stable Output Plugin / pluggable Host Render Backend boundary
       -> adr/ADR-PBK-003.md
@@ -181,6 +190,17 @@ Completed / Stopped / Failed
 ```
 
 The designation attaches to the Playback Session semantic role for one playback episode; its current composition realization is the episode-scoped Playback Session Plugin/Fiber (semantic role != Fiber identity by definition). This is one fact authority, not a complete playback state machine.
+
+Playback subsystem navigation — start from the task, not from the ADR number:
+
+```text
+Playback Architecture
+    ├── ownership / composition      -> adr/ADR-PBK-002.md D1/D4/D5/D6/D12/D13 (+ adr/ADR-PBK-003.md for output)
+    ├── temporal semantics           -> architecture/playback-temporal-semantics.md
+    │                                   (command -> acceptance -> evidence -> commit -> observation)
+    ├── DSP product model            -> architecture/dsp-product-model.md (§7.3 live-update admission)
+    └── observation plane            -> architecture/audio-observation-plane.md (DRAFT; #187)
+```
 
 ---
 

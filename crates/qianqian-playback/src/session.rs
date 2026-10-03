@@ -535,14 +535,20 @@ fn decode_worker<P: ProcessingRuntime>(
                     completion.release_seek_without_commit();
                     pending_seek = None;
                 } else if completion.leg_parked_evidence() {
-                    // The parked evidence is eventually-true, not
-                    // instantaneous: a just-resumed leg may still have
-                    // its engagement latched for the microseconds before
-                    // its Disengaged publication lands. That is the
-                    // precondition's honest strength — the load-bearing
-                    // re-validation is the commit boundary, which
-                    // requires FRESH paired park + quiescence evidence
-                    // under the same lock stop linearizes through.
+                    // The parked evidence is CURRENT world state, not
+                    // per-cycle state: a continuously-held park stays
+                    // true across seek-cycle boundaries while the leg
+                    // physically remains parked (the D14.7 park
+                    // invariant — no device buffer held, tail cannot
+                    // refill), and a just-resumed leg may still be
+                    // latched for the microseconds before its
+                    // Disengaged publication lands. Safety here does not
+                    // rest on latch freshness but on worker program
+                    // order: the commit boundary re-reads the current
+                    // park conjunction under the completion lock, and
+                    // the load-bearing stale-PCM wall is THIS
+                    // serialization point's discipline — purge →
+                    // landing → production hold (D14.5 Applied).
                     // Defense in depth: the data plane was Open at
                     // acceptance; re-validate here, where the provider is
                     // about to be called. An edge that went terminal in

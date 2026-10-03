@@ -1330,15 +1330,19 @@ fn a_mutated_then_failed_seek_never_reconstructs_eq_continuation() {
         );
         let stopped_at = failed_w.consumed();
         // "No post-failure production" is a PRODUCER-side claim; the
-        // consumer may still legally drain the PCM already buffered in
-        // the bounded edge when the failure published (the render leg
-        // exits on the first read after the edge failed, so the drain is
-        // capped by the edge's capacity). A fixed sleep wagered that the
-        // drain finished inside 300 ms — under load it can not, false-
-        // REDing a correct engine (the #190 D6 recorded debt). The
-        // protocol bound below is schedule-free: whatever the drain is
-        // still doing, consumption can never exceed the failure-time
-        // sample plus one full edge capacity.
+        // consumer may still lawfully consume PCM that was already
+        // buffered in the bounded edge. That lawful window is the one
+        // BETWEEN the Failed Fact's publication (which anchors this
+        // sample) and `edge.fail()` running on the worker's path — the
+        // edge stays Open inside it, so the render leg may drain up to
+        // one full edge capacity. After `edge.fail()` there is no drain:
+        // a FAILED/STOPPED edge abandons its buffered frames on the
+        // first read. A fixed sleep wagered that the window closed
+        // inside 300 ms — under load it can not, false-REDing a correct
+        // engine (the #190 D6 recorded debt). The protocol bound below
+        // is schedule-free: whatever the leg is still draining,
+        // consumption can never exceed the failure-time sample plus one
+        // full edge capacity.
         assert!(
             failed_w.consumed() <= stopped_at + EDGE_CAPACITY_FRAMES,
             "no post-failure production beyond the bounded drain"
