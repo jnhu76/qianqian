@@ -219,7 +219,7 @@ Verification must match the phase.
 
 ### Local pre-push gate (Lefthook)
 
-Lefthook is the repository Git hook orchestrator. Its `pre-push` gate is the fast local rejection layer: it proves the working tree passes fast deterministic checks. It is developer-side policy, not repository authority — GitHub Actions remains the authority for platform, formal (TLA+), Miri/Loom, mutation, Windows and release evidence.
+Lefthook is the repository Git hook orchestrator. Its `pre-push` gate is the fast local rejection layer: it proves the working tree passes fast deterministic checks and validates the commit headers ahead of the push base. It is developer-side policy, not repository authority — GitHub Actions remains the authority for platform, formal (TLA+), Miri/Loom, mutation, Windows and release evidence.
 
 Install once per clone (Lefthook 2.1.16 or newer; binary only, no root Node package):
 
@@ -243,7 +243,7 @@ Before every push (this is the canonical manual entrypoint for humans and coding
 lefthook run pre-push --all-files
 ```
 
-The gate is checks-only: no formatting, no auto-fixing, no staging, no commits, no network. A failed pre-push leaves the working tree unchanged. What stays CI-only: `specs/check.sh current|rust`, the Windows compile gate, the VitePress build, commit/PR convention enforcement, OpenCodeReview.
+The gate is checks-only: no formatting, no auto-fixing, no staging, no commits, no network. A failed pre-push leaves the working tree unchanged. What stays CI-only: `specs/check.sh current|rust`, the Windows compile gate, OpenCodeReview.
 
 ### Boundary-design work
 

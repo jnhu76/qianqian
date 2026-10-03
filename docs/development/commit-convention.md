@@ -14,7 +14,7 @@ Breaking changes use:
 
 The same format is required for pull-request titles.
 
-The machine-readable policy lives in `.github/commit-convention.json`. The checker is `tools/check_commit_convention.py`, and `.github/workflows/commit-convention.yml` enforces the policy for pull requests.
+The machine-readable policy lives in `.github/commit-convention.json`. The checker is `tools/check_commit_convention.py`, and the Lefthook `pre-push` gate (see `lefthook.yml`, `AGENTS.md`, `CONTRIBUTING.md`) enforces the policy locally on every push.
 
 ## Allowed types
 
@@ -148,27 +148,39 @@ feat(plugin): add real SongCore decode plugin
 
 The PR body may contain campaign names, evidence identifiers, issue numbers, and detailed status. The title should stay semantic and durable.
 
+The local gate cannot see a PR title (it does not exist locally); titles are author-checked. Deriving the title from the commit header keeps them identical by construction.
+
 ## Automated gate
 
-`.github/workflows/commit-convention.yml` validates:
+The Lefthook `pre-push` gate validates, on every push:
 
-1. the PR title;
-2. every commit subject in the PR;
-3. the checker itself against known valid/invalid examples.
+1. the checker itself against known valid/invalid examples (`--self-test`);
+2. every commit header ahead of the push base
+   (`--range origin/main HEAD`) — the set a push from this ref would
+   carry; an empty range passes, because there is nothing local to
+   validate.
 
-The workflow runs from the trusted base revision with read-only permissions. It does not execute code from the pull-request branch. Commit subjects are read through the GitHub API, so a PR cannot weaken its own check by editing the checker or workflow in the same PR.
+Canonical manual run:
 
-The policy is configured in `.github/commit-convention.json` and implemented with Python standard-library code only; no Node/commitlint dependency is required.
+```bash
+lefthook run pre-push --all-files
+```
 
-Local checks:
+or the check directly:
 
 ```bash
 python3 tools/check_commit_convention.py --self-test
-python3 tools/check_commit_convention.py \
-  --message 'feat(plugin): add SongCore decode provider' \
-  --label 'example'
-python3 tools/check_commit_convention.py --range <base-sha> <head-sha>
+python3 tools/check_commit_convention.py --range origin/main HEAD
 ```
+
+There is no server-side commit-convention workflow anymore: enforcement
+is local, before the commits exist to push. When the gate fails, fix the
+header directly (`git commit --amend`, or `git rebase -i` for older
+commits) and re-run the gate — never push around it. A push that
+bypasses the hook (`git push --no-verify`) is not machine-checked
+anywhere.
+
+The policy is configured in `.github/commit-convention.json` and implemented with Python standard-library code only; no Node/commitlint dependency is required.
 
 The governing principle is:
 
