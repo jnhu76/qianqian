@@ -16,7 +16,7 @@ Load only the documentation needed for the current task. Git history and externa
 | SongCore one-core/many-bindings architecture, raw vs ergonomic binding boundary, binding parity oracle, target support maturity (BUILD…RELEASE) | `architecture/songcore-binding-architecture.md` — binding-architecture authority (Issue #173); the canonical ABI description itself is `../native/include/songcore.h` |
 | Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
 | Playback temporal semantics — how commands are accepted, what establishes ordering, evidence classes (world-state vs operation), commit boundaries, observation vs truth (timing/order/causality questions) | `architecture/playback-temporal-semantics.md` — cross-cutting temporal vocabulary + reading model over existing mechanisms; protocol predicates stay with their owners (D11 / D14.5 / D14.7 / D14.8 / D14.11) |
-| Playback execution — identity/attachment, owners, waiting/ordering, host settlement, work fate, quiescence and bounds | [Playback execution model](architecture/playback-execution-model.md) — **CANDIDATE / NOT FROZEN**, Stage 1 #202; owner #198, umbrella #201; protocol authorities retain their predicates |
+| Playback execution — identity/attachment, owners, waiting/ordering, host settlement, work fate, quiescence and bounds | [Playback execution model](architecture/playback-execution-model.md) — **CANDIDATE / NOT FROZEN**, Stage 4 #207; merged C1 #205 and C2 #213; D1–D6 pending #209 acceptance; owner #198, umbrella #201; protocol authorities retain their predicates |
 | Playlist ordering / repeat / EOF-navigation policy + TUI keymap (Issue #166 U2) | `adr/ADR-PBK-002.md` §20 D14.6 — the 2026-09-19 U2 amendment (App-owned product policy; the Playback Session establishes terminal Facts and nothing else). The shipped temporary playlist is a realization of that decision, not a second authority |
 | Terminal Fact commit-ownership boundary evidence（F2 seam 前置 formal campaign） | `../specs/f2-terminal-commit-boundary/` — campaign evidence only，**未裁决**；结论是 CURRENT_CONTRACT_UNDERSPECIFIED，等 ADR/code gap audit |
 | F5 seek 实现 guardrail 证据（M1–M11 生产突变 + fail-closed runner） | `../specs/f5-seek-implementation/` — executable evidence only；seek 语义权威 = `adr/ADR-PBK-002.md` §20 D14.5 |
@@ -95,6 +95,9 @@ EVIDENCE
      realtime-publication-lifetime-decision.md,
      component-boundary-a0.md, first-audible-slice.md) /
      draft design input (architecture/audio-observation-plane.md) /
+     candidate cross-protocol execution authority
+     (architecture/playback-execution-model.md — #207, CANDIDATE;
+      protocol authorities retain their predicates; acceptance #209) /
      audit records (audits/plugin-boundary-conformance-audit.md,
      audits/audio-processing-plugin-audit.md) /
      historical refs
