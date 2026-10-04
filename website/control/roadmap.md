@@ -11,7 +11,7 @@ import { projectState } from '../data/project-state.ts'
 
 路线图展示当前工程状态，并保留明确标注的历史 checkpoint；架构语义以仓库 ADR / architecture docs 为准。
 
-当前执行阅读入口为 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)：Stage 4 #207/#214 已合并，Stage 5 #208 为 explicitness pass，C1 #205/C2 #213 已合并；D1–D6 **CANDIDATE / NOT FROZEN**。§1 路由 accepted PBK/K0/DSP/temporal owning authorities，§12 保留 20/20 traceability；后续 acceptance/freeze gate 属于 #209/#210。
+当前执行阅读入口为 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)：Stage 4 #207/#214 已合并，Stage 5 #208 为 explicitness pass，C1 #205/C2 #213 已合并；D1–D6 已由 #209 ACCEPT（PASS_ARCHITECTURE_ACCEPTED）、#210 FROZEN。§1 路由 accepted PBK/K0/DSP/temporal owning authorities，§12 保留 20/20 traceability；Stage 8 验证属于 #211（绑定 #212 契约）。
 
 ---
 

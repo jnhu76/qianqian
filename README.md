@@ -86,7 +86,7 @@ Context controls reachability/dependency truth. It does not carry PCM blocks or 
 
 ## Playback status: foundations accepted
 
-The [playback execution model](docs/architecture/playback-execution-model.md) is the **CANDIDATE / NOT FROZEN** cross-protocol entry: Stage 4 #207/#214 is merged, Stage 5 #208 makes wording explicit, and D1–D6 await #209 acceptance. C1 establishment #205 and C2 machine-host settlement #213 are merged. Its §1 routes accepted authorities; §12 holds minimum-core 20/20 traceability.
+The [playback execution model](docs/architecture/playback-execution-model.md) is the **FROZEN** cross-protocol entry (Stage 7 #210; subject `a225d524`): Stage 4 #207/#214 is merged, Stage 5 #208 made the wording explicit, #209 accepted D1–D6 (`PASS_ARCHITECTURE_ACCEPTED`), and #210 froze the architecture bound to validation contract #212 (PLAYBACK-EXECUTION-VALIDATION-v1; Stage-8 execution #211 not started). C1 establishment #205 and C2 machine-host settlement #213 are merged. Its §1 routes accepted authorities; §12 holds minimum-core 20/20 traceability.
 
 There is still **no accepted playback state-machine vocabulary**. The accepted foundations (`docs/adr/ADR-PBK-001.md`) freeze foundational boundaries — composition vs execution/control vs facts vs realtime data — while current role names and the earned static playback composition are governed by `docs/adr/ADR-PBK-002.md`.
 

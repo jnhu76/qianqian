@@ -7,7 +7,7 @@ status: CURRENT
 
 > **Playback Foundations reset（2026-09）：** 本页 mermaid 图与下文中的 `MusicComponent` / `MusicKernel` / `TransportKernel` / `TrackSession` / `DecodeSession` 内容是**历史实验证据**，不再是 current authority。当前 Playback Foundations authority 是 `docs/adr/ADR-PBK-001.md`（**ACCEPTED**，不冻结播放状态机名词）。
 
-当前静态 Plugin/Fiber 组合与最小播放语义由 PBK-002（ACCEPTED）定义，Output/backend 边界由 PBK-003（ACCEPTED）定义。当前执行阅读入口是 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)：C1/C2 已合并，Stage 5 #208 明确表达 Stage-4 merged candidate；D1–D6 仍 **CANDIDATE / NOT FROZEN**，§1 路由各 owning authority，§12 保留 20/20 minimum-core traceability。本页是派生摘要，历史图不描述当前实现。
+当前静态 Plugin/Fiber 组合与最小播放语义由 PBK-002（ACCEPTED）定义，Output/backend 边界由 PBK-003（ACCEPTED）定义。当前执行阅读入口是 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)：C1/C2 已合并，Stage 5 #208 明确表达 Stage-4 merged candidate；D1–D6 已由 #209 ACCEPT、#210 FROZEN（绑定 #212 验证契约），§1 路由各 owning authority，§12 保留 20/20 minimum-core traceability。本页是派生摘要，历史图不描述当前实现。
 
 Qianqian Architecture v2 是一个面向本地优先音乐播放器的、边界优先、面向组合的运行时架构。
 
@@ -165,7 +165,7 @@ Gain → EQ → SRC → Limiter → ...
 | Decode Plugin / Decoder | <StatusBadge status="IMPLEMENTED" /> SongCore-backed provider；PBK-002 D6/D14 |
 | Output Plugin / AudioOutput | <StatusBadge status="IMPLEMENTED" /> backend-neutral contract，当前 owned WASAPI mechanism；PBK-003 |
 | Episode-owned Audio Processing | <StatusBadge status="IMPLEMENTED" /> Gain + 10-band EQ / live update；PBK-002 D14.11、DSP product model §7.3 |
-| Playback execution model | <StatusBadge status="CURRENT" /> CANDIDATE / NOT FROZEN；C1 #205、C2 #213 已合并，D1–D6 待 #209 |
+| Playback execution model | <StatusBadge status="CURRENT" /> FROZEN（#210）；C1 #205、C2 #213 已合并，D1–D6 已由 #209 ACCEPT |
 | UiHost | <StatusBadge status="DEFERRED" /> |
 
 旧 playback 实验代码及其 test-local executable traces 已随 post-#139 spec reset 从 main 移除（Git 历史存档），不是 current authority；仍在验证的竞态由当前 specs/tests 承载（`specs/README.md`）。当前 decode/PCM/output 与已挣得的最小播放语义已有实现；更广的播放状态机、未挣得的 Plugin 与机制仍须 authority review。上述实现状态不构成设备或跨平台运行验证。

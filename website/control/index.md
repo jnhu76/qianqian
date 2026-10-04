@@ -15,7 +15,7 @@ import { projectState } from '../data/project-state.ts'
 
 ## 当前执行阅读入口
 
-当前播放基础、静态组合/最小播放语义、Output/backend 边界分别由 PBK-001/002/003（ACCEPTED）拥有。跨协议阅读见 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)：C1/C2 已合并，Stage 5 #208 明确表达 merged Stage-4 candidate；D1–D6 仍 **CANDIDATE / NOT FROZEN**，§1 路由 owning authorities，§12 为 20/20 minimum-core traceability。本页是派生状态页。
+当前播放基础、静态组合/最小播放语义、Output/backend 边界分别由 PBK-001/002/003（ACCEPTED）拥有。跨协议阅读见 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)：C1/C2 已合并，Stage 5 #208 明确表达 merged Stage-4 candidate；D1–D6 已由 #209 ACCEPT、#210 FROZEN（绑定 #212 验证契约），§1 路由 owning authorities，§12 为 20/20 minimum-core traceability。本页是派生状态页。
 
 ## 历史 reset checkpoint 的前沿
 

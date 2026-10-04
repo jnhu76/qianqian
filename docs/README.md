@@ -16,7 +16,7 @@ Load only the documentation needed for the current task. Git history and externa
 | SongCore one-core/many-bindings architecture, raw vs ergonomic binding boundary, binding parity oracle, target support maturity (BUILD…RELEASE) | `architecture/songcore-binding-architecture.md` — binding-architecture authority (Issue #173); the canonical ABI description itself is `../native/include/songcore.h` |
 | Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
 | Playback temporal semantics — how commands are accepted, what establishes ordering, evidence classes (world-state vs operation), commit boundaries, observation vs truth (timing/order/causality questions) | `architecture/playback-temporal-semantics.md` — cross-cutting temporal vocabulary + reading model over existing mechanisms; protocol predicates stay with their owners (D11 / D14.5 / D14.7 / D14.8 / D14.11) |
-| Playback execution — identity/attachment, owners, waiting/ordering, host settlement, work fate, quiescence and bounds | [Playback execution model](architecture/playback-execution-model.md) — **CANDIDATE / NOT FROZEN**, Stage 5 #208 over merged Stage 4 #207/#214; §12 holds 20/20 traceability; merged C1 #205 and C2 #213; D1–D6 pending #209 acceptance; owner #198, umbrella #201; protocol authorities retain their predicates |
+| Playback execution — identity/attachment, owners, waiting/ordering, host settlement, work fate, quiescence and bounds | [Playback execution model](architecture/playback-execution-model.md) — **FROZEN** (Stage 7 #210; subject `a225d524`), Stage 5 #208 over merged Stage 4 #207/#214; §12 holds 20/20 traceability; merged C1 #205 and C2 #213; D1–D6 ACCEPTED by #209 (PASS_ARCHITECTURE_ACCEPTED); validation contract #212 (PLAYBACK-EXECUTION-VALIDATION-v1), execution #211 not started; owner #198, umbrella #201; protocol authorities retain their predicates |
 | How Stage-8 validation of the accepted playback execution architecture is decided (validation cells, evidence modes, platform matrix, PASS/FAIL/INCONCLUSIVE, counterexample taxonomy) | [Playback execution validation contract](architecture/playback-execution-validation.md) — **VALIDATION_CONTRACT** (PLAYBACK-EXECUTION-VALIDATION-v1; FROZEN once merged and recorded by #212); governance owner #212, execution stage #211; defines no architecture semantics |
 | Playlist ordering / repeat / EOF-navigation policy + TUI keymap (Issue #166 U2) | `adr/ADR-PBK-002.md` §20 D14.6 — the 2026-09-19 U2 amendment (App-owned product policy; the Playback Session establishes terminal Facts and nothing else). The shipped temporary playlist is a realization of that decision, not a second authority |
 | Terminal Fact commit-ownership boundary evidence（F2 seam 前置 formal campaign） | `../specs/f2-terminal-commit-boundary/` — historical campaign evidence only; its CURRENT_CONTRACT_UNDERSPECIFIED finding was resolved by PBK-002 D11/D14.3 and the current authority-owned settlement realization |
@@ -101,9 +101,10 @@ EVIDENCE
      realtime-publication-lifetime-decision.md,
      component-boundary-a0.md, first-audible-slice.md) /
      draft design input (architecture/audio-observation-plane.md) /
-     candidate cross-protocol execution authority
-     (architecture/playback-execution-model.md — #208, CANDIDATE;
-      protocol authorities retain their predicates; acceptance #209) /
+     frozen cross-protocol execution authority
+     (architecture/playback-execution-model.md — #210 FROZEN, subject
+      `a225d524`; protocol authorities retain their predicates;
+      accepted by #209; validation contract #212 / execution #211) /
      audit records (audits/plugin-boundary-conformance-audit.md,
      audits/audio-processing-plugin-audit.md) /
      historical refs
