@@ -20,7 +20,7 @@ Current execution roadmap:
 Phase F v2                  -> Issue #119 PHASE-F-HEADLESS-CONTROL-1
 ```
 
-Issue #119 is the Phase-F **product execution roadmap**, derived from the normative authorities and current production reality; it is not a replacement for the ADRs. The current playback execution-architecture campaign is #198/#201: Stage 4 #207/#214 is merged, Stage 5 #208 is the explicitness pass, C1 #205 and C2 #213 are merged, and D1–D6 remain CANDIDATE / NOT FROZEN pending #209/#210. Start at [the execution model](docs/architecture/playback-execution-model.md) (§1 authority routing; §12 minimum-core 20/20 traceability). Issue #141 is the closed post-#139/#140 Phase-F reality-audit record whose REV.3 conclusions are reflected in #119 and this file. Issue #138 records the architecture-corrective basis; it remains design input, not authority.
+Issue #119 is the Phase-F **product execution roadmap**, derived from the normative authorities and current production reality; it is not a replacement for the ADRs. The current playback execution-architecture campaign is #198/#201: Stage 4 #207/#214 is merged, Stage 5 #208 is the explicitness pass, C1 #205 and C2 #213 are merged, #209 accepted D1–D6 (`PASS_ARCHITECTURE_ACCEPTED`), and #210 froze the playback execution architecture (subject `a225d524`, bound to validation contract #212, PLAYBACK-EXECUTION-VALIDATION-v1). Stage 8 validation is #211, not started. Start at [the execution model](docs/architecture/playback-execution-model.md) (§1 authority routing; §12 minimum-core 20/20 traceability). Issue #141 is the closed post-#139/#140 Phase-F reality-audit record whose REV.3 conclusions are reflected in #119 and this file. Issue #138 records the architecture-corrective basis; it remains design input, not authority.
 
 ---
 
@@ -441,7 +441,7 @@ Seek/open/device-switch do not trigger Realtime Audio Runtime merely because the
 # Current Phase-F execution routing (derived projection)
 
 Accepted protocol meanings live in PBK-002; their cross-protocol execution
-reading lives in [the candidate execution model](docs/architecture/playback-execution-model.md).
+reading lives in [the execution model](docs/architecture/playback-execution-model.md).
 The older Pause/Seek/Open hypotheses are superseded by the narrow accepted
 amendments below; this router does not reopen them.
 
@@ -453,7 +453,7 @@ amendments below; this router does not reopen them.
 | Open / Next / Previous | D14.6: probe-before-destruction; old-side clearance from absent root or Discharged; fresh whole-composition establishment through C1. App owns navigation/repeat; Completed-only automatic transition, no failed-candidate auto-skip. |
 | Volume | D14.9: App-owned desired stream factor, routed to Output; distinct from processing Gain. Windows loop-top placement is grounded by V-PROBE. |
 | DSP | D14.11 + DSP product model §7.3: episode-owned processing on the decode worker; Desired recording, worker Accepted, fresh-block Applied and sample-driven Settled remain distinct. |
-| Machine input | Execution-model D3/D5 CANDIDATE, realized by C2: EOF is normal closure; Spawn/Read/caught Panic are host failures. Effect admission, acknowledgement and seal do not terminate stdin. |
+| Machine input | Execution-model D3/D5 (accepted #209, frozen #210), realized by C2: EOF is normal closure; Spawn/Read/caught Panic are host failures. Effect admission, acknowledgement and seal do not terminate stdin. |
 
 Device switch/replaceable render binding, broader transport vocabulary,
 multi-session/preload/gapless and specialized realtime-runtime representation

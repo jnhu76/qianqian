@@ -23,7 +23,7 @@ features:
     details: "Context、Capability、Fiber、Effect、Reconcile 五个原语已实现。它只拥有 composition truth，不拥有音乐/PCM/playback timeline。"
     status: "IMPLEMENTED"
   - title: "Playback Foundations"
-    details: "PBK-001/002/003 是已接受的播放基础、当前静态组合/最小播放语义与 Output/backend 边界 authority。执行模型 #198/#201 经 Stage 4 #207/#214 和 Stage 5 #208 明确表达；C1/C2 已合并，D1–D6 仍 CANDIDATE / NOT FROZEN，待 #209 review。旧 MusicKernel / TransportKernel 等模型是历史证据。"
+    details: "PBK-001/002/003 是已接受的播放基础、当前静态组合/最小播放语义与 Output/backend 边界 authority。执行模型 #198/#201 经 Stage 4 #207/#214 和 Stage 5 #208 明确表达；C1/C2 已合并，#209 已 ACCEPT D1–D6，#210 已 FROZEN（绑定 #212 验证契约）。旧 MusicKernel / TransportKernel 等模型是历史证据。"
     status: "CURRENT"
   - title: "Decoder"
     details: "Decode Plugin 提供 SongCore-backed Decoder；真实 decode → PCM 路径已实现。当前 ownership/lifetime 见 PBK-002 D6/D14；目标支持成熟度见 SongCore binding authority。"

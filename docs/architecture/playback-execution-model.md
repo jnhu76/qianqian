@@ -1,19 +1,28 @@
 # Playback execution model
 
 ```text
-STATUS = CANDIDATE / NOT FROZEN
+STATUS = FROZEN
 OWNER = #198
 IMPLEMENTATION_UMBRELLA = #201
-STAGE = #208 (Stage 5 explicitness; next independent review #209)
+STAGE = #210 (Stage 7 freeze; acceptance #209; validation contract #212)
+ARCHITECTURE_SUBJECT_SHA = a225d524046609dbbf9bef32d96fe84800bddd92
+EXECUTION_MODEL_ACCEPTED_BLOB_SHA = 815b8e7e1218ae8cfdbd5fcc60dc2ce6d22d8d3a
+STAGE_6_VERDICT = PASS_ARCHITECTURE_ACCEPTED (#209)
+D1_D6_STATUS = ACCEPTED (#209) / FROZEN (#210)
+MINIMUM_CORE_TRACEABILITY = 20/20 VALID (#209)
+FREEZE_STAGE = #210
+VALIDATION_OWNER = #212
+VALIDATION_CONTRACT_VERSION = PLAYBACK-EXECUTION-VALIDATION-v1
+VALIDATION_CONTRACT_BLOB_SHA = bed2522f89d0976de24d58682df95a7ba67eb071
+VALIDATION_STAGE = #211 (NOT STARTED)
 BASE_MAIN_SHA = b72cab4d647edba5ecb255050f9434a13e38c2d0
 STAGE_4_MERGE_SHA = b72cab4d647edba5ecb255050f9434a13e38c2d0
 PRODUCTION_BEHAVIOR_CHANGE = NONE
 C1 = COMPLETE / MERGED (#204 / #205)
 C2 = COMPLETE / MERGED (#206 / #213)
-D1_D6_STATUS = CANDIDATE / PENDING STAGE-6 ACCEPTANCE (#209)
 ```
 
-This is the canonical candidate cross-protocol execution authority and reading
+This is the canonical frozen cross-protocol execution authority and reading
 entry point. [#198][198] owns architecture diagnosis/decisions; [#201][201] owns
 sequencing. [#207][207] / [#214][214] produced the Stage-4 candidate;
 [#208][208] makes that merged subject explicit without changing execution.
@@ -23,10 +32,13 @@ with #206 closed. Both realizations are present at the exact base above.
 Old issue status snapshots and historical implementation proposals are provenance,
 not the current resume point.
 
-**D1–D6 remain CANDIDATE.** Inherited statements retain only the force and scope
-of their linked accepted authority. Current realization describes code, not a
-new protocol definition. Stage 5 neither accepts these decisions nor freezes
-architecture; those gates belong to #209 and #210 respectively.
+**D1–D6 are ACCEPTED (#209) and FROZEN (#210).** Inherited statements retain only
+the force and scope of their linked accepted authority. Current realization
+describes code, not a new protocol definition. #209 recorded
+`PASS_ARCHITECTURE_ACCEPTED` at the exact subject SHA above (minimum-core
+20/20 VALID; P0/P1/P2 = 0); #210 freezes the accepted architecture at that
+subject and binds it to the already-frozen validation contract of #212.
+The freeze records status and identity only; it changes no D1–D6 proposition.
 
 The execution shape is state owners, resource-confined workers, typed bounded
 seams, local serialization/program order, designated semantic authorities and
@@ -50,17 +62,17 @@ it does not replace their predicates.
 | DSP Desired/Accepted/Applied/Transitioning/Settled | [DSP product model][dsp] §7.3; PBK-002 D14.11 for lifecycle/placement/admission | Explain control recording versus worker execution |
 | Evidence, acceptance, commit, observation vocabulary | [Temporal semantics][temporal] §2–6 | Reuse vocabulary; protocol owners retain predicates |
 | PCM transport | PBK-002 D8, D14.5/D14.11; PBK-003 §5; [edge][edge] and [render ports][ports] as implementation evidence | Explain ownership, bounds and waiting; do not promote implementation constants to protocol authority |
-| Execution identity/attachment, ownership, waiting, ordering, failure, quiescence and bounds scope | **This candidate, D1–D6** | Proposed cross-protocol authority; requires review before freeze |
-| Host-input failure/result settlement | This candidate D3/D5; C2 realizes it | Invocation-local admission/failure/acknowledgement/seal only; never D11 truth |
+| Execution identity/attachment, ownership, waiting, ordering, failure, quiescence and bounds scope | **This document, D1–D6** | Accepted cross-protocol authority (#209); frozen (#210) |
+| Host-input failure/result settlement | This document D3/D5; C2 realizes it | Invocation-local admission/failure/acknowledgement/seal only; never D11 truth |
 
 | Decision | Status | Scope / review gate |
 | --- | --- | --- |
-| D1 | CANDIDATE | Episode identity/attachment; fresh-core precondition, not structural enforcement |
-| D2 | CANDIDATE | Cross-protocol result representation/consumption; inherited D14.6 establishment semantics remain accepted |
-| D3 | CANDIDATE | Machine input failure and result settlement; C2 realization does not accept policy |
-| D4 | CANDIDATE | Cross-protocol work-fate reading; each linked protocol retains its predicates |
-| D5 | CANDIDATE | Shutdown/quiescence scopes; no process-wide shutdown contract |
-| D6 | CANDIDATE | Local bounds/liveness scope; no global budget/deadline |
+| D1 | ACCEPTED / FROZEN | Episode identity/attachment; fresh-core precondition, not structural enforcement |
+| D2 | ACCEPTED / FROZEN | Cross-protocol result representation/consumption; inherited D14.6 establishment semantics remain accepted |
+| D3 | ACCEPTED / FROZEN | Machine input failure and result settlement; C2 realization does not accept policy |
+| D4 | ACCEPTED / FROZEN | Cross-protocol work-fate reading; each linked protocol retains its predicates |
+| D5 | ACCEPTED / FROZEN | Shutdown/quiescence scopes; no process-wide shutdown contract |
+| D6 | ACCEPTED / FROZEN | Local bounds/liveness scope; no global budget/deadline |
 
 ## 2. Reading views + Fact lens
 
@@ -102,7 +114,7 @@ Source, Position and DSP diagnostic reads need not form one cross-cell snapshot.
 
 ## 3. Identity / lifetime / attachment
 
-### D1 — Episode attachment (CANDIDATE)
+### D1 — Episode attachment (ACCEPTED / FROZEN)
 
 **One fresh `PlaybackSessionHandle`/completion core is attached to one playback
 episode's establishment attempt. A clone references that same episode. Retry,
@@ -146,11 +158,11 @@ enforce the precondition structurally remains an unchosen implementation
 hardening question outside Stage 5. #208 only clarifies the candidate domain
 precondition; it authorizes no executable enforcement.
 
-### D2 — Whole fresh-composition establishment (CANDIDATE; inherited D14.6)
+### D2 — Whole fresh-composition establishment (ACCEPTED / FROZEN; inherited D14.6)
 
 **PBK-002 D14.6 already defines the authoritative new-episode activation result
 `Activated` over the WHOLE fresh composition.** Required providers, dependency
-resolution and Session activation all belong to that result. This candidate does not
+resolution and Session activation all belong to that result. This document does not
 reopen or redefine it.
 
 Generic K0 operation success is not playback `Activated`. `FiberState::Active`,
@@ -198,7 +210,7 @@ clearance uses absent root or `Discharged`; only then create/establish fresh
 world. On success install that episode; on failure perform D14.6 failure-clean
 disposal or retain the violated root and fail-stop. Neither host derives the
 choice from a read-side snapshot. C1 realizes representation and placement;
-the candidate does not itself prescribe an API spelling.
+the document does not itself prescribe an API spelling.
 
 C1 provenance: [#204][204] / [#205][205] record the removed Fiber/source/diagnostic
 reconstruction. Current establishment correctness follows the operation result
@@ -246,16 +258,16 @@ seam. The application factory structurally fixes the whole composition to the
 canonical three-Plugin wiring. Fresh-core/single-attempt remains a precondition; no
 reattachment enforcement, second lifecycle or terminal rule is added. The result
 survives immediate D11 settlement and disposal. C2 realizes only the machine-host
-settlement in §8; the overall execution architecture remains
-CANDIDATE / NOT FROZEN.
+settlement in §8; the overall execution architecture is ACCEPTED
+(#209) / FROZEN (#210).
 
 ## 4. Owner / writer inventory
 
 An entry can be a semantic owner, execution context or owned communication
 resource; these are not additional Plugins. Session core and SessionCompletion
 are the semantic role and its realization, **not two terminal authorities**.
-All “current” entries map to production at the audited SHA; D3/D5 remain
-candidate cross-cutting policy, realized by merged C2.
+All “current” entries map to production at the audited SHA; D3/D5 are
+accepted cross-cutting policy (#209), realized by merged C2.
 
 Here, **owner** names lifetime/teardown responsibility; **writer** names the
 path that mutates a particular record; **serializer** names the local lock or
@@ -270,7 +282,7 @@ Resource ownership does not designate a Fact authority.
 
 ### 4.1 App / host
 
-| Attribute | Current realization / candidate obligation |
+| Attribute | Current realization / accepted obligation |
 | --- | --- |
 | Identity; lifetime; lifetime owner | One QianqianApp composition root per attempted episode; machine invocation or longer-lived ReferencePlayer owns roots and host collections |
 | Execution context; state; writers | Serialized caller/control thread; host methods write current root/handle, playlist/navigation/volume, desired input and failure-clean disposition; generic K0 alone writes admitted desired/catalog/Fiber state behind the root |
@@ -285,7 +297,7 @@ Evidence: entry `start_episode`, `RealEpisodeSource`; player `replace_episode`,
 
 ### 4.2 Playback Session semantic core
 
-| Attribute | Current realization / candidate obligation |
+| Attribute | Current realization / accepted obligation |
 | --- | --- |
 | Identity; lifetime; lifetime owner | D1 one fresh handle/core for one attempt/episode; App owns attachment/root; retained clones extend storage lifetime |
 | Execution context; state; writers | No dedicated Session thread. Completion state/cells hold mutable episode intent/evidence/truth; methods write them on command callers, decode exit/failure paths and render evidence callbacks; no dedicated Session thread |
@@ -299,7 +311,7 @@ Evidence: handle/session/completion. Ownership authority: PBK-002 D6/D11/D14.2.
 
 ### 4.3 SessionCompletion realization
 
-| Attribute | Current realization / candidate obligation |
+| Attribute | Current realization / accepted obligation |
 | --- | --- |
 | Identity; lifetime; lifetime owner | Shared completion Arc of D1 core; handles/activation closures/callbacks hold references, evidence callbacks use weak core references |
 | Execution context; state; writers | CompletionState under mutex: stop/pause, activation/source evidence, first failure/terminal, worker/gate/cut fields, bound stop target. Session activation caller writes activation/source evidence and binds stop target; command callers write intent/routing; worker/render callbacks publish their designated evidence |
@@ -314,7 +326,7 @@ Evidence: completion `publish_evidence`, `wait_terminal`, `request_seek`,
 
 ### 4.4 Decode worker
 
-| Attribute | Current realization / candidate obligation |
+| Attribute | Current realization / accepted obligation |
 | --- | --- |
 | Identity; lifetime; lifetime owner | One spawned worker of established Session; Session's registered inverse owns its JoinHandle and endpoint relation |
 | Execution context; state; writers | Worker thread exclusively owns decoder endpoint, processing instances, staging/remainder, local pending seek; decoder reads/seeks and LiveProcessing progression confined to it |
@@ -329,7 +341,7 @@ worker/failure methods. PBK-002 D14.5/D14.11 own ordering and seek/DSP interacti
 
 ### 4.5 LiveProcessing / ProcessingControl
 
-| Attribute | Current realization / candidate obligation |
+| Attribute | Current realization / accepted obligation |
 | --- | --- |
 | Identity; lifetime; lifetime owner | Episode-owned processor/control resource; Session binds it, decode worker owns live engine; handle may retain control after engine ends |
 | Execution context; state; writers | Construction/Session factory records initial Desired and clears pending through `establish`; setters write Desired/pending/intrinsic-refusal diagnostics under control lock; activation caller binds by consuming pending and reading Desired in one hold; decode worker consumes pending and can write compile-refusal diagnostics under that lock, and alone writes accepted engine, old/new transition, elapsed frames and scratch |
@@ -344,7 +356,7 @@ Evidence: live `ProcessingControl`, `LiveProcessing`, `poll_update`, `stage`,
 
 ### 4.6 PcmEdge producer / consumer
 
-| Attribute | Current realization / candidate obligation |
+| Attribute | Current realization / accepted obligation |
 | --- | --- |
 | Identity; lifetime; lifetime owner | One prebound episode PCM resource; Session owns relation, shared references may outlive joined workers |
 | Execution context; state; writers | No thread of its own; decode writes samples/write cursor/buffered count and EOF/fail/Applied-seek purge; render `read_frames` writes read cursor/buffered count; backend abort, command Stop and Session inverse call edge stop. One edge mutex serializes these writers; none gains semantic authority |
@@ -358,7 +370,7 @@ Evidence: edge; session prebinds producer/consumer, PBK-002 D8/D14.5.
 
 ### 4.7 Render worker / device seam
 
-| Attribute | Current realization / candidate obligation |
+| Attribute | Current realization / accepted obligation |
 | --- | --- |
 | Identity; lifetime; lifetime owner | One backend render stream per current Session relation; Output owns backend allocation mechanism, Session owns returned stream lifetime |
 | Execution context; state; writers | WASAPI render thread owns COM/device/event objects, handed-off basis, tail probes and volume application; Session command/teardown paths and worker-side Session seek decisions route gate intent/release; render consumes release and produces engagement/position/drain evidence |
@@ -374,7 +386,7 @@ not executed by this documentation audit.
 
 ### 4.8 Machine stdin reader
 
-| Attribute | Current realization / candidate obligation |
+| Attribute | Current realization / accepted obligation |
 | --- | --- |
 | Identity; lifetime; lifetime owner | Named `qianqian-stdin` thread per machine transport; host creates it, currently may detach; retained handle fixes its episode scope |
 | Execution context; state; writers | Reader thread owns stdin lock/current line; host observes spawn failure; reader and owner share bounded first-failure bookkeeping and owner seal (C2) |
@@ -386,11 +398,12 @@ not executed by this documentation audit.
 
 Evidence: entry `machine_transport`/`finish_episode`; [machine input][machine-input]
 admission, failure and acknowledgement operations; [oracles][machine-input-tests].
-C2 realizes candidate D3/D5; it does not freeze the execution architecture.
+C2 realizes accepted D3/D5 (#209); realization itself is not the freeze
+(#210 froze the architecture at the Stage-6 subject).
 
 ### 4.9 Observation / read-side consumers
 
-| Attribute | Current realization / candidate obligation |
+| Attribute | Current realization / accepted obligation |
 | --- | --- |
 | Identity; lifetime; lifetime owner | Host/UI/status readers, not automatically Plugins; caller owns subscription/poll lifetime and retained references |
 | Execution context; state; writers | Caller contexts build display/navigation projections; completion/Position/control producers own underlying truth/evidence |
@@ -428,7 +441,7 @@ No independent Plugin/thread/result authority is introduced by this boundary.
 | Observers | Invocation owner reads sealed failure; reader checks admission. No observation consumer commits a playback outcome |
 | Inputs; outputs | Reader effects or infrastructure failures plus owner seal call → effect permit/completion ack and fixed first-failure classification; final exit also consumes genuine terminal/disposal presentation independently |
 | Waiting seams; serialization | `admit`, failure record, `Operation::drop`, `seal` use one bookkeeping mutex; completion condvar releases it while owner drains active work. Neither blocked read nor reader return carries an operation debt |
-| Semantic authority; failure responsibility | D3/D5 candidate host-result scope only; HostFailure is invocation-local infrastructure truth, never D11. Reports first admitted cause before Stop response |
+| Semantic authority; failure responsibility | D3/D5 host-result scope only; HostFailure is invocation-local infrastructure truth, never D11. Reports first admitted cause before Stop response |
 | Stop/cancellation; termination acknowledgement; resources | Closure rejects fresh effects; drain acknowledges admitted operation, then seal fixes failure record. Does not cancel/join stdin. Owns only fixed bookkeeping/condvar, not edge/device/Session lifecycle |
 
 Evidence: [machine input][machine-input] `HostInput`, `Operation`, `start_reader`;
@@ -458,7 +471,7 @@ review, even when ordinary private mechanisms can be replaced.
 | DSP transition / worker → same worker | One old/new pair plus one-block scratch; exclusive worker program order | No inter-thread wait; processed-frame progression; worker edge backpressure may suspend further processing | Complete-in-flight during continuing PCM; Applied seek rebuilds accepted target; ending/EOF drops incomplete work | DSP §7.3 sample-driven sound semantics, no publication epoch. Live `stage`, `invalidate_signal_history` |
 | Drain signal + gate event callbacks / render → Session | One drain verdict **FIRST-WINS**; fixed current gate fields, no event queue | Synchronous observer before first `complete` returns, outside signal locks; terminal condvar notification through owner publication | Later drain calls inert; terminal suppresses later evidence; callback is not worker termination acknowledgement | Backend evidence feeds Session decision; Output never commits D11 independently. Ports `DrainSignal::complete`, `RenderGate::emit`; completion weak observers |
 | Position + output level / render → read side; App → render | One Position cell/single writer; one routed level; no delivery queue | Pure atomic sample/load; rebase on render path; level apply at loop top | Unknown landing withdraws Position; terminal suppresses product derivation; latest routed level observed when leg progresses | Evidence/desired value, no acoustic claim or applied-level receipt. Ports `PositionEvidence`, `OutputLevel`; WASAPI `steady_loop` |
-| HostInput admission/failure/ack/seal / reader or spawning host → invocation owner | One active effect, one fixed first cause; bookkeeping-lock order, not physical-event timestamp | Permit guard holds no mutex; Drop clears active + notifies; seal closes admission then condvar-waits for ack; no domain/I/O inside lock | **FIRST-WINS** failure; admission closed → **INERT** fresh work; admitted effects finish before seal; active output can delay seal | D3/D5 candidate host-result cut; not playback Fact or reader join. [machine input][machine-input] `admit`, `fail_with_response`, `Operation::drop`, `seal` |
+| HostInput admission/failure/ack/seal / reader or spawning host → invocation owner | One active effect, one fixed first cause; bookkeeping-lock order, not physical-event timestamp | Permit guard holds no mutex; Drop clears active + notifies; seal closes admission then condvar-waits for ack; no domain/I/O inside lock | **FIRST-WINS** failure; admission closed → **INERT** fresh work; admitted effects finish before seal; active output can delay seal | D3/D5 host-result cut; not playback Fact or reader join. [machine input][machine-input] `admit`, `fail_with_response`, `Operation::drop`, `seal` |
 | Blocking stdin / OS → reader | One reusable String, input-sized/unbounded line; local read/line order | `read_line` holds stdin lock and can block forever; owns no admitted-operation debt; no unconditional join | EOF normal; read error/panic tries effect admission; late read result exits on rejection; a preclosure open check can permit read-start after seal; unread input may be abandoned | Physical input wait is outside result serialization. Machine input `read_input`, `spawn_reader` |
 | Worker joins / Session inverse → decode/render thread | One JoinHandle each; render inverse registered first, decode last | Ordinary blocking join after edge stop; gate release before render join. No mutex needed by joined work held across join | Thread return acknowledges termination; failure verdict remains distinct; native calls may prevent progress | D6 lifetime relations/K0 discharge, not terminal/acoustic truth. Session activation inverses; WASAPI `stop_and_join`; [open-abort][open-abort] |
 | Device open/native waits / Output caller ↔ render; worker ↔ decoder | One open verdict slot; device-owned buffer; one endpoint | Open condvar up to 10 s then abort/join outside verdict lock; event wait 100 ms; native decoder/device calls may block | Failed open cleans before handoff; runtime abort stops edge + publishes drain; drain loop 5 s cap, not whole-operation deadline | PBK-003 realization; platform-specific calls/constants do not define generic semantics. [wasapi][wasapi] `open_stream`, `run_render_thread`, `drain_to_zero`; ports decode/output contracts |
@@ -469,7 +482,7 @@ signal locks before entering Session. Host bookkeeping is never nested across
 Stop, terminal wait, root disposal or blocking I/O. Independent local lock orders
 are not a global execution order; observe and command callers can interleave.
 
-## 6. Admission / in-flight / work fate — D4 (CANDIDATE)
+## 6. Admission / in-flight / work fate — D4 (ACCEPTED / FROZEN)
 
 Inherited protocol-specific semantics, with D1 attachment and D3 host settlement
 proposed above. “Must settle” means the stated protocol obligation, not a common
@@ -488,7 +501,7 @@ conditions; it is not a second episode lifecycle enum.
 | Active DSP transition | Worker creates accepted target transition, starts Applied on a whole staging block | One transition; complete-in-flight before another pickup during continuing processing; sample-driven progression | Normal newer Desired does not preempt it. Applied Seek invalidates/rebuilds accepted target fresh; Refused Seek preserves it. Ending/EOF may drop an incomplete transition; current R0 has no artificial output-tail duty | DSP §7.3; PBK-002 D14.11; live `stage`, `invalidate_signal_history` |
 | PCM buffered frames | Producer writes bounded edge FIFO; render pulls | Prefix write until capacity, **BLOCK** by producer wait/retry on full, not latest-wins | EOF preserves buffered drain; stopped/failed edge refuses reads before buffer drain, so frames may be abandoned. With the leg parked, provider Applied precedes history/edge purge; production then waits for the cut's tail-quiescence/commit and release consumption. Tail-quiescence is a commit condition, not a pre-purge condition. Refused Seek preserves frames exactly | PBK-002 D14.5; PBK-003 §5; [edge][edge] `write_some`, `read_frames`, `invalidate` |
 | Late retained-handle commands | Same episode's retained core/control cells | Existing protocol methods only, no new attachment | Stop/Pause/Resume history inert for terminal semantics; Seek refuses. DSP/level histories may still mutate; no resurrection or successor binding. Terminal alone does not prove all worker code has stopped; joins do | PBK-002 D14.2/D14.4/D14.7/D14.9/D14.11; [handle][handle], completion/live |
-| Stdin unread input | OS stdin/line reader, no playback record until parsed command dispatched | Reader's local line order only; not a universal mailbox; no bounded input admission promised. D3 admission closure rejects new command/failure-report/status-output effects before its drain/seal | EOF closes normally; unread input may be abandoned. After seal, the reader only exits/releases local resources on wake, without dispatch or output; no duty to consume every line. Infrastructure failures recorded before the seal enter the host result and require record-then-Stop for an established unsettled episode | D3 candidate; [entry][entry] `machine_transport` |
+| Stdin unread input | OS stdin/line reader, no playback record until parsed command dispatched | Reader's local line order only; not a universal mailbox; no bounded input admission promised. D3 admission closure rejects new command/failure-report/status-output effects before its drain/seal | EOF closes normally; unread input may be abandoned. After seal, the reader only exits/releases local resources on wake, without dispatch or output; no duty to consume every line. Infrastructure failures recorded before the seal enter the host result and require record-then-Stop for an established unsettled episode | D3 (accepted #209); [entry][entry] `machine_transport` |
 
 Refusal and abort are different from a successful semantic result. In particular,
 an accepted seek awaiting device-tail quiescence can remain pending indefinitely
@@ -514,7 +527,7 @@ introduce no fields, sequence numbers, event log or global total order.
 | Seek: offered target → preliminary eligibility; second completion hold plants one in-flight slot, resets operation evidence and routes hold | Recording serializes with Session ending/worker exit, but its separate edge sample does not certify Accepted. Temporal §6.1 maps plant to Accepted only when actual joint eligibility holds; non-Open plant is Refused/Inert. Worker waits for actionable park and checks ending/Open before provider seek, then calls provider before any invalidation. Refusal finishes preserved remainder; Applied discards history/remainder and purges once | Landing plus current park/tail evidence and worker program order feed D14.5 cut decision; one atomic Committed/Aborted/Pending sample. Cut commit is protocol state, no Seek Fact | Committed release routes actual landing; leg consumes/rebases before further submission; continuing worker frees slot after consumption. Position sample/reported target is not commit authority; no seek join | PBK-002 D14.5; completion `request_seek`, `seek_cutover_decision`; Session `decode_worker`; ports gate, WASAPI loop |
 | Pause / Resume: caller offers intent → completion-lock record/route | Pause routes only while protocol eligible; render engages at loop top before reservation; Resume clears intent/releases gate | Current engagement and tail evidence support PBK-002 Paused derivation, never an intent-time commit or terminal Fact; disengagement proves only park ended | `paused()` is Projection; Resume is Command only. Park/tail acknowledgement is narrower than resource join; bounded prefetch can continue while paused | PBK-002 D14.7/.8; completion `request_pause`, `request_resume`, `apply_gate_event`; ports `park_loop_top` |
 | DSP update: setter offers field/config → compose + intrinsic validation + Desired/pending record in one control hold | Recording linearizes racing setters; after remainder/seek handling and prior transition settlement, worker takes latest pending and compiles outside control lock for episode format | Worker compile gives semantic Accepted; next whole unprocessed block gives Applied/Transitioning; sample progression reaches Settled. Setter `Ok` is not Accepted. No new playback Fact or durability promise | Refusal diagnostics are separate reads; external sound/applied-config identity is not exposed. Ordinary updates complete-in-flight while processing continues; ending/Seek follows §6. No per-setter completion debt | DSP §7.3; temporal §6.5; live `update_desired`, `accept`, `poll_update`, `stage`; Session fresh-block pickup |
-| C2 host settlement: physical read outside admission; returned command/report/failure offers effect → `admit` sets active if open | Failure record `get_or_insert` under host mutex precedes unlocked Stop response; `Operation::drop` clears active and notifies. After terminal + disposal, owner closes admission, waits ack, then reads first failure under mutex (final seal) | HostInput first cause contributes invocation failure independently of genuine D11 outcome. Admission closure ≠ final seal; admitted operation retains recording/effect rights during drain. No playback Fact is committed by host failure | Final owner reports/exit policy use sealed failure; fresh reader effects rejected after closure, post-seal read result inert. An unlocked preclosure read-open check may still lead to a physical read starting after seal; seal acknowledges admitted effects, not physical input/thread/process termination | D3/D5 CANDIDATE realized by C2; machine input `HostInput`, `Operation`; entry `finish_episode`; machine `machine_exit_code` |
+| C2 host settlement: physical read outside admission; returned command/report/failure offers effect → `admit` sets active if open | Failure record `get_or_insert` under host mutex precedes unlocked Stop response; `Operation::drop` clears active and notifies. After terminal + disposal, owner closes admission, waits ack, then reads first failure under mutex (final seal) | HostInput first cause contributes invocation failure independently of genuine D11 outcome. Admission closure ≠ final seal; admitted operation retains recording/effect rights during drain. No playback Fact is committed by host failure | Final owner reports/exit policy use sealed failure; fresh reader effects rejected after closure, post-seal read result inert. An unlocked preclosure read-open check may still lead to a physical read starting after seal; seal acknowledges admitted effects, not physical input/thread/process termination | D3/D5 ACCEPTED (#209), realized by C2; machine input `HostInput`, `Operation`; entry `finish_episode`; machine `machine_exit_code` |
 
 There is no shared acceptance/commit instant across these rows. In particular,
 temporal §6.5 and DSP §7.3's specific worker Accepted boundary govern DSP; generic
@@ -523,7 +536,7 @@ setter success. No publication implies persistence, pipe delivery or audibility.
 
 ## 8. Failure / cancellation / host-result settlement
 
-### D3 — Machine input responsibility (CANDIDATE)
+### D3 — Machine input responsibility (ACCEPTED / FROZEN)
 
 Authority source: #198/#201/#202 assign host-input responsibility and require a
 deterministic settlement boundary; PBK-002 D11 owns episode truth. Code evidence:
@@ -600,7 +613,7 @@ After settlement, no reader command, failure report, status or diagnostic output
 is accepted. A late failure is discarded locally, without reporting or output;
 it cannot reopen or change this invocation's result. Panic-abort/process death and
 failures of unrelated host code are outside this recoverable reader policy.
-Merged C2 realizes these candidate rules as described below.
+Merged C2 realizes these accepted rules as described below.
 
 ### Detached reader and deterministic exit
 
@@ -634,7 +647,7 @@ needed. “Host-result ledger”
 is explanatory language for an invocation-local result record, not a new runtime
 subsystem.
 
-### 8.2 C2 merged realization (#206 / #213; D3/D5 CANDIDATE)
+### 8.2 C2 merged realization (#206 / #213; D3/D5 ACCEPTED)
 
 [Machine input][machine-input] keeps an ordinary invocation-local `HostInput`:
 one admission-closed bit, one active-operation bit, and one optional fixed-size
@@ -686,7 +699,7 @@ protocols are unchanged. [Deterministic oracles][machine-input-tests] exercise
 real Session/PCM/terminal/disposal paths with test Decode/Output mechanisms,
 pre/post-admission cuts, acknowledgement waits and a physically blocked reader
 thread. This is host-boundary evidence, not physical-device or process-quiescence
-evidence. D3/D5 and the overall execution architecture remain CANDIDATE / NOT FROZEN.
+evidence. D3/D5 and the overall execution architecture are ACCEPTED (#209) / FROZEN (#210).
 
 ### 8.3 Failure / cancellation domains
 
@@ -705,7 +718,7 @@ classification. Cleanup may itself expose a K0 violation, never relabel a Fact.
 | Live DSP validation/compile refusal / control diagnostic | NO from refusal alone | NO in current machine reader (typed DSP updates not wired there) | Preserve old engine; refuse coherent config, report diagnostic, no episode teardown required | Not Accepted, applied sound or processing Failed. DSP §7.3; live `update_desired`, `accept` |
 | Runtime device/output abort or caught render panic / Output mechanism evidence to Session | YES: Session resolver may classify Failed or Stopped according to decisive evidence/recorded Stop; detector never commits itself | YES if real Failed or disposal unsuccessful | Render exits/stops input, publishes Aborted; decode exits; Session gate release + joins | Not unconditional Failed solely from drain Aborted, no acoustic claim. D11, PBK-003; WASAPI `run_render_thread`, completion `resolve` |
 | User Stop / Session command history | YES: only real D11 Stopped/other winning predicate, not command itself | YES conditionally: real Stopped/Completed with quiet disposal succeeds; Failed/unclean disposal fails | Release gates and edge; owner consumes terminal then disposes | Cannot rewrite already decisive/committed Completed/Failed; not cancellation acknowledgement. D14.4; completion `request_stop`, machine `episode_exit_code` |
-| Stdin spawn failure / spawning host infrastructure cause | NO: never forged playback Failed | YES: admitted host cause forces exit 1 | No reader exists; synchronously record first cause, existing Stop if unsettled, genuine terminal/disposal then seal | Cannot relabel natural Completed/Stopped/Failed. D3/D5 candidate; machine input `start_reader`, `failure` |
+| Stdin spawn failure / spawning host infrastructure cause | NO: never forged playback Failed | YES: admitted host cause forces exit 1 | No reader exists; synchronously record first cause, existing Stop if unsettled, genuine terminal/disposal then seal | Cannot relabel natural Completed/Stopped/Failed. D3/D5; machine input `start_reader`, `failure` |
 | Stdin read error / admitted reader infrastructure cause | NO | YES if admitted/recorded before final seal | Reader effect records before unlocked Stop, acknowledges and exits; host owns terminal/disposal/seal | Not EOF or playback diagnosis; physical occurrence before cut alone insufficient. D3; `read_input`, `Operation::fail` |
 | Caught reader unwind panic / admitted host infrastructure cause | NO | YES if admitted before seal | Inside admitted output/dispatch catch, record/Stop before Drop ack; read/outer catches must acquire admission. Postclosure panic report inert; hook filter currently suppresses automatic reader diagnostics | No universal panic recovery/panic-abort guarantee; hook/name mechanism is replaceable. D3; `line`, `start_reader`, `install_reader_panic_hook` |
 | Teardown/disposal violation / K0 authoritative verdict | NO new playback Fact from violation; existing D11 remains immutable | YES: non-success disposal report/exit | K0 latches open relation and blocks provider release; reference retains violated root/fail-stops. Machine consumes verdict/report and returns non-success; no new recovery | Not failed activation, clean quiescence or late terminal relabel. K0 §G.6; kernel unwind/dispose, player `latch_fail_stop`, entry disposal report |
@@ -718,13 +731,13 @@ correctness predicate. A racing terminal makes existing Stop semantically inert.
 EOF creates no host failure; host failure and playback failure remain separate
 even when both contribute non-success presentation.
 
-## 9. Shutdown / quiescence / resource milestones — D5 (CANDIDATE)
+## 9. Shutdown / quiescence / resource milestones — D5 (ACCEPTED / FROZEN)
 
 This milestone model names observations and obligations, not new production
 states. Inherited authority: D11, PBK-002 D6/D14.6, K0 §G.6, PBK-003 §5.
 Code mapping: [session][session] activation relations/inverses, [completion][completion]
 worker/evidence paths, [WASAPI][wasapi] stream stop/join, [kernel][kernel] unwind.
-D3/D5's candidate host milestones are realized by merged C2.
+D3/D5's host milestones are realized by merged C2.
 
 | Milestone | Scope / owner | What it proves | What it does not prove | What becomes impossible / what remains possible |
 | --- | --- | --- | --- | --- |
@@ -739,7 +752,7 @@ D3/D5's candidate host milestones are realized by merged C2.
 | Host input admission closed | Invocation effects / host `HostInput::seal` | `admission_closed = true` under bookkeeping lock rejects new effects | Final sealed result, finished admitted effects, cancelled/joined stdin | No fresh reader effect admission; a preclosure admitted effect/failure response may still finish/record before seal; blocked stdin may remain. |
 | Host admitted operation drained | Invocation effects / `Operation::drop` + owner wait | Active bit cleared under mutex; condition-variable wait finishes after ack | Stdin returned; final owner reports completed; failure physical-event timestamp order | No admitted operation remains to act for this invocation; final seal/read and owner reporting may remain; stdin can remain blocked. |
 | Host result sealed | Invocation result / machine host | D3 pre-seal recorded-failure cut and final classification fixed; reader command/failure-report/status-output admission closed | Reader ended, final owner reports delivered, process-wide quiescence | No reader command/report/failure or result relabeling; final owner output, detached blocked read and later local cleanup can remain. |
-| Host function returned | Invocation caller boundary / host | Control returned with the sealed result (candidate D3) | Detached reader ended, all process threads joined | No further code in this host call; detached reader storage/I/O and other process work can remain. |
+| Host function returned | Invocation caller boundary / host | Control returned with the sealed result (D3) | Detached reader ended, all process threads joined | No further code in this host call; detached reader storage/I/O and other process work can remain. |
 | Stdin reader ended | Host-input worker / reader, acknowledgement if owned/observed | No further reader work after actual return; observed join would acknowledge it | Episode completion, all host tasks ended; production currently has no such observation | No work from this returned reader; other invocation/process/episode resources may remain. |
 | Process exited | Process / entrypoint + OS | Process execution ceased; OS reclaims process resources | Graceful protocol discharge, successful joins, delivery of final output | No process execution; OS resource reclamation is not graceful discharge evidence. |
 
@@ -770,9 +783,9 @@ D3 deliberately permits return without that claim. Process-wide quiescence
 requires accounting for every process execution context, not only playback/K0.
 Neither K0 `Discharged` nor host-result settlement proves the reader ended.
 PBK-001's wider shutdown/unwind gaps are not silently closed by this machine-only
-candidate policy.
+policy.
 
-## 10. Bounds / backpressure / liveness assumptions — D6 (CANDIDATE)
+## 10. Bounds / backpressure / liveness assumptions — D6 (ACCEPTED / FROZEN)
 
 These are audited realization bounds at the stated SHA, not a global allocation
 budget. Owners retain protocol policies in the authority table. Logical element
@@ -868,10 +881,10 @@ promise that private representation remains frozen.
 
 | Question | Owning authority | Primary code evidence | Current closure / remaining gap |
 | --- | --- | --- | --- |
-| EA-A01 — execution identity | D1 candidate; PBK-002 D11/D14.6 | [handle][handle] `new`/Clone; [assembly][assembly] `establish`; [session][session] `playback_session_spec_with_establishment`; entry `RealEpisodeSource::start`; kernel `activate_fiber` | Fresh episode core, shared clones; repeat attachment unsupported, not structurally forbidden |
+| EA-A01 — execution identity | D1 (accepted); PBK-002 D11/D14.6 | [handle][handle] `new`/Clone; [assembly][assembly] `establish`; [session][session] `playback_session_spec_with_establishment`; entry `RealEpisodeSource::start`; kernel `activate_fiber` | Fresh episode core, shared clones; repeat attachment unsupported, not structurally forbidden |
 | EA-B01 — mutable state and writers | D1/D4/§4; protocol owners | [completion][completion] state; [live][live] control/engine; [edge][edge] cursors; [wasapi][wasapi] locals; [machine input][machine-input] state (§4) | Named writer/lock/thread ownership; no inferred global state owner |
 | EA-B02 — owner versus serializer versus authority | PBK-002 D6/D11; DSP §7.3; §4 | session inverses; completion `publish_evidence`; live `stage` | Session lifetime ownership, locks/program order serialization, designated semantic authority kept distinct |
-| EA-C01 — command admission and ending fate | PBK-002 D14.4/.5/.7; DSP §7.3; D3/D4 | completion `request_*`; live setters/`poll_update`; machine input `HostInput`/`Operation`; entry reader | §6 and temporal §6.1 distinguish Accepted from non-Open Refused/Inert records; completion split-record/exit oracle + session real-worker/control oracle pin fate. D3/D4 remain candidate |
+| EA-C01 — command admission and ending fate | PBK-002 D14.4/.5/.7; DSP §7.3; D3/D4 | completion `request_*`; live setters/`poll_update`; machine input `HostInput`/`Operation`; entry reader | §6 and temporal §6.1 distinguish Accepted from non-Open Refused/Inert records; completion split-record/exit oracle + session real-worker/control oracle pin fate. D3/D4 accepted (#209) |
 | EA-D01 — communication model | PBK-002 D8/D14.5; PBK-003 §5; D6 | edge; ports gate/drain; completion seek slot; live pending | Typed FIFO/cells/callbacks, no generic mailbox or PCM event bus |
 | EA-E01 — local serialization | Temporal §3/§6; protocol owners; §4 | completion lock holds; live control lock; session worker; wasapi loop; machine input admission/record/ack/seal (§5/§7) | Local serial points identified; no universal command order |
 | EA-E02 — acceptance/linearization | PBK-002 D14.5/.7; DSP §7.3; D2/D3 | completion `request_seek`/pause/stop; live setters/`accept`; player `replace_episode` | Seek plant is Accepted only with actual D14.5 eligibility there (temporal §6.1); exact ending witness and Open worker control distinguish it. Setter record differs from DSP Accepted; C1 establishment and C2 admission/ack/seal retain their boundaries (§7) |
@@ -885,7 +898,7 @@ promise that private representation remains frozen.
 | EA-K02 — failure domains | Same owners; D2/D3/D5 | player `failure_clean_start`/fail-stop; completion first failure; entry `finish_episode`; machine input `fail_with_response`, `seal` (§8) | Host failure cannot forge Failed; violation retains composition; no invented recovery |
 | EA-O01 — boundedness | D6; DSP §7.3; protocol owners | session constants/staging/remainder; edge ring; live slots/transition; completion fields; HostInput `State` (§10) | Logical local bounds inventoried; diagnostic/native/host bytes not globally budgeted |
 | EA-O02 — backpressure/busy policy | PBK-002 D14.5; DSP §7.3; D4/D6 | edge `write_some`/wait; completion seek refuse; live latest pending | BLOCK/REFUSE/LATEST-WINS/FIRST-WINS/DROP/INERT scoped to actual structures |
-| EA-Q01 — shutdown order | K0 §G.6; PBK-002 D6/D14.6; PBK-003 §5; D5 | session inverse registration; kernel `run_unwind`; player retirement; open-abort | Episode relation ordering explicit; merged C2 realizes candidate host closure/ack/seal; detached reader separately scoped |
+| EA-Q01 — shutdown order | K0 §G.6; PBK-002 D6/D14.6; PBK-003 §5; D5 | session inverse registration; kernel `run_unwind`; player retirement; open-abort | Episode relation ordering explicit; merged C2 realizes accepted host closure/ack/seal; detached reader separately scoped |
 | EA-Q02 — quiescence proof | Same owners; D5 | decode/render JoinHandles; dispose verdict; completion terminal | Terminal ≠ joins; Discharged ≠ stdin end; host result ≠ process quiescence |
 | EA-R01 — resource lifetime | PBK-002 D6; PBK-003 §5; D1/D5/§4 | session endpoint/stream effects; wasapi RAII; core retained Arcs; App roots | Allocation versus relation ownership explicit; retained history/storage can outlive execution |
 
@@ -901,23 +914,23 @@ promise that private representation remains frozen.
 | GUARANTEE (inherited) | Composition inverse/discharge ordering blocks provider release past violation | K0 §G.6; realization kernel/session |
 | ASSUMPTION | A claimed backend discharge/format/read contract is honored by its implementation; tests must target the actual boundary | PBK-003 §5; decode/output ports; not established by this docs audit |
 | ASSUMPTION | OS schedules runnable work, native calls/device progress and blocking I/O eventually return where liveness is claimed | D6; concrete native/backend paths |
-| ASSUMPTION (candidate precondition) | Assembly attaches one fresh core/spec to only one attempt | D1; current handle contract |
+| ASSUMPTION (accepted D1 precondition) | Assembly attaches one fresh core/spec to only one attempt | D1; current handle contract |
 | NON-GUARANTEE | No general Actor runtime, universal mailbox ordering, playback-wide generation/epoch or new global registry | K0/PBK-002 current model; D1/§1 |
 | NON-GUARANTEE | No global fixed-memory budget or global operation deadline; local bounds/slices are narrower | D6 |
 | NON-GUARANTEE | Terminal Fact implies neither resource quiescence nor worker joins; Discharged implies neither host nor process quiescence | D5; D11/K0 scopes |
 | NON-GUARANTEE | Source/Position/refusal observations have no universal cross-cell atomicity/freshness/acoustic guarantee | PBK-001; PBK-002 D14.8; temporal |
-| NON-GUARANTEE | No unconditional blocked-stdin join or external output-delivery deadline; reader dispatch/report/output is forbidden after seal | D3 candidate |
-| OPEN / CANDIDATE DECISION | D1 attachment clarification; optional structural enforcement unchosen | D1; no executable enforcement in this stage |
-| OPEN / CANDIDATE DECISION | D2 common host representation and consumption of existing Activated; C1 merged #205; cross-protocol D2 acceptance still belongs to #209 | D2; #201 sequencing |
-| OPEN / CANDIDATE DECISION | D3 recorded-failure cut, mandatory record-then-Stop and closed post-seal reader admission/output; C2 realization; decision remains candidate for architecture review | D3; #202 scope |
-| OPEN / CANDIDATE DECISION | D4–D6 cross-protocol fate, quiescence and bounds scopes await independent review/freeze; inherited rules already retain their authority | This candidate |
-| CURRENT REALIZATION (candidate policy) | One fixed-size first host cause; close→admitted-effect ack→seal; pre-seal failure contributes exit 1; no host mutex across playback/I/O | C2 #213; D3/§5/§7/§8 |
+| NON-GUARANTEE | No unconditional blocked-stdin join or external output-delivery deadline; reader dispatch/report/output is forbidden after seal | D3 (accepted) |
+| ACCEPTED / FROZEN DECISION | D1 attachment clarification; optional structural enforcement remains unchosen future work | D1; no executable enforcement accepted |
+| ACCEPTED / FROZEN DECISION | D2 common host representation and consumption of existing Activated; C1 merged #205; cross-protocol D2 acceptance recorded by #209 | D2; #201 sequencing |
+| ACCEPTED / FROZEN DECISION | D3 recorded-failure cut, mandatory record-then-Stop and closed post-seal reader admission/output; C2 realization; decision accepted by #209 | D3; #202 scope |
+| ACCEPTED / FROZEN DECISION | D4–D6 cross-protocol fate, quiescence and bounds scopes accepted by #209 and frozen by #210; inherited rules retain their authority | This document |
+| CURRENT REALIZATION (accepted policy #209) | One fixed-size first host cause; close→admitted-effect ack→seal; pre-seal failure contributes exit 1; no host mutex across playback/I/O | C2 #213; D3/§5/§7/§8 |
 | CURRENT REALIZATION (replaceable mechanism) | Owned-reader automatic panic diagnostics filtered by thread-name/global hook; catchers implement host classification. Neither name nor hook is architectural identity/semantics | machine input `install_reader_panic_hook`; §8.2 |
 | NON-GUARANTEE | Host result sealed ≠ blocked stdin returned/reader joined/host output delivered/process exited; no reader effects after seal | D3/D5; §8–10 |
 
 No new runtime gap or accepted-authority contradiction is claimed by this audit.
 The two campaign differentials C1/F1 and C2/F2 are corrected by merged #205
-and #213 respectively; the candidate decisions await #209 acceptance. A concrete
+and #213 respectively; the decisions were accepted by #209 and frozen by #210. A concrete
 counterexample must be classified as model/spec mismatch, implementation defect,
 authority gap, or refinement/oracle gap before changing production or authority.
 Generic K0 capability is not evidence of supported playback-core reattachment;
@@ -928,7 +941,7 @@ already-owned D14.6 or DSP §7.3 semantics.
 ### Review / validation handoff
 
 The Stage-4 merge and this Stage-5 explicitness subject retain all fixed 20
-questions in §12. C1/C2 are merged; D1–D6 remain CANDIDATE. Stage-5 review
+questions in §12. C1/C2 are merged; D1–D6 are ACCEPTED (#209) and FROZEN (#210). Stage-5 review
 checks wording, authority routing and the docs/comment-only diff; it is **not
 #209 acceptance** and does not freeze architecture.
 
@@ -945,16 +958,19 @@ authority and current realization. Optional structural one-shot attachment,
 DSP applied/read-model identity and generic process shutdown remain unchosen
 future work; Stage 5 authorizes none of them.
 
-**Before Stage 7 architecture freeze begins, the separate execution-validation
-owner #212 and its versioned contract must already be ready** (#198/#201 Stage 6.5). #212 freezes the contract in
-`playback-execution-validation.md`; this candidate does not create that
-future artifact. The contract covers:
+**Stage 7 (#210) froze this architecture only after the separate
+execution-validation owner #212 and its versioned contract were already
+frozen** (#198/#201 Stage 6.5). #212 froze the contract in
+`playback-execution-validation.md` as `PLAYBACK-EXECUTION-VALIDATION-v1`
+(contract blob `bed2522f89d0976de24d58682df95a7ba67eb071`); this freeze binds
+to that exact contract identity and does not modify it. The contract covers:
 architecture version under test; required platforms; deterministic/failure
 oracles; mandatory versus earned stress/performance/model checking; PASS / FAIL /
 INCONCLUSIVE; counterexample taxonomy; implementation defect versus authority
 gap; and the authority-gap reopen protocol. This document does not execute that
-campaign or weaken its gate. Validation after freeze precedes resuming dependent
-#187/#188 work. No Windows/device/audible result is inferred from generic tests.
+campaign or weaken its gate. Validation (#211) runs against the frozen subject
+and contract after freeze; resuming dependent #187/#188 work waits on its
+verdict. No Windows/device/audible result is inferred from generic tests.
 
 [198]: https://github.com/jnhu76/qianqian/issues/198
 [201]: https://github.com/jnhu76/qianqian/issues/201

@@ -9,7 +9,7 @@ status: CURRENT
 
 > **Capability Plane != Data Plane。**
 
-本页是派生阅读页：generic control/data-plane 防火墙（K0，PR #71）和当前 decode → episode-owned processing → PCM edge → output 路径均已有实现。PBK-001（ACCEPTED）拥有基础契约，PBK-002（ACCEPTED）拥有当前静态组合与最小播放语义，PBK-003（ACCEPTED）拥有 Output/backend 边界。跨协议执行阅读见 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)（D1–D6 **CANDIDATE / NOT FROZEN**；§1 authority routing，§12 20/20 traceability）。本页 TransportKernel / Physical Fence 等历史映射不描述当前实现。
+本页是派生阅读页：generic control/data-plane 防火墙（K0，PR #71）和当前 decode → episode-owned processing → PCM edge → output 路径均已有实现。PBK-001（ACCEPTED）拥有基础契约，PBK-002（ACCEPTED）拥有当前静态组合与最小播放语义，PBK-003（ACCEPTED）拥有 Output/backend 边界。跨协议执行阅读见 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)（D1–D6 已由 #209 ACCEPT、#210 FROZEN；§1 authority routing，§12 20/20 traceability）。本页 TransportKernel / Physical Fence 等历史映射不描述当前实现。
 
 ---
 
