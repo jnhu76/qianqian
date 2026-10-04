@@ -295,20 +295,31 @@ fn a_processing_failure_takes_the_d11_failed_route_with_a_truthful_diagnostic() 
             !diagnostic.contains("decode"),
             "a processing failure must not masquerade as a decode failure: {diagnostic}"
         );
-        // The failed episode never resumes production.
-        let stopped_at = witnesses.consumed();
-        std::thread::sleep(Duration::from_millis(300));
-        assert_eq!(
-            witnesses.consumed(),
-            stopped_at,
-            "a failed episode must never resume production"
-        );
         assert!(
             handle.observe().position.is_none(),
             "the terminal Fact withdraws the projection"
         );
+        // The failed episode never resumes production. The Failed Fact
+        // and the data plane's own terminal are separate events — the
+        // failure publication does not atomically fail the edge (the
+        // coexistence is pinned in the completion oracles), so the
+        // render leg may still drain PCM published BEFORE the failure
+        // while the worker sits between its two publications. The
+        // freeze witness is therefore taken after teardown joined both
+        // legs (nothing can consume anymore), and its bound is the
+        // pre-failure publication itself: three staging blocks were
+        // published, the fourth stage call is the one that failed —
+        // resumed production would march past the bound toward the
+        // eight-second source.
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        let consumed = witnesses.consumed();
+        assert!(
+            consumed <= 3 * crate::session::STAGING_FRAMES,
+            "a failed episode must never resume production: {consumed} frames \
+             consumed, but only the three pre-failure staging blocks were \
+             ever published"
+        );
     });
 }
 

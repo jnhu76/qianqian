@@ -526,24 +526,27 @@ fn a_destructive_provider_failure_fails_the_episode_and_never_resumes() {
                 .is_some_and(|d| d.contains("seek failed")),
             "the diagnostic is presentation evidence of the route: {observation:?}"
         );
-        // The episode never resumes: production stopped at the cut.
-        let stopped_at = witnesses.consumed.load(Ordering::SeqCst);
-        assert!(
-            stopped_at < SOURCE_FRAMES,
-            "the destructive failure must end before the source is exhausted"
-        );
-        std::thread::sleep(Duration::from_millis(300));
-        assert_eq!(
-            witnesses.consumed.load(Ordering::SeqCst),
-            stopped_at,
-            "a failed episode must never resume production"
-        );
         assert!(
             handle.observe().position.is_none(),
             "the terminal Fact withdraws the projection"
         );
+        // The episode never resumes: production stopped at the cut. The
+        // Failed Fact and the data plane's own terminal are separate
+        // events, so the render leg may still drain PCM published before
+        // the failure while the worker sits between its two publications
+        // — the freeze witness is therefore taken after teardown joined
+        // both legs (nothing can consume anymore) and pinned against the
+        // source: resumption would drain to exhaustion, a failed episode
+        // must stay short of it.
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        let settled = witnesses.consumed.load(Ordering::SeqCst);
+        assert!(
+            settled < SOURCE_FRAMES,
+            "a failed episode must never resume production: {settled} frames \
+             consumed — the destructive failure must leave the source \
+             unexhausted"
+        );
     });
 }
 
