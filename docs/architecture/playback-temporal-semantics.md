@@ -114,10 +114,10 @@ episode format, with the accepted processor target held as specified by
 neither a universal lock nor a universal acceptance mechanism.
 
 ```text
-seek        the second completion-lock hold in request_seek
-            (re-validation + one-seek plant + per-cycle evidence reset
-            + gate-hold routing — one atomic unit; crate
-            qianqian-playback, completion.rs)
+seek        conditional refinement at the one-seek slot plant in
+            request_seek: Accepted iff the actual D14.5 eligibility
+            conjunction holds there; an internal plant alone does
+            not establish Accepted (see §6.1)
 stop/pause  intent recorded under the one completion lock; stop intent
             is recorded BEFORE the data-plane stop is released
 DSP update  Desired recording: compose + intrinsic validation + whole-config
@@ -167,8 +167,9 @@ seek_refused    the CURRENT cycle's proven pre-mutation refusal
 cut_committed   the CURRENT cycle's cutover-commit record
 ```
 
-Lifecycle: **reset at acceptance** — when the next seek is accepted, all
-three are cleared before the new protocol runs; only the single worker
+Lifecycle: **reset at internal recording** — an Accepted seek therefore
+starts with all three cleared before the new protocol runs. A never-Accepted
+ending-raced record may also clear these private fields (§6.1); only the single worker
 thread can publish new operation evidence, strictly after the slot was
 re-occupied. An operation's evidence therefore can never satisfy a later
 operation's commit boundary. This reset + the one-in-flight slot is why
@@ -311,7 +312,7 @@ SINGLE_WRITER        each published cell has exactly one writer
                      (position cell; worker-failure record)
 ONE_IN_FLIGHT        the seek slot holds at most one operation; a
                      second request is inert, not queued or coalesced
-EVIDENCE_RESET       operation evidence is reset at acceptance;
+EVIDENCE_RESET       seek operation evidence is reset at recording;
                      engagement-scoped evidence is reset at engagement
                      AND disengagement
 WORLD_STATE_FENCE    engagement events fence prior-cycle evidence out
@@ -372,7 +373,7 @@ Therefore:
 > stale-operation evidence.**
 
 Stale **operation** evidence (a previous cycle's landing) can never
-ground a later commit — acceptance resets it, and the slot keeps cycles
+ground a later commit — recording resets it, and the slot keeps cycles
 serialized. Continuously-true **world** evidence grounding a later
 commit is correct by definition: it asserts something about the world
 NOW. Two boundaries keep world evidence honest: the disengagement fence
@@ -399,13 +400,23 @@ COMMAND
     request_seek(target)                       (source-relative; inert
                                                 when invalid)
 
-ACCEPTANCE                                     LOCK_LINEARIZATION ·
-    one atomic unit under the completion       ONE_IN_FLIGHT ·
-    lock: re-validate frozen conditions,       EVIDENCE_RESET
-    plant under the one-seek slot ("no
-    queueing, no coalescing, no request
-    identity"), reset the cycle's operation
-    evidence, route the cut's gate hold
+ELIGIBILITY OBSERVATION
+    preliminary completion checks, then a
+    separate edge-Open sample; this is not
+    an atomic joint eligibility observation
+
+INTERNAL RECORD                                LOCK_LINEARIZATION ·
+    second completion hold rechecks episode   ONE_IN_FLIGHT ·
+    conditions, then plants in the free slot, EVIDENCE_RESET
+    resets cut evidence and routes gate hold;
+    it does NOT recheck edge Open
+
+SEMANTIC ACCEPTED (D14.5 refinement)
+    at the slot's false → true plant iff the
+    actual edge is Open there, together with
+    the protected episode/free-slot conditions;
+    otherwise the plant is Refused/Inert,
+    never Accepted
 
 WORLD-STATE EVIDENCE                           WORLD_STATE_FENCE
     engaged · seek_engaged
@@ -418,7 +429,7 @@ ENGAGEMENT-SCOPED EVIDENCE
 
 OPERATION EVIDENCE
     landing · refusal · cut commit
-    (reset at acceptance; first-wins
+    (reset at recording; first-wins
     landing latch)
 
 SERIALIZATION WALL                             PROGRAM_ORDER
@@ -436,10 +447,44 @@ COMMIT                                         ATOMIC_COMMIT ·
     else → Pending (never an abort)
 ```
 
+This is a classification of existing source histories, not an added
+runtime check, latch or public result. The second completion hold protects
+the episode conditions and serializes slot reservation; the earlier Open
+sample does not protect edge state at the plant. D14.5 owns the semantic
+classification; `request_seek` returns `()` and supplies no positive receipt.
+
+In the disputed ending history, A occupies the slot while B observes Open;
+the edge becomes Stopped before A frees the slot; B then records. B is
+**Refused/Inert, never Accepted**. Its temporary record/reset/hold is private
+bookkeeping. No instant with Open plus a free slot exists in that history.
+An Open-at-plant record is instead Accepted, even if ending subsequently
+aborts it; admission refusal and an accepted provider `RefusedUnchanged`
+outcome are different stages.
+
+The refinement is carried by irreversible edge terminals and worker program
+order. A later worker Open check confirms that the edge was also Open at the
+earlier plant; it does not introduce a later acceptance point. A non-Open
+plant can never become Open again: it cannot cause provider seek, purge,
+landing or committed rebase. The worker's ending/non-Open checks abandon it,
+or its exit funnel publishes worker-gone and aborts the stranded slot/hold.
+These private Seek fields do not participate in D11 `resolve`; the original
+ending cause retains terminal authority. After an Accepted provider call,
+result classification, successful purge/landing, cut commit, render rebase
+and observation remain the distinct stages below.
+
+Targeted deterministic evidence is source-visible in `completion.rs::tests::
+sampled_open_busy_then_stopped_free_plant_is_never_accepted` (the exact split
+recording/returning-worker cleanup boundary) and `session.rs::seek_record_tests::
+stopped_record_has_no_seek_effects_while_open_record_executes_cut` (that record
+through the real worker, counted provider/processing and controlled render
+gate, with an Open-at-plant Applied control). These compose property-local
+oracles; they do not claim a contiguous A/device race run. Existing public
+`seek_seam` content/rebase/refusal/ending tests retain their distinct scope.
+
 ```text
 Why no explicit seek identity is currently earned:
     one operation in flight        (slot)
-  + operation evidence reset       (acceptance)
+  + operation evidence reset       (recording)
   + slot freed only on resolution  (release payload consumed first)
   + current-world fences           (disengagement clears; fresh probes)
   + single-writer program order    (the one producer)
@@ -604,15 +649,25 @@ terminal Fact publication   decode_failed publishes failure evidence;
 edge terminal transition    edge.fail() runs LATER on the worker's path
                             (a scheduler-open window between the two)
 already-buffered /          lawful consumption after the Failed Fact is
-already-fetched PCM         bounded by what was buffered at Fact time
-                            plus one in-flight read — at most one edge
-                            capacity; the "drain" is the PRE-edge.fail()
-                            window, never a post-failure edge drain
+already-fetched PCM         subject to separate local reservoir bounds:
+                            ring occupancy <= its capacity C; each pull
+                            <= min(resident frames, destination frames).
+                            A pull frees ring space before submission,
+                            so refill can leave ring C plus fetched n.
+                            There is NO single-ring-capacity aggregate
+                            guarantee for these simultaneously held sets.
+                            The "drain" is the PRE-edge.fail() window,
+                            never a post-failure edge drain
 consumer quiescence         the join (stop_and_join) is the
                             acknowledgement that no consumer remains
 ```
 
-The guarantees come from **capacity** (the bound is structural),
+These are source-side reservoir bounds, distinct from PCM already submitted
+downstream, device queues and acoustic output. Staging/remainder and gate/slot
+cardinalities retain their own explicit local bounds in the execution model
+§10. No replacement aggregate numerical bound is asserted here.
+
+The guarantees come from **local capacity** (each bound is structural),
 **program order** (the worker returns immediately after `edge.fail()`),
 the **first-wins terminal** (a stop cannot overwrite a committed EOF),
 and **join**. Not from "eventually drains" prose.
@@ -657,7 +712,7 @@ Under five minutes, whole subsystem:
 
 | Protocol | Acceptance | World-state evidence | Operation / scoped evidence | Commit | Primary correctness carriers |
 |---|---|---|---|---|---|
-| Seek (D14.5) | one completion-lock unit: re-validate + plant + reset + route hold | `engaged`, `seek_engaged` (either attribution) | landing / refusal / `cut_committed` (per-cycle, reset at acceptance); `*_tail_quiesced` (per-park) | `seek_cutover_decision()` — one three-valued sample | LOCK_LINEARIZATION, ONE_IN_FLIGHT, EVIDENCE_RESET, PROGRAM_ORDER, ATOMIC_COMMIT |
+| Seek (D14.5) | plant refines to Accepted iff actual joint eligibility holds there; ending-invalid plant is Refused/Inert (§6.1) | `engaged`, `seek_engaged` (either attribution) | landing / provider refusal / `cut_committed` (per-cycle, reset at recording); `*_tail_quiesced` (per-park) | `seek_cutover_decision()` — one three-valued sample | LOCK_LINEARIZATION, ONE_IN_FLIGHT, EVIDENCE_RESET, PROGRAM_ORDER, ATOMIC_COMMIT |
 | Pause (D14.7) | intent recorded under the completion lock; routing withheld after stop/teardown/settlement | `Engaged` | `TailQuiesced` (per-engagement) | the Paused establishment formula holds (a Projection, not a Fact) | WORLD_STATE_FENCE (Engaged fence), PROGRAM_ORDER (leg event order) |
 | Terminal (D11) | — (settlement is not a command) | mechanism evidence: worker failure/terminal, drain verdict | stop intent recorded pre-data-plane-stop | `resolve()` memoized once, first-wins | FIRST_WINS, LOCK_LINEARIZATION |
 | Position (D14.8) | — (not a command) | device-consumed presentation sample | per-discontinuity rebase at commit release | the committed cutover IS the discontinuity | SINGLE_WRITER, PROGRAM_ORDER (writer-side monotone) |
@@ -673,12 +728,12 @@ Populated from live code; do not extend it without authority.
 | Guarantee | Carrier | NOT carried by |
 |---|---|---|
 | no stale post-cut PCM | worker program order: purge → landing → production hold on the only producer thread | wall clock; latch "freshness"; the purge primitive alone |
-| seek cycle isolation (an old landing never satisfies a new seek) | one-in-flight slot + acceptance-time evidence reset | SeekId; timestamps |
+| seek cycle isolation (an old landing never satisfies a new seek) | one-in-flight slot + recording-time evidence reset | SeekId; timestamps |
 | paused-seek progress | current physical park evidence (dual attribution, frozen D14.5) | scheduler timing; pause-specific special-casing |
 | terminal immutability | first-wins memoized commit under the one lock | observer order; `wait_terminal()` call placement |
 | decision-time stop stability | stop intent recorded under the completion lock before the data-plane stop releases | observation timing |
 | DSP block coherence | whole-config one-hold commit + fresh-block pickup + processed-remainder immutability | UI timing; wall clock |
-| bounded post-failure consumption | edge capacity + terminal-check-before-data abandonment + `edge.fail()` program order | "eventually drains" reasoning |
+| local source-PCM bounds after failure | separate ring/pull bounds + terminal-check-before-data abandonment + `edge.fail()` program order (§6.6) | a single-ring-capacity aggregate; "eventually drains" reasoning |
 
 ---
 

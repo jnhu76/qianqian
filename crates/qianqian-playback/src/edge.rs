@@ -292,3 +292,15 @@ fn copy_from_ring(ring: &[f32], read_pos: usize, dst: &mut [f32]) {
         rest.copy_from_slice(&ring[..rest.len()]);
     }
 }
+
+// Test-local orchestration over the existing mutex. No hook is inserted
+// into read/write/terminal paths; production never compiles this module.
+#[cfg(all(test, not(loom)))]
+pub(crate) mod test_sync {
+    use super::PcmEdge;
+
+    pub(crate) fn with_terminal_sample_blocked(edge: &PcmEdge, f: impl FnOnce()) {
+        let _guard = edge.state.lock().expect("pcm edge lock");
+        f();
+    }
+}

@@ -609,8 +609,8 @@ fn decode_worker<P: ProcessingRuntime>(
                     // the load-bearing stale-PCM wall is THIS
                     // serialization point's discipline — purge →
                     // landing → production hold (D14.5 Applied).
-                    // Defense in depth: the data plane was Open at
-                    // acceptance; re-validate here, where the provider is
+                    // The earlier Open observation does not certify the
+                    // record's eligibility; check here, where the provider is
                     // about to be called. An edge that went terminal in
                     // between (EOF drain window, a stop racing the
                     // pickup) is not seekable.
@@ -723,11 +723,11 @@ fn decode_worker<P: ProcessingRuntime>(
                                         // or the teardown itself issued, after
                                         // which the worker writes nothing more —
                                         // but that guarantee is bounded by that
-                                        // fact, NOT by acceptance (whose atomic
+                                        // fact, NOT by recording (whose atomic
                                         // hold re-validates the session latches,
                                         // not the edge), so the claim is stated
                                         // no stronger than it is: a racing
-                                        // acceptance against a just-stopped plane
+                                        // recording against a just-stopped plane
                                         // could still plant and wipe a payload
                                         // no leg will read.
                                         completion.clear_seek_in_flight();
@@ -871,12 +871,12 @@ fn decode_worker<P: ProcessingRuntime>(
         }
     }
     // The single exit funnel (normal and panic paths alike): publish the
-    // terminal evidence AND mark the worker gone — the acceptance side
-    // of the seek/worker-exit linearization — then abort any stranded
+    // terminal evidence AND mark the worker gone — ordering recording
+    // against worker exit — then abort any stranded
     // seek. The order is load-bearing (implementation corrective-1): a
-    // request_seek accepted before the `worker_gone` publication is
+    // request_seek record planted before `worker_gone` publication is
     // found and released by the cleanup; one attempted after it is
-    // rejected by acceptance. Without the cleanup, a request accepted
+    // rejected by recording checks. Without cleanup, a record planted
     // against an about-to-exit worker (the request × EOF interleaving)
     // could route a hold nobody ever releases and wedge the episode's
     // final drain.
@@ -954,5 +954,165 @@ fn resolve_error(e: qianqian_composition::ResolveError) -> &'static str {
         qianqian_composition::ResolveError::Unresolved => "no active provider",
         qianqian_composition::ResolveError::Ambiguous => "multiple providers",
         qianqian_composition::ResolveError::AlreadyProvided => "already provided",
+    }
+}
+
+#[cfg(all(test, not(loom)))]
+mod seek_record_tests {
+    use super::*;
+    use qianqian_audio_api::ports::{
+        DecodeError, DrainVerdict, GateSlice, PcmPull, ProviderSeekOutcome, RenderPcmInput,
+        SeekParkRelease, TailProbeOutcome,
+    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct Provider {
+        seeks: Arc<AtomicUsize>,
+        ending: bool,
+    }
+
+    impl DecodedPcmStream for Provider {
+        fn format(&self) -> PcmFormat {
+            crate::test_common::TEST_FORMAT
+        }
+
+        fn source_duration(&self) -> Option<Duration> {
+            None
+        }
+
+        fn read_frames(&mut self, _dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
+            Ok(if self.ending {
+                DecodeOutcome::Frames(0)
+            } else {
+                DecodeOutcome::Eof
+            })
+        }
+
+        fn seek(&mut self, _target: Duration) -> ProviderSeekOutcome {
+            self.seeks.fetch_add(1, Ordering::SeqCst);
+            ProviderSeekOutcome::Applied { landing: Some(5) }
+        }
+    }
+
+    struct Processing(Arc<AtomicUsize>);
+
+    impl ProcessingRuntime for Processing {
+        fn stage(&mut self, _block: &mut [f32]) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn invalidate_signal_history(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    /// Composition of two property-nearest oracles: the deterministic
+    /// admission fixture produces B's actual record, then the real worker
+    /// consumes it against controlled provider/processing/output seams.
+    /// This continuation checks the non-Open guard independently of the
+    /// original A-returning path, whose exit is pinned in completion tests.
+    /// It is not a contiguous A/device execution or a platform claim.
+    #[test]
+    fn stopped_record_has_no_seek_effects_while_open_record_executes_cut() {
+        crate::test_common::within(Duration::from_secs(10), || {
+            for ending in [true, false] {
+                let (completion, edge) =
+                    crate::completion::tests::record_after_delayed_open_sample(ending);
+                let seeks = Arc::new(AtomicUsize::new(0));
+                let invalidations = Arc::new(AtomicUsize::new(0));
+                let position = completion.position_evidence();
+                if ending {
+                    completion.drain_signal().complete(DrainVerdict::Aborted);
+                }
+                assert!(!completion.seek_aborted());
+                assert!(completion.committed().is_none());
+
+                // Actual gate engagement establishes parked evidence;
+                // rebase executes only from the payload received by this
+                // controlled output leg. No completion latch is forged.
+                let (parked_tx, parked_rx) = std::sync::mpsc::sync_channel(1);
+                let output = {
+                    let gate = completion.render_gate();
+                    let position = position.clone();
+                    let edge = edge.clone();
+                    let drain = completion.drain_signal();
+                    std::thread::spawn(move || {
+                        let mut parked_tx = Some(parked_tx);
+                        let mut release = None;
+                        gate.park_loop_top(|slice| match slice {
+                            GateSlice::TailProbe => {
+                                if let Some(tx) = parked_tx.take() {
+                                    tx.send(()).unwrap();
+                                }
+                                TailProbeOutcome::Quiesced
+                            }
+                            GateSlice::SeekRelease(payload) => {
+                                if let SeekParkRelease::Committed { landing } = payload {
+                                    position.rebase(landing);
+                                }
+                                release = Some(payload);
+                                TailProbeOutcome::Pending
+                            }
+                        });
+                        let pull = edge.read_frames(&mut [0.0; 2]);
+                        drain.complete(match pull {
+                            PcmPull::Stopped => DrainVerdict::Aborted,
+                            PcmPull::Eof => DrainVerdict::Drained,
+                            other => panic!("unexpected post-cut data: {other:?}"),
+                        });
+                        release
+                    })
+                };
+                parked_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+                assert!(completion.leg_parked_evidence());
+                decode_worker(
+                    Box::new(Provider {
+                        seeks: seeks.clone(),
+                        ending,
+                    }),
+                    edge.clone(),
+                    completion.clone(),
+                    STAGING_FRAMES,
+                    Processing(invalidations.clone()),
+                );
+                let release = output.join().expect("output leg exited");
+                assert!(!completion.seek_in_flight());
+                assert_eq!(completion.take_seek_command(), None);
+                assert!(!completion.seek_release_pending());
+                if ending {
+                    assert_eq!(seeks.load(Ordering::SeqCst), 0);
+                    assert_eq!(invalidations.load(Ordering::SeqCst), 0);
+                    assert_eq!(edge.buffered_frames(), 4, "no purge");
+                    assert_eq!(position.published(), Some(4), "no rebase");
+                    assert_eq!(completion.seek_protocol_state(), (false, false, None));
+                    assert_eq!(release, Some(SeekParkRelease::Aborted));
+                    assert_eq!(
+                        completion.observe_snapshot().terminal_outcome,
+                        Some(crate::EpisodeTerminalOutcome::Failed)
+                    );
+                } else {
+                    assert_eq!(seeks.load(Ordering::SeqCst), 1);
+                    assert_eq!(invalidations.load(Ordering::SeqCst), 1);
+                    assert_eq!(edge.buffered_frames(), 0, "Applied purged old PCM");
+                    assert_eq!(
+                        position.published(),
+                        Some(5),
+                        "output rebased actual landing"
+                    );
+                    assert_eq!(
+                        completion.seek_protocol_state(),
+                        (false, true, Some(Some(5)))
+                    );
+                    assert_eq!(
+                        release,
+                        Some(SeekParkRelease::Committed { landing: Some(5) })
+                    );
+                    assert_eq!(
+                        completion.observe_snapshot().terminal_outcome,
+                        Some(crate::EpisodeTerminalOutcome::Completed)
+                    );
+                }
+            }
+        });
     }
 }
