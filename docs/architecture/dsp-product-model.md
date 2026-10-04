@@ -537,12 +537,21 @@ Settled         only the accepted configuration contributes; the settled
   same lock hold, so a command issued between establishment and
   activation folds into the initial applied configuration instead of
   starting a phantom initial→same transition. The cell's lock is
-  bounded on both sides — the worker takes one `Option` per fresh
-  block; a command's critical section is one fixed-size
+  bounded in algorithmic critical-section work — the worker takes one
+  `Option` per fresh block; a command's critical section is one fixed-size
   compose+validate+commit over `Copy` data (only a refusal allocates
-  its diagnostic, on the command path) — the bounded-blocking reading
-  of the per-block firewall, which bans UNBOUNDED blocking; no
-  condvar, no waiter, no I/O inside the lock.
+  its diagnostic, on the command path). There is no condvar wait or I/O
+  inside that critical section. This does not bound contention,
+  scheduling, mutex acquisition, diagnostic allocation time, whole-update
+  completion or end-to-end latency.
+
+  **Authority corrective ([#216](https://github.com/jnhu76/qianqian/issues/216)).**
+  The former "bounded on both sides" / "bounded-blocking" reading is
+  narrowed to the algorithmic work above; it is not an elapsed-time
+  guarantee. The realtime/PCM firewall and PBK-002 D14.11's frozen current
+  decode-worker staging placement remain binding. Desired / Accepted /
+  Applied / Transitioning / Settled and their frozen propositions above
+  are unchanged.
 
 ---
 

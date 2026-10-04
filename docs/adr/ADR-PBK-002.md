@@ -665,9 +665,10 @@ fact kind:            episode terminal outcome
 subject scope:        one playback episode
 authority role:       Playback Session semantic role for one playback episode
 current variants:     Completed / Stopped / Failed
-current realization:  SessionCompletion / resolver (replaceable Rust detail;
-                      current consumer-triggered commit path is a known
-                      production differential to be corrected by F2)
+current realization:  SessionCompletion / resolver behind the episode handle
+                      (replaceable Rust detail; authority-owned evidence
+                      publication evaluates/commits when decisive synchronously;
+                      reads/waits are pure)
 current composition:  episode-scoped Playback Session Plugin / Fiber (D1/D6)
 ```
 
@@ -739,11 +740,13 @@ production code:  crates/qianqian-playback/src/completion.rs
                   stop_requested 并 memoize 一个 terminal outcome）
                   crates/qianqian-playback/src/session.rs（episode lifecycle）
 
-known differential after PR #142 formal campaign:
-    wait() / try_resolve_now() currently call resolve() and can therefore
-    be required to create terminalOutcome. That consumer-triggered settlement
-    is no longer the target contract after this amendment; F2 must move
-    commit progress back under Playback Session-owned execution/teardown.
+historical differential identified by PR #142 (corrected by F2):
+    the former wait() / try_resolve_now() could create terminalOutcome.
+    Current publish_evidence mutates evidence, evaluates resolve and memoizes
+    under one completion-lock hold on Session-owned publication paths.
+    observe() and wait_terminal() only consume already committed truth.
+    Publication context/lock layout is realization, not semantic identity;
+    terminal commit does not acknowledge decode/render thread termination.
 
 resolver 精确 precedence：保留在 production code / formal campaign evidence；
 本文只冻结对外 terminal propositions、single-writer/immutability、settlement ownership
@@ -751,7 +754,7 @@ resolver 精确 precedence：保留在 production code / formal campaign evidenc
 authority review。
 ```
 
-本块明确标注 CURRENT REALIZATION：不是 frozen representation，不代表任何永久承诺。
+本块的 current code reading 是 CURRENT REALIZATION；PR #142 differential 是历史证据。不是 frozen representation，不代表任何永久承诺。
 
 ### Terminal outcome propositions
 
@@ -827,8 +830,8 @@ source identity / playlist authority / navigation policy
 volume / device-switch authority
     (partially no longer OPEN: the same amendment froze the volume
      owner/semantics and the IAudioStreamVolume candidate in D14.9 —
-     the physical realtime apply placement stays OPEN pending V-PROBE;
-     device-switch authority remains OPEN)
+     the Windows apply placement is grounded by the later D14.9
+     VOLUME-IMPLEMENTATION-1 note; device-switch authority remains OPEN)
 PlaybackFacts publication topology beyond D14 read seam
 PlaybackSnapshot
 EpisodeId / Generation / Window
