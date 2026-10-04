@@ -40,6 +40,9 @@
 > ```
 >
 > Owner: issue #197 (QIANQIAN-PLAYBACK-TEMPORAL-EXPLICITNESS).
+> Authority corrective: [#216](https://github.com/jnhu76/qianqian/issues/216)
+> reconciles the acceptance summaries with DSP §7.3 and narrows unsupported
+> elapsed-time claims. Exact protocol predicates and DSP states are unchanged.
 > Evidence basis (not authority): `research/temporal-model-0/RESULTS.md`
 > and `research/temporal-mechanism-audit-0/RESULTS.md`.
 
@@ -98,12 +101,16 @@ Truth class: **Command state** (PBK-001 §2.3: command ≠ fact). A
 command that is never accepted — or accepted and later aborted — remains
 inert command history; it never becomes semantic truth by itself.
 
-### 2.2 Acceptance (linearization boundary)
+### 2.2 Acceptance (protocol-owner-defined point)
 
-The exact point where a command becomes part of protocol state. `ACCEPTED`
-is a protocol event established by an **authority-owned synchronization
-boundary** — a lock hold inside the session's control surface — never by
-API-call entry.
+`ACCEPTED` names the semantic acceptance point defined by the protocol's
+owning authority, never API-call entry. Command recording has its own
+linearization point; it need not coincide with semantic acceptance.
+Some protocols record/admit intent under a control lock. DSP product
+Accepted instead follows worker validation/compilation against the
+episode format, with the accepted processor target held as specified by
+[DSP §7.3](dsp-product-model.md). This cross-cutting category prescribes
+neither a universal lock nor a universal acceptance mechanism.
 
 ```text
 seek        the second completion-lock hold in request_seek
@@ -112,12 +119,15 @@ seek        the second completion-lock hold in request_seek
             qianqian-playback, completion.rs)
 stop/pause  intent recorded under the one completion lock; stop intent
             is recorded BEFORE the data-plane stop is released
-DSP update  the command's compose + intrinsic validation + whole-config
-            commit under ONE ProcessingControl lock hold
+DSP update  Desired recording: compose + intrinsic validation + whole-config
+            record under ONE ProcessingControl lock hold; later worker
+            validation/compile establishes Accepted under DSP §7.3 (§6.5)
 ```
 
-Everything a protocol later does — worker pickups, park waits, commit
-polls — happens strictly after acceptance and re-validates against it.
+Worker pickups, park waits and commit polls follow their protocol's
+recording/admission and revalidate the relevant conditions. DSP pickup
+follows Desired recording and precedes the worker compile that establishes
+Accepted. Exact acceptance predicates remain with each protocol owner.
 
 ### 2.3 World-state evidence
 
@@ -240,16 +250,16 @@ correctness basis.
 
 ## 3. The canonical temporal pipeline
 
-Every playback protocol instantiates this shape. It is a **semantic
-schema**, not a runtime framework — protocols do not share data
-structures, and the owning ADR sections freeze each protocol's exact
-predicate.
+This is a **semantic reading schema**, not a runtime framework. Each
+protocol owner determines the applicable steps and exact predicates;
+protocols do not share data structures or an acceptance mechanism.
 
 ```text
 Command                          (§2.1 — intent; not automatically accepted)
    │
    ▼
-Acceptance / linearization       (§2.2 — one authority-owned lock hold)
+Acceptance / linearization       (§2.2 — protocol-owner-defined point;
+   │                             recording may precede acceptance)
    │
    ▼
 Current protocol state
@@ -543,7 +553,7 @@ architecture/dsp-product-model.md §7.3
 ```text
 Desired
    ↓  typed set_* command: compose + intrinsic validation +
-   ↓  whole-config commit, ONE lock hold
+   ↓  whole-config Desired recording, ONE lock hold
 pending depth-1 slot (latest-wins; complete-in-flight)
    ↓  worker pickup at the FRESH-STAGING-BLOCK boundary
 Accepted (pickup-time compile against the episode format)
@@ -637,7 +647,7 @@ Under five minutes, whole subsystem:
 | Pause (D14.7) | intent recorded under the completion lock; routing withheld after stop/teardown/settlement | `Engaged` | `TailQuiesced` (per-engagement) | the Paused establishment formula holds (a Projection, not a Fact) | WORLD_STATE_FENCE (Engaged fence), PROGRAM_ORDER (leg event order) |
 | Terminal (D11) | — (settlement is not a command) | mechanism evidence: worker failure/terminal, drain verdict | stop intent recorded pre-data-plane-stop | `resolve()` memoized once, first-wins | FIRST_WINS, LOCK_LINEARIZATION |
 | Position (D14.8) | — (not a command) | device-consumed presentation sample | per-discontinuity rebase at commit release | the committed cutover IS the discontinuity | SINGLE_WRITER, PROGRAM_ORDER (writer-side monotone) |
-| DSP update (D14.11, §7.3) | compose + validate + whole-config commit, one lock hold | desired configuration (App-owned) | pending depth-1 slot, take-once | fresh-block pickup → apply | LOCK_LINEARIZATION (atomic whole-config), ONE_IN_FLIGHT-equivalent (depth-1), fresh-block boundary |
+| DSP update (D14.11, §7.3) | Desired recording: compose + intrinsic validate + whole-config record, one lock hold; Accepted: worker format validation/compile per DSP §7.3 | desired configuration (App-owned command state, not physical-world evidence) | pending depth-1 slot, take-once | next whole unprocessed staging block → Applied; processed samples → Transitioning / Settled | LOCK_LINEARIZATION (atomic whole-config recording), PROGRAM_ORDER (worker acceptance/apply), ONE_IN_FLIGHT-equivalent (depth-1), fresh-block boundary |
 | Edge failure | — (mechanism, not command) | edge terminal (first-wins) | buffered-at-failure quantity | the D11 settlement of the published Fact | BOUNDED_QUEUE, FIRST_WINS, ACKNOWLEDGEMENT (join), PROGRAM_ORDER (`fail()` before worker return) |
 
 ---
@@ -677,11 +687,14 @@ timestamps may measure duration
 but do not establish causal ownership.
 ```
 
-Causality comes from the carriers in §4. A wait with a timeout is
-legitimate as a **liveness backstop** (bounded latency, wake-with-bounded-
-slice discipline) and for diagnostics — never as the anchor of a safety
-claim. (Methodology for test oracles is a separate, future guide; this
-section only fixes what counts as correctness authority.)
+Causality comes from the carriers in §4. A timeout can provide a
+**local liveness backstop** (notify plus a capped requested wait slice)
+and diagnostics, never the anchor of a safety claim. This corrective
+narrows the former bounded-latency wording: the slice does not bound
+scheduling, mutex acquisition/reacquisition, native I/O, join duration
+or end-to-end operation latency. It does not relax PBK-001's realtime
+safety/publication contracts. (Methodology for test oracles is a separate,
+future guide; this section only fixes what counts as correctness authority.)
 
 ---
 
