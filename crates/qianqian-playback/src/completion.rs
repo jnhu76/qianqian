@@ -27,12 +27,14 @@
 //! drain verdict             → the session installs a one-shot observer
 //!                             on its DrainSignal at construction, so
 //!                             the first successful complete() publishes
-//!                             and settles synchronously on the render
-//!                             leg's call stack, before complete returns
+//!                             and evaluates D11 synchronously on the
+//!                             render leg's call stack, committing only
+//!                             if decisive, before complete returns
 //! ```
 //!
-//! There is no settlement watcher, resolver thread, or asynchronous gap
-//! (D14.3 forbids a resolver thread outright). `request_stop` records
+//! This realization uses no settlement watcher, resolver thread, or
+//! asynchronous settlement gap (D14.3 requires authority-owned progress).
+//! `request_stop` records
 //! intent through the same completion lock, so the lock IS the decision
 //! boundary: a stop linearized before the decisive publication
 //! participates in the classification; a stop linearized after it cannot
@@ -300,8 +302,9 @@ struct CompletionArc {
     /// deliberately NOT part of the lock-protected state: the render leg
     /// publishes into it from its realtime path with one relaxed atomic
     /// update, and the observation reads it with one relaxed load while
-    /// holding the state lock — so the hot atomic never shares a lock,
-    /// and never a cache line, with the settlement state.
+    /// holding the state lock. Its storage is separate and its writer
+    /// never takes the settlement lock; cache-line separation is not
+    /// guaranteed by this representation.
     position: PositionEvidence,
     /// The episode's output-level cell (ADR-PBK-002 D14.9), created
     /// here and handed to the same render stream through its open
@@ -460,8 +463,9 @@ impl SessionCompletion {
 
     /// The drain signal handed to the render stream's open request. The
     /// session-owned drain observer is installed at construction; the
-    /// render leg's first `complete` therefore publishes and settles
-    /// synchronously on the render leg's call stack.
+    /// render leg's first `complete` publishes and evaluates D11 synchronously
+    /// on that leg's call stack. It commits only when the evidence is decisive;
+    /// publication by itself does not acknowledge terminal truth or thread exit.
     pub(crate) fn drain_signal(&self) -> DrainSignal {
         self.state.drain.clone()
     }
@@ -571,8 +575,9 @@ impl SessionCompletion {
     /// teardown release has begun is recorded as inert command history
     /// but routes nothing: a released, released-then-stopping, or
     /// tearing-down episode must never be re-parked (D14.7: stop and
-    /// teardown wake every parked participant with bounded latency), and
-    /// a settled episode has no leg to park.
+    /// teardown release the gate and notify its capped wait), and
+    /// terminal settlement suppresses further pause routing. A render leg
+    /// may still execute until its separate stop/join acknowledgement.
     pub(crate) fn request_pause(&self) {
         let mut guard = self.state.state.lock().expect("completion lock");
         if !guard.pause_requested {
@@ -730,8 +735,8 @@ impl SessionCompletion {
     /// in the slot? Used by the interruptible write between bounded
     /// slices (with no other lock held). A `try_lock` peek: contention
     /// with a planting writer resolves to "not yet observed" and the
-    /// next slice re-peeks — the serialization point is bounded by the
-    /// wait slice, not by lock ordering.
+    /// next slice re-peeks. The slice caps a requested capacity wait,
+    /// not repeated contention, scheduling or time to the serialization point.
     pub(crate) fn seek_command_observed(&self) -> bool {
         match self.state.seek_slot.try_lock() {
             Ok(slot) => slot.command.is_some(),
@@ -1061,13 +1066,12 @@ impl SessionCompletion {
         }
     }
 
-    /// One coherent observation of the episode, taken under a single
-    /// lock acquisition so the returned fields coexisted at one real
-    /// instant (no torn combinations such as `Stopped` with
-    /// `stop_requested == false`).
+    /// Pure observation. Completion-state fields share one lock hold
+    /// (no torn combinations such as `Stopped` with `stop_requested == false`).
+    /// Position and DSP refusal are read from independently written cells;
+    /// no cross-cell single-instant or freshness promise covers them.
     ///
-    /// The position sample is the one field that is not part of that
-    /// single-instant promise: it is one pure load of the episode's
+    /// Position is a projection: it is one pure load of the episode's
     /// position cell (D14.8), which the render leg publishes to
     /// independently and which gives no freshness bound. The load is
     /// taken only for an episode that is both live and unsettled — a
@@ -1252,7 +1256,7 @@ fn publish_evidence(core: &CompletionArc, evidence: impl FnOnce(&mut CompletionS
 /// with recorded stop intent disambiguating an aborted drain. Called
 /// only from [`publish_evidence`], so `outcome` is still `None` here.
 fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
-    // Worker-side failure is authoritative over everything downstream:
+    // In this Session resolver, worker-failure evidence has precedence:
     // the failure was published before the edge was failed. The stage
     // spelling keeps the origin truthful (D14.11): a decode failure and
     // an audio-processing failure settle the same `Failed` terminal
@@ -1281,7 +1285,8 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
                 // stop (the render leg is typically the first to observe
                 // it) and on a real device failure. Keep waiting — every
                 // abort path releases the data-plane stop, and that stop
-                // wakes the worker, so this always terminates.
+                // wakes edge waiters. Worker-exit progress still depends
+                // on scheduling and outstanding native decoder calls returning.
                 None => {}
                 Some(EdgeTerminal::Stopped) => {
                     // The worker terminal alone cannot distinguish "the

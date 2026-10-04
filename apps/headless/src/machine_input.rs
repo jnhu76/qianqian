@@ -1,5 +1,7 @@
 //! Invocation-local machine input responsibility (execution-model D3/D5).
-//! OS reads are outside admission: sealing never waits for stdin or joins it.
+//! OS reads are outside effect admission: seal closes admission, drains the
+//! active effect acknowledgement, then fixes the host-failure result. It never
+//! waits for stdin or joins the reader; an active output effect can delay seal.
 
 use std::io;
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -175,7 +177,9 @@ impl Drop for Operation<'_> {
 
 // This private module is the only production creator of this named thread.
 // The process host owns the name; it is a diagnostic filter, never an identity
-// used to route commands or grant semantic authority.
+// used to route commands or grant semantic authority. Name plus process-wide
+// panic-hook wrapper is a replaceable diagnostic mechanism, not the D3 identity
+// model. Catchers classify admitted host failures; they never commit D11.
 const READER_THREAD_NAME: &str = "qianqian-stdin";
 
 fn install_reader_panic_hook() {
@@ -252,6 +256,8 @@ fn start_reader(
 /// One physical read at a time; read errors/panics acquire admission only when
 /// reported. A blocked read owns no acknowledgement debt. A late wake exits
 /// without command parsing, status formatting, output, failure or another read.
+/// An unlocked open check before closure may still precede a physical OS read
+/// starting after seal; its result cannot gain postclosure effect admission.
 fn read_input(
     input: &HostInput,
     handle: &PlaybackSessionHandle,

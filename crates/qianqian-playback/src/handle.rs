@@ -8,9 +8,12 @@
 //! request_pause()    record pause intent (Command, not a Fact; D14.7)
 //! request_resume()   release a recorded pause intent (Command)
 //! request_seek()     record a seek command (Command, not a Fact; D14.5)
-//! observe()          one coherent pure read of the episode
+//! observe()          pure read of terminal/command/evidence fields
 //! wait_terminal()    pure blocking wait for the committed terminal Fact
 //! ```
+//!
+//! Completion-lock fields share one read; Position and DSP refusal use
+//! separate cells. No cross-cell snapshot or freshness bound is promised.
 //!
 //! The handle is NOT a Plugin, Capability, K0 primitive, global store or
 //! second lifecycle owner, and it carries no mechanism rights: terminal
@@ -114,14 +117,10 @@ pub enum PauseEngagement {
     TailQuiesced,
 }
 
-/// One coherent observation of one playback episode: the episode state
-/// is read under a single lock, so those fields coexisted at one real
-/// instant. `position` is the one exception, and deliberately so — it is
-/// a separate pure load of the mechanism's cell, which the render leg
-/// publishes to independently and which promises no freshness bound
-/// (D14.8). Its own doc states what it does and does not promise; do not
-/// read it as "the position at the instant the terminal outcome was
-/// read".
+/// Pure observation of one playback episode. Completion-lock fields
+/// coexisted at one instant; `position` and `last_processing_refusal`
+/// come from independent cells with no cross-cell freshness bound.
+/// Neither sample names the instant at which terminal truth was read.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PlaybackSessionObservation {
     /// The committed terminal outcome, or `None` while no terminal Fact
@@ -177,14 +176,15 @@ pub struct PlaybackSessionObservation {
     /// tail; this read promises no freshness bound (the age of a sample
     /// is the reader's poll interval plus the mechanism's publication
     /// cadence, not a concurrency invariant). What it does promise:
-    /// never backward, never above the writer's own handed-off
+    /// monotone between committed seek discontinuities (a cut may rebase
+    /// backward once), never above the writer's own handed-off
     /// accounting, never fabricated.
     ///
-    /// Pause coupling (D14.8): while the episode is parked at the D14.7
-    /// gate no frame is submitted, so the sample holds at the frozen
-    /// total — that is the freeze point, and it is later than the pause
-    /// command. A release legitimately ends the park and lets the loop
-    /// proceed once more (resume, or the stop that wakes it), so an
+    /// Pause coupling (D14.8): while parked at the D14.7 gate no new
+    /// frame is submitted, but the queued tail can still drain and advance
+    /// the sample. It freezes at current-engagement tail quiescence,
+    /// later than the pause command or engagement alone. A release ends
+    /// the park and lets the loop proceed once more (resume, or the stop that wakes it), so an
     /// observation taken before a release is a sample, not a latch: the
     /// writer may still publish one more in-flight block, exactly the
     /// advance the frozen rule measures at command time. It stays within
@@ -210,7 +210,8 @@ pub struct PlaybackSessionObservation {
     /// semantic contract, never a Fact, and never a correctness basis.
     /// It reports WHY the most recent refused `set_*` command left the
     /// old configuration running (invalid data, compile refusal); it is
-    /// cleared by the next accepted update. Like `position`, it is read
+    /// cleared by the next intrinsically valid Desired record, before
+    /// worker Accepted/Applied. Like `position`, it is read
     /// from its own cell rather than the single observation lock, so it
     /// carries no freshness bound relative to the other fields.
     pub last_processing_refusal: Option<String>,
@@ -391,7 +392,8 @@ impl PlaybackSessionHandle {
         self.completion.processing().set_eq_preset(preset)
     }
 
-    /// One coherent observation of the episode. Pure read: no resolve,
+    /// Pure observation with the field coherence scope documented on
+    /// [`PlaybackSessionObservation`]. No resolve,
     /// no commit, no lifecycle action, no edge or drain operation.
     /// Repeating it changes nothing.
     pub fn observe(&self) -> PlaybackSessionObservation {

@@ -351,7 +351,7 @@ impl crate::player::EpisodeStart for RealEpisodeSource {
 /// The scriptable stdin/stdout transport (automation contract, F1/F2):
 /// while the episode runs, stdin lines go through the frozen
 /// interactive parser; `stop` requests the stop and `status` renders
-/// the seam's coherent observation through the shared truthful
+/// the seam's pure observation through the shared truthful
 /// projection. The transport never touches the edge, the stream, or
 /// any mechanism. The session never activating is reported honestly:
 /// no episode exists, so there is no terminal Fact to wait for and
@@ -406,9 +406,10 @@ fn machine_transport_with_reader(
 }
 
 /// Wait for the committed terminal Fact, dispose, and report. The
-/// scriptable transport's settle order (wait → dispose → outcome
-/// lines → disposal report) and the exit-code contract stay identical;
-/// the observable contract itself lives in [`machine`].
+/// machine order is terminal wait → root disposal → host admission closure
+/// → admitted-effect acknowledgement → result seal → final owner reports.
+/// These milestones do not acknowledge stdin-reader or process termination.
+/// Report spelling/exit presentation lives in [`machine`].
 #[cfg(any(feature = "playback", test))]
 fn finish_episode(
     mut episode: Episode,

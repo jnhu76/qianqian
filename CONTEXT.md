@@ -20,7 +20,7 @@ Current execution roadmap:
 Phase F v2                  -> Issue #119 PHASE-F-HEADLESS-CONTROL-1
 ```
 
-Issue #119 is the current **execution roadmap**, derived from the normative authorities and current production reality; it is not a replacement for the ADRs. Issue #141 is the closed post-#139/#140 Phase-F reality-audit record whose REV.3 conclusions are reflected in #119 and this file. Issue #138 records the architecture-corrective basis; it remains design input, not authority.
+Issue #119 is the Phase-F **product execution roadmap**, derived from the normative authorities and current production reality; it is not a replacement for the ADRs. The current playback execution-architecture campaign is #198/#201: Stage 4 #207/#214 is merged, Stage 5 #208 is the explicitness pass, C1 #205 and C2 #213 are merged, and D1–D6 remain CANDIDATE / NOT FROZEN pending #209/#210. Start at [the execution model](docs/architecture/playback-execution-model.md) (§1 authority routing; §12 minimum-core 20/20 traceability). Issue #141 is the closed post-#139/#140 Phase-F reality-audit record whose REV.3 conclusions are reflected in #119 and this file. Issue #138 records the architecture-corrective basis; it remains design input, not authority.
 
 ---
 
@@ -210,20 +210,6 @@ Playing / Starting / Stopping semantics
  AUTHORITY-CORRECTIVE (disengagement evidence cannot prove a viable
  render leg remains): resume is Command-only, disengagement is
  Mechanism Evidence; the rest of the transport enum is not earned)
-position / duration authority
-    (F4-IMPLEMENTATION-1 realized the frozen D14.8 shape: Position =
-     episode-local Projection, one pure load of the render leg's
-     monotone mechanism-evidence cell, withdrawn at the terminal Fact;
-     Duration = optional source-scoped Mechanism Evidence that stays
-     observable after settlement and whose unknown stays None; neither
-     is a Fact — pending human review of the implementation PR)
-seek acceptance / discontinuity / commit semantics
-    (F5-IMPLEMENTATION-1 realized the frozen D14.5 shape: refusal-first
-     ordering with song_seek before ANY invalidation, three-class
-     provider outcome, park + natural-drain output cut, commit boundary
-     conjunction, same-cell position rebase to the ACTUAL landing,
-     one-seek-in-flight, pause intent survives; P1–P5 untriggered —
-     pending human review of the implementation PR)
 device switch / replaceable render binding
 PlaybackControl topology
 PlaybackFacts publication topology
@@ -251,7 +237,7 @@ Issue #119 is the current Phase-F v2 execution roadmap.
 ```text
 F0 CLI shell / grammar          DONE / CLOSED
 F1 Stop                         DONE / CLOSED
-F2 Observable read side         REALITY GATE CLOSED
+F2 Observable read side         IMPLEMENTED / REALITY GATE CLOSED
     F2-READ-SIDE-SEAM-REALITY-GATE-2 verdict:
         A. SessionCompletion directly as application seam   REJECT
         B. episode-scoped public Playback Session
@@ -259,12 +245,10 @@ F2 Observable read side         REALITY GATE CLOSED
         C. split handles / generic state/fact infrastructure NOT EARNED
     representation:
         episode-scoped public Playback Session handle/wrapper
-    next authorized step:
-        QIANQIAN-F2-TRUTHFUL-READ-SIDE-IMPLEMENTATION-2
-        (public seam request_stop/observe/wait_terminal;
-         D14.3 authority-owned settlement;
-         SessionCompletion/resolver becomes crate-internal
-         replaceable realization)
+    current realization:
+        public seam request_stop/observe/wait_terminal;
+        D14.3 authority-owned settlement;
+        SessionCompletion/resolver is crate-internal and replaceable
 F3 Pause / Resume               CLOSED after authority corrective
                                 (feat/f3-pause-resume-1, PR #150:
                                 D14.7 mechanism A render-loop gate
@@ -297,7 +281,7 @@ F4 Position / Duration          GATE MERGED (research/f4-timeline-gate-1,
                                 (PR #152) behind the episode seam: one
                                 session-owned cell, observation fields
                                 position/duration, headless read-side
-                                timeline — pending human review
+                                timeline — present in current production
 F5 Seek                         GATE MERGED (PR #154, D14.5:
                                 refusal-first frozen ordering, three-class
                                 provider outcome, park + natural-drain
@@ -318,7 +302,7 @@ F5 Seek                         GATE MERGED (PR #154, D14.5:
                                 read the data plane terminal, cut decision
                                 is one atomic three-valued sample, a FAILED
                                 tail observation escapes the park bounded —
-                                pending human review
+                                present in current production
 F6 Open                         AUTHORITY PROMOTED (architecture/
                                 f6-open-authority-promotion-1:
                                 F6-AUTHORITY-PROMOTION-1 amends D14.6 —
@@ -351,7 +335,7 @@ F7 Volume                       owner/semantics PROMOTED (D14.9);
                                 App-owned desired 0..=100 step 5; O7
                                 physical row; narrow ADR grounding
                                 amendment carried)
-Transport v1 dogfood +          Stage A dogfood PASS (runs E/F/G:
+Historical transport-v1        Stage A dogfood PASS (runs E/F/G:
 integrated audit + TUI          26/26 TUI + 7/7 machine), Stage B
 v1 closure                      integrated audit PASS_WITH_MINOR ->
                                 corrective landed (teardown-gate
@@ -363,9 +347,11 @@ v1 closure                      integrated audit PASS_WITH_MINOR ->
                                 transport-dogfood-tui-v1-closure-1;
                                 final physical regression 31/31 TUI +
                                 7/7 machine at clean closure HEAD).
-                                Verdict QIANQIAN_PHASE_F_TRANSPORT_V1_
-                                CLOSED is pending final human review —
-                                NOT yet written.
+                                At that closure checkpoint, verdict
+                                QIANQIAN_PHASE_F_TRANSPORT_V1_CLOSED
+                                awaited human review; this records that
+                                historical checkpoint, not current
+                                #198/#201 execution-campaign status.
 U1 Windows TUI launch /         CLOSED (Issue #166 U1, PR #167, merged
    folder input                  2026-09-19): canonical qianqian.exe
                                 product binary (qianqian-headless kept
@@ -452,79 +438,28 @@ Seek/open/device-switch do not trigger Realtime Audio Runtime merely because the
 
 ---
 
-# Current Phase-F execution hypotheses (derived projection; #119 is the roadmap)
+# Current Phase-F execution routing (derived projection)
 
-These are compact execution hypotheses, not new normative authority.
+Accepted protocol meanings live in PBK-002; their cross-protocol execution
+reading lives in [the candidate execution model](docs/architecture/playback-execution-model.md).
+The older Pause/Seek/Open hypotheses are superseded by the narrow accepted
+amendments below; this router does not reopen them.
 
-```text
-Pause / Resume
-    same Playback Session Plugin is still the default ownership hypothesis
-    mechanism is OPEN
-    compare at least:
-      - explicit render-loop pause gate before WASAPI GetBuffer
-      - IAudioClient::Stop / Start
-      - another smaller proven mechanism
-    backpressure is an effect of not consuming; it is not itself the pause mechanism
+| Concern | Current authority and realization |
+| --- | --- |
+| Pause / Resume | PBK-002 D14.7: Session routes a render-loop gate; Paused is derived from current engagement/tail evidence, Resume is Command only. Backpressure is an effect of the park. |
+| Position / Duration | D14.8: pure Position load, monotone between committed discontinuities; optional source-duration evidence. Neither authorizes control or measures acoustics. |
+| Seek | D14.5: provider refusal before invalidation; RefusedUnchanged preserves processed remainder/history; Applied purges then waits for the parked/tail-quiesced cut and release consumption. Same resources, no P1–P5 overlap. |
+| Open / Next / Previous | D14.6: probe-before-destruction; old-side clearance from absent root or Discharged; fresh whole-composition establishment through C1. App owns navigation/repeat; Completed-only automatic transition, no failed-candidate auto-skip. |
+| Volume | D14.9: App-owned desired stream factor, routed to Output; distinct from processing Gain. Windows loop-top placement is grounded by V-PROBE. |
+| DSP | D14.11 + DSP product model §7.3: episode-owned processing on the decode worker; Desired recording, worker Accepted, fresh-block Applied and sample-driven Settled remain distinct. |
+| Machine input | Execution-model D3/D5 CANDIDATE, realized by C2: EOF is normal closure; Spawn/Read/caught Panic are host failures. Effect admission, acknowledgement and seal do not terminate stdin. |
 
-Seek
-    first try same Playback Session Plugin and same resource set
-    correctness requires a three-layer SEEK DISCONTINUITY PROTOCOL:
-
-      decode-side cutover
-        worker command -> serialization point -> discard OLD staging -> decoder reposition
-
-      edge-side cutover
-        invalidate/flush OLD buffered PCM without corrupting terminal monotonicity
-
-      output-side physical cutover
-        prove already-submitted OLD PCM cannot remain audible after seek commit
-        exact mechanism remains OPEN
-
-    output-side candidates remain OPEN; do not copy the historical #40 Stop()+Reset()
-    implementation as current contract
-
-    distinguish:
-      seek command accepted
-      logical decoder/edge landing
-      audible cutover committed
-
-    Loom/native tests cover worker/edge races; a Windows physical-output gate is required
-    for audible cutover because device buffering is outside Loom
-
-    if the same resources remain and no old/new resource world overlaps, P1–P5 is NOT earned
-
-Open(source B)
-    K0 staged teardown/mount ordering exists
-    fresh episode configuration mechanism does NOT yet exist
-    current ComponentSpec capture(file, completion) is not an Open contract
-
-    config candidates remain OPEN (per-instance config / App-owned config source /
-    multiple concrete definitions / another minimal construction mechanism)
-
-    Fiber Active is not automatically the semantic-authority start boundary
-    failure rollback, transactional preflight and zero-gap are separate product/mechanism questions
-    zero-gap is the clearest current candidate for real old/new RT overlap
-
-Next / Previous
-    only after Open exists
-    default minimal hypothesis is App-owned ordered selection + Open(selected)
-    PlaylistPlugin must be independently earned by D13
-
-Volume
-    parameter/control routed through an existing mechanism service is the default hypothesis
-    do not conflate playback volume with PCM gain / DSP / ReplayGain
-    no feature-shaped VolumePlugin
-
-Devices / Device switch
-    enumeration is an Output-side mechanism query
-    switching is not implemented by the current RenderStream ownership shape
-    first earn either:
-      - a session-owned replaceable render binding with coherent drain semantics, or
-      - whole-episode replacement
-    seamless switch may create real old/new render overlap and therefore may trigger P1–P5
-```
-
-Historical Issue #40 may be used only as a **counterexample/mechanism evidence** that machine/logical seek landing can differ from audible device-buffer truth. Its historical implementation is not current architecture authority.
+Device switch/replaceable render binding, broader transport vocabulary,
+multi-session/preload/gapless and specialized realtime-runtime representation
+remain OPEN. Any future overlap must earn the minimum P1–P5 mechanism.
+Historical Issue #40 remains counterexample/mechanism evidence only, not a
+current cutover contract.
 
 ---
 

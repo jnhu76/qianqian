@@ -41,11 +41,12 @@
 //! runtime behind the existing [`crate::session::ProcessingRuntime`]
 //! staging seam. The overlap is same-thread, same-owner and
 //! episode-bounded, so PBK-001 P1–P5 are not triggered. The cell's lock
-//! is bounded on both sides — the worker touches it exactly once per
+//! protects bounded critical-section work — the worker touches it once per
 //! fresh block (one `Option::take`), and a command's critical section
 //! is one fixed-size compose+validate+commit over `Copy` data (only a
 //! REFUSED command allocates its diagnostic) — so the per-block
-//! firewall's ban on unbounded blocking holds.
+//! pickup performs no I/O or condvar wait while holding it. This bounds
+//! work under the lock, not contention, scheduling or update completion time.
 
 use std::sync::{Arc, Mutex};
 
@@ -93,7 +94,8 @@ struct ProcessingControlState {
     /// The most recent refusal diagnostic (mechanism evidence): a
     /// refused `set_*` records why here, so a client that did not
     /// capture the command's return value still sees the honest
-    /// refusal. Cleared by the next accepted update.
+    /// refusal. Cleared by the next intrinsically valid Desired record;
+    /// worker Accepted/Applied happens later.
     last_refusal: Option<String>,
 }
 
@@ -126,10 +128,11 @@ impl ProcessingControl {
     ///
     /// The pending slot is for LIVE updates only — establishment binds
     /// `desired` directly (the engine compiles its initial snapshot from
-    /// it at activation), so the slot is CLEARED here: a leftover
-    /// pending update from an earlier episode on this handle must never
-    /// survive into a new episode as a phantom first transition
-    /// (Open/replacement, §7.3).
+    /// it at activation), so the slot is CLEARED here: any pre-activation
+    /// pending value is superseded by the constructor's initial Desired
+    /// configuration, not replayed as a phantom first transition.
+    /// This local reset does not authorize reusing a handle for another
+    /// episode; fresh-core attachment remains the caller's precondition.
     pub(crate) fn establish(&self, desired: AudioProcessingConfig) {
         let mut state = self.state.lock().unwrap();
         state.desired = desired;
@@ -245,7 +248,7 @@ impl ProcessingControl {
     }
 
     /// Test-only whole-configuration routing: the oracle harness drives
-    /// the SAME coherent acceptance the typed `set_*` commands use, so
+    /// the SAME coherent Desired recording the typed `set_*` commands use, so
     /// the D3 oracles exercise the production control path.
     #[cfg(all(test, not(loom)))]
     pub(crate) fn route_whole(&self, candidate: AudioProcessingConfig) -> Result<(), String> {
@@ -293,10 +296,11 @@ struct Transition {
     to: EpisodeProcessing,
     elapsed_frames: usize,
     total_frames: usize,
-    /// Grown at most once PER TRANSITION to the largest block seen (the
-    /// transition owns the buffer and settle drops it with the
-    /// transition), so each transition's allocation cost is bounded by
-    /// that one growth — the steady path stays allocation-free.
+    /// Transition-owned input copy, dropped when the transition settles.
+    /// It may grow for successive larger blocks; in the production
+    /// episode its size is bounded by the decode staging block. This
+    /// does not bound allocation count or elapsed allocation time.
+    /// The steady path does not use this scratch buffer.
     scratch_in: Vec<f32>,
     /// The wall-clock witness of the previous stage call — used ONLY by
     /// the N4 mutation (a ramp advanced by wall time, the defect the
@@ -442,8 +446,9 @@ impl ProcessingRuntime for LiveProcessing {
         let total = transition.total_frames;
         let base = transition.elapsed_frames;
         // Both sides process the SAME input; the block arrives as the
-        // input and leaves as the blend. Scratch grows once (transition
-        // only — the steady path stays allocation-free).
+        // input and leaves as the blend. Transition scratch may grow
+        // as blocks require within the episode staging bound; the
+        // steady path adds no scratch allocation.
         transition.scratch_in.clear();
         transition.scratch_in.extend_from_slice(block);
 

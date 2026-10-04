@@ -396,6 +396,8 @@ Playback Foundations / PBK-001                 ACCEPTED
 Current Plugin/Fiber taxonomy / PBK-002        ACCEPTED (D12; admission invariant D13)
 Playback Session Plugin classification         episode-scoped Plugin (PBK-002 D6);
                                                code already runs on the common K0 substrate
-Phase-F playback semantics                     OPEN (PBK-002 §14); new implementation
-                                               paused pending authority design
+Phase-F playback minimums                      ACCEPTED / implemented (PBK-002 D11/D14;
+                                               broader semantics remain OPEN)
+Playback execution model                       CANDIDATE / NOT FROZEN (#208; D1–D6)
+                                               see playback-execution-model.md §1/§12
 ```

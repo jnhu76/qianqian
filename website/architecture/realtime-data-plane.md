@@ -9,13 +9,13 @@ status: CURRENT
 
 > **Capability Plane != Data Plane。**
 
-本页分两层：**已实现**的 generic control/data-plane 防火墙（Base Kernel K0，PR #71），以及 ADR-PBK-001（**ACCEPTED**）的 Playback Foundations。后者已接受但尚无可执行实现，不代表真实 PCM playback pipeline 已经实现；文中出现的 TransportKernel / Physical Fence 等名词是旧实验证据，不是 current authority。
+本页是派生阅读页：generic control/data-plane 防火墙（K0，PR #71）和当前 decode → episode-owned processing → PCM edge → output 路径均已有实现。PBK-001（ACCEPTED）拥有基础契约，PBK-002（ACCEPTED）拥有当前静态组合与最小播放语义，PBK-003（ACCEPTED）拥有 Output/backend 边界。跨协议执行阅读见 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)（D1–D6 **CANDIDATE / NOT FROZEN**；§1 authority routing，§12 20/20 traceability）。本页 TransportKernel / Physical Fence 等历史映射不描述当前实现。
 
 ---
 
 ## 分离
 
-<ClaimBadge role="authority" />
+<ClaimBadge role="interpretation" />
 
 Context 决定**谁能到达谁**。绑定之后，载荷通过已解析服务或预绑定数据边直接流动。
 
@@ -37,13 +37,13 @@ flowchart TB
     BIND -.->|"建立长期/预绑定边，不逐块查找"| DP
 ```
 
-Composition Kernel 不拥有 PCM、MediaSpan、playback cursor、Window、Generation 或 rendered position。图中 Decoder / Processing / AudioOutput 是 capability seam；真实 provider 实现尚未获得授权。
+Composition Kernel 不拥有 PCM、MediaSpan、playback cursor、Window、Generation 或 rendered position。上图是分离示意，不冻结 MediaSpan 或 Processing Graph API。当前 Decode/Output 是 Plugin；processing 与 PCM edge 是 Session-owned resources，processing 不是独立 Capability/Plugin。真实 provider 已实现，具体执行/所有权见 execution model §4；存在实现不等于本次已验证设备运行。
 
 ---
 
 ## Realtime 热路径绝不允许
 
-<ClaimBadge role="authority" />
+<ClaimBadge role="interpretation" />
 
 每个 callback/block 内不得执行：
 
@@ -55,7 +55,7 @@ Composition Kernel 不拥有 PCM、MediaSpan、playback cursor、Window、Genera
 - UI / JS / 托管运行时往返
 - 无界分配、锁等待或阻塞
 
-图的变更在 control side 准备，再在 RT-safe boundary 发布。当前 publication/reclamation 的 normative contract 是 `docs/adr/ADR-PBK-001.md` §6 **P1–P5**（本页不复制其正文；具体机制仍 OPEN，由 §12 Phase D 验证）。
+需要重叠 realtime views 的变更须遵守 `docs/adr/ADR-PBK-001.md` §6 **P1–P5**。是否触发该契约与需要何种机制，由 owning authority 和具体证据决定；当前静态播放与 live DSP 的 placement/lifetime 见 PBK-002 D6/D14、DSP product model §7.3。本页不预建通用 graph-publication 机制，也不把旧 Phase-D 计划当作当前状态。
 
 ---
 
@@ -101,18 +101,18 @@ Fence 进入 claimed 阶段后，后来的 intent 不得假装它没有发生或
 
 **历史实验映射（illustrative，非 current architecture 必须形状）**：旧实验中 MusicComponent 通过 Composition Kernel 获得 AudioOutput/PcmSink capability。具体 PCM 边在绑定后成为直接/预绑定 data edge；不能由 composition root 偷偷塞一个反向 Music 指针，也不能让 AudioOutput 通过 Context 在每个 block 反查 Music。当前 contract 只依赖 ADR-PBK-001 §2.4（realtime data plane）与 §6 P1–P5（publication/reclamation）。
 
-具体 `SinkSession` API/representation 可以随实现演进；长期不变量是：
+下列是旧 `SinkSession` 实验的说明，不冻结当前 API/representation；当前 data-edge lifetime 和 raw evidence 路由分别见 PBK-002 D6/D11/D14、PBK-003 §5–6 与 execution model §4/§9：
 
 1. data edge 有明确生命周期与 teardown；
 2. provider final release 之前 dependent 完成必要 teardown；
 3. RT thread 只触碰预先准备好的 bounded state；
-4. raw physical evidence 进入语义解释者（旧实验映射为 TransportKernel；重置后该映射本身是 OPEN 问题），而不是全局可写状态袋。
+4. raw physical evidence 进入当时的语义解释者（旧实验映射为 TransportKernel），而不是全局可写状态袋；当前 D11 terminal authority 是 Session semantic role，其他机制证据不能自动成为 Fact。
 
 ---
 
 ## Processing Graph
 
-目标 PCM 路径：
+长期 processing 示例（当前已实现 Gain + 10-band EQ；SRC 等仍须单独挣得）：
 
 ```text
 Decoder → Gain / EQ / SRC / ... → AudioOutput
@@ -123,7 +123,7 @@ Decoder → Gain / EQ / SRC / ... → AudioOutput
 ---
 
 <ProvenancePanel
-  :authority="['docs/architecture/composition-kernel-0-design.md', 'docs/adr/ADR-PBK-001.md']"
+  :authority="['docs/architecture/composition-kernel-0-design.md', 'docs/adr/ADR-PBK-001.md', 'docs/adr/ADR-PBK-002.md', 'docs/adr/ADR-PBK-003.md', 'docs/architecture/dsp-product-model.md', 'docs/architecture/playback-execution-model.md']"
   :decisions="[{ pr: 68 }]"
   :implementation="[{ pr: 71 }]"
   :evidence="['crates/qianqian-audio-api/tests/realtime_view_publication', 'specs/realtime-publication/RealtimePublication.tla']"

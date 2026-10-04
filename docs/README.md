@@ -16,9 +16,9 @@ Load only the documentation needed for the current task. Git history and externa
 | SongCore one-core/many-bindings architecture, raw vs ergonomic binding boundary, binding parity oracle, target support maturity (BUILD…RELEASE) | `architecture/songcore-binding-architecture.md` — binding-architecture authority (Issue #173); the canonical ABI description itself is `../native/include/songcore.h` |
 | Episode terminal outcome semantic authority | `adr/ADR-PBK-002.md` §17 / D11 |
 | Playback temporal semantics — how commands are accepted, what establishes ordering, evidence classes (world-state vs operation), commit boundaries, observation vs truth (timing/order/causality questions) | `architecture/playback-temporal-semantics.md` — cross-cutting temporal vocabulary + reading model over existing mechanisms; protocol predicates stay with their owners (D11 / D14.5 / D14.7 / D14.8 / D14.11) |
-| Playback execution — identity/attachment, owners, waiting/ordering, host settlement, work fate, quiescence and bounds | [Playback execution model](architecture/playback-execution-model.md) — **CANDIDATE / NOT FROZEN**, Stage 4 #207; merged C1 #205 and C2 #213; D1–D6 pending #209 acceptance; owner #198, umbrella #201; protocol authorities retain their predicates |
+| Playback execution — identity/attachment, owners, waiting/ordering, host settlement, work fate, quiescence and bounds | [Playback execution model](architecture/playback-execution-model.md) — **CANDIDATE / NOT FROZEN**, Stage 5 #208 over merged Stage 4 #207/#214; §12 holds 20/20 traceability; merged C1 #205 and C2 #213; D1–D6 pending #209 acceptance; owner #198, umbrella #201; protocol authorities retain their predicates |
 | Playlist ordering / repeat / EOF-navigation policy + TUI keymap (Issue #166 U2) | `adr/ADR-PBK-002.md` §20 D14.6 — the 2026-09-19 U2 amendment (App-owned product policy; the Playback Session establishes terminal Facts and nothing else). The shipped temporary playlist is a realization of that decision, not a second authority |
-| Terminal Fact commit-ownership boundary evidence（F2 seam 前置 formal campaign） | `../specs/f2-terminal-commit-boundary/` — campaign evidence only，**未裁决**；结论是 CURRENT_CONTRACT_UNDERSPECIFIED，等 ADR/code gap audit |
+| Terminal Fact commit-ownership boundary evidence（F2 seam 前置 formal campaign） | `../specs/f2-terminal-commit-boundary/` — historical campaign evidence only; its CURRENT_CONTRACT_UNDERSPECIFIED finding was resolved by PBK-002 D11/D14.3 and the current authority-owned settlement realization |
 | F5 seek 实现 guardrail 证据（M1–M11 生产突变 + fail-closed runner） | `../specs/f5-seek-implementation/` — executable evidence only；seek 语义权威 = `adr/ADR-PBK-002.md` §20 D14.5 |
 | Current architecture corrective basis | Issue #138 — design input only, **not authority** |
 | Minimal PCM contract evidence | `architecture/pcm-contract-a0.md` + `../crates/qianqian-audio-api/tests/pcm_edge_contract/` — Phase B evidence only |
@@ -27,7 +27,7 @@ Load only the documentation needed for the current task. Git history and externa
 | Current Rust behavior | current code + tests |
 | Retired pre-reset playback models/harness | Git history / PR records — historical evidence only; removed from main by the post-#139 spec reset (still-current races are covered by today's specs/tests, see `../specs/README.md`) |
 | Historical component-boundary audit | `architecture/component-boundary-a0.md` — historical evidence only |
-| Plugin boundary conformance audit (post-#145 headless path) | `audits/plugin-boundary-conformance-audit.md` — audit evidence record; hardening plan accepted, **not yet implemented** |
+| Plugin boundary conformance audit (post-#145 headless path) | `audits/plugin-boundary-conformance-audit.md` — historical audit evidence at its recorded BASE_SHA; its then-pending hardening status is not a current implementation claim |
 | Audio Processing Plugin architecture audit (post-`ba545ee`) | `audits/audio-processing-plugin-audit.md` — historical/evidence audit record; D13 negative ruling remains current, while the bounded production minimum is now accepted in `adr/ADR-PBK-002.md` D14.11 |
 | DSP product semantics / heterogeneous algorithm contract / ordering / compatibility / downstream PCM consumer boundary | `architecture/dsp-product-model.md` — **NORMATIVE AUTHORITY** for DSP product semantics; D14.11 remains authoritative for the current processing minimum, episode lifecycle/ownership, placement, and live-update admission |
 | Audio Observation Plane / visualizer PCM-consumer contract (#187) | `architecture/audio-observation-plane.md` — **DRAFT design input only**; observation point/representation remain OPEN and #187 is not closed |
@@ -96,7 +96,7 @@ EVIDENCE
      component-boundary-a0.md, first-audible-slice.md) /
      draft design input (architecture/audio-observation-plane.md) /
      candidate cross-protocol execution authority
-     (architecture/playback-execution-model.md — #207, CANDIDATE;
+     (architecture/playback-execution-model.md — #208, CANDIDATE;
       protocol authorities retain their predicates; acceptance #209) /
      audit records (audits/plugin-boundary-conformance-audit.md,
      audits/audio-processing-plugin-audit.md) /
@@ -200,6 +200,8 @@ Playback subsystem navigation — start from the task, not from the ADR number:
 ```text
 Playback Architecture
     ├── ownership / composition      -> adr/ADR-PBK-002.md D1/D4/D5/D6/D12/D13 (+ adr/ADR-PBK-003.md for output)
+    ├── execution model              -> architecture/playback-execution-model.md
+    │                                   (CANDIDATE D1–D6; §1 authority map, §12 traceability)
     ├── temporal semantics           -> architecture/playback-temporal-semantics.md
     │                                   (command -> acceptance -> evidence -> commit -> observation)
     ├── DSP product model            -> architecture/dsp-product-model.md (§7.3 live-update admission)
@@ -302,8 +304,9 @@ frozen by the D14.8 amendment (Position = episode-local
 device-consumed Projection, read as one pure load of a monotone
 mechanism-evidence sample published by the render leg; Duration =
 optional source-scoped Mechanism Evidence whose unknown stays unknown)
-and implemented behind the same seam (PR #152) — pending human review;
-the remaining transport semantics stay OPEN
+and present in current production behind the same seam (PR #152);
+Seek/Open/volume and the processing minimum are routed through PBK-002
+D14.5/.6/.9/.11 and the execution model. The remaining transport semantics stay OPEN
 (PBK-002 §14) pending their authority design.
 
 For host-render wording in those frozen mechanisms, PBK-003 is the interpretation boundary: platform-specific WASAPI counters/calls are current Windows realization/evidence, while another backend must refine the same platform-neutral obligation rather than clone the same API.

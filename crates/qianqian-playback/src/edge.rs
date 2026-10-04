@@ -1,8 +1,9 @@
 //! The bounded PCM data edge: one producer, one consumer, kernel-free
 //! (first-audible-slice design §4). Preallocated once at construction;
 //! the steady-state read/write path performs no allocation. Terminals —
-//! EOF, failure, stop — always unblock both endpoints so no lifecycle
-//! path can wedge the data plane.
+//! EOF, failure, stop — notify data/space waiters. EOF drains buffered
+//! frames; failed/stopped edges abandon pulls. These wake paths neither
+//! commit D11 truth nor acknowledge worker/render termination or native I/O.
 //!
 //! The synchronization primitives are selected by `cfg(loom)` (campaign
 //! FV-CONC-0): the loom types are drop-in for the std ones and preserve
@@ -78,10 +79,10 @@ impl PcmEdge {
     /// return immediately with the sample count accepted (0 when the
     /// edge is full or a terminal is set). This is the F5 seek
     /// protocol's bounded-slice write primitive: the decode worker's
-    /// write wait observes the seek command slot between slices, so the
-    /// worker always reaches its serialization point with bounded
-    /// latency regardless of edge occupancy — no destructive pre-purge
-    /// (D14.5).
+    /// write wait re-observes the seek command slot between capped
+    /// capacity waits, without a destructive pre-purge (D14.5). Full edge
+    /// occupancy does not eliminate those checks; scheduling/lock waits
+    /// and provider progress have no end-to-end deadline here.
     ///
     /// Partial writes leave the accepted prefix in the ring (FIFO
     /// integrity is unchanged); the caller owns the rest of the slice.
@@ -104,11 +105,11 @@ impl PcmEdge {
         take
     }
 
-    /// Producer wait for free space or a state change, bounded by
-    /// `slice`: the interruptible write loop's back-off between bounded
-    /// slices. Wakes on space freed, any terminal, or the timeout (the
-    /// timeout is the backstop that re-observes the seek command slot;
-    /// a missed notify costs one slice of latency, never correctness).
+    /// Producer capacity wait with requested timeout `slice`: the
+    /// interruptible write loop's back-off. Space/terminal notifications
+    /// or timeout cause a predicate recheck. The timeout is a local
+    /// observation backstop; mutex acquisition/reacquisition and scheduling
+    /// can extend elapsed time, so it is not a progress deadline.
     /// The caller holds no other lock across this wait.
     pub(crate) fn wait_for_space(&self, slice: Duration) {
         // `mut` for the loom branch below (it reassigns the guard across
@@ -168,7 +169,7 @@ impl PcmEdge {
         self.data_ready.notify_all();
     }
 
-    /// Producer committed EOF: consumers drain what remains, then see
+    /// Producer records edge EOF evidence: consumers drain what remains, then see
     /// [`PcmPull::Eof`].
     pub(crate) fn close_eof(&self) {
         self.set_terminal(TERMINAL_EOF);
@@ -180,8 +181,8 @@ impl PcmEdge {
         self.set_terminal(TERMINAL_FAILED);
     }
 
-    /// Request the data plane to stop; both endpoints unblock with
-    /// terminal outcomes. Idempotent.
+    /// Request the edge to stop and notify data/space waiters. Idempotent;
+    /// this edge state is not a D11 terminal Fact or a thread acknowledgement.
     pub(crate) fn stop(&self) {
         self.set_terminal(TERMINAL_STOPPED);
     }
@@ -230,8 +231,9 @@ impl RenderPcmInput for PcmEdge {
         let mut guard = self.state.lock().expect("pcm edge lock");
         loop {
             // A failed or stopped edge stops the consumer immediately —
-            // buffered frames are abandoned, because the session outcome
-            // is already decided (terminal checks precede the data check).
+            // buffered frames are abandoned (terminal checks precede data).
+            // This edge state does not establish the Session outcome; Stop or
+            // backend abort can stop the edge before D11 becomes decisive.
             if guard.terminal == TERMINAL_STOPPED || guard.terminal == TERMINAL_FAILED {
                 return PcmPull::Stopped;
             }
