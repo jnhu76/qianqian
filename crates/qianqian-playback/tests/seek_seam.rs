@@ -56,12 +56,13 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use qianqian_app::QianqianApp;
-use qianqian_audio_api::ports::ProviderSeekOutcome;
+use qianqian_audio_api::ports::{DecodeOutcome, PcmDecode, ProviderSeekOutcome};
 use qianqian_composition::{DesiredEntry, Revision};
 use qianqian_playback::{EpisodeTerminalOutcome, PlaybackSessionHandle};
 
 use common::{
-    DeviceTail, OutputBehavior, Playout, SourceBehavior, TailProbe, TestDecode, TestOutput, within,
+    DeviceTail, OutputBehavior, Playout, ProducerFreezeWitness, SourceBehavior, TEST_FORMAT,
+    TailProbe, TestDecode, TestOutput, within,
 };
 
 const DUMMY_PATH: &str = "test://seek-seam";
@@ -178,6 +179,17 @@ fn activate(runtime: &mut QianqianApp) {
 /// by a slow mock consumer (so a seek fired in the first second is
 /// decisively mid-stream), with the standard witness set.
 fn episode(seeks: Vec<ProviderSeekOutcome>) -> (Witnesses, PlaybackSessionHandle, QianqianApp) {
+    episode_with_freeze(seeks, &ProducerFreezeWitness::default())
+}
+
+/// [`episode`] with the caller owning the decode double's producer
+/// freeze witness, so a destructive-seek oracle can pin the
+/// producer-side "never resumes old-cursor production" guarantee
+/// directly (see `common::ProducerFreezeWitness`).
+fn episode_with_freeze(
+    seeks: Vec<ProviderSeekOutcome>,
+    freeze: &ProducerFreezeWitness,
+) -> (Witnesses, PlaybackSessionHandle, QianqianApp) {
     let witnesses = Witnesses {
         consumed: Arc::new(AtomicUsize::new(0)),
         consumed_values: Arc::new(Mutex::new(Vec::new())),
@@ -190,6 +202,7 @@ fn episode(seeks: Vec<ProviderSeekOutcome>) -> (Witnesses, PlaybackSessionHandle
             behavior: SourceBehavior::EofAfter(SOURCE_FRAMES),
             duration: Some(Duration::from_secs(8)),
             seeks,
+            freeze: freeze.clone(),
         },
         OutputBehavior::SlowConsume {
             per_read: Duration::from_millis(1),
@@ -502,15 +515,23 @@ fn a_refused_seek_finishes_its_own_remainder_with_zero_content_loss() {
 /// episode NEVER resumes old-cursor production — it takes the ordinary
 /// D11 `Failed` route, production stops for good, and the terminal is
 /// `Failed` (not Stopped, not Completed), with the diagnostic as
-/// presentation only.
+/// presentation only. "Never resumes" is witnessed on the PRODUCER
+/// side — the decode endpoint's own count of reads arriving after the
+/// destructive outcome — because a consumed-total bound alone cannot
+/// separate a short resumption from the legal post-failure drain, and
+/// teardown's own stop could truncate a resuming worker before the
+/// consumer side ever shows it.
 #[test]
 fn a_destructive_provider_failure_fails_the_episode_and_never_resumes() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
-        let (witnesses, handle, mut runtime) =
-            episode(vec![ProviderSeekOutcome::MutatedThenFailed {
+        let freeze = ProducerFreezeWitness::default();
+        let (witnesses, handle, mut runtime) = episode_with_freeze(
+            vec![ProviderSeekOutcome::MutatedThenFailed {
                 diagnostic: "mid-stream corruption".to_owned(),
-            }]);
+            }],
+            &freeze,
+        );
         wait_for_position_past(&handle, HALF_A_SECOND);
         handle.request_seek(Duration::from_secs(5));
         assert_eq!(
@@ -526,25 +547,93 @@ fn a_destructive_provider_failure_fails_the_episode_and_never_resumes() {
                 .is_some_and(|d| d.contains("seek failed")),
             "the diagnostic is presentation evidence of the route: {observation:?}"
         );
-        // The episode never resumes: production stopped at the cut.
-        let stopped_at = witnesses.consumed.load(Ordering::SeqCst);
-        assert!(
-            stopped_at < SOURCE_FRAMES,
-            "the destructive failure must end before the source is exhausted"
-        );
-        std::thread::sleep(Duration::from_millis(300));
-        assert_eq!(
-            witnesses.consumed.load(Ordering::SeqCst),
-            stopped_at,
-            "a failed episode must never resume production"
-        );
         assert!(
             handle.observe().position.is_none(),
             "the terminal Fact withdraws the projection"
         );
         let snapshot = runtime.dispose().snapshot;
         assert!(snapshot.quiet, "teardown must stay quiet: {snapshot:?}");
+        // The producer-side freeze oracle, final now that teardown
+        // joined the worker: a resumed worker READS before it writes,
+        // so the endpoint's own count sees a resumption even when the
+        // edge, the consumer total or teardown's stop would hide it.
+        assert_eq!(
+            freeze.post_failed_seek_reads(),
+            0,
+            "the producer resumed old-cursor production after the \
+             destructive seek"
+        );
+        // Secondary consumer-side bound (the Failed Fact and the data
+        // plane's own terminal are separate events, so the render leg
+        // may legally drain PCM published before the failure): the
+        // final total must still sit short of the source — resumption
+        // draining to exhaustion is the coarse failure this catches.
+        let settled = witnesses.consumed.load(Ordering::SeqCst);
+        assert!(
+            settled < SOURCE_FRAMES,
+            "a failed episode must never resume production: {settled} frames \
+             consumed — the destructive failure must leave the source \
+             unexhausted"
+        );
     });
+}
+
+/// Run `f` and report whether it panicked — the negative-control shape:
+/// an oracle MUST be able to fail, and the control proves it does on
+/// the exact defect signature it exists to catch.
+fn rejects(f: impl FnOnce()) -> bool {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).is_err()
+}
+
+/// Negative control: the producer-freeze oracle must be able to FAIL.
+/// Production never resumes after a destructive seek, so no real
+/// episode can reach the wrong shape — the control drives the decode
+/// double directly: the scripted destructive outcome issues, then ONE
+/// old-cursor read arrives, exactly the resumed-production defect the
+/// oracle exists to catch. The oracle predicate must reject that
+/// shape, so a green destructive oracle above proves something.
+#[test]
+fn negative_control_the_producer_freeze_oracle_rejects_a_resumed_read() {
+    let freeze = ProducerFreezeWitness::default();
+    let decode = TestDecode {
+        behavior: SourceBehavior::EofAfter(SOURCE_FRAMES),
+        duration: None,
+        seeks: vec![ProviderSeekOutcome::MutatedThenFailed {
+            diagnostic: "synthetic destructive outcome".to_owned(),
+        }],
+        freeze: freeze.clone(),
+    };
+    let mut endpoint = decode
+        .open_media(std::path::Path::new(DUMMY_PATH))
+        .expect("the double opens");
+    assert!(
+        matches!(
+            endpoint.seek(Duration::from_secs(5)),
+            ProviderSeekOutcome::MutatedThenFailed { .. }
+        ),
+        "precondition: the scripted destructive outcome issues"
+    );
+    let mut dst = vec![0.0f32; 256 * usize::from(TEST_FORMAT.channels)];
+    assert!(
+        matches!(endpoint.read_frames(&mut dst), Ok(DecodeOutcome::Frames(_))),
+        "precondition: the resumed read produces old-cursor frames"
+    );
+    assert_eq!(
+        freeze.post_failed_seek_reads(),
+        1,
+        "precondition: the witness counted the one resumed read"
+    );
+    assert!(
+        rejects(|| {
+            assert_eq!(
+                freeze.post_failed_seek_reads(),
+                0,
+                "the producer resumed old-cursor production after the \
+                 destructive seek"
+            );
+        }),
+        "the producer-freeze oracle must reject the resumed-production shape"
+    );
 }
 
 // --- pause x seek --------------------------------------------------------

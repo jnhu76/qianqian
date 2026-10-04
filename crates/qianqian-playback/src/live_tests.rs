@@ -157,6 +157,7 @@ fn live_episode_parts(
         behavior: source,
         duration: None,
         seeks,
+        freeze: Default::default(),
     };
     runtime
         .register_component({
@@ -1157,6 +1158,7 @@ fn a_failure_during_a_transition_settles_failed_through_d11() {
             behavior: SourceBehavior::EofAfter(EIGHT_SECONDS),
             duration: None,
             seeks: Vec::new(),
+            freeze: Default::default(),
         };
         runtime
             .register_component({
