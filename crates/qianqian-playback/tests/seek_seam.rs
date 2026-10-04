@@ -968,10 +968,11 @@ fn a_seek_on_a_never_activated_episode_is_inert() {
 // --- seek x worker EOF (implementation corrective-1, C2) ------------------
 
 /// A request_seek racing the worker's EOF exit can never wedge the
-/// episode: the acceptance/worker-exit linearization (atomic acceptance
-/// hold + the exit funnel's stranded-seek cleanup, pinned deterministically
-/// white-box) means every interleaving ends one of two ways — the seek is
-/// rejected, or it is accepted and then aborted by the worker's exit —
+/// episode: recording/worker-exit ordering (atomic recording hold +
+/// exit-funnel cleanup, pinned by the white-box boundary oracles) means
+/// a request is rejected or its private record is cleared. A record may
+/// be Accepted then aborted, or never-Accepted Refused/Inert when ending
+/// invalidated Open before plant (temporal semantics §6.1) —
 /// and EITHER way the episode's ordinary EOF course completes. This is
 /// the integration sweep over that envelope: requests are hammered while
 /// the episode approaches and enters its EOF window, and the terminal

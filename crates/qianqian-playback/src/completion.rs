@@ -639,26 +639,25 @@ impl SessionCompletion {
     /// here). Acceptance records the command and parks the leg; it does
     /// NOT imply a cutover — "a seek request is not a cutover".
     ///
-    /// The acceptance is one atomic unit (implementation corrective-1,
-    /// the seek/worker-exit linearization): the second hold below
-    /// re-validates every condition, plants the command, resets the
-    /// current cut cycle's evidence, and routes the cut's park — all
-    /// under ONE completion-lock hold. A seek is therefore either wholly
-    /// accepted before the worker's exit publication (whose stranded-
-    /// seek cleanup runs after it and aborts exactly this plant) or
-    /// wholly rejected after it; no interleaving can leave a planted
-    /// command whose only resolver has left. Without this, a
-    /// `request_seek` × worker-EOF interleaving could route a hold
-    /// nobody releases and wedge the episode's final drain — D11
-    /// Completed would never settle.
+    /// Internal recording is one completion-lock unit: recheck episode
+    /// conditions, reserve the free slot, reset cut evidence and route
+    /// the hold. Edge Open was sampled separately and is NOT rechecked
+    /// by that unit. A plant refines to semantic Accepted only if the
+    /// actual D14.5 conjunction holds there (temporal semantics §6.1).
+    /// A non-Open plant is never-Accepted Refused/Inert bookkeeping:
+    /// irreversible edge terminals and worker checks prevent provider
+    /// seek/purge/rebase; the exit funnel clears any stranded slot/hold.
+    ///
+    /// Recording still serializes with worker-gone publication: a plant
+    /// before it is found by exit cleanup; a request after it is rejected.
+    /// That cleanup guarantee does not make every plant Accepted.
     pub(crate) fn request_seek(&self, target: Duration) {
         // First hold: cheap reject against the command state and worker
         // liveness. The edge is reached only after this lock is dropped
         // (the established completion→edge discipline: `request_stop`'s
-        // pattern). A terminal that changes in the window between the
-        // holds is caught again by the second hold's re-validation and
-        // at the worker's own serialization point — defense lines, not
-        // one.
+        // pattern). Session ending is rechecked by the second hold;
+        // edge ending is checked separately by the worker. These
+        // samples do not form one atomic joint eligibility predicate.
         let edge = {
             let guard = self.state.state.lock().expect("completion lock");
             if guard.outcome.is_some()
@@ -677,7 +676,7 @@ impl SessionCompletion {
         if edge.terminal() != crate::edge::EdgeTerminal::Open {
             return; // data plane not Open (includes the post-EOF drain window)
         }
-        // The atomic acceptance unit (see the doc above). Lock order:
+        // The atomic internal-record unit (see the refinement above). Lock order:
         // completion state → seek slot → gate intent, each nested only
         // in that direction (the routers' established
         // gate-intent-under-completion-lock discipline; the slot is
@@ -707,7 +706,7 @@ impl SessionCompletion {
             }
             // A NEW cut cycle owns its own OPERATION evidence: the
             // previous cycle's landing/refusal/commit latches are reset
-            // here, at acceptance, and must never satisfy THIS cycle's
+            // here, at recording, and must never satisfy THIS cycle's
             // commit boundary (the same current-engagement attribution
             // discipline D14.7 freezes for pause). Safe against the
             // worker's in-flight protocol: the one-seek slot only frees
@@ -719,7 +718,7 @@ impl SessionCompletion {
             guard.cut_committed = false;
             // The cut's park routes INSIDE this hold, so it can never
             // lag the plant: the worker-exit cleanup always finds and
-            // releases exactly what an acceptance routed.
+            // releases exactly what an internal record routed.
             self.state.gate.set_seek_hold(true);
         }
     }
@@ -1024,8 +1023,9 @@ impl SessionCompletion {
     /// The decode worker wrapper reports the edge terminal at its exit.
     /// This is the worker's single exit funnel (normal and panic paths):
     /// it publishes the terminal evidence AND — first, under the same
-    /// lock hold — marks the worker gone, which is the acceptance side
-    /// of the seek/worker-exit linearization. The caller MUST run
+    /// lock hold — marks the worker gone, which orders recording
+    /// against worker exit; it does not certify edge eligibility.
+    /// The caller MUST run
     /// [`SessionCompletion::abort_stranded_seek`] after this returns.
     /// The publication and the settlement step run under one lock hold,
     /// inside this call.
@@ -1040,9 +1040,9 @@ impl SessionCompletion {
     /// seek accepted before this worker's exit can never be resolved by
     /// a worker that is leaving — abort it here, strictly AFTER
     /// [`SessionCompletion::worker_exited`] published `worker_gone`.
-    /// Acceptance linearizes against that publication: a plant whose
-    /// acceptance hold ran before it is found and cleared here; a plant
-    /// attempted after it is rejected by the acceptance re-validation.
+    /// Recording serializes against that publication: a plant whose
+    /// recording hold ran before it is found and cleared here, including
+    /// a never-Accepted ending-raced plant; a request after it is rejected.
     /// Every exit path reaches this — including a refusal whose
     /// preserved remainder was cut short by a stop (slot still occupied)
     /// — and re-routing an abort is idempotent: the episode is ending,
@@ -1319,7 +1319,7 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     #[cfg(not(loom))]
     use qianqian_audio_api::ports::{GateSlice, RenderGate, TailProbeOutcome};
@@ -1340,6 +1340,166 @@ mod tests {
             }
         });
         captured.into_inner()
+    }
+
+    /// S6-F01: one consumer can hold a fetched chunk while the ring is
+    /// refilled. Failure publication does not atomically fail the edge.
+    #[cfg(not(loom))]
+    #[test]
+    fn failed_fact_can_coexist_with_full_ring_and_fetched_pcm() {
+        use qianqian_audio_api::ports::{PcmPull, RenderPcmInput};
+
+        let completion = SessionCompletion::new();
+        let edge = Arc::new(PcmEdge::new(2, 8));
+        completion.bind_stop_target(edge.clone());
+        assert_eq!(edge.write_some(&[1.0; 16]), 16);
+        let mut fetched = [0.0; 4];
+        assert_eq!(edge.read_frames(&mut fetched), PcmPull::Frames(2));
+        assert_eq!(edge.write_some(&[2.0; 4]), 4);
+
+        completion.decode_failed("next provider read failed");
+        assert_eq!(edge.terminal(), EdgeTerminal::Open);
+        assert_eq!(
+            completion.observe_snapshot().terminal_outcome,
+            Some(EpisodeTerminalOutcome::Failed)
+        );
+        assert_eq!(edge.buffered_frames(), 8);
+        assert_eq!(fetched, [1.0; 4]);
+        assert_eq!(edge.buffered_frames() + fetched.len() / 2, 10);
+        edge.fail();
+        assert_eq!(edge.read_frames(&mut fetched), PcmPull::Stopped);
+        assert_eq!(edge.buffered_frames(), 8, "abandonment is not a purge");
+    }
+
+    /// Test-local boundary fixture shared with the real-worker oracle.
+    /// A's slot-release critical section is held by this driver; B uses
+    /// the real request method. No production path gains a test hook.
+    #[cfg(not(loom))]
+    pub(crate) fn record_after_delayed_open_sample(
+        ending_before_free: bool,
+    ) -> (SessionCompletion, Arc<PcmEdge>) {
+        use std::sync::TryLockError;
+        use std::time::Instant;
+
+        let completion = SessionCompletion::new();
+        let edge = Arc::new(PcmEdge::new(2, 8));
+        completion.bind_stop_target(edge.clone());
+        assert_eq!(edge.write_some(&[7.0; 8]), 8);
+        let position = completion.position_evidence();
+        position.publish_consumed(4, 0);
+
+        // A is genuinely Open-at-plant Accepted. Its worker already took
+        // the command; select its non-committing ending/release seam.
+        completion.request_seek(Duration::from_secs(1));
+        assert_eq!(completion.take_seek_command(), Some(Duration::from_secs(1)));
+        let mut slot = completion.state.seek_slot.lock().expect("seek slot lock");
+        assert!(slot.in_flight);
+        let references_before_b = Arc::strong_count(&edge);
+        let mut request = None;
+
+        // Holding edge state makes B stop between its two completion
+        // holds. The cloned edge plus acquired completion guard proves
+        // its FIRST hold has finished, without sleeps or scheduler odds.
+        crate::edge::test_sync::with_terminal_sample_blocked(&edge, || {
+            let b = completion.clone();
+            request = Some(std::thread::spawn(move || {
+                b.request_seek(Duration::from_secs(2))
+            }));
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                let guard = completion.state.state.lock().expect("completion lock");
+                if Arc::strong_count(&edge) > references_before_b {
+                    drop(guard);
+                    break;
+                }
+                drop(guard);
+                assert!(Instant::now() < deadline, "B never reached its edge sample");
+                std::thread::yield_now();
+            }
+        });
+        // First hold is known finished; only B's SECOND hold can now
+        // own completion while blocked on the occupied slot. Open was
+        // observed before that hold. Timeout is a backstop, not ordering.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match completion.state.state.try_lock() {
+                Err(TryLockError::WouldBlock) => break,
+                Ok(guard) => drop(guard),
+                Err(TryLockError::Poisoned(_)) => panic!("completion lock poisoned"),
+            }
+            assert!(Instant::now() < deadline, "B never reached its second hold");
+            std::thread::yield_now();
+        }
+
+        if ending_before_free {
+            edge.stop();
+            assert_eq!(edge.terminal(), EdgeTerminal::Stopped);
+            assert!(slot.in_flight, "no Open/free interval during B");
+        } else {
+            assert_eq!(edge.terminal(), EdgeTerminal::Open);
+        }
+        // A's no-commit resolution releases the gate, then clears the
+        // slot. Drive that existing clear critical section while B cannot
+        // enter it; its two assignments are the only fixture mutation.
+        completion.release_seek_park();
+        slot.in_flight = false;
+        slot.command = None;
+        drop(slot);
+        request.take().unwrap().join().expect("B returned");
+
+        assert!(
+            completion.seek_in_flight(),
+            "B really planted after the selected ending/Open branch"
+        );
+        assert_eq!(
+            completion.state.seek_slot.lock().unwrap().command,
+            Some(Duration::from_secs(2))
+        );
+        assert_eq!(completion.seek_protocol_state(), (false, false, None));
+        assert_eq!(edge.buffered_frames(), 4, "B did not purge PCM");
+        assert_eq!(position.published(), Some(4), "B did not rebase");
+        let state = completion.state.state.lock().unwrap();
+        assert!(!state.worker_gone && !state.stop_requested && state.outcome.is_none());
+        drop(state);
+
+        (completion, edge)
+    }
+
+    /// S6-F02 exact busy→Stopped→free witness and the returning worker's
+    /// real exit funnel. This boundary oracle does not run a device or
+    /// resume A's whole worker history. The companion session oracle
+    /// drives B's record through real worker/provider/gate seams.
+    #[cfg(not(loom))]
+    #[test]
+    fn sampled_open_busy_then_stopped_free_plant_is_never_accepted() {
+        let (completion, edge) = record_after_delayed_open_sample(true);
+        let position = completion.position_evidence();
+        // The ending render's Aborted evidence alone is not terminal
+        // truth. B remains unpicked, so the sole worker has executed no
+        // B provider operation. Its exiting path clears, not executes it.
+        completion.drain_signal().complete(DrainVerdict::Aborted);
+        assert_eq!(completion.committed(), None);
+        completion.worker_exited(EdgeTerminal::Stopped);
+        completion.abort_stranded_seek();
+        assert!(!completion.seek_in_flight());
+        assert_eq!(completion.take_seek_command(), None);
+        assert_eq!(
+            consume_release(&completion.render_gate()),
+            Some(SeekParkRelease::Aborted)
+        );
+        assert_eq!(consume_release(&completion.render_gate()), None);
+        assert_eq!(edge.buffered_frames(), 4);
+        assert_eq!(position.published(), Some(4));
+        assert_eq!(
+            completion.observe_snapshot().terminal_outcome,
+            Some(EpisodeTerminalOutcome::Failed)
+        );
+        assert_eq!(completion.seek_protocol_state(), (false, false, None));
+        completion.request_stop();
+        assert_eq!(
+            completion.observe_snapshot().terminal_outcome,
+            Some(EpisodeTerminalOutcome::Failed)
+        );
     }
 
     /// D14.7 corrective-2, the delayed-delivery interleaving no leg-level
@@ -1894,9 +2054,10 @@ mod tests {
     ///     → acceptance rejects (no live resolver), no plant, no hold.
     /// ```
     ///
-    /// Every acceptance hold is atomic (plant + latch reset + hold
-    /// routing under ONE completion-lock hold), so these two sides
-    /// exhaust the interleavings: a partial acceptance cannot exist.
+    /// Each recording hold is atomic against worker-gone (plant + reset +
+    /// hold routing). These two sides exhaust that cleanup ordering, not
+    /// the separately sampled edge eligibility; the ending-race oracle
+    /// below distinguishes a private plant from semantic Accepted.
     #[cfg(not(loom))]
     #[test]
     fn an_accepted_seek_cannot_outlive_its_worker_exit() {

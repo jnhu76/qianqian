@@ -282,10 +282,12 @@ impl PlaybackSessionHandle {
 
     /// Request a seek to `target` — source-relative media time
     /// (ADR-PBK-002 D14.5). Infallible Command, non-negative by type;
-    /// it records the seek and routes the cut's park to the render
-    /// mechanism when — and only when — every frozen acceptance
-    /// condition holds (episode unsettled, data plane Open, no stop
-    /// intent, no seek already in flight). Invalid moments are inert,
+    /// it observes eligibility, then attempts internal recording and
+    /// cut-park routing. A record is semantic Accepted only if the actual
+    /// D14.5 conditions hold at plant (temporal semantics §6.1); the
+    /// separate Open sample cannot certify them there. An ending-raced
+    /// non-Open record is never-Accepted and is cleaned without a provider
+    /// seek/purge/rebase. Invalid moments are inert,
     /// exactly like late stop/pause intent; a second seek while one is
     /// in flight is inert (one-seek policy — no queueing, no
     /// coalescing, no latest-wins, no request identity).
