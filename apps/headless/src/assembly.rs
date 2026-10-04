@@ -129,7 +129,7 @@ pub(crate) fn establish_specs_for_test(
 
 #[cfg(test)]
 #[path = "../../../crates/qianqian-playback/tests/common/mod.rs"]
-mod mechanisms;
+pub(crate) mod mechanisms;
 
 #[cfg(test)]
 mod tests {
