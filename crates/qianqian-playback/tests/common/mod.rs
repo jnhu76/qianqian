@@ -109,6 +109,44 @@ pub enum SourceBehavior {
     Paced { after: usize, delay: Duration },
 }
 
+/// Producer-side freeze witness for the destructive-seek oracle: the
+/// decode double counts `read_frames` calls that arrive AFTER it
+/// returned a failure-class seek outcome. The `MutatedThenFailed`
+/// contract says the caller must NEVER resume old-cursor production, so
+/// a well-behaved worker leaves the count at zero — the count is the
+/// direct "producer did not resume" observable, unlike a consumed-total
+/// bound, which a short resumption (or teardown's own stop) can hide.
+/// Shared through the provider's clones; the test keeps one handle.
+#[derive(Clone, Default)]
+pub struct ProducerFreezeWitness {
+    failed_seek_issued: Arc<std::sync::atomic::AtomicBool>,
+    post_failed_seek_reads: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl ProducerFreezeWitness {
+    /// The oracle read: how many `read_frames` calls reached the decode
+    /// endpoint after it returned a failure-class seek outcome.
+    pub fn post_failed_seek_reads(&self) -> usize {
+        self.post_failed_seek_reads
+            .load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn latch_failed_seek(&self) {
+        self.failed_seek_issued
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn note_read(&self) {
+        if self
+            .failed_seek_issued
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            self.post_failed_seek_reads
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct TestDecode {
     pub behavior: SourceBehavior,
@@ -124,6 +162,10 @@ pub struct TestDecode {
     /// the requested target, which is how tests prove the Position
     /// rebases to the ACTUAL landing, never the request.
     pub seeks: Vec<ProviderSeekOutcome>,
+    /// The producer-side freeze witness (see [`ProducerFreezeWitness`]).
+    /// Shared with every endpoint this provider opens, so the test that
+    /// built the double reads the same counts the worker drives.
+    pub freeze: ProducerFreezeWitness,
 }
 
 impl TestDecode {
@@ -133,6 +175,7 @@ impl TestDecode {
             behavior,
             duration: None,
             seeks: Vec::new(),
+            freeze: ProducerFreezeWitness::default(),
         }
     }
 
@@ -143,6 +186,7 @@ impl TestDecode {
             behavior,
             duration: Some(duration),
             seeks: Vec::new(),
+            freeze: ProducerFreezeWitness::default(),
         }
     }
 }
@@ -165,6 +209,7 @@ impl PcmDecode for TestDecode {
             format: TEST_FORMAT,
             duration: self.duration,
             seek_script: self.seeks.clone().into(),
+            freeze: self.freeze.clone(),
         }))
     }
 }
@@ -189,6 +234,7 @@ struct TestDecodeStream {
     format: PcmFormat,
     duration: Option<Duration>,
     seek_script: VecDeque<ProviderSeekOutcome>,
+    freeze: ProducerFreezeWitness,
 }
 
 impl DecodedPcmStream for TestDecodeStream {
@@ -201,6 +247,7 @@ impl DecodedPcmStream for TestDecodeStream {
     }
 
     fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
+        self.freeze.note_read();
         let avail = self.total.saturating_sub(self.cursor);
         let n = if avail == 0 {
             if self.fail_after {
@@ -258,8 +305,10 @@ impl DecodedPcmStream for TestDecodeStream {
             // Proven pre-mutation: the cursor is untouched.
             ProviderSeekOutcome::RefusedUnchanged => {}
             // Destructive: the worker never reads again, so the cursor
-            // value is irrelevant — leave it untouched.
-            ProviderSeekOutcome::MutatedThenFailed { .. } => {}
+            // value is irrelevant — leave it untouched. The outcome
+            // itself arms the producer-freeze witness: every later
+            // read_frames call counts as resumed old-cursor production.
+            ProviderSeekOutcome::MutatedThenFailed { .. } => self.freeze.latch_failed_seek(),
         }
         outcome
     }
