@@ -1,5 +1,8 @@
 /**
- * Single presentation-state authority for the Qianqian Engineering Observatory.
+ * Historical presentation snapshot for the Qianqian Engineering Observatory,
+ * ending at the reset-era PR #101–#103 checkpoint. Control pages label these
+ * values with that historical scope; current playback execution status routes
+ * through docs/architecture/playback-execution-model.md and its owners.
  *
  * This file contains presentation state only; architecture semantics remain in
  * the relevant docs/ADR. GitHub issue state must not mutate these values

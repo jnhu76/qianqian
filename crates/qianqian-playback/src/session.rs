@@ -17,7 +17,7 @@
 //! Effects unwind strictly LIFO, so disposal runs stop-edge, join worker,
 //! then stop-join-release the stream — preserving stop -> join -> release.
 //! There is no settlement watcher/resolver thread (D14.3): every terminal
-//! evidence publication settles synchronously on the publishing leg's own
+//! evidence publication evaluates settlement synchronously on the publishing leg's own
 //! call stack (the worker wrapper for decode/worker evidence; the
 //! session-installed one-shot DrainSignal observer for the drain verdict),
 //! so when both join inverses return, no decisive evidence can sit
@@ -39,10 +39,11 @@ use crate::handle::PlaybackSessionHandle;
 use crate::live::LiveProcessing;
 use crate::processing::{AudioProcessingConfig, EpisodeProcessing};
 
-/// Frames of PCM the edge buffers (~185 ms at 44.1 kHz stereo). Chosen
-/// from the measured decode tail (p99 ~0.2 ms per 1024-frame block,
-/// decode-cost-model.md §5) plus scheduling margin — a latency bound, not
-/// a throughput parameter. `pub(crate)` so the in-crate processing
+/// Current edge-capacity tuning: 8192 PCM frames (~185 ms of media at
+/// 44.1 kHz). Chosen from the measured decode tail (p99 ~0.2 ms per
+/// 1024-frame block, decode-cost-model.md §5) plus scheduling margin.
+/// This bounds edge occupancy, not elapsed end-to-end latency or native
+/// progress. `pub(crate)` so the in-crate processing
 /// oracles can pin geometry against the same bound (a blocked write at a
 /// full edge is what forces a mid-block cut with a non-empty remainder).
 pub(crate) const EDGE_CAPACITY_FRAMES: usize = 8192;
@@ -392,13 +393,13 @@ fn activate_established_with_spawn<P: ProcessingRuntime + 'static>(
     completion.bind_stop_target(edge.clone());
 
     // Playback-specific render stream, pre-bound to the edge's consumer
-    // half and the session's drain signal. A bounded open verdict keeps
-    // device failures inside activation. The drain signal already
-    // carries the session-owned one-shot observer: the render leg's
-    // first verdict publication settles the episode synchronously,
-    // before `complete` returns — which also means this stream's
-    // stop_and_join inverse below cannot return before the terminal
-    // publication path has run. The render gate routes the episode's
+    // half and the session's drain signal. Open/negotiation errors surface
+    // in activation; a local verdict timeout does not bound abort/join cleanup.
+    // The session-owned one-shot drain observer synchronously evaluates
+    // D11 before the first `complete` returns, committing only if evidence
+    // is decisive. This stream's stop_and_join inverse cannot return before
+    // that publication/evaluation path has run; a drain verdict alone need
+    // not commit terminal truth. The render gate routes the episode's
     // pause intent to the same leg's loop-top check (D14.7), and the
     // position cell is where that leg publishes its consumed estimate
     // from the tail readings it already takes (D14.8) — one episode-owned
@@ -462,8 +463,9 @@ fn spawn_worker<P: ProcessingRuntime + 'static>(
 
 /// Bounded wait slice for the decode worker's seek-protocol waits (the
 /// commit decision poll and the interruptible write's back-off). Off
-/// the RT path: the bound is the worker's serialization/commit latency,
-/// never correctness.
+/// the device submission path: this caps each requested wait, not
+/// serialization/commit latency or a whole-operation deadline. Scheduling,
+/// lock acquisition, native calls and missing evidence can delay progress.
 const WORKER_WAIT_SLICE: Duration = Duration::from_millis(2);
 
 /// The processing runtime the decode worker drives at the frozen
@@ -811,7 +813,9 @@ fn decode_worker<P: ProcessingRuntime>(
                     // accepted block leaves already-PROCESSED PCM in the
                     // preserved remainder (the D14.5 seek obligations
                     // extend to it). One in-place stage per block: no
-                    // per-block K0 work, no allocation, no dispatch.
+                    // per-block K0 work or dispatch. Steady processing
+                    // adds no allocation; live-transition scratch may
+                    // grow within this episode's staging-block bound.
                     if let Err(message) = processing.stage(&mut staging[..total]) {
                         // D14.11 failure semantics: the unrecoverable
                         // processing failure settles through the existing
@@ -881,9 +885,10 @@ fn decode_worker<P: ProcessingRuntime>(
 }
 
 /// The interruptible bounded-slice write (D14.5): write `src` into the
-/// edge while re-observing the seek command slot, so the worker always
-/// reaches its serialization point with bounded latency regardless of
-/// edge occupancy — no destructive pre-purge. When a seek becomes
+/// edge while re-observing the seek command slot between capacity waits.
+/// Full occupancy alone cannot suppress those observation points; the wait
+/// slice is not a scheduling/native-call or seek-completion deadline.
+/// No destructive pre-purge. When a seek becomes
 /// actionable (command observed, leg parked, no abort) the write stops
 /// at its written prefix and the unwritten tail is PRESERVED: the
 /// provider outcome owns it (a refusal finishes it exactly — zero

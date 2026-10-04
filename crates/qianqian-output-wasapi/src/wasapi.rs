@@ -687,7 +687,10 @@ fn steady_loop(
                 }
             }
         }
+        // Historical wording retained only as a mutation-oracle insertion anchor:
         // Period cadence; the bounded wait is also the stop-latency bound.
+        // Its bound covers only the requested event-wait slice. Scheduling,
+        // PCM pulls and native calls are outside it; it is not a Stop deadline.
         unsafe { WaitForSingleObject(session.event.raw(), EVENT_TIMEOUT_MS) };
         let padding = match unsafe { session.client.GetCurrentPadding() } {
             Ok(p) => p,
@@ -739,8 +742,9 @@ fn steady_loop(
     }
 }
 
-/// Wait until the device has played out everything submitted
-/// (padding reaches zero), bounded. EOF must be audible, not just queued.
+/// Observe this stream's queued-to-play tail until padding reaches zero.
+/// The drain-loop cap is local tuning; native calls may outlast it. Drained
+/// is mechanism evidence for Session D11, not proof of acoustic completion.
 ///
 /// The same readings keep the F4 position evidence current: the leg
 /// submits nothing more here, so each observation publishes the rising

@@ -11,7 +11,7 @@ Qianqian  = player product that consumes SongCore
 
 SongCore owns media probing/metadata/artwork/stream selection/decode/seek and produces source-rate/source-layout Float32 PCM through its stable C ABI. Qianqian owns player behavior above that boundary: application/UI, playback/session policy, playlist/navigation, output backends/devices, and other product semantics. SongCore is therefore a reusable component, not merely an internal decoder implementation of Qianqian. See [`docs/architecture/overview.md`](docs/architecture/overview.md) for the system boundary and [`docs/architecture/songcore-binding-architecture.md`](docs/architecture/songcore-binding-architecture.md) for SongCore's cross-platform binding authority.
 
-The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the implementation is being rebuilt boundary-first on a small generic Composition Kernel; the playback-specific foundation is **accepted** in `ADR-PBK-001` (plane-boundary constitution — production playback semantics remain open until real Audio Runtime experiments earn them).
+The repository is in **Architecture v2**. The first verified playback experiment was frozen, `main` was reset, and the implementation is being rebuilt boundary-first on a small generic Composition Kernel; the playback-specific foundation is **accepted** in `ADR-PBK-001` (plane-boundary constitution). Earned production playback minimums are owned by `ADR-PBK-002` D11/D14; broader semantics remain open.
 
 ## Architecture in 30 seconds
 
@@ -57,7 +57,7 @@ Realtime-view publication/reclamation
 mechanism evidence                 DELIVERED (PR #97; Issue #94 closed)
 ```
 
-The previous playback architecture (the pre-reset ARCH-003 experiment, briefly accepted in former ADR revisions) was **deliberately reopened from first principles**; the reset foundation itself is accepted in `docs/adr/ADR-PBK-001.md` (**ACCEPTED**). Old playback implementation, specs and formal models remain in the repository as **experimental evidence only** — they preserve failure witnesses and test techniques, not current authority. Production playback semantics remain unauthorized until real Audio Runtime experiments earn them (ADR §10 remains OPEN).
+The previous playback architecture (the pre-reset ARCH-003 experiment, briefly accepted in former ADR revisions) was **deliberately reopened from first principles**; the reset foundation itself is accepted in `docs/adr/ADR-PBK-001.md` (**ACCEPTED**). Old playback implementation, specs and formal models remain in the repository as **experimental evidence only** — they preserve failure witnesses and test techniques, not current authority. PBK-002 D11/D14 now own the earned terminal/control/replacement/processing minimums; broader playback semantics remain OPEN beyond those amendments.
 
 ## Control plane and data plane
 
@@ -85,6 +85,8 @@ The previous playback architecture (the pre-reset ARCH-003 experiment, briefly a
 Context controls reachability/dependency truth. It does not carry PCM blocks or become a universal product message bus.
 
 ## Playback status: foundations accepted
+
+The [playback execution model](docs/architecture/playback-execution-model.md) is the **CANDIDATE / NOT FROZEN** cross-protocol entry: Stage 4 #207/#214 is merged, Stage 5 #208 makes wording explicit, and D1–D6 await #209 acceptance. C1 establishment #205 and C2 machine-host settlement #213 are merged. Its §1 routes accepted authorities; §12 holds minimum-core 20/20 traceability.
 
 There is still **no accepted playback state-machine vocabulary**. The accepted foundations (`docs/adr/ADR-PBK-001.md`) freeze foundational boundaries — composition vs execution/control vs facts vs realtime data — while current role names and the earned static playback composition are governed by `docs/adr/ADR-PBK-002.md`.
 

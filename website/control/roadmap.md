@@ -9,7 +9,9 @@ import { projectState } from '../data/project-state.ts'
 
 # 路线图
 
-路线图只展示当前工程状态；架构语义以仓库 ADR / architecture docs 为准。
+路线图展示当前工程状态，并保留明确标注的历史 checkpoint；架构语义以仓库 ADR / architecture docs 为准。
+
+当前执行阅读入口为 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)：Stage 4 #207/#214 已合并，Stage 5 #208 为 explicitness pass，C1 #205/C2 #213 已合并；D1–D6 **CANDIDATE / NOT FROZEN**。§1 路由 accepted PBK/K0/DSP/temporal owning authorities，§12 保留 20/20 traceability；后续 acceptance/freeze gate 属于 #209/#210。
 
 ---
 
@@ -21,19 +23,21 @@ import { projectState } from '../data/project-state.ts'
 | FFmpeg 闭包研究 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | Decoder/Processing 共用单一 closure authority 的历史证据 |
 | 组件边界 A0 | <StatusBadge status="HISTORICAL_EVIDENCE" /> | #53 历史审计保留；其 playback-specific 结论是历史证据，不是 current authority |
 | Base / Composition Kernel K0 | <StatusBadge status="IMPLEMENTED" /> | Context / Capability / Fiber / Effect / Reconcile 已实现 |
-| Playback Foundations | <StatusBadge status="CURRENT" /> | 播放基础已接受（ADR-PBK-001 ACCEPTED）；旧 playback 模型仍是 experimental evidence；production 播放语义仍需实验挣得 |
-| Decoder provider | <StatusBadge status="PLANNED" /> | capability seam 已有；真实 provider 实现未授权于本轮 |
-| Audio Processing | <StatusBadge status="PLANNED" /> | ordered PCM graph；普通 DSP node 不自动成为 plugin |
-| AudioOutput provider | <StatusBadge status="PLANNED" /> | capability seam 已有；真实设备实现未授权于本轮 |
+| Playback Foundations | <StatusBadge status="CURRENT" /> | PBK-001/002/003 ACCEPTED；当前已挣得的最小播放语义已有实现，旧模型仍是历史证据 |
+| Decode Plugin / Decoder | <StatusBadge status="IMPLEMENTED" /> | SongCore-backed provider；ownership/lifetime 见 PBK-002 D6/D14 |
+| Episode-owned Audio Processing | <StatusBadge status="IMPLEMENTED" /> | Gain + 10-band EQ / live update；PBK-002 D14.11、DSP §7.3；不是独立 Plugin |
+| Output Plugin / AudioOutput | <StatusBadge status="IMPLEMENTED" /> | backend-neutral contract，当前 owned WASAPI mechanism；PBK-003；不构成本次设备验证 |
 | UI Host | <StatusBadge status="DEFERRED" /> | UI 不参与 realtime correctness |
 
 ---
 
-## 当前前沿：Playback Foundations reset
+## 历史前沿：Playback Foundations reset checkpoint
+
+以下 metadata 与 Phase-B/C/D/E/F ladder 保留 PR #101–#103 checkpoint 的读法，不描述当前执行 campaign。当前状态以本页开头和 execution model 为入口。
 
 **{{ projectState.currentFrontier }}**
 
-旧版 ADR-PBK-001（MusicComponent / MusicKernel / TransportKernel 模型）及其 deterministic executable temporal core 已随 2026-09 架构重置降级为 experimental evidence。重置后的 Playback Foundations 已 ACCEPTED；realtime publication/lifetime 的语义碰撞已在模型层证明（`specs/realtime-publication/`），其语义协议 **P1–P5 已 normative 冻结于 ADR §6**；Realtime Runtime 责任已由机制证据挣得（`docs/architecture/realtime-view-publication.md`，Issue #94 closed）。当前 ladder：
+旧版 ADR-PBK-001（MusicComponent / MusicKernel / TransportKernel 模型）及其 deterministic executable temporal core 已随 2026-09 架构重置降级为 experimental evidence。重置后的 Playback Foundations 已 ACCEPTED；realtime publication/lifetime 在 bounded model/assumptions 内检查（`specs/realtime-publication/`），不是整个架构的证明；其语义协议 **P1–P5 已 normative 冻结于 ADR §6**；Realtime Runtime 责任有机制证据（`docs/architecture/realtime-view-publication.md`，Issue #94 closed）。当时的 ladder：
 
 - composition reality 之上的 minimal PCM contract（Phase B）——**已交付**（PR #93）；
 - direct Source → processing → Sink 数据流（Phase C）——**已交付**（PR #96）；
@@ -60,7 +64,7 @@ Composition Graph != Audio Processing Graph
 
 ---
 
-## 下一步问题
+## 该历史 checkpoint 的下一步问题
 
 <template v-for="(q, i) in projectState.nextQuestions" :key="i">
 1. {{ q }}
@@ -89,7 +93,7 @@ flowchart LR
 PR #78 / #79 属于旧 ADR 修订历史（experimental evidence），不再列为当前决策记录。
 
 <ProvenancePanel
-  :authority="['docs/adr/ADR-PBK-001.md', 'docs/site/project-state.ts']"
+  :authority="['docs/adr/ADR-PBK-001.md', 'docs/adr/ADR-PBK-002.md', 'docs/adr/ADR-PBK-003.md', 'docs/architecture/playback-execution-model.md']"
   :decisions="[]"
   :evidence="['specs/composition-kernel-0/CompositionKernel0.tla', 'specs/realtime-publication/RealtimePublication.tla']"
 />

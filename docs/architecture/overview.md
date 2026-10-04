@@ -2,7 +2,7 @@
 
 > **Derived projection/router only.** Normative Playback Foundations: [`../adr/ADR-PBK-001.md`](../adr/ADR-PBK-001.md). Current vocabulary / Plugin-Fiber taxonomy / static playback composition: [`../adr/ADR-PBK-002.md`](../adr/ADR-PBK-002.md). K0 semantics: [`composition-kernel-0-design.md`](composition-kernel-0-design.md); representation: [`composition-kernel-0-implementation-adr.md`](composition-kernel-0-implementation-adr.md). SongCore cross-language binding authority: [`songcore-binding-architecture.md`](songcore-binding-architecture.md).
 
-Qianqian Architecture v2 is a composable Plugin/Fiber runtime with a strict firewall between composition/control and realtime PCM payload flow.
+Qianqian Architecture v2 is a composable Plugin/Fiber runtime with a strict firewall between composition/control and realtime PCM payload flow. Cross-protocol execution reading starts at [the playback execution model](playback-execution-model.md): **CANDIDATE / NOT FROZEN**, Stage 5 #208 over merged #207/#214; §1 routes accepted authorities and §12 retains minimum-core 20/20 traceability. C1 #205 and C2 #213 are merged; D1–D6 await #209 acceptance.
 
 ---
 
@@ -335,25 +335,17 @@ Plugin-owned domain resources
 small orthogonal semantic facts/control state
 ```
 
-Current hypotheses (Issue #138; not yet accepted feature semantics):
+Current execution routing (accepted per-protocol meanings, not new authority):
 
 ```text
-Pause/Resume
-    same Playback Session Plugin; alter execution behavior
-
-Seek
-    first try: quiesce -> discard stale PCM -> decoder seek -> resume same Session
-    escalate only if old/new RT worlds genuinely overlap
-
-Open(source B)
-    first try: replace Playback Session Plugin through K0 lifecycle
-    exact construction/config mechanism remains OPEN
-
-Next / Previous
-    playlist/queue selection + Open(selected)
-
-Volume
-    parameter/control through an existing mechanism service
+Pause/Resume       -> PBK-002 D14.7 (Session-routed gate; Paused Projection)
+Position/Duration  -> PBK-002 D14.8 (pure read; evidence, not acoustic truth)
+Seek               -> PBK-002 D14.5 (refusal first; parked natural-drain cut)
+Open/replacement   -> PBK-002 D14.6 (whole fresh root; C1 operation result)
+Navigation/repeat  -> PBK-002 D14.6 U2 (App policy from committed Completed)
+Volume             -> PBK-002 D14.9 (+ PBK-003 backend refinement)
+DSP                -> PBK-002 D14.11 + dsp-product-model.md §7.3
+Host settlement    -> playback-execution-model.md D3/D5 (CANDIDATE; C2 merged)
 ```
 
 This keeps the model small and avoids a giant `Playing/Seeking/Opening/Preempted/...` FSM unless product semantics genuinely require those states.
@@ -393,33 +385,22 @@ D11 episode terminal-outcome authority
 PBK-001 P1–P5 realtime lifetime contract
 ```
 
-Still OPEN:
+Accepted Phase-F minimums are routed above. Cross-protocol execution
+D1–D6 remain CANDIDATE / NOT FROZEN; production realization is not acceptance.
+
+Still OPEN beyond those minimums:
 
 ```text
-pause/resume semantics
-position/duration authority (D14.8 PROPOSED on the F4 gate branch:
-    episode-local device-consumed Position Projection — one monotone
-    mechanism-evidence sample published by the render leg, read as one
-    pure load — + optional Duration evidence; never a Fact; pending
-    human review)
-seek mechanism/authority
-open/session replacement representation
-playlist/queue authority
-    (CLOSED: application navigation state — the 2026-09-18
-     F6-AUTHORITY-PROMOTION-1 amendment in ADR-PBK-002 D14.6; no new
-     authority, no PlaylistPlugin/navigation Fact)
-next/previous
-    (CLOSED: application navigation through the same Open replacement;
-     ordering/repeat policy is App-owned product policy per the
-     2026-09-19 U2 amendment in ADR-PBK-002 D14.6)
-volume
-device switch
-Processing Plugin
+broader transport/source identity vocabulary
+device switch / replaceable render binding
 multi-session / preload / gapless
-PlaybackControl
-PlaybackFacts publication topology
+broader PlaybackControl / PlaybackFacts publication topology
 Realtime Audio Runtime representation
+DSP operations/update classes beyond the accepted minimum
 ```
+
+AudioProcessingPlugin/Capability remain NOT_EARNED_NOW under D14.11/D13;
+processing remains an owned episode resource.
 
 ---
 

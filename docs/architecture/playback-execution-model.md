@@ -4,8 +4,9 @@
 STATUS = CANDIDATE / NOT FROZEN
 OWNER = #198
 IMPLEMENTATION_UMBRELLA = #201
-STAGE = #207 (Stage 4; next explicitness #208)
-BASE_MAIN_SHA = cc87368d4dee74b977e08a87de2cba15a3187b32
+STAGE = #208 (Stage 5 explicitness; next independent review #209)
+BASE_MAIN_SHA = b72cab4d647edba5ecb255050f9434a13e38c2d0
+STAGE_4_MERGE_SHA = b72cab4d647edba5ecb255050f9434a13e38c2d0
 PRODUCTION_BEHAVIOR_CHANGE = NONE
 C1 = COMPLETE / MERGED (#204 / #205)
 C2 = COMPLETE / MERGED (#206 / #213)
@@ -14,16 +15,17 @@ D1_D6_STATUS = CANDIDATE / PENDING STAGE-6 ACCEPTANCE (#209)
 
 This is the canonical candidate cross-protocol execution authority and reading
 entry point. [#198][198] owns architecture diagnosis/decisions; [#201][201] owns
-sequencing. [#207][207] reconciles accepted authority and production at the exact
-base above. C1 [#205][205] merged at
-`029b0a4d7587ec39ef3eb768466ab0d2ce6ca16f`; C2 [#213][213] merged at the base
-SHA, with #206 closed. Both realizations are present in this audit subject.
+sequencing. [#207][207] / [#214][214] produced the Stage-4 candidate;
+[#208][208] makes that merged subject explicit without changing execution.
+C1 [#205][205] merged at `029b0a4d7587ec39ef3eb768466ab0d2ce6ca16f`;
+C2 [#213][213] merged at `cc87368d4dee74b977e08a87de2cba15a3187b32`,
+with #206 closed. Both realizations are present at the exact base above.
 Old issue status snapshots and historical implementation proposals are provenance,
 not the current resume point.
 
 **D1–D6 remain CANDIDATE.** Inherited statements retain only the force and scope
 of their linked accepted authority. Current realization describes code, not a
-new protocol definition. Stage 4 neither accepts these decisions nor freezes
+new protocol definition. Stage 5 neither accepts these decisions nor freezes
 architecture; those gates belong to #209 and #210 respectively.
 
 The execution shape is state owners, resource-confined workers, typed bounded
@@ -140,7 +142,9 @@ this decision introduces no playback generation, epoch, registry or ActorRef.
 The application assembly must respect this precondition, including when using
 generic reactivation APIs. This is a reviewable clarification of the documented
 handle lifetime, not a proposal to change K0's supported semantics. Whether to
-enforce the precondition structurally is a later explicitness choice, outside Stage 4; #208 may clarify existing docs/comments, not add executable enforcement.
+enforce the precondition structurally remains an unchosen implementation
+hardening question outside Stage 5. #208 only clarifies the candidate domain
+precondition; it authorizes no executable enforcement.
 
 ### D2 — Whole fresh-composition establishment (CANDIDATE; inherited D14.6)
 
@@ -253,8 +257,16 @@ are the semantic role and its realization, **not two terminal authorities**.
 All “current” entries map to production at the audited SHA; D3/D5 remain
 candidate cross-cutting policy, realized by merged C2.
 
+Here, **owner** names lifetime/teardown responsibility; **writer** names the
+path that mutates a particular record; **serializer** names the local lock or
+program order that orders those mutations; **execution context** names where
+that path runs; **semantic authority** names the role designated by the owning
+protocol to establish truth. **Observers** consume truth/evidence/visibility.
+These dimensions can align without being interchangeable.
+
 Owner ≠ writer; writer ≠ serializer; serializer ≠ semantic authority.
 Plugin ≠ execution owner; execution owner ≠ thread; thread ≠ semantic authority.
+Resource ownership does not designate a Fact authority.
 
 ### 4.1 App / host
 
@@ -401,7 +413,7 @@ entry status. PBK-001 §2.3 and temporal §6 own the firewall/vocabulary.
 | Inputs; outputs | Source, processing config, initial level → root, handle, `EstablishmentResult`, separate admission presentation |
 | Waiting seams; serialization | Synchronous K0 registration/revision/activation and provider opens; ordinary caller order; consume-only `EstablishmentAttempt::finish` after settle |
 | Semantic authority; failure responsibility | PBK-002 D14.6 owns whole-establishment meaning; assembly fixes certification scope, covers registration/admission/provider/dependency/Session acquisition failures |
-| Stop/cancellation; termination acknowledgement; resources | Failed attempt still requires host-owned disposal; successful call return certifies establishment, not worker termination. Fresh-core/single-attempt is a precondition. Owns construction, transfers root/handles to host |
+| Stop/cancellation; termination acknowledgement; resources | Failed attempt still requires host-owned disposal; the returned Established variant certifies establishment, not worker termination. The call can instead return NotEstablished. Fresh-core/single-attempt is a precondition. Owns construction, transfers root/handles to host |
 
 Evidence: [assembly][assembly] `establish`, `assemble`, `admission_refused`;
 [establishment][establishment] `EstablishmentAttempt`; Session `record_establishment`.
@@ -427,6 +439,13 @@ Evidence: [machine input][machine-input] `HostInput`, `Operation`, `start_reader
 This is the actual waiting map at the audited base. It creates no generic
 mailbox/global command queue. Protocol truth belongs to §1's owners; the policies
 here inventory their current realization. Bounds are logical, not allocator bytes.
+Exact capacities, slice durations, private helpers, lock/condvar layout and
+concrete OS-thread layout below describe **current realization or tuning**.
+This classification does not weaken accepted placement obligations: PBK-002
+D14.11 freezes decode-worker staging as the current processing minimum.
+Inherited protocol predicates, placement and scoped acknowledgements retain
+their linked authority; changing those obligations requires that authority's
+review, even when ordinary private mechanisms can be replaced.
 
 | Actual seam / producer → consumer | Buffer / order | Blocking and wake / acknowledgement | Ending / capacity policy | Semantic role versus mechanism-only role; primary code |
 | --- | --- | --- | --- | --- |
@@ -713,7 +732,7 @@ D3/D5's candidate host milestones are realized by merged C2.
 | Terminal committed | Episode semantic truth / Session | One immutable D11 outcome; decisive predicate evaluated without observer demand | Decode/render joined, edge memory reclaimed, audible completion | No later terminal relabeling; already-buffered/fetched PCM, render execution and teardown may remain until scoped stop/join. |
 | Decode worker exited | Worker evidence / decode exit funnel | No further decode-loop iterations; while unsettled, worker-gone is published before stranded-seek cleanup. After terminal commit, publication may be suppressed | OS thread already returned, join completed, render stopped; worker-gone is not an unconditional postterminal acknowledgement | No new decode-loop work; exit funnel/destructors/thread return and render work may remain. Evidence can be suppressed postterminal. |
 | Decode worker joined | Session relation / Session inverse | Thread returned; endpoint and worker-owned processing/staging resources dropped on this path | Render/device quiescence, stdin exit, success rather than failure | No future decode-thread work; render/device drain/stop/join and retained history cells may remain. |
-| Render stopped | Backend relation / Output-owned mechanism, Session requests stop | Stop invoked; eventual mechanism acknowledgement still needed | A Stop request alone does not prove device/worker returned; terminal drain evidence is distinct | No impossibility claim from stop request alone; render can still be draining or blocked until acknowledgement. |
+| Render stop requested | Backend relation / Output-owned mechanism, Session requests stop | Stop invoked; eventual mechanism acknowledgement still needed | A Stop request alone does not prove device/worker returned; terminal drain evidence is distinct | No impossibility claim from stop request alone; render can still be draining or blocked until acknowledgement. |
 | Render joined | Backend relation / stream `stop_and_join` | Render thread returned; backend-owned resources released on the exercised path | Physical acoustic silence on every device, reader exit, successful episode outcome | No future work from this render thread; retained storage, host reader and process work can remain. |
 | K0 relation obligations discharged | Composition / K0 records inverse and teardown verdicts | Registered obligations discharged in lifecycle order; no provider final release past violated dependents | Universal thread discovery, stdin termination, correctness of an untested backend's discharge claim | No undischarged registered relation under conforming component contract; host/stdin and retained control allocations may remain. |
 | Root disposed | Whole attempted composition / App calls K0 | **Only `DisposeVerdict::Discharged`** supports clean disposal; `TeardownViolated` retains violated world and fail-stops replacement | Clean exit from a mere `dispose()` call or quiet snapshot; host/process quiescence | Clean Discharged forbids remaining mounted obligations in that attempted root; violation instead keeps world open. Host seal/final I/O may remain. |
@@ -899,28 +918,29 @@ implementation constants are not new accepted global budgets. Historical OPEN
 notes are read with their later accepted narrow amendments, not used to reopen
 already-owned D14.6 or DSP §7.3 semantics.
 
-### Review / validation handoff and remaining explicitness debt
+### Review / validation handoff
 
-This Stage-4 subject reconciles current authority/code and all fixed 20 questions.
-C1/C2 are merged. Its documentation review checks completeness, internal
-coherence, code/authority accuracy and candidate status; it is **not #209
-acceptance**. #208 Stage 5 owns the next comments/API-result/routing explicitness
-pass, and will emit the exact subject for #209. No new runtime gap or accepted
-semantic contradiction is asserted here.
+The Stage-4 merge and this Stage-5 explicitness subject retain all fixed 20
+questions in §12. C1/C2 are merged; D1–D6 remain CANDIDATE. Stage-5 review
+checks wording, authority routing and the docs/comment-only diff; it is **not
+#209 acceptance** and does not freeze architecture.
 
-Remaining P3 explicitness debt, separately routed rather than hidden runtime
-work: older derived summaries in CONTEXT/overview still contain historical
-F4/F5/Open-era OPEN or pending-implementation wording; broad source comments may
-use “audible”, “bounded latency” or generic “acceptance” more strongly than their
-linked protocol admits. Stage 5 should reconcile those comments/routers against
-current authority without executable edits. Optional structural one-shot core
-attachment, DSP applied/read-model identity and generic process shutdown remain
-unchosen future work; Stage 4 does not authorize them. The canonical candidate
-itself must provide accurate propositions now, not rely on that future pass.
+Before merge, #208's PR records `STAGE_5_BASE_SHA`, `STAGE_5_PR_HEAD_SHA`,
+`REVIEW_SUBJECT_CANDIDATE_HEAD_SHA`, `EXECUTION_MODEL_BLOB_SHA` and the linked
+authority blob identities. The PR head is an immutable **candidate**; it is not
+necessarily the future merged main SHA. After owner review/merge, #208/#201
+must bind `REVIEW_SUBJECT_MAIN_SHA` to the actual post-merge main and record
+the execution-model blob present there. #209 must review that exact merged
+subject rather than a later moving main. This document starts no Stage-6 work.
+
+The former Stage-4 P3 routing/comment debt is addressed against the linked
+authority and current realization. Optional structural one-shot attachment,
+DSP applied/read-model identity and generic process shutdown remain unchosen
+future work; Stage 5 authorizes none of them.
 
 **Before Stage 7 architecture freeze begins, the separate execution-validation
 owner #212 and its versioned contract must already be ready** (#198/#201 Stage 6.5). #212 freezes the contract in
-`playback-execution-validation.md`; this Stage-4 document does not create that
+`playback-execution-validation.md`; this candidate does not create that
 future artifact. The contract covers:
 architecture version under test; required platforms; deterministic/failure
 oracles; mandatory versus earned stress/performance/model checking; PASS / FAIL /
@@ -959,6 +979,8 @@ campaign or weaken its gate. Validation after freeze precedes resuming dependent
 [205]: https://github.com/jnhu76/qianqian/pull/205
 [206]: https://github.com/jnhu76/qianqian/issues/206
 [207]: https://github.com/jnhu76/qianqian/issues/207
+[208]: https://github.com/jnhu76/qianqian/issues/208
+[214]: https://github.com/jnhu76/qianqian/pull/214
 [213]: https://github.com/jnhu76/qianqian/pull/213
 [assembly]: ../../apps/headless/src/assembly.rs
 [establishment]: ../../crates/qianqian-playback/src/establishment.rs

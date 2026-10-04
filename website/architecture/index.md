@@ -7,6 +7,8 @@ status: CURRENT
 
 > **Playback Foundations reset（2026-09）：** 本页 mermaid 图与下文中的 `MusicComponent` / `MusicKernel` / `TransportKernel` / `TrackSession` / `DecodeSession` 内容是**历史实验证据**，不再是 current authority。当前 Playback Foundations authority 是 `docs/adr/ADR-PBK-001.md`（**ACCEPTED**，不冻结播放状态机名词）。
 
+当前静态 Plugin/Fiber 组合与最小播放语义由 PBK-002（ACCEPTED）定义，Output/backend 边界由 PBK-003（ACCEPTED）定义。当前执行阅读入口是 [playback execution model](https://github.com/jnhu76/qianqian/blob/main/docs/architecture/playback-execution-model.md)：C1/C2 已合并，Stage 5 #208 明确表达 Stage-4 merged candidate；D1–D6 仍 **CANDIDATE / NOT FROZEN**，§1 路由各 owning authority，§12 保留 20/20 minimum-core traceability。本页是派生摘要，历史图不描述当前实现。
+
 Qianqian Architecture v2 是一个面向本地优先音乐播放器的、边界优先、面向组合的运行时架构。
 
 > **Composition Kernel 控制可达性、组合所有权与生命周期；它不拥有应用载荷。**
@@ -160,12 +162,13 @@ Gain → EQ → SRC → Limiter → ...
 |---|---|
 | Base / Composition Kernel K0 | <StatusBadge status="IMPLEMENTED" /> |
 | Playback Foundations / ADR-PBK-001 | <StatusBadge status="CURRENT" /> `ACCEPTED` — 旧 playback 名词为 historical evidence（Git 历史存档） |
-| Decoder provider | <StatusBadge status="PLANNED" /> |
-| AudioOutput provider | <StatusBadge status="PLANNED" /> |
-| Audio Processing implementation | <StatusBadge status="PLANNED" /> |
+| Decode Plugin / Decoder | <StatusBadge status="IMPLEMENTED" /> SongCore-backed provider；PBK-002 D6/D14 |
+| Output Plugin / AudioOutput | <StatusBadge status="IMPLEMENTED" /> backend-neutral contract，当前 owned WASAPI mechanism；PBK-003 |
+| Episode-owned Audio Processing | <StatusBadge status="IMPLEMENTED" /> Gain + 10-band EQ / live update；PBK-002 D14.11、DSP product model §7.3 |
+| Playback execution model | <StatusBadge status="CURRENT" /> CANDIDATE / NOT FROZEN；C1 #205、C2 #213 已合并，D1–D6 待 #209 |
 | UiHost | <StatusBadge status="DEFERRED" /> |
 
-旧 playback 实验代码及其 test-local executable traces 已随 post-#139 spec reset 从 main 移除（Git 历史存档），不是 current authority；仍在验证的竞态由当前 specs/tests 承载（`specs/README.md`）。FFmpeg/WASAPI 和完整 playback state machine 未获得实现授权。
+旧 playback 实验代码及其 test-local executable traces 已随 post-#139 spec reset 从 main 移除（Git 历史存档），不是 current authority；仍在验证的竞态由当前 specs/tests 承载（`specs/README.md`）。当前 decode/PCM/output 与已挣得的最小播放语义已有实现；更广的播放状态机、未挣得的 Plugin 与机制仍须 authority review。上述实现状态不构成设备或跨平台运行验证。
 
 ---
 
@@ -178,7 +181,7 @@ Gain → EQ → SRC → Limiter → ...
 ---
 
 <ProvenancePanel
-  :authority="['docs/adr/ADR-PBK-001.md', 'docs/architecture/composition-kernel-0-design.md']"
+  :authority="['docs/adr/ADR-PBK-001.md', 'docs/adr/ADR-PBK-002.md', 'docs/adr/ADR-PBK-003.md', 'docs/architecture/composition-kernel-0-design.md', 'docs/architecture/playback-execution-model.md']"
   :decisions="[{ issue: 67 }, { pr: 68 }]"
   :implementation="[{ issue: 70 }, { pr: 71 }]"
   :evidence="['crates/qianqian-composition/tests', 'specs/composition-kernel-0/CompositionKernel0.tla']"

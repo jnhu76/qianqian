@@ -105,8 +105,8 @@ pub fn outcome_report(
 /// The pinned verdict line for a root disposal that did NOT end
 /// Discharged (F6): a latched §G.6 teardown violation has no exit, and
 /// the report says so in exactly this spelling. `None` for a clean
-/// discharge (the disposal report stays silent about success —
-/// quietness is the success signal).
+/// discharge (the disposal report stays silent about success). The verdict
+/// authorizes clearance; snapshot quietness is report/exit presentation only.
 pub fn disposal_verdict_warning(verdict: &DisposeVerdict) -> Option<String> {
     match verdict {
         DisposeVerdict::Discharged => None,

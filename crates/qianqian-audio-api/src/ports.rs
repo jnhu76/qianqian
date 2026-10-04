@@ -94,7 +94,8 @@ impl std::fmt::Debug for DrainInner {
     }
 }
 
-/// How the render leg terminated.
+/// Render drain/abort evidence. Publication does not acknowledge thread
+/// return/join or commit a D11 outcome; the Session interprets this evidence.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DrainVerdict {
     /// EOF was reached and every submitted frame played out.
@@ -184,7 +185,9 @@ pub enum GateEvent {
     /// pause engagement evidence.
     SeekEngaged,
     /// The CURRENT seek park observed its output tail quiesced (the
-    /// D14.5 commit-boundary evidence class: padding == 0 while parked).
+    /// D14.5 commit-boundary evidence class: no pre-park frame remains
+    /// queued for future presentation). WASAPI currently observes this
+    /// through zero padding while parked; that probe is backend-specific.
     /// Published at most once per seek park.
     SeekTailQuiesced,
     /// The seek park ended (a release routed by the session): the leg
@@ -295,8 +298,8 @@ pub enum GateSlice {
 ///     device-buffer acquisition (GetBuffer), never holding a device
 ///     buffer across a park;
 /// while parked, submit nothing, hold no device buffer, and wait in
-///     bounded slices (notify + cap) so release and stop wake the leg
-///     with bounded latency;
+///     capped wait slices with notify for release/stop; the wait cap
+///     does not bound scheduling, tail-probe calls or whole-operation latency;
 /// never abort the leg from the gate — after release the loop proceeds
 ///     once more and the data plane decides;
 /// a failed tail observation is neither quiescence nor a reason to keep
@@ -373,9 +376,10 @@ impl std::fmt::Debug for GateInner {
     }
 }
 
-/// Bounded park slice: the notify is the wake path, this cap is the
-/// backstop so a missed wakeup costs latency (one slice), never
-/// correctness.
+/// Requested park-wait cap: notify is the wake path; repeated predicate
+/// checks provide the missed-notify backstop. Scheduling, lock acquisition
+/// and tail probes are outside this slice, so it is not a release or
+/// acknowledgement deadline.
 const PARK_SLICE: std::time::Duration = std::time::Duration::from_millis(10);
 
 impl RenderGate {
@@ -408,7 +412,8 @@ impl RenderGate {
     }
     /// Route the pause intent into the mechanism: `true` parks the render
     /// leg at its next loop-top gate check; `false` releases a parked leg
-    /// (bounded-slice latency via notify). Idempotent. Inert on a closed
+    /// via notify plus capped park waits (no end-to-end deadline).
+    /// Idempotent. Inert on a closed
     /// gate: a closed gate never parks again (see
     /// [`RenderGate::close_and_release`]).
     pub fn set_paused(&self, paused: bool) {
@@ -452,9 +457,9 @@ impl RenderGate {
     /// is stored before the hold clears (one lock hold), so the waking
     /// leg observes hold-clear and payload together and the leg's seek
     /// gate consumes the payload exactly once (at the park exit, or at
-    /// its entry if the leg had not parked). Wake is immediate (notify):
-    /// the leg's park slice is the latency bound. Inert on a closed
-    /// gate.
+    /// its entry if the leg had not parked). Notify requests a wake;
+    /// the park slice caps only the requested wait, not scheduling,
+    /// lock acquisition or release acknowledgement. Inert on a closed gate.
     pub fn release_seek_hold(&self, release: SeekParkRelease) {
         if self.inner.closed.load(Ordering::Acquire) {
             return;
@@ -482,8 +487,9 @@ impl RenderGate {
     /// be safe against ANY later pause intent on this gate, routed or
     /// hostile: once closed, `set_paused` routes nothing and a leg
     /// between two park calls finds the gate shut at its next loop-top
-    /// check. A parked leg is woken with bounded latency (notify + the
-    /// park-slice cap) and proceeds once more; the data plane — here the
+    /// check. Notify plus the park-slice cap lets a progressing leg
+    /// recheck closure; scheduling/tail-probe calls remain outside that cap.
+    /// After release the leg proceeds once more; the data plane — here the
     /// stop issued by the abort itself — decides how it ends. Idempotent;
     /// there is no un-close.
     pub fn close_and_release(&self) {
@@ -538,7 +544,7 @@ impl RenderGate {
     /// Closed gate: returns immediately, always.
     ///
     /// A FAILED tail observation ends whichever park is running (the
-    /// only bounded exit that is not an owner release): no quiescence
+    /// failure exit without further wait slices or owner release): no quiescence
     /// is published for it, the park's disengagement fence still
     /// publishes, any routed release payload is still consumed on the
     /// leg's path, and [`ParkOutcome::TailProbeFailed`] is returned so
@@ -758,7 +764,8 @@ impl RenderGate {
 }
 
 /// Session-owned, episode-scoped position-evidence cell (ADR-PBK-002
-/// D14.8): the render leg publishes one monotone sample of the
+/// D14.8): the render leg publishes a sample, monotone between committed
+/// seek discontinuities, of the
 /// device-consumed presentation position into it, and the observation
 /// path reads that sample as one pure load.
 ///
@@ -768,9 +775,9 @@ impl RenderGate {
 /// The sample is exact only for the instant its writer took the tail
 /// reading; a reader is promised no bound on how old its sample is
 /// (freshness is a scheduling property of the reader, not a concurrency
-/// invariant) — only that the published sample never goes backward,
-/// never exceeds the writer's own handed-off accounting, and is never
-/// fabricated.
+/// invariant). Ordinary publication never goes backward or exceeds the
+/// writer's handed-off accounting; D14.5 committed seek rebase may move
+/// to an earlier landing or withdraw the sample. Neither path fabricates it.
 ///
 /// Writer contract (D14.8): exactly ONE writer — the episode's render
 /// leg — which owns both derivation inputs on its own execution path:
@@ -779,12 +786,13 @@ impl RenderGate {
 /// handed_off   the frames this episode's leg has submitted into the
 ///              device buffer, its own plain local accounting
 /// tail         that leg's own queued-to-play reading
-///              (GetCurrentPadding), taken on the same execution path
+///              (currently GetCurrentPadding in WASAPI), taken on that path
 /// publish      published = max(published, handed_off - min(tail, handed_off))
 /// ```
 ///
 /// The subtraction therefore happens on the render leg's path, and the
-/// monotonicity is owned by the publication: no reader composes a
+/// monotonicity between committed discontinuities is owned by publication:
+/// no reader composes a
 /// position from two cells, keeps a previous value, or clamps anything —
 /// which is what keeps the D14.2 observation a pure read. The update is
 /// one relaxed monotone RMW: no lock, no allocation, no blocking, no
@@ -838,7 +846,8 @@ impl PositionEvidence {
         // u64::MAX sample maps to the top of the legal domain instead of
         // wrapping into 0, which would have read as "undefined".
         let encoded = estimate.saturating_add(1);
-        // The single writer is monotone, so the max is a guard against a
+        // Between committed seek rebases the single writer is monotone,
+        // so the max is a guard against a
         // regressing tail reading (the queue growing again) rather than a
         // repair of a torn read: both inputs come from one execution path.
         self.published.fetch_max(encoded, Ordering::Relaxed);
@@ -910,9 +919,9 @@ impl PositionEvidence {
 pub struct OutputLevel {
     /// The desired factor as f32 bits (0.0 = silent, 1.0 = unity).
     /// Relaxed coherence suffices: one writer-routed value, one
-    /// mechanism reader, and the apply placement is bounded by design —
-    /// a stale-by-one-iteration factor costs nothing (the next loop top
-    /// re-checks).
+    /// mechanism reader; a progressing render loop rechecks at each
+    /// loop top. This carries desired state, not an apply acknowledgement
+    /// or a bound on audibility/update latency.
     factor_bits: Arc<AtomicU32>,
 }
 
@@ -967,22 +976,25 @@ pub struct RenderRequest {
     /// The episode's position-evidence cell (D14.8). The render leg's F4
     /// obligation is exactly this: from the tail readings it already
     /// takes, publish its own consumed estimate into this cell — one
-    /// monotone relaxed update per observation, from the same execution
+    /// monotone relaxed update per observation between committed seek
+    /// rebases, from the same execution
     /// path that owns the handed-off accounting. The cell is an owned
     /// resource of the episode (like the gate), not a Capability; the
     /// leg neither reads it nor creates one.
     pub position: PositionEvidence,
 }
 
-/// One acquired render stream: owns its render thread and the physical
-/// device session for one playback episode.
+/// One acquired render stream: owns the episode's render execution and
+/// associated backend resources. WASAPI currently uses a dedicated thread
+/// and device session; the generic contract does not require that topology.
 pub trait RenderStream: Send {
     /// The format the device actually accepted (diagnostic truth).
     fn negotiated_format(&self) -> PcmFormat;
 
-    /// Signal stop, wait for the render thread to exit, release the
-    /// device. Consumes the stream: stop -> join -> release in one
-    /// owner-local inverse, on the mechanism side.
+    /// Request stop, acknowledge that the owned render execution ended,
+    /// then release its backend resources. Consumes the stream in one
+    /// owner-local inverse on the mechanism side. WASAPI currently
+    /// realizes this as stop -> thread join -> device release.
     ///
     /// Ownership precondition (D14.7 teardown obligation): before this
     /// call, the owning playback/session teardown path must already
@@ -998,9 +1010,10 @@ pub trait RenderStream: Send {
 /// Output capability service: opens local render streams. Long-lived
 /// mechanism provider; the acquired stream belongs to the caller.
 pub trait AudioOutput {
-    /// Open a render stream for `request`. Blocks for a bounded open
-    /// verdict: device-open or negotiation failure is returned here, so
-    /// activation can fail fast and cleanly (no half-open stream).
+    /// Acquire the episode stream or return a clean open/negotiation
+    /// failure (PBK-003 §5). The current WASAPI verdict wait has a local
+    /// timeout followed by abort/join cleanup; it does not bound total call
+    /// duration or prescribe a timeout/thread mechanism for other backends.
     fn open_stream(&self, request: RenderRequest) -> Result<Box<dyn RenderStream>, OutputError>;
 }
 
