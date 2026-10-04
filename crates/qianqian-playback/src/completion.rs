@@ -618,7 +618,7 @@ impl SessionCompletion {
     // the commit/abort decisions. The render leg's rebase happens on
     // the leg's own path through the gate's release payload.
 
-    /// Record a seek command (D14.5 acceptance) and route the cut's
+    /// Attempt to record a seek command under D14.5 and route the cut's
     /// park to the render leg. Inert — a command with no semantic
     /// effect, exactly like late stop/pause — unless every frozen
     /// acceptance condition holds:
@@ -636,8 +636,9 @@ impl SessionCompletion {
     /// `target` is source-relative media time, non-negative by type.
     /// Beyond-duration targets pass through: the PROVIDER decides
     /// validity and clamping (duration evidence is never consulted
-    /// here). Acceptance records the command and parks the leg; it does
-    /// NOT imply a cutover — "a seek request is not a cutover".
+    /// here). Internal recording plants the command and routes the park;
+    /// semantic acceptance is the refinement described below. Recording
+    /// does NOT imply a cutover — "a seek request is not a cutover".
     ///
     /// Internal recording is one completion-lock unit: recheck episode
     /// conditions, reserve the free slot, reset cut evidence and route
