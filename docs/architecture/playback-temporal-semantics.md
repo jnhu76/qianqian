@@ -42,7 +42,8 @@
 > Owner: issue #197 (QIANQIAN-PLAYBACK-TEMPORAL-EXPLICITNESS).
 > Authority corrective: [#216](https://github.com/jnhu76/qianqian/issues/216)
 > reconciles the acceptance summaries with DSP §7.3 and narrows unsupported
-> elapsed-time claims. Exact protocol predicates and DSP states are unchanged.
+> elapsed-time and episode-lifetime claims. Exact protocol predicates and DSP
+> states are unchanged.
 > Evidence basis (not authority): `research/temporal-model-0/RESULTS.md`
 > and `research/temporal-mechanism-audit-0/RESULTS.md`.
 
@@ -619,15 +620,28 @@ and **join**. Not from "eventually drains" prose.
 ### 6.7 Episode replacement — authority: D14.11 ownership rules
 
 Episode-owned temporal state — the completion record, the gate, the
-seek slot, the position cell, the edge — is created at episode
-establishment and **dies with episode ownership**. A new episode binds
-fresh state (including fresh processing state under its own
-configuration snapshot); no cross-episode channel exists, so an
-"old-episode result under the new episode" is structurally impossible.
+seek slot, the position cell, the edge — remains bound to its originating
+episode. On current supported fresh assembly/replacement paths, a new
+episode binds fresh state (including processing state under its own
+configuration snapshot). Retained old handles and callbacks still refer
+to the old episode state; they cannot target the successor on these paths.
+Retained references may keep old storage alive after active episode
+ownership ends, including after terminal settlement and teardown/joins.
+Ending the episode does not prove allocation reclamation.
+
+**Authority corrective ([#216](https://github.com/jnhu76/qianqian/issues/216)).**
+The former "dies with episode ownership" / "structurally impossible"
+wording is narrowed to episode binding and the supported topology above,
+not allocation lifetime or generic structural enforcement. The
+[execution model's D1](playback-execution-model.md) fresh-core /
+single-attempt attachment rule remains a **CANDIDATE playback-domain
+precondition**. Production Session factories and generic K0 do not
+structurally enforce one-shot core attachment; this correction neither
+accepts D1 nor adds enforcement.
 
 ```text
-This is why current architecture does not require a global EpisodeEpoch
-for internal playback correctness.
+The current supported topology does not require a global EpisodeEpoch
+for internal playback correctness; this is not a generic core-reuse guarantee.
 ```
 
 Future asynchronous consumers that hold results across episode
