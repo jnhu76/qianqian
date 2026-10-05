@@ -397,8 +397,26 @@ fn handle_modal_input<S: EpisodeStart>(
 /// the listing (plus the popup's title) shows where the picker is.
 fn navigate_picker_to(model: &mut TuiModel, dir: &Path) {
     let listing = crate::input::list_directory(dir);
-    let target = std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf());
+    let target =
+        simplify_verbatim(&std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf()));
     model.set_open_listing(target, listing);
+}
+
+/// Drop the Windows verbatim prefix that [`std::fs::canonicalize`]
+/// adds (`\\?\C:\...`): navigation keeps canonicalization's value,
+/// while display and commit paths stay in the vocabulary the user
+/// typed. UNC targets (`\\?\UNC\server\share`) map to their plain
+/// `\\server\share` spelling; on non-Windows targets this is the
+/// identity.
+fn simplify_verbatim(path: &Path) -> std::path::PathBuf {
+    let text = path.as_os_str().to_string_lossy();
+    let Some(stripped) = text.strip_prefix(r"\\?\") else {
+        return path.to_path_buf();
+    };
+    if let Some(unc) = stripped.strip_prefix("UNC\\") {
+        return std::path::PathBuf::from(format!(r"\\{unc}"));
+    }
+    std::path::PathBuf::from(stripped)
 }
 
 /// Append one user-picked subject — file OR folder — to the temporary
@@ -496,7 +514,7 @@ fn perform_play_selected<S: EpisodeStart>(
     player: &mut ReferencePlayerApp<S>,
 ) {
     if player.selected_is_live_episode() {
-        model.set_status(Some("already playing the selected track".to_owned()));
+        model.set_status(Some("the selected track is the live episode".to_owned()));
         return;
     }
     let feedback = match player.play_selected() {
@@ -1978,6 +1996,41 @@ mod tests {
             dispatch(TuiAction::SeekPerMille(500), &mut model, &mut player),
             Step::Continue,
             "no episode: the fraction is dropped, not fabricated into a command"
+        );
+    }
+    /// G1 §8 parent navigation through the VISIBLE affordance: Enter
+    /// (or [Open]-button-less activation) on the `..` row ascends to
+    /// the parent directory — the review-found P1 where it re-listed
+    /// the same directory.
+    #[test]
+    fn enter_on_the_parent_row_ascends() {
+        let tree = TempTree::new("picker-parent");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        assert_eq!(
+            handle_key(key(KeyCode::Char('O')), &mut model, &mut player),
+            Step::Continue
+        );
+        model.set_open_listing(
+            tree.path().to_path_buf(),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "album".to_owned(),
+                is_dir: true,
+            }]),
+        );
+        // Listing rows: [.., album]. ↓ selects `..`; Enter ascends.
+        assert_eq!(
+            handle_key(key(KeyCode::Down), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(
+            model.open_picker_dir().and_then(|dir| dir.file_name()),
+            tree.path().parent().and_then(|dir| dir.file_name()),
+            "Enter on `..` lists the parent directory"
         );
     }
 }

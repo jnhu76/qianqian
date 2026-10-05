@@ -254,20 +254,48 @@ fn draw_now_playing(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &m
     // The seek bar row (G1 §9): a click-to-position affordance over
     // the D14.8 display. It publishes a region ONLY while duration
     // evidence exists — an unknown timeline is never clickable and
-    // never fabricates a target. The row itself always occupies its
-    // line, so the layout does not flex as evidence arrives.
+    // never fabricates a target. The region is exactly the drawn
+    // bar GLYPH cells (not the whole row): the click fraction and the
+    // painted marker come from the same geometry, so a click where the
+    // bar looks full is a click near the end. The row itself always
+    // occupies its line, so the layout does not flex as evidence
+    // arrives.
     if let Some(bar_label) = model.position_bar_label() {
-        frame.render_widget(Paragraph::new(bar_label).centered(), bar);
+        frame.render_widget(Paragraph::new(bar_label.clone()).centered(), bar);
         if model
             .observation()
             .source_duration
             .is_some_and(|duration| !duration.is_zero())
+            && let Some(glyph) = seek_bar_glyph_area(&bar_label, bar)
         {
             regions.push(HitRegion {
-                area: bar,
+                area: glyph,
                 target: HitTarget::SeekBar,
             });
         }
+    }
+
+    /// The drawn bar glyph's cells inside the seek-bar row, from the SAME
+    /// centering the painter used: the label (`mm:ss ━━━╸─── mm:ss`) is
+    /// single-width characters, so its character count is its cell width,
+    /// and the glyph is the [`BAR_WIDTH`]-cell run starting at the first
+    /// box-drawing character. `None` when the row cannot show the whole
+    /// label — a clipped bar is a display, not a scrub strip.
+    fn seek_bar_glyph_area(bar_label: &str, bar: Rect) -> Option<Rect> {
+        let label_cells = bar_label.chars().count();
+        if label_cells >= bar.width as usize {
+            return None;
+        }
+        let glyph_offset = bar_label
+            .char_indices()
+            .find(|(_, character)| matches!(character, '━' | '╸' | '─'))?
+            .0;
+        Some(Rect::new(
+            bar.x + (bar.width - label_cells as u16) / 2 + glyph_offset as u16,
+            bar.y,
+            super::model::BAR_WIDTH as u16,
+            1,
+        ))
     }
 
     // The transport row (§36, G1): Open joins the four transport

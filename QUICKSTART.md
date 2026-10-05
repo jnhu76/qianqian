@@ -5,8 +5,9 @@ files and folders on your computer. It does not need a media library, a
 database, or an account — point it at a folder and listen.
 
 Qianqian runs in a terminal window. Every control is visible on screen —
-you never have to memorize a key to use the player. The keys below are
-shortcuts for the same controls.
+core playback never requires memorizing a key. The keys below are
+shortcuts for the same controls; the one worth knowing is that `Enter`
+plays the selected playlist row.
 
 ## Start
 

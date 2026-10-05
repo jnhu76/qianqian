@@ -1107,8 +1107,8 @@ impl TuiModel {
 
     /// The focus target a mouse hit on `target` selects (§17: Left
     /// Down focuses the target). `None` for targets that carry no
-    /// keyboard focus of their own (the seek bar; the picker's commit
-    /// buttons).
+    /// keyboard focus of their own (the seek bar — a mouse affordance
+    /// over an already keyboard-complete command).
     pub fn focus_of_target(target: HitTarget) -> Option<FocusId> {
         match target {
             HitTarget::RouteTab(route) => Some(FocusId::RouteTab(route)),
@@ -1124,9 +1124,9 @@ impl TuiModel {
 
     /// The action activating `target` performs (§17: Left Up activates
     /// the armed target). `None` for targets that arm nothing: the
-    /// pane area, the seek bar (its action is computed from the click
-    /// geometry at decode time), the picker commit buttons (decoded
-    /// the same way while their modal is open).
+    /// playlist pane area, the path-field row, and the seek bar (its
+    /// action is the click position, computed from the frame geometry
+    /// at decode time).
     pub fn action_of_target(target: HitTarget) -> Option<TuiAction> {
         match target {
             HitTarget::RouteTab(route) => Some(TuiAction::Navigate(route)),
@@ -1319,7 +1319,8 @@ impl TuiModel {
 
     /// The full path of the picker listing's current cursor entry, if
     /// one is selected, plus whether descending into it stays a
-    /// directory step.
+    /// directory step. The `..` row resolves to the PARENT directory —
+    /// activating it ascends (G1 §8 parent navigation).
     pub fn picker_cursor_entry(&self) -> Option<(std::path::PathBuf, bool)> {
         let Some(Modal::Open(picker)) = self.modal.as_ref() else {
             return None;
@@ -1328,7 +1329,7 @@ impl TuiModel {
         let index = picker.cursor?;
         let entry = picker.entries.get(index)?;
         let path = if entry.is_parent {
-            dir.to_path_buf()
+            dir.parent()?.to_path_buf()
         } else {
             dir.join(&entry.name)
         };
@@ -1514,6 +1515,17 @@ pub fn decode_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
 /// directory; Esc cancels.
 fn decode_modal_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
     let modal_kind = model.modal().map(Modal::kind)?;
+    // Below the minimum size the shell renders no interactive layout
+    // and paints no popup (§28): the modal's keys go inert except the
+    // cancel — a blind Enter behind an invisible popup must never
+    // commit a real Open. Ctrl+C keeps its conventional meaning (it is
+    // decoded before this function).
+    if model.class() == ResponsiveClass::Minimum {
+        return match key.code {
+            KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
+            _ => None,
+        };
+    }
     match modal_kind {
         ModalKind::Help => match key.code {
             KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
@@ -3141,8 +3153,8 @@ mod tests {
         model.move_picker_cursor(PlaylistCursor::Next);
         assert_eq!(
             model.picker_cursor_entry(),
-            Some((std::path::PathBuf::from("/media",), true)),
-            "the first ↓ lands on the `..` parent row"
+            Some((std::path::PathBuf::from("/",), true)),
+            "the first ↓ lands on the `..` row, which resolves to the PARENT"
         );
         model.move_picker_cursor(PlaylistCursor::Next);
         model.move_picker_cursor(PlaylistCursor::Next);
@@ -3165,7 +3177,8 @@ mod tests {
         model.move_picker_cursor(PlaylistCursor::Previous);
         assert_eq!(
             model.picker_cursor_entry().map(|(path, _)| path),
-            Some(std::path::PathBuf::from("/media",)),
+            Some(std::path::PathBuf::from("/",)),
+            "activating `..` ascends"
         );
     }
 
@@ -3244,8 +3257,8 @@ mod tests {
         assert_eq!(decode_mouse(down, &mut model), None, "Down only arms");
         assert_eq!(
             decode_mouse(up, &mut model),
-            Some(TuiAction::SeekPerMille(505)),
-            "the click's per-mille of the bar"
+            Some(TuiAction::SeekPerMille(520)),
+            "the click's per-mille of the DRAWN glyph (24 cells, click at center)"
         );
     }
 
@@ -3310,6 +3323,27 @@ mod tests {
         assert_eq!(
             dsp_summary(&AudioProcessingConfig::gain(2.0)),
             "DSP (desired): on — preamp +6.0 dB"
+        );
+    }
+    /// Below the minimum size the shell paints no popup (§28), so the
+    /// modal's keys go inert except the cancel: a blind Enter behind
+    /// an invisible picker must never commit a real Open.
+    #[test]
+    fn a_modal_below_the_minimum_only_cancels() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::Open);
+        model.modal_push('x');
+        model.set_class(ResponsiveClass::Minimum);
+        assert_eq!(
+            decode_key(key(KeyCode::Enter), &model),
+            None,
+            "no blind commit behind an invisible popup"
+        );
+        assert_eq!(decode_key(key(KeyCode::Char('a')), &model), None);
+        assert_eq!(
+            decode_key(key(KeyCode::Esc), &model),
+            Some(TuiAction::ModalInput(ModalInput::Cancel)),
+            "Esc stays the honest way out"
         );
     }
 }

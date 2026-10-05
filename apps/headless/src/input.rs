@@ -554,10 +554,12 @@ pub struct DirectoryEntry {
 }
 
 /// One level of directory listing for the Open picker's navigation pane
-/// (Issue #188 G1): directories first, then audio-candidate files, each
-/// group name-sorted exactly like [`walk_directory`]'s deterministic
-/// order. The same classification discipline applies: regular entries
-/// only, symlinks/junctions classified out (never followed), and the
+/// (Issue #188 G1): directories first, then audio-candidate files,
+/// each group name-sorted with the SAME byte order as
+/// [`walk_directory`] — so the order a folder-Open seeds into the
+/// playlist is the order the picker browsed it in. The same
+/// classification discipline applies: regular entries only,
+/// symlinks/junctions classified out (never followed), and the
 /// extension list is a PRESENTATION prefilter for the listing alone —
 /// a path typed or committed through the picker still goes through the
 /// full expansion, where an explicit file bypasses the filter and the
@@ -591,8 +593,8 @@ pub fn list_directory(dir: &Path) -> Result<Vec<DirectoryEntry>, String> {
             }
         }
     }
-    directories.sort_by_key(|entry| entry.name.to_lowercase());
-    files.sort_by_key(|entry| entry.name.to_lowercase());
+    directories.sort_by_key(|entry| entry.name.clone());
+    files.sort_by_key(|entry| entry.name.clone());
     directories.extend(files);
     Ok(directories)
 }
@@ -1771,11 +1773,11 @@ mod tests {
             listing,
             vec![
                 DirectoryEntry {
-                    name: "acid".to_owned(),
+                    name: "Zoo".to_owned(),
                     is_dir: true,
                 },
                 DirectoryEntry {
-                    name: "Zoo".to_owned(),
+                    name: "acid".to_owned(),
                     is_dir: true,
                 },
                 DirectoryEntry {
@@ -1787,7 +1789,8 @@ mod tests {
                     is_dir: false,
                 },
             ],
-            "directories name-sorted, then audio files name-sorted, both case-insensitive"
+            "directories byte-order sorted, then audio files, the SAME \
+             order a folder-Open seeds into the playlist"
         );
     }
 
