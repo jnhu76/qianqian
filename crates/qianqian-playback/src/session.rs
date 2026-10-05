@@ -37,6 +37,7 @@ use crate::edge::PcmEdge;
 use crate::establishment::{EstablishmentAttempt, EstablishmentResult};
 use crate::handle::PlaybackSessionHandle;
 use crate::live::LiveProcessing;
+use crate::observation::ObservationTap;
 use crate::processing::{AudioProcessingConfig, EpisodeProcessing};
 
 /// Current edge-capacity tuning: 8192 PCM frames (~185 ms of media at
@@ -455,9 +456,23 @@ fn spawn_worker<P: ProcessingRuntime + 'static>(
     completion: SessionCompletion,
     processing: P,
 ) -> Result<std::thread::JoinHandle<()>, ActivationError> {
+    // The episode's observation tap (#187 O0/O1): one per decode
+    // worker, capacity exactly one staging block. Episode replacement
+    // builds a fresh worker and therefore a fresh tap — no generation
+    // machinery.
+    let observation = ObservationTap::new(decode_stream.format(), STAGING_FRAMES);
     std::thread::Builder::new()
         .name("qianqian-decode".into())
-        .spawn(move || decode_worker(decode_stream, edge, completion, STAGING_FRAMES, processing))
+        .spawn(move || {
+            decode_worker(
+                decode_stream,
+                edge,
+                completion,
+                STAGING_FRAMES,
+                processing,
+                observation,
+            )
+        })
         .map_err(|e| ActivationError::new(format!("decode worker spawn failed: {e}")))
 }
 
@@ -564,8 +579,14 @@ fn decode_worker<P: ProcessingRuntime>(
     completion: SessionCompletion,
     staging_frames: usize,
     mut processing: P,
+    observation: ObservationTap,
 ) {
     let channels = usize::from(decode_stream.format().channels);
+    // The off-path observation analyst (#187 O1): one thread spawned
+    // with the worker, retired at this worker's single exit funnel
+    // below. Its spawn failure or death retires observation only —
+    // playback never depends on it.
+    let analyst = observation.spawn_worker();
     let catch = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         // Startup allocation only; the steady loop reuses this buffer.
         let mut staging = vec![0.0f32; staging_frames * channels];
@@ -661,6 +682,14 @@ fn decode_worker<P: ProcessingRuntime>(
                                 remainder = None;
                                 processing.invalidate_signal_history();
                                 edge.invalidate();
+                                // The observation plane's own reset at
+                                // the same seam (#187 O0): pending
+                                // pre-cut material is dropped and the
+                                // boundary bit arms, so no pre-cut
+                                // signal-derived state can be delivered
+                                // as post-cut observation.
+                                // RefusedUnchanged never reaches this.
+                                observation.invalidate();
                                 completion.seek_landing_published(landing);
                                 // The cut is irrevocable from here: the old
                                 // staging is discarded and the edge purged.
@@ -828,6 +857,13 @@ fn decode_worker<P: ProcessingRuntime>(
                         edge.fail();
                         return;
                     }
+                    // Observation offer (#187 O1): a bounded, nonblocking
+                    // copy of the DSP-complete block, strictly before
+                    // PcmEdge admission. Overwrite-latest: loss is normal
+                    // telemetry policy, the call always succeeds
+                    // immediately, and nothing here can fail the
+                    // production path.
+                    observation.offer(&staging[..total]);
                     match write_observing_seek(
                         &edge,
                         &completion,
@@ -882,6 +918,14 @@ fn decode_worker<P: ProcessingRuntime>(
     // final drain.
     completion.worker_exited(edge.terminal());
     completion.abort_stranded_seek();
+    // Observation teardown: one stop path, one join path, one owner
+    // (this worker), at its single exit funnel — normal and panic paths
+    // alike. Bounded by one analyst iteration; the join result is
+    // telemetry, never playback truth.
+    observation.close();
+    if let Some(analyst) = analyst {
+        let _ = analyst.join();
+    }
 }
 
 /// The interruptible bounded-slice write (D14.5): write `src` into the
@@ -1074,6 +1118,7 @@ mod seek_record_tests {
                     completion.clone(),
                     STAGING_FRAMES,
                     Processing(invalidations.clone()),
+                    ObservationTap::new(crate::test_common::TEST_FORMAT, STAGING_FRAMES),
                 );
                 let release = output.join().expect("output leg exited");
                 assert!(!completion.seek_in_flight());
@@ -1113,6 +1158,238 @@ mod seek_record_tests {
                     );
                 }
             }
+        });
+    }
+}
+
+/// Observation seam oracles (#187 O1): the REAL decode worker, with a
+/// controlled provider, proves the tap's production wiring — the offer
+/// sits after `processing.stage` and before PcmEdge admission, the
+/// Applied arm resets the observation plane, and the exit funnel
+/// retires the off-path analyst. These are mechanism probes, not
+/// playback-semantics claims; the seek/DSP suites above own those.
+#[cfg(all(test, not(loom)))]
+mod observation_seam_tests {
+    use super::*;
+    use crate::test_common::{TEST_FORMAT, within};
+    use qianqian_audio_api::ports::{
+        DecodeError, DrainVerdict, GateSlice, PcmPull, ProviderSeekOutcome, RenderPcmInput,
+        SeekParkRelease, TailProbeOutcome,
+    };
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    /// Serves whole 1024-frame blocks (constant fill), then EOF.
+    /// `seek` is unreachable in the no-seek oracle.
+    struct BlockProvider {
+        blocks: usize,
+    }
+
+    impl DecodedPcmStream for BlockProvider {
+        fn format(&self) -> PcmFormat {
+            TEST_FORMAT
+        }
+
+        fn source_duration(&self) -> Option<Duration> {
+            None
+        }
+
+        fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
+            if self.blocks == 0 {
+                return Ok(DecodeOutcome::Eof);
+            }
+            self.blocks -= 1;
+            let frames = (dst.len() / usize::from(TEST_FORMAT.channels)).min(STAGING_FRAMES);
+            let samples = frames * usize::from(TEST_FORMAT.channels);
+            dst[..samples].fill(0.25);
+            Ok(DecodeOutcome::Frames(frames))
+        }
+
+        fn seek(&mut self, _target: Duration) -> ProviderSeekOutcome {
+            panic!("the no-seek oracle must not observe a seek")
+        }
+    }
+
+    /// Serves whole post-cut blocks, then EOF; the seek is always
+    /// Applied (the command is planted before the worker starts, so no
+    /// pre-cut production happens in this oracle).
+    struct CutProvider {
+        blocks: usize,
+        seeks: Arc<AtomicUsize>,
+    }
+
+    impl DecodedPcmStream for CutProvider {
+        fn format(&self) -> PcmFormat {
+            TEST_FORMAT
+        }
+
+        fn source_duration(&self) -> Option<Duration> {
+            None
+        }
+
+        fn read_frames(&mut self, dst: &mut [f32]) -> Result<DecodeOutcome, DecodeError> {
+            if self.blocks == 0 {
+                return Ok(DecodeOutcome::Eof);
+            }
+            self.blocks -= 1;
+            let frames = (dst.len() / usize::from(TEST_FORMAT.channels)).min(STAGING_FRAMES);
+            let samples = frames * usize::from(TEST_FORMAT.channels);
+            dst[..samples].fill(0.5);
+            Ok(DecodeOutcome::Frames(frames))
+        }
+
+        fn seek(&mut self, _target: Duration) -> ProviderSeekOutcome {
+            self.seeks.fetch_add(1, Ordering::SeqCst);
+            ProviderSeekOutcome::Applied { landing: Some(5) }
+        }
+    }
+
+    struct Counting(Arc<AtomicUsize>);
+
+    impl ProcessingRuntime for Counting {
+        fn stage(&mut self, _block: &mut [f32]) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn invalidate_signal_history(&mut self) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    /// Steady production flows to the off-path analyst through the real
+    /// worker: post-stage, pre-edge; at least one block is delivered,
+    /// the accounting is self-consistent, no cut evidence exists, and
+    /// the funnel retired the analyst.
+    #[test]
+    fn real_worker_offers_processed_blocks_to_the_off_path_analyst() {
+        let completion = SessionCompletion::new();
+        let edge = Arc::new(PcmEdge::new(TEST_FORMAT.channels, EDGE_CAPACITY_FRAMES));
+        let observation = ObservationTap::new(TEST_FORMAT, STAGING_FRAMES);
+        // 5 blocks fit the edge outright: the write path never blocks,
+        // the worker reaches EOF and returns, and the funnel close+join
+        // has already run when this call returns.
+        decode_worker(
+            Box::new(BlockProvider { blocks: 5 }),
+            edge.clone(),
+            completion,
+            STAGING_FRAMES,
+            Counting(Arc::new(AtomicUsize::new(0))),
+            observation.clone(),
+        );
+        let latest = observation.latest();
+        assert!(latest.worker_closed, "the funnel retired the analyst");
+        assert!(
+            (1..=5).contains(&latest.delivered_blocks),
+            "delivered {latest:?}"
+        );
+        assert_eq!(latest.delivered_frames, 1024 * latest.delivered_blocks);
+        assert_eq!(latest.cuts, 0, "no cut signal, no cut evidence");
+        assert_eq!(latest.sample_rate, TEST_FORMAT.sample_rate);
+        assert_eq!(latest.channels, TEST_FORMAT.channels);
+    }
+
+    /// The Applied arm resets the observation plane on the real seek
+    /// path: the analyst sees exactly one cut boundary, and everything
+    /// it receives past the cut is post-cut production. (The pre-cut/
+    /// refusal delivery semantics are pinned at the primitive; this
+    /// oracle pins the REAL call site.)
+    #[test]
+    fn applied_cut_resets_observation_at_the_real_seam() {
+        within(Duration::from_secs(10), || {
+            let completion = SessionCompletion::new();
+            let edge = Arc::new(PcmEdge::new(TEST_FORMAT.channels, EDGE_CAPACITY_FRAMES));
+            // The data plane is bound as the stop target first (the
+            // activation step `request_seek` routes through); without
+            // it a plant is inert by design.
+            completion.bind_stop_target(edge.clone());
+            // The seek is planted before the worker starts, so the
+            // first loop-top picks it up: no pre-cut production exists
+            // in this oracle.
+            completion.request_seek(Duration::from_millis(5));
+
+            // The controlled output leg: establishes parked evidence,
+            // answers the tail probe quiesced, consumes the committed
+            // release, then drains the edge to its terminal.
+            let (parked_tx, parked_rx) = std::sync::mpsc::sync_channel(1);
+            let position = completion.position_evidence();
+            let gate = completion.render_gate();
+            let drain = completion.drain_signal();
+            let leg_edge = edge.clone();
+            let leg = std::thread::spawn(move || {
+                let mut release = None;
+                let mut parked_tx = Some(parked_tx);
+                gate.park_loop_top(|slice| match slice {
+                    GateSlice::TailProbe => {
+                        if let Some(tx) = parked_tx.take() {
+                            let _ = tx.send(());
+                        }
+                        TailProbeOutcome::Quiesced
+                    }
+                    GateSlice::SeekRelease(payload) => {
+                        if let SeekParkRelease::Committed { landing } = payload {
+                            position.rebase(landing);
+                        }
+                        release = Some(payload);
+                        TailProbeOutcome::Pending
+                    }
+                });
+                let mut frame = [0.0f32; 2];
+                loop {
+                    match leg_edge.read_frames(&mut frame) {
+                        PcmPull::Frames(_) => continue,
+                        PcmPull::Eof => {
+                            drain.complete(DrainVerdict::Drained);
+                            break;
+                        }
+                        PcmPull::Stopped => {
+                            drain.complete(DrainVerdict::Aborted);
+                            break;
+                        }
+                    }
+                }
+                release
+            });
+            parked_rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("the leg parks");
+            assert!(completion.leg_parked_evidence());
+
+            let seeks = Arc::new(AtomicUsize::new(0));
+            let invalidations = Arc::new(AtomicUsize::new(0));
+            let observation = ObservationTap::new(TEST_FORMAT, STAGING_FRAMES);
+            decode_worker(
+                Box::new(CutProvider {
+                    blocks: 2,
+                    seeks: seeks.clone(),
+                }),
+                edge.clone(),
+                completion,
+                STAGING_FRAMES,
+                Counting(invalidations.clone()),
+                observation.clone(),
+            );
+            let release = leg.join().expect("the leg exits");
+            assert_eq!(seeks.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                invalidations.load(Ordering::SeqCst),
+                1,
+                "the D14.11 invalidation ran once, at the Applied arm"
+            );
+            assert_eq!(
+                release,
+                Some(SeekParkRelease::Committed { landing: Some(5) })
+            );
+
+            let latest = observation.latest();
+            assert!(latest.worker_closed, "the funnel retired the analyst");
+            assert_eq!(
+                latest.cuts, 1,
+                "the Applied reset is visible off-path, exactly once"
+            );
+            assert!(
+                (1..=2).contains(&latest.delivered_blocks),
+                "delivered {latest:?}"
+            );
+            assert_eq!(latest.delivered_frames, 1024 * latest.delivered_blocks);
         });
     }
 }
