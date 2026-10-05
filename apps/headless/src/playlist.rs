@@ -309,6 +309,69 @@ impl TemporaryPlaylist {
         self.entries.len()
     }
 
+    /// Append in discovery order without disturbing the current traversal
+    /// prefix or either cursor. An empty list gains selection, not playback.
+    pub fn append(&mut self, entries: Vec<PathBuf>) -> usize {
+        let count = entries.len();
+        if count == 0 {
+            return 0;
+        }
+        let first = self.entries.len();
+        self.entries.extend(entries);
+        self.play_order.extend(first..self.entries.len());
+        if self.selected.is_none() {
+            self.selected = Some(0);
+        }
+        self.bump_revision();
+        count
+    }
+
+    /// Select a current traversal row; the row number is not entry identity.
+    pub fn select(&mut self, position: usize) -> bool {
+        if self.entry_at(position).is_none() {
+            return false;
+        }
+        if self.selected != Some(position) {
+            self.selected = Some(position);
+            self.bump_revision();
+        }
+        true
+    }
+
+    /// The App must retire an episode on this row before calling this.
+    /// Surviving entry/cursor relations follow the compacted entry indices.
+    pub fn remove_selected(&mut self) -> bool {
+        let Some(position) = self.selected else {
+            return false;
+        };
+        let entry = self.play_order.remove(position);
+        self.entries.remove(entry);
+        for id in &mut self.play_order {
+            if *id > entry {
+                *id -= 1;
+            }
+        }
+        self.playing = self.playing.and_then(|playing| {
+            if playing == position {
+                None
+            } else {
+                Some(playing - usize::from(playing > position))
+            }
+        });
+        self.selected = self
+            .play_order
+            .len()
+            .checked_sub(1)
+            .map(|last| position.min(last));
+        self.bump_revision();
+        true
+    }
+
+    /// The App must retire its episode first. Process preferences survive.
+    pub fn clear(&mut self) {
+        self.establish(Vec::new(), 0);
+    }
+
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -469,6 +532,14 @@ impl TemporaryPlaylist {
         self.playing = Some(position);
         self.selected = Some(position);
         self.bump_revision();
+    }
+
+    /// A replay commits playback without changing the browsing selection.
+    pub fn commit_replay(&mut self, position: usize) {
+        if self.entry_at(position).is_some() {
+            self.playing = Some(position);
+            self.bump_revision();
+        }
     }
 
     /// What the EOF policy does with a COMPLETED episode (Issue #166
@@ -634,7 +705,7 @@ impl TemporaryPlaylist {
             return false;
         }
         // Both cursors point into the traversal.
-        self.playing.is_some_and(|p| p < self.play_order.len())
+        self.playing.is_none_or(|p| p < self.play_order.len())
             && self.selected.is_some_and(|p| p < self.play_order.len())
             // Sequential's traversal IS the canonical order.
             && (self.order == PlaybackOrder::Shuffle
@@ -650,6 +721,40 @@ mod tests {
     //! filesystem — the whole matrix is the pure policy.
 
     use super::*;
+
+    #[test]
+    fn edits_follow_surviving_entries_across_shuffle_and_compaction() {
+        for order in [PlaybackOrder::Sequential, PlaybackOrder::Shuffle] {
+            for remove in 0..5 {
+                let mut p = TemporaryPlaylist::new_seeded(188);
+                p.establish(entries(5), 2);
+                p.set_order(order);
+                p.cycle_repeat();
+                let before: Vec<_> = p.rows().map(|row| row.path.to_owned()).collect();
+                let current = p.path_at(p.playing_position().unwrap()).unwrap().to_owned();
+                let removed_current = before[remove] == current;
+                assert!(p.select(remove));
+                assert!(p.remove_selected());
+                let mut expected = before;
+                expected.remove(remove);
+                assert_eq!(
+                    p.rows().map(|row| row.path.to_owned()).collect::<Vec<_>>(),
+                    expected
+                );
+                assert_eq!(p.selected_position(), Some(remove.min(3)));
+                if removed_current {
+                    assert_eq!(p.playing_position(), None);
+                } else {
+                    assert_eq!(
+                        p.path_at(p.playing_position().unwrap()),
+                        Some(current.as_path())
+                    );
+                }
+                assert_eq!(p.repeat(), RepeatMode::All);
+                assert!(p.invariants_hold());
+            }
+        }
+    }
 
     fn entries(n: usize) -> Vec<PathBuf> {
         (0..n)

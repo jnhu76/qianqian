@@ -149,7 +149,7 @@ impl AudioProcessingConfig {
 /// band 9 is a HIGH SHELF — the kind mapping is part of this product
 /// table, not a registry or a plugin taxonomy. The table is fixed for
 /// the slice; band KINDS and centers are never semantic authority.
-pub(crate) const EQ_BAND_FREQUENCY_HZ: [f32; 10] = [
+pub const EQ_BAND_FREQUENCY_HZ: [f32; 10] = [
     31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0,
 ];
 
@@ -158,7 +158,15 @@ pub(crate) const EQ_BAND_FREQUENCY_HZ: [f32; 10] = [
 /// headroom posture to be explicit: +18 dB on every band stays finite
 /// in internal Float32 (pinned by an oracle), the device owns
 /// out-of-range samples, and no limiter or clip exists.
-pub(crate) const EQ_MAX_BAND_GAIN_DB: f32 = 18.0;
+pub const EQ_MAX_BAND_GAIN_DB: f32 = 18.0;
+
+/// Pure source-domain description in fixed band order: `Some(true)` is
+/// available, `Some(false)` is inert, `None` is unknown (no positive source
+/// rate). This reports neither processing enablement nor applied state.
+pub fn eq_band_availability(source_rate_hz: Option<u32>) -> [Option<bool>; 10] {
+    let rate = source_rate_hz.filter(|rate| *rate > 0);
+    EQ_BAND_FREQUENCY_HZ.map(|center| rate.map(|rate| band_participates(center, rate)))
+}
 
 /// The rate-aware AVAILABILITY rule of the 10-band product EQ
 /// (dsp-product-model.md §2.1, the accepted LOW_RATE_EQ_POLICY =
@@ -185,8 +193,8 @@ pub(crate) const EQ_MAX_BAND_GAIN_DB: f32 = 18.0;
 /// Strictness is load-bearing: at exactly Nyquist (w0 = π) the f32
 /// trigonometry collapses toward the degenerate recursion the per-band
 /// stability check would then have to refuse, so the boundary band
-/// belongs to the unavailable side. [`EqStage::new`] is the only caller
-/// in production; the crate oracles restate the rule independently.
+/// belongs to the unavailable side. The compiler and public pure product
+/// description share this rule; crate oracles restate it independently.
 pub(crate) fn band_participates(center_hz: f32, sample_rate_hz: u32) -> bool {
     center_hz * 2.0 < sample_rate_hz as f32
 }

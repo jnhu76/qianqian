@@ -292,8 +292,22 @@ where
 {
     let mut expanded = ExpandedInputs::default();
     let mut seen = std::collections::HashSet::new();
+    let base = match std::env::current_dir() {
+        Ok(base) => base,
+        Err(error) => {
+            expanded.push_diagnostic(format!("cannot read working directory: {error}"));
+            return expanded;
+        }
+    };
     for root in roots {
-        let root = root.as_ref();
+        let normalized = match normalize_path(root.as_ref(), &base) {
+            Ok(path) => path,
+            Err(diagnostic) => {
+                expanded.push_diagnostic(diagnostic);
+                continue;
+            }
+        };
+        let root = normalized.as_path();
         // symlink_metadata never follows the root link, so a symlinked
         // root is reported as what it is instead of silently expanding
         // its target (or its cycle).
@@ -316,6 +330,29 @@ where
         }
     }
     expanded
+}
+
+/// Host path preparation shared with picker navigation: native paths,
+/// relative to the displayed directory, with only a leading home prefix
+/// expanded. No shell, variables, globbing or filesystem canonicalization.
+pub fn normalize_path(path: &Path, base: &Path) -> Result<PathBuf, String> {
+    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" });
+    normalize_with_home(path, base, home.as_deref().map(Path::new))
+}
+
+fn normalize_with_home(path: &Path, base: &Path, home: Option<&Path>) -> Result<PathBuf, String> {
+    let mut components = path.components();
+    let prepared = if components.next() == Some(std::path::Component::Normal("~".as_ref())) {
+        home.ok_or_else(|| "cannot expand ~: home directory unavailable".to_owned())?
+            .join(components.as_path())
+    } else {
+        path.to_owned()
+    };
+    Ok(if prepared.is_absolute() {
+        prepared
+    } else {
+        base.join(prepared)
+    })
 }
 
 /// Accept one enumerated/explicit candidate unless the exact same path
@@ -377,6 +414,20 @@ pub fn open_expanded<S: EpisodeStart>(
         player.establish_playlist(expanded.accepted.clone());
     }
     Some(outcome)
+}
+
+/// Add shares expansion/probe admission with Open, but its disposition
+/// only appends through the App. No candidate is activated, even on an
+/// empty list. Bounded scan/rejection detail remains on `expanded`.
+pub fn append_expanded<S: EpisodeStart>(
+    player: &mut ReferencePlayerApp<S>,
+    expanded: &mut ExpandedInputs,
+) -> Result<usize, String> {
+    validate_with_probe(player, expanded);
+    if expanded.accepted.is_empty() {
+        return Err(expanded.refusal());
+    }
+    player.append_admitted(expanded.accepted.clone())
 }
 
 /// What a product startup prepared from its argv before the shell
@@ -487,7 +538,7 @@ const AUDIO_EXTENSIONS: [&str; 18] = [
     "ogg", "opus", "wav", "wma", "wv",
 ];
 
-fn is_audio_candidate(path: &Path) -> bool {
+pub fn is_audio_candidate(path: &Path) -> bool {
     path.extension().is_some_and(|extension| {
         let extension = extension.to_string_lossy().to_ascii_lowercase();
         AUDIO_EXTENSIONS.contains(&extension.as_str())
@@ -1136,6 +1187,95 @@ mod tests {
         assert_eq!(player.active_source(), Some(file.as_path()));
     }
 
+    #[test]
+    fn open_and_add_share_real_tree_admission_but_have_distinct_disposition() {
+        let tree = TempTree::new("open-add");
+        let first = tree.file("a.flac");
+        let second = tree.file("b.mp3");
+        tree.file("invalid-c.flac");
+        tree.file("cover.jpg");
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        let mut add = expand_inputs([tree.path(), tree.path()]);
+        assert_eq!(append_expanded(&mut player, &mut add), Ok(2));
+        assert_eq!(add.accepted, vec![first.clone(), second.clone()]);
+        assert_eq!(add.rejected, 1);
+        assert_eq!(add.skipped, 2);
+        assert_eq!(add.duplicates, 3);
+        assert!(player.active_handle().is_none());
+        assert_eq!(player.navigation_position(), None);
+        assert_eq!(player.playlist_selected_position(), Some(0));
+        let mut open = expand_inputs([tree.path(), tree.path()]);
+        assert_eq!(
+            open_expanded(&mut player, &mut open),
+            Some(OpenOutcome::Opened)
+        );
+        assert_eq!(open.accepted, add.accepted);
+        let old = player.active_handle().unwrap().clone();
+        let before = log.lock().unwrap().len();
+        let mut add = expand_inputs([&second, &second]);
+        assert_eq!(append_expanded(&mut player, &mut add), Ok(1));
+        assert_eq!(add.duplicates, 1);
+        assert_eq!(player.active_source(), Some(first.as_path()));
+        assert_eq!(old.observe().terminal_outcome, None);
+        assert_eq!(player.playlist_playing_position(), Some(0));
+        assert_eq!(
+            player.playlist_rows().count(),
+            3,
+            "separate Adds allow repeated sources"
+        );
+        assert!(
+            log.lock().unwrap()[before..]
+                .iter()
+                .all(|event| event.starts_with("probe")),
+            "Add only probes, never activates/retires"
+        );
+        let rows: Vec<_> = player
+            .playlist_rows()
+            .map(|row| row.path.to_owned())
+            .collect();
+        let mut rejected = expand_inputs([tree.path().join("invalid-c.flac")]);
+        assert!(append_expanded(&mut player, &mut rejected).is_err());
+        assert_eq!(open_expanded(&mut player, &mut rejected), None);
+        assert_eq!(
+            player
+                .playlist_rows()
+                .map(|row| row.path.to_owned())
+                .collect::<Vec<_>>(),
+            rows
+        );
+        assert_eq!(old.observe().terminal_outcome, None);
+        player.quit();
+    }
+
+    #[test]
+    fn path_preparation_preserves_literal_text_and_expands_only_home_prefix() {
+        let base = std::env::temp_dir().join("picker-base");
+        let home = std::env::temp_dir().join("test-home");
+        for (input, expected) in [
+            ("~/Music/千千 song.flac", home.join("Music/千千 song.flac")),
+            ("~", home.clone()),
+            ("~someone/song.flac", base.join("~someone/song.flac")),
+            ("$HOME/*.flac", base.join("$HOME/*.flac")),
+            (
+                "Q:\\Music\\song.flac",
+                if cfg!(windows) {
+                    PathBuf::from("Q:\\Music\\song.flac")
+                } else {
+                    base.join("Q:\\Music\\song.flac")
+                },
+            ),
+        ] {
+            assert_eq!(
+                normalize_with_home(Path::new(input), &base, Some(&home)),
+                Ok(expected)
+            );
+        }
+        assert!(normalize_with_home(Path::new("~/Music"), &base, None).is_err());
+        assert_eq!(normalize_with_home(&home, &base, None), Ok(home));
+    }
+
     // --- open_expanded: scan-time probe validation + commit-riding seed -
 
     use crate::player::tests::{FakeEpisodeSource, LIVE_A, LIVE_B};
@@ -1363,7 +1503,12 @@ mod tests {
                     .map(|_facts| ())
                     .map_err(|e| e.message)
             }
-            fn start(&self, _source: &Path, _level: u8) -> crate::player::StartAttempt {
+            fn start(
+                &self,
+                _source: &Path,
+                _level: u8,
+                _: qianqian_playback::AudioProcessingConfig,
+            ) -> crate::player::StartAttempt {
                 unreachable!("scan-hardening tests never start an episode")
             }
         }
