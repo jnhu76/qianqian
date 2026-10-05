@@ -41,7 +41,10 @@
 //! next post-cut block, so pre-cut signal-derived state cannot be
 //! delivered as post-cut observation. `RefusedUnchanged` never reaches
 //! the call site: observation continues without a fake reset. Pause
-//! owns no truth here: production simply stops offering.
+//! owns no truth here either way: the pause gate holds the render leg,
+//! not the producer, so bounded prefetch may keep producing (and
+//! offering) until ordinary edge backpressure suspends it — and the
+//! observation plane records no "paused" state.
 
 use std::sync::{Arc, Condvar, Mutex};
 
@@ -87,7 +90,7 @@ pub(crate) struct ObservationSnapshot {
     /// producer offers whole staging blocks).
     pub(crate) delivered_frames: u64,
     /// Delivered blocks that followed an Applied cut.
-    pub(crate) cuts: u32,
+    pub(crate) cuts: u64,
     /// The analyst has observed close and exited (teardown evidence).
     pub(crate) worker_closed: bool,
 }
