@@ -1758,10 +1758,13 @@ mod tests {
     /// CJK filenames render structurally (C12): the Source line shows
     /// the characters, the Open modal accepts CJK characters and
     /// backspace pops ONE character, and the frame stays free of
-    /// unearned semantics.
+    /// unearned semantics. The fixtures are SIMPLIFIED Chinese (the
+    /// product's audience; QUICKSTART's examples are 夜曲/七里香/晴天)
+    /// — wide glyphs are what the structural assertions need, and the
+    /// spelling stays in the users' own script.
     #[test]
     fn cjk_filenames_render_and_edit_structurally() {
-        let mut model = TuiModel::new("千曲テスト曲.flac");
+        let mut model = TuiModel::new("千曲测试曲.flac");
         model.update(pending());
         let text = rendered(&mut model, 100, 30);
         // Wide CJK glyphs occupy two cells; the skipped cells surface as
@@ -1769,18 +1772,18 @@ mod tests {
         // terminal renders them as one glyph). Structural assertion is
         // on the space-normalized text.
         let compact = text.replace(' ', "");
-        assert!(compact.contains("Source:千曲テスト曲.flac"), "{text}");
+        assert!(compact.contains("Source:千曲测试曲.flac"), "{text}");
         assert_eq!(scan(&text), None, "{text}");
 
         model.open_modal(ModalKind::Open);
-        for c in "音楽/千曲.flac".chars() {
+        for c in "音乐/歌曲.flac".chars() {
             model.modal_push(c);
         }
         model.modal_backspace();
         let text = rendered(&mut model, 100, 30);
         let compact = text.replace(' ', "");
         assert!(
-            compact.contains("音楽/千曲.fla▏"),
+            compact.contains("音乐/歌曲.fla▏"),
             "backspace popped exactly one character:\n{text}"
         );
         assert!(text.contains("Enter open"), "{text}");
