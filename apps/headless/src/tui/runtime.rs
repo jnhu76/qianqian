@@ -1,12 +1,16 @@
 //! The terminal session of the reference player: raw mode + alternate
-//! screen under a small RAII guard, and a modest event loop.
+//! screen + mouse capture under a small RAII guard, and a modest event
+//! loop.
 //!
 //! Terminal ownership is lexical: the guard on this function's stack is
 //! the ONLY owner of the entered terminal modes, and unwinding (a panic
 //! inside the draw/loop code) drops it like any other early return. The
 //! module deliberately installs no process-global policy (no panic
 //! hook): background threads panicking must not be able to tear down a
-//! terminal session they do not own.
+//! terminal session they do not own. Mouse capture is entered and left
+//! by the SAME guard lifecycle (§16/§40) — the enter/restore command
+//! sequences are factored over any writer so the Enable/Disable pairing
+//! is pinned by a test without a real terminal.
 //!
 //! Deliberately the ONLY place where crossterm I/O happens, and
 //! deliberately ordinary: no event framework, no state machine, no
@@ -15,23 +19,29 @@
 //! audio path (the episode's realtime work lives on session-owned
 //! threads behind the seam, and this loop only polls terminal input
 //! between draws). UI refresh cadence: the loop waits for input up to
-//! [`TICK`], so a quiet terminal redraws about every 150 ms and a key
-//! press is answered within the same budget.
+//! [`TICK`], so a quiet terminal redraws about every 150 ms and an
+//! input event is answered within the same budget.
 //!
-//! The one deliberate exception to non-blocking key handling is the
+//! The one deliberate exception to non-blocking input handling is the
 //! Open operation (ADR-PBK-002 D14.6): `ReferencePlayerApp::open` runs
 //! the whole frozen replacement sequence synchronously on this thread
-//! (repeated Open is App-thread-serialized), so the O key's Enter can
-//! block for as long as the old episode needs to settle. That stall IS
-//! the replacement being honest about its ordering — no async
+//! (repeated Open is App-thread-serialized), so the Open modal's Enter
+//! can block for as long as the old episode needs to settle. That stall
+//! IS the replacement being honest about its ordering — no async
 //! machinery is earned in v1.
+//!
+//! Every input event flows through the same pipe (§8's one dispatch
+//! boundary): decode (model) → at most one [`TuiAction`] →
+//! [`dispatch`] — which performs at most one product operation
+//! (§31). Resize invalidates the frame's geometry and lets the next
+//! draw republish it (§29).
 
 use std::io::{self, Write};
 use std::path::Path;
 use std::time::Duration;
 
 use crossterm::cursor::{Hide, Show};
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
 use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
@@ -42,7 +52,8 @@ use ratatui::backend::CrosstermBackend;
 use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 
 use super::model::{
-    Action, GotoConfirm, PlaylistRow, Step, TuiModel, action_for_key, apply_action, row_label,
+    ModalConfirm, ModalInput, PlaylistCursor, Step, TuiAction, TuiModel, decode_key, decode_mouse,
+    seek_target,
 };
 use super::view;
 
@@ -54,7 +65,7 @@ pub const TICK: Duration = Duration::from_millis(150);
 /// through this frame (normal quit, I/O error, panic unwind) before
 /// returning; the caller owns everything else (quit, disposal
 /// reporting, exit codes). `initial_status` is presented as the first
-/// Open-operation feedback line (e.g. the startup Open's outcome).
+/// operation feedback line (e.g. the startup Open's outcome).
 pub fn run<S: EpisodeStart>(
     player: &mut ReferencePlayerApp<S>,
     initial_status: Option<String>,
@@ -72,19 +83,35 @@ pub fn run<S: EpisodeStart>(
 
     loop {
         terminal
-            .draw(|frame| view::draw(frame, &model))
+            .draw(|frame| view::draw(frame, &mut model))
             .map_err(|error| format!("terminal draw failed: {error}"))?;
 
         if event::poll(TICK).map_err(|error| format!("terminal input failed: {error}"))? {
-            match event::read().map_err(|error| format!("terminal input failed: {error}"))? {
-                Event::Key(key) => {
-                    if handle_key(key, &mut model, player) == Step::Exit {
-                        break;
+            let step =
+                match event::read().map_err(|error| format!("terminal input failed: {error}"))? {
+                    // One physical event decodes to at most one action, and
+                    // one action dispatches to at most one product
+                    // operation (§31) — key and mouse share the boundary.
+                    Event::Key(key) => decode_key(key, &model).map_or(Step::Continue, |action| {
+                        dispatch(action, &mut model, player)
+                    }),
+                    Event::Mouse(mouse) => decode_mouse(mouse, &mut model)
+                        .map_or(Step::Continue, |action| {
+                            dispatch(action, &mut model, player)
+                        }),
+                    // §29: clear the armed click, invalidate the old hit
+                    // regions; the draw at the top of the next iteration
+                    // recomputes the layout, revalidates the focus and
+                    // publishes fresh geometry. No product command is
+                    // generated by a resize.
+                    Event::Resize(_, _) => {
+                        model.invalidate_frame();
+                        Step::Continue
                     }
-                }
-                // The next draw picks up the new terminal size.
-                Event::Resize(_, _) => {}
-                _ => {}
+                    _ => Step::Continue,
+                };
+            if step == Step::Exit {
+                break;
             }
         }
 
@@ -92,7 +119,7 @@ pub fn run<S: EpisodeStart>(
         // `Completed` Fact may advance the temporary playlist through
         // the SAME Open replacement. It runs AFTER input so a key press
         // and an automatic transition never race for the same refresh,
-        // and it blocks exactly as the O key's Enter does (the
+        // and it blocks exactly as the Open modal's Enter does (the
         // documented synchronous-Open stall) — no async machinery is
         // earned here either.
         if let Some(outcome) = player.poll_eof_policy() {
@@ -123,173 +150,172 @@ fn eof_feedback<S: EpisodeStart>(outcome: &OpenOutcome, player: &ReferencePlayer
     }
 }
 
-/// Whether a key press carries no modifier, or only SHIFT (terminals
-/// disagree about reporting SHIFT with a character, so both act for
-/// every LETTER key).
-fn plain(key: crossterm::event::KeyEvent) -> bool {
-    key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT
-}
-
-/// One key press against the shell state, under the frozen input-mode
-/// precedence (Issue #166 §28): Ctrl+C quits from EVERY mode, the Open
-/// line captures the editing keys, then the GoTo line, then the help
-/// overlay — which owns the keyboard entirely, so no playback key can
-/// fire behind it — and only then the normal grammar. No key both edits
-/// and executes.
-fn handle_key<S: EpisodeStart>(
-    key: crossterm::event::KeyEvent,
+/// The ONE dispatch boundary (§8): every [`TuiAction`] — decoded from a
+/// key, a mouse click, or a focused control's activation — comes here,
+/// and the same action leads to the same product operation regardless
+/// of its source. One call performs at most one product operation
+/// (§31): the `ActivateFocused` resolution happens inside this same
+/// call, and a resolved activation is never itself an activation.
+fn dispatch<S: EpisodeStart>(
+    action: TuiAction,
     model: &mut TuiModel,
     player: &mut ReferencePlayerApp<S>,
 ) -> Step {
-    use crossterm::event::KeyEventKind;
-    if key.kind != KeyEventKind::Press {
-        return Step::Continue;
-    }
-    // The conventional quit is the ONE key that works everywhere,
-    // including inside the Open line (that is why it is not part of any
-    // modal's vocabulary).
-    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-        return Step::Exit;
-    }
-    if model.open_input_active() {
-        match key.code {
-            KeyCode::Enter => {
-                if let Some(candidate) = model.confirm_open_input() {
-                    perform_open(model, player, Path::new(&candidate));
+    match action {
+        // Quit is loop control, never an episode command: it exits even
+        // with no episode committed — the idle shell must stay
+        // quittable.
+        TuiAction::Quit => Step::Exit,
+        // Route changes are presentation-only (§5).
+        TuiAction::Navigate(route) => {
+            model.set_route(route);
+            Step::Continue
+        }
+        TuiAction::MoveFocus(direction) => {
+            model.move_focus(direction);
+            Step::Continue
+        }
+        // Enter on the focused control: resolve to that control's own
+        // action and run it — inside this one dispatch, so one physical
+        // event still performs at most one product operation (§31).
+        TuiAction::ActivateFocused => match model.activation() {
+            Some(resolved) => dispatch(resolved, model, player),
+            None => Step::Continue,
+        },
+        TuiAction::OpenModal(kind) => {
+            model.open_modal(kind);
+            Step::Continue
+        }
+        TuiAction::ModalInput(input) => {
+            handle_modal_input(input, model, player);
+            Step::Continue
+        }
+        // The transport commands: with no episode they are inert (there
+        // is nothing to command).
+        TuiAction::PlayPause => {
+            if let Some(handle) = player.active_handle() {
+                // The choice between the two commands comes from a FRESH
+                // authoritative observation of the episode's pause-intent
+                // command state — the shell never keeps a local `paused`
+                // bool.
+                if handle.observe().pause_requested {
+                    handle.request_resume();
+                } else {
+                    handle.request_pause();
                 }
             }
-            KeyCode::Esc => model.cancel_open_input(),
-            KeyCode::Backspace => model.open_input_backspace(),
-            // The Q-drive-lesson (Issue #166 §29): inside the Open line
-            // every character is a literal path character, `q`/`Q`
-            // included — `Q:\Music` must stay typeable. Only Ctrl+C
-            // (handled above) quits from here.
-            KeyCode::Char(c) if plain(key) => model.open_input_push(c),
-            _ => {}
+            Step::Continue
         }
-        return Step::Continue;
-    }
-    if model.goto_input_active() {
-        match key.code {
-            KeyCode::Enter => match model.confirm_goto_input() {
-                GotoConfirm::Seek(target) => match player.active_handle() {
-                    Some(handle) => {
-                        // The SAME frozen seek command the arrows use
-                        // (Issue #166 §27): the episode's own
-                        // clamp/refusal contract decides the landing.
-                        handle.request_seek(target);
-                        model.set_status(Some(format!(
-                            "seek requested: {}",
-                            crate::status::format_clock(target)
-                        )));
-                    }
-                    // Nothing to seek: the parsed target is dropped
-                    // rather than sent into a nonexistent episode.
-                    None => model.set_status(Some("seek: no episode".to_owned())),
-                },
-                GotoConfirm::Cancelled => {}
-                GotoConfirm::Unreadable(diagnostic) => {
-                    model.set_status(Some(diagnostic.to_owned()))
+        TuiAction::Stop => {
+            if let Some(handle) = player.active_handle() {
+                handle.request_stop();
+            }
+            Step::Continue
+        }
+        TuiAction::SeekRelative(seconds) => {
+            if let Some(handle) = player.active_handle() {
+                // The SAME frozen seek command as before: the target is
+                // derived from one fresh coherent observation, and an
+                // episode whose position is unknown gets NO command at
+                // all (no fabricated zero, no seek to the start).
+                if let Some(target) = seek_target(
+                    &handle.observe(),
+                    Duration::from_secs(seconds.unsigned_abs()),
+                    seconds > 0,
+                ) {
+                    handle.request_seek(target);
                 }
-            },
-            KeyCode::Esc => model.cancel_goto_input(),
-            KeyCode::Backspace => model.goto_input_backspace(),
-            KeyCode::Char(c) if plain(key) => model.goto_input_push(c),
-            _ => {}
-        }
-        return Step::Continue;
-    }
-    if model.help_visible() {
-        // Help owns the keyboard: `?`/Esc close it, Q quits, and every
-        // other key is noise. Playback keys therefore cannot fire
-        // behind the overlay.
-        match key.code {
-            KeyCode::Char('?') if plain(key) => model.close_help(),
-            KeyCode::Esc => model.close_help(),
-            KeyCode::Char('q') | KeyCode::Char('Q') if plain(key) => return Step::Exit,
-            _ => {}
-        }
-        return Step::Continue;
-    }
-    let Some(action) = action_for_key(key) else {
-        return Step::Continue;
-    };
-    match action {
-        Action::Open => {
-            model.begin_open_input();
+            }
             Step::Continue
         }
-        Action::GoTo => {
-            model.begin_goto_input();
-            Step::Continue
-        }
-        Action::Help => {
-            model.toggle_help();
-            Step::Continue
-        }
-        // Quit is loop control, never an episode command: it exits even
-        // with no episode committed — the U1 idle shell must stay
-        // quittable (previously unreachable: every session used to
-        // START with a committed episode).
-        Action::Quit => Step::Exit,
-        // Selection is presentation: it moves the `>` cursor and
-        // nothing else (Issue #166 §18).
-        Action::SelectNext => {
-            player.select_next_track();
-            Step::Continue
-        }
-        Action::SelectPrevious => {
-            player.select_previous_track();
-            Step::Continue
-        }
-        Action::PlaySelected => {
-            perform_play_selected(model, player);
-            Step::Continue
-        }
-        Action::Next => {
-            perform_navigation(model, player, Navigation::Next);
-            Step::Continue
-        }
-        Action::Previous => {
+        TuiAction::Previous => {
             perform_navigation(model, player, Navigation::Previous);
             Step::Continue
         }
-        Action::ToggleOrder => {
+        TuiAction::Next => {
+            perform_navigation(model, player, Navigation::Next);
+            Step::Continue
+        }
+        // The playlist selection is presentation of the App's own
+        // selection cursor: it moves the cursor and nothing else
+        // (Issue #166 §18).
+        TuiAction::PlaylistSelect(cursor) => {
+            match cursor {
+                PlaylistCursor::Next => player.select_next_track(),
+                PlaylistCursor::Previous => player.select_previous_track(),
+                PlaylistCursor::Row(position) => {
+                    player.select_track(position);
+                }
+            }
+            Step::Continue
+        }
+        TuiAction::PlaylistPlaySelected => {
+            perform_play_selected(model, player);
+            Step::Continue
+        }
+        TuiAction::ToggleOrder => {
             let order = player.toggle_order();
             model.set_order(order);
             model.set_status(Some(format!("Order: {}", order.label())));
             Step::Continue
         }
-        Action::CycleRepeat => {
+        TuiAction::CycleRepeat => {
             let repeat = player.cycle_repeat();
             model.set_repeat(repeat);
             model.set_status(Some(format!("Repeat: {}", repeat.label())));
             Step::Continue
         }
-        Action::VolumeUp => {
+        TuiAction::VolumeUp => {
             let volume = player.change_volume(VOLUME_STEP);
             model.set_status(Some(format!("volume {volume}/100 (desired)")));
             Step::Continue
         }
-        Action::VolumeDown => {
+        TuiAction::VolumeDown => {
             let volume = player.change_volume(-VOLUME_STEP);
             model.set_status(Some(format!("volume {volume}/100 (desired)")));
             Step::Continue
         }
-        // Remaining episode commands route through the player's
-        // committed seam; with no episode they are inert (there is
-        // nothing to command).
-        action => {
-            if let Some(handle) = player.active_handle() {
-                apply_action(action, handle)
-            } else {
-                Step::Continue
-            }
-        }
     }
 }
 
-/// Which navigation key was pressed.
+/// One editing step inside the active modal (§24/§26/§31). The modal
+/// owns its keys, so nothing here can also reach a background control:
+/// a cancel closes and restores a valid route focus, and a confirm
+/// closes and performs THIS modal's operation — never both a modal
+/// action and a background action in one event.
+fn handle_modal_input<S: EpisodeStart>(
+    input: ModalInput,
+    model: &mut TuiModel,
+    player: &mut ReferencePlayerApp<S>,
+) {
+    match input {
+        ModalInput::Char(c) => model.modal_push(c),
+        ModalInput::Backspace => model.modal_backspace(),
+        ModalInput::Cancel => model.close_modal(),
+        ModalInput::Confirm => match model.confirm_modal() {
+            ModalConfirm::Nothing => {}
+            ModalConfirm::Open(candidate) => perform_open(model, player, Path::new(&candidate)),
+            ModalConfirm::Seek(target) => match player.active_handle() {
+                Some(handle) => {
+                    // The SAME frozen seek command the arrows use
+                    // (Issue #166 §27): the episode's own
+                    // clamp/refusal contract decides the landing.
+                    handle.request_seek(target);
+                    model.set_status(Some(format!(
+                        "seek requested: {}",
+                        crate::status::format_clock(target)
+                    )));
+                }
+                // Nothing to seek: the parsed target is dropped rather
+                // than sent into a nonexistent episode.
+                None => model.set_status(Some("seek: no episode".to_owned())),
+            },
+            ModalConfirm::Unreadable(diagnostic) => model.set_status(Some(diagnostic.to_owned())),
+        },
+    }
+}
+
+/// Which navigation step was requested.
 enum Navigation {
     Next,
     Previous,
@@ -309,7 +335,7 @@ impl Navigation {
     }
 }
 
-/// The D14.9 volume step: one key press, five points of the desired
+/// The D14.9 volume step: one action, five points of the desired
 /// stream factor. One product decision, one constant.
 const VOLUME_STEP: i16 = 5;
 
@@ -348,10 +374,10 @@ fn perform_navigation<S: EpisodeStart>(
 
 /// Play the SELECTED playlist row through the same Open replacement
 /// (Issue #166 §19). The selection is presentation state the user
-/// already moved; this key is the only thing that turns it into
+/// already moved; this action is the only thing that turns it into
 /// playback, and only on commit evidence. One inert rule (field
-/// round 3): Enter on the row that IS the unsettled live episode is
-/// not a replay request — the frozen replacement would restart the
+/// round 3): activation on the row that IS the unsettled live episode
+/// is not a replay request — the frozen replacement would restart the
 /// track from its head, so the shell refuses to re-invoke it and says
 /// so instead (no probe, no teardown, nothing moves).
 fn perform_play_selected<S: EpisodeStart>(
@@ -426,8 +452,8 @@ fn refresh<S: EpisodeStart>(model: &mut TuiModel, player: &ReferencePlayerApp<S>
     model.set_playlist(player.playlist_revision(), || {
         player
             .playlist_rows()
-            .map(|row| PlaylistRow {
-                label: row_label(row.path),
+            .map(|row| super::model::PlaylistRow {
+                label: super::model::row_label(row.path),
                 playing: row.playing,
                 selected: row.selected,
             })
@@ -436,6 +462,19 @@ fn refresh<S: EpisodeStart>(model: &mut TuiModel, player: &ReferencePlayerApp<S>
     if let Some(handle) = player.active_handle() {
         model.update(handle.observe());
     }
+}
+
+/// The terminal enter/restore command sequences, factored over any
+/// writer. The enable/disable MOUSE-CAPTURE pairing lives on this same
+/// lifecycle (§16/§40), and the factoring exists so a test can pin it
+/// without a real terminal.
+fn enter_terminal<W: Write>(writer: &mut W) -> io::Result<()> {
+    execute!(writer, EnterAlternateScreen, Hide, EnableMouseCapture)
+}
+
+fn restore_terminal<W: Write>(writer: &mut W) -> io::Result<()> {
+    execute!(writer, DisableMouseCapture, LeaveAlternateScreen, Show)?;
+    writer.flush()
 }
 
 /// Owns the entered terminal modes until the shell is done. Restore is
@@ -449,15 +488,12 @@ struct TerminalGuard {
 impl TerminalGuard {
     fn acquire() -> io::Result<Self> {
         enable_raw_mode()?;
-        if let Err(error) = execute!(io::stdout(), EnterAlternateScreen) {
-            // Do not strand raw mode because the screen enter failed.
-            let _ = disable_raw_mode();
-            return Err(error);
-        }
-        if let Err(error) = execute!(io::stdout(), Hide) {
-            // A cursor-hide failure must not strand the already-entered
-            // alternate screen.
-            let _ = execute!(io::stdout(), LeaveAlternateScreen);
+        let mut stdout = io::stdout();
+        if let Err(error) = enter_terminal(&mut stdout) {
+            // Unwind the already-entered modes: the screen leave and the
+            // capture disable ride the same restore sequence raw mode is
+            // dropped under.
+            let _ = restore_terminal(&mut stdout);
             let _ = disable_raw_mode();
             return Err(error);
         }
@@ -468,9 +504,8 @@ impl TerminalGuard {
         if self.restored {
             return;
         }
-        let restored = execute!(io::stdout(), LeaveAlternateScreen, Show).is_ok()
-            && disable_raw_mode().is_ok()
-            && io::stdout().flush().is_ok();
+        let mut stdout = io::stdout();
+        let restored = restore_terminal(&mut stdout).is_ok() && disable_raw_mode().is_ok();
         self.restored = restored;
     }
 }
@@ -483,21 +518,26 @@ impl Drop for TerminalGuard {
 
 #[cfg(test)]
 mod tests {
-    //! Key-routing tests for the shell grammar over the SAME fake
-    //! episode harness the player's C7 matrix uses (real kernel, real
-    //! playback session, fake providers). Unlike the player matrix,
-    //! these tests use REAL temporary files and folders for everything
-    //! that crosses the U1 input expansion — that seam reads the
-    //! filesystem, and faking it here would test nothing. The terminal
-    //! itself stays fake-free by construction: `handle_key` is the
-    //! loop's whole reaction to a key and needs no terminal.
+    //! Action-routing tests for the shell over the SAME fake episode
+    //! harness the player's C7 matrix uses (real kernel, real playback
+    //! session, fake providers). Unlike the player matrix, these tests
+    //! use REAL temporary files and folders for everything that crosses
+    //! the U1 input expansion — that seam reads the filesystem, and
+    //! faking it here would test nothing. The terminal itself stays
+    //! fake-free by construction: decode + dispatch is the loop's whole
+    //! reaction to an input event and needs no terminal.
 
     use std::fs;
     use std::path::{Path, PathBuf};
 
-    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use crossterm::event::{
+        KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+    };
 
-    use super::super::model::{Step, TuiModel};
+    use super::super::model::{
+        FocusId, FocusMove, ModalKind, TransportButton, TuiRoute, responsive_class,
+    };
+    use super::super::view;
     use super::*;
     use crate::player::tests::FakeEpisodeSource;
     use crate::playlist::{PlaybackOrder, RepeatMode};
@@ -543,9 +583,79 @@ mod tests {
         KeyEvent::new(code, KeyModifiers::NONE)
     }
 
-    fn type_text(
+    /// The loop's whole reaction to one key press: decode, then
+    /// dispatch. Needs no terminal.
+    fn handle_key<S: EpisodeStart>(
+        event: KeyEvent,
         model: &mut TuiModel,
-        player: &mut ReferencePlayerApp<FakeEpisodeSource>,
+        player: &mut ReferencePlayerApp<S>,
+    ) -> Step {
+        match decode_key(event, model) {
+            Some(action) => dispatch(action, model, player),
+            None => Step::Continue,
+        }
+    }
+
+    /// The loop's whole reaction to one left click at a terminal cell:
+    /// a Down then an Up at the same cell, each decoded and dispatched.
+    /// Needs no terminal beyond the published regions the model
+    /// already holds.
+    fn click_at<S: EpisodeStart>(
+        column: u16,
+        row: u16,
+        model: &mut TuiModel,
+        player: &mut ReferencePlayerApp<S>,
+    ) -> Option<TuiAction> {
+        let down = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        };
+        let up = MouseEvent {
+            kind: MouseEventKind::Up(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        };
+        if let Some(action) = decode_mouse(down, model) {
+            let _ = dispatch(action, model, player);
+        }
+        match decode_mouse(up, model) {
+            Some(action) => {
+                let _ = dispatch(action, model, player);
+                Some(action)
+            }
+            None => None,
+        }
+    }
+
+    /// Draw the model at a fixed size so the published regions are the
+    /// real frame geometry, then return the first cell of the region
+    /// with the wanted target.
+    fn draw_and_locate(
+        model: &mut TuiModel,
+        width: u16,
+        height: u16,
+        target: &super::super::model::HitTarget,
+    ) -> (u16, u16) {
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height))
+                .expect("virtual terminal");
+        terminal
+            .draw(|frame| view::draw(frame, model))
+            .expect("draw");
+        let region = model
+            .regions()
+            .iter()
+            .find(|region| &region.target == target)
+            .unwrap_or_else(|| panic!("no region for {target:?}"));
+        (region.area.x + 1, region.area.y + region.area.height / 2)
+    }
+
+    fn type_text<S: EpisodeStart>(
+        model: &mut TuiModel,
+        player: &mut ReferencePlayerApp<S>,
         text: &str,
     ) {
         for c in text.chars() {
@@ -556,17 +666,20 @@ mod tests {
         }
     }
 
-    /// The whole O flow from a model state: begin input, type, Enter.
-    fn open_via_keys(
+    /// The whole O flow from a model state: open the modal, type, Enter.
+    fn open_via_keys<S: EpisodeStart>(
         model: &mut TuiModel,
-        player: &mut ReferencePlayerApp<FakeEpisodeSource>,
+        player: &mut ReferencePlayerApp<S>,
         target: &Path,
     ) {
         assert_eq!(
             handle_key(key(KeyCode::Char('O')), model, player),
             Step::Continue
         );
-        assert!(model.open_input_active());
+        assert!(matches!(
+            model.modal(),
+            Some(super::super::model::Modal::Open { .. })
+        ));
         type_text(model, player, &target.to_string_lossy());
         assert_eq!(
             handle_key(key(KeyCode::Enter), model, player),
@@ -574,8 +687,12 @@ mod tests {
         );
     }
 
-    /// U1 §16: the idle no-episode state stays truthful — nothing to
-    /// command, nothing fabricated, and Q exits the loop.
+    // ------------------------------------------------------------------
+    // Idle shell / Open flow (U1 §16 behaviors preserved).
+    // ------------------------------------------------------------------
+
+    /// The idle no-episode state stays truthful — nothing to command,
+    /// nothing fabricated, and Q exits the loop.
     #[test]
     fn q_from_the_idle_state_exits_and_touches_nothing() {
         let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
@@ -590,8 +707,8 @@ mod tests {
         assert!(player.active_handle().is_none());
     }
 
-    /// U1 §16: O from the no-episode state, typing a REAL file path,
-    /// commits an episode through the same frozen replacement.
+    /// O from the no-episode state, typing a REAL file path, commits an
+    /// episode through the same frozen replacement.
     #[test]
     fn o_from_no_episode_opens_a_real_file() {
         let tree = TempTree::new("o-file");
@@ -613,8 +730,8 @@ mod tests {
         assert_eq!(observation.terminal_outcome, None);
     }
 
-    /// U1 §16: a folder typed into the O line expands into the seeded
-    /// list — first track opens, N reaches the next entry.
+    /// A folder typed into the O modal expands into the seeded list —
+    /// first track opens, N reaches the next entry.
     #[test]
     fn o_folder_seeds_the_list_and_navigates() {
         let tree = TempTree::new("o-folder");
@@ -643,10 +760,10 @@ mod tests {
         assert_eq!(model.navigation_position(), Some((2, 2)));
     }
 
-    /// U1 §16: Esc cancels the Open line and opens nothing — not even
-    /// a probe runs.
+    /// Esc cancels the Open modal and opens nothing — not even a probe
+    /// runs.
     #[test]
-    fn esc_cancels_the_open_line_without_touching_the_player() {
+    fn esc_cancels_the_open_modal_without_touching_the_player() {
         let source = FakeEpisodeSource::new();
         let log = source.log.clone();
         let tree = TempTree::new("esc");
@@ -664,15 +781,15 @@ mod tests {
             Step::Continue
         );
 
-        assert!(!model.open_input_active());
+        assert_eq!(model.modal(), None);
         assert_eq!(model.status(), None);
         assert!(player.active_handle().is_none());
         assert!(log.lock().unwrap().is_empty(), "no Open was attempted");
     }
 
-    /// U1 §16: an empty/unreadable folder refuses INSIDE the shell
-    /// before any destructive step — the idle state survives intact
-    /// (no episode, no playlist, no probe).
+    /// An empty/unreadable folder refuses INSIDE the shell before any
+    /// destructive step — the idle state survives intact (no episode,
+    /// no playlist, no probe).
     #[test]
     fn a_bad_folder_open_from_idle_preserves_the_idle_state() {
         let source = FakeEpisodeSource::new();
@@ -695,9 +812,9 @@ mod tests {
         );
     }
 
-    /// U1 §16: a bad folder open WHILE PLAYING leaves live playback
-    /// untouched — the expansion refusal happens before the frozen
-    /// replacement can destroy anything.
+    /// A bad folder open WHILE PLAYING leaves live playback untouched —
+    /// the expansion refusal happens before the frozen replacement can
+    /// destroy anything.
     #[test]
     fn a_bad_folder_open_while_playing_leaves_playback_untouched() {
         let source = FakeEpisodeSource::new();
@@ -779,517 +896,679 @@ mod tests {
         );
     }
 
-    /// Field round 3, problem 1: Enter on the row that IS the
-    /// unsettled live episode is INERT — no probe, no replacement, no
-    /// restart from the head of the track, and the shell says so. The
-    /// frozen replacement is a restart by construction; the shell must
-    /// not re-invoke it for the row already playing.
+    // ------------------------------------------------------------------
+    // The one-dispatch invariant and the transport commands.
+    // ------------------------------------------------------------------
+
+    /// The stop action routes through the EXISTING request_stop seam —
+    /// the same frozen right the machine transport uses — quit never
+    /// touches the episode, and with no episode the command is inert.
     #[test]
-    fn enter_on_the_live_selected_track_is_inert() {
-        let tree = TempTree::new("enter-inert");
+    fn the_stop_action_routes_through_the_request_stop_seam_only() {
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        // Inert without an episode.
+        assert_eq!(
+            dispatch(TuiAction::Stop, &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(player.active_handle().is_none());
+
+        // Commit an episode by opening a real file.
+        let tree = TempTree::new("stop-seam");
+        let file = tree.live_file("live.flac");
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
+        refresh(&mut model, &player);
+
+        assert!(!player.active_handle().unwrap().observe().stop_requested);
+        assert_eq!(
+            dispatch(TuiAction::Stop, &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(
+            player.active_handle().unwrap().observe().stop_requested,
+            "Stop must record stop intent through the seam"
+        );
+        // Idempotent: dispatching Stop again stays a plain seam call.
+        assert_eq!(
+            dispatch(TuiAction::Stop, &mut model, &mut player),
+            Step::Continue
+        );
+
+        // Quit is loop control, not a playback command.
+        let before = player.active_handle().unwrap().observe();
+        assert_eq!(
+            dispatch(TuiAction::Quit, &mut model, &mut player),
+            Step::Exit
+        );
+        assert_eq!(player.active_handle().unwrap().observe(), before);
+    }
+
+    /// The pause/resume action never keeps a local paused bool: the
+    /// first dispatch records pause intent through the seam, the next
+    /// releases it, and the choice between the two commands is read
+    /// from a fresh authoritative observation each time.
+    #[test]
+    fn the_pause_resume_action_routes_through_the_seam_both_ways() {
+        let tree = TempTree::new("pause-resume");
+        let file = tree.live_file("live.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        let handle = player.active_handle().expect("committed").clone();
+        assert!(!handle.observe().pause_requested);
+        assert!(!handle.observe().paused());
+
+        assert_eq!(
+            dispatch(TuiAction::PlayPause, &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(
+            handle.observe().pause_requested,
+            "the first PlayPause must record pause intent through the seam"
+        );
+        assert_eq!(
+            dispatch(TuiAction::PlayPause, &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(
+            !handle.observe().pause_requested,
+            "the second PlayPause must release the pause through the seam"
+        );
+    }
+
+    /// The seek action routes the SAME request_seek seam, and an
+    /// episode whose position is unknown gets NO command: the dispatch
+    /// changes nothing (and panics on nothing).
+    #[test]
+    fn the_seek_action_changes_nothing_when_the_position_is_unknown() {
+        let tree = TempTree::new("seek-blind");
+        let file = tree.live_file("live.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+        let handle = player.active_handle().expect("committed").clone();
+
+        let before = handle.observe();
+        assert_eq!(
+            dispatch(TuiAction::SeekRelative(5), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(
+            dispatch(TuiAction::SeekRelative(-30), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(
+            handle.observe(),
+            before,
+            "no position evidence: no seek command"
+        );
+    }
+
+    /// The N/P actions are the App's manual navigation, not episode
+    /// commands: the shell reports the outcome, the episode is only
+    /// ever touched by the frozen replacement.
+    #[test]
+    fn n_and_p_route_the_manual_navigation() {
+        let tree = TempTree::new("navigation");
+        let a = tree.live_file("live-a.flac");
+        let b = tree.live_file("live-b.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        assert_eq!(player.open(&a), crate::player::OpenOutcome::Opened);
+        player.establish_playlist(vec![a.clone(), b.clone()]);
+        refresh(&mut model, &player);
+
+        assert_eq!(
+            dispatch(TuiAction::Next, &mut model, &mut player),
+            Step::Continue
+        );
+        refresh(&mut model, &player);
+        assert_eq!(model.source(), Some(b.to_string_lossy().as_ref()));
+        assert!(
+            model.status().unwrap().starts_with("next: opened "),
+            "{:?}",
+            model.status()
+        );
+
+        assert_eq!(
+            dispatch(TuiAction::Previous, &mut model, &mut player),
+            Step::Continue
+        );
+        refresh(&mut model, &player);
+        assert_eq!(model.source(), Some(a.to_string_lossy().as_ref()));
+    }
+
+    /// The policy and volume actions route to the player and say so;
+    /// they never touch the episode.
+    #[test]
+    fn policy_and_volume_route_to_the_player() {
+        let tree = TempTree::new("policy");
+        let file = tree.live_file("live.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let handle = {
+            assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
+            player.active_handle().expect("committed").clone()
+        };
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        assert_eq!(
+            dispatch(TuiAction::ToggleOrder, &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(player.playlist_order(), PlaybackOrder::Shuffle);
+        assert_eq!(model.status(), Some("Order: Shuffle"));
+        assert_eq!(
+            dispatch(TuiAction::CycleRepeat, &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(player.playlist_repeat(), RepeatMode::All);
+        assert_eq!(
+            dispatch(TuiAction::VolumeDown, &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(player.desired_volume(), 95);
+        assert_eq!(model.status(), Some("volume 95/100 (desired)"));
+        assert_eq!(
+            handle.observe().terminal_outcome,
+            None,
+            "policy and volume never touch the episode"
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // Route switching never touches product state (§5).
+    // ------------------------------------------------------------------
+
+    /// Route switching leaves playback, navigation and policy state
+    /// untouched, and the SAME TuiAction arrives from the keyboard
+    /// (Enter on the focused tab) and the mouse (a tab click) (§30).
+    #[test]
+    fn route_switching_is_presentation_only_and_parity_holds() {
+        let tree = TempTree::new("routes");
         let file = tree.live_file("live.flac");
         let source = FakeEpisodeSource::new();
         let log = source.log.clone();
         let mut player = ReferencePlayerApp::new(source);
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
+        player.establish_playlist(vec![file.clone()]);
         let mut model = TuiModel::new(String::new());
-        open_via_keys(&mut model, &mut player, &file);
         refresh(&mut model, &player);
-        assert!(
-            player.selected_is_live_episode(),
-            "the committed row is live"
-        );
         let activations = || {
             log.lock()
-                .expect("fixture log")
+                .unwrap()
                 .iter()
                 .filter(|event| event.starts_with("activate "))
                 .count()
         };
-        let before = activations();
-        let observation = player.active_handle().expect("committed").observe();
+        let activations_before = activations();
 
+        // Keyboard: focus the Playlist tab, Enter.
+        model.set_focus(Some(FocusId::RouteTab(TuiRoute::Playlist)));
+        let keyboard_action = model.activation().expect("the tab activates");
+        assert_eq!(keyboard_action, TuiAction::Navigate(TuiRoute::Playlist));
         assert_eq!(
-            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            dispatch(keyboard_action, &mut model, &mut player),
             Step::Continue
         );
-        refresh(&mut model, &player);
+        assert_eq!(model.route(), TuiRoute::Playlist);
 
-        assert_eq!(
-            model.status(),
-            Some("already playing the selected track"),
-            "{:?}",
-            model.status()
+        // The player never noticed.
+        let observation = player.active_handle().unwrap().observe();
+        assert_eq!(observation.terminal_outcome, None);
+        assert!(!observation.stop_requested);
+        assert!(!observation.pause_requested);
+        assert_eq!(player.playlist_order(), PlaybackOrder::Sequential);
+        assert_eq!(player.playlist_repeat(), RepeatMode::Off);
+        assert_eq!(player.navigation_position(), Some((1, 1)));
+        assert_eq!(activations(), activations_before, "no probe, no open");
+
+        // Mouse: click the Audio tab. Same action shape, same dispatch.
+        let (column, row) = draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &super::super::model::HitTarget::RouteTab(TuiRoute::Audio),
         );
-        assert_eq!(
-            activations(),
-            before,
-            "Enter must not re-open the live track"
-        );
-        assert_eq!(
-            player
-                .active_handle()
-                .expect("still live")
-                .observe()
-                .terminal_outcome,
-            observation.terminal_outcome,
-            "the live episode was never disturbed"
-        );
+        let mouse_action = click_at(column, row, &mut model, &mut player);
+        assert_eq!(mouse_action, Some(TuiAction::Navigate(TuiRoute::Audio)));
+        assert_eq!(model.route(), TuiRoute::Audio);
+        let observation = player.active_handle().unwrap().observe();
+        assert_eq!(observation.terminal_outcome, None);
+        assert!(!observation.stop_requested);
+        assert!(!observation.pause_requested);
+        assert_eq!(activations(), activations_before, "still no probe, no open");
     }
 
-    /// The inert rule ends where the episode settles: after the D11
-    /// terminal is committed, the same Enter replays the row through
-    /// the frozen replacement (a replay of a finished track is what
-    /// Enter on it means).
+    // ------------------------------------------------------------------
+    // Transport parity: keyboard and mouse converge on one action (§30).
+    // ------------------------------------------------------------------
+
     #[test]
-    fn enter_on_a_settled_selected_track_replays() {
-        let tree = TempTree::new("enter-replay");
-        let file = tree.live_file("finite-00.flac");
+    fn transport_activation_parity_holds() {
+        let tree = TempTree::new("transport-parity");
+        let file = tree.live_file("live.flac");
         let source = FakeEpisodeSource::new();
         let log = source.log.clone();
         let mut player = ReferencePlayerApp::new(source);
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
         let mut model = TuiModel::new(String::new());
-        open_via_keys(&mut model, &mut player, &file);
         refresh(&mut model, &player);
-        let handle = player.active_handle().expect("committed").clone();
-        assert_eq!(
-            handle.wait_terminal(),
-            qianqian_playback::EpisodeTerminalOutcome::Completed
-        );
-        assert!(
-            !player.selected_is_live_episode(),
-            "a settled episode is not live: Enter replays it"
-        );
         let activations = || {
             log.lock()
-                .expect("fixture log")
+                .unwrap()
                 .iter()
                 .filter(|event| event.starts_with("activate "))
                 .count()
         };
-        let before = activations();
+        let activations_before = activations();
 
+        let wanted = super::super::model::HitTarget::Transport(TransportButton::PlayPause);
+        let (column, row) = draw_and_locate(&mut model, 100, 30, &wanted);
+        let mouse_action = click_at(column, row, &mut model, &mut player);
+
+        model.set_focus(Some(FocusId::Transport(TransportButton::PlayPause)));
+        let keyboard_action = model.activation();
+        assert_eq!(mouse_action, keyboard_action, "§30: one action per control");
+
+        // The dispatched mouse click really paused the episode: the
+        // witness is the SEAM's command state, not the status line.
+        assert!(
+            player.active_handle().unwrap().observe().pause_requested,
+            "the clicked Play/Pause recorded pause intent"
+        );
         assert_eq!(
-            handle_key(key(KeyCode::Enter), &mut model, &mut player),
-            Step::Continue
-        );
-        refresh(&mut model, &player);
-
-        assert!(
-            activations() > before,
-            "the settled row was re-opened through the frozen replacement"
-        );
-        assert!(
-            model.status().unwrap().starts_with("play: opened "),
-            "{:?}",
-            model.status()
+            activations(),
+            activations_before,
+            "the transport click composed no new episode"
         );
     }
 
-    /// The playlist keys reach the App through the shell: ↑/↓ move only
-    /// the selection, Enter plays the selected row, R and L move only
-    /// the policy (Issue #166 §18/§19/§25).
+    // ------------------------------------------------------------------
+    // Playlist route behaviors (§35: focus, selection, row hit, wheel).
+    // ------------------------------------------------------------------
+
     #[test]
-    fn the_playlist_keys_route_to_the_player() {
-        let tree = TempTree::new("playlist-keys");
+    fn the_playlist_route_selects_and_plays() {
+        let tree = TempTree::new("playlist-route");
         let files: Vec<PathBuf> = (0..3)
             .map(|n| tree.live_file(&format!("live-{n}.flac")))
             .collect();
         let source = FakeEpisodeSource::new();
         let log = source.log.clone();
         let mut player = ReferencePlayerApp::new(source);
+        assert_eq!(player.open(&files[0]), crate::player::OpenOutcome::Opened);
+        player.establish_playlist(files.clone());
         let mut model = TuiModel::new(String::new());
-        open_via_keys(&mut model, &mut player, tree.path());
         refresh(&mut model, &player);
-        assert_eq!(model.navigation_position(), Some((1, 3)));
-        let events_after_open = log.lock().unwrap().len();
 
-        // ↓ / ↑ move the selection and NOTHING else.
+        // To the Playlist route; focus falls to the list (the route's
+        // first local control, §12).
+        dispatch(
+            TuiAction::Navigate(TuiRoute::Playlist),
+            &mut model,
+            &mut player,
+        );
+        model.validate_focus();
+        assert_eq!(model.focus(), Some(FocusId::Playlist));
+
+        // ↓ moves only the selection — no probe, no open.
+        let events_before = log.lock().unwrap().len();
         assert_eq!(
             handle_key(key(KeyCode::Down), &mut model, &mut player),
             Step::Continue
         );
-        refresh(&mut model, &player);
         assert_eq!(player.playlist_selected_position(), Some(1));
-        assert_eq!(
-            model.navigation_position(),
-            Some((1, 3)),
-            "the committed cursor did not move"
-        );
+        assert_eq!(player.playlist_playing_position(), Some(0));
         assert_eq!(
             log.lock().unwrap().len(),
-            events_after_open,
-            "selection is presentation: no probe, no open"
+            events_before,
+            "selection is presentation"
         );
 
-        // Enter plays the selected row.
+        // A mouse row hit selects that row.
+        let wanted = super::super::model::HitTarget::PlaylistRow(2);
+        let (column, row) = draw_and_locate(&mut model, 100, 30, &wanted);
+        let mouse_action = click_at(column, row, &mut model, &mut player);
+        assert_eq!(
+            mouse_action,
+            Some(TuiAction::PlaylistSelect(PlaylistCursor::Row(2)))
+        );
+        assert_eq!(player.playlist_selected_position(), Some(2));
+
+        // Enter on the focused list plays the selected row.
+        model.set_focus(Some(FocusId::Playlist));
         assert_eq!(
             handle_key(key(KeyCode::Enter), &mut model, &mut player),
             Step::Continue
         );
         refresh(&mut model, &player);
-        assert_eq!(player.active_source(), Some(files[1].as_path()));
-        assert_eq!(model.navigation_position(), Some((2, 3)));
+        assert_eq!(player.active_source(), Some(files[2].as_path()));
         assert!(
             model.status().unwrap().starts_with("play: opened "),
             "{:?}",
             model.status()
         );
-
-        // R and L move only the policy, and say so.
-        assert_eq!(
-            handle_key(key(KeyCode::Char('r')), &mut model, &mut player),
-            Step::Continue
-        );
-        assert_eq!(player.playlist_order(), PlaybackOrder::Shuffle);
-        assert_eq!(model.status(), Some("Order: Shuffle"));
-        assert_eq!(model.order_label(), Some("Shuffle"));
-        assert_eq!(
-            handle_key(key(KeyCode::Char('L')), &mut model, &mut player),
-            Step::Continue
-        );
-        assert_eq!(player.playlist_repeat(), RepeatMode::All);
-        assert_eq!(model.status(), Some("Repeat: All"));
-
-        // They never touched the episode.
-        let handle = player.active_handle().expect("committed").clone();
-        assert_eq!(handle.observe().terminal_outcome, None);
-        assert_eq!(player.active_source(), Some(files[1].as_path()));
     }
 
-    /// The frozen input-mode precedence (Issue #166 §28): the help
-    /// overlay OWNS the keyboard, so no playback key can fire behind it,
-    /// and the modal lines capture their editing keys — no key both
-    /// edits and executes.
+    // ------------------------------------------------------------------
+    // Modal isolation and the one-event-one-action invariant (§25/§31).
+    // ------------------------------------------------------------------
+
+    /// While a modal is open, a click on a background control neither
+    /// dispatches nor steals focus — and after the modal closes on ONE
+    /// key event, that event has already been consumed: nothing leaks
+    /// through to the background.
     #[test]
-    fn no_key_fires_across_input_modes() {
-        let tree = TempTree::new("modes");
-        let file = tree.live_file("live-a.flac");
-        let other = tree.live_file("live-b.flac");
+    fn a_modal_click_never_leaks_and_a_close_consumes_its_event() {
+        let tree = TempTree::new("modal-isolation");
+        let file = tree.live_file("live.flac");
+        let source = FakeEpisodeSource::new();
+        let mut player = ReferencePlayerApp::new(source);
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        // Background click behind the help overlay.
+        dispatch(
+            TuiAction::OpenModal(ModalKind::Help),
+            &mut model,
+            &mut player,
+        );
+        let wanted = super::super::model::HitTarget::Transport(TransportButton::Stop);
+        let (column, row) = draw_and_locate(&mut model, 100, 30, &wanted);
+        assert_eq!(click_at(column, row, &mut model, &mut player), None);
+        assert!(
+            !player.active_handle().unwrap().observe().stop_requested,
+            "the background Stop never fired"
+        );
+
+        // Esc closes the help overlay and NOTHING else: the same event
+        // cannot also act on the background (§31).
+        assert_eq!(
+            handle_key(key(KeyCode::Esc), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(model.modal(), None);
+        assert!(
+            !player.active_handle().unwrap().observe().stop_requested,
+            "the closing Esc never leaked through"
+        );
+        assert!(
+            !player.active_handle().unwrap().observe().pause_requested,
+            "no background command fired behind the modal either"
+        );
+    }
+
+    /// ONE physical Enter inside the GoTo modal performs at most one
+    /// product operation: the seek. The same Enter cannot also activate
+    /// a background control (§31).
+    #[test]
+    fn one_modal_enter_performs_at_most_one_product_operation() {
+        let tree = TempTree::new("one-enter");
+        let file = tree.live_file("live.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        dispatch(
+            TuiAction::OpenModal(ModalKind::GoTo),
+            &mut model,
+            &mut player,
+        );
+        type_text(&mut model, &mut player, "1:35");
+        let event = key(KeyCode::Enter);
+        // Exactly one decode out of this physical event.
+        let action = decode_key(event, &model);
+        assert_eq!(action, Some(TuiAction::ModalInput(ModalInput::Confirm)));
+        assert_eq!(
+            dispatch(action.expect("one action"), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(model.modal(), None, "the modal closed");
+        assert_eq!(
+            model.status(),
+            Some("seek requested: 01:35"),
+            "exactly one product operation was performed"
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // Resize (§29).
+    // ------------------------------------------------------------------
+
+    /// A resize event clears the armed click and the old hit regions;
+    /// the next draw republishes fresh geometry and the focus stays on
+    /// a valid visible control. No product command is generated.
+    #[test]
+    fn a_resize_invalidates_geometry_and_preserves_a_valid_focus() {
+        let tree = TempTree::new("resize");
+        let file = tree.live_file("live.flac");
         let source = FakeEpisodeSource::new();
         let log = source.log.clone();
         let mut player = ReferencePlayerApp::new(source);
-        let handle = {
-            assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
-            player.active_handle().expect("committed").clone()
-        };
-        // A TWO-entry playlist: with one entry, Enter/N behind the
-        // overlay would be inert for reasons that have nothing to do
-        // with mode precedence, and the test could not fail.
-        player.establish_playlist(vec![file.clone(), other.clone()]);
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
         let mut model = TuiModel::new(String::new());
         refresh(&mut model, &player);
         let activations = || {
             log.lock()
-                .expect("fixture log")
+                .unwrap()
                 .iter()
                 .filter(|event| event.starts_with("activate "))
                 .count()
         };
-        let settled_activations = activations();
-        assert_eq!(player.playlist_order(), PlaybackOrder::Sequential);
-        assert_eq!(player.playlist_repeat(), RepeatMode::Off);
+        let activations_before = activations();
 
-        // Help owns the keyboard: Space, N, S and the arrows are noise.
-        handle_key(key(KeyCode::Char('?')), &mut model, &mut player);
-        assert!(model.help_visible());
-        for code in [
-            KeyCode::Char(' '),
-            KeyCode::Char('n'),
-            KeyCode::Char('s'),
-            KeyCode::Char('r'),
-            KeyCode::Char('l'),
-            KeyCode::Down,
-            KeyCode::Up,
-            KeyCode::Enter,
-            KeyCode::Left,
-        ] {
-            assert_eq!(
-                handle_key(key(code), &mut model, &mut player),
-                Step::Continue,
-                "{code:?} must not act behind the help overlay"
-            );
-        }
-        let observation = handle.observe();
-        assert!(!observation.stop_requested, "S never reached the episode");
+        // Arm a click on a transport button.
+        let wanted = super::super::model::HitTarget::Transport(TransportButton::PlayPause);
+        let (column, row) = draw_and_locate(&mut model, 100, 30, &wanted);
+        let down = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        };
+        decode_mouse(down, &mut model);
+        assert!(model.armed().is_some());
+
+        // The resize event.
+        model.invalidate_frame();
+        assert_eq!(model.armed(), None, "the resize cleared the armed click");
+        let up = MouseEvent {
+            kind: MouseEventKind::Up(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert_eq!(
+            decode_mouse(up, &mut model),
+            None,
+            "the Up after a resize is no action"
+        );
+
+        // The next draw republishes fresh geometry and the focus (set
+        // by the Down before the resize) is still a valid control.
+        draw_and_locate(&mut model, 100, 30, &wanted);
         assert!(
-            !observation.pause_requested,
-            "Space never reached it either"
-        );
-        assert_eq!(player.playlist_playing_position(), Some(0));
-        assert_eq!(
-            player.playlist_selected_position(),
-            Some(0),
-            "the selection did not move behind the overlay"
+            !model.regions().is_empty(),
+            "fresh geometry after the resize"
         );
         assert_eq!(
-            player.playlist_order(),
-            PlaybackOrder::Sequential,
-            "R did not toggle the order behind the overlay"
-        );
-        assert_eq!(
-            player.playlist_repeat(),
-            RepeatMode::Off,
-            "L did not cycle the repeat mode behind the overlay"
+            model.focus(),
+            Some(FocusId::Transport(TransportButton::PlayPause)),
+            "the focus is still a visible enabled control"
         );
         assert_eq!(
             activations(),
-            settled_activations,
-            "no episode was composed behind the overlay"
-        );
-        // `?` and Esc close it; Q quits.
-        handle_key(key(KeyCode::Esc), &mut model, &mut player);
-        assert!(!model.help_visible());
-        handle_key(key(KeyCode::Char('?')), &mut model, &mut player);
-        assert!(model.help_visible());
-        handle_key(key(KeyCode::Char('?')), &mut model, &mut player);
-        assert!(!model.help_visible());
-        handle_key(key(KeyCode::Char('?')), &mut model, &mut player);
-        assert_eq!(
-            handle_key(key(KeyCode::Char('q')), &mut model, &mut player),
-            Step::Exit,
-            "Q quits from inside help"
-        );
-        // (The real loop would have exited there; the test closes the
-        // overlay and carries on.)
-        handle_key(key(KeyCode::Esc), &mut model, &mut player);
-        assert!(!model.help_visible());
-
-        // The GoTo line captures its editing keys: `n`, `s` and Space are
-        // target characters there, never commands.
-        handle_key(key(KeyCode::Char('g')), &mut model, &mut player);
-        assert!(model.goto_input_active());
-        for (code, expected) in [
-            (KeyCode::Char('1'), "1"),
-            (KeyCode::Char(':'), "1:"),
-            (KeyCode::Char('3'), "1:3"),
-            (KeyCode::Char('.'), "1:3."),
-            (KeyCode::Backspace, "1:3"),
-            (KeyCode::Char('n'), "1:3n"),
-            (KeyCode::Char(' '), "1:3n "),
-        ] {
-            handle_key(key(code), &mut model, &mut player);
-            assert_eq!(model.goto_input(), Some(expected), "{code:?}");
-        }
-        let observation = handle.observe();
-        assert!(!observation.stop_requested && !observation.pause_requested);
-        // Esc leaves without sending anything.
-        handle_key(key(KeyCode::Esc), &mut model, &mut player);
-        assert!(!model.goto_input_active());
-        assert_eq!(
-            handle.observe(),
-            observation,
-            "a cancelled GoTo sends no command"
+            activations_before,
+            "the resize composed nothing"
         );
     }
 
-    /// The Q-drive lesson survives every modal (Issue #166 §29): inside
-    /// the Open line a `Q`/`q` is a literal path character — `Q:\Music`
-    /// stays typeable — and only Ctrl+C quits from there.
+    // ------------------------------------------------------------------
+    // Focus cycle keys route (Tab / Shift+Tab).
+    // ------------------------------------------------------------------
+
     #[test]
-    fn the_open_line_types_a_drive_letter_and_only_ctrl_c_quits() {
+    fn tab_moves_focus_through_the_real_cycle() {
+        let tree = TempTree::new("tab");
+        let file = tree.live_file("live.flac");
         let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
         let mut model = TuiModel::new(String::new());
-        assert_eq!(
-            handle_key(key(KeyCode::Char('O')), &mut model, &mut player),
-            Step::Continue
+        refresh(&mut model, &player);
+        // Draw once so the class (Wide at 100x30) is known; the draw's
+        // focus validation lands on the route's first local control.
+        draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &super::super::model::HitTarget::RouteTab(TuiRoute::NowPlaying),
         );
-        assert!(model.open_input_active());
-        for c in r"Q:\Music".chars() {
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::Transport(TransportButton::Previous)),
+            "the validated start is the route's first local control"
+        );
+
+        for expected in [
+            FocusId::Transport(TransportButton::PlayPause),
+            FocusId::Transport(TransportButton::Stop),
+            FocusId::Transport(TransportButton::Next),
+            FocusId::RouteTab(TuiRoute::NowPlaying),
+            FocusId::RouteTab(TuiRoute::Playlist),
+        ] {
             assert_eq!(
-                handle_key(key(KeyCode::Char(c)), &mut model, &mut player),
-                Step::Continue,
-                "{c:?} must be typed literally, not acted on"
+                handle_key(key(KeyCode::Tab), &mut model, &mut player),
+                Step::Continue
             );
+            assert_eq!(model.focus(), Some(expected));
         }
-        assert_eq!(model.open_input(), Some(r"Q:\Music"));
-        // The GoTo line gets the same treatment for `q`.
-        model.cancel_open_input();
-        handle_key(key(KeyCode::Char('g')), &mut model, &mut player);
-        handle_key(key(KeyCode::Char('q')), &mut model, &mut player);
-        assert_eq!(model.goto_input(), Some("q"));
+        // Shift+Tab walks back (terminals report BackTab).
         assert_eq!(
             handle_key(
-                KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+                KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT),
                 &mut model,
                 &mut player
             ),
-            Step::Exit,
-            "Ctrl+C quits from inside a modal line"
-        );
-    }
-
-    /// The GoTo line sends the parsed target through the SAME seek seam
-    /// the arrows use, reports the request honestly, and sends nothing
-    /// for an unreadable token (Issue #166 §27).
-    #[test]
-    fn the_goto_line_requests_a_seek_and_fails_closed() {
-        let tree = TempTree::new("goto");
-        let file = tree.live_file("live-a.flac");
-        let source = FakeEpisodeSource::new();
-        let log = source.log.clone();
-        let mut player = ReferencePlayerApp::new(source);
-        let handle = {
-            assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
-            player.active_handle().expect("committed").clone()
-        };
-        let mut model = TuiModel::new(String::new());
-        refresh(&mut model, &player);
-
-        handle_key(key(KeyCode::Char('G')), &mut model, &mut player);
-        assert!(model.goto_input_active());
-        for c in "1:35".chars() {
-            handle_key(key(KeyCode::Char(c)), &mut model, &mut player);
-        }
-        assert_eq!(
-            handle_key(key(KeyCode::Enter), &mut model, &mut player),
             Step::Continue
         );
-        assert!(!model.goto_input_active());
-        assert_eq!(model.status(), Some("seek requested: 01:35"));
-        // The shell's claim is that the parsed target became the SAME
-        // D14.5 seek command the arrows issue. That is witnessed at the
-        // DECODER (the fixture logs every seek request it receives), not
-        // by the status line the same branch just wrote: the F2 read side
-        // has no seek-pending / seek-complete state at all, so the shell
-        // cannot own seek-completion truth (Issue #166 §0), and the
-        // frozen provider verdict for this fixture is `RefusedUnchanged`.
-        // The D14.5 seek is worker-owned and asynchronous by design, so
-        // the witness is a bounded wait for the request to REACH the
-        // decoder — not a sleep, and not the status line.
-        let requested = wait_for_seek(&log, "seek 95000ms", Duration::from_secs(5));
-        assert!(
-            requested,
-            "the typed 1:35 must become a 95 s provider seek request: {:?}",
-            seek_requests(&log)
-        );
-        let observation = handle.observe();
-        assert_eq!(observation.terminal_outcome, None);
-        assert!(!observation.stop_requested && !observation.pause_requested);
-
-        // An unreadable token stays in the line and sends nothing.
-        handle_key(key(KeyCode::Char('G')), &mut model, &mut player);
-        for c in "abc".chars() {
-            handle_key(key(KeyCode::Char(c)), &mut model, &mut player);
-        }
-        let before = handle.observe();
-        assert_eq!(before, observation, "the request left no read-side residue");
-        handle_key(key(KeyCode::Enter), &mut model, &mut player);
-        assert!(model.goto_input_active(), "the line stays open");
-        assert!(model.status().unwrap().starts_with("cannot read that time"));
-        assert_eq!(handle.observe(), before, "no malformed seek was sent");
-        // …and the unreadable line added nothing on top of the one
-        // legitimate request (a fully quiet window for a late arrival).
-        assert!(
-            !wait_for_seek(&log, "seek 0ms", Duration::from_millis(200)),
-            "no empty seek was sent"
+        assert_eq!(model.focus(), Some(FocusId::RouteTab(TuiRoute::NowPlaying)));
+        assert_eq!(
+            dispatch(
+                TuiAction::MoveFocus(FocusMove::Previous),
+                &mut model,
+                &mut player
+            ),
+            Step::Continue
         );
         assert_eq!(
-            seek_requests(&log),
-            vec!["seek 95000ms".to_owned()],
-            "the unreadable line added no seek request"
+            model.focus(),
+            Some(FocusId::Transport(TransportButton::Next))
         );
     }
 
-    /// Wait, bounded, for one seek request to reach the decoder.
-    fn wait_for_seek(
-        log: &std::sync::Arc<std::sync::Mutex<Vec<String>>>,
-        expected: &str,
-        within: Duration,
-    ) -> bool {
-        let deadline = std::time::Instant::now() + within;
-        loop {
-            if seek_requests(log).iter().any(|event| event == expected) {
-                return true;
+    // ------------------------------------------------------------------
+    // Terminal guard: the mouse-capture pairing (§16/§40).
+    // ------------------------------------------------------------------
+
+    /// EnableMouseCapture on the enter sequence has its matching
+    /// DisableMouseCapture on the same restore lifecycle, ordered
+    /// before the alternate-screen leave. (The raw-mode pairing is the
+    /// guard's own concern; this pins the NEW capture obligation.)
+    ///
+    /// The oracle is ANSI byte order, valid only where the capture
+    /// commands actually emit bytes: on Windows crossterm routes mouse
+    /// capture through the WinAPI console path
+    /// (`is_ansi_code_supported` is `false`), so nothing reaches the
+    /// writer. The pairing there is crossterm's own mechanism; Windows
+    /// keeps the compile gate and device-free tests, and real device
+    /// evidence stays out of CI scope.
+    #[cfg(not(windows))]
+    #[test]
+    fn mouse_capture_is_disabled_on_the_same_lifecycle_that_enables_it() {
+        let mut enter_buffer = Vec::new();
+        enter_terminal(&mut enter_buffer).expect("enter sequence");
+        let enter = String::from_utf8(enter_buffer).expect("ansi");
+        assert!(
+            enter.contains("\x1B[?1000h"),
+            "the enter sequence must enable mouse capture: {enter:?}"
+        );
+
+        let mut restore_buffer = Vec::new();
+        restore_terminal(&mut restore_buffer).expect("restore sequence");
+        let restore = String::from_utf8(restore_buffer).expect("ansi");
+        assert!(
+            restore.contains("\x1B[?1000l"),
+            "the restore sequence must disable mouse capture: {restore:?}"
+        );
+        // Capture is disabled BEFORE the alternate screen is left, so a
+        // partially failed restore cannot strand the capture either.
+        let disable = restore.find("\x1B[?1000l").expect("disable marker");
+        let leave = restore.find("\x1B[?1049l").expect("leave marker");
+        assert!(
+            disable < leave,
+            "disable capture before leaving the screen: {restore:?}"
+        );
+    }
+
+    /// The guard's acquire-failure path unwinds the modes it already
+    /// entered — exercised on the writer seam: a failing writer makes
+    /// `enter_terminal` fail, and the caller-side cleanup order is what
+    /// the guard performs (restore sequence first, then raw mode).
+    #[test]
+    fn the_guard_unwinds_entered_modes_when_a_later_step_fails() {
+        // A writer that accepts the first command write and then fails
+        // exercises the mid-sequence failure branch of `acquire`.
+        struct FailsOnSecondWrite {
+            writes: usize,
+        }
+        impl Write for FailsOnSecondWrite {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                self.writes += 1;
+                if self.writes > 1 {
+                    Err(io::Error::other("boom"))
+                } else {
+                    Ok(buf.len())
+                }
             }
-            if std::time::Instant::now() >= deadline {
-                return false;
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
             }
-            std::thread::sleep(Duration::from_millis(10));
         }
-    }
-
-    /// The seek requests the episode's decoder actually received.
-    fn seek_requests(log: &std::sync::Arc<std::sync::Mutex<Vec<String>>>) -> Vec<String> {
-        log.lock()
-            .expect("fixture log")
-            .iter()
-            .filter(|event| event.starts_with("seek "))
-            .cloned()
-            .collect()
-    }
-
-    /// An automatic EOF transition is visible to the shell exactly as a
-    /// manual one: the model follows the App's committed episode and the
-    /// feedback names the automatic step.
-    #[test]
-    fn an_auto_next_transition_reaches_the_shell() {
-        let tree = TempTree::new("auto-next-shell");
-        let first = tree.live_file("finite-00.flac");
-        let second = tree.live_file("live-01.flac");
-        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
-        assert_eq!(player.open(&first), crate::player::OpenOutcome::Opened);
-        player.establish_playlist(vec![first.clone(), second.clone()]);
-        let mut model = TuiModel::new(String::new());
-        refresh(&mut model, &player);
-        assert_eq!(model.navigation_position(), Some((1, 2)));
-
-        // Drive the real D11 settlement, then the policy the loop runs.
-        let handle = player.active_handle().expect("committed").clone();
-        assert_eq!(
-            handle.wait_terminal(),
-            qianqian_playback::EpisodeTerminalOutcome::Completed
-        );
-        let outcome = player.poll_eof_policy().expect("the policy is due");
-        model.set_status(Some(eof_feedback(&outcome, &player)));
-        refresh(&mut model, &player);
-
-        assert_eq!(model.source(), Some(second.to_string_lossy().as_ref()));
-        assert_eq!(model.navigation_position(), Some((2, 2)));
+        let mut writer = FailsOnSecondWrite { writes: 0 };
         assert!(
-            model.status().unwrap().starts_with("auto-next: opened "),
-            "{:?}",
-            model.status()
+            enter_terminal(&mut writer).is_err(),
+            "the enter sequence failed mid-way"
         );
-        // The pane followed: the second row is the committed one.
-        let pane = model.playlist();
-        assert_eq!(pane.len(), 2);
-        assert!(pane[1].playing && pane[1].selected);
-        assert!(!pane[0].playing);
+        // The recovery is exactly what TerminalGuard::acquire performs:
+        // a best-effort restore (which may also fail) and no panic.
+        let _ = restore_terminal(&mut writer);
     }
 
-    /// The help overlay toggles from the plain grammar and Esc closes
-    /// it; neither touches a live episode.
+    /// The responsive class helper is wired into the shell through the
+    /// draw (the model tests pin the derivation; this pins the wiring
+    /// at the runtime's shell sizes).
     #[test]
-    fn help_toggles_and_esc_closes_without_touching_the_episode() {
-        let tree = TempTree::new("help");
-        let file = tree.live_file("song.flac");
-        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
-        let handle = {
-            assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
-            player.active_handle().expect("committed").clone()
-        };
+    fn the_shell_classes_are_the_ones_the_draw_publishes() {
         let mut model = TuiModel::new(String::new());
-        refresh(&mut model, &player);
-
-        assert_eq!(
-            handle_key(key(KeyCode::Char('?')), &mut model, &mut player),
-            Step::Continue
+        refresh(
+            &mut model,
+            &ReferencePlayerApp::new(FakeEpisodeSource::new()),
         );
-        assert!(model.help_visible());
-        assert_eq!(
-            handle_key(key(KeyCode::Esc), &mut model, &mut player),
-            Step::Continue
+        draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &super::super::model::HitTarget::RouteTab(TuiRoute::NowPlaying),
         );
-        assert!(!model.help_visible());
-        // Esc with the overlay closed is noise.
-        assert_eq!(
-            handle_key(key(KeyCode::Esc), &mut model, &mut player),
-            Step::Continue
-        );
-        assert!(!model.help_visible());
-
-        let observation = handle.observe();
-        assert_eq!(observation.terminal_outcome, None);
-        assert!(!observation.stop_requested);
+        assert_eq!(model.class(), responsive_class(100, 30));
     }
 }

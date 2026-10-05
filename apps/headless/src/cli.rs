@@ -202,8 +202,10 @@ Examples:
   qianqian play --eq rock \"D:\\Music\"
 
 Keys in the player:
+  Tab / Shift+Tab  move keyboard focus
+  Mouse            click a tab, a transport button or a playlist row
   Up / Down    select a row in the list (does not change what plays)
-  Enter        play the selected row
+  Enter        play the selected row, or activate the focused control
   N / P        next / previous track
   R            order: sequential / shuffle
   L            repeat: off / all / one

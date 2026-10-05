@@ -1000,8 +1000,8 @@ def run_negative_controls():
         "source: apps/headless/src/tui/model.rs",
         {
             "apps/headless/src/tui/model.rs": lambda t: t.replace(
-                "use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};",
-                "use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};\n"
+                "use std::path::Path;",
+                "use std::path::Path;\n"
                 "use qianqian_audio_api::ports::DecodedPcmStream;",
                 1,
             )

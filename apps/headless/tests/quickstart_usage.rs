@@ -12,6 +12,8 @@ use std::path::PathBuf;
 /// The QUICKSTART key-table rows: (key spelling in QUICKSTART,
 /// needle in the `--help` usage text).
 const KEY_ROWS: &[(&str, &str)] = &[
+    ("Tab / Shift+Tab", "Tab / Shift+Tab"),
+    ("Mouse", "Mouse"),
     ("↑ / ↓", "Up / Down"),
     ("Enter", "Enter"),
     ("N / P", "N / P"),
@@ -115,6 +117,7 @@ fn the_usage_key_section_has_no_key_quickstart_does_not_document() {
     let expected: Vec<&str> = KEY_ROWS
         .iter()
         .filter_map(|(key, _)| match *key {
+            "Tab / Shift+Tab" => Some("Tab"),
             "↑ / ↓" => Some("Up"),
             "← / →" => Some("Left"),
             "Shift+← / Shift+→" => Some("Shift+Left"),
