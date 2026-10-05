@@ -70,7 +70,8 @@ see a `scanning <path> ...` line while a large folder is checked.
 Two markers matter in the list:
 
 - `▶` marks the track that is currently playing.
-- `>` marks the row you have selected with Up / Down.
+- `>` marks the row you have selected with Up / Down (with the list
+  focused: `Tab` until the list is, or a mouse click on a row).
 
 One row can carry both. The small `sel 2/3` counter in the list's title
 is your selection; the `Track: 1/3` line below is the playing track.
@@ -82,24 +83,26 @@ Enter.
 
 ## Keys
 
-| Key                 | Action                                       |
-| ------------------- | -------------------------------------------- |
-| `↑ / ↓`             | Select previous / next playlist row          |
-| `Enter`             | Play the selected row                        |
-| `N / P`             | Next / previous track                        |
-| `R`                 | Order: Sequential / Shuffle                  |
-| `L`                 | Repeat: Off / All / One                      |
-| `Space`             | Pause / resume                               |
-| `← / →`             | Seek 5 seconds back / forward                |
-| `Shift+← / Shift+→` | Seek 30 seconds back / forward               |
-| `G`                 | Go to an exact position you type             |
-| `+ / -`             | Volume up / down (steps of 5, range 0–100)   |
-| `S`                 | Stop                                         |
-| `O`                 | Open a file or folder                        |
-| `?`                 | Help overlay                                 |
-| `Esc`               | Cancel the current input / close the help    |
-| `Q`                 | Quit                                         |
-| `Ctrl+C`            | Quit (works everywhere)                      |
+| Key                 | Action                                            |
+| ------------------- | ------------------------------------------------- |
+| `Tab / Shift+Tab`   | Move keyboard focus to the next / previous control |
+| `Enter`             | Activate the focused control; on the playlist, play the selected row |
+| `Mouse`             | Click a tab, transport button or playlist row     |
+| `↑ / ↓`             | Select previous / next playlist row (list focused) |
+| `N / P`             | Next / previous track                             |
+| `R`                 | Order: Sequential / Shuffle                       |
+| `L`                 | Repeat: Off / All / One                           |
+| `Space`             | Pause / resume                                    |
+| `← / →`             | Seek 5 seconds back / forward                     |
+| `Shift+← / Shift+→` | Seek 30 seconds back / forward                    |
+| `G`                 | Go to an exact position you type                  |
+| `+ / -`             | Volume up / down (steps of 5, range 0–100)        |
+| `S`                 | Stop                                              |
+| `O`                 | Open a file or folder                             |
+| `?`                 | Help overlay                                      |
+| `Esc`               | Cancel the current input / close the help         |
+| `Q`                 | Quit                                              |
+| `Ctrl+C`            | Quit (works everywhere)                           |
 
 For `G`, type a position like `1:35` (minutes:seconds) or `95`
 (seconds), then press Enter.
