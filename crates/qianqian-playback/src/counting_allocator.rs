@@ -21,6 +21,7 @@ use std::cell::Cell;
 thread_local! {
     static ALLOC_WINDOW_ARMED: Cell<bool> = const { Cell::new(false) };
     static ALLOC_WINDOW_COUNT: Cell<usize> = const { Cell::new(0) };
+    static ALLOC_WINDOW_OBSERVER: Cell<Option<fn()>> = const { Cell::new(None) };
 }
 
 pub struct CountingAllocator;
@@ -57,6 +58,11 @@ fn record_if_armed() {
     ALLOC_WINDOW_ARMED.with(|armed| {
         if armed.get() {
             ALLOC_WINDOW_COUNT.with(|count| count.set(count.get() + 1));
+            ALLOC_WINDOW_OBSERVER.with(|observer| {
+                if let Some(observe) = observer.get() {
+                    observe();
+                }
+            });
         }
     });
 }
@@ -76,4 +82,17 @@ pub fn run_counting_allocations<R>(f: impl FnOnce() -> R) -> (R, usize) {
     let result = f();
     let count = ALLOC_WINDOW_COUNT.with(|count| count.get());
     (result, count)
+}
+
+/// Observes actual allocator calls within the existing thread-local counting
+/// window. The observer must neither allocate nor panic (GlobalAlloc rules).
+pub fn run_observing_allocations<R>(observer: fn(), f: impl FnOnce() -> R) -> (R, usize) {
+    struct RestoreObserver(Option<fn()>);
+    impl Drop for RestoreObserver {
+        fn drop(&mut self) {
+            ALLOC_WINDOW_OBSERVER.with(|observer| observer.set(self.0));
+        }
+    }
+    let _restore = RestoreObserver(ALLOC_WINDOW_OBSERVER.with(|cell| cell.replace(Some(observer))));
+    run_counting_allocations(f)
 }

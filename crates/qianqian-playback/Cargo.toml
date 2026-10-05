@@ -6,6 +6,7 @@ publish = false
 description = "Playback Session: composes Decode + Output capabilities into one bounded playback episode"
 
 [dependencies]
+realfft = "3.5"
 qianqian-audio-api = { path = "../qianqian-audio-api" }
 qianqian-composition = { path = "../qianqian-composition" }
 # FV-CONC-0: selected only under `--cfg loom` + `--features loom` so the

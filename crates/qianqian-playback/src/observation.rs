@@ -1,334 +1,440 @@
-//! The bounded audio observation tap (#187 O0/O1 decision, issue
-//! comment OBSERVATION_PLANE-O0): a crate-private, lossy, read-only
-//! branch off the decode worker's post-DSP staging seam.
+//! Episode-owned visualization telemetry: post-DSP / pre-PcmEdge.
+//! One nonblocking lossy slot, one off-path analyst, one latest snapshot.
+//! No sample here establishes playback, device, Position or audibility truth.
 //!
-//! Topology (frozen at O0):
-//!
-//! ```text
-//! decode → processing.stage (staging block)
-//!              ├─ observation tap: nonblocking bounded offer
-//!              │       └─ off-path analyst worker → latest snapshot
-//!              └─ PcmEdge (D14.5-governed admission, untouched)
-//! ```
-//!
-//! Authority boundary: the tap may inspect PCM; it must never modify
-//! it, and nothing observed here is playback truth. Observation data
-//! is non-authoritative, ephemeral, lossy, bounded and safe to drop —
-//! dropping is normal telemetry policy, never an error, and never a
-//! playback failure (an analyst failure retires observation only).
-//!
-//! Mechanism: an overwrite-latest slot of ONE staging block. `offer`
-//! is producer-nonblocking by construction: it takes the slot mutex
-//! with `try_lock`, and if the analyst is mid-copy-out the block is
-//! dropped — contention is loss, loss is normal telemetry policy, and
-//! the decode worker never waits for observer ownership. On success it
-//! copies the block in and notifies; the consumer takes and clears
-//! under the same mutex and analyzes OUTSIDE it. Both buffers are
-//! preallocated — the steady-state path performs no allocation. The
-//! one-shot control-plane calls (`invalidate` at the Applied arm,
-//! `close` at the exit funnel) take the mutex blocking on purpose:
-//! each runs once per episode on a path that already takes the
-//! edge/control mutexes, and the hold it can wait out is one bounded
-//! copy-out. This is the same realization class as the episode's other
-//! latest-wins slot (DSP pending, PBK-002 D14.11 live control), on a
-//! thread that already takes the edge/control locks per block.
-//!
-//! Lifetime is structural, with no generation/epoch machinery: the tap
-//! is created with the episode's decode worker, and the analyst worker
-//! is spawned at worker entry; the worker's single exit funnel closes
-//! the tap and joins the analyst before the worker's own thread
-//! returns. Episode replacement builds a fresh worker → a fresh tap;
-//! old observation state dies with the old worker frame and its
-//! analyst thread, so nothing can observe across episodes.
-//!
-//! Discontinuity (D14.5 Applied cut): `invalidate` is called exactly
-//! once, at the worker's existing Applied arm — it drops pending
-//! pre-cut material and arms a one-bit boundary flag that rides the
-//! next post-cut block, so pre-cut signal-derived state cannot be
-//! delivered as post-cut observation. `RefusedUnchanged` never reaches
-//! the call site: observation continues without a fake reset. Pause
-//! owns no truth here either way: the pause gate holds the render leg,
-//! not the producer, so bounded prefetch may keep producing (and
-//! offering) until ordinary edge backpressure suspends it — and the
-//! observation plane records no "paused" state.
+//! Applied clears pending PCM and the published snapshot under the slot lock,
+//! then arms the existing boundary bit. A single analyst cannot take another
+//! block while analyzing: if Applied races its work, that bit is still armed
+//! at publication, so the late result is rejected. The next take consumes the
+//! bit and resets smoothing. No generation or second cut state is needed.
+//! Offer uses try_lock; contention drops. Control-only invalidate/close wait
+//! for bounded copy sections, never FFT. Presentation gets owned copies and
+//! cannot retain a lock. Worker exit closes and joins after at most one pending
+//! analysis; scheduling/lock acquisition have no wall-clock deadline.
 
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
 use qianqian_audio_api::ports::PcmFormat;
+use realfft::{RealFftPlanner, RealToComplex, num_complex::Complex32};
 
-/// One tap slot: the pending block plus the pending boundary bit.
-struct Slot {
-    /// Close request from the owning decode worker's exit funnel.
-    closed: bool,
-    /// A whole block is pending delivery.
-    pending: bool,
-    /// The next delivered block follows an Applied cut; consumed by
-    /// the take that delivers it.
-    after_cut: bool,
-    /// Fixed-capacity staging-block storage (frames × channels).
-    block: Box<[f32]>,
-    /// Valid frames in `block` (frames × channels samples).
-    frames: usize,
+pub(crate) const FFT_SIZE: usize = 1024;
+/// Number of fixed logarithmic display bands, independent of terminal width.
+pub const SPECTRUM_BANDS: usize = 32;
+/// Number of mono bucket-average points from one delivered block; no history.
+pub const WAVEFORM_POINTS: usize = 64;
+/// Display floor in dB relative to a nominal full-scale sine's amplitude.
+pub const SPECTRUM_FLOOR_DBFS: f32 = -80.0;
+/// Fixed band edges in Hz (40 Hz to 16 kHz). Each band's upper edge is
+/// additionally bounded by the snapshot format's Nyquist frequency. Bands
+/// wholly above Nyquist stay at the floor; they do not shift with sample rate.
+pub const SPECTRUM_BAND_EDGES_HZ: [f32; SPECTRUM_BANDS + 1] = [
+    40.0, 48.2363, 58.1686, 70.146, 84.5897, 102.007, 123.012, 148.341, 178.885, 215.719, 260.138,
+    313.703, 378.297, 456.191, 550.125, 663.4, 800.0, 964.727, 1163.37, 1402.92, 1691.79, 2040.15,
+    2460.23, 2966.82, 3577.71, 4314.39, 5202.76, 6274.05, 7565.93, 9123.82, 11002.5, 13268.0,
+    16000.0,
+];
+
+/// Linear sample-amplitude measurements for one interleaved channel index.
+/// Unity is nominal full scale. Values above unity remain visible (overload);
+/// these are sample peak and block RMS, never true peak, LUFS or loudness.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ChannelLevel {
+    pub peak: f32,
+    pub rms: f32,
 }
 
-impl Slot {
-    fn empty(capacity_samples: usize) -> Self {
+/// Complete, owned visualization telemetry from one delivered post-DSP block.
+/// This is neither playback state nor device truth, Position, or proof of
+/// audibility. Intervals may be skipped; without new PCM the latest snapshot
+/// can remain unchanged, including during bounded producer prefetch on pause.
+/// Episode identity is the reader's structural lifetime, not a field here.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ObservationSnapshot {
+    /// Actual tap format evidence. Unknown channel_mask remains unknown;
+    /// channel_levels follow interleaved index order, never guessed labels.
+    pub format: PcmFormat,
+    /// Hann-windowed, coherent-gain-normalized amplitude, max per log band,
+    /// clamped to [-80, 0] dBFS for display, with local attack/decay smoothing.
+    /// Narrow bands below FFT resolution use interpolated center magnitude.
+    /// This is a musical display, not a calibrated spectrum analyzer.
+    pub spectrum_dbfs: [f32; SPECTRUM_BANDS],
+    /// Unsmoothened peak/RMS over this block, with no full-scale clamp.
+    pub channel_levels: Box<[ChannelLevel]>,
+    /// Arithmetic channel mean, then 64 temporal bucket averages over this
+    /// block. Opposite-phase channels can cancel. Values are not clipped.
+    pub waveform: [f32; WAVEFORM_POINTS],
+}
+
+impl ObservationSnapshot {
+    fn empty(format: PcmFormat) -> Self {
         Self {
-            closed: false,
-            pending: false,
-            after_cut: false,
-            block: vec![0.0; capacity_samples].into_boxed_slice(),
-            frames: 0,
+            format,
+            spectrum_dbfs: [SPECTRUM_FLOOR_DBFS; SPECTRUM_BANDS],
+            channel_levels: vec![ChannelLevel::default(); usize::from(format.channels)]
+                .into_boxed_slice(),
+            waveform: [0.0; WAVEFORM_POINTS],
         }
+    }
+
+    // Copy into already-sized publication storage, without allocating.
+    fn copy_from(&mut self, other: &Self) {
+        self.spectrum_dbfs = other.spectrum_dbfs;
+        self.channel_levels.copy_from_slice(&other.channel_levels);
+        self.waveform = other.waveform;
     }
 }
 
-/// The probe's internal latest-observation record: what the off-path
-/// analyst publishes (O1 mechanism evidence only — no playback truth,
-/// no public API).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ObservationSnapshot {
+/// Read-only view of one episode's observation lifetime. Clone to share with
+/// presentation readers; obtain a new reader on episode replacement. No PCM,
+/// reset, control, lock guard or analyst internals are exposed.
+#[derive(Clone)]
+pub struct ObservationReader {
+    shared: Arc<Shared>,
+}
+
+impl ObservationReader {
+    /// Latest complete owned copy, or None before publication / after Applied
+    /// until a post-cut result arrives. Old publications may be skipped. A
+    /// previously returned owned copy cannot be revoked by a later cut.
+    /// Allocates the owned channel array before locking, even if unavailable;
+    /// the slot lock covers only the availability check and bounded copy.
+    pub fn latest(&self) -> Option<ObservationSnapshot> {
+        let mut snapshot = ObservationSnapshot::empty(self.shared.format);
+        let slot = self.shared.lock_slot();
+        let available = slot.available;
+        if available {
+            snapshot.copy_from(&slot.snapshot);
+        }
+        drop(slot);
+        available.then_some(snapshot)
+    }
+
+    /// Observation close requested (or analyst unavailable). The worker may
+    /// finish its one pending block; the final snapshot remains readable.
+    /// Closure is telemetry lifetime evidence, never a playback terminal Fact.
+    pub fn is_closed(&self) -> bool {
+        self.shared.lock_slot().closed
+    }
+}
+
+struct Slot {
+    closed: bool,
+    pending: bool,
+    after_cut: bool,
+    block: Box<[f32]>,
+    frames: usize,
+    snapshot: ObservationSnapshot,
+    available: bool,
+    #[cfg(all(test, not(loom)))]
+    evidence: ProbeEvidence,
+}
+
+// O1 counters are oracle-only: they are not product snapshot semantics.
+#[cfg(all(test, not(loom)))]
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ProbeEvidence {
     pub(crate) sample_rate: u32,
     pub(crate) channels: u16,
-    /// Whole blocks delivered to the analyst.
     pub(crate) delivered_blocks: u64,
-    /// Frames delivered (a multiple of the block frame count while the
-    /// producer offers whole staging blocks).
     pub(crate) delivered_frames: u64,
-    /// Delivered blocks that followed an Applied cut.
     pub(crate) cuts: u64,
-    /// The analyst has observed close and exited (teardown evidence).
     pub(crate) worker_closed: bool,
 }
 
 struct Shared {
-    /// Episode channel count; converts the interleaved slice length to
-    /// the frame count the consumer sees.
-    channels: usize,
+    format: PcmFormat,
     slot: Mutex<Slot>,
     block_ready: Condvar,
-    record: Mutex<ObservationSnapshot>,
 }
 
-/// The bounded observation seam. Producer side (the decode worker):
-/// [`offer`](ObservationTap::offer) / [`invalidate`](ObservationTap::invalidate)
-/// / [`close`](ObservationTap::close). Off-path consumer: one analyst
-/// thread spawned by [`spawn_worker`](ObservationTap::spawn_worker).
-/// Clones share the one seam.
 #[derive(Clone)]
 pub(crate) struct ObservationTap {
     shared: Arc<Shared>,
 }
 
 impl ObservationTap {
-    /// A tap for one episode: capacity is exactly one staging block at
-    /// the episode's format.
     pub(crate) fn new(format: PcmFormat, staging_frames: usize) -> Self {
-        let channels = usize::from(format.channels);
-        assert!(channels > 0, "a tap without channels cannot exist");
-        assert!(staging_frames > 0, "an empty tap is not a tap");
+        assert!(format.channels > 0 && format.sample_rate > 0);
+        assert!(staging_frames > 0 && staging_frames <= FFT_SIZE);
         Self {
             shared: Arc::new(Shared {
-                channels,
-                slot: Mutex::new(Slot::empty(staging_frames * channels)),
-                block_ready: Condvar::new(),
-                record: Mutex::new(ObservationSnapshot {
-                    sample_rate: format.sample_rate,
-                    channels: format.channels,
-                    delivered_blocks: 0,
-                    delivered_frames: 0,
-                    cuts: 0,
-                    worker_closed: false,
+                format,
+                slot: Mutex::new(Slot {
+                    closed: false,
+                    pending: false,
+                    after_cut: false,
+                    block: vec![0.0; staging_frames * usize::from(format.channels)]
+                        .into_boxed_slice(),
+                    frames: 0,
+                    snapshot: ObservationSnapshot::empty(format),
+                    available: false,
+                    #[cfg(all(test, not(loom)))]
+                    evidence: ProbeEvidence {
+                        sample_rate: format.sample_rate,
+                        channels: format.channels,
+                        delivered_blocks: 0,
+                        delivered_frames: 0,
+                        cuts: 0,
+                        worker_closed: false,
+                    },
                 }),
+                block_ready: Condvar::new(),
             }),
         }
     }
 
-    /// Producer side, nonblocking: overwrite the slot with this block
-    /// and notify the analyst — unless the analyst is mid-copy-out and
-    /// holds the slot, in which case this observation is dropped and
-    /// the call still returns immediately. Observation is lossy by
-    /// policy (latest wins): contention is just another way to lose a
-    /// block, so the decode worker never waits for observer ownership.
-    /// Dropping observation data is normal.
-    ///
-    /// `block` is a whole processed staging block (frames × channels);
-    /// the caller's staging buffer is NOT retained or aliased.
+    pub(crate) fn reader(&self) -> ObservationReader {
+        ObservationReader {
+            shared: Arc::clone(&self.shared),
+        }
+    }
+
+    /// Bounded copy only; no analysis, allocation or wait for observer locks.
     pub(crate) fn offer(&self, block: &[f32]) {
-        let Some(mut slot) = self.try_lock_slot() else {
-            // The consumer owns the slot right now: drop this block.
-            return;
+        let mut slot = match self.shared.slot.try_lock() {
+            Ok(guard) => guard,
+            Err(std::sync::TryLockError::WouldBlock) => return,
+            Err(std::sync::TryLockError::Poisoned(p)) => p.into_inner(),
         };
-        let capacity = slot.block.len();
-        assert!(
-            block.len() <= capacity,
-            "observation offer exceeds the staging-block capacity"
-        );
+        if slot.closed {
+            return;
+        }
+        assert!(block.len() <= slot.block.len());
+        assert_eq!(block.len() % usize::from(self.shared.format.channels), 0);
+        if block.is_empty() {
+            return;
+        }
         slot.block[..block.len()].copy_from_slice(block);
-        slot.frames = block.len() / self.shared.channels;
+        slot.frames = block.len() / usize::from(self.shared.format.channels);
         slot.pending = true;
         drop(slot);
-        self.shared.block_ready.notify_all();
+        self.shared.block_ready.notify_one();
     }
 
-    /// The D14.5 Applied-cut obligation, at the worker's Applied arm:
-    /// pending pre-cut material can no longer be delivered, and the
-    /// boundary bit arms so the NEXT post-cut block tells the analyst
-    /// to reset its signal-derived state. Unlike `offer` this takes
-    /// the mutex blocking on purpose: the reset must be reliable (a
-    /// dropped reset could pass pre-cut state off as post-cut), it is
-    /// one-shot control plane, and the Applied arm already takes the
-    /// edge/control mutexes. RefusedUnchanged never calls this:
-    /// observation continues without a fake reset.
+    /// Reliable control-only Applied boundary. RefusedUnchanged never calls it.
     pub(crate) fn invalidate(&self) {
-        let mut slot = self.lock_slot();
+        let mut slot = self.shared.lock_slot();
         slot.pending = false;
         slot.after_cut = true;
-        drop(slot);
-        self.shared.block_ready.notify_all();
+        slot.available = false;
     }
 
-    /// Stop request from the owner's exit funnel: the analyst delivers
-    /// any pending block, publishes its closed evidence, and exits.
-    /// Idempotent.
     pub(crate) fn close(&self) {
-        let mut slot = self.lock_slot();
-        slot.closed = true;
-        drop(slot);
-        self.shared.block_ready.notify_all();
+        self.shared.lock_slot().closed = true;
+        self.shared.block_ready.notify_one();
     }
 
-    /// Consumer side, nonblocking: delivers the pending block into
-    /// `dst` (capacity is reused across calls) as `(frames, after_cut)`,
-    /// or `None` when nothing is pending. The boundary bit is consumed
-    /// by the delivery that carries it. The production analyst uses
-    /// [`Shared::wait_and_take`] instead; this primitive is the
-    /// deterministic oracle seam, like the edge's test-only occupancy
-    /// reader.
-    #[cfg(all(test, not(loom)))]
-    pub(crate) fn take_into(&self, dst: &mut Vec<f32>) -> Option<(usize, bool)> {
-        let mut slot = self.lock_slot();
-        if !slot.pending {
-            return None;
-        }
-        let frames = slot.frames;
-        let after_cut = slot.after_cut;
-        let samples = frames * self.shared.channels;
-        dst.clear();
-        dst.extend_from_slice(&slot.block[..samples]);
-        slot.pending = false;
-        slot.after_cut = false;
-        Some((frames, after_cut))
-    }
-
-    /// The off-path analyst: one thread, the smallest earned execution
-    /// context. It owns its copy-out buffer and its derived record and
-    /// never touches the production path. Spawn failure retires
-    /// observation only (the caller proceeds without a worker).
     pub(crate) fn spawn_worker(&self) -> Option<std::thread::JoinHandle<()>> {
         let shared = Arc::clone(&self.shared);
-        std::thread::Builder::new()
+        let worker = std::thread::Builder::new()
             .name("qianqian-observation".into())
-            .spawn(move || analyst_loop(&shared))
-            .ok()
-    }
-
-    /// The analyst's latest published record (probe/oracle evidence).
-    #[cfg(all(test, not(loom)))]
-    pub(crate) fn latest(&self) -> ObservationSnapshot {
-        *self.lock_record()
-    }
-
-    /// Poison-immune locking: an analyst panic must never fail a later
-    /// producer offer (observation loss is normal; playback failure is
-    /// not an observation outcome). The slot holds no invariant worth
-    /// a poison guard.
-    fn lock_slot(&self) -> std::sync::MutexGuard<'_, Slot> {
-        self.shared
-            .slot
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
-    /// Producer-side try-lock: `None` means the consumer holds the
-    /// slot (mid-copy-out) and the hot path drops instead of waiting.
-    /// Poison recovery matches `lock_slot`.
-    fn try_lock_slot(&self) -> Option<std::sync::MutexGuard<'_, Slot>> {
-        match self.shared.slot.try_lock() {
-            Ok(guard) => Some(guard),
-            Err(std::sync::TryLockError::WouldBlock) => None,
-            Err(std::sync::TryLockError::Poisoned(poisoned)) => Some(poisoned.into_inner()),
+            .spawn(move || {
+                // Observation failure closes this reader only, never playback.
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    analyst_loop(&shared)
+                }));
+                let mut slot = shared.lock_slot();
+                slot.closed = true;
+                #[cfg(all(test, not(loom)))]
+                {
+                    slot.evidence.worker_closed = true;
+                }
+            })
+            .ok();
+        if worker.is_none() {
+            self.close();
         }
+        worker
     }
 
     #[cfg(all(test, not(loom)))]
-    fn lock_record(&self) -> std::sync::MutexGuard<'_, ObservationSnapshot> {
-        self.shared
-            .record
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    pub(crate) fn latest(&self) -> ProbeEvidence {
+        self.shared.lock_slot().evidence
     }
 
-    /// Oracle seam (test-only): holds the slot for the duration of
-    /// `f`, reproducing the analyst's mid-copy-out critical section so
-    /// the producer's drop-don't-wait policy is pinned
-    /// deterministically (a blocking offer would self-deadlock here).
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn take_into(&self, dst: &mut Vec<f32>) -> Option<(usize, bool)> {
+        self.shared.take(&mut self.shared.lock_slot(), dst)
+    }
+
     #[cfg(all(test, not(loom)))]
     pub(crate) fn run_with_slot_locked<R>(&self, f: impl FnOnce() -> R) -> R {
-        let _slot = self.lock_slot();
+        let _slot = self.shared.lock_slot();
         f()
     }
 }
 
-/// The off-path consumer: wait for the latest block, publish the
-/// record, repeat — all analysis-adjacent state lives here, never on
-/// the production path. Exits when the tap is closed and nothing is
-/// pending; a pending block is delivered before the exit so the last
-/// offered material is not silently lost at teardown.
-fn analyst_loop(shared: &Shared) {
-    let mut block = Vec::new();
-    while let Some((frames, after_cut)) = shared.wait_and_take(&mut block) {
-        let mut record = shared
-            .record
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        record.delivered_blocks += 1;
-        record.delivered_frames += frames as u64;
-        if after_cut {
-            record.cuts += 1;
-        }
-    }
-    let mut record = shared
-        .record
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    record.worker_closed = true;
-}
-
 impl Shared {
-    /// Wait for something to deliver, then take it under the SAME lock
-    /// hold — the wait, the close/pending recheck and the copy-out are
-    /// one critical section, so an `invalidate` racing between wake and
-    /// take can never be misread as an exit condition (only `closed`
-    /// ends the loop). `None` = closed and nothing pending.
-    fn wait_and_take(&self, dst: &mut Vec<f32>) -> Option<(usize, bool)> {
-        let mut slot = self
-            .slot
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        slot = self
-            .block_ready
-            .wait_while(slot, |s| !s.closed && !s.pending)
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+    fn lock_slot(&self) -> MutexGuard<'_, Slot> {
+        self.slot.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    fn take(&self, slot: &mut Slot, dst: &mut Vec<f32>) -> Option<(usize, bool)> {
         if !slot.pending {
             return None;
         }
         let frames = slot.frames;
         let after_cut = slot.after_cut;
         dst.clear();
-        dst.extend_from_slice(&slot.block[..frames * self.channels]);
+        dst.extend_from_slice(&slot.block[..frames * usize::from(self.format.channels)]);
         slot.pending = false;
         slot.after_cut = false;
+        #[cfg(all(test, not(loom)))]
+        {
+            slot.evidence.delivered_blocks += 1;
+            slot.evidence.delivered_frames += frames as u64;
+            slot.evidence.cuts += u64::from(after_cut);
+        }
         Some((frames, after_cut))
     }
+
+    fn wait_and_take(&self, dst: &mut Vec<f32>) -> Option<(usize, bool)> {
+        let mut slot = self
+            .block_ready
+            .wait_while(self.lock_slot(), |s| !s.closed && !s.pending)
+            .unwrap_or_else(|p| p.into_inner());
+        self.take(&mut slot, dst)
+    }
+
+    fn publish(&self, snapshot: &ObservationSnapshot) {
+        let mut slot = self.lock_slot();
+        // Only this analyst can consume after_cut, and it has not taken
+        // another block since beginning this analysis. An armed bit means
+        // Applied raced the in-flight block; its result must be discarded.
+        if !slot.after_cut {
+            slot.snapshot.copy_from(snapshot);
+            slot.available = true;
+        }
+    }
 }
+
+fn analyst_loop(shared: &Shared) {
+    let capacity = shared.lock_slot().block.len();
+    let mut block = Vec::with_capacity(capacity);
+    let mut analysis = Analysis::new(shared.format);
+    while let Some((_frames, after_cut)) = shared.wait_and_take(&mut block) {
+        if after_cut {
+            analysis.reset();
+        }
+        analysis.analyze(&block);
+        shared.publish(&analysis.snapshot);
+    }
+}
+
+// One private analyst-owned implementation, not a DSP framework. Every block
+// is an independent window: loss cannot splice unrelated PCM into an FFT.
+struct Analysis {
+    fft: Arc<dyn RealToComplex<f32>>,
+    input: Vec<f32>,
+    output: Vec<Complex32>,
+    scratch: Vec<Complex32>,
+    window: [f32; FFT_SIZE],
+    energy: Box<[f64]>,
+    snapshot: ObservationSnapshot,
+}
+
+impl Analysis {
+    fn new(format: PcmFormat) -> Self {
+        let fft = RealFftPlanner::new().plan_fft_forward(FFT_SIZE);
+        Self {
+            input: fft.make_input_vec(),
+            output: fft.make_output_vec(),
+            scratch: fft.make_scratch_vec(),
+            fft,
+            window: std::array::from_fn(|i| {
+                0.5 - 0.5 * (std::f32::consts::TAU * i as f32 / FFT_SIZE as f32).cos()
+            }),
+            energy: vec![0.0; usize::from(format.channels)].into_boxed_slice(),
+            snapshot: ObservationSnapshot::empty(format),
+        }
+    }
+
+    fn reset(&mut self) {
+        self.snapshot.spectrum_dbfs.fill(SPECTRUM_FLOOR_DBFS);
+        // No overlap, meter smoothing or waveform history exists. All other
+        // outputs and FFT input are overwritten in full on every analysis.
+    }
+
+    fn analyze(&mut self, block: &[f32]) {
+        let channels = usize::from(self.snapshot.format.channels);
+        let frames = block.len() / channels;
+        assert!(frames > 0 && frames <= FFT_SIZE);
+        self.energy.fill(0.0);
+        self.snapshot.channel_levels.fill(ChannelLevel::default());
+        self.input.fill(0.0);
+        for (i, frame) in block.chunks_exact(channels).enumerate() {
+            let mut sum = 0.0f64;
+            for (ch, &sample) in frame.iter().enumerate() {
+                // Malformed non-finite PCM is ignored locally; observation
+                // neither modifies nor fails the playback signal.
+                let sample = if sample.is_finite() { sample } else { 0.0 };
+                self.snapshot.channel_levels[ch].peak =
+                    self.snapshot.channel_levels[ch].peak.max(sample.abs());
+                self.energy[ch] += f64::from(sample) * f64::from(sample);
+                sum += f64::from(sample);
+            }
+            self.input[i] = (sum / channels as f64) as f32;
+        }
+        for (level, energy) in self.snapshot.channel_levels.iter_mut().zip(&self.energy) {
+            level.rms = (energy / frames as f64).sqrt() as f32;
+        }
+        for (p, point) in self.snapshot.waveform.iter_mut().enumerate() {
+            let start = p * frames / WAVEFORM_POINTS;
+            let end = ((p + 1) * frames / WAVEFORM_POINTS).max(start + 1);
+            *point = (self.input[start..end]
+                .iter()
+                .map(|&v| f64::from(v))
+                .sum::<f64>()
+                / (end - start) as f64) as f32;
+        }
+        for (sample, window) in self.input.iter_mut().zip(&self.window) {
+            *sample *= window;
+        }
+        self.fft
+            .process_with_scratch(&mut self.input, &mut self.output, &mut self.scratch)
+            .expect("fixed preallocated real FFT buffers");
+        let gain: f32 = self.window[..frames].iter().sum();
+        let bin_hz = self.snapshot.format.sample_rate as f32 / FFT_SIZE as f32;
+        let nyquist = self.snapshot.format.sample_rate as f32 / 2.0;
+        for b in 0..SPECTRUM_BANDS {
+            let low = SPECTRUM_BAND_EDGES_HZ[b];
+            let high = SPECTRUM_BAND_EDGES_HZ[b + 1].min(nyquist);
+            let db = if low >= high {
+                SPECTRUM_FLOOR_DBFS
+            } else {
+                let first = (low / bin_hz).ceil() as usize;
+                let last = (high / bin_hz).floor() as usize;
+                let amplitude = if first <= last {
+                    (first..=last)
+                        .map(|i| self.amplitude(i, gain))
+                        .fold(0.0, f32::max)
+                } else {
+                    let position = (low * high).sqrt() / bin_hz;
+                    let i = position.floor() as usize;
+                    let fraction = position.fract();
+                    self.amplitude(i, gain) * (1.0 - fraction)
+                        + self.amplitude(i + 1, gain) * fraction
+                };
+                (20.0 * amplitude.max(0.0001).log10()).clamp(SPECTRUM_FLOOR_DBFS, 0.0)
+            };
+            let old = &mut self.snapshot.spectrum_dbfs[b];
+            *old += (db - *old) * if db > *old { 0.65 } else { 0.15 };
+        }
+    }
+
+    fn amplitude(&self, i: usize, gain: f32) -> f32 {
+        let value = self.output[i];
+        let magnitude = f64::from(value.re).hypot(f64::from(value.im));
+        let factor = if i == 0 || i == FFT_SIZE / 2 {
+            1.0
+        } else {
+            2.0
+        };
+        let amplitude = (magnitude * factor / f64::from(gain.max(f32::MIN_POSITIVE))) as f32;
+        if amplitude.is_nan() { 0.0 } else { amplitude }
+    }
+}
+
+#[cfg(all(test, not(loom)))]
+#[path = "observation_signal_tests.rs"]
+mod signal_tests;

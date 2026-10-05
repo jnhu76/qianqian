@@ -67,6 +67,7 @@ use qianqian_audio_api::ports::{
 use crate::edge::{EdgeTerminal, PcmEdge};
 use crate::handle::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
 use crate::live::ProcessingControl;
+use crate::observation::ObservationReader;
 
 /// How one playback episode ended. Crate-internal realization: the
 /// public semantic contract is only the stable
@@ -143,6 +144,8 @@ impl WorkerFailure {
 }
 
 struct CompletionState {
+    // Episode-local read-side attachment; never a settlement input.
+    observation_reader: Option<ObservationReader>,
     outcome: Option<SessionOutcome>,
     /// Terminal the decode worker observed on the edge at its exit.
     worker_terminal: Option<EdgeTerminal>,
@@ -373,6 +376,7 @@ impl SessionCompletion {
                 });
                 CompletionArc {
                     state: Mutex::new(CompletionState {
+                        observation_reader: None,
                         outcome: None,
                         worker_terminal: None,
                         worker_failure: None,
@@ -428,6 +432,23 @@ impl SessionCompletion {
                 }
             }),
         }
+    }
+
+    pub(crate) fn bind_observation_reader(&self, reader: ObservationReader) {
+        self.state
+            .state
+            .lock()
+            .expect("completion lock")
+            .observation_reader = Some(reader);
+    }
+
+    pub(crate) fn observation_reader(&self) -> Option<ObservationReader> {
+        self.state
+            .state
+            .lock()
+            .expect("completion lock")
+            .observation_reader
+            .clone()
     }
 
     /// The session publishes its activation failure (first wins). This

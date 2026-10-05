@@ -30,6 +30,10 @@ mod handle;
 mod headroom;
 mod live;
 mod observation;
+pub use observation::{
+    ChannelLevel, ObservationReader, ObservationSnapshot, SPECTRUM_BAND_EDGES_HZ, SPECTRUM_BANDS,
+    SPECTRUM_FLOOR_DBFS, WAVEFORM_POINTS,
+};
 mod presets;
 mod processing;
 mod session;

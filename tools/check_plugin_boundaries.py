@@ -180,8 +180,35 @@ EXPORT_RULES = {
             "pub use presets::EqPreset;",
             "pub use processing::{AudioProcessingConfig, EqConfig};",
             "pub use headroom::{HeadroomGuidance, estimated_eq_headroom_guidance};",
+            "pub use observation::{ChannelLevel, ObservationReader, ObservationSnapshot, SPECTRUM_BAND_EDGES_HZ, SPECTRUM_BANDS, SPECTRUM_FLOOR_DBFS, WAVEFORM_POINTS,};",
         ],
-        "authority": "ADR-PBK-002 D6/D14.2/D14.3/D14.7 — the admitted public surface is exactly the F2 episode seam (extended by the D14.7 F3 pause fields/commands, whose spelling is representation); the episode mechanism is session-owned, not product API. Extended 2026-10-02 (Issue #177 I1, D14.11): the desired Audio Processing configuration's establishment handoff — the `AudioProcessingConfig` payload and the `playback_session_spec_with_processing` constructor — is the application/product-control owner's one product seam for it; the processing runtime itself stays session-owned and crate-private. Extended 2026-10-02 (Issue #177 I4, D14.11): `presets::EqPreset` joins as pure configuration DATA (the application must be able to name a desired configuration); it carries no processor/Plugin identity and no live-update right. Extended 2026-10-02 (Issue #190 D2, dsp-product-model.md §9.1): `headroom::{HeadroomGuidance, estimated_eq_headroom_guidance}` joins as the NON-BINDING headroom advisory — a deterministic pure analysis over the desired EQ data and the source rate (estimated steady-state cascade guidance, never a clipping guarantee); it grants no live-update right, carries no processor/Plugin identity, and never mutates the desired configuration. Extended by Issue #204 C1 (PBK-002 D14.6): the paired Session activation attempt carries the fresh-assembly result; it is separate from the observation handle and grants no terminal/worker mutator",
+        "authority": "ADR-PBK-002 D6/D14.2/D14.3/D14.7 — the admitted public surface is exactly the F2 episode seam (extended by the D14.7 F3 pause fields/commands, whose spelling is representation); the episode mechanism is session-owned, not product API. Extended 2026-10-02 (Issue #177 I1, D14.11): the desired Audio Processing configuration's establishment handoff — the `AudioProcessingConfig` payload and the `playback_session_spec_with_processing` constructor — is the application/product-control owner's one product seam for it; the processing runtime itself stays session-owned and crate-private. Extended 2026-10-02 (Issue #177 I4, D14.11): `presets::EqPreset` joins as pure configuration DATA (the application must be able to name a desired configuration); it carries no processor/Plugin identity and no live-update right. Extended 2026-10-02 (Issue #190 D2, dsp-product-model.md §9.1): `headroom::{HeadroomGuidance, estimated_eq_headroom_guidance}` joins as the NON-BINDING headroom advisory — a deterministic pure analysis over the desired EQ data and the source rate (estimated steady-state cascade guidance, never a clipping guarantee); it grants no live-update right, carries no processor/Plugin identity, and never mutates the desired configuration. Extended by Issue #204 C1 (PBK-002 D14.6): the paired Session activation attempt carries the fresh-assembly result; it is separate from the observation handle and grants no terminal/worker mutator. Issue #187 O7 explicitly admits the read-only ObservationReader and visualization data/constants; no PCM or lifecycle mutator is exposed",
+    },
+    # #187 O7: freeze visualization reader rights and data, while the tap
+    # and analyst remain private. This is an explicitly requested product
+    # observation seam, not a change to D11/D14 playback authority.
+    "crates/qianqian-playback/src/observation.rs": {
+        "label": "visualization-reader",
+        "allowed_root_public": [
+            "pub const SPECTRUM_BANDS: usize = 32;",
+            "pub const WAVEFORM_POINTS: usize = 64;",
+            "pub const SPECTRUM_FLOOR_DBFS: f32 = -80.0;",
+            "pub const SPECTRUM_BAND_EDGES_HZ: [f32;",
+            "pub struct ChannelLevel {",
+            "pub peak: f32,",
+            "pub rms: f32,",
+            "pub struct ObservationSnapshot {",
+            "pub format: PcmFormat,",
+            "pub spectrum_dbfs: [f32;",
+            "pub channel_levels: Box<[ChannelLevel]>,",
+            "pub waveform: [f32;",
+            "pub struct ObservationReader {",
+            "pub fn latest(&self) -> Option<ObservationSnapshot> {",
+            "pub fn is_closed(&self) -> bool {",
+        ],
+        "authority": "Issue #187 O2-O7 completion scope; audio-observation-plane.md "
+        "implemented contract — visualization telemetry only, one read-only reader "
+        "per episode; no PCM/reset/seek/lifecycle control or playback authority",
     },
     "crates/qianqian-playback/src/establishment.rs": {
         "label": "establishment-result",
@@ -302,6 +329,7 @@ EXPORT_RULES = {
             "pub fn observe(&self) -> PlaybackSessionObservation {",
             "pub fn wait_terminal(&self) -> EpisodeTerminalOutcome {",
             "pub fn paused(&self) -> bool {",
+            "pub fn observation_reader(&self) -> Option<ObservationReader> {",
         ],
         "authority": "ADR-PBK-002 D14.2 + the D14.7 F3 amendment as narrowed by the D14.7 "
         "AUTHORITY-CORRECTIVE + the D14.8 F4 amendment + the D14.5 F5 amendment + the D14.9 "
@@ -336,7 +364,8 @@ EXPORT_RULES = {
         "surface) — plus exactly one observation field, `last_processing_refusal` "
         "(mechanism evidence/diagnostic, the same truth class as failure_diagnostic; "
         "never a Fact, never a correctness basis; the typed desired/applied read model "
-        "is D5's decision). A further new "
+        "is D5's decision). Issue #187 O7 explicitly admits observation_reader(): "
+        "an episode-local read-only visualization handle, never PCM or playback truth. A further new "
         "public right must first earn an explicit D14/phase-authority amendment, then "
         "update this allowlist on purpose",
     },
@@ -669,6 +698,7 @@ MUTABLE_FILES = [
     "crates/qianqian-playback/Cargo.toml",
     "crates/qianqian-playback/src/lib.rs",
     "crates/qianqian-playback/src/handle.rs",
+    "crates/qianqian-playback/src/observation.rs",
     "crates/qianqian-decode-songcore/Cargo.toml",
     "crates/qianqian-decode-songcore/src/lib.rs",
     "crates/qianqian-output-wasapi/src/lib.rs",
@@ -858,6 +888,25 @@ def run_negative_controls():
                 "    pub fn boundary_escape_probe(&self) {}\n"
                 "}\n"
             )
+        },
+    )
+    # #187: public visualization types must not grant tap/analyst rights.
+    expect_fail(
+        "O7 visualization reader write-right expansion",
+        "unexpected visualization-reader public surface: 'pubfninvalidate(&self){'",
+        {
+            "crates/qianqian-playback/src/observation.rs": lambda t: (
+                t + "\nimpl ObservationReader {\n    pub fn invalidate(&self) {}\n}\n"
+            ),
+        },
+    )
+    expect_fail(
+        "O7 producer tap exposure",
+        "unexpected visualization-reader public surface: 'pubstructObservationTap{'",
+        {
+            "crates/qianqian-playback/src/observation.rs": lambda t: t.replace(
+                "pub(crate) struct ObservationTap {", "pub struct ObservationTap {"
+            ),
         },
     )
     # M8b — the observation surface is frozen at FIELD granularity: the
