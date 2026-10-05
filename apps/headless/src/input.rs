@@ -1801,6 +1801,7 @@ mod tests {
         tree.file("cover.jpg");
         tree.file("notes.txt");
         tree.file("no_extension");
+        #[cfg(unix)]
         std::os::unix::fs::symlink(tree.path().join("elsewhere"), tree.path().join("link-dir"))
             .expect("symlink");
 
