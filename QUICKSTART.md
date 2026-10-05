@@ -4,7 +4,9 @@ Qianqian (千千) is a local Windows music player. It plays music from
 files and folders on your computer. It does not need a media library, a
 database, or an account — point it at a folder and listen.
 
-Qianqian runs in a terminal window. You control it with the keyboard.
+Qianqian runs in a terminal window. Every control is visible on screen —
+you never have to memorize a key to use the player. The keys below are
+shortcuts for the same controls.
 
 ## Start
 
@@ -20,8 +22,12 @@ or open PowerShell / Command Prompt / Windows Terminal and run:
 qianqian.exe
 ```
 
-The player opens with no music loaded. Press `O`, type or paste the path
-of a file or folder (for example `D:\Music`), and press `Enter`.
+The player opens with no music loaded. Press the visible `Open` button
+(or the `O` key): a picker opens showing the current folder. Type or
+paste a path (for example `D:\Music`), or browse the listing with the
+mouse or the arrow keys, and press `Open` (or `Enter`) to play it. The
+picker's `Add to Playlist` button appends a file or folder to the track
+list instead of playing it right away.
 
 ## Play a folder
 
@@ -48,24 +54,27 @@ see a `scanning <path> ...` line while a large folder is checked.
 ## The screen
 
 ```
-┌ Playlist ───────────────────────────────── sel 2/3 ┐
-│ ▶       1  夜曲.flac                              │
-│   >     2  七里香.flac                            │
-│         3  晴天.flac                              │
-├ Qianqian Reference Player ────────────────────────┤
+Now Playing              Playlist                 Audio                    Visualizer
+┌ Qianqian Reference Player ────────────────────────┐
 │ Source: D:\Music\夜曲.flac                        │
 │ Format: 44100 Hz, 2 channels, mask 0x3            │
+│ DSP (desired): off (bypass)                       │
 │ Position: 01:42 / 03:58                           │
-│ 01:42 ━━━━━━━━━━━╸──────────── 03:58              │
 │ Terminal: pending   Stop requested: false ...     │
-│ Track: 1/3   Volume: 100/100 (desired)            │
-│ Order: Sequential   Repeat: Off                   │
-├ Diagnostics ──────────────────────────────────────┤
-│ (none)                                            │
-├ Controls ─────────────────────────────────────────┤
-│ ↑/↓  Select    Enter  Play    Space  Pause ...    │
+│ Track: 1/3                                        │
 └───────────────────────────────────────────────────┘
+01:42 ━━━━━━━━━━━╸──────────── 03:58
+┌────────┐┌────────┐┌────────────┐┌────────┐┌────────┐
+│  Open  ││ ◀ Prev ││ Play/Pause ││ ■ Stop ││ Next ▶ │
+└────────┘└────────┘└────────────┘└────────┘└────────┘
+┌───┐ 100/100 (desired) ┌───┐┌───────────────────┐┌──────────────┐
+│ − │                   │ + ││ Order: Sequential ││ Repeat: Off  │
+└───┘                   └───┘└───────────────────┘└──────────────┘
 ```
+
+The `Playlist` tab shows the track list. Every button above is clickable
+with the mouse and reachable with `Tab` + `Enter`; the progress bar is
+click-to-seek, and the `−` / `+` buttons change Qianqian's own volume.
 
 Two markers matter in the list:
 
@@ -87,7 +96,7 @@ Enter.
 | ------------------- | ------------------------------------------------- |
 | `Tab / Shift+Tab`   | Move keyboard focus to the next / previous control |
 | `Enter`             | Activate the focused control; on the playlist, play the selected row |
-| `Mouse`             | Click a tab, transport button or playlist row     |
+| `Mouse`             | Click any visible control: tabs, buttons, the progress bar, playlist rows |
 | `↑ / ↓`             | Select previous / next playlist row (list focused) |
 | `N / P`             | Next / previous track                             |
 | `R`                 | Order: Sequential / Shuffle                       |
@@ -172,17 +181,19 @@ claim is made beyond the list above.
 
 ## Volume
 
-`+` and `-` change Qianqian's own volume in steps of 5 (0–100). The
-scale is perceptual: each step is about 3 dB, so a press feels alike
-near the top and near the bottom (100 is full, 0 is silence). The
-`Volume: 75/100 (desired)` line is the player's setting — Windows'
-own mixer and output device still apply on top of it.
+The visible `−` / `+` buttons (or the `+` and `-` keys) change
+Qianqian's own volume in steps of 5 (0–100). The scale is perceptual:
+each step is about 3 dB, so a press feels alike near the top and near
+the bottom (100 is full, 0 is silence). The number between the buttons,
+like `75/100 (desired)`, is the player's own setting — Windows' own
+mixer and output device still apply on top of it.
 
 ## Troubleshooting
 
 ### Player opens but no music is loaded
 
-Press `O` and paste a file or folder path, then Enter.
+Press the `Open` button (or the `O` key) and paste a file or folder
+path, or browse to it in the picker, then press `Open` / Enter.
 
 ### A folder says "no playable audio files found"
 
