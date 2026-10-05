@@ -178,7 +178,7 @@ EXPORT_RULES = {
             "pub use session::{\n    playback_session_spec, playback_session_spec_with_establishment,\n    playback_session_spec_with_processing,\n};",
             "pub use establishment::{EstablishmentAttempt, EstablishmentResult};",
             "pub use presets::EqPreset;",
-            "pub use processing::{AudioProcessingConfig, EqConfig};",
+            "pub use processing::{AudioProcessingConfig, EQ_BAND_FREQUENCY_HZ, EQ_MAX_BAND_GAIN_DB, EqConfig, eq_band_availability,};",
             "pub use headroom::{HeadroomGuidance, estimated_eq_headroom_guidance};",
             "pub use observation::{ChannelLevel, ObservationReader, ObservationSnapshot, SPECTRUM_BAND_EDGES_HZ, SPECTRUM_BANDS, SPECTRUM_FLOOR_DBFS, WAVEFORM_POINTS,};",
         ],
@@ -237,6 +237,9 @@ EXPORT_RULES = {
             "pub fn new(band_gain_db: [f32; 10], q: f32) -> Self {",
         ],
         "allowed_root_public": [
+            "pub const EQ_BAND_FREQUENCY_HZ: [f32;",
+            "pub const EQ_MAX_BAND_GAIN_DB: f32 = 18.0;",
+            "pub fn eq_band_availability(source_rate_hz: Option<u32>) -> [Option<bool>;",
             "pub struct AudioProcessingConfig {",
             "pub enabled: bool,",
             "pub gain: f32,",
@@ -265,7 +268,9 @@ EXPORT_RULES = {
         "and join only as data, never as processors). The applied snapshot and the "
         "processing runtime are session-owned subordinate resources and stay "
         "crate-private. A new public right here must first earn its narrow authority, "
-        "then update this allowlist on purpose",
+        "then update this allowlist on purpose. Issue #188 T1A admits only the pure "
+        "fixed band centers, symmetric trim bound and source-rate availability helper "
+        "under dsp-product-model.md §2.1; no applied-state query or processor rights",
     },
     # The rights freeze behind the lib.rs re-export (I4 review): the
     # preset vocabulary is configuration DATA (D14.11), and its public

@@ -51,7 +51,10 @@ pub use handle::{
 };
 pub use headroom::{HeadroomGuidance, estimated_eq_headroom_guidance};
 pub use presets::EqPreset;
-pub use processing::{AudioProcessingConfig, EqConfig};
+pub use processing::{
+    AudioProcessingConfig, EQ_BAND_FREQUENCY_HZ, EQ_MAX_BAND_GAIN_DB, EqConfig,
+    eq_band_availability,
+};
 pub use session::{
     playback_session_spec, playback_session_spec_with_establishment,
     playback_session_spec_with_processing,

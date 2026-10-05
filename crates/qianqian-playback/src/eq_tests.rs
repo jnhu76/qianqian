@@ -1641,3 +1641,42 @@ fn s0_replay_mutated_then_failed_prefix_law_needs_no_drain_slack_wager() {
         });
     });
 }
+
+#[test]
+fn public_eq_description_matches_intrinsic_bounds_and_strict_rate_availability() {
+    use crate::{EQ_BAND_FREQUENCY_HZ, EQ_MAX_BAND_GAIN_DB, eq_band_availability};
+    assert_eq!(
+        EQ_BAND_FREQUENCY_HZ,
+        [
+            31.0, 62.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0
+        ]
+    );
+    assert_eq!(eq_band_availability(None), [None; 10]);
+    assert_eq!(eq_band_availability(Some(0)), [None; 10]);
+    for rate in [8000, 16000, 32000, 44100, 48000, 96000] {
+        let available = eq_band_availability(Some(rate));
+        for (index, center) in EQ_BAND_FREQUENCY_HZ.iter().enumerate() {
+            assert_eq!(
+                available[index],
+                Some(f64::from(*center) < f64::from(rate) / 2.0)
+            );
+        }
+    }
+    assert_eq!(eq_band_availability(Some(32000))[9], Some(false));
+    assert_eq!(eq_band_availability(Some(32001))[9], Some(true));
+    for trim in [-EQ_MAX_BAND_GAIN_DB, EQ_MAX_BAND_GAIN_DB] {
+        assert!(
+            crate::AudioProcessingConfig::eq(crate::EqConfig::new([trim; 10], 1.0))
+                .validate()
+                .is_ok()
+        );
+    }
+    assert!(
+        crate::AudioProcessingConfig::eq(crate::EqConfig::new(
+            [EQ_MAX_BAND_GAIN_DB + 0.1; 10],
+            1.0
+        ))
+        .validate()
+        .is_err()
+    );
+}

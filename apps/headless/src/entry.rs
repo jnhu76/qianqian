@@ -138,10 +138,9 @@ fn run_playback(
     // it; each episode establishment binds its own applied snapshot, so
     // a selection made at startup applies to every track this shell
     // starts. The machine transport selects nothing (bypass).
-    let processing = eq.map(EqPreset::to_config);
     match shell {
         Shell::Machine => machine_transport(start_episode(single_file(files))),
-        Shell::ReferencePlayer => reference_player_transport(files, order, processing),
+        Shell::ReferencePlayer => reference_player_transport(files, order, eq),
     }
 }
 
@@ -198,19 +197,17 @@ fn machine_episode(file: PathBuf, assembled: crate::assembly::AssemblyOutcome) -
 fn reference_player_transport(
     files: Vec<PathBuf>,
     order: OrderPreference,
-    processing: Option<AudioProcessingConfig>,
+    preset: Option<EqPreset>,
 ) -> ExitCode {
     use crate::input;
     use crate::player::ReferencePlayerApp;
     use crate::playlist::PlaybackOrder;
 
     let interactive_startup = files.is_empty();
-    let mut player = ReferencePlayerApp::new(RealEpisodeSource {
-        // The shell's desired Audio Processing configuration (D14.11):
-        // every episode this source starts binds this same snapshot at
-        // its own establishment. No selection is the transparent BYPASS.
-        processing: processing.unwrap_or(AudioProcessingConfig::BYPASS),
-    });
+    let mut player = ReferencePlayerApp::new(RealEpisodeSource);
+    if let Some(preset) = preset {
+        player.set_eq_preset(preset).expect("valid factory preset");
+    }
     // `--shuffle` selects the order policy BEFORE the startup Open, so
     // the playlist that rides the commit is already the shuffled one.
     // The start discipline is untouched: the expansion's first accepted
@@ -326,9 +323,7 @@ fn reference_player_transport(
 /// with the shell's desired Audio Processing configuration (D14.11)
 /// handed to each establishment.
 #[cfg(feature = "playback")]
-struct RealEpisodeSource {
-    processing: AudioProcessingConfig,
-}
+struct RealEpisodeSource;
 
 #[cfg(feature = "playback")]
 impl crate::player::EpisodeStart for RealEpisodeSource {
@@ -342,9 +337,13 @@ impl crate::player::EpisodeStart for RealEpisodeSource {
             .map_err(|e| e.message)
     }
 
-    fn start(&self, source: &Path, initial_output_level: u8) -> crate::player::StartAttempt {
-        crate::assembly::establish(source.to_path_buf(), self.processing, initial_output_level)
-            .start
+    fn start(
+        &self,
+        source: &Path,
+        initial_output_level: u8,
+        processing: AudioProcessingConfig,
+    ) -> crate::player::StartAttempt {
+        crate::assembly::establish(source.to_path_buf(), processing, initial_output_level).start
     }
 }
 

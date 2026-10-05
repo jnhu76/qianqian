@@ -109,16 +109,14 @@ fn unknown_command_is_rejected_with_the_offending_token() {
     );
 }
 
-/// Negative control: the retired pre-F0 positional grammar must not be
-/// silently accepted as a file argument — `song.flac` is a token where a
-/// command belongs, and the parser must say so.
+/// Unknown option-looking tokens stay usage errors under positional convenience.
 #[test]
-fn the_retired_positional_grammar_is_rejected_as_an_unknown_command() {
-    let run = invoke(&["song.flac"]);
+fn positional_convenience_does_not_swallow_unknown_options() {
+    let run = invoke(&["--unknown"]);
     assert_eq!(run.code, 2);
     assert!(
-        run.stderr.contains("unknown command 'song.flac'"),
-        "old positional grammar must fail loudly, not play by accident: {}",
+        run.stderr.contains("unknown command '--unknown'"),
+        "unknown options must fail loudly: {}",
         run.stderr
     );
 }

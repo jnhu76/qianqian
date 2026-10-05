@@ -2024,6 +2024,62 @@ The exact configuration/handoff mechanism that creates a fresh session definitio
 >        lyrics, DSP/EQ, further backends).
 > ```
 
+> **2026-10-05 differential (#188 T0 → T1, QIANQIAN-TUI-V2).**
+> Product/design source: [the frozen T0 record](https://github.com/jnhu76/qianqian/issues/188#issuecomment-5988718203).
+> This narrow amendment supersedes the U2 presentation/keymap scope and adds
+> temporary-list editing/replay policy; the D14.6 replacement protocol,
+> D11 terminal authority and Completed-only EOF policy remain unchanged.
+>
+> - The v2 client is a terminal-native local audio player with four
+>   presentation routes: Now Playing (default), Playlist, Audio, Visualizer.
+>   Visible enabled controls define discoverable actions; keyboard and mouse
+>   converge on one typed TUI action vocabulary. Shortcuts are accelerators.
+>   Route/focus/modal/geometry changes have no playback, DSP or analyst effect.
+>   Modal input is isolated; one event performs at most one product action.
+>   The U2 shortcut-first stacked layout and exact keymap are historical v1
+>   presentation scope, not constraints on v2 controls or focus navigation.
+> - Playlist entries, traversal/order/repeat and selection remain owned by
+>   ReferencePlayerApp and its TemporaryPlaylist. Direct row selection uses
+>   current traversal positions, never persistent UI identity, and never plays.
+>   Open-file/folder still commits the replacement list only after successful
+>   activation. CLI, Open and Add share host normalization, deterministic
+>   enumeration, advisory extension filtering, provider probing, lexical
+>   within-operation deduplication and bounded diagnostics; disposition differs.
+>   A single positional CLI source is convenience for existing interactive Play;
+>   known subcommands/options keep precedence, explicit Play keeps multiple roots
+>   and flags, and machine grammar does not change.
+> - Add appends admitted entries in discovery order and to the current traversal
+>   tail, preserving its existing shuffle prefix, selection and committed entry.
+>   It never replaces or autoplays. An empty list selects its first appended
+>   entry with no committed episode. Separate Adds may repeat a source.
+> - Remove non-current changes only navigation, preserving the surviving current
+>   entry. Remove-current and Clear first use the existing stop-if-unsettled,
+>   authoritative terminal wait and disposal path; an already-terminal episode
+>   still requires disposal. Only successful retirement (or no episode) permits
+>   mutation. Failure retains the list and the existing fail-stop behavior;
+>   editing cannot recover a latched violation. Removed selection chooses the
+>   row now at that traversal position, otherwise the previous last row. Remove
+>   current leaves no committed playback cursor/episode and no successor autoplay;
+>   Clear leaves no entries or selection. Order/repeat/volume/desired DSP survive.
+> - Play-selected is inert on the unsettled current entry and otherwise uses the
+>   existing replacement. Home Play replays a terminal current entry independently
+>   of browsing selection, preserving that selection; with no episode it plays
+>   selection. Repeat One continues through the existing EOF replacement path.
+> - Audio presentation reports editing Draft and App-owned complete Desired
+>   configuration; **Applied: not reported**. Desired seeds future establishment,
+>   persists without an episode and across replacement, and changes only after a
+>   validated operation succeeds. Live edits use only the four typed operations
+>   already authorized by [the DSP product model](../architecture/dsp-product-model.md)
+>   §7.3. Immediate refusal preserves desired and reports existing diagnostics;
+>   worker refusal remains mechanism evidence, never an applied acknowledgement.
+>   Factory presets remain whole-config operations; Flat is not bypass. Pure
+>   fixed EQ centers/trim bounds/source-rate availability expose that model's
+>   §2.1 rule, not runtime introspection or applied state.
+>
+> No new playback/DSP authority, protocol, Plugin, Fact, observation publication
+> or realtime mechanism is introduced. T1A implements the product seams; T1B
+> implements interaction only after the separate owner review gate.
+
 Consequences already frozen:
 
 - Open creates a new playback episode; it is not Seek。

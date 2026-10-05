@@ -101,7 +101,8 @@ use std::path::{Path, PathBuf};
 use qianqian_app::QianqianApp;
 use qianqian_composition::{CompositionSnapshot, DisposeVerdict};
 use qianqian_playback::{
-    EpisodeTerminalOutcome, PlaybackSessionHandle, PlaybackSessionObservation,
+    AudioProcessingConfig, EpisodeTerminalOutcome, EqConfig, EqPreset, PlaybackSessionHandle,
+    PlaybackSessionObservation,
 };
 
 use crate::playlist::{PlaybackOrder, RepeatMode, Row, TemporaryPlaylist};
@@ -134,7 +135,12 @@ pub trait EpisodeStart {
     /// episode BEFORE activation, so the mechanism applies it at stream
     /// open. Never disposes anything: the CALLER owns the returned root
     /// on both arms (commit, or the failure-clean disposal).
-    fn start(&self, source: &Path, initial_output_level: u8) -> StartAttempt;
+    fn start(
+        &self,
+        source: &Path,
+        initial_output_level: u8,
+        processing: AudioProcessingConfig,
+    ) -> StartAttempt;
 }
 
 /// One fresh-root start attempt carrying the D14.6 operation result.
@@ -240,6 +246,8 @@ pub struct ReferencePlayerApp<S: EpisodeStart> {
     /// episode, not the App; each fresh episode receives it BEFORE
     /// activation and its mechanism applies it at stream open.
     desired_volume: u8,
+    /// Complete process-level desired DSP data; never an applied readback.
+    desired_processing: AudioProcessingConfig,
 }
 
 impl<S: EpisodeStart> ReferencePlayerApp<S> {
@@ -253,6 +261,7 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
             fail_stop: None,
             playlist: TemporaryPlaylist::new(),
             desired_volume: 100,
+            desired_processing: AudioProcessingConfig::BYPASS,
         }
     }
 
@@ -292,8 +301,8 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// the committed episode, so the traversal cursor starts on it. The
     /// transport calls this ONCE, right after the first Open committed;
     /// an empty list leaves the navigation state untouched (there is no
-    /// committed entry to point at). Nothing else ever appends to the
-    /// playlist — a direct Open REPLACES it.
+    /// committed entry to point at). A direct Open REPLACES the list;
+    /// Add uses the separate append disposition.
     pub fn establish_playlist(&mut self, entries: Vec<PathBuf>) {
         if entries.is_empty() {
             return;
@@ -316,6 +325,102 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
     /// (D14.9).
     pub fn desired_volume(&self) -> u8 {
         self.desired_volume
+    }
+
+    /// Product intent only. Applied configuration is not reported.
+    pub fn desired_processing(&self) -> AudioProcessingConfig {
+        self.desired_processing
+    }
+
+    pub fn set_processing_enabled(&mut self, enabled: bool) -> Result<(), String> {
+        let candidate = AudioProcessingConfig {
+            enabled,
+            ..self.desired_processing
+        };
+        self.update_processing(candidate, |handle| handle.set_processing_enabled(enabled))
+    }
+
+    pub fn set_preamp(&mut self, gain: f32) -> Result<(), String> {
+        let candidate = AudioProcessingConfig {
+            gain,
+            ..self.desired_processing
+        };
+        self.update_processing(candidate, |handle| handle.set_preamp(gain))
+    }
+
+    pub fn set_eq_config(&mut self, eq: EqConfig) -> Result<(), String> {
+        let candidate = AudioProcessingConfig {
+            eq: Some(eq),
+            ..self.desired_processing
+        };
+        self.update_processing(candidate, |handle| handle.set_eq_config(eq))
+    }
+
+    pub fn set_eq_preset(&mut self, preset: EqPreset) -> Result<(), String> {
+        self.update_processing(preset.to_config(), |handle| handle.set_eq_preset(preset))
+    }
+
+    fn update_processing(
+        &mut self,
+        candidate: AudioProcessingConfig,
+        command: impl FnOnce(&PlaybackSessionHandle) -> Result<(), String>,
+    ) -> Result<(), String> {
+        if let Some(handle) = self.active_handle()
+            && handle.observe().terminal_outcome.is_none()
+        {
+            // The existing command records immediate refusal evidence. Ok
+            // records desired only; worker acceptance/application comes later.
+            command(handle)?;
+        } else {
+            candidate.validate()?;
+        }
+        self.desired_processing = candidate;
+        Ok(())
+    }
+
+    /// Append candidates admitted by the shared host preparation. Never
+    /// establishes/replaces an episode; separate Adds may repeat a source.
+    pub fn append_admitted(&mut self, entries: Vec<PathBuf>) -> Result<usize, String> {
+        self.require_list_editable()?;
+        Ok(self.playlist.append(entries))
+    }
+
+    /// Direct selection uses the current App traversal, not a persistent UI id.
+    pub fn select_track(&mut self, position: usize) -> bool {
+        self.playlist.select(position)
+    }
+
+    /// Retire first iff this selected entry owns the actual episode.
+    /// A disposal failure latches fail-stop and leaves the list untouched.
+    pub fn remove_selected(&mut self) -> Result<bool, String> {
+        self.require_list_editable()?;
+        if self.active.is_some()
+            && self.playlist.selected_position() == self.playlist.playing_position()
+        {
+            self.retire_for_list_edit()?;
+        }
+        Ok(self.playlist.remove_selected())
+    }
+
+    pub fn clear_playlist(&mut self) -> Result<(), String> {
+        self.require_list_editable()?;
+        self.retire_for_list_edit()?;
+        self.playlist.clear();
+        Ok(())
+    }
+
+    fn require_list_editable(&self) -> Result<(), String> {
+        match &self.fail_stop {
+            Some(reason) => Err(reason.clone()),
+            None => Ok(()),
+        }
+    }
+
+    fn retire_for_list_edit(&mut self) -> Result<(), String> {
+        if let Some(old) = self.active.take() {
+            self.retire_old_episode(old)?;
+        }
+        Ok(())
     }
 
     /// Change the desired stream factor by `delta` (clamped to
@@ -438,9 +543,12 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
 
     /// `Enter`: play the SELECTED playlist entry through the SAME
     /// Open/replacement path (Issue #166 §19). `None` = nothing is
-    /// selected (an empty playlist). Selection movement itself never
+    /// selected, or selection is the unsettled current entry. Selection movement itself never
     /// reaches here — browsing cannot play anything.
     pub fn play_selected(&mut self) -> Option<OpenOutcome> {
+        if self.selected_is_live_episode() {
+            return None;
+        }
         let position = self.playlist.selected_position()?;
         let candidate = self.playlist.path_at(position)?.to_owned();
         let outcome = self.replace_episode(&candidate);
@@ -448,6 +556,24 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
             // The committed cursor moves ON COMMIT; the selection is
             // already on this row, so it simply stays there.
             self.playlist.commit_navigation(position);
+        }
+        Some(outcome)
+    }
+
+    /// Home Play replays the terminal current entry independently of browsing;
+    /// with no episode it plays selection. An unsettled episode is inert here
+    /// (the client uses its existing pause/resume commands instead).
+    pub fn play_current(&mut self) -> Option<OpenOutcome> {
+        let Some(episode) = self.active.as_ref() else {
+            return self.play_selected();
+        };
+        episode.handle.observe().terminal_outcome?;
+        let position = self.playlist.playing_position()?;
+        let candidate = self.playlist.path_at(position)?.to_owned();
+        let outcome = self.replace_episode(&candidate);
+        if outcome == OpenOutcome::Opened {
+            // Replaying does not move a separate browsing selection.
+            self.playlist.commit_replay(position);
         }
         Some(outcome)
     }
@@ -565,7 +691,9 @@ impl<S: EpisodeStart> ReferencePlayerApp<S> {
         // 3. Fresh start, then the replacement commit condition: the
         //    old-side clear (the arm above) AND the authoritative
         //    whole fresh-assembly result.
-        let attempt = self.start.start(candidate, self.desired_volume);
+        let attempt = self
+            .start
+            .start(candidate, self.desired_volume, self.desired_processing);
         match attempt.establishment {
             qianqian_playback::EstablishmentResult::Established => {
                 self.active = Some(ActiveEpisode {
@@ -932,6 +1060,7 @@ pub(crate) mod tests {
         violating_cleanup: bool,
         refuse_composition: bool,
         start_levels: Arc<Mutex<Vec<u8>>>,
+        start_processing: Arc<Mutex<Vec<AudioProcessingConfig>>>,
     }
 
     impl FakeEpisodeSource {
@@ -943,6 +1072,7 @@ pub(crate) mod tests {
                 violating_cleanup: false,
                 refuse_composition: false,
                 start_levels: Arc::new(Mutex::new(Vec::new())),
+                start_processing: Arc::new(Mutex::new(Vec::new())),
             }
         }
 
@@ -961,8 +1091,14 @@ pub(crate) mod tests {
             Ok(())
         }
 
-        fn start(&self, source: &Path, initial_output_level: u8) -> StartAttempt {
+        fn start(
+            &self,
+            source: &Path,
+            initial_output_level: u8,
+            processing: AudioProcessingConfig,
+        ) -> StartAttempt {
             let root = self.generation.fetch_add(1, Ordering::Relaxed) + 1;
+            self.start_processing.lock().unwrap().push(processing);
             let mut decode = ComponentSpec::new("fake_decode_plugin")
                 .provides::<PcmDecodeCapability>()
                 .on_activate(fake_provider(
@@ -992,7 +1128,7 @@ pub(crate) mod tests {
             let (spec, attempt) = qianqian_playback::playback_session_spec_with_establishment(
                 source.to_path_buf(),
                 mounted.clone(),
-                qianqian_playback::AudioProcessingConfig::BYPASS,
+                processing,
             );
             // Deliberate false-positive projection: an Active no-op Session
             // cannot produce the paired real Session activation result.
@@ -1003,6 +1139,251 @@ pub(crate) mod tests {
             };
             crate::assembly::establish_specs_for_test(decode, output, spec, attempt, mounted).start
         }
+    }
+
+    // #188 T1A: product operations through real K0/session retirement, with
+    // fake decode/output providers. No device/platform claim is made here.
+    #[test]
+    fn append_and_noncurrent_remove_preserve_the_episode_and_entry_relations() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new_seeded(source, 188);
+        assert_eq!(player.open(Path::new(LIVE_A)), OpenOutcome::Opened);
+        player.establish_playlist(vec![
+            LIVE_A.into(),
+            LIVE_B.into(),
+            "/media/live-c.flac".into(),
+        ]);
+        player.set_order(PlaybackOrder::Shuffle);
+        assert!(player.select_track(2));
+        let prefix: Vec<_> = player
+            .playlist_rows()
+            .map(|row| row.path.to_owned())
+            .collect();
+        let selected = prefix[2].clone();
+        let old = player.active_handle().unwrap().clone();
+        let events = log.lock().unwrap().len();
+        assert_eq!(
+            player.append_admitted(vec![LIVE_A.into(), LIVE_B.into()]),
+            Ok(2)
+        );
+        assert_eq!(
+            player
+                .playlist_rows()
+                .take(3)
+                .map(|row| row.path.to_owned())
+                .collect::<Vec<_>>(),
+            prefix
+        );
+        assert_eq!(player.playlist.selected_path(), Some(selected.as_path()));
+        assert!(!player.select_track(99));
+        assert_eq!(player.remove_selected(), Ok(true));
+        assert_eq!(
+            log.lock().unwrap().len(),
+            events,
+            "no probe/start/stop/disposal for list-only edits"
+        );
+        assert_eq!(old.observe().terminal_outcome, None);
+        assert_eq!(player.active_source(), Some(Path::new(LIVE_A)));
+        assert!(cursor_names_active_source(&player));
+        assert_eq!(player.playlist_selected_position(), Some(2));
+        assert!(player.playlist.invariants_hold());
+        player.quit();
+    }
+
+    #[test]
+    fn remove_current_and_clear_retire_before_mutating_and_keep_preferences() {
+        for clear in [false, true] {
+            let source = FakeEpisodeSource::new();
+            let log = source.log.clone();
+            let mut player = ReferencePlayerApp::new(source);
+            player.set_eq_preset(EqPreset::Rock).unwrap();
+            player.change_volume(-35);
+            player.cycle_repeat();
+            assert_eq!(player.open(Path::new(LIVE_A)), OpenOutcome::Opened);
+            player.establish_playlist(vec![LIVE_A.into(), LIVE_B.into()]);
+            let old = player.active_handle().unwrap().clone();
+            old.request_pause();
+            let before = log.lock().unwrap().len();
+            if clear {
+                player.clear_playlist().unwrap();
+            } else {
+                assert_eq!(player.remove_selected(), Ok(true));
+            }
+            assert_eq!(
+                old.observe().terminal_outcome,
+                Some(EpisodeTerminalOutcome::Stopped)
+            );
+            assert!(player.active_handle().is_none());
+            assert_eq!(player.playlist_playing_position(), None);
+            assert_eq!(
+                player.playlist_selected_position(),
+                if clear { None } else { Some(0) }
+            );
+            assert_eq!(
+                player
+                    .playlist_rows()
+                    .map(|row| row.path)
+                    .collect::<Vec<_>>(),
+                if clear {
+                    Vec::new()
+                } else {
+                    vec![Path::new(LIVE_B)]
+                }
+            );
+            let events = log.lock().unwrap();
+            assert!(
+                events[before..]
+                    .iter()
+                    .any(|event| event.starts_with("teardown")),
+                "provider resources retired: {events:?}"
+            );
+            assert!(
+                !events[before..]
+                    .iter()
+                    .any(|event| event.starts_with("probe")),
+                "no successor autoplay"
+            );
+            assert_eq!(player.desired_volume(), 65);
+            assert_eq!(player.desired_processing(), EqPreset::Rock.to_config());
+            assert_eq!(player.playlist_repeat(), RepeatMode::All);
+            assert!(player.playlist.invariants_hold());
+        }
+    }
+
+    #[test]
+    fn terminal_current_edit_disposes_without_relabeling_or_stopping() {
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        assert_eq!(player.open(Path::new(A)), OpenOutcome::Opened);
+        let old = player.active_handle().unwrap().clone();
+        assert_eq!(old.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        let before = log.lock().unwrap().len();
+        player.clear_playlist().unwrap();
+        assert!(!old.observe().stop_requested);
+        assert_eq!(old.wait_terminal(), EpisodeTerminalOutcome::Completed);
+        assert!(
+            log.lock().unwrap()[before..]
+                .iter()
+                .any(|event| event.starts_with("teardown"))
+        );
+        assert!(player.active_handle().is_none());
+    }
+
+    #[test]
+    fn retirement_failure_preserves_the_whole_list_and_latches_edit_refusal() {
+        for clear in [false, true] {
+            let mut source = FakeEpisodeSource::new();
+            source.violating_cleanup = true;
+            let mut player = ReferencePlayerApp::new(source);
+            assert_eq!(player.open(Path::new(LIVE_A)), OpenOutcome::Opened);
+            player.establish_playlist(vec![LIVE_A.into(), LIVE_B.into()]);
+            let rows: Vec<_> = player
+                .playlist_rows()
+                .map(|row| (row.path.to_owned(), row.selected, row.playing))
+                .collect();
+            let revision = player.playlist_revision();
+            let result = if clear {
+                player.clear_playlist().map(|_| true)
+            } else {
+                player.remove_selected()
+            };
+            assert!(result.is_err());
+            assert!(player.is_fail_stopped());
+            assert_eq!(player.playlist_revision(), revision);
+            assert_eq!(
+                player
+                    .playlist_rows()
+                    .map(|row| (row.path.to_owned(), row.selected, row.playing))
+                    .collect::<Vec<_>>(),
+                rows
+            );
+            assert!(player.clear_playlist().is_err());
+            assert!(player.remove_selected().is_err());
+            assert!(player.append_admitted(vec![LIVE_B.into()]).is_err());
+            assert!(matches!(
+                player.play_current(),
+                Some(OpenOutcome::FailStop { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn home_replay_uses_terminal_current_while_browsing_another_entry() {
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        player
+            .append_admitted(vec![LIVE_A.into(), LIVE_B.into()])
+            .unwrap();
+        assert_eq!(player.navigation_position(), None);
+        assert!(player.active_handle().is_none());
+        assert_eq!(player.play_current(), Some(OpenOutcome::Opened));
+        assert_eq!(
+            player.play_selected(),
+            None,
+            "unsettled current is not restarted"
+        );
+        let old = player.active_handle().unwrap().clone();
+        old.request_stop();
+        assert_eq!(old.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        assert!(player.select_track(1));
+        assert_eq!(player.play_current(), Some(OpenOutcome::Opened));
+        assert_eq!(player.active_source(), Some(Path::new(LIVE_A)));
+        assert_eq!(player.playlist_selected_position(), Some(1));
+        assert_eq!(old.wait_terminal(), EpisodeTerminalOutcome::Stopped);
+        assert_eq!(player.play_selected(), Some(OpenOutcome::Opened));
+        assert_eq!(player.active_source(), Some(Path::new(LIVE_B)));
+        player.quit();
+    }
+
+    #[test]
+    fn desired_dsp_persists_and_live_refusal_keeps_it_truthful() {
+        let source = FakeEpisodeSource::new();
+        let seeds = source.start_processing.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        player.set_eq_preset(EqPreset::Rock).unwrap();
+        player.set_preamp(0.5).unwrap();
+        player.set_processing_enabled(false).unwrap();
+        let desired = player.desired_processing();
+        assert!(player.active_handle().is_none());
+        assert!(player.set_preamp(f32::NAN).is_err());
+        assert_eq!(player.desired_processing(), desired);
+        assert_eq!(player.open(Path::new(LIVE_A)), OpenOutcome::Opened);
+        assert_eq!(seeds.lock().unwrap().last(), Some(&desired));
+        player.set_processing_enabled(true).unwrap();
+        player.set_preamp(0.25).unwrap();
+        let mut eq = EqConfig::FLAT;
+        eq.band_gain_db[2] = 3.0;
+        player.set_eq_config(eq).unwrap();
+        let desired = player.desired_processing();
+        eq.band_gain_db[9] = 19.0;
+        assert!(player.set_eq_config(eq).is_err());
+        assert_eq!(player.desired_processing(), desired);
+        assert!(
+            player
+                .active_handle()
+                .unwrap()
+                .observe()
+                .last_processing_refusal
+                .is_some()
+        );
+        assert_eq!(player.open(Path::new(LIVE_B)), OpenOutcome::Opened);
+        assert_eq!(seeds.lock().unwrap().last(), Some(&desired));
+        player.set_eq_preset(EqPreset::Flat).unwrap();
+        assert_eq!(player.desired_processing(), EqPreset::Flat.to_config());
+        assert!(
+            player.desired_processing().enabled,
+            "Flat is a preset, not bypass"
+        );
+        player.clear_playlist().unwrap();
+        player.set_preamp(0.0).unwrap();
+        assert!(player.active_handle().is_none());
+        assert_eq!(player.open(Path::new(LIVE_A)), OpenOutcome::Opened);
+        assert_eq!(
+            seeds.lock().unwrap().last(),
+            Some(&player.desired_processing())
+        );
+        player.quit();
     }
 
     fn player_with(source: FakeEpisodeSource) -> ReferencePlayerApp<FakeEpisodeSource> {

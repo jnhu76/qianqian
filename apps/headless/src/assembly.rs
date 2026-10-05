@@ -225,7 +225,7 @@ mod tests {
         fn probe(&self, _: &Path) -> Result<(), String> {
             Ok(())
         }
-        fn start(&self, _: &Path, _: u8) -> StartAttempt {
+        fn start(&self, _: &Path, _: u8, _: AudioProcessingConfig) -> StartAttempt {
             self.0.borrow_mut().take().unwrap()
         }
     }

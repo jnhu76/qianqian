@@ -108,6 +108,11 @@ pub fn parse_invocation(args: &[String]) -> Result<Invocation, InvocationError> 
                 command: "--version",
             }),
         },
+        other if args.len() == 1 && !other.starts_with('-') => Ok(Invocation::Play {
+            files: vec![PathBuf::from(other)],
+            shuffle: false,
+            eq: None,
+        }),
         other => Err(InvocationError::UnknownCommand(other.to_string())),
     }
 }
@@ -177,6 +182,7 @@ pub fn usage() -> &'static str {
 
 Usage:
   qianqian                                   listen (opens the player)
+  qianqian <file-or-folder>                  play one file or folder
   qianqian play <file-or-folder> [more...]   play files or folders
   qianqian play --shuffle <paths...>         start in shuffle order
   qianqian play --eq <preset> <paths...>     start with an EQ preset
@@ -189,6 +195,7 @@ move around it or make it repeat.
 
 Examples:
   qianqian
+  qianqian song.flac
   qianqian play song.flac
   qianqian play \"D:\\Music\"
   qianqian play --shuffle \"D:\\Music\" \"E:\\More Music\"
@@ -216,9 +223,8 @@ the same way, and the rest of the folder follows shuffled.
 
 --eq picks a tonal balance for this listening session: flat, jazz, vocal,
 blues, rock, classical, bass, or treble. It applies to everything this
-launch plays and lasts until you quit. The EQ works on sources above
-32 kHz sample rate; a lower-rate file is refused (not played) while an
-EQ preset is set.
+launch plays and lasts until you quit. Bands at or above source Nyquist
+are inert for that source; their desired trims are retained.
 
 Automation (advanced):
   qianqian --machine play <file>   scriptable single-episode transport
@@ -554,7 +560,7 @@ mod tests {
             "qianqian play --eq <preset>",
             // The low-rate refusal disclosure (I4 review): the usage
             // text must tell the user the EQ's sample-rate condition.
-            "a lower-rate file is refused",
+            "their desired trims are retained",
             "Up / Down",
             "Enter        play the selected row",
             "R            order: sequential / shuffle",
@@ -746,6 +752,27 @@ mod tests {
     /// a real terminal session), so the physical launch evidence lives
     /// in the Windows ConPTY/physical gate.
     #[test]
+    fn one_positional_source_is_the_existing_play_intent() {
+        for source in [
+            "song.flac",
+            "~/Music/Album/",
+            "./play",
+            "Q:\\Music\\千千.flac",
+        ] {
+            assert_eq!(
+                parse_invocation(&argv(&[source])),
+                Ok(Invocation::Play {
+                    files: vec![PathBuf::from(source)],
+                    shuffle: false,
+                    eq: None
+                })
+            );
+        }
+        assert!(parse_invocation(&argv(&["song.flac", "--shuffle"])).is_err());
+        assert!(parse_invocation(&argv(&["--shuffle"])).is_err());
+    }
+
+    #[test]
     fn empty_argv_is_the_interactive_invocation() {
         assert_eq!(
             parse_invocation(&argv(&[])).expect("no arguments is a legal invocation"),
@@ -759,8 +786,8 @@ mod tests {
     #[test]
     fn the_interactive_invocation_never_swallows_a_typed_token() {
         for tokens in [
-            &["frobnicate"][..],
-            &["song.flac"][..],
+            &["--unknown"][..],
+            &["song.flac", "second.flac"][..],
             &["--machine"][..],
             &["--machine", "play"][..],
             &["--machine", "play", "a.flac", "b.flac"][..],
@@ -777,7 +804,7 @@ mod tests {
     fn an_unrecognized_first_token_reports_the_offending_token() {
         // The pre-F0 positional grammar (`qianqian-headless <file>`) now
         // lands here: the file token is not a known command.
-        for tokens in [&["frobnicate", "x"][..], &["song.flac"][..]] {
+        for tokens in [&["frobnicate", "x"][..], &["--unknown"][..]] {
             let err = parse_invocation(&argv(tokens)).expect_err("unknown command");
             assert_eq!(err, InvocationError::UnknownCommand(tokens[0].to_string()));
         }
