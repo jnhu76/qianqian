@@ -291,7 +291,10 @@ fn draw_now_playing(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &m
             .find(|(_, character)| matches!(character, '━' | '╸' | '─'))?
             .0;
         Some(Rect::new(
-            bar.x + (bar.width - label_cells as u16) / 2 + glyph_offset as u16,
+            // The painter's EXACT centering (ratatui's Paragraph): the
+            // click mapping and the painted cells must never disagree
+            // by a cell at odd label lengths.
+            bar.x + (bar.width / 2).saturating_sub(label_cells as u16 / 2) + glyph_offset as u16,
             bar.y,
             super::model::BAR_WIDTH as u16,
             1,

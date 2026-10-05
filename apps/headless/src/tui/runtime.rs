@@ -2033,4 +2033,35 @@ mod tests {
             "Enter on `..` lists the parent directory"
         );
     }
+    /// The inert Enter on the row that IS the live episode (field round
+    /// 3): the refusal is the bounded status feedback, named in
+    /// vocabulary the forbidden-claim scan accepts — never a playing
+    /// claim. This render pins that the scan stays clean (the review
+    /// round found the old wording leaked a forbidden word).
+    #[test]
+    fn enter_on_the_live_row_refuses_in_scan_clean_vocabulary() {
+        let tree = TempTree::new("live-row");
+        let file = tree.live_file("live.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+        // The committed episode is also the selection.
+        assert!(player.selected_is_live_episode());
+        assert_eq!(
+            dispatch(TuiAction::PlaylistPlaySelected, &mut model, &mut player),
+            Step::Continue
+        );
+        let status = model.status().expect("the refusal is reported").to_owned();
+        assert_eq!(status, "the selected track is the live episode");
+        assert_eq!(
+            crate::status::forbidden_status_claim(&status),
+            None,
+            "the refusal must stay inside the earned vocabulary"
+        );
+        assert!(
+            player.active_handle().is_some(),
+            "the live episode is untouched"
+        );
+    }
 }

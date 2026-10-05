@@ -836,12 +836,14 @@ impl TuiModel {
             && self.observation.activation_error.is_none()
     }
 
-    /// The read-only progress bar (Issue #166 §33):
+    /// The progress bar (Issue #166 §33):
     /// `00:42 ━━━━━╸────────── 05:47`. `None` unless BOTH sides have
     /// evidence: an unknown duration has no percentage to draw and an
     /// unknown position is not a zero, so the bar simply does not
-    /// appear — it is never fabricated, and it is never an input
-    /// affordance (seeking stays a keyboard and transport matter).
+    /// appear — it is never fabricated. Since G1 the drawn glyph is
+    /// ALSO a click-to-position affordance: a seek-bar hit region over
+    /// exactly its cells, and only while duration evidence exists (see
+    /// the view's `seek_bar_glyph_area`).
     ///
     /// The one exception is the same live pre-first-sample window as
     /// [`Self::timeline_label`] (field round 5): a LIVE episode with no
