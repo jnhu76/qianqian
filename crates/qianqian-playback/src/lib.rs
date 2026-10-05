@@ -29,6 +29,7 @@ mod establishment;
 mod handle;
 mod headroom;
 mod live;
+mod observation;
 mod presets;
 mod processing;
 mod session;
@@ -110,6 +111,13 @@ mod edge_lifecycle_tests;
 // oracles were retargeted to it.
 #[cfg(all(test, not(loom)))]
 mod live_tests;
+
+// Audio observation tap oracles (#187 O1): the bounded, lossy,
+// read-only staging seam probe and its off-path worker. Real OS
+// threads — kept out of loom builds like the other thread-based
+// suites; the loom partition explores the edge, not this tap.
+#[cfg(all(test, not(loom)))]
+mod observation_tests;
 
 #[cfg(all(test, loom))]
 mod loom_edge_tests;
