@@ -71,6 +71,7 @@ use std::time::Duration;
 use qianqian_audio_api::ports::PcmFormat;
 
 use crate::completion::{SessionCompletion, SessionOutcome};
+use crate::observation::ObservationReader;
 use crate::presets::EqPreset;
 use crate::processing::EqConfig;
 
@@ -252,6 +253,15 @@ impl PlaybackSessionHandle {
         Self {
             completion: SessionCompletion::new(),
         }
+    }
+
+    /// Read-only visualization telemetry for this episode, once its decode
+    /// worker starts. None means no observation reader is attached yet.
+    /// Keep this reader for the episode and obtain a fresh one on replacement.
+    /// Observation closure/absence is never playback state; use observe() and
+    /// wait_terminal() for their existing authority-defined meanings.
+    pub fn observation_reader(&self) -> Option<ObservationReader> {
+        self.completion.observation_reader()
     }
 
     /// Request the episode to stop. Command only: records stop intent

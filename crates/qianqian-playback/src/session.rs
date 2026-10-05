@@ -586,6 +586,7 @@ fn decode_worker<P: ProcessingRuntime>(
     // with the worker, retired at this worker's single exit funnel
     // below. Its spawn failure or death retires observation only —
     // playback never depends on it.
+    completion.bind_observation_reader(observation.reader());
     let analyst = observation.spawn_worker();
     let catch = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         // Startup allocation only; the steady loop reuses this buffer.
@@ -1265,6 +1266,9 @@ mod observation_seam_tests {
         let completion = SessionCompletion::new();
         let edge = Arc::new(PcmEdge::new(TEST_FORMAT.channels, EDGE_CAPACITY_FRAMES));
         let observation = ObservationTap::new(TEST_FORMAT, STAGING_FRAMES);
+        let handle = PlaybackSessionHandle {
+            completion: completion.clone(),
+        };
         // 5 blocks fit the edge outright: the write path never blocks,
         // the worker reaches EOF and returns, and the funnel close+join
         // has already run when this call returns.
@@ -1275,6 +1279,23 @@ mod observation_seam_tests {
             STAGING_FRAMES,
             Counting(Arc::new(AtomicUsize::new(0))),
             observation.clone(),
+        );
+        let reader = handle
+            .observation_reader()
+            .expect("real worker attaches the public reader");
+        let snapshot = reader
+            .latest()
+            .expect("real production publishes visualization telemetry");
+        assert_eq!(snapshot.format, TEST_FORMAT);
+        assert_eq!(
+            snapshot.channel_levels.len(),
+            usize::from(TEST_FORMAT.channels)
+        );
+        assert_eq!(snapshot.waveform.len(), crate::WAVEFORM_POINTS);
+        assert_eq!(snapshot.spectrum_dbfs.len(), crate::SPECTRUM_BANDS);
+        assert!(
+            reader.is_closed(),
+            "real exit funnel closes the public reader"
         );
         let latest = observation.latest();
         assert!(latest.worker_closed, "the funnel retired the analyst");
