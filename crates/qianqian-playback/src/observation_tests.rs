@@ -1,10 +1,11 @@
 //! Observation tap oracles (#187 O1). The tap is a bounded, lossy,
 //! non-authoritative read-only branch off the decode worker's staging
 //! seam; these oracles pin the load-bearing mechanism invariants only:
-//! bounded/latest-wins delivery, the Applied-cut reset at the seam,
-//! off-path worker lifecycle, and teardown that cannot require consumer
-//! progress. They are not playback-semantics claims; the existing seek/
-//! DSP/edge suites own those.
+//! bounded/latest-wins delivery, producer contention dropping instead
+//! of waiting, the Applied-cut reset at the seam, off-path worker
+//! lifecycle, and teardown that cannot require consumer progress. They
+//! are not playback-semantics claims; the existing seek/DSP/edge
+//! suites own those.
 
 use crate::observation::ObservationTap;
 use crate::test_common::{TEST_FORMAT, within};
@@ -48,6 +49,24 @@ fn slow_consumer_loses_intermediate_blocks_and_storage_stays_fixed() {
 }
 
 #[test]
+fn offer_contended_by_the_analyst_drops_instead_of_waiting() {
+    let tap = ObservationTap::new(TEST_FORMAT, 1024);
+    let block = vec![0.25f32; 2048];
+    // Hold the slot exactly like the analyst's mid-copy-out critical
+    // section: a blocking offer would self-deadlock on this guard and
+    // hang the run; the try_lock policy drops the block and returns
+    // while the hold is still active.
+    tap.run_with_slot_locked(|| tap.offer(&block));
+    let mut dst = Vec::new();
+    assert_eq!(
+        tap.take_into(&mut dst),
+        None,
+        "a contended offer drops the block instead of queueing it"
+    );
+    assert_eq!(tap.latest().delivered_blocks, 0);
+}
+
+#[test]
 fn applied_cut_drops_pending_precut_material_and_flags_the_next_block() {
     let tap = ObservationTap::new(TEST_FORMAT, 1024);
     let mut dst = Vec::new();
@@ -85,11 +104,13 @@ fn applied_cut_drops_pending_precut_material_and_flags_the_next_block() {
 #[test]
 fn analyst_consumes_off_path_and_publishes_the_probe_record() {
     let tap = ObservationTap::new(TEST_FORMAT, 1024);
+    // The first block lands before the analyst exists, so at least one
+    // delivery is deterministic under the drop-on-contention policy;
+    // the second may contend and drop (loss is normal).
+    tap.offer(&[1.0f32; 2048]);
     let worker = tap
         .spawn_worker()
         .expect("the off-path analyst spawns with the tap");
-
-    tap.offer(&[1.0f32; 2048]);
     tap.offer(&[2.0f32; 2048]);
 
     // Bounded poll: delivery happens on the analyst's own path.
@@ -124,9 +145,11 @@ fn analyst_consumes_off_path_and_publishes_the_probe_record() {
 fn teardown_never_requires_consumer_progress_or_production() {
     // A block pending at close: the join completes without further
     // production, and the pending block is delivered, not silently lost.
+    // The offer precedes the analyst so the pending state cannot race
+    // the analyst's startup window under the drop-on-contention policy.
     let tap = ObservationTap::new(TEST_FORMAT, 1024);
-    let worker = tap.spawn_worker().expect("analyst spawn");
     tap.offer(&[1.0f32; 2048]);
+    let worker = tap.spawn_worker().expect("analyst spawn");
     tap.close();
     within(Duration::from_secs(5), move || {
         worker.join().expect("the analyst exits on close");

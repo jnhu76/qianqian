@@ -860,9 +860,10 @@ fn decode_worker<P: ProcessingRuntime>(
                     // Observation offer (#187 O1): a bounded, nonblocking
                     // copy of the DSP-complete block, strictly before
                     // PcmEdge admission. Overwrite-latest: loss is normal
-                    // telemetry policy, the call always succeeds
-                    // immediately, and nothing here can fail the
-                    // production path.
+                    // telemetry policy — including the loss caused by the
+                    // analyst currently holding the slot, which drops
+                    // this block instead of ever waiting — and nothing
+                    // here can block or fail the production path.
                     observation.offer(&staging[..total]);
                     match write_observing_seek(
                         &edge,

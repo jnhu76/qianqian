@@ -18,14 +18,20 @@
 //! playback failure (an analyst failure retires observation only).
 //!
 //! Mechanism: an overwrite-latest slot of ONE staging block. `offer`
-//! always succeeds (overwrite has no full state, so the producer never
-//! waits for observation capacity), copies the block in under a short
-//! mutex, and notifies. The consumer takes and clears under the same
-//! mutex and analyzes OUTSIDE it. Both buffers are preallocated — the
-//! steady-state path performs no allocation. This is the same
-//! realization class as the episode's other latest-wins slot (DSP
-//! pending, PBK-002 D14.11 live control), on a thread that already
-//! takes the edge/control locks per block.
+//! is producer-nonblocking by construction: it takes the slot mutex
+//! with `try_lock`, and if the analyst is mid-copy-out the block is
+//! dropped — contention is loss, loss is normal telemetry policy, and
+//! the decode worker never waits for observer ownership. On success it
+//! copies the block in and notifies; the consumer takes and clears
+//! under the same mutex and analyzes OUTSIDE it. Both buffers are
+//! preallocated — the steady-state path performs no allocation. The
+//! one-shot control-plane calls (`invalidate` at the Applied arm,
+//! `close` at the exit funnel) take the mutex blocking on purpose:
+//! each runs once per episode on a path that already takes the
+//! edge/control mutexes, and the hold it can wait out is one bounded
+//! copy-out. This is the same realization class as the episode's other
+//! latest-wins slot (DSP pending, PBK-002 D14.11 live control), on a
+//! thread that already takes the edge/control locks per block.
 //!
 //! Lifetime is structural, with no generation/epoch machinery: the tap
 //! is created with the episode's decode worker, and the analyst worker
@@ -139,15 +145,20 @@ impl ObservationTap {
     }
 
     /// Producer side, nonblocking: overwrite the slot with this block
-    /// and notify the analyst. Always succeeds immediately — overwrite
-    /// has no full state, so playback never waits for observation
-    /// capacity. A slow analyst loses intermediate blocks by policy
-    /// (latest wins). Dropping observation data is normal.
+    /// and notify the analyst — unless the analyst is mid-copy-out and
+    /// holds the slot, in which case this observation is dropped and
+    /// the call still returns immediately. Observation is lossy by
+    /// policy (latest wins): contention is just another way to lose a
+    /// block, so the decode worker never waits for observer ownership.
+    /// Dropping observation data is normal.
     ///
     /// `block` is a whole processed staging block (frames × channels);
     /// the caller's staging buffer is NOT retained or aliased.
     pub(crate) fn offer(&self, block: &[f32]) {
-        let mut slot = self.lock_slot();
+        let Some(mut slot) = self.try_lock_slot() else {
+            // The consumer owns the slot right now: drop this block.
+            return;
+        };
         let capacity = slot.block.len();
         assert!(
             block.len() <= capacity,
@@ -163,8 +174,12 @@ impl ObservationTap {
     /// The D14.5 Applied-cut obligation, at the worker's Applied arm:
     /// pending pre-cut material can no longer be delivered, and the
     /// boundary bit arms so the NEXT post-cut block tells the analyst
-    /// to reset its signal-derived state. RefusedUnchanged never calls
-    /// this: observation continues without a fake reset.
+    /// to reset its signal-derived state. Unlike `offer` this takes
+    /// the mutex blocking on purpose: the reset must be reliable (a
+    /// dropped reset could pass pre-cut state off as post-cut), it is
+    /// one-shot control plane, and the Applied arm already takes the
+    /// edge/control mutexes. RefusedUnchanged never calls this:
+    /// observation continues without a fake reset.
     pub(crate) fn invalidate(&self) {
         let mut slot = self.lock_slot();
         slot.pending = false;
@@ -235,12 +250,33 @@ impl ObservationTap {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
+    /// Producer-side try-lock: `None` means the consumer holds the
+    /// slot (mid-copy-out) and the hot path drops instead of waiting.
+    /// Poison recovery matches `lock_slot`.
+    fn try_lock_slot(&self) -> Option<std::sync::MutexGuard<'_, Slot>> {
+        match self.shared.slot.try_lock() {
+            Ok(guard) => Some(guard),
+            Err(std::sync::TryLockError::WouldBlock) => None,
+            Err(std::sync::TryLockError::Poisoned(poisoned)) => Some(poisoned.into_inner()),
+        }
+    }
+
     #[cfg(all(test, not(loom)))]
     fn lock_record(&self) -> std::sync::MutexGuard<'_, ObservationSnapshot> {
         self.shared
             .record
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Oracle seam (test-only): holds the slot for the duration of
+    /// `f`, reproducing the analyst's mid-copy-out critical section so
+    /// the producer's drop-don't-wait policy is pinned
+    /// deterministically (a blocking offer would self-deadlock here).
+    #[cfg(all(test, not(loom)))]
+    pub(crate) fn run_with_slot_locked<R>(&self, f: impl FnOnce() -> R) -> R {
+        let _slot = self.lock_slot();
+        f()
     }
 }
 
