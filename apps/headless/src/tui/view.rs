@@ -34,8 +34,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::model::{
-    FocusId, HitRegion, HitTarget, Modal, PlaylistRow, PreferenceButton, ResponsiveClass,
-    SEEK_BUTTONS, TRANSPORT, TransportButton, TuiModel, TuiRoute, responsive_class,
+    FocusId, HitRegion, HitTarget, MAX_STATUS_ROWS, Modal, ModalButton, PlaylistRow,
+    PreferenceButton, ResponsiveClass, SEEK_BUTTONS, TRANSPORT, TransportButton, TuiModel,
+    TuiRoute, responsive_class, status_shape,
 };
 
 /// Shown once the episode's terminal Fact is committed: the shell
@@ -62,10 +63,6 @@ const PLAYING_MARKER: &str = "▶";
 /// The selection marker: the UI cursor row. Independent of the play
 /// marker; one row may carry both.
 const SELECTED_MARKER: &str = ">";
-
-/// How many status lines the bottom bar renders at most (a multi-line
-/// status BLOCK clips honestly past this, like every other region).
-const MAX_STATUS_ROWS: usize = 3;
 
 /// Render one frame of the shell, and publish the frame's hit regions
 /// into the model from the same layout this draw used.
@@ -386,12 +383,18 @@ fn draw_preference_row(
     regions: &mut Vec<HitRegion>,
 ) {
     let compact = model.class() == ResponsiveClass::Compact;
+    // The volume value is FIXED-width ("100/100" is its widest compact
+    // spelling; the wide class appends " (desired)"): a percentage
+    // share starves it at the class minimum and the number clips into
+    // a lie ("100/"). The toggles split whatever remains (G1 re-review
+    // B1: the minimum shell is pinned by semantic-region evidence).
+    let value_width = if compact { 7 } else { 18 };
     let [down, label, up, order, repeat] = Layout::horizontal([
         Constraint::Length(3),
-        Constraint::Percentage(22),
+        Constraint::Length(value_width),
         Constraint::Length(3),
-        Constraint::Percentage(37),
-        Constraint::Percentage(38),
+        Constraint::Min(10),
+        Constraint::Min(10),
     ])
     .areas(area);
 
@@ -588,14 +591,11 @@ fn draw_status(frame: &mut Frame, model: &TuiModel, area: Rect) {
 const HINT_LINE: &str = "Tab=focus  Enter=activate  O=open  ?=help  Q=quit";
 
 /// How many rows the bottom bar needs: the status block (capped) plus
-/// the hint line — always at least one.
+/// the hint line — always at least one. The cap and the shape come
+/// from the model (the same shape its `set_status` arm invalidation
+/// compares).
 fn status_line_count(model: &TuiModel) -> usize {
-    let status_rows = model
-        .status()
-        .map(|status| status.lines().count())
-        .unwrap_or(0)
-        .min(MAX_STATUS_ROWS);
-    status_rows + 1
+    status_shape(model.status()) + 1
 }
 
 /// The first visible row of the playlist pane: a STATELESS scroll that
@@ -648,8 +648,14 @@ fn playlist_row_line(position: usize, row: &PlaylistRow, episode_live: bool) -> 
 struct PickerLayout {
     popup: Rect,
     field: Rect,
+    /// The navigation row between the field and the listing: the T0
+    /// picker's frozen [Use this folder] control.
+    nav: Rect,
     list: Rect,
-    error: Option<Rect>,
+    /// The bounded note row: an honest failure diagnostic when one
+    /// stands, else the [Use this folder] target display. Absent when
+    /// there is nothing to say.
+    note: Option<Rect>,
     /// One rect per button, in [`PICKER_BUTTONS`] order, MEASURED from
     /// the labels this frame actually renders (G1 F13: at the supported
     /// minimum no control clips into its neighbor, and the hit geometry
@@ -662,10 +668,10 @@ struct PickerLayout {
 /// as many entries as the popup can hold (degrading honestly on small
 /// terminals), and nothing ever exceeds the terminal area.
 fn picker_layout(picker: &super::model::OpenPicker, area: Rect, compact: bool) -> PickerLayout {
-    let error_rows = u16::from(picker.error.is_some());
+    let note_rows = u16::from(picker.error.is_some() || picker.folder_target);
     let width = area.width.min(64).saturating_sub(4).max(16);
-    // field + buttons + hint + borders (+ an honest error row).
-    let reserved = 3 + 2 + error_rows;
+    // field + nav + buttons + hint + borders (+ an honest note row).
+    let reserved = 4 + 2 + note_rows;
     let list_rows = picker
         .entries
         .len()
@@ -684,9 +690,10 @@ fn picker_layout(picker: &super::model::OpenPicker, area: Rect, compact: bool) -
         popup.height.saturating_sub(2),
     );
     let [field, rest] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
-    let [list, error, buttons, hint] = Layout::vertical([
+    let [nav, list, note, buttons, hint] = Layout::vertical([
+        Constraint::Length(1),
         Constraint::Fill(1),
-        Constraint::Length(error_rows),
+        Constraint::Length(note_rows),
         Constraint::Length(1),
         Constraint::Length(1),
     ])
@@ -721,8 +728,9 @@ fn picker_layout(picker: &super::model::OpenPicker, area: Rect, compact: bool) -
     PickerLayout {
         popup,
         field,
+        nav,
         list,
-        error: (error_rows > 0).then_some(error),
+        note: (note_rows > 0).then_some(note),
         buttons: cells,
         hint,
     }
@@ -730,7 +738,8 @@ fn picker_layout(picker: &super::model::OpenPicker, area: Rect, compact: bool) -
 
 /// The ORDER of the picker's visible buttons, in render (and Tab)
 /// order: the two commit buttons, the mouse's enter-folder step, and
-/// the cancel.
+/// the cancel. The [Use this folder] control lives on the popup's nav
+/// row, above the listing ([`USE_FOLDER_LABEL`]).
 const PICKER_BUTTONS: [super::model::ModalButton; 4] = [
     super::model::ModalButton::Open,
     super::model::ModalButton::Add,
@@ -738,10 +747,17 @@ const PICKER_BUTTONS: [super::model::ModalButton; 4] = [
     super::model::ModalButton::Cancel,
 ];
 
+/// The nav-row control's label (T0 picker freeze: "Use this folder
+/// selects the displayed directory as the target"). One spelling for
+/// every class: it fits the supported-minimum popup with room to
+/// spare (17 ≤ 34 inner cells).
+const USE_FOLDER_LABEL: &str = "[Use this folder]";
+
 fn button_label(button: super::model::ModalButton) -> &'static str {
     match button {
         super::model::ModalButton::Open => "[Open]",
         super::model::ModalButton::Add => "[Add to Playlist]",
+        super::model::ModalButton::UseFolder => USE_FOLDER_LABEL,
         super::model::ModalButton::EnterFolder => "[Enter folder]",
         super::model::ModalButton::Cancel => "[Cancel]",
     }
@@ -749,11 +765,13 @@ fn button_label(button: super::model::ModalButton) -> &'static str {
 
 /// The button labels in the compact classes: the SAME four controls,
 /// spellings that fit the supported-minimum popup (the class minimums
-/// and the row tests pin the fit — G1 F13).
+/// and the row tests pin the fit — G1 F13). The nav-row [Use this
+/// folder] label is shared — see [`USE_FOLDER_LABEL`].
 fn compact_button_label(button: super::model::ModalButton) -> &'static str {
     match button {
         super::model::ModalButton::Open => "[Open]",
         super::model::ModalButton::Add => "[Add]",
+        super::model::ModalButton::UseFolder => USE_FOLDER_LABEL,
         super::model::ModalButton::EnterFolder => "[Enter]",
         super::model::ModalButton::Cancel => "[Cancel]",
     }
@@ -770,6 +788,10 @@ fn modal_regions(modal: &Modal, area: Rect, compact: bool, regions: &mut Vec<Hit
     regions.push(HitRegion {
         area: layout.field,
         target: HitTarget::ModalField,
+    });
+    regions.push(HitRegion {
+        area: layout.nav,
+        target: HitTarget::ModalButton(super::model::ModalButton::UseFolder),
     });
     // One region per VISIBLE listing row, from the same offset the
     // painter uses (the playlist pane's rule: the row geometry and the
@@ -828,8 +850,33 @@ fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &TuiModel) {
             // The path row: the typed line (a click focuses it).
             frame.render_widget(Paragraph::new(format!(" {}▏", picker.input)), layout.field);
 
-            if let (Some(error), Some(slot)) = (&picker.error, layout.error) {
-                frame.render_widget(Paragraph::new(error.clone()), slot);
+            // The nav row: the T0 picker's frozen [Use this folder]
+            // control — the displayed directory becomes the submission
+            // target without entering it.
+            let nav_focused = model.focus() == Some(FocusId::PickerButton(ModalButton::UseFolder));
+            let nav = Paragraph::new(USE_FOLDER_LABEL);
+            frame.render_widget(
+                if nav_focused {
+                    nav.style(Style::default().add_modifier(Modifier::REVERSED))
+                } else {
+                    nav
+                },
+                layout.nav,
+            );
+
+            // The note row: the honest diagnostic while correction is
+            // needed; otherwise the [Use this folder] target display.
+            if let Some(slot) = layout.note {
+                if let Some(error) = &picker.error {
+                    frame.render_widget(Paragraph::new(error.clone()), slot);
+                } else if picker.folder_target
+                    && let Some(dir) = &picker.dir
+                {
+                    frame.render_widget(
+                        Paragraph::new(format!("Target: {} (folder)", dir.display())),
+                        slot,
+                    );
+                }
             }
 
             // The listing window: the same stateless offset rule as the
@@ -1773,6 +1820,69 @@ mod tests {
         assert_eq!(responsive_class(30, 10), ResponsiveClass::Minimum);
     }
 
+    /// G1 re-review (B1): the exact-minimum Now Playing shell is
+    /// pinned by SEMANTIC evidence, not just nonpanic — every
+    /// interactive label renders whole at `MIN_WIDTH×MIN_HEIGHT` and
+    /// every published region sits inside the frame. The picker's
+    /// minimum has its own test above.
+    #[test]
+    fn the_minimum_shell_renders_every_interactive_label_whole() {
+        let mut model = plain_model();
+        let text = rendered(
+            &mut model,
+            super::super::model::MIN_WIDTH,
+            super::super::model::MIN_HEIGHT,
+        );
+        assert_eq!(model.class(), ResponsiveClass::Compact);
+        for label in [
+            // Navigation (compact spellings).
+            "Now",
+            "List",
+            "Viz",
+            // Transport.
+            "Open",
+            "Prev",
+            "Pause",
+            "Stop",
+            "Next",
+            // The visible relative seek (evidence exists here).
+            "[ Back 5s ]",
+            "[ Forward 5s ]",
+            // Preferences (compact spellings + glyphs).
+            "Ord:Seq",
+            "Rep:Off",
+            "100/100",
+            "-",
+            "+",
+        ] {
+            assert!(
+                text.contains(label),
+                "{label:?} is clipped at the supported minimum:\n{text}"
+            );
+        }
+        // No region leaks outside the frame: every published hit target
+        // is exactly what the minimum shell drew.
+        let (width, height) = (
+            super::super::model::MIN_WIDTH,
+            super::super::model::MIN_HEIGHT,
+        );
+        assert!(
+            !model.regions().is_empty(),
+            "the minimum shell publishes regions"
+        );
+        for region in model.regions() {
+            let area = region.area;
+            assert!(
+                area.x < width
+                    && area.y < height
+                    && area.x + area.width <= width
+                    && area.y + area.height <= height,
+                "region {area:?} for {:?} escapes the minimum frame",
+                region.target
+            );
+        }
+    }
+
     /// The compact class shortens the tab labels — the mechanics exist
     /// so controls do not overlap on a narrow terminal (§27).
     #[test]
@@ -2095,19 +2205,41 @@ mod tests {
             super::super::model::MIN_WIDTH,
             super::super::model::MIN_HEIGHT,
         );
-        for label in ["[Open]", "[Add]", "[Enter]", "[Cancel]"] {
+        for label in [
+            "[Open]",
+            "[Add]",
+            "[Enter]",
+            "[Use this folder]",
+            "[Cancel]",
+        ] {
             assert!(
                 text.contains(label),
                 "{label:?} is clipped at the supported minimum:\n{text}"
             );
         }
-        // The four button regions are disjoint, in order, and each one
-        // contains its own label's cells.
+        // The nav-row control is its own region; the four button-run
+        // regions are disjoint, in order, and each one contains its own
+        // label's cells.
+        let nav_region = model
+            .regions()
+            .iter()
+            .find(|region| {
+                region.target == HitTarget::ModalButton(super::super::model::ModalButton::UseFolder)
+            })
+            .expect("the [Use this folder] nav region exists");
+        assert!(
+            nav_region.area.width as usize >= USE_FOLDER_LABEL.len(),
+            "the nav row holds the whole label"
+        );
         let mut button_rects: Vec<(u16, super::super::model::ModalButton)> = model
             .regions()
             .iter()
             .filter_map(|region| match region.target {
-                HitTarget::ModalButton(button) => Some((region.area.x, button)),
+                HitTarget::ModalButton(button)
+                    if button != super::super::model::ModalButton::UseFolder =>
+                {
+                    Some((region.area.x, button))
+                }
                 _ => None,
             })
             .collect();
