@@ -47,7 +47,10 @@ use std::path::Path;
 use std::time::Duration;
 
 use crate::playlist::{PlaybackOrder, RepeatMode};
-use qianqian_playback::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
+use qianqian_playback::{
+    AudioProcessingConfig, EpisodeTerminalOutcome, EqPreset, PauseEngagement,
+    PlaybackSessionObservation,
+};
 
 /// One playlist row as the shell presents it: the display label and the
 /// two INDEPENDENT markers. A projection of the App's navigation state.
@@ -115,6 +118,9 @@ impl TuiRoute {
 /// One transport control on the Now Playing route.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransportButton {
+    /// The Open entry control (G1): the picker modal, converged with the
+    /// O key on the same [`TuiAction::OpenModal`].
+    Open,
     Previous,
     PlayPause,
     Stop,
@@ -122,7 +128,8 @@ pub enum TransportButton {
 }
 
 /// The transport controls in left-to-right render (and Tab) order.
-pub const TRANSPORT: [TransportButton; 4] = [
+pub const TRANSPORT: [TransportButton; 5] = [
+    TransportButton::Open,
     TransportButton::Previous,
     TransportButton::PlayPause,
     TransportButton::Stop,
@@ -133,13 +140,48 @@ impl TransportButton {
     /// The button's label.
     pub fn label(self) -> &'static str {
         match self {
+            TransportButton::Open => "Open",
             TransportButton::Previous => "◀ Prev",
             TransportButton::PlayPause => "Play/Pause",
             TransportButton::Stop => "■ Stop",
             TransportButton::Next => "Next ▶",
         }
     }
+
+    /// The button's label in the compact shell class. Same control,
+    /// shorter spelling — never a different control set.
+    pub fn compact_label(self) -> &'static str {
+        match self {
+            TransportButton::Open => "Open",
+            TransportButton::Previous => "◀",
+            TransportButton::PlayPause => "P/P",
+            TransportButton::Stop => "■",
+            TransportButton::Next => "▶",
+        }
+    }
 }
+
+/// One visible preference control on the Now Playing route's preference
+/// row (G1): the App-owned policies every core player function must
+/// expose without a memorized shortcut. Each converges on the same
+/// [`TuiAction`] its accelerator key produces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreferenceButton {
+    VolumeDown,
+    VolumeUp,
+    Order,
+    Repeat,
+}
+
+/// The preference controls in left-to-right render (and Tab) order;
+/// the desired-volume label between the two steppers is display, not a
+/// control, so it is not in this cycle.
+pub const PREFERENCES: [PreferenceButton; 4] = [
+    PreferenceButton::VolumeDown,
+    PreferenceButton::VolumeUp,
+    PreferenceButton::Order,
+    PreferenceButton::Repeat,
+];
 
 /// The ONE active interactive focus target (§10). Focus is presentation
 /// state only: it selects which control Enter activates and which group
@@ -151,8 +193,15 @@ pub enum FocusId {
     RouteTab(TuiRoute),
     /// One of the Now Playing transport buttons.
     Transport(TransportButton),
+    /// One of the Now Playing preference controls.
+    Preference(PreferenceButton),
     /// The playlist list (the selection cursor is the focus inside it).
     Playlist,
+    /// The Open picker's directory listing (the picker cursor is the
+    /// focus inside it).
+    PickerList,
+    /// One of the Open picker's commit buttons.
+    PickerButton(ModalButton),
     /// The text field of the active modal.
     ModalField,
 }
@@ -175,11 +224,48 @@ pub enum ModalKind {
     Help,
 }
 
+/// One entry of the Open picker's listing: the display name and the
+/// kind the runtime's `list_directory` classified it as. A
+/// presentation draft inside the modal — no admission happened by
+/// listing anything.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PickerEntry {
+    pub name: String,
+    pub is_dir: bool,
+    /// The synthesized `..` row: descending goes to the parent
+    /// directory (G1 §8 parent navigation).
+    pub is_parent: bool,
+}
+
+/// The Open modal as a terminal-native picker (G1 §8): an editable
+/// path line over a one-level listing of the directory it names, with
+/// the commit buttons and their accelerators. The listing is a
+/// presentation draft the runtime refreshes (the model performs no
+/// I/O); admission still happens only at commit, through the same
+/// shared input expansion as before.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenPicker {
+    /// The path line the user can type into (the pre-picker editing
+    /// semantics, unchanged).
+    pub input: String,
+    /// The directory the listing shows, when one has been listed.
+    pub dir: Option<std::path::PathBuf>,
+    /// The listed entries, runtime-supplied (directories first, then
+    /// audio-candidate files).
+    pub entries: Vec<PickerEntry>,
+    /// The listing cursor (the selection), when the listing has rows.
+    pub cursor: Option<usize>,
+    /// The listing's honest failure diagnostic (an unreadable
+    /// directory), shown inside the modal instead of a fabricated
+    /// empty list.
+    pub error: Option<String>,
+}
+
 /// The ONE active modal (§23/§24), replacing the old collection of
 /// modal booleans. At most one exists; there is no modal stack.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Modal {
-    Open { input: String },
+    Open(OpenPicker),
     GoTo { input: String },
     Help,
 }
@@ -188,7 +274,7 @@ impl Modal {
     /// Which kind this modal is.
     pub fn kind(&self) -> ModalKind {
         match self {
-            Modal::Open { .. } => ModalKind::Open,
+            Modal::Open(_) => ModalKind::Open,
             Modal::GoTo { .. } => ModalKind::GoTo,
             Modal::Help => ModalKind::Help,
         }
@@ -198,7 +284,8 @@ impl Modal {
     #[cfg(test)]
     pub fn input(&self) -> Option<&str> {
         match self {
-            Modal::Open { input } | Modal::GoTo { input } => Some(input),
+            Modal::Open(picker) => Some(picker.input.as_str()),
+            Modal::GoTo { input } => Some(input),
             Modal::Help => None,
         }
     }
@@ -211,10 +298,32 @@ impl Modal {
 pub enum ModalInput {
     Char(char),
     Backspace,
-    /// Enter: confirm the modal (open the path / seek / close Help).
+    /// Enter on the path field: confirm the typed subject.
     Confirm,
+    /// Enter on the picker listing: a directory descends into view, a
+    /// file commits the Open.
+    ListActivate,
+    /// The picker listing's cursor moves (arrows, wheel, a row click).
+    ListMove(PlaylistCursor),
+    /// The picker steps up to the parent directory (Backspace on the
+    /// list, a click on the `..` row).
+    ListParent,
+    /// The [Open] button (or its accelerator): commit the picked
+    /// subject through the Open composition.
+    CommitOpen,
+    /// The [Add to Playlist] button (or its accelerator): append the
+    /// picked subject through the same shared input expansion.
+    CommitAdd,
     /// Esc (or `?` for Help): close the modal. The closing event is
     /// consumed by the modal — it never also acts on the background.
+    Cancel,
+}
+
+/// One of the Open picker's three visible commit buttons.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModalButton {
+    Open,
+    Add,
     Cancel,
 }
 
@@ -242,10 +351,23 @@ pub enum ModalConfirm {
 pub enum HitTarget {
     RouteTab(TuiRoute),
     Transport(TransportButton),
-    /// A visible playlist row, by absolute traversal index.
+    /// One of the preference-row controls.
+    Preference(PreferenceButton),
+    /// A playlist row, by absolute traversal index.
     PlaylistRow(usize),
     /// The playlist list's content area (the wheel-scroll target).
     PlaylistPane,
+    /// The position bar WITH duration evidence: a click-to-position
+    /// seek affordance (G1 §9). Without duration evidence the bar is a
+    /// display and publishes no region at all.
+    SeekBar,
+    /// One visible row of the Open picker's listing, by list index
+    /// (index 0 is the synthesized `..` parent row when shown).
+    PickerRow(usize),
+    /// The Open picker's path-field row (a click focuses the field).
+    ModalField,
+    /// One of the Open picker's commit buttons.
+    ModalButton(ModalButton),
 }
 
 /// One frame's hit region: a rectangle plus the semantic target drawn
@@ -329,6 +451,13 @@ pub enum TuiAction {
     /// The SAME frozen seek command as before; a target with no
     /// computable position is never sent.
     SeekRelative(i64),
+    /// A click-to-position seek on the visible progress bar (G1 §9):
+    /// the wanted position as per-mille of the episode's duration.
+    /// The runtime derives the actual target from a FRESH coherent
+    /// observation — the fraction chooses WHERE, the episode's own
+    /// evidence chooses WHAT — and a duration without evidence gets no
+    /// command at all.
+    SeekPerMille(u16),
 
     // Playlist route.
     /// Move the selection (↑/↓, a mouse row hit, or a wheel step over
@@ -386,6 +515,53 @@ pub fn seek_target(
     })
 }
 
+/// The click-to-position seek target (G1 §9): `per_mille` of the
+/// episode's PUBLISHED duration evidence, clamped into it. Like
+/// [`seek_target`], it is `None` — no command at all — whenever the
+/// duration evidence does not exist: an unknown timeline is never
+/// seekable by fraction, and nothing is fabricated in its place.
+pub fn seek_fraction_target(
+    observation: &PlaybackSessionObservation,
+    per_mille: u16,
+) -> Option<Duration> {
+    let duration = observation.source_duration?;
+    if duration.is_zero() {
+        return None;
+    }
+    let per_mille = u128::from(per_mille.min(1000));
+    let micros = duration.as_micros() * per_mille / 1000;
+    Some(Duration::from_micros(u64::try_from(micros).ok()?))
+}
+
+/// The one-line summary of the App's DESIRED DSP configuration (G1:
+/// the Now Playing route names it; the Audio route will edit it). A
+/// desired-state statement only — the word is part of the line — and
+/// the parts come from the T1A product data: bypass vs enabled, the
+/// EQ stage as a matched factory preset or `custom EQ`, and the
+/// preamp in dB. Nothing here is an applied-DSP claim.
+pub fn dsp_summary(config: &AudioProcessingConfig) -> String {
+    if !config.enabled {
+        return "DSP (desired): off (bypass)".to_owned();
+    }
+    let mut parts = Vec::new();
+    if let Some(eq) = &config.eq {
+        let preset = EqPreset::all()
+            .into_iter()
+            .find(|preset| preset.to_config().eq == Some(*eq));
+        parts.push(match preset {
+            Some(preset) => format!("preset {}", preset.name()),
+            None => "custom EQ".to_owned(),
+        });
+    }
+    let preamp_db = if config.gain > 0.0 {
+        format!("{:+.1} dB", 20.0 * config.gain.log10())
+    } else {
+        "-inf dB".to_owned()
+    };
+    parts.push(format!("preamp {preamp_db}"));
+    format!("DSP (desired): on — {}", parts.join(", "))
+}
+
 /// One event-loop step after a dispatched action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
@@ -422,6 +598,11 @@ pub struct TuiModel {
     /// configured value — never an acoustic level or mechanism
     /// readback).
     volume: Option<u8>,
+    /// The App's desired DSP configuration, as the one-line summary
+    /// label built by [`dsp_summary`] (T1A seam read side). Always a
+    /// DESIRED-state statement: nothing here is an applied-DSP claim
+    /// (G3 §20 discipline applies to the summary line too).
+    desired_dsp: Option<String>,
 
     /// The active route (§5). Presentation-only: default Now Playing.
     route: TuiRoute,
@@ -463,6 +644,7 @@ impl TuiModel {
             order: None,
             repeat: None,
             volume: None,
+            desired_dsp: None,
             route: TuiRoute::NowPlaying,
             focus: None,
             modal: None,
@@ -528,6 +710,16 @@ impl TuiModel {
     /// The desired stream factor label: the App's configured value.
     pub fn volume_label(&self) -> Option<String> {
         self.volume.map(|v| format!("{v}/100"))
+    }
+
+    /// Record the App's desired DSP summary line (T1A seam read side).
+    pub fn set_desired_dsp(&mut self, summary: String) {
+        self.desired_dsp = Some(summary);
+    }
+
+    /// The desired DSP summary line, once refreshed from the App.
+    pub fn desired_dsp_label(&self) -> Option<&str> {
+        self.desired_dsp.as_deref()
     }
 
     /// Follow the player's committed episode: `Some(path)` after a
@@ -816,14 +1008,30 @@ impl TuiModel {
 
     /// The visible enabled focus targets in Tab order (§11): the four
     /// route tabs, then the active route's local controls. While a
-    /// modal is open the cycle is exactly the modal's controls (§24);
-    /// below the minimum size there is nothing to focus (§28).
+    /// modal is open the cycle is exactly the modal's controls (§24) —
+    /// the picker's field and listing; a listing with no rows leaves
+    /// only the field. Below the minimum size there is nothing to
+    /// focus (§28).
     pub fn focus_cycle(&self) -> Vec<FocusId> {
         if self.class == ResponsiveClass::Minimum {
             return Vec::new();
         }
-        if self.modal.is_some() {
-            return vec![FocusId::ModalField];
+        if let Some(modal) = self.modal() {
+            return match modal {
+                Modal::Open(picker) => {
+                    let mut cycle = vec![FocusId::ModalField];
+                    if !picker.entries.is_empty() {
+                        cycle.push(FocusId::PickerList);
+                    }
+                    cycle.extend([
+                        FocusId::PickerButton(ModalButton::Open),
+                        FocusId::PickerButton(ModalButton::Add),
+                        FocusId::PickerButton(ModalButton::Cancel),
+                    ]);
+                    cycle
+                }
+                _ => vec![FocusId::ModalField],
+            };
         }
         let mut cycle: Vec<FocusId> = TuiRoute::ALL
             .iter()
@@ -832,6 +1040,11 @@ impl TuiModel {
         match self.route {
             TuiRoute::NowPlaying => {
                 cycle.extend(TRANSPORT.iter().map(|button| FocusId::Transport(*button)));
+                cycle.extend(
+                    PREFERENCES
+                        .iter()
+                        .map(|button| FocusId::Preference(*button)),
+                );
             }
             // The list is focusable only while it has rows: an empty
             // pane has no enabled control inside it (§11).
@@ -874,39 +1087,82 @@ impl TuiModel {
         if cycle.iter().any(|id| Some(*id) == self.focus) {
             return;
         }
+        let fallback = |id: &FocusId| {
+            matches!(
+                id,
+                FocusId::Transport(_)
+                    | FocusId::Preference(_)
+                    | FocusId::Playlist
+                    | FocusId::ModalField
+                    | FocusId::PickerList
+                    | FocusId::PickerButton(_)
+            )
+        };
         self.focus = cycle
             .iter()
-            .find(|id| matches!(id, FocusId::Transport(_) | FocusId::Playlist))
+            .find(|id| fallback(id))
             .or_else(|| cycle.first())
             .copied();
     }
 
     /// The focus target a mouse hit on `target` selects (§17: Left
-    /// Down focuses the target).
-    pub fn focus_of_target(target: HitTarget) -> FocusId {
+    /// Down focuses the target). `None` for targets that carry no
+    /// keyboard focus of their own (the seek bar; the picker's commit
+    /// buttons).
+    pub fn focus_of_target(target: HitTarget) -> Option<FocusId> {
         match target {
-            HitTarget::RouteTab(route) => FocusId::RouteTab(route),
-            HitTarget::Transport(button) => FocusId::Transport(button),
-            HitTarget::PlaylistRow(_) | HitTarget::PlaylistPane => FocusId::Playlist,
+            HitTarget::RouteTab(route) => Some(FocusId::RouteTab(route)),
+            HitTarget::Transport(button) => Some(FocusId::Transport(button)),
+            HitTarget::Preference(button) => Some(FocusId::Preference(button)),
+            HitTarget::PlaylistRow(_) | HitTarget::PlaylistPane => Some(FocusId::Playlist),
+            HitTarget::PickerRow(_) => Some(FocusId::PickerList),
+            HitTarget::ModalButton(button) => Some(FocusId::PickerButton(button)),
+            HitTarget::ModalField => Some(FocusId::ModalField),
+            HitTarget::SeekBar => None,
         }
     }
 
     /// The action activating `target` performs (§17: Left Up activates
-    /// the armed target). `None` for targets that arm nothing.
+    /// the armed target). `None` for targets that arm nothing: the
+    /// pane area, the seek bar (its action is computed from the click
+    /// geometry at decode time), the picker commit buttons (decoded
+    /// the same way while their modal is open).
     pub fn action_of_target(target: HitTarget) -> Option<TuiAction> {
         match target {
             HitTarget::RouteTab(route) => Some(TuiAction::Navigate(route)),
             HitTarget::Transport(button) => Some(match button {
+                TransportButton::Open => TuiAction::OpenModal(ModalKind::Open),
                 TransportButton::Previous => TuiAction::Previous,
                 TransportButton::PlayPause => TuiAction::PlayPause,
                 TransportButton::Stop => TuiAction::Stop,
                 TransportButton::Next => TuiAction::Next,
             }),
+            HitTarget::Preference(button) => Some(match button {
+                PreferenceButton::VolumeDown => TuiAction::VolumeDown,
+                PreferenceButton::VolumeUp => TuiAction::VolumeUp,
+                PreferenceButton::Order => TuiAction::ToggleOrder,
+                PreferenceButton::Repeat => TuiAction::CycleRepeat,
+            }),
             HitTarget::PlaylistRow(index) => {
                 Some(TuiAction::PlaylistSelect(PlaylistCursor::Row(index)))
             }
-            // The pane area focuses the list but is not itself a control.
+            HitTarget::PickerRow(index) => Some(TuiAction::ModalInput(ModalInput::ListMove(
+                PlaylistCursor::Row(index),
+            ))),
+            HitTarget::ModalButton(button) => Some(TuiAction::ModalInput(match button {
+                ModalButton::Open => ModalInput::CommitOpen,
+                ModalButton::Add => ModalInput::CommitAdd,
+                ModalButton::Cancel => ModalInput::Cancel,
+            })),
+            // The pane area focuses the list but is not itself a
+            // control.
             HitTarget::PlaylistPane => None,
+            // The path-field row focuses the field but arms nothing.
+            HitTarget::ModalField => None,
+            // The seek bar arms like a control, but its action is the
+            // click position — resolved by the mouse decoder, not by
+            // the target alone.
+            HitTarget::SeekBar => None,
         }
     }
 
@@ -917,19 +1173,28 @@ impl TuiModel {
         match self.focus? {
             FocusId::RouteTab(route) => Some(TuiAction::Navigate(route)),
             FocusId::Transport(button) => Self::action_of_target(HitTarget::Transport(button)),
+            FocusId::Preference(button) => Self::action_of_target(HitTarget::Preference(button)),
             FocusId::Playlist => Some(TuiAction::PlaylistPlaySelected),
+            FocusId::PickerList => Some(TuiAction::ModalInput(ModalInput::ListActivate)),
+            FocusId::PickerButton(button) => Self::action_of_target(HitTarget::ModalButton(button)),
             FocusId::ModalField => Some(TuiAction::ModalInput(ModalInput::Confirm)),
         }
     }
 
     /// Open the one modal of `kind` (§24): captures input (the modal
     /// field becomes the focus), clears the armed mouse target. Opening
-    /// while one is open replaces it — there is no stack.
+    /// while one is open replaces it — there is no stack. The Open
+    /// modal starts as a fresh picker draft; the runtime supplies its
+    /// first listing right after (the model performs no I/O).
     pub fn open_modal(&mut self, kind: ModalKind) {
         self.modal = Some(match kind {
-            ModalKind::Open => Modal::Open {
+            ModalKind::Open => Modal::Open(OpenPicker {
                 input: String::new(),
-            },
+                dir: None,
+                entries: Vec::new(),
+                cursor: None,
+                error: None,
+            }),
             ModalKind::GoTo => Modal::GoTo {
                 input: String::new(),
             },
@@ -956,7 +1221,8 @@ impl TuiModel {
             return;
         };
         let text = match modal {
-            Modal::Open { input } | Modal::GoTo { input } => input,
+            Modal::Open(picker) => &mut picker.input,
+            Modal::GoTo { input } => input,
             Modal::Help => return,
         };
         match input {
@@ -964,8 +1230,127 @@ impl TuiModel {
             ModalInput::Backspace => {
                 text.pop();
             }
-            ModalInput::Confirm | ModalInput::Cancel => {}
+            ModalInput::Confirm
+            | ModalInput::Cancel
+            | ModalInput::ListActivate
+            | ModalInput::ListMove(_)
+            | ModalInput::ListParent
+            | ModalInput::CommitOpen
+            | ModalInput::CommitAdd => {}
         }
+    }
+
+    /// Replace the Open picker's listing with one runtime-supplied
+    /// directory read (the model performs no I/O of its own). A
+    /// readable directory becomes `..` (when one exists) plus the
+    /// classified entries; an unreadable one keeps an honest
+    /// diagnostic instead of a fabricated empty list. Either way the
+    /// cursor starts unselected and the armed click dies with the old
+    /// geometry (§17: a re-listed pane is new geometry).
+    pub fn set_open_listing(
+        &mut self,
+        dir: std::path::PathBuf,
+        listing: Result<Vec<crate::input::DirectoryEntry>, String>,
+    ) {
+        let Some(Modal::Open(picker)) = self.modal.as_mut() else {
+            return;
+        };
+        picker.dir = Some(dir);
+        picker.error = None;
+        picker.cursor = None;
+        picker.entries = match listing {
+            Ok(entries) => {
+                let mut rows: Vec<PickerEntry> = Vec::with_capacity(entries.len() + 1);
+                if picker
+                    .dir
+                    .as_ref()
+                    .is_some_and(|dir| dir.parent().is_some())
+                {
+                    rows.push(PickerEntry {
+                        name: "..".to_owned(),
+                        is_dir: true,
+                        is_parent: true,
+                    });
+                }
+                rows.extend(entries.into_iter().map(|entry| PickerEntry {
+                    name: entry.name,
+                    is_dir: entry.is_dir,
+                    is_parent: false,
+                }));
+                rows
+            }
+            Err(diagnostic) => {
+                picker.error = Some(diagnostic);
+                Vec::new()
+            }
+        };
+        self.invalidate_frame();
+        self.validate_focus();
+    }
+
+    /// The Open picker's listed directory, while one is shown.
+    pub fn open_picker_dir(&self) -> Option<&std::path::Path> {
+        match self.modal.as_ref() {
+            Some(Modal::Open(picker)) => picker.dir.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// Move the Open picker's listing cursor (§24 presentation). The
+    /// first move from the unselected state enters at the list's edge
+    /// in the pressed direction; a row click selects that row.
+    pub fn move_picker_cursor(&mut self, cursor: PlaylistCursor) {
+        let Some(Modal::Open(picker)) = self.modal.as_mut() else {
+            return;
+        };
+        if picker.entries.is_empty() {
+            return;
+        }
+        picker.cursor = Some(match (picker.cursor, cursor) {
+            (Some(current), PlaylistCursor::Previous) => current.saturating_sub(1),
+            (Some(current), PlaylistCursor::Next) => (current + 1).min(picker.entries.len() - 1),
+            (None, PlaylistCursor::Previous) => picker.entries.len() - 1,
+            (None, PlaylistCursor::Next) | (None, PlaylistCursor::Row(0)) => 0,
+            (None, PlaylistCursor::Row(index)) => index.min(picker.entries.len() - 1),
+            (Some(_), PlaylistCursor::Row(index)) => index.min(picker.entries.len() - 1),
+        });
+        self.focus = Some(FocusId::PickerList);
+    }
+
+    /// The full path of the picker listing's current cursor entry, if
+    /// one is selected, plus whether descending into it stays a
+    /// directory step.
+    pub fn picker_cursor_entry(&self) -> Option<(std::path::PathBuf, bool)> {
+        let Some(Modal::Open(picker)) = self.modal.as_ref() else {
+            return None;
+        };
+        let dir = picker.dir.as_ref()?;
+        let index = picker.cursor?;
+        let entry = picker.entries.get(index)?;
+        let path = if entry.is_parent {
+            dir.to_path_buf()
+        } else {
+            dir.join(&entry.name)
+        };
+        Some((path, entry.is_parent || entry.is_dir))
+    }
+
+    /// The Open picker's commit SUBJECT (G1 §8): the selected listing
+    /// entry when one is selected, otherwise the typed path line.
+    /// `None` = nothing to commit (no selection, an empty line).
+    pub fn picker_commit_subject(&self) -> Option<(std::path::PathBuf, bool)> {
+        if let Some(entry) = self.picker_cursor_entry() {
+            return Some(entry);
+        }
+        let Some(Modal::Open(picker)) = self.modal.as_ref() else {
+            return None;
+        };
+        if picker.input.is_empty() {
+            return None;
+        }
+        // The typed subject's kind is decided by the runtime's one
+        // filesystem question at commit time, not guessed here.
+        Some((std::path::PathBuf::from(&picker.input), false))
     }
 
     /// Confirm the active modal (§26): decides what the confirmation
@@ -977,13 +1362,15 @@ impl TuiModel {
                 self.close_modal();
                 ModalConfirm::Nothing
             }
-            Some(Modal::Open { input }) => {
-                let line = std::mem::take(input);
+            Some(Modal::Open(picker)) => {
+                let line = std::mem::take(&mut picker.input);
                 self.close_modal();
                 if line.is_empty() {
                     // An empty line is a cancel, never an Open of "".
                     ModalConfirm::Nothing
                 } else {
+                    // The frozen U1 field semantic: the typed line —
+                    // file or folder — is an Open subject.
                     ModalConfirm::Open(line)
                 }
             }
@@ -1009,9 +1396,15 @@ impl TuiModel {
         }
     }
 
-    /// Type one character into the active text modal.
+    /// Type one character into the active text modal. Typing always
+    /// edits the picker's path line, from wherever inside the modal the
+    /// focus currently sits (type-through), and returns the focus to
+    /// the field.
     pub fn modal_push(&mut self, c: char) {
         self.modal_edit(ModalInput::Char(c));
+        if self.modal.is_some() {
+            self.focus = Some(FocusId::ModalField);
+        }
     }
 
     /// Backspace one character out of the active text modal.
@@ -1060,8 +1453,8 @@ pub fn decode_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
         return Some(TuiAction::Quit);
     }
-    if let Some(modal) = model.modal() {
-        return decode_modal_key(key, modal.kind());
+    if model.modal().is_some() {
+        return decode_modal_key(key, model);
     }
     match key.code {
         KeyCode::Tab => Some(TuiAction::MoveFocus(FocusMove::Next)),
@@ -1108,20 +1501,60 @@ pub fn decode_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
 /// The modal owns the keyboard while it is open (§24). No key both
 /// edits and executes: inside a text modal every plain character is a
 /// literal character — `q`/`Q` included, so `Q:\Music` stays typeable
-/// (Issue #166 §29) — and the help overlay lets only its close keys
-/// through, so no playback key can fire behind it.
-fn decode_modal_key(key: KeyEvent, kind: ModalKind) -> Option<TuiAction> {
-    match kind {
+/// (Issue #166 §29), and the same rule makes the picker's path line an
+/// ordinary text field, so it has NO letter accelerators — and the
+/// help overlay lets only its close keys through, so no playback key
+/// can fire behind it.
+///
+/// The Open picker's grammar (G1 §8): Tab cycles field → list →
+/// commit buttons; ↑/↓ move the listing cursor; Enter acts on the
+/// focused picker control (the field confirms its typed subject, a
+/// listing row descends into a directory or opens a file, a commit
+/// button commits); Backspace on the listing steps up to the parent
+/// directory; Esc cancels.
+fn decode_modal_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
+    let modal_kind = model.modal().map(Modal::kind)?;
+    match modal_kind {
         ModalKind::Help => match key.code {
             KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
             KeyCode::Char('?') if plain(key) => Some(TuiAction::ModalInput(ModalInput::Cancel)),
             KeyCode::Char('q') | KeyCode::Char('Q') if plain(key) => Some(TuiAction::Quit),
             _ => None,
         },
-        ModalKind::Open | ModalKind::GoTo => match key.code {
+        ModalKind::GoTo => match key.code {
             KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
             KeyCode::Enter if plain(key) => Some(TuiAction::ModalInput(ModalInput::Confirm)),
             KeyCode::Backspace if plain(key) => Some(TuiAction::ModalInput(ModalInput::Backspace)),
+            KeyCode::Char(c) if plain(key) => Some(TuiAction::ModalInput(ModalInput::Char(c))),
+            _ => None,
+        },
+        ModalKind::Open => match key.code {
+            KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
+            KeyCode::Tab => Some(TuiAction::MoveFocus(FocusMove::Next)),
+            KeyCode::BackTab => Some(TuiAction::MoveFocus(FocusMove::Previous)),
+            KeyCode::Enter if plain(key) => Some(TuiAction::ModalInput(match model.focus() {
+                Some(FocusId::PickerList) => ModalInput::ListActivate,
+                Some(FocusId::PickerButton(ModalButton::Open)) => ModalInput::CommitOpen,
+                Some(FocusId::PickerButton(ModalButton::Add)) => ModalInput::CommitAdd,
+                Some(FocusId::PickerButton(ModalButton::Cancel)) => ModalInput::Cancel,
+                _ => ModalInput::Confirm,
+            })),
+            KeyCode::Up if plain(key) => Some(TuiAction::ModalInput(ModalInput::ListMove(
+                PlaylistCursor::Previous,
+            ))),
+            KeyCode::Down if plain(key) => Some(TuiAction::ModalInput(ModalInput::ListMove(
+                PlaylistCursor::Next,
+            ))),
+            KeyCode::Backspace if plain(key) => {
+                match model.focus() {
+                    // On the listing, Backspace is the parent step; on
+                    // the field it edits the line.
+                    Some(FocusId::PickerList) => {
+                        Some(TuiAction::ModalInput(ModalInput::ListParent))
+                    }
+                    _ => Some(TuiAction::ModalInput(ModalInput::Backspace)),
+                }
+            }
             KeyCode::Char(c) if plain(key) => Some(TuiAction::ModalInput(ModalInput::Char(c))),
             _ => None,
         },
@@ -1142,18 +1575,29 @@ fn decode_modal_key(key: KeyEvent, kind: ModalKind) -> Option<TuiAction> {
 /// Decoding mutates exactly the presentation state a physical event
 /// owns — the focus and the armed click — and never a product seam.
 pub fn decode_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction> {
-    // §24/§25: a modal captures input and clears the armed target;
-    // background clicks (inside or outside the popup) dispatch nothing.
+    // §24/§25: while a modal is open only the modal's own controls
+    // answer; the background (inside or outside the popup) dispatches
+    // nothing.
     if model.modal().is_some() {
-        return None;
+        return decode_modal_mouse(mouse, model);
     }
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left) => match model.hit_test(mouse.column, mouse.row) {
             Some(target) => {
-                model.focus = Some(TuiModel::focus_of_target(target));
+                // A seek-bar hit carries no keyboard focus (the bar is
+                // a mouse affordance over an already keyboard-complete
+                // command); every other control focuses as before.
+                if let Some(focus) = TuiModel::focus_of_target(target) {
+                    model.focus = Some(focus);
+                }
                 // Only a control arms; the pane area focuses the list
-                // and nothing else.
-                model.armed = TuiModel::action_of_target(target).map(|_| target);
+                // and nothing else, and the seek bar arms for its
+                // geometry-resolved action below.
+                model.armed = if target == HitTarget::SeekBar {
+                    Some(target)
+                } else {
+                    TuiModel::action_of_target(target).map(|_| target)
+                };
                 None
             }
             None => {
@@ -1169,7 +1613,12 @@ pub fn decode_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction
             // re-render/revision that moved or replaced the control
             // all cancel (§17).
             if model.hit_test(mouse.column, mouse.row) == Some(armed) {
-                TuiModel::action_of_target(armed)
+                match armed {
+                    HitTarget::SeekBar => {
+                        Some(TuiAction::SeekPerMille(seek_bar_per_mille(model, &mouse)))
+                    }
+                    _ => TuiModel::action_of_target(armed),
+                }
             } else {
                 None
             }
@@ -1188,6 +1637,78 @@ pub fn decode_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction
         MouseEventKind::ScrollLeft | MouseEventKind::ScrollRight => None,
         // Right/middle buttons carry no product meaning (§19).
         MouseEventKind::Down(_) | MouseEventKind::Up(_) => None,
+    }
+}
+
+/// The per-mille a click on the seek bar's area requests (G1 §9): the
+/// clicked cell's center as a fraction of the bar, clamped into
+/// `1..=1000`. The bar region is this frame's own geometry — the same
+/// region the hit test just answered — so the fraction and the hit can
+/// never disagree.
+fn seek_bar_per_mille(model: &TuiModel, mouse: &MouseEvent) -> u16 {
+    let Some(region) = model
+        .regions
+        .iter()
+        .find(|region| region.target == HitTarget::SeekBar)
+    else {
+        return 0;
+    };
+    let offset = u32::from(mouse.column.saturating_sub(region.area.x));
+    let width = u32::from(region.area.width.max(1));
+    (((offset * 2 + 1) * 500) / width).min(1000) as u16
+}
+
+/// Whether a hit target belongs to the active modal's own surface
+/// (§25): everything else is background and stays inert.
+fn modal_target(target: HitTarget) -> bool {
+    matches!(
+        target,
+        HitTarget::PickerRow(_) | HitTarget::ModalButton(_) | HitTarget::ModalField
+    )
+}
+
+/// The armed-click discipline (§16–§22) applied to the Open picker's
+/// own controls: rows and buttons arm and activate like every other
+/// control, the wheel steps the listing where it has rows, and a
+/// click anywhere else — including the background visible around the
+/// popup — disarms and dispatches nothing.
+fn decode_modal_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction> {
+    match mouse.kind {
+        MouseEventKind::Down(MouseButton::Left) => match model.hit_test(mouse.column, mouse.row) {
+            Some(target) if modal_target(target) => {
+                model.focus = TuiModel::focus_of_target(target);
+                model.armed = TuiModel::action_of_target(target).map(|_| target);
+                None
+            }
+            _ => {
+                model.disarm();
+                None
+            }
+        },
+        MouseEventKind::Up(MouseButton::Left) => {
+            let armed = model.armed.take()?;
+            if modal_target(armed) && model.hit_test(mouse.column, mouse.row) == Some(armed) {
+                TuiModel::action_of_target(armed)
+            } else {
+                None
+            }
+        }
+        MouseEventKind::Drag(_) => {
+            model.disarm();
+            None
+        }
+        MouseEventKind::ScrollUp => modal_wheel(model, &mouse, PlaylistCursor::Previous),
+        MouseEventKind::ScrollDown => modal_wheel(model, &mouse, PlaylistCursor::Next),
+        _ => None,
+    }
+}
+
+/// The wheel action over one cell while the picker is open: a listing
+/// scroll over the listing rows, otherwise nothing.
+fn modal_wheel(model: &TuiModel, mouse: &MouseEvent, cursor: PlaylistCursor) -> Option<TuiAction> {
+    match model.hit_test(mouse.column, mouse.row)? {
+        HitTarget::PickerRow(_) => Some(TuiAction::ModalInput(ModalInput::ListMove(cursor))),
+        _ => None,
     }
 }
 
@@ -1605,7 +2126,8 @@ mod tests {
             }]
         });
 
-        // Now Playing: four tabs then the four transport buttons.
+        // Now Playing: four tabs, then the five transport buttons
+        // (Open included), then the preference row.
         model.set_route(TuiRoute::NowPlaying);
         assert_eq!(
             model.focus_cycle(),
@@ -1614,10 +2136,15 @@ mod tests {
                 FocusId::RouteTab(TuiRoute::Playlist),
                 FocusId::RouteTab(TuiRoute::Audio),
                 FocusId::RouteTab(TuiRoute::Visualizer),
+                FocusId::Transport(TransportButton::Open),
                 FocusId::Transport(TransportButton::Previous),
                 FocusId::Transport(TransportButton::PlayPause),
                 FocusId::Transport(TransportButton::Stop),
                 FocusId::Transport(TransportButton::Next),
+                FocusId::Preference(PreferenceButton::VolumeDown),
+                FocusId::Preference(PreferenceButton::VolumeUp),
+                FocusId::Preference(PreferenceButton::Order),
+                FocusId::Preference(PreferenceButton::Repeat),
             ]
         );
 
@@ -1717,7 +2244,7 @@ mod tests {
         model.set_route(TuiRoute::NowPlaying);
         assert_eq!(
             model.focus(),
-            Some(FocusId::Transport(TransportButton::Previous)),
+            Some(FocusId::Transport(TransportButton::Open)),
             "an out-of-cycle focus falls back to the route's first local control"
         );
     }
@@ -2061,7 +2588,7 @@ mod tests {
         assert_eq!(model.modal(), None);
         assert_eq!(
             model.focus(),
-            Some(FocusId::Transport(TransportButton::Previous)),
+            Some(FocusId::Transport(TransportButton::Open)),
             "closing restores the route's first meaningful local focus (§24)"
         );
     }
@@ -2483,5 +3010,306 @@ mod tests {
         assert_eq!(responsive_class(50, 16), ResponsiveClass::Compact);
         assert_eq!(responsive_class(80, 24), ResponsiveClass::Normal);
         assert_eq!(responsive_class(120, 40), ResponsiveClass::Wide);
+    }
+
+    // ------------------------------------------------------------------
+    // G1: the Open picker grammar, the seek bar, the DSP summary.
+    // ------------------------------------------------------------------
+
+    /// The picker's keyboard grammar (G1 §8): Tab cycles field → list
+    /// → commit buttons; ↑/↓ move the listing cursor and hand focus to
+    /// the list; typing always edits the field and returns focus to it;
+    /// Backspace edits on the field and steps to the parent on the
+    /// list; Enter acts on the focused control.
+    #[test]
+    fn the_open_picker_keyboard_grammar_walks_field_list_and_buttons() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::Open);
+        model.set_open_listing(
+            std::path::PathBuf::from("/media"),
+            Ok(vec![
+                crate::input::DirectoryEntry {
+                    name: "album".to_owned(),
+                    is_dir: true,
+                },
+                crate::input::DirectoryEntry {
+                    name: "b.flac".to_owned(),
+                    is_dir: false,
+                },
+            ]),
+        );
+        // The `..` parent row is synthesized in front of the listing.
+        assert_eq!(model.modal().map(Modal::kind), Some(ModalKind::Open));
+        assert_eq!(model.focus(), Some(FocusId::ModalField));
+
+        // Down: into the list, first row (the parent row).
+        assert_eq!(
+            decode_key(key(KeyCode::Down), &model),
+            Some(TuiAction::ModalInput(ModalInput::ListMove(
+                PlaylistCursor::Next
+            )))
+        );
+        model.move_picker_cursor(PlaylistCursor::Next);
+        assert_eq!(model.focus(), Some(FocusId::PickerList));
+
+        // Typing from the list is type-through: the field edits and
+        // regains focus.
+        assert_eq!(
+            decode_key(key(KeyCode::Char('x')), &model),
+            Some(TuiAction::ModalInput(ModalInput::Char('x')))
+        );
+        model.modal_push('x');
+        assert_eq!(model.modal_line(), Some("x"));
+        assert_eq!(model.focus(), Some(FocusId::ModalField));
+
+        // Tab walks field → list → Open → Add → Cancel → field.
+        for expected in [
+            FocusId::PickerList,
+            FocusId::PickerButton(ModalButton::Open),
+            FocusId::PickerButton(ModalButton::Add),
+            FocusId::PickerButton(ModalButton::Cancel),
+            FocusId::ModalField,
+        ] {
+            model.move_focus(FocusMove::Next);
+            assert_eq!(model.focus(), Some(expected));
+        }
+
+        // Backspace on the LIST is the parent step, on the FIELD an
+        // edit. Shift+Tab walks back: field → Cancel → Add → Open →
+        // list.
+        model.move_focus(FocusMove::Previous);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerButton(ModalButton::Cancel))
+        );
+        model.move_focus(FocusMove::Previous);
+        assert_eq!(model.focus(), Some(FocusId::PickerButton(ModalButton::Add)));
+        model.move_focus(FocusMove::Previous);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerButton(ModalButton::Open))
+        );
+        model.move_focus(FocusMove::Previous);
+        assert_eq!(model.focus(), Some(FocusId::PickerList));
+        assert_eq!(
+            decode_key(key(KeyCode::Backspace), &model),
+            Some(TuiAction::ModalInput(ModalInput::ListParent))
+        );
+        model.set_focus(Some(FocusId::ModalField));
+        assert_eq!(
+            decode_key(key(KeyCode::Backspace), &model),
+            Some(TuiAction::ModalInput(ModalInput::Backspace))
+        );
+
+        // Enter follows the focus: list activates, a button commits,
+        // the field confirms.
+        assert_eq!(
+            decode_key(key(KeyCode::Enter), &model),
+            Some(TuiAction::ModalInput(ModalInput::Confirm))
+        );
+        model.set_focus(Some(FocusId::PickerButton(ModalButton::Add)));
+        assert_eq!(
+            decode_key(key(KeyCode::Enter), &model),
+            Some(TuiAction::ModalInput(ModalInput::CommitAdd))
+        );
+        model.set_focus(Some(FocusId::PickerList));
+        assert_eq!(
+            decode_key(key(KeyCode::Enter), &model),
+            Some(TuiAction::ModalInput(ModalInput::ListActivate))
+        );
+    }
+
+    /// The cursor movement rule: from unselected, ↓ enters at the top
+    /// and ↑ at the bottom; a row click selects that row; the cursor
+    /// clamps at the edges.
+    #[test]
+    fn the_picker_cursor_moves_and_clamps() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::Open);
+        let feed = Ok(vec![
+            crate::input::DirectoryEntry {
+                name: "d1".to_owned(),
+                is_dir: true,
+            },
+            crate::input::DirectoryEntry {
+                name: "f1.flac".to_owned(),
+                is_dir: false,
+            },
+        ]);
+        model.set_open_listing(std::path::PathBuf::from("/media"), feed);
+        // Entries: [.., d1, f1.flac].
+        model.move_picker_cursor(PlaylistCursor::Next);
+        assert_eq!(
+            model.picker_cursor_entry(),
+            Some((std::path::PathBuf::from("/media",), true)),
+            "the first ↓ lands on the `..` parent row"
+        );
+        model.move_picker_cursor(PlaylistCursor::Next);
+        model.move_picker_cursor(PlaylistCursor::Next);
+        assert_eq!(
+            model.picker_cursor_entry(),
+            Some((std::path::PathBuf::from("/media/f1.flac",), false)),
+        );
+        model.move_picker_cursor(PlaylistCursor::Next);
+        assert_eq!(
+            model.picker_cursor_entry().map(|(path, _)| path),
+            Some(std::path::PathBuf::from("/media/f1.flac")),
+            "the cursor clamps at the last row"
+        );
+        model.move_picker_cursor(PlaylistCursor::Row(1));
+        assert_eq!(
+            model.picker_cursor_entry().map(|(path, _)| path),
+            Some(std::path::PathBuf::from("/media/d1")),
+            "a row click selects that row"
+        );
+        model.move_picker_cursor(PlaylistCursor::Previous);
+        assert_eq!(
+            model.picker_cursor_entry().map(|(path, _)| path),
+            Some(std::path::PathBuf::from("/media",)),
+        );
+    }
+
+    /// The commit subject (G1 §8): the selected row when one is
+    /// selected, else the typed line; nothing selected and an empty
+    /// line is no subject at all.
+    #[test]
+    fn the_picker_commit_subject_prefers_the_selection_then_the_field() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::Open);
+        assert_eq!(model.picker_commit_subject(), None, "nothing picked yet");
+        model.modal_push('/');
+
+        // No selection: the typed line is the subject, kind unknown.
+        let (path, is_dir) = model.picker_commit_subject().expect("typed subject");
+        assert_eq!(path, std::path::PathBuf::from("/"));
+        assert!(!is_dir, "the typed kind is the runtime's question");
+
+        // A selection wins over the field.
+        model.set_open_listing(
+            std::path::PathBuf::from("/media"),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "b.flac".to_owned(),
+                is_dir: false,
+            }]),
+        );
+        model.move_picker_cursor(PlaylistCursor::Row(1));
+        assert_eq!(
+            model.picker_commit_subject().map(|(path, _)| path),
+            Some(std::path::PathBuf::from("/media/b.flac")),
+        );
+    }
+
+    /// A click on the seek bar decodes to the clicked cell's per-mille
+    /// of the bar (G1 §9): Down arms, Up activates at the SAME cell,
+    /// and the fraction comes from the frame's own published geometry.
+    #[test]
+    fn a_click_on_the_seek_bar_decodes_to_a_per_mille_of_the_bar() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            source_format: Some(qianqian_audio_api::ports::PcmFormat {
+                sample_rate: 44_100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            position: Some(44_100),
+            source_duration: Some(Duration::from_secs(200)),
+            ..pending()
+        });
+        model.set_class(ResponsiveClass::Wide);
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| super::super::view::draw(frame, &mut model))
+            .expect("draw");
+        let region = model
+            .regions()
+            .iter()
+            .find(|region| region.target == HitTarget::SeekBar)
+            .expect("the bar publishes a region with duration evidence");
+        let column = region.area.x + region.area.width / 2;
+        let row = region.area.y;
+
+        let down = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        };
+        let up = MouseEvent {
+            kind: MouseEventKind::Up(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert_eq!(decode_mouse(down, &mut model), None, "Down only arms");
+        assert_eq!(
+            decode_mouse(up, &mut model),
+            Some(TuiAction::SeekPerMille(505)),
+            "the click's per-mille of the bar"
+        );
+    }
+
+    /// The fraction seek target is a per-mille of the PUBLISHED
+    /// duration — and `None` (no command at all) without duration
+    /// evidence: an unknown timeline is never clickable into a
+    /// fabricated target.
+    #[test]
+    fn the_seek_fraction_target_needs_published_duration_evidence() {
+        let with_duration = PlaybackSessionObservation {
+            source_duration: Some(Duration::from_secs(200)),
+            ..pending()
+        };
+        assert_eq!(
+            seek_fraction_target(&with_duration, 500),
+            Some(Duration::from_secs(100))
+        );
+        assert_eq!(
+            seek_fraction_target(&with_duration, 1000),
+            Some(Duration::from_secs(200))
+        );
+        assert_eq!(
+            seek_fraction_target(&with_duration, 1500),
+            Some(Duration::from_secs(200)),
+            "the fraction clamps into the duration"
+        );
+        let without_duration = PlaybackSessionObservation {
+            source_duration: None,
+            ..pending()
+        };
+        assert_eq!(seek_fraction_target(&without_duration, 500), None);
+        let zero_duration = PlaybackSessionObservation {
+            source_duration: Some(Duration::ZERO),
+            ..pending()
+        };
+        assert_eq!(seek_fraction_target(&zero_duration, 500), None);
+    }
+
+    /// The DSP summary line (G1): a DESIRED-state statement only —
+    /// bypass says off, a preset configuration names the preset, a
+    /// custom EQ says custom, the preamp renders in dB — and nothing
+    /// here claims an applied state.
+    #[test]
+    fn the_dsp_summary_names_the_desired_configuration_only() {
+        assert_eq!(
+            dsp_summary(&AudioProcessingConfig::BYPASS),
+            "DSP (desired): off (bypass)"
+        );
+        assert_eq!(
+            dsp_summary(&EqPreset::Rock.to_config()),
+            "DSP (desired): on — preset rock, preamp +0.0 dB"
+        );
+        let mut custom = EqPreset::Bass.to_config();
+        custom.eq = Some(qianqian_playback::EqConfig::new(
+            qianqian_playback::EqConfig::FLAT.band_gain_db,
+            1.7,
+        ));
+        assert_eq!(
+            dsp_summary(&custom),
+            "DSP (desired): on — custom EQ, preamp +0.0 dB"
+        );
+        assert_eq!(
+            dsp_summary(&AudioProcessingConfig::gain(2.0)),
+            "DSP (desired): on — preamp +6.0 dB"
+        );
     }
 }
