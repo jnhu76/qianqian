@@ -251,6 +251,45 @@ fn concurrent_presentation_copies_cannot_tear_snapshots_or_retain_producer_locks
     });
 }
 
+#[test]
+fn reader_allocation_never_holds_the_applied_close_slot_lock() {
+    use crate::edge_lifecycle_tests::counting_allocator::run_observing_allocations;
+    use std::cell::{Cell, RefCell};
+
+    thread_local! {
+        static SHARED: RefCell<Option<Arc<Shared>>> = const { RefCell::new(None) };
+        static LOCKED_ALLOCATIONS: Cell<usize> = const { Cell::new(0) };
+    }
+    fn observe_allocation() {
+        SHARED.with(|cell| {
+            if let Some(shared) = cell.borrow().as_ref()
+                && shared.slot.try_lock().is_err()
+            {
+                // Record instead of panicking inside the global allocator.
+                LOCKED_ALLOCATIONS.with(|count| count.set(count.get() + 1));
+            }
+        });
+    }
+
+    let tap = ObservationTap::new(TEST_FORMAT, FFT_SIZE);
+    let reader = tap.reader();
+    let mut analysis = Analysis::new(TEST_FORMAT);
+    analysis.analyze(&[0.5; FFT_SIZE * 2]);
+    tap.shared.publish(&analysis.snapshot);
+    SHARED.with(|cell| *cell.borrow_mut() = Some(tap.shared.clone()));
+    LOCKED_ALLOCATIONS.with(|count| count.set(0));
+    let (snapshot, allocations) = run_observing_allocations(observe_allocation, || reader.latest());
+    tap.invalidate();
+    let (unavailable, unavailable_allocations) =
+        run_observing_allocations(observe_allocation, || reader.latest());
+    SHARED.with(|cell| cell.borrow_mut().take());
+    assert!(snapshot.is_some());
+    assert!(unavailable.is_none());
+    assert_eq!(LOCKED_ALLOCATIONS.with(Cell::get), 0);
+    assert_eq!(allocations, 1);
+    assert_eq!(unavailable_allocations, 1);
+}
+
 /// Focused repeatable O6 evidence. Run with --release --nocapture for cost;
 /// timing is descriptive, allocations are asserted, no CI speed threshold.
 #[test]

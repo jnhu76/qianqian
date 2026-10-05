@@ -70,7 +70,10 @@ supports keeping the small always-on analyst.
 
 One mutex protects the slot and latest publication. The analyst copies a
 complete result into preallocated snapshot storage under a short lock; readers
-obtain independent owned copies and never receive guards. Readers can cause
+allocate their owned snapshot before locking, then check availability and copy
+into it under the lock. Returning or discarding that copy happens after unlock;
+the presentation allocator never runs while holding the control mutex.
+Readers obtain independent owned copies and never receive guards. Readers can cause
 telemetry contention/drop, but cannot backpressure playback. The only blocking
 producer calls are the inherited control-only Applied invalidation and close;
 they wait for bounded copies, never analysis. Allocation/scheduling/lock
@@ -192,24 +195,26 @@ cargo test -p qianqian-playback --release observation_cost_and_steady_state_allo
 
 Local target: x86_64-unknown-linux-gnu, WSL2 Linux 6.18.33.2, Intel i7-12700H,
 Rust 1.97.1, release profile. Base `cbfb4f28228212fd388cf882e6b0926d4796a513`;
-completion PR binds its exact head. 20 warmups then 2000 iterations per
+completion PR binds its exact head. Measurements refreshed for the reader
+allocation corrective to owner review 5410078075. 20 warmups then 2000 iterations per
 operation/format; thread-scoped existing counting allocator. Timings are
 local descriptive evidence, not CI speed thresholds or platform promises.
 
 | Operation | 44.1 kHz stereo median / p99 | 48 kHz stereo median / p99 |
 | --- | --- | --- |
-| complete analyst pass | 9.116 / 19.879 µs | 8.914 / 16.531 µs |
-| snapshot publication | 32 / 33 ns | 32 / 33 ns |
-| producer offer copy + notify | 211 / 241 ns | 206 / 231 ns |
-| contended producer drop | 23 / 24 ns | 23 / 24 ns |
-| offer + analyst copy-out | 278 / 305 ns | 255 / 274 ns |
-| owned reader snapshot copy | 55 / 69 ns | 55 / 69 ns |
+| complete analyst pass | 9.116 / 17.779 µs | 8.933 / 23.028 µs |
+| snapshot publication | 32 / 34 ns | 33 / 34 ns |
+| producer offer copy + notify | 207 / 236 ns | 209 / 239 ns |
+| contended producer drop | 23 / 24 ns | 24 / 25 ns |
+| offer + analyst copy-out | 271 / 298 ns | 264 / 282 ns |
+| owned reader snapshot copy | 62 / 76 ns | 63 / 76 ns |
 
 All measured producer, copy-out, analysis and publication paths allocate **0**
-times after initialization. Reader copies allocate **one channel array/read**
-(16 payload bytes for stereo), entirely on the presentation thread. No extra
+times after initialization. Reader copies allocate **one channel array/attempted read**
+(16 payload bytes for stereo), entirely on the presentation thread and before
+taking the slot lock, including when no snapshot is available. No extra
 snapshot wrapper allocation occurs. FFT-only comparison: 1024 median/p99
-0.881/0.978 µs; 2048 1.965/2.554 µs, both zero steady-state allocations.
+0.883/1.134 µs; 2048 1.942/2.501 µs, both zero steady-state allocations.
 At natural full-block cadence, median analysis work is about 0.04% of one
 CPU core; this excludes wake/scheduling overhead and possible prefetch bursts.
 No measured bottleneck earns hidden-route coordination or another worker.
@@ -228,7 +233,9 @@ Strong regression evidence: deterministic silence/two tones/amplitude,
 channel peak/RMS and overload, waveform polarity/cancellation/short final block,
 controlled in-flight Applied rejection + complete reset, coherent latest
 publication, structural replacement isolation, concurrent readers, measured
-allocation paths; reused O1 drop/overwrite/teardown tests and real worker
+allocation paths and an allocator oracle that checks the slot remains unlocked
+during reader allocations (restoring the old clone makes this oracle fail);
+reused O1 drop/overwrite/teardown tests and real worker
 Applied/offer seam tests (extended to prove public reader attachment).
 `RefusedUnchanged` reset absence follows the Applied-only production call site;
 existing seek/refusal suites retain their playback content claims.

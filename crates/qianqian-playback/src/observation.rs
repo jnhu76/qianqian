@@ -96,9 +96,17 @@ impl ObservationReader {
     /// Latest complete owned copy, or None before publication / after Applied
     /// until a post-cut result arrives. Old publications may be skipped. A
     /// previously returned owned copy cannot be revoked by a later cut.
+    /// Allocates the owned channel array before locking, even if unavailable;
+    /// the slot lock covers only the availability check and bounded copy.
     pub fn latest(&self) -> Option<ObservationSnapshot> {
+        let mut snapshot = ObservationSnapshot::empty(self.shared.format);
         let slot = self.shared.lock_slot();
-        slot.available.then(|| slot.snapshot.clone())
+        let available = slot.available;
+        if available {
+            snapshot.copy_from(&slot.snapshot);
+        }
+        drop(slot);
+        available.then_some(snapshot)
     }
 
     /// Observation close requested (or analyst unavailable). The worker may
