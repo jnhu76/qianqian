@@ -1483,6 +1483,15 @@ mod tests {
     /// DisableMouseCapture on the same restore lifecycle, ordered
     /// before the alternate-screen leave. (The raw-mode pairing is the
     /// guard's own concern; this pins the NEW capture obligation.)
+    ///
+    /// The oracle is ANSI byte order, valid only where the capture
+    /// commands actually emit bytes: on Windows crossterm routes mouse
+    /// capture through the WinAPI console path
+    /// (`is_ansi_code_supported` is `false`), so nothing reaches the
+    /// writer. The pairing there is crossterm's own mechanism; Windows
+    /// keeps the compile gate and device-free tests, and real device
+    /// evidence stays out of CI scope.
+    #[cfg(not(windows))]
     #[test]
     fn mouse_capture_is_disabled_on_the_same_lifecycle_that_enables_it() {
         let mut enter_buffer = Vec::new();
