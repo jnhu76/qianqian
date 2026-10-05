@@ -1764,6 +1764,17 @@ mod tests {
         let file = tree.live_file("picked live.flac");
         let subdir = tree.path().join("album");
         fs::create_dir_all(&subdir).expect("subdir");
+        // navigate_picker_to browses CANONICAL paths, and on Windows
+        // runners `std::env::temp_dir()` spells the user profile in the
+        // 8.3 short form (RUNNER~1) that canonicalize resolves away.
+        // The expectations therefore go through the SAME
+        // canonicalize + simplify transform the runtime applies.
+        let canonical = |path: &Path| {
+            simplify_verbatim(&std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()))
+        };
+        let subdir = canonical(&subdir);
+        let root = canonical(tree.path());
+        let file = canonical(&file);
 
         let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
         let mut model = TuiModel::new(String::new());
@@ -1824,7 +1835,7 @@ mod tests {
         );
         assert_eq!(
             model.open_picker_dir(),
-            Some(tree.path()),
+            Some(root.as_path()),
             "Backspace on the listing steps up to the parent"
         );
         for _ in 0..3 {
