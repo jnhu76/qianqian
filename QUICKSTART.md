@@ -24,11 +24,20 @@ qianqian.exe
 ```
 
 The player opens with no music loaded. Press the visible `Open` button
-(or the `O` key): a picker opens showing the current folder. Type or
-paste a path (for example `D:\Music`), or browse the listing with the
-mouse or the arrow keys, and press `Open` (or `Enter`) to play it. The
-picker's `Add to Playlist` button appends a file or folder to the track
-list instead of playing it right away.
+(or the `O` key): a picker opens showing the current folder. Browse the
+listing with the mouse or the arrow keys — the `[Enter folder]` button
+(or `Enter` on a selected folder) descends into it, the `..` row moves
+up, and `Enter` on a file row just marks that file as the selection.
+Typing or pasting a path (for example `D:\Music`) into the path line
+and pressing `Enter` selects that file or folder in the listing.
+
+The picker commits exactly one subject: the selected row, or — once you
+type into the path line, which clears the selection — the typed path.
+The visible `[Open]` button plays that subject now (a file goes
+straight to Now Playing; a folder seeds the track list with its
+playable tracks), and `[Add to Playlist]` appends it to the track list
+without playing it. If a path cannot be read, the picker stays open
+with the diagnostic so you can correct it and retry.
 
 ## Play a folder
 
@@ -65,17 +74,22 @@ Now Playing              Playlist                 Audio                    Visua
 │ Track: 1/3                                        │
 └───────────────────────────────────────────────────┘
 01:42 ━━━━━━━━━━━╸──────────── 03:58
-┌────────┐┌────────┐┌────────────┐┌────────┐┌────────┐
-│  Open  ││ ◀ Prev ││ Play/Pause ││ ■ Stop ││ Next ▶ │
-└────────┘└────────┘└────────────┘└────────┘└────────┘
+[ Back 5s ]                    [ Forward 5s ]
+┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐
+│  Open  ││ ◀ Prev ││ Pause  ││ ■ Stop ││ Next ▶ │
+└────────┘└────────┘└────────┘└────────┘└────────┘
 ┌───┐ 100/100 (desired) ┌───┐┌───────────────────┐┌──────────────┐
-│ − │                   │ + ││ Order: Sequential ││ Repeat: Off  │
+│ - │                   │ + ││ Order: Sequential ││ Repeat: Off  │
 └───┘                   └───┘└───────────────────┘└──────────────┘
 ```
 
 The `Playlist` tab shows the track list. Every button above is clickable
-with the mouse and reachable with `Tab` + `Enter`; the progress bar is
-click-to-seek, and the `−` / `+` buttons change Qianqian's own volume.
+with the mouse and reachable with `Tab` + `Enter`; the
+`[ Back 5s ]` / `[ Forward 5s ]` buttons seek in small steps (they are
+visible while a track reports its position), the progress bar is
+click-to-seek, and the `-` / `+` buttons change Qianqian's own volume.
+The middle transport button is contextual — `Pause` while a track is
+active, `Resume` while paused, `Play` with nothing active.
 
 Two markers matter in the list:
 
@@ -96,8 +110,8 @@ Enter.
 | Key                 | Action                                            |
 | ------------------- | ------------------------------------------------- |
 | `Tab / Shift+Tab`   | Move keyboard focus to the next / previous control |
-| `Enter`             | Activate the focused control; on the playlist, play the selected row |
-| `Mouse`             | Click any visible control: tabs, buttons, the progress bar, playlist rows |
+| `Enter`             | Activate the focused control; on the playlist, play the selected row; in the picker, navigate or select (the visible buttons commit) |
+| `Mouse`             | Click any visible control: tabs, buttons, the progress bar, playlist rows, picker rows |
 | `↑ / ↓`             | Select previous / next playlist row (list focused) |
 | `N / P`             | Next / previous track                             |
 | `R`                 | Order: Sequential / Shuffle                       |
@@ -182,7 +196,7 @@ claim is made beyond the list above.
 
 ## Volume
 
-The visible `−` / `+` buttons (or the `+` and `-` keys) change
+The visible `-` / `+` buttons (or the `+` and `-` keys) change
 Qianqian's own volume in steps of 5 (0–100). The scale is perceptual:
 each step is about 3 dB, so a press feels alike near the top and near
 the bottom (100 is full, 0 is silence). The number between the buttons,
@@ -194,7 +208,8 @@ mixer and output device still apply on top of it.
 ### Player opens but no music is loaded
 
 Press the `Open` button (or the `O` key) and paste a file or folder
-path, or browse to it in the picker, then press `Open` / Enter.
+path, or browse to it in the picker, then press the visible `Open`
+button.
 
 ### A folder says "no playable audio files found"
 

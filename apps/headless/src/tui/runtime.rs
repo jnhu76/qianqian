@@ -52,8 +52,8 @@ use ratatui::backend::CrosstermBackend;
 use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 
 use super::model::{
-    ModalConfirm, ModalInput, ModalKind, PlaylistCursor, Step, TuiAction, TuiModel, decode_key,
-    decode_mouse, dsp_summary, seek_fraction_target, seek_target,
+    Modal, ModalConfirm, ModalInput, ModalKind, PickerSubject, PlaylistCursor, Step, TuiAction,
+    TuiModel, TuiRoute, decode_key, decode_mouse, dsp_summary, seek_fraction_target, seek_target,
 };
 use super::view;
 
@@ -199,19 +199,35 @@ fn dispatch<S: EpisodeStart>(
             handle_modal_input(input, model, player);
             Step::Continue
         }
-        // The transport commands: with no episode they are inert (there
-        // is nothing to command).
+        // The central transport control (T0 transport freeze, G1 F03).
+        // The frozen truth table, executed through EXISTING product
+        // authority only — no second start path, no episode mutation:
+        //
+        //   unsettled current episode -> pause / resume, by the FRESH
+        //                                pause-command state
+        //   terminal current entry    -> replay through the existing
+        //                                replacement (`play_current`)
+        //   no episode, a list        -> play the selected entry
+        //                                (`play_current`'s own rule)
+        //   neither                   -> honest inert feedback
         TuiAction::PlayPause => {
-            if let Some(handle) = player.active_handle() {
-                // The choice between the two commands comes from a FRESH
-                // authoritative observation of the episode's pause-intent
-                // command state — the shell never keeps a local `paused`
-                // bool.
-                if handle.observe().pause_requested {
-                    handle.request_resume();
-                } else {
-                    handle.request_pause();
+            match player.active_handle() {
+                Some(handle) => {
+                    // The choice comes from a FRESH authoritative
+                    // observation — the shell never keeps a local
+                    // `paused` or `terminal` bool.
+                    if handle.observe().terminal_outcome.is_some() {
+                        perform_play_current(model, player);
+                    } else if handle.observe().pause_requested {
+                        handle.request_resume();
+                    } else {
+                        handle.request_pause();
+                    }
                 }
+                // No live episode: `play_current` IS the App's
+                // Home-Play seam — with no episode it plays the
+                // selected entry, and with neither it reports why not.
+                None => perform_play_current(model, player),
             }
             Step::Continue
         }
@@ -306,9 +322,19 @@ fn dispatch<S: EpisodeStart>(
 
 /// One editing step inside the active modal (§24/§26/§31). The modal
 /// owns its keys, so nothing here can also reach a background control:
-/// a cancel closes and restores a valid route focus, and a confirm
-/// closes and performs THIS modal's operation — never both a modal
-/// action and a background action in one event.
+/// a cancel closes and restores a valid route focus, and a commit
+/// performs THIS modal's operation — never both a modal action and a
+/// background action in one event.
+///
+/// The picker's submission disposition (G1 F11/F12, T0 freeze): the
+/// modal closes ONLY on a successful commit — an Open that started, an
+/// Add that appended. A refused/unreadable subject keeps the picker
+/// (the typed line, the displayed directory, the listing and the
+/// selection all survive) with a bounded diagnostic, so the failed
+/// attempt is correctable; FailStop rides the same retention (the
+/// latched state refuses again, honestly). Success routes exactly as
+/// T0 freezes it: Open-file -> Now Playing, Open-folder -> Playlist,
+/// Add -> Playlist.
 fn handle_modal_input<S: EpisodeStart>(
     input: ModalInput,
     model: &mut TuiModel,
@@ -321,13 +347,16 @@ fn handle_modal_input<S: EpisodeStart>(
         // The picker listing's cursor: presentation only, like the
         // playlist pane's selection.
         ModalInput::ListMove(cursor) => model.move_picker_cursor(cursor),
-        // Enter on the listing: a directory (or the `..` row) descends
-        // into view; a file commits the Open. Nothing selected — inert.
+        // Enter on the listing (T0 picker freeze): a directory — or the
+        // `..` row — navigates; a FILE is SELECTED, never committed.
+        // Final Open/Add requires activating an explicit button, so no
+        // row gesture can start playback by accident (G1 F05).
         ModalInput::ListActivate => match model.picker_cursor_entry() {
-            Some((path, true)) => navigate_picker_to(model, &path),
-            Some((path, false)) => {
-                model.close_modal();
-                perform_open(model, player, &path);
+            Some((_entry, path, true)) => navigate_picker_to(model, &path),
+            Some((_entry, _path, false)) => {
+                // Selection only: the cursor is already on this row;
+                // the row itself asserts nothing further. The commit
+                // buttons are the only way forward.
             }
             None => {}
         },
@@ -341,53 +370,199 @@ fn handle_modal_input<S: EpisodeStart>(
                 navigate_picker_to(model, &parent);
             }
         }
-        // The [Open] commit button: the SELECTED subject if one is,
-        // otherwise the typed path line. A directory subject commits
-        // as a folder Open (the shared expansion seeds the list), it
-        // does not navigate — Enter on a row is navigation, the
-        // button is a commit.
-        ModalInput::CommitOpen => match model.picker_commit_subject() {
-            Some((path, _is_dir)) => {
-                model.close_modal();
-                perform_open(model, player, &path);
-            }
-            None => model.set_status(Some("nothing picked to open".to_owned())),
-        },
-        // The [Add to Playlist] commit button: the same subject rule,
-        // appended through the same shared expansion/probe admission —
-        // no candidate is activated (T1A A1/A2 semantics).
-        ModalInput::CommitAdd => match model.picker_commit_subject() {
-            Some((path, _is_dir)) => {
-                model.close_modal();
-                perform_add(model, player, &path);
-            }
-            None => model.set_status(Some("nothing picked to add".to_owned())),
-        },
-        ModalInput::Confirm => match model.confirm_modal() {
-            ModalConfirm::Nothing => {}
-            // The frozen U1 field flow, unchanged: a typed path — file
-            // OR folder — commits the Open (the shared expansion seeds
-            // the list). Navigation belongs to the listing rows; the
-            // field line is always an Open subject.
-            ModalConfirm::Open(candidate) => perform_open(model, player, Path::new(&candidate)),
-            ModalConfirm::Seek(target) => match player.active_handle() {
-                Some(handle) => {
-                    // The SAME frozen seek command the arrows use
-                    // (Issue #166 §27): the episode's own
-                    // clamp/refusal contract decides the landing.
-                    handle.request_seek(target);
-                    model.set_status(Some(format!(
-                        "seek requested: {}",
-                        crate::status::format_clock(target)
-                    )));
+        // The [Open] button: the ONE subject (selection, else typed
+        // line) committed as a folder or file Open. A directory subject
+        // commits as a folder Open (the shared expansion seeds the
+        // list) — it does not navigate; row gestures navigate, the
+        // button commits.
+        ModalInput::CommitOpen => {
+            commit_picker_subject(model, player, PickerDisposition::Open);
+        }
+        // The [Add to Playlist] button: the same subject, appended
+        // through the same shared expansion/probe admission — no
+        // candidate is activated (T1A A1/A2 semantics).
+        ModalInput::CommitAdd => {
+            commit_picker_subject(model, player, PickerDisposition::Add);
+        }
+        // Enter on the field (T0 picker freeze): navigate a directory,
+        // select a named file, or stay with a bounded diagnostic. It
+        // NEVER starts playback, and an unreadable path keeps the
+        // picker for correction (G1 F05/F09/F11).
+        ModalInput::Confirm => match model.modal().map(Modal::kind) {
+            Some(ModalKind::Open) => confirm_picker_field(model),
+            _ => match model.confirm_modal() {
+                ModalConfirm::Nothing => {}
+                ModalConfirm::Seek(target) => match player.active_handle() {
+                    Some(handle) => {
+                        // The SAME frozen seek command the arrows use
+                        // (Issue #166 §27): the episode's own
+                        // clamp/refusal contract decides the landing.
+                        handle.request_seek(target);
+                        model.set_status(Some(format!(
+                            "seek requested: {}",
+                            crate::status::format_clock(target)
+                        )));
+                    }
+                    // Nothing to seek: the parsed target is dropped
+                    // rather than sent into a nonexistent episode.
+                    None => model.set_status(Some("seek: no episode".to_owned())),
+                },
+                ModalConfirm::Unreadable(diagnostic) => {
+                    model.set_status(Some(diagnostic.to_owned()))
                 }
-                // Nothing to seek: the parsed target is dropped rather
-                // than sent into a nonexistent episode.
-                None => model.set_status(Some("seek: no episode".to_owned())),
             },
-            ModalConfirm::Unreadable(diagnostic) => model.set_status(Some(diagnostic.to_owned())),
         },
     }
+}
+
+/// What committing the picker's subject was asked to do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PickerDisposition {
+    Open,
+    Add,
+}
+
+/// Resolve and commit the picker's ONE subject for one disposition.
+/// The subject resolution (G1 F08/F09/F10): a listing selection
+/// commits its NATIVE path unchanged; the typed line is normalized
+/// against the DISPLAYED directory (relative base, leading `~`), never
+/// against the process working directory of the moment. A subject that
+/// cannot be normalized keeps the picker with its diagnostic; a
+/// well-formed one runs the shared expansion/admission path, and the
+/// modal closes only when the operation actually succeeded.
+fn commit_picker_subject<S: EpisodeStart>(
+    model: &mut TuiModel,
+    player: &mut ReferencePlayerApp<S>,
+    disposition: PickerDisposition,
+) {
+    let nothing_message = match disposition {
+        PickerDisposition::Open => "nothing picked to open",
+        PickerDisposition::Add => "nothing picked to add",
+    };
+    // The one filesystem question the typed subject needs (its
+    // directory-or-file kind for the success routing); the LISTING
+    // subject already knows its kind.
+    let resolved = match model.picker_subject() {
+        PickerSubject::None => {
+            model.set_status(Some(nothing_message.to_owned()));
+            return;
+        }
+        PickerSubject::Listing { path, is_dir } => Some((path, is_dir)),
+        PickerSubject::Typed(line) => match picker_typed_path(model, &line) {
+            Ok(path) => {
+                let is_dir = std::fs::symlink_metadata(&path)
+                    .map(|metadata| metadata.is_dir())
+                    .unwrap_or(false);
+                Some((path, is_dir))
+            }
+            Err(diagnostic) => {
+                // Unresolvable typed line: nothing was touched, the
+                // picker stays for correction (G1 F11).
+                model.set_picker_error(diagnostic);
+                return;
+            }
+        },
+    };
+    let Some((path, is_dir)) = resolved else {
+        return;
+    };
+    // The synchronous expansion/admission can stall this thread for as
+    // long as the operation takes; the busy interval publishes no
+    // interactive geometry — stale regions and any armed press die
+    // here, so events queued during the stall decode against nothing
+    // and the post-return draw publishes fresh geometry (T0).
+    model.invalidate_frame();
+    match disposition {
+        PickerDisposition::Open => {
+            let outcome = perform_open(model, player, &path);
+            if matches!(outcome, Some(OpenOutcome::Opened)) {
+                model.close_modal();
+                // The frozen success routing (T0): a file goes to Now
+                // Playing; a folder goes to Playlist with its first
+                // candidate already started.
+                model.set_route(if is_dir {
+                    TuiRoute::Playlist
+                } else {
+                    TuiRoute::NowPlaying
+                });
+            }
+            // Any other outcome: the picker stays, the diagnostic is
+            // on the status block, the context is intact for retry.
+        }
+        PickerDisposition::Add => {
+            let added = perform_add(model, player, &path);
+            if let Ok(_count) = added {
+                model.close_modal();
+                model.set_route(TuiRoute::Playlist);
+            }
+        }
+    }
+}
+
+/// Enter on the picker's path field (T0): navigate a directory or
+/// select a named file — never a commit. The typed line is normalized
+/// against the displayed directory (G1 F09); a file inside the listing
+/// is selected by moving the cursor onto its row (visible, and it
+/// becomes the subject); a file outside it is revealed by listing its
+/// parent directory with the file row selected. An unreadable path
+/// keeps the picker with a bounded diagnostic (G1 F11).
+fn confirm_picker_field(model: &mut TuiModel) {
+    let line = match model.modal() {
+        Some(Modal::Open(picker)) if !picker.input.is_empty() => picker.input.clone(),
+        _ => return,
+    };
+    let path = match picker_typed_path(model, &line) {
+        Ok(path) => path,
+        Err(diagnostic) => {
+            model.set_picker_error(diagnostic);
+            return;
+        }
+    };
+    let metadata = std::fs::symlink_metadata(&path);
+    match metadata {
+        // A directory navigates the listing into view.
+        Ok(metadata) if metadata.is_dir() => navigate_picker_to(model, &path),
+        // A file is SELECTED: list its parent (when not already shown)
+        // and put the cursor on its row. Selection is visible; the
+        // commit stays on the explicit buttons.
+        Ok(_) => {
+            let parent = path.parent().map(|parent| parent.to_path_buf());
+            let file_name = path.file_name().map(|name| name.to_os_string());
+            if let (Some(parent), Some(file_name)) = (parent, file_name) {
+                if model.open_picker_dir() != Some(parent.as_path()) {
+                    navigate_picker_to(model, &parent);
+                }
+                let row = model
+                    .picker_entries()
+                    .iter()
+                    .position(|entry| entry.path.file_name() == Some(file_name.as_os_str()));
+                if let Some(row) = row {
+                    model.move_picker_cursor(PlaylistCursor::Row(row));
+                } else {
+                    model.set_picker_error(format!(
+                        "cannot select {}: not in the listing",
+                        path.display()
+                    ));
+                }
+            }
+        }
+        // Unreadable: nothing moved, the picker stays for correction.
+        Err(error) => model.set_picker_error(format!("cannot read {}: {error}", path.display())),
+    }
+}
+
+/// Normalize the picker's typed line the ONE frozen way (T0): a
+/// leading `~` expands to the home directory, a relative line
+/// resolves against the DISPLAYED directory — never the process working
+/// directory of the moment (G1 F09). No shell, variables or globs.
+fn picker_typed_path(model: &TuiModel, line: &str) -> Result<std::path::PathBuf, String> {
+    let base = model
+        .open_picker_dir()
+        .map(|dir| dir.to_path_buf())
+        .unwrap_or_else(|| {
+            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+        });
+    crate::input::normalize_path(Path::new(line), &base)
 }
 
 /// List one directory into the Open picker (G1 §8 navigation). I/O
@@ -407,9 +582,14 @@ fn navigate_picker_to(model: &mut TuiModel, dir: &Path) {
 /// while display and commit paths stay in the vocabulary the user
 /// typed. UNC targets (`\\?\UNC\server\share`) map to their plain
 /// `\\server\share` spelling; on non-Windows targets this is the
+/// identity. The transform is LOSSLESS (G1 F10): a path whose text
+/// cannot be rendered without loss keeps its canonical native form
+/// untouched — a display convenience must never corrupt filesystem
 /// identity.
 fn simplify_verbatim(path: &Path) -> std::path::PathBuf {
-    let text = path.as_os_str().to_string_lossy();
+    let Some(text) = path.to_str() else {
+        return path.to_path_buf();
+    };
     let Some(stripped) = text.strip_prefix(r"\\?\") else {
         return path.to_path_buf();
     };
@@ -423,14 +603,17 @@ fn simplify_verbatim(path: &Path) -> std::path::PathBuf {
 /// playlist through the SAME shared input expansion the startup and
 /// Open use (T1A A1/A2). Admission runs before anything is appended;
 /// the bounded scan detail rides the status block. The operation is
-/// list-only: no episode is started, replaced or retired.
+/// list-only: no episode is started, replaced or retired. Returns the
+/// appended count so the caller owns the submission's disposition
+/// (the picker closes only on success — G1 F11).
 fn perform_add<S: EpisodeStart>(
     model: &mut TuiModel,
     player: &mut ReferencePlayerApp<S>,
     candidate: &Path,
-) {
+) -> Result<usize, String> {
     let mut expansion = crate::input::expand_inputs([candidate]);
-    let feedback = match crate::input::append_expanded(player, &mut expansion) {
+    let result = crate::input::append_expanded(player, &mut expansion);
+    let feedback = match &result {
         Ok(count) => {
             let warnings = expansion.scan_warnings();
             if warnings.is_empty() {
@@ -442,6 +625,7 @@ fn perform_add<S: EpisodeStart>(
         Err(refusal) => format!("add refused: {refusal}"),
     };
     model.set_status(Some(feedback));
+    result
 }
 
 /// Which navigation step was requested.
@@ -543,20 +727,54 @@ fn perform_play_selected<S: EpisodeStart>(
 /// application composition feedback (D14.6), never a playback
 /// semantic; a partial traversal reports its bounded scan warnings
 /// right under the opened line (U1 corrective REQUIRED-2), so a
-/// partially unreadable folder never looks complete.
+/// partially unreadable folder never looks complete. Returns the
+/// outcome so the caller owns the submission's disposition (the picker
+/// closes only on an actual Open — G1 F11).
 fn perform_open<S: EpisodeStart>(
     model: &mut TuiModel,
     player: &mut ReferencePlayerApp<S>,
     candidate: &Path,
-) {
+) -> Option<OpenOutcome> {
     let mut expansion = crate::input::expand_inputs([candidate]);
     let outcome = crate::input::open_expanded(player, &mut expansion);
-    let feedback = match outcome {
+    let feedback = match &outcome {
         None => format!("open refused: {}", expansion.refusal()),
         Some(OpenOutcome::Opened) => expansion.opened_status(),
         Some(OpenOutcome::Refused { diagnostic }) => format!("open refused: {diagnostic}"),
         Some(OpenOutcome::ActivationFailedClean { diagnostic }) => {
             format!("open failed (clean): {diagnostic}")
+        }
+        Some(OpenOutcome::FailStop { diagnostic }) => format!("FAIL-STOP: {diagnostic}"),
+    };
+    model.set_status(Some(feedback));
+    outcome
+}
+
+/// The central transport control's Home-Play commands (T0 transport
+/// freeze, G1 F03), for a terminal current entry or a no-episode
+/// list: replay/play through the App's EXISTING `play_current`
+/// replacement seam — never a local restart, never a mutated episode,
+/// never a second start path. The feedback is the operation's own
+/// composition feedback, and the inert cases say why.
+fn perform_play_current<S: EpisodeStart>(model: &mut TuiModel, player: &mut ReferencePlayerApp<S>) {
+    let feedback = match player.play_current() {
+        // `play_current` is inert in exactly two ways: a terminal
+        // episode with no replayable entry, or no episode and no
+        // selection (the frozen "Play is disabled with its reason").
+        None => {
+            if player.active_handle().is_some() {
+                "play: the current episode has no replayable entry".to_owned()
+            } else {
+                "No music loaded — open something with the Open button".to_owned()
+            }
+        }
+        Some(OpenOutcome::Opened) => match player.active_source() {
+            Some(source) => format!("play: opened {}", source.display()),
+            None => "play: opened".to_owned(),
+        },
+        Some(OpenOutcome::Refused { diagnostic }) => format!("play refused: {diagnostic}"),
+        Some(OpenOutcome::ActivationFailedClean { diagnostic }) => {
+            format!("play failed (clean): {diagnostic}")
         }
         Some(OpenOutcome::FailStop { diagnostic }) => format!("FAIL-STOP: {diagnostic}"),
     };
@@ -798,6 +1016,11 @@ mod tests {
     }
 
     /// The whole O flow from a model state: open the modal, type, Enter.
+    /// The typed-path flow under the frozen picker grammar (T0): the
+    /// typed line + Enter NAVIGATES a directory or SELECTS a named
+    /// file — it never starts playback — and the explicit [Open]
+    /// button (Tab to it, Enter on it) commits. Keyboard-only, no
+    /// mouse, no hidden shortcuts.
     fn open_via_keys<S: EpisodeStart>(
         model: &mut TuiModel,
         player: &mut ReferencePlayerApp<S>,
@@ -812,6 +1035,33 @@ mod tests {
             Some(super::super::model::Modal::Open { .. })
         ));
         type_text(model, player, &target.to_string_lossy());
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), model, player),
+            Step::Continue,
+            "the field's Enter navigates or selects; it never commits"
+        );
+        assert!(
+            model.modal().is_some(),
+            "the picker stays open after the field's Enter"
+        );
+        // Tab to the [Open] button and activate it.
+        for _ in 0..8 {
+            assert_eq!(handle_key(key(KeyCode::Tab), model, player), Step::Continue);
+            if model.focus()
+                == Some(FocusId::PickerButton(
+                    super::super::model::ModalButton::Open,
+                ))
+            {
+                break;
+            }
+        }
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerButton(
+                super::super::model::ModalButton::Open
+            )),
+            "Tab reaches the [Open] button from the field"
+        );
         assert_eq!(
             handle_key(key(KeyCode::Enter), model, player),
             Step::Continue
@@ -1756,10 +2006,11 @@ mod tests {
     }
 
     /// The picker rows navigate (a directory row descends, `..`
-    /// ascends) and Enter on a file row commits the Open through the
-    /// same frozen replacement.
+    /// ascends) and Enter on a file row SELECTS ONLY (the frozen T0
+    /// rule): no row gesture commits — the explicit [Open] button does,
+    /// consuming the selection's native path.
     #[test]
-    fn the_picker_rows_navigate_and_a_file_row_activates_through_enter() {
+    fn the_picker_rows_navigate_and_a_file_row_only_selects() {
         let tree = TempTree::new("picker-rows");
         let file = tree.live_file("picked live.flac");
         let subdir = tree.path().join("album");
@@ -1791,10 +2042,12 @@ mod tests {
                 crate::input::DirectoryEntry {
                     name: "album".to_owned(),
                     is_dir: true,
+                    path: tree.path().join("album"),
                 },
                 crate::input::DirectoryEntry {
                     name: "picked live.flac".to_owned(),
                     is_dir: false,
+                    path: tree.path().join("picked live.flac"),
                 },
             ]),
         );
@@ -1828,7 +2081,8 @@ mod tests {
         );
 
         // Back up with the parent step (Backspace on the listing),
-        // then walk ↓ to the file row and Enter commits the Open.
+        // then walk ↓ to the file row. Enter on a FILE row selects it
+        // — the modal stays open and nothing starts.
         assert_eq!(
             handle_key(key(KeyCode::Backspace), &mut model, &mut player),
             Step::Continue
@@ -1848,11 +2102,123 @@ mod tests {
             handle_key(key(KeyCode::Enter), &mut model, &mut player),
             Step::Continue
         );
+        assert!(
+            model.modal().is_some(),
+            "Enter on a file row never commits: the picker stays"
+        );
+        assert!(
+            player.active_handle().is_none(),
+            "no episode started from a row gesture"
+        );
+        assert_eq!(
+            model.picker_subject(),
+            super::super::model::PickerSubject::Listing {
+                path: file.clone(),
+                is_dir: false,
+            },
+            "the file row IS the selection, its native path the subject"
+        );
+
+        // The explicit [Open] button commits the selection through the
+        // frozen replacement, and success routes to Now Playing.
+        let (column, row) = draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &super::super::model::HitTarget::ModalButton(super::super::model::ModalButton::Open),
+        );
+        click_at(column, row, &mut model, &mut player);
         refresh(&mut model, &player);
         assert_eq!(
             model.source(),
             Some(file.to_string_lossy().as_ref()),
-            "Enter on the file row opened it"
+            "the [Open] button opened the selection"
+        );
+        assert_eq!(model.modal(), None, "success closed the picker");
+        assert_eq!(
+            model.route(),
+            TuiRoute::NowPlaying,
+            "an Open-file success lands on Now Playing"
+        );
+    }
+
+    /// Mouse-only picker navigation (G1 F04, T0: mouse-only navigation
+    /// needs no typed path): clicking `..` ascends, clicking a
+    /// directory row selects it, and the visible [Enter folder] button
+    /// descends — the mouse converging on the same semantic actions as
+    /// the keyboard, with no hidden keyboard assistance.
+    #[test]
+    fn the_picker_navigates_by_mouse_alone() {
+        let tree = TempTree::new("picker-mouse");
+        let subdir = tree.path().join("album");
+        fs::create_dir_all(&subdir).expect("subdir");
+        let canonical = |path: &Path| {
+            simplify_verbatim(&std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()))
+        };
+        let root = canonical(tree.path());
+        let subdir = canonical(&subdir);
+        let root_parent = canonical(tree.path().parent().unwrap_or(Path::new("/")));
+
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        assert_eq!(
+            handle_key(key(KeyCode::Char('O')), &mut model, &mut player),
+            Step::Continue
+        );
+        model.set_open_listing(
+            tree.path().to_path_buf(),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "album".to_owned(),
+                is_dir: true,
+                path: tree.path().join("album"),
+            }]),
+        );
+
+        // Click the `..` row: navigation chrome — the click IS the
+        // parent step, ascending one level.
+        let (column, row) = draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &super::super::model::HitTarget::PickerRow(0),
+        );
+        click_at(column, row, &mut model, &mut player);
+        assert_eq!(
+            model.open_picker_dir(),
+            Some(root_parent.as_path()),
+            "a click on `..` ascends to the parent"
+        );
+
+        // Back into the temp tree via the real listing, click the
+        // directory row (a selection, not a descent)...
+        navigate_picker_to(&mut model, &root);
+        let (column, row) = draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &super::super::model::HitTarget::PickerRow(1),
+        );
+        click_at(column, row, &mut model, &mut player);
+        assert_eq!(
+            model.open_picker_dir(),
+            Some(root.as_path()),
+            "a click on a directory row selects; it does not descend"
+        );
+
+        // ...and the visible [Enter folder] button descends.
+        let (column, row) = draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &super::super::model::HitTarget::ModalButton(
+                super::super::model::ModalButton::EnterFolder,
+            ),
+        );
+        click_at(column, row, &mut model, &mut player);
+        assert_eq!(
+            model.open_picker_dir(),
+            Some(subdir.as_path()),
+            "[Enter folder] descends into the selected directory"
         );
     }
 
@@ -1876,6 +2242,7 @@ mod tests {
             Ok(vec![crate::input::DirectoryEntry {
                 name: "addition live.flac".to_owned(),
                 is_dir: false,
+                path: tree.path().join("addition live.flac"),
             }]),
         );
         // Select the file row, then click the visible Add button.
@@ -2027,6 +2394,7 @@ mod tests {
             Ok(vec![crate::input::DirectoryEntry {
                 name: "album".to_owned(),
                 is_dir: true,
+                path: tree.path().join("album"),
             }]),
         );
         // Listing rows: [.., album]. ↓ selects `..`; Enter ascends.
@@ -2044,6 +2412,322 @@ mod tests {
             "Enter on `..` lists the parent directory"
         );
     }
+    /// G1 F03 — the frozen Home-Play truth table, through the existing
+    /// product authority only:
+    ///
+    /// ```text
+    /// unsettled episode, pause not requested -> pause (command state)
+    /// paused episode (pause requested)       -> resume
+    /// terminal current entry                 -> fresh replay via the
+    ///                                           existing replacement
+    /// no episode, a list                     -> play the selection
+    /// neither                                -> honest inert reason
+    /// ```
+    #[test]
+    fn home_play_follows_the_frozen_truth_table() {
+        let tree = TempTree::new("home-play");
+        let file = tree.live_file("home.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+
+        // Neither episode nor list: the honest disabled reason.
+        refresh(&mut model, &player);
+        assert_eq!(
+            dispatch(TuiAction::PlayPause, &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(player.active_handle().is_none(), "nothing started");
+        assert_eq!(
+            model.status(),
+            Some("No music loaded — open something with the Open button"),
+            "the disabled Play says why"
+        );
+
+        // No episode, a list: play_current plays the SELECTED entry
+        // (the App's no-episode Home-Play rule) — no autoplay happened
+        // at Add time.
+        assert_eq!(player.append_admitted(vec![file.clone()]), Ok(1));
+        refresh(&mut model, &player);
+        assert!(player.active_handle().is_none());
+        assert_eq!(
+            dispatch(TuiAction::PlayPause, &mut model, &mut player),
+            Step::Continue
+        );
+        let handle = player
+            .active_handle()
+            .expect("the selection was played")
+            .clone();
+        assert_eq!(handle.observe().terminal_outcome, None);
+
+        // Unsettled episode: the fresh pause-command state decides.
+        assert_eq!(
+            dispatch(TuiAction::PlayPause, &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(
+            handle.observe().pause_requested,
+            "the first press requested a pause"
+        );
+        assert_eq!(
+            dispatch(TuiAction::PlayPause, &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(
+            !handle.observe().pause_requested,
+            "the second press resumed"
+        );
+
+        // Terminal current entry: the press REPLAYS through the
+        // existing replacement — a fresh episode, never a mutated old
+        // one.
+        handle.request_stop();
+        let outcome = handle.wait_terminal();
+        assert_eq!(outcome, qianqian_playback::EpisodeTerminalOutcome::Stopped);
+        assert_eq!(
+            player.active_handle().unwrap().observe().terminal_outcome,
+            Some(qianqian_playback::EpisodeTerminalOutcome::Stopped),
+            "the terminal Fact is committed and visible"
+        );
+        assert_eq!(
+            dispatch(TuiAction::PlayPause, &mut model, &mut player),
+            Step::Continue
+        );
+        let replayed = player.active_handle().expect("a fresh episode");
+        assert_eq!(
+            replayed.observe().terminal_outcome,
+            None,
+            "the fresh episode is unsettled — the terminal old handle was \
+             replaced, not mutated back"
+        );
+        assert!(
+            model
+                .status()
+                .is_some_and(|status| status.starts_with("play: opened ")),
+            "{}",
+            model.status().unwrap_or_default()
+        );
+    }
+
+    /// G1 F09: a RELATIVE typed line resolves against the DISPLAYED
+    /// directory (the picker's own base), never against the process
+    /// working directory of the moment. The test's CWD (the crate dir)
+    /// differs from the displayed temp directory, so only the frozen
+    /// base can resolve the name.
+    #[test]
+    fn a_relative_typed_line_resolves_against_the_displayed_directory() {
+        let tree = TempTree::new("relative-base");
+        let file = tree.live_file("relative live.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        assert_eq!(
+            handle_key(key(KeyCode::Char('O')), &mut model, &mut player),
+            Step::Continue
+        );
+        // The picker now displays the temp tree (a deterministic feed
+        // standing in for the runtime's listing of it).
+        model.set_open_listing(
+            tree.path().to_path_buf(),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "relative live.flac".to_owned(),
+                is_dir: false,
+                path: tree.path().join("relative live.flac"),
+            }]),
+        );
+        // Type the BARE NAME — relative text — and confirm the field.
+        for c in "relative live.flac".chars() {
+            model.modal_push(c);
+        }
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        // The file was SELECTED (it is in the listing): the cursor sits
+        // on its row and the subject is its native path.
+        assert_eq!(
+            model.picker_subject(),
+            PickerSubject::Listing {
+                path: file.clone(),
+                is_dir: false,
+            },
+            "the relative line resolved against the DISPLAYED directory"
+        );
+        assert!(
+            model.modal().is_some(),
+            "the field's Enter selected; it did not start playback"
+        );
+
+        // The explicit [Open] commits the resolved subject.
+        let (column, row) = draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &super::super::model::HitTarget::ModalButton(super::super::model::ModalButton::Open),
+        );
+        click_at(column, row, &mut model, &mut player);
+        refresh(&mut model, &player);
+        assert_eq!(
+            model.source(),
+            Some(file.to_string_lossy().as_ref()),
+            "the resolved native path is what was opened"
+        );
+    }
+
+    /// G1 F11: a FAILED submission keeps the picker and its whole
+    /// retry context — the typed line, the displayed directory and the
+    /// selection all survive — with a bounded diagnostic; correcting
+    /// the line then commits.
+    #[test]
+    fn a_failed_field_confirm_keeps_the_picker_context_for_retry() {
+        let tree = TempTree::new("retry-context");
+        let file = tree.live_file("real live.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        assert_eq!(
+            handle_key(key(KeyCode::Char('O')), &mut model, &mut player),
+            Step::Continue
+        );
+        model.set_open_listing(
+            tree.path().to_path_buf(),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "real live.flac".to_owned(),
+                is_dir: false,
+                path: tree.path().join("real live.flac"),
+            }]),
+        );
+        // Type a line naming nothing that exists, and confirm it.
+        for c in "missing live.flac".chars() {
+            model.modal_push(c);
+        }
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(model.modal().is_some(), "the picker STAYS open");
+        assert!(
+            model.open_picker_dir().is_some(),
+            "the displayed directory survives"
+        );
+        assert!(
+            player.active_handle().is_none(),
+            "the failed attempt touched no player state"
+        );
+
+        // Correct the line (backspace the wrong name away, type the
+        // real one) and confirm again: the corrected file is selected.
+        for _ in 0.."missing live.flac".len() {
+            assert_eq!(
+                handle_key(key(KeyCode::Backspace), &mut model, &mut player),
+                Step::Continue
+            );
+        }
+        for c in "real live.flac".chars() {
+            model.modal_push(c);
+        }
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(
+            model.picker_subject(),
+            PickerSubject::Listing {
+                path: file,
+                is_dir: false,
+            },
+            "the corrected line selects the real file"
+        );
+    }
+
+    /// G1 F12: the frozen success routing — an Open-FOLDER lands on
+    /// Playlist (its first candidate already started); an Add lands on
+    /// Playlist without interrupting audio. (Open-FILE -> Now Playing
+    /// is pinned by the picker-rows test.)
+    #[test]
+    fn picker_success_routes_follow_the_frozen_dispositions() {
+        let tree = TempTree::new("success-routes");
+        tree.live_file("first.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        // A folder Open: success -> Playlist.
+        assert_eq!(
+            handle_key(key(KeyCode::Char('O')), &mut model, &mut player),
+            Step::Continue
+        );
+        for c in tree.path().to_string_lossy().chars() {
+            model.modal_push(c);
+        }
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        // Tab to [Open] and commit.
+        for _ in 0..8 {
+            handle_key(key(KeyCode::Tab), &mut model, &mut player);
+            if model.focus()
+                == Some(FocusId::PickerButton(
+                    super::super::model::ModalButton::Open,
+                ))
+            {
+                break;
+            }
+        }
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(model.modal(), None, "success closed the picker");
+        assert_eq!(
+            model.route(),
+            TuiRoute::Playlist,
+            "an Open-folder success lands on Playlist"
+        );
+        assert!(
+            player.active_handle().is_some(),
+            "the first candidate started"
+        );
+
+        // An Add from the picker: success -> Playlist, episode intact.
+        tree.live_file("second.flac");
+        assert_eq!(
+            handle_key(key(KeyCode::Char('O')), &mut model, &mut player),
+            Step::Continue
+        );
+        for c in tree.path().join("second.flac").to_string_lossy().chars() {
+            model.modal_push(c);
+        }
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        for _ in 0..8 {
+            handle_key(key(KeyCode::Tab), &mut model, &mut player);
+            if model.focus() == Some(FocusId::PickerButton(super::super::model::ModalButton::Add)) {
+                break;
+            }
+        }
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(model.modal(), None);
+        assert_eq!(model.route(), TuiRoute::Playlist);
+        assert_eq!(
+            player.playlist_playing_position(),
+            Some(0),
+            "no replacement"
+        );
+        assert_eq!(
+            player.navigation_position(),
+            Some((1, 2)),
+            "the file appended"
+        );
+    }
+
     /// The inert Enter on the row that IS the live episode (field round
     /// 3): the refusal is the bounded status feedback, named in
     /// vocabulary the forbidden-claim scan accepts — never a playing
