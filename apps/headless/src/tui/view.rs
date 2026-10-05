@@ -213,9 +213,7 @@ fn draw_now_playing(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &m
             // The desired-DSP summary is secondary detail (G5 §39): it
             // yields to the core controls under constrained layouts
             // before any of them does.
-            if !compact
-                && let Some(dsp) = model.desired_dsp_label()
-            {
+            if !compact && let Some(dsp) = model.desired_dsp_label() {
                 lines.push(Line::from(dsp.to_owned()));
             }
             // Read-side presentation only (D14.8). The bar below is
