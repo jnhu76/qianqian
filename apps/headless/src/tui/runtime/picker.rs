@@ -63,9 +63,11 @@ pub(super) fn handle_modal_input<S: EpisodeStart>(
         // `..` row — navigates; a FILE is SELECTED, never committed.
         // Final Open/Add requires activating an explicit button, so no
         // row gesture can start playback by accident (G1 F05).
-        // Activating the preset menu's cursor fills the draft's EQ
-        // stage (a draft edit, never a direct commit) and closes the
-        // menu.
+        // Activating the preset menu's cursor is the WHOLE-CONFIGURATION
+        // preset operation (T0): the App's own preset seam replaces the
+        // desired configuration — processing on, unity preamp, the
+        // preset's Q/trims. The popup announced that consequence before
+        // this Enter.
         ModalInput::ListActivate
             if matches!(
                 model.modal(),
@@ -73,7 +75,26 @@ pub(super) fn handle_modal_input<S: EpisodeStart>(
             ) =>
         {
             if let Some(preset) = model.activate_preset_selection() {
-                model.set_status(Some(format!("preset {} selected (draft)", preset.name())));
+                match player.set_eq_preset(preset) {
+                    Ok(()) => {
+                        let discarded = model.audio_note_preset_committed();
+                        model.note_desired_processing(player.desired_processing());
+                        model.set_status(Some(format!(
+                            "preset {} recorded: processing on, unity preamp, {} trims \
+                             (applied state not reported){}",
+                            preset.name(),
+                            preset.name(),
+                            if discarded {
+                                "; open drafts discarded"
+                            } else {
+                                ""
+                            }
+                        )));
+                    }
+                    Err(refusal) => {
+                        model.set_status(Some(format!("preset refused: {refusal}")));
+                    }
+                }
             }
         }
         ModalInput::ListActivate => match model.picker_cursor_entry() {

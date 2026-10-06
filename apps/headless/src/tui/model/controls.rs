@@ -168,31 +168,47 @@ impl PlaylistButton {
 /// product functions are buttons, like every route's: keyboard focus
 /// and the mouse both reach them, and each converges on the same
 /// [`TuiAction`](super::actions::TuiAction).
+///
+/// T0 freezes editing as PER OPERATION: each button belongs to one of
+/// the four admitted operations (enablement, preset, preamp, EQ), and
+/// each operation commits through its own App seam — there is no
+/// global Apply transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AudioButton {
-    /// Toggle the desired processing enablement (bypass vs on) — a
-    /// DRAFT edit until applied.
+    /// Toggle the desired processing enablement (bypass vs on) —
+    /// commits through `set_processing_enabled`.
     Enabled,
-    /// Step the draft preamp down one decibel.
+    /// Step the preamp draft down one visible press (linear gain).
     PreampDown,
-    /// Step the draft preamp up one decibel.
+    /// Step the preamp draft up one visible press (linear gain).
     PreampUp,
-    /// Open the EQ preset picker modal.
+    /// Commit the preamp draft through `set_preamp`.
+    PreampCommit,
+    /// Discard the preamp draft: restore the latest desired value,
+    /// send nothing.
+    PreampCancel,
+    /// Open the EQ preset picker modal (the whole-configuration
+    /// operation).
     Presets,
-    /// Commit the draft through the App's desired-DSP seams.
-    Apply,
-    /// Discard the draft.
-    Cancel,
+    /// Commit the EQ draft through exactly one `set_eq_config`.
+    EqCommit,
+    /// Revert the EQ draft: restore the latest desired stage, send
+    /// nothing.
+    EqRevert,
 }
 
-/// The audio toolbar controls in left-to-right render (and Tab) order.
-pub const AUDIO_BUTTONS: [AudioButton; 6] = [
+/// The audio toolbar controls in left-to-right render (and Tab) order:
+/// the enablement and the preamp operation on the first row, the EQ
+/// operation and the preset picker on the second.
+pub const AUDIO_BUTTONS: [AudioButton; 8] = [
     AudioButton::Enabled,
     AudioButton::PreampDown,
     AudioButton::PreampUp,
+    AudioButton::PreampCommit,
+    AudioButton::PreampCancel,
     AudioButton::Presets,
-    AudioButton::Apply,
-    AudioButton::Cancel,
+    AudioButton::EqCommit,
+    AudioButton::EqRevert,
 ];
 
 impl AudioButton {
@@ -222,6 +238,20 @@ impl AudioButton {
                     "[Preamp +]"
                 }
             }
+            AudioButton::PreampCommit => {
+                if compact {
+                    "[Set pre]"
+                } else {
+                    "[Set preamp]"
+                }
+            }
+            AudioButton::PreampCancel => {
+                if compact {
+                    "[Cancel]"
+                } else {
+                    "[Cancel edit]"
+                }
+            }
             AudioButton::Presets => {
                 if compact {
                     "[Presets]"
@@ -229,8 +259,20 @@ impl AudioButton {
                     "[EQ preset...]"
                 }
             }
-            AudioButton::Apply => "[Apply]",
-            AudioButton::Cancel => "[Cancel]",
+            AudioButton::EqCommit => {
+                if compact {
+                    "[Apply]"
+                } else {
+                    "[Apply EQ]"
+                }
+            }
+            AudioButton::EqRevert => {
+                if compact {
+                    "[Revert]"
+                } else {
+                    "[Revert draft]"
+                }
+            }
         }
     }
 }

@@ -118,23 +118,32 @@ pub enum TuiAction {
     /// frozen stop-aware confirmation first while an episode is live.
     PlaylistClear,
 
-    // Audio route (G3). The draft edits are presentation until an
-    // explicit [Apply] commits them through the App's desired-DSP
-    // seams; [Cancel] discards. Nothing here claims applied state.
-    /// Toggle the draft's processing enablement (bypass vs on).
+    // Audio route (G3, the T0 per-operation contract): each operation
+    // edits its own local draft and commits through its OWN App seam —
+    // there is no global Apply transaction. Nothing here claims
+    // applied state.
+    /// Toggle the desired processing enablement (bypass vs on) —
+    /// commits through `set_processing_enabled`.
     DspToggleEnabled,
-    /// Step the draft preamp a signed number of decibels (±1 per
-    /// press). Integer decibels keep the typed vocabulary `Eq`; the
-    /// dispatch converts to the seam's linear gain.
+    /// Step the preamp draft one visible press (signed; linear gain).
+    /// An integer press count keeps the typed vocabulary `Eq`; the
+    /// step size is the model's presentation tuning.
     DspPreampStep(i32),
     /// Step one EQ band's trim: band index, signed decibels.
     DspEqBandStep(usize, i32),
-    /// Open the EQ preset menu (the modal fills the draft's EQ stage).
+    /// Open the EQ preset menu (the whole-configuration operation).
     DspOpenPresets,
-    /// Commit the draft through the App's seams.
-    DspApply,
-    /// Discard the draft.
-    DspCancel,
+    /// Commit the preamp draft through `set_preamp` ([Set preamp]).
+    DspPreampCommit,
+    /// Discard the preamp draft: restore the latest desired value,
+    /// send nothing ([Cancel edit]).
+    DspPreampCancel,
+    /// Commit the EQ draft through exactly one `set_eq_config`
+    /// ([Apply EQ]); preserves enabled and preamp.
+    DspApplyEq,
+    /// Discard the EQ draft: restore the latest desired stage, send
+    /// nothing ([Revert draft]).
+    DspRevertEq,
 
     // Visualizer route (G4).
     /// Switch the active visualization mode (presentation only).

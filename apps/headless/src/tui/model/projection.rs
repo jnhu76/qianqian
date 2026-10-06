@@ -6,7 +6,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use qianqian_playback::{AudioProcessingConfig, EqPreset, PlaybackSessionObservation};
+use qianqian_playback::{AudioProcessingConfig, EqConfig, EqPreset, PlaybackSessionObservation};
 
 /// One playlist row as the shell presents it: the display label and the
 /// two INDEPENDENT markers. A projection of the App's navigation state.
@@ -98,6 +98,19 @@ pub fn seek_fraction_target(
     Some(Duration::from_micros(u64::try_from(micros).ok()?))
 }
 
+/// The EQ stage's name by EXACT public data equality (T0): a factory
+/// preset whose trims and Q match verbatim, else `custom EQ` — no new
+/// product variant is invented for modified configurations.
+pub fn eq_stage_summary(eq: &EqConfig) -> String {
+    let preset = EqPreset::all()
+        .into_iter()
+        .find(|preset| preset.to_config().eq.as_ref() == Some(eq));
+    match preset {
+        Some(preset) => format!("preset {}", preset.name()),
+        None => "custom EQ".to_owned(),
+    }
+}
+
 /// The one-line summary of the App's DESIRED DSP configuration (G1:
 /// the Now Playing route names it; the Audio route will edit it). A
 /// desired-state statement only — the word is part of the line — and
@@ -110,13 +123,7 @@ pub fn dsp_summary(config: &AudioProcessingConfig) -> String {
     }
     let mut parts = Vec::new();
     if let Some(eq) = &config.eq {
-        let preset = EqPreset::all()
-            .into_iter()
-            .find(|preset| preset.to_config().eq == Some(*eq));
-        parts.push(match preset {
-            Some(preset) => format!("preset {}", preset.name()),
-            None => "custom EQ".to_owned(),
-        });
+        parts.push(eq_stage_summary(eq));
     }
     let preamp_db = if config.gain > 0.0 {
         format!("{:+.1} dB", 20.0 * config.gain.log10())
