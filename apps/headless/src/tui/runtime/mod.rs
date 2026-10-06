@@ -1,0 +1,366 @@
+//! The terminal session of the reference player: raw mode + alternate
+//! screen + mouse capture under a small RAII guard, and a modest event
+//! loop.
+//!
+//! Terminal ownership is lexical: the guard on this function's stack is
+//! the ONLY owner of the entered terminal modes, and unwinding drops it
+//! like any other early return. This module is deliberately the ONLY
+//! place where crossterm I/O happens: per refresh the loop takes exactly
+//! one pure `observe()` read and one `terminal.draw()`; it never blocks
+//! the audio path.
+//!
+//! Every input event flows through the same pipe: decode (model) → at
+//! most one [`TuiAction`] → [`dispatch::dispatch`] — the ONE dispatch
+//! boundary, which performs at most one product operation. The command
+//! performers live in [`dispatch`]; the Open picker's operations and
+//! their I/O live in [`picker`].
+
+mod dispatch;
+mod picker;
+
+#[cfg(test)]
+mod testutil;
+
+use std::io::{self, Write};
+use std::time::Duration;
+
+use crossterm::cursor::{Hide, Show};
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
+use crossterm::execute;
+use crossterm::terminal::{
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+};
+use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
+
+use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
+use crate::tui::view;
+
+use super::model::{Step, TuiModel, decode_key, decode_mouse, dsp_summary};
+use dispatch::{dispatch, eof_feedback};
+
+/// UI refresh cadence (~100–250 ms band).
+pub const TICK: Duration = Duration::from_millis(150);
+
+/// Run the reference-player shell over the player until the user
+/// quits. Restores the terminal on every exit path that unwinds
+/// through this frame (normal quit, I/O error, panic unwind) before
+/// returning; the caller owns everything else (quit, disposal
+/// reporting, exit codes). `initial_status` is presented as the first
+/// operation feedback line (e.g. the startup Open's outcome).
+pub fn run<S: EpisodeStart>(
+    player: &mut ReferencePlayerApp<S>,
+    initial_status: Option<String>,
+) -> Result<(), String> {
+    let mut guard =
+        TerminalGuard::acquire().map_err(|error| format!("terminal setup failed: {error}"))?;
+
+    let backend = CrosstermBackend::new(io::stdout());
+    let mut terminal =
+        Terminal::new(backend).map_err(|error| format!("terminal setup failed: {error}"))?;
+
+    let mut model = TuiModel::new(String::new());
+    model.set_status(initial_status);
+    refresh(&mut model, player);
+
+    loop {
+        terminal
+            .draw(|frame| view::draw(frame, &mut model))
+            .map_err(|error| format!("terminal draw failed: {error}"))?;
+
+        if event::poll(TICK).map_err(|error| format!("terminal input failed: {error}"))?
+            && handle_event(
+                event::read().map_err(|error| format!("terminal input failed: {error}"))?,
+                &mut model,
+                player,
+            ) == Step::Exit
+        {
+            break;
+        }
+
+        // The App's natural-EOF policy (Issue #166 §13): one D11
+        // `Completed` Fact may advance the temporary playlist through
+        // the SAME Open replacement. It runs AFTER input so a key press
+        // and an automatic transition never race for the same refresh,
+        // and it blocks exactly as the Open modal's Enter does (the
+        // documented synchronous-Open stall) — no async machinery is
+        // earned here either.
+        if let Some(outcome) = player.poll_eof_policy() {
+            if matches!(outcome, OpenOutcome::Opened) {
+                model.note_episode_replacement();
+            }
+            model.set_status(Some(eof_feedback(&outcome, player)));
+            // The advance stalled this loop like any Open replacement:
+            // input queued during the stall never reaches the new
+            // episode's geometry (T0 picker freeze).
+            drain_busy_interval_input();
+        }
+
+        refresh(&mut model, player);
+    }
+
+    guard.restore();
+    Ok(())
+}
+
+/// The loop's per-event body, factored out so the wiring is itself
+/// testable: one physical event decodes to at most one action, and one
+/// action dispatches to at most one product operation (§31) — key and
+/// mouse share the boundary.
+fn handle_event<S: EpisodeStart>(
+    event: Event,
+    model: &mut TuiModel,
+    player: &mut ReferencePlayerApp<S>,
+) -> Step {
+    match event {
+        Event::Key(key) => {
+            decode_key(key, model).map_or(Step::Continue, |action| dispatch(action, model, player))
+        }
+        Event::Mouse(mouse) => decode_mouse(mouse, model)
+            .map_or(Step::Continue, |action| dispatch(action, model, player)),
+        // §29: clear the armed click, invalidate the old hit regions;
+        // the draw at the top of the next iteration recomputes the
+        // layout, revalidates the focus and publishes fresh geometry.
+        // No product command is generated by a resize.
+        Event::Resize(_, _) => {
+            model.invalidate_frame();
+            Step::Continue
+        }
+        _ => Step::Continue,
+    }
+}
+
+/// Drop the input that arrived during a synchronous stall (T0 picker
+/// freeze: "after it returns, clear armed clicks/buffered input from
+/// the busy interval before publishing new interactive geometry"). The
+/// event loop reads one event per iteration; whatever queued behind
+/// the dispatch that stalled — keys, clicks, wheels — was typed
+/// against surfaces that no longer exist and must never decode
+/// against the post-operation frame. Resize events are dropped too:
+/// the next draw auto-resizes to the real terminal size. Every stall
+/// (submission, navigation, a large listing) calls this before the
+/// next draw publishes fresh geometry.
+pub(super) fn drain_busy_interval_input() {
+    while event::poll(Duration::ZERO).unwrap_or(false) {
+        let _ = event::read();
+    }
+}
+
+/// Follow the player's committed episode and its playlist: swap the
+/// source label when the committed episode changed, take the new
+/// episode's one pure observation for this refresh, and rebuild the
+/// playlist rows only when the App's playlist revision moved (a huge
+/// playlist must not cost per-frame work).
+/// Follow the player's committed episode and its playlist: swap the
+/// source label when the committed episode changed, take the new
+/// episode's one pure observation for this refresh, and rebuild the
+/// playlist rows only when the App's playlist revision moved (a huge
+/// playlist must not cost per-frame work).
+pub(super) fn refresh<S: EpisodeStart>(model: &mut TuiModel, player: &ReferencePlayerApp<S>) {
+    model.set_episode(
+        player
+            .active_source()
+            .map(|p| p.to_string_lossy().into_owned()),
+    );
+    model.set_navigation(player.navigation_position());
+    model.set_volume(Some(player.desired_volume()));
+    model.set_order(player.playlist_order());
+    model.set_repeat(player.playlist_repeat());
+    model.set_desired_dsp(dsp_summary(&player.desired_processing()));
+    model.set_playlist(player.playlist_revision(), || {
+        player
+            .playlist_rows()
+            .map(|row| super::model::PlaylistRow {
+                label: super::model::row_label(row.path),
+                playing: row.playing,
+                selected: row.selected,
+            })
+            .collect()
+    });
+    if let Some(handle) = player.active_handle() {
+        model.update(handle.observe());
+    }
+}
+/// The terminal enter/restore command sequences, factored over any
+/// writer. The enable/disable MOUSE-CAPTURE pairing lives on this same
+/// lifecycle (§16/§40), and the factoring exists so a test can pin it
+/// without a real terminal.
+fn enter_terminal<W: Write>(writer: &mut W) -> io::Result<()> {
+    execute!(writer, EnterAlternateScreen, Hide, EnableMouseCapture)
+}
+
+fn restore_terminal<W: Write>(writer: &mut W) -> io::Result<()> {
+    execute!(writer, DisableMouseCapture, LeaveAlternateScreen, Show)?;
+    writer.flush()
+}
+
+/// Owns the entered terminal modes until the shell is done. Restore is
+/// best-effort (that is all terminal recovery can honestly promise):
+/// the flag records whether a full pass succeeded, so a partially
+/// failed restore is retried once more through `Drop`.
+struct TerminalGuard {
+    restored: bool,
+}
+
+impl TerminalGuard {
+    fn acquire() -> io::Result<Self> {
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        if let Err(error) = enter_terminal(&mut stdout) {
+            // Unwind the already-entered modes: the screen leave and the
+            // capture disable ride the same restore sequence raw mode is
+            // dropped under.
+            let _ = restore_terminal(&mut stdout);
+            let _ = disable_raw_mode();
+            return Err(error);
+        }
+        Ok(Self { restored: false })
+    }
+
+    fn restore(&mut self) {
+        if self.restored {
+            return;
+        }
+        let mut stdout = io::stdout();
+        let restored = restore_terminal(&mut stdout).is_ok() && disable_raw_mode().is_ok();
+        self.restored = restored;
+    }
+}
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        self.restore();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Tests for this submodule.
+
+    use std::io::{self, Write};
+
+    use crossterm::event::{Event, MouseButton, MouseEventKind};
+
+    use super::testutil::*;
+    use super::{enter_terminal, handle_event, refresh, restore_terminal};
+    use crate::player::ReferencePlayerApp;
+    use crate::player::tests::FakeEpisodeSource;
+    use crate::tui::model::*;
+
+    #[test]
+    fn mouse_capture_is_disabled_on_the_same_lifecycle_that_enables_it() {
+        let mut enter_buffer = Vec::new();
+        enter_terminal(&mut enter_buffer).expect("enter sequence");
+        let enter = String::from_utf8(enter_buffer).expect("ansi");
+        assert!(
+            enter.contains("\x1B[?1000h"),
+            "the enter sequence must enable mouse capture: {enter:?}"
+        );
+
+        let mut restore_buffer = Vec::new();
+        restore_terminal(&mut restore_buffer).expect("restore sequence");
+        let restore = String::from_utf8(restore_buffer).expect("ansi");
+        assert!(
+            restore.contains("\x1B[?1000l"),
+            "the restore sequence must disable mouse capture: {restore:?}"
+        );
+        // Capture is disabled BEFORE the alternate screen is left, so a
+        // partially failed restore cannot strand the capture either.
+        let disable = restore.find("\x1B[?1000l").expect("disable marker");
+        let leave = restore.find("\x1B[?1049l").expect("leave marker");
+        assert!(
+            disable < leave,
+            "disable capture before leaving the screen: {restore:?}"
+        );
+    }
+
+    /// The guard's acquire-failure path unwinds the modes it already
+    /// entered — exercised on the writer seam: a failing writer makes
+    /// `enter_terminal` fail, and the caller-side cleanup order is what
+    /// the guard performs (restore sequence first, then raw mode).
+    #[test]
+    fn the_guard_unwinds_entered_modes_when_a_later_step_fails() {
+        // A writer that accepts the first command write and then fails
+        // exercises the mid-sequence failure branch of `acquire`.
+        struct FailsOnSecondWrite {
+            writes: usize,
+        }
+        impl Write for FailsOnSecondWrite {
+            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                self.writes += 1;
+                if self.writes > 1 {
+                    Err(io::Error::other("boom"))
+                } else {
+                    Ok(buf.len())
+                }
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut writer = FailsOnSecondWrite { writes: 0 };
+        assert!(
+            enter_terminal(&mut writer).is_err(),
+            "the enter sequence failed mid-way"
+        );
+        // The recovery is exactly what TerminalGuard::acquire performs:
+        // a best-effort restore (which may also fail) and no panic.
+        let _ = restore_terminal(&mut writer);
+    }
+
+    /// The loop's Resize wiring, now factored into `handle_event` so it
+    /// is testable (G1 re-review): a resize event through the real
+    /// per-event body invalidates the published geometry and any arm.
+    #[test]
+    fn a_resize_event_through_the_loop_clears_the_frame() {
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new("song.flac");
+        refresh(&mut model, &player);
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| super::super::view::draw(frame, &mut model))
+            .expect("draw");
+        let (column, row) = region_cell(&model, &HitTarget::Transport(TransportButton::Open));
+        decode_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), column, row),
+            &mut model,
+        );
+        assert!(model.armed().is_some());
+
+        assert_eq!(
+            handle_event(Event::Resize(80, 24), &mut model, &mut player,),
+            Step::Continue,
+            "a resize generates no product command"
+        );
+        assert!(
+            model.regions().is_empty(),
+            "the resize cleared the published regions"
+        );
+        assert_eq!(model.armed(), None, "the resize cancelled the arm");
+    }
+
+    /// The responsive class helper is wired into the shell through the
+    /// draw (the model tests pin the derivation; this pins the wiring
+    /// at the runtime's shell sizes).
+    #[test]
+    fn the_shell_classes_are_the_ones_the_draw_publishes() {
+        let mut model = TuiModel::new(String::new());
+        refresh(
+            &mut model,
+            &ReferencePlayerApp::new(FakeEpisodeSource::new()),
+        );
+        draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &crate::tui::model::HitTarget::RouteTab(TuiRoute::NowPlaying),
+        );
+        assert_eq!(model.class(), responsive_class(100, 30));
+    }
+
+    // ------------------------------------------------------------------
+    // G1: the visible Open/picker flow, the preference row, modal
+    // isolation.
+    // ------------------------------------------------------------------
+}
