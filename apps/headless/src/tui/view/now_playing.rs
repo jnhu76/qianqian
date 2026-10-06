@@ -11,8 +11,8 @@ use ratatui::widgets::{Block, Paragraph};
 
 use super::{COMMITTED_HINT, NO_MUSIC_LINE, bold};
 use crate::tui::model::{
-    FocusId, HitRegion, HitTarget, PreferenceButton, ResponsiveClass, SEEK_BUTTONS, TRANSPORT,
-    TransportButton, TuiModel,
+    FocusId, HitRegion, HitTarget, PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton,
+    TuiModel,
 };
 
 /// The Now Playing route (G1): the episode read-side panel with the
@@ -36,7 +36,7 @@ pub(super) fn draw_now_playing(
     ])
     .areas(area);
 
-    let compact = model.class() == ResponsiveClass::Compact;
+    let compact = model.compact_layout();
     let mut lines: Vec<Line<'static>> = Vec::new();
     match model.source() {
         // The no-episode panel (F6; the U1 idle page): after a
@@ -228,7 +228,7 @@ fn draw_preference_row(
     area: Rect,
     regions: &mut Vec<HitRegion>,
 ) {
-    let compact = model.class() == ResponsiveClass::Compact;
+    let compact = model.compact_layout();
     // The volume value is FIXED-width ("100/100" is its widest compact
     // spelling; the wide class appends " (desired)"): a percentage
     // share starves it at the class minimum and the number clips into
@@ -346,7 +346,6 @@ mod tests {
     //! Tests for this submodule.
 
     use super::super::testutil::*;
-    use super::*;
     use crate::tui::model::*;
     use qianqian_playback::PlaybackSessionObservation;
 

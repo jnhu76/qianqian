@@ -12,7 +12,7 @@ use ratatui::widgets::{Block, Paragraph};
 use super::{PLAYING_MARKER, SELECTED_MARKER, bold};
 use crate::tui::model::{
     FocusId, HitRegion, HitTarget, PLAYLIST_BUTTONS, PlaylistButton, PlaylistRow, PreferenceButton,
-    ResponsiveClass, TuiModel,
+    TuiModel,
 };
 
 /// The Playlist route (G2): toolbar, list, summary. Rows and regions
@@ -25,7 +25,7 @@ pub(super) fn draw_playlist(
     area: Rect,
     regions: &mut Vec<HitRegion>,
 ) {
-    let compact = model.class() == ResponsiveClass::Compact;
+    let compact = model.compact_layout();
     // The toolbar wraps whenever the FULL spellings would not fit one
     // row — the class decides the spelling, the measurement decides
     // the wrap. A clipped active hit target is a T0 violation at any
@@ -295,7 +295,6 @@ mod tests {
 
     use super::super::testutil::*;
 
-    use super::*;
     use crate::tui::model::*;
 
     /// The Playlist route renders the pane and publishes the pane
