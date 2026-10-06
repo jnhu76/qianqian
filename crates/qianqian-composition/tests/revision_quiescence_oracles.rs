@@ -390,7 +390,7 @@ fn half_finished_staged_replacement_does_not_settle() {
     assert_eq!(k.step(), qianqian_composition::StepOutcome::Transitioned);
     let snap = k.snapshot();
     assert!(!snap.fibers.contains_key("p"), "old generation removed");
-    assert!(!snap.provisions.get("Tag").is_some_and(|v| !v.is_empty()));
+    assert!(snap.provisions.get("Tag").is_none_or(|v| v.is_empty()));
     assert!(
         !snap.quiet,
         "a staged replacement still owing its new mount is not quiescent"
