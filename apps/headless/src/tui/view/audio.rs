@@ -16,7 +16,7 @@ use ratatui::widgets::{Block, Paragraph};
 
 use super::bold;
 use crate::tui::model::{
-    AUDIO_BUTTONS, AudioButton, EqAdjust, FocusId, HitRegion, HitTarget, ResponsiveClass, TuiModel,
+    AUDIO_BUTTONS, AudioButton, EqAdjust, FocusId, HitRegion, HitTarget, TuiModel,
 };
 use qianqian_playback::{EQ_BAND_FREQUENCY_HZ, EQ_MAX_BAND_GAIN_DB};
 
@@ -34,7 +34,7 @@ pub(super) fn draw_audio(
     area: Rect,
     regions: &mut Vec<HitRegion>,
 ) {
-    let compact = model.class() == ResponsiveClass::Compact;
+    let compact = model.compact_layout();
     let info = info_lines(model, compact);
     let info_rows = info.len() as u16;
     // The toolbar is always exactly two measured rows (never a clipped
@@ -56,10 +56,12 @@ pub(super) fn draw_audio(
     }
 }
 
-/// The route's information block: the desired summary, the draft line
-/// (while a draft is open), the standing applied-not-reported line,
-/// the last processing refusal (while the episode carries one), and
-/// the headroom advisory (while there is honest advice to show).
+/// The route's information block: the desired summary, the preamp
+/// factor the route displays (T0: a numeric LINEAR gain factor — the
+/// draft's while one is open, its own line saying so), the EQ draft's
+/// line, the standing applied-not-reported line, the last processing
+/// refusal (while the episode carries one), and the headroom advisory
+/// (while there is honest advice to show).
 fn info_lines(model: &TuiModel, compact: bool) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     lines.push(Line::from(
@@ -68,8 +70,16 @@ fn info_lines(model: &TuiModel, compact: bool) -> Vec<Line<'static>> {
             .unwrap_or(DESIRED_PENDING)
             .to_owned(),
     ));
-    if let Some(draft) = model.audio_draft_summary() {
-        lines.push(Line::from(draft));
+    match model.audio_preamp_summary() {
+        Some(draft_line) => lines.push(Line::from(draft_line)),
+        None => {
+            if let Some(gain) = model.audio_preamp_display() {
+                lines.push(Line::from(format!("Preamp (linear): {gain:.3}x")));
+            }
+        }
+    }
+    if let Some(eq_line) = model.audio_eq_summary() {
+        lines.push(Line::from(eq_line));
     }
     lines.push(Line::from(APPLIED_NOT_REPORTED.to_owned()));
     if let Some(refusal) = &model.observation().last_processing_refusal {
@@ -86,9 +96,10 @@ fn info_lines(model: &TuiModel, compact: bool) -> Vec<Line<'static>> {
     lines
 }
 
-/// The Audio toolbar: the six controls in two fixed measured rows —
-/// the playlist toolbar's idiom (label-driven cells; a clipped active
-/// hit target is a T0 violation).
+/// The Audio toolbar: the per-operation controls in two fixed measured
+/// rows — the playlist toolbar's idiom (label-driven cells; a clipped
+/// active hit target is a T0 violation). Row 1 is the enablement and
+/// the preamp operation; row 2 the EQ operation and the preset picker.
 fn draw_toolbar(
     frame: &mut Frame,
     model: &mut TuiModel,
@@ -111,21 +122,14 @@ fn draw_button_row(
     compact: bool,
     regions: &mut Vec<HitRegion>,
 ) {
+    let enabled = model.audio_desired_enabled();
     let widths: Vec<Constraint> = buttons
         .iter()
-        .map(|button| {
-            Constraint::Length(
-                button
-                    .label(model.audio_enabled_label(), compact)
-                    .chars()
-                    .count() as u16
-                    + 2,
-            )
-        })
+        .map(|button| Constraint::Length(button.label(enabled, compact).chars().count() as u16 + 2))
         .collect();
     let cells = Layout::horizontal(widths).split(area);
     for (button, cell) in buttons.iter().zip(cells.iter()) {
-        let label = button.label(model.audio_enabled_label(), compact);
+        let label = button.label(enabled, compact);
         let focused = model.focus() == Some(FocusId::AudioButton(*button));
         // A plain text button, the T0 wireframe's `[Add File...]`
         // shape; focus is REVERSED (never colour alone).
@@ -246,12 +250,12 @@ fn draw_band_cell(
     frame.render_widget(Paragraph::new(Line::from(inert_label)), inert);
 }
 
-/// The trims the route currently shows: the draft's when one is open,
-/// the desired configuration's otherwise (before the first refresh:
-/// the neutral stage — honest defaults, not fabricated state).
+/// The trims the route currently shows: the EQ draft's when one is
+/// open, the desired configuration's otherwise (before the first
+/// refresh: the neutral stage — honest defaults, not fabricated state).
 fn current_trims(model: &TuiModel) -> [f32; 10] {
-    let eq = match model.audio_draft() {
-        Some(draft) => draft.config().eq,
+    let eq = match model.audio_eq_draft() {
+        Some(draft) => Some(draft.value()),
         None => model.desired_eq(),
     };
     eq.map(|eq| eq.band_gain_db).unwrap_or([0.0; 10])
@@ -332,8 +336,14 @@ mod tests {
         assert!(
             regions
                 .iter()
-                .any(|region| region.target == HitTarget::AudioButton(AudioButton::Apply)),
-            "the toolbar's Apply is hit-testable"
+                .any(|region| region.target == HitTarget::AudioButton(AudioButton::EqCommit)),
+            "the toolbar's [Apply EQ] is hit-testable"
+        );
+        assert!(
+            regions
+                .iter()
+                .any(|region| region.target == HitTarget::AudioButton(AudioButton::PreampCommit)),
+            "the toolbar's [Set preamp] is hit-testable"
         );
         assert!(
             regions.iter().any(|region| region.target

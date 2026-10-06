@@ -9,9 +9,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::{SELECTED_MARKER, bold, viewport_offset};
-use crate::tui::model::{
-    ConfirmKind, FocusId, HitRegion, HitTarget, Modal, ModalButton, ResponsiveClass, TuiModel,
-};
+use crate::tui::model::{ConfirmKind, FocusId, HitRegion, HitTarget, Modal, ModalButton, TuiModel};
 use qianqian_playback::EqPreset;
 
 /// The Open picker's geometry for ONE frame: the popup, its field row,
@@ -243,13 +241,15 @@ pub(super) fn modal_regions(
 }
 
 /// The preset menu's geometry (G3): one centered popup listing the
-/// eight factory presets, one row each, plus a hint row. The SINGLE
-/// layout decision for [`modal_regions`] and [`draw_modal`].
+/// eight factory presets, one row each, plus the frozen CONSEQUENCE
+/// lines and a hint row. The SINGLE layout decision for
+/// [`modal_regions`] and [`draw_modal`].
 fn presets_layout(area: Rect) -> (Rect, Rect, u16) {
     let rows = EqPreset::all().len() as u16;
-    let height = (rows + 3).min(area.height);
+    // 8 presets + 2 consequence lines + the hint + the borders.
+    let height = (rows + 5).min(area.height);
     let mut popup = centered_area(area, height);
-    popup.width = popup.width.min(34);
+    popup.width = popup.width.min(48);
     let inner = Rect::new(
         popup.x + 1,
         popup.y + 1,
@@ -327,7 +327,7 @@ fn confirm_regions(kind: ConfirmKind, area: Rect, regions: &mut Vec<HitRegion>) 
 pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &TuiModel) {
     match modal {
         Modal::Open(picker) => {
-            let compact = model.class() == ResponsiveClass::Compact;
+            let compact = model.compact_layout();
             let layout = picker_layout(picker, area, compact);
             frame.render_widget(Clear, layout.popup);
             // The popup's title names the listed directory — the field
@@ -477,7 +477,7 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             );
             // One row per preset; the cursor carries `>` and — while
             // the list owns the focus — the REVERSED emphasis.
-            let visible = rows.min(inner.height.saturating_sub(1));
+            let visible = rows.min(inner.height.saturating_sub(3));
             for (row, preset) in EqPreset::all().iter().enumerate().take(visible as usize) {
                 let marked = *cursor == Some(row);
                 let mark = if marked { SELECTED_MARKER } else { " " };
@@ -490,6 +490,18 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
                     Rect::new(inner.x, inner.y + row as u16, inner.width, 1),
                 );
             }
+            // The frozen consequence (T0): shown BEFORE the Enter that
+            // commits — a preset is the whole-configuration operation,
+            // not an EQ-trim copy.
+            let consequence_row = inner.y + inner.height.saturating_sub(2);
+            frame.render_widget(
+                Paragraph::new("Replaces the whole configuration:"),
+                Rect::new(inner.x, consequence_row, inner.width, 1),
+            );
+            frame.render_widget(
+                Paragraph::new("on · unity preamp · the preset's trims"),
+                Rect::new(inner.x, consequence_row + 1, inner.width, 1),
+            );
             let hint_row = inner.y + inner.height.saturating_sub(1);
             frame.render_widget(
                 Paragraph::new("↑↓ select · Enter use · Esc").centered(),
@@ -608,12 +620,14 @@ fn help_lines() -> Vec<Line<'static>> {
         Line::from("   wheel             over the list: scroll its view"),
         Line::from(""),
         Line::from(" 3 · Shape the sound — the Audio tab"),
-        Line::from("   Edits a draft; [Apply] commits it, [Cancel] discards."),
-        Line::from("   Until an Apply, nothing is applied."),
-        Line::from("   [DSP: on/off]     processing bypass or on"),
-        Line::from("   [Preamp −] / [+]  the draft preamp, one dB per press"),
+        Line::from("   Each setting commits on its own button; nothing is"),
+        Line::from("   applied silently, and applied state is not reported."),
+        Line::from("   [DSP: on/off]     processing bypass or on (commits)"),
+        Line::from("   [Preamp −] / [+]  the preamp draft, 0.1x per press"),
+        Line::from("   [Set preamp] / [Cancel edit]  commit / discard it"),
         Line::from("   [−] / [+]         one band's trim, ±18 dB"),
-        Line::from("   [EQ preset...]    fill the draft from a factory preset"),
+        Line::from("   [Apply EQ] / [Revert draft]   commit / discard them"),
+        Line::from("   [EQ preset...]    a preset: on, unity preamp, its trims"),
         Line::from(""),
         Line::from(" 4 · Watch — the Visualizer tab"),
         Line::from("   [Spectrum] [Peak-RMS] [Waveform]  switch the display"),

@@ -10,7 +10,7 @@ use super::focus::FocusId;
 use super::hit::{ArmedClick, HitRegion};
 use super::modal::Modal;
 use super::projection::{BAR_WIDTH, PlaylistRow, status_shape};
-use super::responsive::{ResponsiveClass, responsive_class};
+use super::responsive::{ShellFit, shell_fit};
 use crate::playlist::{PlaybackOrder, RepeatMode};
 use qianqian_playback::{
     AudioProcessingConfig, EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation,
@@ -19,7 +19,7 @@ use qianqian_playback::{
 /// One frame's worth of presentation state: the episode the player has
 /// committed (source path + latest coherent observation), the playlist
 /// rows, and the T1B interaction state (route, focus, modal, armed
-/// click, this frame's hit regions, responsive class). All of it is
+/// click, this frame's hit regions, shell fit). All of it is
 /// presentation: the shell keeps no playback truth of its own.
 pub struct TuiModel {
     /// The committed episode's source path. `None` is a real state
@@ -66,10 +66,13 @@ pub struct TuiModel {
     /// seeds from and is staleness-checked against it — the App owns
     /// the truth, the shell keeps the projection.
     pub(super) desired_processing: Option<AudioProcessingConfig>,
-    /// The Audio route's TUI-local draft (G3): presentation only, an
-    /// edit buffer over the desired configuration. `None` = the route
-    /// shows the desired configuration read-only.
-    pub(super) audio_draft: Option<super::audio::AudioDraft>,
+    /// The Audio route's TUI-local per-operation drafts (G3, corrected
+    /// to the T0 per-operation contract): presentation only, each an
+    /// edit buffer over ONE operation's field of the desired
+    /// configuration. `None` = that operation shows the desired value
+    /// read-only.
+    pub(super) preamp_draft: Option<super::audio::PreampDraft>,
+    pub(super) eq_draft: Option<super::audio::EqDraft>,
     /// The Visualizer route's active mode (G4).
     pub(super) visualizer_mode: super::visualizer::VisualizerMode,
     /// The Observation Plane's latest snapshot (G4): an owned display
@@ -91,8 +94,10 @@ pub struct TuiModel {
     /// The CURRENT frame's hit regions (§13/§15). Empty before the
     /// first draw and after every invalidation.
     pub(super) regions: Vec<HitRegion>,
-    /// The current responsive class, set by every draw (§27).
-    pub(super) class: ResponsiveClass,
+    /// The current shell fit (§27/§28): one of the four operable
+    /// responsive classes, or the distinct below-minimum too-small
+    /// state. Set by every draw.
+    pub(super) fit: ShellFit,
 }
 
 impl TuiModel {
@@ -124,7 +129,8 @@ impl TuiModel {
             volume: None,
             desired_dsp: None,
             desired_processing: None,
-            audio_draft: None,
+            preamp_draft: None,
+            eq_draft: None,
             visualizer_mode: super::visualizer::VisualizerMode::Spectrum,
             snapshot: None,
             route: TuiRoute::NowPlaying,
@@ -133,7 +139,7 @@ impl TuiModel {
             modal: None,
             armed: None,
             regions: Vec::new(),
-            class: responsive_class(u16::MAX, u16::MAX),
+            fit: shell_fit(u16::MAX, u16::MAX),
         }
     }
 

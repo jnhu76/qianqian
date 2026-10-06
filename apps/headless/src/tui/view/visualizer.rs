@@ -18,7 +18,7 @@ use ratatui::widgets::{Block, Paragraph};
 
 use super::bold;
 use crate::tui::model::{
-    FocusId, HitRegion, HitTarget, ResponsiveClass, TuiModel, VISUALIZER_MODES, VisualizerMode,
+    FocusId, HitRegion, HitTarget, TuiModel, VISUALIZER_MODES, VisualizerMode,
 };
 use qianqian_playback::{ObservationSnapshot, SPECTRUM_BANDS, SPECTRUM_FLOOR_DBFS};
 
@@ -32,7 +32,7 @@ pub(super) fn draw_visualizer(
     area: Rect,
     regions: &mut Vec<HitRegion>,
 ) {
-    let compact = model.class() == ResponsiveClass::Compact;
+    let compact = model.compact_layout();
     let [toolbar, panel] =
         Layout::vertical([Constraint::Length(1), Constraint::Min(1)]).areas(area);
     draw_mode_toolbar(frame, model, toolbar, compact, regions);

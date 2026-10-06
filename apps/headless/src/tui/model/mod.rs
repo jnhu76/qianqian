@@ -27,11 +27,13 @@
 //! modal       the ONE modal: kinds, the picker draft, editing steps
 //! focus       the one active focus target and its moves
 //! hit         hit regions, semantic targets, the armed click
-//! responsive  the responsive classes and the supported minimum
+//! responsive  the four operable shell classes, the shell fit, and the
+//!             supported minimum (§27/§28)
 //! projection  read-side labels derived from one coherent observation
 //! state       TuiModel: the presentation state and its mutators
 //! interaction route/focus/modal/viewport behavior on TuiModel
-//! audio       the Audio route's draft and read-side labels (G3)
+//! audio       the Audio route's per-operation drafts and read-side
+//!             labels (G3)
 //! input       the keyboard decoder
 //! mouse       the mouse decoder
 //! ```
@@ -51,7 +53,6 @@ mod state;
 mod visualizer;
 
 pub use actions::{PlaylistCursor, Step, TuiAction, TuiRoute};
-pub(crate) use audio::same_gain;
 #[cfg(test)]
 pub use controls::SeekButton;
 pub use controls::{
@@ -79,8 +80,8 @@ pub use projection::{
 #[cfg(test)]
 pub use projection::{LARGE_SEEK_STEP_SECS, SEEK_STEP_SECS};
 #[cfg(test)]
-pub use responsive::{MIN_HEIGHT, MIN_WIDTH};
-pub use responsive::{ResponsiveClass, responsive_class};
+pub use responsive::{MIN_HEIGHT, MIN_WIDTH, ResponsiveClass};
+pub use responsive::{ShellFit, shell_fit};
 pub use state::TuiModel;
 pub use visualizer::{VISUALIZER_MODES, VisualizerMode};
 

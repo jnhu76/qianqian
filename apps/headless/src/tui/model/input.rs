@@ -9,7 +9,7 @@ use super::actions::{PlaylistCursor, TuiAction};
 use super::focus::{FocusId, FocusMove};
 use super::modal::{HelpScroll, Modal, ModalButton, ModalInput, ModalKind};
 use super::projection::{LARGE_SEEK_STEP_SECS, SEEK_STEP_SECS};
-use super::responsive::ResponsiveClass;
+use super::responsive::ShellFit;
 use super::state::TuiModel;
 
 /// Whether a key press carries no modifier, or only SHIFT (terminals
@@ -113,7 +113,7 @@ fn decode_modal_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
     // cancel — a blind Enter behind an invisible popup must never
     // commit a real Open. Ctrl+C keeps its conventional meaning (it is
     // decoded before this function).
-    if model.class() == ResponsiveClass::Minimum {
+    if model.fit() == ShellFit::TooSmall {
         return match key.code {
             KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
             _ => None,

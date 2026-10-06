@@ -18,7 +18,7 @@ use super::modal::{
     ModalKind, OpenPicker, PickerEntry, PickerMode, PickerSubject,
 };
 use super::projection::SEEK_STEP_SECS;
-use super::responsive::ResponsiveClass;
+use super::responsive::{ResponsiveClass, ShellFit};
 use super::state::TuiModel;
 use super::visualizer::VISUALIZER_MODES;
 use qianqian_playback::{EQ_BAND_FREQUENCY_HZ, EqPreset};
@@ -49,9 +49,17 @@ impl TuiModel {
         self.armed
     }
 
-    /// The current responsive class (set by every draw).
-    pub fn class(&self) -> ResponsiveClass {
-        self.class
+    /// The current shell fit (set by every draw).
+    pub fn fit(&self) -> ShellFit {
+        self.fit
+    }
+
+    /// Whether this frame draws the Minimum band's compact layout (the
+    /// two-row navigation, the short control spellings). The layout
+    /// keeps its historical name; the class that selects it is the
+    /// frozen `Minimum` — the smallest fully operable band.
+    pub fn compact_layout(&self) -> bool {
+        self.fit == ShellFit::Operable(ResponsiveClass::Minimum)
     }
 
     /// The current frame's hit regions.
@@ -70,10 +78,10 @@ impl TuiModel {
             .map(|region| region.target)
     }
 
-    /// Record the responsive class for this frame (§27) — the draw
+    /// Record the shell fit for this frame (§27/§28) — the draw
     /// calls this before rendering, from the real terminal size.
-    pub fn set_class(&mut self, class: ResponsiveClass) {
-        self.class = class;
+    pub fn set_fit(&mut self, fit: ShellFit) {
+        self.fit = fit;
     }
 
     /// Publish the current frame's hit regions (§14). The view calls
@@ -113,10 +121,11 @@ impl TuiModel {
     /// route tabs, then the active route's local controls. While a
     /// modal is open the cycle is exactly the modal's controls (§24) —
     /// the picker's field and listing; a listing with no rows leaves
-    /// only the field. Below the minimum size there is nothing to
-    /// focus (§28).
+    /// only the field. In the below-minimum too-small state (not a
+    /// class — there are no controls rendered at all) nothing is
+    /// focusable (§28).
     pub fn focus_cycle(&self) -> Vec<FocusId> {
-        if self.class == ResponsiveClass::Minimum {
+        if self.fit == ShellFit::TooSmall {
             return Vec::new();
         }
         if let Some(modal) = self.modal() {
@@ -195,7 +204,7 @@ impl TuiModel {
                 if !self.playlist.is_empty() {
                     cycle.push(FocusId::Playlist);
                 }
-                if self.class != ResponsiveClass::Compact {
+                if !self.compact_layout() {
                     cycle.push(FocusId::Preference(PreferenceButton::Order));
                     cycle.push(FocusId::Preference(PreferenceButton::Repeat));
                 }
@@ -362,9 +371,11 @@ impl TuiModel {
                 AudioButton::Enabled => TuiAction::DspToggleEnabled,
                 AudioButton::PreampDown => TuiAction::DspPreampStep(-1),
                 AudioButton::PreampUp => TuiAction::DspPreampStep(1),
+                AudioButton::PreampCommit => TuiAction::DspPreampCommit,
+                AudioButton::PreampCancel => TuiAction::DspPreampCancel,
                 AudioButton::Presets => TuiAction::DspOpenPresets,
-                AudioButton::Apply => TuiAction::DspApply,
-                AudioButton::Cancel => TuiAction::DspCancel,
+                AudioButton::EqCommit => TuiAction::DspApplyEq,
+                AudioButton::EqRevert => TuiAction::DspRevertEq,
             }),
             HitTarget::EqBand { band, adjust } => Some(TuiAction::DspEqBandStep(
                 band,
@@ -469,14 +480,12 @@ impl TuiModel {
             },
             ModalKind::Help => Modal::Help { scroll: 0 },
             // The preset menu (G3) starts its cursor on the preset the
-            // draft (or, with no draft, the desired configuration)
-            // currently matches — the menu answers "which preset am I
-            // on" as honestly as "pick one".
+            // DESIRED configuration currently matches — the menu answers
+            // "which preset am I on" as honestly as "pick one". (The
+            // preset operation reads the desired configuration itself;
+            // per-operation drafts are not its subject.)
             ModalKind::Presets => {
-                let eq = match self.audio_draft.as_ref() {
-                    Some(draft) => draft.config().eq,
-                    None => self.desired_processing.as_ref().and_then(|c| c.eq),
-                };
+                let eq = self.desired_processing.as_ref().and_then(|c| c.eq);
                 let cursor = eq.and_then(|eq| {
                     EqPreset::all()
                         .iter()
@@ -824,6 +833,13 @@ impl TuiModel {
     pub(crate) fn set_focus(&mut self, focus: Option<FocusId>) {
         self.focus = focus;
     }
+
+    /// Test seam: place the shell directly in one operable class (the
+    /// real paths set the fit from the terminal size on every draw).
+    #[cfg(test)]
+    pub(crate) fn set_class(&mut self, class: ResponsiveClass) {
+        self.fit = ShellFit::Operable(class);
+    }
 }
 
 #[cfg(test)]
@@ -938,10 +954,10 @@ mod tests {
             ]
         );
 
-        // Audio (G3): tabs + the six toolbar controls + the ten band
+        // Audio (G3): tabs + the eight toolbar controls + the ten band
         // steppers (− and + per band) + the persistent pair.
         model.set_route(TuiRoute::Audio);
-        assert_eq!(model.focus_cycle().len(), 32);
+        assert_eq!(model.focus_cycle().len(), 34);
         model.set_route(TuiRoute::Visualizer);
         assert_eq!(
             model.focus_cycle().len(),
@@ -954,11 +970,12 @@ mod tests {
         assert_eq!(model.focus_cycle(), vec![FocusId::ModalField]);
         model.close_modal();
 
-        // Below the minimum: nothing is focusable (§28).
-        model.set_class(ResponsiveClass::Minimum);
+        // The too-small state (§28): nothing is focusable — the shell
+        // renders no interactive layout there at all.
+        model.set_fit(ShellFit::TooSmall);
         assert!(model.focus_cycle().is_empty());
         model.validate_focus();
-        assert_eq!(model.focus(), None, "no invisible focus below minimum");
+        assert_eq!(model.focus(), None, "no invisible focus while too small");
     }
 
     /// The nav bar's persistent pair (G5): Help and Quit close the
@@ -1690,15 +1707,15 @@ mod tests {
         );
     }
 
-    /// Below the minimum size the shell paints no popup (§28), so the
-    /// modal's keys go inert except the cancel: a blind Enter behind
-    /// an invisible picker must never commit a real Open.
+    /// In the below-minimum too-small state the shell paints no popup
+    /// (§28), so the modal's keys go inert except the cancel: a blind
+    /// Enter behind an invisible picker must never commit a real Open.
     #[test]
     fn a_modal_below_the_minimum_only_cancels() {
         let mut model = TuiModel::new("song.flac");
         model.open_modal(ModalKind::Open);
         model.modal_push('x');
-        model.set_class(ResponsiveClass::Minimum);
+        model.set_fit(ShellFit::TooSmall);
         assert_eq!(
             decode_key(key(KeyCode::Enter), &model),
             None,

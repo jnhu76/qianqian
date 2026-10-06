@@ -31,8 +31,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::model::{
-    FocusId, HitRegion, HitTarget, MAX_STATUS_ROWS, NAV_BUTTONS, NavBarButton, ResponsiveClass,
-    TuiModel, TuiRoute, responsive_class, status_shape,
+    FocusId, HitRegion, HitTarget, MAX_STATUS_ROWS, NAV_BUTTONS, NavBarButton, ShellFit, TuiModel,
+    TuiRoute, shell_fit, status_shape,
 };
 
 use audio::draw_audio;
@@ -52,9 +52,10 @@ pub const COMMITTED_HINT: &str = "terminal outcome committed";
 /// and nothing is loaded. The panel fabricates no label beyond it.
 pub const NO_MUSIC_LINE: &str = "No music loaded.";
 
-/// The below-minimum page (§28): no interactive layout, no hit
-/// regions, no focus — one truthful line, and playback continues under
-/// the product's own semantics.
+/// The below-minimum page (§28): the distinct too-small state under
+/// the four operable classes — no interactive layout, no hit regions,
+/// no focus, one truthful line, and playback continues under the
+/// product's own semantics.
 pub const TOO_SMALL_LINE: &str = "Terminal too small.";
 
 /// The play marker: the committed (playing) row. Deliberately a shape,
@@ -69,8 +70,8 @@ const SELECTED_MARKER: &str = ">";
 /// into the model from the same layout this draw used.
 pub fn draw(frame: &mut Frame, model: &mut TuiModel) {
     let area = frame.area();
-    let class = responsive_class(area.width, area.height);
-    model.set_class(class);
+    let fit = shell_fit(area.width, area.height);
+    model.set_fit(fit);
     // The frame starts with no geometry; everything published below is
     // drawn THIS frame (§15: stale coordinates never survive).
     let mut regions: Vec<HitRegion> = Vec::new();
@@ -78,7 +79,7 @@ pub fn draw(frame: &mut Frame, model: &mut TuiModel) {
     // frame's class (§12/§29).
     model.validate_focus();
 
-    if class == ResponsiveClass::Minimum {
+    if fit == ShellFit::TooSmall {
         render_too_small(frame, area);
         model.publish_regions(regions);
         return;
@@ -90,12 +91,7 @@ pub fn draw(frame: &mut Frame, model: &mut TuiModel) {
     // is still PAINTED last, over everything (§23) — publication order
     // and paint order are deliberately independent decisions.
     if let Some(modal) = model.modal() {
-        modal_regions(
-            modal,
-            area,
-            model.class() == ResponsiveClass::Compact,
-            &mut regions,
-        );
+        modal_regions(modal, area, model.compact_layout(), &mut regions);
     }
 
     let status_rows = status_line_count(model);
@@ -154,7 +150,7 @@ fn render_too_small(frame: &mut Frame, area: Rect) {
 /// control's cell is published as its hit region from the very rect
 /// it was drawn into.
 fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<HitRegion>) {
-    let compact = model.class() == ResponsiveClass::Compact;
+    let compact = model.compact_layout();
     let label = |button: NavBarButton| {
         if compact {
             button.compact_label()
@@ -586,15 +582,17 @@ mod tests {
             model.regions()
         );
         assert_eq!(model.focus(), None, "no invisible focus below the minimum");
-        assert_eq!(model.class(), ResponsiveClass::Minimum);
-        assert_eq!(responsive_class(30, 10), ResponsiveClass::Minimum);
+        assert_eq!(model.fit(), ShellFit::TooSmall);
+        assert_eq!(shell_fit(30, 10), ShellFit::TooSmall);
     }
 
-    /// G1 re-review (B1): the exact-minimum Now Playing shell is
-    /// pinned by SEMANTIC evidence, not just nonpanic — every
-    /// interactive label renders whole at `MIN_WIDTH×MIN_HEIGHT` and
-    /// every published region sits inside the frame. The picker's
-    /// minimum has its own test above.
+    /// G1 re-review (B1), re-aimed by the owner's P1-05: the supported
+    /// minimum is the smallest FULLY OPERABLE class, not an error page.
+    /// The exact-minimum Now Playing shell is pinned by SEMANTIC
+    /// evidence, not just nonpanic — every interactive label renders
+    /// whole at `MIN_WIDTH×MIN_HEIGHT`, the frame publishes hit
+    /// regions, and the focus cycle is live. The too-small state has
+    /// its own test above.
     #[test]
     fn the_minimum_shell_renders_every_interactive_label_whole() {
         let mut model = plain_model();
@@ -603,7 +601,15 @@ mod tests {
             crate::tui::model::MIN_WIDTH,
             crate::tui::model::MIN_HEIGHT,
         );
-        assert_eq!(model.class(), ResponsiveClass::Compact);
+        assert_eq!(
+            model.fit(),
+            ShellFit::Operable(ResponsiveClass::Minimum),
+            "the supported minimum is the smallest operable class"
+        );
+        assert!(
+            !model.focus_cycle().is_empty(),
+            "the minimum class is operable: its controls focus"
+        );
         for label in [
             // Navigation (compact spellings).
             "Now",
@@ -650,16 +656,22 @@ mod tests {
         }
     }
 
-    /// The compact class shortens the tab labels — the mechanics exist
-    /// so controls do not overlap on a narrow terminal (§27).
+    /// The Minimum class's compact layout shortens the tab labels — the
+    /// mechanics exist so controls do not overlap on a narrow terminal
+    /// (§27). The class stays fully operable: focus and hit geometry
+    /// are live.
     #[test]
-    fn the_compact_class_shortens_the_tab_labels() {
+    fn the_minimum_class_shortens_the_tab_labels() {
         let mut model = plain_model();
         let text = rendered(&mut model, 50, 16);
         assert!(text.contains("Now"), "{text}");
         assert!(text.contains("List"), "{text}");
         assert!(text.contains("Viz"), "{text}");
-        assert_eq!(model.class(), ResponsiveClass::Compact);
+        assert_eq!(model.fit(), ShellFit::Operable(ResponsiveClass::Minimum));
+        assert!(
+            !model.focus_cycle().is_empty() && !model.regions().is_empty(),
+            "the smallest operable class focuses and answers the mouse"
+        );
     }
 
     /// A large → small → large resize sequence keeps the shell coherent
@@ -671,7 +683,7 @@ mod tests {
         model.set_focus(Some(FocusId::Transport(TransportButton::PlayPause)));
         let large = rendered(&mut model, 100, 30);
         assert!(large.contains("Pause"), "{large}");
-        assert_eq!(model.class(), ResponsiveClass::Wide);
+        assert_eq!(model.fit(), ShellFit::Operable(ResponsiveClass::Normal));
 
         let small = rendered(&mut model, 30, 10);
         assert!(small.contains(TOO_SMALL_LINE), "{small}");
@@ -713,8 +725,8 @@ mod tests {
         }
     }
 
-    /// The responsive pass over every route (§27): at the compact
-    /// floor, the Normal boundary and the Wide boundary, each route
+    /// The responsive pass over every route (§27): at the Minimum
+    /// floor and at the Compact, Normal and Wide boundaries, each route
     /// renders its key controls WHOLE (the class's own spellings), the
     /// persistent Help/Quit buttons render whole everywhere, the frame
     /// claims nothing unearned, and the hit geometry is published.
@@ -743,16 +755,20 @@ mod tests {
                     "DSP",
                     "[Pre−]",
                     "[Pre+]",
+                    "[Set pre]",
+                    "[Cancel]",
                     "[Presets]",
                     "[Apply]",
-                    "[Cancel]",
+                    "[Revert]",
                 ],
                 &[
                     "[Preamp −]",
                     "[Preamp +]",
+                    "[Set preamp]",
+                    "[Cancel edit]",
                     "[EQ preset...]",
-                    "[Apply]",
-                    "[Cancel]",
+                    "[Apply EQ]",
+                    "[Revert draft]",
                 ],
             ),
             (
@@ -789,10 +805,10 @@ mod tests {
             }
             assert!(!model.regions().is_empty(), "{route:?} at 40x14");
 
-            // The Normal boundary and the Wide boundary: full
-            // spellings — including at 60 columns, where the playlist
-            // toolbar's full row would not fit and wraps instead.
-            for (width, height) in [(60u16, 18u16), (100u16, 30u16)] {
+            // The Compact, Normal and Wide boundaries: full spellings —
+            // including at 60 columns, where the playlist toolbar's
+            // full row would not fit and wraps instead.
+            for (width, height) in [(60u16, 18u16), (100u16, 30u16), (120u16, 40u16)] {
                 let mut model = plain_model();
                 model.set_route(route);
                 let text = rendered(&mut model, width, height);
