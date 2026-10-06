@@ -1050,50 +1050,27 @@ impl TuiModel {
     /// side whose evidence does not exist yet (or is unknown). Rendered
     /// by the same projection helper the scriptable status text uses, so
     /// the two read-side surfaces cannot disagree; the model keeps no
-    /// position of its own (no `last_position`, no local playback truth).
-    ///
-    /// One presentation policy on top (field round 5): while the episode
-    /// is LIVE and its position evidence simply has not arrived yet —
-    /// the first sampling window after every Open replacement — the
-    /// timeline renders at the START (`00:00 / …`) instead of
-    /// collapsing to `--:--`. The episode has consumed nothing (the
-    /// render leg publishes from zero), and a collapsing timeline
-    /// flexed the panel height on every track switch. A SETTLED
-    /// episode keeps the dashes: a dead timeline has no start, and the
-    /// no-evidence state must not grow a fabricated zero.
+    /// position of its own (no `last_position`, no local playback
+    /// truth). The live pre-first-sample window keeps the dashes too
+    /// (T0 unknown-position): an unknown position is not a zero, and the
+    /// display must not promote a start-of-track shortcut into position
+    /// evidence.
     pub fn timeline_label(&self) -> String {
-        if self.pending_start_window() {
-            let mut pending = self.observation.clone();
-            pending.position = Some(0);
-            return crate::status::format_timeline(&pending);
-        }
         crate::status::format_timeline(&self.observation)
-    }
-
-    /// Whether this frame is in the live pre-first-sample window: an
-    /// unsettled episode with no activation failure whose position
-    /// projection has not published yet.
-    fn pending_start_window(&self) -> bool {
-        self.observation.position.is_none()
-            && self.observation.terminal_outcome.is_none()
-            && self.observation.activation_error.is_none()
     }
 
     /// The progress bar (Issue #166 §33):
     /// `00:42 ━━━━━╸────────── 05:47`. `None` unless BOTH sides have
     /// evidence: an unknown duration has no percentage to draw and an
     /// unknown position is not a zero, so the bar simply does not
-    /// appear — it is never fabricated. Since G1 the drawn glyph is
-    /// ALSO a click-to-position affordance: a seek-bar hit region over
-    /// exactly its cells, and only while duration evidence exists (see
-    /// the view's `seek_bar_glyph_area`).
+    /// appear — it is never fabricated, not even in the live
+    /// pre-first-sample window after an Open replacement (T0
+    /// unknown-position; see [`Self::timeline_label`]). Since G1 the
+    /// drawn glyph is ALSO a click-to-position affordance: a seek-bar
+    /// hit region over exactly its cells, and only while duration
+    /// evidence exists (see the view's `seek_bar_glyph_area`).
     ///
-    /// The one exception is the same live pre-first-sample window as
-    /// [`Self::timeline_label`] (field round 5): a LIVE episode with no
-    /// position sample yet renders the bar at its START (empty fill),
-    /// with `--:--` as the total if the duration is not known either —
-    /// the row stays put instead of vanishing and flexing the layout
-    /// for the first second of every track. The fill is the position's
+    /// The fill is the position's
     /// fraction of the reported duration, clamped into the bar. The
     /// duration is mechanism evidence and the position an independent
     /// projection, so a position beyond the reported duration is
@@ -1105,26 +1082,15 @@ impl TuiModel {
         if rate == 0 {
             return None;
         }
-        let live_pending = self.pending_start_window();
-        let position_frames = match self.observation.position {
-            Some(frames) => frames,
-            None if live_pending => 0,
-            None => return None,
-        };
-        let position_secs = position_frames / rate;
-        let duration_secs = match self.observation.source_duration {
-            Some(duration) => Some(duration.as_secs()),
-            None if live_pending => None,
-            None => return None,
-        };
+        let position_secs = self.observation.position? / rate;
+        let duration_secs = self.observation.source_duration?.as_secs();
 
-        let filled = match duration_secs {
-            Some(d) if d > 0 => {
-                let width = BAR_WIDTH as u128;
-                let filled = u128::from(position_secs) * width / u128::from(d);
-                usize::try_from(filled.min(width)).unwrap_or(BAR_WIDTH)
-            }
-            _ => 0,
+        let filled = if duration_secs > 0 {
+            let width = BAR_WIDTH as u128;
+            let filled = u128::from(position_secs) * width / u128::from(duration_secs);
+            usize::try_from(filled.min(width)).unwrap_or(BAR_WIDTH)
+        } else {
+            0
         };
         let mut bar = String::with_capacity(BAR_WIDTH);
         for cell in 0..BAR_WIDTH {
@@ -1134,9 +1100,7 @@ impl TuiModel {
                 std::cmp::Ordering::Greater => '─',
             });
         }
-        let total = duration_secs
-            .map(|d| crate::status::format_clock(Duration::from_secs(d)))
-            .unwrap_or_else(|| "--:--".to_owned());
+        let total = crate::status::format_clock(Duration::from_secs(duration_secs));
         Some(format!(
             "{} {bar} {}",
             crate::status::format_clock(Duration::from_secs(position_secs)),
@@ -2270,6 +2234,30 @@ mod tests {
         });
         assert_eq!(model.timeline_label(), "00:42 / 03:58");
 
+        // The live pre-first-sample window (owner re-review P1): format
+        // and duration have arrived, the position projection has NOT.
+        // The window where a fabricated start was observable — and the
+        // unknown position must still not be rewritten into a zero.
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            position: None,
+            source_duration: Some(Duration::from_secs(238)),
+            ..pending()
+        });
+        assert_eq!(
+            model.timeline_label(),
+            "--:-- / 03:58",
+            "a live episode without a position sample keeps the dashes"
+        );
+        assert!(
+            model.position_bar_label().is_none(),
+            "the bar does not render a fabricated start fill"
+        );
+
         // A settled episode (the seam withdraws the position) keeps the
         // duration evidence and shows no position — no final-position
         // latch is invented here either.
@@ -2284,6 +2272,61 @@ mod tests {
             ..pending()
         });
         assert_eq!(model.timeline_label(), "--:-- / 03:58");
+    }
+
+    /// The progress bar renders only from BOTH sides' evidence: the
+    /// fraction is the published position over the reported duration,
+    /// clamped when the position runs past the duration, and no state
+    /// short of both sides draws anything.
+    #[test]
+    fn the_position_bar_renders_only_from_both_sides_evidence() {
+        let mut model = TuiModel::new("song.flac");
+
+        // Nothing at all: no bar.
+        assert_eq!(model.position_bar_label(), None);
+
+        // Duration alone (position unknown — even LIVE): still no bar.
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            source_duration: Some(Duration::from_secs(238)),
+            ..pending()
+        });
+        assert_eq!(model.position_bar_label(), None);
+
+        // Both sides: 00:42 of 03:58 fills 42/238 of the width.
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            position: Some(44_100 * 42),
+            source_duration: Some(Duration::from_secs(238)),
+            ..pending()
+        });
+        let bar = model.position_bar_label().expect("both sides known");
+        let filled = bar.chars().filter(|&c| c == '━').count();
+        assert_eq!(filled, 42 * BAR_WIDTH / 238, "{bar}");
+        assert!(
+            bar.starts_with("00:42 ") && bar.ends_with(" 03:58"),
+            "{bar}"
+        );
+
+        // A position past the reported duration clamps to a full bar.
+        model.update(PlaybackSessionObservation {
+            position: Some(44_100 * 300),
+            ..model.observation().clone()
+        });
+        let bar = model.position_bar_label().expect("still both sides");
+        assert_eq!(
+            bar.chars().filter(|&c| c == '━').count(),
+            BAR_WIDTH,
+            "{bar}"
+        );
     }
 
     #[test]
