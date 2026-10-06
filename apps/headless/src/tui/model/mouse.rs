@@ -6,6 +6,7 @@
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use super::actions::{PlaylistCursor, TuiAction};
+use super::controls::{AudioButton, PreferenceButton};
 use super::hit::{ArmedClick, HitTarget};
 use super::modal::ModalInput;
 use super::state::TuiModel;
@@ -94,17 +95,20 @@ pub fn decode_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction
         MouseEventKind::Moved => None,
         // §22 / G2 owner ruling: over the playlist list the wheel
         // scrolls the TUI-LOCAL VIEWPORT ONLY — the selection, the
-        // committed episode and the App never move. Everywhere else it
-        // is inert. Either way the wheel cancels any armed press (§22:
-        // "wheel cancels an arm and acts once on the control under the
-        // pointer").
+        // committed episode and the App never move. Over a stepper
+        // control (volume, preamp, one EQ band's trim) the wheel acts
+        // on the axis that control visibly owns: up increases, down
+        // decreases — the same signed step the button under the pointer
+        // performs. Everywhere else it is inert. Either way the wheel
+        // cancels any armed press (§22: "wheel cancels an arm and acts
+        // once on the control under the pointer").
         MouseEventKind::ScrollUp => {
             model.disarm();
-            wheel(model, &mouse, -1)
+            wheel(model, &mouse, WheelDir::Up)
         }
         MouseEventKind::ScrollDown => {
             model.disarm();
-            wheel(model, &mouse, 1)
+            wheel(model, &mouse, WheelDir::Down)
         }
         // Horizontal wheels have no meaning here (§22: no scroll physics).
         MouseEventKind::ScrollLeft | MouseEventKind::ScrollRight => None,
@@ -204,16 +208,49 @@ fn modal_wheel(model: &TuiModel, mouse: &MouseEvent, cursor: PlaylistCursor) -> 
     }
 }
 
-/// The wheel over one cell (G2, the owner's viewport ruling): over the
-/// playlist list it scrolls the TUI-local viewport — presentation
-/// only, no action to dispatch, no selection movement. Over anything
-/// else it is inert.
-fn wheel(model: &mut TuiModel, mouse: &MouseEvent, lines: i32) -> Option<TuiAction> {
+/// Which way a wheel step turns (§22). `Up`/`Down` are the pointer's
+/// physical direction; what they mean is the control's own axis.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WheelDir {
+    Up,
+    Down,
+}
+
+/// The wheel over one cell (G2, the owner's viewport ruling; G6 mouse
+/// parity): over the playlist list it scrolls the TUI-local viewport —
+/// presentation only, no action to dispatch, no selection movement.
+/// Over a stepper control it is that control's own signed step: the
+/// volume buttons, the preamp pair, and one EQ band's trim pair all
+/// own an up/down axis, so the wheel converges on the SAME action the
+/// [+]/[−] buttons produce (§30). Over anything else it is inert.
+fn wheel(model: &mut TuiModel, mouse: &MouseEvent, dir: WheelDir) -> Option<TuiAction> {
     match model.hit_test(mouse.column, mouse.row)? {
         HitTarget::PlaylistRow(_) | HitTarget::PlaylistPane => {
-            model.playlist_wheel_scroll(lines);
+            model.playlist_wheel_scroll(match dir {
+                WheelDir::Down => 1,
+                WheelDir::Up => -1,
+            });
             None
         }
+        HitTarget::Preference(PreferenceButton::VolumeDown | PreferenceButton::VolumeUp) => {
+            Some(match dir {
+                WheelDir::Up => TuiAction::VolumeUp,
+                WheelDir::Down => TuiAction::VolumeDown,
+            })
+        }
+        HitTarget::AudioButton(AudioButton::PreampDown | AudioButton::PreampUp) => {
+            Some(TuiAction::DspPreampStep(match dir {
+                WheelDir::Up => 1,
+                WheelDir::Down => -1,
+            }))
+        }
+        HitTarget::EqBand { band, .. } => Some(TuiAction::DspEqBandStep(
+            band,
+            match dir {
+                WheelDir::Up => 1,
+                WheelDir::Down => -1,
+            },
+        )),
         _ => None,
     }
 }
@@ -643,9 +680,10 @@ mod tests {
     /// ONLY (G2, the owner ruling; T0: "Wheel scrolls the viewport
     /// without changing selection or playback"): no action dispatches,
     /// the selection and the committed markers never move, the window
-    /// does. Everywhere else the wheel is inert.
+    /// does. Over click-only controls (a tab, a transport button) it
+    /// is inert.
     #[test]
-    fn the_wheel_scrolls_only_the_viewport() {
+    fn the_wheel_over_the_playlist_scrolls_only_the_viewport() {
         let mut model = model_with_regions(100, 30, TuiRoute::Playlist);
         let (column, row) = region_cell(&model, &HitTarget::PlaylistRow(2));
         let selected_before = model
@@ -705,6 +743,59 @@ mod tests {
         let (tab, tab_row) = region_cell(&model, &HitTarget::RouteTab(TuiRoute::Audio));
         assert_eq!(
             decode_mouse(mouse(MouseEventKind::ScrollDown, tab, tab_row), &mut model),
+            None
+        );
+    }
+
+    /// The wheel over a stepper control acts on that control's own
+    /// axis (§22/§30): up increases, down decreases — the SAME action
+    /// the [+]/[−] buttons under the pointer produce. Over a
+    /// click-only control it stays inert.
+    #[test]
+    fn the_wheel_steps_the_controls_that_own_an_axis() {
+        // The volume steppers (Now Playing).
+        let mut model = model_with_regions(100, 30, TuiRoute::NowPlaying);
+        let (column, row) =
+            region_cell(&model, &HitTarget::Preference(PreferenceButton::VolumeDown));
+        assert_eq!(
+            decode_mouse(mouse(MouseEventKind::ScrollUp, column, row), &mut model),
+            Some(TuiAction::VolumeUp),
+            "wheel up over a volume stepper: one step up"
+        );
+        let (column, row) = region_cell(&model, &HitTarget::Preference(PreferenceButton::VolumeUp));
+        assert_eq!(
+            decode_mouse(mouse(MouseEventKind::ScrollDown, column, row), &mut model),
+            Some(TuiAction::VolumeDown),
+            "wheel down over a volume stepper: one step down"
+        );
+
+        // The preamp pair and one band's trim (Audio).
+        model.set_route(TuiRoute::Audio);
+        redraw(&mut model, 100, 30);
+        let (column, row) = region_cell(&model, &HitTarget::AudioButton(AudioButton::PreampUp));
+        assert_eq!(
+            decode_mouse(mouse(MouseEventKind::ScrollDown, column, row), &mut model),
+            Some(TuiAction::DspPreampStep(-1))
+        );
+        let (column, row) = region_cell(
+            &model,
+            &HitTarget::EqBand {
+                band: 3,
+                adjust: EqAdjust::Boost,
+            },
+        );
+        assert_eq!(
+            decode_mouse(mouse(MouseEventKind::ScrollUp, column, row), &mut model),
+            Some(TuiAction::DspEqBandStep(3, 1)),
+            "the wheel over either half of the pair steps the band's axis"
+        );
+
+        // A click-only control has no axis: inert.
+        model.set_route(TuiRoute::NowPlaying);
+        redraw(&mut model, 100, 30);
+        let (column, row) = region_cell(&model, &HitTarget::Transport(TransportButton::Stop));
+        assert_eq!(
+            decode_mouse(mouse(MouseEventKind::ScrollDown, column, row), &mut model),
             None
         );
     }

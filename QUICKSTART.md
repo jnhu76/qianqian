@@ -142,7 +142,9 @@ For `G`, type a position like `1:35` (minutes:seconds) or `95`
 
 The mouse wheel works over the list, too: over the playlist it
 scrolls the list's view (the selection stays put), and over the
-Open picker's listing it moves the selection.
+Open picker's listing it moves the selection. Over a stepper
+control — the volume buttons, the preamp and EQ trim pairs on the
+Audio tab — a wheel step performs that control's own step.
 
 ### Typing a path: Q is a normal character
 

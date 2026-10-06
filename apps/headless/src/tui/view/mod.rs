@@ -713,6 +713,105 @@ mod tests {
         }
     }
 
+    /// The responsive pass over every route (§27): at the compact
+    /// floor, the Normal boundary and the Wide boundary, each route
+    /// renders its key controls WHOLE (the class's own spellings), the
+    /// persistent Help/Quit buttons render whole everywhere, the frame
+    /// claims nothing unearned, and the hit geometry is published.
+    #[test]
+    fn every_route_renders_whole_at_the_class_boundaries() {
+        // (route, labels for the COMPACT floor, labels for full width).
+        let routes: [(TuiRoute, &[&str], &[&str]); 4] = [
+            (
+                TuiRoute::NowPlaying,
+                &["Open", "Pause", "Ord:Seq", "100/100", "Help", "Quit"],
+                &["Open", "Pause", "100/100 (desired)", "Help", "Quit"],
+            ),
+            (
+                TuiRoute::Playlist,
+                &["[+File]", "[+Folder]", "[Play]", "[Remove]", "[Clear]"],
+                &[
+                    "[Add File...]",
+                    "[Add Folder...]",
+                    "[Play selected]",
+                    "[Clear...]",
+                ],
+            ),
+            (
+                TuiRoute::Audio,
+                &[
+                    "DSP",
+                    "[Pre−]",
+                    "[Pre+]",
+                    "[Presets]",
+                    "[Apply]",
+                    "[Cancel]",
+                ],
+                &[
+                    "[Preamp −]",
+                    "[Preamp +]",
+                    "[EQ preset...]",
+                    "[Apply]",
+                    "[Cancel]",
+                ],
+            ),
+            (
+                TuiRoute::Visualizer,
+                &[
+                    "[Spectrum]",
+                    "[Levels]",
+                    "[Wave]",
+                    "Visualization unavailable",
+                ],
+                &[
+                    "[Spectrum]",
+                    "[Peak-RMS]",
+                    "[Waveform]",
+                    "Visualization unavailable",
+                ],
+            ),
+        ];
+        for (route, compact_labels, full_labels) in routes {
+            // The compact floor: the class's own short spellings.
+            let mut model = plain_model();
+            model.set_route(route);
+            let text = rendered(
+                &mut model,
+                crate::tui::model::MIN_WIDTH,
+                crate::tui::model::MIN_HEIGHT,
+            );
+            assert_eq!(scan(&text), None, "{route:?} at 40x14:\n{text}");
+            for label in compact_labels {
+                assert!(
+                    text.contains(label),
+                    "{label:?} for {route:?} clipped at the compact floor:\n{text}"
+                );
+            }
+            assert!(!model.regions().is_empty(), "{route:?} at 40x14");
+
+            // The Normal boundary and the Wide boundary: full
+            // spellings — including at 60 columns, where the playlist
+            // toolbar's full row would not fit and wraps instead.
+            for (width, height) in [(60u16, 18u16), (100u16, 30u16)] {
+                let mut model = plain_model();
+                model.set_route(route);
+                let text = rendered(&mut model, width, height);
+                assert_eq!(scan(&text), None, "{route:?} at {width}x{height}:\n{text}");
+                for label in full_labels {
+                    assert!(
+                        text.contains(label),
+                        "{label:?} for {route:?} clipped at {width}x{height}:\n{text}"
+                    );
+                }
+                assert!(
+                    text.contains("Help") && text.contains("Quit"),
+                    "the persistent buttons clipped at {width}x{height}:\n{text}"
+                );
+                assert!(!model.regions().is_empty(), "{route:?} at {width}x{height}");
+            }
+        }
+    }
+
     /// A very long source path clips at the panel edge without
     /// corrupting the rows below it (C11): the display truncates; the
     /// model keeps the full internal identity.

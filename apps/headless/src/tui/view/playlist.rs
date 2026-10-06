@@ -26,16 +26,26 @@ pub(super) fn draw_playlist(
     regions: &mut Vec<HitRegion>,
 ) {
     let compact = model.class() == ResponsiveClass::Compact;
+    // The toolbar wraps whenever the FULL spellings would not fit one
+    // row — the class decides the spelling, the measurement decides
+    // the wrap. A clipped active hit target is a T0 violation at any
+    // class (this is the compact freeze's own reason, generalized to
+    // the narrow end of the Normal band).
+    let full_width: u16 = PLAYLIST_BUTTONS
+        .iter()
+        .map(|button| button.label().chars().count() as u16 + 2)
+        .sum();
+    let wrap = compact || full_width > area.width;
     let [toolbar, list, summary] = Layout::vertical([
         // T0 Compact freeze: "Playlist toolbar wraps" — two rows where
         // the full spellings would not fit the supported minimum.
-        Constraint::Length(if compact { 2 } else { 1 }),
+        Constraint::Length(if wrap { 2 } else { 1 }),
         Constraint::Min(1),
         Constraint::Length(1),
     ])
     .areas(area);
 
-    draw_playlist_toolbar(frame, model, toolbar, compact, regions);
+    draw_playlist_toolbar(frame, model, toolbar, compact, wrap, regions);
     draw_playlist_list(frame, model, list, regions);
     draw_playlist_summary(frame, model, summary, compact, regions);
 }
@@ -48,20 +58,22 @@ fn draw_playlist_toolbar(
     model: &mut TuiModel,
     area: Rect,
     compact: bool,
+    wrap: bool,
     regions: &mut Vec<HitRegion>,
 ) {
-    if !compact {
-        draw_button_row(frame, model, area, &PLAYLIST_BUTTONS, false, regions);
+    if !wrap {
+        draw_button_row(frame, model, area, &PLAYLIST_BUTTONS, compact, regions);
         return;
     }
     // T0 Compact freeze: "Playlist toolbar wraps" — three buttons on
     // the first row, two on the second; every spelling stays inside
-    // the class minimum.
+    // the class minimum (and the Normal band's narrow end keeps its
+    // full spellings, wrapped).
     let [first, second] =
         Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(area);
     let (head, tail) = PLAYLIST_BUTTONS.split_at(3);
-    draw_button_row(frame, model, first, head, true, regions);
-    draw_button_row(frame, model, second, tail, true, regions);
+    draw_button_row(frame, model, first, head, compact, regions);
+    draw_button_row(frame, model, second, tail, compact, regions);
 }
 
 /// One measured row of bordered text buttons (the transport row's
