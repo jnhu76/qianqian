@@ -12,8 +12,8 @@
 //! without a real terminal.
 //!
 //! The route bodies live in the sibling modules ([`now_playing`],
-//! [`playlist`], and the route placeholders [`audio`]/[`visualizer`]);
-//! the popups live in [`modal`].
+//! [`playlist`], the Audio workbench [`audio`], and the Observation
+//! Plane displays of [`visualizer`]); the popups live in [`modal`].
 
 mod audio;
 mod modal;
