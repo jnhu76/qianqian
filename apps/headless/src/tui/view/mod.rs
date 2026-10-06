@@ -39,6 +39,7 @@ use audio::draw_audio;
 use modal::{draw_modal, modal_regions};
 use now_playing::draw_now_playing;
 use playlist::draw_playlist;
+use visualizer::draw_visualizer;
 
 /// Shown once the episode's terminal Fact is committed: the shell
 /// stays up so the outcome can be inspected; the player keys stay
@@ -110,7 +111,7 @@ pub fn draw(frame: &mut Frame, model: &mut TuiModel) {
         TuiRoute::NowPlaying => draw_now_playing(frame, model, body, &mut regions),
         TuiRoute::Playlist => draw_playlist(frame, model, body, &mut regions),
         TuiRoute::Audio => draw_audio(frame, model, body, &mut regions),
-        route => draw_placeholder(frame, route, body),
+        TuiRoute::Visualizer => draw_visualizer(frame, model, body, &mut regions),
     }
     draw_status(frame, model, status);
 
@@ -174,21 +175,6 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
         });
     }
 }
-/// The Visualizer placeholder route (§33/§34): an honest panel so the
-/// route model, the focus model and the tabs stay complete — no
-/// visualization semantics are claimed.
-fn draw_placeholder(frame: &mut Frame, route: TuiRoute, area: Rect) {
-    let (title, line) = match route {
-        TuiRoute::Visualizer => (" Visualizer ", "Visualizer route — not started (T5)."),
-        _ => return,
-    };
-    frame.render_widget(
-        Paragraph::new(vec![Line::from(""), Line::from(line)])
-            .block(Block::bordered().title(bold(title))),
-        area,
-    );
-}
-
 /// The bottom status/context line (§6): the latest operation feedback
 /// (application composition feedback, never a playback semantic) and
 /// one fixed keymap hint.
@@ -288,18 +274,18 @@ mod tests {
         );
     }
 
-    /// The Visualizer placeholder renders an honest not-started panel
-    /// (§33) and no transport controls. The Audio route is real since
-    /// G3; its body is exercised in `view::audio`.
+    /// The Visualizer route without telemetry renders the honest
+    /// unavailable panel (G4): no fabricated bars, no playback claim.
+    /// The Audio route body is exercised in `view::audio`.
     #[test]
-    fn the_placeholder_routes_render_honest_not_started_panels() {
+    fn the_visualizer_route_renders_honest_unavailable_without_telemetry() {
         let mut model = plain_model();
         model.set_route(TuiRoute::Visualizer);
         let text = rendered(&mut model, 100, 30);
-        assert!(
-            text.contains("Visualizer route — not started (T5)."),
-            "{text}"
-        );
+        assert!(text.contains("Visualization unavailable"), "{text}");
+        assert!(text.contains("[Spectrum]"), "{text}");
+        assert!(text.contains("[Peak-RMS]"), "{text}");
+        assert!(text.contains("[Waveform]"), "{text}");
         assert_eq!(scan(&text), None, "{text}");
     }
 

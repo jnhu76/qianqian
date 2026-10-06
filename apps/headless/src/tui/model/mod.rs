@@ -48,6 +48,7 @@ mod mouse;
 mod projection;
 mod responsive;
 mod state;
+mod visualizer;
 
 pub use actions::{PlaylistCursor, Step, TuiAction, TuiRoute};
 #[cfg(test)]
@@ -78,6 +79,7 @@ pub use projection::{LARGE_SEEK_STEP_SECS, SEEK_STEP_SECS};
 pub use responsive::{MIN_HEIGHT, MIN_WIDTH};
 pub use responsive::{ResponsiveClass, responsive_class};
 pub use state::TuiModel;
+pub use visualizer::{VISUALIZER_MODES, VisualizerMode};
 
 #[cfg(test)]
 pub(crate) mod testutil;

@@ -247,6 +247,12 @@ pub(super) fn dispatch<S: EpisodeStart>(
             }
             Step::Continue
         }
+        // Visualizer route (G4): switching the active mode is a pure
+        // presentation mutation — no player seam, no product command.
+        TuiAction::SetVisualizerMode(mode) => {
+            model.set_visualizer_mode(mode);
+            Step::Continue
+        }
         TuiAction::ToggleOrder => {
             let order = player.toggle_order();
             model.set_order(order);

@@ -5,6 +5,7 @@ use super::controls::{
     AudioButton, EqAdjust, PlaylistButton, PreferenceButton, SeekButton, TransportButton,
 };
 use super::modal::ModalButton;
+use super::visualizer::VisualizerMode;
 
 /// The ONE active interactive focus target (§10). Focus is presentation
 /// state only: it selects which control Enter activates and which group
@@ -31,6 +32,8 @@ pub enum FocusId {
     /// which way. The band table is a fixed 10-row grid, so the pair
     /// IS the control identity.
     EqBand { band: usize, adjust: EqAdjust },
+    /// One of the Visualizer route's mode buttons (G4).
+    VisualizerMode(VisualizerMode),
     /// The Open picker's directory listing (the picker cursor is the
     /// focus inside it).
     PickerList,

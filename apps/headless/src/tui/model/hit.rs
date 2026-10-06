@@ -9,6 +9,7 @@ use super::controls::{
     AudioButton, EqAdjust, PlaylistButton, PreferenceButton, SeekButton, TransportButton,
 };
 use super::modal::ModalButton;
+use super::visualizer::VisualizerMode;
 
 /// The semantic target of one hit region: a rendered, currently valid
 /// control (§13). No widget tree, no DOM, no retained component graph —
@@ -36,6 +37,8 @@ pub enum HitTarget {
         band: usize,
         adjust: EqAdjust,
     },
+    /// One of the Visualizer route's mode buttons (G4).
+    VisualizerMode(VisualizerMode),
     /// The position bar WITH duration evidence: a click-to-position
     /// seek affordance (G1 §9). Without duration evidence the bar is a
     /// display and publishes no region at all.

@@ -70,6 +70,11 @@ pub struct TuiModel {
     /// edit buffer over the desired configuration. `None` = the route
     /// shows the desired configuration read-only.
     pub(super) audio_draft: Option<super::audio::AudioDraft>,
+    /// The Visualizer route's active mode (G4).
+    pub(super) visualizer_mode: super::visualizer::VisualizerMode,
+    /// The Observation Plane's latest snapshot (G4): an owned display
+    /// copy re-read every refresh. `None` = no telemetry available.
+    pub(super) snapshot: Option<qianqian_playback::ObservationSnapshot>,
 
     /// The active route (§5). Presentation-only: default Now Playing.
     pub(super) route: TuiRoute,
@@ -120,6 +125,8 @@ impl TuiModel {
             desired_dsp: None,
             desired_processing: None,
             audio_draft: None,
+            visualizer_mode: super::visualizer::VisualizerMode::Spectrum,
+            snapshot: None,
             route: TuiRoute::NowPlaying,
             focus: None,
             focus_before_modal: None,

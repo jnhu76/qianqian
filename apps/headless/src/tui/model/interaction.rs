@@ -20,6 +20,7 @@ use super::modal::{
 use super::projection::SEEK_STEP_SECS;
 use super::responsive::ResponsiveClass;
 use super::state::TuiModel;
+use super::visualizer::VISUALIZER_MODES;
 use qianqian_playback::{EQ_BAND_FREQUENCY_HZ, EqPreset};
 
 impl TuiModel {
@@ -210,7 +211,16 @@ impl TuiModel {
                     });
                 }
             }
-            _ => {}
+            // The Visualizer route (G4): three mode buttons. The
+            // visualization itself arms nothing — it is a display of
+            // Observation Plane telemetry, not a control.
+            TuiRoute::Visualizer => {
+                cycle.extend(
+                    VISUALIZER_MODES
+                        .iter()
+                        .map(|mode| FocusId::VisualizerMode(*mode)),
+                );
+            }
         }
         cycle
     }
@@ -256,6 +266,7 @@ impl TuiModel {
                     | FocusId::PlaylistButton(_)
                     | FocusId::AudioButton(_)
                     | FocusId::EqBand { .. }
+                    | FocusId::VisualizerMode(_)
                     | FocusId::ModalField
                     | FocusId::PickerList
                     | FocusId::PickerButton(_)
@@ -282,6 +293,7 @@ impl TuiModel {
             HitTarget::PlaylistButton(button) => Some(FocusId::PlaylistButton(button)),
             HitTarget::AudioButton(button) => Some(FocusId::AudioButton(button)),
             HitTarget::EqBand { band, adjust } => Some(FocusId::EqBand { band, adjust }),
+            HitTarget::VisualizerMode(mode) => Some(FocusId::VisualizerMode(mode)),
             HitTarget::PickerRow(_) => Some(FocusId::PickerList),
             HitTarget::ModalButton(button) => Some(FocusId::PickerButton(button)),
             HitTarget::ModalField => Some(FocusId::ModalField),
@@ -344,6 +356,7 @@ impl TuiModel {
                     EqAdjust::Boost => 1,
                 },
             )),
+            HitTarget::VisualizerMode(mode) => Some(TuiAction::SetVisualizerMode(mode)),
             HitTarget::PickerRow(index) => Some(TuiAction::ModalInput(
                 match self.picker_entries().get(index) {
                     // The synthesized `..` row activates the parent
@@ -390,6 +403,7 @@ impl TuiModel {
             FocusId::EqBand { band, adjust } => {
                 self.action_of_target(HitTarget::EqBand { band, adjust })
             }
+            FocusId::VisualizerMode(mode) => self.action_of_target(HitTarget::VisualizerMode(mode)),
             FocusId::Playlist => Some(TuiAction::PlaylistPlaySelected),
             FocusId::PickerList => Some(TuiAction::ModalInput(ModalInput::ListActivate)),
             FocusId::PickerButton(button) => self.action_of_target(HitTarget::ModalButton(button)),
@@ -879,7 +893,7 @@ mod tests {
         model.set_route(TuiRoute::Audio);
         assert_eq!(model.focus_cycle().len(), 30);
         model.set_route(TuiRoute::Visualizer);
-        assert_eq!(model.focus_cycle().len(), 4);
+        assert_eq!(model.focus_cycle().len(), 7, "tabs + three mode buttons");
 
         // A modal collapses the cycle to its field (§24).
         model.open_modal(ModalKind::GoTo);

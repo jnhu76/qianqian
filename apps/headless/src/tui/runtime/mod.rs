@@ -180,6 +180,16 @@ pub(super) fn refresh<S: EpisodeStart>(model: &mut TuiModel, player: &ReferenceP
     if let Some(handle) = player.active_handle() {
         model.update(handle.observe());
     }
+    // The Observation Plane (G4): the current episode's reader, polled
+    // for its latest owned snapshot. The lookup happens per refresh, so
+    // an episode replacement automatically re-attaches to the NEW
+    // episode's reader — no stale telemetry survives the seam.
+    model.note_observation_snapshot(
+        player
+            .active_handle()
+            .and_then(|handle| handle.observation_reader())
+            .and_then(|reader| reader.latest()),
+    );
 }
 /// The terminal enter/restore command sequences, factored over any
 /// writer. The enable/disable MOUSE-CAPTURE pairing lives on this same

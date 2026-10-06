@@ -136,6 +136,10 @@ pub enum TuiAction {
     /// Discard the draft.
     DspCancel,
 
+    // Visualizer route (G4).
+    /// Switch the active visualization mode (presentation only).
+    SetVisualizerMode(super::visualizer::VisualizerMode),
+
     // Application policy.
     /// R: toggle Sequential ↔ Shuffle (Issue #166 §25).
     ToggleOrder,
