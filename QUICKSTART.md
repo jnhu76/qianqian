@@ -134,7 +134,7 @@ Enter.
 | `S`                 | Stop                                              |
 | `O`                 | Open a file or folder                             |
 | `?`                 | Help overlay                                      |
-| `Esc`               | Cancel the current input / close the help         |
+| `Esc`               | Cancel input / drop open edits / close the help   |
 | `Q`                 | Quit                                              |
 | `Ctrl+C`            | Quit (works everywhere)                           |
 

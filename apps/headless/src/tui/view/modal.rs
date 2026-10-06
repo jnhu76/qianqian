@@ -638,7 +638,7 @@ fn help_lines() -> Vec<Line<'static>> {
         Line::from("   Enter             activate the focused control"),
         Line::from("   Mouse             click any control: tabs, buttons, rows"),
         Line::from("   ?                 close this help"),
-        Line::from("   Esc               cancel / close this help"),
+        Line::from("   Esc               cancel edits · close this help"),
         Line::from("   Q / Ctrl+C        quit (Ctrl+C works everywhere)"),
     ]
 }

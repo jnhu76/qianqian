@@ -297,6 +297,42 @@ mod tests {
 
     use crate::tui::model::*;
 
+    /// The compact layout drops the summary row's Order/Repeat toggles
+    /// from the DRAWN controls and from the focus cycle alike — a drawn
+    /// control is always a keyboard-reachable control, so an undrawn
+    /// toggle must be neither.
+    #[test]
+    fn the_compact_layout_drops_the_summary_toggles_everywhere() {
+        let mut model = plain_model();
+        model.set_order(crate::playlist::PlaybackOrder::Shuffle);
+        model.set_repeat(crate::playlist::RepeatMode::All);
+        model.set_route(TuiRoute::Playlist);
+        rendered(&mut model, 50, 16);
+        assert!(
+            !model
+                .regions()
+                .iter()
+                .any(|region| matches!(region.target, HitTarget::Preference(_))),
+            "no toggle regions in the compact layout"
+        );
+        assert!(
+            !model
+                .focus_cycle()
+                .iter()
+                .any(|id| matches!(id, FocusId::Preference(_))),
+            "no invisible toggle stops in the compact layout"
+        );
+        // And the non-compact class keeps both drawn and focusable.
+        rendered(&mut model, 100, 30);
+        assert!(
+            model
+                .regions()
+                .iter()
+                .any(|region| matches!(region.target, HitTarget::Preference(_))),
+            "the toggles return with the width"
+        );
+    }
+
     /// The Playlist route renders the pane and publishes the pane
     /// region plus one region per VISIBLE row, at the rows the pane
     /// actually drew — including through the windowed scroll.

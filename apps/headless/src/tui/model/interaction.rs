@@ -211,25 +211,28 @@ impl TuiModel {
             }
             // The Audio route (G3): the toolbar (the enablement label
             // is contextual but the CONTROL always exists), then the
-            // ten band steppers in band order (− before +). The steppers
-            // are route-local controls, always present — they edit the
-            // draft, seeding it from the desired configuration on first
-            // use.
+            // ten band steppers in band order (− before +) — in the
+            // classes where the band editor is drawn. The compact
+            // layout degrades the bands to a read-only summary, so
+            // their steppers are not drawn and are not focus stops
+            // either (an invisible control is never a stop).
             TuiRoute::Audio => {
                 cycle.extend(
                     AUDIO_BUTTONS
                         .iter()
                         .map(|button| FocusId::AudioButton(*button)),
                 );
-                for band in 0..EQ_BAND_FREQUENCY_HZ.len() {
-                    cycle.push(FocusId::EqBand {
-                        band,
-                        adjust: EqAdjust::Cut,
-                    });
-                    cycle.push(FocusId::EqBand {
-                        band,
-                        adjust: EqAdjust::Boost,
-                    });
+                if !self.compact_layout() {
+                    for band in 0..EQ_BAND_FREQUENCY_HZ.len() {
+                        cycle.push(FocusId::EqBand {
+                            band,
+                            adjust: EqAdjust::Cut,
+                        });
+                        cycle.push(FocusId::EqBand {
+                            band,
+                            adjust: EqAdjust::Boost,
+                        });
+                    }
                 }
             }
             // The Visualizer route (G4): three mode buttons. The
@@ -958,6 +961,15 @@ mod tests {
         // steppers (− and + per band) + the persistent pair.
         model.set_route(TuiRoute::Audio);
         assert_eq!(model.focus_cycle().len(), 34);
+        // The compact layout degrades the bands to a read-only summary:
+        // their steppers vanish from the cycle with their cells.
+        model.set_class(ResponsiveClass::Minimum);
+        assert_eq!(
+            model.focus_cycle().len(),
+            14,
+            "tabs + the eight toolbar controls + the persistent pair"
+        );
+        model.set_class(ResponsiveClass::Normal);
         model.set_route(TuiRoute::Visualizer);
         assert_eq!(
             model.focus_cycle().len(),

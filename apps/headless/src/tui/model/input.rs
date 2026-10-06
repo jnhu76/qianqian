@@ -5,7 +5,7 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use super::actions::{PlaylistCursor, TuiAction};
+use super::actions::{PlaylistCursor, TuiAction, TuiRoute};
 use super::focus::{FocusId, FocusMove};
 use super::modal::{HelpScroll, Modal, ModalButton, ModalInput, ModalKind};
 use super::projection::{LARGE_SEEK_STEP_SECS, SEEK_STEP_SECS};
@@ -88,6 +88,17 @@ pub fn decode_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
         KeyCode::Char('+') | KeyCode::Char('=') if plain(key) => Some(TuiAction::VolumeUp),
         KeyCode::Char('-') | KeyCode::Char('_') if plain(key) => Some(TuiAction::VolumeDown),
         KeyCode::Char('q') | KeyCode::Char('Q') if plain(key) => Some(TuiAction::Quit),
+        // Esc outside a modal is contextual (T0: Cancel/Esc/Revert
+        // restore the latest desired value and send no command): on the
+        // Audio route it cancels the open draft edits. Elsewhere — and
+        // with no draft open — it is inert.
+        KeyCode::Esc
+            if plain(key)
+                && model.route() == TuiRoute::Audio
+                && (model.audio_preamp_draft().is_some() || model.audio_eq_draft().is_some()) =>
+        {
+            Some(TuiAction::DspCancel)
+        }
         _ => None,
     }
 }

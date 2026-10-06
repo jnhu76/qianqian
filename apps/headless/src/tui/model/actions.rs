@@ -144,6 +144,9 @@ pub enum TuiAction {
     /// Discard the EQ draft: restore the latest desired stage, send
     /// nothing ([Revert draft]).
     DspRevertEq,
+    /// Esc on the Audio route: cancel any open drafts — restore the
+    /// latest desired values, send nothing (T0: Cancel/Esc/Revert).
+    DspCancel,
 
     // Visualizer route (G4).
     /// Switch the active visualization mode (presentation only).

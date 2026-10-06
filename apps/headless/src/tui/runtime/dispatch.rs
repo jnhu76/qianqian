@@ -262,6 +262,23 @@ pub(super) fn dispatch<S: EpisodeStart>(
             }
             Step::Continue
         }
+        // Esc on the Audio route (T0: Cancel/Esc/Revert): discard the
+        // open drafts — restore the latest desired values, send no
+        // command. Only the dirty drafts say so; a clean draft held
+        // nothing to restore.
+        TuiAction::DspCancel => {
+            let preamp_dirty = model.audio_cancel_preamp();
+            let eq_dirty = model.audio_revert_eq();
+            match (preamp_dirty, eq_dirty) {
+                (true, false) => model.set_status(Some("preamp edit cancelled".to_owned())),
+                (false, true) => model.set_status(Some("EQ draft reverted".to_owned())),
+                (true, true) => model.set_status(Some(
+                    "drafts cancelled: the desired values are restored".to_owned(),
+                )),
+                (false, false) => {}
+            }
+            Step::Continue
+        }
         // Visualizer route (G4): switching the active mode is a pure
         // presentation mutation — no player seam, no product command.
         TuiAction::SetVisualizerMode(mode) => {
@@ -381,6 +398,7 @@ pub(super) fn perform_dsp_set_preamp<S: EpisodeStart>(
     player: &mut ReferencePlayerApp<S>,
 ) {
     let Some(draft) = model.audio_preamp_draft() else {
+        model.set_status(Some("no preamp draft to commit".to_owned()));
         return;
     };
     let value = draft.value();
@@ -408,6 +426,7 @@ pub(super) fn perform_dsp_apply_eq<S: EpisodeStart>(
     player: &mut ReferencePlayerApp<S>,
 ) {
     let Some(draft) = model.audio_eq_draft() else {
+        model.set_status(Some("no EQ draft to commit".to_owned()));
         return;
     };
     let stage = draft.value();
@@ -1193,7 +1212,13 @@ mod tests {
         );
 
         // EQ: draft, then [Apply EQ] — the other operations' fields
-        // survive untouched.
+        // survive untouched, and the stage's Q rides through: the draft
+        // is the WHOLE EqConfig (T0), so a rebuilt-with-default-Q
+        // regression fails here.
+        player
+            .set_eq_config(qianqian_playback::EqConfig::new([0.0; 10], 1.7))
+            .expect("a valid stage");
+        refresh(&mut model, &player);
         dispatch(TuiAction::DspEqBandStep(0, 3), &mut model, &mut player);
         assert!(model.audio_eq_draft().expect("draft").dirty());
         dispatch(TuiAction::DspApplyEq, &mut model, &mut player);
@@ -1203,8 +1228,60 @@ mod tests {
             (desired.gain - 1.2).abs() < 1e-5,
             "the EQ commit preserves the preamp"
         );
-        assert_eq!(desired.eq.expect("stage").band_gain_db[0], 3.0);
+        let stage = desired.eq.expect("stage");
+        assert_eq!(stage.band_gain_db[0], 3.0);
+        assert!(
+            (stage.q - 1.7).abs() < 1e-5,
+            "Q is preserved through the apply: {}",
+            stage.q
+        );
         assert!(model.audio_eq_draft().is_none(), "the draft closed");
+    }
+
+    /// Esc on the Audio route (T0: Cancel/Esc/Revert) cancels the open
+    /// drafts, sends no command, and is inert with no draft open.
+    #[test]
+    fn esc_cancels_the_open_audio_drafts_and_sends_nothing() {
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+        let before = player.desired_processing();
+
+        dispatch(
+            TuiAction::Navigate(TuiRoute::Audio),
+            &mut model,
+            &mut player,
+        );
+        assert_eq!(
+            handle_key(key(KeyCode::Esc), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(
+            model.status(),
+            None,
+            "no draft, nothing to cancel, no noise"
+        );
+
+        dispatch(TuiAction::DspPreampStep(1), &mut model, &mut player);
+        dispatch(TuiAction::DspEqBandStep(2, 2), &mut model, &mut player);
+        assert_eq!(
+            handle_key(key(KeyCode::Esc), &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(model.audio_preamp_draft().is_none());
+        assert!(model.audio_eq_draft().is_none());
+        assert_eq!(
+            player.desired_processing(),
+            before,
+            "Esc restored the latest desired values and sent nothing"
+        );
+        assert!(
+            model
+                .status()
+                .is_some_and(|status| status.contains("drafts cancelled")),
+            "{}",
+            model.status().unwrap_or_default()
+        );
     }
 
     /// The preset menu (G3, the T0 whole-configuration contract):

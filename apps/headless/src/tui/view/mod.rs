@@ -803,6 +803,10 @@ mod tests {
                     "{label:?} for {route:?} clipped at the compact floor:\n{text}"
                 );
             }
+            assert!(
+                text.contains("Help") && text.contains("Quit"),
+                "the persistent buttons clipped at the compact floor:\n{text}"
+            );
             assert!(!model.regions().is_empty(), "{route:?} at 40x14");
 
             // The Compact, Normal and Wide boundaries: full spellings —

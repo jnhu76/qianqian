@@ -229,20 +229,41 @@ fn draw_preference_row(
     regions: &mut Vec<HitRegion>,
 ) {
     let compact = model.compact_layout();
-    // The volume value is FIXED-width ("100/100" is its widest compact
-    // spelling; the wide class appends " (desired)"): a percentage
-    // share starves it at the class minimum and the number clips into
-    // a lie ("100/"). The toggles split whatever remains (G1 re-review
-    // B1: the minimum shell is pinned by semantic-region evidence).
+    // The toggle labels decide their own cell widths — the toolbar
+    // idiom, everywhere: a clipped CONTROL label is a violation at any
+    // class ("Order: Sequential" is 17 cells and a fixed share starved
+    // it exactly at the 60-column Compact boundary). The volume VALUE
+    // is the flexible display text: it shrinks before any control does.
+    let order_text = model.order_label().map(|label| {
+        if compact {
+            format!("Ord:{}", order_short(label))
+        } else {
+            format!("Order: {label}")
+        }
+    });
+    let repeat_text = model.repeat_label().map(|label| {
+        if compact {
+            format!("Rep:{label}")
+        } else {
+            format!("Repeat: {label}")
+        }
+    });
+    let toggle_width = |text: &Option<String>| {
+        text.as_ref()
+            .map(|text| text.chars().count() as u16 + 2)
+            .unwrap_or(3)
+    };
     let value_width = if compact { 7 } else { 18 };
-    let [down, label, up, order, repeat] = Layout::horizontal([
+    let [down, label, up, order, repeat, rest] = Layout::horizontal([
         Constraint::Length(3),
         Constraint::Length(value_width),
         Constraint::Length(3),
-        Constraint::Min(10),
-        Constraint::Min(10),
+        Constraint::Length(toggle_width(&order_text)),
+        Constraint::Length(toggle_width(&repeat_text)),
+        Constraint::Min(0),
     ])
     .areas(area);
+    let _ = rest;
 
     let steppers: [(Rect, PreferenceButton); 2] = [
         (down, PreferenceButton::VolumeDown),
@@ -287,28 +308,8 @@ fn draw_preference_row(
     }
 
     let toggles: [(Rect, PreferenceButton, Option<String>); 2] = [
-        (
-            order,
-            PreferenceButton::Order,
-            model.order_label().map(|label| {
-                if compact {
-                    format!("Ord:{}", order_short(label))
-                } else {
-                    format!("Order: {label}")
-                }
-            }),
-        ),
-        (
-            repeat,
-            PreferenceButton::Repeat,
-            model.repeat_label().map(|label| {
-                if compact {
-                    format!("Rep:{label}")
-                } else {
-                    format!("Repeat: {label}")
-                }
-            }),
-        ),
+        (order, PreferenceButton::Order, order_text),
+        (repeat, PreferenceButton::Repeat, repeat_text),
     ];
     for (cell, button, label) in toggles {
         let focused = model.focus() == Some(FocusId::Preference(button));
@@ -346,8 +347,25 @@ mod tests {
     //! Tests for this submodule.
 
     use super::super::testutil::*;
+    use crate::playlist::{PlaybackOrder, RepeatMode};
     use crate::tui::model::*;
     use qianqian_playback::PlaybackSessionObservation;
+
+    /// The preference row's toggles are measured cells (the toolbar
+    /// idiom, everywhere): the full "Order: Sequential" spelling
+    /// renders WHOLE at the 60-column Compact boundary, where a fixed
+    /// share used to starve it into "Order: Sequentia".
+    #[test]
+    fn the_preference_toggles_render_whole_at_the_compact_boundary() {
+        let mut model = plain_model();
+        model.set_order(PlaybackOrder::Sequential);
+        model.set_repeat(RepeatMode::Off);
+        let text = rendered(&mut model, 60, 18);
+        assert!(text.contains("Order: Sequential"), "{text}");
+        assert!(text.contains("Repeat: Off"), "{text}");
+        let text = rendered(&mut model, 100, 30);
+        assert!(text.contains("Order: Sequential"), "{text}");
+    }
 
     /// The Now Playing route renders the episode read side, the
     /// diagnostics, the transport row with its Open control, and the
