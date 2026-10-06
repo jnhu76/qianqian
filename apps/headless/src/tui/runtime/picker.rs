@@ -44,11 +44,35 @@ pub(super) fn handle_modal_input<S: EpisodeStart>(
         ModalInput::UseFolder => model.use_picker_folder(),
         // The picker listing's cursor: presentation only, like the
         // playlist pane's selection.
-        ModalInput::ListMove(cursor) => model.move_picker_cursor(cursor),
+        // The preset menu's list (G3) moves its own cursor; the
+        // filesystem picker's grammar is unchanged in its own modes.
+        ModalInput::ListMove(cursor) => {
+            if matches!(
+                model.modal(),
+                Some(crate::tui::model::Modal::Presets { .. })
+            ) {
+                model.move_presets_cursor(cursor);
+            } else {
+                model.move_picker_cursor(cursor);
+            }
+        }
         // Enter on the listing (T0 picker freeze): a directory — or the
         // `..` row — navigates; a FILE is SELECTED, never committed.
         // Final Open/Add requires activating an explicit button, so no
         // row gesture can start playback by accident (G1 F05).
+        // Activating the preset menu's cursor fills the draft's EQ
+        // stage (a draft edit, never a direct commit) and closes the
+        // menu.
+        ModalInput::ListActivate
+            if matches!(
+                model.modal(),
+                Some(crate::tui::model::Modal::Presets { .. })
+            ) =>
+        {
+            if let Some(preset) = model.activate_preset_selection() {
+                model.set_status(Some(format!("preset {} selected (draft)", preset.name())));
+            }
+        }
         ModalInput::ListActivate => match model.picker_cursor_entry() {
             Some((_entry, path, true)) => navigate_picker_to(model, &path),
             Some((_entry, _path, false)) => {

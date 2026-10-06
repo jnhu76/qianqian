@@ -1,7 +1,9 @@
 //! The ONE active interactive focus target and the Tab move direction.
 
 use super::actions::TuiRoute;
-use super::controls::{PlaylistButton, PreferenceButton, SeekButton, TransportButton};
+use super::controls::{
+    AudioButton, EqAdjust, PlaylistButton, PreferenceButton, SeekButton, TransportButton,
+};
 use super::modal::ModalButton;
 
 /// The ONE active interactive focus target (§10). Focus is presentation
@@ -23,6 +25,12 @@ pub enum FocusId {
     Playlist,
     /// One of the Playlist route's toolbar controls (G2).
     PlaylistButton(PlaylistButton),
+    /// One of the Audio route's toolbar controls (G3).
+    AudioButton(AudioButton),
+    /// One of the Audio route's EQ band steppers (G3): band index and
+    /// which way. The band table is a fixed 10-row grid, so the pair
+    /// IS the control identity.
+    EqBand { band: usize, adjust: EqAdjust },
     /// The Open picker's directory listing (the picker cursor is the
     /// focus inside it).
     PickerList,

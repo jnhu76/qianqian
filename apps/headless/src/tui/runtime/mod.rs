@@ -36,7 +36,7 @@ use ratatui::backend::CrosstermBackend;
 use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 use crate::tui::view;
 
-use super::model::{Step, TuiModel, decode_key, decode_mouse, dsp_summary};
+use super::model::{Step, TuiModel, decode_key, decode_mouse};
 use dispatch::{dispatch, eof_feedback};
 
 /// UI refresh cadence (~100–250 ms band).
@@ -166,7 +166,7 @@ pub(super) fn refresh<S: EpisodeStart>(model: &mut TuiModel, player: &ReferenceP
     model.set_volume(Some(player.desired_volume()));
     model.set_order(player.playlist_order());
     model.set_repeat(player.playlist_repeat());
-    model.set_desired_dsp(dsp_summary(&player.desired_processing()));
+    model.note_desired_processing(player.desired_processing());
     model.set_playlist(player.playlist_revision(), || {
         player
             .playlist_rows()

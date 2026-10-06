@@ -35,6 +35,7 @@ use super::model::{
     responsive_class, status_shape,
 };
 
+use audio::draw_audio;
 use modal::{draw_modal, modal_regions};
 use now_playing::draw_now_playing;
 use playlist::draw_playlist;
@@ -108,6 +109,7 @@ pub fn draw(frame: &mut Frame, model: &mut TuiModel) {
     match model.route() {
         TuiRoute::NowPlaying => draw_now_playing(frame, model, body, &mut regions),
         TuiRoute::Playlist => draw_playlist(frame, model, body, &mut regions),
+        TuiRoute::Audio => draw_audio(frame, model, body, &mut regions),
         route => draw_placeholder(frame, route, body),
     }
     draw_status(frame, model, status);
@@ -172,12 +174,11 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
         });
     }
 }
-/// The Audio / Visualizer placeholder routes (§33/§34): honest panels
-/// that exist so the route model, the focus model and the tabs are
-/// complete — no DSP or visualization semantics are claimed.
+/// The Visualizer placeholder route (§33/§34): an honest panel so the
+/// route model, the focus model and the tabs stay complete — no
+/// visualization semantics are claimed.
 fn draw_placeholder(frame: &mut Frame, route: TuiRoute, area: Rect) {
     let (title, line) = match route {
-        TuiRoute::Audio => (" Audio ", "Audio route — not started (T4)."),
         TuiRoute::Visualizer => (" Visualizer ", "Visualizer route — not started (T5)."),
         _ => return,
     };
@@ -287,28 +288,12 @@ mod tests {
         );
     }
 
-    /// The placeholder routes render honest not-started panels (§33/§34)
-    /// and no transport/list controls.
+    /// The Visualizer placeholder renders an honest not-started panel
+    /// (§33) and no transport controls. The Audio route is real since
+    /// G3; its body is exercised in `view::audio`.
     #[test]
     fn the_placeholder_routes_render_honest_not_started_panels() {
         let mut model = plain_model();
-        model.set_route(TuiRoute::Audio);
-        let text = rendered(&mut model, 100, 30);
-        assert!(text.contains("Audio route — not started (T4)."), "{text}");
-        assert!(
-            !text.contains("Play/Pause"),
-            "no transport on a placeholder: {text}"
-        );
-        assert_eq!(
-            model
-                .regions()
-                .iter()
-                .filter(|region| matches!(region.target, HitTarget::Transport(_)))
-                .count(),
-            0,
-            "no transport regions on a placeholder route"
-        );
-
         model.set_route(TuiRoute::Visualizer);
         let text = rendered(&mut model, 100, 30);
         assert!(

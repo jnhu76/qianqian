@@ -27,6 +27,9 @@ pub enum ModalKind {
     ConfirmRemoveCurrent,
     /// The same confirmation before clearing the whole list.
     ConfirmClear,
+    /// The EQ preset picker (G3): a menu over the eight factory
+    /// presets; activating one fills the Audio route's DRAFT EQ stage.
+    Presets,
 }
 
 /// Which final subject the shared picker accepts. Navigation is
@@ -178,6 +181,11 @@ pub enum Modal {
     Confirm {
         kind: ConfirmKind,
     },
+    /// The EQ preset menu (G3): the cursor over the eight presets;
+    /// activating the cursor fills the Audio route's draft EQ stage.
+    Presets {
+        cursor: Option<usize>,
+    },
 }
 
 impl Modal {
@@ -191,6 +199,7 @@ impl Modal {
                 ConfirmKind::RemoveCurrent => ModalKind::ConfirmRemoveCurrent,
                 ConfirmKind::Clear => ModalKind::ConfirmClear,
             },
+            Modal::Presets { .. } => ModalKind::Presets,
         }
     }
 
@@ -200,7 +209,7 @@ impl Modal {
         match self {
             Modal::Open(picker) => Some(picker.input.as_str()),
             Modal::GoTo { input } => Some(input),
-            Modal::Help | Modal::Confirm { .. } => None,
+            Modal::Help | Modal::Confirm { .. } | Modal::Presets { .. } => None,
         }
     }
 }

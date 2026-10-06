@@ -163,3 +163,83 @@ impl PlaylistButton {
         }
     }
 }
+
+/// One visible toolbar control on the Audio route (G3). The route's
+/// product functions are buttons, like every route's: keyboard focus
+/// and the mouse both reach them, and each converges on the same
+/// [`TuiAction`](super::actions::TuiAction).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AudioButton {
+    /// Toggle the desired processing enablement (bypass vs on) — a
+    /// DRAFT edit until applied.
+    Enabled,
+    /// Step the draft preamp down one decibel.
+    PreampDown,
+    /// Step the draft preamp up one decibel.
+    PreampUp,
+    /// Open the EQ preset picker modal.
+    Presets,
+    /// Commit the draft through the App's desired-DSP seams.
+    Apply,
+    /// Discard the draft.
+    Cancel,
+}
+
+/// The audio toolbar controls in left-to-right render (and Tab) order.
+pub const AUDIO_BUTTONS: [AudioButton; 6] = [
+    AudioButton::Enabled,
+    AudioButton::PreampDown,
+    AudioButton::PreampUp,
+    AudioButton::Presets,
+    AudioButton::Apply,
+    AudioButton::Cancel,
+];
+
+impl AudioButton {
+    /// The button's label. The enablement control's label is
+    /// CONTEXTUAL (like the transport's central control): the view
+    /// renders it from the draft (or the desired configuration when no
+    /// draft is open), showing what activation WOULD commit.
+    pub fn label(self, enabled: bool, compact: bool) -> &'static str {
+        match self {
+            AudioButton::Enabled => match (enabled, compact) {
+                (true, false) => "[DSP: on]",
+                (false, false) => "[DSP: off]",
+                (true, true) => "[DSP on]",
+                (false, true) => "[DSP off]",
+            },
+            AudioButton::PreampDown => {
+                if compact {
+                    "[Pre−]"
+                } else {
+                    "[Preamp −]"
+                }
+            }
+            AudioButton::PreampUp => {
+                if compact {
+                    "[Pre+]"
+                } else {
+                    "[Preamp +]"
+                }
+            }
+            AudioButton::Presets => {
+                if compact {
+                    "[Presets]"
+                } else {
+                    "[EQ preset...]"
+                }
+            }
+            AudioButton::Apply => "[Apply]",
+            AudioButton::Cancel => "[Cancel]",
+        }
+    }
+}
+
+/// Which way one EQ band's trim adjusts. The band steppers are two
+/// buttons per band (− / +), the same affordance grammar as every
+/// other stepper in the shell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EqAdjust {
+    Cut,
+    Boost,
+}

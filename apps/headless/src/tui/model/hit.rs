@@ -5,7 +5,9 @@
 use ratatui::layout::Rect;
 
 use super::actions::TuiRoute;
-use super::controls::{PlaylistButton, PreferenceButton, SeekButton, TransportButton};
+use super::controls::{
+    AudioButton, EqAdjust, PlaylistButton, PreferenceButton, SeekButton, TransportButton,
+};
 use super::modal::ModalButton;
 
 /// The semantic target of one hit region: a rendered, currently valid
@@ -26,6 +28,14 @@ pub enum HitTarget {
     PlaylistPane,
     /// One of the Playlist route's toolbar controls (G2).
     PlaylistButton(PlaylistButton),
+    /// One of the Audio route's toolbar controls (G3).
+    AudioButton(AudioButton),
+    /// One of the Audio route's EQ band steppers (G3): band index and
+    /// which way.
+    EqBand {
+        band: usize,
+        adjust: EqAdjust,
+    },
     /// The position bar WITH duration evidence: a click-to-position
     /// seek affordance (G1 §9). Without duration evidence the bar is a
     /// display and publishes no region at all.

@@ -6,8 +6,8 @@ use ratatui::layout::Position;
 
 use super::actions::{PlaylistCursor, TuiAction, TuiRoute};
 use super::controls::{
-    PLAYLIST_BUTTONS, PREFERENCES, PlaylistButton, PreferenceButton, SEEK_BUTTONS, SeekButton,
-    TRANSPORT, TransportButton,
+    AUDIO_BUTTONS, AudioButton, EqAdjust, PLAYLIST_BUTTONS, PREFERENCES, PlaylistButton,
+    PreferenceButton, SEEK_BUTTONS, SeekButton, TRANSPORT, TransportButton,
 };
 use super::focus::{FocusId, FocusMove};
 #[cfg(test)]
@@ -20,6 +20,7 @@ use super::modal::{
 use super::projection::SEEK_STEP_SECS;
 use super::responsive::ResponsiveClass;
 use super::state::TuiModel;
+use qianqian_playback::{EQ_BAND_FREQUENCY_HZ, EqPreset};
 
 impl TuiModel {
     // The T1B interaction state (route / focus / modal / hit regions).
@@ -148,6 +149,9 @@ impl TuiModel {
                     FocusId::PickerButton(ModalButton::Confirm),
                     FocusId::PickerButton(ModalButton::Cancel),
                 ],
+                // The preset menu (G3): one list, the cursor is the
+                // focus inside it.
+                Modal::Presets { .. } => vec![FocusId::PickerList],
                 _ => vec![FocusId::ModalField],
             };
         }
@@ -181,6 +185,29 @@ impl TuiModel {
                 );
                 if !self.playlist.is_empty() {
                     cycle.push(FocusId::Playlist);
+                }
+            }
+            // The Audio route (G3): the toolbar (the enablement label
+            // is contextual but the CONTROL always exists), then the
+            // ten band steppers in band order (− before +). The steppers
+            // are route-local controls, always present — they edit the
+            // draft, seeding it from the desired configuration on first
+            // use.
+            TuiRoute::Audio => {
+                cycle.extend(
+                    AUDIO_BUTTONS
+                        .iter()
+                        .map(|button| FocusId::AudioButton(*button)),
+                );
+                for band in 0..EQ_BAND_FREQUENCY_HZ.len() {
+                    cycle.push(FocusId::EqBand {
+                        band,
+                        adjust: EqAdjust::Cut,
+                    });
+                    cycle.push(FocusId::EqBand {
+                        band,
+                        adjust: EqAdjust::Boost,
+                    });
                 }
             }
             _ => {}
@@ -227,6 +254,8 @@ impl TuiModel {
                     | FocusId::Preference(_)
                     | FocusId::Playlist
                     | FocusId::PlaylistButton(_)
+                    | FocusId::AudioButton(_)
+                    | FocusId::EqBand { .. }
                     | FocusId::ModalField
                     | FocusId::PickerList
                     | FocusId::PickerButton(_)
@@ -251,6 +280,8 @@ impl TuiModel {
             HitTarget::Preference(button) => Some(FocusId::Preference(button)),
             HitTarget::PlaylistRow(_) | HitTarget::PlaylistPane => Some(FocusId::Playlist),
             HitTarget::PlaylistButton(button) => Some(FocusId::PlaylistButton(button)),
+            HitTarget::AudioButton(button) => Some(FocusId::AudioButton(button)),
+            HitTarget::EqBand { band, adjust } => Some(FocusId::EqBand { band, adjust }),
             HitTarget::PickerRow(_) => Some(FocusId::PickerList),
             HitTarget::ModalButton(button) => Some(FocusId::PickerButton(button)),
             HitTarget::ModalField => Some(FocusId::ModalField),
@@ -298,6 +329,21 @@ impl TuiModel {
                 PlaylistButton::Remove => TuiAction::PlaylistRemove,
                 PlaylistButton::Clear => TuiAction::PlaylistClear,
             }),
+            HitTarget::AudioButton(button) => Some(match button {
+                AudioButton::Enabled => TuiAction::DspToggleEnabled,
+                AudioButton::PreampDown => TuiAction::DspPreampStep(-1),
+                AudioButton::PreampUp => TuiAction::DspPreampStep(1),
+                AudioButton::Presets => TuiAction::DspOpenPresets,
+                AudioButton::Apply => TuiAction::DspApply,
+                AudioButton::Cancel => TuiAction::DspCancel,
+            }),
+            HitTarget::EqBand { band, adjust } => Some(TuiAction::DspEqBandStep(
+                band,
+                match adjust {
+                    EqAdjust::Cut => -1,
+                    EqAdjust::Boost => 1,
+                },
+            )),
             HitTarget::PickerRow(index) => Some(TuiAction::ModalInput(
                 match self.picker_entries().get(index) {
                     // The synthesized `..` row activates the parent
@@ -340,6 +386,10 @@ impl TuiModel {
             FocusId::PlaylistButton(button) => {
                 self.action_of_target(HitTarget::PlaylistButton(button))
             }
+            FocusId::AudioButton(button) => self.action_of_target(HitTarget::AudioButton(button)),
+            FocusId::EqBand { band, adjust } => {
+                self.action_of_target(HitTarget::EqBand { band, adjust })
+            }
             FocusId::Playlist => Some(TuiAction::PlaylistPlaySelected),
             FocusId::PickerList => Some(TuiAction::ModalInput(ModalInput::ListActivate)),
             FocusId::PickerButton(button) => self.action_of_target(HitTarget::ModalButton(button)),
@@ -380,6 +430,23 @@ impl TuiModel {
                 input: String::new(),
             },
             ModalKind::Help => Modal::Help,
+            // The preset menu (G3) starts its cursor on the preset the
+            // draft (or, with no draft, the desired configuration)
+            // currently matches — the menu answers "which preset am I
+            // on" as honestly as "pick one".
+            ModalKind::Presets => {
+                let eq = match self.audio_draft.as_ref() {
+                    Some(draft) => draft.config().eq,
+                    None => self.desired_processing.as_ref().and_then(|c| c.eq),
+                };
+                let cursor = eq.and_then(|eq| {
+                    EqPreset::all()
+                        .iter()
+                        .position(|preset| preset.to_config().eq == Some(eq))
+                });
+                self.focus = Some(FocusId::PickerList);
+                Modal::Presets { cursor }
+            }
             // T0 modal table: the destructive confirmation starts with
             // CANCEL focused — the dangerous choice is never the
             // default.
@@ -429,7 +496,7 @@ impl TuiModel {
             }
             Modal::GoTo { input } => input,
             // Help and the confirm modal have no text field to edit.
-            Modal::Help | Modal::Confirm { .. } => return,
+            Modal::Help | Modal::Confirm { .. } | Modal::Presets { .. } => return,
         };
         match input {
             ModalInput::Char(c) => text.push(c),
@@ -669,7 +736,7 @@ impl TuiModel {
                 self.close_modal();
                 ModalConfirm::Confirm(kind)
             }
-            Some(Modal::Open(_)) | None => ModalConfirm::Nothing,
+            Some(Modal::Open(_)) | Some(Modal::Presets { .. }) | None => ModalConfirm::Nothing,
         }
     }
 
@@ -807,8 +874,11 @@ mod tests {
             ]
         );
 
-        // Audio/Visualizer: tabs only (placeholder routes, §34/§33).
+        // Audio (G3): tabs + the six toolbar controls + the ten band
+        // steppers (− and + per band). Visualizer: tabs only (§33).
         model.set_route(TuiRoute::Audio);
+        assert_eq!(model.focus_cycle().len(), 30);
+        model.set_route(TuiRoute::Visualizer);
         assert_eq!(model.focus_cycle().len(), 4);
 
         // A modal collapses the cycle to its field (§24).
@@ -1084,8 +1154,11 @@ mod tests {
         model.close_modal();
         assert_eq!(
             model.focus(),
-            Some(FocusId::RouteTab(TuiRoute::NowPlaying)),
-            "an obsolete restored focus falls back to §12: the first tab"
+            Some(FocusId::AudioButton(
+                crate::tui::model::AudioButton::Enabled
+            )),
+            "an obsolete restored focus falls back to §12: the route's
+             first local control (G3 gave the Audio route a toolbar)"
         );
     }
 

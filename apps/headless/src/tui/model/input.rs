@@ -176,6 +176,20 @@ fn decode_modal_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
             KeyCode::Enter if plain(key) => Some(TuiAction::ActivateFocused),
             _ => None,
         },
+        // The preset menu (G3): ↑/↓ move the cursor, Enter activates it
+        // (fills the draft's EQ stage), Esc cancels. No field exists,
+        // so characters are inert.
+        ModalKind::Presets => match key.code {
+            KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
+            KeyCode::Up => Some(TuiAction::ModalInput(ModalInput::ListMove(
+                PlaylistCursor::Previous,
+            ))),
+            KeyCode::Down => Some(TuiAction::ModalInput(ModalInput::ListMove(
+                PlaylistCursor::Next,
+            ))),
+            KeyCode::Enter if plain(key) => Some(TuiAction::ActivateFocused),
+            _ => None,
+        },
     }
 }
 

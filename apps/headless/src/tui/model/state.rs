@@ -12,7 +12,9 @@ use super::modal::Modal;
 use super::projection::{BAR_WIDTH, PlaylistRow, status_shape};
 use super::responsive::{ResponsiveClass, responsive_class};
 use crate::playlist::{PlaybackOrder, RepeatMode};
-use qianqian_playback::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
+use qianqian_playback::{
+    AudioProcessingConfig, EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation,
+};
 
 /// One frame's worth of presentation state: the episode the player has
 /// committed (source path + latest coherent observation), the playlist
@@ -25,7 +27,7 @@ pub struct TuiModel {
     /// runtime, and the honest panel says so instead of fabricating
     /// labels.
     source: Option<String>,
-    observation: PlaybackSessionObservation,
+    pub(super) observation: PlaybackSessionObservation,
     /// The last operation's feedback — application composition feedback
     /// (D14.6), never a playback semantic.
     status: Option<String>,
@@ -54,11 +56,20 @@ pub struct TuiModel {
     /// configured value — never an acoustic level or mechanism
     /// readback).
     volume: Option<u8>,
-    /// The App's desired DSP configuration, as the one-line summary
-    /// label built by [`dsp_summary`] (T1A seam read side). Always a
-    /// DESIRED-state statement: nothing here is an applied-DSP claim
-    /// (G3 §20 discipline applies to the summary line too).
+    /// The App's desired DSP summary line built by [`dsp_summary`]
+    /// (T1A seam read side). Always a DESIRED-state statement: nothing
+    /// here is an applied-DSP claim (G3 §20 discipline applies to the
+    /// summary line too).
     desired_dsp: Option<String>,
+    /// The App's desired DSP configuration as last refreshed (the
+    /// Audio route's read side; G3). The draft in [`super::audio`]
+    /// seeds from and is staleness-checked against it — the App owns
+    /// the truth, the shell keeps the projection.
+    pub(super) desired_processing: Option<AudioProcessingConfig>,
+    /// The Audio route's TUI-local draft (G3): presentation only, an
+    /// edit buffer over the desired configuration. `None` = the route
+    /// shows the desired configuration read-only.
+    pub(super) audio_draft: Option<super::audio::AudioDraft>,
 
     /// The active route (§5). Presentation-only: default Now Playing.
     pub(super) route: TuiRoute,
@@ -107,6 +118,8 @@ impl TuiModel {
             repeat: None,
             volume: None,
             desired_dsp: None,
+            desired_processing: None,
+            audio_draft: None,
             route: TuiRoute::NowPlaying,
             focus: None,
             focus_before_modal: None,

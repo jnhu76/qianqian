@@ -31,11 +31,13 @@
 //! projection  read-side labels derived from one coherent observation
 //! state       TuiModel: the presentation state and its mutators
 //! interaction route/focus/modal/viewport behavior on TuiModel
+//! audio       the Audio route's draft and read-side labels (G3)
 //! input       the keyboard decoder
 //! mouse       the mouse decoder
 //! ```
 
 mod actions;
+mod audio;
 mod controls;
 mod focus;
 mod hit;
@@ -51,7 +53,8 @@ pub use actions::{PlaylistCursor, Step, TuiAction, TuiRoute};
 #[cfg(test)]
 pub use controls::SeekButton;
 pub use controls::{
-    PLAYLIST_BUTTONS, PlaylistButton, PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton,
+    AUDIO_BUTTONS, AudioButton, EqAdjust, PLAYLIST_BUTTONS, PlaylistButton, PreferenceButton,
+    SEEK_BUTTONS, TRANSPORT, TransportButton,
 };
 pub use focus::FocusId;
 #[cfg(test)]
@@ -63,10 +66,11 @@ pub use modal::{
     PickerSubject,
 };
 pub use mouse::decode_mouse;
+#[cfg(test)]
+pub use projection::dsp_summary;
 pub(crate) use projection::status_shape;
 pub use projection::{
-    BAR_WIDTH, MAX_STATUS_ROWS, PlaylistRow, dsp_summary, row_label, seek_fraction_target,
-    seek_target,
+    BAR_WIDTH, MAX_STATUS_ROWS, PlaylistRow, row_label, seek_fraction_target, seek_target,
 };
 #[cfg(test)]
 pub use projection::{LARGE_SEEK_STEP_SECS, SEEK_STEP_SECS};

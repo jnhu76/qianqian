@@ -12,6 +12,7 @@ use super::{SELECTED_MARKER, bold, viewport_offset};
 use crate::tui::model::{
     ConfirmKind, FocusId, HitRegion, HitTarget, Modal, ModalButton, ResponsiveClass, TuiModel,
 };
+use qianqian_playback::EqPreset;
 
 /// The Open picker's geometry for ONE frame: the popup, its field row,
 /// the listing rows area, the (optional) honest error row, the visible
@@ -228,8 +229,34 @@ pub(super) fn modal_regions(
             }
         }
         Modal::Confirm { kind } => confirm_regions(*kind, area, regions),
+        Modal::Presets { .. } => {
+            let (_, inner, rows) = presets_layout(area);
+            for row in 0..rows {
+                regions.push(HitRegion {
+                    area: Rect::new(inner.x, inner.y + row, inner.width, 1),
+                    target: HitTarget::PickerRow(row as usize),
+                });
+            }
+        }
         _ => {}
     }
+}
+
+/// The preset menu's geometry (G3): one centered popup listing the
+/// eight factory presets, one row each, plus a hint row. The SINGLE
+/// layout decision for [`modal_regions`] and [`draw_modal`].
+fn presets_layout(area: Rect) -> (Rect, Rect, u16) {
+    let rows = EqPreset::all().len() as u16;
+    let height = (rows + 3).min(area.height);
+    let mut popup = centered_area(area, height);
+    popup.width = popup.width.min(34);
+    let inner = Rect::new(
+        popup.x + 1,
+        popup.y + 1,
+        popup.width.saturating_sub(2),
+        popup.height.saturating_sub(2),
+    );
+    (popup, inner, rows)
 }
 
 /// The stop-aware confirmation's geometry (T0): one consequence line
@@ -440,6 +467,34 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
                     *cell,
                 );
             }
+        }
+        Modal::Presets { cursor } => {
+            let (popup, inner, rows) = presets_layout(area);
+            frame.render_widget(Clear, popup);
+            frame.render_widget(
+                Paragraph::new("").block(Block::bordered().title(bold(" EQ preset "))),
+                popup,
+            );
+            // One row per preset; the cursor carries `>` and — while
+            // the list owns the focus — the REVERSED emphasis.
+            let visible = rows.min(inner.height.saturating_sub(1));
+            for (row, preset) in EqPreset::all().iter().enumerate().take(visible as usize) {
+                let marked = *cursor == Some(row);
+                let mark = if marked { SELECTED_MARKER } else { " " };
+                let mut line = Line::from(format!("{mark} {}", preset.name()));
+                if marked && model.focus() == Some(FocusId::PickerList) {
+                    line.style = Style::default().add_modifier(Modifier::REVERSED);
+                }
+                frame.render_widget(
+                    Paragraph::new(line),
+                    Rect::new(inner.x, inner.y + row as u16, inner.width, 1),
+                );
+            }
+            let hint_row = inner.y + inner.height.saturating_sub(1);
+            frame.render_widget(
+                Paragraph::new("↑↓ select · Enter apply · Esc cancel").centered(),
+                Rect::new(inner.x, hint_row, inner.width, 1),
+            );
         }
         Modal::GoTo { input } => {
             let popup = input_popup_area(area, 3);

@@ -217,6 +217,36 @@ pub(super) fn dispatch<S: EpisodeStart>(
             }
             Step::Continue
         }
+        // Audio route (G3): draft edits are presentation mutations on
+        // the model; the explicit [Apply] is the one path that touches
+        // the App's desired-DSP seams. Nothing here ever claims an
+        // applied-DSP readback.
+        TuiAction::DspToggleEnabled => {
+            model.audio_toggle_enabled();
+            Step::Continue
+        }
+        TuiAction::DspPreampStep(delta_db) => {
+            model.audio_preamp_step(delta_db as f32);
+            Step::Continue
+        }
+        TuiAction::DspEqBandStep(band, delta_db) => {
+            model.audio_eq_band_step(band, delta_db as f32);
+            Step::Continue
+        }
+        TuiAction::DspOpenPresets => {
+            model.open_modal(ModalKind::Presets);
+            Step::Continue
+        }
+        TuiAction::DspApply => {
+            perform_dsp_apply(model, player);
+            Step::Continue
+        }
+        TuiAction::DspCancel => {
+            if model.audio_cancel_draft() {
+                model.set_status(Some("draft discarded".to_owned()));
+            }
+            Step::Continue
+        }
         TuiAction::ToggleOrder => {
             let order = player.toggle_order();
             model.set_order(order);
@@ -291,6 +321,48 @@ pub(super) fn perform_clear_playlist<S: EpisodeStart>(
     match player.clear_playlist() {
         Ok(()) => model.set_status(Some("playlist cleared".to_owned())),
         Err(refusal) => model.set_status(Some(format!("clear refused: {refusal}"))),
+    }
+    drain_busy_interval_input();
+}
+
+/// The confirmed Apply of the Audio route's draft (G3): commit the
+/// draft's fields through the App's own desired-DSP seams, in the
+/// stage order the configuration documents (enablement, preamp, EQ).
+/// Each seam re-validates; the FIRST refusal stops the apply with the
+/// honest diagnostic and keeps the draft dirty for correction. Either
+/// way the draft's staleness witness re-syncs to the App's current
+/// desired configuration — the base change was the shell's OWN apply,
+/// never "elsewhere". The seams set the DESIRED state; the shell
+/// claims no applied readback (the route's standing line says exactly
+/// that).
+pub(super) fn perform_dsp_apply<S: EpisodeStart>(
+    model: &mut TuiModel,
+    player: &mut ReferencePlayerApp<S>,
+) {
+    let config = match model.audio_draft() {
+        Some(draft) => draft.config(),
+        None => return,
+    };
+    let result = (|| -> Result<(), String> {
+        if config.enabled != player.desired_processing().enabled {
+            player.set_processing_enabled(config.enabled)?;
+        }
+        if config.gain != player.desired_processing().gain {
+            player.set_preamp(config.gain)?;
+        }
+        if config.eq != player.desired_processing().eq
+            && let Some(eq) = config.eq
+        {
+            player.set_eq_config(eq)?;
+        }
+        Ok(())
+    })();
+    model.audio_note_applied(player.desired_processing());
+    match result {
+        Ok(()) => model.set_status(Some(
+            "desired DSP updated (applied state not reported)".to_owned(),
+        )),
+        Err(refusal) => model.set_status(Some(format!("apply refused: {refusal}"))),
     }
     drain_busy_interval_input();
 }
@@ -441,6 +513,7 @@ mod tests {
     use crate::player::tests::FakeEpisodeSource;
     use crate::playlist::{PlaybackOrder, RepeatMode};
     use crate::tui::model::*;
+    use qianqian_playback::EqPreset;
 
     /// The idle no-episode state stays truthful — nothing to command,
     /// nothing fabricated, and Q exits the loop.
@@ -1011,6 +1084,137 @@ mod tests {
             model
                 .status()
                 .is_some_and(|status| status.contains("added")),
+            "{}",
+            model.status().unwrap_or_default()
+        );
+    }
+
+    /// The Audio route's [Apply] (G3) commits the draft through the
+    /// App's own desired-DSP seams. Without a live episode the seams
+    /// validate the candidate directly; the draft re-syncs clean and
+    /// the status line stays truthful about applied state.
+    #[test]
+    fn the_audio_route_applies_the_draft_without_a_live_episode() {
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        dispatch(
+            TuiAction::Navigate(TuiRoute::Audio),
+            &mut model,
+            &mut player,
+        );
+        dispatch(TuiAction::DspToggleEnabled, &mut model, &mut player);
+        dispatch(TuiAction::DspPreampStep(-6), &mut model, &mut player);
+        assert!(
+            model.audio_draft().expect("draft").dirty(),
+            "the edits are pending"
+        );
+
+        dispatch(TuiAction::DspApply, &mut model, &mut player);
+        let desired = player.desired_processing();
+        assert!(desired.enabled, "the enablement committed");
+        assert!(
+            (desired.gain - 10f32.powf(-6.0 / 20.0)).abs() < 1e-5,
+            "the preamp committed: {}",
+            desired.gain
+        );
+        let draft = model.audio_draft().expect("the session stays open");
+        assert!(!draft.dirty(), "the draft re-synced clean");
+        assert!(
+            model
+                .status()
+                .is_some_and(|status| status.contains("applied state not reported")),
+            "{}",
+            model.status().unwrap_or_default()
+        );
+    }
+
+    /// [Apply] with a live episode runs the same seams through the
+    /// handle; a preset chosen in the menu commits as the custom
+    /// config seam (the summary still recognizes it by its trims).
+    #[test]
+    fn the_audio_route_applies_a_preset_with_a_live_episode() {
+        let tree = TempTree::new("audio-apply-live");
+        let file = tree.live_file("live.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        dispatch(
+            TuiAction::Navigate(TuiRoute::Audio),
+            &mut model,
+            &mut player,
+        );
+        // DSP must be ON for the summary to name the EQ stage at all
+        // (a bypass configuration's stages are inert by definition).
+        dispatch(TuiAction::DspToggleEnabled, &mut model, &mut player);
+        dispatch(TuiAction::DspOpenPresets, &mut model, &mut player);
+        // ↓ ↓ into the menu, Enter applies the preset to the draft.
+        assert_eq!(
+            handle_key(key(KeyCode::Down), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(
+            handle_key(key(KeyCode::Down), &mut model, &mut player),
+            Step::Continue
+        );
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(model.modal().is_none(), "the menu closed on activation");
+        let draft = model.audio_draft().expect("the menu edited the draft");
+        assert_eq!(
+            draft.config().eq,
+            Some(EqPreset::Jazz.to_config().eq.expect("EQ")),
+            "two downs from no cursor: flat, jazz"
+        );
+
+        dispatch(TuiAction::DspApply, &mut model, &mut player);
+        let desired = player.desired_processing();
+        assert_eq!(
+            desired.eq,
+            Some(EqPreset::Jazz.to_config().eq.expect("EQ")),
+            "the preset trims committed"
+        );
+        refresh(&mut model, &player);
+        assert!(
+            model
+                .desired_dsp_label()
+                .is_some_and(|label| label.contains("preset jazz")),
+            "the summary recognizes the preset by its trims: {:?}",
+            model.desired_dsp_label()
+        );
+    }
+
+    /// [Cancel] discards a dirty draft with a notice; the App's
+    /// desired configuration is untouched.
+    #[test]
+    fn the_audio_route_cancel_discards_the_draft() {
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+        let before = player.desired_processing();
+
+        dispatch(
+            TuiAction::Navigate(TuiRoute::Audio),
+            &mut model,
+            &mut player,
+        );
+        dispatch(TuiAction::DspToggleEnabled, &mut model, &mut player);
+        dispatch(TuiAction::DspCancel, &mut model, &mut player);
+        assert!(model.audio_draft().is_none(), "the draft discarded");
+        assert_eq!(
+            player.desired_processing(),
+            before,
+            "cancel never touches the App"
+        );
+        assert!(
+            model
+                .status()
+                .is_some_and(|status| status.contains("draft discarded")),
             "{}",
             model.status().unwrap_or_default()
         );

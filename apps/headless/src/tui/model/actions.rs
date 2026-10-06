@@ -118,6 +118,24 @@ pub enum TuiAction {
     /// frozen stop-aware confirmation first while an episode is live.
     PlaylistClear,
 
+    // Audio route (G3). The draft edits are presentation until an
+    // explicit [Apply] commits them through the App's desired-DSP
+    // seams; [Cancel] discards. Nothing here claims applied state.
+    /// Toggle the draft's processing enablement (bypass vs on).
+    DspToggleEnabled,
+    /// Step the draft preamp a signed number of decibels (±1 per
+    /// press). Integer decibels keep the typed vocabulary `Eq`; the
+    /// dispatch converts to the seam's linear gain.
+    DspPreampStep(i32),
+    /// Step one EQ band's trim: band index, signed decibels.
+    DspEqBandStep(usize, i32),
+    /// Open the EQ preset menu (the modal fills the draft's EQ stage).
+    DspOpenPresets,
+    /// Commit the draft through the App's seams.
+    DspApply,
+    /// Discard the draft.
+    DspCancel,
+
     // Application policy.
     /// R: toggle Sequential ↔ Shuffle (Issue #166 §25).
     ToggleOrder,
