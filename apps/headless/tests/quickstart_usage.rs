@@ -16,6 +16,7 @@ const KEY_ROWS: &[(&str, &str)] = &[
     ("Mouse", "Mouse"),
     ("↑ / ↓", "Up / Down"),
     ("Enter", "Enter"),
+    ("Backspace", "Backspace"),
     ("N / P", "N / P"),
     ("R", "R            order"),
     ("L", "L            repeat"),

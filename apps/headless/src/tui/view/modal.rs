@@ -492,7 +492,7 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             }
             let hint_row = inner.y + inner.height.saturating_sub(1);
             frame.render_widget(
-                Paragraph::new("↑↓ select · Enter apply · Esc cancel").centered(),
+                Paragraph::new("↑↓ select · Enter use · Esc").centered(),
                 Rect::new(inner.x, hint_row, inner.width, 1),
             );
         }
@@ -625,7 +625,7 @@ fn help_lines() -> Vec<Line<'static>> {
         Line::from("   Mouse             click any control: tabs, buttons, rows"),
         Line::from("   ?                 close this help"),
         Line::from("   Esc               cancel / close this help"),
-        Line::from("   Q / Ctrl+C        quit"),
+        Line::from("   Q / Ctrl+C        quit (Ctrl+C works everywhere)"),
     ]
 }
 
@@ -702,6 +702,7 @@ mod tests {
             ("Enter", "Enter"),
             ("Mouse", "Mouse"),
             ("↑ / ↓", "↑ / ↓"),
+            ("Backspace", "Backspace"),
             ("N / P", "N / P"),
             ("R", "R                 order"),
             ("L", "L                 repeat"),

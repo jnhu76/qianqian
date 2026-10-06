@@ -151,11 +151,6 @@ pub(super) fn drain_busy_interval_input() {
 /// episode's one pure observation for this refresh, and rebuild the
 /// playlist rows only when the App's playlist revision moved (a huge
 /// playlist must not cost per-frame work).
-/// Follow the player's committed episode and its playlist: swap the
-/// source label when the committed episode changed, take the new
-/// episode's one pure observation for this refresh, and rebuild the
-/// playlist rows only when the App's playlist revision moved (a huge
-/// playlist must not cost per-frame work).
 pub(super) fn refresh<S: EpisodeStart>(model: &mut TuiModel, player: &ReferencePlayerApp<S>) {
     model.set_episode(
         player

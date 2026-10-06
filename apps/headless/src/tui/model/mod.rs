@@ -51,6 +51,7 @@ mod state;
 mod visualizer;
 
 pub use actions::{PlaylistCursor, Step, TuiAction, TuiRoute};
+pub(crate) use audio::same_gain;
 #[cfg(test)]
 pub use controls::SeekButton;
 pub use controls::{

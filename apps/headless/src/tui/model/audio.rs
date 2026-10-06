@@ -27,6 +27,19 @@ use super::state::TuiModel;
 /// reaching the EQ band bound's recklessness.
 const PREAMP_MIN_DB: f32 = -60.0;
 const PREAMP_MAX_DB: f32 = 12.0;
+
+/// Whether two linear preamp gains are the same at this UI's display
+/// resolution. The stepper's dB↔linear round trip can leave a ~1 ULP
+/// difference at the SAME displayed decibel; "unchanged" is evaluated
+/// at a resolution coarser than that noise and far finer than the
+/// stepper's own 1 dB step (1e-3 relative ≈ 0.009 dB), so a net-zero
+/// step pair never reads as an edit. The enablement and the EQ
+/// compare exactly — their edits are exact arithmetic.
+pub(crate) fn same_gain(a: f32, b: f32) -> bool {
+    const GAIN_EPS_RELATIVE: f32 = 1e-3;
+    (a - b).abs() <= GAIN_EPS_RELATIVE * a.max(b)
+}
+
 /// The Audio route's draft: the desired configuration as the route
 /// first saw it (`base`), plus the field edits on top. Edits are
 /// presentation until [Apply] commits them field-by-field through the
@@ -70,7 +83,10 @@ impl AudioDraft {
 
     /// Whether the draft differs from the base it seeded from.
     pub fn dirty(&self) -> bool {
-        self.config() != self.base
+        let config = self.config();
+        config.enabled != self.base.enabled
+            || config.eq != self.base.eq
+            || !same_gain(config.gain, self.base.gain)
     }
 
     /// The base the draft seeded from (the staleness witness).
@@ -353,6 +369,27 @@ mod tests {
         assert!(
             (cut - floor).abs() < 1e-6,
             "clamped to −60 dB: {cut} vs {floor}"
+        );
+    }
+
+    /// A net-zero preamp round trip (+1 dB then −1 dB through the
+    /// stepper's dB↔linear conversions) is NOT an edit: the draft
+    /// reads clean at the display resolution instead of carrying an
+    /// "[unsaved]" mark over ~ULP conversion noise.
+    #[test]
+    fn a_net_zero_preamp_round_trip_is_not_an_edit() {
+        let mut model = model_with_desired(bypass());
+        model.audio_preamp_step(1.0);
+        assert!(
+            model.audio_draft().expect("draft").dirty(),
+            "one real step is an edit"
+        );
+        model.audio_preamp_step(-1.0);
+        let draft = model.audio_draft().expect("the draft stays open");
+        assert!(
+            !draft.dirty(),
+            "the round trip lands on the same displayed dB: {:?}",
+            draft.config()
         );
     }
 

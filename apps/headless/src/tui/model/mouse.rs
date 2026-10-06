@@ -829,8 +829,9 @@ mod tests {
         assert_eq!(model.armed(), None, "no arming behind a modal");
         assert_eq!(
             model.focus(),
-            Some(FocusId::ModalField),
-            "the click did not steal focus from the modal"
+            None,
+            "the help overlay owns the keyboard and focuses nothing; \
+             the click did not steal anything"
         );
         // Wheel behind the modal is inert too — the tab cell would be
         // background either way.

@@ -53,11 +53,10 @@ pub(super) fn draw_visualizer(
         },
         None => {
             // No telemetry published (no episode, or nothing since the
-            // last cut): say so instead of fabricating a flat line.
+            // last cut): say so instead of fabricating a flat line —
+            // and without naming an episode that may not exist.
             frame.render_widget(
-                Paragraph::new(Line::from(
-                    "Visualization unavailable — no telemetry from the current episode.",
-                )),
+                Paragraph::new(Line::from("Visualization unavailable — no telemetry.")),
                 inner,
             );
         }

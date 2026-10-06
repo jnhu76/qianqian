@@ -120,6 +120,7 @@ Enter.
 | ------------------- | ------------------------------------------------- |
 | `Tab / Shift+Tab`   | Move keyboard focus to the next / previous control |
 | `Enter`             | Activate the focused control; on the playlist, play the selected row; in the picker, navigate or select (the visible buttons commit) |
+| `Backspace`         | In the Open picker's listing: go up to the parent folder |
 | `Mouse`             | Click any visible control: tabs, buttons, the progress bar, playlist rows, picker rows — including the persistent `Help` and `Quit` buttons at the tab bar's right end |
 | `↑ / ↓`             | Select previous / next playlist row (list focused) |
 | `N / P`             | Next / previous track                             |
@@ -241,7 +242,8 @@ The player does not silently skip failed tracks in this release. Press
 ### No sound
 
 Check the usual suspects, in this order: the Windows output device, the
-system volume mixer, Qianqian's own `Volume:` setting, and whether
+system volume mixer, the player's own volume (the number between the
+− / + buttons), and whether
 another audio application on the same device works.
 
 ### The terminal looks wrong after a crash
@@ -255,7 +257,9 @@ Close and reopen the terminal window. If a key appears stuck, press
 - The track list lives only as long as the player runs — nothing is
   saved.
 - No playlist files (M3U or others), no import/export.
-- No lyrics, cover art, spectrum or skins.
+- No lyrics, cover art or skins. (The Visualizer tab shows a musical
+  spectrum from the player's own telemetry; it is not a calibrated
+  analyzer.)
 - No gapless playback claim: a short gap between tracks is normal.
 - Windows only, x86_64.
 

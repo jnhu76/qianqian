@@ -153,7 +153,11 @@ impl TuiModel {
                 // The preset menu (G3): one list, the cursor is the
                 // focus inside it.
                 Modal::Presets { .. } => vec![FocusId::PickerList],
-                _ => vec![FocusId::ModalField],
+                // The help overlay owns the keyboard and draws no
+                // control: nothing is focused while it is open (its
+                // keys are modal-scoped and never consult focus).
+                Modal::Help { .. } => Vec::new(),
+                Modal::GoTo { .. } => vec![FocusId::ModalField],
             };
         }
         let mut cycle: Vec<FocusId> = TuiRoute::ALL
@@ -177,7 +181,11 @@ impl TuiModel {
             }
             // The playlist toolbar exists whether or not the list has
             // rows (Add works on an empty list); the list itself is
-            // focusable only while it has rows (§11).
+            // focusable only while it has rows (§11). The summary
+            // row's Order/Repeat toggles are drawn (and clickable) in
+            // the non-compact classes, so they are focus stops there
+            // too — a drawn control is always a keyboard-reachable
+            // control.
             TuiRoute::Playlist => {
                 cycle.extend(
                     PLAYLIST_BUTTONS
@@ -186,6 +194,10 @@ impl TuiModel {
                 );
                 if !self.playlist.is_empty() {
                     cycle.push(FocusId::Playlist);
+                }
+                if self.class != ResponsiveClass::Compact {
+                    cycle.push(FocusId::Preference(PreferenceButton::Order));
+                    cycle.push(FocusId::Preference(PreferenceButton::Repeat));
                 }
             }
             // The Audio route (G3): the toolbar (the enablement label
@@ -903,7 +915,8 @@ mod tests {
         );
 
         // Playlist: the toolbar first, then the list (it has rows),
-        // then the same persistent pair.
+        // then the summary row's Order/Repeat toggles (drawn in this
+        // class), then the same persistent pair.
         model.set_route(TuiRoute::Playlist);
         assert_eq!(
             model.focus_cycle(),
@@ -918,6 +931,8 @@ mod tests {
                 FocusId::PlaylistButton(PlaylistButton::Remove),
                 FocusId::PlaylistButton(PlaylistButton::Clear),
                 FocusId::Playlist,
+                FocusId::Preference(PreferenceButton::Order),
+                FocusId::Preference(PreferenceButton::Repeat),
                 FocusId::NavBar(NavBarButton::Help),
                 FocusId::NavBar(NavBarButton::Quit),
             ]
@@ -1104,8 +1119,19 @@ mod tests {
             Some(FocusId::Playlist),
             "the list joined the cycle"
         );
-        // The persistent pair (G5) sits between the route content and
-        // the wrap.
+        // The summary row's Order/Repeat toggles (drawn in this class)
+        // and then the persistent pair (G5) sit between the route
+        // content and the wrap.
+        model.move_focus(FocusMove::Next);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::Preference(PreferenceButton::Order))
+        );
+        model.move_focus(FocusMove::Next);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::Preference(PreferenceButton::Repeat))
+        );
         model.move_focus(FocusMove::Next);
         assert_eq!(model.focus(), Some(FocusId::NavBar(NavBarButton::Help)));
         model.move_focus(FocusMove::Next);
@@ -1191,7 +1217,9 @@ mod tests {
             Some(ModalKind::Help),
             "no modal stack"
         );
-        assert_eq!(model.focus(), Some(FocusId::ModalField));
+        // The help overlay owns the keyboard and draws no control:
+        // nothing holds focus while it is open.
+        assert_eq!(model.focus(), None);
         assert_eq!(model.armed(), None, "opening clears the armed click (§24)");
 
         model.close_modal();

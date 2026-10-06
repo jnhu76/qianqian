@@ -146,15 +146,13 @@ fn render_too_small(frame: &mut Frame, area: Rect) {
     );
 }
 
-/// The persistent top navigation: the four frozen tabs (§6). The active
-/// route is bold, the focused tab is inverted — two shapes a monochrome
-/// terminal renders distinctly. Each tab's cell is published as its hit
-/// region from the very rect it was drawn into.
 /// The persistent top navigation (§6, G5): the four frozen route tabs,
 /// then the two persistent application controls — Help and Quit —
 /// pinned to the bar's right end on every route and in every class
 /// above the minimum. The active route is bold, the focused control is
-/// inverted — two shapes a monochrome terminal can tell apart.
+/// inverted — two shapes a monochrome terminal can tell apart. Every
+/// control's cell is published as its hit region from the very rect
+/// it was drawn into.
 fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<HitRegion>) {
     let compact = model.class() == ResponsiveClass::Compact;
     let label = |button: NavBarButton| {
@@ -247,12 +245,14 @@ const HINT_LINE: &str = "Tab=focus  Enter=activate  O=open  ?=help  Q=quit";
 fn status_line_count(model: &TuiModel) -> usize {
     status_shape(model.status()) + 1
 }
-/// The first visible row of the playlist pane: a STATELESS scroll that
-/// keeps the selected row inside the window (Issue #166 §21). No scroll
-/// offset is kept anywhere — the rule is a pure function of the list
-/// length, the selection and the pane height, so no presentation state
-/// can drift out of sync with what is on screen, and the committed row
-/// is free to scroll away while the user browses.
+/// The picker listing's first visible row: a STATELESS scroll that
+/// keeps the cursor inside the listing window (Issue #166 §21). No
+/// scroll offset is kept for the picker — the rule is a pure function
+/// of the list length, the cursor and the window height, so no
+/// presentation state can drift out of sync with what is on screen.
+/// (The playlist pane is different: G2's owner ruling keeps an
+/// explicit TUI-local viewport hint on the model, which the wheel
+/// moves and the selection reveals.)
 fn viewport_offset(len: usize, selected: Option<usize>, height: usize) -> usize {
     if height == 0 || len <= height {
         return 0;

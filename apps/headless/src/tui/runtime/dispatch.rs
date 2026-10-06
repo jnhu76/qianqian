@@ -99,12 +99,14 @@ pub(super) fn dispatch<S: EpisodeStart>(
         TuiAction::PlayPause => {
             match player.active_handle() {
                 Some(handle) => {
-                    // The choice comes from a FRESH authoritative
+                    // The choice comes from ONE fresh authoritative
                     // observation — the shell never keeps a local
-                    // `paused` or `terminal` bool.
-                    if handle.observe().terminal_outcome.is_some() {
+                    // `paused` or `terminal` bool, and one press
+                    // reasons about one coherent snapshot, never two.
+                    let observation = handle.observe();
+                    if observation.terminal_outcome.is_some() {
                         perform_play_current(model, player);
-                    } else if handle.observe().pause_requested {
+                    } else if observation.pause_requested {
                         handle.request_resume();
                     } else {
                         handle.request_pause();
@@ -350,13 +352,16 @@ pub(super) fn perform_dsp_apply<S: EpisodeStart>(
         None => return,
     };
     let result = (|| -> Result<(), String> {
-        if config.enabled != player.desired_processing().enabled {
+        let desired = player.desired_processing();
+        if config.enabled != desired.enabled {
             player.set_processing_enabled(config.enabled)?;
         }
-        if config.gain != player.desired_processing().gain {
+        // The gain compares at the stepper's display resolution (a
+        // ~ULP round-trip difference is not an edit to commit).
+        if !crate::tui::model::same_gain(config.gain, desired.gain) {
             player.set_preamp(config.gain)?;
         }
-        if config.eq != player.desired_processing().eq
+        if config.eq != desired.eq
             && let Some(eq) = config.eq
         {
             player.set_eq_config(eq)?;
