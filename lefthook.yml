@@ -132,8 +132,12 @@ pre-push:
         cd website
         node scripts/verify.mjs
         if [ ! -d node_modules ]; then
-          echo "docs:build prerequisite missing: website dependencies not installed."
-          echo "Run once:  cd website && npm ci"
+          # Keep echo text quote-free: lefthook's Windows path mangles
+          # double quotes inside a multi-line run block into an
+          # unbalanced shell script that dies at parse time (exit 2)
+          # after the first few lines. Linux/macOS are unaffected.
+          echo docs:build prerequisite missing: website dependencies not installed.
+          echo Run once: cd website, then npm ci
           exit 1
         fi
         npx vitepress build
