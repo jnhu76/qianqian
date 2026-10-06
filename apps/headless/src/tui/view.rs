@@ -34,8 +34,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::model::{
-    FocusId, HitRegion, HitTarget, Modal, PlaylistRow, ResponsiveClass, TRANSPORT, TuiModel,
-    TuiRoute, responsive_class,
+    FocusId, HitRegion, HitTarget, MAX_STATUS_ROWS, Modal, ModalButton, PlaylistRow,
+    PreferenceButton, ResponsiveClass, SEEK_BUTTONS, TRANSPORT, TransportButton, TuiModel,
+    TuiRoute, responsive_class, status_shape,
 };
 
 /// Shown once the episode's terminal Fact is committed: the shell
@@ -63,10 +64,6 @@ const PLAYING_MARKER: &str = "▶";
 /// marker; one row may carry both.
 const SELECTED_MARKER: &str = ">";
 
-/// How many status lines the bottom bar renders at most (a multi-line
-/// status BLOCK clips honestly past this, like every other region).
-const MAX_STATUS_ROWS: usize = 3;
-
 /// Render one frame of the shell, and publish the frame's hit regions
 /// into the model from the same layout this draw used.
 pub fn draw(frame: &mut Frame, model: &mut TuiModel) {
@@ -86,6 +83,20 @@ pub fn draw(frame: &mut Frame, model: &mut TuiModel) {
         return;
     }
 
+    // The modal's regions are PUBLISHED first, so the first-match hit
+    // test answers a click inside the popup with the modal's own
+    // control and never with the background under it (§25). The modal
+    // is still PAINTED last, over everything (§23) — publication order
+    // and paint order are deliberately independent decisions.
+    if let Some(modal) = model.modal() {
+        modal_regions(
+            modal,
+            area,
+            model.class() == ResponsiveClass::Compact,
+            &mut regions,
+        );
+    }
+
     let status_rows = status_line_count(model);
     let [tabs, body, status] = Layout::vertical([
         Constraint::Length(1),
@@ -102,11 +113,9 @@ pub fn draw(frame: &mut Frame, model: &mut TuiModel) {
     }
     draw_status(frame, model, status);
 
-    // The modal renders last, over everything (§23). It publishes no
-    // regions: at this foundation a modal has no mouse controls, and
-    // the decoders ignore the background while one is open (§25).
+    // The modal paints last, over everything (§23).
     if let Some(modal) = model.modal() {
-        draw_modal(frame, modal, area);
+        draw_modal(frame, modal, area, model);
     }
 
     model.publish_regions(regions);
@@ -165,44 +174,50 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
     }
 }
 
-/// The Now Playing route: the episode read-side panel, the episode
-/// diagnostics, and the minimal transport row (§36) that proves
-/// keyboard/mouse action parity without becoming the T2 layout.
+/// The Now Playing route (G1): the episode read-side panel with the
+/// desired-DSP summary line, the click-to-position seek bar, the
+/// discoverable relative-seek buttons, the transport row with the
+/// visible Open control, and the preference row (volume steppers,
+/// order, repeat) — every core player function as a visible control
+/// that keyboard focus and the mouse both reach.
 fn draw_now_playing(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<HitRegion>) {
-    let [content, transport] =
-        Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).areas(area);
+    let [content, bar, seek, transport, preferences] = Layout::vertical([
+        Constraint::Min(1),
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(3),
+        Constraint::Length(3),
+    ])
+    .areas(area);
 
+    let compact = model.class() == ResponsiveClass::Compact;
     let mut lines: Vec<Line<'static>> = Vec::new();
     match model.source() {
         // The no-episode panel (F6; the U1 idle page): after a
         // clean-failed Open no runtime remains, and on a no-argument
         // launch none was ever started — the honest frame says exactly
         // that instead of fabricating labels for an episode that does
-        // not exist.
+        // not exist. The Open control below is always live.
         None => {
             lines.push(Line::from(""));
             lines.push(Line::from(NO_MUSIC_LINE));
-            lines.push(Line::from("Press O to open a file or folder."));
+            lines.push(Line::from(
+                "Open a file or folder with the Open button below.",
+            ));
             if let Some((position, total)) = model.navigation_position() {
                 lines.push(Line::from(format!(
                     "Track: {position}/{total} (navigation cursor)"
                 )));
-            }
-            if let Some(volume) = model.volume_label() {
-                lines.push(Line::from(format!("Volume: {volume} (desired)")));
             }
         }
         Some(source) => {
             lines.push(Line::from(""));
             lines.push(Line::from(format!("Source: {source}")));
             lines.push(Line::from(format!("Format: {}", model.format_label())));
-            // Read-side presentation only (D14.8): the position
-            // Projection over the source duration evidence. The bar is
-            // a display, never an input affordance.
+            // Read-side presentation only (D14.8). The bar below is
+            // the same projection with a click-to-position affordance
+            // wherever duration evidence exists.
             lines.push(Line::from(format!("Position: {}", model.timeline_label())));
-            if let Some(bar) = model.position_bar_label() {
-                lines.push(Line::from(bar));
-            }
             let observation = model.observation();
             lines.push(Line::from(format!(
                 "Terminal: {}   Stop requested: {}   Pause requested: {}   Paused: {}",
@@ -211,8 +226,8 @@ fn draw_now_playing(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &m
                 observation.pause_requested,
                 model.paused(),
             )));
-            if let Some(preferences) = preference_line(model) {
-                lines.push(Line::from(preferences));
+            if let Some((position, total)) = model.navigation_position() {
+                lines.push(Line::from(format!("Track: {position}/{total}")));
             }
             if model.terminal_committed() {
                 lines.push(Line::from(COMMITTED_HINT));
@@ -225,6 +240,15 @@ fn draw_now_playing(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &m
             }
         }
     }
+    // The desired-DSP summary is the App's DESIRED configuration line —
+    // its product lifetime is independent of any active episode (T0:
+    // a validated desired change with no episode configures the next
+    // one), so it renders on the idle page too (G1 F14). It stays
+    // secondary detail (G5 §39): it yields to the core controls under
+    // constrained layouts before any of them does.
+    if !compact && let Some(dsp) = model.desired_dsp_label() {
+        lines.push(Line::from(dsp.to_owned()));
+    }
     frame.render_widget(
         Paragraph::new(lines).block(
             Block::bordered()
@@ -234,13 +258,102 @@ fn draw_now_playing(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &m
         content,
     );
 
-    // The minimal transport row (§36): four buttons, focusable,
-    // keyboard-activatable and mouse-activatable through the same
-    // TuiAction vocabulary.
-    let buttons: [Rect; 4] = Layout::horizontal([Constraint::Ratio(1, 4); 4]).areas(transport);
+    // The seek bar row (G1 §9): a click-to-position affordance over
+    // the D14.8 display. It publishes a region ONLY while duration
+    // evidence exists — an unknown timeline is never clickable and
+    // never fabricates a target. The region is exactly the drawn
+    // bar GLYPH cells (not the whole row): the click fraction and the
+    // painted marker come from the same geometry, so a click where the
+    // bar looks full is a click near the end. The row itself always
+    // occupies its line, so the layout does not flex as evidence
+    // arrives.
+    if let Some(bar_label) = model.position_bar_label() {
+        frame.render_widget(Paragraph::new(bar_label.clone()).centered(), bar);
+        if model
+            .observation()
+            .source_duration
+            .is_some_and(|duration| !duration.is_zero())
+            && let Some(glyph) = seek_bar_glyph_area(&bar_label, bar)
+        {
+            regions.push(HitRegion {
+                area: glyph,
+                target: HitTarget::SeekBar,
+            });
+        }
+    }
+
+    /// The drawn bar glyph's cells inside the seek-bar row, from the SAME
+    /// centering the painter used: the label (`mm:ss ━━━╸─── mm:ss`) is
+    /// single-width characters, so its character count is its cell width,
+    /// and the glyph is the [`BAR_WIDTH`]-cell run starting at the first
+    /// box-drawing character. `None` when the row cannot show the whole
+    /// label — a clipped bar is a display, not a scrub strip.
+    fn seek_bar_glyph_area(bar_label: &str, bar: Rect) -> Option<Rect> {
+        let label_cells = bar_label.chars().count();
+        if label_cells >= bar.width as usize {
+            return None;
+        }
+        let glyph_offset = bar_label
+            .char_indices()
+            .find(|(_, character)| matches!(character, '━' | '╸' | '─'))?
+            .0;
+        Some(Rect::new(
+            // The painter's EXACT centering (ratatui's Paragraph): the
+            // click mapping and the painted cells must never disagree
+            // by a cell at odd label lengths.
+            bar.x + (bar.width / 2).saturating_sub(label_cells as u16 / 2) + glyph_offset as u16,
+            bar.y,
+            super::model::BAR_WIDTH as u16,
+            1,
+        ))
+    }
+
+    // The seek row (G1 F07, the T0 input-parity freeze): the visible,
+    // focusable, clickable relative-seek controls. They render ONLY
+    // while the episode publishes the evidence a relative seek is
+    // computed from (position + sample rate) — without evidence the
+    // row stays empty, publishes no regions, and holds no focus stop;
+    // an invisible control is never an interactive one. The row's slot
+    // is always reserved so the layout does not flex as evidence
+    // arrives.
+    if model.relative_seek_available() {
+        let cells: [Rect; 2] = Layout::horizontal([Constraint::Ratio(1, 2); 2]).areas(seek);
+        for (button, cell) in SEEK_BUTTONS.iter().zip(cells.iter()) {
+            let focused = model.focus() == Some(FocusId::Seek(*button));
+            let paragraph =
+                Paragraph::new(Line::from(format!("[ {} ]", button.label())).centered());
+            frame.render_widget(
+                if focused {
+                    paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
+                } else {
+                    paragraph
+                },
+                *cell,
+            );
+            regions.push(HitRegion {
+                area: *cell,
+                target: HitTarget::Seek(*button),
+            });
+        }
+    }
+
+    // The transport row (§36, G1): Open joins the four transport
+    // buttons — the picker entry is a core player control, not a
+    // shortcut reserved for those who read the help. The central
+    // control is CONTEXT-LABELED from the model's fresh offer (T0
+    // transport freeze): Pause / Resume / Play.
+    let buttons: [Rect; 5] = Layout::horizontal([Constraint::Ratio(1, 5); 5]).areas(transport);
+    let play_pause_label = model.play_pause_offer().label();
     for (button, cell) in TRANSPORT.iter().zip(buttons.iter()) {
         let focused = model.focus() == Some(FocusId::Transport(*button));
-        let paragraph = Paragraph::new(Line::from(button.label()).centered());
+        let label = if *button == TransportButton::PlayPause {
+            play_pause_label.to_owned()
+        } else if compact {
+            button.compact_label().to_owned()
+        } else {
+            button.label().to_owned()
+        };
+        let paragraph = Paragraph::new(Line::from(label).centered());
         frame.render_widget(
             if focused {
                 paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
@@ -254,6 +367,131 @@ fn draw_now_playing(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &m
             area: *cell,
             target: HitTarget::Transport(*button),
         });
+    }
+
+    draw_preference_row(frame, model, preferences, regions);
+}
+
+/// The preference row (G1): the App-owned policies as visible controls
+/// — volume steppers around the desired-factor display, then the order
+/// and repeat toggles. Each converges on exactly the [`TuiAction`] its
+/// accelerator key produces.
+fn draw_preference_row(
+    frame: &mut Frame,
+    model: &TuiModel,
+    area: Rect,
+    regions: &mut Vec<HitRegion>,
+) {
+    let compact = model.class() == ResponsiveClass::Compact;
+    // The volume value is FIXED-width ("100/100" is its widest compact
+    // spelling; the wide class appends " (desired)"): a percentage
+    // share starves it at the class minimum and the number clips into
+    // a lie ("100/"). The toggles split whatever remains (G1 re-review
+    // B1: the minimum shell is pinned by semantic-region evidence).
+    let value_width = if compact { 7 } else { 18 };
+    let [down, label, up, order, repeat] = Layout::horizontal([
+        Constraint::Length(3),
+        Constraint::Length(value_width),
+        Constraint::Length(3),
+        Constraint::Min(10),
+        Constraint::Min(10),
+    ])
+    .areas(area);
+
+    let steppers: [(Rect, PreferenceButton); 2] = [
+        (down, PreferenceButton::VolumeDown),
+        (up, PreferenceButton::VolumeUp),
+    ];
+    for (cell, button) in steppers {
+        let focused = model.focus() == Some(FocusId::Preference(button));
+        // The stepper glyph is ONE plain ASCII character (G1 F02): the
+        // cell is one column wide inside its borders, so any longer —
+        // or any glyph the terminal's font may lack — renders as a
+        // blank, and an invisible control is a live target with no
+        // visible affordance.
+        let paragraph = Paragraph::new(
+            Line::from(if button == PreferenceButton::VolumeDown {
+                "-"
+            } else {
+                "+"
+            })
+            .centered(),
+        );
+        frame.render_widget(
+            if focused {
+                paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
+            } else {
+                paragraph
+            }
+            .block(Block::bordered()),
+            cell,
+        );
+        regions.push(HitRegion {
+            area: cell,
+            target: HitTarget::Preference(button),
+        });
+    }
+    if let Some(volume) = model.volume_label() {
+        let desired = if compact {
+            volume
+        } else {
+            format!("{volume} (desired)")
+        };
+        frame.render_widget(Paragraph::new(desired).centered(), label);
+    }
+
+    let toggles: [(Rect, PreferenceButton, Option<String>); 2] = [
+        (
+            order,
+            PreferenceButton::Order,
+            model.order_label().map(|label| {
+                if compact {
+                    format!("Ord:{}", order_short(label))
+                } else {
+                    format!("Order: {label}")
+                }
+            }),
+        ),
+        (
+            repeat,
+            PreferenceButton::Repeat,
+            model.repeat_label().map(|label| {
+                if compact {
+                    format!("Rep:{label}")
+                } else {
+                    format!("Repeat: {label}")
+                }
+            }),
+        ),
+    ];
+    for (cell, button, label) in toggles {
+        let focused = model.focus() == Some(FocusId::Preference(button));
+        let paragraph = match label {
+            Some(label) => Paragraph::new(Line::from(label).centered()),
+            None => Paragraph::new(Line::from("—").centered()),
+        };
+        frame.render_widget(
+            if focused {
+                paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
+            } else {
+                paragraph
+            }
+            .block(Block::bordered()),
+            cell,
+        );
+        regions.push(HitRegion {
+            area: cell,
+            target: HitTarget::Preference(button),
+        });
+    }
+}
+
+/// The compact spelling of an order label (same policy, shorter word).
+fn order_short(label: &str) -> &'static str {
+    match label {
+        "Sequential" => "Seq",
+        "Shuffle" => "Shuf",
+        _ => "?",
     }
 }
 
@@ -353,37 +591,11 @@ fn draw_status(frame: &mut Frame, model: &TuiModel, area: Rect) {
 const HINT_LINE: &str = "Tab=focus  Enter=activate  O=open  ?=help  Q=quit";
 
 /// How many rows the bottom bar needs: the status block (capped) plus
-/// the hint line — always at least one.
+/// the hint line — always at least one. The cap and the shape come
+/// from the model (the same shape its `set_status` arm invalidation
+/// compares).
 fn status_line_count(model: &TuiModel) -> usize {
-    let status_rows = model
-        .status()
-        .map(|status| status.lines().count())
-        .unwrap_or(0)
-        .min(MAX_STATUS_ROWS);
-    status_rows + 1
-}
-
-/// The player's preferences, as one line of independent facts: each
-/// appears only once the shell has been told it (so an unrefreshed
-/// model fabricates none of them).
-fn preference_line(model: &TuiModel) -> Option<String> {
-    let mut facts = Vec::new();
-    if let Some((position, total)) = model.navigation_position() {
-        facts.push(format!("Track: {position}/{total}"));
-    }
-    if let Some(volume) = model.volume_label() {
-        facts.push(format!("Volume: {volume} (desired)"));
-    }
-    if let Some(order) = model.order_label() {
-        facts.push(format!("Order: {order}"));
-    }
-    if let Some(repeat) = model.repeat_label() {
-        facts.push(format!("Repeat: {repeat}"));
-    }
-    if facts.is_empty() {
-        return None;
-    }
-    Some(facts.join("   "))
+    status_shape(model.status()) + 1
 }
 
 /// The first visible row of the playlist pane: a STATELESS scroll that
@@ -428,18 +640,295 @@ fn playlist_row_line(position: usize, row: &PlaylistRow, episode_live: bool) -> 
     ))
 }
 
+/// The Open picker's geometry for ONE frame: the popup, its field row,
+/// the listing rows area, the (optional) honest error row, the visible
+/// buttons and the hint line. The SINGLE layout decision (§14) —
+/// [`modal_regions`] publishes from it and [`draw_modal`] paints from
+/// it, so a hit test cannot disagree with what is on screen.
+struct PickerLayout {
+    popup: Rect,
+    field: Rect,
+    /// The navigation row between the field and the listing: the T0
+    /// picker's frozen [Use this folder] control.
+    nav: Rect,
+    list: Rect,
+    /// The bounded note row: an honest failure diagnostic when one
+    /// stands, else the [Use this folder] target display. Absent when
+    /// there is nothing to say.
+    note: Option<Rect>,
+    /// One rect per button, in [`PICKER_BUTTONS`] order, MEASURED from
+    /// the labels this frame actually renders (G1 F13: at the supported
+    /// minimum no control clips into its neighbor, and the hit geometry
+    /// is the final rendered geometry).
+    buttons: Vec<Rect>,
+    hint: Rect,
+}
+
+/// Compute the picker's layout for one frame. The listing window shows
+/// as many entries as the popup can hold (degrading honestly on small
+/// terminals), and nothing ever exceeds the terminal area.
+fn picker_layout(picker: &super::model::OpenPicker, area: Rect, compact: bool) -> PickerLayout {
+    let note_rows = u16::from(picker.error.is_some() || picker.folder_target);
+    let width = area.width.min(64).saturating_sub(4).max(16);
+    // field + nav + buttons + hint + borders (+ an honest note row).
+    let reserved = 4 + 2 + note_rows;
+    let list_rows = picker
+        .entries
+        .len()
+        .min(area.height.saturating_sub(reserved).max(1) as usize) as u16;
+    let height = (list_rows + reserved).min(area.height);
+    let popup = Rect::new(
+        area.x + area.width.saturating_sub(width) / 2,
+        area.y + area.height.saturating_sub(height) / 2,
+        width,
+        height,
+    );
+    let inner = Rect::new(
+        popup.x + 1,
+        popup.y + 1,
+        popup.width.saturating_sub(2),
+        popup.height.saturating_sub(2),
+    );
+    let [field, rest] = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).areas(inner);
+    let [nav, list, note, buttons, hint] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Fill(1),
+        Constraint::Length(note_rows),
+        Constraint::Length(1),
+        Constraint::Length(1),
+    ])
+    .areas(rest);
+    // The button run is MEASURED, then centered: each cell is exactly
+    // its rendered label wide, so cells cannot overlap and labels
+    // cannot clip. The compact classes render the short spellings (the
+    // class minimums guarantee the run fits; the row-tests pin it at
+    // the exact supported minimum).
+    let labels: Vec<&'static str> = PICKER_BUTTONS
+        .iter()
+        .map(|button| {
+            if compact {
+                compact_button_label(*button)
+            } else {
+                button_label(*button)
+            }
+        })
+        .collect();
+    let total: u16 = labels
+        .iter()
+        .map(|label| label.chars().count() as u16)
+        .sum();
+    let gap = buttons.width.saturating_sub(total) / 2;
+    let mut cells = Vec::with_capacity(labels.len());
+    let mut x = buttons.x + gap;
+    for label in &labels {
+        let width = label.chars().count() as u16;
+        cells.push(Rect::new(x, buttons.y, width, 1));
+        x += width;
+    }
+    PickerLayout {
+        popup,
+        field,
+        nav,
+        list,
+        note: (note_rows > 0).then_some(note),
+        buttons: cells,
+        hint,
+    }
+}
+
+/// The ORDER of the picker's visible buttons, in render (and Tab)
+/// order: the two commit buttons, the mouse's enter-folder step, and
+/// the cancel. The [Use this folder] control lives on the popup's nav
+/// row, above the listing ([`USE_FOLDER_LABEL`]).
+const PICKER_BUTTONS: [super::model::ModalButton; 4] = [
+    super::model::ModalButton::Open,
+    super::model::ModalButton::Add,
+    super::model::ModalButton::EnterFolder,
+    super::model::ModalButton::Cancel,
+];
+
+/// The nav-row control's label (T0 picker freeze: "Use this folder
+/// selects the displayed directory as the target"). One spelling for
+/// every class: it fits the supported-minimum popup with room to
+/// spare (17 ≤ 34 inner cells).
+const USE_FOLDER_LABEL: &str = "[Use this folder]";
+
+fn button_label(button: super::model::ModalButton) -> &'static str {
+    match button {
+        super::model::ModalButton::Open => "[Open]",
+        super::model::ModalButton::Add => "[Add to Playlist]",
+        super::model::ModalButton::UseFolder => USE_FOLDER_LABEL,
+        super::model::ModalButton::EnterFolder => "[Enter folder]",
+        super::model::ModalButton::Cancel => "[Cancel]",
+    }
+}
+
+/// The button labels in the compact classes: the SAME four controls,
+/// spellings that fit the supported-minimum popup (the class minimums
+/// and the row tests pin the fit — G1 F13). The nav-row [Use this
+/// folder] label is shared — see [`USE_FOLDER_LABEL`].
+fn compact_button_label(button: super::model::ModalButton) -> &'static str {
+    match button {
+        super::model::ModalButton::Open => "[Open]",
+        super::model::ModalButton::Add => "[Add]",
+        super::model::ModalButton::UseFolder => USE_FOLDER_LABEL,
+        super::model::ModalButton::EnterFolder => "[Enter]",
+        super::model::ModalButton::Cancel => "[Cancel]",
+    }
+}
+
+/// Publish the active modal's hit regions from the SAME layout the
+/// modal paints from. Only the Open picker has mouse controls; the
+/// GoTo and Help modals stay keyboard-owned and publish none.
+fn modal_regions(modal: &Modal, area: Rect, compact: bool, regions: &mut Vec<HitRegion>) {
+    let Modal::Open(picker) = modal else {
+        return;
+    };
+    let layout = picker_layout(picker, area, compact);
+    regions.push(HitRegion {
+        area: layout.field,
+        target: HitTarget::ModalField,
+    });
+    regions.push(HitRegion {
+        area: layout.nav,
+        target: HitTarget::ModalButton(super::model::ModalButton::UseFolder),
+    });
+    // One region per VISIBLE listing row, from the same offset the
+    // painter uses (the playlist pane's rule: the row geometry and the
+    // drawn rows come from one calculation).
+    let offset = viewport_offset(
+        picker.entries.len(),
+        picker.cursor,
+        layout.list.height as usize,
+    );
+    for (visible_row, index) in (offset..picker.entries.len())
+        .take(layout.list.height as usize)
+        .enumerate()
+    {
+        regions.push(HitRegion {
+            area: Rect::new(
+                layout.list.x,
+                layout.list.y + visible_row as u16,
+                layout.list.width,
+                1,
+            ),
+            target: HitTarget::PickerRow(index),
+        });
+    }
+    for (button, cell) in PICKER_BUTTONS.iter().zip(layout.buttons.iter()) {
+        regions.push(HitRegion {
+            area: *cell,
+            target: HitTarget::ModalButton(*button),
+        });
+    }
+}
+
 /// The active modal, rendered as the ONE popup over the shell (§23).
-/// No modal publishes hit regions: the modal owns the keyboard, and the
-/// mouse ignores the background while it is open (§25).
-fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect) {
+/// The Open picker paints from the same [`picker_layout`] that
+/// [`modal_regions`] published regions from.
+fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &TuiModel) {
     match modal {
-        Modal::Open { input } => {
-            let popup = input_popup_area(area, 3);
-            frame.render_widget(Clear, popup);
+        Modal::Open(picker) => {
+            let compact = model.class() == ResponsiveClass::Compact;
+            let layout = picker_layout(picker, area, compact);
+            frame.render_widget(Clear, layout.popup);
+            // The popup's title names the listed directory — the field
+            // stays the user's own typed line, so the picker says
+            // where it is instead of editing under the user's hands.
+            // A long path clips honestly at the border.
+            let title = Span::styled(
+                match &picker.dir {
+                    Some(dir) => format!(" Open — {} ", dir.display()),
+                    None => " Open ".to_owned(),
+                },
+                Style::default().add_modifier(Modifier::BOLD),
+            );
             frame.render_widget(
-                Paragraph::new(format!("Open: {input}▏  (Enter = open, Esc = cancel)"))
-                    .block(Block::bordered().title(bold(" Open "))),
-                popup,
+                Paragraph::new("").block(Block::bordered().title(Line::from(title))),
+                layout.popup,
+            );
+            // The path row: the typed line (a click focuses it).
+            frame.render_widget(Paragraph::new(format!(" {}▏", picker.input)), layout.field);
+
+            // The nav row: the T0 picker's frozen [Use this folder]
+            // control — the displayed directory becomes the submission
+            // target without entering it.
+            let nav_focused = model.focus() == Some(FocusId::PickerButton(ModalButton::UseFolder));
+            let nav = Paragraph::new(USE_FOLDER_LABEL);
+            frame.render_widget(
+                if nav_focused {
+                    nav.style(Style::default().add_modifier(Modifier::REVERSED))
+                } else {
+                    nav
+                },
+                layout.nav,
+            );
+
+            // The note row: the honest diagnostic while correction is
+            // needed; otherwise the [Use this folder] target display.
+            if let Some(slot) = layout.note {
+                if let Some(error) = &picker.error {
+                    frame.render_widget(Paragraph::new(error.clone()), slot);
+                } else if picker.folder_target
+                    && let Some(dir) = &picker.dir
+                {
+                    frame.render_widget(
+                        Paragraph::new(format!("Target: {} (folder)", dir.display())),
+                        slot,
+                    );
+                }
+            }
+
+            // The listing window: the same stateless offset rule as the
+            // playlist pane, the cursor marked `>`, directories spelled
+            // with a trailing `/`. The synthesized `..` row is
+            // navigation chrome and renders as its own name.
+            let offset = viewport_offset(
+                picker.entries.len(),
+                picker.cursor,
+                layout.list.height as usize,
+            );
+            let lines: Vec<Line<'static>> = (offset..picker.entries.len())
+                .take(layout.list.height as usize)
+                .map(|index| {
+                    let entry = &picker.entries[index];
+                    let cursor_mark = if picker.cursor == Some(index) {
+                        SELECTED_MARKER
+                    } else {
+                        " "
+                    };
+                    let name = if entry.is_parent {
+                        entry.name.clone()
+                    } else if entry.is_dir {
+                        format!("{}/", entry.name)
+                    } else {
+                        entry.name.clone()
+                    };
+                    Line::from(format!("{cursor_mark} {name}"))
+                })
+                .collect();
+            frame.render_widget(Paragraph::new(lines), layout.list);
+
+            for (button, cell) in PICKER_BUTTONS.iter().zip(layout.buttons.iter()) {
+                let focused = model.focus() == Some(FocusId::PickerButton(*button));
+                let label = if compact {
+                    compact_button_label(*button)
+                } else {
+                    button_label(*button)
+                };
+                let paragraph = Paragraph::new(Line::from(label).centered());
+                frame.render_widget(
+                    if focused {
+                        paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
+                    } else {
+                        paragraph
+                    },
+                    *cell,
+                );
+            }
+            frame.render_widget(
+                Paragraph::new("↑↓ select · Tab cycle · Esc cancel").centered(),
+                layout.hint,
             );
         }
         Modal::GoTo { input } => {
@@ -515,9 +1004,21 @@ fn help_lines() -> Vec<Line<'static>> {
         Line::from("   R                 order: sequential / shuffle"),
         Line::from("   L                 repeat: off / all / one"),
         Line::from(""),
+        Line::from(" Open picker"),
+        Line::from("   Tab / Shift+Tab   path field / listing / buttons"),
+        Line::from("   ↑ / ↓ / wheel     move the listing selection"),
+        Line::from("   Enter             field: navigate a folder or select a file"),
+        Line::from("   Enter             folder row: enter it; file row: select it"),
+        Line::from("   Backspace         on the listing: up to the parent folder"),
+        Line::from("   [Open] / [Add]    commit the selection or the typed path"),
+        Line::from("   [Enter folder]    descend into the selected folder"),
+        Line::from("   Esc               cancel"),
+        Line::from(""),
         Line::from(" Playback"),
-        Line::from("   Space             pause / resume"),
+        Line::from("   Space             pause / resume / play"),
         Line::from("   ← / →             seek 5 s back / forward"),
+        Line::from("   [Back 5s]         the same 5 s seek, as a visible button"),
+        Line::from("   [Forward 5s]      the same 5 s seek, as a visible button"),
         Line::from("   Shift+← / →       seek 30 s back / forward"),
         Line::from("   G                 go to an exact position"),
         Line::from("   + / -             volume up / down"),
@@ -673,8 +1174,9 @@ mod tests {
     }
 
     /// The Now Playing route renders the episode read side, the
-    /// diagnostics, and the minimal transport row (§36) — and nothing
-    /// unearned.
+    /// diagnostics, the transport row with its Open control, and the
+    /// preference row — every core player function visible (G1) — and
+    /// nothing unearned.
     #[test]
     fn the_now_playing_route_renders_the_episode_and_transport() {
         let mut model = plain_model();
@@ -684,11 +1186,14 @@ mod tests {
             "Format: 44100 Hz, 2 channels, mask 0x3",
             "Position:",
             "Track: 1/6",
-            "Volume: 100/100 (desired)",
+            "100/100 (desired)",
             "Order: Sequential",
             "Repeat: Off",
+            "Open",
+            "[ Back 5s ]",
+            "[ Forward 5s ]",
             "◀ Prev",
-            "Play/Pause",
+            "Pause",
             "■ Stop",
             "Next ▶",
             "Tab=focus",
@@ -718,14 +1223,14 @@ mod tests {
                 region.area
             );
         }
-        // Exactly four transport regions exist.
+        // Exactly five transport regions exist (Open joined the row).
         assert_eq!(
             model
                 .regions()
                 .iter()
                 .filter(|region| matches!(region.target, HitTarget::Transport(_)))
                 .count(),
-            4
+            5
         );
     }
 
@@ -842,11 +1347,9 @@ mod tests {
                 let text = rendered(&mut model, width, height);
                 match kind {
                     ModalKind::Open => {
-                        assert!(
-                            text.contains("Open: /media/b.flac"),
-                            "{width}x{height}:\n{text}"
-                        );
-                        assert!(text.contains("Enter = open"), "{text}");
+                        assert!(text.contains("/media/b.flac▏"), "{width}x{height}:\n{text}");
+                        assert!(text.contains("↑↓ select"), "{text}");
+                        assert!(text.contains("[Add to Playlist]"), "{text}");
                     }
                     ModalKind::GoTo => {
                         assert!(text.contains("Go to: [1:35]"), "{width}x{height}:\n{text}");
@@ -1100,14 +1603,19 @@ mod tests {
 
     /// The no-episode frame (F6; the U1 idle page) fabricates nothing —
     /// no Source/Format/Position/Terminal labels, and no operation
-    /// feedback for an Open that was never attempted.
+    /// feedback for an Open that was never attempted. The visible Open
+    /// control is the discoverable entry (G1), so the idle page names
+    /// it instead of a shortcut.
     #[test]
     fn a_no_episode_frame_says_so_and_fabricates_nothing() {
         let mut model = TuiModel::new("song.flac");
         model.set_episode(None);
         let text = rendered(&mut model, 100, 30);
         assert!(text.contains(NO_MUSIC_LINE), "{text}");
-        assert!(text.contains("Press O to open a file or folder"), "{text}");
+        assert!(
+            text.contains("Open a file or folder with the Open button below"),
+            "{text}"
+        );
         for fabricated in ["Source:", "Format:", "Position:", "Terminal:", "Paused:"] {
             assert!(
                 !text.contains(fabricated),
@@ -1143,20 +1651,20 @@ mod tests {
         }
     }
 
-    /// The volume line renders the App's desired stream factor (D14.9
-    /// read side: exactly the configured value, never an acoustic or
-    /// mechanism claim).
+    /// The preference row renders the App's desired stream factor
+    /// between its steppers (D14.9 read side: exactly the configured
+    /// value, never an acoustic or mechanism claim).
     #[test]
     fn the_volume_line_renders_the_desired_factor() {
         let mut model = TuiModel::new("song.flac");
         model.update(pending());
         assert!(
-            !rendered(&mut model, 100, 30).contains("Volume:"),
+            !rendered(&mut model, 100, 30).contains("(desired)"),
             "before the first refresh the model holds no level and renders none"
         );
         model.set_volume(Some(80));
         let text = rendered(&mut model, 100, 30);
-        assert!(text.contains("Volume: 80/100 (desired)"), "{text}");
+        assert!(text.contains("80/100 (desired)"), "{text}");
         assert_eq!(scan(&text), None, "{text}");
     }
 
@@ -1312,6 +1820,69 @@ mod tests {
         assert_eq!(responsive_class(30, 10), ResponsiveClass::Minimum);
     }
 
+    /// G1 re-review (B1): the exact-minimum Now Playing shell is
+    /// pinned by SEMANTIC evidence, not just nonpanic — every
+    /// interactive label renders whole at `MIN_WIDTH×MIN_HEIGHT` and
+    /// every published region sits inside the frame. The picker's
+    /// minimum has its own test above.
+    #[test]
+    fn the_minimum_shell_renders_every_interactive_label_whole() {
+        let mut model = plain_model();
+        let text = rendered(
+            &mut model,
+            super::super::model::MIN_WIDTH,
+            super::super::model::MIN_HEIGHT,
+        );
+        assert_eq!(model.class(), ResponsiveClass::Compact);
+        for label in [
+            // Navigation (compact spellings).
+            "Now",
+            "List",
+            "Viz",
+            // Transport.
+            "Open",
+            "Prev",
+            "Pause",
+            "Stop",
+            "Next",
+            // The visible relative seek (evidence exists here).
+            "[ Back 5s ]",
+            "[ Forward 5s ]",
+            // Preferences (compact spellings + glyphs).
+            "Ord:Seq",
+            "Rep:Off",
+            "100/100",
+            "-",
+            "+",
+        ] {
+            assert!(
+                text.contains(label),
+                "{label:?} is clipped at the supported minimum:\n{text}"
+            );
+        }
+        // No region leaks outside the frame: every published hit target
+        // is exactly what the minimum shell drew.
+        let (width, height) = (
+            super::super::model::MIN_WIDTH,
+            super::super::model::MIN_HEIGHT,
+        );
+        assert!(
+            !model.regions().is_empty(),
+            "the minimum shell publishes regions"
+        );
+        for region in model.regions() {
+            let area = region.area;
+            assert!(
+                area.x < width
+                    && area.y < height
+                    && area.x + area.width <= width
+                    && area.y + area.height <= height,
+                "region {area:?} for {:?} escapes the minimum frame",
+                region.target
+            );
+        }
+    }
+
     /// The compact class shortens the tab labels — the mechanics exist
     /// so controls do not overlap on a narrow terminal (§27).
     #[test]
@@ -1332,7 +1903,7 @@ mod tests {
         let mut model = plain_model();
         model.set_focus(Some(FocusId::Transport(TransportButton::PlayPause)));
         let large = rendered(&mut model, 100, 30);
-        assert!(large.contains("Play/Pause"), "{large}");
+        assert!(large.contains("Pause"), "{large}");
         assert_eq!(model.class(), ResponsiveClass::Wide);
 
         let small = rendered(&mut model, 30, 10);
@@ -1341,14 +1912,14 @@ mod tests {
 
         let large_again = rendered(&mut model, 100, 30);
         assert!(
-            large_again.contains("Play/Pause"),
+            large_again.contains("Pause"),
             "the shell is back after growing:\n{large_again}"
         );
         assert_eq!(
             model.focus(),
-            Some(FocusId::Transport(TransportButton::Previous)),
+            Some(FocusId::Seek(super::super::model::SeekButton::Back)),
             "focus revalidates to a visible enabled control (§12: the route's \
-             first local control)"
+             first local control — the seek row, whose evidence exists)"
         );
     }
 
@@ -1399,10 +1970,13 @@ mod tests {
     /// CJK filenames render structurally (C12): the Source line shows
     /// the characters, the Open modal accepts CJK characters and
     /// backspace pops ONE character, and the frame stays free of
-    /// unearned semantics.
+    /// unearned semantics. The fixtures are SIMPLIFIED Chinese (the
+    /// product's audience; QUICKSTART's examples are 夜曲/七里香/晴天)
+    /// — wide glyphs are what the structural assertions need, and the
+    /// spelling stays in the users' own script.
     #[test]
     fn cjk_filenames_render_and_edit_structurally() {
-        let mut model = TuiModel::new("千曲テスト曲.flac");
+        let mut model = TuiModel::new("千曲测试曲.flac");
         model.update(pending());
         let text = rendered(&mut model, 100, 30);
         // Wide CJK glyphs occupy two cells; the skipped cells surface as
@@ -1410,18 +1984,367 @@ mod tests {
         // terminal renders them as one glyph). Structural assertion is
         // on the space-normalized text.
         let compact = text.replace(' ', "");
-        assert!(compact.contains("Source:千曲テスト曲.flac"), "{text}");
+        assert!(compact.contains("Source:千曲测试曲.flac"), "{text}");
         assert_eq!(scan(&text), None, "{text}");
 
         model.open_modal(ModalKind::Open);
-        for c in "音楽/千曲.flac".chars() {
+        for c in "音乐/歌曲.flac".chars() {
             model.modal_push(c);
         }
         model.modal_backspace();
         let text = rendered(&mut model, 100, 30);
         let compact = text.replace(' ', "");
-        assert!(compact.contains("Open:音楽/千曲"), "{text}");
-        assert!(text.contains("Enter = open"), "{text}");
+        assert!(
+            compact.contains("音乐/歌曲.fla▏"),
+            "backspace popped exactly one character:\n{text}"
+        );
+        assert!(text.contains("↑↓ select"), "{text}");
+        assert_eq!(scan(&text), None, "{text}");
+    }
+    // ------------------------------------------------------------------
+    // G1: the seek bar affordance, the DSP summary line, the picker.
+    // ------------------------------------------------------------------
+
+    /// The seek bar publishes a click region ONLY while duration
+    /// evidence exists (G1 §9): an unknown timeline renders at most a
+    /// display bar and is never clickable into a fabricated target.
+    #[test]
+    fn the_seek_bar_publishes_a_region_only_with_duration_evidence() {
+        // With duration evidence: the bar row is a seek affordance.
+        let mut model = plain_model();
+        let _text = rendered(&mut model, 100, 30);
+        assert!(
+            model
+                .regions()
+                .iter()
+                .any(|region| region.target == HitTarget::SeekBar),
+            "a known duration makes the bar clickable"
+        );
+
+        // The same frame without duration evidence: no region at all.
+        let mut model = plain_model();
+        model.update(PlaybackSessionObservation {
+            source_duration: None,
+            ..pending()
+        });
+        let text = rendered(&mut model, 100, 30);
+        assert!(
+            !model
+                .regions()
+                .iter()
+                .any(|region| region.target == HitTarget::SeekBar),
+            "an unknown duration is never clickable:\n{text}"
+        );
+        assert_eq!(scan(&text), None, "{text}");
+    }
+
+    /// The desired-DSP summary renders at generous sizes and yields
+    /// first under constrained layouts (G5 §39: secondary detail hides
+    /// before any core control does). The line is always a DESIRED
+    /// statement, never an applied claim.
+    #[test]
+    fn the_dsp_line_renders_desired_and_hides_in_compact() {
+        let mut model = plain_model();
+        model.set_desired_dsp(super::super::model::dsp_summary(
+            &qianqian_playback::EqPreset::Rock.to_config(),
+        ));
+        let wide = rendered(&mut model, 100, 30);
+        assert!(wide.contains("DSP (desired): on — preset rock"), "{wide}");
+        assert_eq!(scan(&wide), None, "{wide}");
+
+        // The compact class hides the summary and keeps every control.
+        let compact = rendered(&mut model, 50, 16);
+        assert!(!compact.contains("DSP (desired)"), "{compact}");
+        for control in ["Open", "Ord:Seq", "Rep:Off", "100/100"] {
+            assert!(compact.contains(control), "{control:?} missing:\n{compact}");
+        }
+    }
+
+    /// G1 F14: the DESIRED DSP configuration has a product lifetime
+    /// independent of any active episode, so its summary renders on the
+    /// idle page too — not only inside an active-source panel. Still a
+    /// desired statement, never an applied claim.
+    #[test]
+    fn the_desired_dsp_summary_renders_while_idle() {
+        let mut model = TuiModel::new(String::new());
+        model.set_episode(None);
+        model.update(pending());
+        assert_eq!(model.source(), None, "the idle page has no episode");
+        model.set_desired_dsp(super::super::model::dsp_summary(
+            &qianqian_playback::EqPreset::Rock.to_config(),
+        ));
+        let text = rendered(&mut model, 100, 30);
+        assert!(
+            text.contains("No music loaded."),
+            "the honest idle page: {text}"
+        );
+        assert!(
+            text.contains("DSP (desired): on — preset rock"),
+            "the desired summary is visible while idle:\n{text}"
+        );
+        assert_eq!(scan(&text), None, "{text}");
+    }
+
+    /// G1 F02: a live control's visible affordance exists INSIDE its
+    /// rendered geometry. The volume steppers are one-cell-wide inner
+    /// areas; the glyph drawn there must be the plain ASCII `-` / `+`
+    /// — rendered, at every supported class — and the regions must
+    /// still answer at that exact cell.
+    #[test]
+    fn the_volume_steppers_render_visible_glyphs_in_their_own_geometry() {
+        for (width, height) in [(100u16, 30u16), (50, 16)] {
+            let mut model = plain_model();
+            let _text = rendered(&mut model, width, height);
+            for button in [PreferenceButton::VolumeDown, PreferenceButton::VolumeUp] {
+                let region = model
+                    .regions()
+                    .iter()
+                    .find(|region| region.target == HitTarget::Preference(button))
+                    .unwrap_or_else(|| panic!("no {button:?} region at {width}x{height}"));
+                // The bordered stepper is 3 cells: border, glyph, border.
+                assert!(
+                    region.area.width >= 3,
+                    "{button:?} cell too narrow at {width}x{height}: {region:?}"
+                );
+            }
+        }
+        // Glyph-presence check on the actual buffer rows: the cell
+        // inside each stepper's border holds exactly the glyph.
+        let mut model = plain_model();
+        let text = rendered(&mut model, 100, 30);
+        let rows: Vec<&str> = text.lines().collect();
+        for (button, glyph) in [
+            (PreferenceButton::VolumeDown, "-"),
+            (PreferenceButton::VolumeUp, "+"),
+        ] {
+            let region = model
+                .regions()
+                .iter()
+                .find(|region| region.target == HitTarget::Preference(button))
+                .expect("the stepper region");
+            let row = rows
+                .get(region.area.y as usize + 1)
+                .unwrap_or_else(|| panic!("row {} exists", region.area.y + 1));
+            let inner = row
+                .chars()
+                .nth(region.area.x as usize + 1)
+                .map(|character| character.to_string())
+                .unwrap_or_default();
+            assert_eq!(
+                inner,
+                glyph,
+                "{button:?}: the glyph inside its own geometry at x={} is {inner:?}",
+                region.area.x + 1
+            );
+        }
+    }
+
+    /// G1 F07: the seek buttons are rendered affordances with regions
+    /// while the evidence exists — and they vanish (no regions, no
+    /// painted labels) without it.
+    #[test]
+    fn the_seek_buttons_render_with_evidence_and_vanish_without_it() {
+        // Evidence (position + rate): two rendered, hit-tested buttons.
+        let mut model = plain_model();
+        let text = rendered(&mut model, 100, 30);
+        assert!(text.contains("[ Back 5s ]"), "{text}");
+        assert!(text.contains("[ Forward 5s ]"), "{text}");
+        for button in super::super::model::SEEK_BUTTONS {
+            assert!(
+                model
+                    .regions()
+                    .iter()
+                    .any(|region| region.target == HitTarget::Seek(button)),
+                "no region for {button:?}"
+            );
+        }
+
+        // No position evidence: nothing rendered, nothing published.
+        let mut model = plain_model();
+        model.update(PlaybackSessionObservation {
+            position: None,
+            ..pending()
+        });
+        let text = rendered(&mut model, 100, 30);
+        assert!(!text.contains("[ Back 5s ]"), "{text}");
+        assert!(
+            !model
+                .regions()
+                .iter()
+                .any(|region| matches!(region.target, HitTarget::Seek(_))),
+            "no seek regions without evidence"
+        );
+    }
+
+    /// G1 F13: at the SUPPORTED MINIMUM terminal (40x14, the compact
+    /// floor) the picker's four buttons all render their compact
+    /// spellings whole — no clipped label, no overlapping cells — and
+    /// the hit geometry is the final rendered geometry. One cell
+    /// larger, normal size, below the minimum, and restore are all
+    /// pinned.
+    #[test]
+    fn the_picker_buttons_fit_at_the_supported_minimum_and_degrade_truthfully() {
+        let build = || {
+            let mut model = plain_model();
+            model.open_modal(ModalKind::Open);
+            model.set_open_listing(
+                std::path::PathBuf::from("/media"),
+                Ok(vec![crate::input::DirectoryEntry {
+                    name: "b.flac".to_owned(),
+                    is_dir: false,
+                    path: std::path::PathBuf::from("/media/b.flac"),
+                }]),
+            );
+            model
+        };
+
+        // Exactly the supported minimum: every compact label whole.
+        let mut model = build();
+        let text = rendered(
+            &mut model,
+            super::super::model::MIN_WIDTH,
+            super::super::model::MIN_HEIGHT,
+        );
+        for label in [
+            "[Open]",
+            "[Add]",
+            "[Enter]",
+            "[Use this folder]",
+            "[Cancel]",
+        ] {
+            assert!(
+                text.contains(label),
+                "{label:?} is clipped at the supported minimum:\n{text}"
+            );
+        }
+        // The nav-row control is its own region; the four button-run
+        // regions are disjoint, in order, and each one contains its own
+        // label's cells.
+        let nav_region = model
+            .regions()
+            .iter()
+            .find(|region| {
+                region.target == HitTarget::ModalButton(super::super::model::ModalButton::UseFolder)
+            })
+            .expect("the [Use this folder] nav region exists");
+        assert!(
+            nav_region.area.width as usize >= USE_FOLDER_LABEL.len(),
+            "the nav row holds the whole label"
+        );
+        let mut button_rects: Vec<(u16, super::super::model::ModalButton)> = model
+            .regions()
+            .iter()
+            .filter_map(|region| match region.target {
+                HitTarget::ModalButton(button)
+                    if button != super::super::model::ModalButton::UseFolder =>
+                {
+                    Some((region.area.x, button))
+                }
+                _ => None,
+            })
+            .collect();
+        button_rects.sort_by_key(|(x, _)| *x);
+        assert_eq!(button_rects.len(), 4, "one region per visible button");
+        for pair in button_rects.windows(2) {
+            let (_, left) = (&pair[0].0, &pair[0].1);
+            let (right_x, _) = pair[1];
+            let left_region = model
+                .regions()
+                .iter()
+                .find(|region| region.target == HitTarget::ModalButton(*left))
+                .expect("left region");
+            assert!(
+                left_region.area.x + left_region.area.width <= right_x,
+                "button cells overlap at the minimum"
+            );
+        }
+
+        // One larger: still whole.
+        let mut model = build();
+        let text = rendered(
+            &mut model,
+            super::super::model::MIN_WIDTH + 1,
+            super::super::model::MIN_HEIGHT,
+        );
+        assert!(text.contains("[Enter]"), "{text}");
+
+        // Normal size: the full spellings.
+        let mut model = build();
+        let text = rendered(&mut model, 100, 30);
+        for label in ["[Open]", "[Add to Playlist]", "[Enter folder]", "[Cancel]"] {
+            assert!(text.contains(label), "{label:?} missing:\n{text}");
+        }
+
+        // Below the minimum: no interactive layout at all, then restore.
+        let mut model = build();
+        let _text = rendered(
+            &mut model,
+            super::super::model::MIN_WIDTH - 1,
+            super::super::model::MIN_HEIGHT,
+        );
+        assert!(model.regions().is_empty(), "below minimum: no regions");
+        let text = rendered(
+            &mut model,
+            super::super::model::MIN_WIDTH,
+            super::super::model::MIN_HEIGHT,
+        );
+        assert!(
+            text.contains("[Cancel]"),
+            "restored at the minimum:\n{text}"
+        );
+        assert!(!model.regions().is_empty(), "restored: regions republished");
+    }
+
+    /// The Open picker publishes regions for its field row, its
+    /// VISIBLE listing rows and its visible buttons, from the same
+    /// layout that painted them (§14) — and the row regions sit at the
+    /// rows the popup actually drew.
+    #[test]
+    fn the_open_picker_publishes_regions_for_its_rows_and_buttons() {
+        let mut model = plain_model();
+        model.open_modal(ModalKind::Open);
+        model.set_open_listing(
+            std::path::PathBuf::from("/media"),
+            Ok((0..30)
+                .map(|n| crate::input::DirectoryEntry {
+                    name: format!("track-{n:02}.flac"),
+                    is_dir: false,
+                    path: std::path::PathBuf::from(format!("/media/track-{n:02}.flac")),
+                })
+                .collect()),
+        );
+        let text = rendered(&mut model, 100, 30);
+        assert!(text.contains(" Open "), "{text}");
+        assert!(text.contains("[Add to Playlist]"), "{text}");
+        assert!(text.contains("[Enter folder]"), "{text}");
+
+        let rows: Vec<(u16, usize)> = model
+            .regions()
+            .iter()
+            .filter_map(|region| match region.target {
+                HitTarget::PickerRow(index) => Some((region.area.y, index)),
+                _ => None,
+            })
+            .collect();
+        assert!(!rows.is_empty(), "the visible rows have regions");
+        // The visible indices are contiguous from the top row.
+        for (position, (_, index)) in rows.iter().enumerate() {
+            assert_eq!(*index, position, "row regions follow the listing order");
+        }
+        for button in [
+            super::super::model::ModalButton::Open,
+            super::super::model::ModalButton::Add,
+            super::super::model::ModalButton::EnterFolder,
+            super::super::model::ModalButton::Cancel,
+        ] {
+            assert!(
+                model
+                    .regions()
+                    .iter()
+                    .any(|region| region.target == HitTarget::ModalButton(button)),
+                "no region for {button:?}"
+            );
+        }
         assert_eq!(scan(&text), None, "{text}");
     }
 }

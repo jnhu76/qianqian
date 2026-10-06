@@ -4,7 +4,10 @@ Qianqian (千千) is a local Windows music player. It plays music from
 files and folders on your computer. It does not need a media library, a
 database, or an account — point it at a folder and listen.
 
-Qianqian runs in a terminal window. You control it with the keyboard.
+Qianqian runs in a terminal window. Every control is visible on screen —
+core playback never requires memorizing a key. The keys below are
+shortcuts for the same controls; the one worth knowing is that `Enter`
+plays the selected playlist row.
 
 ## Start
 
@@ -20,8 +23,25 @@ or open PowerShell / Command Prompt / Windows Terminal and run:
 qianqian.exe
 ```
 
-The player opens with no music loaded. Press `O`, type or paste the path
-of a file or folder (for example `D:\Music`), and press `Enter`.
+The player opens with no music loaded. Press the visible `Open` button
+(or the `O` key): a picker opens showing the current folder. Browse the
+listing with the mouse or the arrow keys — the `[Enter folder]` button
+(or `Enter` on a selected folder) descends into it, the `..` row moves
+up, and `Enter` on a file row just marks that file as the selection.
+Typing or pasting a path (for example `D:\Music`) into the path line
+and pressing `Enter` navigates into a directory or selects that file
+in the listing, and `[Use this folder]` makes the currently displayed
+folder itself the target — handy for opening the folder you are
+already looking at.
+
+The picker commits exactly one subject: the selected row, the displayed
+folder after `[Use this folder]`, or — once you type into the path
+line, which clears the selection — the typed path. The visible `[Open]`
+button plays that subject now (a file goes straight to Now Playing; a
+folder seeds the track list with its playable tracks), and
+`[Add to Playlist]` appends it to the track list without playing it. If
+a path cannot be read, the picker stays open with the diagnostic so you
+can correct it and retry.
 
 ## Play a folder
 
@@ -48,33 +68,46 @@ see a `scanning <path> ...` line while a large folder is checked.
 ## The screen
 
 ```
-┌ Playlist ───────────────────────────────── sel 2/3 ┐
-│ ▶       1  夜曲.flac                              │
-│   >     2  七里香.flac                            │
-│         3  晴天.flac                              │
-├ Qianqian Reference Player ────────────────────────┤
+Now Playing              Playlist                 Audio                    Visualizer
+┌ Qianqian Reference Player ────────────────────────┐
 │ Source: D:\Music\夜曲.flac                        │
 │ Format: 44100 Hz, 2 channels, mask 0x3            │
+│ DSP (desired): off (bypass)                       │
 │ Position: 01:42 / 03:58                           │
-│ 01:42 ━━━━━━━━━━━╸──────────── 03:58              │
 │ Terminal: pending   Stop requested: false ...     │
-│ Track: 1/3   Volume: 100/100 (desired)            │
-│ Order: Sequential   Repeat: Off                   │
-├ Diagnostics ──────────────────────────────────────┤
-│ (none)                                            │
-├ Controls ─────────────────────────────────────────┤
-│ ↑/↓  Select    Enter  Play    Space  Pause ...    │
+│ Track: 1/3                                        │
 └───────────────────────────────────────────────────┘
+01:42 ━━━━━━━━━━━╸──────────── 03:58
+[ Back 5s ]                    [ Forward 5s ]
+┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐
+│  Open  ││ ◀ Prev ││ Pause  ││ ■ Stop ││ Next ▶ │
+└────────┘└────────┘└────────┘└────────┘└────────┘
+┌───┐ 100/100 (desired) ┌───┐┌───────────────────┐┌──────────────┐
+│ - │                   │ + ││ Order: Sequential ││ Repeat: Off  │
+└───┘                   └───┘└───────────────────┘└──────────────┘
 ```
+
+The `Playlist` tab shows the track list. Every button above is clickable
+with the mouse and reachable with `Tab` + `Enter` (or `Space`); the
+`[ Back 5s ]` / `[ Forward 5s ]` buttons seek in small steps (they are
+visible while a track reports its position), the progress bar accepts
+click-to-position while the track reports its duration, and the `-` /
+`+` buttons change Qianqian's own volume. The middle transport button is
+contextual — `Pause` while a track is active, `Resume` while a pause was
+requested, `Play` with nothing active.
 
 Two markers matter in the list:
 
-- `▶` marks the track that is currently playing.
+- `▶` marks the player's current committed entry — the track the
+  player is positioned on. It is a position marker, not an audibility
+  claim: during a pause the marker stays, and after a terminal outcome
+  it still names the entry that produced it.
 - `>` marks the row you have selected with Up / Down (with the list
   focused: `Tab` until the list is, or a mouse click on a row).
 
 One row can carry both. The small `sel 2/3` counter in the list's title
-is your selection; the `Track: 1/3` line below is the playing track.
+is your selection; the `Track: 1/3` line below is the player's current
+entry.
 
 **Up / Down only move the selection. They do NOT change what plays.
 Enter plays the selected row.** This is the one distinction worth
@@ -86,13 +119,13 @@ Enter.
 | Key                 | Action                                            |
 | ------------------- | ------------------------------------------------- |
 | `Tab / Shift+Tab`   | Move keyboard focus to the next / previous control |
-| `Enter`             | Activate the focused control; on the playlist, play the selected row |
-| `Mouse`             | Click a tab, transport button or playlist row     |
+| `Enter`             | Activate the focused control; on the playlist, play the selected row; in the picker, navigate or select (the visible buttons commit) |
+| `Mouse`             | Click any visible control: tabs, buttons, the progress bar, playlist rows, picker rows |
 | `↑ / ↓`             | Select previous / next playlist row (list focused) |
 | `N / P`             | Next / previous track                             |
 | `R`                 | Order: Sequential / Shuffle                       |
 | `L`                 | Repeat: Off / All / One                           |
-| `Space`             | Pause / resume                                    |
+| `Space`             | Activate the focused control (like Enter); with nothing focused, pause / resume / play |
 | `← / →`             | Seek 5 seconds back / forward                     |
 | `Shift+← / Shift+→` | Seek 30 seconds back / forward                    |
 | `G`                 | Go to an exact position you type                  |
@@ -109,9 +142,10 @@ For `G`, type a position like `1:35` (minutes:seconds) or `95`
 
 ### Typing a path: Q is a normal character
 
-While you are typing into the `Open:` line, every character — including
-`q` and `Q` — is part of the path. That is what makes paths like
-`Q:\Music` typeable. To quit from inside the input line, use `Ctrl+C`.
+While you are typing into the picker's path line, every character —
+including `q` and `Q` — is part of the path. That is what makes paths
+like `Q:\Music` typeable. To quit from inside the input line, use
+`Ctrl+C`.
 
 ## Order: Sequential and Shuffle
 
@@ -172,17 +206,20 @@ claim is made beyond the list above.
 
 ## Volume
 
-`+` and `-` change Qianqian's own volume in steps of 5 (0–100). The
-scale is perceptual: each step is about 3 dB, so a press feels alike
-near the top and near the bottom (100 is full, 0 is silence). The
-`Volume: 75/100 (desired)` line is the player's setting — Windows'
-own mixer and output device still apply on top of it.
+The visible `-` / `+` buttons (or the `+` and `-` keys) change
+Qianqian's own volume in steps of 5 (0–100). The scale is perceptual:
+each step is about 3 dB, so a press feels alike near the top and near
+the bottom (100 is full, 0 is silence). The number between the buttons,
+like `75/100`, is the player's own desired setting — Windows' own
+mixer and output device still apply on top of it.
 
 ## Troubleshooting
 
 ### Player opens but no music is loaded
 
-Press `O` and paste a file or folder path, then Enter.
+Press the `Open` button (or the `O` key) and paste a file or folder
+path, or browse to it in the picker, then press the visible `Open`
+button.
 
 ### A folder says "no playable audio files found"
 

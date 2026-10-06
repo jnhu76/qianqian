@@ -545,6 +545,73 @@ pub fn is_audio_candidate(path: &Path) -> bool {
     })
 }
 
+/// One entry of an Open-picker directory listing: a display name,
+/// whether following it stays inside the directory tree, and the entry's
+/// NATIVE filesystem identity. The name is a lossy rendering for the
+/// row alone; the path is what a selection commits. A display string
+/// must never become filesystem identity (Issue #188 G1 F10): on Unix
+/// a non-UTF-8 filename survives here byte for byte, and on Windows the
+/// committed path is the one the filesystem reported, not the text the
+/// row happened to show.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirectoryEntry {
+    pub name: String,
+    pub is_dir: bool,
+    pub path: PathBuf,
+}
+
+/// One level of directory listing for the Open picker's navigation pane
+/// (Issue #188 G1): directories first, then audio-candidate files,
+/// each group sorted by the NATIVE file name with the SAME OsStr byte
+/// order as [`walk_directory`] — so the order a folder-Open seeds into
+/// the playlist is the order the picker browsed it in, including for
+/// names that are not valid UTF-8. The same classification discipline
+/// applies: regular entries only, symlinks/junctions classified out
+/// (never followed), and the extension list is a PRESENTATION prefilter
+/// for the listing alone — a path typed or committed through the picker
+/// still goes through the full expansion, where an explicit file
+/// bypasses the filter and the decode probe remains the playability
+/// witness. This helper browses; it never admits anything.
+pub fn list_directory(dir: &Path) -> Result<Vec<DirectoryEntry>, String> {
+    let read_dir = std::fs::read_dir(dir)
+        .map_err(|error| format!("cannot read {}: {error}", dir.display()))?;
+    let mut directories = Vec::new();
+    let mut files = Vec::new();
+    for entry in read_dir {
+        let Ok(entry) = entry else {
+            continue;
+        };
+        // Mirror walk_directory: DirEntry::file_type never follows
+        // symlinks, so a symlinked directory/junction is classified out
+        // rather than traversed, and every non-regular entry is skipped.
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let path = entry.path();
+        if kind.is_dir() {
+            directories.push(DirectoryEntry {
+                name,
+                is_dir: true,
+                path,
+            });
+        } else if kind.is_file() && is_audio_candidate(&path) {
+            files.push(DirectoryEntry {
+                name,
+                is_dir: false,
+                path,
+            });
+        }
+    }
+    // The SAME sort key as walk_directory: the native file name, not
+    // the lossy display string. Within one directory the path order IS
+    // the file-name order (a shared parent, then the name component).
+    directories.sort_by(|a, b| a.path.as_os_str().cmp(b.path.as_os_str()));
+    files.sort_by(|a, b| a.path.as_os_str().cmp(b.path.as_os_str()));
+    directories.extend(files);
+    Ok(directories)
+}
+
 /// Deterministic pre-order walk: each directory's entries are sorted by
 /// name and visited in that order, descending into subdirectories as
 /// they are met, so the candidate order is path-sorted and stable
@@ -1699,5 +1766,103 @@ mod tests {
             );
             assert_eq!(expansion.rejected, 1);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // The Open picker's one-level listing (Issue #188 G1).
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn the_picker_listing_orders_directories_first_then_audio_files() {
+        let tree = TempTree::new("picker-order");
+        tree.file("zebra.flac");
+        tree.file("album.flac");
+        tree.dir("Zoo");
+        tree.dir("acid");
+
+        let listing = list_directory(tree.path()).expect("listing");
+
+        let names: Vec<&str> = listing.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(
+            names,
+            vec!["Zoo", "acid", "album.flac", "zebra.flac"],
+            "directories byte-order sorted, then audio files, the SAME \
+             order a folder-Open seeds into the playlist"
+        );
+        for entry in &listing {
+            assert_eq!(
+                entry.path,
+                tree.path().join(&entry.name),
+                "the native identity is the filesystem's own path"
+            );
+        }
+        assert_eq!(
+            listing.iter().map(|entry| entry.is_dir).collect::<Vec<_>>(),
+            vec![true, true, false, false],
+            "directories are marked"
+        );
+    }
+
+    /// The listing's identity discipline (G1 F10): the committed path is
+    /// the filesystem's own, not a reconstruction from the lossy display
+    /// string. On Unix a non-UTF-8 filename must survive byte for byte.
+    #[test]
+    #[cfg(unix)]
+    fn the_picker_listing_keeps_native_identity_for_non_utf8_names() {
+        use std::os::unix::ffi::OsStrExt;
+
+        let tree = TempTree::new("picker-native");
+        let raw = b"night-\xff\xfe-song.flac";
+        fs::write(tree.path().join(std::ffi::OsStr::from_bytes(raw)), b"x").expect("raw file");
+
+        let listing = list_directory(tree.path()).expect("listing");
+
+        assert_eq!(listing.len(), 1, "the raw name is listed once");
+        assert_eq!(
+            listing[0]
+                .path
+                .file_name()
+                .map(|name| name.as_encoded_bytes()),
+            Some(raw.as_slice()),
+            "the native name survives; the display rendering may not"
+        );
+        assert_ne!(
+            listing[0].name.as_bytes(),
+            raw,
+            "the lossy display string is not the identity"
+        );
+    }
+
+    #[test]
+    fn the_picker_listing_hides_non_audio_and_names_nothing_it_cannot_classify() {
+        let tree = TempTree::new("picker-filter");
+        tree.file("song.flac");
+        tree.file("cover.jpg");
+        tree.file("notes.txt");
+        tree.file("no_extension");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(tree.path().join("elsewhere"), tree.path().join("link-dir"))
+            .expect("symlink");
+
+        let listing = list_directory(tree.path()).expect("listing");
+
+        let names: Vec<&str> = listing.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(
+            names,
+            vec!["song.flac"],
+            "the listing is a presentation prefilter, not an admission witness"
+        );
+    }
+
+    #[test]
+    fn an_unreadable_directory_reports_one_honest_diagnostic() {
+        let missing = TempTree::new("picker-missing").path().join("never-made");
+
+        let error = list_directory(&missing).expect_err("unreadable");
+
+        assert!(
+            error.contains("cannot read"),
+            "the diagnostic names the failure: {error}"
+        );
     }
 }

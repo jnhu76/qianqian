@@ -47,7 +47,10 @@ use std::path::Path;
 use std::time::Duration;
 
 use crate::playlist::{PlaybackOrder, RepeatMode};
-use qianqian_playback::{EpisodeTerminalOutcome, PauseEngagement, PlaybackSessionObservation};
+use qianqian_playback::{
+    AudioProcessingConfig, EpisodeTerminalOutcome, EqPreset, PauseEngagement,
+    PlaybackSessionObservation,
+};
 
 /// One playlist row as the shell presents it: the display label and the
 /// two INDEPENDENT markers. A projection of the App's navigation state.
@@ -115,6 +118,9 @@ impl TuiRoute {
 /// One transport control on the Now Playing route.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransportButton {
+    /// The Open entry control (G1): the picker modal, converged with the
+    /// O key on the same [`TuiAction::OpenModal`].
+    Open,
     Previous,
     PlayPause,
     Stop,
@@ -122,7 +128,8 @@ pub enum TransportButton {
 }
 
 /// The transport controls in left-to-right render (and Tab) order.
-pub const TRANSPORT: [TransportButton; 4] = [
+pub const TRANSPORT: [TransportButton; 5] = [
+    TransportButton::Open,
     TransportButton::Previous,
     TransportButton::PlayPause,
     TransportButton::Stop,
@@ -130,16 +137,84 @@ pub const TRANSPORT: [TransportButton; 4] = [
 ];
 
 impl TransportButton {
-    /// The button's label.
+    /// The button's label. The central control's label is CONTEXTUAL
+    /// (T0 transport freeze: Pause / Resume / Play) — the view renders
+    /// it from [`TuiModel::play_pause_offer`], not from this table.
     pub fn label(self) -> &'static str {
         match self {
+            TransportButton::Open => "Open",
             TransportButton::Previous => "◀ Prev",
-            TransportButton::PlayPause => "Play/Pause",
+            TransportButton::PlayPause => "Pause",
             TransportButton::Stop => "■ Stop",
             TransportButton::Next => "Next ▶",
         }
     }
+
+    /// The button's label in the compact shell class. Same control,
+    /// shorter spelling — never a different control set. The GLYPHS are
+    /// the decoration and drop first (T0 retention priority); the words
+    /// stay, because T0's minimum is text controls — a symbol-only
+    /// button is an affordance the terminal may not render at all. (The
+    /// central control stays context-labeled in every class; the short
+    /// words fit the compact cell's six inner columns.)
+    pub fn compact_label(self) -> &'static str {
+        match self {
+            TransportButton::Open => "Open",
+            TransportButton::Previous => "Prev",
+            TransportButton::PlayPause => "Pause",
+            TransportButton::Stop => "Stop",
+            TransportButton::Next => "Next",
+        }
+    }
 }
+
+/// One visible seek control on the Now Playing route's seek row (G1
+/// F07): the discoverable relative-seek affordance the T0 input-parity
+/// table freezes — visible, Tab-reachable, mouse-clickable, converging
+/// on the SAME [`TuiAction::SeekRelative`] the arrow accelerators
+/// produce. The controls exist only while the episode publishes the
+/// evidence a relative seek is computed from (position + sample rate);
+/// without evidence they render nothing and arm nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SeekButton {
+    Back,
+    Forward,
+}
+
+/// The seek controls in left-to-right render (and Tab) order.
+pub const SEEK_BUTTONS: [SeekButton; 2] = [SeekButton::Back, SeekButton::Forward];
+
+impl SeekButton {
+    /// The button's label (the T0 wireframe's wording).
+    pub fn label(self) -> &'static str {
+        match self {
+            SeekButton::Back => "Back 5s",
+            SeekButton::Forward => "Forward 5s",
+        }
+    }
+}
+
+/// One visible preference control on the Now Playing route's preference
+/// row (G1): the App-owned policies every core player function must
+/// expose without a memorized shortcut. Each converges on the same
+/// [`TuiAction`] its accelerator key produces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreferenceButton {
+    VolumeDown,
+    VolumeUp,
+    Order,
+    Repeat,
+}
+
+/// The preference controls in left-to-right render (and Tab) order;
+/// the desired-volume label between the two steppers is display, not a
+/// control, so it is not in this cycle.
+pub const PREFERENCES: [PreferenceButton; 4] = [
+    PreferenceButton::VolumeDown,
+    PreferenceButton::VolumeUp,
+    PreferenceButton::Order,
+    PreferenceButton::Repeat,
+];
 
 /// The ONE active interactive focus target (§10). Focus is presentation
 /// state only: it selects which control Enter activates and which group
@@ -149,10 +224,20 @@ impl TransportButton {
 pub enum FocusId {
     /// One of the four route tabs.
     RouteTab(TuiRoute),
+    /// One of the Now Playing seek buttons (G1 F07), while the
+    /// episode's evidence makes a relative seek computable.
+    Seek(SeekButton),
     /// One of the Now Playing transport buttons.
     Transport(TransportButton),
+    /// One of the Now Playing preference controls.
+    Preference(PreferenceButton),
     /// The playlist list (the selection cursor is the focus inside it).
     Playlist,
+    /// The Open picker's directory listing (the picker cursor is the
+    /// focus inside it).
+    PickerList,
+    /// One of the Open picker's visible buttons.
+    PickerButton(ModalButton),
     /// The text field of the active modal.
     ModalField,
 }
@@ -175,11 +260,60 @@ pub enum ModalKind {
     Help,
 }
 
+/// One entry of the Open picker's listing: the display name, the kind
+/// the runtime's `list_directory` classified it as, and the entry's
+/// NATIVE filesystem identity — the path a selection commits (G1 F10).
+/// A presentation draft inside the modal — no admission happened by
+/// listing anything.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PickerEntry {
+    pub name: String,
+    pub is_dir: bool,
+    /// The synthesized `..` row: descending goes to the parent
+    /// directory (G1 §8 parent navigation).
+    pub is_parent: bool,
+    /// The entry's native path: the listed directory joined with the
+    /// filesystem's own file name — never a reconstruction from the
+    /// lossy display string (for the `..` row: the parent directory).
+    pub path: std::path::PathBuf,
+}
+
+/// The Open modal as a terminal-native picker (G1 §8): an editable
+/// path line over a one-level listing of the directory it names, with
+/// the commit buttons and their accelerators. The listing is a
+/// presentation draft the runtime refreshes (the model performs no
+/// I/O); admission still happens only at commit, through the same
+/// shared input expansion as before.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenPicker {
+    /// The path line the user can type into (the pre-picker editing
+    /// semantics, unchanged).
+    pub input: String,
+    /// The directory the listing shows, when one has been listed.
+    pub dir: Option<std::path::PathBuf>,
+    /// The listed entries, runtime-supplied (directories first, then
+    /// audio-candidate files).
+    pub entries: Vec<PickerEntry>,
+    /// The listing cursor (the selection), when the listing has rows.
+    pub cursor: Option<usize>,
+    /// The listing's honest failure diagnostic (an unreadable
+    /// directory), shown inside the modal instead of a fabricated
+    /// empty list.
+    pub error: Option<String>,
+    /// Whether the [Use this folder] button has made the DISPLAYED
+    /// directory the submission subject (T0 picker freeze: "Use this
+    /// folder selects the displayed directory as the target"). It dies
+    /// with the intent it represented: any navigation, listing
+    /// refresh, field edit or row selection replaces it with a fresh
+    /// subject.
+    pub folder_target: bool,
+}
+
 /// The ONE active modal (§23/§24), replacing the old collection of
 /// modal booleans. At most one exists; there is no modal stack.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Modal {
-    Open { input: String },
+    Open(OpenPicker),
     GoTo { input: String },
     Help,
 }
@@ -188,7 +322,7 @@ impl Modal {
     /// Which kind this modal is.
     pub fn kind(&self) -> ModalKind {
         match self {
-            Modal::Open { .. } => ModalKind::Open,
+            Modal::Open(_) => ModalKind::Open,
             Modal::GoTo { .. } => ModalKind::GoTo,
             Modal::Help => ModalKind::Help,
         }
@@ -198,7 +332,8 @@ impl Modal {
     #[cfg(test)]
     pub fn input(&self) -> Option<&str> {
         match self {
-            Modal::Open { input } | Modal::GoTo { input } => Some(input),
+            Modal::Open(picker) => Some(picker.input.as_str()),
+            Modal::GoTo { input } => Some(input),
             Modal::Help => None,
         }
     }
@@ -211,10 +346,48 @@ impl Modal {
 pub enum ModalInput {
     Char(char),
     Backspace,
-    /// Enter: confirm the modal (open the path / seek / close Help).
+    /// Enter on the path field: navigate the typed directory or select
+    /// the named file — never a commit (T0 picker freeze: the field
+    /// line never starts playback; Open/Add need their buttons).
     Confirm,
+    /// Enter on the picker listing: a directory (or the `..` row)
+    /// navigates, a file is SELECTED — the frozen T0 rule that keeps
+    /// submission off the rows and on the explicit buttons.
+    ListActivate,
+    /// The picker listing's cursor moves (arrows, wheel, a row click).
+    ListMove(PlaylistCursor),
+    /// The picker steps up to the parent directory (Backspace on the
+    /// list, the `..` row's own activation).
+    ListParent,
+    /// The [Open] button (or its accelerator): commit the picked
+    /// subject through the Open composition.
+    CommitOpen,
+    /// The [Add to Playlist] button (or its accelerator): append the
+    /// picked subject through the same shared input expansion.
+    CommitAdd,
+    /// The [Use this folder] button: the DISPLAYED directory becomes
+    /// the submission subject (T0 picker freeze), so a folder can be
+    /// opened or added without entering it.
+    UseFolder,
     /// Esc (or `?` for Help): close the modal. The closing event is
     /// consumed by the modal — it never also acts on the background.
+    Cancel,
+}
+
+/// One of the Open picker's visible buttons.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModalButton {
+    Open,
+    Add,
+    /// Make the displayed directory the submission target — one of the
+    /// T0 picker's frozen visible navigation controls, so a folder can
+    /// be committed without entering it.
+    UseFolder,
+    /// Descend into the selected directory row — the mouse's
+    /// [`ModalInput::ListActivate`] (G1 F04: every visible core picker
+    /// operation must be mouse-reachable; "Enter folder" is one of the
+    /// T0 picker's frozen visible navigation controls).
+    EnterFolder,
     Cancel,
 }
 
@@ -223,10 +396,8 @@ pub enum ModalInput {
 /// grammar, shared with the scriptable transport.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ModalConfirm {
-    /// Nothing to do (a Help confirm, or an empty line: a cancel).
+    /// Nothing to do (a Help confirm).
     Nothing,
-    /// The confirmed Open candidate; the modal is already closed.
-    Open(String),
     /// The confirmed seek target; the modal is already closed.
     Seek(Duration),
     /// The token is not a readable time. The GoTo modal STAYS OPEN for
@@ -235,17 +406,60 @@ pub enum ModalConfirm {
     Unreadable(&'static str),
 }
 
+/// The Open picker's ONE deterministic submission subject (G1 §8, the
+/// frozen "one target" model). The subject is the listing selection
+/// while one exists; when none does, it is the typed path line — the
+/// line the field visibly shows, normalized by the RUNTIME against the
+/// displayed directory (T0: relative text resolves against the
+/// displayed directory, and native identities stay native). Editing the
+/// field clears the selection, so a stale row can never hide behind a
+/// freshly edited target — the user commits exactly what they see
+/// selected, or exactly what they typed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PickerSubject {
+    /// The selected listing entry, with its NATIVE path and the kind
+    /// the listing classified it as.
+    Listing {
+        path: std::path::PathBuf,
+        is_dir: bool,
+    },
+    /// The typed path line, as typed. The runtime expands a leading
+    /// `~` and resolves a relative line against the picker's displayed
+    /// directory at commit time.
+    Typed(String),
+    /// Nothing to commit: no selection and an empty line.
+    None,
+}
+
 /// The semantic target of one hit region: a rendered, currently valid
 /// control (§13). No widget tree, no DOM, no retained component graph —
 /// only what THIS frame actually drew.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HitTarget {
     RouteTab(TuiRoute),
+    /// One visible seek button (G1 F07) — present only while the
+    /// episode's position/rate evidence makes the step computable.
+    Seek(SeekButton),
     Transport(TransportButton),
-    /// A visible playlist row, by absolute traversal index.
+    /// One of the preference-row controls.
+    Preference(PreferenceButton),
+    /// A playlist row, by absolute traversal index.
     PlaylistRow(usize),
     /// The playlist list's content area (the wheel-scroll target).
     PlaylistPane,
+    /// The position bar WITH duration evidence: a click-to-position
+    /// seek affordance (G1 §9). Without duration evidence the bar is a
+    /// display and publishes no region at all.
+    SeekBar,
+    /// One visible row of the Open picker's listing, by list index
+    /// (index 0 is the synthesized `..` parent row when shown). The
+    /// parent row is navigation chrome, not a selectable target: its
+    /// activation is the parent step ([`ModalInput::ListParent`]).
+    PickerRow(usize),
+    /// The Open picker's path-field row (a click focuses the field).
+    ModalField,
+    /// One of the Open picker's visible buttons.
+    ModalButton(ModalButton),
 }
 
 /// One frame's hit region: a rectangle plus the semantic target drawn
@@ -255,6 +469,30 @@ pub enum HitTarget {
 pub struct HitRegion {
     pub area: Rect,
     pub target: HitTarget,
+}
+
+/// An armed pointer interaction: the control under the pointer AND the
+/// cell the press landed on (§17, G1 F06/F15). The frozen validity rule
+/// is ONE rule, not a pile of per-event patches:
+///
+/// > An armed interaction activates only when Left Up lands on the SAME
+/// > cell it was armed on AND the hit test still answers that cell with
+/// > the SAME semantic target. Everything else is inert.
+///
+/// Semantic invalidation is carried by the model's own mutators: a
+/// route/modal change, a refreshed listing, an EPISODE REPLACEMENT, a
+/// playlist REVISION change or a resize each call
+/// [`TuiModel::invalidate_frame`], which drops the arm together with
+/// the frame's regions — so an armed press can never activate into a
+/// context it was not armed in, even when the new context draws the
+/// same control at the same coordinates. An ordinary redraw that
+/// changes none of those (the per-tick refresh) keeps the arm: holding
+/// a button across a position update is not a context change.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ArmedClick {
+    pub target: HitTarget,
+    pub column: u16,
+    pub row: u16,
 }
 
 /// The responsive shell class (§27). Exact thresholds are presentation
@@ -329,6 +567,13 @@ pub enum TuiAction {
     /// The SAME frozen seek command as before; a target with no
     /// computable position is never sent.
     SeekRelative(i64),
+    /// A click-to-position seek on the visible progress bar (G1 §9):
+    /// the wanted position as per-mille of the episode's duration.
+    /// The runtime derives the actual target from a FRESH coherent
+    /// observation — the fraction chooses WHERE, the episode's own
+    /// evidence chooses WHAT — and a duration without evidence gets no
+    /// command at all.
+    SeekPerMille(u16),
 
     // Playlist route.
     /// Move the selection (↑/↓, a mouse row hit, or a wheel step over
@@ -358,6 +603,23 @@ pub const SEEK_STEP_SECS: i64 = 5;
 /// seconds of the same media time.
 pub const LARGE_SEEK_STEP_SECS: i64 = 30;
 
+/// How many status lines the bottom bar renders at most (a multi-line
+/// status BLOCK clips honestly past this, like every other region).
+/// The MODEL owns the cap because the status block's shape feeds the
+/// shell layout — a shape change moves every target below it and must
+/// invalidate the arm (§22); the view renders from the same constant.
+pub const MAX_STATUS_ROWS: usize = 3;
+
+/// How many rows the status BLOCK occupies under the bounded cap: the
+/// shape `set_status` compares (and the view's bottom-bar budget is
+/// built from).
+pub(crate) fn status_shape(status: Option<&str>) -> usize {
+    status
+        .map(|status| status.lines().count())
+        .unwrap_or(0)
+        .min(MAX_STATUS_ROWS)
+}
+
 /// The read-only progress bar's width in cells (Issue #166 §33).
 pub const BAR_WIDTH: usize = 24;
 
@@ -384,6 +646,74 @@ pub fn seek_target(
     } else {
         current.saturating_sub(step)
     })
+}
+
+/// The click-to-position seek target (G1 §9): `per_mille` of the
+/// episode's PUBLISHED duration evidence, clamped into it. Like
+/// [`seek_target`], it is `None` — no command at all — whenever the
+/// duration evidence does not exist: an unknown timeline is never
+/// seekable by fraction, and nothing is fabricated in its place.
+pub fn seek_fraction_target(
+    observation: &PlaybackSessionObservation,
+    per_mille: u16,
+) -> Option<Duration> {
+    let duration = observation.source_duration?;
+    if duration.is_zero() {
+        return None;
+    }
+    let per_mille = u128::from(per_mille.min(1000));
+    let micros = duration.as_micros() * per_mille / 1000;
+    Some(Duration::from_micros(u64::try_from(micros).ok()?))
+}
+
+/// The one-line summary of the App's DESIRED DSP configuration (G1:
+/// the Now Playing route names it; the Audio route will edit it). A
+/// desired-state statement only — the word is part of the line — and
+/// the parts come from the T1A product data: bypass vs enabled, the
+/// EQ stage as a matched factory preset or `custom EQ`, and the
+/// preamp in dB. Nothing here is an applied-DSP claim.
+pub fn dsp_summary(config: &AudioProcessingConfig) -> String {
+    if !config.enabled {
+        return "DSP (desired): off (bypass)".to_owned();
+    }
+    let mut parts = Vec::new();
+    if let Some(eq) = &config.eq {
+        let preset = EqPreset::all()
+            .into_iter()
+            .find(|preset| preset.to_config().eq == Some(*eq));
+        parts.push(match preset {
+            Some(preset) => format!("preset {}", preset.name()),
+            None => "custom EQ".to_owned(),
+        });
+    }
+    let preamp_db = if config.gain > 0.0 {
+        format!("{:+.1} dB", 20.0 * config.gain.log10())
+    } else {
+        "-inf dB".to_owned()
+    };
+    parts.push(format!("preamp {preamp_db}"));
+    format!("DSP (desired): on — {}", parts.join(", "))
+}
+
+/// What the central transport control currently offers (its context
+/// label and dispatch): see [`TuiModel::play_pause_offer`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlayPauseOffer {
+    Pause,
+    Resume,
+    Play,
+}
+
+impl PlayPauseOffer {
+    /// The label the central control renders for this offer, in every
+    /// responsive class (the words fit the smallest transport cell).
+    pub fn label(self) -> &'static str {
+        match self {
+            PlayPauseOffer::Pause => "Pause",
+            PlayPauseOffer::Resume => "Resume",
+            PlayPauseOffer::Play => "Play",
+        }
+    }
 }
 
 /// One event-loop step after a dispatched action.
@@ -422,15 +752,24 @@ pub struct TuiModel {
     /// configured value — never an acoustic level or mechanism
     /// readback).
     volume: Option<u8>,
+    /// The App's desired DSP configuration, as the one-line summary
+    /// label built by [`dsp_summary`] (T1A seam read side). Always a
+    /// DESIRED-state statement: nothing here is an applied-DSP claim
+    /// (G3 §20 discipline applies to the summary line too).
+    desired_dsp: Option<String>,
 
     /// The active route (§5). Presentation-only: default Now Playing.
     route: TuiRoute,
     /// The one active focus target, if any (§10).
     focus: Option<FocusId>,
+    /// The route-local focus a modal interrupted, restored on close
+    /// (§24: close restores a valid prior focus) when it still exists.
+    focus_before_modal: Option<FocusId>,
     /// The one active modal, if any (§23).
     modal: Option<Modal>,
-    /// The armed-click target between Left Down and Left Up (§17).
-    armed: Option<HitTarget>,
+    /// The armed-click interaction between Left Down and Left Up (§17):
+    /// target AND origin cell, invalidated as one with the frame.
+    armed: Option<ArmedClick>,
     /// The CURRENT frame's hit regions (§13/§15). Empty before the
     /// first draw and after every invalidation.
     regions: Vec<HitRegion>,
@@ -463,8 +802,10 @@ impl TuiModel {
             order: None,
             repeat: None,
             volume: None,
+            desired_dsp: None,
             route: TuiRoute::NowPlaying,
             focus: None,
+            focus_before_modal: None,
             modal: None,
             armed: None,
             regions: Vec::new(),
@@ -486,13 +827,17 @@ impl TuiModel {
     /// Record the playlist pane's rows, keyed by the App's playlist
     /// revision. A revision the model already holds does not even build
     /// the rows: the caller may call this on every refresh, and an
-    /// unchanged (or huge) playlist costs nothing per frame.
+    /// unchanged (or huge) playlist costs nothing per frame. A MOVING
+    /// revision is a list edit — the armed click dies with it (§17:
+    /// a list revision change cancels the arm, even where a same-named
+    /// row reappears at the same coordinates).
     pub fn set_playlist(&mut self, revision: u64, rows: impl FnOnce() -> Vec<PlaylistRow>) {
         if self.playlist_revision == Some(revision) {
             return;
         }
         self.playlist_revision = Some(revision);
         self.playlist = rows();
+        self.invalidate_frame();
     }
 
     /// The playlist pane's rows, in the App's traversal order.
@@ -530,14 +875,44 @@ impl TuiModel {
         self.volume.map(|v| format!("{v}/100"))
     }
 
+    /// Record the App's desired DSP summary line (T1A seam read side).
+    pub fn set_desired_dsp(&mut self, summary: String) {
+        self.desired_dsp = Some(summary);
+    }
+
+    /// The desired DSP summary line, once refreshed from the App.
+    pub fn desired_dsp_label(&self) -> Option<&str> {
+        self.desired_dsp.as_deref()
+    }
+
     /// Follow the player's committed episode: `Some(path)` after a
     /// committed replacement, `None` after a clean-failed one. `None`
     /// also drops the last observation — the model holds no episode
     /// truth at all then, so the retired episode's diagnostics must
     /// not leak into the frame as if they described anything current.
+    ///
+    /// Every COMMITTED CHANGE of the episode is an episode replacement
+    /// (§17): the armed click dies with it, so a press armed on one
+    /// episode can never activate into the next one — even where the
+    /// new episode draws the same control at the same coordinates
+    /// (G1 F06). An unchanged refresh between two ticks keeps the arm.
+    ///
+    /// `set_episode` alone cannot see every replacement: its guard
+    /// compares the DISPLAY string, and pathname equality is not
+    /// episode identity — a same-file replay/Repeat One replaces the
+    /// episode under an unchanged display, and two distinct native
+    /// paths can render to one lossy string. The RUNTIME owns
+    /// replacement knowledge (its seams perform the replacements), so
+    /// it reports each committed replacement through
+    /// [`Self::note_episode_replacement`]; the string guard below
+    /// stays as the refresh-path safety net.
     pub fn set_episode(&mut self, source: Option<String>) {
+        if self.source == source {
+            return;
+        }
         let episode_gone = source.is_none();
         self.source = source;
+        self.invalidate_frame();
         if episode_gone {
             self.observation = PlaybackSessionObservation {
                 terminal_outcome: None,
@@ -559,9 +934,29 @@ impl TuiModel {
         self.source.as_deref()
     }
 
+    /// The runtime's report that a replacement seam (open, add-commit,
+    /// navigation, play-selected, play-current, the EOF policy's
+    /// advance) committed a NEW episode. The display string cannot be
+    /// the replacement witness — a same-file replay reuses it — so the
+    /// seam owner reports the event and the arm dies with the context
+    /// it was armed in (§17, G1 F06; the model holds no episode
+    /// identity of its own).
+    pub fn note_episode_replacement(&mut self) {
+        self.invalidate_frame();
+    }
+
     /// Record one operation's feedback line (composition feedback,
-    /// never a playback semantic).
+    /// never a playback semantic). The status block's SHAPE feeds the
+    /// shell layout — a status that grows or shrinks across the
+    /// bounded line cap moves every target below it — so a shape
+    /// change invalidates the frame exactly like a resize (§22: "the
+    /// same applies after content changes that move targets"). A
+    /// same-shape feedback keeps the arm.
     pub fn set_status(&mut self, status: Option<String>) {
+        let shape = status_shape(status.as_deref());
+        if shape != status_shape(self.status.as_deref()) {
+            self.invalidate_frame();
+        }
         self.status = status;
     }
 
@@ -599,6 +994,46 @@ impl TuiModel {
         self.observation.paused()
     }
 
+    /// What the central transport control OFFERS right now (T0
+    /// transport freeze, G1 F03) — the context-labeled button:
+    ///
+    /// ```text
+    /// no episode                 -> Play        (establish selection;
+    ///                                               inert with a reason
+    ///                                               when there is none)
+    /// episode, terminal Fact     -> Play        (replay through the
+    ///                                               existing replacement)
+    /// episode, pause requested   -> Resume      (the command state)
+    /// episode, otherwise         -> Pause       (the command state)
+    /// ```
+    ///
+    /// Derived from the current observation every frame — never from a
+    /// local paused/playing bool. `Pause`/`Resume` are the command
+    /// state's own vocabulary; no unsettled episode is ever labeled
+    /// Playing/Starting/Stopping.
+    pub fn play_pause_offer(&self) -> PlayPauseOffer {
+        if self.source.is_none() || self.observation.terminal_outcome.is_some() {
+            return PlayPauseOffer::Play;
+        }
+        if self.observation.pause_requested {
+            PlayPauseOffer::Resume
+        } else {
+            PlayPauseOffer::Pause
+        }
+    }
+
+    /// Whether a relative seek step is COMPUTABLE right now (T0:
+    /// visible relative-seek controls require published position/rate;
+    /// G1 F07): exactly the evidence [`seek_target`] consumes. Without
+    /// it the seek buttons render nothing, publish no regions and stay
+    /// out of the focus cycle.
+    pub fn relative_seek_available(&self) -> bool {
+        let Some(format) = &self.observation.source_format else {
+            return false;
+        };
+        format.sample_rate > 0 && self.observation.position.is_some()
+    }
+
     /// The source-format label: the published PCM format once
     /// activation reported it (mechanism evidence), `pending` before.
     pub fn format_label(&self) -> String {
@@ -615,48 +1050,27 @@ impl TuiModel {
     /// side whose evidence does not exist yet (or is unknown). Rendered
     /// by the same projection helper the scriptable status text uses, so
     /// the two read-side surfaces cannot disagree; the model keeps no
-    /// position of its own (no `last_position`, no local playback truth).
-    ///
-    /// One presentation policy on top (field round 5): while the episode
-    /// is LIVE and its position evidence simply has not arrived yet —
-    /// the first sampling window after every Open replacement — the
-    /// timeline renders at the START (`00:00 / …`) instead of
-    /// collapsing to `--:--`. The episode has consumed nothing (the
-    /// render leg publishes from zero), and a collapsing timeline
-    /// flexed the panel height on every track switch. A SETTLED
-    /// episode keeps the dashes: a dead timeline has no start, and the
-    /// no-evidence state must not grow a fabricated zero.
+    /// position of its own (no `last_position`, no local playback
+    /// truth). The live pre-first-sample window keeps the dashes too
+    /// (T0 unknown-position): an unknown position is not a zero, and the
+    /// display must not promote a start-of-track shortcut into position
+    /// evidence.
     pub fn timeline_label(&self) -> String {
-        if self.pending_start_window() {
-            let mut pending = self.observation.clone();
-            pending.position = Some(0);
-            return crate::status::format_timeline(&pending);
-        }
         crate::status::format_timeline(&self.observation)
     }
 
-    /// Whether this frame is in the live pre-first-sample window: an
-    /// unsettled episode with no activation failure whose position
-    /// projection has not published yet.
-    fn pending_start_window(&self) -> bool {
-        self.observation.position.is_none()
-            && self.observation.terminal_outcome.is_none()
-            && self.observation.activation_error.is_none()
-    }
-
-    /// The read-only progress bar (Issue #166 §33):
+    /// The progress bar (Issue #166 §33):
     /// `00:42 ━━━━━╸────────── 05:47`. `None` unless BOTH sides have
     /// evidence: an unknown duration has no percentage to draw and an
     /// unknown position is not a zero, so the bar simply does not
-    /// appear — it is never fabricated, and it is never an input
-    /// affordance (seeking stays a keyboard and transport matter).
+    /// appear — it is never fabricated, not even in the live
+    /// pre-first-sample window after an Open replacement (T0
+    /// unknown-position; see [`Self::timeline_label`]). Since G1 the
+    /// drawn glyph is ALSO a click-to-position affordance: a seek-bar
+    /// hit region over exactly its cells, and only while duration
+    /// evidence exists (see the view's `seek_bar_glyph_area`).
     ///
-    /// The one exception is the same live pre-first-sample window as
-    /// [`Self::timeline_label`] (field round 5): a LIVE episode with no
-    /// position sample yet renders the bar at its START (empty fill),
-    /// with `--:--` as the total if the duration is not known either —
-    /// the row stays put instead of vanishing and flexing the layout
-    /// for the first second of every track. The fill is the position's
+    /// The fill is the position's
     /// fraction of the reported duration, clamped into the bar. The
     /// duration is mechanism evidence and the position an independent
     /// projection, so a position beyond the reported duration is
@@ -668,26 +1082,15 @@ impl TuiModel {
         if rate == 0 {
             return None;
         }
-        let live_pending = self.pending_start_window();
-        let position_frames = match self.observation.position {
-            Some(frames) => frames,
-            None if live_pending => 0,
-            None => return None,
-        };
-        let position_secs = position_frames / rate;
-        let duration_secs = match self.observation.source_duration {
-            Some(duration) => Some(duration.as_secs()),
-            None if live_pending => None,
-            None => return None,
-        };
+        let position_secs = self.observation.position? / rate;
+        let duration_secs = self.observation.source_duration?.as_secs();
 
-        let filled = match duration_secs {
-            Some(d) if d > 0 => {
-                let width = BAR_WIDTH as u128;
-                let filled = u128::from(position_secs) * width / u128::from(d);
-                usize::try_from(filled.min(width)).unwrap_or(BAR_WIDTH)
-            }
-            _ => 0,
+        let filled = if duration_secs > 0 {
+            let width = BAR_WIDTH as u128;
+            let filled = u128::from(position_secs) * width / u128::from(duration_secs);
+            usize::try_from(filled.min(width)).unwrap_or(BAR_WIDTH)
+        } else {
+            0
         };
         let mut bar = String::with_capacity(BAR_WIDTH);
         for cell in 0..BAR_WIDTH {
@@ -697,9 +1100,7 @@ impl TuiModel {
                 std::cmp::Ordering::Greater => '─',
             });
         }
-        let total = duration_secs
-            .map(|d| crate::status::format_clock(Duration::from_secs(d)))
-            .unwrap_or_else(|| "--:--".to_owned());
+        let total = crate::status::format_clock(Duration::from_secs(duration_secs));
         Some(format!(
             "{} {bar} {}",
             crate::status::format_clock(Duration::from_secs(position_secs)),
@@ -748,9 +1149,9 @@ impl TuiModel {
         self.modal.as_ref()
     }
 
-    /// The armed-click target between Left Down and Left Up, if any.
+    /// The armed-click interaction between Left Down and Left Up, if any.
     #[cfg(test)]
-    pub fn armed(&self) -> Option<HitTarget> {
+    pub fn armed(&self) -> Option<ArmedClick> {
         self.armed
     }
 
@@ -816,14 +1217,35 @@ impl TuiModel {
 
     /// The visible enabled focus targets in Tab order (§11): the four
     /// route tabs, then the active route's local controls. While a
-    /// modal is open the cycle is exactly the modal's controls (§24);
-    /// below the minimum size there is nothing to focus (§28).
+    /// modal is open the cycle is exactly the modal's controls (§24) —
+    /// the picker's field and listing; a listing with no rows leaves
+    /// only the field. Below the minimum size there is nothing to
+    /// focus (§28).
     pub fn focus_cycle(&self) -> Vec<FocusId> {
         if self.class == ResponsiveClass::Minimum {
             return Vec::new();
         }
-        if self.modal.is_some() {
-            return vec![FocusId::ModalField];
+        if let Some(modal) = self.modal() {
+            return match modal {
+                Modal::Open(picker) => {
+                    let mut cycle = vec![FocusId::ModalField];
+                    // The navigation button sits between the field and
+                    // the listing (the popup's nav row); it is a stop
+                    // even with no listing rows yet.
+                    cycle.push(FocusId::PickerButton(ModalButton::UseFolder));
+                    if !picker.entries.is_empty() {
+                        cycle.push(FocusId::PickerList);
+                    }
+                    cycle.extend([
+                        FocusId::PickerButton(ModalButton::Open),
+                        FocusId::PickerButton(ModalButton::Add),
+                        FocusId::PickerButton(ModalButton::EnterFolder),
+                        FocusId::PickerButton(ModalButton::Cancel),
+                    ]);
+                    cycle
+                }
+                _ => vec![FocusId::ModalField],
+            };
         }
         let mut cycle: Vec<FocusId> = TuiRoute::ALL
             .iter()
@@ -831,7 +1253,18 @@ impl TuiModel {
             .collect();
         match self.route {
             TuiRoute::NowPlaying => {
+                // The seek buttons exist in the cycle only while their
+                // evidence exists — an inert control is never a focus
+                // stop (§11).
+                if self.relative_seek_available() {
+                    cycle.extend(SEEK_BUTTONS.iter().map(|button| FocusId::Seek(*button)));
+                }
                 cycle.extend(TRANSPORT.iter().map(|button| FocusId::Transport(*button)));
+                cycle.extend(
+                    PREFERENCES
+                        .iter()
+                        .map(|button| FocusId::Preference(*button)),
+                );
             }
             // The list is focusable only while it has rows: an empty
             // pane has no enabled control inside it (§11).
@@ -874,39 +1307,102 @@ impl TuiModel {
         if cycle.iter().any(|id| Some(*id) == self.focus) {
             return;
         }
+        let fallback = |id: &FocusId| {
+            matches!(
+                id,
+                FocusId::Seek(_)
+                    | FocusId::Transport(_)
+                    | FocusId::Preference(_)
+                    | FocusId::Playlist
+                    | FocusId::ModalField
+                    | FocusId::PickerList
+                    | FocusId::PickerButton(_)
+            )
+        };
         self.focus = cycle
             .iter()
-            .find(|id| matches!(id, FocusId::Transport(_) | FocusId::Playlist))
+            .find(|id| fallback(id))
             .or_else(|| cycle.first())
             .copied();
     }
 
     /// The focus target a mouse hit on `target` selects (§17: Left
-    /// Down focuses the target).
-    pub fn focus_of_target(target: HitTarget) -> FocusId {
+    /// Down focuses the target). `None` for targets that carry no
+    /// keyboard focus of their own (the seek bar — a mouse affordance
+    /// over an already keyboard-complete command).
+    pub fn focus_of_target(target: HitTarget) -> Option<FocusId> {
         match target {
-            HitTarget::RouteTab(route) => FocusId::RouteTab(route),
-            HitTarget::Transport(button) => FocusId::Transport(button),
-            HitTarget::PlaylistRow(_) | HitTarget::PlaylistPane => FocusId::Playlist,
+            HitTarget::RouteTab(route) => Some(FocusId::RouteTab(route)),
+            HitTarget::Seek(button) => Some(FocusId::Seek(button)),
+            HitTarget::Transport(button) => Some(FocusId::Transport(button)),
+            HitTarget::Preference(button) => Some(FocusId::Preference(button)),
+            HitTarget::PlaylistRow(_) | HitTarget::PlaylistPane => Some(FocusId::Playlist),
+            HitTarget::PickerRow(_) => Some(FocusId::PickerList),
+            HitTarget::ModalButton(button) => Some(FocusId::PickerButton(button)),
+            HitTarget::ModalField => Some(FocusId::ModalField),
+            HitTarget::SeekBar => None,
         }
     }
 
     /// The action activating `target` performs (§17: Left Up activates
-    /// the armed target). `None` for targets that arm nothing.
-    pub fn action_of_target(target: HitTarget) -> Option<TuiAction> {
+    /// the armed target). `None` for targets that arm nothing: the
+    /// playlist pane area, the path-field row, and the seek bar (its
+    /// action is the click position, computed from the frame geometry
+    /// at decode time).
+    ///
+    /// This is an INSTANCE method for one reason: the picker's `..`
+    /// row is navigation chrome, not a target — activating it is the
+    /// parent step, while every other listing row's activation is a
+    /// cursor move. The answer needs the listing this frame shows.
+    pub fn action_of_target(&self, target: HitTarget) -> Option<TuiAction> {
         match target {
             HitTarget::RouteTab(route) => Some(TuiAction::Navigate(route)),
+            HitTarget::Seek(button) => Some(TuiAction::SeekRelative(match button {
+                SeekButton::Back => -SEEK_STEP_SECS,
+                SeekButton::Forward => SEEK_STEP_SECS,
+            })),
             HitTarget::Transport(button) => Some(match button {
+                TransportButton::Open => TuiAction::OpenModal(ModalKind::Open),
                 TransportButton::Previous => TuiAction::Previous,
                 TransportButton::PlayPause => TuiAction::PlayPause,
                 TransportButton::Stop => TuiAction::Stop,
                 TransportButton::Next => TuiAction::Next,
             }),
+            HitTarget::Preference(button) => Some(match button {
+                PreferenceButton::VolumeDown => TuiAction::VolumeDown,
+                PreferenceButton::VolumeUp => TuiAction::VolumeUp,
+                PreferenceButton::Order => TuiAction::ToggleOrder,
+                PreferenceButton::Repeat => TuiAction::CycleRepeat,
+            }),
             HitTarget::PlaylistRow(index) => {
                 Some(TuiAction::PlaylistSelect(PlaylistCursor::Row(index)))
             }
-            // The pane area focuses the list but is not itself a control.
+            HitTarget::PickerRow(index) => Some(TuiAction::ModalInput(
+                match self.picker_entries().get(index) {
+                    // The synthesized `..` row activates the parent
+                    // step — the same action as keyboard Enter/Backspace
+                    // on it (G1 F04: the mouse converges on the same
+                    // semantic action, never a separate machine).
+                    Some(entry) if entry.is_parent => ModalInput::ListParent,
+                    _ => ModalInput::ListMove(PlaylistCursor::Row(index)),
+                },
+            )),
+            HitTarget::ModalButton(button) => Some(TuiAction::ModalInput(match button {
+                ModalButton::Open => ModalInput::CommitOpen,
+                ModalButton::Add => ModalInput::CommitAdd,
+                ModalButton::UseFolder => ModalInput::UseFolder,
+                ModalButton::EnterFolder => ModalInput::ListActivate,
+                ModalButton::Cancel => ModalInput::Cancel,
+            })),
+            // The pane area focuses the list but is not itself a
+            // control.
             HitTarget::PlaylistPane => None,
+            // The path-field row focuses the field but arms nothing.
+            HitTarget::ModalField => None,
+            // The seek bar arms like a control, but its action is the
+            // click position — resolved by the mouse decoder, not by
+            // the target alone.
+            HitTarget::SeekBar => None,
         }
     }
 
@@ -916,20 +1412,34 @@ impl TuiModel {
     pub fn activation(&self) -> Option<TuiAction> {
         match self.focus? {
             FocusId::RouteTab(route) => Some(TuiAction::Navigate(route)),
-            FocusId::Transport(button) => Self::action_of_target(HitTarget::Transport(button)),
+            FocusId::Seek(button) => self.action_of_target(HitTarget::Seek(button)),
+            FocusId::Transport(button) => self.action_of_target(HitTarget::Transport(button)),
+            FocusId::Preference(button) => self.action_of_target(HitTarget::Preference(button)),
             FocusId::Playlist => Some(TuiAction::PlaylistPlaySelected),
+            FocusId::PickerList => Some(TuiAction::ModalInput(ModalInput::ListActivate)),
+            FocusId::PickerButton(button) => self.action_of_target(HitTarget::ModalButton(button)),
             FocusId::ModalField => Some(TuiAction::ModalInput(ModalInput::Confirm)),
         }
     }
 
     /// Open the one modal of `kind` (§24): captures input (the modal
-    /// field becomes the focus), clears the armed mouse target. Opening
-    /// while one is open replaces it — there is no stack.
+    /// field becomes the focus), clears the armed mouse target, and
+    /// remembers the route-local focus so a later close can restore it
+    /// (§24). Opening while one is open replaces it — there is no
+    /// stack. The Open modal starts as a fresh picker draft; the
+    /// runtime supplies its first listing right after (the model
+    /// performs no I/O).
     pub fn open_modal(&mut self, kind: ModalKind) {
+        self.focus_before_modal = self.focus;
         self.modal = Some(match kind {
-            ModalKind::Open => Modal::Open {
+            ModalKind::Open => Modal::Open(OpenPicker {
                 input: String::new(),
-            },
+                dir: None,
+                entries: Vec::new(),
+                cursor: None,
+                error: None,
+                folder_target: false,
+            }),
             ModalKind::GoTo => Modal::GoTo {
                 input: String::new(),
             },
@@ -939,24 +1449,38 @@ impl TuiModel {
         self.validate_focus();
     }
 
-    /// Close the modal and restore a valid route focus (§24). The
-    /// pre-modal focus was the modal's own field, so the restore is the
-    /// §12 fallback: the route's first meaningful local control, else
-    /// the first tab.
+    /// Close the modal and restore a valid route focus (§24): the
+    /// pre-modal focus when it still exists in the cycle, else the §12
+    /// fallback (the route's first meaningful local control, else the
+    /// first tab).
     pub fn close_modal(&mut self) {
         self.modal = None;
         self.invalidate_frame();
+        if let Some(focus) = self.focus_before_modal.take() {
+            self.focus = Some(focus);
+        }
         self.validate_focus();
     }
 
     /// Apply one editing step to the active modal (a no-op when no
-    /// text modal is open — Help has no field to edit).
+    /// text modal is open — Help has no field to edit). In the picker,
+    /// editing the typed line is an edit of the TARGET: it clears the
+    /// listing selection, so the submission subject can never be a row
+    /// the user stopped looking at while the field shows something
+    /// else (G1 F08 — one deterministic subject, the one on display).
     pub fn modal_edit(&mut self, input: ModalInput) {
         let Some(modal) = self.modal.as_mut() else {
             return;
         };
         let text = match modal {
-            Modal::Open { input } | Modal::GoTo { input } => input,
+            Modal::Open(picker) => {
+                if matches!(input, ModalInput::Char(_) | ModalInput::Backspace) {
+                    picker.cursor = None;
+                    picker.folder_target = false;
+                }
+                &mut picker.input
+            }
+            Modal::GoTo { input } => input,
             Modal::Help => return,
         };
         match input {
@@ -964,28 +1488,201 @@ impl TuiModel {
             ModalInput::Backspace => {
                 text.pop();
             }
-            ModalInput::Confirm | ModalInput::Cancel => {}
+            ModalInput::Confirm
+            | ModalInput::Cancel
+            | ModalInput::ListActivate
+            | ModalInput::ListMove(_)
+            | ModalInput::ListParent
+            | ModalInput::CommitOpen
+            | ModalInput::CommitAdd
+            | ModalInput::UseFolder => {}
         }
+    }
+
+    /// Replace the Open picker's listing with one runtime-supplied
+    /// directory read (the model performs no I/O of its own). A
+    /// readable directory becomes `..` (when one exists) plus the
+    /// classified entries, each carrying its NATIVE path; an unreadable
+    /// one keeps an honest diagnostic instead of a fabricated empty
+    /// list. Either way the cursor starts unselected and the armed
+    /// click dies with the old geometry (§17: a re-listed pane is new
+    /// geometry).
+    pub fn set_open_listing(
+        &mut self,
+        dir: std::path::PathBuf,
+        listing: Result<Vec<crate::input::DirectoryEntry>, String>,
+    ) {
+        let Some(Modal::Open(picker)) = self.modal.as_mut() else {
+            return;
+        };
+        picker.dir = Some(dir);
+        picker.error = None;
+        picker.cursor = None;
+        picker.folder_target = false;
+        picker.entries = match listing {
+            Ok(entries) => {
+                let mut rows: Vec<PickerEntry> = Vec::with_capacity(entries.len() + 1);
+                if let Some(parent) = picker
+                    .dir
+                    .as_ref()
+                    .and_then(|dir| dir.parent().map(|parent| parent.to_path_buf()))
+                {
+                    rows.push(PickerEntry {
+                        name: "..".to_owned(),
+                        is_dir: true,
+                        is_parent: true,
+                        path: parent,
+                    });
+                }
+                rows.extend(entries.into_iter().map(|entry| PickerEntry {
+                    name: entry.name,
+                    is_dir: entry.is_dir,
+                    is_parent: false,
+                    path: entry.path,
+                }));
+                rows
+            }
+            Err(diagnostic) => {
+                picker.error = Some(diagnostic);
+                Vec::new()
+            }
+        };
+        self.invalidate_frame();
+        self.validate_focus();
+    }
+
+    /// The Open picker's listed entries, while one is shown.
+    pub fn picker_entries(&self) -> &[PickerEntry] {
+        match self.modal.as_ref() {
+            Some(Modal::Open(picker)) => &picker.entries,
+            _ => &[],
+        }
+    }
+
+    /// The Open picker's listed directory, while one is shown.
+    pub fn open_picker_dir(&self) -> Option<&std::path::Path> {
+        match self.modal.as_ref() {
+            Some(Modal::Open(picker)) => picker.dir.as_deref(),
+            _ => None,
+        }
+    }
+
+    /// Record the picker's bounded diagnostic WITHOUT touching any
+    /// other picker state: the typed line, the displayed directory, the
+    /// listing and the selection all survive — the context a failed
+    /// submission needs for correction/retry (G1 F11, T0: failure
+    /// keeps the picker).
+    pub fn set_picker_error(&mut self, message: String) {
+        if let Some(Modal::Open(picker)) = self.modal.as_mut() {
+            picker.error = Some(message);
+        }
+    }
+
+    /// The [Use this folder] button (T0 picker freeze): the DISPLAYED
+    /// directory becomes the submission subject, so a folder can be
+    /// opened or added without entering it. The target note is what
+    /// the popup shows while it stands; any navigation, listing
+    /// refresh, field edit or row selection replaces the subject with
+    /// a fresh one (the mutators above clear the flag).
+    pub fn use_picker_folder(&mut self) {
+        let Some(Modal::Open(picker)) = self.modal.as_mut() else {
+            return;
+        };
+        if picker.dir.is_none() {
+            return;
+        }
+        picker.folder_target = true;
+        picker.error = None;
+        // The popup's note row and the (now released) list geometry
+        // change with the target: the next frame republishes.
+        self.invalidate_frame();
+    }
+
+    /// Move the Open picker's listing cursor (§24 presentation). The
+    /// first move from the unselected state enters at the list's edge
+    /// in the pressed direction; a row click selects that row. A row
+    /// selection replaces the [Use this folder] target — the subject
+    /// is the row the user just chose.
+    pub fn move_picker_cursor(&mut self, cursor: PlaylistCursor) {
+        let Some(Modal::Open(picker)) = self.modal.as_mut() else {
+            return;
+        };
+        if picker.entries.is_empty() {
+            return;
+        }
+        picker.folder_target = false;
+        picker.cursor = Some(match (picker.cursor, cursor) {
+            (Some(current), PlaylistCursor::Previous) => current.saturating_sub(1),
+            (Some(current), PlaylistCursor::Next) => (current + 1).min(picker.entries.len() - 1),
+            (None, PlaylistCursor::Previous) => picker.entries.len() - 1,
+            (None, PlaylistCursor::Next) | (None, PlaylistCursor::Row(0)) => 0,
+            (None, PlaylistCursor::Row(index)) => index.min(picker.entries.len() - 1),
+            (Some(_), PlaylistCursor::Row(index)) => index.min(picker.entries.len() - 1),
+        });
+        self.focus = Some(FocusId::PickerList);
+    }
+
+    /// The listing entry under the picker's cursor, with whether
+    /// activating it is a directory step: a real directory (or the
+    /// `..` row) navigates, a file is selected. The path is the entry's
+    /// NATIVE identity (G1 F10) — for the `..` row, the parent
+    /// directory.
+    pub fn picker_cursor_entry(&self) -> Option<(&PickerEntry, std::path::PathBuf, bool)> {
+        let Some(Modal::Open(picker)) = self.modal.as_ref() else {
+            return None;
+        };
+        let index = picker.cursor?;
+        let entry = picker.entries.get(index)?;
+        Some((entry, entry.path.clone(), entry.is_parent || entry.is_dir))
+    }
+
+    /// The Open picker's ONE deterministic submission subject (G1 §8):
+    /// the selected listing entry — with its native path — while one
+    /// is selected; otherwise the typed path line, as typed (the
+    /// runtime normalizes it against the displayed directory at commit
+    /// time). Editing the field clears the selection, so the subject is
+    /// always exactly what the surface shows (G1 F08). The [Use this
+    /// folder] target outranks both while it stands: the displayed
+    /// directory is the subject the button visibly chose, until a
+    /// navigation, field edit or row selection replaces it.
+    pub fn picker_subject(&self) -> PickerSubject {
+        if let Some(Modal::Open(picker)) = self.modal.as_ref()
+            && picker.folder_target
+            && let Some(dir) = &picker.dir
+        {
+            return PickerSubject::Listing {
+                path: dir.clone(),
+                is_dir: true,
+            };
+        }
+        if let Some((_entry, path, is_dir)) = self.picker_cursor_entry() {
+            return PickerSubject::Listing { path, is_dir };
+        }
+        let Some(Modal::Open(picker)) = self.modal.as_ref() else {
+            return PickerSubject::None;
+        };
+        if picker.input.is_empty() {
+            return PickerSubject::None;
+        }
+        // The typed subject's kind is decided by the runtime's one
+        // filesystem question at commit time, not guessed here.
+        PickerSubject::Typed(picker.input.clone())
     }
 
     /// Confirm the active modal (§26): decides what the confirmation
     /// means and closes the modal — EXCEPT an unreadable GoTo token,
     /// which keeps the line open for correction and sends nothing.
+    ///
+    /// The Open picker's field is NOT confirmed here: its Enter is a
+    /// navigate-or-select step (T0 picker freeze — the field line never
+    /// starts playback), and the step's filesystem questions and its
+    /// failure disposition live in the runtime's one dispatch boundary,
+    /// where the modal closes only on success.
     pub fn confirm_modal(&mut self) -> ModalConfirm {
         match self.modal.as_mut() {
             Some(Modal::Help) => {
                 self.close_modal();
                 ModalConfirm::Nothing
-            }
-            Some(Modal::Open { input }) => {
-                let line = std::mem::take(input);
-                self.close_modal();
-                if line.is_empty() {
-                    // An empty line is a cancel, never an Open of "".
-                    ModalConfirm::Nothing
-                } else {
-                    ModalConfirm::Open(line)
-                }
             }
             Some(Modal::GoTo { input }) => {
                 let line = std::mem::take(input);
@@ -1005,13 +1702,19 @@ impl TuiModel {
                     }
                 }
             }
-            None => ModalConfirm::Nothing,
+            Some(Modal::Open(_)) | None => ModalConfirm::Nothing,
         }
     }
 
-    /// Type one character into the active text modal.
+    /// Type one character into the active text modal. Typing always
+    /// edits the picker's path line, from wherever inside the modal the
+    /// focus currently sits (type-through), and returns the focus to
+    /// the field.
     pub fn modal_push(&mut self, c: char) {
         self.modal_edit(ModalInput::Char(c));
+        if self.modal.is_some() {
+            self.focus = Some(FocusId::ModalField);
+        }
     }
 
     /// Backspace one character out of the active text modal.
@@ -1060,8 +1763,8 @@ pub fn decode_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
         return Some(TuiAction::Quit);
     }
-    if let Some(modal) = model.modal() {
-        return decode_modal_key(key, modal.kind());
+    if model.modal().is_some() {
+        return decode_modal_key(key, model);
     }
     match key.code {
         KeyCode::Tab => Some(TuiAction::MoveFocus(FocusMove::Next)),
@@ -1085,7 +1788,16 @@ pub fn decode_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
         KeyCode::Right if key.modifiers == KeyModifiers::SHIFT => {
             Some(TuiAction::SeekRelative(LARGE_SEEK_STEP_SECS))
         }
-        KeyCode::Char(' ') if plain(key) => Some(TuiAction::PlayPause),
+        // Space (§25, T0 focus rule): a focused control consumes it
+        // exactly like Enter; the global pause/resume/play accelerator
+        // acts only when no focused control exists to consume it.
+        KeyCode::Char(' ') if plain(key) => {
+            if model.focus().is_some() {
+                Some(TuiAction::ActivateFocused)
+            } else {
+                Some(TuiAction::PlayPause)
+            }
+        }
         KeyCode::Char('s') | KeyCode::Char('S') if plain(key) => Some(TuiAction::Stop),
         KeyCode::Char('o') | KeyCode::Char('O') if plain(key) => {
             Some(TuiAction::OpenModal(ModalKind::Open))
@@ -1108,20 +1820,73 @@ pub fn decode_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
 /// The modal owns the keyboard while it is open (§24). No key both
 /// edits and executes: inside a text modal every plain character is a
 /// literal character — `q`/`Q` included, so `Q:\Music` stays typeable
-/// (Issue #166 §29) — and the help overlay lets only its close keys
-/// through, so no playback key can fire behind it.
-fn decode_modal_key(key: KeyEvent, kind: ModalKind) -> Option<TuiAction> {
-    match kind {
+/// (Issue #166 §29), and the same rule makes the picker's path line an
+/// ordinary text field, so it has NO letter accelerators — and the
+/// help overlay lets only its close keys through, so no playback key
+/// can fire behind it.
+///
+/// The Open picker's grammar (G1 §8): Tab cycles field → list →
+/// commit buttons; ↑/↓ move the listing cursor; Enter acts on the
+/// focused picker control (the field confirms its typed subject, a
+/// listing row descends into a directory or opens a file, a commit
+/// button commits); Backspace on the listing steps up to the parent
+/// directory; Esc cancels.
+fn decode_modal_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
+    let modal_kind = model.modal().map(Modal::kind)?;
+    // Below the minimum size the shell renders no interactive layout
+    // and paints no popup (§28): the modal's keys go inert except the
+    // cancel — a blind Enter behind an invisible popup must never
+    // commit a real Open. Ctrl+C keeps its conventional meaning (it is
+    // decoded before this function).
+    if model.class() == ResponsiveClass::Minimum {
+        return match key.code {
+            KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
+            _ => None,
+        };
+    }
+    match modal_kind {
         ModalKind::Help => match key.code {
             KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
             KeyCode::Char('?') if plain(key) => Some(TuiAction::ModalInput(ModalInput::Cancel)),
             KeyCode::Char('q') | KeyCode::Char('Q') if plain(key) => Some(TuiAction::Quit),
             _ => None,
         },
-        ModalKind::Open | ModalKind::GoTo => match key.code {
+        ModalKind::GoTo => match key.code {
             KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
             KeyCode::Enter if plain(key) => Some(TuiAction::ModalInput(ModalInput::Confirm)),
             KeyCode::Backspace if plain(key) => Some(TuiAction::ModalInput(ModalInput::Backspace)),
+            KeyCode::Char(c) if plain(key) => Some(TuiAction::ModalInput(ModalInput::Char(c))),
+            _ => None,
+        },
+        ModalKind::Open => match key.code {
+            KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
+            KeyCode::Tab => Some(TuiAction::MoveFocus(FocusMove::Next)),
+            KeyCode::BackTab => Some(TuiAction::MoveFocus(FocusMove::Previous)),
+            KeyCode::Enter if plain(key) => Some(TuiAction::ModalInput(match model.focus() {
+                Some(FocusId::PickerList) => ModalInput::ListActivate,
+                Some(FocusId::PickerButton(ModalButton::Open)) => ModalInput::CommitOpen,
+                Some(FocusId::PickerButton(ModalButton::Add)) => ModalInput::CommitAdd,
+                Some(FocusId::PickerButton(ModalButton::UseFolder)) => ModalInput::UseFolder,
+                Some(FocusId::PickerButton(ModalButton::EnterFolder)) => ModalInput::ListActivate,
+                Some(FocusId::PickerButton(ModalButton::Cancel)) => ModalInput::Cancel,
+                _ => ModalInput::Confirm,
+            })),
+            KeyCode::Up if plain(key) => Some(TuiAction::ModalInput(ModalInput::ListMove(
+                PlaylistCursor::Previous,
+            ))),
+            KeyCode::Down if plain(key) => Some(TuiAction::ModalInput(ModalInput::ListMove(
+                PlaylistCursor::Next,
+            ))),
+            KeyCode::Backspace if plain(key) => {
+                match model.focus() {
+                    // On the listing, Backspace is the parent step; on
+                    // the field it edits the line.
+                    Some(FocusId::PickerList) => {
+                        Some(TuiAction::ModalInput(ModalInput::ListParent))
+                    }
+                    _ => Some(TuiAction::ModalInput(ModalInput::Backspace)),
+                }
+            }
             KeyCode::Char(c) if plain(key) => Some(TuiAction::ModalInput(ModalInput::Char(c))),
             _ => None,
         },
@@ -1142,18 +1907,37 @@ fn decode_modal_key(key: KeyEvent, kind: ModalKind) -> Option<TuiAction> {
 /// Decoding mutates exactly the presentation state a physical event
 /// owns — the focus and the armed click — and never a product seam.
 pub fn decode_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction> {
-    // §24/§25: a modal captures input and clears the armed target;
-    // background clicks (inside or outside the popup) dispatch nothing.
+    // §24/§25: while a modal is open only the modal's own controls
+    // answer; the background (inside or outside the popup) dispatches
+    // nothing.
     if model.modal().is_some() {
-        return None;
+        return decode_modal_mouse(mouse, model);
     }
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left) => match model.hit_test(mouse.column, mouse.row) {
             Some(target) => {
-                model.focus = Some(TuiModel::focus_of_target(target));
+                // A seek-bar hit carries no keyboard focus (the bar is
+                // a mouse affordance over an already keyboard-complete
+                // command); every other control focuses as before.
+                if let Some(focus) = TuiModel::focus_of_target(target) {
+                    model.focus = Some(focus);
+                }
                 // Only a control arms; the pane area focuses the list
-                // and nothing else.
-                model.armed = TuiModel::action_of_target(target).map(|_| target);
+                // and nothing else, and the seek bar arms for its
+                // geometry-resolved action below.
+                model.armed = if target == HitTarget::SeekBar {
+                    Some(ArmedClick {
+                        target,
+                        column: mouse.column,
+                        row: mouse.row,
+                    })
+                } else {
+                    model.action_of_target(target).map(|_| ArmedClick {
+                        target,
+                        column: mouse.column,
+                        row: mouse.row,
+                    })
+                };
                 None
             }
             None => {
@@ -1164,12 +1948,23 @@ pub fn decode_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction
         MouseEventKind::Up(MouseButton::Left) => {
             // An unmatched Up is no action.
             let armed = model.armed.take()?;
-            // Activate only if the SAME valid target still sits under
-            // the pointer: stale geometry, a moved pointer, or a
-            // re-render/revision that moved or replaced the control
-            // all cancel (§17).
-            if model.hit_test(mouse.column, mouse.row) == Some(armed) {
-                TuiModel::action_of_target(armed)
+            // Activate only when the release is the SAME interaction
+            // the press armed (§17): the SAME CELL (a press and a
+            // release on different cells are different interactions,
+            // G1 F15) AND the SAME semantic target still sitting under
+            // the pointer. Stale geometry, a moved pointer, a
+            // re-render/revision that moved or replaced the control —
+            // all cancel.
+            if armed.column == mouse.column
+                && armed.row == mouse.row
+                && model.hit_test(mouse.column, mouse.row) == Some(armed.target)
+            {
+                match armed.target {
+                    HitTarget::SeekBar => {
+                        Some(TuiAction::SeekPerMille(seek_bar_per_mille(model, &mouse)))
+                    }
+                    _ => model.action_of_target(armed.target),
+                }
             } else {
                 None
             }
@@ -1182,12 +1977,112 @@ pub fn decode_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction
         MouseEventKind::Moved => None,
         // §22: the wheel scrolls where a control already has a clear
         // meaning — the playlist list — and is inert everywhere else.
-        MouseEventKind::ScrollUp => wheel(model, &mouse, PlaylistCursor::Previous),
-        MouseEventKind::ScrollDown => wheel(model, &mouse, PlaylistCursor::Next),
+        // Either way the wheel cancels any armed press (§22: "wheel
+        // cancels an arm and acts once on the control under the
+        // pointer").
+        MouseEventKind::ScrollUp => {
+            model.disarm();
+            wheel(model, &mouse, PlaylistCursor::Previous)
+        }
+        MouseEventKind::ScrollDown => {
+            model.disarm();
+            wheel(model, &mouse, PlaylistCursor::Next)
+        }
         // Horizontal wheels have no meaning here (§22: no scroll physics).
         MouseEventKind::ScrollLeft | MouseEventKind::ScrollRight => None,
         // Right/middle buttons carry no product meaning (§19).
         MouseEventKind::Down(_) | MouseEventKind::Up(_) => None,
+    }
+}
+
+/// The per-mille a click on the seek bar's area requests (G1 §9): the
+/// clicked cell's center as a fraction of the bar, clamped into
+/// `1..=1000`. The bar region is this frame's own geometry — the same
+/// region the hit test just answered — so the fraction and the hit can
+/// never disagree.
+fn seek_bar_per_mille(model: &TuiModel, mouse: &MouseEvent) -> u16 {
+    let Some(region) = model
+        .regions
+        .iter()
+        .find(|region| region.target == HitTarget::SeekBar)
+    else {
+        return 0;
+    };
+    let offset = u32::from(mouse.column.saturating_sub(region.area.x));
+    let width = u32::from(region.area.width.max(1));
+    (((offset * 2 + 1) * 500) / width).min(1000) as u16
+}
+
+/// Whether a hit target belongs to the active modal's own surface
+/// (§25): everything else is background and stays inert.
+fn modal_target(target: HitTarget) -> bool {
+    matches!(
+        target,
+        HitTarget::PickerRow(_) | HitTarget::ModalButton(_) | HitTarget::ModalField
+    )
+}
+
+/// The armed-click discipline (§16–§22) applied to the Open picker's
+/// own controls: rows and buttons arm and activate like every other
+/// control, the wheel steps the listing where it has rows, and a
+/// click anywhere else — including the background visible around the
+/// popup — disarms and dispatches nothing.
+fn decode_modal_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction> {
+    match mouse.kind {
+        MouseEventKind::Down(MouseButton::Left) => match model.hit_test(mouse.column, mouse.row) {
+            Some(target) if modal_target(target) => {
+                model.focus = TuiModel::focus_of_target(target);
+                model.armed = model.action_of_target(target).map(|_| ArmedClick {
+                    target,
+                    column: mouse.column,
+                    row: mouse.row,
+                });
+                None
+            }
+            _ => {
+                model.disarm();
+                None
+            }
+        },
+        MouseEventKind::Up(MouseButton::Left) => {
+            // The same one-rule check as the background: same cell,
+            // same target still under the pointer, still a modal
+            // control (§17; G1 F15).
+            let armed = model.armed.take()?;
+            if modal_target(armed.target)
+                && armed.column == mouse.column
+                && armed.row == mouse.row
+                && model.hit_test(mouse.column, mouse.row) == Some(armed.target)
+            {
+                model.action_of_target(armed.target)
+            } else {
+                None
+            }
+        }
+        MouseEventKind::Drag(_) => {
+            model.disarm();
+            None
+        }
+        // The wheel cancels any armed press even inside the modal
+        // (§22), and steps the listing where it has rows.
+        MouseEventKind::ScrollUp => {
+            model.disarm();
+            modal_wheel(model, &mouse, PlaylistCursor::Previous)
+        }
+        MouseEventKind::ScrollDown => {
+            model.disarm();
+            modal_wheel(model, &mouse, PlaylistCursor::Next)
+        }
+        _ => None,
+    }
+}
+
+/// The wheel action over one cell while the picker is open: a listing
+/// scroll over the listing rows, otherwise nothing.
+fn modal_wheel(model: &TuiModel, mouse: &MouseEvent, cursor: PlaylistCursor) -> Option<TuiAction> {
+    match model.hit_test(mouse.column, mouse.row)? {
+        HitTarget::PickerRow(_) => Some(TuiAction::ModalInput(ModalInput::ListMove(cursor))),
+        _ => None,
     }
 }
 
@@ -1339,6 +2234,30 @@ mod tests {
         });
         assert_eq!(model.timeline_label(), "00:42 / 03:58");
 
+        // The live pre-first-sample window (owner re-review P1): format
+        // and duration have arrived, the position projection has NOT.
+        // The window where a fabricated start was observable — and the
+        // unknown position must still not be rewritten into a zero.
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            position: None,
+            source_duration: Some(Duration::from_secs(238)),
+            ..pending()
+        });
+        assert_eq!(
+            model.timeline_label(),
+            "--:-- / 03:58",
+            "a live episode without a position sample keeps the dashes"
+        );
+        assert!(
+            model.position_bar_label().is_none(),
+            "the bar does not render a fabricated start fill"
+        );
+
         // A settled episode (the seam withdraws the position) keeps the
         // duration evidence and shows no position — no final-position
         // latch is invented here either.
@@ -1353,6 +2272,61 @@ mod tests {
             ..pending()
         });
         assert_eq!(model.timeline_label(), "--:-- / 03:58");
+    }
+
+    /// The progress bar renders only from BOTH sides' evidence: the
+    /// fraction is the published position over the reported duration,
+    /// clamped when the position runs past the duration, and no state
+    /// short of both sides draws anything.
+    #[test]
+    fn the_position_bar_renders_only_from_both_sides_evidence() {
+        let mut model = TuiModel::new("song.flac");
+
+        // Nothing at all: no bar.
+        assert_eq!(model.position_bar_label(), None);
+
+        // Duration alone (position unknown — even LIVE): still no bar.
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            source_duration: Some(Duration::from_secs(238)),
+            ..pending()
+        });
+        assert_eq!(model.position_bar_label(), None);
+
+        // Both sides: 00:42 of 03:58 fills 42/238 of the width.
+        model.update(PlaybackSessionObservation {
+            source_format: Some(PcmFormat {
+                sample_rate: 44100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            position: Some(44_100 * 42),
+            source_duration: Some(Duration::from_secs(238)),
+            ..pending()
+        });
+        let bar = model.position_bar_label().expect("both sides known");
+        let filled = bar.chars().filter(|&c| c == '━').count();
+        assert_eq!(filled, 42 * BAR_WIDTH / 238, "{bar}");
+        assert!(
+            bar.starts_with("00:42 ") && bar.ends_with(" 03:58"),
+            "{bar}"
+        );
+
+        // A position past the reported duration clamps to a full bar.
+        model.update(PlaybackSessionObservation {
+            position: Some(44_100 * 300),
+            ..model.observation().clone()
+        });
+        let bar = model.position_bar_label().expect("still both sides");
+        assert_eq!(
+            bar.chars().filter(|&c| c == '━').count(),
+            BAR_WIDTH,
+            "{bar}"
+        );
     }
 
     #[test]
@@ -1605,7 +2579,8 @@ mod tests {
             }]
         });
 
-        // Now Playing: four tabs then the four transport buttons.
+        // Now Playing: four tabs, then the five transport buttons
+        // (Open included), then the preference row.
         model.set_route(TuiRoute::NowPlaying);
         assert_eq!(
             model.focus_cycle(),
@@ -1614,10 +2589,15 @@ mod tests {
                 FocusId::RouteTab(TuiRoute::Playlist),
                 FocusId::RouteTab(TuiRoute::Audio),
                 FocusId::RouteTab(TuiRoute::Visualizer),
+                FocusId::Transport(TransportButton::Open),
                 FocusId::Transport(TransportButton::Previous),
                 FocusId::Transport(TransportButton::PlayPause),
                 FocusId::Transport(TransportButton::Stop),
                 FocusId::Transport(TransportButton::Next),
+                FocusId::Preference(PreferenceButton::VolumeDown),
+                FocusId::Preference(PreferenceButton::VolumeUp),
+                FocusId::Preference(PreferenceButton::Order),
+                FocusId::Preference(PreferenceButton::Repeat),
             ]
         );
 
@@ -1717,7 +2697,7 @@ mod tests {
         model.set_route(TuiRoute::NowPlaying);
         assert_eq!(
             model.focus(),
-            Some(FocusId::Transport(TransportButton::Previous)),
+            Some(FocusId::Transport(TransportButton::Open)),
             "an out-of-cycle focus falls back to the route's first local control"
         );
     }
@@ -2061,16 +3041,18 @@ mod tests {
         assert_eq!(model.modal(), None);
         assert_eq!(
             model.focus(),
-            Some(FocusId::Transport(TransportButton::Previous)),
+            Some(FocusId::Transport(TransportButton::Open)),
             "closing restores the route's first meaningful local focus (§24)"
         );
     }
 
-    /// The Open modal lifecycle: begin → edit → confirm returns the
-    /// candidate and closes; an empty line and Esc are cancels; a
-    /// second O restarts the line.
+    /// The Open picker's field is a text line that never COMMITS (T0
+    /// picker freeze, G1 F05): its Enter is the runtime's
+    /// navigate-or-select step, so the model's confirm answers Nothing
+    /// for the picker and the modal stays open — only Esc (or the
+    /// runtime's success path) closes it.
     #[test]
-    fn the_open_modal_edits_confirms_and_cancels() {
+    fn the_open_picker_field_edits_and_never_commits_from_the_model() {
         let mut model = TuiModel::new("song.flac");
         assert_eq!(model.modal(), None);
 
@@ -2083,20 +3065,15 @@ mod tests {
         model.modal_backspace();
         assert_eq!(model.modal_line(), Some("/media/b.fla"));
 
-        assert_eq!(
-            model.confirm_modal(),
-            ModalConfirm::Open("/media/b.fla".to_owned()),
-            "confirm returns the candidate and closes the modal"
-        );
-        assert_eq!(model.modal(), None);
-
-        // An empty line confirms nothing — it is a cancel, never an
-        // Open of "".
-        model.open_modal(ModalKind::Open);
+        // The model's confirm is a no-op for the picker: the field
+        // never starts playback, and the modal stays for the runtime's
+        // navigate-or-select handling.
         assert_eq!(model.confirm_modal(), ModalConfirm::Nothing);
-        assert_eq!(model.modal(), None);
+        assert!(model.modal().is_some(), "the picker stays open");
+        assert_eq!(model.modal_line(), Some("/media/b.fla"), "the line stays");
 
         // Editing primitives are inert without an open text modal.
+        model.close_modal();
         model.modal_push('x');
         assert_eq!(model.modal(), None);
     }
@@ -2178,7 +3155,10 @@ mod tests {
             "the Down dispatches nothing"
         );
         assert_eq!(model.focus(), Some(FocusId::RouteTab(TuiRoute::Playlist)));
-        assert_eq!(model.armed(), Some(HitTarget::RouteTab(TuiRoute::Playlist)));
+        assert_eq!(
+            model.armed().map(|armed| armed.target),
+            Some(HitTarget::RouteTab(TuiRoute::Playlist))
+        );
         assert_eq!(
             decode_mouse(
                 mouse(MouseEventKind::Up(MouseButton::Left), column, row),
@@ -2266,7 +3246,7 @@ mod tests {
             &mut model,
         );
         assert_eq!(
-            model.armed(),
+            model.armed().map(|armed| armed.target),
             Some(HitTarget::Transport(TransportButton::PlayPause))
         );
         model.set_route(TuiRoute::Playlist);
@@ -2278,6 +3258,384 @@ mod tests {
             ),
             None
         );
+    }
+
+    /// G1 F06, the stale-arm lifetime (§17): a press armed on one
+    /// episode cannot activate into the next one. The episode is
+    /// REPLACED between Down and Up — and the same control reappears at
+    /// the SAME cell — but the Up is inert: the arm died with the
+    /// replaced episode, not with the geometry.
+    #[test]
+    fn an_episode_replacement_disarms_a_press_even_at_the_same_cell() {
+        let mut model = model_with_regions(100, 30, TuiRoute::NowPlaying);
+        let (column, row) = region_cell(&model, &HitTarget::Transport(TransportButton::PlayPause));
+        decode_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), column, row),
+            &mut model,
+        );
+        assert!(model.armed().is_some(), "the press arms");
+
+        // The episode is replaced by a redraw that publishes THE SAME
+        // regions — only the committed source changed.
+        model.set_episode(Some("other-song.flac".to_owned()));
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| super::super::view::draw(frame, &mut model))
+            .expect("draw");
+        assert_eq!(
+            model.hit_test(column, row),
+            Some(HitTarget::Transport(TransportButton::PlayPause)),
+            "the same control IS rendered at the same cell for the new episode"
+        );
+        assert_eq!(model.armed(), None, "the replacement disarmed the press");
+        assert_eq!(
+            decode_mouse(
+                mouse(MouseEventKind::Up(MouseButton::Left), column, row),
+                &mut model
+            ),
+            None,
+            "the old interaction cannot cross into the new episode"
+        );
+    }
+
+    /// §22 (G1 re-review): a wheel step cancels an armed press and acts
+    /// once on the control under the pointer — a press-and-hold, a
+    /// wheel, then a release on the same cell must NOT activate the
+    /// armed target.
+    #[test]
+    fn a_wheel_step_cancels_an_armed_press() {
+        let mut model = model_with_regions(100, 30, TuiRoute::Playlist);
+        let (column, row) = region_cell(&model, &HitTarget::PlaylistRow(2));
+        decode_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), column, row),
+            &mut model,
+        );
+        assert!(model.armed().is_some(), "the row press arms");
+
+        // The wheel acts once (the selection moves) and kills the arm.
+        assert_eq!(
+            decode_mouse(mouse(MouseEventKind::ScrollDown, column, row), &mut model),
+            Some(TuiAction::PlaylistSelect(PlaylistCursor::Next)),
+            "the wheel acts on the control under the pointer"
+        );
+        assert_eq!(model.armed(), None, "the wheel cancelled the arm");
+        assert_eq!(
+            decode_mouse(
+                mouse(MouseEventKind::Up(MouseButton::Left), column, row),
+                &mut model
+            ),
+            None,
+            "the release after a wheel is inert"
+        );
+
+        // The same rule inside the modal.
+        let mut model = model_with_regions(100, 30, TuiRoute::NowPlaying);
+        model.open_modal(ModalKind::Open);
+        model.set_open_listing(
+            std::path::PathBuf::from("/media"),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "b.flac".to_owned(),
+                is_dir: false,
+                path: std::path::PathBuf::from("/media/b.flac"),
+            }]),
+        );
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| super::super::view::draw(frame, &mut model))
+            .expect("draw");
+        let (column, row) = region_cell(&model, &HitTarget::PickerRow(0));
+        decode_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), column, row),
+            &mut model,
+        );
+        assert!(model.armed().is_some(), "the picker row press arms");
+        assert_eq!(
+            decode_mouse(mouse(MouseEventKind::ScrollDown, column, row), &mut model),
+            Some(TuiAction::ModalInput(ModalInput::ListMove(
+                PlaylistCursor::Next
+            ))),
+        );
+        assert_eq!(model.armed(), None, "the modal wheel cancelled the arm");
+    }
+
+    /// §25 (T0 focus rule, G1 re-review): a focused control consumes
+    /// Space exactly like Enter; the global pause/play accelerator
+    /// acts only when nothing is focused.
+    #[test]
+    fn space_activates_the_focused_control_before_the_global_accelerator() {
+        let mut model = model_with_regions(100, 30, TuiRoute::NowPlaying);
+        model.set_focus(Some(FocusId::Transport(TransportButton::Stop)));
+        assert_eq!(
+            decode_key(key(KeyCode::Char(' ')), &model),
+            Some(TuiAction::ActivateFocused),
+            "the focused control consumes Space"
+        );
+
+        model.set_focus(None);
+        assert_eq!(
+            decode_key(key(KeyCode::Char(' ')), &model),
+            Some(TuiAction::PlayPause),
+            "with no focus, Space is the global accelerator"
+        );
+    }
+
+    /// §22 (G1 re-review): "the same applies after content changes
+    /// that move targets" — a status block that changes SHAPE (its
+    /// bounded line count) moves every target below it and cancels the
+    /// arm; a same-shape feedback keeps it.
+    #[test]
+    fn a_status_shape_change_disarms_but_a_same_shape_feedback_keeps_the_arm() {
+        let mut model = model_with_regions(100, 30, TuiRoute::NowPlaying);
+        let (column, row) = region_cell(&model, &HitTarget::Transport(TransportButton::Stop));
+        decode_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), column, row),
+            &mut model,
+        );
+        assert!(model.armed().is_some(), "the press arms");
+
+        // A second feedback line grows the status block: the targets
+        // below move.
+        model.set_status(Some("volume 75/100 (desired)\nsecond line".to_owned()));
+        assert_eq!(model.armed(), None, "the shape change cancelled the arm");
+
+        // Re-arm, then a same-shape feedback: the targets stay put.
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| super::super::view::draw(frame, &mut model))
+            .expect("draw");
+        let (column, row) = region_cell(&model, &HitTarget::Transport(TransportButton::Stop));
+        decode_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), column, row),
+            &mut model,
+        );
+        assert!(model.armed().is_some());
+        model.set_status(Some(
+            "opened /media (2 candidates)\nanother line".to_owned(),
+        ));
+        assert!(
+            model.armed().is_some(),
+            "a same-shape feedback keeps the arm"
+        );
+    }
+
+    /// The T0 picker freeze's [Use this folder]: the DISPLAYED
+    /// directory becomes the submission subject, outranking any typed
+    /// line or row selection; a field edit, a row selection or a
+    /// navigation replaces it.
+    #[test]
+    fn use_this_folder_makes_the_displayed_directory_the_subject() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::Open);
+        model.set_open_listing(
+            std::path::PathBuf::from("/media/albums"),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "b.flac".to_owned(),
+                is_dir: false,
+                path: std::path::PathBuf::from("/media/albums/b.flac"),
+            }]),
+        );
+
+        // Select a row AND type a line: the folder target still wins.
+        model.move_picker_cursor(PlaylistCursor::Next);
+        model.modal_push('x');
+        model.use_picker_folder();
+        assert_eq!(
+            model.picker_subject(),
+            PickerSubject::Listing {
+                path: std::path::PathBuf::from("/media/albums"),
+                is_dir: true,
+            },
+            "the displayed directory is the subject"
+        );
+
+        // A field edit replaces it (the typed line is the subject).
+        model.modal_push('y');
+        assert_eq!(
+            model.picker_subject(),
+            PickerSubject::Typed("xy".to_owned()),
+            "editing the field replaces the folder target"
+        );
+
+        // So does a row selection; and a navigation resets everything.
+        model.use_picker_folder();
+        model.move_picker_cursor(PlaylistCursor::Row(1));
+        assert_eq!(
+            model.picker_subject(),
+            PickerSubject::Listing {
+                path: std::path::PathBuf::from("/media/albums/b.flac"),
+                is_dir: false,
+            },
+            "a row selection replaces the folder target"
+        );
+        model.use_picker_folder();
+        model.set_open_listing(
+            std::path::PathBuf::from("/media"),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "c.flac".to_owned(),
+                is_dir: false,
+                path: std::path::PathBuf::from("/media/c.flac"),
+            }]),
+        );
+        assert_eq!(
+            model.picker_subject(),
+            PickerSubject::Typed("xy".to_owned()),
+            "a navigation cleared the (stale) folder target; the user's \
+             typed line — what the field shows — is the subject again"
+        );
+    }
+
+    /// G1 F06, the list-revision half of the arm lifetime: a press
+    /// armed on a playlist row cannot survive a list edit, even when a
+    /// row still sits at the same coordinates (§17: a list revision
+    /// change cancels the arm).
+    #[test]
+    fn a_playlist_revision_change_disarms_a_row_press() {
+        let mut model = model_with_regions(100, 30, TuiRoute::Playlist);
+        let (column, row) = region_cell(&model, &HitTarget::PlaylistRow(2));
+        decode_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), column, row),
+            &mut model,
+        );
+        assert!(model.armed().is_some(), "the row press arms");
+
+        // A list edit moves the revision; a redraw publishes fresh
+        // regions where SOME row still occupies the cell.
+        model.set_playlist(2, || {
+            (0..40)
+                .map(|n| PlaylistRow {
+                    label: format!("new-track-{n:02}.flac"),
+                    playing: false,
+                    selected: false,
+                })
+                .collect()
+        });
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| super::super::view::draw(frame, &mut model))
+            .expect("draw");
+        assert_eq!(model.armed(), None, "the revision change disarmed");
+        assert_eq!(
+            decode_mouse(
+                mouse(MouseEventKind::Up(MouseButton::Left), column, row),
+                &mut model
+            ),
+            None,
+            "the old row interaction cannot fire on the edited list"
+        );
+    }
+
+    /// G1 F15: the arm carries its origin CELL. A Down and an Up on
+    /// DIFFERENT cells of the same wide control are different
+    /// interactions — the Up is inert, even though both cells hit-test
+    /// to the same target (§17: matching Up on the same target/cell).
+    #[test]
+    fn a_release_on_a_different_cell_of_the_same_control_is_inert() {
+        let mut model = model_with_regions(100, 30, TuiRoute::NowPlaying);
+        let region = model
+            .regions()
+            .iter()
+            .find(|region| region.target == HitTarget::Transport(TransportButton::PlayPause))
+            .expect("the transport region");
+        let down = (region.area.x + 1, region.area.y);
+        let up = (region.area.x + region.area.width - 2, region.area.y);
+        assert_ne!(down, up, "the two cells differ within the one control");
+        assert_eq!(
+            model.hit_test(up.0, up.1),
+            Some(HitTarget::Transport(TransportButton::PlayPause)),
+            "the release cell still hit-tests to the SAME target"
+        );
+        decode_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), down.0, down.1),
+            &mut model,
+        );
+        assert_eq!(
+            decode_mouse(
+                mouse(MouseEventKind::Up(MouseButton::Left), up.0, up.1),
+                &mut model
+            ),
+            None,
+            "same target, different cell: no activation"
+        );
+        assert_eq!(model.armed(), None, "the release consumed the stale arm");
+    }
+
+    /// G1 F16 (§24): a modal close restores the route-local focus the
+    /// modal interrupted — when that focus still exists; an obsolete
+    /// one falls back to §12.
+    #[test]
+    fn a_modal_close_restores_the_prior_route_focus() {
+        let mut model = model_with_regions(100, 30, TuiRoute::NowPlaying);
+        model.set_focus(Some(FocusId::Preference(PreferenceButton::Repeat)));
+        model.open_modal(ModalKind::Open);
+        assert_eq!(model.focus(), Some(FocusId::ModalField));
+        model.close_modal();
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::Preference(PreferenceButton::Repeat)),
+            "close restores the interrupted route focus (§24)"
+        );
+
+        // A focus that no longer exists after the close falls back.
+        model.open_modal(ModalKind::GoTo);
+        model.set_route(TuiRoute::Audio);
+        model.close_modal();
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::RouteTab(TuiRoute::NowPlaying)),
+            "an obsolete restored focus falls back to §12: the first tab"
+        );
+    }
+
+    /// G1 F07 (model side): the seek buttons join the focus cycle only
+    /// while the episode publishes position + rate — the evidence a
+    /// relative seek is computed from. Duration has no say here; the
+    /// click-to-position bar has its own, separate gate.
+    #[test]
+    fn the_seek_buttons_hold_focus_stops_only_with_position_and_rate() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(pending());
+        model.set_class(ResponsiveClass::Normal);
+        let cycle = model.focus_cycle();
+        assert!(
+            !cycle.iter().any(|id| matches!(id, FocusId::Seek(_))),
+            "no seek stops without evidence"
+        );
+
+        // Position + rate: the two stops exist, before the transport.
+        model.update(PlaybackSessionObservation {
+            source_format: Some(qianqian_audio_api::ports::PcmFormat {
+                sample_rate: 44_100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            position: Some(44_100),
+            ..pending()
+        });
+        let cycle = model.focus_cycle();
+        let seek_positions: Vec<usize> = cycle
+            .iter()
+            .enumerate()
+            .filter_map(|(index, id)| matches!(id, FocusId::Seek(_)).then_some(index))
+            .collect();
+        assert_eq!(seek_positions, vec![4, 5], "two stops after the four tabs");
+        model.focus = Some(FocusId::Seek(SeekButton::Forward));
+        assert_eq!(
+            model.activation(),
+            Some(TuiAction::SeekRelative(SEEK_STEP_SECS)),
+            "activation is the SAME frozen relative seek"
+        );
+
+        // The rate disappears: the stops go with it.
+        model.update(PlaybackSessionObservation {
+            source_format: None,
+            position: Some(44_100),
+            ..pending()
+        });
+        assert!(!model.relative_seek_available());
     }
 
     /// Drag cancels the armed click (§21); plain movement is inert (§18).
@@ -2483,5 +3841,366 @@ mod tests {
         assert_eq!(responsive_class(50, 16), ResponsiveClass::Compact);
         assert_eq!(responsive_class(80, 24), ResponsiveClass::Normal);
         assert_eq!(responsive_class(120, 40), ResponsiveClass::Wide);
+    }
+
+    // ------------------------------------------------------------------
+    // G1: the Open picker grammar, the seek bar, the DSP summary.
+    // ------------------------------------------------------------------
+
+    /// The picker's keyboard grammar (G1 §8): Tab cycles field → list
+    /// → commit buttons; ↑/↓ move the listing cursor and hand focus to
+    /// the list; typing always edits the field and returns focus to it;
+    /// Backspace edits on the field and steps to the parent on the
+    /// list; Enter acts on the focused control.
+    #[test]
+    fn the_open_picker_keyboard_grammar_walks_field_list_and_buttons() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::Open);
+        model.set_open_listing(
+            std::path::PathBuf::from("/media"),
+            Ok(vec![
+                crate::input::DirectoryEntry {
+                    name: "album".to_owned(),
+                    is_dir: true,
+                    path: std::path::PathBuf::from("/media/album"),
+                },
+                crate::input::DirectoryEntry {
+                    name: "b.flac".to_owned(),
+                    is_dir: false,
+                    path: std::path::PathBuf::from("/media/b.flac"),
+                },
+            ]),
+        );
+        // The `..` parent row is synthesized in front of the listing.
+        assert_eq!(model.modal().map(Modal::kind), Some(ModalKind::Open));
+        assert_eq!(model.focus(), Some(FocusId::ModalField));
+
+        // Down: into the list, first row (the parent row).
+        assert_eq!(
+            decode_key(key(KeyCode::Down), &model),
+            Some(TuiAction::ModalInput(ModalInput::ListMove(
+                PlaylistCursor::Next
+            )))
+        );
+        model.move_picker_cursor(PlaylistCursor::Next);
+        assert_eq!(model.focus(), Some(FocusId::PickerList));
+
+        // Typing from the list is type-through: the field edits and
+        // regains focus.
+        assert_eq!(
+            decode_key(key(KeyCode::Char('x')), &model),
+            Some(TuiAction::ModalInput(ModalInput::Char('x')))
+        );
+        model.modal_push('x');
+        assert_eq!(model.modal_line(), Some("x"));
+        assert_eq!(model.focus(), Some(FocusId::ModalField));
+
+        // Tab walks field → [Use this folder] → list → Open → Add →
+        // Enter folder → Cancel → field.
+        for expected in [
+            FocusId::PickerButton(ModalButton::UseFolder),
+            FocusId::PickerList,
+            FocusId::PickerButton(ModalButton::Open),
+            FocusId::PickerButton(ModalButton::Add),
+            FocusId::PickerButton(ModalButton::EnterFolder),
+            FocusId::PickerButton(ModalButton::Cancel),
+            FocusId::ModalField,
+        ] {
+            model.move_focus(FocusMove::Next);
+            assert_eq!(model.focus(), Some(expected));
+        }
+
+        // Backspace on the LIST is the parent step, on the FIELD an
+        // edit. Shift+Tab walks back: field → Cancel → Enter folder →
+        // Add → Open → list.
+        model.move_focus(FocusMove::Previous);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerButton(ModalButton::Cancel))
+        );
+        model.move_focus(FocusMove::Previous);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerButton(ModalButton::EnterFolder))
+        );
+        model.move_focus(FocusMove::Previous);
+        assert_eq!(model.focus(), Some(FocusId::PickerButton(ModalButton::Add)));
+        model.move_focus(FocusMove::Previous);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerButton(ModalButton::Open))
+        );
+        model.move_focus(FocusMove::Previous);
+        assert_eq!(model.focus(), Some(FocusId::PickerList));
+        assert_eq!(
+            decode_key(key(KeyCode::Backspace), &model),
+            Some(TuiAction::ModalInput(ModalInput::ListParent))
+        );
+        model.set_focus(Some(FocusId::ModalField));
+        assert_eq!(
+            decode_key(key(KeyCode::Backspace), &model),
+            Some(TuiAction::ModalInput(ModalInput::Backspace))
+        );
+
+        // Enter follows the focus: list activates, a button commits or
+        // navigates, the field confirms (navigate-or-select).
+        assert_eq!(
+            decode_key(key(KeyCode::Enter), &model),
+            Some(TuiAction::ModalInput(ModalInput::Confirm))
+        );
+        model.set_focus(Some(FocusId::PickerButton(ModalButton::Add)));
+        assert_eq!(
+            decode_key(key(KeyCode::Enter), &model),
+            Some(TuiAction::ModalInput(ModalInput::CommitAdd))
+        );
+        model.set_focus(Some(FocusId::PickerList));
+        assert_eq!(
+            decode_key(key(KeyCode::Enter), &model),
+            Some(TuiAction::ModalInput(ModalInput::ListActivate))
+        );
+        model.set_focus(Some(FocusId::PickerButton(ModalButton::EnterFolder)));
+        assert_eq!(
+            decode_key(key(KeyCode::Enter), &model),
+            Some(TuiAction::ModalInput(ModalInput::ListActivate)),
+            "the mouse's [Enter folder] is the list's Enter: one action"
+        );
+    }
+
+    /// The cursor movement rule: from unselected, ↓ enters at the top
+    /// and ↑ at the bottom; a row click selects that row; the cursor
+    /// clamps at the edges. The `..` row's NATIVE path is the parent
+    /// directory (G1 F10).
+    #[test]
+    fn the_picker_cursor_moves_and_clamps() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::Open);
+        let feed = Ok(vec![
+            crate::input::DirectoryEntry {
+                name: "d1".to_owned(),
+                is_dir: true,
+                path: std::path::PathBuf::from("/media/d1"),
+            },
+            crate::input::DirectoryEntry {
+                name: "f1.flac".to_owned(),
+                is_dir: false,
+                path: std::path::PathBuf::from("/media/f1.flac"),
+            },
+        ]);
+        model.set_open_listing(std::path::PathBuf::from("/media"), feed);
+        // Entries: [.., d1, f1.flac].
+        model.move_picker_cursor(PlaylistCursor::Next);
+        assert_eq!(
+            model.picker_cursor_entry().map(|(_entry, path, _)| path),
+            Some(std::path::PathBuf::from("/")),
+            "the first ↓ lands on the `..` row, which resolves to the PARENT"
+        );
+        model.move_picker_cursor(PlaylistCursor::Next);
+        model.move_picker_cursor(PlaylistCursor::Next);
+        assert_eq!(
+            model.picker_cursor_entry().map(|(_entry, path, _)| path),
+            Some(std::path::PathBuf::from("/media/f1.flac")),
+        );
+        model.move_picker_cursor(PlaylistCursor::Next);
+        assert_eq!(
+            model.picker_cursor_entry().map(|(_entry, path, _)| path),
+            Some(std::path::PathBuf::from("/media/f1.flac")),
+            "the cursor clamps at the last row"
+        );
+        model.move_picker_cursor(PlaylistCursor::Row(1));
+        assert_eq!(
+            model.picker_cursor_entry().map(|(_entry, path, _)| path),
+            Some(std::path::PathBuf::from("/media/d1")),
+            "a row click selects that row"
+        );
+        model.move_picker_cursor(PlaylistCursor::Previous);
+        assert_eq!(
+            model.picker_cursor_entry().map(|(_entry, path, _)| path),
+            Some(std::path::PathBuf::from("/")),
+            "activating `..` ascends"
+        );
+    }
+
+    /// The ONE deterministic submission subject (G1 §8/F08): the
+    /// selected row while one is selected; editing the field CLEARS
+    /// the selection, so the subject becomes the typed line — never a
+    /// stale row behind a freshly edited target.
+    #[test]
+    fn the_picker_subject_prefers_the_selection_and_an_edit_clears_it() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::Open);
+        assert_eq!(model.picker_subject(), PickerSubject::None);
+        model.modal_push('/');
+
+        // No selection: the typed line is the subject, as typed (the
+        // runtime normalizes it against the displayed directory).
+        assert_eq!(model.picker_subject(), PickerSubject::Typed("/".to_owned()),);
+
+        // The listing is rebuilt (which resets the cursor); selecting
+        // a row makes the SELECTION the subject, with its native path.
+        model.set_open_listing(
+            std::path::PathBuf::from("/media"),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "b.flac".to_owned(),
+                is_dir: false,
+                path: std::path::PathBuf::from("/media/b.flac"),
+            }]),
+        );
+        model.move_picker_cursor(PlaylistCursor::Row(1));
+        assert_eq!(
+            model.picker_subject(),
+            PickerSubject::Listing {
+                path: std::path::PathBuf::from("/media/b.flac"),
+                is_dir: false,
+            },
+            "the selected row — its native identity — is the subject"
+        );
+
+        // Editing the field invalidates the stale row selection: the
+        // subject becomes exactly what the field now shows.
+        model.modal_push('x');
+        assert_eq!(
+            model.picker_subject(),
+            PickerSubject::Typed("/x".to_owned()),
+            "an edited field is the subject; the old row cannot hide behind it"
+        );
+        assert!(
+            model.picker_cursor_entry().is_none(),
+            "the cleared selection is visible: no row is marked"
+        );
+    }
+
+    /// A click on the seek bar decodes to the clicked cell's per-mille
+    /// of the bar (G1 §9): Down arms, Up activates at the SAME cell,
+    /// and the fraction comes from the frame's own published geometry.
+    #[test]
+    fn a_click_on_the_seek_bar_decodes_to_a_per_mille_of_the_bar() {
+        let mut model = TuiModel::new("song.flac");
+        model.update(PlaybackSessionObservation {
+            source_format: Some(qianqian_audio_api::ports::PcmFormat {
+                sample_rate: 44_100,
+                channels: 2,
+                channel_mask: 0x3,
+            }),
+            position: Some(44_100),
+            source_duration: Some(Duration::from_secs(200)),
+            ..pending()
+        });
+        model.set_class(ResponsiveClass::Wide);
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| super::super::view::draw(frame, &mut model))
+            .expect("draw");
+        let region = model
+            .regions()
+            .iter()
+            .find(|region| region.target == HitTarget::SeekBar)
+            .expect("the bar publishes a region with duration evidence");
+        let column = region.area.x + region.area.width / 2;
+        let row = region.area.y;
+
+        let down = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        };
+        let up = MouseEvent {
+            kind: MouseEventKind::Up(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert_eq!(decode_mouse(down, &mut model), None, "Down only arms");
+        assert_eq!(
+            decode_mouse(up, &mut model),
+            Some(TuiAction::SeekPerMille(520)),
+            "the click's per-mille of the DRAWN glyph (24 cells, click at center)"
+        );
+    }
+
+    /// The fraction seek target is a per-mille of the PUBLISHED
+    /// duration — and `None` (no command at all) without duration
+    /// evidence: an unknown timeline is never clickable into a
+    /// fabricated target.
+    #[test]
+    fn the_seek_fraction_target_needs_published_duration_evidence() {
+        let with_duration = PlaybackSessionObservation {
+            source_duration: Some(Duration::from_secs(200)),
+            ..pending()
+        };
+        assert_eq!(
+            seek_fraction_target(&with_duration, 500),
+            Some(Duration::from_secs(100))
+        );
+        assert_eq!(
+            seek_fraction_target(&with_duration, 1000),
+            Some(Duration::from_secs(200))
+        );
+        assert_eq!(
+            seek_fraction_target(&with_duration, 1500),
+            Some(Duration::from_secs(200)),
+            "the fraction clamps into the duration"
+        );
+        let without_duration = PlaybackSessionObservation {
+            source_duration: None,
+            ..pending()
+        };
+        assert_eq!(seek_fraction_target(&without_duration, 500), None);
+        let zero_duration = PlaybackSessionObservation {
+            source_duration: Some(Duration::ZERO),
+            ..pending()
+        };
+        assert_eq!(seek_fraction_target(&zero_duration, 500), None);
+    }
+
+    /// The DSP summary line (G1): a DESIRED-state statement only —
+    /// bypass says off, a preset configuration names the preset, a
+    /// custom EQ says custom, the preamp renders in dB — and nothing
+    /// here claims an applied state.
+    #[test]
+    fn the_dsp_summary_names_the_desired_configuration_only() {
+        assert_eq!(
+            dsp_summary(&AudioProcessingConfig::BYPASS),
+            "DSP (desired): off (bypass)"
+        );
+        assert_eq!(
+            dsp_summary(&EqPreset::Rock.to_config()),
+            "DSP (desired): on — preset rock, preamp +0.0 dB"
+        );
+        let mut custom = EqPreset::Bass.to_config();
+        custom.eq = Some(qianqian_playback::EqConfig::new(
+            qianqian_playback::EqConfig::FLAT.band_gain_db,
+            1.7,
+        ));
+        assert_eq!(
+            dsp_summary(&custom),
+            "DSP (desired): on — custom EQ, preamp +0.0 dB"
+        );
+        assert_eq!(
+            dsp_summary(&AudioProcessingConfig::gain(2.0)),
+            "DSP (desired): on — preamp +6.0 dB"
+        );
+    }
+    /// Below the minimum size the shell paints no popup (§28), so the
+    /// modal's keys go inert except the cancel: a blind Enter behind
+    /// an invisible picker must never commit a real Open.
+    #[test]
+    fn a_modal_below_the_minimum_only_cancels() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::Open);
+        model.modal_push('x');
+        model.set_class(ResponsiveClass::Minimum);
+        assert_eq!(
+            decode_key(key(KeyCode::Enter), &model),
+            None,
+            "no blind commit behind an invisible popup"
+        );
+        assert_eq!(decode_key(key(KeyCode::Char('a')), &model), None);
+        assert_eq!(
+            decode_key(key(KeyCode::Esc), &model),
+            Some(TuiAction::ModalInput(ModalInput::Cancel)),
+            "Esc stays the honest way out"
+        );
     }
 }
