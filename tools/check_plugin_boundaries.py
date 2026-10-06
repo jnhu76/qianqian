@@ -392,7 +392,7 @@ EXPORT_RULES = {
         "authority": "ADR-PBK-002 D5/D7 as amended by ADR-PBK-003 §2/§3/§11 — the admitted public surface is exactly the STABLE Output Plugin constructor (the owned WASAPI Host Render Backend stays crate-private; consumers reach the mechanism only as the AudioOutput capability service; backend brand must not reappear in the composition identity)",
     },
     # U2 (Issue #166) presentation/product-policy modules. A Cargo edge
-    # cannot express an intra-crate firewall, and these four modules are
+    # cannot express an intra-crate firewall, and these modules are
     # where the playlist policy and the shell live: they may speak the
     # F2 episode seam vocabulary (qianqian_playback's read types) and
     # nothing of the composition kernel, the providers or the PCM
@@ -403,24 +403,73 @@ EXPORT_RULES = {
         "forbid": U2_SHELL_FORBIDDEN,
         "authority": U2_SHELL_AUTHORITY,
     },
-    "apps/headless/src/tui/model.rs": {
-        "forbid": U2_SHELL_FORBIDDEN,
-        "authority": U2_SHELL_AUTHORITY,
-    },
-    "apps/headless/src/tui/view.rs": {
-        "forbid": U2_SHELL_FORBIDDEN,
-        "authority": U2_SHELL_AUTHORITY,
-    },
-    "apps/headless/src/tui/runtime.rs": {
-        "forbid": U2_SHELL_FORBIDDEN,
-        "authority": U2_SHELL_AUTHORITY,
-    },
-    # `apps/headless/src/tui/mod.rs` is deliberately NOT scanned: it is a
-    # module-index document whose text NAMES these mechanisms only to
-    # disclaim them ("never sees … PcmEdge …"), and a substring rule
-    # cannot tell a disclaimer from a dependency. The three modules that
-    # hold the shell's actual code are covered.
+    # The TUI shell itself (the three monoliths split into module
+    # directories, Issue #188): every file of model/, view/ and
+    # runtime/ carries the same shell rule. The list is EXPLICIT — a
+    # new file joins the scan on purpose, exactly like every other
+    # allowlist in this gate. `tui/mod.rs` is deliberately NOT
+    # scanned: it is a module-index document whose text NAMES these
+    # mechanisms only to disclaim them ("never sees … PcmEdge …"),
+    # and a substring rule cannot tell a disclaimer from a dependency.
+    # TUI_SHELL_FILES below feeds this table and MUTABLE_FILES.
 }
+
+# Every real file of the TUI shell's three module directories (the
+# cfg(test) helpers included — they are part of the shell's source and
+# answer to the same rule).
+TUI_SHELL_FILES = [
+    f"apps/headless/src/tui/{directory}/{name}"
+    for directory, names in (
+        (
+            "model",
+            (
+                "actions.rs",
+                "audio.rs",
+                "controls.rs",
+                "focus.rs",
+                "hit.rs",
+                "input.rs",
+                "interaction.rs",
+                "modal.rs",
+                "mod.rs",
+                "mouse.rs",
+                "projection.rs",
+                "responsive.rs",
+                "state.rs",
+                "testutil.rs",
+                "visualizer.rs",
+            ),
+        ),
+        (
+            "view",
+            (
+                "audio.rs",
+                "modal.rs",
+                "mod.rs",
+                "now_playing.rs",
+                "playlist.rs",
+                "testutil.rs",
+                "visualizer.rs",
+            ),
+        ),
+        (
+            "runtime",
+            (
+                "dispatch.rs",
+                "mod.rs",
+                "picker.rs",
+                "testutil.rs",
+            ),
+        ),
+    )
+    for name in names
+]
+
+for _tui_shell_path in TUI_SHELL_FILES:
+    EXPORT_RULES[_tui_shell_path] = {
+        "forbid": U2_SHELL_FORBIDDEN,
+        "authority": U2_SHELL_AUTHORITY,
+    }
 
 # Human-facing rule prose for violation output (mission §21 format).
 EDGE_RULE_PROSE = {
@@ -709,9 +758,7 @@ MUTABLE_FILES = [
     "crates/qianqian-output-wasapi/src/lib.rs",
     "apps/headless/Cargo.toml",
     "apps/headless/src/playlist.rs",
-    "apps/headless/src/tui/model.rs",
-    "apps/headless/src/tui/view.rs",
-    "apps/headless/src/tui/runtime.rs",
+    *TUI_SHELL_FILES,
     "Cargo.toml",
 ]
 
@@ -997,9 +1044,9 @@ def run_negative_controls():
     )
     expect_fail(
         "M9-tui-model PCM data-plane import",
-        "source: apps/headless/src/tui/model.rs",
+        "source: apps/headless/src/tui/model/projection.rs",
         {
-            "apps/headless/src/tui/model.rs": lambda t: t.replace(
+            "apps/headless/src/tui/model/projection.rs": lambda t: t.replace(
                 "use std::path::Path;",
                 "use std::path::Path;\n"
                 "use qianqian_audio_api::ports::DecodedPcmStream;",
@@ -1009,9 +1056,9 @@ def run_negative_controls():
     )
     expect_fail(
         "M9-tui-view K0-representation import",
-        "source: apps/headless/src/tui/view.rs",
+        "source: apps/headless/src/tui/view/mod.rs",
         {
-            "apps/headless/src/tui/view.rs": lambda t: t.replace(
+            "apps/headless/src/tui/view/mod.rs": lambda t: t.replace(
                 "use ratatui::Frame;",
                 "use qianqian_composition::ComponentSpec;\nuse ratatui::Frame;",
                 1,
@@ -1020,9 +1067,9 @@ def run_negative_controls():
     )
     expect_fail(
         "M9-tui-runtime PCM data-plane import",
-        "source: apps/headless/src/tui/runtime.rs",
+        "source: apps/headless/src/tui/runtime/mod.rs",
         {
-            "apps/headless/src/tui/runtime.rs": lambda t: t.replace(
+            "apps/headless/src/tui/runtime/mod.rs": lambda t: t.replace(
                 "use ratatui::Terminal;",
                 "use qianqian_audio_api::ports::RenderRequest;\nuse ratatui::Terminal;",
                 1,
