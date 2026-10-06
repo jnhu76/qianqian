@@ -71,7 +71,10 @@ pub(super) fn dispatch<S: EpisodeStart>(
             // the runtime performs the one directory read and hands the
             // listing to the model; an unreadable start keeps the
             // picker's honest diagnostic with the field typeable.
-            if kind == ModalKind::Open {
+            if matches!(
+                kind,
+                ModalKind::Open | ModalKind::AddFile | ModalKind::AddFolder
+            ) {
                 let start =
                     std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
                 navigate_picker_to(model, &start);
@@ -163,7 +166,8 @@ pub(super) fn dispatch<S: EpisodeStart>(
         }
         // The playlist selection is presentation of the App's own
         // selection cursor: it moves the cursor and nothing else
-        // (Issue #166 §18).
+        // (Issue #166 §18). The viewport reveals the selected row
+        // (T0: keyboard navigation selects and reveals).
         TuiAction::PlaylistSelect(cursor) => {
             match cursor {
                 PlaylistCursor::Next => player.select_next_track(),
@@ -172,10 +176,45 @@ pub(super) fn dispatch<S: EpisodeStart>(
                     player.select_track(position);
                 }
             }
+            if let Some(position) = player.playlist_selected_position() {
+                model.playlist_reveal(position);
+            }
             Step::Continue
         }
         TuiAction::PlaylistPlaySelected => {
             perform_play_selected(model, player);
+            Step::Continue
+        }
+        // The playlist toolbar (G2): Add File / Add Folder open the
+        // shared picker in their restricted Add mode; the submission
+        // and its feedback live in the picker's commit path.
+        TuiAction::PlaylistAddFile => {
+            open_picker(model, ModalKind::AddFile);
+            Step::Continue
+        }
+        TuiAction::PlaylistAddFolder => {
+            open_picker(model, ModalKind::AddFolder);
+            Step::Continue
+        }
+        // Remove (G2): the CURRENT row needs the frozen stop-aware
+        // confirmation first; a non-current row is a direct App list
+        // edit. The App owns the retire-then-edit ordering either way.
+        TuiAction::PlaylistRemove => {
+            if player.selected_is_live_episode() {
+                model.open_modal(ModalKind::ConfirmRemoveCurrent);
+            } else {
+                perform_remove_selected(model, player);
+            }
+            Step::Continue
+        }
+        // Clear (G2): the frozen stop-aware confirmation first while an
+        // episode is live; without one it is a direct App list edit.
+        TuiAction::PlaylistClear => {
+            if player.active_handle().is_some() {
+                model.open_modal(ModalKind::ConfirmClear);
+            } else {
+                perform_clear_playlist(model, player);
+            }
             Step::Continue
         }
         TuiAction::ToggleOrder => {
@@ -202,6 +241,60 @@ pub(super) fn dispatch<S: EpisodeStart>(
         }
     }
 }
+
+/// Open the shared picker in one mode (G2): a plain open, an Add File
+/// or an Add Folder. The modal opens first, then the runtime lists the
+/// start directory — the same one-read-then-hand-over flow the Open
+/// entry uses.
+fn open_picker(model: &mut TuiModel, kind: ModalKind) {
+    model.open_modal(kind);
+    let start = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    navigate_picker_to(model, &start);
+}
+
+/// The confirmed Remove of the SELECTED row through the App's own
+/// remove seam (G2): the App retires the current episode FIRST when the
+/// selection owns it, then mutates the list — the TUI never orders a
+/// teardown itself, and a retirement failure leaves the list untouched
+/// with the honest diagnostic.
+pub(super) fn perform_remove_selected<S: EpisodeStart>(
+    model: &mut TuiModel,
+    player: &mut ReferencePlayerApp<S>,
+) {
+    let label = player.playlist_selected_position().and_then(|position| {
+        player
+            .playlist_rows()
+            .nth(position)
+            .map(|row| row.path.display().to_string())
+    });
+    match player.remove_selected() {
+        Ok(true) => {
+            model.set_status(Some(match label {
+                Some(label) => format!("removed {label}"),
+                None => "removed the selected row".to_owned(),
+            }));
+        }
+        Ok(false) => model.set_status(Some("nothing selected".to_owned())),
+        Err(refusal) => model.set_status(Some(format!("remove refused: {refusal}"))),
+    }
+    drain_busy_interval_input();
+}
+
+/// The confirmed Clear through the App's own clear seam (G2): the App
+/// retires the current episode first (the T0 owner decision), then
+/// clears; preferences survive, and a retirement failure leaves the
+/// list untouched with the honest diagnostic.
+pub(super) fn perform_clear_playlist<S: EpisodeStart>(
+    model: &mut TuiModel,
+    player: &mut ReferencePlayerApp<S>,
+) {
+    match player.clear_playlist() {
+        Ok(()) => model.set_status(Some("playlist cleared".to_owned())),
+        Err(refusal) => model.set_status(Some(format!("clear refused: {refusal}"))),
+    }
+    drain_busy_interval_input();
+}
+
 /// Which navigation step was requested.
 enum Navigation {
     Next,
@@ -673,14 +766,22 @@ mod tests {
         let mut model = TuiModel::new(String::new());
         refresh(&mut model, &player);
 
-        // To the Playlist route; focus falls to the list (the route's
-        // first local control, §12).
+        // To the Playlist route; focus falls to the route's first local
+        // control (§12) — the toolbar's first button (G2: the toolbar
+        // always exists) — then Tab walks the toolbar into the list.
         dispatch(
             TuiAction::Navigate(TuiRoute::Playlist),
             &mut model,
             &mut player,
         );
         model.validate_focus();
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PlaylistButton(PlaylistButton::AddFile))
+        );
+        for _ in 0..5 {
+            handle_key(key(KeyCode::Tab), &mut model, &mut player);
+        }
         assert_eq!(model.focus(), Some(FocusId::Playlist));
 
         // ↓ moves only the selection — no probe, no open.
@@ -720,6 +821,236 @@ mod tests {
             "{:?}",
             model.status()
         );
+    }
+
+    // ------------------------------------------------------------------
+    // Playlist productization (G2): the toolbar's destructive flows and
+    // the mode-restricted Add picker.
+    // ------------------------------------------------------------------
+
+    /// Remove of the row that OWNS the live episode asks first (T0):
+    /// the stop-aware confirmation opens with Cancel focused, the
+    /// question touches nothing, and the confirmed choice performs the
+    /// App's retire-first removal.
+    #[test]
+    fn removing_the_live_row_asks_first_then_retires_it() {
+        let tree = TempTree::new("remove-current");
+        let files: Vec<PathBuf> = (0..3)
+            .map(|n| tree.live_file(&format!("live-{n}.flac")))
+            .collect();
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        assert_eq!(player.open(&files[0]), crate::player::OpenOutcome::Opened);
+        player.establish_playlist(files.clone());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        dispatch(TuiAction::PlaylistRemove, &mut model, &mut player);
+        assert_eq!(
+            model.modal().map(Modal::kind),
+            Some(ModalKind::ConfirmRemoveCurrent),
+            "the live row's removal asks first"
+        );
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerButton(ModalButton::Cancel)),
+            "Cancel starts focused (T0): the dangerous choice is never the default"
+        );
+        assert!(player.active_handle().is_some(), "asking touches nothing");
+        assert_eq!(player.playlist_rows().count(), 3, "asking removes nothing");
+
+        // Tab to the destructive choice, Enter confirms: the App
+        // retires the episode FIRST, then the row leaves the list.
+        handle_key(key(KeyCode::Tab), &mut model, &mut player);
+        assert_eq!(
+            handle_key(key(KeyCode::Enter), &mut model, &mut player),
+            Step::Continue
+        );
+        assert!(model.modal().is_none(), "the confirmation closed");
+        assert!(
+            player.active_handle().is_none(),
+            "removing the live row retired the episode first"
+        );
+        refresh(&mut model, &player);
+        assert_eq!(model.playlist().len(), 2);
+        assert!(
+            model
+                .status()
+                .is_some_and(|status| status.starts_with("removed ")),
+            "{}",
+            model.status().unwrap_or_default()
+        );
+    }
+
+    /// Remove of a row that does NOT own the live episode is a direct
+    /// App list edit — no confirmation stands between (the frozen
+    /// confirmation exists for the stop consequence only), and the live
+    /// episode survives.
+    #[test]
+    fn removing_a_non_live_row_removes_directly() {
+        let tree = TempTree::new("remove-other");
+        let files: Vec<PathBuf> = (0..3)
+            .map(|n| tree.live_file(&format!("live-{n}.flac")))
+            .collect();
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        assert_eq!(player.open(&files[0]), crate::player::OpenOutcome::Opened);
+        player.establish_playlist(files.clone());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        dispatch(
+            TuiAction::PlaylistSelect(PlaylistCursor::Row(1)),
+            &mut model,
+            &mut player,
+        );
+        dispatch(TuiAction::PlaylistRemove, &mut model, &mut player);
+        assert!(
+            model.modal().is_none(),
+            "no confirmation for a non-live row"
+        );
+        refresh(&mut model, &player);
+        assert_eq!(model.playlist().len(), 2);
+        assert!(player.active_handle().is_some(), "the episode survived");
+        assert_eq!(player.active_source(), Some(files[0].as_path()));
+    }
+
+    /// Clear with a live episode asks first (T0); Cancel keeps
+    /// everything; the confirmed choice retires the episode first and
+    /// empties the list.
+    #[test]
+    fn clearing_with_a_live_episode_asks_and_cancel_keeps_everything() {
+        let tree = TempTree::new("clear-confirm");
+        let files: Vec<PathBuf> = (0..2)
+            .map(|n| tree.live_file(&format!("live-{n}.flac")))
+            .collect();
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        assert_eq!(player.open(&files[0]), crate::player::OpenOutcome::Opened);
+        player.establish_playlist(files.clone());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        dispatch(TuiAction::PlaylistClear, &mut model, &mut player);
+        assert_eq!(
+            model.modal().map(Modal::kind),
+            Some(ModalKind::ConfirmClear),
+            "clearing a live episode asks first"
+        );
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerButton(ModalButton::Cancel)),
+            "Cancel starts focused (T0)"
+        );
+
+        // Esc cancels: the list and the episode are untouched.
+        handle_key(key(KeyCode::Esc), &mut model, &mut player);
+        assert!(model.modal().is_none());
+        assert!(player.active_handle().is_some());
+        refresh(&mut model, &player);
+        assert_eq!(model.playlist().len(), 2);
+
+        // Ask again, confirm this time: retire first, then empty.
+        dispatch(TuiAction::PlaylistClear, &mut model, &mut player);
+        handle_key(key(KeyCode::Tab), &mut model, &mut player);
+        handle_key(key(KeyCode::Enter), &mut model, &mut player);
+        assert!(
+            player.active_handle().is_none(),
+            "clear retired the episode first"
+        );
+        refresh(&mut model, &player);
+        assert!(model.playlist().is_empty());
+        assert_eq!(model.status(), Some("playlist cleared"));
+    }
+
+    /// The toolbar's Add File opens the picker in the restricted
+    /// Add-File mode — no [Open], no [Use this folder] — and a
+    /// committed file appends WITHOUT starting an episode (T0: Add
+    /// never plays; T1A A1/A2).
+    #[test]
+    fn the_toolbar_add_file_appends_without_starting_playback() {
+        let tree = TempTree::new("toolbar-add-file");
+        let _existing = tree.live_file("already.flac");
+        let addition = tree.live_file("addition.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        dispatch(TuiAction::PlaylistAddFile, &mut model, &mut player);
+        assert_eq!(model.picker_mode(), Some(PickerMode::AddFile));
+        let cycle = model.focus_cycle();
+        assert!(
+            !cycle.contains(&FocusId::PickerButton(ModalButton::Open)),
+            "no [Open] in Add File mode"
+        );
+        assert!(
+            !cycle.contains(&FocusId::PickerButton(ModalButton::UseFolder)),
+            "no [Use this folder] in Add File mode"
+        );
+
+        model.set_open_listing(
+            tree.path().to_path_buf(),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "addition.flac".to_owned(),
+                is_dir: false,
+                path: addition,
+            }]),
+        );
+        // ↓ ↓ walks the cursor onto the file row (past `..`).
+        handle_key(key(KeyCode::Down), &mut model, &mut player);
+        handle_key(key(KeyCode::Down), &mut model, &mut player);
+        dispatch(
+            TuiAction::ModalInput(ModalInput::CommitAdd),
+            &mut model,
+            &mut player,
+        );
+        refresh(&mut model, &player);
+        assert!(
+            player.active_handle().is_none(),
+            "Add never starts an episode"
+        );
+        assert_eq!(model.playlist().len(), 1);
+        assert!(
+            model
+                .status()
+                .is_some_and(|status| status.contains("added")),
+            "{}",
+            model.status().unwrap_or_default()
+        );
+    }
+
+    /// Add Folder refuses a FILE subject with the bounded truthful
+    /// diagnostic and keeps the picker open for correction (T0 subject
+    /// kinds; G1 F11 retention).
+    #[test]
+    fn add_folder_mode_refuses_a_file_subject() {
+        let tree = TempTree::new("toolbar-add-folder");
+        let file = tree.live_file("not-a-folder.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        dispatch(TuiAction::PlaylistAddFolder, &mut model, &mut player);
+        assert_eq!(model.picker_mode(), Some(PickerMode::AddFolder));
+        model.set_open_listing(
+            tree.path().to_path_buf(),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "not-a-folder.flac".to_owned(),
+                is_dir: false,
+                path: file,
+            }]),
+        );
+        handle_key(key(KeyCode::Down), &mut model, &mut player);
+        handle_key(key(KeyCode::Down), &mut model, &mut player);
+        dispatch(
+            TuiAction::ModalInput(ModalInput::CommitAdd),
+            &mut model,
+            &mut player,
+        );
+        assert!(
+            model.modal().is_some(),
+            "the picker stays open for correction"
+        );
+        assert_eq!(model.status(), Some("select a folder to add"));
+        refresh(&mut model, &player);
+        assert!(model.playlist().is_empty(), "nothing was appended");
     }
 
     // ------------------------------------------------------------------

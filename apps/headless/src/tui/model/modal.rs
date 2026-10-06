@@ -11,10 +11,103 @@ use super::actions::PlaylistCursor;
 pub enum ModalKind {
     /// The Open input line (D14.6): a literal file-or-folder path.
     Open,
+    /// The shared picker restricted to a FILE subject (T0 Add File
+    /// policy): the final Add commits a file only.
+    AddFile,
+    /// The shared picker restricted to a FOLDER subject (T0 Add Folder
+    /// policy): the final Add commits a folder only.
+    AddFolder,
     /// The GoTo exact-seek line (Issue #166 §27).
     GoTo,
     /// The keyboard/mouse help overlay.
     Help,
+    /// The frozen stop-aware confirmation before removing the CURRENT
+    /// row (T0 owner decision: retire the episode first, then edit the
+    /// list; Cancel is initially focused).
+    ConfirmRemoveCurrent,
+    /// The same confirmation before clearing the whole list.
+    ConfirmClear,
+}
+
+/// Which final subject the shared picker accepts. Navigation is
+/// identical in every mode (T0: "Navigation directories remain
+/// available in either mode"); only the final commit buttons and the
+/// subject kind they accept differ.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PickerMode {
+    /// Open a file or a folder: both commit buttons are visible.
+    OpenAny,
+    /// Add File: the final button is Add, a file subject only;
+    /// replacement Open is absent.
+    AddFile,
+    /// Add Folder: the final button is Add, a folder subject only;
+    /// replacement Open is absent.
+    AddFolder,
+}
+
+impl PickerMode {
+    /// Whether the replacement [Open] button exists in this mode.
+    pub fn allows_open(self) -> bool {
+        matches!(self, PickerMode::OpenAny)
+    }
+
+    /// Whether the [Use this folder] control exists in this mode: it
+    /// makes the displayed directory the subject, which only makes
+    /// sense where a folder CAN be the subject.
+    pub fn allows_use_folder(self) -> bool {
+        !matches!(self, PickerMode::AddFile)
+    }
+
+    /// Whether `is_dir` is an acceptable FINAL subject kind.
+    pub fn accepts(self, is_dir: bool) -> bool {
+        match self {
+            PickerMode::OpenAny => true,
+            PickerMode::AddFile => !is_dir,
+            PickerMode::AddFolder => is_dir,
+        }
+    }
+
+    /// The bounded feedback for a subject of the wrong kind; the
+    /// picker stays open for correction (G1 F11 retention).
+    pub fn subject_refusal(self) -> &'static str {
+        match self {
+            PickerMode::OpenAny => "nothing picked to add",
+            PickerMode::AddFile => "select a file to add",
+            PickerMode::AddFolder => "select a folder to add",
+        }
+    }
+}
+
+/// What a stop-aware confirmation modal decides about (T0 owner
+/// decision: "Remove-current and Clear stop and retire the current
+/// episode first"). The consequence text is presentation; the decision
+/// routes to the SAME App operation the toolbar button would have
+/// called directly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfirmKind {
+    RemoveCurrent,
+    Clear,
+}
+
+impl ConfirmKind {
+    /// The modal's title.
+    pub fn title(self) -> &'static str {
+        match self {
+            ConfirmKind::RemoveCurrent => " Remove current? ",
+            ConfirmKind::Clear => " Clear playlist? ",
+        }
+    }
+
+    /// The explicit stop consequence the modal must state (T0: "an
+    /// explicit stop consequence").
+    pub fn consequence(self) -> &'static str {
+        match self {
+            ConfirmKind::RemoveCurrent => "Removing the current row stops and retires its episode.",
+            ConfirmKind::Clear => {
+                "Clearing stops and retires the current episode, then removes every row."
+            }
+        }
+    }
 }
 
 /// One entry of the Open picker's listing: the display name, the kind
@@ -43,6 +136,10 @@ pub struct PickerEntry {
 /// shared input expansion as before.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OpenPicker {
+    /// Which final subject this picker instance accepts (T0 Add
+    /// File/Folder policies): navigation is identical, the commit
+    /// buttons and the accepted subject kind differ.
+    pub mode: PickerMode,
     /// The path line the user can type into (the pre-picker editing
     /// semantics, unchanged).
     pub input: String,
@@ -71,8 +168,16 @@ pub struct OpenPicker {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Modal {
     Open(OpenPicker),
-    GoTo { input: String },
+    GoTo {
+        input: String,
+    },
     Help,
+    /// The stop-aware confirmation before a destructive list edit
+    /// (T0 owner decision). One value per opening; Cancel is focused
+    /// first and Esc cancels — the modal decides nothing by itself.
+    Confirm {
+        kind: ConfirmKind,
+    },
 }
 
 impl Modal {
@@ -82,6 +187,10 @@ impl Modal {
             Modal::Open(_) => ModalKind::Open,
             Modal::GoTo { .. } => ModalKind::GoTo,
             Modal::Help => ModalKind::Help,
+            Modal::Confirm { kind } => match kind {
+                ConfirmKind::RemoveCurrent => ModalKind::ConfirmRemoveCurrent,
+                ConfirmKind::Clear => ModalKind::ConfirmClear,
+            },
         }
     }
 
@@ -91,7 +200,7 @@ impl Modal {
         match self {
             Modal::Open(picker) => Some(picker.input.as_str()),
             Modal::GoTo { input } => Some(input),
-            Modal::Help => None,
+            Modal::Help | Modal::Confirm { .. } => None,
         }
     }
 }
@@ -126,6 +235,11 @@ pub enum ModalInput {
     /// the submission subject (T0 picker freeze), so a folder can be
     /// opened or added without entering it.
     UseFolder,
+    /// The confirm modal's destructive choice was activated: perform
+    /// the remove-current / clear edit the modal was opened for (T0:
+    /// "explicit destructive choice"; which edit rides on the modal
+    /// kind itself).
+    CommitConfirm,
     /// Esc (or `?` for Help): close the modal. The closing event is
     /// consumed by the modal — it never also acts on the background.
     Cancel,
@@ -145,6 +259,9 @@ pub enum ModalButton {
     /// operation must be mouse-reachable; "Enter folder" is one of the
     /// T0 picker's frozen visible navigation controls).
     EnterFolder,
+    /// The confirm modal's explicit destructive choice button; which
+    /// edit it commits rides on the modal kind.
+    Confirm,
     Cancel,
 }
 
@@ -157,6 +274,9 @@ pub enum ModalConfirm {
     Nothing,
     /// The confirmed seek target; the modal is already closed.
     Seek(Duration),
+    /// The confirm modal's destructive choice was confirmed; the modal
+    /// is already closed and the dispatch performs the frozen edit.
+    Confirm(ConfirmKind),
     /// The token is not a readable time. The GoTo modal STAYS OPEN for
     /// correction and the shell shows the bounded diagnostic — a
     /// malformed seek intent is never sent.

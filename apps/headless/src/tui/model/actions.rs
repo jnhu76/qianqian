@@ -94,12 +94,29 @@ pub enum TuiAction {
     SeekPerMille(u16),
 
     // Playlist route.
-    /// Move the selection (↑/↓, a mouse row hit, or a wheel step over
-    /// the list). Presentation of the App's selection — it never plays.
+    /// Move the selection (↑/↓, or a mouse row hit). Presentation of
+    /// the App's selection — it never plays. The viewport reveals the
+    /// selected row (T0: keyboard navigation selects and reveals).
     PlaylistSelect(PlaylistCursor),
-    /// Enter on the list: play the SELECTED row through the same Open
-    /// replacement (Issue #166 §19).
+    /// Enter on the list, or the [Play selected] toolbar button: play
+    /// the SELECTED row through the same Open replacement (Issue #166
+    /// §19).
     PlaylistPlaySelected,
+    /// The [Add File...] toolbar button (G2): the shared picker in its
+    /// file-only Add mode (T0 Add File policy). The picker commits
+    /// through the same shared input expansion; append never plays.
+    PlaylistAddFile,
+    /// The [Add Folder...] toolbar button: the shared picker in its
+    /// folder-only Add mode (T0 Add Folder policy).
+    PlaylistAddFolder,
+    /// The [Remove] toolbar button (G2): remove the SELECTED row.
+    /// Removing the CURRENT row opens the frozen stop-aware
+    /// confirmation first; removing a non-current row is a list edit
+    /// only. The App owns the retire-then-edit ordering.
+    PlaylistRemove,
+    /// The [Clear...] toolbar button: clear the whole list, with the
+    /// frozen stop-aware confirmation first while an episode is live.
+    PlaylistClear,
 
     // Application policy.
     /// R: toggle Sequential ↔ Shuffle (Issue #166 §25).

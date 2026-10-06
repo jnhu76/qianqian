@@ -133,7 +133,7 @@ fn decode_modal_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
             KeyCode::Char(c) if plain(key) => Some(TuiAction::ModalInput(ModalInput::Char(c))),
             _ => None,
         },
-        ModalKind::Open => match key.code {
+        ModalKind::Open | ModalKind::AddFile | ModalKind::AddFolder => match key.code {
             KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
             KeyCode::Tab => Some(TuiAction::MoveFocus(FocusMove::Next)),
             KeyCode::BackTab => Some(TuiAction::MoveFocus(FocusMove::Previous)),
@@ -163,6 +163,17 @@ fn decode_modal_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
                 }
             }
             KeyCode::Char(c) if plain(key) => Some(TuiAction::ModalInput(ModalInput::Char(c))),
+            _ => None,
+        },
+        // The stop-aware confirmation (T0): Tab between the two
+        // buttons, Enter activates the FOCUSED one (Cancel starts
+        // focused), Esc cancels. No field exists, so characters are
+        // inert — a stray keystroke can never confirm the edit.
+        ModalKind::ConfirmRemoveCurrent | ModalKind::ConfirmClear => match key.code {
+            KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
+            KeyCode::Tab => Some(TuiAction::MoveFocus(FocusMove::Next)),
+            KeyCode::BackTab => Some(TuiAction::MoveFocus(FocusMove::Previous)),
+            KeyCode::Enter if plain(key) => Some(TuiAction::ActivateFocused),
             _ => None,
         },
     }
@@ -483,6 +494,33 @@ mod tests {
         assert_eq!(
             decode_key(key(KeyCode::Char('q')), &model),
             Some(TuiAction::Quit)
+        );
+    }
+
+    /// The confirmation modal keeps only its own keys (G2): Esc
+    /// cancels, Enter activates the focused button, Tab moves focus,
+    /// and no other key — not even text — reaches it or the
+    /// background. A destructive dialog answers to nothing else.
+    #[test]
+    fn the_confirm_modal_lets_only_its_keys_through() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::ConfirmClear);
+        assert_eq!(
+            decode_key(key(KeyCode::Esc), &model),
+            Some(TuiAction::ModalInput(ModalInput::Cancel))
+        );
+        assert_eq!(
+            decode_key(key(KeyCode::Enter), &model),
+            Some(TuiAction::ActivateFocused)
+        );
+        assert_eq!(
+            decode_key(key(KeyCode::Tab), &model),
+            Some(TuiAction::MoveFocus(FocusMove::Next))
+        );
+        assert_eq!(
+            decode_key(key(KeyCode::Char('y')), &model),
+            None,
+            "no text reaches the confirmation"
         );
     }
 

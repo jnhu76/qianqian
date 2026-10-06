@@ -92,18 +92,19 @@ pub fn decode_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction
             None
         }
         MouseEventKind::Moved => None,
-        // §22: the wheel scrolls where a control already has a clear
-        // meaning — the playlist list — and is inert everywhere else.
-        // Either way the wheel cancels any armed press (§22: "wheel
-        // cancels an arm and acts once on the control under the
+        // §22 / G2 owner ruling: over the playlist list the wheel
+        // scrolls the TUI-LOCAL VIEWPORT ONLY — the selection, the
+        // committed episode and the App never move. Everywhere else it
+        // is inert. Either way the wheel cancels any armed press (§22:
+        // "wheel cancels an arm and acts once on the control under the
         // pointer").
         MouseEventKind::ScrollUp => {
             model.disarm();
-            wheel(model, &mouse, PlaylistCursor::Previous)
+            wheel(model, &mouse, -1)
         }
         MouseEventKind::ScrollDown => {
             model.disarm();
-            wheel(model, &mouse, PlaylistCursor::Next)
+            wheel(model, &mouse, 1)
         }
         // Horizontal wheels have no meaning here (§22: no scroll physics).
         MouseEventKind::ScrollLeft | MouseEventKind::ScrollRight => None,
@@ -203,12 +204,15 @@ fn modal_wheel(model: &TuiModel, mouse: &MouseEvent, cursor: PlaylistCursor) -> 
     }
 }
 
-/// The wheel action over one cell: a list scroll when the cell belongs
-/// to the playlist list, otherwise nothing.
-fn wheel(model: &TuiModel, mouse: &MouseEvent, cursor: PlaylistCursor) -> Option<TuiAction> {
+/// The wheel over one cell (G2, the owner's viewport ruling): over the
+/// playlist list it scrolls the TUI-local viewport — presentation
+/// only, no action to dispatch, no selection movement. Over anything
+/// else it is inert.
+fn wheel(model: &mut TuiModel, mouse: &MouseEvent, lines: i32) -> Option<TuiAction> {
     match model.hit_test(mouse.column, mouse.row)? {
         HitTarget::PlaylistRow(_) | HitTarget::PlaylistPane => {
-            Some(TuiAction::PlaylistSelect(cursor))
+            model.playlist_wheel_scroll(lines);
+            None
         }
         _ => None,
     }
@@ -218,7 +222,7 @@ fn wheel(model: &TuiModel, mouse: &MouseEvent, cursor: PlaylistCursor) -> Option
 mod tests {
     //! Tests for this submodule.
 
-    use crate::tui::model::testutil::{model_with_regions, mouse, pending};
+    use crate::tui::model::testutil::{model_with_regions, mouse, pending, redraw};
     use crate::tui::model::*;
     use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 
@@ -399,11 +403,13 @@ mod tests {
         );
         assert!(model.armed().is_some(), "the row press arms");
 
-        // The wheel acts once (the selection moves) and kills the arm.
+        // The wheel acts once (the viewport moves; G2 owner ruling)
+        // and kills the arm. It dispatches NO action: the scroll is
+        // presentation-only.
         assert_eq!(
             decode_mouse(mouse(MouseEventKind::ScrollDown, column, row), &mut model),
-            Some(TuiAction::PlaylistSelect(PlaylistCursor::Next)),
-            "the wheel acts on the control under the pointer"
+            None,
+            "the wheel's scroll is not a product action"
         );
         assert_eq!(model.armed(), None, "the wheel cancelled the arm");
         assert_eq!(
@@ -633,27 +639,69 @@ mod tests {
         }
     }
 
-    /// The wheel scrolls only the playlist list (§22): over a row or
-    /// the pane it moves the selection, everywhere else it is inert.
+    /// The wheel over the playlist list scrolls the TUI-LOCAL VIEWPORT
+    /// ONLY (G2, the owner ruling; T0: "Wheel scrolls the viewport
+    /// without changing selection or playback"): no action dispatches,
+    /// the selection and the committed markers never move, the window
+    /// does. Everywhere else the wheel is inert.
     #[test]
-    fn the_wheel_scrolls_only_the_list() {
+    fn the_wheel_scrolls_only_the_viewport() {
         let mut model = model_with_regions(100, 30, TuiRoute::Playlist);
         let (column, row) = region_cell(&model, &HitTarget::PlaylistRow(2));
+        let selected_before = model
+            .playlist()
+            .iter()
+            .position(|row| row.selected)
+            .expect("the fixture has a selected row");
+        let playing_before = model
+            .playlist()
+            .iter()
+            .position(|row| row.playing)
+            .expect("the fixture has a committed row");
+
         assert_eq!(
             decode_mouse(mouse(MouseEventKind::ScrollDown, column, row), &mut model),
-            Some(TuiAction::PlaylistSelect(PlaylistCursor::Next))
+            None,
+            "a viewport scroll is presentation, not a product action"
         );
         assert_eq!(
-            decode_mouse(mouse(MouseEventKind::ScrollUp, column, row), &mut model),
-            Some(TuiAction::PlaylistSelect(PlaylistCursor::Previous))
+            model.playlist_viewport_hint(),
+            1,
+            "the window moved down one row"
         );
+        // The scroll invalidated the frame; the production loop redraws
+        // every tick, and the next wheel step must hit-test against the
+        // republished regions.
+        redraw(&mut model, 100, 30);
+        assert_eq!(
+            decode_mouse(mouse(MouseEventKind::ScrollUp, column, row), &mut model),
+            None
+        );
+        assert_eq!(model.playlist_viewport_hint(), 0, "and back up");
+        // The top clamps: scrolling up at the top stays at the top.
+        redraw(&mut model, 100, 30);
+        decode_mouse(mouse(MouseEventKind::ScrollUp, column, row), &mut model);
+        assert_eq!(model.playlist_viewport_hint(), 0);
+        // The selection and the committed marker did not move.
+        assert_eq!(
+            model.playlist().iter().position(|row| row.selected),
+            Some(selected_before),
+            "the wheel never moves the selection"
+        );
+        assert_eq!(
+            model.playlist().iter().position(|row| row.playing),
+            Some(playing_before),
+            "the wheel never moves the committed marker"
+        );
+
         // Horizontal wheels have no meaning.
+        redraw(&mut model, 100, 30);
         assert_eq!(
             decode_mouse(mouse(MouseEventKind::ScrollLeft, column, row), &mut model),
             None
         );
 
-        // Inert over a tab on the same frame.
+        // Inert over a tab.
         let (tab, tab_row) = region_cell(&model, &HitTarget::RouteTab(TuiRoute::Audio));
         assert_eq!(
             decode_mouse(mouse(MouseEventKind::ScrollDown, tab, tab_row), &mut model),

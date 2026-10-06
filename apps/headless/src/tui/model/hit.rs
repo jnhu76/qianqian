@@ -5,7 +5,7 @@
 use ratatui::layout::Rect;
 
 use super::actions::TuiRoute;
-use super::controls::{PreferenceButton, SeekButton, TransportButton};
+use super::controls::{PlaylistButton, PreferenceButton, SeekButton, TransportButton};
 use super::modal::ModalButton;
 
 /// The semantic target of one hit region: a rendered, currently valid
@@ -24,6 +24,8 @@ pub enum HitTarget {
     PlaylistRow(usize),
     /// The playlist list's content area (the wheel-scroll target).
     PlaylistPane,
+    /// One of the Playlist route's toolbar controls (G2).
+    PlaylistButton(PlaylistButton),
     /// The position bar WITH duration evidence: a click-to-position
     /// seek affordance (G1 §9). Without duration evidence the bar is a
     /// display and publishes no region at all.

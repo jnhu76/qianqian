@@ -103,3 +103,63 @@ pub const PREFERENCES: [PreferenceButton; 4] = [
     PreferenceButton::Order,
     PreferenceButton::Repeat,
 ];
+
+/// One visible toolbar control on the Playlist route (G2, the T0
+/// playlist wireframe). Every playlist product function is a button:
+/// keyboard focus and the mouse both reach it, and each converges on
+/// the same [`TuiAction`](super::actions::TuiAction) the route's other
+/// paths produce.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlaylistButton {
+    /// The shared picker over the filesystem, restricted to a FILE
+    /// subject (T0: "Playlist Add File uses the same picker with
+    /// file-only final selection").
+    AddFile,
+    /// The shared picker restricted to a FOLDER subject.
+    AddFolder,
+    /// Play the SELECTED row through the same Open replacement — the
+    /// same action Enter on the focused list performs.
+    PlaySelected,
+    /// Remove the selected row. Removing the CURRENT row asks for the
+    /// frozen stop-aware confirmation first (T0 owner decision);
+    /// removing a non-current row is a list edit only.
+    Remove,
+    /// Clear the whole list. Always asks for the frozen stop-aware
+    /// confirmation first (T0 owner decision) while an episode is live.
+    Clear,
+}
+
+/// The playlist toolbar controls in left-to-right render (and Tab)
+/// order (the T0 wireframe's row).
+pub const PLAYLIST_BUTTONS: [PlaylistButton; 5] = [
+    PlaylistButton::AddFile,
+    PlaylistButton::AddFolder,
+    PlaylistButton::PlaySelected,
+    PlaylistButton::Remove,
+    PlaylistButton::Clear,
+];
+
+impl PlaylistButton {
+    /// The button's label (the T0 wireframe's wording).
+    pub fn label(self) -> &'static str {
+        match self {
+            PlaylistButton::AddFile => "[Add File...]",
+            PlaylistButton::AddFolder => "[Add Folder...]",
+            PlaylistButton::PlaySelected => "[Play selected]",
+            PlaylistButton::Remove => "[Remove]",
+            PlaylistButton::Clear => "[Clear...]",
+        }
+    }
+
+    /// The button's label in the compact classes. Same controls,
+    /// shorter spellings — the words stay, the decoration drops.
+    pub fn compact_label(self) -> &'static str {
+        match self {
+            PlaylistButton::AddFile => "[+File]",
+            PlaylistButton::AddFolder => "[+Folder]",
+            PlaylistButton::PlaySelected => "[Play]",
+            PlaylistButton::Remove => "[Remove]",
+            PlaylistButton::Clear => "[Clear]",
+        }
+    }
+}

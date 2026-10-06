@@ -49,10 +49,18 @@ pub(crate) fn model_with_regions(width: u16, height: u16, route: TuiRoute) -> Tu
             })
             .collect()
     });
+    redraw(&mut model, width, height);
+    model
+}
+
+/// Republish the hit regions after an invalidation: draw the model
+/// again at the same size, exactly what the production loop does every
+/// tick. Tests that fire multiple input events between invalidations
+/// need this or the second event hit-tests against no regions.
+pub(crate) fn redraw(model: &mut TuiModel, width: u16, height: u16) {
     let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(width, height))
         .expect("virtual terminal");
     terminal
-        .draw(|frame| crate::tui::view::draw(frame, &mut model))
+        .draw(|frame| crate::tui::view::draw(frame, model))
         .expect("draw");
-    model
 }

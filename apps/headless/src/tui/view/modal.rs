@@ -10,7 +10,7 @@ use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::{SELECTED_MARKER, bold, viewport_offset};
 use crate::tui::model::{
-    FocusId, HitRegion, HitTarget, Modal, ModalButton, ResponsiveClass, TuiModel,
+    ConfirmKind, FocusId, HitRegion, HitTarget, Modal, ModalButton, ResponsiveClass, TuiModel,
 };
 
 /// The Open picker's geometry for ONE frame: the popup, its field row,
@@ -80,7 +80,8 @@ fn picker_layout(
     // cannot clip. The compact classes render the short spellings (the
     // class minimums guarantee the run fits; the row-tests pin it at
     // the exact supported minimum).
-    let labels: Vec<&'static str> = PICKER_BUTTONS
+    let picker_button_list = picker_buttons(picker.mode);
+    let labels: Vec<&'static str> = picker_button_list
         .iter()
         .map(|button| {
             if compact {
@@ -114,15 +115,22 @@ fn picker_layout(
 }
 
 /// The ORDER of the picker's visible buttons, in render (and Tab)
-/// order: the two commit buttons, the mouse's enter-folder step, and
-/// the cancel. The [Use this folder] control lives on the popup's nav
-/// row, above the listing ([`USE_FOLDER_LABEL`]).
-const PICKER_BUTTONS: [crate::tui::model::ModalButton; 4] = [
-    crate::tui::model::ModalButton::Open,
-    crate::tui::model::ModalButton::Add,
-    crate::tui::model::ModalButton::EnterFolder,
-    crate::tui::model::ModalButton::Cancel,
-];
+/// order, per picker MODE (G2): the Open-any mode shows both commit
+/// buttons; the Add File / Add Folder modes show Add only — "their
+/// final button is Add, with replacement Open absent" (T0). The
+/// [Use this folder] control lives on the popup's nav row, above the
+/// listing ([`USE_FOLDER_LABEL`]), and exists only where a folder can
+/// be the subject.
+fn picker_buttons(mode: crate::tui::model::PickerMode) -> Vec<crate::tui::model::ModalButton> {
+    let mut buttons = Vec::with_capacity(4);
+    if mode.allows_open() {
+        buttons.push(crate::tui::model::ModalButton::Open);
+    }
+    buttons.push(crate::tui::model::ModalButton::Add);
+    buttons.push(crate::tui::model::ModalButton::EnterFolder);
+    buttons.push(crate::tui::model::ModalButton::Cancel);
+    buttons
+}
 
 /// The nav-row control's label (T0 picker freeze: "Use this folder
 /// selects the displayed directory as the target"). One spelling for
@@ -136,11 +144,12 @@ fn button_label(button: crate::tui::model::ModalButton) -> &'static str {
         crate::tui::model::ModalButton::Add => "[Add to Playlist]",
         crate::tui::model::ModalButton::UseFolder => USE_FOLDER_LABEL,
         crate::tui::model::ModalButton::EnterFolder => "[Enter folder]",
+        crate::tui::model::ModalButton::Confirm => "[Stop & remove]",
         crate::tui::model::ModalButton::Cancel => "[Cancel]",
     }
 }
 
-/// The button labels in the compact classes: the SAME four controls,
+/// The button labels in the compact classes: the SAME controls,
 /// spellings that fit the supported-minimum popup (the class minimums
 /// and the row tests pin the fit — G1 F13). The nav-row [Use this
 /// folder] label is shared — see [`USE_FOLDER_LABEL`].
@@ -150,59 +159,139 @@ fn compact_button_label(button: crate::tui::model::ModalButton) -> &'static str 
         crate::tui::model::ModalButton::Add => "[Add]",
         crate::tui::model::ModalButton::UseFolder => USE_FOLDER_LABEL,
         crate::tui::model::ModalButton::EnterFolder => "[Enter]",
+        crate::tui::model::ModalButton::Confirm => "[Stop & remove]",
         crate::tui::model::ModalButton::Cancel => "[Cancel]",
     }
 }
 
+/// The popup title for the picker's mode (G2): the Add modes name
+/// their disposition so the user knows which operation the final
+/// button will commit.
+fn mode_title(mode: crate::tui::model::PickerMode) -> &'static str {
+    match mode {
+        crate::tui::model::PickerMode::OpenAny => "Open",
+        crate::tui::model::PickerMode::AddFile => "Add File",
+        crate::tui::model::PickerMode::AddFolder => "Add Folder",
+    }
+}
+
 /// Publish the active modal's hit regions from the SAME layout the
-/// modal paints from. Only the Open picker has mouse controls; the
-/// GoTo and Help modals stay keyboard-owned and publish none.
+/// modal paints from. The Open picker's controls follow its mode (G2);
+/// the confirm modal publishes its two buttons; the GoTo and Help
+/// modals stay keyboard-owned and publish none.
 pub(super) fn modal_regions(
     modal: &Modal,
     area: Rect,
     compact: bool,
     regions: &mut Vec<HitRegion>,
 ) {
-    let Modal::Open(picker) = modal else {
-        return;
-    };
-    let layout = picker_layout(picker, area, compact);
-    regions.push(HitRegion {
-        area: layout.field,
-        target: HitTarget::ModalField,
-    });
-    regions.push(HitRegion {
-        area: layout.nav,
-        target: HitTarget::ModalButton(crate::tui::model::ModalButton::UseFolder),
-    });
-    // One region per VISIBLE listing row, from the same offset the
-    // painter uses (the playlist pane's rule: the row geometry and the
-    // drawn rows come from one calculation).
-    let offset = viewport_offset(
-        picker.entries.len(),
-        picker.cursor,
-        layout.list.height as usize,
+    match modal {
+        Modal::Open(picker) => {
+            let layout = picker_layout(picker, area, compact);
+            regions.push(HitRegion {
+                area: layout.field,
+                target: HitTarget::ModalField,
+            });
+            if picker.mode.allows_use_folder() {
+                regions.push(HitRegion {
+                    area: layout.nav,
+                    target: HitTarget::ModalButton(ModalButton::UseFolder),
+                });
+            }
+            // One region per VISIBLE listing row, from the same offset the
+            // painter uses (the playlist pane's rule: the row geometry and the
+            // drawn rows come from one calculation).
+            let offset = viewport_offset(
+                picker.entries.len(),
+                picker.cursor,
+                layout.list.height as usize,
+            );
+            for (visible_row, index) in (offset..picker.entries.len())
+                .take(layout.list.height as usize)
+                .enumerate()
+            {
+                regions.push(HitRegion {
+                    area: Rect::new(
+                        layout.list.x,
+                        layout.list.y + visible_row as u16,
+                        layout.list.width,
+                        1,
+                    ),
+                    target: HitTarget::PickerRow(index),
+                });
+            }
+            for (button, cell) in picker_buttons(picker.mode).into_iter().zip(layout.buttons) {
+                regions.push(HitRegion {
+                    area: cell,
+                    target: HitTarget::ModalButton(button),
+                });
+            }
+        }
+        Modal::Confirm { kind } => confirm_regions(*kind, area, regions),
+        _ => {}
+    }
+}
+
+/// The stop-aware confirmation's geometry (T0): one consequence line
+/// and the two buttons — the destructive choice and the Cancel that
+/// starts focused. The popup is small and centered; it cannot become
+/// an invisible keyboard trap (§28).
+fn confirm_layout(kind: ConfirmKind, area: Rect) -> (Rect, Rect, [Rect; 2]) {
+    let width = area.width.min(56).saturating_sub(4).max(20);
+    let height = 6.min(area.height);
+    let popup = Rect::new(
+        area.x + area.width.saturating_sub(width) / 2,
+        area.y + area.height.saturating_sub(height) / 2,
+        width,
+        height,
     );
-    for (visible_row, index) in (offset..picker.entries.len())
-        .take(layout.list.height as usize)
-        .enumerate()
-    {
-        regions.push(HitRegion {
-            area: Rect::new(
-                layout.list.x,
-                layout.list.y + visible_row as u16,
-                layout.list.width,
-                1,
-            ),
-            target: HitTarget::PickerRow(index),
-        });
+    let inner = Rect::new(
+        popup.x + 1,
+        popup.y + 1,
+        popup.width.saturating_sub(2),
+        popup.height.saturating_sub(2),
+    );
+    let [_, consequence, buttons] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Length(1),
+    ])
+    .areas(inner);
+    let labels = confirm_button_labels(kind);
+    let total: u16 = labels
+        .iter()
+        .map(|label| label.chars().count() as u16)
+        .sum();
+    let gap = buttons.width.saturating_sub(total) / 2;
+    let mut cells = [buttons; 2];
+    let mut x = buttons.x + gap;
+    for (cell, label) in cells.iter_mut().zip(labels.iter()) {
+        *cell = Rect::new(x, buttons.y, label.chars().count() as u16, 1);
+        x += cell.width;
     }
-    for (button, cell) in PICKER_BUTTONS.iter().zip(layout.buttons.iter()) {
-        regions.push(HitRegion {
-            area: *cell,
-            target: HitTarget::ModalButton(*button),
-        });
+    (popup, consequence, cells)
+}
+
+/// The confirmation's two button labels. The destructive choice names
+/// its stop consequence in the button itself (T0: "an explicit stop
+/// consequence").
+fn confirm_button_labels(kind: ConfirmKind) -> [&'static str; 2] {
+    match kind {
+        ConfirmKind::RemoveCurrent => ["[Stop & remove]", "[Cancel]"],
+        ConfirmKind::Clear => ["[Stop & clear]", "[Cancel]"],
     }
+}
+
+fn confirm_regions(kind: ConfirmKind, area: Rect, regions: &mut Vec<HitRegion>) {
+    let (_, _, cells) = confirm_layout(kind, area);
+    regions.push(HitRegion {
+        area: cells[0],
+        target: HitTarget::ModalButton(ModalButton::Confirm),
+    });
+    regions.push(HitRegion {
+        area: cells[1],
+        target: HitTarget::ModalButton(ModalButton::Cancel),
+    });
 }
 
 /// The active modal, rendered as the ONE popup over the shell (§23).
@@ -219,9 +308,15 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             // where it is instead of editing under the user's hands.
             // A long path clips honestly at the border.
             let title = Span::styled(
-                match &picker.dir {
-                    Some(dir) => format!(" Open — {} ", dir.display()),
-                    None => " Open ".to_owned(),
+                match (&picker.dir, picker.mode) {
+                    (Some(dir), crate::tui::model::PickerMode::OpenAny) => {
+                        format!(" Open — {} ", dir.display())
+                    }
+                    (Some(dir), mode) => {
+                        format!(" {} — {} ", mode_title(mode), dir.display())
+                    }
+                    (None, crate::tui::model::PickerMode::OpenAny) => " Open ".to_owned(),
+                    (None, mode) => format!(" {} ", mode_title(mode)),
                 },
                 Style::default().add_modifier(Modifier::BOLD),
             );
@@ -234,17 +329,21 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
 
             // The nav row: the T0 picker's frozen [Use this folder]
             // control — the displayed directory becomes the submission
-            // target without entering it.
-            let nav_focused = model.focus() == Some(FocusId::PickerButton(ModalButton::UseFolder));
-            let nav = Paragraph::new(USE_FOLDER_LABEL);
-            frame.render_widget(
-                if nav_focused {
-                    nav.style(Style::default().add_modifier(Modifier::REVERSED))
-                } else {
-                    nav
-                },
-                layout.nav,
-            );
+            // target without entering it. Absent in the Add File mode,
+            // where a folder can never be the subject (G2).
+            if picker.mode.allows_use_folder() {
+                let nav_focused =
+                    model.focus() == Some(FocusId::PickerButton(ModalButton::UseFolder));
+                let nav = Paragraph::new(USE_FOLDER_LABEL);
+                frame.render_widget(
+                    if nav_focused {
+                        nav.style(Style::default().add_modifier(Modifier::REVERSED))
+                    } else {
+                        nav
+                    },
+                    layout.nav,
+                );
+            }
 
             // The note row: the honest diagnostic while correction is
             // needed; otherwise the [Use this folder] target display.
@@ -291,14 +390,47 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
                 .collect();
             frame.render_widget(Paragraph::new(lines), layout.list);
 
-            for (button, cell) in PICKER_BUTTONS.iter().zip(layout.buttons.iter()) {
-                let focused = model.focus() == Some(FocusId::PickerButton(*button));
+            for (button, cell) in picker_buttons(picker.mode).into_iter().zip(layout.buttons) {
+                let focused = model.focus() == Some(FocusId::PickerButton(button));
                 let label = if compact {
-                    compact_button_label(*button)
+                    compact_button_label(button)
                 } else {
-                    button_label(*button)
+                    button_label(button)
                 };
                 let paragraph = Paragraph::new(Line::from(label).centered());
+                frame.render_widget(
+                    if focused {
+                        paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
+                    } else {
+                        paragraph
+                    },
+                    cell,
+                );
+            }
+            frame.render_widget(
+                Paragraph::new("↑↓ select · Tab cycle · Esc cancel").centered(),
+                layout.hint,
+            );
+        }
+        Modal::Confirm { kind } => {
+            let (popup, consequence, cells) = confirm_layout(*kind, area);
+            frame.render_widget(Clear, popup);
+            frame.render_widget(
+                Paragraph::new("").block(Block::bordered().title(bold(kind.title()))),
+                popup,
+            );
+            frame.render_widget(
+                Paragraph::new(Line::from(kind.consequence()).centered()),
+                consequence,
+            );
+            let labels = confirm_button_labels(*kind);
+            for ((cell, label), button) in cells
+                .iter()
+                .zip(labels.iter())
+                .zip([ModalButton::Confirm, ModalButton::Cancel])
+            {
+                let focused = model.focus() == Some(FocusId::PickerButton(button));
+                let paragraph = Paragraph::new(Line::from(*label).centered());
                 frame.render_widget(
                     if focused {
                         paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
@@ -308,10 +440,6 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
                     *cell,
                 );
             }
-            frame.render_widget(
-                Paragraph::new("↑↓ select · Tab cycle · Esc cancel").centered(),
-                layout.hint,
-            );
         }
         Modal::GoTo { input } => {
             let popup = input_popup_area(area, 3);
@@ -455,6 +583,7 @@ mod tests {
                             "{width}x{height}:\n{text}"
                         );
                     }
+                    _ => {}
                 }
             }
         }

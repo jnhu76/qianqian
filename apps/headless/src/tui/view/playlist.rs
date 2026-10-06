@@ -1,69 +1,185 @@
-//! The Playlist route: the list pane, its window over the App's
-//! traversal order, and the independent playing/selection markers.
+//! The Playlist route (G2): the toolbar of visible list-edit controls,
+//! the windowed list pane with its independent playing/selection
+//! markers, and the summary row — every T0 playlist function as a
+//! visible control that keyboard focus and the mouse both reach.
 
 use ratatui::Frame;
-use ratatui::layout::Rect;
+use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 
-use super::{PLAYING_MARKER, SELECTED_MARKER, bold, viewport_offset};
-use crate::tui::model::{HitRegion, HitTarget, PlaylistRow, TuiModel};
+use super::{PLAYING_MARKER, SELECTED_MARKER, bold};
+use crate::tui::model::{
+    FocusId, HitRegion, HitTarget, PLAYLIST_BUTTONS, PlaylistButton, PlaylistRow, PreferenceButton,
+    ResponsiveClass, TuiModel,
+};
 
-/// The Playlist route: the same pane as before (Issue #166 §6/§20/§21),
-/// proving list focus, the selection action, mouse row hits and wheel
-/// scroll without turning T1B into playlist productization (§35).
-/// Rows and regions come from ONE offset calculation.
+/// The Playlist route (G2): toolbar, list, summary. Rows and regions
+/// come from ONE window calculation, and the effective window is
+/// reported back to the model so wheel scrolling continues from the
+/// rows actually on screen.
 pub(super) fn draw_playlist(
     frame: &mut Frame,
-    model: &TuiModel,
+    model: &mut TuiModel,
     area: Rect,
     regions: &mut Vec<HitRegion>,
 ) {
-    let rows = model.playlist();
-    let episode_live = model.source().is_some();
+    let compact = model.class() == ResponsiveClass::Compact;
+    let [toolbar, list, summary] = Layout::vertical([
+        // T0 Compact freeze: "Playlist toolbar wraps" — two rows where
+        // the full spellings would not fit the supported minimum.
+        Constraint::Length(if compact { 2 } else { 1 }),
+        Constraint::Min(1),
+        Constraint::Length(1),
+    ])
+    .areas(area);
+
+    draw_playlist_toolbar(frame, model, toolbar, compact, regions);
+    draw_playlist_list(frame, model, list, regions);
+    draw_playlist_summary(frame, model, summary, compact, regions);
+}
+
+/// The toolbar (the T0 playlist wireframe's control row): Add File,
+/// Add Folder, Play selected, Remove, Clear — measured buttons, so no
+/// label clips at any supported width.
+fn draw_playlist_toolbar(
+    frame: &mut Frame,
+    model: &mut TuiModel,
+    area: Rect,
+    compact: bool,
+    regions: &mut Vec<HitRegion>,
+) {
+    if !compact {
+        draw_button_row(frame, model, area, &PLAYLIST_BUTTONS, false, regions);
+        return;
+    }
+    // T0 Compact freeze: "Playlist toolbar wraps" — three buttons on
+    // the first row, two on the second; every spelling stays inside
+    // the class minimum.
+    let [first, second] =
+        Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(area);
+    let (head, tail) = PLAYLIST_BUTTONS.split_at(3);
+    draw_button_row(frame, model, first, head, true, regions);
+    draw_button_row(frame, model, second, tail, true, regions);
+}
+
+/// One measured row of bordered text buttons (the transport row's
+/// idiom, at label-driven widths: an equal share would clip
+/// `[Add Folder...]` at the class minimum — a clipped active hit
+/// target is a T0 violation).
+fn draw_button_row(
+    frame: &mut Frame,
+    model: &mut TuiModel,
+    area: Rect,
+    buttons: &[PlaylistButton],
+    compact: bool,
+    regions: &mut Vec<HitRegion>,
+) {
+    let widths: Vec<Constraint> = buttons
+        .iter()
+        .map(|button| {
+            let label = if compact {
+                button.compact_label()
+            } else {
+                button.label()
+            };
+            Constraint::Length(label.chars().count() as u16 + 2)
+        })
+        .collect();
+    let cells = Layout::horizontal(widths).split(area);
+    for (button, cell) in buttons.iter().zip(cells.iter()) {
+        let label = if compact {
+            button.compact_label()
+        } else {
+            button.label()
+        };
+        let focused = model.focus() == Some(FocusId::PlaylistButton(*button));
+        // A plain text button — the T0 wireframe's `[Add File...]`
+        // shape, the same affordance as the picker's buttons. The
+        // measured cell leaves one padding column each side, so the
+        // label never clips; focus is REVERSED (never colour alone).
+        let paragraph = Paragraph::new(Line::from(label).centered());
+        frame.render_widget(
+            if focused {
+                paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
+            } else {
+                paragraph
+            },
+            *cell,
+        );
+        regions.push(HitRegion {
+            area: *cell,
+            target: HitTarget::PlaylistButton(*button),
+        });
+    }
+}
+
+/// The list pane: the model's viewport window over the App's traversal
+/// order, the two independent markers, and one hit region per VISIBLE
+/// row (T0: only visible rows get hit targets).
+fn draw_playlist_list(
+    frame: &mut Frame,
+    model: &mut TuiModel,
+    area: Rect,
+    regions: &mut Vec<HitRegion>,
+) {
+    // Everything the immutable rows borrow feeds is computed first;
+    // the window report below needs &mut.
+    let (total, selection_ordinal, episode_live) = {
+        let rows = model.playlist();
+        (
+            rows.len(),
+            rows.iter().position(|row| row.selected).map(|p| p + 1),
+            model.source().is_some(),
+        )
+    };
     let mut block = Block::bordered().title(bold(" Playlist "));
-    if !rows.is_empty() {
+    if total > 0 {
         // The pane's title is the SELECTION ordinal (the committed
         // position is the `Track: <committed>/<len>` line on the Now
         // Playing panel, so no reader has to guess which cursor an
         // unlabelled number is).
-        let cursor = rows
-            .iter()
-            .position(|row| row.selected)
-            .map(|position| position + 1)
-            .unwrap_or(0);
-        block = block.title(Line::from(format!(" sel {cursor}/{} ", rows.len())).right_aligned());
+        block = block.title(
+            Line::from(format!(
+                " sel {}/{} ",
+                selection_ordinal.unwrap_or(0),
+                total
+            ))
+            .right_aligned(),
+        );
     }
     let inner = block.inner(area);
-    let height = inner.height as usize;
-    let selected = rows.iter().position(|row| row.selected);
-    // The ONE layout decision (§14): the same offset draws the lines
-    // and indexes the row regions, so a hit test cannot disagree with
-    // what is on screen.
-    let offset = viewport_offset(rows.len(), selected, height);
-    let lines: Vec<Line<'static>> = rows
-        .iter()
-        .enumerate()
-        .skip(offset)
-        .take(height)
-        .map(|(position, row)| playlist_row_line(position, row, episode_live))
-        .collect();
-    frame.render_widget(Paragraph::new(lines).block(block), area);
-
-    // Publish the list's geometry: one region per VISIBLE row first,
-    // then the pane content area (the wheel target). Order matters:
-    // hit_test answers the FIRST containing region, so the specific
-    // rows must sit in front of the whole-pane region.
-    if !rows.is_empty() {
-        for (visible, (index, _)) in rows
+    let visible = inner.height as usize;
+    let (top, visible_indices, lines) = {
+        let rows = model.playlist();
+        // The ONE window decision (§14): the model's stored top,
+        // clamped so a full window fits — the same top draws the lines
+        // and indexes the row regions, so a hit test cannot disagree
+        // with the screen.
+        let top = model
+            .playlist_viewport_hint()
+            .min(total.saturating_sub(visible.min(total)));
+        let indices: Vec<usize> = (0..total).skip(top).take(visible).collect();
+        let lines: Vec<Line<'static>> = rows
             .iter()
             .enumerate()
-            .skip(offset)
-            .take(height)
-            .enumerate()
-        {
+            .skip(top)
+            .take(visible)
+            .map(|(position, row)| playlist_row_line(position, row, episode_live))
+            .collect();
+        (top, indices, lines)
+    };
+    frame.render_widget(Paragraph::new(lines).block(block), area);
+
+    // The view reports the window it actually drew; wheel steps and
+    // reveals continue from these rows.
+    model.note_playlist_window(top, visible);
+
+    if total > 0 {
+        for (visible_row, index) in visible_indices.into_iter().enumerate() {
             regions.push(HitRegion {
-                area: Rect::new(inner.x, inner.y + visible as u16, inner.width, 1),
+                area: Rect::new(inner.x, inner.y + visible_row as u16, inner.width, 1),
                 target: HitTarget::PlaylistRow(index),
             });
         }
@@ -73,6 +189,72 @@ pub(super) fn draw_playlist(
         });
     }
 }
+
+/// The summary row (the T0 wireframe's status line): the row/selection
+/// counts, with the order/repeat toggles in the spacious classes. In
+/// Compact the toggles drop (they remain visible on Now Playing; T0's
+/// playlist retention puts the summary last).
+fn draw_playlist_summary(
+    frame: &mut Frame,
+    model: &TuiModel,
+    area: Rect,
+    compact: bool,
+    regions: &mut Vec<HitRegion>,
+) {
+    let rows = model.playlist();
+    let selected = rows.iter().position(|row| row.selected).map(|p| p + 1);
+    let counts = format!(
+        "{} tracks / selected {}",
+        rows.len(),
+        selected
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "none".into())
+    );
+    if compact {
+        frame.render_widget(Paragraph::new(counts), area);
+        return;
+    }
+    let [text, order, repeat] = Layout::horizontal([
+        Constraint::Min(12),
+        Constraint::Length(19),
+        Constraint::Length(13),
+    ])
+    .areas(area);
+    frame.render_widget(Paragraph::new(counts), text);
+    let toggles: [(Rect, PreferenceButton, Option<String>); 2] = [
+        (
+            order,
+            PreferenceButton::Order,
+            model.order_label().map(|label| format!("Order: {label}")),
+        ),
+        (
+            repeat,
+            PreferenceButton::Repeat,
+            model.repeat_label().map(|label| format!("Repeat: {label}")),
+        ),
+    ];
+    for (cell, button, label) in toggles {
+        let focused = model.focus() == Some(FocusId::Preference(button));
+        let paragraph = match label {
+            Some(label) => Paragraph::new(Line::from(label).centered()),
+            None => Paragraph::new(Line::from("—").centered()),
+        };
+        frame.render_widget(
+            if focused {
+                paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
+            } else {
+                paragraph
+            }
+            .block(Block::bordered()),
+            cell,
+        );
+        regions.push(HitRegion {
+            area: cell,
+            target: HitTarget::Preference(button),
+        });
+    }
+}
+
 /// One playlist row: the two markers, the traversal position and the
 /// file name.
 ///
@@ -106,7 +288,7 @@ mod tests {
 
     /// The Playlist route renders the pane and publishes the pane
     /// region plus one region per VISIBLE row, at the rows the pane
-    /// actually drew — including through the stateless scroll window.
+    /// actually drew — including through the windowed scroll.
     #[test]
     fn playlist_row_regions_match_the_visible_window() {
         let mut model = plain_model();
@@ -114,6 +296,7 @@ mod tests {
         let text = rendered(&mut model, 100, 30);
         assert!(text.contains(" Playlist "), "{text}");
         assert!(text.contains("sel 1/6"), "{text}");
+        assert!(text.contains("6 tracks"), "{text}");
         assert_eq!(scan(&text), None, "{text}");
 
         let mut row_regions: Vec<(u16, usize)> = model
@@ -126,11 +309,9 @@ mod tests {
             .collect();
         row_regions.sort_by_key(|(y, _)| *y);
         assert!(!row_regions.is_empty(), "the visible rows have regions");
-        // The visible indices are contiguous and start at 0.
         for (position, (_, index)) in row_regions.iter().enumerate() {
             assert_eq!(*index, position, "row regions follow the traversal order");
         }
-        // Each row region's cell holds the marker column of that row.
         let pane_region = model
             .regions()
             .iter()
@@ -140,6 +321,35 @@ mod tests {
             pane_region.area.height >= row_regions.len() as u16,
             "the pane contains its rows"
         );
+    }
+
+    /// The toolbar is a visible control row (G2): every T0 playlist
+    /// button renders, carries its own hit region, and the counts line
+    /// names the selection.
+    #[test]
+    fn the_playlist_toolbar_is_visible_and_hittable() {
+        let mut model = plain_model();
+        model.set_route(TuiRoute::Playlist);
+        let text = rendered(&mut model, 100, 30);
+        for label in [
+            "[Add File...]",
+            "[Add Folder...]",
+            "[Play selected]",
+            "[Remove]",
+            "[Clear...]",
+        ] {
+            assert!(text.contains(label), "{label} must render:\n{text}");
+        }
+        for button in PLAYLIST_BUTTONS {
+            assert!(
+                model
+                    .regions()
+                    .iter()
+                    .any(|region| region.target == HitTarget::PlaylistButton(button)),
+                "{button:?} has no hit region:\n{text}"
+            );
+        }
+        assert_eq!(scan(&text), None, "{text}");
     }
 
     /// The pane marks the committed row and the selected row with two
@@ -241,9 +451,9 @@ mod tests {
         assert_eq!(scan(&text), None, "{text}");
     }
 
-    /// Selection scrolling follows the cursor and returns to the top
-    /// with it — the offset is a pure function of the selection, so
-    /// nothing can drift out of sync (Issue #166 §21).
+    /// The viewport window follows the selection up and down while the
+    /// selection is the thing that moves (the wheel has its own ruling
+    /// — see the mouse tests).
     #[test]
     fn the_pane_viewport_follows_the_selection_up_and_down() {
         for (selected, expected) in [
@@ -255,16 +465,16 @@ mod tests {
             (Some(19), 16),
         ] {
             assert_eq!(
-                viewport_offset(20, selected, 4),
+                super::super::viewport_offset(20, selected, 4),
                 expected,
                 "selection {selected:?}"
             );
         }
         // A list that fits, an empty list and a zero-height pane all sit
         // at the top.
-        assert_eq!(viewport_offset(3, Some(2), 4), 0);
-        assert_eq!(viewport_offset(0, None, 4), 0);
-        assert_eq!(viewport_offset(20, Some(19), 0), 0);
+        assert_eq!(super::super::viewport_offset(3, Some(2), 4), 0);
+        assert_eq!(super::super::viewport_offset(0, None, 4), 0);
+        assert_eq!(super::super::viewport_offset(20, Some(19), 0), 0);
     }
 
     // ------------------------------------------------------------------

@@ -7,9 +7,11 @@ use std::path::Path;
 
 use crate::player::{EpisodeStart, OpenOutcome, ReferencePlayerApp};
 
+use super::dispatch::{perform_clear_playlist, perform_remove_selected};
 use super::drain_busy_interval_input;
 use crate::tui::model::{
-    Modal, ModalConfirm, ModalInput, ModalKind, PickerSubject, PlaylistCursor, TuiModel, TuiRoute,
+    ConfirmKind, Modal, ModalConfirm, ModalInput, ModalKind, PickerSubject, PlaylistCursor,
+    TuiModel, TuiRoute,
 };
 
 /// One editing step inside the active modal (§24/§26/§31). The modal
@@ -74,20 +76,35 @@ pub(super) fn handle_modal_input<S: EpisodeStart>(
         ModalInput::CommitOpen => {
             commit_picker_subject(model, player, PickerDisposition::Open);
         }
-        // The [Add to Playlist] button: the same subject, appended
-        // through the same shared expansion/probe admission — no
-        // candidate is activated (T1A A1/A2 semantics).
+        // The [Add] button: the same subject, appended through the same
+        // shared expansion/probe admission — no candidate is activated
+        // (T1A A1/A2 semantics). In the Add File / Add Folder modes the
+        // subject kind is restricted (G2, T0 policies).
         ModalInput::CommitAdd => {
             commit_picker_subject(model, player, PickerDisposition::Add);
         }
+        // The confirmation's destructive choice (G2, T0 owner
+        // decision): the modal already closed; perform the frozen edit
+        // — retire first, then mutate the list.
+        ModalInput::CommitConfirm => match model.confirm_modal() {
+            ModalConfirm::Confirm(ConfirmKind::RemoveCurrent) => {
+                perform_remove_selected(model, player);
+            }
+            ModalConfirm::Confirm(ConfirmKind::Clear) => {
+                perform_clear_playlist(model, player);
+            }
+            _ => {}
+        },
         // Enter on the field (T0 picker freeze): navigate a directory,
         // select a named file, or stay with a bounded diagnostic. It
         // NEVER starts playback, and an unreadable path keeps the
         // picker for correction (G1 F05/F09/F11).
         ModalInput::Confirm => match model.modal().map(Modal::kind) {
-            Some(ModalKind::Open) => confirm_picker_field(model),
+            Some(ModalKind::Open | ModalKind::AddFile | ModalKind::AddFolder) => {
+                confirm_picker_field(model)
+            }
             _ => match model.confirm_modal() {
-                ModalConfirm::Nothing => {}
+                ModalConfirm::Nothing | ModalConfirm::Confirm(_) => {}
                 ModalConfirm::Seek(target) => match player.active_handle() {
                     Some(handle) => {
                         // The SAME frozen seek command the arrows use
@@ -162,6 +179,16 @@ fn commit_picker_subject<S: EpisodeStart>(
     let Some((path, is_dir)) = resolved else {
         return;
     };
+    // The Add File / Add Folder modes restrict the final subject kind
+    // (G2, the T0 Add policies): a wrong-kind subject keeps the picker
+    // with its bounded refusal — nothing was touched.
+    if disposition == PickerDisposition::Add
+        && let Some(mode) = model.picker_mode()
+        && !mode.accepts(is_dir)
+    {
+        model.set_status(Some(mode.subject_refusal().to_owned()));
+        return;
+    }
     // The synchronous expansion/admission can stall this thread for as
     // long as the operation takes; the busy interval publishes no
     // interactive geometry — stale regions and any armed press die

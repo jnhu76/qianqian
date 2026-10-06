@@ -1,7 +1,7 @@
 //! The ONE active interactive focus target and the Tab move direction.
 
 use super::actions::TuiRoute;
-use super::controls::{PreferenceButton, SeekButton, TransportButton};
+use super::controls::{PlaylistButton, PreferenceButton, SeekButton, TransportButton};
 use super::modal::ModalButton;
 
 /// The ONE active interactive focus target (§10). Focus is presentation
@@ -21,6 +21,8 @@ pub enum FocusId {
     Preference(PreferenceButton),
     /// The playlist list (the selection cursor is the focus inside it).
     Playlist,
+    /// One of the Playlist route's toolbar controls (G2).
+    PlaylistButton(PlaylistButton),
     /// The Open picker's directory listing (the picker cursor is the
     /// focus inside it).
     PickerList,

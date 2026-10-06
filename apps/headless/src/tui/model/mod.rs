@@ -50,14 +50,17 @@ mod state;
 pub use actions::{PlaylistCursor, Step, TuiAction, TuiRoute};
 #[cfg(test)]
 pub use controls::SeekButton;
-pub use controls::{PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton};
+pub use controls::{
+    PLAYLIST_BUTTONS, PlaylistButton, PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton,
+};
 pub use focus::FocusId;
 #[cfg(test)]
 pub use focus::FocusMove;
 pub use hit::{HitRegion, HitTarget};
 pub use input::decode_key;
 pub use modal::{
-    Modal, ModalButton, ModalConfirm, ModalInput, ModalKind, OpenPicker, PickerSubject,
+    ConfirmKind, Modal, ModalButton, ModalConfirm, ModalInput, ModalKind, OpenPicker, PickerMode,
+    PickerSubject,
 };
 pub use mouse::decode_mouse;
 pub(crate) use projection::status_shape;

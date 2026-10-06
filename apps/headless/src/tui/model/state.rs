@@ -36,6 +36,17 @@ pub struct TuiModel {
     /// revision moves (so a 5 000-row list costs nothing per frame).
     pub(super) playlist: Vec<PlaylistRow>,
     playlist_revision: Option<u64>,
+    /// The Playlist route's viewport: the absolute index of the row
+    /// drawn first (G2, the owner's wheel ruling). The WHEEL moves
+    /// this; the SELECTION reveals itself into the window. The view
+    /// clamps it against the list's real length and the visible height
+    /// every draw and reports the effective window back, so the model
+    /// needs no geometry of its own. Presentation state only.
+    playlist_viewport: usize,
+    /// How many playlist rows the last draw could show (the view
+    /// reports it; 0 before the first draw). Reveal arithmetic needs
+    /// it; nothing else does.
+    playlist_visible: usize,
     /// The App's traversal order / repeat preferences (labels only).
     order: Option<PlaybackOrder>,
     repeat: Option<RepeatMode>,
@@ -90,6 +101,8 @@ impl TuiModel {
             navigation_position: None,
             playlist: Vec::new(),
             playlist_revision: None,
+            playlist_viewport: 0,
+            playlist_visible: 0,
             order: None,
             repeat: None,
             volume: None,
@@ -128,12 +141,86 @@ impl TuiModel {
         }
         self.playlist_revision = Some(revision);
         self.playlist = rows();
+        // A list edit is a NEW list (§17): the viewport follows the
+        // selection again, so a remove/clear/append can never leave a
+        // stale window. Wheel scrolling starts from wherever the
+        // revealed selection sits.
+        self.playlist_viewport = 0;
+        self.reveal_selected_row();
         self.invalidate_frame();
     }
 
     /// The playlist pane's rows, in the App's traversal order.
     pub fn playlist(&self) -> &[PlaylistRow] {
         &self.playlist
+    }
+
+    /// One wheel step over the playlist list (G2, the owner ruling):
+    /// move the viewport ONLY. The selection, the committed episode
+    /// and the App are untouched — a scrolled window is presentation
+    /// browsing, not navigation. `lines` is signed; the wheel scrolls
+    /// one row per step (T0: no scroll physics). The top clamps so at
+    /// least one row stays visible; the view re-clamps against the
+    /// real height every draw.
+    pub fn playlist_wheel_scroll(&mut self, lines: i32) {
+        if self.playlist.is_empty() {
+            return;
+        }
+        let top = self.playlist_viewport as i64 + i64::from(lines);
+        let last_top = (self.playlist.len() as i64 - 1).max(0);
+        self.playlist_viewport = top.clamp(0, last_top) as usize;
+        self.invalidate_frame();
+    }
+
+    /// Reveal one absolute row into the visible window (T0: keyboard
+    /// navigation selects and reveals the row; a focused control is
+    /// revealed, never silently active offscreen). Before the first
+    /// draw has reported a window height there is no window to reveal
+    /// INTO — the hint jumps straight to the row, and the first draw
+    /// clamps it against the real height with the row inside the
+    /// window (a reveal must never silently drop a selection offscreen
+    /// just because no draw happened yet).
+    pub fn playlist_reveal(&mut self, index: usize) {
+        if self.playlist_visible == 0 {
+            self.playlist_viewport = index;
+            self.invalidate_frame();
+            return;
+        }
+        if index < self.playlist_viewport {
+            self.playlist_viewport = index;
+        } else if index >= self.playlist_viewport + self.playlist_visible {
+            self.playlist_viewport = index + 1 - self.playlist_visible;
+        }
+        self.invalidate_frame();
+    }
+
+    /// Reveal the SELECTED row (a selection move, or a freshly rebuilt
+    /// projection after a list edit). No rows — nothing to reveal.
+    fn reveal_selected_row(&mut self) {
+        let selected = self
+            .playlist
+            .iter()
+            .position(|row| row.selected)
+            .or((!self.playlist.is_empty()).then_some(0));
+        if let Some(index) = selected {
+            self.playlist_reveal(index);
+        }
+    }
+
+    /// The view's report of the window it actually drew (G2): the
+    /// effective top (the stored hint, clamped against the real length
+    /// and height) and how many rows fit. Pure presentation
+    /// bookkeeping — no invalidation, or drawing would loop.
+    pub fn note_playlist_window(&mut self, top: usize, visible: usize) {
+        self.playlist_viewport = top;
+        self.playlist_visible = visible;
+    }
+
+    /// The stored viewport hint: the row the window should start at,
+    /// before the view's length/height clamp. The view is the only
+    /// consumer.
+    pub fn playlist_viewport_hint(&self) -> usize {
+        self.playlist_viewport
     }
 
     /// Record the App's traversal order preference.
@@ -453,6 +540,43 @@ mod tests {
 
         model.set_playlist(8, Vec::new);
         assert!(model.playlist().is_empty());
+    }
+
+    /// A list edit is a NEW list (G2): the window follows the selection
+    /// again, even after the old window had been wheel-scrolled deep
+    /// into the list — a remove/clear/append can never leave a stale
+    /// window.
+    #[test]
+    fn a_list_edit_recenters_the_window_on_the_selection() {
+        let mut model = TuiModel::new("song.flac");
+        model.set_playlist(1, || {
+            (0..5000)
+                .map(|n| PlaylistRow {
+                    label: format!("track-{n}.flac"),
+                    playing: false,
+                    selected: false,
+                })
+                .collect()
+        });
+        // The view's report of the window it drew after a deep
+        // wheel scroll.
+        model.note_playlist_window(4000, 20);
+        assert_eq!(model.playlist_viewport_hint(), 4000);
+
+        model.set_playlist(2, || {
+            (0..5000)
+                .map(|n| PlaylistRow {
+                    label: format!("track-{n}.flac"),
+                    playing: false,
+                    selected: n == 4200,
+                })
+                .collect()
+        });
+        assert_eq!(
+            model.playlist_viewport_hint(),
+            4200 + 1 - 20,
+            "the new list's selected row is revealed into the window"
+        );
     }
 
     /// The model follows the player's committed episode; a no-episode

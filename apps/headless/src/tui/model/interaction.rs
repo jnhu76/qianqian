@@ -6,14 +6,16 @@ use ratatui::layout::Position;
 
 use super::actions::{PlaylistCursor, TuiAction, TuiRoute};
 use super::controls::{
-    PREFERENCES, PreferenceButton, SEEK_BUTTONS, SeekButton, TRANSPORT, TransportButton,
+    PLAYLIST_BUTTONS, PREFERENCES, PlaylistButton, PreferenceButton, SEEK_BUTTONS, SeekButton,
+    TRANSPORT, TransportButton,
 };
 use super::focus::{FocusId, FocusMove};
 #[cfg(test)]
 use super::hit::ArmedClick;
 use super::hit::{HitRegion, HitTarget};
 use super::modal::{
-    Modal, ModalButton, ModalConfirm, ModalInput, ModalKind, OpenPicker, PickerEntry, PickerSubject,
+    ConfirmKind, Modal, ModalButton, ModalConfirm, ModalInput, ModalKind, OpenPicker, PickerEntry,
+    PickerMode, PickerSubject,
 };
 use super::projection::SEEK_STEP_SECS;
 use super::responsive::ResponsiveClass;
@@ -121,19 +123,31 @@ impl TuiModel {
                     let mut cycle = vec![FocusId::ModalField];
                     // The navigation button sits between the field and
                     // the listing (the popup's nav row); it is a stop
-                    // even with no listing rows yet.
-                    cycle.push(FocusId::PickerButton(ModalButton::UseFolder));
+                    // even with no listing rows yet — in the modes
+                    // where a folder can be the subject (G2: Add File
+                    // has no [Use this folder]).
+                    if picker.mode.allows_use_folder() {
+                        cycle.push(FocusId::PickerButton(ModalButton::UseFolder));
+                    }
                     if !picker.entries.is_empty() {
                         cycle.push(FocusId::PickerList);
                     }
+                    if picker.mode.allows_open() {
+                        cycle.push(FocusId::PickerButton(ModalButton::Open));
+                    }
                     cycle.extend([
-                        FocusId::PickerButton(ModalButton::Open),
                         FocusId::PickerButton(ModalButton::Add),
                         FocusId::PickerButton(ModalButton::EnterFolder),
                         FocusId::PickerButton(ModalButton::Cancel),
                     ]);
                     cycle
                 }
+                // The confirmation's two buttons: the destructive
+                // choice and the Cancel that starts focused (T0).
+                Modal::Confirm { .. } => vec![
+                    FocusId::PickerButton(ModalButton::Confirm),
+                    FocusId::PickerButton(ModalButton::Cancel),
+                ],
                 _ => vec![FocusId::ModalField],
             };
         }
@@ -156,10 +170,18 @@ impl TuiModel {
                         .map(|button| FocusId::Preference(*button)),
                 );
             }
-            // The list is focusable only while it has rows: an empty
-            // pane has no enabled control inside it (§11).
-            TuiRoute::Playlist if !self.playlist.is_empty() => {
-                cycle.push(FocusId::Playlist);
+            // The playlist toolbar exists whether or not the list has
+            // rows (Add works on an empty list); the list itself is
+            // focusable only while it has rows (§11).
+            TuiRoute::Playlist => {
+                cycle.extend(
+                    PLAYLIST_BUTTONS
+                        .iter()
+                        .map(|button| FocusId::PlaylistButton(*button)),
+                );
+                if !self.playlist.is_empty() {
+                    cycle.push(FocusId::Playlist);
+                }
             }
             _ => {}
         }
@@ -204,6 +226,7 @@ impl TuiModel {
                     | FocusId::Transport(_)
                     | FocusId::Preference(_)
                     | FocusId::Playlist
+                    | FocusId::PlaylistButton(_)
                     | FocusId::ModalField
                     | FocusId::PickerList
                     | FocusId::PickerButton(_)
@@ -227,6 +250,7 @@ impl TuiModel {
             HitTarget::Transport(button) => Some(FocusId::Transport(button)),
             HitTarget::Preference(button) => Some(FocusId::Preference(button)),
             HitTarget::PlaylistRow(_) | HitTarget::PlaylistPane => Some(FocusId::Playlist),
+            HitTarget::PlaylistButton(button) => Some(FocusId::PlaylistButton(button)),
             HitTarget::PickerRow(_) => Some(FocusId::PickerList),
             HitTarget::ModalButton(button) => Some(FocusId::PickerButton(button)),
             HitTarget::ModalField => Some(FocusId::ModalField),
@@ -267,6 +291,13 @@ impl TuiModel {
             HitTarget::PlaylistRow(index) => {
                 Some(TuiAction::PlaylistSelect(PlaylistCursor::Row(index)))
             }
+            HitTarget::PlaylistButton(button) => Some(match button {
+                PlaylistButton::AddFile => TuiAction::PlaylistAddFile,
+                PlaylistButton::AddFolder => TuiAction::PlaylistAddFolder,
+                PlaylistButton::PlaySelected => TuiAction::PlaylistPlaySelected,
+                PlaylistButton::Remove => TuiAction::PlaylistRemove,
+                PlaylistButton::Clear => TuiAction::PlaylistClear,
+            }),
             HitTarget::PickerRow(index) => Some(TuiAction::ModalInput(
                 match self.picker_entries().get(index) {
                     // The synthesized `..` row activates the parent
@@ -282,6 +313,7 @@ impl TuiModel {
                 ModalButton::Add => ModalInput::CommitAdd,
                 ModalButton::UseFolder => ModalInput::UseFolder,
                 ModalButton::EnterFolder => ModalInput::ListActivate,
+                ModalButton::Confirm => ModalInput::CommitConfirm,
                 ModalButton::Cancel => ModalInput::Cancel,
             })),
             // The pane area focuses the list but is not itself a
@@ -305,6 +337,9 @@ impl TuiModel {
             FocusId::Seek(button) => self.action_of_target(HitTarget::Seek(button)),
             FocusId::Transport(button) => self.action_of_target(HitTarget::Transport(button)),
             FocusId::Preference(button) => self.action_of_target(HitTarget::Preference(button)),
+            FocusId::PlaylistButton(button) => {
+                self.action_of_target(HitTarget::PlaylistButton(button))
+            }
             FocusId::Playlist => Some(TuiAction::PlaylistPlaySelected),
             FocusId::PickerList => Some(TuiAction::ModalInput(ModalInput::ListActivate)),
             FocusId::PickerButton(button) => self.action_of_target(HitTarget::ModalButton(button)),
@@ -322,18 +357,40 @@ impl TuiModel {
     pub fn open_modal(&mut self, kind: ModalKind) {
         self.focus_before_modal = self.focus;
         self.modal = Some(match kind {
-            ModalKind::Open => Modal::Open(OpenPicker {
-                input: String::new(),
-                dir: None,
-                entries: Vec::new(),
-                cursor: None,
-                error: None,
-                folder_target: false,
-            }),
+            ModalKind::Open | ModalKind::AddFile | ModalKind::AddFolder => {
+                // One picker, three modes (T0 Add File/Folder policies):
+                // navigation identical, commit buttons and subject kind
+                // restricted per mode.
+                let mode = match kind {
+                    ModalKind::AddFile => PickerMode::AddFile,
+                    ModalKind::AddFolder => PickerMode::AddFolder,
+                    _ => PickerMode::OpenAny,
+                };
+                Modal::Open(OpenPicker {
+                    mode,
+                    input: String::new(),
+                    dir: None,
+                    entries: Vec::new(),
+                    cursor: None,
+                    error: None,
+                    folder_target: false,
+                })
+            }
             ModalKind::GoTo => Modal::GoTo {
                 input: String::new(),
             },
             ModalKind::Help => Modal::Help,
+            // T0 modal table: the destructive confirmation starts with
+            // CANCEL focused — the dangerous choice is never the
+            // default.
+            ModalKind::ConfirmRemoveCurrent | ModalKind::ConfirmClear => {
+                let confirm = match kind {
+                    ModalKind::ConfirmRemoveCurrent => ConfirmKind::RemoveCurrent,
+                    _ => ConfirmKind::Clear,
+                };
+                self.focus = Some(FocusId::PickerButton(ModalButton::Cancel));
+                Modal::Confirm { kind: confirm }
+            }
         });
         self.invalidate_frame();
         self.validate_focus();
@@ -371,7 +428,8 @@ impl TuiModel {
                 &mut picker.input
             }
             Modal::GoTo { input } => input,
-            Modal::Help => return,
+            // Help and the confirm modal have no text field to edit.
+            Modal::Help | Modal::Confirm { .. } => return,
         };
         match input {
             ModalInput::Char(c) => text.push(c),
@@ -385,6 +443,7 @@ impl TuiModel {
             | ModalInput::ListParent
             | ModalInput::CommitOpen
             | ModalInput::CommitAdd
+            | ModalInput::CommitConfirm
             | ModalInput::UseFolder => {}
         }
     }
@@ -446,6 +505,15 @@ impl TuiModel {
         match self.modal.as_ref() {
             Some(Modal::Open(picker)) => &picker.entries,
             _ => &[],
+        }
+    }
+
+    /// Which final subject the active picker accepts (G2). `None` when
+    /// no Open-picker modal is active.
+    pub fn picker_mode(&self) -> Option<PickerMode> {
+        match self.modal.as_ref() {
+            Some(Modal::Open(picker)) => Some(picker.mode),
+            _ => None,
         }
     }
 
@@ -592,6 +660,15 @@ impl TuiModel {
                     }
                 }
             }
+            Some(Modal::Confirm { kind }) => {
+                // The destructive choice was activated (Enter on the
+                // focused [Confirm] button). Close first — the modal
+                // never stays over the operation it authorized — and
+                // let the dispatch perform the frozen edit.
+                let kind = *kind;
+                self.close_modal();
+                ModalConfirm::Confirm(kind)
+            }
             Some(Modal::Open(_)) | None => ModalConfirm::Nothing,
         }
     }
@@ -712,7 +789,7 @@ mod tests {
             ]
         );
 
-        // Playlist: the list (it has rows).
+        // Playlist: the toolbar first, then the list (it has rows).
         model.set_route(TuiRoute::Playlist);
         assert_eq!(
             model.focus_cycle(),
@@ -721,6 +798,11 @@ mod tests {
                 FocusId::RouteTab(TuiRoute::Playlist),
                 FocusId::RouteTab(TuiRoute::Audio),
                 FocusId::RouteTab(TuiRoute::Visualizer),
+                FocusId::PlaylistButton(PlaylistButton::AddFile),
+                FocusId::PlaylistButton(PlaylistButton::AddFolder),
+                FocusId::PlaylistButton(PlaylistButton::PlaySelected),
+                FocusId::PlaylistButton(PlaylistButton::Remove),
+                FocusId::PlaylistButton(PlaylistButton::Clear),
                 FocusId::Playlist,
             ]
         );
@@ -755,14 +837,14 @@ mod tests {
         model.validate_focus();
         assert_eq!(
             model.focus(),
-            Some(FocusId::RouteTab(TuiRoute::NowPlaying)),
-            "fallback with an empty list is the first tab"
+            Some(FocusId::PlaylistButton(PlaylistButton::AddFile)),
+            "fallback with an empty list is the toolbar's first button"
         );
         model.move_focus(FocusMove::Previous);
         assert_eq!(
             model.focus(),
             Some(FocusId::RouteTab(TuiRoute::Visualizer)),
-            "Shift+Tab from the cycle edge wraps to the last control"
+            "Shift+Tab from the cycle edge wraps to the last tab"
         );
 
         // One row appears: the list joins the cycle. The focus on the
@@ -783,6 +865,14 @@ mod tests {
         model.move_focus(FocusMove::Next);
         assert_eq!(
             model.focus(),
+            Some(FocusId::PlaylistButton(PlaylistButton::AddFile)),
+            "the toolbar joined the cycle between the tabs and the list"
+        );
+        for _ in 0..5 {
+            model.move_focus(FocusMove::Next);
+        }
+        assert_eq!(
+            model.focus(),
             Some(FocusId::Playlist),
             "the list joined the cycle"
         );
@@ -794,13 +884,15 @@ mod tests {
         );
 
         // The §12 fallback: a focus that left the cycle (the list, after
-        // it emptied again) lands on the first remaining control.
+        // it emptied again) lands on the first remaining local control —
+        // the toolbar always exists, so that is its first button.
+        model.set_focus(Some(FocusId::Playlist));
         model.set_playlist(3, Vec::new);
         model.validate_focus();
         assert_eq!(
             model.focus(),
-            Some(FocusId::RouteTab(TuiRoute::NowPlaying)),
-            "an empty list drops the local control from the cycle"
+            Some(FocusId::PlaylistButton(PlaylistButton::AddFile)),
+            "an empty list drops the list from the cycle"
         );
         // On Now Playing the same fallback lands on the transport row,
         // the route's first local control.
@@ -810,6 +902,40 @@ mod tests {
             model.focus(),
             Some(FocusId::Transport(TransportButton::Open)),
             "an out-of-cycle focus falls back to the route's first local control"
+        );
+    }
+
+    /// The confirmation modal (G2, T0): Cancel starts focused, the
+    /// cycle is exactly the two buttons, and the destructive choice is
+    /// one explicit step away.
+    #[test]
+    fn the_confirm_modal_starts_cancel_focused() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::ConfirmRemoveCurrent);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerButton(ModalButton::Cancel)),
+            "the dangerous choice is never the default (T0)"
+        );
+        assert_eq!(
+            model.focus_cycle(),
+            vec![
+                FocusId::PickerButton(ModalButton::Confirm),
+                FocusId::PickerButton(ModalButton::Cancel),
+            ]
+        );
+        // Tab reaches the destructive choice; its activation is the
+        // ONE confirm step the dispatch performs the edit through.
+        model.move_focus(FocusMove::Next);
+        assert_eq!(
+            model.activation(),
+            Some(TuiAction::ModalInput(ModalInput::CommitConfirm))
+        );
+        model.move_focus(FocusMove::Next);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerButton(ModalButton::Cancel)),
+            "the two-button cycle wraps"
         );
     }
 
