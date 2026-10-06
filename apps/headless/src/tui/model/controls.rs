@@ -243,3 +243,43 @@ pub enum EqAdjust {
     Cut,
     Boost,
 }
+
+/// One persistent application control at the nav bar's right end (G5):
+/// Help and Quit live on every route and in every responsive class
+/// above the minimum — the two things a first-time user must always be
+/// able to find. They are buttons like any other: keyboard focus and
+/// the mouse both reach them, and each converges on the same
+/// [`TuiAction`](super::actions::TuiAction) its accelerator key
+/// produces (`?` and `Q`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NavBarButton {
+    /// Open the help overlay (the `?` key's action).
+    Help,
+    /// Quit (the `Q` key's action).
+    Quit,
+}
+
+/// The nav bar's persistent controls in left-to-right render (and Tab)
+/// order, after the route tabs.
+pub const NAV_BUTTONS: [NavBarButton; 2] = [NavBarButton::Help, NavBarButton::Quit];
+
+impl NavBarButton {
+    /// The button's label; the bracket names the accelerator, the same
+    /// affordance grammar as every other bracketed button.
+    pub fn label(self) -> &'static str {
+        match self {
+            NavBarButton::Help => "[?] Help",
+            NavBarButton::Quit => "[Q] Quit",
+        }
+    }
+
+    /// The label in the compact shell class. Same controls, shorter
+    /// spellings — the accelerators stay discoverable through the
+    /// help overlay itself.
+    pub fn compact_label(self) -> &'static str {
+        match self {
+            NavBarButton::Help => "Help",
+            NavBarButton::Quit => "Quit",
+        }
+    }
+}

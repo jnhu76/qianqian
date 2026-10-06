@@ -120,7 +120,7 @@ Enter.
 | ------------------- | ------------------------------------------------- |
 | `Tab / Shift+Tab`   | Move keyboard focus to the next / previous control |
 | `Enter`             | Activate the focused control; on the playlist, play the selected row; in the picker, navigate or select (the visible buttons commit) |
-| `Mouse`             | Click any visible control: tabs, buttons, the progress bar, playlist rows, picker rows |
+| `Mouse`             | Click any visible control: tabs, buttons, the progress bar, playlist rows, picker rows — including the persistent `Help` and `Quit` buttons at the tab bar's right end |
 | `↑ / ↓`             | Select previous / next playlist row (list focused) |
 | `N / P`             | Next / previous track                             |
 | `R`                 | Order: Sequential / Shuffle                       |
@@ -139,6 +139,10 @@ Enter.
 
 For `G`, type a position like `1:35` (minutes:seconds) or `95`
 (seconds), then press Enter.
+
+The mouse wheel works over the list, too: over the playlist it
+scrolls the list's view (the selection stays put), and over the
+Open picker's listing it moves the selection.
 
 ### Typing a path: Q is a normal character
 

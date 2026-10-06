@@ -505,15 +505,41 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
                 popup,
             );
         }
-        Modal::Help => {
+        Modal::Help { scroll } => {
             let lines = help_lines();
-            let height = (lines.len() as u16 + 2).min(area.height);
+            // Content rows + the borders + one always-visible hint
+            // row. A terminal too short for all of it scrolls instead
+            // of clipping (G5).
+            let height = (lines.len() as u16 + 3).min(area.height);
             let popup = centered_area(area, height);
             frame.render_widget(Clear, popup);
             frame.render_widget(
-                Paragraph::new(lines).block(Block::bordered().title(bold(" Help "))),
+                Paragraph::new("").block(Block::bordered().title(bold(" Help "))),
                 popup,
             );
+            let inner = Rect::new(
+                popup.x + 1,
+                popup.y + 1,
+                popup.width.saturating_sub(2),
+                popup.height.saturating_sub(2),
+            );
+            let [content, hint_area] =
+                Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(inner);
+            // The offset counts content lines from the top; the model
+            // keeps the raw count, the view clamps it to what THIS
+            // popup can actually show.
+            let visible = content.height as usize;
+            let max_offset = lines.len().saturating_sub(visible);
+            let offset = (*scroll as usize).min(max_offset);
+            frame.render_widget(Paragraph::new(lines).scroll((offset as u16, 0)), content);
+            let hint = if max_offset == 0 {
+                "Esc close"
+            } else if offset >= max_offset {
+                "↑↓ scroll · end · Esc close"
+            } else {
+                "↑↓ scroll · Esc close"
+            };
+            frame.render_widget(Paragraph::new(hint).centered(), hint_area);
         }
     }
 }
@@ -544,51 +570,62 @@ fn centered_area(area: Rect, height: u16) -> Rect {
     )
 }
 /// The help modal's content (the `?` key): the shipped keys and input
-/// methods, and nothing beyond them. Every line here must stay in
+/// methods, ordered by the T0 user workflows — open and play, steer
+/// the playlist, shape the sound, watch — instead of a flat key dump,
+/// with the always-true keys last. Every line here must stay in
 /// lockstep with the frozen grammar — no affordance may be advertised
 /// before it exists, and none may be missing once it does (the
-/// QUICKSTART lockstep test pins this from both sides).
+/// QUICKSTART lockstep test pins this from both sides). The popup
+/// scrolls (G5), so the terminal's height decides the first page, not
+/// the content's importance.
 fn help_lines() -> Vec<Line<'static>> {
     vec![
-        Line::from(" Qianqian keys"),
+        Line::from(" Qianqian — the short tour"),
         Line::from(""),
-        Line::from(" Focus"),
-        Line::from("   Tab / Shift+Tab   move keyboard focus"),
-        Line::from("   Enter             activate the focused control"),
-        Line::from("   Mouse             click a tab, button or playlist row"),
+        Line::from(" 1 · Open and play"),
+        Line::from("   O                 open a file or folder"),
+        Line::from("   Tab / Shift+Tab   path field / listing / buttons"),
+        Line::from("   ↑ / ↓ / wheel     move the listing selection"),
+        Line::from("   Enter             folder row: enter it; file row: select it"),
+        Line::from("   Backspace         on the listing: up to the parent folder"),
+        Line::from("   [Open]            play the picked subject now"),
+        Line::from("   [Add]             append it to the playlist instead"),
+        Line::from("   [Use this folder] make the shown folder the subject"),
+        Line::from("   Esc               cancel"),
         Line::from(""),
-        Line::from(" Playlist"),
-        Line::from("   ↑ / ↓ / wheel     select the previous / next row (list focused)"),
+        Line::from(" 2 · Steer what plays"),
+        Line::from("   ↑ / ↓             select the previous / next playlist row"),
         Line::from("   Enter             play the selected row"),
         Line::from("   N / P             next / previous track"),
         Line::from("   R                 order: sequential / shuffle"),
         Line::from("   L                 repeat: off / all / one"),
-        Line::from(""),
-        Line::from(" Open picker"),
-        Line::from("   Tab / Shift+Tab   path field / listing / buttons"),
-        Line::from("   ↑ / ↓ / wheel     move the listing selection"),
-        Line::from("   Enter             field: navigate a folder or select a file"),
-        Line::from("   Enter             folder row: enter it; file row: select it"),
-        Line::from("   Backspace         on the listing: up to the parent folder"),
-        Line::from("   [Open] / [Add]    commit the selection or the typed path"),
-        Line::from("   [Enter folder]    descend into the selected folder"),
-        Line::from("   Esc               cancel"),
-        Line::from(""),
-        Line::from(" Playback"),
         Line::from("   Space             pause / resume / play"),
         Line::from("   ← / →             seek 5 s back / forward"),
-        Line::from("   [Back 5s]         the same 5 s seek, as a visible button"),
-        Line::from("   [Forward 5s]      the same 5 s seek, as a visible button"),
         Line::from("   Shift+← / →       seek 30 s back / forward"),
         Line::from("   G                 go to an exact position"),
         Line::from("   + / -             volume up / down"),
         Line::from("   S                 stop"),
+        Line::from("   wheel             over the list: scroll its view"),
         Line::from(""),
-        Line::from(" Application"),
-        Line::from("   O                 open a file or folder"),
+        Line::from(" 3 · Shape the sound — the Audio tab"),
+        Line::from("   Edits a draft; [Apply] commits it, [Cancel] discards."),
+        Line::from("   Until an Apply, nothing is applied."),
+        Line::from("   [DSP: on/off]     processing bypass or on"),
+        Line::from("   [Preamp −] / [+]  the draft preamp, one dB per press"),
+        Line::from("   [−] / [+]         one band's trim, ±18 dB"),
+        Line::from("   [EQ preset...]    fill the draft from a factory preset"),
+        Line::from(""),
+        Line::from(" 4 · Watch — the Visualizer tab"),
+        Line::from("   [Spectrum] [Levels] [Waveform]  switch the display"),
+        Line::from("   Without a live episode the panel says so honestly."),
+        Line::from(""),
+        Line::from(" 5 · Any time"),
+        Line::from("   Tab / Shift+Tab   move keyboard focus"),
+        Line::from("   Enter             activate the focused control"),
+        Line::from("   Mouse             click any control: tabs, buttons, rows"),
         Line::from("   ?                 close this help"),
+        Line::from("   Esc               cancel / close this help"),
         Line::from("   Q / Ctrl+C        quit"),
-        Line::from("   Esc               cancel / close help"),
     ]
 }
 
@@ -633,8 +670,10 @@ mod tests {
                     }
                     ModalKind::Help => {
                         assert!(text.contains(" Help "), "{width}x{height}:\n{text}");
+                        // The tour opens with the first workflow (G5),
+                        // whatever the terminal's height.
                         assert!(
-                            text.contains("move keyboard focus"),
+                            text.contains("open a file or folder"),
                             "{width}x{height}:\n{text}"
                         );
                     }
@@ -648,8 +687,9 @@ mod tests {
     /// file documents must be advertised by the on-screen overlay, and
     /// nothing beyond the shipped set. The usage-text side of the same
     /// agreement lives in QUICKSTART.md's key table; this test renders
-    /// the ACTUAL overlay and reads the ACTUAL QUICKSTART.md, so the
-    /// two surfaces cannot drift apart silently.
+    /// the ACTUAL overlay — scrolling through every page, the way a
+    /// short terminal reads it (G5) — and reads the ACTUAL
+    /// QUICKSTART.md, so the two surfaces cannot drift apart silently.
     #[test]
     fn the_help_overlay_advertises_every_quickstart_key() {
         let quickstart_path =
@@ -661,7 +701,7 @@ mod tests {
             ("Tab / Shift+Tab", "Tab / Shift+Tab"),
             ("Enter", "Enter"),
             ("Mouse", "Mouse"),
-            ("↑ / ↓", "↑ / ↓ / wheel"),
+            ("↑ / ↓", "↑ / ↓"),
             ("N / P", "N / P"),
             ("R", "R                 order"),
             ("L", "L                 repeat"),
@@ -702,16 +742,33 @@ mod tests {
 
         let mut model = plain_model();
         model.open_modal(ModalKind::Help);
-        let text = rendered(&mut model, 100, 40);
+        // Page through the whole overlay (one draw per page), the way
+        // a terminal too short for the content reads it.
+        let mut seen = String::new();
+        for _ in 0..10 {
+            let text = rendered(&mut model, 100, 30);
+            assert_eq!(scan(&text), None, "{text}");
+            seen.push_str(&text);
+            if text.contains("· end ·") {
+                break;
+            }
+            for _ in 0..HELP_PAGE_LINES {
+                model.help_scroll(HelpScroll::PageDown);
+            }
+        }
+        assert!(
+            seen.contains("· end ·"),
+            "the page walk never reached the overlay's end:\n{seen}"
+        );
         for (quickstart_key, overlay_needle) in overlay_needles {
             assert!(
                 documented.iter().any(|key| key == quickstart_key),
                 "{quickstart_key:?} missing from QUICKSTART's key table"
             );
             assert!(
-                text.contains(overlay_needle),
+                seen.contains(overlay_needle),
                 "the overlay does not advertise {quickstart_key:?} \
-                 (expected {overlay_needle:?}):\n{text}"
+                 (expected {overlay_needle:?}):\n{seen}"
             );
         }
         // Not shipped: none of it may be advertised.
@@ -722,13 +779,45 @@ mod tests {
             "scrub",
             "lyrics",
             "album art",
-            "equalizer",
             "library",
             "favorites",
         ] {
-            assert!(!text.contains(unearned), "{unearned:?} in:\n{text}");
+            assert!(!seen.contains(unearned), "{unearned:?} in:\n{seen}");
         }
-        assert_eq!(scan(&text), None, "{text}");
+    }
+
+    /// The help overlay pages (G5): a short terminal scrolls, says so
+    /// in its hint row, and says "end" at the bottom; a terminal tall
+    /// enough for the whole tour says only "Esc close".
+    #[test]
+    fn the_help_overlay_pages_and_tells_the_truth_about_it() {
+        // A terminal the tour is taller than.
+        let mut model = plain_model();
+        model.open_modal(ModalKind::Help);
+        let text = rendered(&mut model, 60, 20);
+        assert!(text.contains(" Help "), "{text}");
+        assert!(text.contains("↑↓ scroll · Esc close"), "{text}");
+        assert!(
+            !text.contains("move keyboard focus"),
+            "the last section must start below the fold:\n{text}"
+        );
+
+        // Page to the end: the late sections arrive and the hint
+        // says so.
+        for _ in 0..6 {
+            model.help_scroll(HelpScroll::PageDown);
+        }
+        let text = rendered(&mut model, 60, 20);
+        assert!(text.contains("move keyboard focus"), "{text}");
+        assert!(text.contains("· end ·"), "{text}");
+
+        // A tall terminal shows the whole tour at once.
+        let mut model = plain_model();
+        model.open_modal(ModalKind::Help);
+        let text = rendered(&mut model, 100, 60);
+        assert!(text.contains("move keyboard focus"), "{text}");
+        assert!(text.contains("Esc close"), "{text}");
+        assert!(!text.contains("↑↓ scroll"), "nothing to scroll:\n{text}");
     }
 
     // ------------------------------------------------------------------

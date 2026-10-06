@@ -7,7 +7,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
 use super::actions::{PlaylistCursor, TuiAction};
 use super::focus::{FocusId, FocusMove};
-use super::modal::{Modal, ModalButton, ModalInput, ModalKind};
+use super::modal::{HelpScroll, Modal, ModalButton, ModalInput, ModalKind};
 use super::projection::{LARGE_SEEK_STEP_SECS, SEEK_STEP_SECS};
 use super::responsive::ResponsiveClass;
 use super::state::TuiModel;
@@ -124,6 +124,20 @@ fn decode_modal_key(key: KeyEvent, model: &TuiModel) -> Option<TuiAction> {
             KeyCode::Esc => Some(TuiAction::ModalInput(ModalInput::Cancel)),
             KeyCode::Char('?') if plain(key) => Some(TuiAction::ModalInput(ModalInput::Cancel)),
             KeyCode::Char('q') | KeyCode::Char('Q') if plain(key) => Some(TuiAction::Quit),
+            // The content scroll (G5): one line per arrow, one page per
+            // Page key. Nothing else leaks through to the background.
+            KeyCode::Up if plain(key) => Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::Up,
+            ))),
+            KeyCode::Down if plain(key) => Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::Down,
+            ))),
+            KeyCode::PageUp => Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::PageUp,
+            ))),
+            KeyCode::PageDown => Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::PageDown,
+            ))),
             _ => None,
         },
         ModalKind::GoTo => match key.code {
@@ -479,7 +493,7 @@ mod tests {
     /// The help overlay owns the keyboard: `?`/Esc close it, Q quits,
     /// everything else is noise — no playback key can fire behind it.
     #[test]
-    fn the_help_modal_lets_only_its_close_keys_through() {
+    fn the_help_modal_lets_only_its_close_and_scroll_keys_through() {
         let mut model = TuiModel::new("song.flac");
         model.open_modal(ModalKind::Help);
         for code in [
@@ -487,7 +501,6 @@ mod tests {
             KeyCode::Char('s'),
             KeyCode::Char('n'),
             KeyCode::Char('r'),
-            KeyCode::Down,
             KeyCode::Enter,
             KeyCode::Left,
         ] {
@@ -497,6 +510,32 @@ mod tests {
                 "{code:?} must not act behind the help overlay"
             );
         }
+        // The content scroll (G5): one line per arrow, one page per
+        // Page key — the overlay's own vocabulary, nothing behind it.
+        assert_eq!(
+            decode_key(key(KeyCode::Up), &model),
+            Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::Up
+            )))
+        );
+        assert_eq!(
+            decode_key(key(KeyCode::Down), &model),
+            Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::Down
+            )))
+        );
+        assert_eq!(
+            decode_key(key(KeyCode::PageUp), &model),
+            Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::PageUp
+            )))
+        );
+        assert_eq!(
+            decode_key(key(KeyCode::PageDown), &model),
+            Some(TuiAction::ModalInput(ModalInput::HelpScroll(
+                HelpScroll::PageDown
+            )))
+        );
         assert_eq!(
             decode_key(key(KeyCode::Char('?')), &model),
             Some(TuiAction::ModalInput(ModalInput::Cancel))

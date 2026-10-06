@@ -6,16 +6,16 @@ use ratatui::layout::Position;
 
 use super::actions::{PlaylistCursor, TuiAction, TuiRoute};
 use super::controls::{
-    AUDIO_BUTTONS, AudioButton, EqAdjust, PLAYLIST_BUTTONS, PREFERENCES, PlaylistButton,
-    PreferenceButton, SEEK_BUTTONS, SeekButton, TRANSPORT, TransportButton,
+    AUDIO_BUTTONS, AudioButton, EqAdjust, NAV_BUTTONS, NavBarButton, PLAYLIST_BUTTONS, PREFERENCES,
+    PlaylistButton, PreferenceButton, SEEK_BUTTONS, SeekButton, TRANSPORT, TransportButton,
 };
 use super::focus::{FocusId, FocusMove};
 #[cfg(test)]
 use super::hit::ArmedClick;
 use super::hit::{HitRegion, HitTarget};
 use super::modal::{
-    ConfirmKind, Modal, ModalButton, ModalConfirm, ModalInput, ModalKind, OpenPicker, PickerEntry,
-    PickerMode, PickerSubject,
+    ConfirmKind, HELP_PAGE_LINES, HelpScroll, Modal, ModalButton, ModalConfirm, ModalInput,
+    ModalKind, OpenPicker, PickerEntry, PickerMode, PickerSubject,
 };
 use super::projection::SEEK_STEP_SECS;
 use super::responsive::ResponsiveClass;
@@ -222,6 +222,10 @@ impl TuiModel {
                 );
             }
         }
+        // The nav bar's persistent application controls (G5) close the
+        // cycle on every route: Help and Quit are always reachable,
+        // after the route's own content.
+        cycle.extend(NAV_BUTTONS.iter().map(|button| FocusId::NavBar(*button)));
         cycle
     }
 
@@ -294,6 +298,7 @@ impl TuiModel {
             HitTarget::AudioButton(button) => Some(FocusId::AudioButton(button)),
             HitTarget::EqBand { band, adjust } => Some(FocusId::EqBand { band, adjust }),
             HitTarget::VisualizerMode(mode) => Some(FocusId::VisualizerMode(mode)),
+            HitTarget::NavBar(button) => Some(FocusId::NavBar(button)),
             HitTarget::PickerRow(_) => Some(FocusId::PickerList),
             HitTarget::ModalButton(button) => Some(FocusId::PickerButton(button)),
             HitTarget::ModalField => Some(FocusId::ModalField),
@@ -357,6 +362,12 @@ impl TuiModel {
                 },
             )),
             HitTarget::VisualizerMode(mode) => Some(TuiAction::SetVisualizerMode(mode)),
+            HitTarget::NavBar(button) => Some(match button {
+                NavBarButton::Help => TuiAction::OpenModal(ModalKind::Help),
+                // The same loop control the Q key produces (§7: keyboard
+                // and mouse converge on one action vocabulary).
+                NavBarButton::Quit => TuiAction::Quit,
+            }),
             HitTarget::PickerRow(index) => Some(TuiAction::ModalInput(
                 match self.picker_entries().get(index) {
                     // The synthesized `..` row activates the parent
@@ -404,6 +415,7 @@ impl TuiModel {
                 self.action_of_target(HitTarget::EqBand { band, adjust })
             }
             FocusId::VisualizerMode(mode) => self.action_of_target(HitTarget::VisualizerMode(mode)),
+            FocusId::NavBar(button) => self.action_of_target(HitTarget::NavBar(button)),
             FocusId::Playlist => Some(TuiAction::PlaylistPlaySelected),
             FocusId::PickerList => Some(TuiAction::ModalInput(ModalInput::ListActivate)),
             FocusId::PickerButton(button) => self.action_of_target(HitTarget::ModalButton(button)),
@@ -443,7 +455,7 @@ impl TuiModel {
             ModalKind::GoTo => Modal::GoTo {
                 input: String::new(),
             },
-            ModalKind::Help => Modal::Help,
+            ModalKind::Help => Modal::Help { scroll: 0 },
             // The preset menu (G3) starts its cursor on the preset the
             // draft (or, with no draft, the desired configuration)
             // currently matches — the menu answers "which preset am I
@@ -510,7 +522,7 @@ impl TuiModel {
             }
             Modal::GoTo { input } => input,
             // Help and the confirm modal have no text field to edit.
-            Modal::Help | Modal::Confirm { .. } | Modal::Presets { .. } => return,
+            Modal::Help { .. } | Modal::Confirm { .. } | Modal::Presets { .. } => return,
         };
         match input {
             ModalInput::Char(c) => text.push(c),
@@ -525,7 +537,8 @@ impl TuiModel {
             | ModalInput::CommitOpen
             | ModalInput::CommitAdd
             | ModalInput::CommitConfirm
-            | ModalInput::UseFolder => {}
+            | ModalInput::UseFolder
+            | ModalInput::HelpScroll(_) => {}
         }
     }
 
@@ -719,7 +732,7 @@ impl TuiModel {
     /// where the modal closes only on success.
     pub fn confirm_modal(&mut self) -> ModalConfirm {
         match self.modal.as_mut() {
-            Some(Modal::Help) => {
+            Some(Modal::Help { .. }) => {
                 self.close_modal();
                 ModalConfirm::Nothing
             }
@@ -768,6 +781,22 @@ impl TuiModel {
     /// Backspace one character out of the active text modal.
     pub fn modal_backspace(&mut self) {
         self.modal_edit(ModalInput::Backspace);
+    }
+
+    /// Scroll the help overlay's content (G5). The offset counts lines
+    /// from the top and saturates at zero; the view clamps the top end
+    /// to what the popup actually shows. Opening help always starts at
+    /// the top — the tour begins at the beginning.
+    pub fn help_scroll(&mut self, scroll: HelpScroll) {
+        let Some(Modal::Help { scroll: offset }) = self.modal.as_mut() else {
+            return;
+        };
+        match scroll {
+            HelpScroll::Up => *offset = offset.saturating_sub(1),
+            HelpScroll::Down => *offset = offset.saturating_add(1),
+            HelpScroll::PageUp => *offset = offset.saturating_sub(HELP_PAGE_LINES),
+            HelpScroll::PageDown => *offset = offset.saturating_add(HELP_PAGE_LINES),
+        }
     }
 
     /// The active modal's text content, while editing.
@@ -849,7 +878,8 @@ mod tests {
         });
 
         // Now Playing: four tabs, then the five transport buttons
-        // (Open included), then the preference row.
+        // (Open included), then the preference row, then the nav bar's
+        // persistent Help/Quit (G5).
         model.set_route(TuiRoute::NowPlaying);
         assert_eq!(
             model.focus_cycle(),
@@ -867,10 +897,13 @@ mod tests {
                 FocusId::Preference(PreferenceButton::VolumeUp),
                 FocusId::Preference(PreferenceButton::Order),
                 FocusId::Preference(PreferenceButton::Repeat),
+                FocusId::NavBar(NavBarButton::Help),
+                FocusId::NavBar(NavBarButton::Quit),
             ]
         );
 
-        // Playlist: the toolbar first, then the list (it has rows).
+        // Playlist: the toolbar first, then the list (it has rows),
+        // then the same persistent pair.
         model.set_route(TuiRoute::Playlist);
         assert_eq!(
             model.focus_cycle(),
@@ -885,15 +918,21 @@ mod tests {
                 FocusId::PlaylistButton(PlaylistButton::Remove),
                 FocusId::PlaylistButton(PlaylistButton::Clear),
                 FocusId::Playlist,
+                FocusId::NavBar(NavBarButton::Help),
+                FocusId::NavBar(NavBarButton::Quit),
             ]
         );
 
         // Audio (G3): tabs + the six toolbar controls + the ten band
-        // steppers (− and + per band). Visualizer: tabs only (§33).
+        // steppers (− and + per band) + the persistent pair.
         model.set_route(TuiRoute::Audio);
-        assert_eq!(model.focus_cycle().len(), 30);
+        assert_eq!(model.focus_cycle().len(), 32);
         model.set_route(TuiRoute::Visualizer);
-        assert_eq!(model.focus_cycle().len(), 7, "tabs + three mode buttons");
+        assert_eq!(
+            model.focus_cycle().len(),
+            9,
+            "tabs + three mode buttons + the persistent pair"
+        );
 
         // A modal collapses the cycle to its field (§24).
         model.open_modal(ModalKind::GoTo);
@@ -905,6 +944,89 @@ mod tests {
         assert!(model.focus_cycle().is_empty());
         model.validate_focus();
         assert_eq!(model.focus(), None, "no invisible focus below minimum");
+    }
+
+    /// The nav bar's persistent pair (G5): Help and Quit close the
+    /// focus cycle on every route and activate into the SAME actions
+    /// their keys produce — and the §12 fallback never lands on them,
+    /// because they are application chrome, not a route's first local
+    /// control.
+    #[test]
+    fn the_nav_bar_buttons_focus_activate_and_never_catch_the_fallback() {
+        let mut model = TuiModel::new("song.flac");
+        model.set_class(ResponsiveClass::Normal);
+
+        for route in TuiRoute::ALL {
+            model.set_route(route);
+            let cycle = model.focus_cycle();
+            assert_eq!(
+                cycle[cycle.len() - 2],
+                FocusId::NavBar(NavBarButton::Help),
+                "{route:?}"
+            );
+            assert_eq!(
+                cycle[cycle.len() - 1],
+                FocusId::NavBar(NavBarButton::Quit),
+                "{route:?}"
+            );
+        }
+
+        // Enter on the focused Help opens the overlay; Enter on Quit
+        // is the quit action.
+        model.set_route(TuiRoute::Visualizer);
+        model.set_focus(Some(FocusId::NavBar(NavBarButton::Help)));
+        assert_eq!(
+            model.activation(),
+            Some(TuiAction::OpenModal(ModalKind::Help))
+        );
+        model.set_focus(Some(FocusId::NavBar(NavBarButton::Quit)));
+        assert_eq!(model.activation(), Some(TuiAction::Quit));
+
+        // A focus that left the cycle falls to the route's first local
+        // control, never to the persistent chrome.
+        model.set_route(TuiRoute::NowPlaying);
+        model.set_focus(Some(FocusId::Playlist));
+        model.validate_focus();
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::Transport(TransportButton::Open)),
+            "the fallback is the route's first local control"
+        );
+    }
+
+    /// The help overlay's scroll (G5): it starts at the top, moves one
+    /// line per step and one page per page step, saturates at the top,
+    /// and reopening starts over. The text-edit path cannot move it —
+    /// the overlay has no text field.
+    #[test]
+    fn the_help_overlay_scrolls_and_reopens_at_the_top() {
+        let mut model = TuiModel::new("song.flac");
+        model.open_modal(ModalKind::Help);
+        let scroll = |model: &TuiModel| match model.modal() {
+            Some(Modal::Help { scroll }) => *scroll,
+            other => panic!("help modal expected, got {other:?}"),
+        };
+        assert_eq!(scroll(&model), 0, "the tour starts at the top");
+        for _ in 0..3 {
+            model.help_scroll(HelpScroll::Down);
+        }
+        assert_eq!(scroll(&model), 3);
+        model.help_scroll(HelpScroll::Up);
+        assert_eq!(scroll(&model), 2);
+        for _ in 0..5 {
+            model.help_scroll(HelpScroll::Up);
+        }
+        assert_eq!(scroll(&model), 0, "the top saturates");
+        model.help_scroll(HelpScroll::PageDown);
+        assert_eq!(scroll(&model), HELP_PAGE_LINES);
+        model.help_scroll(HelpScroll::PageUp);
+        assert_eq!(scroll(&model), 0);
+        // The editing step is not a scroll step.
+        model.modal_edit(ModalInput::HelpScroll(HelpScroll::PageDown));
+        assert_eq!(scroll(&model), 0);
+        model.close_modal();
+        model.open_modal(ModalKind::Help);
+        assert_eq!(scroll(&model), 0, "reopening starts over");
     }
 
     /// Tab/Shift+Tab walk the visible enabled controls with wraparound,
@@ -928,11 +1050,23 @@ mod tests {
         assert_eq!(
             model.focus(),
             Some(FocusId::RouteTab(TuiRoute::Visualizer)),
-            "Shift+Tab from the cycle edge wraps to the last tab"
+            "Shift+Tab from the toolbar lands on the last tab"
+        );
+        // The cycle's other edge: Shift+Tab from the FIRST tab wraps
+        // past the route content to the persistent Quit (G5).
+        for _ in 0..3 {
+            model.move_focus(FocusMove::Previous);
+        }
+        assert_eq!(model.focus(), Some(FocusId::RouteTab(TuiRoute::NowPlaying)));
+        model.move_focus(FocusMove::Previous);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::NavBar(NavBarButton::Quit)),
+            "Shift+Tab from the first tab wraps to the nav bar's Quit"
         );
 
         // One row appears: the list joins the cycle. The focus on the
-        // Visualizer tab is still valid, so validation keeps it.
+        // Quit button is still valid, so validation keeps it.
         model.set_playlist(2, || {
             vec![PlaylistRow {
                 label: "a.flac".to_owned(),
@@ -943,9 +1077,19 @@ mod tests {
         model.validate_focus();
         assert_eq!(
             model.focus(),
-            Some(FocusId::RouteTab(TuiRoute::Visualizer)),
+            Some(FocusId::NavBar(NavBarButton::Quit)),
             "a still-valid focus is never moved by validation"
         );
+        model.move_focus(FocusMove::Next);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::RouteTab(TuiRoute::NowPlaying)),
+            "Tab from the cycle's last stop wraps to the first tab"
+        );
+        for _ in 0..3 {
+            model.move_focus(FocusMove::Next);
+        }
+        assert_eq!(model.focus(), Some(FocusId::RouteTab(TuiRoute::Visualizer)));
         model.move_focus(FocusMove::Next);
         assert_eq!(
             model.focus(),
@@ -960,6 +1104,12 @@ mod tests {
             Some(FocusId::Playlist),
             "the list joined the cycle"
         );
+        // The persistent pair (G5) sits between the route content and
+        // the wrap.
+        model.move_focus(FocusMove::Next);
+        assert_eq!(model.focus(), Some(FocusId::NavBar(NavBarButton::Help)));
+        model.move_focus(FocusMove::Next);
+        assert_eq!(model.focus(), Some(FocusId::NavBar(NavBarButton::Quit)));
         model.move_focus(FocusMove::Next);
         assert_eq!(
             model.focus(),

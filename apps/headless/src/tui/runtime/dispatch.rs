@@ -1453,6 +1453,9 @@ mod tests {
             FocusId::Preference(PreferenceButton::VolumeUp),
             FocusId::Preference(PreferenceButton::Order),
             FocusId::Preference(PreferenceButton::Repeat),
+            // The nav bar's persistent pair closes the cycle (G5).
+            FocusId::NavBar(NavBarButton::Help),
+            FocusId::NavBar(NavBarButton::Quit),
             FocusId::RouteTab(TuiRoute::NowPlaying),
             FocusId::RouteTab(TuiRoute::Playlist),
         ] {
@@ -1472,6 +1475,25 @@ mod tests {
             Step::Continue
         );
         assert_eq!(model.focus(), Some(FocusId::RouteTab(TuiRoute::NowPlaying)));
+        // Previous from the first tab wraps to the persistent pair.
+        assert_eq!(
+            dispatch(
+                TuiAction::MoveFocus(FocusMove::Previous),
+                &mut model,
+                &mut player
+            ),
+            Step::Continue
+        );
+        assert_eq!(model.focus(), Some(FocusId::NavBar(NavBarButton::Quit)));
+        assert_eq!(
+            dispatch(
+                TuiAction::MoveFocus(FocusMove::Previous),
+                &mut model,
+                &mut player
+            ),
+            Step::Continue
+        );
+        assert_eq!(model.focus(), Some(FocusId::NavBar(NavBarButton::Help)));
         assert_eq!(
             dispatch(
                 TuiAction::MoveFocus(FocusMove::Previous),
@@ -1483,6 +1505,47 @@ mod tests {
         assert_eq!(
             model.focus(),
             Some(FocusId::Preference(PreferenceButton::Repeat))
+        );
+    }
+
+    /// The nav bar's persistent buttons answer the mouse (G5), under
+    /// the same armed-click rule as every control: a click on Help
+    /// opens the overlay at the top of the tour; a click on Quit is
+    /// the quit action — the same one the Q key produces.
+    #[test]
+    fn the_nav_bar_help_and_quit_answer_the_mouse() {
+        let tree = TempTree::new("navbar");
+        let file = tree.live_file("live.flac");
+        let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
+        assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        let (help_x, help_y) = draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &crate::tui::model::HitTarget::NavBar(NavBarButton::Help),
+        );
+        assert!(model.modal().is_none(), "no modal before the click");
+        click_at(help_x, help_y, &mut model, &mut player);
+        assert!(
+            matches!(model.modal(), Some(Modal::Help { scroll: 0 })),
+            "the click opens help at the top, got {:?}",
+            model.modal()
+        );
+
+        model.close_modal();
+        let (quit_x, quit_y) = draw_and_locate(
+            &mut model,
+            100,
+            30,
+            &crate::tui::model::HitTarget::NavBar(NavBarButton::Quit),
+        );
+        assert_eq!(
+            click_at(quit_x, quit_y, &mut model, &mut player),
+            Some(TuiAction::Quit),
+            "the Quit click's action is the Q key's action"
         );
     }
 

@@ -54,8 +54,8 @@ pub use actions::{PlaylistCursor, Step, TuiAction, TuiRoute};
 #[cfg(test)]
 pub use controls::SeekButton;
 pub use controls::{
-    AUDIO_BUTTONS, AudioButton, EqAdjust, PLAYLIST_BUTTONS, PlaylistButton, PreferenceButton,
-    SEEK_BUTTONS, TRANSPORT, TransportButton,
+    AUDIO_BUTTONS, AudioButton, EqAdjust, NAV_BUTTONS, NavBarButton, PLAYLIST_BUTTONS,
+    PlaylistButton, PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton,
 };
 pub use focus::FocusId;
 #[cfg(test)]
@@ -66,6 +66,8 @@ pub use modal::{
     ConfirmKind, Modal, ModalButton, ModalConfirm, ModalInput, ModalKind, OpenPicker, PickerMode,
     PickerSubject,
 };
+#[cfg(test)]
+pub use modal::{HELP_PAGE_LINES, HelpScroll};
 pub use mouse::decode_mouse;
 #[cfg(test)]
 pub use projection::dsp_summary;

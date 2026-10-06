@@ -31,8 +31,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::model::{
-    FocusId, HitRegion, HitTarget, MAX_STATUS_ROWS, ResponsiveClass, TuiModel, TuiRoute,
-    responsive_class, status_shape,
+    FocusId, HitRegion, HitTarget, MAX_STATUS_ROWS, NAV_BUTTONS, NavBarButton, ResponsiveClass,
+    TuiModel, TuiRoute, responsive_class, status_shape,
 };
 
 use audio::draw_audio;
@@ -150,9 +150,40 @@ fn render_too_small(frame: &mut Frame, area: Rect) {
 /// route is bold, the focused tab is inverted — two shapes a monochrome
 /// terminal renders distinctly. Each tab's cell is published as its hit
 /// region from the very rect it was drawn into.
+/// The persistent top navigation (§6, G5): the four frozen route tabs,
+/// then the two persistent application controls — Help and Quit —
+/// pinned to the bar's right end on every route and in every class
+/// above the minimum. The active route is bold, the focused control is
+/// inverted — two shapes a monochrome terminal can tell apart.
 fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<HitRegion>) {
-    let cells: [Rect; 4] = Layout::horizontal([Constraint::Ratio(1, 4); 4]).areas(area);
     let compact = model.class() == ResponsiveClass::Compact;
+    let label = |button: NavBarButton| {
+        if compact {
+            button.compact_label()
+        } else {
+            button.label()
+        }
+    };
+    // The bar's right end: one measured cell per persistent control,
+    // one spare column between and after them, over the route tabs'
+    // remaining width. Plain arithmetic — the cells must never
+    // overlap the tabs, whatever the terminal width.
+    let nav_widths: Vec<u16> = NAV_BUTTONS
+        .iter()
+        .map(|button| label(*button).chars().count() as u16)
+        .collect();
+    let nav_total: u16 = nav_widths
+        .iter()
+        .sum::<u16>()
+        .saturating_add(NAV_BUTTONS.len() as u16);
+    let tabs_area = Rect::new(
+        area.x,
+        area.y,
+        area.width.saturating_sub(nav_total),
+        area.height,
+    );
+
+    let cells: [Rect; 4] = Layout::horizontal([Constraint::Ratio(1, 4); 4]).areas(tabs_area);
     for (route, cell) in TuiRoute::ALL.iter().zip(cells.iter()) {
         let active = *route == model.route();
         let focused = model.focus() == Some(FocusId::RouteTab(*route));
@@ -172,6 +203,21 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
         regions.push(HitRegion {
             area: *cell,
             target: HitTarget::RouteTab(*route),
+        });
+    }
+    let mut cell_x = area.x + area.width.saturating_sub(nav_total);
+    for (index, button) in NAV_BUTTONS.iter().enumerate() {
+        let cell = Rect::new(cell_x, area.y, nav_widths[index], area.height);
+        cell_x += nav_widths[index] + 1;
+        let focused = model.focus() == Some(FocusId::NavBar(*button));
+        let mut style = Style::default();
+        if focused {
+            style = style.add_modifier(Modifier::REVERSED);
+        }
+        frame.render_widget(Paragraph::new(Line::styled(label(*button), style)), cell);
+        regions.push(HitRegion {
+            area: cell,
+            target: HitTarget::NavBar(*button),
         });
     }
 }

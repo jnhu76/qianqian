@@ -174,7 +174,13 @@ pub enum Modal {
     GoTo {
         input: String,
     },
-    Help,
+    /// The help overlay (G5): workflow-first content, scrollable when
+    /// the terminal is too short for all of it. The offset counts
+    /// content lines from the top; the view clamps it to what the
+    /// popup actually shows.
+    Help {
+        scroll: u16,
+    },
     /// The stop-aware confirmation before a destructive list edit
     /// (T0 owner decision). One value per opening; Cancel is focused
     /// first and Esc cancels — the modal decides nothing by itself.
@@ -194,7 +200,7 @@ impl Modal {
         match self {
             Modal::Open(_) => ModalKind::Open,
             Modal::GoTo { .. } => ModalKind::GoTo,
-            Modal::Help => ModalKind::Help,
+            Modal::Help { .. } => ModalKind::Help,
             Modal::Confirm { kind } => match kind {
                 ConfirmKind::RemoveCurrent => ModalKind::ConfirmRemoveCurrent,
                 ConfirmKind::Clear => ModalKind::ConfirmClear,
@@ -209,7 +215,7 @@ impl Modal {
         match self {
             Modal::Open(picker) => Some(picker.input.as_str()),
             Modal::GoTo { input } => Some(input),
-            Modal::Help | Modal::Confirm { .. } | Modal::Presets { .. } => None,
+            Modal::Help { .. } | Modal::Confirm { .. } | Modal::Presets { .. } => None,
         }
     }
 }
@@ -249,10 +255,28 @@ pub enum ModalInput {
     /// "explicit destructive choice"; which edit rides on the modal
     /// kind itself).
     CommitConfirm,
+    /// The help overlay's content scroll (G5): one line, or one page
+    /// for the page steps.
+    HelpScroll(HelpScroll),
     /// Esc (or `?` for Help): close the modal. The closing event is
     /// consumed by the modal — it never also acts on the background.
     Cancel,
 }
+
+/// Which way the help overlay's content scrolls (G5). One step is one
+/// line; a page is [`HELP_PAGE_LINES`] lines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HelpScroll {
+    Up,
+    Down,
+    PageUp,
+    PageDown,
+}
+
+/// One page of help scrolling, in content lines. A fixed step — the
+/// model performs no layout, so it cannot measure the popup; the view
+/// clamps the offset to the content anyway.
+pub const HELP_PAGE_LINES: u16 = 10;
 
 /// One of the Open picker's visible buttons.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

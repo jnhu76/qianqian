@@ -6,7 +6,8 @@ use ratatui::layout::Rect;
 
 use super::actions::TuiRoute;
 use super::controls::{
-    AudioButton, EqAdjust, PlaylistButton, PreferenceButton, SeekButton, TransportButton,
+    AudioButton, EqAdjust, NavBarButton, PlaylistButton, PreferenceButton, SeekButton,
+    TransportButton,
 };
 use super::modal::ModalButton;
 use super::visualizer::VisualizerMode;
@@ -39,6 +40,8 @@ pub enum HitTarget {
     },
     /// One of the Visualizer route's mode buttons (G4).
     VisualizerMode(VisualizerMode),
+    /// One of the nav bar's persistent application controls (G5).
+    NavBar(NavBarButton),
     /// The position bar WITH duration evidence: a click-to-position
     /// seek affordance (G1 §9). Without duration evidence the bar is a
     /// display and publishes no region at all.

@@ -2,7 +2,8 @@
 
 use super::actions::TuiRoute;
 use super::controls::{
-    AudioButton, EqAdjust, PlaylistButton, PreferenceButton, SeekButton, TransportButton,
+    AudioButton, EqAdjust, NavBarButton, PlaylistButton, PreferenceButton, SeekButton,
+    TransportButton,
 };
 use super::modal::ModalButton;
 use super::visualizer::VisualizerMode;
@@ -34,6 +35,9 @@ pub enum FocusId {
     EqBand { band: usize, adjust: EqAdjust },
     /// One of the Visualizer route's mode buttons (G4).
     VisualizerMode(VisualizerMode),
+    /// One of the nav bar's persistent application controls (G5):
+    /// Help and Quit, present on every route.
+    NavBar(NavBarButton),
     /// The Open picker's directory listing (the picker cursor is the
     /// focus inside it).
     PickerList,

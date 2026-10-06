@@ -38,6 +38,9 @@ pub(super) fn handle_modal_input<S: EpisodeStart>(
         ModalInput::Char(c) => model.modal_push(c),
         ModalInput::Backspace => model.modal_backspace(),
         ModalInput::Cancel => model.close_modal(),
+        // The help overlay's content scroll (G5): presentation inside
+        // the modal, nothing behind it.
+        ModalInput::HelpScroll(scroll) => model.help_scroll(scroll),
         // The [Use this folder] button (T0 picker freeze): the
         // displayed directory becomes the subject — pure presentation,
         // nothing is committed until an explicit commit button.
