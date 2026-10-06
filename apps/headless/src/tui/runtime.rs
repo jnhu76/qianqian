@@ -2820,6 +2820,15 @@ mod tests {
     fn use_this_folder_commits_the_displayed_directory_without_entering_it() {
         let tree = TempTree::new("use-folder");
         tree.live_file("inside.flac");
+        // The picker browses CANONICAL paths (navigate_picker_to), and
+        // on Windows runners `std::env::temp_dir()` spells the user
+        // profile in the 8.3 short form (RUNNER~1) that canonicalize
+        // resolves away — the typed line navigates through the SAME
+        // canonicalize + simplify transform, so the oracle must too.
+        let canonical = |path: &Path| {
+            simplify_verbatim(&std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()))
+        };
+        let displayed = canonical(tree.path());
         let mut player = ReferencePlayerApp::new(FakeEpisodeSource::new());
         let mut model = TuiModel::new(String::new());
         refresh(&mut model, &player);
@@ -2845,7 +2854,7 @@ mod tests {
         );
         assert_eq!(
             model.open_picker_dir(),
-            Some(tree.path()),
+            Some(displayed.as_path()),
             "the parent of the target is displayed"
         );
         for _ in 0..8 {
