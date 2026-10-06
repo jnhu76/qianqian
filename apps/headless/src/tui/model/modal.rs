@@ -1,0 +1,342 @@
+//! The ONE active modal (there is no stack): its kinds, the Open
+//! picker's presentation draft, the editing vocabulary, the picker's
+//! buttons and the deterministic submission subject.
+
+use std::time::Duration;
+
+use super::actions::PlaylistCursor;
+
+/// The modal kind to open.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModalKind {
+    /// The Open input line (D14.6): a literal file-or-folder path.
+    Open,
+    /// The shared picker restricted to a FILE subject (T0 Add File
+    /// policy): the final Add commits a file only.
+    AddFile,
+    /// The shared picker restricted to a FOLDER subject (T0 Add Folder
+    /// policy): the final Add commits a folder only.
+    AddFolder,
+    /// The GoTo exact-seek line (Issue #166 §27).
+    GoTo,
+    /// The keyboard/mouse help overlay.
+    Help,
+    /// The frozen stop-aware confirmation before removing the CURRENT
+    /// row (T0 owner decision: retire the episode first, then edit the
+    /// list; Cancel is initially focused).
+    ConfirmRemoveCurrent,
+    /// The same confirmation before clearing the whole list.
+    ConfirmClear,
+    /// The EQ preset picker (G3): a menu over the eight factory
+    /// presets; activating one fills the Audio route's DRAFT EQ stage.
+    Presets,
+}
+
+/// Which final subject the shared picker accepts. Navigation is
+/// identical in every mode (T0: "Navigation directories remain
+/// available in either mode"); only the final commit buttons and the
+/// subject kind they accept differ.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PickerMode {
+    /// Open a file or a folder: both commit buttons are visible.
+    OpenAny,
+    /// Add File: the final button is Add, a file subject only;
+    /// replacement Open is absent.
+    AddFile,
+    /// Add Folder: the final button is Add, a folder subject only;
+    /// replacement Open is absent.
+    AddFolder,
+}
+
+impl PickerMode {
+    /// Whether the replacement [Open] button exists in this mode.
+    pub fn allows_open(self) -> bool {
+        matches!(self, PickerMode::OpenAny)
+    }
+
+    /// Whether the [Use this folder] control exists in this mode: it
+    /// makes the displayed directory the subject, which only makes
+    /// sense where a folder CAN be the subject.
+    pub fn allows_use_folder(self) -> bool {
+        !matches!(self, PickerMode::AddFile)
+    }
+
+    /// Whether `is_dir` is an acceptable FINAL subject kind.
+    pub fn accepts(self, is_dir: bool) -> bool {
+        match self {
+            PickerMode::OpenAny => true,
+            PickerMode::AddFile => !is_dir,
+            PickerMode::AddFolder => is_dir,
+        }
+    }
+
+    /// The bounded feedback for a subject of the wrong kind; the
+    /// picker stays open for correction (G1 F11 retention).
+    pub fn subject_refusal(self) -> &'static str {
+        match self {
+            PickerMode::OpenAny => "nothing picked to add",
+            PickerMode::AddFile => "select a file to add",
+            PickerMode::AddFolder => "select a folder to add",
+        }
+    }
+}
+
+/// What a stop-aware confirmation modal decides about (T0 owner
+/// decision: "Remove-current and Clear stop and retire the current
+/// episode first"). The consequence text is presentation; the decision
+/// routes to the SAME App operation the toolbar button would have
+/// called directly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfirmKind {
+    RemoveCurrent,
+    Clear,
+}
+
+impl ConfirmKind {
+    /// The modal's title.
+    pub fn title(self) -> &'static str {
+        match self {
+            ConfirmKind::RemoveCurrent => " Remove current? ",
+            ConfirmKind::Clear => " Clear playlist? ",
+        }
+    }
+
+    /// The explicit stop consequence the modal must state (T0: "an
+    /// explicit stop consequence").
+    pub fn consequence(self) -> &'static str {
+        match self {
+            ConfirmKind::RemoveCurrent => "Removing the current row stops and retires its episode.",
+            ConfirmKind::Clear => {
+                "Clearing stops and retires the current episode, then removes every row."
+            }
+        }
+    }
+}
+
+/// One entry of the Open picker's listing: the display name, the kind
+/// the runtime's `list_directory` classified it as, and the entry's
+/// NATIVE filesystem identity — the path a selection commits (G1 F10).
+/// A presentation draft inside the modal — no admission happened by
+/// listing anything.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PickerEntry {
+    pub name: String,
+    pub is_dir: bool,
+    /// The synthesized `..` row: descending goes to the parent
+    /// directory (G1 §8 parent navigation).
+    pub is_parent: bool,
+    /// The entry's native path: the listed directory joined with the
+    /// filesystem's own file name — never a reconstruction from the
+    /// lossy display string (for the `..` row: the parent directory).
+    pub path: std::path::PathBuf,
+}
+
+/// The Open modal as a terminal-native picker (G1 §8): an editable
+/// path line over a one-level listing of the directory it names, with
+/// the commit buttons and their accelerators. The listing is a
+/// presentation draft the runtime refreshes (the model performs no
+/// I/O); admission still happens only at commit, through the same
+/// shared input expansion as before.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenPicker {
+    /// Which final subject this picker instance accepts (T0 Add
+    /// File/Folder policies): navigation is identical, the commit
+    /// buttons and the accepted subject kind differ.
+    pub mode: PickerMode,
+    /// The path line the user can type into (the pre-picker editing
+    /// semantics, unchanged).
+    pub input: String,
+    /// The directory the listing shows, when one has been listed.
+    pub dir: Option<std::path::PathBuf>,
+    /// The listed entries, runtime-supplied (directories first, then
+    /// audio-candidate files).
+    pub entries: Vec<PickerEntry>,
+    /// The listing cursor (the selection), when the listing has rows.
+    pub cursor: Option<usize>,
+    /// The listing's honest failure diagnostic (an unreadable
+    /// directory), shown inside the modal instead of a fabricated
+    /// empty list.
+    pub error: Option<String>,
+    /// Whether the [Use this folder] button has made the DISPLAYED
+    /// directory the submission subject (T0 picker freeze: "Use this
+    /// folder selects the displayed directory as the target"). It dies
+    /// with the intent it represented: any navigation, listing
+    /// refresh, field edit or row selection replaces it with a fresh
+    /// subject.
+    pub folder_target: bool,
+}
+
+/// The ONE active modal (§23/§24), replacing the old collection of
+/// modal booleans. At most one exists; there is no modal stack.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Modal {
+    Open(OpenPicker),
+    GoTo {
+        input: String,
+    },
+    /// The help overlay (G5): workflow-first content, scrollable when
+    /// the terminal is too short for all of it. The offset counts
+    /// content lines from the top; the view clamps it to what the
+    /// popup actually shows.
+    Help {
+        scroll: u16,
+    },
+    /// The stop-aware confirmation before a destructive list edit
+    /// (T0 owner decision). One value per opening; Cancel is focused
+    /// first and Esc cancels — the modal decides nothing by itself.
+    Confirm {
+        kind: ConfirmKind,
+    },
+    /// The EQ preset menu (G3): the cursor over the eight presets;
+    /// activating the cursor fills the Audio route's draft EQ stage.
+    Presets {
+        cursor: Option<usize>,
+    },
+}
+
+impl Modal {
+    /// Which kind this modal is.
+    pub fn kind(&self) -> ModalKind {
+        match self {
+            Modal::Open(_) => ModalKind::Open,
+            Modal::GoTo { .. } => ModalKind::GoTo,
+            Modal::Help { .. } => ModalKind::Help,
+            Modal::Confirm { kind } => match kind {
+                ConfirmKind::RemoveCurrent => ModalKind::ConfirmRemoveCurrent,
+                ConfirmKind::Clear => ModalKind::ConfirmClear,
+            },
+            Modal::Presets { .. } => ModalKind::Presets,
+        }
+    }
+
+    /// The modal's text content, for the two text modals.
+    #[cfg(test)]
+    pub fn input(&self) -> Option<&str> {
+        match self {
+            Modal::Open(picker) => Some(picker.input.as_str()),
+            Modal::GoTo { input } => Some(input),
+            Modal::Help { .. } | Modal::Confirm { .. } | Modal::Presets { .. } => None,
+        }
+    }
+}
+
+/// One editing step inside a text modal. The modal's editing keys are
+/// actions like any other, so a modal key press converges on the same
+/// single dispatch boundary as everything else.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModalInput {
+    Char(char),
+    Backspace,
+    /// Enter on the path field: navigate the typed directory or select
+    /// the named file — never a commit (T0 picker freeze: the field
+    /// line never starts playback; Open/Add need their buttons).
+    Confirm,
+    /// Enter on the picker listing: a directory (or the `..` row)
+    /// navigates, a file is SELECTED — the frozen T0 rule that keeps
+    /// submission off the rows and on the explicit buttons.
+    ListActivate,
+    /// The picker listing's cursor moves (arrows, wheel, a row click).
+    ListMove(PlaylistCursor),
+    /// The picker steps up to the parent directory (Backspace on the
+    /// list, the `..` row's own activation).
+    ListParent,
+    /// The [Open] button (or its accelerator): commit the picked
+    /// subject through the Open composition.
+    CommitOpen,
+    /// The [Add to Playlist] button (or its accelerator): append the
+    /// picked subject through the same shared input expansion.
+    CommitAdd,
+    /// The [Use this folder] button: the DISPLAYED directory becomes
+    /// the submission subject (T0 picker freeze), so a folder can be
+    /// opened or added without entering it.
+    UseFolder,
+    /// The confirm modal's destructive choice was activated: perform
+    /// the remove-current / clear edit the modal was opened for (T0:
+    /// "explicit destructive choice"; which edit rides on the modal
+    /// kind itself).
+    CommitConfirm,
+    /// The help overlay's content scroll (G5): one line, or one page
+    /// for the page steps.
+    HelpScroll(HelpScroll),
+    /// Esc (or `?` for Help): close the modal. The closing event is
+    /// consumed by the modal — it never also acts on the background.
+    Cancel,
+}
+
+/// Which way the help overlay's content scrolls (G5). One step is one
+/// line; a page is [`HELP_PAGE_LINES`] lines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HelpScroll {
+    Up,
+    Down,
+    PageUp,
+    PageDown,
+}
+
+/// One page of help scrolling, in content lines. A fixed step — the
+/// model performs no layout, so it cannot measure the popup; the view
+/// clamps the offset to the content anyway.
+pub const HELP_PAGE_LINES: u16 = 10;
+
+/// One of the Open picker's visible buttons.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModalButton {
+    Open,
+    Add,
+    /// Make the displayed directory the submission target — one of the
+    /// T0 picker's frozen visible navigation controls, so a folder can
+    /// be committed without entering it.
+    UseFolder,
+    /// Descend into the selected directory row — the mouse's
+    /// [`ModalInput::ListActivate`] (G1 F04: every visible core picker
+    /// operation must be mouse-reachable; "Enter folder" is one of the
+    /// T0 picker's frozen visible navigation controls).
+    EnterFolder,
+    /// The confirm modal's explicit destructive choice button; which
+    /// edit it commits rides on the modal kind.
+    Confirm,
+    Cancel,
+}
+
+/// What confirming the active modal decided. The GoTo reader is the
+/// EXISTING [`crate::cli::parse_seek_time`] — the shell's one time
+/// grammar, shared with the scriptable transport.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ModalConfirm {
+    /// Nothing to do (a Help confirm).
+    Nothing,
+    /// The confirmed seek target; the modal is already closed.
+    Seek(Duration),
+    /// The confirm modal's destructive choice was confirmed; the modal
+    /// is already closed and the dispatch performs the frozen edit.
+    Confirm(ConfirmKind),
+    /// The token is not a readable time. The GoTo modal STAYS OPEN for
+    /// correction and the shell shows the bounded diagnostic — a
+    /// malformed seek intent is never sent.
+    Unreadable(&'static str),
+}
+
+/// The Open picker's ONE deterministic submission subject (G1 §8, the
+/// frozen "one target" model). The subject is the listing selection
+/// while one exists; when none does, it is the typed path line — the
+/// line the field visibly shows, normalized by the RUNTIME against the
+/// displayed directory (T0: relative text resolves against the
+/// displayed directory, and native identities stay native). Editing the
+/// field clears the selection, so a stale row can never hide behind a
+/// freshly edited target — the user commits exactly what they see
+/// selected, or exactly what they typed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PickerSubject {
+    /// The selected listing entry, with its NATIVE path and the kind
+    /// the listing classified it as.
+    Listing {
+        path: std::path::PathBuf,
+        is_dir: bool,
+    },
+    /// The typed path line, as typed. The runtime expands a leading
+    /// `~` and resolves a relative line against the picker's displayed
+    /// directory at commit time.
+    Typed(String),
+    /// Nothing to commit: no selection and an empty line.
+    None,
+}

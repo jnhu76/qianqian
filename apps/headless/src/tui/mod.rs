@@ -40,9 +40,13 @@
 //! modal, armed click, hit regions, feedback labels) — never playback
 //! truth.
 //!
-//! T1B scope note (Issue #188 QIANQIAN-TUI-V2): this is the shared
-//! interaction foundation for the T2–T5 pages, not the completed v2
-//! UI. The Audio and Visualizer routes are intentional placeholders.
+//! v2 scope note (Issue #188 QIANQIAN-TUI-V2): all four routes ship —
+//! Now Playing and Playlist (T1B/T2), the Audio route's desired-DSP
+//! draft workbench (G3), the Visualizer route over the Observation
+//! Plane's telemetry (G4) — plus the shared picker, the stop-aware
+//! confirmations, the playlist toolbar and viewport, and the nav bar's
+//! persistent Help/Quit controls (G5) with the scrollable,
+//! workflow-first help overlay.
 
 mod model;
 mod runtime;

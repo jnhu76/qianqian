@@ -203,13 +203,14 @@ Examples:
 
 Keys in the player:
   Tab / Shift+Tab  move keyboard focus
-  Mouse            click a tab, a transport button or a playlist row
+  Mouse            click any control; the wheel scrolls the list's view and steps the volume / preamp / EQ steppers
   Up / Down    select a row in the list (does not change what plays)
   Enter        play the selected row, or activate the focused control
+  Backspace    in the picker listing: up to the parent folder
   N / P        next / previous track
   R            order: sequential / shuffle
   L            repeat: off / all / one
-  Space        pause / resume
+  Space        pause / resume / play (a focused control first)
   Left / Right seek 5 seconds back / forward
   Shift+Left / Shift+Right                    seek 30 seconds
   G            go to a time you type (e.g. 1:35)
