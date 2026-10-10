@@ -14,7 +14,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 
-use super::bold;
+use super::theme;
 use crate::tui::model::{AUDIO_BUTTONS, AudioButton, EqAdjust, HitRegion, HitTarget, TuiModel};
 use qianqian_playback::{EQ_BAND_FREQUENCY_HZ, EQ_MAX_BAND_GAIN_DB};
 
@@ -163,7 +163,9 @@ fn draw_bands_editor(
 ) {
     let availability = model.audio_band_availability();
     let trims = current_trims(model);
-    let block = Block::bordered().title(bold(" EQ bands "));
+    let block = Block::bordered()
+        .title(theme::title(" EQ bands "))
+        .border_style(theme::border());
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -282,7 +284,11 @@ fn draw_bands_summary(frame: &mut Frame, model: &mut TuiModel, area: Rect) {
         lines.push(Line::from(line));
     }
     frame.render_widget(
-        Paragraph::new(lines).block(Block::bordered().title(bold(" EQ bands "))),
+        Paragraph::new(lines).block(
+            Block::bordered()
+                .title(theme::title(" EQ bands "))
+                .border_style(theme::border()),
+        ),
         area,
     );
 }
