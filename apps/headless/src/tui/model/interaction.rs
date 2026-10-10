@@ -339,6 +339,26 @@ impl TuiModel {
         }
     }
 
+    /// Whether a Left press is currently ARMED on `target` (§17): the
+    /// physical press the shell is holding, from Down to Up.
+    pub fn pressed(&self, target: &HitTarget) -> bool {
+        self.armed
+            .as_ref()
+            .is_some_and(|armed| &armed.target == target)
+    }
+
+    /// Whether the control at `target` is currently claimed and renders
+    /// the TRANSIENT inversion (REVERSED): the keyboard focus sits on
+    /// it, OR a Left press is armed on it — the press renders for
+    /// exactly the hold's duration and the release bounces it back
+    /// (§16, the owner's press/bounce ruling: 按下变白、松开弹回).
+    /// The armed press never moves the focus, so during a click-hold
+    /// the pressed control and the focused control may both render
+    /// inverted; neither outlives its interaction.
+    pub fn claims(&self, target: &HitTarget) -> bool {
+        self.pressed(target) || self.focus == Self::focus_of_target(*target)
+    }
+
     /// The action activating `target` performs (§17: Left Up activates
     /// the armed target). `None` for targets that arm nothing: the
     /// playlist pane area, the path-field row, and the seek bar (its

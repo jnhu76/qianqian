@@ -17,9 +17,7 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 
 use super::bold;
-use crate::tui::model::{
-    FocusId, HitRegion, HitTarget, TuiModel, VISUALIZER_MODES, VisualizerMode,
-};
+use crate::tui::model::{HitRegion, HitTarget, TuiModel, VISUALIZER_MODES, VisualizerMode};
 use qianqian_playback::{ObservationSnapshot, SPECTRUM_BANDS, SPECTRUM_FLOOR_DBFS};
 
 /// The partial-height bar glyphs, low to high: the last segment of a
@@ -91,9 +89,9 @@ fn draw_mode_toolbar(
             mode.label()
         };
         let active = *mode == model.visualizer_mode();
-        let focused = model.focus() == Some(FocusId::VisualizerMode(*mode));
+        let claimed = model.claims(&HitTarget::VisualizerMode(*mode));
         let paragraph = Paragraph::new(Line::from(label).centered());
-        let style = if focused {
+        let style = if claimed {
             Style::default().add_modifier(Modifier::REVERSED)
         } else if active {
             Style::default().add_modifier(Modifier::BOLD)

@@ -11,8 +11,7 @@ use ratatui::widgets::{Block, Paragraph};
 
 use super::{PLAYING_MARKER, SELECTED_MARKER, bold};
 use crate::tui::model::{
-    FocusId, HitRegion, HitTarget, PLAYLIST_BUTTONS, PlaylistButton, PlaylistRow, PreferenceButton,
-    TuiModel,
+    HitRegion, HitTarget, PLAYLIST_BUTTONS, PlaylistButton, PlaylistRow, PreferenceButton, TuiModel,
 };
 
 /// The Playlist route (G2): toolbar, list, summary. Rows and regions
@@ -106,14 +105,15 @@ fn draw_button_row(
         } else {
             button.label()
         };
-        let focused = model.focus() == Some(FocusId::PlaylistButton(*button));
+        let claimed = model.claims(&HitTarget::PlaylistButton(*button));
         // A plain text button — the T0 wireframe's `[Add File...]`
         // shape, the same affordance as the picker's buttons. The
         // measured cell leaves one padding column each side, so the
-        // label never clips; focus is REVERSED (never colour alone).
+        // label never clips; the transient inversion (keyboard focus
+        // or a held press) is REVERSED (never colour alone).
         let paragraph = Paragraph::new(Line::from(label).centered());
         frame.render_widget(
-            if focused {
+            if claimed {
                 paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
             } else {
                 paragraph
@@ -183,7 +183,8 @@ fn draw_playlist_list(
             if offset > 0 {
                 lines.push(Line::from(""));
             }
-            lines.push(playlist_row_line(position, row, episode_live));
+            let pressed = model.pressed(&HitTarget::PlaylistRow(position));
+            lines.push(playlist_row_line(position, row, episode_live, pressed));
         }
         (top, indices, lines)
     };
@@ -256,20 +257,20 @@ fn draw_playlist_summary(
         ),
     ];
     for (cell, button, label, engaged) in toggles {
-        let focused = model.focus() == Some(FocusId::Preference(button));
+        let claimed = model.claims(&HitTarget::Preference(button));
         // The summary row is ONE cell tall: a bordered box spends that
         // cell on its border and renders no label at all — an empty
         // box is a live target with no visible affordance. The
         // toolbar's plain-text `[...]` shape is the affordance instead
         // (the cells above are measured for exactly these spellings).
-        // REVERSED is the TRANSIENT keyboard focus, so an engaged mode
-        // carries the tabs' persistent shape (BOLD) to stay readable
-        // after the focus moves on.
+        // The persistent shape of an ENGAGED mode is BOLD; the
+        // transient inversion (keyboard focus or a held press) is
+        // REVERSED.
         let mut style = Style::default();
         if engaged {
             style = style.add_modifier(Modifier::BOLD);
         }
-        if focused {
+        if claimed {
             style = style.add_modifier(Modifier::REVERSED);
         }
         let paragraph = match label {
@@ -292,18 +293,29 @@ fn draw_playlist_summary(
 /// App's cursor still names the last committed ENTRY — that is
 /// navigation state the authority sanctions — but no episode exists, so
 /// the row must not carry the play marker.
-fn playlist_row_line(position: usize, row: &PlaylistRow, episode_live: bool) -> Line<'static> {
+fn playlist_row_line(
+    position: usize,
+    row: &PlaylistRow,
+    episode_live: bool,
+    pressed: bool,
+) -> Line<'static> {
     let playing = if row.playing && episode_live {
         PLAYING_MARKER
     } else {
         " "
     };
     let selected = if row.selected { SELECTED_MARKER } else { " " };
-    Line::from(format!(
+    let mut line = Line::from(format!(
         "{playing} {selected} {:>3}  {}",
         position + 1,
         row.label
-    ))
+    ));
+    // A held press on the row renders the same transient inversion as
+    // every control (§16): white while held, bounced back on release.
+    if pressed {
+        line.style = Style::default().add_modifier(Modifier::REVERSED);
+    }
+    line
 }
 
 #[cfg(test)]
@@ -312,7 +324,80 @@ mod tests {
 
     use super::super::testutil::*;
 
+    use crate::tui::model::testutil::model_with_regions;
     use crate::tui::model::*;
+
+    /// The owner's press/bounce ruling (§16, 2026-10-10): a held press
+    /// lights the control — the SAME transient inversion as the keyboard
+    /// focus — for exactly the hold's duration, and the release bounces
+    /// it back. The keyboard focus (none here) is never moved by it.
+    #[test]
+    fn a_held_press_lights_the_button_and_the_release_bounces_it_back() {
+        use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+
+        let mut model = model_with_regions(100, 30, TuiRoute::Playlist);
+        assert_eq!(model.focus(), None, "no keyboard press, no inversion");
+        let target = HitTarget::PlaylistButton(PlaylistButton::PlaySelected);
+        let area = model
+            .regions()
+            .iter()
+            .find(|region| region.target == target)
+            .expect("the toolbar button region")
+            .area;
+        let (column, row) = (area.x + 1, area.y);
+        let event = |kind| MouseEvent {
+            kind,
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        };
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+
+        // Down arms and lights: the next frame shows the held press.
+        assert_eq!(
+            decode_mouse(event(MouseEventKind::Down(MouseButton::Left)), &mut model),
+            None,
+            "the Down dispatches nothing"
+        );
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        assert!(
+            buffer
+                .cell((column, row))
+                .expect("the label cell")
+                .style()
+                .add_modifier
+                .contains(ratatui::style::Modifier::REVERSED),
+            "the held press lights the button"
+        );
+        assert_eq!(
+            model.focus(),
+            None,
+            "the press did not move the keyboard focus"
+        );
+
+        // The release activates AND bounces the light back off.
+        assert_eq!(
+            decode_mouse(event(MouseEventKind::Up(MouseButton::Left)), &mut model),
+            Some(TuiAction::PlaylistPlaySelected)
+        );
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        assert!(
+            !buffer
+                .cell((column, row))
+                .expect("the label cell")
+                .style()
+                .add_modifier
+                .contains(ratatui::style::Modifier::REVERSED),
+            "the release bounces the press light back off"
+        );
+    }
 
     /// The compact layout drops the summary row's Order/Repeat toggles
     /// from the DRAWN controls and from the focus cycle alike — a drawn

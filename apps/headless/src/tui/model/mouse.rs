@@ -19,12 +19,16 @@ use super::state::TuiModel;
 /// moves the keyboard focus (owner ruling: a pressed control must
 /// bounce back, so the focus inversion follows the keyboard alone —
 /// the seek bar already worked exactly this way); focus moves only
-/// through Tab/arrow navigation. Drag, a moved pointer, stale
-/// geometry, a route/modal change or a resize all cancel; an unmatched
-/// Up is no action. Right/middle clicks and double clicks carry no
-/// product meaning (§19/§20); plain movement is inert (§18); the wheel
-/// scrolls only where a control already has clear meaning (§22). While
-/// a modal is open the background is inert (§25).
+/// through Tab/arrow navigation. The ARMED press itself renders: the
+/// control under a held press shows the same transient inversion
+/// (REVERSED, via `TuiModel::claims`) for exactly the hold's duration,
+/// and the release bounces it back — 按下变白、松开弹回. Drag, a moved
+/// pointer, stale geometry, a route/modal change or a resize all
+/// cancel; an unmatched Up is no action. Right/middle clicks and
+/// double clicks carry no product meaning (§19/§20); plain movement is
+/// inert (§18); the wheel scrolls only where a control already has
+/// clear meaning (§22). While a modal is open the background is inert
+/// (§25).
 ///
 /// Decoding mutates exactly the presentation state a physical event
 /// owns — the armed click (and, inside a modal, the path field's

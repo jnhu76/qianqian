@@ -12,8 +12,7 @@ use ratatui::widgets::{Block, Paragraph};
 use super::{COMMITTED_HINT, NO_MUSIC_LINE, bold};
 use crate::playlist::{PlaybackOrder, RepeatMode};
 use crate::tui::model::{
-    FocusId, HitRegion, HitTarget, PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton,
-    TuiModel,
+    HitRegion, HitTarget, PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton, TuiModel,
 };
 
 /// The Now Playing route (G1): the episode read-side panel with the
@@ -166,11 +165,11 @@ pub(super) fn draw_now_playing(
     if model.relative_seek_available() {
         let cells: [Rect; 2] = Layout::horizontal([Constraint::Ratio(1, 2); 2]).areas(seek);
         for (button, cell) in SEEK_BUTTONS.iter().zip(cells.iter()) {
-            let focused = model.focus() == Some(FocusId::Seek(*button));
+            let claimed = model.claims(&HitTarget::Seek(*button));
             let paragraph =
                 Paragraph::new(Line::from(format!("[ {} ]", button.label())).centered());
             frame.render_widget(
-                if focused {
+                if claimed {
                     paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
                 } else {
                     paragraph
@@ -192,7 +191,7 @@ pub(super) fn draw_now_playing(
     let buttons: [Rect; 5] = Layout::horizontal([Constraint::Ratio(1, 5); 5]).areas(transport);
     let play_pause_label = model.play_pause_offer().label();
     for (button, cell) in TRANSPORT.iter().zip(buttons.iter()) {
-        let focused = model.focus() == Some(FocusId::Transport(*button));
+        let claimed = model.claims(&HitTarget::Transport(*button));
         let label = if *button == TransportButton::PlayPause {
             play_pause_label.to_owned()
         } else if compact {
@@ -202,7 +201,7 @@ pub(super) fn draw_now_playing(
         };
         let paragraph = Paragraph::new(Line::from(label).centered());
         frame.render_widget(
-            if focused {
+            if claimed {
                 paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
             } else {
                 paragraph
@@ -271,7 +270,7 @@ fn draw_preference_row(
         (up, PreferenceButton::VolumeUp),
     ];
     for (cell, button) in steppers {
-        let focused = model.focus() == Some(FocusId::Preference(button));
+        let claimed = model.claims(&HitTarget::Preference(button));
         // The stepper glyph is ONE plain ASCII character (G1 F02): the
         // cell is one column wide inside its borders, so any longer —
         // or any glyph the terminal's font may lack — renders as a
@@ -286,7 +285,7 @@ fn draw_preference_row(
             .centered(),
         );
         frame.render_widget(
-            if focused {
+            if claimed {
                 paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
             } else {
                 paragraph
@@ -323,17 +322,16 @@ fn draw_preference_row(
         ),
     ];
     for (cell, button, label, engaged) in toggles {
-        let focused = model.focus() == Some(FocusId::Preference(button));
-        // Two shapes, the tabs' vocabulary: REVERSED is the TRANSIENT
-        // keyboard focus (it follows the click and lingers on it), so
-        // an engaged mode needs its own persistent shape — BOLD — to
-        // stay readable after the focus moves on. A monochrome
-        // terminal can tell both apart.
+        let claimed = model.claims(&HitTarget::Preference(button));
+        // Two shapes, the tabs' vocabulary: the persistent shape of an
+        // ENGAGED mode is BOLD; the TRANSIENT inversion — the keyboard
+        // focus or a held press (§16: the release bounces it back) —
+        // is REVERSED. A monochrome terminal can tell both apart.
         let mut style = Style::default();
         if engaged {
             style = style.add_modifier(Modifier::BOLD);
         }
-        if focused {
+        if claimed {
             style = style.add_modifier(Modifier::REVERSED);
         }
         let paragraph = match label {

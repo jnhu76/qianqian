@@ -31,8 +31,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::model::{
-    FocusId, HitRegion, HitTarget, MAX_STATUS_ROWS, NAV_BUTTONS, NavBarButton, ShellFit, TuiModel,
-    TuiRoute, shell_fit, status_shape,
+    HitRegion, HitTarget, MAX_STATUS_ROWS, NAV_BUTTONS, NavBarButton, ShellFit, TuiModel, TuiRoute,
+    shell_fit, status_shape,
 };
 
 use audio::draw_audio;
@@ -181,7 +181,7 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
     let cells: [Rect; 4] = Layout::horizontal([Constraint::Ratio(1, 4); 4]).areas(tabs_area);
     for (route, cell) in TuiRoute::ALL.iter().zip(cells.iter()) {
         let active = *route == model.route();
-        let focused = model.focus() == Some(FocusId::RouteTab(*route));
+        let claimed = model.claims(&HitTarget::RouteTab(*route));
         let label = if compact {
             route.compact_label()
         } else {
@@ -191,7 +191,7 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
         if active {
             style = style.add_modifier(Modifier::BOLD);
         }
-        if focused {
+        if claimed {
             style = style.add_modifier(Modifier::REVERSED);
         }
         frame.render_widget(Paragraph::new(Line::styled(label, style)), *cell);
@@ -204,9 +204,9 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
     for (index, button) in NAV_BUTTONS.iter().enumerate() {
         let cell = Rect::new(cell_x, area.y, nav_widths[index], area.height);
         cell_x += nav_widths[index] + 1;
-        let focused = model.focus() == Some(FocusId::NavBar(*button));
+        let claimed = model.claims(&HitTarget::NavBar(*button));
         let mut style = Style::default();
-        if focused {
+        if claimed {
             style = style.add_modifier(Modifier::REVERSED);
         }
         frame.render_widget(Paragraph::new(Line::styled(label(*button), style)), cell);

@@ -15,9 +15,7 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 
 use super::bold;
-use crate::tui::model::{
-    AUDIO_BUTTONS, AudioButton, EqAdjust, FocusId, HitRegion, HitTarget, TuiModel,
-};
+use crate::tui::model::{AUDIO_BUTTONS, AudioButton, EqAdjust, HitRegion, HitTarget, TuiModel};
 use qianqian_playback::{EQ_BAND_FREQUENCY_HZ, EQ_MAX_BAND_GAIN_DB};
 
 /// The Audio route's standing truthfulness line (G3): the shell
@@ -130,12 +128,13 @@ fn draw_button_row(
     let cells = Layout::horizontal(widths).split(area);
     for (button, cell) in buttons.iter().zip(cells.iter()) {
         let label = button.label(enabled, compact);
-        let focused = model.focus() == Some(FocusId::AudioButton(*button));
+        let claimed = model.claims(&HitTarget::AudioButton(*button));
         // A plain text button, the T0 wireframe's `[Add File...]`
-        // shape; focus is REVERSED (never colour alone).
+        // shape; the transient inversion (keyboard focus or a held
+        // press) is REVERSED (never colour alone).
         let paragraph = Paragraph::new(Line::from(label).centered());
         frame.render_widget(
-            if focused {
+            if claimed {
                 paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
             } else {
                 paragraph
@@ -227,10 +226,10 @@ fn draw_band_cell(
             EqAdjust::Cut => "[−]",
             EqAdjust::Boost => "[+]",
         };
-        let focused = model.focus() == Some(FocusId::EqBand { band, adjust });
+        let claimed = model.claims(&HitTarget::EqBand { band, adjust });
         let paragraph = Paragraph::new(Line::from(label));
         frame.render_widget(
-            if focused {
+            if claimed {
                 paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
             } else {
                 paragraph
@@ -293,8 +292,8 @@ mod tests {
     //! Tests for this submodule.
 
     use super::*;
-    use crate::tui::model::TuiModel;
-    use crate::tui::model::{FocusId, TuiAction};
+    use crate::tui::model::TuiAction;
+    use crate::tui::model::{FocusId, TuiModel};
     use crate::tui::view::testutil::{pending, plain_model, rendered, scan};
     use qianqian_audio_api::ports::PcmFormat;
     use qianqian_playback::{AudioProcessingConfig, EqPreset, PlaybackSessionObservation};
