@@ -9,6 +9,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 
+use super::now_playing::{order_toggle_width, repeat_toggle_width};
 use super::{PLAYING_MARKER, SELECTED_MARKER, bold};
 use crate::tui::model::{
     HitRegion, HitTarget, PLAYLIST_BUTTONS, PlaylistButton, PlaylistRow, PreferenceButton, TuiModel,
@@ -234,8 +235,11 @@ fn draw_playlist_summary(
     }
     let [text, order, repeat] = Layout::horizontal([
         Constraint::Min(12),
-        Constraint::Length(19),
-        Constraint::Length(13),
+        // The SAME fixed toggle widths the preference row uses: a mode
+        // change re-renders the label inside a cell that never moves
+        // (owner ruling: the row holds still).
+        Constraint::Length(order_toggle_width(compact)),
+        Constraint::Length(repeat_toggle_width(compact)),
     ])
     .areas(area);
     frame.render_widget(Paragraph::new(counts), text);
@@ -326,6 +330,41 @@ mod tests {
 
     use crate::tui::model::testutil::model_with_regions;
     use crate::tui::model::*;
+
+    /// The summary row's toggles use the SAME fixed widths as the
+    /// preference row: a mode change re-renders the label inside a
+    /// cell that never moves (owner stability ruling, 2026-10-10).
+    #[test]
+    fn a_mode_change_never_moves_the_summary_toggles() {
+        let mut model = plain_model();
+        model.set_route(TuiRoute::Playlist);
+        model.set_order(crate::playlist::PlaybackOrder::Sequential);
+        model.set_repeat(crate::playlist::RepeatMode::Off);
+        rendered(&mut model, 100, 30);
+        let toggle_area = |model: &TuiModel, button| {
+            model
+                .regions()
+                .iter()
+                .find(|region| region.target == HitTarget::Preference(button))
+                .expect("the toggle's region")
+                .area
+        };
+        let before = (
+            toggle_area(&model, PreferenceButton::Order),
+            toggle_area(&model, PreferenceButton::Repeat),
+        );
+        model.set_order(crate::playlist::PlaybackOrder::Shuffle);
+        model.set_repeat(crate::playlist::RepeatMode::All);
+        rendered(&mut model, 100, 30);
+        assert_eq!(
+            (
+                toggle_area(&model, PreferenceButton::Order),
+                toggle_area(&model, PreferenceButton::Repeat)
+            ),
+            before,
+            "a mode change moves no summary toggle"
+        );
+    }
 
     /// The owner's press/bounce ruling (§16, 2026-10-10): a held press
     /// lights the control — the SAME transient inversion as the keyboard

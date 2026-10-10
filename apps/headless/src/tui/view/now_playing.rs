@@ -229,11 +229,10 @@ fn draw_preference_row(
     regions: &mut Vec<HitRegion>,
 ) {
     let compact = model.compact_layout();
-    // The toggle labels decide their own cell widths — the toolbar
-    // idiom, everywhere: a clipped CONTROL label is a violation at any
-    // class ("Order: Sequential" is 17 cells and a fixed share starved
-    // it exactly at the 60-column Compact boundary). The volume VALUE
-    // is the flexible display text: it shrinks before any control does.
+    // The toggle cells are FIXED, measured for the WIDEST spelling the
+    // class can ever render (owner ruling 2026-10-10: a mode change
+    // must never re-lay the row out — the row holds still). The volume
+    // VALUE is the flexible display text inside its fixed cell.
     let order_text = model.order_label().map(|label| {
         if compact {
             format!("Ord:{}", order_short(label))
@@ -248,18 +247,13 @@ fn draw_preference_row(
             format!("Repeat: {label}")
         }
     });
-    let toggle_width = |text: &Option<String>| {
-        text.as_ref()
-            .map(|text| text.chars().count() as u16 + 2)
-            .unwrap_or(3)
-    };
     let value_width = if compact { 7 } else { 18 };
     let [down, label, up, order, repeat, rest] = Layout::horizontal([
         Constraint::Length(3),
         Constraint::Length(value_width),
         Constraint::Length(3),
-        Constraint::Length(toggle_width(&order_text)),
-        Constraint::Length(toggle_width(&repeat_text)),
+        Constraint::Length(order_toggle_width(compact)),
+        Constraint::Length(repeat_toggle_width(compact)),
         Constraint::Min(0),
     ])
     .areas(area);
@@ -355,11 +349,47 @@ fn order_short(label: &str) -> &'static str {
     }
 }
 
+/// The FIXED Order toggle cell width: measured for the WIDEST spelling
+/// the class can ever render, so a mode change — or the preference
+/// arriving at all — never re-lays the row out (owner ruling
+/// 2026-10-10: the row holds still).
+pub(super) fn order_toggle_width(compact: bool) -> u16 {
+    [PlaybackOrder::Sequential, PlaybackOrder::Shuffle]
+        .iter()
+        .map(|mode| {
+            let text = if compact {
+                format!("Ord:{}", order_short(mode.label()))
+            } else {
+                format!("Order: {}", mode.label())
+            };
+            text.chars().count() as u16 + 2
+        })
+        .max()
+        .expect("the order modes are known")
+}
+
+/// The FIXED Repeat toggle cell width, the same rule.
+pub(super) fn repeat_toggle_width(compact: bool) -> u16 {
+    [RepeatMode::Off, RepeatMode::All, RepeatMode::One]
+        .iter()
+        .map(|mode| {
+            let text = if compact {
+                format!("Rep:{}", mode.label())
+            } else {
+                format!("Repeat: {}", mode.label())
+            };
+            text.chars().count() as u16 + 2
+        })
+        .max()
+        .expect("the repeat modes are known")
+}
+
 #[cfg(test)]
 mod tests {
     //! Tests for this submodule.
 
     use super::super::testutil::*;
+    use super::{order_toggle_width, repeat_toggle_width};
     use crate::playlist::{PlaybackOrder, RepeatMode};
     use crate::tui::model::*;
     use qianqian_playback::PlaybackSessionObservation;
@@ -378,6 +408,56 @@ mod tests {
         assert!(text.contains("Repeat: Off"), "{text}");
         let text = rendered(&mut model, 100, 30);
         assert!(text.contains("Order: Sequential"), "{text}");
+    }
+
+    /// The owner's stability ruling (2026-10-10): a mode change — or
+    /// the preference arriving at all — never re-lays the preference
+    /// row out. Every control's cell holds still; only the label text
+    /// inside its fixed cell changes (突然变尺寸挺吓人的).
+    #[test]
+    fn a_mode_change_never_moves_the_preference_row() {
+        let mut model = plain_model();
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        let row_areas = |model: &TuiModel| {
+            [
+                PreferenceButton::VolumeDown,
+                PreferenceButton::VolumeUp,
+                PreferenceButton::Order,
+                PreferenceButton::Repeat,
+            ]
+            .map(|button| {
+                model
+                    .regions()
+                    .iter()
+                    .find(|region| region.target == HitTarget::Preference(button))
+                    .expect("the control's region")
+                    .area
+            })
+        };
+
+        // The preferences arrive on a quiet row.
+        model.set_order(PlaybackOrder::Sequential);
+        model.set_repeat(RepeatMode::Off);
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        let settled = row_areas(&model);
+
+        // A mode change re-renders the labels and moves NOTHING.
+        model.set_order(PlaybackOrder::Shuffle);
+        model.set_repeat(RepeatMode::All);
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        assert_eq!(row_areas(&model), settled, "a mode change moves nothing");
+
+        // The fixed widths themselves: the widest spelling per class,
+        // plus the toolbar's two padding columns.
+        assert_eq!(order_toggle_width(false), 19, "Order: Sequential + 2");
+        assert_eq!(repeat_toggle_width(false), 13, "Repeat: Off + 2");
+        assert_eq!(order_toggle_width(true), 10, "Ord:Shuf + 2");
+        assert_eq!(repeat_toggle_width(true), 9, "Rep:One + 2");
     }
 
     /// An ENGAGED preference toggle (Shuffle / a repeat mode that is
