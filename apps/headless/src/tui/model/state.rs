@@ -264,9 +264,19 @@ impl TuiModel {
         self.order.map(PlaybackOrder::label)
     }
 
+    /// The App's traversal order preference, once known.
+    pub fn order(&self) -> Option<PlaybackOrder> {
+        self.order
+    }
+
     /// The repeat label (`Off` / `All` / `One`), once known.
     pub fn repeat_label(&self) -> Option<&'static str> {
         self.repeat.map(RepeatMode::label)
+    }
+
+    /// The App's repeat preference, once known.
+    pub fn repeat(&self) -> Option<RepeatMode> {
+        self.repeat
     }
 
     /// Record the player's desired stream factor (D14.9 read side).

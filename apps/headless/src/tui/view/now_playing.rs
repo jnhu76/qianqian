@@ -10,6 +10,7 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 
 use super::{COMMITTED_HINT, NO_MUSIC_LINE, bold};
+use crate::playlist::{PlaybackOrder, RepeatMode};
 use crate::tui::model::{
     FocusId, HitRegion, HitTarget, PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton,
     TuiModel,
@@ -307,25 +308,39 @@ fn draw_preference_row(
         frame.render_widget(Paragraph::new(desired).centered(), label);
     }
 
-    let toggles: [(Rect, PreferenceButton, Option<String>); 2] = [
-        (order, PreferenceButton::Order, order_text),
-        (repeat, PreferenceButton::Repeat, repeat_text),
+    let toggles: [(Rect, PreferenceButton, Option<String>, bool); 2] = [
+        (
+            order,
+            PreferenceButton::Order,
+            order_text,
+            model.order() == Some(PlaybackOrder::Shuffle),
+        ),
+        (
+            repeat,
+            PreferenceButton::Repeat,
+            repeat_text,
+            !matches!(model.repeat(), None | Some(RepeatMode::Off)),
+        ),
     ];
-    for (cell, button, label) in toggles {
+    for (cell, button, label, engaged) in toggles {
         let focused = model.focus() == Some(FocusId::Preference(button));
+        // Two shapes, the tabs' vocabulary: REVERSED is the TRANSIENT
+        // keyboard focus (it follows the click and lingers on it), so
+        // an engaged mode needs its own persistent shape — BOLD — to
+        // stay readable after the focus moves on. A monochrome
+        // terminal can tell both apart.
+        let mut style = Style::default();
+        if engaged {
+            style = style.add_modifier(Modifier::BOLD);
+        }
+        if focused {
+            style = style.add_modifier(Modifier::REVERSED);
+        }
         let paragraph = match label {
             Some(label) => Paragraph::new(Line::from(label).centered()),
             None => Paragraph::new(Line::from("—").centered()),
         };
-        frame.render_widget(
-            if focused {
-                paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
-            } else {
-                paragraph
-            }
-            .block(Block::bordered()),
-            cell,
-        );
+        frame.render_widget(paragraph.style(style).block(Block::bordered()), cell);
         regions.push(HitRegion {
             area: cell,
             target: HitTarget::Preference(button),
@@ -365,6 +380,53 @@ mod tests {
         assert!(text.contains("Repeat: Off"), "{text}");
         let text = rendered(&mut model, 100, 30);
         assert!(text.contains("Order: Sequential"), "{text}");
+    }
+
+    /// An ENGAGED preference toggle (Shuffle / a repeat mode that is
+    /// not Off) carries the tabs' persistent shape (BOLD) — distinct
+    /// from the transient focus inversion, which follows the click and
+    /// lingers on it — so the mode stays readable after the focus
+    /// moves on.
+    #[test]
+    fn an_engaged_preference_toggle_is_bold() {
+        let mut model = plain_model();
+        model.set_order(PlaybackOrder::Shuffle);
+        model.set_repeat(RepeatMode::All);
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        let label_cell = |button| {
+            let area = model
+                .regions()
+                .iter()
+                .find(|region| region.target == HitTarget::Preference(button))
+                .expect("the toggle's region")
+                .area;
+            // The bordered toggle draws its label on the cell's middle
+            // row.
+            (area.x + area.width / 2, area.y + 1)
+        };
+        assert!(
+            buffer
+                .cell(label_cell(PreferenceButton::Order))
+                .expect("label cell")
+                .style()
+                .add_modifier
+                .contains(ratatui::style::Modifier::BOLD),
+            "Shuffle is engaged"
+        );
+        assert!(
+            buffer
+                .cell(label_cell(PreferenceButton::Repeat))
+                .expect("label cell")
+                .style()
+                .add_modifier
+                .contains(ratatui::style::Modifier::BOLD),
+            "Repeat All is engaged"
+        );
     }
 
     /// The Now Playing route renders the episode read side, the

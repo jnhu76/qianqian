@@ -162,7 +162,11 @@ fn draw_playlist_list(
         );
     }
     let inner = block.inner(area);
-    let visible = inner.height as usize;
+    // One blank separator line between neighbouring rows (owner
+    // request): a row is TWO screen lines tall, so a click aimed at
+    // one row cannot land on the next. `visible` counts ROWS, not
+    // screen lines; the separator never follows the last row.
+    let visible = (inner.height as usize).div_ceil(2);
     let (top, visible_indices, lines) = {
         let rows = model.playlist();
         // The ONE window decision (§14): the model's stored top,
@@ -173,13 +177,14 @@ fn draw_playlist_list(
             .playlist_viewport_hint()
             .min(total.saturating_sub(visible.min(total)));
         let indices: Vec<usize> = (0..total).skip(top).take(visible).collect();
-        let lines: Vec<Line<'static>> = rows
-            .iter()
-            .enumerate()
-            .skip(top)
-            .take(visible)
-            .map(|(position, row)| playlist_row_line(position, row, episode_live))
-            .collect();
+        let mut lines: Vec<Line<'static>> = Vec::with_capacity(visible * 2);
+        for (offset, (position, row)) in rows.iter().enumerate().skip(top).take(visible).enumerate()
+        {
+            if offset > 0 {
+                lines.push(Line::from(""));
+            }
+            lines.push(playlist_row_line(position, row, episode_live));
+        }
         (top, indices, lines)
     };
     frame.render_widget(Paragraph::new(lines).block(block), area);
@@ -191,7 +196,7 @@ fn draw_playlist_list(
     if total > 0 {
         for (visible_row, index) in visible_indices.into_iter().enumerate() {
             regions.push(HitRegion {
-                area: Rect::new(inner.x, inner.y + visible_row as u16, inner.width, 1),
+                area: Rect::new(inner.x, inner.y + (visible_row * 2) as u16, inner.width, 1),
                 target: HitTarget::PlaylistRow(index),
             });
         }
@@ -233,37 +238,45 @@ fn draw_playlist_summary(
     ])
     .areas(area);
     frame.render_widget(Paragraph::new(counts), text);
-    let toggles: [(Rect, PreferenceButton, Option<String>); 2] = [
+    let toggles: [(Rect, PreferenceButton, Option<String>, bool); 2] = [
         (
             order,
             PreferenceButton::Order,
             model.order_label().map(|label| format!("Order: {label}")),
+            model.order() == Some(crate::playlist::PlaybackOrder::Shuffle),
         ),
         (
             repeat,
             PreferenceButton::Repeat,
             model.repeat_label().map(|label| format!("Repeat: {label}")),
+            !matches!(
+                model.repeat(),
+                None | Some(crate::playlist::RepeatMode::Off)
+            ),
         ),
     ];
-    for (cell, button, label) in toggles {
+    for (cell, button, label, engaged) in toggles {
         let focused = model.focus() == Some(FocusId::Preference(button));
         // The summary row is ONE cell tall: a bordered box spends that
         // cell on its border and renders no label at all — an empty
         // box is a live target with no visible affordance. The
         // toolbar's plain-text `[...]` shape is the affordance instead
         // (the cells above are measured for exactly these spellings).
+        // REVERSED is the TRANSIENT keyboard focus, so an engaged mode
+        // carries the tabs' persistent shape (BOLD) to stay readable
+        // after the focus moves on.
+        let mut style = Style::default();
+        if engaged {
+            style = style.add_modifier(Modifier::BOLD);
+        }
+        if focused {
+            style = style.add_modifier(Modifier::REVERSED);
+        }
         let paragraph = match label {
             Some(label) => Paragraph::new(Line::from(format!("[{label}]")).centered()),
             None => Paragraph::new(Line::from("[—]").centered()),
         };
-        frame.render_widget(
-            if focused {
-                paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
-            } else {
-                paragraph
-            },
-            cell,
-        );
+        frame.render_widget(paragraph.style(style), cell);
         regions.push(HitRegion {
             area: cell,
             target: HitTarget::Preference(button),
@@ -351,6 +364,90 @@ mod tests {
         assert!(text.contains("[Order: Shuffle]"), "{text}");
         assert!(text.contains("[Repeat: All]"), "{text}");
         assert_eq!(scan(&text), None, "{text}");
+    }
+
+    /// An ENGAGED toggle carries the tabs' persistent shape (BOLD),
+    /// distinct from the transient focus inversion: after the focus
+    /// moves on, a non-default mode stays readable. The default modes
+    /// (Sequential / Off) carry neither shape.
+    #[test]
+    fn an_engaged_summary_toggle_is_bold_and_focus_is_still_the_inversion() {
+        fn label_modifiers(
+            buffer: &ratatui::buffer::Buffer,
+            regions: &[HitRegion],
+            button: PreferenceButton,
+        ) -> ratatui::style::Modifier {
+            let area = regions
+                .iter()
+                .find(|region| region.target == HitTarget::Preference(button))
+                .expect("the toggle's region")
+                .area;
+            buffer
+                .cell((area.x + area.width / 2, area.y))
+                .expect("the label cell")
+                .style()
+                .add_modifier
+        }
+        let mut model = plain_model();
+        model.set_order(crate::playlist::PlaybackOrder::Shuffle);
+        model.set_repeat(crate::playlist::RepeatMode::Off);
+        model.set_route(TuiRoute::Playlist);
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        let regions = model.regions().to_vec();
+
+        let order = label_modifiers(&buffer, &regions, PreferenceButton::Order);
+        assert!(
+            order.contains(ratatui::style::Modifier::BOLD),
+            "Shuffle is engaged: the persistent shape"
+        );
+        assert!(
+            !order.contains(ratatui::style::Modifier::REVERSED),
+            "unfocused: no inversion"
+        );
+        assert!(
+            !label_modifiers(&buffer, &regions, PreferenceButton::Repeat)
+                .contains(ratatui::style::Modifier::BOLD),
+            "Off is the default: no persistent shape"
+        );
+
+        model.set_focus(Some(FocusId::Preference(PreferenceButton::Order)));
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        assert!(
+            label_modifiers(&buffer, &regions, PreferenceButton::Order)
+                .contains(ratatui::style::Modifier::REVERSED),
+            "focus is the inversion"
+        );
+    }
+
+    /// Neighbouring playlist rows sit TWO screen lines apart (a blank
+    /// separator between them, owner request): a click aimed at one row
+    /// cannot land on the next.
+    #[test]
+    fn the_playlist_rows_are_spaced_so_a_click_cannot_land_on_the_neighbour() {
+        let mut model = plain_model();
+        model.set_route(TuiRoute::Playlist);
+        rendered(&mut model, 100, 30);
+        let mut rows: Vec<u16> = model
+            .regions()
+            .iter()
+            .filter_map(|region| match region.target {
+                HitTarget::PlaylistRow(_) => Some(region.area.y),
+                _ => None,
+            })
+            .collect();
+        rows.sort_unstable();
+        assert!(rows.len() >= 2, "the fixture drew several rows");
+        for pair in rows.windows(2) {
+            assert_eq!(pair[1] - pair[0], 2, "one blank line between rows");
+        }
     }
 
     /// The Playlist route renders the pane and publishes the pane
