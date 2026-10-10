@@ -416,7 +416,10 @@ mod tests {
     /// inside its fixed cell changes (突然变尺寸挺吓人的).
     #[test]
     fn a_mode_change_never_moves_the_preference_row() {
-        let mut model = plain_model();
+        // Start from NO preference state at all: the fixed cells exist
+        // (the `—` fallback) before the state lands.
+        let mut model = TuiModel::new(String::new());
+        model.set_class(ResponsiveClass::Normal);
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
         let row_areas = |model: &TuiModel| {
@@ -436,12 +439,23 @@ mod tests {
             })
         };
 
-        // The preferences arrive on a quiet row.
+        // Draw the quiet row: the cells predate the state.
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        let unknown = row_areas(&model);
+
+        // The preferences arrive on a quiet row — and move nothing.
         model.set_order(PlaybackOrder::Sequential);
         model.set_repeat(RepeatMode::Off);
         terminal
             .draw(|frame| crate::tui::view::draw(frame, &mut model))
             .expect("draw");
+        assert_eq!(
+            row_areas(&model),
+            unknown,
+            "the state arriving moves nothing"
+        );
         let settled = row_areas(&model);
 
         // A mode change re-renders the labels and moves NOTHING.

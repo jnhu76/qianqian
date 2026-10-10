@@ -266,7 +266,9 @@ fn draw_playlist_summary(
         // cell on its border and renders no label at all — an empty
         // box is a live target with no visible affordance. The
         // toolbar's plain-text `[...]` shape is the affordance instead
-        // (the cells above are measured for exactly these spellings).
+        // (the cells above are measured for exactly these spellings:
+        // the brackets CONSUME the +2 padding, so the wide label sits
+        // flush — change one and the measurement must follow).
         // The persistent shape of an ENGAGED mode is BOLD; the
         // transient inversion (keyboard focus or a held press) is
         // REVERSED.
@@ -488,6 +490,15 @@ mod tests {
         assert!(text.contains("[Order: Shuffle]"), "{text}");
         assert!(text.contains("[Repeat: All]"), "{text}");
         assert_eq!(scan(&text), None, "{text}");
+        // The EXACT-FIT spellings at the narrowest class that draws the
+        // summary row: `[Order: Sequential]` is 19 cells in its
+        // 19-cell fixed cell — zero padding (fresh-review coverage).
+        model.set_order(crate::playlist::PlaybackOrder::Sequential);
+        model.set_repeat(crate::playlist::RepeatMode::Off);
+        let text = rendered(&mut model, 60, 18);
+        assert!(text.contains("[Order: Sequential]"), "{text}");
+        assert!(text.contains("[Repeat: Off]"), "{text}");
+        assert_eq!(scan(&text), None, "{text}");
     }
 
     /// An ENGAGED toggle carries the tabs' persistent shape (BOLD),
@@ -571,6 +582,14 @@ mod tests {
         assert!(rows.len() >= 2, "the fixture drew several rows");
         for pair in rows.windows(2) {
             assert_eq!(pair[1] - pair[0], 2, "one blank line between rows");
+        }
+        for region in model.regions() {
+            if let HitTarget::PlaylistRow(_) = region.target {
+                assert_eq!(
+                    region.area.height, 1,
+                    "a row region is exactly its text line"
+                );
+            }
         }
     }
 

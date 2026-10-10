@@ -316,10 +316,11 @@ impl TuiModel {
             .copied();
     }
 
-    /// The focus target a mouse hit on `target` selects (§17: Left
-    /// Down focuses the target). `None` for targets that carry no
-    /// keyboard focus of their own (the seek bar — a mouse affordance
-    /// over an already keyboard-complete command).
+    /// The focus id whose keyboard inversion claims `target`'s cells
+    /// — the mapping `claims` consults for its focus half (§16).
+    /// `None` for targets that carry no keyboard focus of their own
+    /// (the seek bar — a mouse affordance over an already
+    /// keyboard-complete command).
     pub fn focus_of_target(target: HitTarget) -> Option<FocusId> {
         match target {
             HitTarget::RouteTab(route) => Some(FocusId::RouteTab(route)),
@@ -356,6 +357,10 @@ impl TuiModel {
     /// the pressed control and the focused control may both render
     /// inverted; neither outlives its interaction.
     pub fn claims(&self, target: &HitTarget) -> bool {
+        debug_assert!(
+            Self::focus_of_target(*target).is_some(),
+            "claims() is for drawn controls; a pane/bar target carries no focus mapping"
+        );
         self.pressed(target) || self.focus == Self::focus_of_target(*target)
     }
 

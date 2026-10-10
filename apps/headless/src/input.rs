@@ -851,6 +851,21 @@ mod tests {
         assert_eq!(expanded.skipped, 0);
     }
 
+    /// An explicitly named hidden FILE is accepted as itself — the
+    /// bypass is structural (the file-root arm never classifies), and
+    /// this pins it against regressions that would move the hidden
+    /// check into the root handling (fresh-review coverage).
+    #[test]
+    fn an_explicit_hidden_file_root_still_expands() {
+        let tree = TempTree::new("hidden-file-root");
+        let file = tree.file(".secret.flac");
+
+        let expanded = expand_inputs([&file]);
+        assert_eq!(expanded.accepted, vec![file]);
+        assert_eq!(expanded.skipped, 0);
+        assert!(expanded.diagnostics.is_empty());
+    }
+
     /// An explicitly named file is accepted regardless of extension —
     /// the prefilter exists to slim down directory enumeration, not to
     /// second-guess a path the user named. The Open probe stays the
