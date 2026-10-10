@@ -247,17 +247,21 @@ fn draw_playlist_summary(
     ];
     for (cell, button, label) in toggles {
         let focused = model.focus() == Some(FocusId::Preference(button));
+        // The summary row is ONE cell tall: a bordered box spends that
+        // cell on its border and renders no label at all — an empty
+        // box is a live target with no visible affordance. The
+        // toolbar's plain-text `[...]` shape is the affordance instead
+        // (the cells above are measured for exactly these spellings).
         let paragraph = match label {
-            Some(label) => Paragraph::new(Line::from(label).centered()),
-            None => Paragraph::new(Line::from("—").centered()),
+            Some(label) => Paragraph::new(Line::from(format!("[{label}]")).centered()),
+            None => Paragraph::new(Line::from("[—]").centered()),
         };
         frame.render_widget(
             if focused {
                 paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
             } else {
                 paragraph
-            }
-            .block(Block::bordered()),
+            },
             cell,
         );
         regions.push(HitRegion {
@@ -331,6 +335,22 @@ mod tests {
                 .any(|region| matches!(region.target, HitTarget::Preference(_))),
             "the toggles return with the width"
         );
+    }
+
+    /// The summary row's Order/Repeat toggles render their LABELS: the
+    /// row is one cell tall, and the bordered-box shape spent that cell
+    /// on its border — two empty boxes that were live hit targets with
+    /// no visible affordance.
+    #[test]
+    fn the_summary_toggles_render_their_labels_on_the_one_row() {
+        let mut model = plain_model();
+        model.set_order(crate::playlist::PlaybackOrder::Shuffle);
+        model.set_repeat(crate::playlist::RepeatMode::All);
+        model.set_route(TuiRoute::Playlist);
+        let text = rendered(&mut model, 100, 30);
+        assert!(text.contains("[Order: Shuffle]"), "{text}");
+        assert!(text.contains("[Repeat: All]"), "{text}");
+        assert_eq!(scan(&text), None, "{text}");
     }
 
     /// The Playlist route renders the pane and publishes the pane
