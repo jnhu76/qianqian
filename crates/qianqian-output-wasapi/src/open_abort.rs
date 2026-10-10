@@ -124,12 +124,19 @@ mod tests {
         });
     }
 
-    /// The leg's first read holds until the abort's stop has been
-    /// observed AND the test releases it, so the hostile re-pause below
-    /// lands while the leg is deterministically alive between two
-    /// loop-top gate visits. Its first pull is deliberately
-    /// non-terminal, forcing the leg back to the gate — the exact point
-    /// a re-park wedge would form.
+    /// The leg's first read HOLDS — until the abort's stop has been
+    /// observed AND the test releases it — so the leg stays
+    /// deterministically BETWEEN two loop-top gate visits while the
+    /// hostile re-pause lands: it cannot answer the gate, which is a
+    /// wedge's precondition. Its release is deliberately a
+    /// NON-TERMINAL pull, forcing one more loop-top visit AFTER the
+    /// close — the exact point a re-park wedge would form. (A pause
+    /// arriving mid-read and parking the leg at its NEXT visit is the
+    /// gate's own timing property — no ordering between router and leg
+    /// is required — and is pinned by the gate-level test in
+    /// qianqian-audio-api, not here; THIS test pins the pre-parked
+    /// state, the abort protocol's motivating state, which is why its
+    /// setup routes the pause before the leg exists.)
     #[derive(Default)]
     struct HeldState {
         stopped: bool,

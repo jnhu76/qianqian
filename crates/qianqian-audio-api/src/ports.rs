@@ -1165,3 +1165,154 @@ impl Capability for PcmDecodeCapability {
     const NAME: &'static str = "PcmDecode";
     type Service = dyn PcmDecode;
 }
+
+#[cfg(test)]
+mod gate_pause_timing_tests {
+    //! Gate-level pause-timing semantics: WHO "wins" the race between a
+    //! routed pause and the leg's loop-top visits. The frozen answer is
+    //! NOBODY: pause is an INTENT consulted at the NEXT loop-top check,
+    //! so a leg already mid-read when the pause is routed passes its
+    //! CURRENT visit (the steady shape: nothing routed, no events) and
+    //! parks at the NEXT one — no wakeup is lost, and no ordering
+    //! between the router and the leg is required. (The open-abort
+    //! protocol test in qianqian-output-wasapi pins the PRE-PARKED
+    //! state instead — the abort's release-before-join exists for it —
+    //! which is why that test routes the pause before the leg exists.)
+
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::mpsc;
+    use std::sync::{Arc, Condvar, Mutex};
+    use std::time::{Duration, Instant};
+
+    use super::{GateEvent, GateSlice, RenderGate, TailProbeOutcome};
+
+    /// One-shot latch the leg and the test synchronize through.
+    struct Latch(Mutex<bool>, Condvar);
+
+    impl Latch {
+        fn set(&self) {
+            *self.0.lock().expect("latch lock") = true;
+            self.1.notify_all();
+        }
+        fn wait(&self) {
+            let guard = self.0.lock().expect("latch lock");
+            let mut guard = guard;
+            while !*guard {
+                guard = self.1.wait(guard).expect("latch wait");
+            }
+        }
+    }
+
+    /// A pause routed while the leg is INSIDE its first read (it
+    /// already passed an unrouted gate) parks the leg at its NEXT
+    /// loop-top visit — and the gate publishes exactly one engagement
+    /// for it: visit one and the post-resume visit record nothing.
+    #[test]
+    fn a_pause_routed_mid_read_parks_at_the_legs_next_loop_top() {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let recorder = events.clone();
+        let gate = RenderGate::with_observer(move |event| {
+            recorder.lock().expect("events lock").push(event);
+        });
+
+        let entered_first_read = Arc::new(Latch(Mutex::new(false), Condvar::new()));
+        let release_first_read = Arc::new(Latch(Mutex::new(false), Condvar::new()));
+        let reads = Arc::new(AtomicU32::new(0));
+
+        let leg = {
+            let gate = gate.clone();
+            let entered = entered_first_read.clone();
+            let release = release_first_read.clone();
+            let reads = reads.clone();
+            std::thread::spawn(move || {
+                loop {
+                    gate.park_loop_top(|slice| match slice {
+                        GateSlice::TailProbe => TailProbeOutcome::Pending,
+                        GateSlice::SeekRelease(_) => TailProbeOutcome::Pending,
+                    });
+                    if reads.fetch_add(1, Ordering::AcqRel) == 0 {
+                        // Inside the FIRST read, past an unrouted gate.
+                        entered.set();
+                        // The read is held until the test has routed the
+                        // pause — the mid-read arrival this test exists for.
+                        release.wait();
+                    } else {
+                        // The second read returns Stop: the leg exits.
+                        break;
+                    }
+                }
+            })
+        };
+
+        // The leg is inside its first read: visit one already happened
+        // with nothing routed, so it must have recorded NOTHING.
+        entered_first_read.wait();
+        assert!(
+            !events
+                .lock()
+                .expect("events lock")
+                .contains(&GateEvent::Engaged),
+            "an unrouted visit never engages"
+        );
+
+        // The mid-read arrival, then a NON-TERMINAL first read: the leg
+        // must come back to the gate and park there.
+        gate.set_paused(true);
+        release_first_read.set();
+        let engaged = {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                if events
+                    .lock()
+                    .expect("events lock")
+                    .contains(&GateEvent::Engaged)
+                {
+                    break true;
+                }
+                if Instant::now() >= deadline {
+                    break false;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        };
+        assert!(
+            engaged,
+            "a mid-read pause must park the leg at its next loop-top visit"
+        );
+
+        // Resume releases the park; the next read returns Stop and the
+        // leg exits (bounded join: a wedge fails instead of hanging).
+        gate.set_paused(false);
+        let (done_tx, done_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            leg.join().expect("the leg did not panic");
+            let _ = done_tx.send(());
+        });
+        assert_eq!(
+            done_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the leg never exited after the resume"
+        );
+
+        // Exactly ONE engagement for the ONE routed pause: the passed
+        // visit and the post-resume visit record nothing.
+        let recorded = events.lock().expect("events lock");
+        assert_eq!(
+            recorded
+                .iter()
+                .filter(|event| **event == GateEvent::Engaged)
+                .count(),
+            1,
+            "exactly one park for the one routed pause: {recorded:?}"
+        );
+        assert_eq!(
+            recorded
+                .iter()
+                .filter(|event| **event == GateEvent::Disengaged)
+                .count(),
+            1,
+            "the park ended exactly once: {recorded:?}"
+        );
+        assert_eq!(reads.load(Ordering::Acquire), 2, "two reads, then Stop");
+    }
+}
