@@ -276,10 +276,19 @@ impl TuiModel {
     }
 
     /// Validate focus against the visible enabled controls (§12): a
-    /// focus that no longer exists falls back to the route's first
-    /// meaningful local control, else the first tab. Invisible or
-    /// off-screen focus is never retained.
+    /// STALE focus — one the cycle no longer contains — falls back to
+    /// the route's first meaningful local control, else the first tab.
+    /// A focus of `None` stays `None`: the §16 bounce-back ruling
+    /// completed — the keyboard-focus inversion follows the keyboard
+    /// alone, so the shell never INVENTS a focused control. Before the
+    /// first key press nothing shows the inversion, and a mouse-only
+    /// session shows none at all; a modal assigns its own initial
+    /// focus explicitly when it opens. Invisible or off-screen focus
+    /// is never retained.
     pub fn validate_focus(&mut self) {
+        if self.focus.is_none() {
+            return;
+        }
         let cycle = self.focus_cycle();
         if cycle.iter().any(|id| Some(*id) == self.focus) {
             return;
@@ -307,10 +316,11 @@ impl TuiModel {
             .copied();
     }
 
-    /// The focus target a mouse hit on `target` selects (§17: Left
-    /// Down focuses the target). `None` for targets that carry no
-    /// keyboard focus of their own (the seek bar — a mouse affordance
-    /// over an already keyboard-complete command).
+    /// The focus id whose keyboard inversion claims `target`'s cells
+    /// — the mapping `claims` consults for its focus half (§16).
+    /// `None` for targets that carry no keyboard focus of their own
+    /// (the seek bar — a mouse affordance over an already
+    /// keyboard-complete command).
     pub fn focus_of_target(target: HitTarget) -> Option<FocusId> {
         match target {
             HitTarget::RouteTab(route) => Some(FocusId::RouteTab(route)),
@@ -328,6 +338,30 @@ impl TuiModel {
             HitTarget::ModalField => Some(FocusId::ModalField),
             HitTarget::SeekBar => None,
         }
+    }
+
+    /// Whether a Left press is currently ARMED on `target` (§17): the
+    /// physical press the shell is holding, from Down to Up.
+    pub fn pressed(&self, target: &HitTarget) -> bool {
+        self.armed
+            .as_ref()
+            .is_some_and(|armed| &armed.target == target)
+    }
+
+    /// Whether the control at `target` is currently claimed and renders
+    /// the TRANSIENT inversion (REVERSED): the keyboard focus sits on
+    /// it, OR a Left press is armed on it — the press renders for
+    /// exactly the hold's duration and the release bounces it back
+    /// (§16, the owner's press/bounce ruling: 按下变白、松开弹回).
+    /// The armed press never moves the focus, so during a click-hold
+    /// the pressed control and the focused control may both render
+    /// inverted; neither outlives its interaction.
+    pub fn claims(&self, target: &HitTarget) -> bool {
+        debug_assert!(
+            Self::focus_of_target(*target).is_some(),
+            "claims() is for drawn controls; a pane/bar target carries no focus mapping"
+        );
+        self.pressed(target) || self.focus == Self::focus_of_target(*target)
     }
 
     /// The action activating `target` performs (§17: Left Up activates
@@ -449,13 +483,16 @@ impl TuiModel {
         }
     }
 
-    /// Open the one modal of `kind` (§24): captures input (the modal
-    /// field becomes the focus), clears the armed mouse target, and
-    /// remembers the route-local focus so a later close can restore it
-    /// (§24). Opening while one is open replaces it — there is no
-    /// stack. The Open modal starts as a fresh picker draft; the
-    /// runtime supplies its first listing right after (the model
-    /// performs no I/O).
+    /// Open the one modal of `kind` (§24): captures input, assigns the
+    /// modal's OWN initial focus explicitly (§16: validation never
+    /// invents one — a dialog takes the keyboard the moment it opens:
+    /// the picker's/GoTo's path field, the preset menu's list, the
+    /// confirmation's Cancel; the help overlay owns the keyboard and
+    /// focuses nothing), clears the armed mouse target, and remembers
+    /// the route-local focus so a later close can restore it (§24).
+    /// Opening while one is open replaces it — there is no stack. The
+    /// Open modal starts as a fresh picker draft; the runtime supplies
+    /// its first listing right after (the model performs no I/O).
     pub fn open_modal(&mut self, kind: ModalKind) {
         self.focus_before_modal = self.focus;
         self.modal = Some(match kind {
@@ -468,6 +505,7 @@ impl TuiModel {
                     ModalKind::AddFolder => PickerMode::AddFolder,
                     _ => PickerMode::OpenAny,
                 };
+                self.focus = Some(FocusId::ModalField);
                 Modal::Open(OpenPicker {
                     mode,
                     input: String::new(),
@@ -478,10 +516,19 @@ impl TuiModel {
                     folder_target: false,
                 })
             }
-            ModalKind::GoTo => Modal::GoTo {
-                input: String::new(),
-            },
-            ModalKind::Help => Modal::Help { scroll: 0 },
+            ModalKind::GoTo => {
+                self.focus = Some(FocusId::ModalField);
+                Modal::GoTo {
+                    input: String::new(),
+                }
+            }
+            // The help overlay owns the keyboard and draws no control:
+            // nothing is focused while it is open (its keys are
+            // modal-scoped and never consult focus).
+            ModalKind::Help => {
+                self.focus = None;
+                Modal::Help { scroll: 0 }
+            }
             // The preset menu (G3) starts its cursor on the preset the
             // DESIRED configuration currently matches — the menu answers
             // "which preset am I on" as honestly as "pick one". (The
@@ -516,13 +563,15 @@ impl TuiModel {
     /// Close the modal and restore a valid route focus (§24): the
     /// pre-modal focus when it still exists in the cycle, else the §12
     /// fallback (the route's first meaningful local control, else the
-    /// first tab).
+    /// first tab). A pre-modal focus of `None` — the keyboard never
+    /// spoke before the modal opened — stays `None` (§16).
     pub fn close_modal(&mut self) {
         self.modal = None;
         self.invalidate_frame();
-        if let Some(focus) = self.focus_before_modal.take() {
-            self.focus = Some(focus);
-        }
+        // Restore the pre-modal focus — including `None` (§16): the
+        // modal's own focus must not leak into the route when the
+        // keyboard never held a route control.
+        self.focus = self.focus_before_modal.take();
         self.validate_focus();
     }
 
@@ -1038,6 +1087,65 @@ mod tests {
         );
     }
 
+    /// §16 completed (the owner's bounce-back ruling; 2026-10-10 device
+    /// report): the keyboard-focus inversion follows the keyboard ALONE.
+    /// A shell that has never seen a key press shows no inverted control
+    /// — on any route, across route switches, and after a mouse-opened
+    /// modal closes — and the first Tab enters the cycle from its edge.
+    /// A STALE keyboard focus still re-homes (§12): recovery, not
+    /// invention.
+    #[test]
+    fn the_shell_never_invents_a_keyboard_focus() {
+        let mut model = TuiModel::new("song.flac");
+        model.set_class(ResponsiveClass::Normal);
+        for route in TuiRoute::ALL {
+            model.set_route(route);
+            model.validate_focus();
+            assert_eq!(
+                model.focus(),
+                None,
+                "{route:?}: no keyboard press, no inversion"
+            );
+        }
+
+        // The keyboard enters from the cycle's edge.
+        model.move_focus(FocusMove::Next);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::RouteTab(TuiRoute::NowPlaying)),
+            "the first Tab lands on the first tab"
+        );
+
+        // A mouse-opened modal takes its own focus and gives none back:
+        // the route focus before it was None, so None it stays.
+        model.set_focus(None);
+        model.set_route(TuiRoute::Playlist);
+        model.open_modal(ModalKind::AddFile);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::ModalField),
+            "the picker opens on its path field"
+        );
+        model.close_modal();
+        model.validate_focus();
+        assert_eq!(
+            model.focus(),
+            None,
+            "closing the mouse-opened modal restores the keyboard's None"
+        );
+
+        // A STALE focus is recovery, not invention: the keyboard HAD a
+        // control; when that control vanishes the focus re-homes to the
+        // route's first local control. `None` never re-homes anywhere.
+        model.set_focus(Some(FocusId::Playlist));
+        model.set_route(TuiRoute::NowPlaying);
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::Transport(TransportButton::Open)),
+            "a stale focus falls back; None never does"
+        );
+    }
+
     /// The help overlay's scroll (G5): it starts at the top, moves one
     /// line per step and one page per page step, saturates at the top,
     /// and reopening starts over. The text-edit path cannot move it —
@@ -1084,12 +1192,14 @@ mod tests {
         model.set_playlist(1, Vec::new);
         model.validate_focus();
 
+        // The keyboard has not spoken: validation never invents a
+        // focused control (§16 — the inversion follows the keyboard
+        // alone), even where the §12 fallback would have one to give.
         model.validate_focus();
-        assert_eq!(
-            model.focus(),
-            Some(FocusId::PlaylistButton(PlaylistButton::AddFile)),
-            "fallback with an empty list is the toolbar's first button"
-        );
+        assert_eq!(model.focus(), None, "no keyboard, no inversion");
+        // The keyboard enters at the toolbar's first button; Shift+Tab
+        // from there lands on the last tab.
+        model.set_focus(Some(FocusId::PlaylistButton(PlaylistButton::AddFile)));
         model.move_focus(FocusMove::Previous);
         assert_eq!(
             model.focus(),

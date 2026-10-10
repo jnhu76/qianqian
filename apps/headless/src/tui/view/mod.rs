@@ -31,8 +31,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::model::{
-    FocusId, HitRegion, HitTarget, MAX_STATUS_ROWS, NAV_BUTTONS, NavBarButton, ShellFit, TuiModel,
-    TuiRoute, shell_fit, status_shape,
+    HitRegion, HitTarget, MAX_STATUS_ROWS, NAV_BUTTONS, NavBarButton, ShellFit, TuiModel, TuiRoute,
+    shell_fit, status_shape,
 };
 
 use audio::draw_audio;
@@ -76,7 +76,8 @@ pub fn draw(frame: &mut Frame, model: &mut TuiModel) {
     // drawn THIS frame (§15: stale coordinates never survive).
     let mut regions: Vec<HitRegion> = Vec::new();
     // Focus is validated against the visible enabled controls of THIS
-    // frame's class (§12/§29).
+    // frame's class (§12/§29): stale focus re-homes; `None` — the
+    // keyboard has not spoken — is never replaced (§16).
     model.validate_focus();
 
     if fit == ShellFit::TooSmall {
@@ -180,7 +181,7 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
     let cells: [Rect; 4] = Layout::horizontal([Constraint::Ratio(1, 4); 4]).areas(tabs_area);
     for (route, cell) in TuiRoute::ALL.iter().zip(cells.iter()) {
         let active = *route == model.route();
-        let focused = model.focus() == Some(FocusId::RouteTab(*route));
+        let claimed = model.claims(&HitTarget::RouteTab(*route));
         let label = if compact {
             route.compact_label()
         } else {
@@ -190,7 +191,7 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
         if active {
             style = style.add_modifier(Modifier::BOLD);
         }
-        if focused {
+        if claimed {
             style = style.add_modifier(Modifier::REVERSED);
         }
         frame.render_widget(Paragraph::new(Line::styled(label, style)), *cell);
@@ -203,9 +204,9 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
     for (index, button) in NAV_BUTTONS.iter().enumerate() {
         let cell = Rect::new(cell_x, area.y, nav_widths[index], area.height);
         cell_x += nav_widths[index] + 1;
-        let focused = model.focus() == Some(FocusId::NavBar(*button));
+        let claimed = model.claims(&HitTarget::NavBar(*button));
         let mut style = Style::default();
-        if focused {
+        if claimed {
             style = style.add_modifier(Modifier::REVERSED);
         }
         frame.render_widget(Paragraph::new(Line::styled(label(*button), style)), cell);
@@ -276,6 +277,7 @@ mod tests {
 
     use super::testutil::*;
     use super::*;
+    use crate::tui::model::testutil::model_with_regions;
     use crate::tui::model::*;
 
     /// The persistent shell shows the four tabs on every route, and the
@@ -294,6 +296,106 @@ mod tests {
                     tab.label()
                 );
             }
+        }
+    }
+
+    /// The held-press light is uniform across the shell's control
+    /// families (fresh-review coverage for the §16 press render):
+    /// arming a press on each representative target lights that
+    /// control's cell on the next frame, at every render site family.
+    #[test]
+    fn a_held_press_lights_every_control_family() {
+        use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+
+        // (route, target, centered?) — centered sites take the cell's
+        // middle column; left-aligned text takes the second column.
+        let cases = [
+            // Tabs render LEFT-aligned inside their quarter cells.
+            (
+                TuiRoute::NowPlaying,
+                HitTarget::RouteTab(TuiRoute::Audio),
+                false,
+            ),
+            (
+                TuiRoute::NowPlaying,
+                HitTarget::Transport(TransportButton::PlayPause),
+                true,
+            ),
+            (
+                TuiRoute::NowPlaying,
+                HitTarget::Preference(PreferenceButton::VolumeUp),
+                true,
+            ),
+            (
+                TuiRoute::NowPlaying,
+                HitTarget::NavBar(NavBarButton::Quit),
+                false,
+            ),
+            (
+                TuiRoute::Playlist,
+                HitTarget::PlaylistButton(PlaylistButton::AddFile),
+                true,
+            ),
+            (TuiRoute::Playlist, HitTarget::PlaylistRow(0), false),
+            (
+                TuiRoute::Audio,
+                HitTarget::AudioButton(AudioButton::PreampUp),
+                true,
+            ),
+            (
+                TuiRoute::Audio,
+                HitTarget::EqBand {
+                    band: 0,
+                    adjust: EqAdjust::Boost,
+                },
+                false,
+            ),
+            (
+                TuiRoute::Visualizer,
+                HitTarget::VisualizerMode(VisualizerMode::Levels),
+                true,
+            ),
+        ];
+        for (route, target, centered) in cases {
+            let mut model = model_with_regions(100, 30, route);
+            let area = model
+                .regions()
+                .iter()
+                .find(|region| region.target == target)
+                .unwrap_or_else(|| panic!("no region for {target:?} on {route:?}"))
+                .area;
+            let column = if centered {
+                area.x + area.width / 2
+            } else {
+                area.x + 1
+            };
+            let row = area.y + area.height / 2;
+            let event = MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column,
+                row,
+                modifiers: KeyModifiers::NONE,
+            };
+            assert_eq!(
+                decode_mouse(event, &mut model),
+                None,
+                "{target:?}: the Down dispatches nothing"
+            );
+            let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30))
+                .expect("terminal");
+            terminal
+                .draw(|frame| crate::tui::view::draw(frame, &mut model))
+                .expect("draw");
+            let buffer = terminal.backend().buffer().clone();
+            assert!(
+                buffer
+                    .cell((column, row))
+                    .unwrap_or_else(|| panic!("no cell for {target:?}"))
+                    .style()
+                    .add_modifier
+                    .contains(ratatui::style::Modifier::REVERSED),
+                "{target:?} lights under a held press"
+            );
         }
     }
 
@@ -694,12 +796,10 @@ mod tests {
             large_again.contains("Pause"),
             "the shell is back after growing:\n{large_again}"
         );
-        assert_eq!(
-            model.focus(),
-            Some(FocusId::Seek(crate::tui::model::SeekButton::Back)),
-            "focus revalidates to a visible enabled control (§12: the route's \
-             first local control — the seek row, whose evidence exists)"
-        );
+        // The too-small frame took the keyboard's focus with it; the
+        // grown-back shell does not invent a new one (§16) — the next
+        // Tab re-enters the cycle.
+        assert_eq!(model.focus(), None);
     }
 
     /// A full draw at a series of shrinking sizes — down to a 4×3

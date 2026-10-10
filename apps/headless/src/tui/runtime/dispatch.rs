@@ -897,6 +897,100 @@ mod tests {
         );
     }
 
+    /// The owner's device report (2026-10-10): clicking [Play selected]
+    /// while the keyboard focus sits elsewhere (or nowhere) must fire
+    /// PLAY — never the focused neighbour [Add File...] — and the
+    /// second click on the already-live row still FIRES, answering
+    /// through the frozen inert rule ("the selected track is the live
+    /// episode"), not through silence. §16/§17: the armed click
+    /// activates the target it identified; a click never moves the
+    /// keyboard focus.
+    #[test]
+    fn a_toolbar_click_activates_the_clicked_button_not_the_focused_one() {
+        let tree = TempTree::new("play-selected-click");
+        let files: Vec<PathBuf> = (0..2)
+            .map(|n| tree.live_file(&format!("live-{n}.flac")))
+            .collect();
+        let source = FakeEpisodeSource::new();
+        let log = source.log.clone();
+        let mut player = ReferencePlayerApp::new(source);
+        // The playlist is established on Open commit evidence: entry 0
+        // is the live episode; the SELECTED row (1) is not.
+        assert_eq!(player.open(&files[0]), crate::player::OpenOutcome::Opened);
+        player.establish_playlist(files.clone());
+        let mut model = TuiModel::new(String::new());
+        refresh(&mut model, &player);
+
+        // To the Playlist route. The keyboard has not spoken: no
+        // control is focused, nothing shows the inversion (§16).
+        dispatch(
+            TuiAction::Navigate(TuiRoute::Playlist),
+            &mut model,
+            &mut player,
+        );
+        assert_eq!(model.focus(), None, "no keyboard press, no focus");
+        dispatch(
+            TuiAction::PlaylistSelect(PlaylistCursor::Row(1)),
+            &mut model,
+            &mut player,
+        );
+
+        // Click [Play selected]: the decoded action is PLAY, the
+        // SELECTED row (not the live one) opens, and the Add File
+        // picker never opens.
+        let wanted = crate::tui::model::HitTarget::PlaylistButton(PlaylistButton::PlaySelected);
+        let (column, row) = draw_and_locate(&mut model, 100, 30, &wanted);
+        assert_eq!(
+            click_at(column, row, &mut model, &mut player),
+            Some(TuiAction::PlaylistPlaySelected)
+        );
+        assert!(model.modal().is_none(), "no picker opened");
+        assert_eq!(
+            player.active_source(),
+            Some(files[1].as_path()),
+            "the clicked button played the SELECTED row"
+        );
+        assert_eq!(
+            model.focus(),
+            None,
+            "the click did not move the keyboard focus"
+        );
+
+        // Click [Play selected] again on the already-live row: the
+        // click still FIRES — the frozen no-replay rule answers with
+        // its status line, and no second episode is composed.
+        let activations_before = log
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|event| event.starts_with("activate "))
+            .count();
+        let (column, row) = draw_and_locate(&mut model, 100, 30, &wanted);
+        assert_eq!(
+            click_at(column, row, &mut model, &mut player),
+            Some(TuiAction::PlaylistPlaySelected)
+        );
+        assert_eq!(
+            model.status(),
+            Some("the selected track is the live episode"),
+            "the inert rule says so instead of moving nothing silently"
+        );
+        assert_eq!(
+            player.active_source(),
+            Some(files[1].as_path()),
+            "no teardown, no replacement"
+        );
+        assert_eq!(
+            log.lock()
+                .unwrap()
+                .iter()
+                .filter(|event| event.starts_with("activate "))
+                .count(),
+            activations_before,
+            "no probe, no re-open"
+        );
+    }
+
     // ------------------------------------------------------------------
     // Playlist route behaviors (§35: focus, selection, row hit, wheel).
     // ------------------------------------------------------------------
@@ -915,20 +1009,19 @@ mod tests {
         let mut model = TuiModel::new(String::new());
         refresh(&mut model, &player);
 
-        // To the Playlist route; focus falls to the route's first local
-        // control (§12) — the toolbar's first button (G2: the toolbar
-        // always exists) — then Tab walks the toolbar into the list.
+        // To the Playlist route. The keyboard has not spoken, so no
+        // control shows the inversion (§16: the shell never invents a
+        // focus); the first Tabs enter the cycle — four tabs, then the
+        // toolbar (G2: the toolbar always exists) — and walk into the
+        // list.
         dispatch(
             TuiAction::Navigate(TuiRoute::Playlist),
             &mut model,
             &mut player,
         );
         model.validate_focus();
-        assert_eq!(
-            model.focus(),
-            Some(FocusId::PlaylistButton(PlaylistButton::AddFile))
-        );
-        for _ in 0..5 {
+        assert_eq!(model.focus(), None, "no keyboard press, no keyboard focus");
+        for _ in 0..10 {
             handle_key(key(KeyCode::Tab), &mut model, &mut player);
         }
         assert_eq!(model.focus(), Some(FocusId::Playlist));
@@ -1554,9 +1647,12 @@ mod tests {
         };
         let activations_before = activations();
 
-        // Arm a click on a transport button.
+        // Arm a click on a transport button. The keyboard focus sits
+        // on the same button (keyboard-placed: a mouse press never
+        // moves the focus).
         let wanted = crate::tui::model::HitTarget::Transport(TransportButton::PlayPause);
         let (column, row) = draw_and_locate(&mut model, 100, 30, &wanted);
+        model.set_focus(Some(FocusId::Transport(TransportButton::PlayPause)));
         let down = MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
             column,
@@ -1582,7 +1678,7 @@ mod tests {
         );
 
         // The next draw republishes fresh geometry and the focus (set
-        // by the Down before the resize) is still a valid control.
+        // by the keyboard before the resize) is still a valid control.
         draw_and_locate(&mut model, 100, 30, &wanted);
         assert!(
             !model.regions().is_empty(),
@@ -1612,8 +1708,11 @@ mod tests {
         assert_eq!(player.open(&file), crate::player::OpenOutcome::Opened);
         let mut model = TuiModel::new(String::new());
         refresh(&mut model, &player);
-        // Draw once so the class (Wide at 100x30) is known; the draw's
-        // focus validation lands on the route's first local control.
+        // Draw once so the class (Wide at 100x30) is known. The draw's
+        // focus validation never invents a focus (§16): the keyboard
+        // has not spoken, so nothing is focused, and the first Tabs
+        // enter the cycle at its edge — the four tabs, then the route's
+        // first local control.
         draw_and_locate(
             &mut model,
             100,
@@ -1622,11 +1721,16 @@ mod tests {
         );
         assert_eq!(
             model.focus(),
-            Some(FocusId::Transport(TransportButton::Open)),
-            "the validated start is the route's first local control"
+            None,
+            "the validated start of a keyboard-less session is no focus"
         );
 
         for expected in [
+            FocusId::RouteTab(TuiRoute::NowPlaying),
+            FocusId::RouteTab(TuiRoute::Playlist),
+            FocusId::RouteTab(TuiRoute::Audio),
+            FocusId::RouteTab(TuiRoute::Visualizer),
+            FocusId::Transport(TransportButton::Open),
             FocusId::Transport(TransportButton::Previous),
             FocusId::Transport(TransportButton::PlayPause),
             FocusId::Transport(TransportButton::Stop),

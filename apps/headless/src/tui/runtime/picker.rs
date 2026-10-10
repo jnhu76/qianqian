@@ -749,13 +749,21 @@ mod tests {
                 },
             ]),
         );
-        // Listing rows: [.., album, picked live.flac]. ↓ selects `..`.
+        // Listing rows: [.., album, picked live.flac]. ↓ selects `..`
+        // — and the arrows drive the list, so the listing holds the
+        // focus and Enter activates its cursor.
         assert_eq!(
             handle_key(key(KeyCode::Down), &mut model, &mut player),
             Step::Continue
         );
-        // Click the album row: it SELECTS it (the armed-click rule);
-        // Enter on the selection descends into view.
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerList),
+            "the arrows drive the listing"
+        );
+        // Click the album row: it SELECTS it (the armed-click rule) —
+        // the click itself moves no focus; Enter then activates the
+        // clicked selection through the listing focus the arrows left.
         let (column, row) = draw_and_locate(
             &mut model,
             100,
@@ -764,9 +772,11 @@ mod tests {
         );
         click_at(column, row, &mut model, &mut player);
         assert_eq!(
-            model.focus(),
-            Some(FocusId::PickerList),
-            "a row click focuses the listing"
+            model
+                .picker_cursor_entry()
+                .map(|(entry, _path, _is_dir_step)| entry.name.as_str()),
+            Some("album"),
+            "the row click moved the selection"
         );
         assert_eq!(
             handle_key(key(KeyCode::Enter), &mut model, &mut player),

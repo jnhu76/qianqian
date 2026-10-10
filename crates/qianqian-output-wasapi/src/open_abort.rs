@@ -124,12 +124,19 @@ mod tests {
         });
     }
 
-    /// The leg's first read holds until the abort's stop has been
-    /// observed AND the test releases it, so the hostile re-pause below
-    /// lands while the leg is deterministically alive between two
-    /// loop-top gate visits. Its first pull is deliberately
-    /// non-terminal, forcing the leg back to the gate — the exact point
-    /// a re-park wedge would form.
+    /// The leg's first read HOLDS — until the abort's stop has been
+    /// observed AND the test releases it — so the leg stays
+    /// deterministically BETWEEN two loop-top gate visits while the
+    /// hostile re-pause lands: it cannot answer the gate, which is a
+    /// wedge's precondition. Its release is deliberately a
+    /// NON-TERMINAL pull, forcing one more loop-top visit AFTER the
+    /// close — the exact point a re-park wedge would form. (A pause
+    /// arriving mid-read and parking the leg at its NEXT visit is the
+    /// gate's own timing property — no ordering between router and leg
+    /// is required — and is pinned by the gate-level test in
+    /// qianqian-audio-api, not here; THIS test pins the pre-parked
+    /// state, the abort protocol's motivating state, which is why its
+    /// setup routes the pause before the leg exists.)
     #[derive(Default)]
     struct HeldState {
         stopped: bool,
@@ -202,6 +209,20 @@ mod tests {
             recorder.lock().expect("events lock").push(event);
         });
 
+        // The pause is routed BEFORE the leg exists — the module doc's
+        // own pre-activation state ("pause intent may already sit at the
+        // gate") and the determinism requirement of this setup: the
+        // leg's FIRST loop-top visit must find the pause already routed
+        // so it parks (Engaged) instead of sailing through to the held
+        // first read. The first read blocks until the abort phase, so a
+        // leg that passed an unpaused gate could never come back to
+        // park before `assert!(parked)` — the wait would be a
+        // guaranteed deadlock (CI: the 5.00s timeout at this assert).
+        // With the pause pre-routed, the hostile re-pause below still
+        // lands while the leg is deterministically alive between two
+        // loop-top gate visits: it sits in the held first read.
+        gate.set_paused(true);
+
         let (stopped_tx, stopped_rx) = mpsc::channel();
         let held = Arc::new(HeldInput::new(stopped_tx));
         let input: Arc<dyn RenderPcmInput> = held.clone();
@@ -226,7 +247,6 @@ mod tests {
             })
         };
 
-        gate.set_paused(true);
         let parked = {
             let deadline = std::time::Instant::now() + Duration::from_secs(5);
             loop {

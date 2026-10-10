@@ -359,11 +359,10 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             // target without entering it. Absent in the Add File mode,
             // where a folder can never be the subject (G2).
             if picker.mode.allows_use_folder() {
-                let nav_focused =
-                    model.focus() == Some(FocusId::PickerButton(ModalButton::UseFolder));
+                let nav_claimed = model.claims(&HitTarget::ModalButton(ModalButton::UseFolder));
                 let nav = Paragraph::new(USE_FOLDER_LABEL);
                 frame.render_widget(
-                    if nav_focused {
+                    if nav_claimed {
                         nav.style(Style::default().add_modifier(Modifier::REVERSED))
                     } else {
                         nav
@@ -412,13 +411,19 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
                     } else {
                         entry.name.clone()
                     };
-                    Line::from(format!("{cursor_mark} {name}"))
+                    let mut line = Line::from(format!("{cursor_mark} {name}"));
+                    // A held press on the row: the same transient
+                    // inversion as every control (§16).
+                    if model.pressed(&HitTarget::PickerRow(index)) {
+                        line.style = Style::default().add_modifier(Modifier::REVERSED);
+                    }
+                    line
                 })
                 .collect();
             frame.render_widget(Paragraph::new(lines), layout.list);
 
             for (button, cell) in picker_buttons(picker.mode).into_iter().zip(layout.buttons) {
-                let focused = model.focus() == Some(FocusId::PickerButton(button));
+                let claimed = model.claims(&HitTarget::ModalButton(button));
                 let label = if compact {
                     compact_button_label(button)
                 } else {
@@ -426,7 +431,7 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
                 };
                 let paragraph = Paragraph::new(Line::from(label).centered());
                 frame.render_widget(
-                    if focused {
+                    if claimed {
                         paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
                     } else {
                         paragraph
@@ -456,10 +461,10 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
                 .zip(labels.iter())
                 .zip([ModalButton::Confirm, ModalButton::Cancel])
             {
-                let focused = model.focus() == Some(FocusId::PickerButton(button));
+                let claimed = model.claims(&HitTarget::ModalButton(button));
                 let paragraph = Paragraph::new(Line::from(*label).centered());
                 frame.render_widget(
-                    if focused {
+                    if claimed {
                         paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
                     } else {
                         paragraph
@@ -476,13 +481,17 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
                 popup,
             );
             // One row per preset; the cursor carries `>` and — while
-            // the list owns the focus — the REVERSED emphasis.
+            // the list owns the focus, or a press holds the row — the
+            // REVERSED emphasis.
             let visible = rows.min(inner.height.saturating_sub(3));
             for (row, preset) in EqPreset::all().iter().enumerate().take(visible as usize) {
                 let marked = *cursor == Some(row);
                 let mark = if marked { SELECTED_MARKER } else { " " };
                 let mut line = Line::from(format!("{mark} {}", preset.name()));
-                if marked && model.focus() == Some(FocusId::PickerList) {
+                if marked
+                    && (model.focus() == Some(FocusId::PickerList)
+                        || model.pressed(&HitTarget::PickerRow(row)))
+                {
                     line.style = Style::default().add_modifier(Modifier::REVERSED);
                 }
                 frame.render_widget(

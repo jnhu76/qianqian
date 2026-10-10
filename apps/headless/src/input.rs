@@ -47,19 +47,25 @@
 //!              failures). Never panics; never unbounded.
 //! ```
 //!
-//! Traversal contract (Issue #166 §5/§7): recursive over real
-//! directories; regular files only; directory symlinks and junctions
-//! are never followed (which also makes traversal cycles impossible —
-//! the only cycles a filesystem can form go through symlinks);
-//! per-directory listing is sorted by entry name, so enumeration order
-//! is normalized into a deterministic, path-sorted order and the raw
-//! directory order never becomes playlist order; roots are processed
-//! in the order the user typed them; Unicode/CJK/space paths are
-//! ordinary paths. Recursion depth is bounded by the filesystem's own
-//! path depth. Enumeration is synchronous and UNBOUNDED in entry count
-//! by design: it runs on the caller's thread inside the same
-//! documented synchronous-Open stall (see `tui::runtime`), never on
-//! any playback/realtime thread.
+//! Traversal contract (Issue #166 §5/§7, amended owner-directed
+//! 2026-10-10): recursive over real directories; regular files only;
+//! directory symlinks and junctions are never followed (which also
+//! makes traversal cycles impossible — the only cycles a filesystem can
+//! form go through symlinks); HIDDEN entries — a dot-prefixed name on
+//! every platform, plus the Windows hidden/system attributes (the
+//! spelling `AppData` wears) — are classified out like symlinks:
+//! skipped, never traversed, never listed, so opening a home directory
+//! cannot spend minutes walking its own application data; an
+//! EXPLICITLY named root is never hidden-classified (the user typed
+//! that path on purpose); per-directory listing is sorted by entry
+//! name, so enumeration order is normalized into a deterministic,
+//! path-sorted order and the raw directory order never becomes playlist
+//! order; roots are processed in the order the user typed them;
+//! Unicode/CJK/space paths are ordinary paths. Recursion depth is
+//! bounded by the filesystem's own path depth. Enumeration is
+//! synchronous and UNBOUNDED in entry count by design: it runs on the
+//! caller's thread inside the same documented synchronous-Open stall
+//! (see `tui::runtime`), never on any playback/realtime thread.
 
 use std::path::{Path, PathBuf};
 
@@ -74,7 +80,8 @@ pub struct ExpandedInputs {
     /// truth).
     pub accepted: Vec<PathBuf>,
     /// Enumerated entries classified as non-candidates (unsupported
-    /// extension, symlinks/junctions, non-regular files).
+    /// extension, hidden entries, symlinks/junctions, non-regular
+    /// files).
     pub skipped: usize,
     /// Exact-duplicate accepted paths removed while keeping the first
     /// occurrence (Issue: duplicate input roots / repeated explicit
@@ -545,6 +552,30 @@ pub fn is_audio_candidate(path: &Path) -> bool {
     })
 }
 
+/// Whether an ENUMERATED entry is hidden and therefore classified out —
+/// skipped, never traversed, never listed (see the module's traversal
+/// contract): a dot-prefixed name on every platform, plus the Windows
+/// hidden/system attributes, the spelling `AppData` wears. An
+/// EXPLICITLY named root never reaches this: the user typed that path
+/// on purpose.
+fn is_hidden_entry(name: &std::ffi::OsStr, metadata: Option<std::fs::Metadata>) -> bool {
+    if name.as_encoded_bytes().first() == Some(&b'.') {
+        return true;
+    }
+    #[cfg(windows)]
+    if let Some(metadata) = metadata {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+        const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
+        if metadata.file_attributes() & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM) != 0 {
+            return true;
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = metadata;
+    false
+}
+
 /// One entry of an Open-picker directory listing: a display name,
 /// whether following it stays inside the directory tree, and the entry's
 /// NATIVE filesystem identity. The name is a lossy rendering for the
@@ -566,12 +597,13 @@ pub struct DirectoryEntry {
 /// order as [`walk_directory`] — so the order a folder-Open seeds into
 /// the playlist is the order the picker browsed it in, including for
 /// names that are not valid UTF-8. The same classification discipline
-/// applies: regular entries only, symlinks/junctions classified out
-/// (never followed), and the extension list is a PRESENTATION prefilter
-/// for the listing alone — a path typed or committed through the picker
-/// still goes through the full expansion, where an explicit file
-/// bypasses the filter and the decode probe remains the playability
-/// witness. This helper browses; it never admits anything.
+/// applies: hidden entries, regular entries only, symlinks/junctions
+/// classified out (never followed), and the extension list is a
+/// PRESENTATION prefilter for the listing alone — a path typed or
+/// committed through the picker still goes through the full expansion,
+/// where an explicit file bypasses the filter and the decode probe
+/// remains the playability witness. This helper browses; it never
+/// admits anything.
 pub fn list_directory(dir: &Path) -> Result<Vec<DirectoryEntry>, String> {
     let read_dir = std::fs::read_dir(dir)
         .map_err(|error| format!("cannot read {}: {error}", dir.display()))?;
@@ -581,6 +613,17 @@ pub fn list_directory(dir: &Path) -> Result<Vec<DirectoryEntry>, String> {
         let Ok(entry) = entry else {
             continue;
         };
+        // Hidden entries are not listed either (see `is_hidden_entry`):
+        // the browse pane must not offer the directories the walk will
+        // not take.
+        let metadata = if cfg!(windows) {
+            entry.metadata().ok()
+        } else {
+            None
+        };
+        if is_hidden_entry(&entry.file_name(), metadata) {
+            continue;
+        }
         // Mirror walk_directory: DirEntry::file_type never follows
         // symlinks, so a symlinked directory/junction is classified out
         // rather than traversed, and every non-regular entry is skipped.
@@ -644,6 +687,19 @@ fn walk_directory(
     entries.sort_by_key(|entry| entry.file_name());
     for entry in entries {
         let path = entry.path();
+        // Hidden entries are classified out before anything else: a
+        // dot name or the Windows hidden/system spelling (AppData) is
+        // never traversed and never a candidate — see
+        // [`is_hidden_entry`].
+        let metadata = if cfg!(windows) {
+            entry.metadata().ok()
+        } else {
+            None
+        };
+        if is_hidden_entry(&entry.file_name(), metadata) {
+            expanded.skipped += 1;
+            continue;
+        }
         match entry.file_type() {
             Err(error) => {
                 expanded.push_diagnostic(format!("cannot inspect {}: {error}", path.display()))
@@ -724,6 +780,85 @@ mod tests {
     fn a_single_regular_file_is_accepted_as_itself() {
         let tree = TempTree::new("single-file");
         let file = tree.file("song.flac");
+
+        let expanded = expand_inputs([&file]);
+        assert_eq!(expanded.accepted, vec![file]);
+        assert_eq!(expanded.skipped, 0);
+        assert!(expanded.diagnostics.is_empty());
+    }
+
+    /// Hidden entries are classified out (enumeration-contract
+    /// amendment, owner-directed): a dot-named directory is never
+    /// TRAVERSED — its audio is invisible to the expansion — and a
+    /// dot-named file is never a candidate. Both count as skipped.
+    /// This is what keeps a home-directory Open out of `.rustup` and
+    /// (with the Windows attributes) AppData.
+    #[test]
+    fn hidden_entries_are_skipped_and_never_traversed() {
+        let tree = TempTree::new("hidden");
+        let visible = tree.file("song.flac");
+        tree.file(".rustup/track.flac");
+        tree.file(".secret.flac");
+
+        let expanded = expand_inputs([tree.path()]);
+        assert_eq!(
+            expanded.accepted,
+            vec![visible],
+            "only the visible track is a candidate"
+        );
+        assert_eq!(expanded.skipped, 2, "the dot dir and the dot file");
+        assert!(
+            expanded.diagnostics.is_empty(),
+            "a deliberate skip is silent, not a scan warning"
+        );
+    }
+
+    /// The picker's browse listing hides the same entries: the pane
+    /// must not offer the directories the walk will not take.
+    #[test]
+    fn the_picker_listing_hides_hidden_entries() {
+        let tree = TempTree::new("hidden-listing");
+        tree.file(".rustup/track.flac");
+        tree.file(".secret.flac");
+        let visible = tree.file("song.flac");
+        tree.dir("album");
+
+        let listing = list_directory(tree.path()).expect("readable");
+        let names: Vec<&str> = listing.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(names, vec!["album", "song.flac"], "{names:?}");
+        assert!(
+            listing.iter().any(|entry| entry.path == visible),
+            "the visible track is listed with its native path"
+        );
+        assert!(
+            listing
+                .iter()
+                .all(|entry| entry.path != tree.path().join(".rustup")),
+            "no hidden directory is listed"
+        );
+    }
+
+    /// An EXPLICITLY named hidden root still expands: the
+    /// classification exists for enumeration, not to second-guess a
+    /// path the user typed.
+    #[test]
+    fn an_explicit_hidden_root_still_expands() {
+        let tree = TempTree::new("hidden-root");
+        let track = tree.file(".rustup/track.flac");
+
+        let expanded = expand_inputs([tree.path().join(".rustup")]);
+        assert_eq!(expanded.accepted, vec![track]);
+        assert_eq!(expanded.skipped, 0);
+    }
+
+    /// An explicitly named hidden FILE is accepted as itself — the
+    /// bypass is structural (the file-root arm never classifies), and
+    /// this pins it against regressions that would move the hidden
+    /// check into the root handling (fresh-review coverage).
+    #[test]
+    fn an_explicit_hidden_file_root_still_expands() {
+        let tree = TempTree::new("hidden-file-root");
+        let file = tree.file(".secret.flac");
 
         let expanded = expand_inputs([&file]);
         assert_eq!(expanded.accepted, vec![file]);

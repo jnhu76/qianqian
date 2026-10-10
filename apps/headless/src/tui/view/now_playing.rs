@@ -10,9 +10,9 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 
 use super::{COMMITTED_HINT, NO_MUSIC_LINE, bold};
+use crate::playlist::{PlaybackOrder, RepeatMode};
 use crate::tui::model::{
-    FocusId, HitRegion, HitTarget, PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton,
-    TuiModel,
+    HitRegion, HitTarget, PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton, TuiModel,
 };
 
 /// The Now Playing route (G1): the episode read-side panel with the
@@ -165,11 +165,11 @@ pub(super) fn draw_now_playing(
     if model.relative_seek_available() {
         let cells: [Rect; 2] = Layout::horizontal([Constraint::Ratio(1, 2); 2]).areas(seek);
         for (button, cell) in SEEK_BUTTONS.iter().zip(cells.iter()) {
-            let focused = model.focus() == Some(FocusId::Seek(*button));
+            let claimed = model.claims(&HitTarget::Seek(*button));
             let paragraph =
                 Paragraph::new(Line::from(format!("[ {} ]", button.label())).centered());
             frame.render_widget(
-                if focused {
+                if claimed {
                     paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
                 } else {
                     paragraph
@@ -191,7 +191,7 @@ pub(super) fn draw_now_playing(
     let buttons: [Rect; 5] = Layout::horizontal([Constraint::Ratio(1, 5); 5]).areas(transport);
     let play_pause_label = model.play_pause_offer().label();
     for (button, cell) in TRANSPORT.iter().zip(buttons.iter()) {
-        let focused = model.focus() == Some(FocusId::Transport(*button));
+        let claimed = model.claims(&HitTarget::Transport(*button));
         let label = if *button == TransportButton::PlayPause {
             play_pause_label.to_owned()
         } else if compact {
@@ -201,7 +201,7 @@ pub(super) fn draw_now_playing(
         };
         let paragraph = Paragraph::new(Line::from(label).centered());
         frame.render_widget(
-            if focused {
+            if claimed {
                 paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
             } else {
                 paragraph
@@ -229,11 +229,10 @@ fn draw_preference_row(
     regions: &mut Vec<HitRegion>,
 ) {
     let compact = model.compact_layout();
-    // The toggle labels decide their own cell widths — the toolbar
-    // idiom, everywhere: a clipped CONTROL label is a violation at any
-    // class ("Order: Sequential" is 17 cells and a fixed share starved
-    // it exactly at the 60-column Compact boundary). The volume VALUE
-    // is the flexible display text: it shrinks before any control does.
+    // The toggle cells are FIXED, measured for the WIDEST spelling the
+    // class can ever render (owner ruling 2026-10-10: a mode change
+    // must never re-lay the row out — the row holds still). The volume
+    // VALUE is the flexible display text inside its fixed cell.
     let order_text = model.order_label().map(|label| {
         if compact {
             format!("Ord:{}", order_short(label))
@@ -248,18 +247,13 @@ fn draw_preference_row(
             format!("Repeat: {label}")
         }
     });
-    let toggle_width = |text: &Option<String>| {
-        text.as_ref()
-            .map(|text| text.chars().count() as u16 + 2)
-            .unwrap_or(3)
-    };
     let value_width = if compact { 7 } else { 18 };
     let [down, label, up, order, repeat, rest] = Layout::horizontal([
         Constraint::Length(3),
         Constraint::Length(value_width),
         Constraint::Length(3),
-        Constraint::Length(toggle_width(&order_text)),
-        Constraint::Length(toggle_width(&repeat_text)),
+        Constraint::Length(order_toggle_width(compact)),
+        Constraint::Length(repeat_toggle_width(compact)),
         Constraint::Min(0),
     ])
     .areas(area);
@@ -270,7 +264,7 @@ fn draw_preference_row(
         (up, PreferenceButton::VolumeUp),
     ];
     for (cell, button) in steppers {
-        let focused = model.focus() == Some(FocusId::Preference(button));
+        let claimed = model.claims(&HitTarget::Preference(button));
         // The stepper glyph is ONE plain ASCII character (G1 F02): the
         // cell is one column wide inside its borders, so any longer —
         // or any glyph the terminal's font may lack — renders as a
@@ -285,7 +279,7 @@ fn draw_preference_row(
             .centered(),
         );
         frame.render_widget(
-            if focused {
+            if claimed {
                 paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
             } else {
                 paragraph
@@ -307,25 +301,38 @@ fn draw_preference_row(
         frame.render_widget(Paragraph::new(desired).centered(), label);
     }
 
-    let toggles: [(Rect, PreferenceButton, Option<String>); 2] = [
-        (order, PreferenceButton::Order, order_text),
-        (repeat, PreferenceButton::Repeat, repeat_text),
+    let toggles: [(Rect, PreferenceButton, Option<String>, bool); 2] = [
+        (
+            order,
+            PreferenceButton::Order,
+            order_text,
+            model.order() == Some(PlaybackOrder::Shuffle),
+        ),
+        (
+            repeat,
+            PreferenceButton::Repeat,
+            repeat_text,
+            !matches!(model.repeat(), None | Some(RepeatMode::Off)),
+        ),
     ];
-    for (cell, button, label) in toggles {
-        let focused = model.focus() == Some(FocusId::Preference(button));
+    for (cell, button, label, engaged) in toggles {
+        let claimed = model.claims(&HitTarget::Preference(button));
+        // Two shapes, the tabs' vocabulary: the persistent shape of an
+        // ENGAGED mode is BOLD; the TRANSIENT inversion — the keyboard
+        // focus or a held press (§16: the release bounces it back) —
+        // is REVERSED. A monochrome terminal can tell both apart.
+        let mut style = Style::default();
+        if engaged {
+            style = style.add_modifier(Modifier::BOLD);
+        }
+        if claimed {
+            style = style.add_modifier(Modifier::REVERSED);
+        }
         let paragraph = match label {
             Some(label) => Paragraph::new(Line::from(label).centered()),
             None => Paragraph::new(Line::from("—").centered()),
         };
-        frame.render_widget(
-            if focused {
-                paragraph.style(Style::default().add_modifier(Modifier::REVERSED))
-            } else {
-                paragraph
-            }
-            .block(Block::bordered()),
-            cell,
-        );
+        frame.render_widget(paragraph.style(style).block(Block::bordered()), cell);
         regions.push(HitRegion {
             area: cell,
             target: HitTarget::Preference(button),
@@ -342,11 +349,47 @@ fn order_short(label: &str) -> &'static str {
     }
 }
 
+/// The FIXED Order toggle cell width: measured for the WIDEST spelling
+/// the class can ever render, so a mode change — or the preference
+/// arriving at all — never re-lays the row out (owner ruling
+/// 2026-10-10: the row holds still).
+pub(super) fn order_toggle_width(compact: bool) -> u16 {
+    [PlaybackOrder::Sequential, PlaybackOrder::Shuffle]
+        .iter()
+        .map(|mode| {
+            let text = if compact {
+                format!("Ord:{}", order_short(mode.label()))
+            } else {
+                format!("Order: {}", mode.label())
+            };
+            text.chars().count() as u16 + 2
+        })
+        .max()
+        .expect("the order modes are known")
+}
+
+/// The FIXED Repeat toggle cell width, the same rule.
+pub(super) fn repeat_toggle_width(compact: bool) -> u16 {
+    [RepeatMode::Off, RepeatMode::All, RepeatMode::One]
+        .iter()
+        .map(|mode| {
+            let text = if compact {
+                format!("Rep:{}", mode.label())
+            } else {
+                format!("Repeat: {}", mode.label())
+            };
+            text.chars().count() as u16 + 2
+        })
+        .max()
+        .expect("the repeat modes are known")
+}
+
 #[cfg(test)]
 mod tests {
     //! Tests for this submodule.
 
     use super::super::testutil::*;
+    use super::{order_toggle_width, repeat_toggle_width};
     use crate::playlist::{PlaybackOrder, RepeatMode};
     use crate::tui::model::*;
     use qianqian_playback::PlaybackSessionObservation;
@@ -365,6 +408,117 @@ mod tests {
         assert!(text.contains("Repeat: Off"), "{text}");
         let text = rendered(&mut model, 100, 30);
         assert!(text.contains("Order: Sequential"), "{text}");
+    }
+
+    /// The owner's stability ruling (2026-10-10): a mode change — or
+    /// the preference arriving at all — never re-lays the preference
+    /// row out. Every control's cell holds still; only the label text
+    /// inside its fixed cell changes (突然变尺寸挺吓人的).
+    #[test]
+    fn a_mode_change_never_moves_the_preference_row() {
+        // Start from NO preference state at all: the fixed cells exist
+        // (the `—` fallback) before the state lands.
+        let mut model = TuiModel::new(String::new());
+        model.set_class(ResponsiveClass::Normal);
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        let row_areas = |model: &TuiModel| {
+            [
+                PreferenceButton::VolumeDown,
+                PreferenceButton::VolumeUp,
+                PreferenceButton::Order,
+                PreferenceButton::Repeat,
+            ]
+            .map(|button| {
+                model
+                    .regions()
+                    .iter()
+                    .find(|region| region.target == HitTarget::Preference(button))
+                    .expect("the control's region")
+                    .area
+            })
+        };
+
+        // Draw the quiet row: the cells predate the state.
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        let unknown = row_areas(&model);
+
+        // The preferences arrive on a quiet row — and move nothing.
+        model.set_order(PlaybackOrder::Sequential);
+        model.set_repeat(RepeatMode::Off);
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        assert_eq!(
+            row_areas(&model),
+            unknown,
+            "the state arriving moves nothing"
+        );
+        let settled = row_areas(&model);
+
+        // A mode change re-renders the labels and moves NOTHING.
+        model.set_order(PlaybackOrder::Shuffle);
+        model.set_repeat(RepeatMode::All);
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        assert_eq!(row_areas(&model), settled, "a mode change moves nothing");
+
+        // The fixed widths themselves: the widest spelling per class,
+        // plus the toolbar's two padding columns.
+        assert_eq!(order_toggle_width(false), 19, "Order: Sequential + 2");
+        assert_eq!(repeat_toggle_width(false), 13, "Repeat: Off + 2");
+        assert_eq!(order_toggle_width(true), 10, "Ord:Shuf + 2");
+        assert_eq!(repeat_toggle_width(true), 9, "Rep:One + 2");
+    }
+
+    /// An ENGAGED preference toggle (Shuffle / a repeat mode that is
+    /// not Off) carries the tabs' persistent shape (BOLD) — distinct
+    /// from the transient focus inversion, which follows the click and
+    /// lingers on it — so the mode stays readable after the focus
+    /// moves on.
+    #[test]
+    fn an_engaged_preference_toggle_is_bold() {
+        let mut model = plain_model();
+        model.set_order(PlaybackOrder::Shuffle);
+        model.set_repeat(RepeatMode::All);
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        let label_cell = |button| {
+            let area = model
+                .regions()
+                .iter()
+                .find(|region| region.target == HitTarget::Preference(button))
+                .expect("the toggle's region")
+                .area;
+            // The bordered toggle draws its label on the cell's middle
+            // row.
+            (area.x + area.width / 2, area.y + 1)
+        };
+        assert!(
+            buffer
+                .cell(label_cell(PreferenceButton::Order))
+                .expect("label cell")
+                .style()
+                .add_modifier
+                .contains(ratatui::style::Modifier::BOLD),
+            "Shuffle is engaged"
+        );
+        assert!(
+            buffer
+                .cell(label_cell(PreferenceButton::Repeat))
+                .expect("label cell")
+                .style()
+                .add_modifier
+                .contains(ratatui::style::Modifier::BOLD),
+            "Repeat All is engaged"
+        );
     }
 
     /// The Now Playing route renders the episode read side, the
