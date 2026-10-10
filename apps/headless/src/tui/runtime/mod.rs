@@ -39,8 +39,16 @@ use crate::tui::view;
 use super::model::{Step, TuiModel, decode_key, decode_mouse};
 use dispatch::{dispatch, eof_feedback};
 
-/// UI refresh cadence (~100–250 ms band).
-pub const TICK: Duration = Duration::from_millis(150);
+/// UI refresh cadence: 50 ms — 20 fps (Issue #233). The visualizer's
+/// per-frame deltas are whole terminal cells, and large-area cell
+/// motion reads as continuous to the eye from roughly 20 fps (the
+/// large-field flicker-fusion band); the previous 150 ms (~6.7 fps)
+/// was visibly steppy. One ordinary tick still serves input and
+/// rendering both — `event::poll` wakes on the first input event, so
+/// this only caps the redraw interval — and audio execution stays
+/// untouched: the loop's per-refresh work is one diff-based draw plus
+/// the cheap observation reads, never on the playback threads.
+pub const TICK: Duration = Duration::from_millis(50);
 
 /// Run the reference-player shell over the player until the user
 /// quits. Restores the terminal on every exit path that unwinds
@@ -243,14 +251,24 @@ mod tests {
     //! Tests for this submodule.
 
     use std::io::{self, Write};
+    use std::time::Duration;
 
     use crossterm::event::{Event, MouseButton, MouseEventKind};
 
     use super::testutil::*;
-    use super::{enter_terminal, handle_event, refresh, restore_terminal};
+    use super::{TICK, enter_terminal, handle_event, refresh, restore_terminal};
     use crate::player::ReferencePlayerApp;
     use crate::player::tests::FakeEpisodeSource;
     use crate::tui::model::*;
+
+    /// The refresh tick is 50 ms — 20 fps, the smoothness band for
+    /// whole-cell motion (#233). One ordinary tick serves input and
+    /// visualization both; this pin exists so a cadence change is a
+    /// deliberate act, not drift.
+    #[test]
+    fn the_refresh_tick_is_the_20fps_band() {
+        assert_eq!(TICK, Duration::from_millis(50));
+    }
 
     /// The oracle is ANSI byte order, valid only where the capture
     /// commands actually emit bytes: on Windows crossterm routes mouse
