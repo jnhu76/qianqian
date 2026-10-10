@@ -1554,9 +1554,12 @@ mod tests {
         };
         let activations_before = activations();
 
-        // Arm a click on a transport button.
+        // Arm a click on a transport button. The keyboard focus sits
+        // on the same button (keyboard-placed: a mouse press never
+        // moves the focus).
         let wanted = crate::tui::model::HitTarget::Transport(TransportButton::PlayPause);
         let (column, row) = draw_and_locate(&mut model, 100, 30, &wanted);
+        model.set_focus(Some(FocusId::Transport(TransportButton::PlayPause)));
         let down = MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
             column,
@@ -1582,7 +1585,7 @@ mod tests {
         );
 
         // The next draw republishes fresh geometry and the focus (set
-        // by the Down before the resize) is still a valid control.
+        // by the keyboard before the resize) is still a valid control.
         draw_and_locate(&mut model, 100, 30, &wanted);
         assert!(
             !model.regions().is_empty(),

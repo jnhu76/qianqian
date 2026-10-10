@@ -1,10 +1,11 @@
-//! The mouse decoder: the frozen armed-click rule (Left Down identifies,
-//! focuses and arms; a matching Left Up activates once), the wheel
-//! policy, and the seek-bar geometry. Decoding mutates exactly the
-//! presentation state a physical event owns — never a product seam.
+//! The mouse decoder: the armed-click rule (Left Down identifies and
+//! arms; a matching Left Up activates once), the wheel policy, and the
+//! seek-bar geometry. Decoding mutates exactly the presentation state a
+//! physical event owns — never a product seam.
 
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
+use super::FocusId;
 use super::actions::{PlaylistCursor, TuiAction};
 use super::controls::{AudioButton, PreferenceButton};
 use super::hit::{ArmedClick, HitTarget};
@@ -13,17 +14,21 @@ use super::state::TuiModel;
 
 /// Decode one mouse event into AT MOST ONE [`TuiAction`] (§16–§25).
 ///
-/// The frozen armed-click rule: Left Down identifies the target, focuses
-/// it and arms it; Left Up activates ONLY the same valid target. Drag,
-/// a moved pointer, stale geometry, a route/modal change or a resize
-/// all cancel; an unmatched Up is no action. Right/middle clicks and
-/// double clicks carry no product meaning (§19/§20); plain movement is
-/// inert (§18); the wheel scrolls only where a control already has
-/// clear meaning (§22). While a modal is open the background is inert
-/// (§25).
+/// The armed-click rule: Left Down identifies the target and arms it;
+/// Left Up activates ONLY the same valid target. A mouse press NEVER
+/// moves the keyboard focus (owner ruling: a pressed control must
+/// bounce back, so the focus inversion follows the keyboard alone —
+/// the seek bar already worked exactly this way); focus moves only
+/// through Tab/arrow navigation. Drag, a moved pointer, stale
+/// geometry, a route/modal change or a resize all cancel; an unmatched
+/// Up is no action. Right/middle clicks and double clicks carry no
+/// product meaning (§19/§20); plain movement is inert (§18); the wheel
+/// scrolls only where a control already has clear meaning (§22). While
+/// a modal is open the background is inert (§25).
 ///
 /// Decoding mutates exactly the presentation state a physical event
-/// owns — the focus and the armed click — and never a product seam.
+/// owns — the armed click (and, inside a modal, the path field's
+/// cursor placement) — and never a product seam.
 pub fn decode_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction> {
     // §24/§25: while a modal is open only the modal's own controls
     // answer; the background (inside or outside the popup) dispatches
@@ -34,15 +39,11 @@ pub fn decode_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiAction
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left) => match model.hit_test(mouse.column, mouse.row) {
             Some(target) => {
-                // A seek-bar hit carries no keyboard focus (the bar is
+                // A mouse press identifies and arms; the keyboard focus
+                // stays wherever the keyboard left it (see the module
+                // doc). The seek bar already worked exactly this way —
                 // a mouse affordance over an already keyboard-complete
-                // command); every other control focuses as before.
-                if let Some(focus) = TuiModel::focus_of_target(target) {
-                    model.focus = Some(focus);
-                }
-                // Only a control arms; the pane area focuses the list
-                // and nothing else, and the seek bar arms for its
-                // geometry-resolved action below.
+                // command.
                 model.armed = if target == HitTarget::SeekBar {
                     Some(ArmedClick {
                         target,
@@ -153,7 +154,15 @@ fn decode_modal_mouse(mouse: MouseEvent, model: &mut TuiModel) -> Option<TuiActi
     match mouse.kind {
         MouseEventKind::Down(MouseButton::Left) => match model.hit_test(mouse.column, mouse.row) {
             Some(target) if modal_target(target) => {
-                model.focus = TuiModel::focus_of_target(target);
+                // The same no-focus rule as the background, with ONE
+                // exception: clicking the path FIELD is cursor
+                // placement for the line edit — on a listing focus,
+                // Backspace is the parent step, so a stale list focus
+                // would hijack the edit. Buttons and rows arm without
+                // taking focus.
+                if matches!(TuiModel::focus_of_target(target), Some(FocusId::ModalField)) {
+                    model.focus = Some(FocusId::ModalField);
+                }
                 model.armed = model.action_of_target(target).map(|_| ArmedClick {
                     target,
                     column: mouse.column,
@@ -266,11 +275,15 @@ mod tests {
     use qianqian_playback::PlaybackSessionObservation;
     use std::time::Duration;
 
-    /// Left Down focuses and arms; Left Up on the same valid target
-    /// activates exactly one action; the Down itself dispatches none.
+    /// Left Down identifies and arms; Left Up on the same valid target
+    /// activates exactly one action; the Down itself dispatches none
+    /// and — the owner's bounce-back ruling — NEVER moves the keyboard
+    /// focus: the inversion follows the keyboard alone.
     #[test]
-    fn the_armed_click_rule_down_focuses_and_up_activates() {
+    fn the_armed_click_rule_down_arms_and_up_activates_without_moving_focus() {
         let mut model = model_with_regions(100, 30, TuiRoute::NowPlaying);
+        // The keyboard left the focus on the Play/Pause button.
+        model.set_focus(Some(FocusId::Transport(TransportButton::PlayPause)));
         // Click the Playlist tab.
         let (column, row) = region_cell(&model, &HitTarget::RouteTab(TuiRoute::Playlist));
         assert_eq!(
@@ -281,10 +294,14 @@ mod tests {
             None,
             "the Down dispatches nothing"
         );
-        assert_eq!(model.focus(), Some(FocusId::RouteTab(TuiRoute::Playlist)));
         assert_eq!(
             model.armed().map(|armed| armed.target),
             Some(HitTarget::RouteTab(TuiRoute::Playlist))
+        );
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::Transport(TransportButton::PlayPause)),
+            "the click did not move the keyboard focus"
         );
         assert_eq!(
             decode_mouse(
@@ -652,6 +669,55 @@ mod tests {
             None
         );
         assert_eq!(model.focus(), None, "a non-left Down does not even focus");
+    }
+
+    /// Inside a modal the no-focus rule has ONE exception: clicking
+    /// the path FIELD is cursor placement for the line edit (on a
+    /// listing focus, Backspace is the parent step and would hijack
+    /// the edit); a button click never moves the focus.
+    #[test]
+    fn a_modal_click_moves_focus_only_for_the_path_field() {
+        let mut model = model_with_regions(100, 30, TuiRoute::NowPlaying);
+        model.open_modal(ModalKind::Open);
+        model.set_open_listing(
+            std::path::PathBuf::from("/media"),
+            Ok(vec![crate::input::DirectoryEntry {
+                name: "b.flac".to_owned(),
+                is_dir: false,
+                path: std::path::PathBuf::from("/media/b.flac"),
+            }]),
+        );
+        redraw(&mut model, 100, 30);
+        model.set_focus(Some(FocusId::PickerList));
+
+        // A button click arms and activates but never moves the focus.
+        let (column, row) = region_cell(&model, &HitTarget::ModalButton(ModalButton::EnterFolder));
+        decode_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), column, row),
+            &mut model,
+        );
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::PickerList),
+            "the button click did not move the focus"
+        );
+        decode_mouse(
+            mouse(MouseEventKind::Up(MouseButton::Left), column, row),
+            &mut model,
+        );
+        assert!(model.modal().is_some(), "the inert activation stayed");
+
+        // Clicking the path field places the edit cursor.
+        let (column, row) = region_cell(&model, &HitTarget::ModalField);
+        decode_mouse(
+            mouse(MouseEventKind::Down(MouseButton::Left), column, row),
+            &mut model,
+        );
+        assert_eq!(
+            model.focus(),
+            Some(FocusId::ModalField),
+            "the field click places the edit cursor"
+        );
     }
 
     /// Double clicks have no special product meaning (§20): the second
