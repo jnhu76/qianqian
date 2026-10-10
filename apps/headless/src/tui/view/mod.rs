@@ -76,7 +76,8 @@ pub fn draw(frame: &mut Frame, model: &mut TuiModel) {
     // drawn THIS frame (§15: stale coordinates never survive).
     let mut regions: Vec<HitRegion> = Vec::new();
     // Focus is validated against the visible enabled controls of THIS
-    // frame's class (§12/§29).
+    // frame's class (§12/§29): stale focus re-homes; `None` — the
+    // keyboard has not spoken — is never replaced (§16).
     model.validate_focus();
 
     if fit == ShellFit::TooSmall {
@@ -694,12 +695,10 @@ mod tests {
             large_again.contains("Pause"),
             "the shell is back after growing:\n{large_again}"
         );
-        assert_eq!(
-            model.focus(),
-            Some(FocusId::Seek(crate::tui::model::SeekButton::Back)),
-            "focus revalidates to a visible enabled control (§12: the route's \
-             first local control — the seek row, whose evidence exists)"
-        );
+        // The too-small frame took the keyboard's focus with it; the
+        // grown-back shell does not invent a new one (§16) — the next
+        // Tab re-enters the cycle.
+        assert_eq!(model.focus(), None);
     }
 
     /// A full draw at a series of shrinking sizes — down to a 4×3
