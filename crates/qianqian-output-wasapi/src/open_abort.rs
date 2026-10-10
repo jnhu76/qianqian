@@ -202,6 +202,20 @@ mod tests {
             recorder.lock().expect("events lock").push(event);
         });
 
+        // The pause is routed BEFORE the leg exists — the module doc's
+        // own pre-activation state ("pause intent may already sit at the
+        // gate") and the determinism requirement of this setup: the
+        // leg's FIRST loop-top visit must find the pause already routed
+        // so it parks (Engaged) instead of sailing through to the held
+        // first read. The first read blocks until the abort phase, so a
+        // leg that passed an unpaused gate could never come back to
+        // park before `assert!(parked)` — the wait would be a
+        // guaranteed deadlock (CI: the 5.00s timeout at this assert).
+        // With the pause pre-routed, the hostile re-pause below still
+        // lands while the leg is deterministically alive between two
+        // loop-top gate visits: it sits in the held first read.
+        gate.set_paused(true);
+
         let (stopped_tx, stopped_rx) = mpsc::channel();
         let held = Arc::new(HeldInput::new(stopped_tx));
         let input: Arc<dyn RenderPcmInput> = held.clone();
@@ -226,7 +240,6 @@ mod tests {
             })
         };
 
-        gate.set_paused(true);
         let parked = {
             let deadline = std::time::Instant::now() + Duration::from_secs(5);
             loop {
