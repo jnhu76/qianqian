@@ -13,9 +13,14 @@
 - 分支 / HEAD:交付分支 `test/r2-adequacy-pilots`(由暂存分支 `r2-finish` 移交,见 §G);
   报告基于链上最新前驱 `e5a13e4ed2739f016c04e8dbb0581010f1b81180`(C4,amended)写入。
   本文件自身的 commit SHA(C5)由脚本补记(PR 正文 HEAD 记为 `PENDING_HEAD`)。
+  **复审修正轮(2026-10-12,见 §H)**:PR #250 独立复审(REQUEST_CHANGES)后追加三个修正
+  commit(C1 失败路径 join / C2 Linux 限定 / C3 origin 断言收紧)与本档案修订 commit;
+  §0/A/D/F 各处仅以"复审修正"行与 §H 交叉引用,不改写首轮记录原文。
 - Commit 链【git·档案,`git log --format='%H|%P|%s'`】:
   `3f139694` ← C1 `d0002e47` ← C2 `f5f50a88` ← C3 `056a01da` ← C4 `e5a13e4e`(写入时 HEAD)
-  ← C5(本文件)。**C3 已落地**(首轮受阻回滚,重新落地经过见 §D.5 执行事故记录)。
+  ← C5 `32beab21`(本文件)← 修正 C1′ `4cdb52ba` ← 修正 C2′ `bad486b3` ← 修正 C3′ `6d5c036`
+  ← 复审修正档案 commit(本节,SHA 由 §H 命令记录)。
+  **C3 已落地**(首轮受阻回滚,重新落地经过见 §D.5 执行事故记录)。
 - Commit 头改写偏差(向读者披露):campaign 推荐 C1–C3 header 为
   `fix(test/audio-api)` / `fix(test/playback)`(scope 含斜杠,不合本仓 commit-convention
   门禁),落地时按仓库门禁改写为 `test(audio-api)` / `test(playback)` ×2,**正文零变化**
@@ -60,6 +65,7 @@ PROPERTY / AUTHORITY / PRODUCTION_DAG / TEST_EXECUTED / 负控 / 清理 / 限制
 | NEGATIVE_CONTROL | F1–F4 由【证据包·mutation】实际执行,全部 RED=true、签名匹配、已恢复:F1 必要 quiescence 不发布(删 `ports.rs:715` emit)/ F2 归属伪造(pause 事件泄入 seek park)/ F3 停探守卫恒真化(重复 probe+重复 quiescence)/ F4 出口漏斗断供(`captured=None`)。评审者**静态核验**签名与失败清理路径后未复跑(只读边界,如实声明)。 |
 | CLEANUP_VERIFIED | 两个 wait 点均 release-before-assert(`render_gate_seek.rs:167-188`,【git·档案】Read 核实在位);F1 mutation 的实际 RED 运行即走过"witness 超时 → 先 release → leg 有界退出"的清理路径(不悬挂)【证据包·mutation + 评审静态核验 P1 走 `ports.rs:677-690` pre-arrival 消费、P2 走 `:708-710` break】。 |
 | LIMITATIONS | (i) 5s watchdog 是诊断上界,leg 饿 >5s 仍可 false-RED(与本文件全部既有 `wait_until` 同类,doc 明示 timeout 非公平性证明);(ii) `assert_eq!(observations, 2)` 与当前 probe 形状耦合,机制合法改变 probe 次数时需同步更新;(iii) 同文件其余测试 6 处裸 `assert!(wait_until)` 无失败 release(:239/:295/:381/:421/:454/:503-506,既有卫生债 → §F L10);(iv) 同文件 H3 channel-witness unbound leg(HEAD :477)挂账(→ §F L6);(v) 本地绿 ≠ 交错完备证明。 |
+| 复审修正 | **P1/C1(2026-10-12 复审)**:两失败分支原为 release 后直接 `assert!`,`leg` 句柄随 unwind 静默 detach(RELEASE ≠ JOIN)——修正 @ `4cdb52ba`:release → 有界 join(`wait_until(5s, is_finished)` → `join()`)→ panic 携带 `exited_within_5s/joined` 收集证据;两条错误路径突变 M1(set_seek_hold 失效)/ M2(SeekTailQuiesced 不发布)实测 RED 且 `joined=true`、有界完成。证据与签名见 §H.1。 |
 
 ### A.C2 — `test(playback): establish real post-EOF stop premise`
 
@@ -77,6 +83,7 @@ PROPERTY / AUTHORITY / PRODUCTION_DAG / TEST_EXECUTED / 负控 / 清理 / 限制
 | NEGATIVE_CONTROL | (a) 新增确定性负控 `stop_from_parked_without_eof_settles_stopped`(Paced 源永不 EOF ⇒ `Stopped` 结构唯一可达,`pause_seam.rs:553-596`【git·档案】Read 核实在位);(b) F1–F4 由【证据包·mutation】实际执行,全部 RED=true、签名匹配、已恢复:F1 Drained×Eof 臂改标 Stopped / F2 first-wins 破坏(committed Eof 被 stop 覆写 → `Failed`)/ F3 drain verdict 伪造 Aborted(→ `Failed`)/ F4 无-EOF stop 被误标 Completed(负控咬合)。评审者实核 resolve 三臂(`completion.rs:1298-1301/:1313-1326/:1331-1335`)。 |
 | CLEANUP_VERIFIED | 负向 mutation 均为干净 `assert_eq` RED、无挂起【证据包·mutation】;`dispose().quiet` + `assert_no_leg_threads()` 在位(:547-549、:592-594【git·档案】)。**台账更正(评审者)**:先前分析"QianqianApp Drop 触发 teardown discharge"与代码不符——`qianqian-app`/`qianqian-composition` 均无 `impl Drop`(grep 证实),失败路径实际依赖 `within()` watchdog 大声失败 + 分离线程随进程退出;该姿态为本文件全部 10 测共有且先于本修复存在,非本修复引入、不 wedge harness。 |
 | LIMITATIONS | (i) 非 Linux 残余缝:Eof 返回 → `close_eof` 之间无同步,`request_stop` 的 `edge.stop()` 理论上可先落(first-wins 为设计语义)→ 合法 false-RED 窗口,已在测试注释登记(`pause_seam.rs:496-500`【git·档案】Read 核实),关闭需生产侧 test seam、超出本次范围;(ii) 前提依赖当前 funnel 形状(Eof 返回与 close_eof 之间无阻塞工作);(iii) `stop_from_an_established_pause…`(:374)的"尚未 EOF"前提仍无 witness(既有债 → §F L9);(iv) 同文件 H1@:605→HEAD :800(R0B-03 族)未修(→ §F L7);(v) 本地绿 ≠ 交错完备证明。 |
+| 复审修正 | **P1/C2(2026-10-12 复审)**:上述限制 (i) 的形态从"可运行但不可靠的断言 + 登记债务"改为**诚实 NOT_RUN 限定** @ `bad486b3`——`EofWitness::returned()` 在 `read_frames` 返回处 latch,先于生产 worker 的 `edge.close_eof()`,Linux 线程退见证据之外的平台上无条件 `Completed` 断言构成对合法调度的 false-RED oracle;修正将整个测试 `cfg(target_os = "linux")` 限定(内层 cfg 块随之展开为无条件),非 Linux 不再运行该断言;可移植提交点见证需要生产侧 API(`PcmEdge`/`EdgeTerminal` crate-private、`RenderPcmInput` 无 terminal 查询),复审裁决试点不得新增。no-EOF 负控保持跨平台(其 oracle 无 EOF 前提、交错完备成立)。Windows `x86_64-pc-windows-gnu` 交叉 `cargo check --tests` 编译级冒烟通过(非运行证据,§H.2);L2 verdict 提案更新(§H.2)。 |
 
 ### A.C3 — `test(playback): causally pin live transition failure` — **已落地(landed)**
 
@@ -94,6 +101,7 @@ PROPERTY / AUTHORITY / PRODUCTION_DAG / TEST_EXECUTED / 负控 / 清理 / 限制
 | NEGATIVE_CONTROL | 【证据包·mutation + 评审,首轮候选的 /tmp 沙箱,仓库未动,逐条还原】**baseline 正控:RED=false(诚实实现必须通过——这是正向对照的达标态,不是缺陷;首轮工作流曾误要求其 RED,是为本轮事故一,见 §D.5)** + F1 missing-pickup(`live.rs:533-534` 取走即丢)/ F2 D11 路由吞错(`session.rs:849`)/ F3 伪 decode 标签(`session.rs:857`)/ F4 注入器门恒真(armed-即-失败形状回退)/ F6 pickup 拒收(`live.rs:379`)全部 RED=true、签名匹配;评审者独立复现五条(F4 实测整测 5.00s 完成而非 90s 看门狗)。**限制(如实)**:上述 mutation 执行于首轮候选;落地版与候选的 +21/−2 差异(事件并集断言)不触任何被突变位点(F1/F2/F3/F6 位于生产码 `live.rs`/`session.rs`;F4 位于测试侧注入器门,非生产位点,其落地版支撑另由 §C.3 DAG 的落地 Read 核实),但本档案会话**未在落地版上复跑 mutation**——review 如需可下令重跑。 |
 | CLEANUP_VERIFIED | 【证据包·评审】F4 沙箱复现整测 5.00s 完成(非 90s 看门狗)证明 `catch_unwind → runtime.dispose() → resume_unwind` 守护确实释放 parked leg 与阻塞 worker(dispose 经 LIFO:edge.stop+worker.join → release_pause_gate+stop_and_join);`QianqianApp` 无 Drop teardown(评审 grep 证实),故守护是必要的。落地版守护在位(:1316-1351)【git·档案】。 |
 | LIMITATIONS | (i) mutation(F1–F4/F6+baseline)执行于首轮候选,落地版未复跑(见 NEGATIVE_CONTROL 限制);(ii) 90s `within()` watchdog 是诊断上界,非公平性证明;(iii) `live_tests.rs` 伴随 H1 信号 ×4(HEAD :860/:870/:1033/:1615,其他测试)未修(→ §F L8);(iv) 每 stage 一次 `tap.events()` 克隆仅 cfg(test) 且决策点事件数 ≤2(评审备注,可接受);(v) 任务指令口径:"DSP Live"(=本行对象,`live_tests.rs` 中 live 处理链 transition 失败路径的目标测试;R2 任务指令内部称谓,仓库文档无此缩写,定义仅此一处)未构造性证明 update-before-EOF 不得 ADEQUATE——**构造性证明已由 hold 建立**(§B.C3/§C.3),故本条限制不再阻塞 §F L4 的 ADEQUATE 提案;(vi) 本地绿(含 ×20)≠ 交错完备证明。 |
+| 复审修正 | **证据闭环(2026-10-12 复审)**:限制 (i) 撤销——五条 mutant + baseline 已在最终代码 HEAD `6d5c036` 的隔离 worktree 实际复跑:baseline GREEN;F1/F2/F6 RED 于 `live_tests.rs:1356`(`left: Completed / right: Failed`);F4 RED 于 `:1317`(:5.00s,守护窗口内,非 90s 看门狗;**预测偏差如实记录**:预注册签名 predicted hold 见证断言,实测红在更早的 parked 前提——mutant 使 episode 在 leg park 前即死,判别性质成立);**F3 在收紧前实测存活**(落地断言 `contains("live transition-side failure")` 不含 origin 前缀,origin 伪造不红——探针执行记录见 §H.3)→ 断言收紧为 `contains("processing: live transition-side failure")`(`WorkerFailure::stage()` 的 crate 内 presentation form,completion.rs:141)@ `6d5c036` 后 F3 RED 于 `:1366`。该发现本身即"落地 HEAD 复跑"要求的直接收益:首轮候选的 F3 咬合在落地重写(+21/−2)中丢失,源级核验未捕获,突变复跑捕获。逐条签名表与还原证明见 §H.3;L4 界限 (i) 撤销。 |
 
 ### A.C4 — `test(quality): calibrate opt-in adequacy admission checks`
 
@@ -251,7 +259,7 @@ T: runtime.dispose()
 - **Checker(首轮 15 案例全部实际执行,10 TP / 5 FP / 0 FN;本档案会话复跑输出逐字一致)**:四负向位点在 BASE 精确触发(NEG1–NEG4);修复敏感度——两处修复(d0002e47/f5f50a88)使目标信号消失,无需豁免清单;修复引入的合法形状如实触发并交 review(POS1B 25ms 诊断窗口 → FP-H1-1;POS2B 否定式负控 → FP-H4-2);open_abort H3×2 逐信号驳回(POS3);ports.rs 零误伤(POS4);H5 首次真实数据运行两对修复 18/18 触发全为机制性 FP(BASE/HEAD 行 zip 错位、`assert` 子串污染、H5c 基线误取非等待结构字段)→ 生产化前仅 review 线索;H5a 真阴性;record/P3 结构校验 NOTE 正常。H2/H6/H7:无样本或未实现(NOT_RUN 类)。**C3 落地增量(复验)**:live_tests 目标 H4 @ :1195 仍触发——C3 的 transition 见证是结构性事件断言,token 位于 rustfmt 续行且构造性 hold 对词法层不可见,归 FP-H4-1 已知族逐信号驳回(`r2-checker-calibration.md` §2.6);这不是修复敏感度反例,而是"改 oracle 构造性"类修复在词法信号层的如实保留。
 - **15 案例构成(档案会话 Read 对照 `r2-checker-calibration.md` §1–§2.5 案例表复核,与证据包 cases 逐条一致)**:CHK-SELFTEST(TP);NEG1-RGS-BASE / NEG2-PSM-BASE / NEG3-LIVE-BASE / NEG4-SKS-S6(TP×4);POS1A 修复敏感度(TP)、POS1B 诊断窗口(FP);POS2A 修复敏感度(TP)、POS2B 否定式负控(FP);POS3 open_abort H3×2(FP);POS4 ports.rs 真阴性(TP);H5J 修复对 oracle-diff(FP)、H5K 修复对 oracle-diff(FP)、H5TN 真阴性(TP);REC1 record 冒烟(TP)——**TP 10 / FP 5 / FN 0**,两份记录对账一致(证据包、首轮标定表、本档案会话复跑输出三方一致)。
 - **"18/18 全 FP"与"5 FP"的记账对账(两套口径,不冲突)**:"18/18"是**信号级**计数——H5-J 案例含 8 条 H5b 信号、H5-K 案例含 8 条 H5b + 2 条 H5c = 合计 18 条信号全部为机制性 FP;"5 FP"是**案例级**计数(POS1B/POS2B/POS3/H5J/H5K 五行)。H5-TN 为 TP(真阴性,不含 FP 信号)。对账依据:`r2-checker-calibration.md` §2.4(H5-J ×8;H5-K ×8+×2)与 §3 FP 登记簿(FP-H5-1/FP-H5-2)。
-- **Mutation 执行状态**:C1 F1–F4 与 C2 F1–F4 均为【证据包·mutation】实际执行后恢复("已恢复");C3 五条+baseline 为首轮候选的沙箱实际执行后逐条还原(仓库未动),**落地版(+146/−24)上未复跑——落地与候选的 +21/−2 差异(事件并集断言)不触任何被突变位点(F4 在测试侧注入器门,非生产位点),但如实登记,review 可下令重跑**;C4 不适用(标定 commit)。**本档案会话未复跑任何 mutation**;恢复态由【git·档案】佐证:C1/C2/C4 的 commit 变更集 == changedFiles、工作树 porcelain 为空、live_tests.rs 变更集 == C3 commit 的 +146/−24。
+- **Mutation 执行状态**:C1 F1–F4 与 C2 F1–F4 均为【证据包·mutation】实际执行后恢复("已恢复");C3 五条+baseline 为首轮候选的沙箱实际执行后逐条还原(仓库未动),**落地版(+146/−24)上未复跑——落地与候选的 +21/−2 差异(事件并集断言)不触任何被突变位点(F4 在测试侧注入器门,非生产位点),但如实登记,review 可下令重跑**;C4 不适用(标定 commit)。**本档案会话未复跑任何 mutation**;恢复态由【git·档案】佐证:C1/C2/C4 的 commit 变更集 == changedFiles、工作树 porcelain 为空、live_tests.rs 变更集 == C3 commit 的 +146/−24。**复审修正轮(§H)已在最终代码 HEAD `6d5c036` 实际复跑**:C3 五条 mutant(baseline GREEN;F1/F2/F6 RED@:1356、F4 RED@:1317、F3 收紧前探针实测**存活**→断言收紧 @ `6d5c036` 后 RED@:1366)与 C1 两条错误路径 mutant M1/M2(RED 经失败收集路径、`joined=true`),全部隔离 worktree 执行、逐条删除还原(§H 命令记录)。
 - **C3 blocker 矛盾(已由事故记录解释,原文留档)**:首轮席位 blocker 字段原文"**负向控制未达成**",但其后粘贴的 mutation 记录为 baseline RED=false(诚实实现通过,正确)+ F1–F6 全 RED=true 签名匹配 + 已恢复。两种读法(结果未达标 vs. 落地分支缺负控)的矛盾,经 §D.5 事故一定位:**blocker 文本源于首轮工作流把 baseline 正控误要求为 RED 的判定 bug,mutation 记录本身才是正确结果**。本档案按原文保留两份记录,以事故记录消解其矛盾,最终裁决权仍在 review。
 
 ### D.5 执行事故与处置(首轮 R2 工作流判定事故;诚实记录,不美化)
@@ -304,10 +312,10 @@ CI 成本:无新 CI Job;lefthook 与默认执行链未动 → CI 增量仅为常
 
 | 行 | 对象 | verdict(提案) | 关键依据 | 债务 / 条件 |
 |---|---|---|---|---|
-| L1 | C1 目标测试 `render_gate_seek::a_seek_park_publishes_only_seek_events_in_order` @ d0002e47 | **ADEQUATE** | 前提经 mutex 事件日志同步缝见证;oracle 精确(事件向量 + `observations==2` 机制真值);F1–F4 负控执行(RED+签名+恢复);双失败路径 release-before-assert;220 次加载复测;评审 APPROVED | 界限注记(非证据债):5s watchdog 诊断上界;`observations==2` 与 probe 形状耦合 |
-| L2 | C2 目标测试 `pause_seam::stop_from_parked_after_eof_still_completes` @ f5f50a88 | **LIMITED_EVIDENCE_WITH_PREMISE_DEBT** | Linux 前提链闭合(eof latch + 线程退见证据);F1–F4 执行;评审 APPROVED | **债务:非 Linux 残余 Eof 返回→close_eof 无同步缝**(pause_seam.rs:496-500 登记);关闭需生产侧 test seam,超本次范围 |
+| L1 | C1 目标测试 `render_gate_seek::a_seek_park_publishes_only_seek_events_in_order` @ d0002e47 + 修正 @ 4cdb52ba | **ADEQUATE** | 前提经 mutex 事件日志同步缝见证;oracle 精确(事件向量 + `observations==2` 机制真值);F1–F4 负控执行(RED+签名+恢复);失败路径 release → **有界 join → 带收集证据 panic**(复审修正,M1/M2 实测 RED 且 `joined=true`,§H.1);220 次加载复测;评审 APPROVED | 界限注记(非证据债):5s watchdog 诊断上界;`observations==2` 与 probe 形状耦合 |
+| L2 | C2 目标测试 `pause_seam::stop_from_parked_after_eof_still_completes` @ f5f50a88 + 修正 @ bad486b3 | **ADEQUATE(提案更新;执行域 = Linux)** | Linux 前提链闭合(eof latch + 线程退见证据,闭合 close_eof-vs-stop first-wins 缝);F1–F4 执行;评审 APPROVED;复审修正后非 Linux 不再运行不可靠断言(测试 `cfg(target_os="linux")` 限定,doc 注释诚实登记) | **执行域限定**:非 Linux 该性质 **NOT_RUN(非 PASS)**;可移植提交点见证需生产侧 seam(`PcmEdge` crate-private、`RenderPcmInput` 无 terminal 查询),复审裁决试点不新增产品 API;Windows 交叉编译冒烟 = 编译级证据,非运行 |
 | L3 | C2 新增负控 `pause_seam::stop_from_parked_without_eof_settles_stopped` @ f5f50a88 | **ADEQUATE** | 否定式属性确定性(Paced 永不 EOF ⇒ `Stopped` 结构唯一可达);F4 mutation 咬合(RED) | 维护注记:与 resolver 臂形状(completion.rs:1324-1326)耦合 |
-| L4 | C3 目标测试 `live_tests::a_failure_during_a_transition_settles_failed_through_d11` @ 056a01da(**已落地**) | **ADEQUATE** | **构造性 update-before-EOF 成立**:hold 三见证(`paused() ∧ buffered==EDGE_CAPACITY(8192) ∧ processed==9×STAGING(9216)`,`live_tests.rs:1329-1330`)钉死 worker 阻塞在满边 write、距 EOF 差 352800−9216 帧,held 中递交 update 且 pending 保留(:1339/:1341),resume 后首个可达 `poll_update` take——递交先于 EOF 是构造结论,非时序余量;五路径 vacuity 破除(§B.C3);F1–F4+F6 负控全 RED+签名匹配、baseline 正控 GREEN(RED=false,候选沙箱【证据包·mutation+评审】);落地复跑 1 passed / lib 183/183 / ×20 串行【本档案会话】;失败清理 panic-guard 实证(F4 5.00s 非 90s 看门狗) | 界限:(i) mutation 执行于首轮候选(+125/−26),落地(+146/−24)未复跑——差异为事件并集断言,不触被突变位点,review 可下令重跑;(ii) 90s watchdog 诊断上界;(iii) 伴随 H1×4(L8)不随本行升级;(iv) 本地绿 ≠ 交错完备证明 |
+| L4 | C3 目标测试 `live_tests::a_failure_during_a_transition_settles_failed_through_d11` @ 056a01da(**已落地**)+ 断言收紧 @ 6d5c036 | **ADEQUATE** | **构造性 update-before-EOF 成立**:hold 三见证(`paused() ∧ buffered==EDGE_CAPACITY(8192) ∧ processed==9×STAGING(9216)`,`live_tests.rs:1329-1330`)钉死 worker 阻塞在满边 write、距 EOF 差 352800−9216 帧,held 中递交 update 且 pending 保留(:1339/:1341),resume 后首个可达 `poll_update` take——递交先于 EOF 是构造结论,非时序余量;五路径 vacuity 破除(§B.C3);失败清理 panic-guard 实证(F4 5.00s 非 90s 看门狗);**落地 HEAD(`6d5c036`)突变复跑(§H.3)**:baseline GREEN + F1/F2/F3/F4/F6 全 RED(F1/F2/F6@:1356 Completed/Failed、F3@:1366 decode: 前缀、F4@:1317)——复跑并实际修复了落地版 F3 咬合丢失(断言收紧);落地复跑 1 passed / lib 183/183 / ×20 串行【本档案会话】 | 界限:(i) ~~mutation 执行于首轮候选,落地未复跑~~ **已撤销**(§H.3 复跑;且发现并修复 F3 落地咬合丢失——复跑要求的直接收益);(ii) 90s watchdog 诊断上界;(iii) 伴随 H1×4(L8)不随本行升级;(iv) 本地绿 ≠ 交错完备证明 |
 | L5 | Seek S6 行 6 位点(`seek_seam.rs` H1@457 @ BASE) | **LIMITED_EVIDENCE_WITH_PREMISE_DEBT(维持)** | owner 带债裁决(出处=证据包 NEG4 + `r2-checker-calibration.md` §2.1 NEG-4,均无 issue 指针,溯源状态见 §D.2);NEG4 于 BASE 独立复现位点仍触发(含本档案会话复跑) | **不得因 R2 其他测试通过而升级**;需专项修复重评 |
 | L6 | `render_gate_seek` H3 channel-witness unbound leg(HEAD :477) | DEFERRED | NEG1 伴随信号;既有形状 | 随卫生债批次处理 |
 | L7 | `pause_seam` H1@:605→HEAD :800(R0B-03 族) | DEFERRED | NEG2 伴随;R2 未修 | — |
@@ -380,3 +388,89 @@ cargo test -p qianqian-playback --lib                       # 183 passed / 0 fai
 `cargo fmt` / `cargo clippy`、Lefthook pre-push、C1/C2 的目标/集成测试复跑(pause_seam 等 tests/ 下
 集成测试)、×100/超订阅加载复跑、词汇门禁、非 Linux 平台验证。文中所有此类结果均引自证据包并
 标注原执行主体。首轮事故二所指工作流检查器源码不在本仓库,无法复现执行(§D.5)。
+**复审修正轮的执行/未执行边界见 §H.5**(该轮已实际运行 mutation 与 fmt/clippy/目标与集成测试;
+仍未运行:×100/超订阅加载复跑、Windows/macOS 运行时、CI 复查在推送后进行)。
+
+---
+
+## H. 复审修正轮记录(2026-10-12;PR #250 独立复审 REQUEST_CHANGES 的响应)
+
+> 复审三项要求:P1/C1 失败路径 JoinHandle 静默 detach;P1/C2 非 Linux 无条件 `Completed` 断言的
+> false-RED oracle;C3 落地 HEAD 无已执行突变证据(候选上的 F1–F6 不能替代)。响应 = 三个修正
+> commit + 本节证据。**未合并、未关闭 #244/#247;台账仍为提案行。**
+
+### H.1 P1/C1 修复 — `test(audio-api): collect the parked leg before a failed premise`(`4cdb52ba`)
+
+- 修复:两失败分支(parked 前提 / quiescence 发布前提)改为调用 `fail_premise_releasing_leg`:
+  `release_seek_hold(Aborted)` → `wait_until(5s, leg.is_finished())` → `join()` → panic 携带
+  `exited_within_5s`/`joined` 收集证据(有界清理策略:超界未退出的 leg 在 panic 信息中**具名**,
+  不再静默 detach)。RELEASE ≠ JOIN 由结构化 join 收口;正常路径断言零变化。
+- 错误路径验证(隔离 worktree @ `6d5c036`,逐条删除还原):
+  - **M1** `set_seek_hold` 失效(leg 永不 park)→ RED @ `render_gate_seek.rs:164`:
+    `premise failed: the leg never parked under the routed hold within 5s; leg collection: exited_within_5s=true, joined=true`,5.00s 有界完成。
+  - **M2** 删 `ports.rs` 的 `SeekTailQuiesced` emit(flag 保留)→ RED @ `:164`:
+    `premise failed: the seek park never published its tail quiescence within 5s; leg collection: exited_within_5s=true, joined=true`,5.02s。
+  - 两者均为预注册签名(执行前书面锁定),实测逐字匹配;睡眠未放大(join 尝试的 5s 上界与全文件
+    `wait_until` 同口径,非 sleep 前提)。
+- 诚实基线:`render_gate_seek` 全文件 9/9、目标 ×20 串行 20/20 @ `4cdb52ba`(该文件其后未再变更)。
+
+### H.2 P1/C2 修复 — `test(playback): scope the post-EOF stop oracle to linux`(`bad486b3`)
+
+- 裁决依据(复审原文):可移植因果提交/退出见证,**或** 将该测试的声明/实际执行限定 Linux、其他
+  目标诚实 NOT_RUN;不得为试点新增产品 API。源级核实:`PcmEdge`/`EdgeTerminal` crate-private
+  (playback lib.rs:41-44),ports 缝 `RenderPcmInput` 仅 `read_frames`+`stop`、无 terminal 查询
+  → 可移植提交点见证不存在现成缝,新增即产品 API。**取限定路线**。
+- 修复:测试整体 `#[cfg(target_os = "linux")]`;原内层 Linux cfg 块展开为无条件;doc 注释改写为
+  "非 Linux = NOT_RUN(非 PASS)" 的诚实登记;非 Linux 下仅该测试使用的
+  `registered_runtime_with_decode`/`EofWitness::returned` 加
+  `#[cfg_attr(not(target_os="linux"), allow(dead_code))]`(否则 Windows `clippy -D warnings` 误伤)。
+  no-EOF 负控保持跨平台(其 oracle 无 EOF 前提,`Stopped` 结构唯一可达,交错完备)。
+- 证据:pause_seam 全文件 10/10、目标 ×20 串行 20/20 @ `bad486b3`;
+  `cargo check -p qianqian-playback --tests --target x86_64-pc-windows-gnu`(及 audio-api)exit 0
+  ——**编译级冒烟,不构成 Windows 运行证据**;Windows 运行时验证仍属 CI/平台证据边界。
+
+### H.3 C3 证据闭环 — 落地 HEAD 突变复跑 + F3 咬合丢失的发现与修复(`6d5c036`)
+
+**预注册签名表(执行前书面锁定)与实测对照**(全部隔离 worktree @ `6d5c036`,目标测试
+`live_tests::a_failure_during_a_transition_settles_failed_through_d11`,逐条删除还原,
+`git worktree list` 终态无本轮沙箱、主树 porcelain 空):
+
+| mutant(位点) | 预注册签名 | 实测 | 判定 |
+|---|---|---|---|
+| baseline(诚实) | GREEN(正控) | 1 passed(×20 串行 20/20,lib 183/183) | ✓ |
+| F1 take-and-drop(live.rs `poll_update`) | RED@wait_terminal,Completed/Failed | `:1356 left: Completed / right: Failed`,0.03s | ✓ 匹配 |
+| F2 stage 错误臂吞掉(session.rs:849 区) | 同上 | `:1356 left: Completed / right: Failed`,0.02s | ✓ 匹配 |
+| F3 origin 伪造(session.rs stage 路由 processing_failed→decode_failed,单点位) | (收紧后)RED@diagnostic 断言,decode: 前缀 | **收紧前探针实测:GREEN(mutant 存活)**;断言收紧 @ `6d5c036` 后 RED@`:1366 …decode: live transition-side failure` | ✓ 匹配(收紧后) |
+| F4 注入器门恒真(live_tests.rs gate) | RED@hold 见证,≈5s 非看门狗 | RED@`:1317 the pre-routed pause never parked the leg`,5.00s(非 90s 看门狗) | RED 达成;**预测偏差如实记录**(见下) |
+| F6 pickup 拒收(live.rs `accept`) | RED@wait_terminal,Completed/Failed | `:1356 left: Completed / right: Failed`,0.02s | ✓ 匹配 |
+
+- **F4 预测偏差**:预注册预测红在 hold 见证断言;实测红在更早的 parked 前提(:1317)——门恒真使
+  首个 steady block 立即失败、episode 在 leg park 之前死亡。两者同为 catch_unwind 守护窗口内的
+  前提断言,判别性质(≈5s 完成、非 90s 看门狗、守护释放两腿)成立;偏差属预测错误,非修复缺陷。
+- **F3 咬合丢失(本轮实质发现)**:落地版断言 `contains("live transition-side failure")` 不含
+  origin 前缀,而 `failure_diagnostic` = `WorkerFailure::stage()` 的 `processing: `/`decode: ` 前缀
+  形式(completion.rs:141/:1287-1289)→ origin 伪造在落地版**不红**(首轮候选的 F3 RED 记录
+  对应候选版更强断言;落地重写 +21/−2 丢失该咬合,源级核验未发现,探针突变捕获)。分类:测试
+  oracle 缺口,非生产缺陷;处置 = 断言收紧为 `contains("processing: live transition-side failure")`
+  (crate 内白箱断言 presentation form,D14.11 origin 真实性),收紧后 baseline 仍 GREEN、F3 RED。
+- 操作性备注(如实):F2 首次执行的锚文本笔误致脚本断言失败、沙箱遗留;重试在遗留沙箱(同 HEAD)
+  完成,并以全新沙箱复跑取得完整签名行(F2b)——两次均为 `6d5c036` + 同一 mutant 编辑。
+
+### H.4 Checker 复扫(修正后 HEAD)
+
+`scan` 三文件 @ `6d5c036`:信号族与既往裁定一致、仅行号漂移——render_gate_seek H1 :199→**:221**
+(POS1B 诊断窗口,FP-H1-1 族)、H3 :477→**:499**(L6);pause_seam H1 :800→**:812**(L7)、
+H4 :429/:561/:601→**:434/:573/:613**(两个既有形状 + POS2B 否定式负控 FP-H4-2);live_tests
+H4@:1195 与 H1×4(:860/:870/:1033/:1615)行号不变(+1/−1 等长变更)。无新信号族、无信号消失
+(C3 目标 H4@:1195 仍在,词法层盲区,FP-H4-1 族维持)。逐信号处置沿用 §D.4/标定文档既有裁定。
+
+### H.5 修正轮执行/未执行边界(如实)
+
+- **已执行(修正会话,2026-10-12)**:上列全部 mutation(baseline/F1/F2/F3×2/F4/F6/M1/M2,隔离
+  worktree,逐条还原);render_gate_seek 9/9、pause_seam 10/10、C3 目标 ×1+×20、playback lib
+  183/183(65.02s);`cargo fmt --check`、`cargo clippy -p qianqian-audio-api -p qianqian-playback
+  --all-targets -- -D warnings`;checker scan 三文件;Windows gnu 目标 `cargo check --tests`(编译级);
+  commit 头规范检查 `--range origin/main HEAD` 全 PASS;全量 Lefthook pre-push(见 PR)。
+- **未执行**:×100 / 超订阅加载复跑(本轮以 ×20 串行为稳定性证据,弱于首轮候选的 ×100/超订阅
+  ——如实降格登记);Windows/macOS **运行时**验证(交叉编译仅为编译级);Loom/Miri/TLA+(不在
+  本 PR 范围);exact-HEAD CI 结果于推送后复查(PR 正文记录)。
