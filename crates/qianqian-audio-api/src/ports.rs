@@ -1182,7 +1182,7 @@ mod gate_pause_timing_tests {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::mpsc;
     use std::sync::{Arc, Condvar, Mutex};
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
 
     use super::{GateEvent, GateSlice, RenderGate, TailProbeOutcome};
 
@@ -1203,6 +1203,20 @@ mod gate_pause_timing_tests {
         }
     }
 
+    // Test-only failure cleanup: always release the held read and
+    // clear any parked gate before the test scope unwinds on an assert.
+    struct ReleaseLegOnDrop {
+        gate: RenderGate,
+        release_first_read: Arc<Latch>,
+    }
+
+    impl Drop for ReleaseLegOnDrop {
+        fn drop(&mut self) {
+            self.gate.close_and_release();
+            self.release_first_read.set();
+        }
+    }
+
     /// A pause routed while the leg is INSIDE its first read (it
     /// already passed an unrouted gate) parks the leg at its NEXT
     /// loop-top visit — and the gate publishes exactly one engagement
@@ -1211,17 +1225,24 @@ mod gate_pause_timing_tests {
     fn a_pause_routed_mid_read_parks_at_the_legs_next_loop_top() {
         let events = Arc::new(Mutex::new(Vec::new()));
         let recorder = events.clone();
+        let (engaged_tx, engaged_rx) = mpsc::channel();
         let gate = RenderGate::with_observer(move |event| {
             recorder.lock().expect("events lock").push(event);
+            if event == GateEvent::Engaged {
+                let _ = engaged_tx.send(());
+            }
         });
 
-        let entered_first_read = Arc::new(Latch(Mutex::new(false), Condvar::new()));
+        let (entered_tx, entered_rx) = mpsc::channel();
         let release_first_read = Arc::new(Latch(Mutex::new(false), Condvar::new()));
+        let _release_on_drop = ReleaseLegOnDrop {
+            gate: gate.clone(),
+            release_first_read: release_first_read.clone(),
+        };
         let reads = Arc::new(AtomicU32::new(0));
 
         let leg = {
             let gate = gate.clone();
-            let entered = entered_first_read.clone();
             let release = release_first_read.clone();
             let reads = reads.clone();
             std::thread::spawn(move || {
@@ -1232,7 +1253,7 @@ mod gate_pause_timing_tests {
                     });
                     if reads.fetch_add(1, Ordering::AcqRel) == 0 {
                         // Inside the FIRST read, past an unrouted gate.
-                        entered.set();
+                        let _ = entered_tx.send(());
                         // The read is held until the test has routed the
                         // pause — the mid-read arrival this test exists for.
                         release.wait();
@@ -1246,7 +1267,11 @@ mod gate_pause_timing_tests {
 
         // The leg is inside its first read: visit one already happened
         // with nothing routed, so it must have recorded NOTHING.
-        entered_first_read.wait();
+        assert_eq!(
+            entered_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the leg never entered its first read"
+        );
         assert!(
             !events
                 .lock()
@@ -1259,24 +1284,11 @@ mod gate_pause_timing_tests {
         // must come back to the gate and park there.
         gate.set_paused(true);
         release_first_read.set();
-        let engaged = {
-            let deadline = Instant::now() + Duration::from_secs(5);
-            loop {
-                if events
-                    .lock()
-                    .expect("events lock")
-                    .contains(&GateEvent::Engaged)
-                {
-                    break true;
-                }
-                if Instant::now() >= deadline {
-                    break false;
-                }
-                std::thread::sleep(Duration::from_millis(2));
-            }
-        };
-        assert!(
-            engaged,
+        // The observer publishes a causal witness of the next loop-top
+        // engagement; timeout merely detects a missing event.
+        assert_eq!(
+            engaged_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
             "a mid-read pause must park the leg at its next loop-top visit"
         );
 
