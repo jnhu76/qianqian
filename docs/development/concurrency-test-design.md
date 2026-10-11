@@ -66,7 +66,7 @@ If the list of legal outcomes depends on an unresolved authority question (curre
 
 For a bounded atomic/locking protocol with a concrete interleaving risk, reuse the existing production-code [Loom PcmEdge tests](../../crates/qianqian-playback/src/loom_edge_tests.rs) and their opt-in feature/configuration where applicable. Loom models only synchronization that it can observe, under stated thread/operation/schedule bounds; it is not an automatic test of WASAPI, FFI, scheduler fairness, or the entire playback architecture.
 
-New Loom coverage outside the current PcmEdge slice, Shuttle, or a simulator must be justified by a **specific uncovered counterexample**, not by general concern about flakiness. A modeled clean run means no counterexample **inside that model and its limits**, not full concurrency correctness.
+Extending Loom beyond the existing PcmEdge slice, or adding another scheduling tool, requires a **concrete potential interleaving/collision risk or verification gap**, the contract-owned invariant, a bounded model scope and assumptions, and an explanation of why existing tests/tools do not adequately check it. Prefer the existing Loom integration where it can model the mechanism; separately justify Shuttle or a full simulator. **No previously observed failure or counterexample is required**: exploring whether one exists is the point of proactive verification (see [AGENTS.md, Formalization policy](../../AGENTS.md#formalization-policy)). A modeled clean run means no counterexample **inside that model and its limits**, not full concurrency correctness.
 
 ## Safety, liveness, and evidence strength
 
@@ -80,17 +80,17 @@ New Loom coverage outside the current PcmEdge slice, Shuttle, or a simulator mus
 
 ## Worked examples from this repository
 
-These are **examples of a method**, not a claim that their tests prove every schedule or an invitation to bulk-refactor them. The links below are pinned to the [#237 merged baseline `39f53d4`](https://github.com/jnhu76/qianqian/commit/39f53d4ce7319c2958efb140220b187b9a5d8741) for historical precision.
+These are **examples of causal premises and observation oracles**, not a claim that their tests prove every schedule, exhaustively validate failure-path cleanup, or invite bulk refactoring. In particular, the #238 fixtures illustrate correct *ordering* but have waits/assertions that can exit on timeout or panic before test-owned work is released; **do not copy them as complete panic-safe teardown templates**. New fixtures should provide an explicit release/cleanup path (for example, a scope guard where appropriate) and bound waits where feasible. The links below are pinned to the [#237 merged baseline `39f53d4`](https://github.com/jnhu76/qianqian/commit/39f53d4ce7319c2958efb140220b187b9a5d8741) for historical precision.
 
 ### 1. Pre-parked state before abort (#238): deterministic premise
 
 [Source: `open_abort.rs`, lines 205–315](https://github.com/jnhu76/qianqian/blob/39f53d4ce7319c2958efb140220b187b9a5d8741/crates/qianqian-output-wasapi/src/open_abort.rs#L205-L315)
 
-- **PROPERTY:** once abort closes the gate, hostile re-pause cannot re-park the leg and wedge the join.
+- **PROPERTY / AUTHORITY:** once abort closes the gate, hostile re-pause cannot re-park the leg and wedge the join. The pause/park predicate belongs to [ADR-PBK-002 §20 D14.7](../adr/ADR-PBK-002.md); the abort's close-before-stop and release-before-join ordering is exercised at the current output mechanism seam, not newly defined here.
 - **PRECONDITION:** first leg visit must park. `gate.set_paused(true)` is executed **before** `spawn`, so the first visit observes routed pause; the pre-abort `Engaged` witness checks it.
-- **EXECUTION:** the first read is deliberately held *between* gate visits. Abort closes/releases, signals stop; the test routes a hostile pause on the closed gate and releases the held read.
+- **LEGAL OUTCOMES / EXECUTION:** this fixture deliberately **fixes** the first visit as parked; an initially unpaused first visit is not admitted by its setup. The first read is then held *between* visits. Abort closes/releases, signals stop; the test routes a hostile pause on the closed gate and releases the held read. Only a single initial engagement/disengagement and a successfully joined leg are valid.
 - **OBSERVATION:** abort join returns; exactly one `Engaged` event was recorded. Five-second deadlines detect a wedge; they are **not** the ordering premise.
-- **FALSIFIER:** if closed gate can re-park the post-close leg, the join or engagement-count assertion must fail.
+- **FALSIFIER (hypothesized fault signature, not an executed mutation control):** if a closed gate can re-park the post-close leg, the join watchdog or engagement-count assertion should fail. No such negative mutation was executed for this documentation PR.
 
 The old test spawned before routing pause. A legal scheduler path entered the deliberately held read **before** seeing pause; `Engaged` could never occur before the assertion because release/stop were encoded later. This was an **oracle/fixture defect**, not evidence that production needed a new pause guarantee.
 
@@ -98,11 +98,11 @@ The old test spawned before routing pause. A legal scheduler path entered the de
 
 [Source: `ports.rs`, lines 1211–1319](https://github.com/jnhu76/qianqian/blob/39f53d4ce7319c2958efb140220b187b9a5d8741/crates/qianqian-audio-api/src/ports.rs#L1211-L1319)
 
-- **PROPERTY:** a pause arriving after an unrouted loop-top visit parks the leg at its **next** visit.
+- **PROPERTY / AUTHORITY:** a pause arriving after an unrouted loop-top visit parks the leg at its **next** visit, as governed by [ADR-PBK-002 §20 D14.7](../adr/ADR-PBK-002.md).
 - **PRECONDITION:** an entry latch proves the leg has entered the first read. That read remains held while `set_paused(true)` runs.
-- **EXECUTION:** release the read so it is non-terminal, forcing the leg through the next gate check; later resume and join.
+- **LEGAL OUTCOMES / EXECUTION:** the entry latch fixes a first visit with **no engagement**, followed by a mid-read pause; releasing the non-terminal read forces a second visit, which must engage exactly once. Later resume must disengage once and allow join. This fixture does not leave the relative routing/first-visit order to the scheduler.
 - **OBSERVATION:** no engagement on the first unrouted visit; exactly one engagement and disengagement for the routed pause; two reads before exit.
-- **FALSIFIER:** an ignored mid-read pause or duplicate engagement/disengagement violates the assertions.
+- **FALSIFIER (hypothesized fault signature, not an executed mutation control):** ignoring the mid-read pause or duplicating engagement/disengagement violates the assertions. The example shows test-observable failure signatures; it does not assert a mutation campaign was run.
 
 This is a *different property at a different seam* from the abort test. Do not merge them into a fixture with a scheduler-dependent "who wins" assumption.
 
@@ -110,17 +110,17 @@ This is a *different property at a different seam* from the abort test. Do not m
 
 [Source: `live_tests.rs`, starting line 2400](https://github.com/jnhu76/qianqian/blob/39f53d4ce7319c2958efb140220b187b9a5d8741/crates/qianqian-playback/src/live_tests.rs#L2400-L2570)
 
-- The earlier oracle assumed a pending seek would remain non-actionable until stop. Under load that window could end at a loop-top serialization point.
-- The revised oracle inspects the **actual consumed content** for an audible cut and verifies the corresponding continuation/landing content, rather than assuming there can be no cut.
-- The claim is **not** that arbitrary audio content is acceptable. Each admitted ending still needs a specific content/reference invariant; the #195 park-source authority question remains unresolved.
+- **PROPERTY / AUTHORITY:** seek cutover and actionability follow [ADR-PBK-002 §20 D14.5](../adr/ADR-PBK-002.md); live processing pickup additionally follows [D14.11](../adr/ADR-PBK-002.md) and [DSP product model §7.3](../architecture/dsp-product-model.md). The earlier oracle assumed a pending seek would remain non-actionable until stop. Under load that window could end at a loop-top serialization point.
+- **LEGAL OUTCOMES / OBSERVATION:** the revised oracle inspects the **actual consumed content** for no audible cut, cut before update pickup, or cut at/after pickup; each visible ending has a separate content/reference assertion. It does not assume that a merely observed seek remains non-actionable until stop.
+- **FALSIFIER (oracle behavior; no new mutation run for this PR):** consumed samples that match none of the branch-specific references are rejected. The claim is **not** that arbitrary audio content is acceptable; the #195 park-source authority question remains unresolved.
 
 ### 4. Fact publication is not data-plane quiescence (PR #220)
 
 [Source: `gain_tests.rs`, lines 253–324](https://github.com/jnhu76/qianqian/blob/39f53d4ce7319c2958efb140220b187b9a5d8741/crates/qianqian-playback/src/gain_tests.rs#L253-L324), [`seek_seam.rs`, lines 525–637](https://github.com/jnhu76/qianqian/blob/39f53d4ce7319c2958efb140220b187b9a5d8741/crates/qianqian-playback/tests/seek_seam.rs#L525-L637), and [completion coexistence test](https://github.com/jnhu76/qianqian/blob/39f53d4ce7319c2958efb140220b187b9a5d8741/crates/qianqian-playback/src/completion.rs#L1371-L1394).
 
-- Before correction, sampling consumed frames immediately after `Failed` and comparing after a fixed sleep assumed failure publication instantly halted the data plane.
-- The tests now take the final consumer witness **after `runtime.dispose()` joins**. The destructive seek regression also uses the producer-side `post_failed_seek_reads()` witness, with a test negative control showing the oracle rejects a resumed read.
-- Important: the test did **not** change the production protocol to make its former assertion true.
+- **PROPERTY / AUTHORITY:** [ADR-PBK-002 §17 D11](../adr/ADR-PBK-002.md) owns episode terminal Fact settlement; edge termination and worker/leg join are separate execution/teardown boundaries, not implied by the Fact. Before correction, sampling consumed frames immediately after `Failed` and comparing after a fixed sleep assumed failure publication instantly halted the data plane.
+- **LEGAL OUTCOMES / OBSERVATION:** PCM published before the `Failed` Fact may still be consumed while the edge has not terminated; after `runtime.dispose()` joins the legs, consumption is settled. The tests therefore take the final consumer witness **after dispose**. The destructive seek regression also uses the producer-side `post_failed_seek_reads()` witness.
+- **FALSIFIER:** `seek_seam.rs::negative_control_the_producer_freeze_oracle_rejects_a_resumed_read` is an **existing executed-in-source negative-control test** for a resumed producer read, unlike the hypothetical failure signatures in examples 1–2. This review and docs PR did **not** execute the test locally. The correction did **not** change the production protocol to make the former assertion true.
 
 ## Reviewer checklist (new/changed timing-sensitive tests only)
 
