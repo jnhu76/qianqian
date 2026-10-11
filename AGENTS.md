@@ -388,6 +388,8 @@ Report what was actually verified. Never mark an unrun device/platform/audio che
 
 Green Cargo tests are regression evidence, not architecture acceptance. Verification reports must state target, tool, assumptions/bounds and result class.
 
+When adding or materially modifying a scheduling-, lifecycle-, or timing-sensitive test, follow [concurrency test design](docs/development/concurrency-test-design.md): identify the authority-owned property, prove each required precondition through a real synchronization seam, deterministically construct the intended schedule or verify every legal outcome, observe at the correct settlement boundary, and identify what defect would make the oracle fail. This is a **test-authoring method**, not new product semantics. Do not bulk-rewrite existing tests or turn a fixture's scheduling assumption into authority.
+
 ## Local pre-push gate (Lefthook)
 
 Lefthook is the repository's Git hook orchestrator. The `pre-push` gate is the fast local rejection layer; GitHub Actions remains the authority for platform, formal, concurrency, mutation, Windows and release evidence.
