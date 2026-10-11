@@ -19,6 +19,7 @@ mod audio;
 mod modal;
 mod now_playing;
 mod playlist;
+mod theme;
 mod visualizer;
 
 #[cfg(test)]
@@ -27,13 +28,14 @@ mod testutil;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
-use ratatui::text::{Line, Span};
+use ratatui::text::Line;
 use ratatui::widgets::{Block, Clear, Paragraph};
 
 use super::model::{
     HitRegion, HitTarget, MAX_STATUS_ROWS, NAV_BUTTONS, NavBarButton, ShellFit, TuiModel, TuiRoute,
     shell_fit, status_shape,
 };
+use theme::ACCENT;
 
 use audio::draw_audio;
 use modal::{draw_modal, modal_regions};
@@ -58,9 +60,10 @@ pub const NO_MUSIC_LINE: &str = "No music loaded.";
 /// product's own semantics.
 pub const TOO_SMALL_LINE: &str = "Terminal too small.";
 
-/// The play marker: the committed (playing) row. Deliberately a shape,
-/// not a colour — the shell must stay readable in a monochrome
-/// terminal (Issue #166 §20).
+/// The play marker: the committed (playing) row. A shape FIRST — the
+/// shell must stay readable in a monochrome terminal (Issue #166 §20);
+/// the row additionally carries the theme's LIVE color as redundancy
+/// (Issue #233).
 pub(super) const PLAYING_MARKER: &str = "▶";
 
 /// The selection marker: the UI cursor row. Independent of the play
@@ -138,7 +141,7 @@ fn render_too_small(frame: &mut Frame, area: Rect) {
     );
     frame.render_widget(Clear, box_area);
     frame.render_widget(
-        Paragraph::new(lines).block(Block::bordered().title(bold(" Qianqian "))),
+        Paragraph::new(lines).block(Block::bordered().title(theme::title(" Qianqian "))),
         box_area,
     );
 }
@@ -146,10 +149,11 @@ fn render_too_small(frame: &mut Frame, area: Rect) {
 /// The persistent top navigation (§6, G5): the four frozen route tabs,
 /// then the two persistent application controls — Help and Quit —
 /// pinned to the bar's right end on every route and in every class
-/// above the minimum. The active route is bold, the focused control is
-/// inverted — two shapes a monochrome terminal can tell apart. Every
-/// control's cell is published as its hit region from the very rect
-/// it was drawn into.
+/// above the minimum. The active route is bold + accent, the focused
+/// control is inverted — two shapes a monochrome terminal can tell
+/// apart, with the accent color as redundancy (#233). Every control's
+/// cell is published as its hit region from the very rect it was drawn
+/// into.
 fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<HitRegion>) {
     let compact = model.compact_layout();
     let label = |button: NavBarButton| {
@@ -189,7 +193,7 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
         };
         let mut style = Style::default();
         if active {
-            style = style.add_modifier(Modifier::BOLD);
+            style = style.fg(ACCENT).add_modifier(Modifier::BOLD);
         }
         if claimed {
             style = style.add_modifier(Modifier::REVERSED);
@@ -218,7 +222,8 @@ fn draw_tabs(frame: &mut Frame, model: &TuiModel, area: Rect, regions: &mut Vec<
 }
 /// The bottom status/context line (§6): the latest operation feedback
 /// (application composition feedback, never a playback semantic) and
-/// one fixed keymap hint.
+/// one fixed keymap hint. The hint is secondary chrome — dim where the
+/// terminal carries color, plain everywhere else.
 fn draw_status(frame: &mut Frame, model: &TuiModel, area: Rect) {
     let mut lines: Vec<Line<'static>> = Vec::new();
     if let Some(status) = model.status() {
@@ -226,7 +231,7 @@ fn draw_status(frame: &mut Frame, model: &TuiModel, area: Rect) {
             lines.push(Line::from(line.to_owned()));
         }
     }
-    lines.push(Line::from(HINT_LINE));
+    lines.push(Line::styled(HINT_LINE, Style::default().fg(theme::CHROME)));
     frame.render_widget(Paragraph::new(lines), area);
 }
 
@@ -262,9 +267,6 @@ fn viewport_offset(len: usize, selected: Option<usize>, height: usize) -> usize 
     } else {
         (selected + 1 - height).min(len - height)
     }
-}
-fn bold(title: &'static str) -> Span<'static> {
-    Span::styled(title, Style::default().add_modifier(Modifier::BOLD))
 }
 
 #[cfg(test)]
@@ -986,6 +988,90 @@ mod tests {
         );
         assert!(text.contains("↑↓ select"), "{text}");
         assert_eq!(scan(&text), None, "{text}");
+    }
+
+    // ------------------------------------------------------------------
+    // #233: the theme — color as redundancy over the shapes.
+    // ------------------------------------------------------------------
+
+    /// The active tab carries the accent color ON TOP of its BOLD
+    /// shape; an inactive tab carries neither. A monochrome terminal
+    /// keeps exactly the old distinction (bold vs plain).
+    #[test]
+    fn the_active_tab_is_accent_over_bold_and_inactive_is_plain() {
+        use ratatui::style::Color;
+
+        let mut model = plain_model();
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| draw(frame, &mut model))
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        // The tab labels render left-aligned from the region's first
+        // cell (the Now Playing route is active in `plain_model`).
+        let active = model
+            .regions()
+            .iter()
+            .find(|region| region.target == HitTarget::RouteTab(TuiRoute::NowPlaying))
+            .expect("the active tab's region")
+            .area;
+        let cell = buffer
+            .cell((active.x, active.y))
+            .expect("the 'N' of Now Playing");
+        assert_eq!(cell.fg, Color::Cyan, "the active tab is accent-colored");
+        assert!(
+            cell.style()
+                .add_modifier
+                .contains(ratatui::style::Modifier::BOLD),
+            "the active tab keeps its BOLD shape"
+        );
+
+        let inactive = model
+            .regions()
+            .iter()
+            .find(|region| region.target == HitTarget::RouteTab(TuiRoute::Playlist))
+            .expect("an inactive tab's region")
+            .area;
+        let cell = buffer
+            .cell((inactive.x, inactive.y))
+            .expect("the 'P' of Playlist");
+        assert_eq!(cell.fg, Color::Reset, "an inactive tab carries no accent");
+        assert!(
+            !cell
+                .style()
+                .add_modifier
+                .contains(ratatui::style::Modifier::BOLD),
+            "an inactive tab carries no bold"
+        );
+    }
+
+    /// The keymap hint line renders as dim chrome — secondary to the
+    /// operation feedback above it, and plain in a monochrome terminal.
+    #[test]
+    fn the_keymap_hint_line_is_dim_chrome() {
+        use ratatui::style::Color;
+
+        let mut model = plain_model();
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| draw(frame, &mut model))
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        // With no status feedback set, the status block's single row is
+        // exactly the hint line; its first non-space cell is 'T'.
+        let last = buffer.area.bottom() - 1;
+        let hint_cell = (buffer.area.left()..buffer.area.right())
+            .find(|&x| {
+                buffer
+                    .cell((x, last))
+                    .is_some_and(|cell| cell.symbol() != " ")
+            })
+            .and_then(|x| buffer.cell((x, last)))
+            .expect("the hint line's first glyph");
+        assert_eq!(hint_cell.symbol(), "T", "the row is the hint line");
+        assert_eq!(hint_cell.fg, Color::DarkGray, "the hint is dim chrome");
     }
     // ------------------------------------------------------------------
     // G1: the seek bar affordance, the DSP summary line, the picker.

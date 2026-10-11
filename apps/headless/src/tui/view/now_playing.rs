@@ -9,7 +9,8 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 
-use super::{COMMITTED_HINT, NO_MUSIC_LINE, bold};
+use super::theme;
+use super::{COMMITTED_HINT, NO_MUSIC_LINE};
 use crate::playlist::{PlaybackOrder, RepeatMode};
 use crate::tui::model::{
     HitRegion, HitTarget, PreferenceButton, SEEK_BUTTONS, TRANSPORT, TransportButton, TuiModel,
@@ -98,8 +99,8 @@ pub(super) fn draw_now_playing(
     frame.render_widget(
         Paragraph::new(lines).block(
             Block::bordered()
-                .title(bold(" Qianqian Reference Player "))
-                .title_style(Style::default()),
+                .title(theme::title(" Qianqian Reference Player "))
+                .border_style(theme::border()),
         ),
         content,
     );

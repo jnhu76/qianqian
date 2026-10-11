@@ -10,7 +10,8 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 
 use super::now_playing::{order_toggle_width, repeat_toggle_width};
-use super::{PLAYING_MARKER, SELECTED_MARKER, bold};
+use super::theme::{self, LIVE};
+use super::{PLAYING_MARKER, SELECTED_MARKER};
 use crate::tui::model::{
     HitRegion, HitTarget, PLAYLIST_BUTTONS, PlaylistButton, PlaylistRow, PreferenceButton, TuiModel,
 };
@@ -147,7 +148,9 @@ fn draw_playlist_list(
             model.source().is_some(),
         )
     };
-    let mut block = Block::bordered().title(bold(" Playlist "));
+    let mut block = Block::bordered()
+        .title(theme::title(" Playlist "))
+        .border_style(theme::border());
     if total > 0 {
         // The pane's title is the SELECTION ordinal (the committed
         // position is the `Track: <committed>/<len>` line on the Now
@@ -305,22 +308,26 @@ fn playlist_row_line(
     episode_live: bool,
     pressed: bool,
 ) -> Line<'static> {
-    let playing = if row.playing && episode_live {
-        PLAYING_MARKER
-    } else {
-        " "
-    };
+    let is_playing = row.playing && episode_live;
+    let playing = if is_playing { PLAYING_MARKER } else { " " };
     let selected = if row.selected { SELECTED_MARKER } else { " " };
     let mut line = Line::from(format!(
         "{playing} {selected} {:>3}  {}",
         position + 1,
         row.label
     ));
-    // A held press on the row renders the same transient inversion as
-    // every control (§16): white while held, bounced back on release.
-    if pressed {
-        line.style = Style::default().add_modifier(Modifier::REVERSED);
+    // The committed row carries the LIVE color (redundancy over the ▶
+    // shape, #233); a held press on the row renders the same transient
+    // inversion as every control (§16): white while held, bounced back
+    // on release.
+    let mut style = Style::default();
+    if is_playing {
+        style = style.fg(LIVE);
     }
+    if pressed {
+        style = style.add_modifier(Modifier::REVERSED);
+    }
+    line.style = style;
     line
 }
 
@@ -332,6 +339,49 @@ mod tests {
 
     use crate::tui::model::testutil::model_with_regions;
     use crate::tui::model::*;
+
+    /// The committed (playing) row carries the LIVE color over its ▶
+    /// shape (#233): green where the terminal has color, the same
+    /// glyph-first distinction everywhere — and a non-playing row
+    /// carries neither the marker nor the color.
+    #[test]
+    fn the_playing_row_carries_the_live_color() {
+        use ratatui::style::Color;
+
+        use super::PLAYING_MARKER;
+
+        let mut model = plain_model();
+        model.set_route(TuiRoute::Playlist);
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 30)).expect("terminal");
+        terminal
+            .draw(|frame| crate::tui::view::draw(frame, &mut model))
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+        let area = buffer.area;
+        let playing = (area.top()..area.bottom())
+            .flat_map(|y| (area.left()..area.right()).map(move |x| (x, y)))
+            .find_map(|(x, y)| {
+                buffer
+                    .cell((x, y))
+                    .filter(|cell| cell.symbol() == PLAYING_MARKER)
+            })
+            .expect("the committed row's play marker");
+        assert_eq!(playing.fg, Color::Green, "the marker row is LIVE-colored");
+
+        // A non-playing, non-selected row keeps the default style: the
+        // color belongs to the committed row alone.
+        let plain_row = model
+            .regions()
+            .iter()
+            .find(|region| matches!(region.target, HitTarget::PlaylistRow(1)))
+            .expect("the second row's region")
+            .area;
+        let cell = buffer
+            .cell((plain_row.x + 9, plain_row.y))
+            .expect("a label cell of the second row");
+        assert_eq!(cell.fg, Color::Reset, "an ordinary row stays unthemed");
+    }
 
     /// The summary row's toggles use the SAME fixed widths as the
     /// preference row: a mode change re-renders the label inside a

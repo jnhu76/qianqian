@@ -8,7 +8,8 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 
-use super::{SELECTED_MARKER, bold, viewport_offset};
+use super::theme;
+use super::{SELECTED_MARKER, viewport_offset};
 use crate::tui::model::{ConfirmKind, FocusId, HitRegion, HitTarget, Modal, ModalButton, TuiModel};
 use qianqian_playback::EqPreset;
 
@@ -448,7 +449,11 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             let (popup, consequence, cells) = confirm_layout(*kind, area);
             frame.render_widget(Clear, popup);
             frame.render_widget(
-                Paragraph::new("").block(Block::bordered().title(bold(kind.title()))),
+                Paragraph::new("").block(
+                    Block::bordered()
+                        .title(theme::title(kind.title()))
+                        .border_style(theme::border()),
+                ),
                 popup,
             );
             frame.render_widget(
@@ -477,7 +482,11 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             let (popup, inner, rows) = presets_layout(area);
             frame.render_widget(Clear, popup);
             frame.render_widget(
-                Paragraph::new("").block(Block::bordered().title(bold(" EQ preset "))),
+                Paragraph::new("").block(
+                    Block::bordered()
+                        .title(theme::title(" EQ preset "))
+                        .border_style(theme::border()),
+                ),
                 popup,
             );
             // One row per preset; the cursor carries `>` and — while
@@ -521,8 +530,11 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             let popup = input_popup_area(area, 3);
             frame.render_widget(Clear, popup);
             frame.render_widget(
-                Paragraph::new(format!("Go to: [{input}]  (Enter = seek, Esc = cancel)"))
-                    .block(Block::bordered().title(bold(" Go to "))),
+                Paragraph::new(format!("Go to: [{input}]  (Enter = seek, Esc = cancel)")).block(
+                    Block::bordered()
+                        .title(theme::title(" Go to "))
+                        .border_style(theme::border()),
+                ),
                 popup,
             );
         }
@@ -535,7 +547,11 @@ pub(super) fn draw_modal(frame: &mut Frame, modal: &Modal, area: Rect, model: &T
             let popup = centered_area(area, height);
             frame.render_widget(Clear, popup);
             frame.render_widget(
-                Paragraph::new("").block(Block::bordered().title(bold(" Help "))),
+                Paragraph::new("").block(
+                    Block::bordered()
+                        .title(theme::title(" Help "))
+                        .border_style(theme::border()),
+                ),
                 popup,
             );
             let inner = Rect::new(
