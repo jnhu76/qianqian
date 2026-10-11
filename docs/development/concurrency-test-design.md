@@ -72,11 +72,26 @@ Extending Loom beyond the existing PcmEdge slice, or adding another scheduling t
 
 - **Safety:** an illegal state/output never appears. Observe at a valid publication/serialization boundary; match the assertion to the contract, not incidental scheduling.
 - **Liveness:** progress/wakeup eventually happens *under stated assumptions* (including where relevant fair scheduling and release conditions). CI timeout expiry is a useful hang signal, not an independent proof of fairness or a guaranteed bound promised by production.
-- **Sleep:** may legitimately model a slow source, pace a workload, or temporarily widen a race window during diagnosis. It must not be the sole proof that another thread reached a gate or completed an operation.
+- **Sleep:** distinguish **diagnostic schedule perturbation** (a temporary delay/yield to expose a suspected interleaving), **workload simulation** (intentional source pacing), and **synchronization** (a proven happens-before edge). The first two are legitimate with stated purpose; neither makes a sleep a correctness premise or proves that another thread reached a gate. See the diagnostic method below.
 - **Event counts and snapshots:** counts sampled before the producing owner settles may race. Use an agreed boundary or assert a prefix/monotonic invariant if that is what the contract supports.
 - **Stress and reruns:** can discover counterexamples and help regression detection; 300 green runs do not prove all schedules correct. Do not hide semantic mismatches with retry-on-failure/quarantine.
 - **Negative controls:** when the invariant protects lifetime, deadlock avoidance, terminal truth, or a high-impact concurrency boundary, show a plausible incorrect behavior makes the oracle red (or report a concrete limit if not feasible). A test that never exercises its key assertion is not evidence.
 - **Test hygiene:** avoid production-side testing APIs, leaked parked threads, false liveness from an unbounded wait, and fixture-owned state that changes the semantics under test. Keep cleanup and panic paths explicit.
+
+## Diagnostic schedule perturbation (temporary counterexample search)
+
+A deliberately inserted `sleep`, `yield_now`, or artificial slowdown may be an **effective debugging probe**: it biases which legal schedule occurs and can turn a rare flaky failure into a repeatable one. This is **not** a synchronization primitive, a correctness fix, or proof that a particular execution is guaranteed on every machine. A controlled latch/barrier *can* establish an ordering premise, but a delay alone cannot.
+
+Use this narrow process for a suspected scheduler-dependent failure:
+
+1. **Predict before instrumenting:** write down the competing execution paths and the precise failing assertion/trace expected if one path wins. Record the original failure signature and baseline run count. Choose a delay site that distinguishes these paths.
+2. **Perturb only for diagnosis:** insert a short, visibly tagged test-local delay or yield at that site, then repeat the targeted test. Record the patch/site, delay, platform, number of runs and number of failures. Match the **same failure signature**; a different panic or timeout may indicate a different failure.
+3. **Explain the counterexample:** reconstruct the event/wait-for DAG and identify why the resulting trace is contract-legal or illegal. A delay-amplified failure establishes *scheduling sensitivity*, not by itself a production bug or an oracle defect.
+4. **Remove the diagnostic perturbation:** classify the root cause, repair a test-only false premise with explicit synchronization or legitimate per-outcome assertions, or fix production only if the authority-backed invariant is actually violated. Keep useful **deterministic regression evidence**; report stress/rerun evidence separately. Do not leave arbitrary sleeps, retries, or larger timeouts as the “fix.”
+
+**Real #238 incident:** [post-mortem](https://github.com/jnhu76/qianqian/issues/238) records **150 baseline targeted runs / 0 failures** despite the CI flake. A temporary **2 ms sleep between `spawn(leg)` and `set_paused(true)`** widened the “leg reaches first gate before pause” window and reproduced the **same `assert!(parked)` 5 s failure in 5/5 runs**. The DAG then explained the actual bug: the test's held first read could not finish until actions *after* the assertion, so `Engaged` was unreachable in that perfectly legal interleaving. The **diagnostic sleep was removed**; the actual test-only correction routes pause **before** spawning the leg, and the issue records **300 post-fix runs / 0 failures**. None of those counts by themselves proves exhaustive correctness.
+
+When a test intentionally uses wall-clock sleep to model a paced decoder, an external delay, or a timeout budget, keep that purpose explicit and continue to validate the claimed property at a real observation/settlement boundary.
 
 ## Worked examples from this repository
 
@@ -92,7 +107,7 @@ These are **examples of causal premises and observation oracles**, not a claim t
 - **OBSERVATION:** abort join returns; exactly one `Engaged` event was recorded. Five-second deadlines detect a wedge; they are **not** the ordering premise.
 - **FALSIFIER (hypothesized fault signature, not an executed mutation control):** if a closed gate can re-park the post-close leg, the join watchdog or engagement-count assertion should fail. No such negative mutation was executed for this documentation PR.
 
-The old test spawned before routing pause. A legal scheduler path entered the deliberately held read **before** seeing pause; `Engaged` could never occur before the assertion because release/stop were encoded later. This was an **oracle/fixture defect**, not evidence that production needed a new pause guarantee.
+The old test spawned before routing pause. A legal scheduler path entered the deliberately held read **before** seeing pause; `Engaged` could never occur before the assertion because release/stop were encoded later. The temporary 2 ms diagnostic delay described above reproduced this path; **it was a diagnostic aid, not the fix**. This was an **oracle/fixture defect**, not evidence that production needed a new pause guarantee.
 
 ### 2. Pause arriving mid-read (#238): control at the owner's gate seam
 
