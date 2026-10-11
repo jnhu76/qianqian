@@ -85,7 +85,10 @@ fn registered_runtime(
 /// runtime captures clones of `decode` (every clone sharing its EOF
 /// witness), while the test may keep `decode.eof.clone()` to prove the
 /// decode-EOF premise through the real `read_frames` path before it
-/// issues a stop.
+/// issues a stop. Only the Linux-scoped post-EOF stop test uses this
+/// entry, so off Linux the unused helper is allowed rather than kept
+/// alive by a phantom caller.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn registered_runtime_with_decode(
     decode: EofWitnessedDecode,
     output: OutputBehavior,
@@ -152,7 +155,9 @@ struct EofWitness {
 }
 
 impl EofWitness {
-    /// Has a `read_frames` call returned EOF yet?
+    /// Has a `read_frames` call returned EOF yet? (Polled only by the
+    /// Linux-scoped post-EOF stop test; off Linux nothing reads it.)
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     fn returned(&self) -> bool {
         self.latched.load(Ordering::SeqCst)
     }
@@ -488,17 +493,27 @@ fn eof_while_parked_leaves_the_episode_unsettled_until_resumed() {
 /// own first park slice and says nothing about worker progress — so the
 /// test additionally proves (1) the PRODUCTION worker's `read_frames`
 /// returned Eof (decode-seam evidence, polled without blocking the
-/// worker), and (2) on Linux, that the worker's OS thread is fully
-/// gone: thread exit is program-ordered after the worker's
-/// `edge.close_eof()` and `worker_exited` publication (the session's
-/// single exit funnel), which closes the one seam where the stop's own
-/// `edge.stop()` could still win the edge's first-wins terminal race
-/// and legally relabel the episode `Stopped`. Off Linux that residual
-/// Eof-return→close_eof window stays open — a registered limitation:
-/// closing it would need a production-side test seam, out of scope
-/// here. The boundary also assumes the current funnel shape (no
-/// blocking work between the Eof return and close_eof).
+/// worker), and (2) that the worker's OS thread is fully gone: thread
+/// exit is program-ordered after the worker's `edge.close_eof()` and
+/// `worker_exited` publication (the session's single exit funnel),
+/// which closes the one seam where the stop's own `edge.stop()` could
+/// still win the edge's first-wins terminal race and legally relabel
+/// the episode `Stopped`.
+///
+/// Platform scope (honest NOT_RUN, not a debt hidden behind a runnable
+/// assertion): no portable observation of the post-`close_eof` commit
+/// exists — the edge is crate-private by design and the ports seam
+/// (`RenderPcmInput`) exposes no terminal query — so the test runs on
+/// Linux only, where the thread-gone witness proves the premise. On
+/// other targets this property is NOT_RUN here, never reported as
+/// passing; giving it a portable witness would need a production-side
+/// test seam (a product API decision outside this pilot). The sibling
+/// negative control below stays cross-platform: its oracle needs no
+/// EOF premise, since without worker-terminal EOF evidence `Stopped`
+/// is structurally the only reachable outcome in every legal
+/// interleaving.
 #[test]
+#[cfg(target_os = "linux")]
 fn stop_from_parked_after_eof_still_completes() {
     let _lifecycle = common::lifecycle_lock();
     within(Duration::from_secs(20), move || {
@@ -527,16 +542,13 @@ fn stop_from_parked_after_eof_still_completes() {
             wait_until(Duration::from_secs(5), || eof.returned()),
             "decode never reached EOF through the real read_frames path"
         );
-        #[cfg(target_os = "linux")]
-        {
-            // Premise: the worker is fully gone, so its close_eof and
-            // worker_exited(Eof) both happened before the stop below
-            // issues edge.stop().
-            assert!(
-                common::named_thread_gone_within("qianqian-decode", Duration::from_secs(5)),
-                "the decode worker never exited after EOF"
-            );
-        }
+        // Premise: the worker is fully gone, so its close_eof and
+        // worker_exited(Eof) both happened before the stop below
+        // issues edge.stop().
+        assert!(
+            common::named_thread_gone_within("qianqian-decode", Duration::from_secs(5)),
+            "the decode worker never exited after EOF"
+        );
 
         handle.request_stop();
         assert_eq!(
