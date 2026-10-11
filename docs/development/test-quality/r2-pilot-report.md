@@ -421,9 +421,12 @@ cargo test -p qianqian-playback --lib                       # 183 passed / 0 fai
   (playback lib.rs:41-44),ports 缝 `RenderPcmInput` 仅 `read_frames`+`stop`、无 terminal 查询
   → 可移植提交点见证不存在现成缝,新增即产品 API。**取限定路线**。
 - 修复:测试整体 `#[cfg(target_os = "linux")]`;原内层 Linux cfg 块展开为无条件;doc 注释改写为
-  "非 Linux = NOT_RUN(非 PASS)" 的诚实登记;非 Linux 下仅该测试使用的
-  `registered_runtime_with_decode`/`EofWitness::returned` 加
-  `#[cfg_attr(not(target_os="linux"), allow(dead_code))]`(否则 Windows `clippy -D warnings` 误伤)。
+  "非 Linux = NOT_RUN(非 PASS)" 的诚实登记。**(复审后更正,见后续小 commit)**:初版曾对
+  `registered_runtime_with_decode`/`EofWitness::returned` 各加
+  `#[cfg_attr(not(target_os="linux"), allow(dead_code))]`;复审指出前者经 `registered_runtime`
+  **全平台可达**、豁免从不触发(且注释理由错误)——真正需要豁免的只有 `EofWitness::returned`
+  (其唯一读者即 Linux 限定的目标测试);已在复审后小 commit 中移除前者并更正注释,
+  该更正不触任何执行证据引用的 SHA。
   no-EOF 负控保持跨平台(其 oracle 无 EOF 前提,`Stopped` 结构唯一可达,交错完备)。
 - 证据:pause_seam 全文件 10/10、目标 ×20 串行 20/20 @ `bad486b3`;
   `cargo check -p qianqian-playback --tests --target x86_64-pc-windows-gnu`(及 audio-api)exit 0

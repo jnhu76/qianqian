@@ -85,10 +85,9 @@ fn registered_runtime(
 /// runtime captures clones of `decode` (every clone sharing its EOF
 /// witness), while the test may keep `decode.eof.clone()` to prove the
 /// decode-EOF premise through the real `read_frames` path before it
-/// issues a stop. Only the Linux-scoped post-EOF stop test uses this
-/// entry, so off Linux the unused helper is allowed rather than kept
-/// alive by a phantom caller.
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+/// issues a stop. Live on every platform via [`registered_runtime`];
+/// only the latch's `returned()` reader is Linux-scoped (the post-EOF
+/// stop test), which is where the dead-code allowance lives.
 fn registered_runtime_with_decode(
     decode: EofWitnessedDecode,
     output: OutputBehavior,
