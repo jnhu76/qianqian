@@ -1364,7 +1364,7 @@ fn a_failure_during_a_transition_settles_failed_through_d11() {
             .failure_diagnostic
             .expect("a failed episode carries its diagnostic");
         assert!(
-            diagnostic.contains("live transition-side failure"),
+            diagnostic.contains("processing: live transition-side failure"),
             "the diagnostic stays truthful about the processing origin: \
                  {diagnostic}"
         );
