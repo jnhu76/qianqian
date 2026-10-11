@@ -101,7 +101,7 @@ PROPERTY / AUTHORITY / PRODUCTION_DAG / TEST_EXECUTED / 负控 / 清理 / 限制
 | NEGATIVE_CONTROL | 【证据包·mutation + 评审,首轮候选的 /tmp 沙箱,仓库未动,逐条还原】**baseline 正控:RED=false(诚实实现必须通过——这是正向对照的达标态,不是缺陷;首轮工作流曾误要求其 RED,是为本轮事故一,见 §D.5)** + F1 missing-pickup(`live.rs:533-534` 取走即丢)/ F2 D11 路由吞错(`session.rs:849`)/ F3 伪 decode 标签(`session.rs:857`)/ F4 注入器门恒真(armed-即-失败形状回退)/ F6 pickup 拒收(`live.rs:379`)全部 RED=true、签名匹配;评审者独立复现五条(F4 实测整测 5.00s 完成而非 90s 看门狗)。**限制(如实)**:上述 mutation 执行于首轮候选;落地版与候选的 +21/−2 差异(事件并集断言)不触任何被突变位点(F1/F2/F3/F6 位于生产码 `live.rs`/`session.rs`;F4 位于测试侧注入器门,非生产位点,其落地版支撑另由 §C.3 DAG 的落地 Read 核实),但本档案会话**未在落地版上复跑 mutation**——review 如需可下令重跑。 |
 | CLEANUP_VERIFIED | 【证据包·评审】F4 沙箱复现整测 5.00s 完成(非 90s 看门狗)证明 `catch_unwind → runtime.dispose() → resume_unwind` 守护确实释放 parked leg 与阻塞 worker(dispose 经 LIFO:edge.stop+worker.join → release_pause_gate+stop_and_join);`QianqianApp` 无 Drop teardown(评审 grep 证实),故守护是必要的。落地版守护在位(:1316-1351)【git·档案】。 |
 | LIMITATIONS | (i) mutation(F1–F4/F6+baseline)执行于首轮候选,落地版未复跑(见 NEGATIVE_CONTROL 限制);(ii) 90s `within()` watchdog 是诊断上界,非公平性证明;(iii) `live_tests.rs` 伴随 H1 信号 ×4(HEAD :860/:870/:1033/:1615,其他测试)未修(→ §F L8);(iv) 每 stage 一次 `tap.events()` 克隆仅 cfg(test) 且决策点事件数 ≤2(评审备注,可接受);(v) 任务指令口径:"DSP Live"(=本行对象,`live_tests.rs` 中 live 处理链 transition 失败路径的目标测试;R2 任务指令内部称谓,仓库文档无此缩写,定义仅此一处)未构造性证明 update-before-EOF 不得 ADEQUATE——**构造性证明已由 hold 建立**(§B.C3/§C.3),故本条限制不再阻塞 §F L4 的 ADEQUATE 提案;(vi) 本地绿(含 ×20)≠ 交错完备证明。 |
-| 复审修正 | **证据闭环(2026-10-12 复审)**:限制 (i) 撤销——五条 mutant + baseline 已在最终代码 HEAD `6d5c036` 的隔离 worktree 实际复跑:baseline GREEN;F1/F2/F6 RED 于 `live_tests.rs:1356`(`left: Completed / right: Failed`);F4 RED 于 `:1317`(:5.00s,守护窗口内,非 90s 看门狗;**预测偏差如实记录**:预注册签名 predicted hold 见证断言,实测红在更早的 parked 前提——mutant 使 episode 在 leg park 前即死,判别性质成立);**F3 在收紧前实测存活**(落地断言 `contains("live transition-side failure")` 不含 origin 前缀,origin 伪造不红——探针执行记录见 §H.3)→ 断言收紧为 `contains("processing: live transition-side failure")`(`WorkerFailure::stage()` 的 crate 内 presentation form,completion.rs:141)@ `6d5c036` 后 F3 RED 于 `:1366`。该发现本身即"落地 HEAD 复跑"要求的直接收益:首轮候选的 F3 咬合在落地重写(+21/−2)中丢失,源级核验未捕获,突变复跑捕获。逐条签名表与还原证明见 §H.3;L4 界限 (i) 撤销。 |
+| 复审修正 | **证据闭环(2026-10-12 复审)**:限制 (i) 撤销——五条 mutant + baseline 已在最终代码 HEAD `6d5c036` 的隔离 worktree 实际复跑:baseline GREEN;F1/F2/F6 RED 于 `live_tests.rs:1356`(`left: Completed / right: Failed`);F4 RED 于 `:1317`(:5.00s,守护窗口内,非 90s 看门狗;**预测偏差如实记录,不计入签名匹配——终审分类见 §H.6**:预注册签名 predicted hold 见证断言,实测红在更早的 parked 前提——mutant 使 episode 在 leg park 前即死,判别性质成立);**F3 在收紧前实测存活**(落地断言 `contains("live transition-side failure")` 不含 origin 前缀,origin 伪造不红——探针执行记录见 §H.3)→ 断言收紧为 `contains("processing: live transition-side failure")`(`WorkerFailure::stage()` 的 crate 内 presentation form,completion.rs:141)@ `6d5c036` 后 F3 RED 于 `:1366`。该发现本身即"落地 HEAD 复跑"要求的直接收益:首轮候选的 F3 咬合在落地重写(+21/−2)中丢失,源级核验未捕获,突变复跑捕获。逐条签名表与还原证明见 §H.3;L4 界限 (i) 撤销。 |
 
 ### A.C4 — `test(quality): calibrate opt-in adequacy admission checks`
 
@@ -444,7 +444,7 @@ cargo test -p qianqian-playback --lib                       # 183 passed / 0 fai
 | F1 take-and-drop(live.rs `poll_update`) | RED@wait_terminal,Completed/Failed | `:1356 left: Completed / right: Failed`,0.03s | ✓ 匹配 |
 | F2 stage 错误臂吞掉(session.rs:849 区) | 同上 | `:1356 left: Completed / right: Failed`,0.02s | ✓ 匹配 |
 | F3 origin 伪造(session.rs stage 路由 processing_failed→decode_failed,单点位) | (收紧后)RED@diagnostic 断言,decode: 前缀 | **收紧前探针实测:GREEN(mutant 存活)**;断言收紧 @ `6d5c036` 后 RED@`:1366 …decode: live transition-side failure` | ✓ 匹配(收紧后) |
-| F4 注入器门恒真(live_tests.rs gate) | RED@hold 见证,≈5s 非看门狗 | RED@`:1317 the pre-routed pause never parked the leg`,5.00s(非 90s 看门狗) | RED 达成;**预测偏差如实记录**(见下) |
+| F4 注入器门恒真(live_tests.rs gate) | RED@hold 见证,≈5s 非看门狗 | RED@`:1317 the pre-routed pause never parked the leg`,5.00s(非 90s 看门狗) | **RED 达成但不计入"签名匹配"**(终审分类,§H.6):证明测试拒绝该注入;失败位置偏离预测,不记为"精确失败位置与预注册预测一致"(见下) |
 | F6 pickup 拒收(live.rs `accept`) | RED@wait_terminal,Completed/Failed | `:1356 left: Completed / right: Failed`,0.02s | ✓ 匹配 |
 
 - **F4 预测偏差**:预注册预测红在 hold 见证断言;实测红在更早的 parked 前提(:1317)——门恒真使
@@ -477,3 +477,25 @@ H4@:1195 与 H1×4(:860/:870/:1033/:1615)行号不变(+1/−1 等长变更)。�
 - **未执行**:×100 / 超订阅加载复跑(本轮以 ×20 串行为稳定性证据,弱于首轮候选的 ×100/超订阅
   ——如实降格登记);Windows/macOS **运行时**验证(交叉编译仅为编译级);Loom/Miri/TLA+(不在
   本 PR 范围);exact-HEAD CI 结果于推送后复查(PR 正文记录)。
+
+### H.6 终审记录(2026-10-12,第二轮独立复审;权威原文在 GitHub)
+
+> 终审权威记录:PR #250 第二轮独立技术评审(Review Comment)与 Issue #244 R2 试点终审记录;
+> 本节仅转录要点与本档案的对应修正,不重复裁义。
+
+- **终审裁决:APPROVE_FOR_MERGE_WITH_DOCUMENTED_LIMITS**——三项整改(C1 失败路径清理 /
+  C2 非 Linux false-RED / C3 落地 HEAD mutation)全部 PASS,产品行为边界 PASS(未改生产语义、
+  产品 API、默认 CI 门禁),exact-HEAD CI 四工作流 + CodeRabbit 状态成功(终审同时声明:Draft PR
+  未接受 CodeRabbit 自动审查,该状态不得记为"CodeRabbit 审查通过";正式 APPROVED 事件因
+  同身份平台限制无法提交,结论以 Review Comment 保存)。
+- **F4 证据分类修正(本节执行)**:F4 证明测试能拒绝该错误注入,但失败位置(parked 前提)偏离
+  预注册预测(hold 见证)——**不计入"精确失败位置/签名匹配"**,§H.3 判定列已改;签名匹配的
+  精确计数 = F1/F2/F3/F6 + M1/M2(六条),F4 记"RED 达成 + 位置偏离预测"。
+- **终审保留的证据边界(转录,合并后持续有效)**:RenderGate 因果前提有效,5s 内未退出的线程
+  仍属显式清理风险;Pause/EOF 正向性质 Linux 通过、Windows/macOS NOT_RUN;DSP Live 目标性质
+  及定向负控通过,F4 失败位置偏离预测不记精确匹配;Checker 维持 opt-in(已知 FP 未达强制门禁
+  标准);Skill 自动发现/触发仍未验证。
+- **方法学结论(终审原文要点)**:R2 的核心价值 = 对最终代码重新做 mutation,确实发现并修复了
+  一个原本存活的错误实现(F3);这是后续测试质量规范最应保留的方法,而非机械要求更多断言或
+  更多执行次数。后续(R3)方向:Skill 稳定触发、Checker 减少 FP(非豁免)、存量测试按风险接入
+  Ledger、Loom/Shuttle 在真实并发协议上的交错覆盖价值评估。
