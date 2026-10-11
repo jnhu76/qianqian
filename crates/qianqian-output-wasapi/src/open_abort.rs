@@ -50,6 +50,20 @@ mod tests {
     use std::sync::{Condvar, Mutex};
     use std::time::Duration;
 
+    // Test-only failure cleanup — a RELEASE guarantee, not a join
+    // guarantee: on any exit (including an assert unwind) the gate this
+    // test deliberately parked the leg behind is closed and released, so
+    // no test-owned leg stays blocked behind fixture state. Whether the
+    // leg has actually exited is observed separately, at the join
+    // boundary.
+    struct ReleaseGateOnDrop(RenderGate);
+
+    impl Drop for ReleaseGateOnDrop {
+        fn drop(&mut self) {
+            self.0.close_and_release();
+        }
+    }
+
     struct IdleInput;
 
     impl RenderPcmInput for IdleInput {
@@ -86,9 +100,11 @@ mod tests {
         let gate = RenderGate::with_observer(move |event| {
             recorder.lock().expect("events lock").push(event);
         });
+        let _gate_release = ReleaseGateOnDrop(gate.clone());
 
         // Pre-activation pause: intent is routed before any leg exists.
         gate.set_paused(true);
+        let (exit_tx, exit_rx) = mpsc::channel();
         let leg = {
             let gate = gate.clone();
             std::thread::spawn(move || {
@@ -98,8 +114,18 @@ mod tests {
                     GateSlice::TailProbe => TailProbeOutcome::Pending,
                     GateSlice::SeekRelease(_) => TailProbeOutcome::Pending,
                 });
+                // Normal-exit witness: sent ONLY past the expected
+                // post-park exit. abort_render_thread swallows a panicked
+                // leg (`let _ = handle.join()`), so join success alone
+                // cannot tell a normal exit from a panic; the post-join
+                // assert on this witness turns an abnormal exit into a
+                // test failure instead of a silent pass.
+                let _ = exit_tx.send(());
             })
         };
+        // Mutex-published gate events persist in the shared log, so this
+        // poll cannot miss an engagement; the sleep only throttles the
+        // re-check and the deadline is a fail-fast watchdog.
         let parked = {
             let deadline = std::time::Instant::now() + Duration::from_secs(5);
             loop {
@@ -122,6 +148,16 @@ mod tests {
         join_within(Duration::from_secs(5), move || {
             abort_render_thread(leg, &input, &gate)
         });
+        // Settlement boundary: abort_render_thread has joined the leg, so
+        // its exit is final here — a missing witness now can only mean an
+        // abnormal (panicked) exit that the abort join swallowed.
+        assert_eq!(
+            exit_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the leg did not exit through its expected post-park path: the \
+             abort join swallows a panicked leg, so only this witness \
+             proves a normal exit"
+        );
     }
 
     /// The leg's first read HOLDS — until the abort's stop has been
@@ -168,6 +204,19 @@ mod tests {
         }
     }
 
+    // Test-only failure cleanup — a RELEASE guarantee, not a join
+    // guarantee: on any exit the intentionally held read is stopped and
+    // released so it cannot wait on this Condvar forever. The leg's
+    // exit is observed at the abort join, not here.
+    struct ReleaseHeldInputOnDrop(Arc<HeldInput>);
+
+    impl Drop for ReleaseHeldInputOnDrop {
+        fn drop(&mut self) {
+            self.0.stop();
+            self.0.release();
+        }
+    }
+
     impl RenderPcmInput for HeldInput {
         fn read_frames(&self, dst: &mut [f32]) -> PcmPull {
             if self.first_call.swap(false, Ordering::AcqRel) {
@@ -208,6 +257,7 @@ mod tests {
         let gate = RenderGate::with_observer(move |event| {
             recorder.lock().expect("events lock").push(event);
         });
+        let _gate_release = ReleaseGateOnDrop(gate.clone());
 
         // The pause is routed BEFORE the leg exists — the module doc's
         // own pre-activation state ("pause intent may already sit at the
@@ -225,11 +275,13 @@ mod tests {
 
         let (stopped_tx, stopped_rx) = mpsc::channel();
         let held = Arc::new(HeldInput::new(stopped_tx));
+        let _held_release = ReleaseHeldInputOnDrop(held.clone());
         let input: Arc<dyn RenderPcmInput> = held.clone();
 
         // The steady loop's loop-top posture: the gate is checked before
         // EVERY read, so the leg re-visits it after any non-terminal
         // pull.
+        let (exit_tx, exit_rx) = mpsc::channel();
         let leg = {
             let gate = gate.clone();
             let input = input.clone();
@@ -244,9 +296,19 @@ mod tests {
                         break;
                     }
                 }
+                // Normal-exit witness: sent ONLY after the expected
+                // Stopped exit. abort_render_thread swallows a panicked
+                // leg (`let _ = handle.join()`), so join success alone
+                // cannot tell a normal exit from a panic; the post-join
+                // assert on this witness turns an abnormal exit into a
+                // test failure instead of a silent pass.
+                let _ = exit_tx.send(());
             })
         };
 
+        // Mutex-published gate events persist in the shared log, so this
+        // poll cannot miss an engagement; the sleep only throttles the
+        // re-check and the deadline is a fail-fast watchdog.
         let parked = {
             let deadline = std::time::Instant::now() + Duration::from_secs(5);
             loop {
@@ -297,6 +359,17 @@ mod tests {
             Ok(()),
             "the open-abort join wedged: a hostile re-pause after the close \
              re-parked the leg"
+        );
+
+        // Settlement boundary: abort_render_thread has joined the leg, so
+        // its exit is final here — a missing witness now can only mean an
+        // abnormal (panicked) exit that the abort join swallowed.
+        assert_eq!(
+            exit_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the leg did not exit through its expected Stopped path: the \
+             abort join swallows a panicked leg, so only this witness \
+             proves a normal exit"
         );
 
         // And the gate recorded exactly one engagement: it never

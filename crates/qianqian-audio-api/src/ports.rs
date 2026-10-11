@@ -1201,6 +1201,42 @@ mod gate_pause_timing_tests {
                 guard = self.1.wait(guard).expect("latch wait");
             }
         }
+        /// Bounded wait: a fail-fast watchdog for a premise that never
+        /// arrived. The latch's set/notify — not this deadline — is the
+        /// synchronization edge.
+        fn wait_for(&self, limit: Duration) -> bool {
+            let mut guard = self.0.lock().expect("latch lock");
+            let deadline = Instant::now() + limit;
+            while !*guard {
+                let now = Instant::now();
+                if now >= deadline {
+                    return false;
+                }
+                let (next, _) = self
+                    .1
+                    .wait_timeout(guard, deadline - now)
+                    .expect("latch wait");
+                guard = next;
+            }
+            true
+        }
+    }
+
+    // Test-only failure cleanup — a RELEASE guarantee, not a join
+    // guarantee: on any exit (including an assert unwind) the held read
+    // is released and the gate closed, so the spawned leg cannot stay
+    // blocked behind fixture state. This does not observe the leg's
+    // exit; liveness is asserted at the join boundary below.
+    struct ReleaseLegOnDrop {
+        gate: RenderGate,
+        release_first_read: Arc<Latch>,
+    }
+
+    impl Drop for ReleaseLegOnDrop {
+        fn drop(&mut self) {
+            self.gate.close_and_release();
+            self.release_first_read.set();
+        }
     }
 
     /// A pause routed while the leg is INSIDE its first read (it
@@ -1217,6 +1253,10 @@ mod gate_pause_timing_tests {
 
         let entered_first_read = Arc::new(Latch(Mutex::new(false), Condvar::new()));
         let release_first_read = Arc::new(Latch(Mutex::new(false), Condvar::new()));
+        let _release_on_drop = ReleaseLegOnDrop {
+            gate: gate.clone(),
+            release_first_read: release_first_read.clone(),
+        };
         let reads = Arc::new(AtomicU32::new(0));
 
         let leg = {
@@ -1245,8 +1285,13 @@ mod gate_pause_timing_tests {
         };
 
         // The leg is inside its first read: visit one already happened
-        // with nothing routed, so it must have recorded NOTHING.
-        entered_first_read.wait();
+        // with nothing routed, so it must have recorded NOTHING. The
+        // bounded wait is a watchdog for a premise that never arrived;
+        // the latch itself is the synchronization edge.
+        assert!(
+            entered_first_read.wait_for(Duration::from_secs(5)),
+            "the leg never entered its first read"
+        );
         assert!(
             !events
                 .lock()
@@ -1259,6 +1304,9 @@ mod gate_pause_timing_tests {
         // must come back to the gate and park there.
         gate.set_paused(true);
         release_first_read.set();
+        // Mutex-published gate events persist in the shared log, so this
+        // poll cannot miss an engagement; the sleep only throttles the
+        // re-check and the deadline is a fail-fast watchdog.
         let engaged = {
             let deadline = Instant::now() + Duration::from_secs(5);
             loop {
