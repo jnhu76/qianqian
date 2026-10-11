@@ -143,6 +143,27 @@ fn a_seek_release_landing_before_the_park_is_consumed_at_the_gate() {
     assert!(events2.snapshot().is_empty());
 }
 
+/// A failed premise must still COLLECT the leg before the assertion
+/// fails: RELEASE != JOIN — a handle dropped at the unwind is silently
+/// detached, and even a correctly released leg may still be executing
+/// as the test fails. Release first (a parked leg leaves through the
+/// park's bounded exit; a leg that never parked takes the pre-arrival
+/// consumption path), then bound the join attempt the same way the
+/// premises are bounded: a leg that has not finished within the bound
+/// is NAMED in the failure instead of being dropped quietly. The panic
+/// carries the collection evidence, so a red run distinguishes
+/// "premise unmet" from "leg stuck after release".
+fn fail_premise_releasing_leg(
+    gate: &RenderGate,
+    leg: std::thread::JoinHandle<(Arc<Mutex<Option<SeekParkRelease>>>, usize)>,
+    premise: &str,
+) -> ! {
+    gate.release_seek_hold(SeekParkRelease::Aborted);
+    let exited = wait_until(Duration::from_secs(5), || leg.is_finished());
+    let joined = if exited { leg.join().is_ok() } else { false };
+    panic!("premise failed: {premise}; leg collection: exited_within_5s={exited}, joined={joined}");
+}
+
 /// A full seek park: engagement, exactly-one quiescence, disengagement,
 /// in order, with ONLY Seek* events — a cut-attributed park can never
 /// fabricate pause evidence (D14.5 attribution separation).
@@ -166,13 +187,15 @@ fn a_seek_park_publishes_only_seek_events_in_order() {
     });
     let parked_ok = wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst));
     if !parked_ok {
-        // Release before asserting so a failed premise still unblocks the
-        // leg: with the hold cleared, its gate check takes the
-        // pre-arrival consumption path and returns without parking — a
-        // bounded exit, no detached parked thread.
-        gate.release_seek_hold(SeekParkRelease::Aborted);
+        // Release AND collect before failing the premise — no silently
+        // detached leg on the error paths the negative controls inject
+        // (see fail_premise_releasing_leg).
+        fail_premise_releasing_leg(
+            &gate,
+            leg,
+            "the leg never parked under the routed hold within 5s",
+        );
     }
-    assert!(parked_ok, "the leg must park under the routed hold");
     // Witness the quiescence publication, then release: the mutex-published
     // append-only event log cannot be missed by polling, only observed
     // late, so seeing `SeekTailQuiesced` here establishes the real causal
@@ -182,14 +205,13 @@ fn a_seek_park_publishes_only_seek_events_in_order() {
         events.snapshot().contains(&GateEvent::SeekTailQuiesced)
     });
     if !quiesced {
-        // Same release-before-assert discipline: a parked leg is woken by
-        // the release and leaves through the park's bounded exit.
-        gate.release_seek_hold(SeekParkRelease::Aborted);
+        // Same release-and-collect discipline for the publication premise.
+        fail_premise_releasing_leg(
+            &gate,
+            leg,
+            "the seek park never published its tail quiescence within 5s",
+        );
     }
-    assert!(
-        quiesced,
-        "the seek park never published its tail quiescence within 5s"
-    );
     // Diagnostic detection window for no-reprobe-after-quiescence — NOT a
     // correctness premise. Once quiescence is published, the guard stops
     // the probes, so a correct implementation's observation count is
