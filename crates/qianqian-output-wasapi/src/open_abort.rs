@@ -50,6 +50,16 @@ mod tests {
     use std::sync::{Condvar, Mutex};
     use std::time::Duration;
 
+    // Test-only panic path: a failed assertion must not strand the leg
+    // behind a gate that this test itself deliberately parked.
+    struct ReleaseGateOnDrop(RenderGate);
+
+    impl Drop for ReleaseGateOnDrop {
+        fn drop(&mut self) {
+            self.0.close_and_release();
+        }
+    }
+
     struct IdleInput;
 
     impl RenderPcmInput for IdleInput {
@@ -83,9 +93,14 @@ mod tests {
     fn aborting_a_parked_leg_releases_the_gate_before_the_join() {
         let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let recorder = events.clone();
+        let (engaged_tx, engaged_rx) = mpsc::channel();
         let gate = RenderGate::with_observer(move |event| {
             recorder.lock().expect("events lock").push(event);
+            if event == GateEvent::Engaged {
+                let _ = engaged_tx.send(());
+            }
         });
+        let _gate_release = ReleaseGateOnDrop(gate.clone());
 
         // Pre-activation pause: intent is routed before any leg exists.
         gate.set_paused(true);
@@ -100,23 +115,13 @@ mod tests {
                 });
             })
         };
-        let parked = {
-            let deadline = std::time::Instant::now() + Duration::from_secs(5);
-            loop {
-                if events
-                    .lock()
-                    .expect("events lock")
-                    .contains(&GateEvent::Engaged)
-                {
-                    break true;
-                }
-                if std::time::Instant::now() >= deadline {
-                    break false;
-                }
-                std::thread::sleep(Duration::from_millis(2));
-            }
-        };
-        assert!(parked, "the leg never reached the gate");
+        // An observer event is a causal witness, not a guessed scheduler delay.
+        // The deadline is only a fail-fast watchdog for a missing engagement.
+        assert_eq!(
+            engaged_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the leg never reached the gate"
+        );
 
         let input: Arc<dyn RenderPcmInput> = Arc::new(IdleInput);
         join_within(Duration::from_secs(5), move || {
@@ -168,6 +173,17 @@ mod tests {
         }
     }
 
+    // A failure before the normal abort/release path must not leave the
+    // intentionally held read waiting on the test's own Condvar forever.
+    struct ReleaseHeldInputOnDrop(Arc<HeldInput>);
+
+    impl Drop for ReleaseHeldInputOnDrop {
+        fn drop(&mut self) {
+            self.0.stop();
+            self.0.release();
+        }
+    }
+
     impl RenderPcmInput for HeldInput {
         fn read_frames(&self, dst: &mut [f32]) -> PcmPull {
             if self.first_call.swap(false, Ordering::AcqRel) {
@@ -205,9 +221,14 @@ mod tests {
     fn a_hostile_repause_after_the_close_cannot_repark_the_aborting_leg() {
         let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let recorder = events.clone();
+        let (engaged_tx, engaged_rx) = mpsc::channel();
         let gate = RenderGate::with_observer(move |event| {
             recorder.lock().expect("events lock").push(event);
+            if event == GateEvent::Engaged {
+                let _ = engaged_tx.send(());
+            }
         });
+        let _gate_release = ReleaseGateOnDrop(gate.clone());
 
         // The pause is routed BEFORE the leg exists — the module doc's
         // own pre-activation state ("pause intent may already sit at the
@@ -225,6 +246,7 @@ mod tests {
 
         let (stopped_tx, stopped_rx) = mpsc::channel();
         let held = Arc::new(HeldInput::new(stopped_tx));
+        let _held_release = ReleaseHeldInputOnDrop(held.clone());
         let input: Arc<dyn RenderPcmInput> = held.clone();
 
         // The steady loop's loop-top posture: the gate is checked before
@@ -247,23 +269,13 @@ mod tests {
             })
         };
 
-        let parked = {
-            let deadline = std::time::Instant::now() + Duration::from_secs(5);
-            loop {
-                if events
-                    .lock()
-                    .expect("events lock")
-                    .contains(&GateEvent::Engaged)
-                {
-                    break true;
-                }
-                if std::time::Instant::now() >= deadline {
-                    break false;
-                }
-                std::thread::sleep(Duration::from_millis(2));
-            }
-        };
-        assert!(parked, "the leg never reached the gate");
+        // An observer event is a causal witness, not a guessed scheduler delay.
+        // The deadline is only a fail-fast watchdog for a missing engagement.
+        assert_eq!(
+            engaged_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the leg never reached the gate"
+        );
 
         let (done_tx, done_rx) = mpsc::channel();
         {
