@@ -86,6 +86,41 @@ mod tests {
         assert_eq!(meter_zone(1.0), OVERLOAD);
     }
 
+    /// The composed styles as they land in a real buffer (the fresh
+    /// review's P2: the constants were pinned, the composition was
+    /// not): a title cell is ACCENT over BOLD — BOLD is the §20
+    /// monochrome carrier every panel title rides — and the frame is
+    /// CHROME. Dropping the modifier from `title()` or recoloring
+    /// `border()` fails here, at the source all nine call sites share.
+    #[test]
+    fn a_rendered_title_is_accent_over_bold_and_the_frame_is_chrome() {
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+        use ratatui::widgets::Block;
+
+        let mut terminal = Terminal::new(TestBackend::new(20, 6)).expect("virtual terminal");
+        terminal
+            .draw(|frame| {
+                let block = Block::bordered().title(title("T")).border_style(border());
+                frame.render_widget(block, frame.area());
+            })
+            .expect("draw");
+        let buffer = terminal.backend().buffer().clone();
+
+        // The default top-left title renders after the corner glyph.
+        let title_cell = buffer.cell((1, 0)).expect("the title cell");
+        assert_eq!(title_cell.symbol(), "T");
+        assert_eq!(title_cell.fg, ACCENT, "the title is accent");
+        assert!(
+            title_cell.modifier.contains(Modifier::BOLD),
+            "the title keeps its BOLD carrier"
+        );
+
+        let frame_cell = buffer.cell((0, 5)).expect("the frame cell");
+        assert_eq!(frame_cell.symbol(), "└");
+        assert_eq!(frame_cell.fg, CHROME, "the border is dim chrome");
+    }
+
     /// The palette stays inside the named ANSI 16 colors — the whole
     /// point is inheriting the host terminal's theme instead of
     /// hard-coding RGB that fights it.
