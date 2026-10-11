@@ -84,7 +84,7 @@ These are **examples of causal premises and observation oracles**, not a claim t
 
 ### 1. Pre-parked state before abort (#238): deterministic premise
 
-[Source: `open_abort.rs`, lines 205–315](https://github.com/jnhu76/qianqian/blob/39f53d4ce7319c2958efb140220b187b9a5d8741/crates/qianqian-output-wasapi/src/open_abort.rs#L205-L315)
+[Source: `open_abort.rs`, lines 205–321](https://github.com/jnhu76/qianqian/blob/39f53d4ce7319c2958efb140220b187b9a5d8741/crates/qianqian-output-wasapi/src/open_abort.rs#L205-L321)
 
 - **PROPERTY / AUTHORITY:** once abort closes the gate, hostile re-pause cannot re-park the leg and wedge the join. The pause/park predicate belongs to [ADR-PBK-002 §20 D14.7](../adr/ADR-PBK-002.md); the abort's close-before-stop and release-before-join ordering is exercised at the current output mechanism seam, not newly defined here.
 - **PRECONDITION:** first leg visit must park. `gate.set_paused(true)` is executed **before** `spawn`, so the first visit observes routed pause; the pre-abort `Engaged` witness checks it.
@@ -96,7 +96,7 @@ The old test spawned before routing pause. A legal scheduler path entered the de
 
 ### 2. Pause arriving mid-read (#238): control at the owner's gate seam
 
-[Source: `ports.rs`, lines 1211–1319](https://github.com/jnhu76/qianqian/blob/39f53d4ce7319c2958efb140220b187b9a5d8741/crates/qianqian-audio-api/src/ports.rs#L1211-L1319)
+[Source: `ports.rs`, lines 1211–1318](https://github.com/jnhu76/qianqian/blob/39f53d4ce7319c2958efb140220b187b9a5d8741/crates/qianqian-audio-api/src/ports.rs#L1211-L1318)
 
 - **PROPERTY / AUTHORITY:** a pause arriving after an unrouted loop-top visit parks the leg at its **next** visit, as governed by [ADR-PBK-002 §20 D14.7](../adr/ADR-PBK-002.md).
 - **PRECONDITION:** an entry latch proves the leg has entered the first read. That read remains held while `set_paused(true)` runs.
