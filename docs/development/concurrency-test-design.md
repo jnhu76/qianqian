@@ -120,7 +120,7 @@ This is a *different property at a different seam* from the abort test. Do not m
 
 - **PROPERTY / AUTHORITY:** [ADR-PBK-002 §17 D11](../adr/ADR-PBK-002.md) owns episode terminal Fact settlement; edge termination and worker/leg join are separate execution/teardown boundaries, not implied by the Fact. Before correction, sampling consumed frames immediately after `Failed` and comparing after a fixed sleep assumed failure publication instantly halted the data plane.
 - **LEGAL OUTCOMES / OBSERVATION:** PCM published before the `Failed` Fact may still be consumed while the edge has not terminated; after `runtime.dispose()` joins the legs, consumption is settled. The tests therefore take the final consumer witness **after dispose**. The destructive seek regression also uses the producer-side `post_failed_seek_reads()` witness.
-- **FALSIFIER:** `seek_seam.rs::negative_control_the_producer_freeze_oracle_rejects_a_resumed_read` is an **existing executed-in-source negative-control test** for a resumed producer read, unlike the hypothetical failure signatures in examples 1–2. This review and docs PR did **not** execute the test locally. The correction did **not** change the production protocol to make the former assertion true.
+- **FALSIFIER:** `seek_seam.rs::negative_control_the_producer_freeze_oracle_rejects_a_resumed_read` is an **existing executable negative-control test** for a resumed producer read, unlike the hypothetical failure signatures in examples 1–2. This review and docs PR did **not** execute the test locally. The correction did **not** change the production protocol to make the former assertion true.
 
 ## Reviewer checklist (new/changed timing-sensitive tests only)
 
