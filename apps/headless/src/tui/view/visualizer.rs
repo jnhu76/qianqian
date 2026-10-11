@@ -232,8 +232,10 @@ fn draw_waveform(frame: &mut Frame, snapshot: &ObservationSnapshot, inner: Rect)
         // The midline '·' is the silence baseline: the trace's bar span
         // always covers the midline, so the dot paints only where the
         // amplitude rounds to zero (the original always-overwrite made
-        // it dead paint).
-        if spread == 0.0 {
+        // it dead paint). The test is the integer cell height, not the
+        // float — a sub-cell spread would otherwise paint a one-cell
+        // bar exactly over the dot it was meant to keep.
+        if (spread as u16) == 0 {
             buffer[(x, mid)].set_char('·').set_fg(CHROME);
         } else {
             for y in top..=bottom {
@@ -490,6 +492,31 @@ mod tests {
         assert!(
             count_styled(&buffer, "█", Color::Cyan) > 0,
             "the trace is cyan"
+        );
+        assert!(
+            count_styled(&buffer, "·", Color::DarkGray) > 0,
+            "the silence baseline is dim chrome"
+        );
+    }
+
+    /// A sub-cell amplitude (spread in (0.0, 1.0) rounds to zero
+    /// cells) keeps the dim baseline dot — it must not paint a
+    /// one-cell cyan bar over the midline it was meant to keep.
+    #[test]
+    fn a_sub_cell_waveform_keeps_the_silence_baseline() {
+        let mut model = plain_model();
+        model.set_route(TuiRoute::Visualizer);
+        let mut wave = snapshot();
+        // Tiny but non-zero everywhere: every column's spread is a
+        // fraction of one cell at any panel height the test uses.
+        wave.waveform = [0.05; 64];
+        model.note_observation_snapshot(Some(wave));
+        model.set_visualizer_mode(VisualizerMode::Waveform);
+        let buffer = styled(&mut model, 100, 30);
+        assert_eq!(
+            count_styled(&buffer, "█", Color::Cyan),
+            0,
+            "a sub-cell amplitude paints no trace bar"
         );
         assert!(
             count_styled(&buffer, "·", Color::DarkGray) > 0,
