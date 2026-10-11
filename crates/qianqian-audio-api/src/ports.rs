@@ -1182,7 +1182,7 @@ mod gate_pause_timing_tests {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::mpsc;
     use std::sync::{Arc, Condvar, Mutex};
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use super::{GateEvent, GateSlice, RenderGate, TailProbeOutcome};
 
@@ -1201,10 +1201,32 @@ mod gate_pause_timing_tests {
                 guard = self.1.wait(guard).expect("latch wait");
             }
         }
+        /// Bounded wait: a fail-fast watchdog for a premise that never
+        /// arrived. The latch's set/notify — not this deadline — is the
+        /// synchronization edge.
+        fn wait_for(&self, limit: Duration) -> bool {
+            let mut guard = self.0.lock().expect("latch lock");
+            let deadline = Instant::now() + limit;
+            while !*guard {
+                let now = Instant::now();
+                if now >= deadline {
+                    return false;
+                }
+                let (next, _) = self
+                    .1
+                    .wait_timeout(guard, deadline - now)
+                    .expect("latch wait");
+                guard = next;
+            }
+            true
+        }
     }
 
-    // Test-only failure cleanup: always release the held read and
-    // clear any parked gate before the test scope unwinds on an assert.
+    // Test-only failure cleanup — a RELEASE guarantee, not a join
+    // guarantee: on any exit (including an assert unwind) the held read
+    // is released and the gate closed, so the spawned leg cannot stay
+    // blocked behind fixture state. This does not observe the leg's
+    // exit; liveness is asserted at the join boundary below.
     struct ReleaseLegOnDrop {
         gate: RenderGate,
         release_first_read: Arc<Latch>,
@@ -1225,15 +1247,11 @@ mod gate_pause_timing_tests {
     fn a_pause_routed_mid_read_parks_at_the_legs_next_loop_top() {
         let events = Arc::new(Mutex::new(Vec::new()));
         let recorder = events.clone();
-        let (engaged_tx, engaged_rx) = mpsc::channel();
         let gate = RenderGate::with_observer(move |event| {
             recorder.lock().expect("events lock").push(event);
-            if event == GateEvent::Engaged {
-                let _ = engaged_tx.send(());
-            }
         });
 
-        let (entered_tx, entered_rx) = mpsc::channel();
+        let entered_first_read = Arc::new(Latch(Mutex::new(false), Condvar::new()));
         let release_first_read = Arc::new(Latch(Mutex::new(false), Condvar::new()));
         let _release_on_drop = ReleaseLegOnDrop {
             gate: gate.clone(),
@@ -1243,6 +1261,7 @@ mod gate_pause_timing_tests {
 
         let leg = {
             let gate = gate.clone();
+            let entered = entered_first_read.clone();
             let release = release_first_read.clone();
             let reads = reads.clone();
             std::thread::spawn(move || {
@@ -1253,7 +1272,7 @@ mod gate_pause_timing_tests {
                     });
                     if reads.fetch_add(1, Ordering::AcqRel) == 0 {
                         // Inside the FIRST read, past an unrouted gate.
-                        let _ = entered_tx.send(());
+                        entered.set();
                         // The read is held until the test has routed the
                         // pause — the mid-read arrival this test exists for.
                         release.wait();
@@ -1266,10 +1285,11 @@ mod gate_pause_timing_tests {
         };
 
         // The leg is inside its first read: visit one already happened
-        // with nothing routed, so it must have recorded NOTHING.
-        assert_eq!(
-            entered_rx.recv_timeout(Duration::from_secs(5)),
-            Ok(()),
+        // with nothing routed, so it must have recorded NOTHING. The
+        // bounded wait is a watchdog for a premise that never arrived;
+        // the latch itself is the synchronization edge.
+        assert!(
+            entered_first_read.wait_for(Duration::from_secs(5)),
             "the leg never entered its first read"
         );
         assert!(
@@ -1284,11 +1304,27 @@ mod gate_pause_timing_tests {
         // must come back to the gate and park there.
         gate.set_paused(true);
         release_first_read.set();
-        // The observer publishes a causal witness of the next loop-top
-        // engagement; timeout merely detects a missing event.
-        assert_eq!(
-            engaged_rx.recv_timeout(Duration::from_secs(5)),
-            Ok(()),
+        // Mutex-published gate events persist in the shared log, so this
+        // poll cannot miss an engagement; the sleep only throttles the
+        // re-check and the deadline is a fail-fast watchdog.
+        let engaged = {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                if events
+                    .lock()
+                    .expect("events lock")
+                    .contains(&GateEvent::Engaged)
+                {
+                    break true;
+                }
+                if Instant::now() >= deadline {
+                    break false;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        };
+        assert!(
+            engaged,
             "a mid-read pause must park the leg at its next loop-top visit"
         );
 
