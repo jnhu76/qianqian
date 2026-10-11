@@ -50,8 +50,12 @@ mod tests {
     use std::sync::{Condvar, Mutex};
     use std::time::Duration;
 
-    // Test-only panic path: a failed assertion must not strand the leg
-    // behind a gate that this test itself deliberately parked.
+    // Test-only failure cleanup — a RELEASE guarantee, not a join
+    // guarantee: on any exit (including an assert unwind) the gate this
+    // test deliberately parked the leg behind is closed and released, so
+    // no test-owned leg stays blocked behind fixture state. Whether the
+    // leg has actually exited is observed separately, at the join
+    // boundary.
     struct ReleaseGateOnDrop(RenderGate);
 
     impl Drop for ReleaseGateOnDrop {
@@ -93,17 +97,14 @@ mod tests {
     fn aborting_a_parked_leg_releases_the_gate_before_the_join() {
         let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let recorder = events.clone();
-        let (engaged_tx, engaged_rx) = mpsc::channel();
         let gate = RenderGate::with_observer(move |event| {
             recorder.lock().expect("events lock").push(event);
-            if event == GateEvent::Engaged {
-                let _ = engaged_tx.send(());
-            }
         });
         let _gate_release = ReleaseGateOnDrop(gate.clone());
 
         // Pre-activation pause: intent is routed before any leg exists.
         gate.set_paused(true);
+        let (exit_tx, exit_rx) = mpsc::channel();
         let leg = {
             let gate = gate.clone();
             std::thread::spawn(move || {
@@ -113,20 +114,50 @@ mod tests {
                     GateSlice::TailProbe => TailProbeOutcome::Pending,
                     GateSlice::SeekRelease(_) => TailProbeOutcome::Pending,
                 });
+                // Normal-exit witness: sent ONLY past the expected
+                // post-park exit. abort_render_thread swallows a panicked
+                // leg (`let _ = handle.join()`), so join success alone
+                // cannot tell a normal exit from a panic; the post-join
+                // assert on this witness turns an abnormal exit into a
+                // test failure instead of a silent pass.
+                let _ = exit_tx.send(());
             })
         };
-        // An observer event is a causal witness, not a guessed scheduler delay.
-        // The deadline is only a fail-fast watchdog for a missing engagement.
-        assert_eq!(
-            engaged_rx.recv_timeout(Duration::from_secs(5)),
-            Ok(()),
-            "the leg never reached the gate"
-        );
+        // Mutex-published gate events persist in the shared log, so this
+        // poll cannot miss an engagement; the sleep only throttles the
+        // re-check and the deadline is a fail-fast watchdog.
+        let parked = {
+            let deadline = std::time::Instant::now() + Duration::from_secs(5);
+            loop {
+                if events
+                    .lock()
+                    .expect("events lock")
+                    .contains(&GateEvent::Engaged)
+                {
+                    break true;
+                }
+                if std::time::Instant::now() >= deadline {
+                    break false;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        };
+        assert!(parked, "the leg never reached the gate");
 
         let input: Arc<dyn RenderPcmInput> = Arc::new(IdleInput);
         join_within(Duration::from_secs(5), move || {
             abort_render_thread(leg, &input, &gate)
         });
+        // Settlement boundary: abort_render_thread has joined the leg, so
+        // its exit is final here — a missing witness now can only mean an
+        // abnormal (panicked) exit that the abort join swallowed.
+        assert_eq!(
+            exit_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the leg did not exit through its expected post-park path: the \
+             abort join swallows a panicked leg, so only this witness \
+             proves a normal exit"
+        );
     }
 
     /// The leg's first read HOLDS — until the abort's stop has been
@@ -173,8 +204,10 @@ mod tests {
         }
     }
 
-    // A failure before the normal abort/release path must not leave the
-    // intentionally held read waiting on the test's own Condvar forever.
+    // Test-only failure cleanup — a RELEASE guarantee, not a join
+    // guarantee: on any exit the intentionally held read is stopped and
+    // released so it cannot wait on this Condvar forever. The leg's
+    // exit is observed at the abort join, not here.
     struct ReleaseHeldInputOnDrop(Arc<HeldInput>);
 
     impl Drop for ReleaseHeldInputOnDrop {
@@ -221,12 +254,8 @@ mod tests {
     fn a_hostile_repause_after_the_close_cannot_repark_the_aborting_leg() {
         let events = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
         let recorder = events.clone();
-        let (engaged_tx, engaged_rx) = mpsc::channel();
         let gate = RenderGate::with_observer(move |event| {
             recorder.lock().expect("events lock").push(event);
-            if event == GateEvent::Engaged {
-                let _ = engaged_tx.send(());
-            }
         });
         let _gate_release = ReleaseGateOnDrop(gate.clone());
 
@@ -252,6 +281,7 @@ mod tests {
         // The steady loop's loop-top posture: the gate is checked before
         // EVERY read, so the leg re-visits it after any non-terminal
         // pull.
+        let (exit_tx, exit_rx) = mpsc::channel();
         let leg = {
             let gate = gate.clone();
             let input = input.clone();
@@ -266,16 +296,36 @@ mod tests {
                         break;
                     }
                 }
+                // Normal-exit witness: sent ONLY after the expected
+                // Stopped exit. abort_render_thread swallows a panicked
+                // leg (`let _ = handle.join()`), so join success alone
+                // cannot tell a normal exit from a panic; the post-join
+                // assert on this witness turns an abnormal exit into a
+                // test failure instead of a silent pass.
+                let _ = exit_tx.send(());
             })
         };
 
-        // An observer event is a causal witness, not a guessed scheduler delay.
-        // The deadline is only a fail-fast watchdog for a missing engagement.
-        assert_eq!(
-            engaged_rx.recv_timeout(Duration::from_secs(5)),
-            Ok(()),
-            "the leg never reached the gate"
-        );
+        // Mutex-published gate events persist in the shared log, so this
+        // poll cannot miss an engagement; the sleep only throttles the
+        // re-check and the deadline is a fail-fast watchdog.
+        let parked = {
+            let deadline = std::time::Instant::now() + Duration::from_secs(5);
+            loop {
+                if events
+                    .lock()
+                    .expect("events lock")
+                    .contains(&GateEvent::Engaged)
+                {
+                    break true;
+                }
+                if std::time::Instant::now() >= deadline {
+                    break false;
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        };
+        assert!(parked, "the leg never reached the gate");
 
         let (done_tx, done_rx) = mpsc::channel();
         {
@@ -309,6 +359,17 @@ mod tests {
             Ok(()),
             "the open-abort join wedged: a hostile re-pause after the close \
              re-parked the leg"
+        );
+
+        // Settlement boundary: abort_render_thread has joined the leg, so
+        // its exit is final here — a missing witness now can only mean an
+        // abnormal (panicked) exit that the abort join swallowed.
+        assert_eq!(
+            exit_rx.recv_timeout(Duration::from_secs(5)),
+            Ok(()),
+            "the leg did not exit through its expected Stopped path: the \
+             abort join swallows a panicked leg, so only this witness \
+             proves a normal exit"
         );
 
         // And the gate recorded exactly one engagement: it never
