@@ -164,22 +164,48 @@ fn a_seek_park_publishes_only_seek_events_in_order() {
         });
         (captured, observations)
     });
+    let parked_ok = wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst));
+    if !parked_ok {
+        // Release before asserting so a failed premise still unblocks the
+        // leg: with the hold cleared, its gate check takes the
+        // pre-arrival consumption path and returns without parking — a
+        // bounded exit, no detached parked thread.
+        gate.release_seek_hold(SeekParkRelease::Aborted);
+    }
+    assert!(parked_ok, "the leg must park under the routed hold");
+    // Witness the quiescence publication, then release: the mutex-published
+    // append-only event log cannot be missed by polling, only observed
+    // late, so seeing `SeekTailQuiesced` here establishes the real causal
+    // edge (probe #2 returned Quiesced → publish → observed → release) a
+    // fixed sleep cannot.
+    let quiesced = wait_until(Duration::from_secs(5), || {
+        events.snapshot().contains(&GateEvent::SeekTailQuiesced)
+    });
+    if !quiesced {
+        // Same release-before-assert discipline: a parked leg is woken by
+        // the release and leaves through the park's bounded exit.
+        gate.release_seek_hold(SeekParkRelease::Aborted);
+    }
     assert!(
-        wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)),
-        "the leg must park under the routed hold"
+        quiesced,
+        "the seek park never published its tail quiescence within 5s"
     );
-    // Give the park slices time to run twice (quiescence on #2), then
-    // more slices that must NOT re-publish quiescence.
-    std::thread::sleep(Duration::from_millis(60));
+    // Diagnostic detection window for no-reprobe-after-quiescence — NOT a
+    // correctness premise. Once quiescence is published, the guard stops
+    // the probes, so a correct implementation's observation count is
+    // already frozen here; this window only widens the exposure of an
+    // implementation that wrongly keeps probing. It cannot make a correct
+    // implementation red.
+    std::thread::sleep(Duration::from_millis(25));
     gate.release_seek_hold(SeekParkRelease::Aborted);
     let (captured, observations) = leg.join().expect("leg exits");
     assert_eq!(
         *captured.lock().expect("release lock"),
         Some(SeekParkRelease::Aborted)
     );
-    assert!(
-        (2..=4).contains(&observations),
-        "bounded-slice parking: {observations} observations"
+    assert_eq!(
+        observations, 2,
+        "quiescence on slice #2 stops the probes: {observations}"
     );
     assert_eq!(
         events.snapshot(),
