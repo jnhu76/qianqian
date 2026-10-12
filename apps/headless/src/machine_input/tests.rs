@@ -306,35 +306,57 @@ fn first_failure_storage_is_bounded_and_sealed_result_immutable() {
 
 #[test]
 fn seal_waits_for_admitted_report_ack_and_rejects_fresh_work() {
-    let input = HostInput::default();
-    let (entered, started) = mpsc::channel();
-    let (release, resume) = mpsc::channel();
-    let worker_input = input.clone();
-    let worker = std::thread::spawn(move || {
-        let handle = PlaybackSessionHandle::new();
-        assert!(worker_input.line("status", &handle, &mut |_, _| {
-            assert!(
-                worker_input.shared.state.try_lock().is_ok(),
-                "host lock across blocking output"
-            );
-            entered.send(()).unwrap();
-            resume.recv_timeout(Duration::from_secs(5)).unwrap();
-        }));
-    });
-    started.recv_timeout(Duration::from_secs(5)).unwrap();
-    let sealing_input = input.clone();
-    let (sealed, result) = mpsc::channel();
-    let sealer = std::thread::spawn(move || sealed.send(sealing_input.seal()).unwrap());
-    wait_closed(&input);
-    assert!(
-        matches!(result.try_recv(), Err(mpsc::TryRecvError::Empty)),
-        "seal overtook output acknowledgement"
-    );
-    assert!(!input.line("stop", &PlaybackSessionHandle::new(), &mut no_output));
-    release.send(()).unwrap();
-    assert_eq!(result.recv_timeout(Duration::from_secs(5)).unwrap(), None);
-    worker.join().unwrap();
-    sealer.join().unwrap();
+    for record_failure in [false, true] {
+        let input = HostInput::default();
+        let (entered, started) = mpsc::channel();
+        let (release, resume) = mpsc::channel();
+        let worker_input = input.clone();
+        let worker = std::thread::spawn(move || {
+            let handle = PlaybackSessionHandle::new();
+            let completed = worker_input.line("status", &handle, &mut |_, _| {
+                assert!(
+                    worker_input.shared.state.try_lock().is_ok(),
+                    "host lock across blocking output"
+                );
+                entered.send(()).unwrap();
+                resume.recv_timeout(Duration::from_secs(5)).unwrap();
+                if record_failure {
+                    // An admitted operation keeps its failure-record right
+                    // through admission closure; an output unwind is the
+                    // test-reachable way to record from inside the blocked
+                    // report (line's catcher owns it before Drop acks).
+                    std::panic::resume_unwind(Box::new("output panic"));
+                }
+            });
+            assert_eq!(completed, !record_failure);
+        });
+        started.recv_timeout(Duration::from_secs(5)).unwrap();
+        let sealing_input = input.clone();
+        let (sealed, result) = mpsc::channel();
+        let sealer = std::thread::spawn(move || sealed.send(sealing_input.seal()).unwrap());
+        // Premise: the sealer has executed `admission_closed = true` while
+        // the admitted report is still blocked. wait_closed takes the same
+        // bookkeeping mutex, so this observation is ordered after the
+        // sealer's whole pre-wait critical section — including, for a seal
+        // that skips the acknowledgement wait, its first_failure read.
+        wait_closed(&input);
+        // Fresh work must not overtake the drain while seal is in flight.
+        assert!(!input.line("stop", &PlaybackSessionHandle::new(), &mut no_output));
+        release.send(()).unwrap();
+        // The wait witness is seal's VALUE, not a negative channel sample:
+        // a seal linearizing its first_failure read before the acknowledgement
+        // misses this post-release record and returns None, while a correct
+        // seal reads after the Drop acknowledgement. Blocking recv cannot
+        // miss a preempted sealer — it only delays it.
+        let expected = record_failure.then_some(HostFailure::Panic);
+        assert_eq!(
+            result.recv_timeout(Duration::from_secs(5)).unwrap(),
+            expected,
+            "seal returned before the admitted acknowledgement"
+        );
+        worker.join().unwrap();
+        sealer.join().unwrap();
+    }
 }
 
 #[test]
