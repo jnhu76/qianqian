@@ -1371,7 +1371,8 @@ fn resolve(state: &CompletionState) -> Option<SessionOutcome> {
 pub(crate) mod test_sync {
     use super::SessionCompletion;
     use crate::edge::EdgeTerminal;
-    use std::sync::{Arc, Barrier, Mutex, OnceLock};
+    use std::sync::{Arc, Mutex, OnceLock, mpsc};
+    use std::time::Duration;
 
     /// The parked request's admission read-out: exactly the fields the
     /// second hold's guard evaluates, sampled under the completion lock
@@ -1391,8 +1392,8 @@ pub(crate) mod test_sync {
     struct Armed {
         id: u64,
         target: usize,
-        arrived: Arc<Barrier>,
-        released: Arc<Barrier>,
+        parked: mpsc::Sender<()>,
+        release: Arc<Mutex<mpsc::Receiver<()>>>,
     }
 
     #[derive(Default)]
@@ -1406,26 +1407,32 @@ pub(crate) mod test_sync {
         REGISTRY.get_or_init(|| Mutex::new(Registry::default()))
     }
 
-    /// One armed fence. The request and the test rendezvous on its
-    /// barriers; dropping the handle disarms the fence even on panic
-    /// unwind, so a failing assertion cannot poison a parallel test.
+    /// One armed fence. `wait_parked` observes the request's arrival at
+    /// the recorded suspension point; `release` lets it continue.
+    /// Dropping the handle disarms the fence AND releases: a parked
+    /// request's receive then reports disconnection, which it treats as
+    /// release, so a failing assertion cannot leave a thread parked
+    /// behind it or poison a parallel test.
     pub(crate) struct Fence {
         id: u64,
-        arrived: Arc<Barrier>,
-        released: Arc<Barrier>,
+        parked: mpsc::Receiver<()>,
+        release: mpsc::Sender<()>,
     }
 
     impl Fence {
         /// Block until the fenced request has sampled the edge terminal
-        /// Open and parked. Returns only with the request visibly at the
-        /// fence, before the second hold.
+        /// Open and parked at the fence, before the second hold. The
+        /// rendezvous is the request's own send; the deadline is only a
+        /// failure watchdog, never the ordering edge.
         pub(crate) fn wait_parked(&self) {
-            self.arrived.wait();
+            self.parked
+                .recv_timeout(Duration::from_secs(5))
+                .expect("the fenced request never reached the fence");
         }
 
         /// Release the parked request into the second hold.
         pub(crate) fn release(self) {
-            self.released.wait();
+            let _ = self.release.send(());
         }
     }
 
@@ -1442,8 +1449,8 @@ pub(crate) mod test_sync {
     /// Arm the fence for exactly this completion's next `request_seek`
     /// that gets past its Open sample. Other completions pass through.
     pub(crate) fn arm(completion: &SessionCompletion) -> Fence {
-        let arrived = Arc::new(Barrier::new(2));
-        let released = Arc::new(Barrier::new(2));
+        let (parked_tx, parked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
         let target = Arc::as_ptr(&completion.state) as usize;
         let mut registry = registry().lock().expect("fence registry lock");
         assert!(
@@ -1455,31 +1462,34 @@ pub(crate) mod test_sync {
         registry.armed.push(Armed {
             id,
             target,
-            arrived: arrived.clone(),
-            released: released.clone(),
+            parked: parked_tx,
+            release: Arc::new(Mutex::new(release_rx)),
         });
         Fence {
             id,
-            arrived,
-            released,
+            parked: parked_rx,
+            release: release_tx,
         }
     }
 
     /// The recorded suspension point. Inert unless a fence is armed for
     /// this exact completion, and never called with any lock held: the
     /// publications that must land inside the window have to be able to
-    /// run while the request parks here.
+    /// run while the request parks here. The arrival send cannot block
+    /// the request; the release receive ends on an explicit release or
+    /// on the arming test dropping its handle (unwinding included).
     pub(super) fn pause_between_open_sample_and_second_hold(completion: &SessionCompletion) {
-        let (arrived, released) = {
+        let (parked, release) = {
             let registry = registry().lock().expect("fence registry lock");
             let target = Arc::as_ptr(&completion.state) as usize;
             match registry.armed.iter().find(|armed| armed.target == target) {
-                Some(armed) => (armed.arrived.clone(), armed.released.clone()),
+                Some(armed) => (armed.parked.clone(), armed.release.clone()),
                 None => return,
             }
         };
-        arrived.wait();
-        released.wait();
+        let _ = parked.send(());
+        let release_rx = release.lock().expect("fence release lock");
+        let _ = release_rx.recv();
     }
 
     /// Read the second-hold admission state, exactly as its guard will
