@@ -217,7 +217,11 @@ impl VerifyingSink {
                         expected,
                         actual: f32::NAN,
                     })?;
-                if (actual - expected).abs() > 1e-6 {
+                // This fixture's reference is finite. NaN comparisons are
+                // unordered, so a rejection-only `error > epsilon` silently
+                // accepts corruption. This is a test oracle, not a DSP policy.
+                if !actual.is_finite() || !expected.is_finite() || (actual - expected).abs() > 1e-6
+                {
                     return Err(TransferError::SampleMismatch {
                         frame: self.next_frame + frame,
                         channel,

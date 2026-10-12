@@ -55,6 +55,37 @@ fn stereo() -> PcmFormat {
     PcmFormat::new(48_000, 2).expect("stereo is a valid format")
 }
 
+/// Oracle calibration for the finite identity reference: use real checked
+/// PCM views and the sink's consume path, including both stereo channels.
+#[test]
+fn finite_reference_rejects_nonfinite_and_out_of_tolerance_samples() {
+    use participants::PcmSink;
+    for channel in 0..2 {
+        for actual in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, 2e-6] {
+            let mut storage = [
+                harness::deterministic_sample(0, 0),
+                harness::deterministic_sample(0, 1),
+            ];
+            storage[channel] = actual;
+            let block = harness::PcmView::new(stereo(), &storage).unwrap();
+            let error = VerifyingSink::new(stereo()).consume(&block).unwrap_err();
+            assert!(
+                matches!(error, TransferError::SampleMismatch { channel: c, .. } if c == channel)
+            );
+        }
+    }
+    // Positive boundary: legitimate small error, exact samples and signed
+    // zero stay accepted. No extra allocation is added to the hot oracle.
+    for delta in [0.0, -0.0, 0.5e-6, -0.5e-6] {
+        let storage = [
+            harness::deterministic_sample(0, 0) + delta,
+            harness::deterministic_sample(0, 1),
+        ];
+        let block = harness::PcmView::new(stereo(), &storage).unwrap();
+        VerifyingSink::new(stereo()).consume(&block).unwrap();
+    }
+}
+
 /// Composes the honest identity flow: deterministic source, identity stage,
 /// verifying sink, all bound through the real kernel.
 fn identity_fixture_with_block(block_frames: usize) -> CompositionFixture {
