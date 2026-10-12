@@ -164,6 +164,36 @@ fn fail_premise_releasing_leg<T>(
     panic!("premise failed: {premise}; leg collection: exited_within_5s={exited}, joined={joined}");
 }
 
+/// The pause-parked twin of [`fail_premise_releasing_leg`]: a leg
+/// parked under pause intent consumes a seek release MID-PARK and
+/// KEEPS PARKING — its only exit is the pause release — so release the
+/// seek payload AND the pause, then collect with the same bounded
+/// discipline before the premise panic.
+fn fail_premise_releasing_pause_leg<T>(
+    gate: &RenderGate,
+    leg: std::thread::JoinHandle<T>,
+    premise: &str,
+) -> ! {
+    gate.release_seek_hold(SeekParkRelease::Aborted);
+    gate.set_paused(false);
+    let exited = wait_until(Duration::from_secs(5), || leg.is_finished());
+    let joined = if exited { leg.join().is_ok() } else { false };
+    panic!("premise failed: {premise}; leg collection: exited_within_5s={exited}, joined={joined}");
+}
+
+/// Join a RELEASED leg with a bounded exit witness: release != join —
+/// even a correctly released leg may still be executing, and a leg
+/// that has not finished within the bound is NAMED in the failure
+/// instead of hanging the suite forever. Every caller releases the
+/// leg's park before this call.
+fn join_released_leg<T>(leg: std::thread::JoinHandle<T>, what: &str) -> T {
+    let exited = wait_until(Duration::from_secs(5), || leg.is_finished());
+    if !exited {
+        panic!("released leg never exited within 5s: {what}");
+    }
+    leg.join().expect("released leg joins cleanly after exit")
+}
+
 /// A full seek park: engagement, exactly-one quiescence, disengagement,
 /// in order, with ONLY Seek* events — a cut-attributed park can never
 /// fabricate pause evidence (D14.5 attribution separation).
@@ -220,7 +250,8 @@ fn a_seek_park_publishes_only_seek_events_in_order() {
     // implementation red.
     std::thread::sleep(Duration::from_millis(25));
     gate.release_seek_hold(SeekParkRelease::Aborted);
-    let (captured, observations) = leg.join().expect("leg exits");
+    let (captured, observations) =
+        join_released_leg(leg, "the seek-park leg after its abort release");
     assert_eq!(
         *captured.lock().expect("release lock"),
         Some(SeekParkRelease::Aborted)
@@ -258,11 +289,13 @@ fn a_committed_release_reaches_the_parked_leg_exactly_once() {
             true
         })
     });
-    assert!(wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)));
+    if !wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)) {
+        fail_premise_releasing_leg(&gate, leg, "the leg never parked under the routed hold");
+    }
     gate.release_seek_hold(SeekParkRelease::Committed {
         landing: Some(44_100),
     });
-    let captured = leg.join().expect("leg exits");
+    let captured = join_released_leg(leg, "the parked leg after its committed release");
     assert_eq!(
         *captured.lock().expect("release lock"),
         Some(SeekParkRelease::Committed {
@@ -314,23 +347,32 @@ fn a_committed_release_rebases_a_pause_parked_leg_while_still_parked() {
         });
         captured
     });
-    assert!(wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)));
-    assert!(
-        wait_until(Duration::from_secs(5), || events
-            .snapshot()
-            .contains(&GateEvent::TailQuiesced)),
-        "precondition: the pause engagement published its quiescence"
-    );
+    if !wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)) {
+        fail_premise_releasing_pause_leg(&gate, leg, "the leg never parked under the pause");
+    }
+    if !wait_until(Duration::from_secs(5), || {
+        events.snapshot().contains(&GateEvent::TailQuiesced)
+    }) {
+        fail_premise_releasing_pause_leg(
+            &gate,
+            leg,
+            "the pause engagement never published its quiescence",
+        );
+    }
 
     // The cutover commits while the leg is pause-parked. The payload
     // must reach the leg MID-PARK: the leg consumes it and KEEPS
     // PARKING.
     gate.release_seek_hold(SeekParkRelease::Committed { landing: Some(5) });
-    assert!(
-        wait_until(Duration::from_secs(5), || rebased_while_parked
-            .load(Ordering::SeqCst)),
-        "the committed rebase never reached the parked leg"
-    );
+    if !wait_until(Duration::from_secs(5), || rebased_while_parked
+        .load(Ordering::SeqCst))
+    {
+        fail_premise_releasing_pause_leg(
+            &gate,
+            leg,
+            "the committed rebase never reached the parked leg",
+        );
+    }
     // Still parked at that instant: no Disengaged may exist yet, and no
     // second engagement either — the leg never left the pause park.
     let mid_park = events.snapshot();
@@ -348,7 +390,7 @@ fn a_committed_release_rebases_a_pause_parked_leg_while_still_parked() {
     // ...and only then the pause itself resumes; the leg exits with
     // nothing further to consume.
     gate.set_paused(false);
-    let captured = leg.join().expect("leg exits");
+    let captured = join_released_leg(leg, "the pause-parked leg after its resume");
     assert_eq!(
         *captured.lock().expect("release lock"),
         Some(SeekParkRelease::Committed { landing: Some(5) }),
@@ -400,9 +442,11 @@ fn a_new_hold_drops_a_stale_unconsumed_release() {
             true
         })
     });
-    assert!(wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)));
+    if !wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)) {
+        fail_premise_releasing_leg(&gate, leg, "the leg never parked under cycle 2's hold");
+    }
     gate.release_seek_hold(SeekParkRelease::Aborted);
-    let captured = leg.join().expect("leg exits");
+    let captured = join_released_leg(leg, "the cycle-2 leg after its abort release");
     assert_eq!(
         *captured.lock().expect("release lock"),
         Some(SeekParkRelease::Aborted),
@@ -440,9 +484,11 @@ fn a_closed_gate_never_seek_parks_again() {
             false // never quiesce: the close, not quiescence, must end the park
         })
     });
-    assert!(wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)));
+    if !wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)) {
+        fail_premise_releasing_leg(&gate2, leg, "the leg never parked under the routed hold");
+    }
     gate2.close_and_release();
-    let captured = leg.join().expect("leg exits");
+    let captured = join_released_leg(leg, "the parked leg after the close");
     assert_eq!(
         *captured.lock().expect("release lock"),
         Some(SeekParkRelease::Aborted)
@@ -473,11 +519,13 @@ fn the_seek_park_calls_the_tail_observation_only_while_parked() {
             true
         })
     });
-    assert!(wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)));
+    if !wait_until(Duration::from_secs(5), || parked.load(Ordering::SeqCst)) {
+        fail_premise_releasing_leg(&gate, leg, "the leg never parked under the routed hold");
+    }
     let before = calls.load(Ordering::SeqCst);
     assert!(before >= 1, "at least the first slice's observation ran");
     gate.release_seek_hold(SeekParkRelease::Aborted);
-    let _captured = leg.join().expect("leg exits");
+    let _captured = join_released_leg(leg, "the parked leg after its abort release");
     let after = calls.load(Ordering::SeqCst);
     assert!(
         after <= before + 1,
