@@ -2751,35 +2751,43 @@ pub(crate) mod tests {
     #[test]
     #[cfg(not(loom))]
     fn s0_a_paused_episodes_quiesced_park_commits_the_cut() {
-        let completion = SessionCompletion::new();
-        completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
-        let core = completion.state.clone();
+        // The body drives the real park_loop_top through consume_release
+        // (its tail probe is always-Pending), so a regression that keeps
+        // the pause routed would park it FOREVER — this module has no
+        // other watchdog. The shared within(10s) bounds FAILURE
+        // reporting only: it is not a correctness oracle, and the
+        // semantic oracles below are untouched.
+        crate::test_common::within(Duration::from_secs(10), || {
+            let completion = SessionCompletion::new();
+            completion.bind_stop_target(Arc::new(PcmEdge::new(2, 8192)));
+            let core = completion.state.clone();
 
-        completion.request_pause();
-        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
-        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
-        completion.request_seek(Duration::from_secs(1));
-        assert!(
-            completion.leg_parked_evidence(),
-            "the pause park grounds the precondition instantly (leg already parked)"
-        );
-        completion.seek_landing_published(Some(7));
-        assert_eq!(
-            completion.seek_cutover_decision(Some(7)),
-            CutoverDecision::Committed,
-            "the paused episode's seek cuts on the pause-attributed park pair"
-        );
-        // Release the pause intent FIRST: a consume_release while the
-        // pause is still routed would legitimately park forever (the
-        // D14.7 park waits for a release only a resume routes, and this
-        // probe's tail probe never quiesces).
-        completion.request_resume();
-        publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
-        // The committed release is consumed by the leg; no routed debris.
-        assert_eq!(
-            consume_release(&completion.render_gate()),
-            Some(SeekParkRelease::Committed { landing: Some(7) }),
-        );
-        assert_eq!(consume_release(&completion.render_gate()), None);
+            completion.request_pause();
+            publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Engaged));
+            publish_evidence(&core, |s| apply_gate_event(s, GateEvent::TailQuiesced));
+            completion.request_seek(Duration::from_secs(1));
+            assert!(
+                completion.leg_parked_evidence(),
+                "the pause park grounds the precondition instantly (leg already parked)"
+            );
+            completion.seek_landing_published(Some(7));
+            assert_eq!(
+                completion.seek_cutover_decision(Some(7)),
+                CutoverDecision::Committed,
+                "the paused episode's seek cuts on the pause-attributed park pair"
+            );
+            // Release the pause intent FIRST: a consume_release while the
+            // pause is still routed would legitimately park forever (the
+            // D14.7 park waits for a release only a resume routes, and this
+            // probe's tail probe never quiesces).
+            completion.request_resume();
+            publish_evidence(&core, |s| apply_gate_event(s, GateEvent::Disengaged));
+            // The committed release is consumed by the leg; no routed debris.
+            assert_eq!(
+                consume_release(&completion.render_gate()),
+                Some(SeekParkRelease::Committed { landing: Some(7) }),
+            );
+            assert_eq!(consume_release(&completion.render_gate()), None);
+        });
     }
 }
