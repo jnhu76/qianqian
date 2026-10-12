@@ -126,7 +126,7 @@ impl DestructorGate {
 
     /// Called by the test: release a blocked destructor.
     pub fn release(&self) {
-        let mut state = self.state.lock().expect("destructor gate lock");
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         state.release = true;
         self.changed.notify_all();
     }
@@ -157,17 +157,58 @@ impl Drop for DestructorGate {
 #[derive(Debug)]
 pub struct GateReleaseGuard {
     gate: Arc<DestructorGate>,
+    threads: Vec<std::thread::JoinHandle<()>>,
+    pub joined: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl GateReleaseGuard {
     pub fn new(gate: Arc<DestructorGate>) -> Self {
-        Self { gate }
+        Self {
+            gate,
+            threads: Vec::new(),
+            joined: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        }
+    }
+
+    pub fn track(&mut self, thread: std::thread::JoinHandle<()>) {
+        self.threads.push(thread);
+    }
+
+    fn collect(&mut self) -> bool {
+        self.gate.release();
+        let mut clean = true;
+        for thread in self.threads.drain(..) {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            while !thread.is_finished() && std::time::Instant::now() < deadline {
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+            let exited = thread.is_finished();
+            let joined = if exited {
+                let result = thread.join();
+                self.joined.fetch_add(1, Ordering::SeqCst);
+                result.is_ok()
+            } else {
+                false
+            };
+            clean &= joined;
+            eprintln!("destructor cleanup: exited_within_10s={exited}, joined={joined}");
+        }
+        clean
+    }
+
+    pub fn finish(mut self) {
+        assert!(
+            self.collect(),
+            "destructor/probe cleanup did not join cleanly"
+        );
     }
 }
 
 impl Drop for GateReleaseGuard {
     fn drop(&mut self) {
-        self.gate.release();
+        // Never mask the original assertion with a second unwind. A stuck
+        // thread is reported, not advertised as joined or forcibly killed.
+        self.collect();
     }
 }
 
